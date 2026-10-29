@@ -1582,8 +1582,8 @@
 ;; a*_x on ab_y_x gave _y (#520)
 (define adjust-by (widget 'adjust-by))
 
-(define (replaced by what match . hit)
-  (tm->stree (apply adjust-by (cons* by what match hit))))
+(define (replaced by what match)
+  (tm->stree (adjust-by by what match)))
 
 (define (check-replaced by what match expected)
   ;; match is a hit of what in Replace mode, and its replacement by by
@@ -1741,6 +1741,21 @@
 
 (define test-search-filter '(attr))
 (define test-source-mode? #f)
+
+(define (with-test-filter filter thunk)
+  ;; thunk with the filter of the search set in the buffers of the tests
+  (with old test-search-filter
+    (dynamic-wind
+      (lambda () (set! test-search-filter filter))
+      thunk
+      (lambda () (set! test-search-filter old)))))
+
+(define (with-test-source-mode thunk)
+  ;; thunk with the buffers of the tests in source mode
+  (dynamic-wind
+    (lambda () (set! test-source-mode? #t))
+    thunk
+    (lambda () (set! test-source-mode? #f))))
 
 (define (replace-all-in-buffer doc what by)
   ;; the real Replace All of the widget (perform-search*, replace-all) in a
@@ -2386,18 +2401,39 @@
               (loop (+ i 1) (if (null? p) bad (cons (list c p) bad)))))))))
 
 ;; An empty match: Replace goes on after its replacement, and the next match
-;; starts at least one character later (as a substitution of regular
-;; expressions does); the replacement was found again and again, until a
-;; cap on the number of steps
+;; starts at least one character or tag later; after a match, no empty match
+;; where it ends (as sed and vim do: a lone wildcard as (concat w), the hits
+;; of the search). The replacement was found again and again, until a cap on
+;; the number of steps; a lone wildcard was also replaced by the empty match
+;; after it
 (define (test-replace-empty-matches)
   (check-group "replace empty matches")
   (with-search-mode 'replace
     (lambda ()
       (check-replace-rows
-        '(((document "ab ab") (wildcard "w") "X" (document "XX"))
-          ((document "ab") (select-region "") "X" (document "XX"))
+        '(((document "ab ab") (wildcard "w") "X" (document "X"))
+          ((document "ab ab") (concat (wildcard "w")) "X" (document "X"))
+          ((document "ab ab") (wildcard "w") (concat "<" (wildcard "w") ">")
+           (document "<ab ab>"))
+          ((document "ab ab") (concat (wildcard "w"))
+           (concat "<" (wildcard "w") ">") (document "<ab ab>"))
+          ((document "ab") (select-region "") "X" (document "X"))
           ((document "aab") (concat (select-region (wildcard "w")) "a") "X"
-           (document "XaXab")))))))
+           (document "XaXab"))
+          ((document (concat (with "color" "red" "") (label "1") "a"))
+           (concat (select-region (wildcard "w")) "a") "X"
+           (document "Xa"))))
+      ;; after an empty match, a tag counts as a token, also without text:
+      ;; the hits after rules or empty labels were left out
+      (with from (lambda (doc what)
+                   (tree-search-from (stree->tree doc) (stree->tree what)
+                                     '() '(0 0 0) 1 #t))
+        (check= (from '(document (concat (hrule) (hrule) (hrule) "a")) "a")
+                '((0 3 0) (0 3 1)))
+        (check= (from '(document (concat (label "") (label "") (label "")
+                                         (label "")))
+                      '(label (wildcard "v")))
+                '((0 1 0) (0 1 1)))))))
 
 ;; The wildcards of a region pattern take their values in the region, as its
 ;; content; the values were looked for by the literal parts around the
@@ -2429,31 +2465,75 @@
                (concat "<" (wildcard "w") ">")
                (document "A<y>B a<Y>b")))))))))
 
+;; Replace one and Replace All are one step of undo, also when a step fails:
+;; the document is as before, and the error goes on. The document kept the
+;; partial edit (at the failing step, the match was removed and nothing
+;; inserted), out of the history of undo
+(define (replace-with-failure doc what by n all?)
+  ;; Replace All (if all?) or Replace one in a buffer holding doc, with the
+  ;; insertion failing at the n-th replacement: whether it failed, the body
+  ;; afterwards, and the steps of undo
+  (with-search-buffers doc what by
+    (lambda (u)
+      (ahash-set! (widget 'search-filter-table)
+                  (current-buffer) (stree->tree '(attr)))
+      (clear-undo-history)
+      ((widget 'perform-search*))
+      (let* ((old insert-go-to)
+             (k 0)
+             (failing (lambda (t p)
+                        (set! k (+ k 1))
+                        (if (= k n) (error "injected failure") (old t p))))
+             (r (dynamic-wind
+                  (lambda () (set! insert-go-to failing))
+                  (lambda ()
+                    (catch #t
+                      (lambda () (if all? (replace-all) (replace-one)) 'done)
+                      (lambda args 'failed)))
+                  (lambda () (set! insert-go-to old)))))
+        (list r (tm->stree (buffer-get-body u)) (undo-possibilities))))))
+
+(define (test-replace-failures)
+  (check-group "replace failures")
+  (with-search-mode 'replace
+    (lambda ()
+      (let* ((doc '(document "a1x a2x a3x"))
+             (what '(concat "a" (wildcard "w") "x"))
+             (by '(concat "[" (wildcard "w") "]")))
+        (for (n '(1 2 3))
+          (check= (replace-with-failure doc what by n #t)
+                  (list 'failed doc 0)))
+        (check= (replace-with-failure doc what by 1 #f) (list 'failed doc 0))
+        ;; (without a failure)
+        (check= (replace-with-failure doc what by 4 #t)
+                '(done (document "[1] [2] [3]") 1))))))
+
 (define (test-replace-filters)
   (check-group "replace with a filter")
   ;; Replace goes on after the hits which the filter of the search rejects
   ;; (a paragraph of them stopped it)
   (with-search-mode 'replace
     (lambda ()
-      (set! test-search-filter '(attr "mode" "math"))
-      (check-replace-rows
-        '(((document (math "a") "a" (math "a")) "a" "Z"
-           (document (math "Z") "a" (math "Z")))))
-      (set! test-search-filter '(attr "mode" "text" "language" "french"))
-      (check-replace-rows
-        '(((document (with "language" "french" "a") "a"
-                     (with "language" "french" "a"))
-           "a" "Z"
-           (document (with "language" "french" "Z") "a"
-                     (with "language" "french" "Z")))))
-      (set! test-search-filter '(attr))
+      (with-test-filter '(attr "mode" "math")
+        (lambda ()
+          (check-replace-rows
+            '(((document (math "a") "a" (math "a")) "a" "Z"
+               (document (math "Z") "a" (math "Z")))))))
+      (with-test-filter '(attr "mode" "text" "language" "french")
+        (lambda ()
+          (check-replace-rows
+            '(((document (with "language" "french" "a") "a"
+                         (with "language" "french" "a"))
+               "a" "Z"
+               (document (with "language" "french" "Z") "a"
+                         (with "language" "french" "Z")))))))
       ;; in a source document, also the hidden content, as the search
       ;; (which shows it)
-      (set! test-source-mode? #t)
-      (check= (car (replace-all-in-buffer '(document (folded "q" "ab ab"))
-                                          "ab" "Z"))
-              '(document (unfolded "q" "Z Z")))
-      (set! test-source-mode? #f)
+      (with-test-source-mode
+        (lambda ()
+          (check= (car (replace-all-in-buffer '(document (folded "q" "ab ab"))
+                                              "ab" "Z"))
+                  '(document (unfolded "q" "Z Z")))))
       ;; a hit which is not a match is left with a message (an error, after
       ;; which the editing did not end), and Replace goes on
       (begin
@@ -2513,6 +2593,7 @@
   (test-replace-wildcards)
   (test-replace-in-buffers)
   (test-replace-filters)
+  (test-replace-failures)
   (test-replace-empty-matches)
   (test-replace-region-wildcards)
   (test-replace-random)

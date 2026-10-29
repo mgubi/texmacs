@@ -420,11 +420,14 @@
                             (append-map wildcard-names (tm-children t))))
         (else (list))))
 
-(define (adjust-by by what match . runs)
+(define (adjust-by by what match)
+  (adjust-by* by what match (list)))
+
+(define (adjust-by* by what match runs)
   ;; the replacement of match, a match of what, by by: its wildcards take
-  ;; the values of those of what (runs: the value of each child of a
-  ;; formula pattern, aligned with the match). #f if the values of the
-  ;; wildcards of what which by takes are not known: inserting the
+  ;; the values of those of what (runs, if not empty: the value of each
+  ;; child of a formula pattern, aligned with the match). #f if the values
+  ;; of the wildcards of what which by takes are not known: inserting the
   ;; (wildcard ...) tags, or nothing in their place, would lose the text
   ;; which they took (#520)
   (let* ((swhat (and (tm-atomic? what) (tm->string what)))
@@ -447,10 +450,8 @@
                  ((== (upcase-first swhat) smatch) (upcase-first sby))
                  (else sby)))
           (else
-            (let* ((wc (if (and (tm-func? what 'concat) (nnull? runs)
-                                (nnull? (car runs)))
-                           (append-map get-wildcards (tm-children what)
-                                       (car runs))
+            (let* ((wc (if (and (tm-func? what 'concat) (nnull? runs))
+                           (append-map get-wildcards (tm-children what) runs)
                            (get-wildcards what match)))
                    (need (list-intersection (wildcard-names by)
                                             (wildcard-names what))))
@@ -466,23 +467,26 @@
 ;; the next hit of the document. Replace All is this, again and again, in
 ;; one step of undo (#520)
 
-(define replace-last #f)
+(define replace-last #f)    ;; the state where Replace goes on, and whether
+                            ;; its last match was empty
 (define replace-trace #f)   ;; for the tests, if a list: the document and the
                             ;; range of each replacement (all of the
                             ;; document at each step: only for small ones)
 (define replace-skip-message #f)
-(define replace-after-empty #f) ;; the cursor after an empty match
 
 (define (replace-state cur)
   ;; the place where Replace goes on, with the buffer and the pattern
   (list (url->string (current-buffer)) (tm->stree (search-tree)) cur))
 
-(define (replace-from cur)
+(define (replace-from cur empty?)
   ;; Replace goes on from cur, after its last replacement (or a hit which it
-  ;; left), as long as the buffer, the pattern and the reference are the
-  ;; same
-  (set! replace-last (replace-state cur))
+  ;; left; empty? if its match was empty), as long as the buffer, the
+  ;; pattern and the reference are the same
+  (set! replace-last (list (replace-state cur) empty?))
   (set-search-reference cur))
+
+(define (replace-continues? cur)
+  (and replace-last (== (car replace-last) (replace-state cur))))
 
 (define (pairs l)
   (if (or (null? l) (null? (cdr l))) (list)
@@ -496,16 +500,17 @@
   (let* ((t (buffer-tree))
          (p (tree->path t)))
     (and (list-starts? cur p)
-         (let loop ((from cur))
-           ;; (after an empty match, the next one starts at least one
-           ;; character later: Replace, which goes on after its
-           ;; replacement, ends)
-           (let* ((empty? (== from replace-after-empty))
-                  (l (with-search-access-mode
+         ;; (after an empty match, the next one starts at least one token
+         ;; later: Replace, which goes on after its replacement, ends)
+         (let loop ((from cur)
+                    (empty? (and (replace-continues? cur) (cadr replace-last))))
+           (let* ((l (with-search-access-mode
                        (lambda () (tree-search-from t what p from 1 empty?))))
                   (f (pairs (filter-search-results l))))
              (cond ((nnull? f) (car f))
-                   ((and (nnull? l) (path-less? from (cAr l))) (loop (cAr l)))
+                   ((null? l) #f)
+                   ;; (no empty hit at from: tree-search-from leaves it out)
+                   ((path-less? from (cAr l)) (loop (cAr l) #f))
                    (else #f)))))))
 
 (define (replace-current-range sel what)
@@ -525,7 +530,7 @@
   ;; moves the ends of a range next to a script over its base, which was
   ;; lost), or leave it with a message: the range replaced, or #f if left
   (let* ((rm (replace-current-range sel what))
-         (by* (and rm (adjust-by by what (caddr rm) (cadddr rm)))))
+         (by* (and rm (adjust-by* by what (caddr rm) (cadddr rm)))))
     (if by*
         (let* ((a (car rm))
                (b (cadr rm))
@@ -555,47 +560,52 @@
 (define (current-hit cur what)
   ;; the hit which Replace replaces from cur: after a replacement, the next
   ;; one in the text after it (see next-hit), else the next hit of the search
-  (if (== (replace-state cur) replace-last)
+  (if (replace-continues? cur)
       (next-hit cur what)
       (search-next (get-alt-selection "alternate") cur #f)))
 
 (define (replace-step sel by what)
   ;; replace the hit sel (or leave it), and go on from the end of the
   ;; replacement; #t if replaced
-  (go-to* (car sel))
+  (go-to (car sel))
   (let* ((r (replace-hit sel by what))
          (empty? (if r (== (car r) (cadr r)) (== (car sel) (cadr sel)))))
-    (replace-from (cursor-path))
-    (set! replace-after-empty (and empty? (cursor-path)))
+    (replace-from (cursor-path) empty?)
     (and r #t)))
 
-(define (replace-next* by)
-  ;;(display* "replace-next* " by "\n")
-  (with what (search-tree)
-    (and-with sel (current-hit (get-search-reference #t) what)
-      (replace-step sel by what))))
-
 (define (with-editing thunk)
-  ;; thunk as one step of undo, also when it fails (in a read-only document,
-  ;; end-editing cancels what it changed: there are no read-only parts)
-  (dynamic-wind start-editing thunk end-editing))
+  ;; thunk as one step of undo; if it fails, the document as it was before
+  ;; it, and the error raised again (in a read-only document, end-editing
+  ;; cancels what it changed: there are no read-only parts)
+  (start-editing)
+  (with r (catch #t thunk
+            (lambda args
+              (cancel-editing)
+              (end-editing)
+              (apply throw args)))
+    (end-editing)
+    r))
 
 (tm-define (replace-one)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
-      (with-editing (lambda () (replace-next* by))))
+      (with what (search-tree)
+        (and-with sel (current-hit (get-search-reference #t) what)
+          (with-editing
+            (lambda ()
+              (replace-step sel by what)
+              (go-to* (cursor-path)))))))
     (perform-search*)
-    ;; the match which the next Replace replaces, not the whole hit
+    ;; the match which the next Replace replaces, not the whole hit (none:
+    ;; nothing left to replace)
     (with-buffer (master-buffer)
       (let* ((cur (get-search-reference #t))
-             (what (search-tree))
-             (h (and (== (replace-state cur) replace-last)
-                     (next-hit cur what)))
-             (r (and h (replace-current-range h what))))
-        (cond (r (selection-set-range-set (list (car r) (cadr r))))
-              ((== (replace-state cur) replace-last)
-               ;; nothing left to replace: no hit in the replacements
-               (selection-cancel)))))))
+             (what (search-tree)))
+        (when (replace-continues? cur)
+          (with r (and-with h (current-hit cur what)
+                    (replace-current-range h what))
+            (if r (selection-set-range-set (list (car r) (cadr r)))
+                (selection-cancel))))))))
 
 (define (replace-all-hits by)
   ;; Replace one again and again, from the reference: each step goes on in
@@ -610,7 +620,9 @@
     (let loop ((sel (search-next sels (get-search-reference #t) #f)))
       (when sel
         (replace-step sel by what)
-        (loop (next-hit (cursor-path) what))))))
+        (loop (next-hit (cursor-path) what))))
+    ;; (the place where it ended shown, if hidden)
+    (go-to* (cursor-path))))
 
 (tm-define (replace-all)
   (and-with by (by-tree)

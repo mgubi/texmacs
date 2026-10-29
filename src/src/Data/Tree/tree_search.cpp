@@ -1749,11 +1749,12 @@ match_whole (region_matcher& m, tree what) {
 
 static bool
 match_leftmost (region_matcher& m, tree what, bool to_end, bool any_start,
-                int& start) {
+                int& start, bool ready= false) {
   // the leftmost match of what in the tokens of m, at their start only
   // unless any_start: wildcards take as few tokens as they can, and a
   // trailing one the rest of them if to_end; start: its first token
-  m.init (what, to_end);
+  // (ready: m was just initialized for it)
+  if (!ready || m.to_end != to_end) m.init (what, to_end);
   for (start=0; start<=N(m.toks); start++) {
     if (m.run (0, start)) return true;
     if (!any_start) break;
@@ -1789,7 +1790,7 @@ match_alone (region_matcher& m, tree what, bool lazy, int& start) {
   m.init (what, true);
   if (N(m.kind) == 0) return false;
   bool to_end= m.kind[N(m.kind)-1] == ELEM_WILDCARD;
-  return match_leftmost (m, what, to_end, true, start);
+  return match_leftmost (m, what, to_end, true, start, true);
 }
 
 static bool
@@ -1824,6 +1825,8 @@ argument_match (tree t, path arg, tree what, bool lazy, path from,
   bool cut= !is_nil (from) && arg <= from && arg != from;
   path rel= (cut? from / arg: path ());
   region_matcher m;
+  // (the tokens not before the start of the hit: the same text as the cut
+  // after cur in search_from, from which next-hit takes the hit)
   for (int k=0; k<N(all); k++)
     if (!cut || !(before_position (all[k].before, rel) ||
                   (all[k].kind == TOKEN_TAG && all[k].at <= rel)))
@@ -2103,53 +2106,66 @@ add_hit (array<path>& r, path r1, path r2, path cur) {
 }
 
 static bool
-has_text (tree u) {
+has_tokens (tree u) {
+  // does u hold a character or a tag?
   if (is_atomic (u)) return N(u->label) != 0;
+  if (!is_concat (u) && !is_document (u)) return true;
   for (int i=0; i<N(u); i++)
-    if (has_text (u[i])) return true;
+    if (has_tokens (u[i])) return true;
   return false;
 }
 
 static bool
-text_before (tree u, path h) {
-  // is there a character of u before the position h in it?
+token_before (tree u, path h) {
+  // is there a token of u (a character or a tag) before the position h?
   if (is_nil (h)) return false;
   if (is_atomic (u)) return h->item > 0;
-  if (is_nil (h->next)) return h->item == 1 && has_text (u);
+  if (is_nil (h->next)) return h->item == 1 && has_tokens (u);
+  bool flat= is_concat (u) || is_document (u);
   for (int i=0; i<h->item && i<N(u); i++)
-    if (has_text (u[i])) return true;
-  return h->item < N(u) && text_before (u[h->item], h->next);
+    if ((flat || is_content_child (u, i)) && has_tokens (u[i])) return true;
+  return h->item < N(u) && token_before (u[h->item], h->next);
 }
 
 static array<path>
-search_from_paragraph (tree t, tree what, path p, path q, int limit,
-                       bool after_empty) {
-  // the first hits of what in the paragraph t at p after the position q in
-  // it (see search_from)
-  array<path> r;
+search_after (tree t, tree what, path p, path q, int limit,
+              bool after_empty) {
+  // the first hits of what in t at p (a paragraph, or a document for a
+  // pattern of several paragraphs) after the position q in it (see
+  // search_from). At q (not nil), no empty hit (after a match, which may
+  // end there), and no hit at all after an empty match (after_empty): the
+  // hits at the start, before any token, are left out
+  bool para= !is_document (t);
   array<cut_level> lv;
-  tree d (DOCUMENT, cut_before (t, q, lv));
-  // (after an empty match, the hits at the start are left out: at most an
-  // empty one and one which starts there)
-  range_set sel= search (d, what, path (), limit + (after_empty? 2: 0));
+  tree c= cut_before (t, q, lv);
+  tree d= (para? tree (DOCUMENT, c): c);
   bool narrow= is_concat (what) && N(what) != 0 &&
                !contains_select_region (what);
-  for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2) {
-    path h1= sel[i], h2= sel[i+1];
-    if (narrow) {
-      // the match in the hit which Replace replaces (see replace_range),
-      // in the text after cur: a hit of a lone tag there is the tag
-      search_scope scope;
-      replace_match rm;
-      if (replace_range (d, h1, h2, what, rm)) { h1= rm.q1; h2= rm.q2; }
+  path cur= (is_nil (q)? path (): p * q);
+  for (int lim= limit; true; lim *= 2) {
+    array<path> r;
+    range_set sel= search (d, what, path (), lim);
+    for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2) {
+      path h1= sel[i], h2= sel[i+1];
+      if (narrow) {
+        // the match in the hit which Replace replaces (see replace_range),
+        // in the text after cur: a hit of a lone tag there is the tag
+        search_scope scope;
+        replace_match rm;
+        if (replace_range (d, h1, h2, what, rm)) { h1= rm.q1; h2= rm.q2; }
+      }
+      if (para) {
+        if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
+          continue;
+        h1= h1->next; h2= h2->next;
+      }
+      if (!is_nil (q) && (after_empty || h1 == h2) && !token_before (c, h1))
+        continue;
+      add_hit (r, p * uncut (t, q, h1, lv), p * uncut (t, q, h2, lv), cur);
     }
-    if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
-      continue;
-    if (after_empty && !text_before (d, h1)) continue;
-    add_hit (r, p * uncut (t, q, h1->next, lv),
-             p * uncut (t, q, h2->next, lv), is_nil (q)? path (): p * q);
+    // (hits left out at the start: search further)
+    if (N(r) >= 2*limit || N(sel) < 2*lim) return r;
   }
-  return r;
 }
 
 array<path>
@@ -2161,33 +2177,25 @@ search_from (tree t, tree what, path p, path cur, int limit,
   // Replace replaces (see replace_range): the next match after a
   // replacement (#520). In a document, the paragraph of cur and then the
   // next ones, until there are hits (a pattern of several paragraphs: the
-  // document after cur at once). After an empty match at cur (after_empty)
-  // the next one starts at least one character later, so that Replace,
-  // which goes on after its replacement, always ends. Each call searches
-  // the rest of the paragraph of cur again: Replace All costs O(n^2) in a
-  // paragraph of n hits, but the steps cost more (1000 hits in a paragraph
-  // of 5 kB: about 2 s, as 1000 hits in 1 MB of short paragraphs)
+  // document after cur at once). At cur, no empty match (one which ends
+  // there, the previous match, is not followed by one), and after an empty
+  // match at cur (after_empty), none at all: the next one starts at least
+  // one character or tag later, so that Replace, which goes on after its
+  // replacement, always ends. Each call searches the rest of the paragraph
+  // of cur again: Replace All costs O(n^2) in a paragraph of n hits, but
+  // the steps cost more (1000 hits in a paragraph of 5 kB: about 2 s, as
+  // 1000 hits in 1 MB of short paragraphs)
   array<path> r;
   if (!(p <= cur)) return r;
   path q= cur / p;
   if (!is_position (t, q)) return r;
-  if (!is_document (t))
-    return search_from_paragraph (t, what, p, q, limit, after_empty);
-  if (is_document (what)) {
-    array<cut_level> lv;
-    tree d= cut_before (t, q, lv);
-    range_set sel= search (d, what, path (), limit + (after_empty? 2: 0));
-    for (int i=0; i+1<N(sel) && N(r) < 2*limit; i+=2)
-      if (!after_empty || text_before (d, sel[i]))
-        add_hit (r, p * uncut (t, q, sel[i], lv),
-               p * uncut (t, q, sel[i+1], lv), cur);
-    return r;
-  }
+  if (!is_document (t) || is_document (what))
+    return search_after (t, what, p, q, limit, after_empty);
   if (is_nil (q)) return r;
   for (int k=q->item; k<N(t) && N(r) == 0; k++)
     r= (k == q->item?
-        search_from_paragraph (t[k], what, p * k, q->next, limit, after_empty):
-        search_from_paragraph (t[k], what, p * k, path (), limit, false));
+        search_after (t[k], what, p * k, q->next, limit, after_empty):
+        search_after (t[k], what, p * k, path (), limit, false));
   return r;
 }
 
