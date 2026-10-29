@@ -110,42 +110,58 @@ vue_interface_scale () {
 }
 
 // The points of the display per point of TeXmacs which its pixel density
-// adds to the interface scaling: n / d, where d is the density of the
-// primary display and n the integer it is rounded to, the factor the
-// windows are drawn at (see vue_scaling). It is 1 on the displays of an
-// integer density (macOS, and Linux and Windows at 100% or 200%), but a
-// fractional scaling of the system draws the interface at n pixels per
-// point while SDL counts the windows in points of d pixels: at 167%
-// (GNOME on Wayland, Windows) a dialog sized to contents measured at 2
-// pixels per point got as many points of the display, 1.67 pixels each,
-// and its contents were squeezed into 83% of the room they needed, the
-// text cut on the right and the buttons on the bottom (#376); at 125% it
-// came out a quarter too large. With this factor the sizes and positions
-// are those of the Qt port, whose logical pixels are n device pixels
-// (the rounding policy "Round" set in texmacs.cpp). Set once the video
-// subsystem is there (gui_open); in the browser the density is not
+// adds to the interface scaling: n / d, where d is the pixel density of
+// the display and n the integer it is rounded to, the factor the windows
+// are drawn at (see vue_scaling). It is 1 at an integer density (macOS,
+// and Linux at 100% or 200%), but a fractional scaling of the display
+// (GNOME on Wayland at 150% or 167%, where SDL counts the windows in
+// points of d pixels) has the interface drawn at n pixels per point: a
+// dialog sized to contents measured at 2 pixels per point got as many
+// points of the display, 1.67 pixels each at 167%, and its contents were
+// squeezed into 83% of the room they needed, the text cut on the right
+// and the buttons on the bottom (#376); at 125% it came out a quarter too
+// large. With this factor the sizes are those of the Qt port, whose
+// logical pixels are n device pixels (the rounding policy "Round" set in
+// texmacs.cpp). (On X11 and Windows SDL counts the windows in pixels and
+// gives them a density of 1: nothing changes there.) The sizes of a window
+// take the factor of its own display (vue_sdl_base_window_rep::points),
+// the positions and the extents of the screen that of the primary display,
+// display_points, set by update_display_points (TEXMACS_VUE_DENSITY, which
+// forces the density, forces it too). In the browser the density is not
 // rounded and the factor stays 1.
 static double display_points= 1.0;
+
+static double
+points_factor (float d) {
+#ifdef __EMSCRIPTEN__
+  (void) d;
+  return 1.0;
+#else
+  if (d <= 0.0f) return display_points;
+  return (double) max (1, (int) (d + 0.5f)) / (double) d;
+#endif
+}
 
 // As with Qt, where the scaling makes the logical pixels larger, the
 // positions and the sizes of the windows which TeXmacs sees (PIXEL per
 // point) are the points of the display divided by the scaling: a window
 // of 800 points is 1600 points wide at a scaling of 2, and still holds as
-// much. Every length which goes to or comes from SDL takes one of these.
+// much. Every length which goes to or comes from SDL takes one of these,
+// with the factor above of the display concerned (by default the primary)
 static inline float
-sdl_pointsf (SI v) {
-  return (float) ((double) v * vue_interface_scale () * display_points / PIXEL);
+sdl_pointsf (SI v, double f= display_points) {
+  return (float) ((double) v * vue_interface_scale () * f / PIXEL);
 }
 
 static inline int
-sdl_points (SI v) {
-  double x= floor ((double) v * vue_interface_scale () * display_points / PIXEL + 0.5);
+sdl_points (SI v, double f= display_points) {
+  double x= floor ((double) v * vue_interface_scale () * f / PIXEL + 0.5);
   return (int) max (-2.0e9, min (2.0e9, x)); // (the limits may be huge)
 }
 
 static inline SI
-tm_length (double points) {
-  double x= floor (points * PIXEL / (vue_interface_scale () * display_points) + 0.5);
+tm_length (double points, double f= display_points) {
+  double x= floor (points * PIXEL / (vue_interface_scale () * f) + 0.5);
   return (SI) max (-2.0e9, min (2.0e9, x));
 }
 
@@ -240,6 +256,12 @@ public:
   // the parent of a balloon which is a tooltip of SDL (see making_tooltip),
   // whose position is relative to it; NULL for the other windows
   SDL_Window* tooltip_parent= NULL;
+  // the factor of the points of its display (see points_factor) which its
+  // sizes and size limits take; 0 until known (see update_density)
+  double points= 0.0;
+  double size_points () { return points > 0.0 ? points : display_points; }
+  double display_factor (); // the factor of the display it is on now
+  void   follow_display (); // its size follows a change of that factor
 
   // adopt: an SDL window taken over from a window being destroyed (the
   // host of single-window mode, see forget_host), instead of a new one
@@ -440,29 +462,48 @@ vue_logo_surface () {
 // window first leaves the screen by itself, a null buffer committed to its
 // surface, which the compositor answers with the leave events while the
 // decorations still exist; SDL hides or destroys it a moment later (see
-// retire_windows), the surfaces of its decorations with it.
+// retire_windows), the surfaces of its decorations with it. The moment is
+// a heuristic: 500 ms after the null commit, and only once the events
+// have been read after them (GNOME sends the leave events within a frame
+// or two, the plugin handles them when SDL pumps the events). Only the
+// windows which libdecor decorates: not the popups, the balloons and the
+// borderless windows (the menus), and only once SDL has shown them fully
+// (a turn of the loop after SDL_ShowWindow, which waits for the first
+// configure), and when libdecor is there at all.
 
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+static int    loop_turns= 0;     // the turns of the loop (see retire_note_shown)
+static time_t last_pump_time= 0; // when SDL last read the events (loop_poll)
+
+#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__) && !defined(_WIN32)
 #include <dlfcn.h>
 
-static array<SDL_Window*> retiring;       // windows off the screen, still alive
-static array<time_t>      retiring_until; // when SDL hides or destroys them
-static array<int>         retiring_destroy; // 1: destroyed, 0: hidden
+struct retiring_window {
+  SDL_Window* w;
+  time_t until;  // not before (see above), nor before the events are read
+  bool   destroy; // destroyed by SDL, else hidden
+};
+static array<retiring_window*> retiring; // windows off the screen, still alive
+static hashmap<SDL_Window*,int> shown_turn (-1); // when show_window showed it
 
 static int
 retiring_index (SDL_Window* w) {
   for (int i= 0; i < N(retiring); i++)
-    if (retiring[i] == w) return i;
+    if (retiring[i]->w == w) return i;
   return -1;
 }
 
 static void
 retiring_remove (int i) {
+  tm_delete (retiring[i]);
   retiring= append (range (retiring, 0, i), range (retiring, i+1, N(retiring)));
-  retiring_until= append (range (retiring_until, 0, i),
-                          range (retiring_until, i+1, N(retiring_until)));
-  retiring_destroy= append (range (retiring_destroy, 0, i),
-                            range (retiring_destroy, i+1, N(retiring_destroy)));
+}
+
+// libdecor, which SDL loads where the compositor draws no decorations
+static bool
+libdecor_loaded () {
+  static bool found= false;
+  if (!found) found= (dlopen ("libdecor-0.so.0", RTLD_NOW | RTLD_NOLOAD) != NULL);
+  return found;
 }
 
 // A null buffer committed to the surface of the SDL window w, which unmaps
@@ -499,29 +540,42 @@ wayland_unmap (SDL_Window* w) {
   return true;
 }
 
+// show_window shows the SDL window w (see the conditions above)
+static void
+retire_note_shown (SDL_Window* w) {
+  shown_turn (w)= loop_turns;
+}
+
 // Hides (destroy false) or destroys the SDL window w: at once, but for a
-// toplevel window shown on Wayland, which leaves the screen at once and is
-// hidden or destroyed by SDL some 300 ms later
+// window decorated by libdecor on Wayland, which leaves the screen at once
+// and is hidden or destroyed by SDL a moment later (see above)
 static void
 retire_sdl_window (SDL_Window* w, bool destroy) {
   int i= retiring_index (w);
-  if (i >= 0) { if (destroy) retiring_destroy[i]= 1; return; }
+  if (i >= 0) { if (destroy) retiring[i]->destroy= true; return; }
   const char* driver= SDL_GetCurrentVideoDriver ();
   SDL_WindowFlags f= SDL_GetWindowFlags (w);
+  int shown= shown_turn[w];
+  if (destroy) shown_turn->reset (w);
   if (driver != NULL && strcmp (driver, "wayland") == 0 &&
-      !(f & (SDL_WINDOW_HIDDEN | SDL_WINDOW_TOOLTIP | SDL_WINDOW_POPUP_MENU)) &&
+      !(f & (SDL_WINDOW_HIDDEN | SDL_WINDOW_TOOLTIP | SDL_WINDOW_POPUP_MENU |
+             SDL_WINDOW_BORDERLESS)) &&
+      shown >= 0 && shown < loop_turns && libdecor_loaded () &&
       wayland_unmap (w)) {
-    retiring << w;
-    retiring_until << (texmacs_time () + 300);
-    retiring_destroy << (destroy ? 1 : 0);
+    retiring_window* r= tm_new<retiring_window> ();
+    r->w= w;
+    r->until= texmacs_time () + 500;
+    r->destroy= destroy;
+    retiring << r;
     return;
   }
   if (destroy) SDL_DestroyWindow (w);
   else SDL_HideWindow (w);
 }
 
-// The window w is shown again before SDL has hidden it: SDL hides it now,
-// so that it shows it again from the start
+// The window w is shown again (or given to another window, see forget_host)
+// before SDL has hidden it: SDL hides it now, so that it is shown again
+// from the start
 static void
 unretire_sdl_window (SDL_Window* w) {
   int i= retiring_index (w);
@@ -535,20 +589,22 @@ is_retiring (SDL_Window* w) {
   return retiring_index (w) >= 0;
 }
 
-// SDL hides or destroys the windows whose time has come (all of them when
-// TeXmacs ends)
+// SDL hides or destroys the windows whose moment has come (all of them
+// when TeXmacs ends)
 static void
 retire_windows (bool all) {
   if (N(retiring) == 0) return;
   time_t now= texmacs_time ();
-  for (int i= N(retiring) - 1; i >= 0; i--)
-    if (all || now >= retiring_until[i]) {
-      SDL_Window* w= retiring[i];
-      bool destroy= (retiring_destroy[i] != 0);
+  for (int i= N(retiring) - 1; i >= 0; i--) {
+    retiring_window* r= retiring[i];
+    if (all || (now >= r->until && last_pump_time >= r->until)) {
+      SDL_Window* w= r->w;
+      bool destroy= r->destroy;
       retiring_remove (i);
       if (destroy) SDL_DestroyWindow (w);
       else SDL_HideWindow (w);
     }
+  }
 }
 #else
 static void
@@ -556,10 +612,18 @@ retire_sdl_window (SDL_Window* w, bool destroy) {
   if (destroy) SDL_DestroyWindow (w);
   else SDL_HideWindow (w);
 }
+static void retire_note_shown (SDL_Window* w) { (void) w; }
 static void unretire_sdl_window (SDL_Window* w) { (void) w; }
 static bool is_retiring (SDL_Window* w) { (void) w; return false; }
 static void retire_windows (bool all) { (void) all; }
 #endif
+
+// Whether the SDL window w is on the screen for TeXmacs: shown by SDL, and
+// not leaving the screen (see retire_sdl_window)
+static bool
+sdl_window_shown (SDL_Window* w) {
+  return !(SDL_GetWindowFlags (w) & SDL_WINDOW_HIDDEN) && !is_retiring (w);
+}
 
 // The parent of a balloon (see making_tooltip): the window of TeXmacs
 // with the keyboard, else the one under the pointer, else the last
@@ -570,10 +634,10 @@ tooltip_parent_window () {
                       last_document_sdl };
   for (int i= 0; i < 3; i++) {
     SDL_Window* w= l[i];
-    if (w == NULL || !Window_to_window->contains (w) || is_retiring (w)) continue;
+    if (w == NULL || !Window_to_window->contains (w)) continue;
     vue_sdl_base_window_rep* v= (vue_sdl_base_window_rep*) Window_to_window[w];
-    if (v->popup || (SDL_GetWindowFlags (w) &
-                     (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) continue;
+    if (v->popup || !sdl_window_shown (w) ||
+        (SDL_GetWindowFlags (w) & SDL_WINDOW_MINIMIZED)) continue;
     return w;
   }
   return NULL;
@@ -607,6 +671,10 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     init_window_clay (this, win_w, win_h);
     update_density ();
     visible_requested= ready_to_show= true;
+    // (a window given up by the window which goes, which was leaving the
+    // screen, is hidden by SDL now and shown again by its new owner, see
+    // retire_sdl_window)
+    unretire_sdl_window (sdl_win);
     shown= !(SDL_GetWindowFlags (sdl_win) & SDL_WINDOW_HIDDEN);
     return;
   }
@@ -739,6 +807,7 @@ vue_drawing_factor (float d) {
 // display, which relate the pointer to the layout (see vue_scaling).
 void
 vue_sdl_base_window_rep::update_density () {
+  follow_display ();
   float d= SDL_GetWindowPixelDensity (sdl_win);
   if (d <= 0.0f) d= 1.0f;
   // TEXMACS_VUE_DENSITY overrides it: to draw at 1x on a HiDPI display,
@@ -755,6 +824,46 @@ vue_sdl_base_window_rep::update_density () {
   if (DEBUG_VUE)
     SDL_Log ("Window %d: %.2f pixels per point, drawing at %dx, presented at %.2f",
              id, d, r, p);
+}
+
+// The factor of the points of the display the window is on (see
+// points_factor): that of the primary display while it is hidden (on
+// Wayland the display of a window is known once it is shown)
+double
+vue_sdl_base_window_rep::display_factor () {
+  if (sdl_win == NULL || (SDL_GetWindowFlags (sdl_win) & SDL_WINDOW_HIDDEN))
+    return display_points;
+  static string forced= get_env ("TEXMACS_VUE_DENSITY"); // see update_density
+  if (N(forced) > 0 && is_double (forced)) return points_factor ((float) as_double (forced));
+  return points_factor (SDL_GetWindowPixelDensity (sdl_win));
+}
+
+// The window takes the factor of the display it is on (see points): once
+// shown, and when it goes to a display of another density. Its size and
+// its size limits, in points of TeXmacs, stay the same: in points of the
+// display they follow the factor (a dialog laid out while hidden, with the
+// factor of the primary display, shown on a display of another fractional
+// scaling, keeps the room its contents need)
+void
+vue_sdl_base_window_rep::follow_display () {
+  if (sdl_win == NULL) return; // (see orphan)
+  SDL_WindowFlags flags= SDL_GetWindowFlags (sdl_win);
+  if (points > 0.0 && (flags & SDL_WINDOW_HIDDEN)) return;
+  double was= points;
+  points= display_factor ();
+  if (was <= 0.0 || fabs (points - was) < 1.0e-6) return;
+  if (DEBUG_VUE)
+    SDL_Log ("Window %d: %.3f points of the display per point (was %.3f)",
+             id, points, was);
+  SDL_SetWindowMinimumSize (sdl_win, max (sdl_points (Min_w, points), 0),
+                            max (sdl_points (Min_h, points), 0));
+  SDL_SetWindowMaximumSize (sdl_win, max (sdl_points (Max_w, points), 0),
+                            max (sdl_points (Max_h, points), 0));
+  if (flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED)) return;
+  int w= 0, h= 0;
+  SDL_GetWindowSize (sdl_win, &w, &h);
+  double r= points / was;
+  SDL_SetWindowSize (sdl_win, max (1, (int) (w * r + 0.5)), max (1, (int) (h * r + 0.5)));
 }
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
@@ -837,8 +946,8 @@ void
 vue_sdl_base_window_rep::get_size (SI& ww, SI& hh) {
   int win_w= 0, win_h= 0;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
-  ww= tm_length (win_w);
-  hh= tm_length (win_h);
+  ww= tm_length (win_w, size_points ());
+  hh= tm_length (win_h, size_points ());
 }
 
 void
@@ -883,7 +992,7 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
 void
 vue_sdl_base_window_rep::set_size (SI w, SI h) {
   if (sdl_win == NULL) return; // (see orphan)
-  w= sdl_points (w); h= sdl_points (h);
+  w= sdl_points (w, size_points ()); h= sdl_points (h, size_points ());
   SDL_SetWindowSize (sdl_win, w, h);
   // the change is asynchronous on X11 and Wayland: a dialog sized to its
   // contents was then laid out, shown and drawn at its former size, in a
@@ -899,8 +1008,9 @@ vue_sdl_base_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h
     return;
   Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
   // a limit of 0 means no limit for SDL
-  SDL_SetWindowMinimumSize (sdl_win, max (sdl_points (min_w), 0), max (sdl_points (min_h), 0));
-  SDL_SetWindowMaximumSize (sdl_win, max (sdl_points (max_w), 0), max (sdl_points (max_h), 0));
+  double f= size_points ();
+  SDL_SetWindowMinimumSize (sdl_win, max (sdl_points (min_w, f), 0), max (sdl_points (min_h, f), 0));
+  SDL_SetWindowMaximumSize (sdl_win, max (sdl_points (max_w, f), 0), max (sdl_points (max_h, f), 0));
 }
 
 // The title of a window is the name TeXmacs gives it plus, for a document
@@ -1072,7 +1182,8 @@ vue_sdl_base_window_rep::track_geometry () {
   // (nor by the other ports), nor is the host which outlived its window
   if (first || popup || N(orig_name) == 0) return;
   if (moved) notify_window_move (orig_name, tm_length (x), tm_length (-y));
-  if (resized) notify_window_resize (orig_name, tm_length (w), tm_length (h));
+  if (resized) notify_window_resize (orig_name, tm_length (w, size_points ()),
+                                     tm_length (h, size_points ()));
 }
 
 // The next window is shown without taking the keyboard focus (the window of
@@ -1089,16 +1200,22 @@ gui_set_next_window_without_focus () {
 static void
 show_window (SDL_Window* sdl_win, bool activate) {
   unretire_sdl_window (sdl_win); // (hidden a moment ago, see retire_sdl_window)
-  if (activate) { SDL_ShowWindow (sdl_win); return; }
-  SDL_SetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
-  SDL_ShowWindow (sdl_win);
-  SDL_ResetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+  if (activate) SDL_ShowWindow (sdl_win);
+  else {
+    SDL_SetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
+    SDL_ShowWindow (sdl_win);
+    SDL_ResetHint (SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+  }
+  retire_note_shown (sdl_win);
 }
 
 void
 vue_sdl_base_window_rep::set_visibility (bool flag) {
   if (sdl_win == NULL) return; // (see orphan)
   visible_requested= flag;
+  // (hidden a moment ago: hidden by SDL now, before anything else is done
+  // to it, as the SDL_SyncWindow of set_size, see retire_sdl_window)
+  if (flag) unretire_sdl_window (sdl_win);
   if (!flag) {
     if (shown) retire_sdl_window (sdl_win, false);
     shown= false;
@@ -1582,8 +1699,8 @@ void
 vue_sdl_mupdf_window_rep::process_redraw () {
   // a hidden or minimized window is neither drawn nor uploaded (the loop
   // redraws every window at every frame); it is drawn again when shown
-  if (!shown || (SDL_GetWindowFlags (sdl_win) &
-                 (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) return;
+  if (!shown || !sdl_window_shown (sdl_win) ||
+      (SDL_GetWindowFlags (sdl_win) & SDL_WINDOW_MINIMIZED)) return;
   track_geometry ();
 #ifndef OS_MACOS
   follow_app_focus ();
@@ -1774,8 +1891,8 @@ static bool vue_gpu_deferred= false;
 
 void
 vue_sdl_gpu_window_rep::process_redraw () {
-  if (!shown || (SDL_GetWindowFlags (sdl_win) &
-                 (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) {
+  if (!shown || !sdl_window_shown (sdl_win) ||
+      (SDL_GetWindowFlags (sdl_win) & SDL_WINDOW_MINIMIZED)) {
     presented= 0; // shown again: presented again, whatever it draws
     return;
   }
@@ -3633,6 +3750,22 @@ web_paste_dialog_tm (tmscm choices, tmscm n) {
 }
 #endif
 
+// The pixel density of the primary display (0 if unknown), and the factor
+// of its points (display_points, see points_factor) taken from it: at the
+// start and when the displays change. The density of the desktop mode,
+// not the content scale, which macOS reports as 1 while drawing at 2
+// pixels per point; TEXMACS_VUE_DENSITY forces it (see update_density)
+static float
+update_display_points () {
+  float density= 0.0f;
+  const SDL_DisplayMode* mode= SDL_GetDesktopDisplayMode (SDL_GetPrimaryDisplay ());
+  if (mode != NULL) density= mode->pixel_density;
+  static string forced= get_env ("TEXMACS_VUE_DENSITY");
+  if (N(forced) > 0 && is_double (forced)) density= (float) as_double (forced);
+  if (density > 0.0f) display_points= points_factor (density);
+  return density;
+}
+
 void gui_open (int& argc, char** argv) {
   // start the gui
 #if defined(__EMSCRIPTEN__)
@@ -3708,21 +3841,11 @@ void gui_open (int& argc, char** argv) {
   // drawn (with_window, in vue_gui.hpp); the factor set here, from the
   // primary display, is only the one in force outside of any window.
   {
-    // the pixel density of the desktop mode, not its content scale, which
-    // macOS reports as 1 while drawing at 2 pixels per point
-    float density= 0.0f;
-    const SDL_DisplayMode* mode= SDL_GetDesktopDisplayMode (SDL_GetPrimaryDisplay ());
-    if (mode != NULL) density= mode->pixel_density;
-    string forced= get_env ("TEXMACS_VUE_DENSITY"); // see update_density
-    if (N(forced) > 0 && is_double (forced)) density= (float) as_double (forced);
-    int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
+    float density= update_display_points ();
+    // the renderer wants an integer (rounded as in vue_scaling)
+    int factor= max (1, (int) (density + 0.5f));
     if (density <= 0.0f) factor= 2; // unknown: the previous default
     primary_factor= factor;
-#ifndef __EMSCRIPTEN__
-    // (as vue_scaling rounds it; the forced density too, see update_density)
-    if (density > 0.0f)
-      display_points= (double) max (1, (int) (density + 0.5f)) / (double) density;
-#endif
     factor= vue_drawing_factor ((float) factor); // the interface scaling
     set_retina_factor (factor);
     if (DEBUG_VUE || factor != 2)
@@ -4566,6 +4689,7 @@ loop_poll (SDL_Event* event) {
   watch_may_run= true;
   bool r= SDL_PollEvent (event);
   watch_may_run= false;
+  last_pump_time= texmacs_time ();
   return r;
 }
 
@@ -4582,6 +4706,7 @@ loop_wait (int ms) {
   watch_may_run= true;
   SDL_WaitEventTimeout (NULL, ms);
   watch_may_run= false;
+  last_pump_time= texmacs_time ();
 #endif
 }
 
@@ -4879,8 +5004,9 @@ vue_follow_interface_scale () {
     if (!(SDL_GetWindowFlags (sw) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED))) {
       SI min_w, min_h, max_w, max_h;
       win->get_size_limits (min_w, min_h, max_w, max_h);
-      SDL_SetWindowMinimumSize (sw, max (sdl_points (min_w), 0), max (sdl_points (min_h), 0));
-      SDL_SetWindowMaximumSize (sw, max (sdl_points (max_w), 0), max (sdl_points (max_h), 0));
+      double f= win->size_points ();
+      SDL_SetWindowMinimumSize (sw, max (sdl_points (min_w, f), 0), max (sdl_points (min_h, f), 0));
+      SDL_SetWindowMaximumSize (sw, max (sdl_points (max_w, f), 0), max (sdl_points (max_h, f), 0));
       int w= 0, h= 0;
       SDL_GetWindowSize (sw, &w, &h);
       SDL_SetWindowSize (sw, max (1, (int) (w * ratio + 0.5f)),
@@ -4973,6 +5099,7 @@ loop_iteration_body () {
 
   // the windows which left the screen a moment ago, see retire_sdl_window
   retire_windows (false);
+  loop_turns++;
 
   // 1. process events
   if (script_pump) call ("gui-test-pump"); // may push synthetic events
@@ -5825,7 +5952,7 @@ visible_popup () {
     SDL_Window* sw= it->next ();
     vue_window w= (vue_window) Window_to_window [sw];
     if (w->popup && !w->tooltip &&
-        !(SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) return w;
+        sdl_window_shown (sw)) return w;
   }
   return NULL;
 }
@@ -5875,7 +6002,7 @@ under_tooltip (vue_window win, float& x, float& y) {
   while (it->busy ()) {
     SDL_Window* sw= it->next ();
     vue_window w= (vue_window) Window_to_window [sw];
-    if (w->popup || (SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) continue;
+    if (w->popup || !sdl_window_shown (sw)) continue;
     int wx, wy, ww, wh;
     SDL_GetWindowPosition (sw, &wx, &wy);
     SDL_GetWindowSize (sw, &ww, &wh);
@@ -6332,11 +6459,22 @@ process_event (SDL_Event *event) {
       }
       break;
     }
+    case SDL_EVENT_DISPLAY_ADDED:
+    case SDL_EVENT_DISPLAY_REMOVED:
+    case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED:
+    case SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED:
+      // the factor of the points of the primary display (see points_factor)
+      update_display_points ();
+      break;
+    case SDL_EVENT_WINDOW_SHOWN:
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
       // the window moved to a display of another density: the layout and
       // the backing stores of its editors follow (their pixel size changes
-      // with the density, which the repaint notices)
+      // with the density, which the repaint notices); shown, it takes the
+      // factor of the points of its display (follow_display, from
+      // update_density), known on Wayland only then
       win= get_window_from_ID (event->window.windowID);
       if (win) {
         int was= win->retina;

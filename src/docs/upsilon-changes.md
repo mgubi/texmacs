@@ -14,13 +14,15 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
-- **Dialogs at a fractional scaling** (desktop Vue builds): with the
-  display scaled by a fraction (GNOME on Wayland at 150% or 175%,
-  Windows at 125% or 150%...), a dialog sized to its contents (the
-  question of Ctrl+Q with unsaved documents) came out too small, its
-  text cut on the right and its buttons on the bottom, legible only once
-  resized (or too large at 125%). The windows now have the sizes and the
-  places of the Qt port at those scalings (#376).
+- **Dialogs at a fractional scaling** (desktop Vue builds, Wayland): with
+  the display scaled by a fraction such as 150% or 167% (GNOME on
+  Wayland), a dialog sized to its contents (the question of Ctrl+Q with
+  unsaved documents) came out too small, its text cut on the right and
+  its buttons on the bottom, legible only once resized (or too large at
+  125%). The windows now have the sizes of the Qt port at those scalings,
+  each by the scaling of the display it is on. Window sizes saved at such
+  a scaling are read accordingly, so the windows may open once at
+  another size (#376).
 - **No crash after closing a dialog by a key on GNOME/Wayland** (desktop
   Vue builds): Esc in the question of Ctrl+Q, with the pointer on the
   title bar or the border of the question, could crash TeXmacs at the
