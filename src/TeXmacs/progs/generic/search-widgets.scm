@@ -497,6 +497,7 @@
 (define replace-trace #f)   ;; for the tests: the document and the range of
                             ;; each replacement, if a list
 (define replace-skip-message #f)
+(define replace-after-empty #f) ;; the cursor after an empty match
 
 (define (replace-state cur)
   ;; the place where Replace goes on, with the buffer and the pattern
@@ -522,8 +523,12 @@
          (p (tree->path t)))
     (and (list-starts? cur p)
          (let loop ((from cur))
-           (let* ((l (with-search-access-mode
-                       (lambda () (tree-search-from t what p from 4))))
+           ;; (after an empty match, the next one starts at least one
+           ;; character later: Replace, which goes on after its
+           ;; replacement, ends)
+           (let* ((empty? (== from replace-after-empty))
+                  (l (with-search-access-mode
+                       (lambda () (tree-search-from t what p from 4 empty?))))
                   (f (pairs (filter-search-results l))))
              (cond ((nnull? f) (car f))
                    ((and (nnull? l) (path-less? from (cAr l))) (loop (cAr l)))
@@ -544,7 +549,7 @@
   ;; replace the hit sel of what by by: the match in it which Replace
   ;; replaces (see replace-match), exactly (the selection of the editor
   ;; moves the ends of a range next to a script over its base, which was
-  ;; lost), or leave it with a message; #f if left
+  ;; lost), or leave it with a message: the range replaced, or #f if left
   (let* ((rm (replace-current-range sel what))
          (by* (and rm (adjust-by by what (caddr rm) (cadddr rm)))))
     (if by*
@@ -561,7 +566,7 @@
           ;; (an empty match: nothing to remove)
           (when (path-less? a b) (clipboard-cut-between a b))
           (insert-go-to (tree-copy by*) (path-end by* '()))
-          #t)
+          (list a b))
         (begin
           (go-to (cadr sel))
           (set! replace-skip-message
@@ -574,24 +579,28 @@
           (set-message replace-skip-message "Replace")
           #f))))
 
+(define (current-hit cur what)
+  ;; the hit which Replace replaces from cur: after a replacement, the next
+  ;; one in the text after it (see next-hit), else the next hit of the search
+  (if (== (replace-state cur) replace-last)
+      (next-hit cur what)
+      (search-next (get-alt-selection "alternate") cur #f)))
+
 (define (replace-step sel by what)
-  ;; replace the hit sel, and go on from the end of the replacement; #f if
-  ;; nothing was done (an empty hit left as it is)
+  ;; replace the hit sel (or leave it), and go on from the end of the
+  ;; replacement; #t if replaced
   (go-to* (car sel))
-  (with done? (replace-hit sel by what)
+  (let* ((r (replace-hit sel by what))
+         (empty? (if r (== (car r) (cadr r)) (== (car sel) (cadr sel)))))
     (replace-from (cursor-path))
-    (or done? (!= (car sel) (cadr sel)))))
+    (set! replace-after-empty (and empty? (cursor-path)))
+    (and r #t)))
 
 (define (replace-next* by)
   ;;(display* "replace-next* " by "\n")
-  (let* ((sels (get-alt-selection "alternate"))
-         (cur (get-search-reference #t))
-         (what (search-tree)))
-    (and (nnull? sels)
-         (and-with sel (if (== (replace-state cur) replace-last)
-                           (next-hit cur what)
-                           (search-next sels cur #f))
-           (replace-step sel by what)))))
+  (with what (search-tree)
+    (and-with sel (current-hit (get-search-reference #t) what)
+      (replace-step sel by what))))
 
 (define (with-editing thunk)
   ;; thunk as one step of undo, also when it fails
@@ -614,31 +623,20 @@
                ;; nothing left to replace: no hit in the replacements
                (selection-cancel)))))))
 
-(define (text-length t)
-  (if (tree-atomic? t) (string-length (tree->string t))
-      (apply + (map text-length (tree-children t)))))
-
 (define (replace-all-hits by)
-  ;; Replace one again and again, from the reference, each next hit found
-  ;; by the search after the replacement (see next-hit); at most as many
-  ;; steps as there are characters and hits (a replacement which the search
-  ;; would find again and again would not end), with a message
+  ;; Replace one again and again, from the reference: each step goes on in
+  ;; the text after its match, which a match which is not empty shortens,
+  ;; and after an empty one the next starts at least one character later
+  ;; (see next-hit), so it ends. The first hit from a search of the
+  ;; document now (the hits of the widget can be partial)
   (let* ((what (search-tree))
          (t (buffer-tree))
          (sels (filter-search-results
-                 (tree-perform-search t what (tree->path t) 100000000)))
-         ;; (a match which is not empty takes a character of the text)
-         (cap (+ (text-length t) (quotient (length sels) 2) 100)))
-    (let loop ((sel (search-next sels (get-search-reference #t) #f)) (n 0))
-      (cond ((not sel) (noop))
-            ((>= n cap)
-             (set-message "Replace All stopped: the replacements are found again and again" "Replace"))
-            (else
-             (replace-step sel by what)
-             (with next (next-hit (cursor-path) what)
-               ;; an empty hit found again at the same place ends it
-               (when (not (and next (== next sel) (== (car sel) (cadr sel))))
-                 (loop next (+ n 1)))))))))
+                 (tree-perform-search t what (tree->path t) 1000000))))
+    (let loop ((sel (search-next sels (get-search-reference #t) #f)))
+      (when sel
+        (replace-step sel by what)
+        (loop (next-hit (cursor-path) what))))))
 
 (tm-define (replace-all)
   (and-with by (by-tree)

@@ -2091,8 +2091,28 @@ add_hit (array<path>& r, path r1, path r2, path cur) {
   r << r1 << r2;
 }
 
+static bool
+has_text (tree u) {
+  if (is_atomic (u)) return N(u->label) != 0;
+  for (int i=0; i<N(u); i++)
+    if (has_text (u[i])) return true;
+  return false;
+}
+
+static bool
+text_before (tree u, path h) {
+  // is there a character of u before the position h in it?
+  if (is_nil (h)) return false;
+  if (is_atomic (u)) return h->item > 0;
+  if (is_nil (h->next)) return h->item == 1 && has_text (u);
+  for (int i=0; i<h->item && i<N(u); i++)
+    if (has_text (u[i])) return true;
+  return h->item < N(u) && text_before (u[h->item], h->next);
+}
+
 static array<path>
-search_from_paragraph (tree t, tree what, path p, path q, int limit) {
+search_from_paragraph (tree t, tree what, path p, path q, int limit,
+                       bool after_empty) {
   // the first hits of what in the paragraph t at p after the position q in
   // it (see search_from)
   array<path> r;
@@ -2112,6 +2132,7 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit) {
     }
     if (is_nil (h1) || h1->item != 0 || is_nil (h2) || h2->item != 0)
       continue;
+    if (after_empty && !text_before (d, h1)) continue;
     // (a hit at the start of the text after cur starts at cur)
     add_hit (r, p * uncut (t, q, h1->next, lv),
              p * uncut (t, q, h2->next, lv), is_nil (q)? path (): p * q);
@@ -2120,32 +2141,38 @@ search_from_paragraph (tree t, tree what, path p, path q, int limit) {
 }
 
 array<path>
-search_from (tree t, tree what, path p, path cur, int limit) {
+search_from (tree t, tree what, path p, path cur, int limit,
+             bool after_empty) {
   // the first hits (at most limit) of what in t at p (a paragraph, or the
   // document) from the position cur on, as the search finds them in the
   // text which comes after cur, each one narrowed to the match which
   // Replace replaces (see replace_range): the next match after a
   // replacement (#520). In a document, the paragraph of cur and then the
   // next ones, until there are hits (a pattern of several paragraphs: the
-  // document after cur at once)
+  // document after cur at once). After an empty match at cur (after_empty)
+  // the next one starts at least one character later, so that Replace,
+  // which goes on after its replacement, always ends
   array<path> r;
   if (!(p <= cur)) return r;
   path q= cur / p;
   if (!is_position (t, q)) return r;
-  if (!is_document (t)) return search_from_paragraph (t, what, p, q, limit);
+  if (!is_document (t))
+    return search_from_paragraph (t, what, p, q, limit, after_empty);
   if (is_document (what)) {
     array<cut_level> lv;
     tree d= cut_before (t, q, lv);
     range_set sel= search (d, what, path (), limit);
     for (int i=0; i+1<N(sel) && i < 2*limit; i+=2)
-      add_hit (r, p * uncut (t, q, sel[i], lv),
+      if (!after_empty || text_before (d, sel[i]))
+        add_hit (r, p * uncut (t, q, sel[i], lv),
                p * uncut (t, q, sel[i+1], lv), cur);
     return r;
   }
   if (is_nil (q)) return r;
   for (int k=q->item; k<N(t) && N(r) == 0; k++)
-    r= search_from_paragraph (t[k], what, p * k,
-                              (k == q->item? q->next: path ()), limit);
+    r= (k == q->item?
+        search_from_paragraph (t[k], what, p * k, q->next, limit, after_empty):
+        search_from_paragraph (t[k], what, p * k, path (), limit, false));
   return r;
 }
 

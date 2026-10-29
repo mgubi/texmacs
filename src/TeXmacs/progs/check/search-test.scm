@@ -2381,6 +2381,20 @@
                    (p (random-case-problems c)))
               (loop (+ i 1) (if (null? p) bad (cons (list c p) bad)))))))))
 
+;; An empty match: Replace goes on after its replacement, and the next match
+;; starts at least one character later (as a substitution of regular
+;; expressions does); the replacement was found again and again, until a
+;; cap on the number of steps
+(define (test-replace-empty-matches)
+  (check-group "replace empty matches")
+  (with-search-mode 'replace
+    (lambda ()
+      (check-replace-rows
+        '(((document "ab ab") (wildcard "w") "X" (document "XX"))
+          ((document "ab") (select-region "") "X" (document "XX"))
+          ((document "aab") (concat (select-region (wildcard "w")) "a") "X"
+           (document "XaXab")))))))
+
 (define (test-replace-filters)
   (check-group "replace with a filter")
   ;; Replace goes on after the hits which the filter of the search rejects
@@ -2460,5 +2474,6 @@
   (test-replace-wildcards)
   (test-replace-in-buffers)
   (test-replace-filters)
+  (test-replace-empty-matches)
   (test-replace-random)
   (check-end))
