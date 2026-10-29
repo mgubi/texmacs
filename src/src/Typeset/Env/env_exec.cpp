@@ -2110,11 +2110,12 @@ edit_env_rep::exec_get_binding (tree t) {
   string key= exec_string (t[0]);
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  tree value= lookup ((type == 1 ? "1" : "0") * key);
-  // (warn-missing is read whenever the value is missing, also when the
-  // pass is not complete: the bridge is then not used again in a complete
-  // pass without telling the reference, see replay_missing)
-  if (value == tree (UNINIT) && get_bool (WARN_MISSING) && complete) {
+  // (a lookup under warn-missing false, as tmdoc's if-ref, is looked up
+  // with the keys of has-binding: a bridge used again does not tell it as
+  // missing, see replay_missing)
+  bool warn= get_bool (WARN_MISSING);
+  tree value= lookup ((warn? (type == 1 ? "1" : "0"): (type == 1 ? "3" : "2")) * key);
+  if (value == tree (UNINIT) && warn && complete) {
     missing (key)= tree (GET_BINDING, key);
     //typeset_warning << "Undefined reference " << key << LF;
   }
