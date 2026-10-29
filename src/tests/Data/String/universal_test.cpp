@@ -176,7 +176,11 @@ test_utf8_to_cork_known () {
   CHECK_BYTES (utf8_to_cork ("\xd0\x96"), "<#416>");      // Cyrillic Zhe
   CHECK_BYTES (utf8_to_cork ("\xe4\xb8\xad"), "<#4E2D>"); // CJK
   CHECK_BYTES (utf8_to_cork ("\xe2\x82\xac"), "<#20AC>"); // euro sign
-  CHECK_BYTES (utf8_to_cork ("\xf0\x9f\x98\x80"), "<#1F600>");
+  // an emoji gets its name (#533); another character outside the BMP
+  // its code point
+  CHECK_BYTES (utf8_to_cork ("\xf0\x9f\x98\x80"), "<emoji-grinning-face>");
+  CHECK_BYTES (cork_to_utf8 ("<emoji-grinning-face>"), "\xf0\x9f\x98\x80");
+  CHECK_BYTES (utf8_to_cork ("\xf0\x90\x80\x80"), "<#10000>");
   CHECK_BYTES (utf8_to_cork ("\xf0\x9d\x90\x80"), "<b-up-A>");
   CHECK_BYTES (utf8_to_cork ("x\xce\xb1+\xe4\xb8\xad=\xc3\xa9"),
                "x<alpha>+<#4E2D>=\xe9");
