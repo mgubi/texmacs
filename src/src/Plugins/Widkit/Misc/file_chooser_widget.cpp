@@ -328,7 +328,7 @@ image_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
   ren->clear (0, 0, w, h);
   layout_dark_outline (ren, 0, 0, w, h);
   if (file_name != "") {
-    SI iw, ih;
+    int iw, ih;
     image_size (url_system (file_name), iw, ih);
     
     SI ww= w-2*PIXEL, hh= h-2*PIXEL;

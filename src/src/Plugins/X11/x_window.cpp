@@ -443,7 +443,7 @@ x_window_rep::focus_out_event () {
 }
 
 void
-x_window_rep::mouse_event (string ev, int x, int y, time_t t) {
+x_window_rep::mouse_event (string ev, SI x, SI y, time_t t) {
   if (is_nil (gui->grab_ptr) || (get_x_window (gui->grab_ptr->item) == NULL)) {
     ren->set_origin (0, 0);
     ren->encode (x, y);

@@ -9,6 +9,9 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "scheme.hpp"
+#include "converter.hpp"
+#include "locale.hpp"
 #include "tm_timer.hpp"
 #include "dictionary.hpp"
 #include "X11/x_gui.hpp"
@@ -16,6 +19,7 @@
 #include "X11/x_window.hpp"
 #include "image_files.hpp"
 #include <X11/cursorfont.h>
+#include <sys/select.h>
 #include "message.hpp"
 #include "x_picture.hpp"
 
@@ -100,7 +104,7 @@ x_gui_rep::set_button_state (unsigned int state) {
 void
 x_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
   Window root, child;
-  SI root_x, root_y, x, y;
+  int root_x, root_y, x, y;
   unsigned int mask;
 
   XQueryPointer (dpy, get_Window (old_widget),
@@ -199,6 +203,47 @@ my_selnotify_predicate (Display* dpy, XEvent* ev, XPointer arg) { (void) dpy;
   return (win->win==ev->xany.window) && (ev->type==SelectionNotify);
 }
 
+string
+x_utf8_to_latin1 (string s) {
+  string r;
+  int i= 0, n= N(s);
+  while (i < n) {
+    unsigned int c= decode_from_utf8 (s, i);
+    r << ((c < 256)? (char) c: '?');
+  }
+  return r;
+}
+
+string
+x_latin1_to_utf8 (string s) {
+  string r;
+  for (int i=0; i<N(s); i++)
+    r << encode_as_utf8 ((unsigned int) (unsigned char) s[i]);
+  return r;
+}
+
+// waits for the answer of the owner of a selection, at most timeout ms:
+// sleeps on the connection to the X server between the events (the
+// selections were read by polling the queue up to a million times, #440)
+static bool
+wait_selection_notify (Display* dpy, x_window x_win, XEvent& ev, int timeout) {
+  time_t start= texmacs_time ();
+  int fd= ConnectionNumber (dpy);
+  while (true) {
+    if (XCheckIfEvent (dpy, &ev, my_selnotify_predicate, (XPointer) x_win))
+      return true;
+    int left= timeout - (int) (texmacs_time () - start);
+    if (left <= 0) return false;
+    fd_set fds;
+    FD_ZERO (&fds);
+    FD_SET (fd, &fds);
+    struct timeval tv;
+    tv.tv_sec = left / 1000;
+    tv.tv_usec= (left % 1000) * 1000;
+    (void) select (fd + 1, &fds, NULL, NULL, &tv);
+  }
+}
+
 void
 x_gui_rep::created_window (Window win) {
   windows_l << win;
@@ -212,6 +257,39 @@ x_gui_rep::deleted_window (Window win) {
 void
 x_gui_rep::focussed_window (Window win) {
   windows_l= list<Window> (win, remove (windows_l, win));
+}
+
+// asks the owner of xsel for its text as target, in s (as it comes, of the
+// type given): 1 when it is there, 0 when the owner has none of this type,
+// -1 when the owner did not answer within 2 seconds
+int
+x_gui_rep::request_selection (Atom xsel, Atom target, string& s, Atom& type) {
+  Window win= windows_l->item;
+  x_window x_win= (x_window) Window_to_window[win];
+  Atom prop= XInternAtom (dpy, "MY_STRING_SELECTION", false);
+  XEvent ev;
+  // (the late answer to a request which timed out is not taken for this one)
+  while (XCheckIfEvent (dpy, &ev, my_selnotify_predicate, (XPointer) x_win));
+  XDeleteProperty (dpy, win, prop);
+  XConvertSelection (dpy, xsel, target, prop, win, CurrentTime);
+  if (!wait_selection_notify (dpy, x_win, ev, 2000)) return -1;
+  XSelectionEvent& sel= ev.xselection;
+  if (sel.property != prop) return 0;
+  int fm;
+  unsigned long n, remains;
+  unsigned char* ret= NULL;
+  // (the whole property at once, up to 64 MB; a text sent INCR, in
+  // pieces, is not read)
+  if (XGetWindowProperty (dpy, win, prop, 0, 1L << 24, true,
+                          AnyPropertyType, &type, &fm, &n, &remains,
+                          &ret) != Success) return 0;
+  if (ret != NULL) {
+    if (fm == 8) s= string ((char*) ret, (int) n);
+    XFree (ret);
+  }
+  bool ok= fm == 8 && (type == XA_UTF8_STRING || type == XA_STRING ||
+                       type == XA_TEXT_PLAIN_UTF8);
+  return ok? 1: 0;
 }
 
 bool
@@ -236,38 +314,18 @@ x_gui_rep::get_selection (string key, tree& t, string& s) {
       is_nil (windows_l) ||
       contains (windows_l, selown)) return res;
 
-  Window win= windows_l->item;
-  x_window x_win= (x_window) Window_to_window[win];
-  Atom prop= XInternAtom (dpy, "MY_STRING_SELECTION", false);
-  XConvertSelection (dpy, xsel, XA_STRING, prop, win, CurrentTime);
-
-  int i;
-  XEvent ev;
-  for (i=0; i<1000000; i++)
-    if (XCheckIfEvent (dpy, &ev, my_selnotify_predicate, (XPointer) x_win))
-      break;
-  if (i==1000000) return res;
-  XSelectionEvent& sel= ev.xselection;
-
-  if (sel.property==prop) {
-    long offset=0;
-    Atom type;
-    int fm;
-    unsigned long n, remains;
-    unsigned char* ret;
-    
-    do {
-      XGetWindowProperty (dpy, win, sel.property,
-			  offset, 1024, true, AnyPropertyType,
-			  &type, &fm, &n, &remains, &ret);
-      s << string ((char*) ret, n);
-      offset += (n >> 2);
-      XFree (ret);
-    } while (remains>0);
-    t= tuple ("extern", s);
-    return true;
+  // the text in UTF-8: as UTF8_STRING, else as STRING (Latin-1, #440); an
+  // owner which does not answer is not asked again
+  Atom type= None;
+  int r= request_selection (xsel, XA_UTF8_STRING, s, type);
+  if (r < 0) return res;
+  if (r == 0) {
+    s= "";
+    if (request_selection (xsel, XA_STRING, s, type) <= 0) return res;
   }
-  else return res;
+  if (type == XA_STRING) s= x_latin1_to_utf8 (s);
+  t= tuple ("extern", s);
+  return true;
 }
 
 bool
@@ -292,6 +350,26 @@ x_gui_rep::clear_selection (string key) {
   selection_s->reset (key);
 }
 
+// whether the text exported for a selection in this format is in UTF-8
+// (else in Cork, or in Latin-1), as the converters write it, following the
+// preferences (as the Qt port reads them)
+static string
+exported_encoding (string format) {
+  if (format == "html") return "utf-8";
+  string enc;
+  if (format == "latex")
+    enc= get_preference ("texmacs->latex:encoding", "auto");
+  else if (format == "verbatim" || format == "default")
+    enc= get_preference ("texmacs->verbatim:encoding", "auto");
+  else return "iso-8859-1";
+  if (enc == "auto" || enc == "default") enc= get_locale_charset ();
+  if (enc == "utf-8" || enc == "UTF-8" || enc == "utf8" || enc == "UTF8")
+    return "utf-8";
+  if (enc == "cork" || enc == "Cork")
+    return (format == "latex")? string ("utf-8"): string ("cork");
+  return "iso-8859-1";
+}
+
 bool
 set_selection (string key, tree t,
                string s, string sv, string sh, string format) {
@@ -302,13 +380,28 @@ set_selection (string key, tree t,
   // one instance, the tree t is pasted). Keeping it would need a second
   // target for the markup, as the Qt port offers with its MIME types.
   if (format == "default") s= sv;
+  // kept in UTF-8, offered as UTF8_STRING and as STRING (#440)
+  string enc= exported_encoding (format);
+  if (enc == "cork") s= cork_to_utf8 (s);
+  else if (enc != "utf-8") s= x_latin1_to_utf8 (s);
   return the_gui->set_selection (key, t, s);
 }
 
 bool
 get_selection (string key, tree& t, string& s, string format) {
-  (void) format;
-  return the_gui->get_selection (key, t, s);
+  if (!the_gui->get_selection (key, t, s)) return false;
+  if (!is_tuple (t, "extern", 1)) return true;
+  // the text of another application, in UTF-8: as the Qt port does, plain
+  // text for the default format (not TeXmacs markup: a "<" pasted was taken
+  // for a tag), the text in the encoding of the preferences for verbatim
+  if (format == "default")
+    s= as_string (call ("convert", s, "verbatim-snippet", "texmacs-snippet"));
+  else if (format == "verbatim") {
+    string enc= get_preference ("verbatim->texmacs:encoding", "auto");
+    if (enc == "iso-8859-1" || enc == "ISO-8859-1") s= x_utf8_to_latin1 (s);
+  }
+  t= tuple ("extern", s);
+  return true;
 }
 
 void

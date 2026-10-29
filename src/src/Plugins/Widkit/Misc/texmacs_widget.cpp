@@ -363,6 +363,9 @@ texmacs_widget_rep::handle_set_widget (set_widget_event ev) {
       THIS ["bottom"] << emit_invalidate_all ();
     }
   }
+  else if (ev->which == "side tools" || ev->which == "left tools" ||
+           ev->which == "extra tools");
+    // (no such tools in this port: they made the window fail at its start)
   else if (ev->which == "interactive prompt")
     set_subwidget (THIS ["footer"] ["interactive"], "left", ev->w);
   else if (ev->which == "interactive input")
@@ -411,7 +414,8 @@ texmacs_widget_rep::handle_set_string (set_string_event ev) {
     set_subwidget_flag (THIS ["header"] ["focus"], ev->s == "on");
   else if (ev->which == "user icons")
     set_subwidget_flag (THIS ["header"] ["user"], ev->s == "on");
-  else if (ev->which == "side tools")
+  else if (ev->which == "side tools" || ev->which == "left tools" ||
+           ev->which == "extra tools")
     /*set_side_tools_flag (ev->s == "on")*/;
   else if (ev->which == "bottom tools") {
     if (ev->s != "on") send_keyboard_focus (abstract (THIS ["canvas"]));
@@ -445,6 +449,8 @@ texmacs_widget_rep::handle_get_string (get_string_event ev) {
   else if (ev->which == "side tools")
     //ev->s= get_side_tools_flag ()? string ("on"): string ("off");
     ev->s= string (use_side_tools? "on": "off");
+  else if (ev->which == "left tools" || ev->which == "extra tools")
+    ev->s= "off";
   else if (ev->which == "bottom tools")
     ev->s= get_subwidget_flag (THIS ["bottom"])?
              string ("on"): string ("off");
