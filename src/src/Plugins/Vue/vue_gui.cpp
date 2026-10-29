@@ -620,6 +620,8 @@ is_retiring (SDL_Window* w) {
   return retiring_index (w) >= 0;
 }
 
+extern bool gui_needs_update; // below: the loop has work to do
+
 // SDL hides or destroys the windows whose moment has come (all of them
 // when TeXmacs ends)
 static void
@@ -638,6 +640,7 @@ retire_windows (bool all) {
         if (reshow && !all) {
           sdl_show_window (w, activate);
           retire_note_shown (w);
+          gui_needs_update= true; // draw it again
         }
       }
     }
