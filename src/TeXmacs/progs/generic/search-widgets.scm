@@ -103,11 +103,37 @@
         (check-same? (tm-children new-env) (tm-children old-env)))))
 
 (define (filter-search-results sels)
-  (if (or (null? sels) (null? (cdr sels))) (list)
-      (with r (filter-search-results (cddr sels))
-        (if (accept-search-result? (car sels))
-            (cons* (car sels) (cadr sels) r)
-            r))))
+  ;; (iterative: a document may have tens of thousands of hits, #596)
+  (let loop ((l sels) (r (list)))
+    (if (or (null? l) (null? (cdr l))) (reverse r)
+        (loop (cddr l)
+              (if (accept-search-result? (car l))
+                  (cons* (cadr l) (car l) r)
+                  r)))))
+
+(define (first-accepted-hit sels cur)
+  ;; the first hit of sels (unfiltered) which the filter of the search
+  ;; accepts, after cur, as search-next on the filtered hits gives it, but
+  ;; judging the hits only until it (#596)
+  (let* ((accepted (lambda (l)
+                     ;; the hits from the first accepted one in l on
+                     (let loop ((l l))
+                       (cond ((or (null? l) (null? (cdr l))) (list))
+                             ((accept-search-result? (car l)) l)
+                             (else (loop (cddr l)))))))
+         (after (let loop ((l sels))
+                  (if (and (pair? l) (pair? (cdr l))
+                           (not (path-less-eq? cur (cadr l))))
+                      (loop (cddr l))
+                      l))))
+    (let loop ((l (accepted after)))
+      (and (pair? l)
+           (with next (accepted (cddr l))
+             ;; (as next-search-hit: an empty hit at cur after a hit which
+             ;; ends there)
+             (if (and (pair? next) (== (cadr l) (car next)) (== (cadr l) cur))
+                 (loop next)
+                 (list (car l) (cadr l))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Highlighting the search results
@@ -488,15 +514,13 @@
 (define (replace-continues? cur)
   (and replace-last (== (car replace-last) (replace-state cur))))
 
-(define (pairs l)
-  (if (or (null? l) (null? (cdr l))) (list)
-      (cons (list (car l) (cadr l)) (pairs (cddr l)))))
-
 (define (next-hit cur what)
   ;; the hit from which Replace goes on, from cur: the first one which the
   ;; search finds in the text of the document after cur, now (nothing found
   ;; before a change is kept across it), which the filter of the search
-  ;; accepts: the search goes on after the hits which it rejects
+  ;; accepts: the search goes on after the hits which it rejects. The filter
+  ;; judges the start of the whole hit, as for the hits which the search
+  ;; shows, not that of the match in it (#596)
   (let* ((t (buffer-tree))
          (p (tree->path t)))
     (and (list-starts? cur p)
@@ -505,13 +529,13 @@
          (let loop ((from cur)
                     (empty? (and (replace-continues? cur)
                                  (cadr replace-last))))
-           (let* ((l (with-search-access-mode
-                       (lambda () (tree-search-from t what p from 1 empty?))))
-                  (f (pairs (filter-search-results l))))
-             (cond ((nnull? f) (car f))
-                   ((null? l) #f)
+           ;; (one hit: its match, and the start of the whole hit)
+           (with l (with-search-access-mode
+                     (lambda () (tree-search-from t what p from 1 empty?)))
+             (cond ((< (length l) 3) #f)
+                   ((accept-search-result? (caddr l)) (list (car l) (cadr l)))
                    ;; (no empty hit at from: tree-search-from leaves it out)
-                   ((path-less? from (cAr l)) (loop (cAr l) #f))
+                   ((path-less? from (cadr l)) (loop (cadr l) #f))
                    (else #f)))))))
 
 (define (replace-current-range sel what)
@@ -614,13 +638,18 @@
   ;; Replace one again and again, from the reference: each step goes on in
   ;; the text after its match, which a match which is not empty shortens,
   ;; and after an empty one the next starts at least one character later
-  ;; (see next-hit), so it ends. The first hit from a search of the
-  ;; document now (the hits of the widget can be partial)
+  ;; (see next-hit), so it ends. The first hit: after a replacement, the
+  ;; next one in the text after it, as Replace one goes on (the hit which
+  ;; ends there would replace in the replacement, #596), else the first from
+  ;; a search of the document now (the hits of the widget can be partial)
   (let* ((what (search-tree))
          (t (buffer-tree))
-         (sels (filter-search-results
-                 (tree-perform-search t what (tree->path t) 1000000))))
-    (let loop ((sel (search-next sels (get-search-reference #t) #f)))
+         (cur (get-search-reference #t)))
+    (let loop ((sel (if (replace-continues? cur)
+                        (next-hit cur what)
+                        (first-accepted-hit
+                          (tree-perform-search t what (tree->path t) 1000000)
+                          cur))))
       (when sel
         (replace-step sel by what)
         (loop (next-hit (cursor-path) what))))
