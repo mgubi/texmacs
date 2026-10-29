@@ -2036,6 +2036,16 @@ search_from (tree t, tree what, path p, path cur, int limit) {
   return r;
 }
 
+tree
+search_range_tree (tree t, path p1, path p2) {
+  // the text from p1 to p2 in t, exactly (the selection of the editor
+  // moves the ends of a range next to a script over its base: a match
+  // taken from it got the base, #520)
+  if (!is_position (t, p1) || !is_position (t, p2) || path_less (p2, p1))
+    return "";
+  return simplify_correct (selection_compute (t, p1, p2));
+}
+
 array<tree>
 search_align (tree t, path p1, path p2, tree what) {
   // the run which each child of the formula pattern what takes in the

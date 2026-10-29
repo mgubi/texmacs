@@ -1859,6 +1859,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-search-range-tree <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_range_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(tree-spell <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>

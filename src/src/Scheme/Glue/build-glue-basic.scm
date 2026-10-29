@@ -260,6 +260,7 @@
   (tree-search-align search_align (array_tree content path path content))
   (tree-search-replace-range search_replace_range (array_path content path path content))
   (tree-search-from search_from (array_path content content path path int))
+  (tree-search-range-tree search_range_tree (tree content path path))
   (tree-spell spell (array_path string content path int))
   (tree-spell* spell_with_cache (array_path string content path int))
   (tree-spell-at spell (array_path string content path path int))

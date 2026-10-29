@@ -1888,6 +1888,30 @@
           ((document (concat (rsub "bx") "b"))
            (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
            (document (concat (rsub "<>x") "<>")))
+          ;; next to scripts: exactly the range is removed (the selection
+          ;; of the editor moved its ends over the base of a script: the
+          ;; base was lost, also a whole tag)
+          ((document (concat "x" (rsub "1") "a"))
+           (concat (rsub (wildcard "w")) "a") "Z" (document "xZ"))
+          ((document (concat "x" (rsub "1") "a"))
+           (concat (rsub (wildcard "w")) "a") (concat "<" (wildcard "w") ">")
+           (document "x<1>"))
+          ((document (concat (frac "p" "q") (rsub "1") "a"))
+           (concat (rsub (wildcard "w")) "a") "Z"
+           (document (concat (frac "p" "q") "Z")))
+          ((document (concat (strong "p") (rsup "2") "a"))
+           (concat (rsup (wildcard "w")) "a") "Z"
+           (document (concat (strong "p") "Z")))
+          ((document (concat "a" (lsub "1") "x"))
+           (concat "a" (lsub (wildcard "w"))) "Z" (document "Zx"))
+          ((document (concat "a" (lsup "1") (frac "p" "q")))
+           (concat "a" (lsup (wildcard "w"))) "Z"
+           (document (concat "Z" (frac "p" "q"))))
+          ((document (concat "x" (rsub "1") (rsup "2") "a"))
+           (concat "x" (rsub (wildcard "w"))) "Z"
+           (document (concat "Z" (rsup "2") "a")))
+          ((document (concat "f" (rprime "'") "a"))
+           (concat (rprime (wildcard "w")) "a") "Z" (document "fZ"))
           ;; a leading wildcard does not take the text before the reference
           ((document (concat "p" (strong "xb") "zb"))
            (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
@@ -2161,7 +2185,7 @@
 (define (random-item d)
   (if (or (<= d 0) (< (random-next 10) 5)) (random-string)
       (with x (lambda () (random-formula (- d 1)))
-        (case (random-next 11)
+        (case (random-next 16)
           ((0) `(strong ,(x)))
           ((1) `(math ,(x)))
           ((2) `(with "color" "red" ,(x)))
@@ -2172,6 +2196,12 @@
           ((7) `(tabular (table (row (cell ,(x)) (cell ,(x))))))
           ((8) `(footnote ,(x)))
           ((9) `(tabular (table (row (cell (document ,(x) ,(x)))))))
+          ;; scripts, next to the strings and tags of the formula
+          ((11) `(rsub ,(random-string)))
+          ((12) `(rsup ,(random-string)))
+          ((13) `(lsub ,(random-string)))
+          ((14) `(lsup ,(random-string)))
+          ((15) `(rprime "'"))
           (else `(em ,(x)))))))
 
 (define (random-formula d)
@@ -2184,7 +2214,7 @@
   (let* ((w '(wildcard "w")) (v '(wildcard "v"))
          (doc (simplified `(document ,@(map (lambda (i) (random-formula 2))
                                             (iota (+ 1 (random-next 3)))))))
-         (what (case (random-next 12)
+         (what (case (random-next 15)
                  ((0 1 2) (random-pick '("a" "ab" "ba" "aa" "b" "abx")))
                  ((3) `(concat "a" ,w))
                  ((4) `(concat ,w "b"))
@@ -2194,6 +2224,9 @@
                  ((8) `(concat "a" (select-region "")))
                  ((9) `(concat "a" (select-region ,w) "b"))
                  ((10) `(document (concat ,w "a") (concat "b" ,v)))
+                 ((12) `(concat (rsub ,w) "a"))
+                 ((13) `(concat "a" (lsub ,w)))
+                 ((14) `(concat "b" (rsub ,w)))
                  (else `(concat (strong ,w) "a"))))
          (by (if (and (pair? what) (in? (car what) '(concat document frac))
                       (not (and (== (car what) 'concat)
@@ -2245,6 +2278,47 @@
            (loop (cons (string-append (car l) (cadr l)) (cddr l))))
           (else (cons (car l) (loop (cdr l)))))))
 
+(define (chars-and-tags t keep?)
+  ;; the characters and the tags of t at the root, in order, which keep?
+  ;; keeps (it gets the position before and after each), without the
+  ;; formulas and documents
+  (let walk ((t t) (q (list)))
+    (cond ((string? t)
+           (let loop ((i 0) (acc (list)))
+             (if (>= i (string-length t)) (reverse acc)
+                 (loop (+ i 1)
+                       (if (keep? (rcons q i) (rcons q (+ i 1)))
+                           (cons (substring t i (+ i 1)) acc) acc)))))
+          ((and (pair? t) (in? (car t) '(concat document)))
+           (append-map (lambda (k) (walk (list-ref t (+ k 1)) (rcons q k)))
+                       (iota (- (length t) 1))))
+          ((pair? t)
+           (append (if (keep? (rcons q 0) (rcons q 1)) (list (list (car t)))
+                       (list))
+                   (append-map (lambda (k) (walk (list-ref t (+ k 1))
+                                                 (rcons q k)))
+                               (iota (- (length t) 1)))))
+          (else (list)))))
+
+(define (subsequence? xs ys)
+  (cond ((null? xs) #t)
+        ((null? ys) #f)
+        ((== (car xs) (car ys)) (subsequence? (cdr xs) (cdr ys)))
+        (else (subsequence? xs (cdr ys)))))
+
+(define (kept-outside? trace result)
+  ;; each replacement of trace (the document before it, and its range)
+  ;; kept all the text outside its range: in the next document, in order
+  (let loop ((l (reverse trace)))
+    (or (null? l)
+        (let* ((d (caar l)) (a (cadar l)) (b (caddar l))
+               (next (if (null? (cdr l)) result (caadr l)))
+               (outside (chars-and-tags d (lambda (x y)
+                                            (or (path-less? x a)
+                                                (path-less? b y))))))
+          (and (subsequence? outside (chars-and-tags next (lambda (x y) #t)))
+               (loop (cdr l)))))))
+
 (define (random-case-problems c)
   ;; the checks which the random case c fails
   (let* ((doc (car c)) (what (cadr c)) (by (caddr c)) (prefs (cadddr c))
@@ -2256,7 +2330,10 @@
             (let* ((m (resolve-module '(generic search-widgets)))
                    (no-skip (eval '(set! replace-skip-message #f) m))
                    (all (replace-all-in-buffer doc what by))
+                   (no-trace (eval '(set! replace-trace (list)) m))
                    (one (replace-one-repeatedly doc what by))
+                   (trace (eval 'replace-trace m))
+                   (no-trace2 (eval '(set! replace-trace #f) m))
                    (skip (eval 'replace-skip-message m))
                    (hits (tree-search-tree (stree->tree doc) (stree->tree what)
                                            '() 1000))
@@ -2275,6 +2352,10 @@
                                              (text-and-tags expect))))
                     '() '(string-replacement))
                 (if (> (- (texmacs-time) t0) 10000) '(too-slow) '())
+                ;; nothing outside the range of each replacement changed
+                (if (or (not (pair? one)) (== (car one) 'runaway)
+                        (kept-outside? trace one))
+                    '() '(text-outside-changed))
                 ;; a hit of a string or formula pattern is never left: the
                 ;; search gives only hits which Replace can replace (a hit
                 ;; of a tag pattern whose values would lose text is left)

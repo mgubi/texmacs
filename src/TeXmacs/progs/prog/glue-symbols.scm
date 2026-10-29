@@ -257,6 +257,7 @@
 "tree-search-align"
 "tree-search-replace-range"
 "tree-search-from"
+"tree-search-range-tree"
 "tree-spell"
 "tree-spell*"
 "tree-spell-at"

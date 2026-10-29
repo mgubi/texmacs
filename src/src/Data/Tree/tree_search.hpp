@@ -21,6 +21,7 @@ range_set navigate_search_hit (path cur, bool fw, bool extreme, bool strict);
 array<tree> search_align (tree t, path p1, path p2, tree what);
 array<path> search_replace_range (tree t, path p1, path p2, tree what);
 array<path> search_from (tree t, tree what, path p, path cur, int limit);
+tree search_range_tree (tree t, path p1, path p2);
 
 range_set spell_with_cache (string lan, tree t, path p, int limit= 1000000);
 range_set spell (string lan, tree t, path p, int limit= 1000000);

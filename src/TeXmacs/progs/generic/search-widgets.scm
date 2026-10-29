@@ -476,6 +476,8 @@
 ;; one step of undo (#520)
 
 (define replace-last #f)
+(define replace-trace #f)   ;; for the tests: the document and the range of
+                            ;; each replacement, if a list
 (define replace-skip-message #f)
 
 (define (replace-state cur)
@@ -522,17 +524,32 @@
                                            (list-tail (cadr sel) (length p))
                                            what)
                 (list)))
+         ;; the range, and the match in it, exactly: the selection of the
+         ;; editor (selection-tree, clipboard-cut) moves the ends of a range
+         ;; next to a script over its base, which was then lost
+         (a (if in? (append p (car r)) (car sel)))
+         (b (if in? (append p (cadr r)) (cadr sel)))
          (by* (cond ((not in?)
                      (selection-set-range-set sel)
                      (adjust-by by what (selection-tree)))
                     ((null? r) #f)
                     (else
-                     (selection-set-range-set
-                       (list (append p (car r)) (append p (cadr r))))
-                     (adjust-by by what (selection-tree) t (car r) (cadr r))))))
+                     (selection-set-range-set (list a b))
+                     (adjust-by by what (tree-search-range-tree t (car r) (cadr r))
+                                t (car r) (cadr r))))))
     (if by*
         (with by* (tm->tree by*)
-          (clipboard-cut "dummy")
+          (when replace-trace
+            (set! replace-trace
+                  (cons (list (tm->stree t) (list-tail a (length p))
+                              (list-tail b (length p)))
+                        replace-trace)))
+          (if (not in?) (clipboard-cut "dummy")
+              (begin
+                (selection-cancel)
+                (go-to a)
+                ;; (an empty match: nothing to remove)
+                (when (path-less? a b) (clipboard-cut-between a b))))
           (insert-go-to (tree-copy by*) (path-end by* '()))
           #t)
         (begin
