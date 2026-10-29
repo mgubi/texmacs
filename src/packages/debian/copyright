@@ -28,3 +28,15 @@ see "/usr/share/common-licenses/GPL-3".
 
 # Please also look if there are files or directories which have a
 # different copyright/license attached and list them here.
+
+Files: TeXmacs/misc/csl/styles/* TeXmacs/misc/csl/locales/*
+
+    The styles and the locales of the Citation Style Language, from
+    <https://github.com/citation-style-language/styles> and
+    <https://github.com/citation-style-language/locales>; each style names
+    its authors in its <info> element.
+
+License:
+
+    Creative Commons Attribution-ShareAlike 3.0 Unported,
+    <https://creativecommons.org/licenses/by-sa/3.0/>

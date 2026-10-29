@@ -152,6 +152,10 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
+(lazy-define (csl csl-files) csl-style-name? csl-available-styles)
+(lazy-define (csl csl-bib) csl-bib-process csl-cite-details
+             csl-textual-authors)
+(lazy-define (csl csl-style) csl-style-file csl-language->locale)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -437,7 +441,8 @@
 (lazy-define (database db-convert) db-url?)
 (lazy-define (database bib-db) zealous-bib-import zealous-bib-export)
 (lazy-define (database bib-manage)
-             bib-import-bibtex bib-compile bib-attach open-bib-chooser)
+             bib-import-bibtex bib-compile bib-attach open-bib-chooser
+             bib-entries-as-bibtex)
 (lazy-define (database bib-local) open-biblio)
 (lazy-define (database ai-agents-db) ai-agents-get-corrector
 	     ai-agents-get-interlocutor ai-agents-get-translator

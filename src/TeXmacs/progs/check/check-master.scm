@@ -42,6 +42,7 @@
         (check read-only-test)
         (check typeset-test)
         (check bibtex-test)
+        (check csl-test)
         (check database-test)
         (check math-edit-test)
         (check table-test)
@@ -136,6 +137,7 @@
     ;; document processes the pending GUI events, among which those of the
     ;; views which editing closed (#174)
     ("bibtex" bibtex-test-failures count)
+    ("csl" csl-test-failures count)
     ;; generates the auxiliary data of documents in the temporary directory
     ("links" links-test-failures count)
     ("structures" structures-test-failures count)

@@ -73,15 +73,22 @@
               (document (concat "No preview for external " (BibTeX)
                                 " styles")))))
         (else
-         `(with "bg-color" "#ffffff"
-            (mini-paragraph "480px"
-              ,(bib-process "bib" style
-                            (bibwid-preview-entries (tree->stree t))))))))
+         (with entries (bibwid-preview-entries (tree->stree t))
+           `(with "bg-color" "#ffffff"
+              (mini-paragraph "480px"
+                ,(if (csl-style-name? style)
+                     ;; the entries alone, not the citations of the document
+                     (csl-bib-process "bib" style entries '() #f #f)
+                     (bib-process "bib" style entries))))))))
 
 (define (bibwid-output)
-  (with style (and (string-starts? bibwid-style "tm-")
-                   (string-drop bibwid-style 3))
-    (if style (eval `(use-modules (bibtex ,(string->symbol style)))))
+  ;; tm-NAME and csl-NAME have a preview, the external styles none
+  (with style (cond ((string-starts? bibwid-style "tm-")
+                     (string-drop bibwid-style 3))
+                    ((csl-style-name? bibwid-style) bibwid-style)
+                    (else #f))
+    (if (and style (not (csl-style-name? style)))
+        (eval `(use-modules (bibtex ,(string->symbol style)))))
     (with u (if (and bibwid-use-relative? (not (url-rooted? bibwid-url)))
                 (url-append (url-head bibwid-buffer) bibwid-url)
                 bibwid-url)
@@ -153,7 +160,8 @@
               bibwid-update-buffer?)
       ///
       (text "Style:") // //
-      (enum (bibwid-set-style answer) (bib-standard-styles)
+      (enum (bibwid-set-style answer)
+            (append (bib-standard-styles) (csl-available-styles))
             bibwid-style "10em"))
     === === ===
     (hlist // (dynamic (bibwid-preview)) //)
