@@ -322,7 +322,9 @@ typesetter_rep::typeset () {
     br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   }
   double t1= edit_profile.on ? edit_profile_now () : 0;
-  pager ppp= tm_new<pager_rep> (br->ip, env, l);
+  // (an array of its own: the breaker changes some items in it, see
+  // breaker_prepare_items, and l shares its items with the bridges)
+  pager ppp= tm_new<pager_rep> (br->ip, env, copy (l));
   ppp->memo= kept_pages;
   box rb;
   {
