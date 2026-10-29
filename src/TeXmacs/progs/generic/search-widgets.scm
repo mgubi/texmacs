@@ -529,24 +529,34 @@
                    ((and (nnull? l) (path-less? from (cAr l))) (loop (cAr l)))
                    (else #f)))))))
 
+(define (replace-current-range sel what)
+  ;; the match which Replace replaces in the hit sel of the buffer (see
+  ;; replace-match), its range in the buffer, or #f
+  (let* ((t (buffer-tree))
+         (p (tree->path t))
+         (n (length p)))
+    (and (list-starts? (car sel) p) (list-starts? (cadr sel) p)
+         (and-with r (replace-match t what (list-tail (car sel) n)
+                                    (list-tail (cadr sel) n))
+           (cons* (append p (car r)) (append p (cadr r)) (cddr r))))))
+
 (define (replace-hit sel by what)
   ;; replace the hit sel of what by by: the match in it which Replace
   ;; replaces (see replace-match), exactly (the selection of the editor
   ;; moves the ends of a range next to a script over its base, which was
   ;; lost), or leave it with a message; #f if left
-  (let* ((t (buffer-tree))
-         (p (tree->path t))
-         (rm (and (list-starts? (car sel) p) (list-starts? (cadr sel) p)
-                  (replace-match t what (list-tail (car sel) (length p))
-                                 (list-tail (cadr sel) (length p)))))
+  (let* ((rm (replace-current-range sel what))
          (by* (and rm (adjust-by by what (caddr rm) (cadddr rm)))))
     (if by*
-        (let* ((a (append p (car rm)))
-               (b (append p (cadr rm)))
+        (let* ((a (car rm))
+               (b (cadr rm))
                (by* (tm->tree by*)))
           (when replace-trace
-            (set! replace-trace (cons (list (tm->stree t) (car rm) (cadr rm))
-                                      replace-trace)))
+            (let* ((t (buffer-tree))
+                   (n (length (tree->path t))))
+              (set! replace-trace (cons (list (tm->stree t) (list-tail a n)
+                                              (list-tail b n))
+                                        replace-trace))))
           (go-to a)
           ;; (an empty match: nothing to remove)
           (when (path-less? a b) (clipboard-cut-between a b))
@@ -584,12 +594,6 @@
                            (search-next sels cur #f))
            (replace-step sel by what)))))
 
-(define (replace-next by)
-  ;; Replace one, after which the search goes on from the end of the
-  ;; replacement
-  (and (replace-next* by)
-       (begin (perform-search*) #t)))
-
 (define (with-editing thunk)
   ;; thunk as one step of undo, also when it fails
   (dynamic-wind start-editing thunk end-editing))
@@ -597,22 +601,16 @@
 (tm-define (replace-one)
   (and-with by (by-tree)
     (with-buffer (master-buffer)
-      (with-editing (lambda () (replace-next by))))
+      (with-editing (lambda () (replace-next* by))))
     (perform-search*)
     ;; the match which the next Replace replaces, not the whole hit
     (with-buffer (master-buffer)
       (let* ((cur (get-search-reference #t))
              (what (search-tree))
-             (t (buffer-tree))
-             (p (tree->path t))
              (h (and (== (replace-state cur) replace-last)
                      (next-hit cur what)))
-             (r (and h (list-starts? (car h) p) (list-starts? (cadr h) p)
-                     (replace-match t what (list-tail (car h) (length p))
-                                    (list-tail (cadr h) (length p))))))
-        (cond (r
-               (selection-set-range-set
-                 (list (append p (car r)) (append p (cadr r)))))
+             (r (and h (replace-current-range h what))))
+        (cond (r (selection-set-range-set (list (car r) (cadr r))))
               ((== (replace-state cur) replace-last)
                ;; nothing left to replace: no hit in the replacements
                (selection-cancel)))))))
