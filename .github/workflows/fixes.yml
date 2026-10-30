@@ -12,8 +12,8 @@
 #     without packages of development; published when linux passed too;
 #   * macos: the suites (on Apple silicon) and the startup checks, then an
 #     application for Apple silicon and one for Intel, in a disk image each
-#     (signed ad hoc, not notarized), started once; published when both
-#     passed;
+#     (signed ad hoc, not notarized), started once; each published when
+#     its leg passed;
 #   * windows: the suites and the startup checks, then an installer (Inno
 #     Setup, .github/fixes/TeXmacs-Fixes.iss), installed, run and
 #     uninstalled (.github/fixes/windows-installer.sh), and the bundle in a
@@ -246,8 +246,7 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       # (on Apple silicon only, as in the former CI of wip_fixes: the Intel runner
-      # is slower than the timings some suites check; its disk image is
-      # published only when this leg passed too, see the release job)
+      # is slower than the timings some suites check)
       - name: Run the regression suites
         if: matrix.arch == 'arm64'
         run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
@@ -400,7 +399,7 @@ jobs:
     # in the pre-release fixes-latest, only from fixes_ci: each file
     # replaces the one of the former build, with a label naming the commit
     # (the AppImage once the suites passed on Linux and it ran on all the
-    # systems of appimage-check; the macOS disk images once both legs
+    # systems of appimage-check; each macOS disk image once its leg
     # passed, the suites running on Apple silicon)
     name: Publish in fixes-latest
     needs: [linux, appimage-check, macos, windows]
@@ -415,8 +414,12 @@ jobs:
         with:
           name: texmacs-fixes-appimage
           path: dist
+      # each chip on its own: a leg uploads its disk image only once all
+      # its steps passed (the upload is its last step), so the images
+      # present are those of the legs which passed
       - uses: actions/download-artifact@v4
-        if: needs.macos.result == 'success'
+        if: needs.macos.result != 'skipped'
+        continue-on-error: true
         with:
           pattern: texmacs-fixes-macos-*
           merge-multiple: true
