@@ -415,7 +415,12 @@ ns_put_graphics_on_clipboard (url file) {
 - (void) doUpdate: (NSTimer*) timer
 {
   (void) timer;
-  the_gui->update ();
+  bool done= false;
+  NS_ENTRY_BEGIN
+    the_gui->update ();
+    done= true;
+  NS_ENTRY_END ("the update of the interface")
+  if (!done) the_gui->update_failed ();
 }
 @end
 
@@ -744,6 +749,16 @@ ns_gui_rep::update () {
 
   start_update_timer (delay);
   updating = false;
+}
+
+void
+ns_gui_rep::update_failed () {
+  // update threw an exception (reported, see TMUpdateHelper): the next one
+  // comes a little later, so that an error at each update does not take the
+  // whole processor
+  updating= false;
+  needing_update= false;
+  start_update_timer (100);
 }
 
 void
@@ -1536,6 +1551,22 @@ static NSAutoreleasePool *pool = nil;
 
 /*! Quitting from the application menu goes through TeXmacs, which asks
  about unsaved documents. */
+/*! The application: the events (keys, mouse, menus, the actions of the
+ controls, the delegates of the windows, drag and drop) go through sendEvent,
+ where an exception which nothing caught is reported (see NS_ENTRY_BEGIN)
+ instead of aborting TeXmacs or being only logged by AppKit (#621) */
+@interface TMApplication : NSApplication
+@end
+
+@implementation TMApplication
+- (void) sendEvent: (NSEvent*) event
+{
+  NS_ENTRY_BEGIN
+    [super sendEvent: event];
+  NS_ENTRY_END ("the processing of an event")
+}
+@end
+
 @interface TMQuitHelper : NSObject
 - (void) quit: (id) sender;
 @end
@@ -1595,6 +1626,7 @@ static NSAutoreleasePool *pool = nil;
 - (void) application: (NSApplication*) app openURLs: (NSArray<NSURL*>*) urls
 {
   (void) app;
+  NS_ENTRY_BEGIN
   // as in Qt: the first one replaces the buffer of the start, the others
   // open new windows
   static bool new_window_flag= false;
@@ -1608,6 +1640,7 @@ static NSAutoreleasePool *pool = nil;
     new_window_flag= true;
   }
   if (the_gui) the_gui->need_update ();
+  NS_ENTRY_END ("application:openURLs:")
 }
 
 - (NSApplicationTerminateReply) applicationShouldTerminate: (NSApplication*) app
@@ -1615,8 +1648,10 @@ static NSAutoreleasePool *pool = nil;
   // NOTE: TeXmacs itself ends by stopping the loop (see update), so this
   // only comes from outside
   (void) app;
-  exec_delayed (scheme_cmd ("(safely-quit-TeXmacs)"));
-  if (the_gui) the_gui->need_update ();
+  NS_ENTRY_BEGIN
+    exec_delayed (scheme_cmd ("(safely-quit-TeXmacs)"));
+    if (the_gui) the_gui->need_update ();
+  NS_ENTRY_END ("applicationShouldTerminate:")
   return NSTerminateCancel;
 }
 
@@ -1665,8 +1700,8 @@ void gui_open (int& argc, char** argv)
   // start the gui
 {
   if (!NSApp) {
-    // initialize app
-    [NSApplication sharedApplication];
+    // initialize app (an instance of TMApplication)
+    [TMApplication sharedApplication];
     // NOTE: the menu bar is made by make_main_menu
     // NOTE: needed for a menu bar when TeXmacs is not in a bundle;
     // headless (-headless): no icon in the Dock and no menu bar
@@ -1689,6 +1724,9 @@ void gui_open (int& argc, char** argv)
     static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
     [NSApp setDelegate: delegate];
   }
+  if (![NSApp isKindOfClass: [TMApplication class]])
+    debug_aqua << "the application was made before gui_open: the exceptions "
+               << "of the events are not reported\n";
   ns_follow_theme ();
   static TMAppearanceObserver* observer= [[TMAppearanceObserver alloc] init];
   (void) observer;
@@ -1900,7 +1938,15 @@ command_queue::exec_pending () {
   for (i = 0; i<n; i++) {
     time_t now =  texmacs_time ();
     if ((now - b[i]) >= 0) {
-      object obj = call (a[i]);
+      // (an error in one of them is reported, and the others, taken out
+      // of the queue already, still run: #621)
+      object obj= object (false);
+      try {
+        obj= call (a[i]);
+      }
+      catch (string& msg) {
+        ns_report_exception ("a delayed command", msg);
+      }
       if (is_int (obj) && (now - b[i] < 1000000000)) {
         time_t pause = as_int (obj);
         //cout << "pause = " << obj << "\n";

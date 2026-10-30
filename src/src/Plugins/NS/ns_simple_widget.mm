@@ -172,7 +172,12 @@ ns_bench_now () {
   if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
   if (!wid || !wid->gpu_dirty) { [self sleep]; return; }
   double t= ns_bench_now ();
-  if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
+  bool done= false;
+  NS_ENTRY_BEGIN
+    if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
+    done= true;
+  NS_ENTRY_END ("the presentation of a canvas drawn by the GPU")
+  if (!done) { wid->gpu_dirty= false; [self sleep]; }
   ns_bench_display += ns_bench_now () - t;
   if (dbg) fprintf (stderr, "PRESENT %.3f ms at %.3f\n", 1000 * (ns_bench_now () - t), t);
 }

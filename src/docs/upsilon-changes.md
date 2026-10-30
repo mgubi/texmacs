@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Cocoa: errors reported instead of silent**: an error in an action of
+  the interface (a menu, a button, a delayed command, the closing of a
+  window...) is reported in the terminal and the console of errors, and
+  TeXmacs goes on, instead of aborting or of ignoring it without a word;
+  a document typeset again and again without any input (a loop) gets a
+  warning naming it; the conversions of texts for macOS which fail say so
+  on the debug channel `debug-aqua` (#621).
 - **Hidden definitions in tables and floats**: what a hidden part
   (`hidden`, `hide-preamble`) assigns in a table cell whose lines are
   broken, or in a float, holds for what follows, as when it is not

@@ -301,6 +301,37 @@ fade).
   file chooser, the files given by macOS): `to_nsstring_utf8` keeps a
   string which looks like UTF-8, as `to_qstring` does.
 
+### Failures made visible (#621)
+
+* the conversions of strings (`to_nsstring`, `to_nsstring_utf8`,
+  `from_nsstring`, `from_nsstring_utf8` in `ns_utilities.mm`) print a
+  warning on the channel `debug-aqua` when they fail or when `to_nsstring`
+  takes its fallback (a string in the cork encoding where UTF-8 is
+  expected: its caller should use `to_label` or `to_nsstring_utf8`), with
+  the string (escaped) and the function which called it; once for each
+  string, at most 50;
+* the entry points from AppKit into TeXmacs catch the exceptions,
+  Objective-C (`NSException`) and C++ (the `ASSERT`s and `FAILED`s), and
+  report them as errors (`failed-error`, with the backtrace of the
+  exception): `NS_ENTRY_BEGIN` and `NS_ENTRY_END (where)` of
+  `ns_utilities.h`, in `sendEvent:` of `TMApplication` (the application:
+  keys, mouse, menus, the actions of the controls, the delegates of the
+  windows, drag and drop), the update timer (`TMUpdateHelper`, which then
+  updates again 100 ms later), the presentation of the canvases drawn by
+  the GPU, the actions of the menu items and of the buttons, the delegate
+  of the application; an error in a delayed command is reported and the
+  other delayed commands still run. The same exception again is only
+  counted (reported at its 10th, 100th... time);
+* an editor typeset again from scratch at least 20 times in a row, during
+  more than 5 seconds, without any key or mouse event, gets a warning
+  (`std-warning`, once for each editor, from `apply_changes` in
+  `edit_interface.cpp`, for every interface) with the document, the
+  variables of its initial environment which changed, the size of its
+  canvas and its zoom (#620);
+* the sizes and positions given to the windows (`SLOT_SIZE`,
+  `SLOT_POSITION`) and the lengths of `ns_decode_length` are checked: not
+  a number, negative or huge values are reported on `debug-aqua`.
+
 ### Known gaps
 
 * as in the Qt interface: no ink widget, no empty widget, no mouse pointer

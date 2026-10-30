@@ -169,6 +169,7 @@ public:
   void set_check_events (bool enable_check);
   
   void update();
+  void update_failed();
   void force_update();
   void need_update();
   void refresh_language();
