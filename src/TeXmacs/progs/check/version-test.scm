@@ -991,8 +991,13 @@
       (load-buffer g)
       (switch-to-buffer* g)
       (git-commit msg)
-      (check= (git-sh "log -1 --pretty=%s")
-              (string-append (cork->utf8 msg) "\n"))
+      ;; (read from a file: on Windows, eval-system decodes the output of
+      ;; the command in the OEM code page, windows64_system.cpp:640, which
+      ;; garbles the UTF-8 written by git)
+      (with out (tmp-name "message.txt")
+        (git-sh "log -1 --pretty=%s --output=\"" out "\"")
+        (check= (string-load (system->url out))
+                (string-append (cork->utf8 msg) "\n")))
       (check= (buffer-status g) "  ")
       (for (b (buffer-list))
         (when (not (in? b bufs))
