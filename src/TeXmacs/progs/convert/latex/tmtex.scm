@@ -2866,6 +2866,25 @@
     (tmtex-env-reset "mode")
     r))
 
+(define (tmtex-aligned-columns? ha)
+  (or (null? ha)
+      (and (== (car ha) "r") (nnull? (cdr ha)) (== (cadr ha) "l")
+           (tmtex-aligned-columns? (cddr ha)))))
+
+(define (tmtex-equations-base s l)
+  ;; The Html export expands the arrays (aligned, align*, eqnarray*...)
+  ;; into equations-base, which reaches here inside MathJax formulas (#611):
+  ;; an aligned for columns aligned right and left in turn, else an array
+  (tmtex-env-set "mode" "math")
+  (let* ((p (tmtable-parser (car l)))
+         (ha (p 'cols 'halign))
+         (env (if (tmtex-aligned-columns? ha)
+                  '(!begin "aligned")
+                  `(!begin "array" ,(apply string-append ha))))
+         (r (list env (tmtex-table-make p))))
+    (tmtex-env-reset "mode")
+    r))
+
 (define (tmtex-math s l)
   (cond ((tm-in? (car l) '(equation equation* eqnarray eqnarray*))
          (tmtex (car l)))
@@ -3815,6 +3834,7 @@
   ((:or eqnarray eqnarray* leqnarray*
         gather multline gather* multline* align
         flalign alignat align* flalign* alignat*) (,tmtex-eqnarray 1))
+  (equations-base (,tmtex-equations-base 1))
 
   (eq-number (,tmtex-default -1))
   (separating-space (,tmtex-hspace* 1))

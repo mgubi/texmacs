@@ -14,6 +14,18 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **HTML export with MathJax: accents and aligned formulas** (desktop):
+  the ring accent is written `\mathring`, the inverted breve
+  `\overparen`, the accents below a formula with `\underset` and the
+  braces over or under it with `\overset`/`\underset`, all known to
+  MathJax; an `aligned` (or `split`, `alignedat`...) inside an equation
+  becomes `\begin{aligned}` instead of the unknown `equationsbase`, and
+  `gathered`, `subarray` and `eqnarray*` inside a formula are kept
+  (#607, #611).
+- **Shell sessions: the interrupt message** (desktop): interrupting a
+  command of a shell session shows the red "Interrupted TeXmacs shell"
+  again, never the raw text `(with "color" "red" ...)`, which appeared
+  when the interrupt came at a bad moment on a loaded machine (#646).
 - **The Git merge driver finds TeXmacs on Windows and Linux** (desktop):
   the command which Git runs to merge `.tm` documents structurally now
   calls `texmacs.exe` of the Windows installer and bundle (with `/` in its
