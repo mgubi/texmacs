@@ -48,11 +48,14 @@
           ((== pdir dir) "/")
           (else (git-root pdir)))))
 
+(define (git-options work-dir)
+  (string-append "git"
+                 " " (version-quote (string-append "--work-tree=" work-dir))
+                 " " (version-quote (string-append "--git-dir=" work-dir
+                                                   "/.git"))))
+
 (tm-define (git-command url)
-  (with work-dir (git-root url)
-    (string-append "git"
-                   " --work-tree=" work-dir
-                   " --git-dir=" work-dir "/.git")))
+  (git-options (git-root url)))
 
 ;; Warning: use it carefully since the current buffer changes during tmfs reverting
 (tm-define (current-git-root)
@@ -60,10 +63,41 @@
 
 ;; Warning: do not use it
 (tm-define (current-git-command)
-  (with work-dir (current-git-root)
-    (string-append "git"
-                   " --work-tree=" (current-git-root)
-                   " --git-dir=" (current-git-root) "/.git")))
+  (git-options (current-git-root)))
+
+(define (git-unquote s)
+  ;; a file name as git status writes it: in double quotes, with the
+  ;; escapes of C, when it has a space or another special character
+  (define (octal? c) (and (char>=? c #\0) (char<=? c #\7)))
+  (define (escaped c)
+    (cond ((== c #\n) "\n") ((== c #\t) "\t") ((== c #\r) "\r")
+          ((== c #\a) (string (integer->char 7)))
+          ((== c #\b) (string (integer->char 8)))
+          ((== c #\f) (string (integer->char 12)))
+          ((== c #\v) (string (integer->char 11)))
+          (else (string c))))
+  (if (not (and (string-starts? s "\"") (string-ends? s "\"")
+                (>= (string-length s) 2)))
+      s
+      (let loop ((i 1) (r ""))
+        (let ((n (- (string-length s) 1)))
+          (cond ((>= i n) r)
+                ((!= (string-ref s i) #\\)
+                 (loop (+ i 1) (string-append r (string (string-ref s i)))))
+                ((and (<= (+ i 4) n)
+                      (octal? (string-ref s (+ i 1)))
+                      (octal? (string-ref s (+ i 2)))
+                      (octal? (string-ref s (+ i 3))))
+                 ;; a byte of a name which is not in ASCII
+                 (loop (+ i 4)
+                       (string-append r (string (integer->char
+                                                 (string->number
+                                                  (substring s (+ i 1) (+ i 4))
+                                                  8))))))
+                ((< (+ i 1) n)
+                 (loop (+ i 2)
+                       (string-append r (escaped (string-ref s (+ i 1))))))
+                (else r))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File status
@@ -71,7 +105,8 @@
 
 (tm-define (buffer-status name)
   (let* ((path (url->system name))
-         (cmd (string-append (git-command name) " status --porcelain " path))
+         (cmd (string-append (git-command name) " status --porcelain "
+                             (version-quote path)))
          (ret (eval-system cmd)))
     (cond ((> (string-length ret) 3) (string-take ret 2))
           ((file-exists? path) "  ")
@@ -130,7 +165,8 @@
   (with (date by msg commit blank path) alist
         (list
          (string-append commit ":"
-          (url->tmfs-string (system->url (string-append root "/" path))))
+          (url->tmfs-string (system->url (string-append root "/"
+                                                      (git-unquote path)))))
          by date msg)))
 
 (define (git-history-items alist root)
@@ -144,7 +180,7 @@
   (let* ((cmd (string-append
                (git-command name) " log --follow --pretty=%ai%n%an%n%s%n%H --name-only"
                NR_LOG_OPTION
-               (url->system name)))
+               (version-quote (url->system name))))
          (root (git-root name))
          (ret1 (eval-system cmd))
          (ret2 (string-decompose ret1 "\n")))
@@ -162,7 +198,9 @@
          (root (git-root name))
          (rel (url-delta (url-append root "dummy") name))
          (name-s (url->string name))
-         (cmd (string-append git " show " rev ":" (url->string rel)))
+         (cmd (string-append git " show "
+                             (version-quote (string-append
+                                             rev ":" (url->string rel)))))
          (ret (eval-system cmd)))
     ;;(display* "Got " ret "\n")
     ret))
@@ -196,14 +234,15 @@
 (tm-define (version-register name)
   (:require (== (version-tool name) "git"))
   (let* ((name-s (url->string name))
-         (cmd (string-append (git-command name) " add " name-s))
+         (cmd (string-append (git-command name) " add " (version-quote name-s)))
          (ret (eval-system cmd)))
     (set-message cmd (string-append "Registered file"))))
 
 (tm-define (version-unregister name)
   (:require (== (version-tool name) "git"))
   (let* ((name-s (url->string name))
-         (cmd (string-append (git-command name) " reset HEAD " name-s))
+         (cmd (string-append (git-command name) " reset HEAD "
+                             (version-quote name-s)))
          (ret (eval-system cmd)))
     (set-message cmd "Unregistered file")))
 
@@ -232,7 +271,7 @@
 (tm-define (git-commit-file-parent file hash)
   (let* ((cmd (string-append
                (current-git-command) " log --pretty=%H "
-               (current-git-root) "/" file))
+               (version-quote (string-append (current-git-root) "/" file))))
          (ret (eval-system cmd))
          (ret2 (string-decompose
                 ret (string-append hash "\n"))))
@@ -254,23 +293,25 @@
                    (cdr (string-split ret #\newline))
                    (string-split ret #\newline))))
     (define (convert body)
-      (let* ((alist (string-split body #\tab)))
-        (with dest (url-append root (third alist))
+      (let* ((alist (string-split body #\tab))
+             (fname (git-unquote (third alist))))
+        (with dest (url-append root fname)
           (if (== (first alist) "-")
-              (list 0 0 (utf8->cork (third alist))
-                    (string-length (third alist)))
+              (list 0 0 (utf8->cork fname)
+                    (string-length fname))
               (list (string->number (first alist))
                     (string->number (second alist))
                     ($link (version-revision-url dest hash)
-                      (utf8->cork (third alist)))
-                    (string-length (third alist)))))))
+                      (utf8->cork fname))
+                    (string-length fname))))))
     (and (> (length ret2) 0)
          (string-null? (cAr ret2))
          (map convert (cDr ret2)))))
 
 (tm-define (git-commit message)
   (let* ((cmd (string-append
-               (current-git-command) " commit -m " (raw-quote message)))
+               (current-git-command) " commit -m "
+               (version-quote (cork->utf8 message))))
          (ret (eval-system cmd)))
     ;; (display ret)
     (set-message (string-append (current-git-command) " commit") message))
@@ -318,17 +359,38 @@
 (tm-define (tmfs-url-git root which)
   (string-append "tmfs://git/" which "/" (url->tmfs-string root)))
 
+(define (git-status-name status s)
+  ;; the name of a file in a line of git status --porcelain: for a renamed
+  ;; or copied file, "<old> -> <new>", each name quoted on its own, and the
+  ;; new name is kept (a name with a space is always quoted, so an
+  ;; unquoted " -> " is the separator)
+  (let* ((n (string-length s))
+         (end (if (string-starts? s "\"")
+                  (let loop ((i 1))
+                    (cond ((>= i n) n)
+                          ((== (string-ref s i) #\\) (loop (+ i 2)))
+                          ((== (string-ref s i) #\") (+ i 1))
+                          (else (loop (+ i 1)))))
+                  (with pos (string-search-forwards " -> " 0 s)
+                    (if (< pos 0) n pos)))))
+    ;; R or C in either column (" R": a rename in the working tree)
+    (if (and (or (memv (string-ref status 0) '(#\R #\C))
+                 (memv (string-ref status 1) '(#\R #\C)))
+             (string-starts? (substring s end n) " -> "))
+        (git-unquote (substring s (+ end 4) n))
+        (git-unquote s))))
+
 (tm-define (git-status root)
   (let* ((cmd (string-append (git-command root) " status --porcelain"))
          (ret1 (eval-system cmd))
          (ret2 (string-split ret1 #\newline)))
     (define (convert name)
       (let* ((status (string-take name 2))
-             (fname (string-drop name 3))
+             (fname (git-status-name status (string-drop name 3)))
              (full (url->string (url-append root fname)))
              (file (if (or (string-starts? status "A")
                            (string-starts? status "?"))
-                       fname
+                       (utf8->cork fname)
                        ($link full (utf8->cork fname)))))
         (list status file)))
     (and (> (length ret2) 0)
