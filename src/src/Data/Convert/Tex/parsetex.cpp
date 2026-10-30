@@ -1277,12 +1277,18 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     bool recursive= expands &&
       (expand_depth >= MAX_EXPAND_DEPTH ||
        (latex_type (cmd) == "side-effect!" && expanding[cmd] > 0));
-    if (recursive && DEBUG_CONVERT && !expansion_skipped->contains (cmd)) {
+    if (recursive && !expansion_skipped->contains (cmd)) {
+      // a skipped expansion may lose content: say which one, once
       expansion_skipped (cmd)= true;
-      debug_convert << "LaTeX import: " << cmd << " not expanded, "
-                    << (expand_depth >= MAX_EXPAND_DEPTH?
-                        "too many nested expansions":
-                        "inside its own expansion") << LF;
+      string name= cmd;
+      if (starts (cmd, "\\begin-"))
+        name= "\\begin{" * cmd (7, N(cmd)) * "}";
+      else if (starts (cmd, "\\end-"))
+        name= "\\end{" * cmd (5, N(cmd)) * "}";
+      convert_warning << "LaTeX import: " << name << " not expanded, "
+                      << (expand_depth >= MAX_EXPAND_DEPTH?
+                          "too many nested expansions":
+                          "inside its own expansion") << LF;
     }
     if (expands && !recursive) { expanding (cmd)++; expand_depth++; }
     if (recursive);

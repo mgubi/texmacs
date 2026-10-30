@@ -718,26 +718,34 @@
   (check= (lt "\\newenvironment{X}{\\bf}{}\\begin{X}a\\end{X}")
           '(concat (assign "X" (macro "body" (surround "" "" (document (arg "body")))))
                    (X "a")))
-  ;; with Debug > convert, a skipped expansion is reported, once per macro
-  (let ((old (debug-get "convert")))
-    (debug-set "convert" #t)
-    (check= (convert-debug-messages
-             "\\def\\xa{\\def\\x{\\xb}}\\def\\xb{\\def\\y{\\xa}}\\xa\\xa z")
-            '("LaTeX import: \\xa not expanded, inside its own expansion"))
-    (check= (convert-debug-messages (cyclic-defs 600))
-            '("LaTeX import: \\zqdw not expanded, too many nested expansions"))
-    (check= (convert-debug-messages "\\newcommand{\\foo}[1]{<#1>}\\foo{x}") '())
-    (debug-set "convert" old)))
+  ;; a skipped expansion is reported on convert-warning, once per macro,
+  ;; environments by their LaTeX name
+  (check= (latex-import-warnings
+           "\\def\\xa{\\def\\x{\\xb}}\\def\\xb{\\def\\y{\\xa}}\\xa\\xa z")
+          '("LaTeX import: \\xa not expanded, inside its own expansion"))
+  (check= (latex-import-warnings
+           (string-append "\\newenvironment{col}{\\renewcommand{\\cbreak}"
+                          "{\\end{col}\\begin{col}}}{}"
+                          "\\newenvironment{X}{\\begin{col}}{\\end{col}}"))
+          '("LaTeX import: \\begin{col} not expanded, inside its own expansion"))
+  (check= (latex-import-warnings (cyclic-defs 600))
+          '("LaTeX import: \\zqdw not expanded, too many nested expansions"))
+  (check= (latex-import-warnings "\\newcommand{\\foo}[1]{<#1>}\\foo{x}") '()))
 
-(define (convert-debug-messages s)
-  ;; the debug-convert messages while importing the LaTeX snippet @s
-  (clear-debug-messages)
-  (lt s)
-  (with l (tree-children (get-debug-messages "Debugging console" 1000))
-    (clear-debug-messages)
+(define (all-debug-messages)
+  (tree-children (get-debug-messages "Debugging console" 100000000)))
+
+(define (latex-import-warnings s)
+  ;; the "LaTeX import:" convert warnings of the import of the snippet @s
+  ;; (the messages before it are left in place)
+  (let ((n (length (all-debug-messages))))
+    (lt s)
     (map (lambda (m) (tree->string (tree-ref m 1)))
-         (filter (lambda (m) (== (tree->string (tree-ref m 0)) "debug-convert"))
-                 l))))
+         (filter (lambda (m)
+                   (and (== (tree->string (tree-ref m 0)) "convert-warning")
+                        (string-starts? (tree->string (tree-ref m 1))
+                                        "LaTeX import:")))
+                 (list-tail (all-debug-messages) n)))))
 
 (define (test-import-unknown)
   (check-group "import: unknown commands and comments")
