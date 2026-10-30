@@ -670,6 +670,55 @@
                                                           (document (arg "body")))))
                    (myenv "x"))))
 
+;; Macros whose definition uses themselves: the parser expands the side
+;; effects of a macro (its \def's), also inside the body of a definition,
+;; and expanded them again and again until the stack overflowed (#615,
+;; the table environments of jthread's tables.tex)
+(define (cyclic-defs n)
+  ;; \zqaa defines \x as \zqab, ..., the last one defines \x as \zqaa
+  (with name (lambda (i)
+               (string-append "\\zq"
+                              (string (integer->char (+ 97 (quotient i 26))))
+                              (string (integer->char (+ 97 (remainder i 26))))))
+    (apply string-append
+           (append (map (lambda (i)
+                          (string-append "\\def" (name i) "{\\def\\x{"
+                                         (name (modulo (+ i 1) n)) "}}"))
+                        (iota n))
+                   (list (name 0) " z")))))
+
+(define (test-import-recursive-macros)
+  (check-group "import: macros which use themselves")
+  ;; an environment which redefines a command as \end{col}\begin{col}
+  (with col (string-append "\\newenvironment{col}{\\renewcommand{\\cbreak}"
+                           "{\\end{col}\\begin{col}}}{}")
+    (check= (lt (string-append col "\\begin{col}a\\end{col}"))
+            '(concat (assign "col" (macro "body" (surround (assign "cbreak" (macro ""))
+                                                           "" (document (arg "body")))))
+                     (col "a")))
+    (check= (lt (string-append col "\\newenvironment{X}{\\begin{col}}{\\end{col}}"))
+            '(concat (assign "col" (macro "body" (surround (assign "cbreak" (macro ""))
+                                                           "" (document (arg "body")))))
+                     (assign "X" (macro "body" (col (document (arg "body"))))))))
+  ;; two macros which use each other
+  (check= (lt "\\def\\xa{\\def\\x{\\xb}}\\def\\xb{\\def\\y{\\xa}}\\xa z")
+          '(concat (assign "xa" (macro (assign "x" (macro (xb)))))
+                   (assign "xb" (macro (assign "y" (macro (xa)))))
+                   (xa) "z"))
+  ;; a cycle of 600 macros
+  (with r (lt (cyclic-defs 600))
+    (check-true (pair? r))
+    (check= (and (pair? r) (list-tail r (- (length r) 2))) '((zqaa) "z")))
+  ;; an environment which only begins another one, or changes the font:
+  ;; the arity of the shortcut was read from its name (t[1][0] instead of
+  ;; t[2][0] in parse_command), and crashed
+  (check= (lt "\\newenvironment{X}{\\begin{center}}{\\end{center}}\\begin{X}a\\end{X}")
+          '(concat (assign "X" (macro "body" (padded-center (document (arg "body")))))
+                   (X "a")))
+  (check= (lt "\\newenvironment{X}{\\bf}{}\\begin{X}a\\end{X}")
+          '(concat (assign "X" (macro "body" (surround "" "" (document (arg "body")))))
+                   (X "a"))))
+
 (define (test-import-unknown)
   (check-group "import: unknown commands and comments")
   ;; an unknown command is kept as a tag, its optional argument makes
@@ -1233,6 +1282,7 @@
   (test-import-tables)
   (test-import-environments)
   (test-import-macros)
+  (test-import-recursive-macros)
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)
