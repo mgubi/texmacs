@@ -689,25 +689,85 @@ ns_input_text_widget_rep::commit (bool flag) {
 ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
   ns_widget_rep (embedded_tm_widget), container (nil), quit (_quit) {}
 
+/*! The container of an embedded editor: its default size (dw, dh) gives
+ the first size of the window, after which it is dropped, so that the
+ window can be resized either way (the editor follows it) */
+@interface TMEmbeddedContainer : NSView
+{
+@public
+  NSLayoutConstraint* dw;  // retained
+  NSLayoutConstraint* dh;
+}
+@end
+
+@implementation TMEmbeddedContainer
+- (void) dropDefaultSize
+{
+  [dw setActive: NO];
+  [dh setActive: NO];
+}
+- (void) viewDidMoveToWindow
+{
+  [super viewDidMoveToWindow];
+  // NOTE: the window takes the fitting size of its contents when it is
+  // made, after which the default size is dropped
+  if ([self window] && dw && [dw isActive])
+    [self performSelector: @selector(dropDefaultSize) withObject: nil
+               afterDelay: 0];
+}
+- (void) dealloc
+{
+  [NSObject cancelPreviousPerformRequestsWithTarget: self];
+  [dw release];
+  [dh release];
+  [super dealloc];
+}
+@end
+
 void
 ns_tm_embedded_widget_rep::show_canvas () {
-  // The canvas fills the container
+  // As in the Qt interface, where the canvas of an editor is a scroll view
+  // (QTMScrollView): the canvas is the document view of a scroll view which
+  // fills the container. The size of the editor is that of the clip view,
+  // not that of the document, which is scrolled (the wheel, the scroll bar,
+  // and the cursor kept visible, see SLOT_SCROLL_POSITION). A canvas pinned
+  // to the container whose frame also followed the extents of the document
+  // made the editor be typeset again at each update (#620).
   if (!container || is_nil (main_widget)) return;
   for (NSView* old in [[[container subviews] copy] autorelease])
     [old removeFromSuperview];
-  // (the canvas is sized by the container, not by the document, see
-  // ns_simple_widget_rep::set_fills_container)
-  if (concrete (main_widget)->type == simple_widget)
-    static_cast<ns_simple_widget_rep*> (main_widget.rep)->set_fills_container ();
   NSView* v= concrete (main_widget)->as_nsview ();
   if (!v) return;
-  [v setTranslatesAutoresizingMaskIntoConstraints: NO];
-  [container addSubview: v];
+  NSView* w= v;
+  if (concrete (main_widget)->type == simple_widget) {
+    NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
+    // NOTE: no horizontal scroll bar (the page follows the width), and a
+    // vertical one when the document is taller than the clip view, as in
+    // Qt. With legacy scroll bars, which take room, the scroll bar shown
+    // makes the page narrower, hence not shorter: it stays shown; hidden,
+    // the page is wider, hence not taller: it stays hidden (no loop)
+    [sv setHasVerticalScroller: YES];
+    [sv setHasHorizontalScroller: NO];
+    [sv setAutohidesScrollers: YES];
+    [sv setBorderType: NSNoBorder];
+    [sv setContentView: [[[TMClipView alloc] init] autorelease]];
+    // NOTE: white, as the page: the page of an embedded editor is narrower
+    // than the clip view by the width which the editor keeps for a scroll
+    // bar (scrollbar_width), centered by TMClipView; tm_background would
+    // show as two gray bands on its sides
+    [sv setDrawsBackground: YES];
+    [sv setBackgroundColor: [NSColor whiteColor]];
+    [v setTranslatesAutoresizingMaskIntoConstraints: YES];
+    [sv setDocumentView: v];
+    w= sv;
+  }
+  [w setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [container addSubview: w];
   [NSLayoutConstraint activateConstraints: @[
-    [v.leadingAnchor constraintEqualToAnchor: container.leadingAnchor],
-    [v.trailingAnchor constraintEqualToAnchor: container.trailingAnchor],
-    [v.topAnchor constraintEqualToAnchor: container.topAnchor],
-    [v.bottomAnchor constraintEqualToAnchor: container.bottomAnchor]]];
+    [w.leadingAnchor constraintEqualToAnchor: container.leadingAnchor],
+    [w.trailingAnchor constraintEqualToAnchor: container.trailingAnchor],
+    [w.topAnchor constraintEqualToAnchor: container.topAnchor],
+    [w.bottomAnchor constraintEqualToAnchor: container.bottomAnchor]]];
 }
 
 void
@@ -761,8 +821,32 @@ ns_tm_embedded_widget_rep::as_nsview () {
   // NOTE: as in the Qt interface, a container, since the canvas is usually
   // given after the view was requested
   if (!container) {
-    container= [[NSView alloc] initWithFrame: NSMakeRect (0, 0, 100, 30)];
+    TMEmbeddedContainer* c=
+      [[TMEmbeddedContainer alloc] initWithFrame: NSMakeRect (0, 0, 100, 30)];
+    container= c;
     [container setTranslatesAutoresizingMaskIntoConstraints: NO];
+    // The default size: as Qt, which gives a window at most two thirds of
+    // the screen, the size hint of the editor (the screen) limited to two
+    // thirds of the screen; below the default size of a resize widget
+    // around it (the fields of the search tool, ...). Only the first size
+    // of the window (see TMEmbeddedContainer). The screen is the primary
+    // one, on which the dialogs are placed (as main_screen_height)
+    NSScreen* screen= [[NSScreen screens] firstObject];
+    NSSize scr= screen? [screen visibleFrame].size: NSZeroSize;
+    if (scr.width < 1 || scr.height < 1) scr= NSMakeSize (1200, 800);
+    NSLayoutConstraint* dw=
+      [container.widthAnchor constraintEqualToConstant: floor (scr.width * 2 / 3)];
+    NSLayoutConstraint* dh=
+      [container.heightAnchor constraintEqualToConstant: floor (scr.height * 2 / 3)];
+    [dw setPriority: NSLayoutPriorityDefaultLow - 1];
+    [dh setPriority: NSLayoutPriorityDefaultLow - 1];
+    NSLayoutConstraint* mw= [container.widthAnchor constraintGreaterThanOrEqualToConstant: 40];
+    NSLayoutConstraint* mh= [container.heightAnchor constraintGreaterThanOrEqualToConstant: 20];
+    [mw setPriority: NSLayoutPriorityDefaultHigh];
+    [mh setPriority: NSLayoutPriorityDefaultHigh];
+    [NSLayoutConstraint activateConstraints: @[dw, dh, mw, mh]];
+    c->dw= [dw retain];
+    c->dh= [dh retain];
     show_canvas ();
   }
   return container;

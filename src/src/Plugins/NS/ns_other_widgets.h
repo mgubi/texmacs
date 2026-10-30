@@ -17,6 +17,11 @@
 #include "scheme.hpp"
 
 
+/*! The clip view of the scroll views of the editors (ns_tm_widget.mm): the
+ document is centered when it is smaller, the positions are whole pixels */
+@interface TMClipView : NSClipView
+@end
+
 @class TMWidgetHelper;
 @class TMButtonsController;
 @class TMWindowController;
