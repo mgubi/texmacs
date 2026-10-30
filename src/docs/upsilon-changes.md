@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Cocoa: an error in a menu no longer aborts TeXmacs** (desktop, Cocoa
+  interface): a menu whose computation fails (such as Debug >
+  Miscellaneous > Provoke menu error, computed with all the menus when
+  Spotlight opens) shows a disabled item "Error in menu" and the error
+  goes to the console, as in the Qt interface (#624).
 - **Hidden definitions in tables and floats**: what a hidden part
   (`hidden`, `hide-preamble`) assigns in a table cell whose lines are
   broken, or in a float, holds for what follows, as when it is not
