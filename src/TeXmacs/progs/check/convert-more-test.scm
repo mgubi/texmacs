@@ -256,6 +256,99 @@
           (string-append "a" (u8 #xE9) "<br/>")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Labels inside formulas in HTML
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (occurrences what s)
+  (let loop ((pos 0) (n 0))
+    (with i (string-search-forwards what pos s)
+      (if (< i 0) n (loop (+ i (string-length what)) (+ n 1))))))
+
+(define (html-of-buffer body . opts)
+  ;; the HTML of a document as File > Export makes it: the macros of the
+  ;; style are expanded by the editor (html-expand), then converted
+  (let* ((tm (url-append (temp-dir) "labels.tm"))
+         (old (current-buffer))
+         (before (buffer-list)))
+    (string-save (serialize-texmacs
+                  (stree->tree `(document (TeXmacs ,(texmacs-version))
+                                          (style "article") (body ,body))))
+                 tm)
+    (load-buffer tm :strict)
+    (with r (apply convert (cons* (html-expand (buffer-tree))
+                                  "texmacs-tree" "html-snippet" opts))
+      (for (b (buffer-list))
+        (when (nin? b before)
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer old))
+      r)))
+
+(define formula-label-samples
+  ;; a document, the labels of its formulas, and the references to them
+  (list
+   ;; the document of #617: the label in front, in a concat
+   (list '(document (equation (document (concat (label "eq:one") "a=b+c.")))
+                    (concat "See " (eqref "eq:one") "."))
+         '("eq:one") '("eq:one"))
+   ;; the label at the end
+   (list '(document (equation (document (concat "x=1" (label "eq:end")))))
+         '("eq:end") '())
+   (list '(document (equation* (document (concat "a=b" (label "eq:star")))))
+         '("eq:star") '())
+   ;; several labels in one formula
+   (list '(document (equation (document (concat (label "eq:t1") "a=b"
+                                                (label "eq:t2")))))
+         '("eq:t1" "eq:t2") '())
+   ;; labels in the cells of equation arrays
+   (list '(document
+           (eqnarray* (document
+                       (tformat
+                        (table (row (cell "a") (cell "=")
+                                    (cell (concat "b" (label "eq:r1"))))
+                               (row (cell "c") (cell "=")
+                                    (cell (concat "d" (label "eq:r2")))))))))
+         '("eq:r1" "eq:r2") '())
+   (list '(document
+           (align (document
+                   (tformat
+                    (table (row (cell "a") (cell (concat "=b" (label "eq:a1"))))
+                           (row (cell "c") (cell (concat "=d" (label "eq:a2")))))))))
+         '("eq:a1" "eq:a2") '())
+   ;; an inline formula
+   (list '(document (concat "Let " (math (concat "x" (label "eq:in")))
+                            " and " (reference "eq:in") "."))
+         '("eq:in") '("eq:in"))))
+
+;; A label inside a formula gives one anchor in front of the formula, with
+;; MathJax as with MathML (which both drop the label tag), and the
+;; references link to it (#588, #617).
+(define (test-html-formula-labels)
+  (check-group "html labels in formulas")
+  (for (opts (list (list (cons "texmacs->html:mathjax" "on")
+                         (cons "texmacs->html:mathml" "off"))
+                   (list (cons "texmacs->html:mathjax" "off")
+                         (cons "texmacs->html:mathml" "on"))))
+    (with mathjax? (== (cdar opts) "on")
+      (for (sample formula-label-samples)
+        (let ((s (apply html-of-buffer (car sample) opts))
+              (where (list (if mathjax? "mathjax" "mathml") (car sample))))
+          ;; the formula is MathJax or MathML
+          (check= (list where (if mathjax?
+                                  (or (string-occurs? "\\(" s)
+                                      (string-occurs? "\\begin{" s))
+                                  (string-occurs? "<math" s)))
+                  (list where #t))
+          (for (l (cadr sample))
+            (check= (list where l (occurrences
+                                   (string-append "<a id=\"" l "\">") s))
+                    (list where l 1)))
+          (for (l (caddr sample))
+            (check= (list where l (occurrences
+                                   (string-append "href=\"#" l "\"") s))
+                    (list where l 1))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MathML import
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1755,7 +1848,8 @@
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (system-mkdir (temp-dir))
   (for-each run-group
-            (list test-mathml-export test-mathml-html test-mathml-import
+            (list test-mathml-export test-mathml-html test-html-formula-labels
+                  test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
                   test-cork-bytes test-cork-unicode test-other-encodings
