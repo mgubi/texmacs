@@ -90,9 +90,11 @@ text_of (widget w) {
 {
   (void) sender;
   if (!cmd) return;
-  command c (cmd);
-  if (kind == 1) c (list_object (object ([self state] == NSControlStateValueOn)));
-  else c ();
+  NS_ENTRY_BEGIN
+    command c (cmd);
+    if (kind == 1) c (list_object (object ([self state] == NSControlStateValueOn)));
+    else c ();
+  NS_ENTRY_END ("the action of a button")
 }
 @end
 
@@ -119,8 +121,10 @@ text_of (widget w) {
 {
   (void) sender;
   if (!cmd) return;
-  command c (cmd);
-  c (list_object (object (from_nsstring ([self titleOfSelectedItem]))));
+  NS_ENTRY_BEGIN
+    command c (cmd);
+    c (list_object (object (from_nsstring ([self titleOfSelectedItem]))));
+  NS_ENTRY_END ("the action of a pop-up button")
 }
 @end
 
@@ -154,8 +158,10 @@ text_of (widget w) {
   NSString* v= [self stringValue];
   if (!cmd || [v isEqualToString: last]) return;
   [last release]; last= [v copy];
-  command c (cmd);
-  c (list_object (object (from_nsstring (v))));
+  NS_ENTRY_BEGIN
+    command c (cmd);
+    c (list_object (object (from_nsstring (v))));
+  NS_ENTRY_END ("the action of a combo box")
 }
 @end
 

@@ -21,6 +21,24 @@ have the details, and the problems go to the
   when the text is longer, and the console keeps showing its last
   messages. The console opens at two thirds of the screen instead of the
   whole screen, and stays resizable.
+- **Cocoa: an error in a menu no longer aborts TeXmacs** (desktop, Cocoa
+  interface): a menu whose computation fails (such as Debug >
+  Miscellaneous > Provoke menu error, computed with all the menus when
+  Spotlight opens) shows a disabled item "Error in menu" and the error
+  goes to the console, as in the Qt interface (#624).
+- **Wide braces drawn by the GPU**: the wide over- and underbraces of a
+  long formula and the other glyphs of more than 512 pixels which have no
+  outline (they are assembled from pieces by a virtual font) are drawn
+  by the GPU renderer, as tiles of their bitmap; they were missing from
+  the canvases of the Cocoa interface drawn by the GPU and of the Vue
+  port (desktop applications and browser) (#623).
+- **Cocoa: errors reported instead of silent**: an error in an action of
+  the interface (a menu, a button, a delayed command, the closing of a
+  window...) is reported in the terminal and the console of errors, and
+  TeXmacs goes on, instead of aborting or of ignoring it without a word;
+  a document typeset again and again without any input (a loop) gets a
+  warning naming it; the conversions of texts for macOS which fail say so
+  on the debug channel `debug-aqua` (#621).
 - **Cocoa: still consoles and search fields** (desktop, Cocoa
   interface): the editors inside a window (the consoles, the search and
   replace fields, the other `texmacs-input`) were typeset again from

@@ -14,6 +14,7 @@
 
 #include "MacOS/mac_cocoa.h"
 #include "message.hpp"
+#include <exception>
 
 typedef quartet<SI,SI,SI,SI> coord4;
 typedef pair<SI,SI> coord2;
@@ -87,6 +88,31 @@ string from_label (NSString* s);
 
 #define NOT_IMPLEMENTED(x) \
 { if (DEBUG_QT) debug_qt << x << " not implemented yet.\n"; }
+
+/******************************************************************************
+ * Failures made visible (#621)
+ ******************************************************************************/
+
+void ns_report_exception (const char* where, NSException* e);
+void ns_report_exception (const char* where, string msg);
+bool ns_check_size (NSSize size, const char* where);
+bool ns_check_point (NSPoint pt, const char* where);
+
+/*! An entry point from AppKit into TeXmacs (the events, an action, a timer,
+ a delegate): an exception, of Objective-C or of C++ (the ASSERTs and FAILEDs
+ of TeXmacs), is reported as an error and the entry point returns normally,
+ instead of aborting TeXmacs (#619) or being dropped by AppKit without a
+ word (#468). The C++ handlers are outside the Objective-C one, which only
+ takes the NSExceptions. */
+#define NS_ENTRY_BEGIN try { @try {
+#define NS_ENTRY_END(where)                                                 \
+  } @catch (NSException* ns_entry_e) {                                      \
+    ns_report_exception (where, ns_entry_e); } }                            \
+  catch (string& ns_entry_s) { ns_report_exception (where, ns_entry_s); }   \
+  catch (std::exception& ns_entry_x) {                                      \
+    ns_report_exception (where, string (ns_entry_x.what ())); }             \
+  catch (...) {                                                             \
+    ns_report_exception (where, string ("an unknown C++ exception")); }
 
 
 #endif // NS_UTILITIES_H
