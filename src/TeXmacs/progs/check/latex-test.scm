@@ -717,7 +717,27 @@
                    (X "a")))
   (check= (lt "\\newenvironment{X}{\\bf}{}\\begin{X}a\\end{X}")
           '(concat (assign "X" (macro "body" (surround "" "" (document (arg "body")))))
-                   (X "a"))))
+                   (X "a")))
+  ;; with Debug > convert, a skipped expansion is reported, once per macro
+  (let ((old (debug-get "convert")))
+    (debug-set "convert" #t)
+    (check= (convert-debug-messages
+             "\\def\\xa{\\def\\x{\\xb}}\\def\\xb{\\def\\y{\\xa}}\\xa\\xa z")
+            '("LaTeX import: \\xa not expanded, inside its own expansion"))
+    (check= (convert-debug-messages (cyclic-defs 600))
+            '("LaTeX import: \\zqdw not expanded, too many nested expansions"))
+    (check= (convert-debug-messages "\\newcommand{\\foo}[1]{<#1>}\\foo{x}") '())
+    (debug-set "convert" old)))
+
+(define (convert-debug-messages s)
+  ;; the debug-convert messages while importing the LaTeX snippet @s
+  (clear-debug-messages)
+  (lt s)
+  (with l (tree-children (get-debug-messages "Debugging console" 1000))
+    (clear-debug-messages)
+    (map (lambda (m) (tree->string (tree-ref m 1)))
+         (filter (lambda (m) (== (tree->string (tree-ref m 0)) "debug-convert"))
+                 l))))
 
 (define (test-import-unknown)
   (check-group "import: unknown commands and comments")

@@ -56,8 +56,10 @@ struct latex_parser {
   // macros being expanded, to stop recursive expansions (#615)
   hashmap<string,int> expanding;
   int expand_depth;
+  hashmap<string,bool> expansion_skipped; // reported once per macro
   latex_parser (bool unicode2):
-    level (0), unicode (unicode2), expanding (0), expand_depth (0) {}
+    level (0), unicode (unicode2), expanding (0), expand_depth (0),
+    expansion_skipped (false) {}
   void latex_error (string s, int i, string message);
 
   bool is_opening_option (char c);
@@ -1275,6 +1277,13 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     bool recursive= expands &&
       (expand_depth >= MAX_EXPAND_DEPTH ||
        (latex_type (cmd) == "side-effect!" && expanding[cmd] > 0));
+    if (recursive && DEBUG_CONVERT && !expansion_skipped->contains (cmd)) {
+      expansion_skipped (cmd)= true;
+      debug_convert << "LaTeX import: " << cmd << " not expanded, "
+                    << (expand_depth >= MAX_EXPAND_DEPTH?
+                        "too many nested expansions":
+                        "inside its own expansion") << LF;
+    }
     if (expands && !recursive) { expanding (cmd)++; expand_depth++; }
     if (recursive);
     else if (N(body) > 0 && latex_type (cmd) == "side-effect!"
