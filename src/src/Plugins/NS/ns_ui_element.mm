@@ -291,6 +291,17 @@ stack_of (array<widget> a, bool vertical) {
 
 static void fit_shown_page (NSTabView* tv);
 
+// whether a view contains an embedded editor (see ns_tm_embedded_widget_rep)
+static bool
+has_embedded_editor (NSView* v) {
+  static Class c= NSClassFromString (@"TMEmbeddedContainer");
+  if (!v) return false;
+  if (c && [v isKindOfClass: c]) return true;
+  for (NSView* w in [v subviews])
+    if (has_embedded_editor (w)) return true;
+  return false;
+}
+
 /*! When a tab is chosen, the dialog takes the size of the new page (in the
  main windows, the tools are laid out again). */
 @interface TMTabHelper : NSObject <NSTabViewDelegate>
@@ -314,6 +325,9 @@ static void fit_shown_page (NSTabView* tv);
       postNotificationName: @"TMToolsChanged" object: root];
     return;
   }
+  // a window with an embedded editor (a console) keeps its size, which
+  // the editor follows (it may have been resized by the user)
+  if (has_embedded_editor (root)) return;
   [root layoutSubtreeIfNeeded];
   NSSize fs= [root fittingSize];
   if (fs.width <= 0 || fs.height <= 0) return;
@@ -325,6 +339,13 @@ static void fit_shown_page (NSTabView* tv);
   [win setFrame: nf display: YES animate: [win isVisible]];
 }
 @end
+
+// The priority of the minimal sizes of the tab views (the pages fitted):
+// below NSLayoutPriorityDragThatCanResizeWindow and
+// NSLayoutPriorityWindowSizeStayPut, so that a window can be made smaller
+// than its first size (an embedded editor, such as the one of a console,
+// has a large default size, see ns_tm_embedded_widget_rep)
+#define FIT_PRIORITY 490
 
 // A tab view has no size of its own: plain tabs take that of the page
 // shown, with the room of the tabs and of the border around it (without
@@ -347,6 +368,10 @@ fit_shown_page (NSTabView* tv) {
     [tv setTranslatesAutoresizingMaskIntoConstraints: NO];
     th->fit_w= [tv.widthAnchor constraintGreaterThanOrEqualToConstant: w];
     th->fit_h= [tv.heightAnchor constraintGreaterThanOrEqualToConstant: h];
+    // (the size of the page for the first size of the window, which can
+    // then be made smaller: below the resizing of a window by the user)
+    [th->fit_w setPriority: FIT_PRIORITY];
+    [th->fit_h setPriority: FIT_PRIORITY];
     [th->fit_w setActive: YES];
     [th->fit_h setActive: YES];
   }
@@ -437,8 +462,11 @@ fit_pages (NSTabView* tv) {
     w= max (w, s.width); h= max (h, s.height);
   }
   [tv setTranslatesAutoresizingMaskIntoConstraints: NO];
-  [[tv.widthAnchor constraintGreaterThanOrEqualToConstant: w] setActive: YES];
-  [[tv.heightAnchor constraintGreaterThanOrEqualToConstant: h] setActive: YES];
+  NSLayoutConstraint* fw= [tv.widthAnchor constraintGreaterThanOrEqualToConstant: w];
+  NSLayoutConstraint* fh= [tv.heightAnchor constraintGreaterThanOrEqualToConstant: h];
+  [fw setPriority: FIT_PRIORITY];
+  [fh setPriority: FIT_PRIORITY];
+  [NSLayoutConstraint activateConstraints: @[fw, fh]];
 }
 
 // a button of the column or of the list of the tabs
@@ -574,6 +602,14 @@ responsive_tabs_view (array<url> icons, array<widget> tabs,
   [st setAlignment: NSLayoutAttributeTop];
   [st setSpacing: 0];
   [[line.heightAnchor constraintEqualToAnchor: st.heightAnchor] setActive: YES];
+  // the page takes the room which the window gives (not the line)
+  [[tv.heightAnchor constraintEqualToAnchor: st.heightAnchor] setActive: YES];
+  [line setContentHuggingPriority: NSLayoutPriorityRequired
+                   forOrientation: NSLayoutConstraintOrientationHorizontal];
+  [col setContentHuggingPriority: NSLayoutPriorityDefaultHigh
+                  forOrientation: NSLayoutConstraintOrientationHorizontal];
+  [tv setContentHuggingPriority: 1
+                 forOrientation: NSLayoutConstraintOrientationHorizontal];
   return st;
 }
 

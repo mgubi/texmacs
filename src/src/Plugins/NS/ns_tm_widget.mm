@@ -59,9 +59,6 @@ NSColor* to_nscolor (color col);
 * TMClipView: the document is centered when it is smaller than the window
 ******************************************************************************/
 
-@interface TMClipView : NSClipView
-@end
-
 @implementation TMClipView
 - (NSRect) constrainBoundsRect: (NSRect) r
 {

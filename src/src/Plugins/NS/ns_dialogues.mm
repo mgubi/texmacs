@@ -689,8 +689,39 @@ ns_input_text_widget_rep::commit (bool flag) {
 ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
   ns_widget_rep (embedded_tm_widget), container (nil), quit (_quit) {}
 
-// (defined in ns_tm_widget.mm: the document is centered when it is smaller)
-@interface TMClipView : NSClipView
+/*! The container of an embedded editor: its default size (dw, dh) gives
+ the first size of the window, after which it is dropped, so that the
+ window can be resized either way (the editor follows it) */
+@interface TMEmbeddedContainer : NSView
+{
+@public
+  NSLayoutConstraint* dw;  // retained
+  NSLayoutConstraint* dh;
+}
+@end
+
+@implementation TMEmbeddedContainer
+- (void) dropDefaultSize
+{
+  [dw setActive: NO];
+  [dh setActive: NO];
+}
+- (void) viewDidMoveToWindow
+{
+  [super viewDidMoveToWindow];
+  // NOTE: the window takes the fitting size of its contents when it is
+  // made, after which the default size is dropped
+  if ([self window] && dw && [dw isActive])
+    [self performSelector: @selector(dropDefaultSize) withObject: nil
+               afterDelay: 0];
+}
+- (void) dealloc
+{
+  [NSObject cancelPreviousPerformRequestsWithTarget: self];
+  [dw release];
+  [dh release];
+  [super dealloc];
+}
 @end
 
 void
@@ -711,14 +742,19 @@ ns_tm_embedded_widget_rep::show_canvas () {
   if (concrete (main_widget)->type == simple_widget) {
     NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
     // NOTE: no horizontal scroll bar (the page follows the width), and a
-    // vertical one which is not hidden: one shown or hidden with the
-    // contents would change the width, hence the contents (legacy scroll
-    // bars; the overlay ones of the trackpads take no room)
+    // vertical one when the document is taller than the clip view, as in
+    // Qt. With legacy scroll bars, which take room, the scroll bar shown
+    // makes the page narrower, hence not shorter: it stays shown; hidden,
+    // the page is wider, hence not taller: it stays hidden (no loop)
     [sv setHasVerticalScroller: YES];
     [sv setHasHorizontalScroller: NO];
-    [sv setAutohidesScrollers: NO];
+    [sv setAutohidesScrollers: YES];
     [sv setBorderType: NSNoBorder];
     [sv setContentView: [[[TMClipView alloc] init] autorelease]];
+    // NOTE: white, as the page: the page of an embedded editor is narrower
+    // than the clip view by the width which the editor keeps for a scroll
+    // bar (scrollbar_width), centered by TMClipView; tm_background would
+    // show as two gray bands on its sides
     [sv setDrawsBackground: YES];
     [sv setBackgroundColor: [NSColor whiteColor]];
     [v setTranslatesAutoresizingMaskIntoConstraints: YES];
@@ -785,13 +821,18 @@ ns_tm_embedded_widget_rep::as_nsview () {
   // NOTE: as in the Qt interface, a container, since the canvas is usually
   // given after the view was requested
   if (!container) {
-    container= [[NSView alloc] initWithFrame: NSMakeRect (0, 0, 100, 30)];
+    TMEmbeddedContainer* c=
+      [[TMEmbeddedContainer alloc] initWithFrame: NSMakeRect (0, 0, 100, 30)];
+    container= c;
     [container setTranslatesAutoresizingMaskIntoConstraints: NO];
     // The default size: as Qt, which gives a window at most two thirds of
     // the screen, the size hint of the editor (the screen) limited to two
     // thirds of the screen; below the default size of a resize widget
-    // around it (the fields of the search tool, ...), and resizable
-    NSSize scr= [[NSScreen mainScreen] visibleFrame].size;
+    // around it (the fields of the search tool, ...). Only the first size
+    // of the window (see TMEmbeddedContainer). The screen is the primary
+    // one, on which the dialogs are placed (as main_screen_height)
+    NSScreen* screen= [[NSScreen screens] firstObject];
+    NSSize scr= screen? [screen visibleFrame].size: NSZeroSize;
     if (scr.width < 1 || scr.height < 1) scr= NSMakeSize (1200, 800);
     NSLayoutConstraint* dw=
       [container.widthAnchor constraintEqualToConstant: floor (scr.width * 2 / 3)];
@@ -804,6 +845,8 @@ ns_tm_embedded_widget_rep::as_nsview () {
     [mw setPriority: NSLayoutPriorityDefaultHigh];
     [mh setPriority: NSLayoutPriorityDefaultHigh];
     [NSLayoutConstraint activateConstraints: @[dw, dh, mw, mh]];
+    c->dw= [dw retain];
+    c->dh= [dh retain];
     show_canvas ();
   }
   return container;

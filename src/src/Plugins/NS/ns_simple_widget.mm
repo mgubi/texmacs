@@ -527,6 +527,20 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       // infinite extents)
       rect.size.width = min (rect.size.width , 5000000.0);
       rect.size.height= min (rect.size.height, 5000000.0);
+      {
+        // NOTE: a page which follows the size of the clip view (a page
+        // "automatic") is up to a point larger, from the roundings between
+        // points and TeXmacs units: it is the size of the clip view (else
+        // it scrolls by a point, and has a scroll bar)
+        NSView* clip= [doc superview];
+        if ([clip isKindOfClass: [NSClipView class]]) {
+          NSSize cs= [clip bounds].size;
+          if (rect.size.width > cs.width && rect.size.width <= cs.width + 1)
+            rect.size.width= cs.width;
+          if (rect.size.height > cs.height && rect.size.height <= cs.height + 1)
+            rect.size.height= cs.height;
+        }
+      }
       [doc setFrameSize: rect.size];
       {
         // NOTE: the clip view centers the document when it scrolls; a
