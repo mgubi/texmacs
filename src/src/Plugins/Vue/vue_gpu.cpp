@@ -127,12 +127,21 @@ struct glyph_key_hash {
   size_t operator () (const glyph_key& k) const {
     return std::hash<void*> () (k.fng) ^ (std::hash<int> () (k.c) * 31); }
 };
+// a piece of a glyph too large for the atlas, in a texture of its own: at
+// (x, y) of the glyph's bitmap (y down), w by h pixels
+struct big_tile {
+  gpu_texture tex;
+  int x, y, w, h;
+};
+
 struct glyph_slot {
   int x, y, w, h;       // in the atlas
   SI xo, yo;            // the offsets of shrink
   bool mupdf;           // rendered by MuPDF: placed by dx, dy instead
   int dx, dy;           // its top left corner from the origin (pixels, y down)
-  bool big;             // too large for the atlas: drawn from its outline
+  bool big;             // too large for the atlas: drawn from its outline,
+                        // or from its tiles when it has none
+  std::vector<big_tile> tiles; // (the glyphs of the virtual fonts, #623)
 };
 
 struct slug_glyph {
@@ -169,6 +178,7 @@ struct gpu_state {
   // the atlas of the glyphs, with a white corner for the fills
   gpu_texture atlas= NULL;
   int ax= 4, ay= 0, arow= 4;
+  size_t big_bytes= 0;          // the textures of the tiles of big glyphs
   std::unordered_map<glyph_key, glyph_slot, glyph_key_hash> glyphs;
   std::unordered_map<glyph_key, slug_glyph, glyph_key_hash> slugs;
   std::vector<font_glyphs> fonts;  // kept alive: their address is the key
@@ -368,6 +378,10 @@ static void
 clear_atlas () {
   // what is queued uses the old content
   gpu_flush_all ();
+  for (auto& e: G.glyphs)
+    for (big_tile& t: e.second.tiles) G.B->delete_texture (t.tex);
+  G.big_bytes= 0;
+  if (G.mode == 2) G.tex= NULL; // (it may have been one of them)
   G.glyphs.clear ();
   G.fonts.clear ();
   G.ax= 4; G.ay= 0; G.arow= 4;
@@ -404,7 +418,11 @@ flush_quads () {
   if (G.verts.empty () || G.target == NULL) { G.verts.clear (); return; }
   gpu_target* t= G.target;
   gpu_pass p= make_pass (t, G.sx1, G.sy1, G.sx2, G.sy2);
-  gpu_quads q= { G.mode, G.tex, G.atlas, G.porig_x, G.porig_y, G.ptile_w, G.ptile_h,
+  // (the coverage of a quad of mode 2 is the atlas, or the texture of the
+  // tile of a big glyph given as its texture)
+  gpu_texture cov= (G.mode == 2 && G.tex != NULL) ? G.tex : G.atlas;
+  gpu_quads q= { G.mode, G.mode == 2 ? NULL : G.tex, cov,
+                 G.porig_x, G.porig_y, G.ptile_w, G.ptile_h,
                  G.verts.data (), (int) (G.verts.size () / 8) };
   G.B->draw_quads (p, q);
   G.verts.clear ();
@@ -539,7 +557,7 @@ static void
 batch (gpu_target* t, int mode, gpu_texture tex, int x1, int y1, int x2, int y2,
        float pox= 0, float poy= 0, float ptw= 1, float pth= 1) {
   if (G.pending) flush_vectors ();
-  if (G.target != t || G.mode != mode || (mode != 2 && G.tex != tex) ||
+  if (G.target != t || G.mode != mode || G.tex != tex ||
       G.sx1 != x1 || G.sy1 != y1 || G.sx2 != x2 || G.sy2 != y2 ||
       (mode == 3 && (G.porig_x != pox || G.porig_y != poy ||
                      G.ptile_w != ptw || G.ptile_h != pth))) {
@@ -1273,18 +1291,9 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
       w= gl->width; h= gl->height;
     }
-    // (a glyph of more than 512 pixels, a large zoom: from its outline,
-    // remembered so as not to be rendered again; none without an outline)
-    if (w > 512 || h > 512) {
-      G.glyphs[k]= { 0, 0, w, h, xo, yo, from_mupdf, mx, my, true };
-      G.fonts.push_back (fng);
-      if (trs.empty () && !pattern) outline ();
-      return;
-    }
-    if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
-    if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
-    if (w > 0 && h > 0) {
-      std::vector<unsigned char> cov ((size_t) w * h);
+    // the coverage of the glyph, w by h pixels (y down)
+    auto coverage= [&] (std::vector<unsigned char>& cov) {
+      cov.resize ((size_t) w * h);
       if (from_mupdf) memcpy (cov.data (), &mcov[0], (size_t) w * h);
       else {
         int nr_cols= std_shrinkf * std_shrinkf;
@@ -1293,17 +1302,57 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
           for (int i= 0; i < w; i++)
             cov[j*w + i]= (unsigned char) min (255, (255 * gl->get_x (i, j)) / nr_cols);
       }
-      // what is queued from the atlas is drawn before it changes
-      if (G.mode == 2) flush_quads ();
-      G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov.data ());
+    };
+    // a glyph of more than 512 pixels (a large zoom): from its outline,
+    // remembered so as not to be rendered again; a glyph without an outline
+    // (the big delimiters and the wide braces of the virtual fonts, made of
+    // pieces, #623; every glyph without MuPDF) in tiles, textures of their
+    // own, made once
+    if (w > 512 || h > 512) {
+      glyph_slot big= { 0, 0, w, h, xo, yo, from_mupdf, mx, my, true, {} };
+      if (slug_lookup (fng, c) == NULL) {
+        if (G.big_bytes > (size_t) 64 << 20) clear_atlas (); // (a bound)
+        std::vector<unsigned char> cov;
+        coverage (cov);
+        int side= min (G.B->max_texture_side (), ATLAS);
+        std::vector<unsigned char> part;
+        for (int ty= 0; ty < h; ty += side)
+          for (int tx= 0; tx < w; tx += side) {
+            int tw= min (side, w - tx), th= min (side, h - ty);
+            part.resize ((size_t) tw * th);
+            for (int j= 0; j < th; j++)
+              memcpy (&part[(size_t) j * tw], &cov[(size_t) (ty + j) * w + tx], tw);
+            gpu_texture tex= G.B->new_texture (tw, th, GPU_R8, true, false, part.data ());
+            if (tex == NULL) continue;
+            big.tiles.push_back ({ tex, tx, ty, tw, th });
+            G.big_bytes += (size_t) tw * th;
+          }
+      }
+      G.glyphs[k]= big;
+      G.fonts.push_back (fng);
+      it= G.glyphs.find (k);
     }
-    G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my, false };
-    G.fonts.push_back (fng);
-    G.ax += w + 1; G.arow= max (G.arow, h);
-    it= G.glyphs.find (k);
+    else {
+      if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
+      if (G.ay + h + 1 > ATLAS) clear_atlas (); // full: start again
+      if (w > 0 && h > 0) {
+        std::vector<unsigned char> cov;
+        coverage (cov);
+        // what is queued from the atlas is drawn before it changes
+        if (G.mode == 2) flush_quads ();
+        G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov.data ());
+      }
+      G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my, false };
+      G.fonts.push_back (fng);
+      G.ax += w + 1; G.arow= max (G.arow, h);
+      it= G.glyphs.find (k);
+    }
   }
   const glyph_slot& s= it->second;
-  if (s.big) { if (trs.empty () && !pattern) outline (); return; }
+  if (s.big && s.tiles.empty ()) {
+    if (trs.empty () && !pattern) outline ();
+    return;
+  }
   if (s.w <= 0 || s.h <= 0) return;
   // placed as the MuPDF renderer places its glyphs: rendered by MuPDF from
   // the origin, or as its images of the bitmaps of TeXmacs
@@ -1315,6 +1364,19 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   else {
     left= to_x (x - s.xo * std_shrinkf);
     bottom= to_y (y + s.yo * std_shrinkf - s.h * pixel);
+  }
+  if (s.big) {
+    // its tiles, in the color of the pen (also for a pattern, for now)
+    int r, g, b, a;
+    get_rgb_color (fg, r, g, b, a);
+    if (get_reverse_colors ()) reverse (r, g, b);
+    float fa= a / 255.f;
+    double top= bottom + s.h;
+    for (const big_tile& t: s.tiles)
+      user_quad (left + t.x, top - t.y - t.h, left + t.x + t.w, top - t.y,
+                 2, t.tex, 0, 0, 1, 1,
+                 r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa);
+    return;
   }
   float A= (float) ATLAS;
   if (pen->get_type () == pencil_brush && !is_nil (pen->get_brush ()) &&

@@ -15,6 +15,12 @@
 #include "converter.hpp"
 #include "analyze.hpp"
 #include "wencoding.hpp"
+#include "hashset.hpp"
+#include "hashmap.hpp"
+#include <dlfcn.h>
+#include <cxxabi.h>
+#include <math.h>
+#include <stdlib.h>
 
 #define SCREEN_PIXEL (PIXEL)
 const float invpix =  1.0/SCREEN_PIXEL;
@@ -68,6 +74,72 @@ coord2 from_nssize (NSSize s)
 	return coord2 (c1,c2)	;
 }
 
+/******************************************************************************
+ * Warnings for the conversions of strings (#621)
+ ******************************************************************************/
+
+// a string as it can be printed: the bytes which are not printable ASCII as
+// \xNN, at most 160 of them
+static string
+ns_escaped (string s) {
+  static const char* hex= "0123456789abcdef";
+  string r;
+  int n= min (N(s), 160);
+  for (int i= 0; i < n; i++) {
+    unsigned char c= (unsigned char) s[i];
+    if (c >= 32 && c < 127 && c != '\\') r << ((char) c);
+    else r << "\\x" << hex[c >> 4] << hex[c & 15];
+  }
+  if (n < N(s)) r << "...";
+  return r;
+}
+
+// the function of the code at addr (the caller of a conversion), if known
+static string
+ns_function_at (void* addr) {
+  Dl_info info;
+  if (addr == NULL || dladdr (addr, &info) == 0 || info.dli_sname == NULL)
+    return "?";
+  int status= 0;
+  char* d= abi::__cxa_demangle (info.dli_sname, NULL, NULL, &status);
+  string r (status == 0 && d != NULL ? d : info.dli_sname);
+  if (d != NULL) free (d);
+  return r;
+}
+
+// a conversion of a string which failed, or which took its fallback: once
+// for each function and string (and at most 50 times), on the channel of
+// the debug messages of this interface (the terminal and the console)
+static void
+ns_conversion_warning (const char* fun, const char* what, string s,
+                       void* caller) {
+  static hashset<string> seen;
+  static int count= 0;
+  string key= string (fun) * ":" * s;
+  if (seen->contains (key)) return;
+  seen->insert (key);
+  if (count > 50) return;
+  if (count++ == 50) {
+    debug_aqua << "further warnings for the conversions of strings are "
+               << "not shown\n";
+    return;
+  }
+  debug_aqua << fun << ": " << what << ", for \"" << ns_escaped (s)
+             << "\" (called from " << ns_function_at (caller) << ")\n";
+}
+
+static string
+ns_lossy (NSString* s) {
+  NSData* d= [s dataUsingEncoding: NSUTF8StringEncoding
+              allowLossyConversion: YES];
+  if (d == nil) return "";
+  return string ((const char*) [d bytes], (int) [d length]);
+}
+
+/******************************************************************************
+ * Conversions of strings
+ ******************************************************************************/
+
 /*! UTF-8, or else the cork encoding (as the translations, which are in the
  cork encoding: see #468); never nil, which AppKit does not take */
 NSString *to_nsstring (string s)
@@ -75,15 +147,25 @@ NSString *to_nsstring (string s)
 	c_string p = c_string (s);
 	NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
 	if (!nss) {
+	  // (a string in the cork encoding where UTF-8 is expected: its caller
+	  // should use to_nsstring_utf8 or to_label)
+	  ns_conversion_warning ("to_nsstring", "not UTF-8, taken as cork", s,
+	                         __builtin_return_address (0));
 	  c_string q = c_string (cork_to_utf8 (s));
 	  nss = [NSString stringWithCString:q encoding:NSUTF8StringEncoding];
 	}
+	if (!nss || ([nss length] == 0 && N(s) > 0))
+	  ns_conversion_warning ("to_nsstring", "no text for it", s,
+	                         __builtin_return_address (0));
 	return nss? nss: @"";
 }
 
 string from_nsstring(NSString *s)
 {
 	const char *cstr = s? [s cStringUsingEncoding:NSUTF8StringEncoding]: NULL;
+	if (s && !cstr)
+	  ns_conversion_warning ("from_nsstring", "not convertible to UTF-8",
+	                         ns_lossy (s), __builtin_return_address (0));
 	return cstr? utf8_to_cork(string((char*)cstr)): string ("");
 }
 
@@ -93,6 +175,9 @@ string
 from_nsstring_utf8 (NSString *s) {
   if (!s) return "";
   const char *cstr= [s UTF8String];
+  if (!cstr)
+    ns_conversion_warning ("from_nsstring_utf8", "not convertible to UTF-8",
+                           ns_lossy (s), __builtin_return_address (0));
   return cstr? string ((char*) cstr): string ("");
 }
 
@@ -105,6 +190,9 @@ NSString *to_nsstring_utf8(string s)
     s = cork_to_utf8 (s);
   c_string p = c_string (s);
   NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
+  if (!nss || ([nss length] == 0 && N(s) > 0))
+    ns_conversion_warning ("to_nsstring_utf8", "no text for it", s,
+                           __builtin_return_address (0));
   return nss? nss: @"";
 }
 
@@ -162,6 +250,11 @@ ns_decode_length (string width, string height, NSSize ref) {
   else if (h_unit == "h" ) size.height= h_len * ref.height;
   else if (h_unit == "em") size.height= 14.0 * h_len;
   else if (h_unit == "px") size.height= h_len;
+  if (!ns_check_size (size, "ns_decode_length")) {
+    debug_aqua << "  (the lengths " << width << " and " << height << ")\n";
+    // (not a number: AppKit would raise an exception)
+    if (!isfinite (size.width) || !isfinite (size.height)) return ref;
+  }
   return size;
 }
 
@@ -182,4 +275,86 @@ from_label (NSString* s) {
   // Inputs are returned in the cork encoding, like in the Qt interface
   // (from_nsstring converts already)
   return from_nsstring (s);
+}
+
+/******************************************************************************
+ * Exceptions caught at the entry points from AppKit (#621)
+ ******************************************************************************/
+
+extern string the_report; // (basic.cpp)
+
+// the exceptions which come again (at each update): reported the first
+// time, and then only counted, at the 10th, 100th... time
+static bool
+ns_report_again (const char* where, string what) {
+  static hashmap<string,int> seen (0);
+  string key= string (where) * "\n" * what;
+  int n= seen[key] + 1;
+  seen (key)= n;
+  if (n == 1) return true;
+  int p= 10;
+  while (p < n && p < 1000000000) p *= 10;
+  if (n == p)
+    failed_error << "Cocoa: the same exception again in " << where << " ("
+                 << n << " times): " << what << LF;
+  return false;
+}
+
+void
+ns_report_exception (const char* where, NSException* e) {
+  try {
+    string what= from_nsstring_utf8 ([e name]) * ", " *
+                 from_nsstring_utf8 ([e reason]);
+    if (!ns_report_again (where, what)) return;
+    failed_error << "Cocoa: an Objective-C exception was caught in " << where
+                 << ": " << what << LF;
+    NSArray* st= [e callStackSymbols];
+    string trace;
+    for (NSUInteger i= 0; i < [st count] && i < 30; i++)
+      trace << "  " << from_nsstring_utf8 ([st objectAtIndex: i]) << "\n";
+    if (N(trace) > 0) failed_error << "Backtrace of the exception:\n" << trace;
+  }
+  catch (...) {}
+}
+
+void
+ns_report_exception (const char* where, string msg) {
+  // (the report of tm_throw, with its backtrace, is printed already; a
+  // string thrown otherwise is the message)
+  try {
+    if (N (the_exception) == 0) the_exception= msg;
+    if (!ns_report_again (where, msg)) {
+      the_exception= ""; the_report= "";
+      return;
+    }
+    failed_error << "Cocoa: an error was caught in " << where << LF;
+    handle_exceptions ();
+  }
+  catch (...) {}
+}
+
+/******************************************************************************
+ * Sizes and positions given to AppKit (#621)
+ ******************************************************************************/
+
+static const double ns_huge= 100000.0; // points
+
+bool
+ns_check_size (NSSize size, const char* where) {
+  // false (and a warning) for a size which AppKit would refuse (not a
+  // number) or which is surely wrong (negative, or huge)
+  double w= size.width, h= size.height;
+  if (isfinite (w) && isfinite (h) && w >= 0 && h >= 0 &&
+      w <= ns_huge && h <= ns_huge) return true;
+  debug_aqua << where << ": a bad size (" << w << ", " << h << ")\n";
+  return false;
+}
+
+bool
+ns_check_point (NSPoint pt, const char* where) {
+  double x= pt.x, y= pt.y;
+  if (isfinite (x) && isfinite (y) && fabs (x) <= ns_huge &&
+      fabs (y) <= ns_huge) return true;
+  debug_aqua << where << ": a bad position (" << x << ", " << y << ")\n";
+  return false;
 }

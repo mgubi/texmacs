@@ -304,6 +304,8 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       NSWindow *win = [wc window];
       if (win) {
         NSSize size = to_nssize (p);
+        if (!ns_check_size (size, "ns_window_widget_rep::send (SLOT_SIZE)"))
+          debug_aqua << "  (window " << orig_name << ")\n";
         [win setContentSize: size];
       }
     }
@@ -319,6 +321,8 @@ ns_window_widget_rep::send (slot s, blackbox val) {
         // bottom left
         NSPoint pt= to_nspoint (p);
         pt.y= main_screen_height () - pt.y;
+        if (!ns_check_point (pt, "ns_window_widget_rep::send (SLOT_POSITION)"))
+          debug_aqua << "  (window " << orig_name << ")\n";
         [win setFrameTopLeftPoint: pt];
       }
     }
