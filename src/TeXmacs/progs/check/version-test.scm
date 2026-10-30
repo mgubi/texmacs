@@ -57,14 +57,16 @@
   (system->url (tmp-name name)))
 
 (define (shell . l)
+  ;; a command line without shell syntax, in double quotes where needed:
+  ;; on Windows, eval-system starts the program itself, with no shell
   (eval-system (apply string-append l)))
 
 (define (reset-dir)
-  (shell "rm -rf '" version-dir "'")
+  (shell "rm -rf \"" version-dir "\"")
   (system-mkdir (system->url version-dir)))
 
 (define (remove-dir)
-  (shell "rm -rf '" version-dir "'"))
+  (shell "rm -rf \"" version-dir "\""))
 
 (define (tm-file body)
   ;; a .tm file with @body (lines of the body, already indented)
@@ -784,13 +786,16 @@
 
 (define git-dir (tmp-name "repo"))
 
+;; the root of the repository as git-root gives it, with / on Windows too
+(define git-root-dir (string-replace git-dir "\\" "/"))
+
 (define (git-sh . l)
   ;; a git command in the throwaway repository, never configured globally
-  (apply shell "cd '" git-dir "' && git -c user.name=tester"
+  (apply shell "git -C \"" git-dir "\" -c user.name=tester"
          " -c user.email=tester@example.org " l))
 
 (define (git-available?)
-  (string-starts? (shell "git --version 2>/dev/null") "git version"))
+  (string-starts? (shell "git --version") "git version"))
 
 (define (test-git)
   (check-group "git")
@@ -800,8 +805,8 @@
 
 (define (test-git-sub)
   (system-mkdir (system->url git-dir))
-  (git-sh "init -q . && git -c user.name=tester"
-          " -c user.email=tester@example.org commit -q --allow-empty -m init")
+  (git-sh "init -q .")
+  (git-sh "commit -q --allow-empty -m init")
   (let* ((root (system->url git-dir))
          (f (system->url (string-append git-dir "/a.tm")))
          (g (system->url (string-append git-dir "/b.tm")))
@@ -816,11 +821,11 @@
     (check-true (version-supports-git-style? f))
     (check-false (version-supports-svn-style? f))
     (check-true (version-supports-history? f))
-    (check= (git-root f) git-dir)
-    (check= (git-root root) git-dir)
+    (check= (git-root f) git-root-dir)
+    (check= (git-root root) git-root-dir)
     (check= (git-command f)
-            (string-append "git --work-tree=" git-dir
-                           " --git-dir=" git-dir "/.git"))
+            (string-append "git --work-tree=" git-root-dir
+                           " --git-dir=" git-root-dir "/.git"))
     ;; an untracked file
     (check= (buffer-status f) "??")
     (check= (version-status f) "unknown")
@@ -840,7 +845,7 @@
     (check= (buffer-status f) "??")
     (version-register f)
     ;; committed
-    (git-sh "commit -q -m 'first commit'")
+    (git-sh "commit -q -m \"first commit\"")
     (check= (buffer-status f) "  ")
     (check= (version-status f) "unmodified")
     (check-true (buffer-histed? f))
@@ -882,7 +887,7 @@
               `((" M" (hlink "a.tm" ,(url->string (url-append root "a.tm"))))))
       (check= (version-revision f h1) doc1)
       ;; a second commit
-      (git-sh "commit -q -a -m 'second commit'")
+      (git-sh "commit -q -a -m \"second commit\"")
       (let ((h2 (git-master f)))
         (check-false (== h2 h1))
         (check= (git-commit-parent root h2) h1)
@@ -902,7 +907,7 @@
                           (string-append h1 ":" (url->tmfs-string f))))
             (check= (map cadr h) '("tester" "tester"))
             (check= (map cadddr h) '("second commit" "first commit")))
-          (check= (current-git-root) git-dir)
+          (check= (current-git-root) git-root-dir)
           (check= (git-commit-master) h2)
           ;; the revision url of a history entry
           (check= (version-revision-url f (string-append h1 ":"
@@ -921,7 +926,7 @@
           (when (buffer-exists? old) (switch-to-buffer old)))
         ;; the history is relative to the repository of the file, also
         ;; when the current buffer is outside it
-        (check-false (== (current-git-root) git-dir))
+        (check-false (== (current-git-root) git-root-dir))
         (check= (map car (version-history f))
                 (list (string-append h2 ":" (url->tmfs-string f))
                       (string-append h1 ":" (url->tmfs-string f))))))
