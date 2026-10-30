@@ -844,6 +844,19 @@ typeset_stack (edit_env env, tree t, path ip, SI width,
 }
 
 array<page_item>
+typeset_stack (edit_env env, array<line_item> a, path ip, SI width,
+               stack_border& sb)
+{
+  // (the line items typeset before, see lazy_hidden_rep)
+  lazy_paragraph par (env, ip);
+  par->a= a;
+  par->width= width;
+  par->format_paragraph ();
+  sb= par->sss->sb;
+  return par->sss->l;
+}
+
+array<page_item>
 typeset_stack (edit_env env, tree t, path ip,
 	       array<line_item> a, array<line_item> b, stack_border& sb)
 {

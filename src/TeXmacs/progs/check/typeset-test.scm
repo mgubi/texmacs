@@ -923,7 +923,62 @@
                     3 4 0 0 0 0 2 3 0 0 0)
             (pos-of rect-x1 (in-cell (inner "0.5par")) 3 4 0 0 0 0 3 0 0 0))
     (check= (pos-of rect-x2 (in-cell '(mt "0.5par")) 3 4 0 0 0 0)
-            (pos-of rect-x2 (in-cell '(ml "0.5par")) 3 4 0 0 0 0))))
+            (pos-of rect-x2 (in-cell '(ml "0.5par")) 3 4 0 0 0 0)))
+  ;; what a hidden part assigns in a cell whose lines are broken (the
+  ;; abstract of tmarticle, a hide-preamble in it) holds for the paragraphs
+  ;; after it, as when the assignment is not hidden: the hidden part was
+  ;; typeset only when the cell was broken into lines, after them, and the
+  ;; macro was undefined there
+  (let* ((in-cell (lambda (x)
+                    `(document
+                       (tformat (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                                (table (row (cell (document ,x
+                                                            (concat "a" (ww))))))))))
+         (def '(assign "ww" (macro "wwwwwwwwww")))
+         (end-of (lambda (doc)
+                   (let ((x #f))
+                     (with-typeset-body doc
+                       (lambda () (set! x (rect-x2 (rect 0 1 0 0 0 1)))))
+                     x))))
+    (check= (end-of (in-cell `(hidden ,def)))
+            (end-of (in-cell def))))
+  ;; the hidden part, typeset where it occurs, is in the record of the
+  ;; paragraph around the table: the paragraph used again writes the
+  ;; bindings of the hidden part again (its labels), and when the label is
+  ;; removed from it, the binding goes (drop_bindings). The assignment holds
+  ;; after the table too, as when it is not hidden
+  (let* ((doc `(document
+                 (section (concat "S" (label "s0")))
+                 (concat "see " (reference "hx"))
+                 (tformat (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                          (table (row (cell (document
+                            (hidden (concat "H" (label "hx")))
+                            (hidden (assign "ww" (macro "wwwwwwwwww")))
+                            (concat "a" (ww)))))))
+                 (concat "a" (ww))
+                 "P1" "P2"))
+         (measure (lambda ()
+                    (list (tree->stree (get-reference "hx"))
+                          (rect-width (rect 3))
+                          (rect-x2 (rect 2 1 0 0 0 2))))))
+    (with-typeset-body doc
+      (lambda ()
+        (update-current-buffer)
+        (update-forced)
+        (update-forced)
+        (check= (measure) (from-scratch measure))
+        (check= (rect-width (rect 3)) (rect-width (rect 2 1 0 0 0 2)))
+        (tree-set (tree-ref (buffer-tree) 5) "P2 changed")
+        (update-forced)
+        (check= (cadr (tree->stree (get-reference "hx"))) "1")
+        (check= (measure) (from-scratch measure))
+        (tree-set (path->tree (at 2 1 0 0 0 0)) '(hidden "H"))
+        (update-forced)
+        ;; (the classic cache keeps a removed label until a complete pass)
+        (when (!= (getenv "TEXMACS_TYPESET_READS") "off")
+          (check= (tree->stree (get-reference "hx")) '(uninit))
+          (check= (measure) (from-scratch measure)))
+        (check= (typeset-check-mismatches) 0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Line breaking
