@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Cocoa: still consoles and search fields** (desktop, Cocoa
+  interface): the editors inside a window (the consoles, the search and
+  replace fields, the other `texmacs-input`) were typeset again from
+  scratch at each update, with their page trembling and about one core of
+  the processor busy; they now keep the size of their place in the window
+  and are typeset only when something changes (#620).
 - **Hidden definitions in tables and floats**: what a hidden part
   (`hidden`, `hide-preamble`) assigns in a table cell whose lines are
   broken, or in a float, holds for what follows, as when it is not

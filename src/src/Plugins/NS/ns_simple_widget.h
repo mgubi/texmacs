@@ -64,6 +64,8 @@ public:
   
   ////////////////////// Handling of TeXmacs' messages
   
+  void set_fills_container ();
+  bool fills_container ();
   void save_send_slot (slot s, blackbox val);
   void reapply_sent_slots();
   virtual void      send (slot s, blackbox val);
