@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 30 October 2026
+
+- **Hidden definitions in tables and floats**: what a hidden part
+  (`hidden`, `hide-preamble`) assigns in a table cell whose lines are
+  broken, or in a float, holds for what follows, as when it is not
+  hidden: a macro defined in a hidden preamble inside the abstract of
+  `tmarticle` was undefined in the text of the abstract (#503).
+
 ## 29 October 2026
 
 - **Replace with wildcards, continued**: Replace All after a Replace no
