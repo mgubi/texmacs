@@ -695,6 +695,10 @@ ns_tm_embedded_widget_rep::show_canvas () {
   if (!container || is_nil (main_widget)) return;
   for (NSView* old in [[[container subviews] copy] autorelease])
     [old removeFromSuperview];
+  // (the canvas is sized by the container, not by the document, see
+  // ns_simple_widget_rep::set_fills_container)
+  if (concrete (main_widget)->type == simple_widget)
+    static_cast<ns_simple_widget_rep*> (main_widget.rep)->set_fills_container ();
   NSView* v= concrete (main_widget)->as_nsview ();
   if (!v) return;
   [v setTranslatesAutoresizingMaskIntoConstraints: NO];
