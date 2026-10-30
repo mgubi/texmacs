@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Cocoa: an error in a menu no longer aborts TeXmacs** (desktop, Cocoa
+  interface): a menu whose computation fails (such as Debug >
+  Miscellaneous > Provoke menu error, computed with all the menus when
+  Spotlight opens) shows a disabled item "Error in menu" and the error
+  goes to the console, as in the Qt interface (#624).
 - **Wide braces drawn by the GPU**: the wide over- and underbraces of a
   long formula and the other glyphs of more than 512 pixels which have no
   outline (they are assembled from pieces by a virtual font) are drawn
