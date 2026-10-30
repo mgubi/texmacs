@@ -646,7 +646,8 @@
            (list-or (map (cut latex-mathjax-fill? <> f) (cdr x))))))
 
 (define (latex-mathjax-script x)
-  ;; a script of \overset or \underset at the size of the formula
+  ;; a script of \overset or \underset at the size of text (not of a
+  ;; script: in a subscript, the accent is bigger than its base)
   `(!concat (textstyle) ,x))
 
 (define (latex-mathjax-under-accent acc)
