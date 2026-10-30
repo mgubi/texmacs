@@ -983,6 +983,7 @@
     ;; (the identity in the configuration of the throwaway repository only)
     (git-sh "config user.name tester")
     (git-sh "config user.email tester@example.org")
+    (git-sh "config commit.gpgsign false")
     (let ((old (current-buffer))
           (bufs (buffer-list))
           ;; (a message in Cork, as typed in TeXmacs, given to git in UTF-8)
