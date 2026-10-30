@@ -10,9 +10,10 @@
 #   * linux-appimage, appimage-check: an AppImage made on Ubuntu 22.04
 #     (.github/fixes/build-appimage.sh), run on Ubuntu 24.04 and Debian 12
 #     without packages of development; published when linux passed too;
-#   * macos: the suites and the startup checks, then an application for
-#     Apple silicon and one for Intel, in a disk image each (signed ad hoc,
-#     not notarized), started once;
+#   * macos: the suites (on Apple silicon) and the startup checks, then an
+#     application for Apple silicon and one for Intel, in a disk image each
+#     (signed ad hoc, not notarized), started once; published when both
+#     passed;
 #   * windows: the suites and the startup checks, then an installer (Inno
 #     Setup, .github/fixes/TeXmacs-Fixes.iss), installed, run and
 #     uninstalled (.github/fixes/windows-installer.sh), and the bundle in a
@@ -244,7 +245,11 @@ jobs:
       - name: Build
         run: make -j"$(sysctl -n hw.ncpu)"
 
+      # (on Apple silicon only, as in the former CI of wip_fixes: the Intel runner
+      # is slower than the timings some suites check; its disk image is
+      # published only when this leg passed too, see the release job)
       - name: Run the regression suites
+        if: matrix.arch == 'arm64'
         run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
 
       # the command line and the exit of TeXmacs after a script (a crash at
@@ -315,7 +320,7 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            make perl rsync zip patch git
+            make perl rsync zip
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-ntldd
             mingw-w64-x86_64-pkgconf
@@ -332,8 +337,12 @@ jobs:
             mingw-w64-x86_64-gnupg
             texinfo
 
+      # (with the git of the runner, which made the checkout: no git in
+      # MSYS2, where the version suite would find it and test git, which
+      # it does not pass on Windows)
       - name: The identity of TeXmacs Fixes
         working-directory: .
+        shell: bash
         run: git apply .github/fixes/identity.patch
 
       - name: Configure
@@ -391,8 +400,8 @@ jobs:
     # in the pre-release fixes-latest, only from fixes_ci: each file
     # replaces the one of the former build, with a label naming the commit
     # (the AppImage once the suites passed on Linux and it ran on all the
-    # systems of appimage-check; a macOS disk image exists only when the
-    # suites of its job passed)
+    # systems of appimage-check; the macOS disk images once both legs
+    # passed, the suites running on Apple silicon)
     name: Publish in fixes-latest
     needs: [linux, appimage-check, macos, windows]
     if: always() && github.ref == 'refs/heads/fixes_ci'
@@ -407,6 +416,7 @@ jobs:
           name: texmacs-fixes-appimage
           path: dist
       - uses: actions/download-artifact@v4
+        if: needs.macos.result == 'success'
         with:
           pattern: texmacs-fixes-macos-*
           merge-multiple: true
