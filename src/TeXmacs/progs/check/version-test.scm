@@ -33,8 +33,10 @@
 ;;     git, by a .svn or .git directory above it) and dispatches to
 ;;     version-svn.scm or version-git.scm. The git part is checked on a
 ;;     throwaway repository in the temporary directory, always through
-;;     "git -c user.name=... -c user.email=...", never with a global
-;;     configuration; svn is only checked on files which are not under
+;;     "git -c user.name=... -c user.email=..." (or the GIT_AUTHOR_...
+;;     variables, for git-commit), never with a global configuration, once
+;;     with plain names and once with spaces in the names of the repository
+;;     and of the files; svn is only checked on files which are not under
 ;;     version control.
 
 (texmacs-module (check version-test)
@@ -784,10 +786,15 @@
 ;; Git
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the repository of the current run of test-git-sub
 (define git-dir (tmp-name "repo"))
 
 ;; the root of the repository as git-root gives it, with / on Windows too
 (define git-root-dir (string-replace git-dir "\\" "/"))
+
+(define (set-git-dir! name)
+  (set! git-dir (tmp-name name))
+  (set! git-root-dir (string-replace git-dir "\\" "/")))
 
 (define (git-sh . l)
   ;; a git command in the throwaway repository, never configured globally
@@ -801,15 +808,36 @@
   (check-group "git")
   (if (not (git-available?))
       (display* "  git is not available, the group is skipped\n")
-      (run-group test-git-sub)))
+      (begin
+        (run-group test-git-arguments)
+        (set-git-dir! "repo")
+        (run-group (lambda () (test-git-sub "a.tm" "b.tm")))
+        (check-group "git, spaces in the names")
+        (set-git-dir! "my repo")
+        (run-group (lambda () (test-git-sub "a b.tm" "b c.tm"))))))
 
-(define (test-git-sub)
+(define (sq-quote s)
+  ;; @s as git rev-parse --sq-quote writes it
+  (string-append "'" (string-replace (string-replace s "'" "'\\''")
+                                     "!" "'\\!'")
+                 "'"))
+
+(define (test-git-arguments)
+  ;; the arguments quoted by version-quote reach git unchanged, through
+  ;; /bin/sh or, on Windows, the splitting of the command line by git
+  (for (s (list "plain" "" "a b" "it's" "$HOME" "`echo x`" "x!y" "%PATH%"
+                "say \"hi\"" "C:\\Users\\John Smith\\" "a\\\"b" "a\\\\b"))
+    (check= (shell "git rev-parse --sq-quote " (version-quote s))
+            (string-append " " (sq-quote s) "\n"))))
+
+(define (test-git-sub fa fb)
+  ;; @fa and @fb are the names of two files of the repository git-dir
   (system-mkdir (system->url git-dir))
   (git-sh "init -q .")
   (git-sh "commit -q --allow-empty -m init")
   (let* ((root (system->url git-dir))
-         (f (system->url (string-append git-dir "/a.tm")))
-         (g (system->url (string-append git-dir "/b.tm")))
+         (f (system->url (string-append git-dir "/" fa)))
+         (g (system->url (string-append git-dir "/" fb)))
          (doc1 (tm-file "  One.\n"))
          (doc2 (tm-file "  One more.\n")))
     (string-save doc1 (url->system f))
@@ -824,8 +852,10 @@
     (check= (git-root f) git-root-dir)
     (check= (git-root root) git-root-dir)
     (check= (git-command f)
-            (string-append "git --work-tree=" git-root-dir
-                           " --git-dir=" git-root-dir "/.git"))
+            (string-append
+             "git " (version-quote (string-append "--work-tree=" git-root-dir))
+             " " (version-quote (string-append "--git-dir=" git-root-dir
+                                               "/.git"))))
     ;; an untracked file
     (check= (buffer-status f) "??")
     (check= (version-status f) "unknown")
@@ -833,14 +863,14 @@
     (check-false (buffer-to-unadd? f))
     (check-false (buffer-histed? f))
     (check-false (buffer-has-diff? f))
-    (check= (git-status root) '(("??" "a.tm")))
+    (check= (git-status root) (list (list "??" fa)))
     ;; registered
     (version-register f)
     (check= (buffer-status f) "A ")
     (check= (version-status f) "modified")
     (check-true (buffer-to-unadd? f))
     (check-false (buffer-to-add? f))
-    (check= (git-status root) '(("A " "a.tm")))
+    (check= (git-status root) (list (list "A " fa)))
     (version-unregister f)
     (check= (buffer-status f) "??")
     (version-register f)
@@ -864,7 +894,8 @@
         (check= (cadr m) "Author: tester <tester@example.org>")
         (check-true (in? "    first commit" m)))
       (check= (git-commit-diff root h0 h1)
-              `((7 0 (hlink "a.tm" ,(version-revision-url f h1)) 4)))
+              `((7 0 (hlink ,fa ,(version-revision-url f h1))
+                  ,(string-length fa))))
       ;; the log, newest first
       (with l (git-log root)
         (check= (length l) 2)
@@ -884,7 +915,7 @@
       (check-true (buffer-has-diff? f))
       (check-true (buffer-to-add? f))
       (check= (git-status root)
-              `((" M" (hlink "a.tm" ,(url->string (url-append root "a.tm"))))))
+              `((" M" (hlink ,fa ,(url->string (url-append root fa))))))
       (check= (version-revision f h1) doc1)
       ;; a second commit
       (git-sh "commit -q -a -m \"second commit\"")
@@ -894,7 +925,8 @@
         (check= (version-revision f h2) doc2)
         (check= (version-revision f h1) doc1)
         (check= (git-commit-diff root h1 h2)
-                `((1 1 (hlink "a.tm" ,(version-revision-url f h2)) 4)))
+                `((1 1 (hlink ,fa ,(version-revision-url f h2))
+                  ,(string-length fa))))
         ;; the history of a file, newest first, with the current buffer
         ;; on the file (the history is relative to its repository)
         (let ((old (current-buffer)))
@@ -909,6 +941,7 @@
             (check= (map cadddr h) '("second commit" "first commit")))
           (check= (current-git-root) git-root-dir)
           (check= (git-commit-master) h2)
+          (check= (git-commit-file-parent fa h2) h1)
           ;; the revision url of a history entry
           (check= (version-revision-url f (string-append h1 ":"
                                                          (url->tmfs-string f)))
@@ -933,10 +966,10 @@
     ;; a file which is not in the repository yet
     (string-save doc1 (url->system g))
     (check= (version-status g) "unknown")
-    (check= (git-status root) '(("??" "b.tm")))
+    (check= (git-status root) (list (list "??" fb)))
     (with c (git-status-content root)
       (check= (car c) 'document)
-      (check= (tm-ref c 2 0) '(document (tmfs-title "Git Status")
+      (check= (tm-ref c 2 0) `(document (tmfs-title "Git Status")
                                         (description-long
                                          (document
                                           (concat (item* "Changes to be committed")
@@ -944,7 +977,28 @@
                                           (concat (item* "Changes not staged for commit")
                                                   "")
                                           (concat (item* "Untracked files")
-                                                  (concat "b.tm" (new-line))))))))))
+                                                  (concat ,fb (new-line))))))))
+    ;; committed by git-commit, with the current buffer on the file
+    (version-register g)
+    (let ((old (current-buffer))
+          (bufs (buffer-list))
+          (msg "say \"hi\" to $HOME, it's `date`")
+          (vars '("GIT_AUTHOR_NAME" "GIT_AUTHOR_EMAIL"
+                  "GIT_COMMITTER_NAME" "GIT_COMMITTER_EMAIL")))
+      (load-buffer g)
+      (switch-to-buffer* g)
+      (with saved (map getenv vars)
+        (for (v vars)
+          (setenv v (if (string-ends? v "NAME") "tester" "tester@example.org")))
+        (git-commit msg)
+        (for-each setenv vars saved))
+      (check= (git-sh "log -1 --pretty=%s") (string-append msg "\n"))
+      (check= (buffer-status g) "  ")
+      (for (b (buffer-list))
+        (when (not (in? b bufs))
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main

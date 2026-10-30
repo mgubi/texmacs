@@ -18,6 +18,33 @@
 (define version-tool-loaded (make-ahash-table))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Arguments of the commands of the external tools
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (windows-quote s)
+  ;; On Windows, eval-system starts the program without a shell, and the
+  ;; program splits its command line itself (C runtime rules, as for
+  ;; quote_argument in windows64_system.cpp): the backslashes are doubled
+  ;; before a quote, which is escaped, and before the closing quote
+  (define (bs n) (make-string n #\\))
+  (let loop ((i 0) (n 0) (r "\""))
+    (if (== i (string-length s))
+        (string-append r (bs (* 2 n)) "\"")
+        (with c (string-ref s i)
+          (cond ((== c #\\) (loop (+ i 1) (+ n 1) r))
+                ((== c #\") (loop (+ i 1) 0
+                                  (string-append r (bs (+ (* 2 n) 1)) "\"")))
+                (else (loop (+ i 1) 0
+                            (string-append r (bs n) (string c)))))))))
+
+(tm-define (version-quote s)
+  ;; @s as one argument on the command line of eval-system
+  (if (or (os-mingw?) (os-win32?))
+      (windows-quote s)
+      ;; elsewhere the command goes through /bin/sh
+      (string-append "'" (string-replace s "'" "'\\''") "'")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dispatch to support for various external tools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
