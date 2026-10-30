@@ -134,7 +134,9 @@
   ;; GIT_CONFIG_GLOBAL needs Git 2.32 or newer.
   (system-setenv "GIT_CONFIG_GLOBAL" "/dev/null")
   (system-setenv "GIT_CONFIG_NOSYSTEM" "1")
-  (with v (string->list (eval-system "git --version 2>/dev/null"))
+  ;; (without a shell, which eval-system does not use on Windows)
+  (with v (string->list (cadr (evaluate-system (list "git" "--version")
+                                               '() '() '(1 2))))
     (with n (map string->number
                  (string-tokenize-by-char
                   (list->string (list-filter v (lambda (c)

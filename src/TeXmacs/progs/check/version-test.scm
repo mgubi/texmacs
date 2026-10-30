@@ -34,8 +34,11 @@
 ;;     version-svn.scm or version-git.scm. The git part is checked on a
 ;;     throwaway repository in the temporary directory, whose identity is
 ;;     set in its own configuration, never globally (the Git support itself
-;;     is checked by the suite git, git-test.scm); svn is only checked on
-;;     files which are not under version control.
+;;     is checked by the suite git, git-test.scm), once with plain names
+;;     and once with spaces (and a letter which is not in ASCII) in the
+;;     names of the repository and of the files; svn is only checked on
+;;     files which are not under version control, and the quoting of the
+;;     arguments of its command lines (version-quote) through git.
 
 (texmacs-module (check version-test)
   (:use (check check-lib)
@@ -57,14 +60,16 @@
   (system->url (tmp-name name)))
 
 (define (shell . l)
+  ;; a command line without shell syntax, in double quotes where needed:
+  ;; on Windows, eval-system starts the program itself, with no shell
   (eval-system (apply string-append l)))
 
 (define (reset-dir)
-  (shell "rm -rf '" version-dir "'")
+  (shell "rm -rf \"" version-dir "\"")
   (system-mkdir (system->url version-dir)))
 
 (define (remove-dir)
-  (shell "rm -rf '" version-dir "'"))
+  (shell "rm -rf \"" version-dir "\""))
 
 (define (tm-file body)
   ;; a .tm file with @body (lines of the body, already indented)
@@ -782,12 +787,21 @@
 ;; Git
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the repository of the current run of test-git-sub
 (define git-dir (tmp-name "repo"))
+
+;; the root of the repository as git-root gives it, as a path of the system
+;; (with \ on Windows, where git-dir ends with /repo)
+(define git-root-dir (url->system (system->url git-dir)))
+
+(define (set-git-dir! name)
+  (set! git-dir (tmp-name name))
+  (set! git-root-dir (url->system (system->url git-dir))))
 
 (define (git-sh . l)
   ;; a git command in the throwaway repository, whose identity is set in
-  ;; its own configuration, never globally
-  (apply shell "cd '" git-dir "' && git " l))
+  ;; its own configuration, never globally (one command, no shell syntax)
+  (apply shell "git -C \"" git-dir "\" " l))
 
 (define (test-git)
   (check-group "git")
@@ -798,19 +812,48 @@
       (let* ((key "git trusted repositories")
              (old (and (cpp-has-preference? key) (get-preference key))))
         (check-isolate-git)
-        (run-group test-git-sub)
+        (run-group test-git-arguments)
+        (set-git-dir! "repo")
+        (run-group (lambda () (test-git-sub "a.tm" "b.tm")))
+        (check-group "git, spaces in the names")
+        (set-git-dir! "my repo")
+        ;; (a name in utf8, e with an acute accent, which is not in ASCII)
+        (run-group (lambda ()
+                     (test-git-sub "a b.tm"
+                                   (string-append
+                                    "b c" (string (integer->char 195)
+                                                  (integer->char 169))
+                                    ".tm"))))
         (if old (set-preference key old) (reset-preference key)))))
+
+(define (sq-quote s)
+  ;; @s as git rev-parse --sq-quote writes it
+  (string-append "'" (string-replace (string-replace s "'" "'\\''")
+                                     "!" "'\\!'")
+                 "'"))
+
+(define (test-git-arguments)
+  ;; the arguments quoted by version-quote (for the command lines of svn)
+  ;; reach the program unchanged, through /bin/sh or, on Windows, the
+  ;; splitting of the command line by the program itself
+  (for (s (list "plain" "" "a b" "it's" "$HOME" "`echo x`" "x!y" "%PATH%"
+                "say \"hi\"" "C:\\Users\\John Smith\\" "a\\\"b" "a\\\\b"))
+    (check= (shell "git rev-parse --sq-quote " (version-quote s))
+            (string-append " " (sq-quote s) "\n"))))
 
 ;; The suite "git" (git-test.scm) checks the Git support itself; this group
 ;; checks that version-tmfs.scm dispatches the version-* interface to it.
-(define (test-git-sub)
+(define (test-git-sub fa fb)
+  ;; @fa and @fb are the names of two files of the repository git-dir
   (system-mkdir (system->url git-dir))
-  (git-sh "init -q . && git config user.name tester"
-          " && git config user.email tester@example.org"
-          " && git commit -q --allow-empty -m init")
+  (git-sh "init -q .")
+  (git-sh "config user.name tester")
+  (git-sh "config user.email tester@example.org")
+  (git-sh "config commit.gpgsign false")
+  (git-sh "commit -q --allow-empty -m init")
   (let* ((root (system->url git-dir))
-         (f (system->url (string-append git-dir "/a.tm")))
-         (g (system->url (string-append git-dir "/b.tm")))
+         (f (system->url (string-append git-dir "/" fa)))
+         (g (system->url (string-append git-dir "/" fb)))
          (doc1 (tm-file "  One.\n"))
          (doc2 (tm-file "  One more.\n")))
     (string-save doc1 (url->system f))
@@ -822,8 +865,8 @@
     (check-true (version-supports-git-style? f))
     (check-false (version-supports-svn-style? f))
     (check-true (version-supports-history? f))
-    (check= (url->system (git-root f)) git-dir)
-    (check= (url->system (git-root root)) git-dir)
+    (check= (url->system (git-root f)) git-root-dir)
+    (check= (url->system (git-root root)) git-root-dir)
     ;; Git is only run in trusted repositories
     (check-false (git-trusted? f))
     (check-false (git-status root))
@@ -833,7 +876,7 @@
     ;; an untracked file
     (check= (git-file-state f) 'untracked)
     (check= (version-status f) "unknown")
-    (check= (map git-entry-path (git-status-entries root)) '("a.tm"))
+    (check= (map git-entry-path (git-status-entries root)) (list fa))
     ;; registered
     (check= (version-register f) "Added file")
     (check= (git-file-state f) 'added)
@@ -858,7 +901,7 @@
         (check= (git-commit-author c) "tester")
         (check= (git-commit-subject c) "first commit"))
       (check= (git-commit-message root h1) "first commit\n\n")
-      (check= (git-numstat root h1) '((7 0 "a.tm")))
+      (check= (git-numstat root h1) (list (list 7 0 fa)))
       ;; the log, newest first
       (with l (git-log root 0 10)
         (check= (map git-commit-subject l) '("first commit" "init"))
@@ -876,7 +919,7 @@
       (check= (version-revision f h1) doc1)
       (check= (version-revision f "INDEX") doc1)
       ;; a second commit
-      (git-sh "commit -q -a -m 'second commit'")
+      (git-sh "commit -q -a -m \"second commit\"")
       (git-invalidate root)
       (let ((h2 (git-master f)))
         (check-false (== h2 h1))
@@ -898,7 +941,7 @@
         (let ((old (current-buffer)))
           (load-buffer f)
           (switch-to-buffer* f)
-          (check= (url->system (current-git-root)) git-dir)
+          (check= (url->system (current-git-root)) git-root-dir)
           ;; comparing the buffer with its first revision
           (compare-with-older (string->url (version-revision-url f h1)))
           ;; "One." and "One more." have no word in common
@@ -913,7 +956,7 @@
         ;; the history is relative to the repository of the file, also
         ;; when the current buffer is outside it
         (check-false (== (and-with r (current-git-root) (url->system r))
-                         git-dir))
+                         git-root-dir))
         (check= (map car (version-history f))
                 (list (string-append h2 ":" (url->tmfs-string f))
                       (string-append h1 ":" (url->tmfs-string f))))))
@@ -921,10 +964,34 @@
     (string-save doc1 (url->system g))
     (git-invalidate root)
     (check= (version-status g) "unknown")
-    (check= (map git-entry-path (git-status-entries root)) '("b.tm"))
+    (check= (map git-entry-path (git-status-entries root)) (list fb))
     (with s (tmfs-load (tmfs-url-git root "status"))
       (check-true (string-contains? s "Untracked files"))
-      (check-true (string-contains? s "b.tm")))))
+      (check-true (string-contains? s (utf8->cork fb))))
+    ;; committed by version-commit, with a message in Cork (as typed in
+    ;; TeXmacs), given to Git in utf8
+    (with msg (string-append "say \"hi\" to $HOME, it's a caf"
+                             (string (integer->char 233)))
+      (check= (version-register g) "Added file")
+      (version-commit g msg)
+      (check= (git-file-state g) 'unmodified)
+      ;; (read from a file: on Windows, eval-system decodes the output of
+      ;; the command in the OEM code page, windows64_system.cpp, which
+      ;; garbles the utf8 written by git, issue #641)
+      (with out (tmp-name "message.txt")
+        (git-sh "log -1 --pretty=%s --output=\"" out "\"")
+        (check= (string-load (system->url out))
+                (string-append (cork->utf8 msg) "\n"))))
+    ;; a renamed file: the status gives the new and the old name
+    (with new (string-append "new " fb)
+      (git-sh "mv \"" fb "\" \"" new "\"")
+      (git-invalidate root)
+      (check= (map (lambda (e) (list (git-entry-kind e) (git-entry-path e)
+                                     (git-entry-orig e)))
+                   (git-status-entries root))
+              (list (list 'renamed new fb)))
+      (with s (tmfs-load (tmfs-url-git root "status"))
+        (check-true (string-contains? s (utf8->cork new)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
