@@ -19,8 +19,8 @@ have the details, and the problems go to the
   spaces in its name, or a commit message with quotes, `$` or accents,
   reaches `svn` unchanged, also on Windows, where no shell splits the
   command line (#636). Git, which TeXmacs runs without a command line,
-  is now checked in a repository whose folder and files have spaces and
-  accents in their names (the file names in the status list, renamed
+  is now checked in a repository with spaces in the names of its folder
+  and files, and an accent in a file name (the names in the status list, renamed
   files, a commit message in Cork given to Git in UTF-8), and the checks
   also run on Windows, with the native Git (#625).
 - **No false warning of a typesetting loop**: zooming or resizing a
