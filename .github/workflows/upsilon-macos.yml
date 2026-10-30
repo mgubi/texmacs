@@ -206,6 +206,26 @@ jobs:
           hdiutil detach "$mnt"
           exit $status
 
+      # failures of the Cocoa interface which used to be silent or to abort
+      # TeXmacs (#621): a French dialog title, closing the console, an idle
+      # console; with the application of the disk image (arm64, the
+      # architecture of the runner), about a minute
+      - name: Cocoa checks (tests/cocoa/check.sh)
+        if: matrix.gui == 'cocoa'
+        run: |
+          mnt=$(mktemp -d)
+          for i in 1 2 3 4 5; do
+            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" && break
+            [ $i = 5 ] && exit 1
+            sleep $((i * 10))
+          done
+          status=0
+          TM_TEST_HOME=$(mktemp -d) BIN="$mnt/$APP_NAME.app/Contents/MacOS/TeXmacs" \
+            tests/cocoa/check.sh || status=$?
+          [ $status = 0 ] || tail -40 tests/build/cocoa/*.log
+          hdiutil detach "$mnt"
+          exit $status
+
       # not zipped: the artifact downloads as the .dmg
       - uses: actions/upload-artifact@v7
         with:

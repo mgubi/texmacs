@@ -96,7 +96,20 @@ string from_label (NSString* s);
 void ns_report_exception (const char* where, NSException* e);
 void ns_report_exception (const char* where, string msg);
 bool ns_check_size (NSSize size, const char* where);
-bool ns_check_point (NSPoint pt, const char* where);
+
+/*! The sizes, positions and lengths computed by TeXmacs which are given to
+ AppKit: a value which AppKit would refuse (not a number: an exception) or
+ which is surely wrong (a negative size, a value beyond bound) is replaced
+ by a safe one (0, or the bound), with a warning on debug-aqua the first
+ time at each place (where); the right values are unchanged. ns_fix_*
+ change their argument and say whether they warned. */
+#define NS_HUGE_FRAME 1.0e7
+bool ns_fix_size (NSSize& s, const char* where, double bound= NS_HUGE_FRAME);
+bool ns_fix_point (NSPoint& p, const char* where, double bound= NS_HUGE_FRAME);
+NSSize ns_safe_size (NSSize s, const char* where, double bound= NS_HUGE_FRAME);
+NSPoint ns_safe_point (NSPoint p, const char* where, double bound= NS_HUGE_FRAME);
+NSRect ns_safe_rect (NSRect r, const char* where, double bound= NS_HUGE_FRAME);
+CGFloat ns_safe_length (CGFloat x, const char* where, double bound= NS_HUGE_FRAME);
 
 /*! An entry point from AppKit into TeXmacs (the events, an action, a timer,
  a delegate): an exception, of Objective-C or of C++ (the ASSERTs and FAILEDs

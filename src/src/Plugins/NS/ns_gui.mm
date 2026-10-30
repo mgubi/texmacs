@@ -815,9 +815,11 @@ ns_snapshot (string dir) {
 @implementation TMSnapshotHelper
 - (void) snapshot: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   (void) timer;
   string dir= get_env ("TEXMACS_NS_SNAPSHOT");
   if (dir != "") ns_snapshot (dir);
+  NS_ENTRY_END ("the snapshots (TEXMACS_NS_SNAPSHOT)")
 }
 @end
 
@@ -832,6 +834,7 @@ ns_snapshot (string dir) {
 @implementation TMTypeHelper
 - (void) type: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   (void) timer;
   string click= get_env ("TEXMACS_NS_CLICK");
   string text= get_env ("TEXMACS_NS_TYPE");
@@ -911,6 +914,7 @@ ns_snapshot (string dir) {
       [NSApp postEvent: e atStart: NO];
     }
   }
+  NS_ENTRY_END ("the typing test (TEXMACS_NS_TYPE, TEXMACS_NS_CLICK)")
 }
 @end
 
@@ -982,9 +986,11 @@ ns_print_menu (NSMenu* m, int depth, int max_depth) {
 @implementation TMMenuPrinter
 - (void) print: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   (void) timer;
   ns_print_menu ([NSApp mainMenu], 0,
                  as_int (get_env ("TEXMACS_NS_MENUS")));
+  NS_ENTRY_END ("the menu test (TEXMACS_NS_MENUS)")
 }
 @end
 
@@ -1015,6 +1021,7 @@ find_document_scroll_view (NSView* v) {
 @implementation TMScrollHelper
 - (void) step: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   if (remaining == 0) {
     remaining= as_int (get_env ("TEXMACS_NS_SCROLL"));
   }
@@ -1079,6 +1086,7 @@ find_document_scroll_view (NSView* v) {
     fprintf (stderr, "TEXMACS_NS_SCROLL done at %g\n", [clip bounds].origin.y);
     [timer invalidate];
   }
+  NS_ENTRY_END ("the scroll test (TEXMACS_NS_SCROLL)")
 }
 @end
 
@@ -1175,6 +1183,7 @@ canvas_frame () {
 }
 - (void) step: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   if (!phases) {
     string spec= get_env ("TEXMACS_NS_BENCH");
     if (spec == "1" || spec == "")
@@ -1303,6 +1312,7 @@ canvas_frame () {
     phase++; step= 0;
     paint0= ns_bench_paint; display0= ns_bench_display; move0= ns_bench_move; repaint0= ns_bench_repaint; pixels0= ns_bench_pixels;
   }
+  NS_ENTRY_END ("the benchmark (TEXMACS_NS_BENCH)")
 }
 @end
 
@@ -1313,12 +1323,14 @@ canvas_frame () {
 @implementation TMDropHelper
 - (void) drop: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   (void) timer;
   NSWindow* win= [NSApp keyWindow];
   if (!win) win= [[NSApp orderedWindows] firstObject];
   NSView* v= find_canvas ([win contentView]);
   ns_test_drop (v, to_nsstring (get_env ("TEXMACS_NS_DROP")));
   fprintf (stderr, "TEXMACS_NS_DROP %s\n", v? "done": "no canvas");
+  NS_ENTRY_END ("the drop test (TEXMACS_NS_DROP)")
 }
 @end
 
@@ -1410,6 +1422,7 @@ ns_dump_view (NSView* v, int depth) {
 @implementation TMPressHelper
 - (void) press: (NSTimer*) timer
 {
+  NS_ENTRY_BEGIN
   // NOTE: several steps are separated by ";", one per second
   static int step= 0;
   NSArray* steps= [to_nsstring (get_env ("TEXMACS_NS_PRESS"))
@@ -1443,6 +1456,7 @@ ns_dump_view (NSView* v, int depth) {
       else done= ns_press ([win contentView], label);
     }
   fprintf (stderr, "TEXMACS_NS_PRESS %s\n", done? "done": "not found");
+  NS_ENTRY_END ("the press test (TEXMACS_NS_PRESS)")
 }
 @end
 
@@ -1574,9 +1588,11 @@ static NSAutoreleasePool *pool = nil;
 @implementation TMQuitHelper
 - (void) quit: (id) sender
 {
+  NS_ENTRY_BEGIN
   (void) sender;
   exec_delayed (scheme_cmd ("(safely-quit-TeXmacs)"));
   the_gui->need_update ();
+  NS_ENTRY_END ("-[TMQuitHelper quit:]")
 }
 @end
 
@@ -1606,12 +1622,14 @@ static NSAutoreleasePool *pool = nil;
 - (void) observeValueForKeyPath: (NSString*) path ofObject: (id) object
                          change: (NSDictionary*) change context: (void*) context
 {
+  NS_ENTRY_BEGIN
   (void) path; (void) object; (void) change; (void) context;
   string now= ns_icon_theme ();
   if (now == theme) return;
   theme= now;
   ns_simple_widget_rep::invalidate_every ();
   if (the_gui) the_gui->force_update ();
+  NS_ENTRY_END ("-[TMAppearanceObserver observeValueForKeyPath:...]")
 }
 @end
 

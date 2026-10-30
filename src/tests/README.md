@@ -356,6 +356,19 @@ when a font runs out of sizes: a wide check or breve beyond the largest
 variant is drawn by TeXmacs, a long arrow always covers its labels, and a
 slash without variants (Fira Math) keeps being stretched.
 
+## Checks of the Cocoa interface
+
+`tests/cocoa/check.sh`, run from the top of the source tree of a Cocoa
+build (`--with-gui=cocoa`), or with `BIN=` the executable of a
+`TeXmacs.app`, starts TeXmacs three times (about 15 seconds each, in
+homes of their own) and checks failures which used to be silent or to
+abort it (#621): a dialog title with accents in French (#468), closing the
+console with several tabs (#619) and an idle console, which must not be
+typeset again and again (#620). It also fails on any error caught at an
+entry point from AppKit. The windows are shown: Cocoa has no offscreen
+mode. The workflow `upsilon-macos.yml` runs it on the application of the
+Cocoa disk image.
+
 ## Other tools
 
 `tests/opentype/font-gallery.sh` renders one specimen per math font into a

@@ -35,7 +35,16 @@ to_nsimage (url u) {
   // The icon is drawn in the variant (light or dark) of the appearance it is
   // drawn in, so that it follows a change of the appearance of the system
   NSBitmapImageRep* rep= xpm_image (u, ns_icon_theme ());
-  if (!rep) return nil;
+  if (!rep) {
+    // (a button or an item without its icon: once for each icon, #621)
+    static hashset<string> seen;
+    string name= as_string (u);
+    if (!seen->contains (name) && N(seen) < 100) {
+      seen->insert (name);
+      debug_aqua << "to_nsimage: no image for the icon " << name << "\n";
+    }
+    return nil;
+  }
   NSImage* img= [NSImage imageWithSize: [rep size] flipped: NO
                         drawingHandler: ^BOOL (NSRect r) {
     string theme= ns_icon_theme ([NSAppearance currentDrawingAppearance]);
@@ -837,7 +846,9 @@ ns_refresh_state::recompute (string what) {
 }
 - (void) controlTextDidChange: (NSNotification*) n
 {
+  NS_ENTRY_BEGIN
   [self setFilter: [[n object] stringValue]];
+  NS_ENTRY_END ("-[TMChoiceList controlTextDidChange:]")
 }
 - (NSInteger) numberOfRowsInTableView: (NSTableView*) tv
 {
@@ -850,6 +861,7 @@ ns_refresh_state::recompute (string what) {
 }
 - (void) tableViewSelectionDidChange: (NSNotification*) n
 {
+  NS_ENTRY_BEGIN
   (void) n;
   if (!cmd || filtering) return;
   NSIndexSet* sel= [table selectedRowIndexes];
@@ -867,6 +879,7 @@ ns_refresh_state::recompute (string what) {
   // qt_choice_command_rep): (lambda (answer filter) ...)
   if (filter) c (list_object (l, object (from_nsstring (filter))));
   else c (list_object (l));
+  NS_ENTRY_END ("-[TMChoiceList tableViewSelectionDidChange:]")
 }
 @end
 
@@ -1009,6 +1022,7 @@ node_roles (tree roles, tree t) {
 }
 - (void) outlineViewSelectionDidChange: (NSNotification*) n
 {
+  NS_ENTRY_BEGIN
   // the command gets the subtree and -1 (Qt gives the command and user
   // roles when the tree declares them, QTMTreeView::callOnChange)
   (void) n;
@@ -1016,6 +1030,7 @@ node_roles (tree roles, tree t) {
   if (!cmd || !item) return;
   command c (cmd);
   c (list_object (object (((TMTreeNode*) item)->t), object (-1)));
+  NS_ENTRY_END ("-[TMTreeList outlineViewSelectionDidChange:]")
 }
 @end
 
@@ -1549,6 +1564,7 @@ ns_ui_element_rep::make_nsview () {
           w= editable? max (sz.width, (CGFloat) 40.0): max (sz.width, fit.width);
         }
         [p setTranslatesAutoresizingMaskIntoConstraints: NO];
+        w= ns_safe_length (w, "make_widget (the width of a pop-up)");
         NSLayoutConstraint* c= [p.widthAnchor constraintEqualToConstant: w];
         [c setPriority: NSLayoutPriorityDefaultHigh - 5];
         [c setActive: YES];
@@ -1616,6 +1632,10 @@ ns_ui_element_rep::make_nsview () {
       NSSize mins= ns_decode_length (x.x3.x1, x.x4.x1, ref);
       NSSize defs= ns_decode_length (x.x3.x2, x.x4.x2, ref);
       NSSize maxs= ns_decode_length (x.x3.x3, x.x4.x3, ref);
+      const char* where= "make_widget (resize_widget)";
+      mins= ns_safe_size (mins, where);
+      defs= ns_safe_size (defs, where);
+      maxs= ns_safe_size (maxs, where);
       [v setTranslatesAutoresizingMaskIntoConstraints: NO];
       NSMutableArray* cs= [NSMutableArray array];
       if (NSEqualSizes (mins, defs) && NSEqualSizes (defs, maxs)) {
@@ -1642,19 +1662,21 @@ ns_ui_element_rep::make_nsview () {
     {
       typedef quartet<bool, bool, SI, SI> T;
       T x= open_box<T> (load);
+      CGFloat gw= ns_safe_length (x.x3, "make_widget (glue_widget)");
+      CGFloat gh= ns_safe_length (x.x4, "make_widget (glue_widget)");
       // NOTE: an extensible glue takes the extra space (as the spacers of
       // Qt), shared with the other glues of its list (see stack_of)
       NSView* v= [[[NSView alloc] init] autorelease];
       [v setTranslatesAutoresizingMaskIntoConstraints: NO];
-      if (!x.x1) [[v.widthAnchor constraintEqualToConstant: x.x3] setActive: YES];
+      if (!x.x1) [[v.widthAnchor constraintEqualToConstant: gw] setActive: YES];
       else {
-        [[v.widthAnchor constraintGreaterThanOrEqualToConstant: x.x3] setActive: YES];
+        [[v.widthAnchor constraintGreaterThanOrEqualToConstant: gw] setActive: YES];
         [v setContentHuggingPriority: 1
                       forOrientation: NSLayoutConstraintOrientationHorizontal];
       }
-      if (!x.x2) [[v.heightAnchor constraintEqualToConstant: x.x4] setActive: YES];
+      if (!x.x2) [[v.heightAnchor constraintEqualToConstant: gh] setActive: YES];
       else {
-        [[v.heightAnchor constraintGreaterThanOrEqualToConstant: x.x4] setActive: YES];
+        [[v.heightAnchor constraintGreaterThanOrEqualToConstant: gh] setActive: YES];
         [v setContentHuggingPriority: 1
                       forOrientation: NSLayoutConstraintOrientationVertical];
       }

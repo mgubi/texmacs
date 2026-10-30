@@ -272,11 +272,14 @@ initkeymap () {
 
 - (void) viewWillMoveToWindow: (NSWindow *)newWindow
 {
+  // NOTE: also when the window is released, after the events (#621)
+  NS_ENTRY_BEGIN
   // query widget preferred size
   if (wid) {
     SI w = 0, h = 0;
     wid->handle_get_size_hint (w, h);
-    [self setFrameSize: to_nssize (w, h)];
+    [self setFrameSize: ns_safe_size (to_nssize (w, h),
+                                      "-[TMView viewWillMoveToWindow:]")];
   }
 
   // the canvas which leaves its window loses the focus
@@ -292,6 +295,7 @@ initkeymap () {
     [nc addObserver: self selector: @selector(windowDidResignKey:)
                name: NSWindowDidResignKeyNotification object: newWindow];
   }
+  NS_ENTRY_END ("-[TMView viewWillMoveToWindow:]")
 }
 
 - (void) viewDidMoveToWindow
@@ -306,16 +310,22 @@ initkeymap () {
     [w makeFirstResponder: self];
 }
 
+// (the notifications of the window: also when another application or the
+// program orders the windows, not only in an event)
 - (void) windowDidBecomeKey: (NSNotification*) n
 {
   (void) n;
-  if ([[self window] firstResponder] == self) [self focusIn];
+  NS_ENTRY_BEGIN
+    if ([[self window] firstResponder] == self) [self focusIn];
+  NS_ENTRY_END ("-[TMView windowDidBecomeKey:]")
 }
 
 - (void) windowDidResignKey: (NSNotification*) n
 {
   (void) n;
-  [self focusOut];
+  NS_ENTRY_BEGIN
+    [self focusOut];
+  NS_ENTRY_END ("-[TMView windowDidResignKey:]")
 }
 
 - (BOOL) becomeFirstResponder
@@ -368,7 +378,10 @@ initkeymap () {
   if (dbg) fprintf (stderr, "DRAWRECT %.0f,%.0f %.0fx%.0f of %.0fx%.0f\n",
                     rect.origin.x, rect.origin.y, rect.size.width, rect.size.height,
                     [self bounds].size.width, [self bounds].size.height);
-  wid->draw_backing_store (rect);
+  // (the display of the windows comes after the events)
+  NS_ENTRY_BEGIN
+    wid->draw_backing_store (rect);
+  NS_ENTRY_END ("-[TMView drawRect:]")
 }
 
 /******************************************************************************
@@ -647,15 +660,21 @@ mouse_decode (unsigned int mstate) {
 
 - (BOOL) performDragOperation: (id<NSDraggingInfo>) sender
 {
+  // NOTE: a drop from another application does not come as an event
   if (!wid) return NO;
-  NSPoint point = [[self superview] convertPoint: [sender draggingLocation]
-                                        fromView: nil];
-  coord2 pt = from_nspoint (point);
-  tree doc= ns_dropped_document ([sender draggingPasteboard]);
-  if (N(doc) == 0) return NO;
-  int ticket= ns_drop_payload (doc);
-  the_gui->process_mouse (wid, "drop", pt.x1, pt.x2, ticket, texmacs_time ());
-  return YES;
+  BOOL done= NO;
+  NS_ENTRY_BEGIN
+    NSPoint point = [[self superview] convertPoint: [sender draggingLocation]
+                                          fromView: nil];
+    coord2 pt = from_nspoint (point);
+    tree doc= ns_dropped_document ([sender draggingPasteboard]);
+    if (N(doc) > 0) {
+      int ticket= ns_drop_payload (doc);
+      the_gui->process_mouse (wid, "drop", pt.x1, pt.x2, ticket, texmacs_time ());
+      done= YES;
+    }
+  NS_ENTRY_END ("-[TMView performDragOperation:]")
+  return done;
 }
 
 - (void) scrollWheel: (NSEvent *) event
@@ -696,11 +715,14 @@ mouse_decode (unsigned int mstate) {
 - (void) resizeWithOldSuperviewSize: (NSSize)oldBoundsSize
 {
   [super resizeWithOldSuperviewSize: oldBoundsSize];
+  // (in a layout of the window, which may come after the events)
+  NS_ENTRY_BEGIN
   if (wid)  {
     NSSize size = [self bounds].size;
     coord2 s = from_nssize (size);
     the_gui -> process_resize (wid, s.x1, s.x2);
   }
+  NS_ENTRY_END ("-[TMView resizeWithOldSuperviewSize:]")
 }
 
 - (BOOL) acceptsFirstMouse: (NSEvent*) event
@@ -749,6 +771,9 @@ plain_string (id s) {
 - (void) insertText: (id) aString replacementRange: (NSRange) replacementRange
 {
   (void) replacementRange;
+  // NOTE: the input methods (the Character Viewer, the dictation) may
+  // insert their text outside of a key event
+  NS_ENTRY_BEGIN
   NSString *str= plain_string (aString);
   if (workingText) {
     [self deleteWorkingText];
@@ -763,6 +788,7 @@ plain_string (id s) {
     if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << s << LF;
     the_gui->process_keypress (wid, s, texmacs_time ());
   }
+  NS_ENTRY_END ("-[TMView insertText:replacementRange:]")
 }
 
 - (void) doCommandBySelector: (SEL) aSelector
@@ -771,11 +797,14 @@ plain_string (id s) {
   // an input method which is composing some text does not want are sent
   // to TeXmacs here
   (void) aSelector;
+  NS_ENTRY_BEGIN
   if (wid && ns_pending_key != "") {
     if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << ns_pending_key << LF;
-    the_gui->process_keypress (wid, ns_pending_key, texmacs_time ());
+    string key= ns_pending_key;
     ns_pending_key= "";
+    the_gui->process_keypress (wid, key, texmacs_time ());
   }
+  NS_ENTRY_END ("-[TMView doCommandBySelector:]")
 }
 
 - (void) setMarkedText: (id) aString selectedRange: (NSRange) selRange
@@ -788,13 +817,17 @@ plain_string (id s) {
     workingText = [str copy];
     processingCompose = YES;
   }
-  [self sendPreEdit: str position: selRange.location];
+  NS_ENTRY_BEGIN
+    [self sendPreEdit: str position: selRange.location];
+  NS_ENTRY_END ("-[TMView setMarkedText:selectedRange:replacementRange:]")
 }
 
 - (void) unmarkText
 {
   [self deleteWorkingText];
-  [self sendPreEdit: @"" position: 0];
+  NS_ENTRY_BEGIN
+    [self sendPreEdit: @"" position: 0];
+  NS_ENTRY_END ("-[TMView unmarkText]")
 }
 
 - (BOOL) hasMarkedText

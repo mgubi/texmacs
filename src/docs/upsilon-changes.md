@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Cocoa: errors reported in more places** (desktop, Cocoa interface):
+  an error in the drawing or the layout of a window, in the notifications
+  of the windows (also while a window closes), in a drop from another
+  application, in the text of an input method or in a pop-up window is
+  reported in the console instead of ending TeXmacs or being dropped
+  without a word, and the sizes which AppKit would refuse are replaced by
+  safe ones, with a warning on `debug-aqua`. New checks
+  (`tests/cocoa/check.sh`, run on the Cocoa disk image) cover a French
+  dialog title, closing the console and an idle console (#621).
 - **Version control with spaces in the names** (desktop): the commands
   of Subversion quote their arguments, so that a file in a folder with
   spaces in its name, or a commit message with quotes, `$` or accents,

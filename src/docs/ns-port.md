@@ -321,16 +321,67 @@ fade).
   the GPU, the actions of the menu items and of the buttons, the delegate
   of the application; an error in a delayed command is reported and the
   other delayed commands still run. The same exception again is only
-  counted (reported at its 10th, 100th... time);
+  counted (reported at its 10th, 100th... time). Also the entry points
+  which do not come within an event: the display (`drawRect:` of the
+  canvas), the layouts (`resizeWithOldSuperviewSize:`,
+  `intrinsicContentSize`, the notifications of the frames and of the
+  scrolling, `TMWidgetHelper`), the notifications of the windows (key,
+  main, full screen, moves and sizes, `windowShouldClose:`), which also
+  come while a window is being destroyed (`orderOut:` in
+  `~ns_window_widget_rep`, where an exception would have ended TeXmacs:
+  destructors are `noexcept`), the drops from other applications, the
+  text of the input methods, the monitor of the pop-up windows, the
+  delayed calls (`performSelector:afterDelay:`), the change of the
+  appearance (KVO), the lazy images of the menu items, the delegates of
+  the lists, trees and text fields, and the timers of the test aids
+  (`TEXMACS_NS_*`, the scripted tests);
 * an editor typeset again from scratch at least 20 times in a row, during
   more than 5 seconds, without any key or mouse event, gets a warning
   (`std-warning`, once for each editor, from `apply_changes` in
   `edit_interface.cpp`, for every interface) with the document, the
   variables of its initial environment which changed, the size of its
   canvas and its zoom (#620);
-* the sizes and positions given to the windows (`SLOT_SIZE`,
-  `SLOT_POSITION`) and the lengths of `ns_decode_length` are checked: not
-  a number, negative or huge values are reported on `debug-aqua`.
+* the sizes, positions and lengths computed by TeXmacs which reach AppKit
+  go through `ns_safe_size`, `ns_safe_point`, `ns_safe_rect`,
+  `ns_safe_length` (or `ns_fix_size`, `ns_fix_point`, `ns_utilities.h`):
+  not a number (AppKit raises), negative or beyond a bound (10^7 points,
+  10^5 for the windows) is replaced by 0 or the bound, with a warning on
+  `debug-aqua` once for each place. They guard the windows and the pop-up
+  windows (`SLOT_SIZE`, `SLOT_POSITION`), the frames of the canvas and of
+  its document view, the size hints, and the constants of the constraints
+  of the glues, the resize widgets, the fields and the pop-up buttons;
+  `ns_decode_length` reports bad lengths too. The titles and labels need
+  no check: `to_nsstring`, `to_nsstring_utf8` and `to_label` never return
+  `nil`. An icon which is not found (`to_nsimage`, a button or an item
+  without its picture) is reported once on `debug-aqua`;
+* `tests/cocoa/check.sh` checks a French dialog title (#468), the close
+  of the console with several tabs (#619) and an idle console (#620); it
+  runs on the Cocoa disk image in `upsilon-macos.yml`.
+
+### Teardown review (#621)
+
+The files of `Plugins/NS` are compiled without ARC (`cocoa_mm_obj` in
+`src/Makefile.in`; only `gpu_backend_metal.mm` has `-fobjc-arc`), so that
+their `retain`/`release` were reviewed with the observers, delegates,
+timers and delayed calls, as of 2026-10-30:
+* the observers of the notification center are removed in `dealloc`
+  (`TMView`, `TMDocView`, `TMRefreshView`, `TMMenuHelper`) or in the
+  destructor of the widget (`TMWidgetHelper`); the KVO observer of the
+  appearance and the helpers of the tests live as long as TeXmacs;
+* the delegates and data sources are cleared (`setDelegate: nil`: the
+  windows, the save panels, `TMLazyMenu`) or are associated objects of
+  their view, which outlive its `dealloc`; the pointers from AppKit
+  objects to the C++ widgets (`wid`) are cleared by the destructors of
+  the widgets, and the methods check them;
+* the timers and display links of the GPU canvases are invalidated by
+  `stop`; the delayed calls retain their target and check its widget;
+  the pending `dropDefaultSize` is cancelled in `dealloc`;
+* fixed: the pop-up window, whose quit command (from the monitor of the
+  events) may delete its widget and release it, stays until the end of the
+  event; the text field of an input widget shown twice was forgotten by
+  the widget when the helper of the first field was released (the helper
+  now clears only its own field); the presentation of a GPU canvas whose
+  widget was deleted by the error being reported no longer uses it.
 
 ### Known gaps
 

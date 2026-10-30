@@ -399,11 +399,92 @@ ns_check_size (NSSize size, const char* where) {
   return false;
 }
 
+
+static bool
+ns_first_time (const char* where) {
+  // (a bound on the places: they are those of the source)
+  static hashset<string> seen;
+  string key (where);
+  if (seen->contains (key) || N(seen) > 1000) return false;
+  seen->insert (key);
+  return true;
+}
+
+static bool
+ns_bad_length (double x, double bound) {
+  return !isfinite (x) || x < 0 || x > bound;
+}
+
+static double
+ns_good_length (double x, double bound) {
+  return !isfinite (x) || x < 0? 0.0: (x > bound? bound: x);
+}
+
+static bool
+ns_bad_coordinate (double x, double bound) {
+  return !isfinite (x) || fabs (x) > bound;
+}
+
+static double
+ns_good_coordinate (double x, double bound) {
+  return !isfinite (x)? 0.0: (x > bound? bound: (x < -bound? -bound: x));
+}
+
 bool
-ns_check_point (NSPoint pt, const char* where) {
-  double x= pt.x, y= pt.y;
-  if (isfinite (x) && isfinite (y) && fabs (x) <= ns_huge &&
-      fabs (y) <= ns_huge) return true;
-  debug_aqua << where << ": a bad position (" << x << ", " << y << ")\n";
-  return false;
+ns_fix_size (NSSize& s, const char* where, double bound) {
+  if (!ns_bad_length (s.width, bound) && !ns_bad_length (s.height, bound))
+    return false;
+  NSSize r= NSMakeSize (ns_good_length (s.width, bound),
+                        ns_good_length (s.height, bound));
+  bool first= ns_first_time (where);
+  if (first)
+    debug_aqua << where << ": a bad size for AppKit (" << (double) s.width
+               << ", " << (double) s.height << "), replaced by ("
+               << (double) r.width << ", " << (double) r.height << ")\n";
+  s= r;
+  return first;
+}
+
+bool
+ns_fix_point (NSPoint& p, const char* where, double bound) {
+  if (!ns_bad_coordinate (p.x, bound) && !ns_bad_coordinate (p.y, bound))
+    return false;
+  NSPoint r= NSMakePoint (ns_good_coordinate (p.x, bound),
+                          ns_good_coordinate (p.y, bound));
+  bool first= ns_first_time (where);
+  if (first)
+    debug_aqua << where << ": a bad position for AppKit (" << (double) p.x
+               << ", " << (double) p.y << "), replaced by ("
+               << (double) r.x << ", " << (double) r.y << ")\n";
+  p= r;
+  return first;
+}
+
+NSSize
+ns_safe_size (NSSize s, const char* where, double bound) {
+  ns_fix_size (s, where, bound);
+  return s;
+}
+
+NSPoint
+ns_safe_point (NSPoint p, const char* where, double bound) {
+  ns_fix_point (p, where, bound);
+  return p;
+}
+
+NSRect
+ns_safe_rect (NSRect r, const char* where, double bound) {
+  ns_fix_point (r.origin, where, bound);
+  ns_fix_size (r.size, where, bound);
+  return r;
+}
+
+CGFloat
+ns_safe_length (CGFloat x, const char* where, double bound) {
+  if (!ns_bad_length (x, bound)) return x;
+  CGFloat r= ns_good_length (x, bound);
+  if (ns_first_time (where))
+    debug_aqua << where << ": a bad length for AppKit (" << (double) x
+               << "), replaced by " << (double) r << "\n";
+  return r;
 }

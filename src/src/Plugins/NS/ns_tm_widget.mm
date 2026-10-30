@@ -94,21 +94,28 @@ NSColor* to_nscolor (color col);
 @end
 
 @implementation TMWidgetHelper
+// (the notifications come also outside of the events: a resize of the
+// window by the system, a change of the screens, the end of the animation
+// of the full screen mode)
 - (void)notify:(NSNotification*)n
 {
   (void) n;
-  if (wid) wid->layout();
+  NS_ENTRY_BEGIN
+    if (wid) wid->layout();
+  NS_ENTRY_END ("-[TMWidgetHelper notify:]")
 }
 - (void)windowNotify:(NSNotification*)n
 {
   if (!wid || [n object] != [wid->view window]) return;
-  NSString* name= [n name];
-  if ([name isEqualToString: NSWindowDidBecomeMainNotification])
-    wid->window_became_main ();
-  else if ([name isEqualToString: NSWindowDidEnterFullScreenNotification])
-    wid->window_full_screen (true);
-  else if ([name isEqualToString: NSWindowDidExitFullScreenNotification])
-    wid->window_full_screen (false);
+  NS_ENTRY_BEGIN
+    NSString* name= [n name];
+    if ([name isEqualToString: NSWindowDidBecomeMainNotification])
+      wid->window_became_main ();
+    else if ([name isEqualToString: NSWindowDidEnterFullScreenNotification])
+      wid->window_full_screen (true);
+    else if ([name isEqualToString: NSWindowDidExitFullScreenNotification])
+      wid->window_full_screen (false);
+  NS_ENTRY_END ("-[TMWidgetHelper windowNotify:]")
 }
 - (void)footerContext:(NSMenuItem*)item event:(NSEvent*)e
 {
@@ -127,12 +134,15 @@ NSColor* to_nscolor (color col);
 // mouse_adjust)
 - (void)footerPopup
 {
+  // (a delayed call, after the event)
   if (!wid) return;
-  widget w= make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))"));
-  NSMenu* m= to_nsmenu (w);
-  if (m != nil && [m numberOfItems] > 0)
-    [m popUpMenuPositioningItem: nil atLocation: [NSEvent mouseLocation]
-                         inView: nil];
+  NS_ENTRY_BEGIN
+    widget w= make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))"));
+    NSMenu* m= to_nsmenu (w);
+    if (m != nil && [m numberOfItems] > 0)
+      [m popUpMenuPositioningItem: nil atLocation: [NSEvent mouseLocation]
+                           inView: nil];
+  NS_ENTRY_END ("-[TMWidgetHelper footerPopup]")
 }
 @end
 
@@ -835,10 +845,13 @@ TMMenuHelper *the_menu_helper = nil;
 }
 - (void)installWaiting
 {
+  // (a delayed call, after the event)
   if (menu_tracking || !menu_waiting) return;
   ns_tm_widget_rep* w= menu_waiting;
   menu_waiting= NULL;
-  w->install_main_menu ();
+  NS_ENTRY_BEGIN
+    w->install_main_menu ();
+  NS_ENTRY_END ("-[TMMenuHelper installWaiting]")
 }
 - (void)dealloc
 {
@@ -1192,6 +1205,7 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
 
 @interface TMWindowTester : NSObject
 - (void) step: (NSTimer*) timer;
+- (void) doStep: (NSTimer*) timer;
 @end
 
 @implementation TMWindowTester
@@ -1211,6 +1225,12 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
            [n object] == [NSApp mainMenu]? "menu bar": "pop-up menu");
 }
 - (void) step: (NSTimer*) timer
+{
+  NS_ENTRY_BEGIN
+    [self doStep: timer];
+  NS_ENTRY_END ("the window test (TEXMACS_NS_WINDOW_TEST)")
+}
+- (void) doStep: (NSTimer*) timer
 {
   static int step= 0;
   NSArray* steps= [to_nsstring (get_env ("TEXMACS_NS_WINDOW_TEST"))

@@ -473,6 +473,7 @@ ns_inputs_list_widget_rep::perform_dialog () {
 {
 @public
   ns_input_text_widget_rep* wid;
+  NSView* field;   // the field of the helper (not retained: it keeps us)
   NSArray* proposals;
   NSInteger current;
   BOOL handled;
@@ -497,7 +498,10 @@ ns_inputs_list_widget_rep::perform_dialog () {
 - (void) dealloc
 {
   [proposals release];
-  if (wid) { if (wid->view) wid->view= nil; DEC_COUNT (wid); }
+  // NOTE: the widget forgets its field only if it is ours: the field of
+  // a widget shown again (a refresh, a tab) is a new one, which an old
+  // helper released later made the widget forget (#621)
+  if (wid) { if (wid->view == field) wid->view= nil; DEC_COUNT (wid); }
   [super dealloc];
 }
 
@@ -524,6 +528,7 @@ ns_inputs_list_widget_rep::perform_dialog () {
 - (BOOL) control: (NSControl*) control textView: (NSTextView*) tv
     doCommandBySelector: (SEL) sel
 {
+  NS_ENTRY_BEGIN
   (void) control;
   if (!wid) return NO;
   if (wid->continuous ()) {
@@ -561,25 +566,31 @@ ns_inputs_list_widget_rep::perform_dialog () {
     return YES;
   }
   return NO;
+  NS_ENTRY_END ("-[TMInputTextHelper control:textView:doCommandBySelector:]")
+  return YES; // (after an error: the key is not given to the field)
 }
 
 - (void) controlTextDidChange: (NSNotification*) n
 {
+  NS_ENTRY_BEGIN
   (void) n;
   handled= NO;
   if (wid && wid->continuous ()) {
     NSTextField* f= [n object];
     wid->send_key (from_nsstring ([f stringValue]), "none");
   }
+  NS_ENTRY_END ("-[TMInputTextHelper controlTextDidChange:]")
 }
 
 - (void) controlTextDidEndEditing: (NSNotification*) n
 {
+  NS_ENTRY_BEGIN
   // The field loses the focus
   (void) n;
   if (!wid || handled || wid->continuous ()) return;
   wid->commit (wid->can_autocommit () &&
                get_preference ("gui:line-input:autocommit") == "on");
+  NS_ENTRY_END ("-[TMInputTextHelper controlTextDidEndEditing:]")
 }
 @end
 
@@ -648,11 +659,13 @@ ns_input_text_widget_rep::as_nsview () {
   TMInputTextHelper* h= [[[TMInputTextHelper alloc] initWithWidget: this
                                                           proposals: props]
                           autorelease];
+  h->field= f;
   objc_setAssociatedObject (f, "TMInputTextHelper", h,
                             OBJC_ASSOCIATION_RETAIN);
   [f setDelegate: h];
   // The width (see QTMLineEdit::sizeHint)
-  NSSize sz= ns_decode_length (width, "", NSMakeSize (150, 22));
+  NSSize sz= ns_safe_size (ns_decode_length (width, "", NSMakeSize (150, 22)),
+                           "ns_input_text_widget_rep::as_nsview");
   // NOTE: as in the Qt interface, the fields shrink when there is no room
   [f setTranslatesAutoresizingMaskIntoConstraints: NO];
   NSLayoutConstraint* c= [f.widthAnchor constraintEqualToConstant: sz.width];
