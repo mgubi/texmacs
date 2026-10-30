@@ -323,9 +323,12 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          # (git: for the git group of the version suite, #625)
+          # (git: for the git group of the version suite, #625; the native
+          # git, as Git for Windows, not the git of MSYS2, which does not
+          # take Windows paths like D:\a\b.tm as files of the repository)
           install: >-
-            make perl rsync zip git
+            make perl rsync zip
+            mingw-w64-x86_64-git
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-ntldd
             mingw-w64-x86_64-pkgconf
