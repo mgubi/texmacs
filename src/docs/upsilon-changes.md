@@ -19,6 +19,12 @@ have the details, and the problems go to the
   Miscellaneous > Provoke menu error, computed with all the menus when
   Spotlight opens) shows a disabled item "Error in menu" and the error
   goes to the console, as in the Qt interface (#624).
+- **Wide braces drawn by the GPU**: the wide over- and underbraces of a
+  long formula and the other glyphs of more than 512 pixels which have no
+  outline (they are assembled from pieces by a virtual font) are drawn
+  by the GPU renderer, as tiles of their bitmap; they were missing from
+  the canvases of the Cocoa interface drawn by the GPU and of the Vue
+  port (desktop applications and browser) (#623).
 - **Hidden definitions in tables and floats**: what a hidden part
   (`hidden`, `hide-preamble`) assigns in a table cell whose lines are
   broken, or in a float, holds for what follows, as when it is not
