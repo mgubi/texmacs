@@ -637,6 +637,7 @@ struct full_typesets {
   bool   told= false;
   hashmap<string,tree> env;  // the initial environment at the last one
   string changed;       // the last change of it in the series
+  array<string> sizes;  // the canvas sizes and zooms seen in the series
 };
 static std::unordered_map<const void*, full_typesets> the_full_typesets;
 
@@ -668,6 +669,25 @@ init_changes (hashmap<string,tree> old_env, hashmap<string,tree> new_env) {
   return r;
 }
 
+// whether the initial environment changed in the variables which follow
+// the size of the canvas and the zoom only (or not at all)
+static bool
+only_size_changes (hashmap<string,tree> old_env, hashmap<string,tree> new_env) {
+  iterator<string> it= iterate (new_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (old_env->contains (var) && old_env[var] == new_env[var]) continue;
+    if (!starts (var, "page-screen-") && var != ZOOM_FACTOR) return false;
+  }
+  it= iterate (old_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (!new_env->contains (var) &&
+        !starts (var, "page-screen-") && var != ZOOM_FACTOR) return false;
+  }
+  return true;
+}
+
 static void
 watch_full_typesets (const void* ed, url name, time_t last_event,
                      hashmap<string,tree> init, SI wx, SI wy, double zoom) {
@@ -678,12 +698,28 @@ watch_full_typesets (const void* ed, url name, time_t last_event,
   hashmap<string,tree> env;
   iterator<string> it= iterate (init);
   while (it->busy ()) { string var= it->next (); env (var)= init[var]; }
+  // a canvas size or a zoom not seen yet in the series, with the variables
+  // which follow them only, is a resize or a zoom without input events (a
+  // live resize of the window, a pinch, a zoom by a script): a new series.
+  // A loop comes back to the sizes it had (#620: two sizes in turn)
+  string size= as_string (wx) * "x" * as_string (wy) * "@" * as_string (zoom);
+  bool new_size= f.n > 0 && !contains (size, f.sizes) &&
+                 only_size_changes (f.env, env);
   if (f.n == 0 || f.event != last_event || now - f.last > 1000) {
     f.event= last_event; f.first= now; f.n= 0; f.changed= "";
+    f.sizes= array<string> ();
+  }
+  else if (new_size) {
+    // (the sizes seen are kept: a loop between sizes is still counted)
+    f.first= now; f.n= 0; f.changed= "";
   }
   else {
     string c= init_changes (f.env, env);
     if (N(c) > 0) f.changed= c;
+  }
+  if (!contains (size, f.sizes)) {
+    if (N(f.sizes) >= 64) f.sizes= range (f.sizes, 1, N(f.sizes));
+    f.sizes << size;
   }
   f.n++; f.last= now; f.env= env;
   if (f.n < 20 || now - f.first < 5000) return;

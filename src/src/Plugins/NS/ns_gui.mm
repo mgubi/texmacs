@@ -1947,6 +1947,9 @@ command_queue::exec_pending () {
       catch (string& msg) {
         ns_report_exception ("a delayed command", msg);
       }
+      catch (std::exception& e) {
+        ns_report_exception ("a delayed command", string (e.what ()));
+      }
       if (is_int (obj) && (now - b[i] < 1000000000)) {
         time_t pause = as_int (obj);
         //cout << "pause = " << obj << "\n";

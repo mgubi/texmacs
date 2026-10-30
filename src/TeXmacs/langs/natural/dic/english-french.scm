@@ -882,6 +882,7 @@
 ("equivalent for" "équivalent pour")
 ("erode" "éroder")
 ("error" "erreur")
+("error in menu" "erreur dans le menu")
 ("error messages" "messages d'erreur")
 ("error output" "sortie d'erreur")
 ("error status report" "rapport du statut d'erreur")

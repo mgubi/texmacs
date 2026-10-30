@@ -17,6 +17,7 @@
 #include "wencoding.hpp"
 #include "hashset.hpp"
 #include "hashmap.hpp"
+#include "tm_timer.hpp"
 #include <dlfcn.h>
 #include <cxxabi.h>
 #include <math.h>
@@ -115,15 +116,18 @@ ns_conversion_warning (const char* fun, const char* what, string s,
                        void* caller) {
   static hashset<string> seen;
   static int count= 0;
-  string key= string (fun) * ":" * s;
-  if (seen->contains (key)) return;
-  seen->insert (key);
+  // (the count first: the set does not grow once the warnings stop)
   if (count > 50) return;
-  if (count++ == 50) {
+  if (count == 50) {
+    count++;
     debug_aqua << "further warnings for the conversions of strings are "
                << "not shown\n";
     return;
   }
+  string key= string (fun) * ":" * s;
+  if (seen->contains (key)) return;
+  seen->insert (key);
+  count++;
   debug_aqua << fun << ": " << what << ", for \"" << ns_escaped (s)
              << "\" (called from " << ns_function_at (caller) << ")\n";
 }
@@ -284,19 +288,31 @@ from_label (NSString* s) {
 extern string the_report; // (basic.cpp)
 
 // the exceptions which come again (at each update): reported the first
-// time, and then only counted, at the 10th, 100th... time
+// time, and then only counted, at the 10th, 100th... time, while they come
+// again within ns_report_window; the key is the place, the message and the
+// report (the backtrace), so that distinct errors with the same generic
+// message (such as "widget expected") are reported each
+static const time_t ns_report_window= 10000; // ms
+
 static bool
 ns_report_again (const char* where, string what) {
   static hashmap<string,int> seen (0);
+  static hashmap<string,int> last (0);  // (as int: texmacs_time () in ms)
   string key= string (where) * "\n" * what;
+  int now= (int) texmacs_time ();
   int n= seen[key] + 1;
+  if (n > 1 && now - last[key] > (int) ns_report_window) n= 1;
   seen (key)= n;
+  last (key)= now;
   if (n == 1) return true;
   int p= 10;
   while (p < n && p < 1000000000) p *= 10;
-  if (n == p)
+  if (n == p) {
+    int i= 0;
+    while (i < N(what) && what[i] != '\n') i++;
     failed_error << "Cocoa: the same exception again in " << where << " ("
-                 << n << " times): " << what << LF;
+                 << n << " times): " << what (0, i) << LF;
+  }
   return false;
 }
 
@@ -323,7 +339,7 @@ ns_report_exception (const char* where, string msg) {
   // string thrown otherwise is the message)
   try {
     if (N (the_exception) == 0) the_exception= msg;
-    if (!ns_report_again (where, msg)) {
+    if (!ns_report_again (where, msg * "\n" * the_report)) {
       the_exception= ""; the_report= "";
       return;
     }

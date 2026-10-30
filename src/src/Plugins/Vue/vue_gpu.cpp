@@ -1315,6 +1315,7 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
         std::vector<unsigned char> cov;
         coverage (cov);
         int side= min (G.B->max_texture_side (), ATLAS);
+        if (side <= 0) side= ATLAS; // (no limit known: else no progress)
         std::vector<unsigned char> part;
         for (int ty= 0; ty < h; ty += side)
           for (int tx= 0; tx < w; tx += side) {

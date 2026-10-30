@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **No false warning of a typesetting loop**: zooming or resizing a
+  window for seconds without a key or a click (a pinch, a live resize, a
+  zoom by a script) no longer warns that the document "was typeset again
+  from scratch ... a loop?"; a real loop, which comes back to the same
+  sizes, is still reported (#621). In the Cocoa interface, the item
+  "Error in menu" is translated, and any kind of error in a menu is
+  caught (#624).
 - **Cocoa: an error in a menu no longer aborts TeXmacs** (desktop, Cocoa
   interface): a menu whose computation fails (such as Debug >
   Miscellaneous > Provoke menu error, computed with all the menus when

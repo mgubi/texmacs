@@ -18,6 +18,7 @@
 #include "message.hpp"
 #include "analyze.hpp"
 #include "promise.hpp"
+#include "dictionary.hpp"
 
 /******************************************************************************
 * TMMenuItem
@@ -97,29 +98,38 @@
   // lists (of documents, ...) are up to date
   if (!pm) return;
   NSMenu *menu2 = nil;
-#ifdef USE_EXCEPTIONS
   // An error while computing the menu (a Scheme error in its definition,
-  // such as Debug > Miscellaneous > Provoke menu error) is thrown as a C++
-  // string by tm_throw: it must not cross AppKit, which would abort TeXmacs
-  // (macOS computes all the menus at once, e.g. when Spotlight opens).
-  // As QTMLazyMenu::force (BEGIN_SLOT/END_SLOT): catch it, report it and
-  // leave a disabled item in the menu.
+  // such as Debug > Miscellaneous > Provoke menu error, thrown as a C++
+  // string by tm_throw; an Objective-C exception) must not cross AppKit,
+  // which would abort TeXmacs (macOS computes all the menus at once, e.g.
+  // when Spotlight opens). As QTMLazyMenu::force (BEGIN_SLOT/END_SLOT) and
+  // the other entry points (NS_ENTRY_BEGIN/END): caught and reported; the
+  // menu gets a disabled item which says so
+  bool failed= false;
   try {
-#endif
-    widget w = pm->eval();
-    menu2 = to_nsmenu (w);
-#ifdef USE_EXCEPTIONS
+    @try {
+      widget w = pm->eval();
+      menu2 = to_nsmenu (w);
+    }
+    @catch (NSException* e) {
+      ns_report_exception ("a menu", e); failed= true; }
   }
-  catch (string s) {
-    handle_exceptions ();
+  catch (string& s) {
+    ns_report_exception ("a menu", s); failed= true; }
+  catch (std::exception& x) {
+    ns_report_exception ("a menu", string (x.what ())); failed= true; }
+  catch (...) {
+    ns_report_exception ("a menu", string ("an unknown C++ exception"));
+    failed= true; }
+  if (failed || !menu2) {
     [menu removeAllItems];
-    NSMenuItem *itm = [[[NSMenuItem alloc] initWithTitle: @"Error in menu"
-                         action: NULL keyEquivalent: @""] autorelease];
+    NSMenuItem *itm = [[[NSMenuItem alloc]
+                         initWithTitle: to_nsstring (translate ("Error in menu"))
+                                action: NULL keyEquivalent: @""] autorelease];
     [itm setEnabled: NO];
     [menu addItem: itm];
     return;
   }
-#endif
   [menu removeAllItems];
   NSInteger count = [menu2 numberOfItems];
   for (NSInteger j=0; j<count; j++) {
