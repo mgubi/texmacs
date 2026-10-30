@@ -1668,7 +1668,7 @@
           (if (< (cdr r2) (cdr r)) r2 r)))))
 
 (define (check-fast what thunk expected)
-  ;; @thunk gives @expected in less than 2 s (the fastest of 3 runs)
+  ;; @thunk gives @expected in less than 2 s (the fastest of up to 3 runs)
   (with r (check-run (lambda () (fastest-run thunk 3)))
     (if (and (pair? r) (== (car r) 'error))
         (check-report #f what (object->string r))
