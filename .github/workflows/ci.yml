@@ -63,7 +63,7 @@ jobs:
 
   macos:
     name: macOS (Apple silicon, Qt 6)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     defaults:
       run:
