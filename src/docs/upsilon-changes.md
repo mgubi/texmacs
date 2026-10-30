@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **The Git merge driver finds TeXmacs on Windows and Linux** (desktop):
+  the command which Git runs to merge `.tm` documents structurally now
+  calls `texmacs.exe` of the Windows installer and bundle (with `/` in its
+  path, for the `sh` of Git for Windows), the `texmacs.bin` of a `make
+  install` (under `TEXMACS_BIN_PATH`) and the AppImage itself (not its
+  temporary mount point); before, it fell back on a `texmacs` usually not
+  on the `PATH` (#645).
 - **Version control with spaces in the names** (desktop): the commands
   of Subversion quote their arguments, so that a file in a folder with
   spaces in its name, or a commit message with quotes, `$` or accents,

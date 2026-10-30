@@ -43,7 +43,8 @@
 (texmacs-module (check version-test)
   (:use (check check-lib)
         (version version-compare)
-        (version version-tmfs)))
+        (version version-tmfs)
+        (version git-drivers)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -994,6 +995,61 @@
         (check-true (string-contains? s (utf8->cork new)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The merge driver of Git
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The program which the merge driver runs, in each layout of TeXmacs
+;; (git-test.scm runs the driver itself, on Unix only; this group runs on
+;; Windows too)
+(define (test-merge-driver-program)
+  (check-group "merge driver program")
+  (let ((find (lambda (tp bin appdir appimage windows? . there)
+                (git-driver-program tp bin appdir appimage windows?
+                                    (lambda (s) (in? s there))))))
+    ;; the build tree on Unix
+    (check= (find "/b/TeXmacs" "" "" "" #f "/b/TeXmacs/bin/texmacs.bin")
+            (list "/b/TeXmacs/bin/texmacs.bin" "/b/TeXmacs"))
+    ;; the macOS bundle
+    (with tp "/A/TeXmacs.app/Contents/Resources/share/TeXmacs"
+      (check= (find tp "" "" "" #f
+                    (string-append tp "/../../../MacOS/TeXmacs"))
+              (list (string-append tp "/../../../MacOS/TeXmacs") tp)))
+    ;; make install: the binary under TEXMACS_BIN_PATH, not TEXMACS_PATH
+    (check= (find "/usr/share/TeXmacs" "/usr/lib/texmacs/TeXmacs" "" "" #f
+                  "/usr/lib/texmacs/TeXmacs/bin/texmacs.bin")
+            (list "/usr/lib/texmacs/TeXmacs/bin/texmacs.bin"
+                  "/usr/share/TeXmacs"))
+    ;; the AppImage: its mount point vanishes, the AppImage itself is run
+    (check= (find "/tmp/.mount_x/usr/share/TeXmacs" "/tmp/.mount_x/usr"
+                  "/tmp/.mount_x" "/home/u/a b.AppImage" #f
+                  "/tmp/.mount_x/usr/bin/texmacs.bin")
+            (list "/home/u/a b.AppImage" #f))
+    ;; (APPIMAGE inherited by a TeXmacs which is not the AppImage)
+    (check= (find "/b/TeXmacs" "" "/tmp/.mount_x" "/home/u/a.AppImage" #f
+                  "/b/TeXmacs/bin/texmacs.bin")
+            (list "/b/TeXmacs/bin/texmacs.bin" "/b/TeXmacs"))
+    ;; the Windows bundle and installer: texmacs.exe, with / for Git's sh
+    (check= (find "C:\\Program Files\\TeXmacs Upsilon" "" "" "" #t
+                  "C:\\Program Files\\TeXmacs Upsilon/bin/texmacs.exe")
+            (list "C:/Program Files/TeXmacs Upsilon/bin/texmacs.exe"
+                  "C:/Program Files/TeXmacs Upsilon"))
+    ;; the build tree on Windows (MinGW adds .exe to texmacs.bin)
+    (check= (find "D:\\a\\src\\TeXmacs" "" "" "" #t
+                  "D:\\a\\src\\TeXmacs/bin/texmacs.bin.exe")
+            (list "D:/a/src/TeXmacs/bin/texmacs.bin.exe" "D:/a/src/TeXmacs"))
+    ;; no binary found: the startup script, with its own TEXMACS_PATH
+    (check= (find "/x/TeXmacs" "" "" "" #f) (list "texmacs" #f))
+    (check= (find "C:\\x" "" "" "" #t) (list "texmacs" #f)))
+  ;; this TeXmacs (a build tree or a bundle) finds its own binary
+  (let* ((p (git-merge-driver-program))
+         (cmd (git-merge-driver-command)))
+    (check-true (url-exists? (system->url (car p))))
+    (check-true (string-contains? cmd (git-shell-quote (car p))))
+    (check-true (string-contains? cmd "(git-merge-driver"))
+    (when (or (os-mingw?) (os-win32?))
+      (check-false (string-contains? cmd "\\")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1013,6 +1069,7 @@
   (run-group test-compare-files)
   (run-group test-unversioned)
   (run-group test-revision-urls)
+  (run-group test-merge-driver-program)
   (test-git)
   (set-grain "detailed")
   (remove-dir)
