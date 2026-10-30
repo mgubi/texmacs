@@ -22,6 +22,12 @@ have the details, and the problems go to the
 
 ## 29 October 2026
 
+- **Japanese and Korean text**: the kanji of a Japanese text (and the
+  hanja of a Korean text) come from the Japanese (Korean) font of the
+  system, as the kana (Hangul) next to them, instead of the Chinese
+  fallback; with the fonts which the menus set for Japanese and Korean
+  documents, the CJK characters are no longer shrunk to 70-80% of their
+  size (#196).
 - **Replace with wildcards, continued**: Replace All after a Replace no
   longer replaces again inside the replacement just made; Replace All
   works with more than 10,000 hits; in ordinary text, a hit which Search

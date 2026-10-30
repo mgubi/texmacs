@@ -548,6 +548,20 @@ edit_env_rep::get_script_size (int sz, int level) {
 * Updating the environment from the variables
 ******************************************************************************/
 
+static string
+text_font_for_language (string fam, string lan) {
+  // The CJK characters which the text font lacks come from the font of the
+  // language of the text, so that the Han characters of a Japanese text
+  // (kanji) or of a Korean text (hanja) are not taken from the Chinese
+  // font of the fallback, next to kana or Hangul from another font
+  if (lan != "japanese" && lan != "korean") return fam;
+  if (starts (fam, "sys-") || occurs ("cjk=", fam)) return fam;
+  string lfam= (lan == "japanese"? default_japanese_font_name ():
+                                   default_korean_font_name ());
+  if (lfam == "" || lfam == "roman" || lfam == fam) return fam;
+  return fam * ",cjk=" * lfam;
+}
+
 font
 edit_env_rep::make_current_font (int sz) {
   switch (mode) {
@@ -566,7 +580,9 @@ edit_env_rep::make_current_font (int sz) {
                        get_string (FONT_SERIES), get_string (FONT_SHAPE),
                        sz, (int) (magn*dpi));
   default:
-    return smart_font (get_string (FONT), get_string (FONT_FAMILY),
+    return smart_font (text_font_for_language (get_string (FONT),
+                                               get_string (LANGUAGE)),
+                       get_string (FONT_FAMILY),
                        get_string (FONT_SERIES), get_string (FONT_SHAPE),
                        sz, (int) (magn*dpi));
   }
@@ -1036,6 +1052,7 @@ edit_env_rep::update (string s) {
     break;
   case Env_Language:
     update_language ();
+    if (s == LANGUAGE) update_font ();
     break;
   case Env_Mode:
     update_mode ();
