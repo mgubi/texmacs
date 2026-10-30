@@ -964,6 +964,10 @@ int
 smart_font_rep::resolve (string c, string fam, int attempt) {
   //cout << "Resolve " << c << " in " << fam << ", attempt " << attempt << "\n";
   array<string> a= trimmed_tokenize (fam, "=");
+  // the variant of a font chosen for the CJK range of a family such as
+  // cjk=Hiragino Kaku Gothic ProN,roman: a CJK variant, so that its
+  // characters keep their size (see adjusted_dpi)
+  string cvar= variant;
   if (N(a) >= 2) {
     array<string> given= logical_font (family, variant, series, rshape);
     fam= a[1];
@@ -976,7 +980,15 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         string wanted= locase_all (v[j]);
         if (wanted == "") ok= true;
         else if (contains (wanted, given)) ok= true;
-        else if (in_unicode_range (c, wanted)) ok= true;
+        else if (in_unicode_range (c, wanted)) {
+          ok= true;
+          string r= get_unicode_range (c);
+          if (r == "hiragana" || r == "katakana") r= "cjk";
+          if (wanted == "cjk" || wanted == "hangul" ||
+              wanted == "hiragana" || wanted == "katakana")
+            if (r == "cjk" || r == "hangul")
+              cvar= (variant == "rm"? r: variant * "-" * r);
+        }
         else if (wanted == substitute_math_letter (c, 2)) ok= true;
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
@@ -1033,9 +1045,9 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         return sm->add_char (tuple ("main"), c);
     }
     else {
-      font cfn= closest_font (fam, variant, series, rshape, sz, dpi, 1);
+      font cfn= closest_font (fam, cvar, series, rshape, sz, dpi, 1);
       if (cfn->supports (c)) {
-        tree key= tuple (fam, variant, series, rshape, "1");
+        tree key= tuple (fam, cvar, series, rshape, "1");
         int nr= sm->add_font (key, REWRITE_NONE);
         initialize_font (nr);
         return sm->add_char (key, c);
