@@ -39,6 +39,7 @@
 
 (tm-define (version-quote s)
   ;; @s as one argument on the command line of eval-system
+  ;; (not escape-shell: on MinGW, escape_sh only puts @s in double quotes)
   (if (or (os-mingw?) (os-win32?))
       (windows-quote s)
       ;; elsewhere the command goes through /bin/sh

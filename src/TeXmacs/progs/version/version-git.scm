@@ -310,7 +310,8 @@
 
 (tm-define (git-commit message)
   (let* ((cmd (string-append
-               (current-git-command) " commit -m " (version-quote message)))
+               (current-git-command) " commit -m "
+               (version-quote (cork->utf8 message))))
          (ret (eval-system cmd)))
     ;; (display ret)
     (set-message (string-append (current-git-command) " commit") message))
@@ -358,17 +359,36 @@
 (tm-define (tmfs-url-git root which)
   (string-append "tmfs://git/" which "/" (url->tmfs-string root)))
 
+(define (git-status-name status s)
+  ;; the name of a file in a line of git status --porcelain: for a renamed
+  ;; or copied file, "<old> -> <new>", each name quoted on its own, and the
+  ;; new name is kept (a name with a space is always quoted, so an
+  ;; unquoted " -> " is the separator)
+  (let* ((n (string-length s))
+         (end (if (string-starts? s "\"")
+                  (let loop ((i 1))
+                    (cond ((>= i n) n)
+                          ((== (string-ref s i) #\\) (loop (+ i 2)))
+                          ((== (string-ref s i) #\") (+ i 1))
+                          (else (loop (+ i 1)))))
+                  (with pos (string-search-forwards " -> " 0 s)
+                    (if (< pos 0) n pos)))))
+    (if (and (or (string-starts? status "R") (string-starts? status "C"))
+             (string-starts? (substring s end n) " -> "))
+        (git-unquote (substring s (+ end 4) n))
+        (git-unquote s))))
+
 (tm-define (git-status root)
   (let* ((cmd (string-append (git-command root) " status --porcelain"))
          (ret1 (eval-system cmd))
          (ret2 (string-split ret1 #\newline)))
     (define (convert name)
       (let* ((status (string-take name 2))
-             (fname (git-unquote (string-drop name 3)))
+             (fname (git-status-name status (string-drop name 3)))
              (full (url->string (url-append root fname)))
              (file (if (or (string-starts? status "A")
                            (string-starts? status "?"))
-                       fname
+                       (utf8->cork fname)
                        ($link full (utf8->cork fname)))))
         (list status file)))
     (and (> (length ret2) 0)

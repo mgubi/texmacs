@@ -33,8 +33,8 @@
 ;;     git, by a .svn or .git directory above it) and dispatches to
 ;;     version-svn.scm or version-git.scm. The git part is checked on a
 ;;     throwaway repository in the temporary directory, always through
-;;     "git -c user.name=... -c user.email=..." (or the GIT_AUTHOR_...
-;;     variables, for git-commit), never with a global configuration, once
+;;     "git -c user.name=... -c user.email=..." (or, for git-commit, the
+;;     configuration of the repository), never with a global one, once
 ;;     with plain names and once with spaces in the names of the repository
 ;;     and of the files; svn is only checked on files which are not under
 ;;     version control.
@@ -980,25 +980,31 @@
                                                   (concat ,fb (new-line))))))))
     ;; committed by git-commit, with the current buffer on the file
     (version-register g)
+    ;; (the identity in the configuration of the throwaway repository only)
+    (git-sh "config user.name tester")
+    (git-sh "config user.email tester@example.org")
     (let ((old (current-buffer))
           (bufs (buffer-list))
-          (msg "say \"hi\" to $HOME, it's `date`")
-          (vars '("GIT_AUTHOR_NAME" "GIT_AUTHOR_EMAIL"
-                  "GIT_COMMITTER_NAME" "GIT_COMMITTER_EMAIL")))
+          ;; (a message in Cork, as typed in TeXmacs, given to git in UTF-8)
+          (msg (string-append "say \"hi\" to $HOME, it's a caf"
+                              (string (integer->char 233)))))
       (load-buffer g)
       (switch-to-buffer* g)
-      (with saved (map getenv vars)
-        (for (v vars)
-          (setenv v (if (string-ends? v "NAME") "tester" "tester@example.org")))
-        (git-commit msg)
-        (for-each setenv vars saved))
-      (check= (git-sh "log -1 --pretty=%s") (string-append msg "\n"))
+      (git-commit msg)
+      (check= (git-sh "log -1 --pretty=%s")
+              (string-append (cork->utf8 msg) "\n"))
       (check= (buffer-status g) "  ")
       (for (b (buffer-list))
         (when (not (in? b bufs))
           (buffer-pretend-saved b)
           (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (when (buffer-exists? old) (switch-to-buffer old)))
+    ;; a renamed file: the status shows the new name ("<old> -> <new>",
+    ;; each name quoted by git when it has a space)
+    (with new (string-append (if (== fb "b.tm") "new-" "new ") fb)
+      (git-sh "mv \"" fb "\" \"" new "\"")
+      (check= (git-status root)
+              `(("R " (hlink ,new ,(url->string (url-append root new)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
