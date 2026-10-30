@@ -18,9 +18,10 @@
 #     Setup, .github/fixes/TeXmacs-Fixes.iss), installed, run and
 #     uninstalled (.github/fixes/windows-installer.sh), and the bundle in a
 #     zip.
-# A job whose suites fail makes no package; the release job publishes only
-# the packages of the jobs which passed, and only on fixes_ci (run by hand
-# on another branch, from the Actions tab or with
+# A job whose suites fail makes no package (the AppImage, built apart, is
+# then not published); the release job publishes only the packages of the
+# jobs which passed, never from a cancelled run, and only on fixes_ci (run
+# by hand on another branch, from the Actions tab or with
 #   gh workflow run fixes.yml --ref <branch>
 # the workflow tests and packages without publishing).
 # TeXmacs Fixes installs beside the stock TeXmacs and TeXmacs Upsilon: its
@@ -45,6 +46,10 @@ on:
 concurrency:
   group: fixes-${{ github.ref }}
   cancel-in-progress: true
+
+# read only, but for the release job
+permissions:
+  contents: read
 
 jobs:
   # the regression suites on Linux, on the sources of the packages (with
@@ -403,7 +408,7 @@ jobs:
     # passed, the suites running on Apple silicon)
     name: Publish in fixes-latest
     needs: [linux, appimage-check, macos, windows]
-    if: always() && github.ref == 'refs/heads/fixes_ci'
+    if: ${{ !cancelled() && github.ref == 'refs/heads/fixes_ci' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -419,7 +424,6 @@ jobs:
       # present are those of the legs which passed
       - uses: actions/download-artifact@v4
         if: needs.macos.result != 'skipped'
-        continue-on-error: true
         with:
           pattern: texmacs-fixes-macos-*
           merge-multiple: true
