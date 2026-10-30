@@ -47,7 +47,12 @@
   [super dealloc];
 }
 
-- (void)doit { if (cmd) cmd->apply(); }
+- (void)doit
+{
+  NS_ENTRY_BEGIN
+    if (cmd) cmd->apply();
+  NS_ENTRY_END ("the action of a menu item")
+}
 
 - (NSImage*) image
 {

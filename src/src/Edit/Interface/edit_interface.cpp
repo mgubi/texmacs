@@ -26,6 +26,8 @@
 #include "../../Style/Evaluate/evaluate_main.hpp"
 #endif
 #include "gui.hpp" // for gui_interrupted
+#include "iterator.hpp"
+#include <unordered_map>
 
 extern void (*env_next_prog)(void);
 extern void set_snap_mode (tree t);
@@ -82,7 +84,10 @@ edit_interface_rep::edit_interface_rep ():
   gui_root_extents (cur_wx, cur_wy);
 }
 
+static void forget_full_typesets (const void* ed);
+
 edit_interface_rep::~edit_interface_rep () {
+  forget_full_typesets (this);
   if (shadow != NULL) tm_delete (shadow);
   if (stored != NULL) tm_delete (stored);
   shadow = NULL;
@@ -617,6 +622,82 @@ edit_interface_rep::compute_env_rects (path p, rectangles& rs, bool recurse) {
 }
 
 /******************************************************************************
+* Typesetting loops made visible (#621)
+******************************************************************************/
+
+// The whole document typeset again at update after update, without any
+// input, for seconds, is a loop (as #620: the editor of the console was
+// typeset again at each update). A warning, once for each editor, says
+// which document, and what changed in its initial environment.
+struct full_typesets {
+  time_t event= 0;      // the last input when the series began
+  time_t first= 0;      // the first full typesetting of the series
+  time_t last= 0;       // and the last one
+  int    n= 0;          // their number
+  bool   told= false;
+  hashmap<string,tree> env;  // the initial environment at the last one
+  string changed;       // the last change of it in the series
+};
+static std::unordered_map<const void*, full_typesets> the_full_typesets;
+
+static void
+forget_full_typesets (const void* ed) {
+  the_full_typesets.erase (ed);
+}
+
+static string
+init_changes (hashmap<string,tree> old_env, hashmap<string,tree> new_env) {
+  string r;
+  int n= 0;
+  iterator<string> it= iterate (new_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    tree old_val= old_env->contains (var)? old_env[var]: tree ("(none)");
+    if (old_val == new_env[var]) continue;
+    if (n++ < 6)
+      r << (N(r) == 0? "": ", ") << var << " " << tree_to_scheme (old_val)
+        << " -> " << tree_to_scheme (new_env[var]);
+  }
+  it= iterate (old_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (new_env->contains (var)) continue;
+    if (n++ < 6) r << (N(r) == 0? "": ", ") << var << " removed";
+  }
+  if (n > 6) r << ", ...";
+  return r;
+}
+
+static void
+watch_full_typesets (const void* ed, url name, time_t last_event,
+                     hashmap<string,tree> init, SI wx, SI wy, double zoom) {
+  full_typesets& f= the_full_typesets[ed];
+  if (f.told) return;
+  time_t now= texmacs_time ();
+  // (a copy: the editor changes its environment in place)
+  hashmap<string,tree> env;
+  iterator<string> it= iterate (init);
+  while (it->busy ()) { string var= it->next (); env (var)= init[var]; }
+  if (f.n == 0 || f.event != last_event || now - f.last > 1000) {
+    f.event= last_event; f.first= now; f.n= 0; f.changed= "";
+  }
+  else {
+    string c= init_changes (f.env, env);
+    if (N(c) > 0) f.changed= c;
+  }
+  f.n++; f.last= now; f.env= env;
+  if (f.n < 20 || now - f.first < 5000) return;
+  f.told= true;
+  std_warning << "the document " << name << " was typeset again from "
+              << "scratch " << f.n << " times in " << (now - f.first)
+              << " ms without any input: a loop? ("
+              << (N(f.changed) == 0? string ("its initial environment did "
+                                             "not change"): f.changed)
+              << "; canvas " << (wx / PIXEL) << "x" << (wy / PIXEL)
+              << ", zoom " << zoom << ")" << LF;
+}
+
+/******************************************************************************
 * handling changes
 ******************************************************************************/
 
@@ -1044,8 +1125,11 @@ edit_interface_rep::apply_changes () {
   }
 
   // cout << "Handling environment\n";
-  if (env_change & THE_ENVIRONMENT)
+  if (env_change & THE_ENVIRONMENT) {
+    watch_full_typesets (this, buf->buf->name, last_event, get_init (),
+                         cur_wx, cur_wy, zoomf);
     typeset_invalidate_all ();
+  }
 
   // cout << "Handling tree\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT)) {
