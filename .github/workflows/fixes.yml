@@ -323,8 +323,9 @@ jobs:
         with:
           msystem: MINGW64
           update: true
+          # (git: for the git group of the version suite, #625)
           install: >-
-            make perl rsync zip
+            make perl rsync zip git
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-ntldd
             mingw-w64-x86_64-pkgconf
@@ -341,9 +342,7 @@ jobs:
             mingw-w64-x86_64-gnupg
             texinfo
 
-      # (with the git of the runner, which made the checkout: no git in
-      # MSYS2, where the version suite would find it and test git, which
-      # it does not pass on Windows)
+      # (with the git of the runner, which made the checkout)
       - name: The identity of TeXmacs Fixes
         working-directory: .
         shell: bash
