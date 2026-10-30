@@ -44,6 +44,8 @@ string verbatim_escape (string s);
 * latex_arity instead of command_type and command_arity.
 ******************************************************************************/
 
+#define MAX_EXPAND_DEPTH 100
+
 struct latex_parser {
   int level;
   bool unicode;
@@ -51,7 +53,11 @@ struct latex_parser {
   bool pic;
   hashmap<string,bool> loaded_package;
   hashmap<string,bool> loaded_include;
-  latex_parser (bool unicode2): level (0), unicode (unicode2) {}
+  // macros being expanded, to stop recursive expansions (#615)
+  hashmap<string,int> expanding;
+  int expand_depth;
+  latex_parser (bool unicode2):
+    level (0), unicode (unicode2), expanding (0), expand_depth (0) {}
   void latex_error (string s, int i, string message);
 
   bool is_opening_option (char c);
@@ -1176,7 +1182,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       // hack to retrive arity of shortcuts
       if (is_func (t[2], TUPLE, 1) &&
           latex_type (as_string (t[2][0])) != "undefined") {
-        command_arity (var)= latex_arity (as_string (t[1][0]));
+        command_arity (var)= latex_arity (as_string (t[2][0]));
       }
       var= "\\end-" * string_arg (t[1]);
       command_type  (var)= "user";
@@ -1259,7 +1265,19 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     array<string> body= command_def[cmd];
     if (cmd == "\\def") body= array<string> ();
     arity= command_arity[cmd];
-    if (N(body) > 0 && latex_type (cmd) == "side-effect!"
+    // A macro whose body uses itself, directly (\begin{env} in the body
+    // of env), or through other macros, would be expanded again and again
+    // until the stack overflows (#615): a side effect is not expanded
+    // again inside its own expansion, and the expansions are nested
+    // at most MAX_EXPAND_DEPTH deep.
+    bool expands=
+      latex_type (cmd) == "side-effect!" || latex_type (cmd) == "replace";
+    bool recursive= expands &&
+      (expand_depth >= MAX_EXPAND_DEPTH ||
+       (latex_type (cmd) == "side-effect!" && expanding[cmd] > 0));
+    if (expands && !recursive) { expanding (cmd)++; expand_depth++; }
+    if (recursive);
+    else if (N(body) > 0 && latex_type (cmd) == "side-effect!"
         && !occurs (cmd, body[0]))
       (void) parse (body[0], pos, "", change);
     else if (N(body) > 0 && latex_type (cmd) == "begin-end!"
@@ -1278,6 +1296,10 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       }
       else
         t= parse (sharp_to_arg (body, u, arity), pos, "", 2);
+    }
+    if (expands && !recursive) {
+      expand_depth--;
+      if (--expanding (cmd) == 0) expanding->reset (cmd);
     }
   }
 
