@@ -1367,10 +1367,11 @@ finalize_preamble (tree t, string& style) {
 void
 handle_improper_matches (tree& r, tree t, int& pos) {
   while (pos < N(t)) {
-    if (is_func (t[pos], SET)) {
+    if (is_func (t[pos], SET) && N(t[pos]) > 0) {
       tree b= t[pos++]; r << b;
       handle_improper_matches (r, t, pos);
-      if ((pos < N(t)) && (t[pos][0] == b[0])) r << t[pos++];
+      if (pos < N(t) && is_compound (t[pos]) && N(t[pos]) > 0 &&
+          t[pos][0] == b[0]) r << t[pos++];
       else {
         r << tree (RESET, copy (b[0]));
         return;

@@ -362,18 +362,20 @@ delete_view (url u) {
   tm_view vw= concrete_view (u);
   if (vw == NULL) return;
   // a window which shows the view, and the current view, must not keep it:
-  // the window shows another view, of the same buffer if possible
-  if (vw->win != NULL) {
+  // the window shows another view, of the same buffer if possible. The
+  // window of an embedded editor (texmacs-input) is not in the window table
+  // and is deleted with its buffer: it is left alone (its widget may be
+  // detached already, as in the Cocoa port when the dialog closes)
+  if (vw->win != NULL &&
+      concrete_window (abstract_window (vw->win)) != NULL) {
     url name= vw->buf->buf->name;
     url other= get_recent_view (name, true, false, false, true);
     for (int k=0; is_none (other) && k<N(vw->buf->vws); k++)
       if (vw->buf->vws[k] != vw && vw->buf->vws[k]->win == NULL)
         other= abstract_view (vw->buf->vws[k]);
     if (is_none (other)) other= get_recent_view (name, false, true, false, true);
-    if (is_none (other) &&
-        concrete_window (abstract_window (vw->win)) != NULL) {
+    if (is_none (other)) {
       // a new view of the most recent other buffer, as kill_buffer does
-      // (not for the window of an embedded editor, which has no url)
       url ob= view_to_buffer (get_recent_view (name, false, true, false, false));
       if (!is_none (ob)) other= get_passive_view (ob);
     }
