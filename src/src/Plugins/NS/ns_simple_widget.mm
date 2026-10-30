@@ -48,8 +48,12 @@ ns_bench_now () {
 {
 @public
   ns_simple_widget_rep* wid;
+  BOOL atEnd;      // scrolled to the end of a document taller than the clip
+  NSSize lastClip; // the size of the clip view when atEnd was computed
 }
 - (void) scrolled: (NSNotification*) n;
+- (BOOL) followsEnd;
+- (void) keepEnd;
 @end
 
 @implementation TMDocView
@@ -95,6 +99,32 @@ ns_bench_now () {
   [super dealloc];
 }
 
+// An embedded editor (a console) scrolled to its end stays there when it
+// is resized, as a log: the bottom of its document stays visible (the
+// document is typeset again at the new width, and then longer). Not the
+// main editors, whose place in the document follows the cursor.
+- (BOOL) followsEnd
+{
+  static Class c= NSClassFromString (@"TMEmbeddedContainer");
+  NSView* sv= [self enclosingScrollView];
+  return c && sv && [[sv superview] isKindOfClass: c];
+}
+
+- (void) keepEnd
+{
+  NSScrollView* sv= [self enclosingScrollView];
+  NSClipView* clip= [sv contentView];
+  if (!clip) return;
+  NSRect b= [clip bounds];
+  NSPoint o= NSMakePoint (b.origin.x, [self frame].size.height - b.size.height);
+  o= [clip constrainBoundsRect: NSMakeRect (o.x, o.y, b.size.width,
+                                            b.size.height)].origin;
+  if (!NSEqualPoints (o, b.origin)) {
+    [clip scrollToPoint: o];
+    [sv reflectScrolledClipView: clip];
+  }
+}
+
 - (void) scrolled: (NSNotification*) n
 {
   // The canvas moves to the visible part, and TeXmacs updates at once so
@@ -102,6 +132,14 @@ ns_bench_now () {
   // NOTE: not while the window is being built (there may be no editor yet)
   (void) n;
   if (!wid) return;
+  NSClipView* clip= (NSClipView*) [self superview];
+  if ([self followsEnd] && [clip isKindOfClass: [NSClipView class]]) {
+    NSRect b= [clip bounds];
+    CGFloat h= [self frame].size.height;
+    if (!NSEqualSizes (b.size, lastClip) && atEnd) [self keepEnd];
+    else atEnd= h > b.size.height + 1 && NSMaxY (b) >= h - 1;
+    lastClip= b.size;
+  }
   wid->follow_visible_part ();
   if (wid->has_store () && [NSApp isRunning] && [self window])
     the_gui->force_update ();
@@ -541,7 +579,12 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
             rect.size.height= cs.height;
         }
       }
+      // (an embedded editor at its end stays there, see keepEnd; the state
+      // before the new size, which the clip view notifies)
+      BOOL was_at_end= ((TMDocView*) doc)->atEnd;
       [doc setFrameSize: rect.size];
+      if (was_at_end && [(TMDocView*) doc followsEnd])
+        [(TMDocView*) doc keepEnd];
       {
         // NOTE: the clip view centers the document when it scrolls; a
         // document which became smaller (a zoom out) is centered at once

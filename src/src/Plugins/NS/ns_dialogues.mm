@@ -724,6 +724,23 @@ ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
 }
 @end
 
+/*! The scroll view of an embedded editor: its scroll bar is always an
+ overlay one (shown while scrolling, over the text), also when the system
+ shows legacy scroll bars, which take room: the page of a field in a resize
+ widget has a fixed width (papyrus, page-width of the resize, see
+ attach-resize), whose right part was under the scroll bar; and the width of
+ the editor does not change when the scroll bar appears */
+@interface TMEmbeddedScrollView : NSScrollView
+@end
+
+@implementation TMEmbeddedScrollView
+- (void) setScrollerStyle: (NSScrollerStyle) st
+{
+  (void) st;
+  [super setScrollerStyle: NSScrollerStyleOverlay];
+}
+@end
+
 void
 ns_tm_embedded_widget_rep::show_canvas () {
   // As in the Qt interface, where the canvas of an editor is a scroll view
@@ -740,12 +757,12 @@ ns_tm_embedded_widget_rep::show_canvas () {
   if (!v) return;
   NSView* w= v;
   if (concrete (main_widget)->type == simple_widget) {
-    NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
-    // NOTE: no horizontal scroll bar (the page follows the width), and a
-    // vertical one when the document is taller than the clip view, as in
-    // Qt. With legacy scroll bars, which take room, the scroll bar shown
-    // makes the page narrower, hence not shorter: it stays shown; hidden,
-    // the page is wider, hence not taller: it stays hidden (no loop)
+    NSScrollView* sv= [[[TMEmbeddedScrollView alloc] init] autorelease];
+    [sv setScrollerStyle: NSScrollerStyleOverlay];
+    // NOTE: no horizontal scroll bar (the page follows the width, or has
+    // the width of the field), and a vertical one when the document is
+    // taller than the clip view, as in Qt; an overlay one, which takes no
+    // room (see TMEmbeddedScrollView)
     [sv setHasVerticalScroller: YES];
     [sv setHasHorizontalScroller: NO];
     [sv setAutohidesScrollers: YES];

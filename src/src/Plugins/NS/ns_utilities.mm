@@ -290,15 +290,48 @@ extern string the_report; // (basic.cpp)
 // the exceptions which come again (at each update): reported the first
 // time, and then only counted, at the 10th, 100th... time, while they come
 // again within ns_report_window; the key is the place, the message and the
-// report (the backtrace), so that distinct errors with the same generic
-// message (such as "widget expected") are reported each
+// functions of the backtrace (see ns_report_key), so that distinct errors
+// with the same generic message (such as "widget expected") are reported
+// each. At most ns_report_keys keys are kept.
 static const time_t ns_report_window= 10000; // ms
+static const int    ns_report_keys  = 200;
+
+// the message and the names of the functions of the backtrace of a report
+// of tm_throw (get_crash_report), without what changes from one time to
+// the next (the date, the system information, the status of the editor,
+// the addresses and offsets)
+static string
+ns_report_key (string msg, string report) {
+  string key= msg;
+  int i= search_forwards ("Backtrace of C++ stack:", report);
+  if (i < 0) return key;
+  int n= N(report), frames= 0;
+  i= search_forwards ("\n", i, report);
+  while (i >= 0 && i < n && frames < 24) {
+    int j= search_forwards ("\n", i + 1, report);
+    if (j < 0) j= n;
+    string line= report (i + 1, j);
+    int a= search_forwards (" : ", line);
+    if (a >= 0) {
+      int b= search_backwards (" + ", line);
+      key << "\n" << line (a + 3, b > a? b: N(line));
+      frames++;
+    }
+    i= j;
+  }
+  return key;
+}
 
 static bool
 ns_report_again (const char* where, string what) {
   static hashmap<string,int> seen (0);
   static hashmap<string,int> last (0);  // (as int: texmacs_time () in ms)
+  static int keys= 0;
   string key= string (where) * "\n" * what;
+  if (!seen->contains (key) && ++keys > ns_report_keys) {
+    // (a bound: the counts start again)
+    seen= hashmap<string,int> (0); last= hashmap<string,int> (0); keys= 1;
+  }
   int now= (int) texmacs_time ();
   int n= seen[key] + 1;
   if (n > 1 && now - last[key] > (int) ns_report_window) n= 1;
@@ -339,7 +372,7 @@ ns_report_exception (const char* where, string msg) {
   // string thrown otherwise is the message)
   try {
     if (N (the_exception) == 0) the_exception= msg;
-    if (!ns_report_again (where, msg * "\n" * the_report)) {
+    if (!ns_report_again (where, ns_report_key (msg, the_report))) {
       the_exception= ""; the_report= "";
       return;
     }

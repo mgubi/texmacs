@@ -20,7 +20,9 @@ have the details, and the problems go to the
   from scratch ... a loop?"; a real loop, which comes back to the same
   sizes, is still reported (#621). In the Cocoa interface, the item
   "Error in menu" is translated, and any kind of error in a menu is
-  caught (#624).
+  caught (#624); the scroll bar of the consoles and of the fields is an
+  overlay one, which hides no text, and a console scrolled to its end
+  stays there when its window is resized.
 - **Cocoa: the consoles scroll** (desktop, Cocoa interface): the editors
   inside a window (the consoles, the search and replace fields, the other
   `texmacs-input`) have a scroll view of their own, as in the Qt
