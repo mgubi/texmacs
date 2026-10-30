@@ -1093,6 +1093,14 @@
   (check= (eval-system "printf 'a\\nb'") "a\nb")
   (check= (eval-system "true") "")
   (check= (var-eval-system "echo hello") "hello")
+  ;; an output in UTF-8 is read as UTF-8, also on Windows (it used to be
+  ;; decoded in the OEM code page there, #641); an output which is not
+  ;; valid UTF-8 is still read (on Windows, in the OEM code page)
+  (check= (eval-system "printf 'caf\\303\\251'")
+          (cork->utf8 (string-append "caf" (string (integer->char 233)))))
+  (with s (eval-system "printf 'a\\351b'")
+    (check-true (and (> (string-length s) 2)
+                     (string-starts? s "a") (string-ends? s "b"))))
   (check-true (url-exists-in-path? "sh"))
   ;; (the shell plugin needs a pseudo terminal: not built on Windows)
   (unless (os-mingw?)

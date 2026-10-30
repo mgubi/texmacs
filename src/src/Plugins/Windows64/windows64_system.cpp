@@ -635,11 +635,26 @@ public:
   HANDLE h = 0;
 };
 
-std::wstring ConsoleOutputToWide(const std::string& str) {
+/* The output of a command, read from its pipe, as UTF-16. Most programs
+ * (git, pandoc, python, the LaTeX tools...) write UTF-8 on a pipe: the
+ * bytes are decoded as UTF-8 when they are valid UTF-8 (#641), else in the
+ * OEM code page of the console (the messages of cmd and of older tools).
+ * ASCII is the same in both.
+ */
+static std::wstring ConsoleOutputToWide(const std::string& str) {
     if (str.empty()) return std::wstring();
-    int size_needed = MultiByteToWideChar(CP_OEMCP, 0, &str[0], (int)str.size(), NULL, 0);
+    UINT code_page = CP_UTF8;
+    DWORD flags = MB_ERR_INVALID_CHARS;
+    int size_needed = MultiByteToWideChar(code_page, flags, &str[0], (int)str.size(), NULL, 0);
+    if (size_needed == 0) {
+      // not valid UTF-8 (ERROR_NO_UNICODE_TRANSLATION)
+      code_page = CP_OEMCP;
+      flags = 0;
+      size_needed = MultiByteToWideChar(code_page, flags, &str[0], (int)str.size(), NULL, 0);
+      if (size_needed == 0) return std::wstring();
+    }
     std::wstring wstrTo(size_needed, 0);
-    MultiByteToWideChar(CP_OEMCP, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
+    MultiByteToWideChar(code_page, flags, &str[0], (int)str.size(), &wstrTo[0], size_needed);
     return wstrTo;
 }
 
