@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Version control with spaces in the names** (desktop): the commands
+  of Subversion quote their arguments, so that a file in a folder with
+  spaces in its name, or a commit message with quotes, `$` or accents,
+  reaches `svn` unchanged, also on Windows, where no shell splits the
+  command line (#636). Git, which TeXmacs runs without a command line,
+  is now checked in a repository whose folder and files have spaces and
+  accents in their names (the file names in the status list, renamed
+  files, a commit message in Cork given to Git in UTF-8), and the checks
+  also run on Windows, with the native Git (#625).
 - **No false warning of a typesetting loop**: zooming or resizing a
   window for seconds without a key or a click (a pinch, a live resize, a
   zoom by a script) no longer warns that the document "was typeset again
