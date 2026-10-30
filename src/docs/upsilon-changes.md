@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 30 October 2026
 
+- **Cocoa: the consoles scroll** (desktop, Cocoa interface): the editors
+  inside a window (the consoles, the search and replace fields, the other
+  `texmacs-input`) have a scroll view of their own, as in the Qt
+  interface: the wheel and the trackpad scroll them, with a scroll bar
+  when the text is longer, and the console keeps showing its last
+  messages. The console opens at two thirds of the screen instead of the
+  whole screen, and stays resizable.
 - **Cocoa: still consoles and search fields** (desktop, Cocoa
   interface): the editors inside a window (the consoles, the search and
   replace fields, the other `texmacs-input`) were typeset again from

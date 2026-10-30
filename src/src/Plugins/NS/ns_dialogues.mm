@@ -689,25 +689,49 @@ ns_input_text_widget_rep::commit (bool flag) {
 ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
   ns_widget_rep (embedded_tm_widget), container (nil), quit (_quit) {}
 
+// (defined in ns_tm_widget.mm: the document is centered when it is smaller)
+@interface TMClipView : NSClipView
+@end
+
 void
 ns_tm_embedded_widget_rep::show_canvas () {
-  // The canvas fills the container
+  // As in the Qt interface, where the canvas of an editor is a scroll view
+  // (QTMScrollView): the canvas is the document view of a scroll view which
+  // fills the container. The size of the editor is that of the clip view,
+  // not that of the document, which is scrolled (the wheel, the scroll bar,
+  // and the cursor kept visible, see SLOT_SCROLL_POSITION). A canvas pinned
+  // to the container whose frame also followed the extents of the document
+  // made the editor be typeset again at each update (#620).
   if (!container || is_nil (main_widget)) return;
   for (NSView* old in [[[container subviews] copy] autorelease])
     [old removeFromSuperview];
-  // (the canvas is sized by the container, not by the document, see
-  // ns_simple_widget_rep::set_fills_container)
-  if (concrete (main_widget)->type == simple_widget)
-    static_cast<ns_simple_widget_rep*> (main_widget.rep)->set_fills_container ();
   NSView* v= concrete (main_widget)->as_nsview ();
   if (!v) return;
-  [v setTranslatesAutoresizingMaskIntoConstraints: NO];
-  [container addSubview: v];
+  NSView* w= v;
+  if (concrete (main_widget)->type == simple_widget) {
+    NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
+    // NOTE: no horizontal scroll bar (the page follows the width), and a
+    // vertical one which is not hidden: one shown or hidden with the
+    // contents would change the width, hence the contents (legacy scroll
+    // bars; the overlay ones of the trackpads take no room)
+    [sv setHasVerticalScroller: YES];
+    [sv setHasHorizontalScroller: NO];
+    [sv setAutohidesScrollers: NO];
+    [sv setBorderType: NSNoBorder];
+    [sv setContentView: [[[TMClipView alloc] init] autorelease]];
+    [sv setDrawsBackground: YES];
+    [sv setBackgroundColor: [NSColor whiteColor]];
+    [v setTranslatesAutoresizingMaskIntoConstraints: YES];
+    [sv setDocumentView: v];
+    w= sv;
+  }
+  [w setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [container addSubview: w];
   [NSLayoutConstraint activateConstraints: @[
-    [v.leadingAnchor constraintEqualToAnchor: container.leadingAnchor],
-    [v.trailingAnchor constraintEqualToAnchor: container.trailingAnchor],
-    [v.topAnchor constraintEqualToAnchor: container.topAnchor],
-    [v.bottomAnchor constraintEqualToAnchor: container.bottomAnchor]]];
+    [w.leadingAnchor constraintEqualToAnchor: container.leadingAnchor],
+    [w.trailingAnchor constraintEqualToAnchor: container.trailingAnchor],
+    [w.topAnchor constraintEqualToAnchor: container.topAnchor],
+    [w.bottomAnchor constraintEqualToAnchor: container.bottomAnchor]]];
 }
 
 void
@@ -763,6 +787,23 @@ ns_tm_embedded_widget_rep::as_nsview () {
   if (!container) {
     container= [[NSView alloc] initWithFrame: NSMakeRect (0, 0, 100, 30)];
     [container setTranslatesAutoresizingMaskIntoConstraints: NO];
+    // The default size: as Qt, which gives a window at most two thirds of
+    // the screen, the size hint of the editor (the screen) limited to two
+    // thirds of the screen; below the default size of a resize widget
+    // around it (the fields of the search tool, ...), and resizable
+    NSSize scr= [[NSScreen mainScreen] visibleFrame].size;
+    if (scr.width < 1 || scr.height < 1) scr= NSMakeSize (1200, 800);
+    NSLayoutConstraint* dw=
+      [container.widthAnchor constraintEqualToConstant: floor (scr.width * 2 / 3)];
+    NSLayoutConstraint* dh=
+      [container.heightAnchor constraintEqualToConstant: floor (scr.height * 2 / 3)];
+    [dw setPriority: NSLayoutPriorityDefaultLow - 1];
+    [dh setPriority: NSLayoutPriorityDefaultLow - 1];
+    NSLayoutConstraint* mw= [container.widthAnchor constraintGreaterThanOrEqualToConstant: 40];
+    NSLayoutConstraint* mh= [container.heightAnchor constraintGreaterThanOrEqualToConstant: 20];
+    [mw setPriority: NSLayoutPriorityDefaultHigh];
+    [mh setPriority: NSLayoutPriorityDefaultHigh];
+    [NSLayoutConstraint activateConstraints: @[dw, dh, mw, mh]];
     show_canvas ();
   }
   return container;
