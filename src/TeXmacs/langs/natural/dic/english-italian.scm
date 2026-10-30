@@ -761,6 +761,7 @@
 ("equivalent for" "equivalente per")
 ("erode" "erodi")
 ("error" "errore")
+("error in menu" "errore nel menu")
 ("error messages" "messaggi di errore")
 ("error output" "errore in uscita")
 ("error status report" "rapporto sullo stato dell'errore")
