@@ -348,6 +348,117 @@
                                    (string-append "href=\"#" l "\"") s))
                     (list where l 1))))))))
 
+;; The LaTeX of the MathJax formulas uses only the macros and environments
+;; of MathJax 3 (TeX input, packages base and ams): the accents of the
+;; accents package and of TeXmacs (#607), and the arrays which the Html
+;; export expands to equations-base inside a formula (#611).
+(define (mathjax-of body)
+  (html-of-buffer body (cons "texmacs->html:mathjax" "on")
+                  (cons "texmacs->html:mathml" "off")))
+
+(define (mathjax-formula-has? body . what)
+  ;; the HTML of @body contains each string of @what
+  (with s (mathjax-of body)
+    (list-and (map (cut string-occurs? <> s) what))))
+
+(define mathjax-unknown
+  ;; LaTeX which MathJax does not know
+  '("\\ring" "\\invbreve" "\\underaccent" "bracefill"
+    "equationsbase" "equations-base" "\\["))
+
+(define (mathjax-unknown-in body)
+  (with s (mathjax-of body)
+    (list-filter mathjax-unknown (cut string-occurs? <> s))))
+
+(define mathjax-accents
+  '("<hat>" "<tilde>" "<bar>" "<vect>" "<breve>" "<invbreve>" "<check>"
+    "<abovering>" "<acute>" "<grave>" "<dot>" "<ddot>" "<dddot>" "<ddddot>"
+    "<rightarrow>" "<leftarrow>" "<leftrightarrow>"
+    "<overbrace>" "<underbrace>" "<poverbrace>" "<punderbrace>"
+    "<sqoverbrace>" "<squnderbrace>"))
+
+(define (mathjax-array env . args)
+  ;; @env with two rows in an equation, as the LaTeX import makes it
+  `(document
+    (equation
+     (document
+      (,env ,@args
+            (document (tformat (table (row (cell "a") (cell "=b,"))
+                                      (row (cell "c") (cell "=d."))))))))))
+
+(define (test-html-mathjax-formulas)
+  (check-group "html mathjax formulas")
+  ;; #607: the ring accent is \mathring
+  (check-true (mathjax-formula-has? '(math (wide "O" "<abovering>"))
+                                    "\\(\\mathring{O}\\)"))
+  (check-true (mathjax-formula-has? '(math (wide "O" "<invbreve>"))
+                                    "\\overparen{O}"))
+  ;; the accents below: \underset at the size of the formula
+  (check-true (mathjax-formula-has? '(math (wide* "O" "<hat>"))
+                                    "\\underset{\\textstyle\\hat{}}{O}"))
+  (check-true (mathjax-formula-has? '(math (wide* "O" "<abovering>"))
+                                    "\\underset{\\textstyle\\mathring{}}{O}"))
+  (check-true (mathjax-formula-has? '(math (wide* "O" "<invbreve>"))
+                                    "\\underset{\\textstyle\\overparen{}}{O}"))
+  (check-true (mathjax-formula-has?
+               '(math (wide* "O" "<dddot>"))
+               "\\underset{\\textstyle\\dddot{\\hphantom{O}}}{O}"))
+  ;; a brace above whose tip points down, and conversely
+  (check-true (mathjax-formula-has?
+               '(math (wide "O" "<underbrace>"))
+               "\\overset{\\textstyle\\underbrace{\\hphantom{O}}}{O}"))
+  (check-true (mathjax-formula-has?
+               '(math (wide* "O" "<overbrace>"))
+               "\\underset{\\textstyle\\overbrace{\\hphantom{O}}}{O}"))
+  (for (acc mathjax-accents)
+    (for (w '(wide wide*))
+      (for (x '("O" "xyz"))
+        (with body `(math (,w ,x ,acc))
+          (check= (list body (mathjax-unknown-in body)) (list body '()))))))
+  ;; #611: aligned in an equation, as in the issue
+  (with body (mathjax-array 'aligned)
+    (check-true (mathjax-formula-has? body "\\begin{aligned}"
+                                      "\\end{aligned}"))
+    (check= (mathjax-unknown-in body) '()))
+  ;; the arrays which the export expands: aligned when the columns are
+  ;; aligned right and left in turn, else an array
+  (for (env '(aligned* eqsplit eqsplit* align* flalign*))
+    (check= (list env (mathjax-formula-has? (mathjax-array env)
+                                            "\\begin{aligned}"))
+            (list env #t)))
+  (for (env '(alignedat alignedat*))
+    (check= (list env (mathjax-formula-has? (mathjax-array env "2")
+                                            "\\begin{aligned}"))
+            (list env #t)))
+  (check-true (mathjax-formula-has? (mathjax-array 'gather*)
+                                    "\\begin{array}{cc}"))
+  (check-true (mathjax-formula-has?
+               '(document
+                 (equation
+                  (document
+                   (eqnarray*
+                    (document
+                     (tformat (table (row (cell "a") (cell "=") (cell "b"))
+                                     (row (cell "c") (cell "=") (cell "d")))))))))
+               "\\begin{eqnarray*}"))
+  ;; arrays of LaTeX which TeXmacs does not define are kept
+  (check-true (mathjax-formula-has? (mathjax-array 'gathered)
+                                    "\\begin{gathered}"))
+  (check-true (mathjax-formula-has? (mathjax-array 'subarray "c")
+                                    "\\begin{subarray}{c}"))
+  (for (env '(aligned aligned* eqsplit align* gather* eqnarray* multline*
+              gathered))
+    (with body (mathjax-array env)
+      (check= (list env (mathjax-unknown-in body)) (list env '()))))
+  (with body (mathjax-array 'alignedat "2")
+    (check= (mathjax-unknown-in body) '()))
+  ;; the arrays outside formulas are unchanged
+  (check-true (mathjax-formula-has?
+               '(document
+                 (align* (document (tformat (table (row (cell "a")
+                                                        (cell "=b")))))))
+               "\\begin{array}{rl}")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MathML import
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1849,6 +1960,7 @@
   (system-mkdir (temp-dir))
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
+                  test-html-mathjax-formulas
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
