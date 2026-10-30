@@ -441,6 +441,11 @@ texmacs_widget_rep::handle_set_string (set_string_event ev) {
     set_subwidget_flag (THIS ["middle"] [ev->which == "side tools"? "right": "left"],
                         ev->s == "on");
   }
+  else if (ev->which == "extra tools") {
+    // (the extra tools take the place of the bottom tools: see set_widget)
+    if (ev->s != "on") send_keyboard_focus (abstract (THIS ["canvas"]));
+    set_subwidget_flag (THIS ["bottom"], ev->s == "on");
+  }
   else if (ev->which == "bottom tools") {
     if (ev->s != "on") send_keyboard_focus (abstract (THIS ["canvas"]));
     set_subwidget_flag (THIS ["bottom"], ev->s == "on");
@@ -472,6 +477,9 @@ texmacs_widget_rep::handle_get_string (get_string_event ev) {
              string ("on"): string ("off");
   else if (ev->which == "side tools" || ev->which == "left tools")
     ev->s= get_subwidget_flag (THIS ["middle"] [ev->which == "side tools"? "right": "left"])?
+             string ("on"): string ("off");
+  else if (ev->which == "extra tools")
+    ev->s= get_subwidget_flag (THIS ["bottom"])?
              string ("on"): string ("off");
   else if (ev->which == "bottom tools")
     ev->s= get_subwidget_flag (THIS ["bottom"])?

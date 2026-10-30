@@ -87,7 +87,15 @@ get_editor_status_report () {
     r << "TeXmacs does not yet have a current view";
     return r;
   }
-  
+
+  // Nor when the url of the current view no longer leads to it (#432:
+  // get_current_editor failed, and the report of its failure called it
+  // again, until the stack overflowed)
+  if (concrete_view (get_current_view ()) == NULL) {
+    r << "The current view of TeXmacs is not found";
+    return r;
+  }
+
   server sv= get_server ();
   r << "Editor status:\n";
   editor ed= get_current_editor ();

@@ -278,6 +278,9 @@ x_gui_rep::process_event (x_window win, XEvent* ev) {
       break;
     }
   case SelectionRequest: {
+      // the text of selection_s is in UTF-8: as UTF8_STRING (and as
+      // text/plain;charset=utf-8, or TEXT), or in Latin-1 as STRING, the
+      // characters outside Latin-1 then as '?' (#440)
       XSelectionRequestEvent& req= ev->xselectionrequest;
       XSelectionEvent sel;
       sel.type      = SelectionNotify;
@@ -285,26 +288,42 @@ x_gui_rep::process_event (x_window win, XEvent* ev) {
       sel.selection = req.selection;
       sel.target    = req.target;
       sel.time      = req.time;
+      // (an obsolete client gives no property: the target is the property)
+      Atom property = (req.property == None)? req.target: req.property;
       string key = "none";
       if (req.selection == XA_PRIMARY) key = "mouse";
       else if (req.selection == XA_CLIPBOARD) key = "primary";
       if (!selection_s->contains (key)) sel.property= None;
       else if (req.target==XA_TARGETS) {
-        Atom targets[2];
+        Atom targets[5];
         targets[0] = XA_TARGETS;
-        targets[1] = XA_STRING;
-        XChangeProperty (dpy, req.requestor, req.property, XA_ATOM,
+        targets[1] = XA_UTF8_STRING;
+        targets[2] = XA_TEXT_PLAIN_UTF8;
+        targets[3] = XA_TEXT;
+        targets[4] = XA_STRING;
+        XChangeProperty (dpy, req.requestor, property, XA_ATOM,
                          32, PropModeReplace,
-                         (unsigned char*)&targets[0],2);
-        sel.property = req.property;
+                         (unsigned char*)&targets[0], 5);
+        sel.property = property;
+      }
+      else if (req.target == XA_UTF8_STRING ||
+               req.target == XA_TEXT_PLAIN_UTF8 ||
+               req.target == XA_TEXT) {
+        string txt= selection_s (key);
+        Atom type= (req.target == XA_TEXT)? XA_UTF8_STRING: req.target;
+        c_string ctxt (txt);
+        XChangeProperty (dpy, req.requestor, property, type,
+                         8, PropModeReplace,
+                         (unsigned char*)(char*) ctxt, N(txt));
+        sel.property = property;
       }
       else if ((req.target==AnyPropertyType) || (req.target==XA_STRING)) {
-        c_string txt (selection_s (key));
-        XChangeProperty (dpy, req.requestor, req.property, XA_STRING,
+        string txt= x_utf8_to_latin1 (selection_s (key));
+        c_string ctxt (txt);
+        XChangeProperty (dpy, req.requestor, property, XA_STRING,
                          8, PropModeReplace,
-                         (unsigned char*)(char*) txt,
-                         strlen (txt));
-        sel.property = req.property;
+                         (unsigned char*)(char*) ctxt, N(txt));
+        sel.property = property;
       }
       else sel.property = None;
       XSendEvent (dpy, sel.requestor, false, 0, (XEvent*) &sel);

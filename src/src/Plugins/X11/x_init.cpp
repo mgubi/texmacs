@@ -666,6 +666,9 @@ x_gui_rep::x_gui_rep (int& argc2, char** argv2):
 
   XA_CLIPBOARD = XInternAtom (dpy, "CLIPBOARD", false);
   XA_TARGETS = XInternAtom (dpy, "TARGETS", false);
+  XA_UTF8_STRING = XInternAtom (dpy, "UTF8_STRING", false);
+  XA_TEXT = XInternAtom (dpy, "TEXT", false);
+  XA_TEXT_PLAIN_UTF8 = XInternAtom (dpy, "text/plain;charset=utf-8", false);
 
   set_true_colors (false);
   if (XMatchVisualInfo (dpy, scr, depth, TrueColor, &visual) != 0) {

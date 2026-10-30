@@ -29,6 +29,12 @@ have the details, and the problems go to the
 - **Views**: the numbers of the views are never given again after a
   rename, and a window whose only view is deleted shows a view of another
   buffer instead of staying empty (#610).
+- **Commands run in the background** (the requests of the AI sessions
+  through the curl program, `async-eval-system`): their real exit status
+  and their errors reach TeXmacs, so that a failed request is reported
+  as such; an interrupted answer stops its command at once; the new
+  `async-eval-system-full` gives the exit status, the output and the
+  errors of a command (#437).
 
 - **Views and windows**: deleting a view shown in a window, or the
   current view, no longer leaves TeXmacs with a pointer to a deleted view

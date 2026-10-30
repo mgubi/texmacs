@@ -825,6 +825,30 @@ tmg_async_evaluate_cancel (tmscm arg1) {
 }
 
 tmscm
+tmg_async_eval_system_full (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "async-eval-system-full");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "async-eval-system-full");
+
+  string in1= tmscm_to_string (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= async_eval_system_full (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_async_eval_pending () {
+  // TMSCM_DEFER_INTS;
+  async_eval_pending ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_pdf_2svg_native (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf->svg-native");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf->svg-native");
@@ -12537,6 +12561,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
   tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
   tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
+  tmscm_install_procedure ("async-eval-system-full",  tmg_async_eval_system_full, 2, 0, 0);
+  tmscm_install_procedure ("async-eval-pending",  tmg_async_eval_pending, 0, 0, 0);
   tmscm_install_procedure ("pdf->svg-native",  tmg_pdf_2svg_native, 2, 0, 0);
   tmscm_install_procedure ("zip-archive?",  tmg_zip_archiveP, 1, 0, 0);
   tmscm_install_procedure ("zip-unpack",  tmg_zip_unpack, 1, 0, 0);
