@@ -48,7 +48,6 @@ ns_bench_now () {
 {
 @public
   ns_simple_widget_rep* wid;
-  BOOL fills;   // sized by its container (Auto Layout), not by the extents
 }
 - (void) scrolled: (NSNotification*) n;
 @end
@@ -349,25 +348,6 @@ ns_simple_widget_rep::follow_visible_part () {
   }
 }
 
-/*! The canvas of an embedded editor (a texmacs-input, such as the editors
- of the consoles) fills its container, which Auto Layout sizes: its size is
- not that of the document. Its frame was nevertheless set to the extents of
- the document, which Auto Layout then set back to the size of the container;
- the editor, whose page follows the size of the canvas (a page "automatic"),
- got a size which differed by a fraction of a point at each turn, and was
- typeset again from scratch at each update, with the page trembling (#620).
- */
-void
-ns_simple_widget_rep::set_fills_container () {
-  as_nsview ();
-  ((TMDocView*) doc)->fills= YES;
-}
-
-bool
-ns_simple_widget_rep::fills_container () {
-  return doc && ((TMDocView*) doc)->fills;
-}
-
 /*! The view of the canvas, created when it is needed for the first time
  (see qt_simple_widget_rep::as_qwidget).
  */
@@ -547,7 +527,21 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       // infinite extents)
       rect.size.width = min (rect.size.width , 5000000.0);
       rect.size.height= min (rect.size.height, 5000000.0);
-      if (!fills_container ()) [doc setFrameSize: rect.size];
+      {
+        // NOTE: a page which follows the size of the clip view (a page
+        // "automatic") is up to a point larger, from the roundings between
+        // points and TeXmacs units: it is the size of the clip view (else
+        // it scrolls by a point, and has a scroll bar)
+        NSView* clip= [doc superview];
+        if ([clip isKindOfClass: [NSClipView class]]) {
+          NSSize cs= [clip bounds].size;
+          if (rect.size.width > cs.width && rect.size.width <= cs.width + 1)
+            rect.size.width= cs.width;
+          if (rect.size.height > cs.height && rect.size.height <= cs.height + 1)
+            rect.size.height= cs.height;
+        }
+      }
+      [doc setFrameSize: rect.size];
       {
         // NOTE: the clip view centers the document when it scrolls; a
         // document which became smaller (a zoom out) is centered at once
@@ -569,8 +563,7 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord2>(val, s);
       coord2 sz = open_box<coord2> (val);
-      if (!fills_container ())
-        [doc setFrameSize: to_nssize (sz)]; // FIXME?
+      [doc setFrameSize: to_nssize (sz)]; // FIXME?
       follow_visible_part ();
     }
       break;
