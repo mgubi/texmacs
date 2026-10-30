@@ -373,6 +373,28 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; Closing an embedded TeXmacs widget (the console, a dialog with a
+;; texmacs-input) deletes its buffer and so its view, which is shown in the
+;; window of the widget. That window is not in the window table: deleting
+;; the view tried to detach it from that window when no other view was free,
+;; and aborted with "widget should be attached" when its widget was out of
+;; any window, as in the Cocoa port when the dialog closes (#619). Here the
+;; widget is put in no window, and the free views are deleted first.
+(define (test-embedded-close)
+  (check-group "closing an embedded buffer")
+  (let* ((old (current-buffer))
+         (u (string->url "tmfs://aux/editing-test-embedded-close")))
+    (widget-texmacs-input '(document "a") '(style "generic") u)
+    (check-true (buffer-exists? u))
+    (for (v (view-list))
+      (when (url-none? (view->window-url v)) (view-delete v)))
+    (check-false (list-find (view-list)
+                            (lambda (v) (url-none? (view->window-url v)))))
+    (buffer-close u)
+    (check-false (buffer-exists? u))
+    (check= (current-buffer) old)
+    (check= (view->buffer (window->view (current-window))) old)))
+
 ;; A document written to a .tm file and loaded: the body, the style and the
 ;; initial environment of the file are those of the buffer, which is not
 ;; modified by loading.
@@ -1439,6 +1461,7 @@
   (test-delete-view)
   (test-tree-pointers)
   (test-embedded)
+  (test-embedded-close)
   (test-load)
   (test-insert)
   (test-cursor)
