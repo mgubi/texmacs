@@ -909,6 +909,9 @@ finalize_layout (tree t) {
 
 static tree
 finalize_sections (tree t) {
+  // finalize_preamble returns the only paragraph of a document without
+  // the document around it, e.g. a string for a source which is only text
+  if (!is_document (t)) t= tree (DOCUMENT, t);
   tree r (DOCUMENT);
   for (int i=0; i<N(t); i++) {
     tree u= t[i];

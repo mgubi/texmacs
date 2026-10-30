@@ -42,9 +42,14 @@
 
       <item*|<cpp|int nr>>A number which distinguishes the views on the
       same buffer. It is allocated by <cpp|new_view_number> from the
-      static table <cpp|view_number_table>, indexed by buffer name, and is
-      never reused, not even after the buffer has been closed and opened
-      again.
+      static table <cpp|view_number_table>, indexed by buffer name, above
+      the numbers of the views the buffer already has (a view keeps its
+      number when its buffer is renamed, so that the numbers of the new
+      name may already be taken by it, #560); a rename also raises the
+      table of the new name to these numbers. A number is never given
+      again under the same name, not even after the buffer has been closed
+      and opened again, or after the views which brought it with a rename
+      have been deleted.
     </description>
   </explain>
 
@@ -128,7 +133,14 @@
   Views are destroyed with <cpp|delete_view>, which removes the view from
   its buffer and from the history, sets <cpp|ed-\<gtr\>buf> to <cpp|NULL>
   and deletes the <cpp|tm_view_rep>; the editor itself is reference
-  counted and dies with its last reference. Views are also deleted when
+  counted and dies with its last reference. A window which shows the view
+  first shows another one (a passive view of the same buffer if there is
+  one, else a passive view of another buffer, else a new view of the most
+  recent other buffer, as <cpp|kill_buffer> does; only when there is no
+  other buffer is the view detached and the window left empty), and when
+  the view is the current one, another view becomes current (#559). The
+  window of an embedded editor, which is not in the table of the windows,
+  gets no new view. Views are also deleted when
   their buffer is removed. They are <em|not> deleted when their window is
   closed: <cpp|delete_window> only detaches them, since a buffer without
   views would always be reported as unmodified.

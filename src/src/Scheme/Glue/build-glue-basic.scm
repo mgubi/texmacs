@@ -95,6 +95,8 @@
   (async-evaluate-system async_evaluate_system
     (int array_string string object))
   (async-evaluate-cancel async_evaluate_cancel (void int))
+  (async-eval-system-full async_eval_system_full (bool string object))
+  (async-eval-pending async_eval_pending (void))
   ;; the pictures of a PDF file as SVG, where a library does it
   (pdf->svg-native native_pdf_to_svg (bool url url))
   ;; zip archives

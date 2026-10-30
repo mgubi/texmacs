@@ -10,10 +10,17 @@
 # TEXMACS_HOME_PATH (tests/build/startup/home, or TM_TEST_HOME). Each case
 # is a command line and the lines which it must print, in this order; a
 # case which takes longer than TM_TEST_TIMEOUT seconds (default 60) is
-# stopped and fails. The cases replace quit-TeXmacs by a function which
-# prints the names of the buffers before it exits, to see what was loaded
-# when TeXmacs quits. A run which does not exit with status 0 (a crash at
-# the exit) prints the line "exit status <n>" after the expected ones.
+# stopped and fails. The cases add to the exit of TeXmacs (on-exit) the
+# printing of the names of the buffers, to see what was loaded when TeXmacs
+# quits. A run which does not exit with status 0 (a crash at the exit)
+# prints the line "exit status <n>" after the expected ones.
+#
+# The harness must give the same output under Guile and s7: the lists of
+# strings are printed as one string, (a b), since display* prints the
+# quotes of the strings in a list under s7; the exit is hooked by on-exit,
+# not by redefining quit-TeXmacs, since the automatic quit of -q and of the
+# headless mode is a closure made before the commands of -x run, and under
+# s7 it keeps calling the original quit-TeXmacs (#562).
 
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
@@ -38,8 +45,9 @@ EOF
 cp "$out/startup-a.tm" "$out/startup-b.tm"
 
 # the names of the buffers, without the scratch buffer of the first window
-names='(list-filter (map (lambda (u) (url->string (url-tail u))) (buffer-list)) (lambda (s) (string-starts? s "startup-")))'
-atquit="(set! quit-TeXmacs (lambda () (display* \"CHECK quit \" $names \"\\n\") (exit 0)))"
+# (printed as one string, the same under Guile and s7)
+names='(string-append "(" (string-recompose (list-filter (map (lambda (u) (url->string (url-tail u))) (buffer-list)) (lambda (s) (string-starts? s "startup-"))) " ") ")")'
+atquit="(on-exit (display* \"CHECK quit \" $names \"\\n\"))"
 show () { echo "(display* \"CHECK $1 \" $names \"\\n\")"; }
 
 status=0
@@ -155,7 +163,7 @@ cat > "$out/startup-bib.scm" <<'EOF'
   (update-forced)
   (switch-to-buffer* u)
   (update-forced)
-  (display* "CHECK completer " (focus-completers) "\n")
+  (display* "CHECK completer (" (string-recompose (focus-completers) " ") ")\n")
   (buffer-pretend-saved u)
   (buffer-close o)
   (buffer-close u))

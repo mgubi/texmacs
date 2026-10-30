@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 30 October 2026
+
+- **Hidden definitions in tables and floats**: what a hidden part
+  (`hidden`, `hide-preamble`) assigns in a table cell whose lines are
+  broken, or in a float, holds for what follows, as when it is not
+  hidden: a macro defined in a hidden preamble inside the abstract of
+  `tmarticle` was undefined in the text of the abstract (#503).
+
 ## 29 October 2026
 
 - **Japanese and Korean text**: the kanji of a Japanese text (and the
@@ -20,6 +28,51 @@ have the details, and the problems go to the
   fallback; with the fonts which the menus set for Japanese and Korean
   documents, the CJK characters are no longer shrunk to 70-80% of their
   size (#196).
+- **Replace with wildcards, continued**: Replace All after a Replace no
+  longer replaces again inside the replacement just made; Replace All
+  works with more than 10,000 hits; in ordinary text, a hit which Search
+  shows across formulas is replaced whole, by Replace and by Replace All
+  alike (#596).
+- **Cursor positions from scripts**: a `go-to` to a position which is not
+  in the document (below a text, out of range, the document itself) puts
+  the cursor at the closest valid place, and the next key no longer
+  crashes TeXmacs (#599).
+- **LaTeX import of plain text**: a source which is only text, without
+  `\begin{document}`, no longer crashes TeXmacs, and a source of one
+  paragraph keeps its commands (`\emph{b}` gave `b`) (#608).
+- **Views**: the numbers of the views are never given again after a
+  rename, and a window whose only view is deleted shows a view of another
+  buffer instead of staying empty (#610).
+- **Commands run in the background** (the requests of the AI sessions
+  through the curl program, `async-eval-system`): their real exit status
+  and their errors reach TeXmacs, so that a failed request is reported
+  as such; an interrupted answer stops its command at once; the new
+  `async-eval-system-full` gives the exit status, the output and the
+  errors of a command (#437).
+
+- **Views and windows**: deleting a view shown in a window, or the
+  current view, no longer leaves TeXmacs with a pointer to a deleted view
+  (crashes and hangs afterwards); the views of a renamed buffer get names
+  of their own, and Window > Clone window after File > Save as no longer
+  quits TeXmacs (#559, #560).
+- **A cursor path below a text** no longer makes TeXmacs hang when it
+  reports the error (#592).
+- **LaTeX import**: sources which end too early (a `\` or a command
+  without its argument at the end, a `$` at the end) are no longer read
+  past their end (#561).
+- **Plots of the sessions in the Cocoa build** (desktop, Cocoa): the
+  plots of gnuplot, Maxima and Sage, and any PostScript (`.ps`, `.eps`)
+  image, were blank, only their space reserved. macOS no longer draws
+  PostScript, and the application took the empty image which macOS
+  still gave for it; PostScript is now converted with Ghostscript, as
+  in the other builds, which requires Ghostscript (`gs`, e.g. from
+  Homebrew) (#582).
+- **The file dialogs of the system on Linux** (Vue, desktop): Open, Save
+  and the other file choosers show again the dialog of the desktop (its
+  portal, or zenity) rather than the file chooser of TeXmacs. SDL gave
+  zenity labels for the buttons which zenity 4 refuses ("Could not run
+  zenity: exit code 255"), and the SDL of the Linux packages was built
+  without D-Bus, hence without the desktop portal (#456).
 - **Clicks and selections in long documents**: a click at the right of
   a line (after the square which ends a proof) or at the left of the
   lines no longer puts the cursor at the end or the start of the

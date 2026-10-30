@@ -56,6 +56,7 @@ void secure_wipe (string s);
 
 class object;
 bool async_eval_system (string cmd, object call_back);
+bool async_eval_system_full (string cmd, object call_back);
 bool async_eval_system (string cmd, int& status, string& outbuf,
 			string& errbuf, bool& kill);
 int  async_evaluate_system (array<string> arg, string in, object call_back);

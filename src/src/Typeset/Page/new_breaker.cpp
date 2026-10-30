@@ -69,7 +69,10 @@ breaker_fast_level () {
 // they are after this. new_break_pages does it before it looks for a
 // skeleton it kept, so that the pager gets the same items when the
 // search is skipped, and so that the items are compared as the search
-// sees them. Doing it again changes nothing.
+// sees them. Doing it again changes nothing. An item is copied before it
+// is changed, as the items are those of the bridges, which use them again
+// and compare them in the check mode (and the pager gets its own array:
+// typesetter_rep::typeset)
 void
 breaker_prepare_items (array<page_item>& l) {
   // HACK: migrate double column footnotes in single column text
@@ -96,7 +99,11 @@ breaker_prepare_items (array<page_item>& l) {
     }
   // END HACK
   for (int i=0; i<N(l); i++)
-    if ((i==N(l)-1) || (l[i]->nr_cols!=l[i+1]->nr_cols)) l[i]->penalty=0;
+    if ((i==N(l)-1) || (l[i]->nr_cols!=l[i+1]->nr_cols))
+      if (l[i]->penalty != 0) {
+        l[i]= copy (l[i]);
+        l[i]->penalty= 0;
+      }
 }
 
 new_breaker_rep::new_breaker_rep (

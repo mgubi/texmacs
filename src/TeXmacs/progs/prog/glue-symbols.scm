@@ -102,6 +102,8 @@
 "async-eval-system"
 "async-evaluate-system"
 "async-evaluate-cancel"
+"async-eval-system-full"
+"async-eval-pending"
 "pdf->svg-native"
 "zip-archive?"
 "zip-unpack"

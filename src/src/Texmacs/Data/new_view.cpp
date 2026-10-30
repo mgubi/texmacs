@@ -31,13 +31,19 @@ static hashmap<tree,int> view_number_table (0);
 static hashmap<tree,pointer> view_table (NULL);
 
 static int
-new_view_number (url u) {
-  view_number_table (u->t) += 1;
-  return view_number_table [u->t];
+new_view_number (tm_buffer buf) {
+  // a view keeps its number when its buffer is renamed, so that the numbers
+  // of the new name may already be taken by the views of the buffer
+  tree name= buf->buf->name->t;
+  int nr= view_number_table [name] + 1;
+  for (int i=0; i<N(buf->vws); i++)
+    nr= max (nr, buf->vws[i]->nr + 1);
+  view_number_table (name)= nr;
+  return nr;
 }
 
 tm_view_rep::tm_view_rep (tm_buffer buf2, editor ed2):
-  buf (buf2), ed (ed2), win (NULL), nr (new_view_number (buf->buf->name)) {}
+  buf (buf2), ed (ed2), win (NULL), nr (new_view_number (buf2)) {}
 
 static string
 encode_url (url u) {
@@ -51,8 +57,11 @@ decode_url (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
 #ifdef WINPATHS
+  // a relative name (encoded as "here/...") stays relative: rooting it
+  // gave another name than the one of the buffer, whose views could then
+  // no longer be found after a rename to a relative name (#432)
+  if (s (0, i) == "here") return url (s (i+1, N(s)));
   int j= 0;
-  if (s (0, i) == "here") j= i+1;
   if (s (0, i) == "default") j= i;
   if (j != 0) {
     if (s[j+1] == ':') return url (s (j, N(s)));
@@ -345,10 +354,33 @@ get_recent_view (url name) {
 * Destroying a view
 ******************************************************************************/
 
+void detach_view (url u);
+void window_set_view (url win_u, url new_u, bool focus);
+
 void
 delete_view (url u) {
   tm_view vw= concrete_view (u);
   if (vw == NULL) return;
+  // a window which shows the view, and the current view, must not keep it:
+  // the window shows another view, of the same buffer if possible
+  if (vw->win != NULL) {
+    url name= vw->buf->buf->name;
+    url other= get_recent_view (name, true, false, false, true);
+    for (int k=0; is_none (other) && k<N(vw->buf->vws); k++)
+      if (vw->buf->vws[k] != vw && vw->buf->vws[k]->win == NULL)
+        other= abstract_view (vw->buf->vws[k]);
+    if (is_none (other)) other= get_recent_view (name, false, true, false, true);
+    if (is_none (other) &&
+        concrete_window (abstract_window (vw->win)) != NULL) {
+      // a new view of the most recent other buffer, as kill_buffer does
+      // (not for the window of an embedded editor, which has no url)
+      url ob= view_to_buffer (get_recent_view (name, false, true, false, false));
+      if (!is_none (ob)) other= get_passive_view (ob);
+    }
+    if (is_none (other)) detach_view (u);
+    else window_set_view (abstract_window (vw->win), other,
+                          the_view == vw || the_view == NULL);
+  }
   tm_buffer buf= vw->buf;
   int i, j, n= N(buf->vws);
   for (i=0; i<n; i++)
@@ -361,6 +393,13 @@ delete_view (url u) {
       break; // buf->vws is now shorter: do not read past its end
     }
   notify_delete_view (u);
+  if (the_view == vw) {
+    the_view= NULL;
+    url other= get_recent_view (url_none (), false, false, true, false);
+    if (is_none (other))
+      other= get_recent_view (url_none (), false, false, false, false);
+    if (!is_none (other)) set_current_view (other);
+  }
   vw->ed->buf= NULL;
   tm_delete (vw);
 }
@@ -377,6 +416,13 @@ notify_rename_after (url new_name) {
   array<url> vs= buffer_to_views (new_name);
   for (int i=0; i<N(vs); i++)
     notify_set_view (vs[i]);
+  // the views keep their numbers: the numbers of the new name go on after
+  // them, also once these views are deleted
+  tm_buffer buf= concrete_buffer (new_name);
+  if (!is_nil (buf))
+    for (int i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr > view_number_table [new_name->t])
+        view_number_table (new_name->t)= buf->vws[i]->nr;
 }
 
 /******************************************************************************

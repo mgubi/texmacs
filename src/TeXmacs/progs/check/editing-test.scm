@@ -169,6 +169,36 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; A buffer which has a view can be renamed to a relative name, and to a
+;; name such as "/dir/doc.tm" (relative on Windows): its views still belong
+;; to it and edit it. On Windows, the name in the url of a view decoded a
+;; relative name as an absolute one, so that the views of the renamed
+;; buffer were lost and the rename overflowed the stack (#432: decode_url
+;; of new_view.cpp).
+(define (test-rename-relative)
+  (check-group "renaming to a relative name")
+  (for (name (list (url-append "tm-editing-test-relative" "doc.tm")
+                   (system->url "/tm-editing-test-relative/doc.tm")))
+    (with-buffer-body '(document "a")
+      (lambda ()
+        (let* ((u (current-buffer))
+               (n (length (buffer->views u))))
+          (check-true (> n 0))
+          (buffer-rename u name)
+          (check-true (buffer-exists? name))
+          (check= (current-buffer) name)
+          (check= (length (buffer->views name)) n)
+          (for (v (buffer->views name))
+            (check= (view->buffer v) name))
+          (edit (go-end) (insert "b"))
+          (check= (tree->stree (buffer-get-body name)) '(document "ab"))
+          (with v (view-new name)
+            (check= (view->buffer v) name)
+            (check= (length (buffer->views name)) (+ n 1))
+            (view-delete v))
+          (check= (length (buffer->views name)) n)
+          (buffer-pretend-saved name))))))
+
 ;; Deleting a view of a buffer removes it from the views of the buffer and
 ;; leaves the others, which still show and edit the buffer. delete_view
 ;; went on reading the views after removing one, one past the end of the
@@ -201,7 +231,50 @@
         (check= (body) '(document "ab"))
         (edit (go-end) (insert "c"))
         (check= (tree->stree (buffer-get-body u)) '(document "abc"))
-        (check= (buffer->views u) (list v1 v2))))))
+        (check= (buffer->views u) (list v1 v2))
+        ;; deleting the current view, which the window shows: the window
+        ;; shows another view of the buffer, which becomes the current one;
+        ;; before, both kept the deleted view (#559: delete_view of new_view.cpp)
+        (with win (current-window)
+          (view-delete v2)
+          (check= (buffer->views u) (list v1))
+          (check= (current-view-url) v1)
+          (check= (window->view win) v1)
+          (check= (view->window-url v1) win)
+          (check= (current-window) win))
+        (edit (go-end) (insert "d"))
+        (check= (body) '(document "abcd"))
+        ;; also with a view which was never in a window
+        (with v3 (view-new u)
+          (view-delete v1)
+          (check= (buffer->views u) (list v3))
+          (check= (current-view-url) v3)
+          (check= (window->view (current-window)) v3))
+        (edit (go-end) (insert "e"))
+        (check= (body) '(document "abcde")))))
+  ;; the views of a renamed buffer keep their numbers, and a new view does
+  ;; not take one of them, nor the number of a view deleted after the
+  ;; rename (#560: two views had the same url, and Clone window after Save
+  ;; as aborted)
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (new-name (tmp-file "renamed-views.tm")))
+        (view-new u)
+        (buffer-rename u new-name)
+        (let ((gone (car (list-filter (buffer->views new-name)
+                                      (lambda (v)
+                                        (url-none? (view->window-url v)))))))
+          (view-delete gone)
+          (let* ((vs (buffer->views new-name))
+                 (v2 (view-new new-name))
+                 (vs* (buffer->views new-name)))
+            (check= (length vs*) (+ (length vs) 1))
+            (check-false (in? v2 vs))
+            (check-false (== v2 gone))
+            (check= (view->buffer v2) new-name)
+            (view-delete v2)
+            (check= (buffer->views new-name) vs)))))))
 
 ;; A tree pointer or a position which is collected while it is still
 ;; attached to a tree (a process whose callback was never called, a
@@ -519,6 +592,83 @@
   (mouse "end-drag-left" x y 0)
   (mouse-update)
   (list (rel (selection-get-start)) (rel (selection-get-end))))
+
+;; A cursor path which is not in the document (go-to from a script with a
+;; wrong path: below a string, a negative or out of range index, more
+;; children than a tag has) used to be kept as the cursor: the report of
+;; the error raised when the changes were applied shifted it and looped
+;; (#592), and the next insert crashed TeXmacs (#599). go-to now corrects
+;; such a path to the closest cursor inside the document. The insert is
+;; only done when the cursor is in the document, and the buffer is closed
+;; with a sane cursor, so that a regression fails these checks instead of
+;; crashing the whole suite.
+(define (path-in-stree? t p)
+  ;; whether @p is a cursor position inside the stree @t (as is_inside of
+  ;; tree_cursor.cpp, without the Cork characters)
+  (cond ((null? p) #f)
+        ((string? t)
+         (and (null? (cdr p)) (>= (car p) 0) (<= (car p) (string-length t))))
+        ((null? (cdr p)) (in? (car p) '(0 1)))
+        (else (and (>= (car p) 0) (< (car p) (length (cdr t)))
+                   (path-in-stree? (list-ref (cdr t) (car p)) (cdr p))))))
+
+(define (check-bad-go-to doc bad expected after)
+  ;; go to the path @bad of @doc, which is not in it: the cursor goes to
+  ;; @expected, and an insert there gives the body @after
+  (with-buffer-body doc
+    (lambda ()
+      (edit (go-to (apply at bad)))
+      (check= (cursor) expected)
+      (check= (rel (cursor-path*)) expected)
+      (if (not (path-in-stree? (body) (cursor)))
+          (begin
+            (check-report #f "insert after (go-to bad path)"
+                          "the cursor is not in the document")
+            ;; closing the buffer with that cursor crashes as well
+            (edit (go-start)))
+          (begin
+            (edit (insert "X"))
+            (check= (body) after)
+            (check-true (path-in-stree? (body) (cursor))))))))
+
+(define (test-bad-cursor)
+  (check-group "a cursor path outside the document")
+  (let* ((table '(document (tabular (table (row (cell "a") (cell "b"))))))
+         (table-x (lambda (a b)
+                    `(document (tabular (table (row (cell ,a) (cell ,b))))))))
+    ;; below a string
+    (check-bad-go-to '(document "abc") '(0 0 0) '(0 0) '(document "Xabc"))
+    (check-bad-go-to '(document "abc") '(0 2 5 1) '(0 2) '(document "abXc"))
+    ;; below the string of a table cell (a bus error)
+    (check-bad-go-to table '(0 0 0 1 0 0 0) '(0 0 0 1 0 0)
+                     (table-x "a" "Xb"))
+    ;; a negative index
+    (check-bad-go-to table '(0 0 -1 0) '(0 0 0 0 0 0) (table-x "Xa" "b"))
+    (check-bad-go-to '(document "abc") '(0 -2) '(0 0) '(document "Xabc"))
+    ;; out of range: a paragraph, a position in a string
+    (check-bad-go-to '(document "abc") '(5 0) '(0 3) '(document "abcX"))
+    (check-bad-go-to '(document "abc") '(0 9) '(0 3) '(document "abcX"))
+    ;; more children than the tag has (a row of a one-row table)
+    (check-bad-go-to table '(0 0 7 0 0) '(0 0 0 1 0 1) (table-x "a" "bX"))
+    ;; the path of the buffer itself, the node of the document
+    (check-bad-go-to '(document "abc") '() '(0 0) '(document "Xabc")))
+  ;; the empty path is not in the buffer: go-to ignores it
+  (with-buffer-body '(document "abc")
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (edit (go-to '()))
+      (check= (cursor) '(0 2))
+      (edit (insert "X"))
+      (check= (body) '(document "abXc"))))
+  ;; a path in the document is kept
+  (with-buffer-body '(document "abc" (frac "x" "y"))
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (check= (cursor) '(0 2))
+      (edit (go-to (at 1 1 1)))
+      (check= (cursor) '(1 1 1))
+      (edit (insert "X"))
+      (check= (body) '(document "abc" (frac "x" "yX"))))))
 
 (define (test-mouse-long)
   (check-group "mouse in a long document")
@@ -1285,12 +1435,14 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-rename-relative)
   (test-delete-view)
   (test-tree-pointers)
   (test-embedded)
   (test-load)
   (test-insert)
   (test-cursor)
+  (test-bad-cursor)
   (test-mouse-long)
   (test-selection)
   (test-remove)
