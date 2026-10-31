@@ -539,9 +539,13 @@
   baseline (<verbatim|\\raisebox> around <verbatim|\\includegraphics>).
   The picture files are named <verbatim|<em|base>-<em|n>.pdf> (or
   <verbatim|.eps>) next to the target file, where <em|base> is the name of
-  <scm|current-save-target> without the suffix (<scm|tmtex-eps-names>);
-  when no target is known (<abbr|e.g.> for snippets) the name
-  <verbatim|image-<em|n>> is used.
+  <scm|current-save-target> without the suffix (<scm|tmtex-eps-names>).
+  When a conversion writes no file (<abbr|e.g.> for snippets, or the formulas
+  for <name|MathJax> in an <name|HTML> file), <scm|loose-image-names> puts the
+  pictures in the temporary folder under an absolute name; a copy to the
+  clipboard keeps them next to the document, or else in
+  <verbatim|$TEXMACS_HOME_PATH/system/images>, as
+  <verbatim|image-<em|hash>>.
 
   <section|Bibliographies, citations and indexes>
 

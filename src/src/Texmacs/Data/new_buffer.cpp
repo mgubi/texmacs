@@ -611,7 +611,16 @@ export_tree (tree doc, url u, string fm) {
       }
   // END hook
   if (fm == "generic") fm= "verbatim";
+  // The converters write the images of the document next to their target
+  bool has_target= (fm != "texmacs" && fm != "stm");
+  object old_target;
+  if (has_target) {
+    // A converter passes the target on to programs, which need its full name
+    url target= is_rooted_name (u)? u: resolve (u, "");
+    old_target= call ("save-target-swap", object (target));
+  }
   string s= tree_to_generic (aux, fm * "-document");
+  if (has_target) call ("save-target-swap", old_target);
   if (s == "* error: unknown format *") return true;
   return save_string (u, s);
 }
@@ -652,8 +661,14 @@ buffer_export (url name, url dest, string fm) {
   tree links= as_tree (call ("get-link-locations", arg1, arg2));
   if (N (links) != 0)
     doc << compound ("links", links);
-  
-  return export_tree (doc, dest, fm);
+
+  // The converters find the images linked by the document next to its source
+  bool has_source= (fm != "texmacs" && fm != "stm");
+  object old_source;
+  if (has_source) old_source= call ("save-source-swap", object (name));
+  bool r= export_tree (doc, dest, fm);
+  if (has_source) call ("save-source-swap", old_source);
+  return r;
 }
 
 // The macros of a document are expanded by the editor of a view on it; a

@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **LaTeX and HTML export** (desktop): no crash with an embedded image on
+  Edit > Copy to > LaTeX or with a target which cannot be written; the images
+  always go next to the exported file, also from scripts and under any name;
+  a copy to the clipboard never overwrites a different file, reuses the file
+  of the same image, says where it is, and names an image which exists; a
+  linked image is found when exporting to another folder (#697).
 - **macOS: the applications linked against the current SDK** (desktop,
   Cocoa and Vue): the disk images were linked against the SDK of macOS 13,
   their minimal version, so macOS gave them the behaviour of macOS 13 (for
