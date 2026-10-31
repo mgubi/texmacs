@@ -44,16 +44,19 @@
 #            the focus: the document stays the key and main window and the
 #            current buffer, and gets the keys typed. A click gives the
 #            console the focus, and its close gives it back (#679, #619)
-#   focused  the console which the user opens takes the focus (#679)
+#   focused  the console which the user opens takes the focus, and its close
+#            leaves the document focused (#679)
 #
-# The last two make TeXmacs the active application several times, for about
-# 40 seconds, which takes the keyboard from whoever works on that screen (keys
-# typed then go into the test document): they run on GitHub Actions
-# (GITHUB_ACTIONS=true) or with TM_COCOA_FOCUS=1, not with TM_COCOA_FOCUS=0, and
-# are told to be skipped otherwise. Where they run, one in which TeXmacs says
-# it is not active is skipped on the screen of a person (who may have taken the
-# focus) and fails on GitHub Actions, where that would mean that the focus is
-# never tested. Do not use the screen while they run.
+# Any case may take the keyboard from whoever works on that screen: macOS may
+# make a process active when its parent, a Terminal for instance, is, and every
+# window is shown (TEXMACS_NS_SNAPSHOT, which these cases do not use, also calls
+# activateIgnoringOtherApps). The last two go further: they ask for it several
+# times, for about 40 seconds (keys typed then go into the test document), so
+# they run on GitHub Actions (GITHUB_ACTIONS=true) or with TM_COCOA_FOCUS=1, not
+# with TM_COCOA_FOCUS=0, and are told to be skipped otherwise. Where they run,
+# one in which TeXmacs says it is not active is skipped on the screen of a person
+# (who may have taken the focus) and fails on GitHub Actions, where that would
+# mean that the focus is never tested. Do not use the screen during this script.
 #
 # Every case also fails on an error caught at an entry point from AppKit
 # ("Cocoa: an error was caught", "Cocoa: an Objective-C exception",
@@ -332,6 +335,23 @@ focus_verdict () {
   fi
 }
 
+# close_ok <log> <the text which the document has at the end>: after the close
+# of the console, the keys typed go to the document
+close_ok () {
+  # just after the close, before anything activates TeXmacs
+  closing=$(sed -n '/NSTEST step close:/,/NSTEST step activate/p' "$1")
+  if echo "$closing" | grep -aq '^NSTEST active yes$'; then
+    fail="its close left no key window in the active TeXmacs: $(echo "$closing" | grep -a "^NSTEST window" | cut -c1-80 | tr '\n' ' ')"
+    echo "$closing" | grep -aq "^NSTEST window 'quiet.tm' shown .*main key " || return 1
+  fi
+  closed=$(sed -n '/NSTEST step close:/,$p' "$1" | sed '1,/NSTEST step activate/d')
+  fail="its close did not leave the document focused: $(echo "$closed" | grep -a "^NSTEST window\|^NSTEST type to\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  ! echo "$closed" | grep -aq "^NSTEST window 'Error messages' shown" &&
+    echo "$closed" | grep -aq "^NSTEST window 'quiet.tm' shown .*main key " &&
+    echo "$closed" | grep -aq "^NSTEST type to 'quiet.tm', main 'quiet.tm'" &&
+    echo "$closed" | grep -aq "^CHECK current <url quiet.tm> .*$2\""
+}
+
 warnings='(for-each (lambda (ch) (debug-message ch (string-append ch " line\n"))) (list "std-warning" "debug-io" "debug-automatic"))'
 quit_after=50000
 [ -n "$focus_cases" ] && run quiet "" "$focus_steps;eval:$warnings;activate;wait:Error messages;activate;windows;$state;activate;type:xy;$state;click:Error messages;windows;$state;close:Error messages;windows;activate;windows;$state;type:zw;$state;$focus_quit" \
@@ -356,30 +376,21 @@ quiet_ok () {
   fail="a click did not give the console the focus: $(echo "$clicked" | grep -a "^NSTEST window 'Error\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
   echo "$clicked" | grep -aq "^NSTEST window 'Error messages' shown .*main key " &&
     echo "$clicked" | grep -aq '^CHECK current <url console-' || return 1
-  # just after the close, before anything activates TeXmacs
-  closing=$(sed -n '/NSTEST step close:/,/NSTEST step activate/p' "$log")
-  if echo "$closing" | grep -aq '^NSTEST active yes$'; then
-    fail="its close left no key window in the active TeXmacs: $(echo "$closing" | grep -a "^NSTEST window" | cut -c1-80 | tr '\n' ' ')"
-    echo "$closing" | grep -aq "^NSTEST window 'quiet.tm' shown .*main key " || return 1
-  fi
-  closed=$(sed -n '/NSTEST step close:/,$p' "$log" | sed '1,/NSTEST step activate/d')
-  fail="its close did not leave the document focused: $(echo "$closed" | grep -a "^NSTEST window\|^NSTEST type to\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
-  ! echo "$closed" | grep -aq "^NSTEST window 'Error messages' shown" &&
-    echo "$closed" | grep -aq "^NSTEST window 'quiet.tm' shown .*main key " &&
-    echo "$closed" | grep -aq "^NSTEST type to 'quiet.tm', main 'quiet.tm'" &&
-    echo "$closed" | grep -aq '^CHECK current <url quiet.tm> .*xyzwTop"'
+  close_ok "$log" xyzwTop
 }
 focus_verdict quiet "a console which opens by itself leaves the focus to the document (#679)" quiet_ok
 
 quit_after=50000
-[ -n "$focus_cases" ] && run focused "" "$focus_steps;eval:(open-error-messages);wait:Error messages;activate;windows;type:a;$state;$focus_quit" \
+[ -n "$focus_cases" ] && run focused "" "$focus_steps;eval:(open-error-messages);wait:Error messages;activate;windows;type:a;$state;close:Error messages;windows;activate;windows;$state;type:zw;$state;$focus_quit" \
     "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
 focused_ok () {
   log="$out/focused.log"
-  fail="the console opened by the user did not take the focus: $(grep -a "^NSTEST window 'Error\|^NSTEST type to\|^CHECK current" "$log" | cut -c1-80 | tr '\n' ' ')"
-  grep -aq "^NSTEST window 'Error messages' shown .*main key " "$log" &&
-    grep -aq "^NSTEST type to 'Error messages', main 'Error messages'" "$log" &&
-    grep -aq '^CHECK current <url console-' "$log"
+  opened=$(sed -n '1,/NSTEST step close:/p' "$log")
+  fail="the console opened by the user did not take the focus: $(echo "$opened" | grep -a "^NSTEST window 'Error\|^NSTEST type to\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  echo "$opened" | grep -aq "^NSTEST window 'Error messages' shown .*main key " &&
+    echo "$opened" | grep -aq "^NSTEST type to 'Error messages', main 'Error messages'" &&
+    echo "$opened" | grep -aq '^CHECK current <url console-' || return 1
+  close_ok "$log" zwTop
 }
 focus_verdict focused "a console opened by the user takes the focus (#679)" focused_ok
 

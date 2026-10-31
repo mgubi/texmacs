@@ -373,8 +373,9 @@ end (#661). Two more cases check the focus of
 the console: when it opens by itself on a warning, the document stays the key
 and main window and the current buffer, and gets the keys typed; a click, or
 opening it from the menu, gives it the focus; its close leaves the document
-focused (#679). They make TeXmacs the active application, which takes the
-keyboard from whoever works on the screen: they run on GitHub Actions or with
+focused (#679). Any case may take the keyboard from whoever works on the screen
+(macOS may make a process active when its parent Terminal is, and the windows
+are shown), but these two ask for it several times: they run on GitHub Actions or with
 `TM_COCOA_FOCUS=1` (`0` turns them off), and are skipped otherwise. A case in
 which TeXmacs says it is not active is skipped, except on GitHub Actions, where
 it fails; a crash always fails. It also fails on any other error
