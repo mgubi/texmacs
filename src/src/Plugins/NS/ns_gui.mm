@@ -1748,6 +1748,11 @@ void gui_open (int& argc, char** argv)
     [d registerDefaults: @{ @"NSTreatUnknownArgumentsAsOpen": @NO,
                             @"NSQuitAlwaysKeepsWindows": @NO,
                             @"ApplePersistenceIgnoreState": @YES }];
+    // TEXMACS_NS_SCROLLERS=always: for the tests, the scroll bars which are
+    // always shown (System Settings), for this process only
+    if (get_env ("TEXMACS_NS_SCROLLERS") == "always")
+      [d setVolatileDomain: @{ @"AppleShowScrollBars": @"Always" }
+                   forName: NSArgumentDomain];
     if (![NSApp mainMenu]) make_main_menu ();
     static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
     [NSApp setDelegate: delegate];

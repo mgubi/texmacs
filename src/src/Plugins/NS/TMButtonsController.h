@@ -50,8 +50,9 @@
 /*! The columns: their view, its width (0 when there is none), and their
  layout once the view has its frame */
 - (NSView*) sideBar;
-- (CGFloat) sideWidth;
+- (CGFloat) sideWidth:(CGFloat) height;
 - (void) layoutSide;
+- (void) printSide;
 /*! A row of buttons made from a menu, for a bar of another view (the
  interactive footer): not placed in the bar of the controller, which keeps
  the menu while the row is in use */

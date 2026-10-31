@@ -24,12 +24,34 @@ have the details, and the problems go to the
   (`gs`), which TeXmacs needs to show EPS images, is not installed; before,
   each plot showed as a question mark. The documentation of the Gnuplot and
   Maxima plug-ins says that their plots need Ghostscript (#662).
+- **Structured merge of documents** (desktop): the style packages and
+  the settings of the document (initial environment) of the other side
+  are no longer lost, in *Resolve conflict* and in the Git merge driver (a
+  setting changed on both sides keeps Git's ours, and the message says
+  which);
+  in a folder which is not trusted, *Merge documents structurally* says
+  that nothing was installed instead of reporting success; while
+  resolving a conflict, Version › Retain offers *Keep my version* and
+  *Keep their version* instead of Old and New version, which keep your
+  version also during a rebase, where Git swaps ours and theirs (#676).
+- **Cocoa: the scroller of the icon bars in two columns** (desktop, Cocoa
+  interface): when the scroll bars are always shown (System Settings) and the
+  columns at the left or the right of the document are taller than the
+  window, the bar widens by the width of the scroller, which no longer
+  covers the last column (#683).
 - **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
   these colors of the program were transparent. A text with an unknown color
   name was invisible, on the screen and in a PDF: it is black now, as in Qt;
   the unknown colors of graphics are black too, and the informative flags
   in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
   (#656).
+- **The menu Focus in source files** (desktop and browser): in a `.cpp`, a
+  `.py`, a `.scm`, a `.json`... it now has the entries for program code
+  (Definitions, Outline, Go to definition, Folds, the syntax and server
+  entries), as in a code block. The definitions of a large file are found
+  much faster (6666 functions: 40 ms instead of 2.7 s, also for the page
+  Outline and Go to definition); the submenu Definitions shows the first 500
+  of them, then All definitions, which opens the page Outline (#698).
 - **The menu Focus in code blocks** (desktop and browser): its entries for
   program code (Definitions, Outline, Go to definition, Folds, the syntax
   and server entries) are back; they were lost at each start, and TeXmacs
@@ -43,6 +65,18 @@ have the details, and the problems go to the
   also in Replace one, which stays one step of undo (#591); a pattern made
   only of a wildcard no longer leaves "Match left" on a theorem or a table
   cell alone in its paragraph (#589).
+- **Replace All next to blocks** (desktop): Replace All always ends, also
+  on a document of empty paragraphs which a pattern of empty paragraphs
+  matches, and a match next to a block (a theorem, a table) which the
+  replacement keeps is replaced instead of left (#687).
+- **A change of style in every view** (desktop): a package added by the
+  document itself (natbib for a bibliography) reaches all the views of the
+  buffer, not only the current one (#535).
+- **A `raw-data` tag without arguments** (desktop): saving a document with
+  it no longer crashes TeXmacs (#685).
+- **Hyphenation of Bulgarian, Russian and Ukrainian** (desktop and
+  browser): the decoding of the hyphenation patterns stops at the end of
+  its string, instead of reading past it (#686).
 - **A tag named `string`** (desktop): a tag or macro named `string` works
   like any other; it no longer gives random content or crashes when a
   document with it is loaded (#678).

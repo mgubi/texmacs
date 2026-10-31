@@ -29,6 +29,9 @@
 #            sizes given to AppKit are replaced, with one warning on
 #            debug-aqua for each place in all, and the dialogs are shown
 #            (#621, #650, #666)
+#   columns  the icon bars in two columns, taller than the window, with the
+#            scroll bars which are always shown: the scroller is beside the
+#            last column, not over it (#683)
 #   raise    an error thrown in an entry point from AppKit (a command of
 #            the interface run by the update of -[TMDocView scrolled:]) is
 #            reported once, and TeXmacs goes on: later commands and updates
@@ -208,6 +211,29 @@ sizes_ok () {
   done
 }
 verdict sizes "negative sizes of dialogs: one warning for each place (#650)" sizes_ok
+
+# (columns) TEXMACS_NS_SCROLLERS: the setting of the system for this process
+# only. In a low window the side bar widens by the scroller, which is at the
+# right of the columns; in a high one there is no scroller and no extra room.
+# Both in the same window: the Welcome of the new home may come in front after
+# the first step (the steps follow the window of the last resize)
+export TEXMACS_NS_BARS=left TEXMACS_NS_SCROLLERS=always
+run columns "" "resize:800,300;side-bars;resize:800,1000;side-bars" '(display "")'
+unset TEXMACS_NS_BARS TEXMACS_NS_SCROLLERS
+columns_ok () {
+  lines=$(grep -a 'NSTEST side-bars' "$out/columns.log")
+  fail="no legacy scroller shown in the low window: $lines"
+  low=$(echo "$lines" | sed -n 1p)
+  case "$low" in *"style legacy"*"scroller shown"*) ;; *) return 1 ;; esac
+  high=$(echo "$lines" | sed -n 2p)
+  case "$high" in *"scroller hidden"*) ;; *) fail="a scroller in the high window: $lines"; return 1 ;; esac
+  fail="the scroller is over the columns: $low"
+  echo "$low" | awk '{ for (i = 1; i < NF; i++) { if ($i == "rows-right") r = $(i+1); if ($i == "shown") x = $(i+1) } exit !(r > 0 && x >= r) }' || return 1
+  fail="the scroller takes no room: $lines"
+  [ "$(echo "$low" | sed 's/.*pane \([0-9]*\)x.*/\1/')" -gt "$(echo "$high" | sed 's/.*pane \([0-9]*\)x.*/\1/')" ]
+}
+verdict columns "the scroller of the icon bars in columns is beside them (#683)" columns_ok
+grep -a 'NSTEST \(side-bars\|columns of\)' "$out/columns.log" | sed 's/^/         /'
 
 # (raise) a command of the interface which throws a C++ error (cpp-error),
 # run by the update which -[TMDocView scrolled:] forces: the error is

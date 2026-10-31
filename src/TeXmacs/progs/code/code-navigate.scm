@@ -48,10 +48,28 @@
 (define (entry-label e)
   (string-append (caddr e) " (" (cadr e) ")"))
 
+;; A menu with thousands of items takes seconds to make, and nobody can read
+;; it: the page of the outline has them all.
+(define definitions-menu-max 500)
+
+(tm-define (code-definitions-menu-items)
+  (:synopsis "The entries of the menu Definitions, then 'all if some are left out")
+  (with l (code-outline-entries)
+    (if (> (length l) definitions-menu-max)
+        (rcons (list-head l definitions-menu-max) 'all)
+        l)))
+
 (tm-menu (code-definitions-menu)
-  (for (e (code-outline-entries))
-    ((eval (string-append (make-string (* 2 (car e)) #\space) (entry-label e)))
-     (go-to (list-ref e 4)))))
+  ;; NOTE: a menu is made with its parent, also behind a ->, but its for is
+  ;; only evaluated when it opens: the outline, which may take a while, must
+  ;; stay inside it
+  (for (e (code-definitions-menu-items))
+    (assuming (== e 'all)
+      ---
+      ("All definitions" (code-outline)))
+    (assuming (!= e 'all)
+      ((eval (string-append (make-string (* 2 (car e)) #\space) (entry-label e)))
+       (go-to (list-ref e 4))))))
 
 (define outline-buffer #f)      ; the buffer whose outline is on the page
 (define outline-refresh? #f)

@@ -89,8 +89,11 @@ its left (the preference "icon bars", General tab, followed at once as in
 Vue; `TEXMACS_NS_BARS=top|left` overrides it): the rows of
 `TMButtonsController` are turned around (`setSide:`, `orient:vertical:`),
 their separators become horizontal, their menus open to the right, and the
-columns scroll when they are too long; the focus and user bars stay above
-the document, at the right of the columns.
+columns scroll when they are too long (a legacy scroller, when the system
+always shows the scroll bars, widens them: `sideWidth:`;
+`TEXMACS_NS_SCROLLERS=always` gives that setting to the process, for the
+tests); the focus and user bars stay above the document, at the right of the
+columns.
 
 The responsive tabs follow the preference "gui:responsive tab mode", read
 when they are made, as in Vue (`responsive_tab_mode` in `ns_widget.mm`;

@@ -1397,6 +1397,87 @@
         (buffer-close b)))
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; The style belongs to the buffer too (#535): a change of the style made
+;; in one view (set-style-tree, add-style-package, remove-style-package) is
+;; in its other views, in buffer-get and in the saved file, and in a view
+;; made after it; the buffer stays modified until it is saved.
+(define (style-of doc)
+  ;; the style of @doc (a document as an stree), or #f
+  (with st (doc-part doc 'style)
+    (and st (pair? (cdr st)) (cadr st))))
+
+(define (test-views-style)
+  (check-group "style in the views of a buffer")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (f (tmp-file* "views-style.tm")))
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 f "texmacs")
+    (with r (check-run
+             (lambda ()
+               (load-buffer f)
+               (update-forced)
+               (with v1 (current-view-url)
+                 (switch-to-buffer f)
+                 (with v2 (current-view-url)
+                   (check= (length (buffer->views f)) 2)
+                   (check-false (== v1 v2))
+                   ;; a style set in the second view reaches the first one
+                   (edit (set-style-tree (stree->tree
+                                          '(tuple "article" "number-us"))))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (tree->stree (get-style-tree))
+                           '(tuple "article" "number-us"))
+                   (check= (style-of (tree->stree (buffer-get f)))
+                           '(tuple "article" "number-us"))
+                   (check= (tree->stree (buffer-get-style f))
+                           '(tuple "article" "number-us"))
+                   ;; and the file saved from the first view has it
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (style-of (tree->stree (tree-import f "texmacs")))
+                           '(tuple "article" "number-us"))
+                   ;; a package added in the first view, after the save, is
+                   ;; in the second view and saved from it
+                   (edit (add-style-package "comment"))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v2)
+                   (check= (get-style-list)
+                           '("article" "number-us" "comment"))
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (style-of (tree->stree (tree-import f "texmacs")))
+                           '(tuple "article" "number-us"
+                                   "comment"))
+                   ;; a package removed in the second view
+                   (edit (remove-style-package "number-us"))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-style-list)
+                           '("article" "comment"))
+                   ;; a view made after the changes has them
+                   (with v3 (view-new f)
+                     (window-set-view (current-window) v3 #t)
+                     (check= (current-view-url) v3)
+                     (check= (get-style-list)
+                             '("article" "comment")))
+                   (buffer-save f)
+                   (check= (style-of (tree->stree (tree-import f "texmacs")))
+                           '(tuple "article" "comment"))))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (for (b (buffer-list))
+      (when (nin? b before)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 (define (test-export)
   (check-group "export")
   (with-buffer-body saved-doc
@@ -1480,6 +1561,7 @@
   (test-save)
   (test-save-as-window)
   (test-views-init)
+  (test-views-style)
   (test-export)
   (test-copy-as-text)
   (remove-tmp-files)
