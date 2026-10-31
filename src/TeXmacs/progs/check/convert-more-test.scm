@@ -2144,11 +2144,20 @@
       (check-image-file (system->url first))
       (check-true (url-descends? (system->url first) (url-temp-dir)))
       (check-false (== first second))
-      (check-true (string-starts? second (url->unix (url-temp-dir))))
+      ;; a name which LaTeX can read on Windows too: a drive and slashes
+      (check-true (string-starts? second (image-name-for-latex (url-temp-dir))))
+      (check-false (has-text? "\\" second))
       (export sample "html-snippet")
       (check= (length (folder-files dir)) before))
     (buffer-close doc)
     (when (buffer-exists? old) (switch-to-buffer old)))
+  (check-group "the name of an image in LaTeX stays as it is")
+  ;; a space, a letter which is not ASCII, an underscore: no escapes, no break
+  (with name (string-append "/some/long/folder with a space/and_an_underscore/"
+                            "and a long name so that the line must be broken/"
+                            "h\xc3\xa9/image-1.pdf")
+    (check= (serialize-latex `(includegraphics (!file-name ,name)))
+            (string-append "\\includegraphics{" name "}")))
   (check-group "conversion for MathJax: the images are temporary")
   (let* ((formula `(document (math (concat "x+" (graphics ""
                                                   (point "0" "0")

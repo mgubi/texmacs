@@ -212,13 +212,18 @@
          (folder-writable? dir)
          dir)))
 
+(tm-define (image-name-for-latex u)
+  ;; the absolute name of @u for a program, with slashes on Windows too, where
+  ;; LaTeX wants them; url->unix would drop the colon of the drive (/D/a/b)
+  (string-replace (url->system u) "\\" "/"))
+
 (define (clipboard-image-names key suffix)
   (let* ((dir (document-folder))
          (folder (or dir (string->url "$TEXMACS_HOME_PATH/system/images")))
          (id (list 'tuple (url->string (current-buffer)) key))
          (name (string-append "image-" (tree-hash (tm->tree id)) suffix))
          (u (url-append folder name))
-         (s (if dir name (url->unix u))))
+         (s (if dir name (image-name-for-latex u))))
     (when (not (url-exists? folder)) (system-mkdir folder))
     (set-message `(concat "Image of the copy: " (verbatim ,(url->system u)))
                  "Copy")
@@ -239,7 +244,7 @@
                                            suffix))
           (if (url-exists? u)
               (loose-image-names key suffix)
-              (values u (url->unix u)))))))
+              (values u (image-name-for-latex u)))))))
 
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))

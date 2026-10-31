@@ -339,6 +339,10 @@
 (define (texout-invariant x)
   (output-invariant x))
 
+(define (texout-file-name x)
+  ;; as it is, on one line, whatever its spaces and its letters
+  (output-verbatim x))
+
 (define (texout-group x)
   (output-tex "{")
   (texout x)
@@ -476,6 +480,7 @@
         ((== (car x) '!verbatim) (texout-verbatim (cadr x)))
         ((== (car x) '!verbatim*) (texout-verbatim* (cadr x)))
         ((== (car x) '!invariant) (texout-invariant (cadr x)))
+        ((== (car x) '!file-name) (texout-file-name (cadr x)))
         ((== (car x) '!arg) (texout-arg (cadr x)))
         ((== (car x) '!group) (texout-group (cons '!append (cdr x))))
         ((== (car x) '!marker) (texout-marker (cadr x) (caddr x)))
