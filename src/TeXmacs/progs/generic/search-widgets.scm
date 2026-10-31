@@ -178,17 +178,45 @@
 
 (define (show-hidden-at-cursor)
   ;; show the hidden content which holds the cursor (cursor-show-hidden):
-  ;; a step of undo of its own, or a part of the step of Replace. It only
-  ;; changes the labels of tags, not the paths: the hits, the reference
-  ;; and the selection are kept
+  ;; a step of undo of its own, or a part of the step of Replace (in a
+  ;; read-only document, as before: the end of a step of undo would cancel
+  ;; it). The change cancels the hits, the reference and the selection of
+  ;; the editor. It mostly changes the labels of tags, but not always (a
+  ;; switch may wrap a branch, a part may move the cursor): if the tags
+  ;; around the cursor kept their paths, the hits, the reference and the
+  ;; selection are set again as they were; else the reference and the
+  ;; selection are followed through the change, and the search which
+  ;; go-to* schedules finds the hits again
   (let* ((alt (get-alt-selection "alternate"))
-         (ref (get-alt-selection "search-reference"))
-         (sel (and (selection-active-any?)
-                   (list (selection-get-start) (selection-get-end)))))
-    (if editing? (cursor-show-hidden) (with-editing cursor-show-hidden))
-    (when (nnull? alt) (set-alt-selection "alternate" alt))
-    (when (nnull? ref) (set-alt-selection "search-reference" ref))
-    (when sel (selection-set-range-set sel))))
+         (sel (if (selection-active-any?)
+                  (list (selection-get-start) (selection-get-end))
+                  (list)))
+         (follow (lambda (l) (map position-new-path l)))
+         (ref0 (get-alt-selection "search-reference"))
+         (ref-pos (follow ref0))
+         (sel-pos (follow sel))
+         (tags (map (lambda (u) (cons u (tree->path u)))
+                    (tags-around (cursor-path))))
+         (back (lambda (l)
+                 (map (lambda (o) (with p (position-get o) (position-delete o) p))
+                      l))))
+    (cond ((buffer-read-only? (current-buffer)) (cursor-show-hidden))
+          (editing? (cursor-show-hidden))
+          (else (with-editing cursor-show-hidden)))
+    (let* ((same? (list-and (map (lambda (x)
+                                   (== (tree->path (car x)) (cdr x)))
+                                 tags)))
+           (ref* (back ref-pos))
+           (sel* (back sel-pos))
+           ;; (the paths as they were if the tags around kept theirs: a
+           ;; position followed by an observer may go into a tag next to
+           ;; it, whose border has no cursor position)
+           (ref (if same? ref0 ref*))
+           (sel (if same? sel sel*)))
+      (when (and (nnull? alt) same?)
+        (set-alt-selection "alternate" alt))
+      (when (nnull? ref) (set-alt-selection "search-reference" ref))
+      (when (nnull? sel) (selection-set-range-set sel)))))
 
 (define (go-to* p)
   (go-to p)
@@ -690,14 +718,19 @@
 
 (tm-define (replace-one)
   (and-with by (by-tree)
-    (with-buffer (master-buffer)
-      (with what (search-tree)
-        (and-with sel (current-hit (get-search-reference #t) what)
-          (with-editing
-            (lambda ()
-              (replace-step sel by what)
-              (go-to* (cursor-path)))))))
-    (perform-search*)
+    (with done?
+        (with-buffer (master-buffer)
+          (with what (search-tree)
+            (and-with sel (current-hit (get-search-reference #t) what)
+              ;; (one step of undo, also when the search shows the next
+              ;; hit, in hidden content)
+              (with-editing
+                (lambda ()
+                  (replace-step sel by what)
+                  (go-to* (cursor-path))
+                  (perform-search*)
+                  #t)))))
+      (when (not done?) (perform-search*)))
     ;; the match which the next Replace replaces, not the whole hit (none:
     ;; nothing left to replace)
     (with-buffer (master-buffer)
@@ -1154,7 +1187,9 @@
   (when toolbar-db-active?
     (db-show-toolbar))
   (when (and (not (cursor-accessible?)) (not (in-source?)))
-    (with-editing cursor-show-hidden)))
+    (if (buffer-read-only? (current-buffer))
+        (cursor-show-hidden)
+        (with-editing cursor-show-hidden))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Replace toolbar

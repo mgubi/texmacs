@@ -2591,24 +2591,33 @@
 ;; search, changed the document outside the history of undo, and cancelled
 ;; the hits and the reference of the search: Replace one did not go on
 ;; after its replacement (#591)
-(define (search-in-buffer doc what)
+(define (search-in-buffer doc what . read-only?)
   ;; the real search of the widget (perform-search*) in a buffer holding
-  ;; doc, in source mode if test-source-mode?: the body afterwards, the
-  ;; number of steps of undo, the body after one undo, and whether the hits
-  ;; and the reference of the search are still there after the search
+  ;; doc, in source mode if test-source-mode? (read-only if read-only?):
+  ;; the body afterwards, the number of steps of undo, the body after one
+  ;; undo, whether the hits and the reference of the search are still there
+  ;; after the search, and the selected hit (relative to the buffer)
   (with-search-buffers doc what ""
     (lambda (u)
       (ahash-set! (widget 'search-filter-table)
                   (current-buffer) (stree->tree '(attr)))
       (when test-source-mode? (init-env "mode" "src"))
       (clear-undo-history)
+      (when (and (pair? read-only?) (car read-only?))
+        (buffer-set-read-only u #t))
       ((widget 'perform-search*))
       (let* ((res (tm->stree (buffer-get-body u)))
              (n (undo-possibilities))
              (kept? (and (nnull? (get-alt-selection "alternate"))
-                         (nnull? (get-alt-selection "search-reference")))))
+                         (nnull? (get-alt-selection "search-reference"))))
+             (k (length (tree->path (buffer-tree))))
+             (sel (if (selection-active-any?)
+                      (list (list-tail (selection-get-start) k)
+                            (list-tail (selection-get-end) k))
+                      (list))))
+        (buffer-set-read-only u #f)
         (undo 0)
-        (list res n (tm->stree (buffer-get-body u)) kept?)))))
+        (list res n (tm->stree (buffer-get-body u)) kept? sel)))))
 
 (define (test-replace-next-to-hidden)
   (check-group "replace next to hidden content")
@@ -2636,6 +2645,21 @@
           ;; (as before)
           ((document (concat "a1x" (strong "b"))) "a1x" "Z"
            (document (concat "Z" (strong "b"))))))
+      ;; Replace one, which shows the next hit, is one step of undo
+      (check= (with-search-buffers '(document (concat "a1x" (hidden "a2x")))
+                '(concat "a" (wildcard "w") "x") "Z"
+                (lambda (u)
+                  (ahash-set! (widget 'search-filter-table)
+                              (current-buffer) (stree->tree '(attr)))
+                  (clear-undo-history)
+                  ((widget 'perform-search*))
+                  (replace-one)
+                  (let* ((res (tm->stree (buffer-get-body u)))
+                         (n (undo-possibilities)))
+                    (undo 0)
+                    (list res n (tm->stree (buffer-get-body u))))))
+              '((document (concat "Z" (shown "a2x"))) 1
+                (document (concat "a1x" (hidden "a2x")))))
       ;; Replace one shows the next hit, Replace All only where it ends
       (with doc '(document (concat "a1x" (hidden "a2x") "a3x"))
         (check= (replace-one-repeatedly doc '(concat "a" (wildcard "w") "x")
@@ -2651,19 +2675,26 @@
       (check= (search-in-buffer '(document (concat "x " (hidden "a2x")))
                                 "a2x")
               '((document (concat "x " (shown "a2x"))) 1
-                (document (concat "x " (hidden "a2x"))) #t))
+                (document (concat "x " (hidden "a2x"))) #t ((0 1 0 0) (0 1 0 3))))
+      ;; in a read-only document, shown as before (the end of a step of
+      ;; undo would cancel it), and without a step of undo
+      (check= (search-in-buffer '(document (concat "x " (hidden "a2x")))
+                                "a2x" #t)
+              '((document (concat "x " (shown "a2x"))) 0
+                (document (concat "x " (shown "a2x"))) #t ((0 1 0 0) (0 1 0 3))))
       (with-test-source-mode
         (lambda ()
           (check= (search-in-buffer '(document (concat (folded "q" "a2x")
                                                        "a3x"))
                                     "a2x")
                   '((document (concat (unfolded "q" "a2x") "a3x")) 1
-                    (document (concat (folded "q" "a2x") "a3x")) #t))))
+                    (document (concat (folded "q" "a2x") "a3x")) #t
+                    ((0 0 1 0) (0 0 1 3))))))
       ;; (nothing to show: nothing changes)
       (check= (search-in-buffer '(document (concat "x " (strong "a2x")))
                                 "a2x")
               '((document (concat "x " (strong "a2x"))) 0
-                (document (concat "x " (strong "a2x"))) #t)))))
+                (document (concat "x " (strong "a2x"))) #t ((0 1 0 0) (0 1 0 3)))))))
 
 ;; Replace one, then Replace All: Replace All goes on after the replacement,
 ;; as Replace one does; it took the hit which ends there, and replaced in
