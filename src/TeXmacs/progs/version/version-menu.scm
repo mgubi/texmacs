@@ -241,6 +241,20 @@
 (define (git-history-document?)
   (and (git-document?) (not (git-state? 'untracked 'added))))
 
+(define (resolving-conflict?)
+  ;; In a document with a merge conflict, the old version is ours and the
+  ;; new one theirs (see git-resolve-conflict)
+  (and (git-document?) (git-state? 'conflicted)))
+
+(menu-bind version-retain-menu
+  ("Current version" (version-retain 'current))
+  (assuming (resolving-conflict?)
+    ("Keep my version" (version-retain 0))
+    ("Keep their version" (version-retain 1)))
+  (assuming (not (resolving-conflict?))
+    ("Old version" (version-retain 0))
+    ("New version" (version-retain 1))))
+
 (menu-bind version-differences-menu
   (when (version-has-differences?)
     ("First difference" (version-first-difference))
@@ -251,12 +265,13 @@
   (when (or (inside-version?) (selection-active-any?))
     (-> "Show"
 	("Both versions" (version-show 'version-both))
-	("Old version" (version-show 'version-old))
-	("New version" (version-show 'version-new)))
-    (-> "Retain"
-	("Current version" (version-retain 'current))
-	("Old version" (version-retain 0))
-	("New version" (version-retain 1))))
+        (assuming (resolving-conflict?)
+          ("My version" (version-show 'version-old))
+          ("Their version" (version-show 'version-new)))
+        (assuming (not (resolving-conflict?))
+          ("Old version" (version-show 'version-old))
+          ("New version" (version-show 'version-new))))
+    (-> "Retain" (link version-retain-menu)))
   (-> "Grain"
       ("Detailed" (version-set-grain "detailed"))
       ("Block" (version-set-grain "block"))
@@ -286,10 +301,7 @@
   (assuming (inside-version?)
     ("Previous difference" (version-previous-difference))
     ("Next difference" (version-next-difference))
-    (-> "Retain"
-	("Current version" (version-retain 'current))
-	("Old version" (version-retain 0))
-	("New version" (version-retain 1)))
+    (-> "Retain" (link version-retain-menu))
     ---)
   ;; Conflicts come first, since they have to be resolved
   (assuming (and (git-document?) (git-state? 'conflicted))

@@ -249,7 +249,11 @@ mode** reduces the menus to:
 3. shows the remaining **real conflicts** with the usual comparison
    markup: old (red) is yours, new (green) is theirs. You step through
    them with the Version menu or the shortcuts, retaining one side each
-   time;
+   time (**Version → Retain → Keep my version / Keep their version**);
+   the style packages are merged as a set and the initial environment
+   (the settings of the Document menu) key by key; a change of the same
+   setting, or of the main style, on both sides keeps yours and counts as
+   a conflict;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 
@@ -261,6 +265,8 @@ Examples:
 | A. / B. / C. | A**!** / B. / C. | A. / B. / C**!** | A! / B. / C! |
 | (section Intro) Text. | (section Introduction) Text. | (section Intro) Text, more. | (section Introduction) Text, more. |
 | Let *x+y* be. | Let *x+z* be. | Let *x+y* be given. | Let *x+z* be given. |
+| A. / B. / C. / D. | A. / C. / D. | A. / B. / C**2**. / D. | A. / C2. / D. (one side deleted B., the other changed C.) |
+| A. / (theorem T.) / C. | A. / (theorem T.) / C**2**. | A. / (theorem **label** T.) / **(todo x)** / C. | A. / (theorem label T.) / (todo x) / C2. |
 | The quick fox. | The slow fox. | The lazy fox. | The ⟨slow\|lazy⟩ fox, with one conflict to resolve |
 
 If the document was deleted on one side, you are told to edit it by hand.
@@ -284,7 +290,9 @@ documents structurally, which takes about a second per document. Any
 remaining conflicts are written into the file as TeXmacs difference
 markup instead of `<<<<<<<` text markers, so the document still opens
 and can be resolved in TeXmacs. Collaborators who have not installed the
-driver get git's usual text merge.
+driver get git's usual text merge. The driver merges the preamble (style
+packages, initial environment) like *Resolve conflict*. In a folder which
+is not trusted, nothing is configured and the message says so.
 
 ---
 
@@ -331,6 +339,7 @@ and the snapshot functions in `git-blame.scm` and `git-project.scm`.)
 | `(async-evaluate-system argv input callback)` → id | C++ glue | Runs a command without a shell in the background; `callback` receives `(code stdout stderr)`. |
 | `(async-evaluate-cancel id)` | C++ glue | Terminates such a command and its process group. |
 | `(merge-versions base ours theirs)`, `(merge-conflicts t)` | `version-merge.scm` | Structured 3-way merge of strees. |
+| `(merge-documents base ours theirs)` | `version-merge.scm` | 3-way merge of complete documents (body, style packages, initial environment): `(document . conflicts)`. |
 | `(version-match l1 l2)` | `version-merge.scm` | Longest common subsequence of two lists, as a vector of matching indices. |
 | `(version-normalize t)`, `(version-denormalize t)` | `version-compare.scm` | Public wrappers around the comparison helpers. |
 | `(version-notify-saved name)` | `tm-files.scm` | Hook called after a document is saved. |

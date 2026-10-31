@@ -51,8 +51,16 @@
     window shows the number of conflicts; its buttons <menu|Previous> and
     <menu|Next> go from one conflict to the other, the buttons <menu|Mine>
     and <menu|Theirs> after <menu|Keep> retain one of the two versions, and
-    those after <menu|Show> choose which versions are displayed. You may of course also edit the
-    text of the conflict directly.
+    those after <menu|Show> choose which versions are displayed; the same
+    commands are in the menus <menu|Version|Retain> (<menu|Keep my version>
+    and <menu|Keep their version>) and <menu|Version|Differences|Show>. You
+    may of course also edit the text of the conflict directly.
+
+    Besides the text, the style packages and the settings of the document
+    (<menu|Document> menu) are merged as well: a package or a setting added,
+    changed or removed on one side only is taken over. When the same
+    setting or the main style was changed differently on both sides, your
+    version is kept, and this counts as a conflict.
 
     <item*|<menu|Mark as resolved>>Save the document and tell <name|Git>
     that its conflicts are resolved. If some differences were not processed
@@ -86,7 +94,9 @@
   with the extension <verbatim|.tm> should be merged by <TeXmacs>, and it
   configures your copy of the repository accordingly. The conflicts which
   remain are then written into the documents as differences which
-  <TeXmacs> can display, instead of text markers. If the structured merge
+  <TeXmacs> can display, instead of text markers. This needs a repository
+  in which <TeXmacs> may run <name|Git> (see <menu|Version|Use Git in this
+  folder>); otherwise nothing is configured, and the message says why. If the structured merge
   fails, then the usual text merge of <name|Git> is used instead.
 
   The file <verbatim|.gitattributes> can be committed, but each coauthor

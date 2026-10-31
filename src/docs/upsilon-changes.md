@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Structured merge of documents** (desktop): changes of the two sides
+  in nearby paragraphs (one side deletes a paragraph, the other changes
+  the next one; a label and a new paragraph on one side, a change just
+  after on the other) merge without conflict; the style packages and the
+  settings of the document (initial environment) of the other side are no
+  longer lost, in *Resolve conflict* and in the Git merge driver; in a
+  folder which is not trusted, *Merge documents structurally* says that
+  nothing was installed instead of reporting success; while resolving a
+  conflict, Version › Retain offers *Keep my version* and *Keep their
+  version* instead of Old and New version (#676).
 - **Search and Replace next to hidden content** (desktop): a replacement
   next to a hidden (folded) tag stays in its place instead of going inside
   the tag (#590); going to a hit inside hidden content shows it in a step

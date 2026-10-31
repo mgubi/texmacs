@@ -42,13 +42,13 @@
   (let* ((o (load-document base))
          (a (load-document ours))
          (b (load-document theirs)))
+    ;; NOTE: the preamble is merged too: the style packages, the initial
+    ;; environment (#676)
     (and o a b
-         (let* ((m (merge-versions (document-body o) (document-body a)
-                                   (document-body b)))
-                (doc (document-set-body a m)))
-           (and (not (tree-export (stree->tree doc) (driver-url ours)
+         (with r (merge-documents o a b)
+           (and (not (tree-export (stree->tree (car r)) (driver-url ours)
                                   "texmacs"))
-                (merge-conflicts m))))))
+                (cdr r))))))
 
 (tm-define (git-textual-merge base ours theirs)
   ;; When the structured merge fails (e.g. for a document which cannot be
@@ -142,20 +142,36 @@
          (and (url-exists? f)
               (in? attributes-line (git-split (string-load f) "\n"))))))
 
-(tm-define (git-install-merge-driver root)
+(tm-define (git-install-merge-driver-now root)
   (:synopsis "Make Git merge TeXmacs documents in @root with TeXmacs")
+  ;; Returns (ok? . message).  Nothing is installed when Git refuses to
+  ;; run, for instance in a folder which is not trusted (#676)
   ;; NOTE: the driver itself is configured locally, since it depends on
   ;; the installation; .gitattributes can be shared with collaborators,
   ;; for whom Git falls back to its textual merge
-  (git-run root "config" "merge.texmacs.name" "TeXmacs structured merge")
-  (git-run root "config" "merge.texmacs.driver" (git-merge-driver-command))
-  (let* ((f (attributes-file root))
-         (s (if (url-exists? f) (string-load f) "")))
-    (when (nin? attributes-line (git-split s "\n"))
-      (string-save (string-append s
-                                  (if (or (== s "") (string-ends? s "\n"))
-                                      "" "\n")
-                                  attributes-line "\n")
-                   f)))
-  (git-invalidate root)
-  (set-message "TeXmacs documents will be merged structurally" "Git"))
+  (let* ((r1 (git-run root "config" "merge.texmacs.name"
+                      "TeXmacs structured merge"))
+         (r2 (if (git-ok? r1)
+                 (git-run root "config" "merge.texmacs.driver"
+                          (git-merge-driver-command))
+                 r1)))
+    (if (not (git-ok? r2))
+        (cons #f (with msg (git-message r2)
+                   (if (== msg "") "Git could not be configured" msg)))
+        (let* ((f (attributes-file root))
+               (s (if (url-exists? f) (string-load f) "")))
+          (when (nin? attributes-line (git-split s "\n"))
+            (string-save (string-append s
+                                        (if (or (== s "")
+                                                (string-ends? s "\n"))
+                                            "" "\n")
+                                        attributes-line "\n")
+                         f))
+          (git-invalidate root)
+          (cons #t "TeXmacs documents will be merged structurally")))))
+
+(tm-define (git-install-merge-driver root)
+  (:synopsis "Make Git merge TeXmacs documents in @root with TeXmacs")
+  (with r (git-install-merge-driver-now root)
+    (set-message (cdr r) "Git")
+    (car r)))

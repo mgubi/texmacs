@@ -380,28 +380,30 @@
 (define (version-markup? t)
   (tree-in? t '(version-old version-new version-both)))
 
-(define (revision-body name rev)
-  ;; Body of the document @name at the revision @rev, or #f
+(define (revision-document name rev)
+  ;; The complete document @name at the revision @rev (an stree), or #f
   (and (!= (version-revision name rev) "")
-       (document-body
-        (tree->stree (tree-import (string->url (version-revision-url name rev))
-                                  "texmacs")))))
+       (with doc (tree->stree
+                  (tree-import (string->url (version-revision-url name rev))
+                               "texmacs"))
+         (and (document-body doc) doc))))
 
 (define (resolve-message n)
   (if (== n 0)
       "Merged automatically; check the result, then mark as resolved"
-      (string-append (number->string n) " conflicting changes; old: ours, "
-                     "new: theirs. Retain the right versions, "
+      (string-append (number->string n) " conflicting changes: keep my "
+                     "version or their version of each, "
                      "then mark as resolved")))
 
 (tm-define (git-resolve-conflict name)
   (:synopsis "Merge our and their versions of the conflicting file @name")
   (:interactive #t)
-  ;; The changes made on only one side are merged automatically; the
-  ;; others are shown as differences, with our version as the old one
-  (let* ((base (revision-body name "BASE"))
-         (ours (revision-body name "OURS"))
-         (theirs (revision-body name "THEIRS")))
+  ;; The changes made on only one side are merged automatically, also in
+  ;; the preamble; the others are shown as differences, with our version
+  ;; as the old one
+  (let* ((base (revision-document name "BASE"))
+         (ours (revision-document name "OURS"))
+         (theirs (revision-document name "THEIRS")))
     (cond ((and (buffer-exists? name) (buffer-modified? name))
            (set-message "Please save or revert the document first"
                         "Resolve conflict"))
@@ -412,21 +414,21 @@
           (else
             (when (!= (url->url name) (url->url (current-buffer)))
               (load-buffer name))
-            (buffer-set name (tree-import (string->url
-                                           (version-revision-url name "OURS"))
-                                          "texmacs"))
             (if base
-                (begin
-                  (tree-set (buffer-tree)
-                            (stree->tree (merge-versions base ours theirs)))
+                (with r (merge-documents base ours theirs)
+                  (buffer-set name (stree->tree (car r)))
                   (version-first-difference)
-                  (version-review-open))
-                (compare-with-newer (string->url
-                                     (version-revision-url name "THEIRS"))))
-            (set-message (resolve-message
-                          (length (tree-search (buffer-tree)
-                                               version-markup?)))
-                         "Resolve conflict")))))
+                  (version-review-open)
+                  ;; NOTE: the conflicts of the preamble keep our version
+                  (set-message (resolve-message (cdr r)) "Resolve conflict"))
+                (begin
+                  (buffer-set name (stree->tree ours))
+                  (compare-with-newer (string->url
+                                       (version-revision-url name "THEIRS")))
+                  (set-message (resolve-message
+                                (length (tree-search (buffer-tree)
+                                                     version-markup?)))
+                               "Resolve conflict")))))))
 
 (tm-define (git-mark-resolved-now name)
   (when (or (not (buffer-exists? name)) (git-save-buffer name))

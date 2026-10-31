@@ -96,6 +96,62 @@
   (let loop ((i (- end 1)) (acc '()))
     (if (< i start) acc (loop (- i 1) (cons (vector-ref v i) acc)))))
 
+(define (chunk-alignment o x)
+  ;; How one side changed the chunk @o of the ancestor into its chunk @x:
+  ;; a vector which tells for each element of @o whether it is kept, and a
+  ;; vector with the elements inserted before each element of @o (the last
+  ;; entry: those inserted at the end).  The elements which replace removed
+  ;; ones are inserted before the first of them.
+  (let* ((vo (list->vector o))
+         (vx (list->vector x))
+         (m (lcs-match vo vx))
+         (n (vector-length vo))
+         (kept (make-vector n #f))
+         (ins (make-vector (+ n 1) '())))
+    (let loop ((i 0) (j 0) (g 0))
+      (cond ((>= i n)
+             (vector-set! ins g (subvector->list vx j (vector-length vx))))
+            ((vector-ref m i)
+             (with k (vector-ref m i)
+               (vector-set! ins g (subvector->list vx j k))
+               (vector-set! kept i #t)
+               (loop (+ i 1) (+ k 1) (+ i 1))))
+            (else (loop (+ i 1) j g))))
+    (cons kept ins)))
+
+(define (merge-chunk-elements o a b)
+  ;; Merge the chunks element by element of the ancestor, or #f when the
+  ;; two sides conflict: when they insert different elements at the same
+  ;; place, or when they both remove an element next to which one of them
+  ;; inserts others (a change against a removal).  Otherwise, the result
+  ;; has the insertions of each side and the elements kept by both.
+  (let* ((n (length o))
+         (vo (list->vector o))
+         (al (chunk-alignment o a))
+         (bl (chunk-alignment o b))
+         (ka (car al)) (ia (cdr al))
+         (kb (car bl)) (ib (cdr bl))
+         (ins? (lambda (i) (or (nnull? (vector-ref ia i))
+                               (nnull? (vector-ref ib i))))))
+    (let loop ((i 0) (acc '()))
+      (let* ((xa (vector-ref ia i))
+             (xb (vector-ref ib i))
+             (x (cond ((null? xa) xb)
+                      ((null? xb) xa)
+                      ((== xa xb) xa)
+                      (else #f))))
+        (cond ((not x) #f)
+              ((>= i n) (reverse (append (reverse x) acc)))
+              ((and (not (vector-ref ka i)) (not (vector-ref kb i))
+                    (or (ins? i) (ins? (+ i 1))))
+               #f)
+              (else
+                (loop (+ i 1)
+                      (append (if (and (vector-ref ka i) (vector-ref kb i))
+                                  (list (vector-ref vo i))
+                                  '())
+                              (reverse x) acc))))))))
+
 (define (merge-chunk tag o a b)
   ;; Merge the unstable chunks o, a and b (lists of children of tag)
   (cond ((== a b) a)
@@ -107,7 +163,10 @@
          ;; Replacements of elements: merge them one by one
          ;; NOTE: single words of a concatenation are not merged any further
          (map merge-versions o a b))
+        ((merge-chunk-elements o a b) => identity)
         (else
+          ;; Conflicting changes: shown as differences between ours and
+          ;; theirs
           (with d (compare-versions (version-normalize (cons tag a))
                                     (version-normalize (cons tag b)))
             (if (tm-is? d tag) (cdr d) (list d))))))
@@ -214,3 +273,113 @@
   (cons 'document
         (map (lambda (x) (if (tm-func? x 'body 1) `(body ,body) x))
              (cdr doc))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Complete documents: the body, the style and the initial environment
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (merge-value o a b)
+  ;; Three way merge of values (#f: absent): (value . conflict?)
+  (cond ((== a b) (cons a #f))
+        ((== o a) (cons b #f))
+        ((== o b) (cons a #f))
+        (else (cons a #t))))
+
+(define (document-part doc tag)
+  (list-find (cdr doc) (cut tm-is? <> tag)))
+
+(define (style-list doc)
+  ;; The style and the packages of @doc, as a list of strings
+  (with s (document-part doc 'style)
+    (cond ((not (and s (pair? (cdr s)))) '())
+          ((string? (cadr s)) (list (cadr s)))
+          ((tm-is? (cadr s) 'tuple) (list-filter (cdadr s) string?))
+          (else '()))))
+
+(define (merge-styles o a b)
+  ;; The main style is merged as a value, the packages as a set:
+  ;; (styles . conflicts)
+  (let* ((main (merge-value (and (pair? o) (car o))
+                            (and (pair? a) (car a))
+                            (and (pair? b) (car b))))
+         (po (if (pair? o) (cdr o) '()))
+         (pa (if (pair? a) (cdr a) '()))
+         (pb (if (pair? b) (cdr b) '()))
+         (removed (list-filter po (lambda (x) (or (nin? x pa) (nin? x pb)))))
+         (added (list-filter pb (lambda (x) (and (nin? x po) (nin? x pa)))))
+         (packs (list-filter (append pa added)
+                             (lambda (x) (and (nin? x removed)
+                                              (!= x (car main)))))))
+    (cons (if (car main) (cons (car main) packs) packs)
+          (if (cdr main) 1 0))))
+
+(define (initial-list doc)
+  ;; The initial environment of @doc, as a list of (key value)
+  (with i (document-part doc 'initial)
+    (if (and i (tm-func? i 'initial 1) (tm-is? (cadr i) 'collection))
+        (map cdr (list-filter (cdadr i) (cut tm-func? <> 'associate 2)))
+        '())))
+
+(define (merge-initials o a b)
+  ;; Key by key: (environment . conflicts)
+  (let* ((keys (list-remove-duplicates (map car (append a b))))
+         (val (lambda (l k) (and-with x (assoc k l) (cadr x))))
+         (l (map (lambda (k) (cons k (merge-value (val o k) (val a k)
+                                                  (val b k))))
+                 keys)))
+    (cons (map (lambda (x) (list (car x) (cadr x)))
+               (list-filter l cadr))
+          (length (list-filter l cddr)))))
+
+(define (document-set-part doc tag new after?)
+  ;; Replace the part @tag of @doc by @new (#f: remove it); a new part is
+  ;; put before the body, or after it if @after?
+  (cond ((document-part doc tag)
+         (cons 'document
+               (apply append
+                      (map (lambda (x)
+                             (cond ((not (tm-is? x tag)) (list x))
+                                   (new (list new))
+                                   (else '())))
+                           (cdr doc)))))
+        ((not new) doc)
+        (else
+          (cons 'document
+                (apply append
+                       (map (lambda (x)
+                              (cond ((not (tm-func? x 'body 1)) (list x))
+                                    (after? (list x new))
+                                    (else (list new x))))
+                            (cdr doc)))))))
+
+(tm-define (merge-documents o a b)
+  (:synopsis "Three way merge of the complete documents @a and @b")
+  ;; @o, @a, @b: strees of complete documents, @o being the common ancestor.
+  ;; The result is the merged document and the number of conflicts.  The
+  ;; body is merged as by merge-versions, the style packages as a set, and
+  ;; the initial environment key by key; a conflicting change of the
+  ;; preamble keeps our version (@a) and counts as one conflict.  The other
+  ;; parts (references, auxiliary data...) are ours.
+  (let* ((body (merge-versions (document-body o) (document-body a)
+                               (document-body b)))
+         (sa (style-list a))
+         (st (merge-styles (style-list o) sa (style-list b)))
+         (ia (initial-list a))
+         (in (merge-initials (initial-list o) ia (initial-list b)))
+         (doc (document-set-body a body))
+         (doc (if (== (car st) sa) doc
+                  (document-set-part
+                   doc 'style
+                   (list 'style (if (== (length (car st)) 1)
+                                    (car (car st))
+                                    (cons 'tuple (car st))))
+                   #f)))
+         (doc (if (== (car in) ia) doc
+                  (document-set-part
+                   doc 'initial
+                   (and (nnull? (car in))
+                        `(initial (collection
+                                    ,@(map (cut cons 'associate <>)
+                                           (car in)))))
+                   #t))))
+    (cons doc (+ (merge-conflicts body) (cdr st) (cdr in)))))
