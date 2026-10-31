@@ -42,6 +42,9 @@
 	     deleted marked fill-out
 	     hidden-title doc-title-block
 	     equation* equation-lab equations-base
+	     ;; arrays of LaTeX which TeXmacs does not define: kept for
+	     ;; the LaTeX of MathJax, as they would otherwise vanish (#611)
+	     gathered subarray
              wide-float draw-over draw-under
              html-tag html-attr
 	     html-div-style html-div-class html-style html-class

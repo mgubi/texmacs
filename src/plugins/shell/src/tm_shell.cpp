@@ -71,6 +71,17 @@ static void append (charp &s, char c, int& pos, int& max) {
 int output_pos;
 charp output;
 
+// NOTE: SIGINT is blocked, except while tm_shell waits (for the output of
+// the shell or for the next input): the handler below writes to cout and
+// reads output, which must not be caught in the middle of a change
+static void
+allow_interrupt (bool allow) {
+  sigset_t set;
+  sigemptyset (&set);
+  sigaddset (&set, SIGINT);
+  sigprocmask (allow? SIG_UNBLOCK: SIG_BLOCK, &set, NULL);
+}
+
 static void
 shell_interrupt (int sig) {
   if (output != NULL) {
@@ -80,9 +91,10 @@ shell_interrupt (int sig) {
   }
   cout << DATA_BEGIN << "scheme:(with \"color\" \"red\" \""
        << "Interrupted TeXmacs shell"
-       << "\")" << DATA_END
-       << DATA_END
-       << flush ;
+       << "\")" << DATA_END;
+  // the verbatim block of shell_output is open while output is allocated
+  if (output != NULL) cout << DATA_END;
+  cout << flush;
   killpg(pid, SIGTERM);
   sleep(1);
   killpg(pid, SIGKILL);
@@ -103,7 +115,9 @@ shell_output (bool hide= false) {
     FD_SET (master, &rfds);
     tv.tv_sec = 0;
     tv.tv_usec = 10000;
+    allow_interrupt (true);
     int r = select (master+1, &rfds, NULL, NULL, &tv);
+    allow_interrupt (false);
     if (r == 0) continue;
     if (r == -1) continue;
 
@@ -148,12 +162,15 @@ shell_output (bool hide= false) {
 
   cout << DATA_END << flush;
   free (output);
+  output= NULL;
 }
 
 static void
 shell_input () {
   char input [10000];
+  allow_interrupt (true);
   cin.getline (input, 10000, '\n');
+  allow_interrupt (false);
   strcat (input, "\n");
   write (master, input, strlen (input));
 }
@@ -176,6 +193,7 @@ child() {
 
 static void
 parent() {
+  allow_interrupt (false);
   signal (SIGINT, shell_interrupt);
   shell_output (true);
   cout << DATA_END << flush;
