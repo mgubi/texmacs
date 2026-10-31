@@ -56,8 +56,8 @@
   previous definition. <menu|Focus|Definitions> lists the definitions of
   the code (the first 500 in a large file, then <menu|All definitions>,
   which opens the page <menu|Focus|Outline>), <menu|Focus|Go to definition>
-  goes to the definition of the name at the cursor, and <menu|Focus|Select definition> selects the
-  definition around the cursor.
+  goes to the definition of the name at the cursor, and
+  <menu|Focus|Select definition> selects the definition around the cursor.
 
   <paragraph*|Structural edits>
 

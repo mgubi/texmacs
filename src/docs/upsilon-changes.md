@@ -41,6 +41,9 @@ have the details, and the problems go to the
   the unknown colors of graphics are black too, and the informative flags
   in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
   (#656).
+- **Definitions in minified files** (desktop and browser): Definitions,
+  Outline and Go to definition no longer take gigabytes of memory on a file
+  with thousands of definitions on one line, which could freeze the machine.
 - **The menu Focus in source files** (desktop and browser): in a `.cpp`, a
   `.py`, a `.scm`, a `.json`... it now has the entries for program code
   (Definitions, Outline, Go to definition, Folds, the syntax and server

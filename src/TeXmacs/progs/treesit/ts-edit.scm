@@ -33,6 +33,7 @@
       (and (= (car a) (car b)) (< (cadr a) (cadr b)))))
 
 (define (point<=? a b) (not (point<? b a)))
+(define-public syntax-point<=? point<=?)
 
 ;; a node is (type named? start end field)
 (define (node-type n) (car n))
@@ -101,18 +102,41 @@
                     (list (cDr leaf) parent (cAr leaf) (cAr p))
                     (list leaf t 0 (cAr p))))))))
 
-(define (context-path ctx point)
+(define row-strings-taken 0)
+
+(define-public (syntax-row-strings-taken)
+  ;; how many copies of a line the places in a region have asked for (tests)
+  row-strings-taken)
+
+(define (row-strings root)
+  ;; a function which gives the string of a row of the region @root, and keeps
+  ;; the last one. tree->string copies the line, which may be a whole minified
+  ;; file: for many places, one copy per row and not one per place (one per
+  ;; name took gigabytes, the garbage collector does not count the strings)
+  (let ((row #f) (s ""))
+    (lambda (r)
+      (when (not (eqv? r row))
+        (set! row r)
+        (set! row-strings-taken (+ row-strings-taken 1))
+        (set! s (cond ((tree-is? root 'document) (line-string root r))
+                      ((tree-atomic? root) (tree->string root))
+                      (else ""))))
+      s)))
+
+(define (context-path ctx point . opt)
   ;; the path of a point of the region of ctx (a point after the last line,
-  ;; such as the end of the root node, is the end of that line)
-  (let ((root (cadr ctx)))
+  ;; such as the end of the root node, is the end of that line); @opt: the
+  ;; row-strings of the region, for many points
+  (let* ((root (cadr ctx))
+         (strings (if (pair? opt) (car opt) (row-strings root))))
     (cond ((not (tree-is? root 'document))
-           (append (car ctx) (list (min (cadr point) (string-length (tree->string root))))))
+           (append (car ctx) (list (min (cadr point) (string-length (strings 0))))))
           ((< (car point) (tree-arity root))
            (append (car ctx) (list (car point) (cadr point))))
           (else
            (let ((last (- (tree-arity root) 1)))
              (append (car ctx)
-                     (list last (string-length (tree->string (tree-ref root last))))))))))
+                     (list last (string-length (strings last)))))))))
 
 (define-public (syntax-cursor-language)
   ;; the language of tree-sitter of the code at the cursor, or #f
@@ -993,14 +1017,14 @@
   ;; the query of the definitions of the program language lan, or #f
   (grammar-query lan id "tags.scm"))
 
-(define (region-text root start end)
-  ;; the text between two points of the same line
-  (let ((line (if (tree-is? root 'document) (tree-ref root (car start)) root)))
-    (if (and line (tree-atomic? line) (= (car start) (car end)))
-        (let ((s (tree->string line)))
-          (substring s (min (cadr start) (string-length s))
-                     (min (cadr end) (string-length s))))
-        "")))
+(define (region-text root start end . opt)
+  ;; the text between two points of the same line; @opt: the row-strings of
+  ;; the region, for many texts
+  (if (= (car start) (car end))
+      (let ((s ((if (pair? opt) (car opt) (row-strings root)) (car start))))
+        (substring s (min (cadr start) (string-length s))
+                   (min (cadr end) (string-length s))))
+      ""))
 
 (define (point-key p)
   ;; a key for the point @p in a hash table (a column does not reach 2^32:
@@ -1060,7 +1084,8 @@
            (map (lambda (d) (cons (string-drop (cap-name d) 11) (cdr d))) defs)
            (map cdr nms)
            point<=?
-           (lambda (start end) (region-text root start end)))))))
+           (with strings (row-strings root)
+             (lambda (start end) (region-text root start end strings))))))))
 
 (define (cursor-outline)
   ;; (ctx id definitions) for the code at the cursor, or #f
@@ -1075,14 +1100,16 @@
   ;; empty node covers a character); #f without a syntax tree
   (let ((c (cursor-code)))
     (and c (tree-is? (cadr (car c)) 'document)
-         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx)))
+         (let* ((ctx (car c)) (lan (cadr c)) (root (cadr ctx))
+                (strings (row-strings root)))
            (map (lambda (e)
                   (let* ((s (cadr e)) (en (caddr e))
-                         (len (string-length (line-string root (car en))))
+                         (len (string-length (strings (car en))))
                          (en* (if (and (== s en) (< (cadr en) len))
                                   (list (car en) (+ (cadr en) 1))
                                   en)))
-                    (list 'error (context-path ctx s) (context-path ctx en*)
+                    (list 'error (context-path ctx s strings)
+                          (context-path ctx en* strings)
                           (if (== (car e) "missing") "Missing in the syntax"
                               "Syntax error"))))
                 (syntax-region-errors root lan))))))
@@ -1113,9 +1140,10 @@
   ;; without a syntax tree
   (let ((o (cursor-outline)))
     (and o
-         (map (lambda (d) (list 0 (car d) (cadr d) ""
-                                (context-path (car o) (caddr d))))
-              (caddr o)))))
+         (with strings (row-strings (cadr (car o)))
+           (map (lambda (d) (list 0 (car d) (cadr d) ""
+                                  (context-path (car o) (caddr d) strings)))
+                (caddr o))))))
 
 (define-public (syntax-go-to-point ctx point)
   (go-to (context-path ctx point)))
@@ -1124,8 +1152,10 @@
   ;; the definitions of the code at the cursor: (kind name path)
   (let ((o (cursor-outline)))
     (if (not o) '()
-        (map (lambda (d) (list (car d) (cadr d) (context-path (car o) (caddr d))))
-             (caddr o)))))
+        (with strings (row-strings (cadr (car o)))
+          (map (lambda (d) (list (car d) (cadr d)
+                                 (context-path (car o) (caddr d) strings)))
+               (caddr o))))))
 
 (define-public (syntax-go-to-definition)
   ;; go to the definition of the name at the cursor in the same code; #f

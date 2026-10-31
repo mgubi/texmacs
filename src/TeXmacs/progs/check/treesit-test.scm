@@ -1385,22 +1385,19 @@
               "conflict"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Master routine
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The names of the definitions, without a grammar
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (point-leq? a b)
-  (or (< (car a) (car b))
-      (and (== (car a) (car b)) (<= (cadr a) (cadr b)))))
 
 (define (outline-items defs names)
   ;; (kind name) with the name given by the place of its capture
   (map (lambda (i) (list (car i) (cadr i)))
-       (syntax-outline-items defs names point-leq?
+       (syntax-outline-items defs names syntax-point<=?
                              (lambda (start end) (object->string start)))))
+
+(define (cpp-line n)
+  (apply string-append
+         (map (lambda (i) (string-append "int f" (number->string i) "(){} "))
+              (.. 0 n))))
 
 (define (test-outline-items)
   (check-group "the names of the definitions")
@@ -1422,7 +1419,7 @@
     (check= (map cadr (syntax-outline-items
                        '(("function" (0 0) (1 0)) ("function" (2 0) (3 0)))
                        '(((0 0) (0 1)) ((2 0) (2 1)))
-                       point-leq? (lambda (start end) "f")))
+                       syntax-point<=? (lambda (start end) "f")))
             '("f"))
     ;; no name inside; a name which goes beyond the definition
     (check= (outline-items '(("function" (0 0) (0 3))) (list n1)) '())
@@ -1438,7 +1435,7 @@
   ;; once through the names: the number of comparisons, not the time
   (let* ((n 3000)
          (count 0)
-         (leq? (lambda (a b) (set! count (+ count 1)) (point-leq? a b)))
+         (leq? (lambda (a b) (set! count (+ count 1)) (syntax-point<=? a b)))
          (rows (.. 0 n))
          (defs (map (lambda (i) (list "function" (list i 0) (list i 9))) rows))
          (names (map (lambda (i) (list (list i 4) (list i 5))) rows)))
@@ -1446,7 +1443,67 @@
                                           (lambda (start end)
                                             (object->string start))))
             n)
+    (check-true (< count (* 6 n)))
+    ;; ... also for definitions without a name, whose search stops at once
+    (set! count 0)
+    (check= (syntax-outline-items
+             (map (lambda (i) (list "function" (list i 0) (list i 1))) rows)
+             names leq? (lambda (start end) ""))
+            '())
     (check-true (< count (* 6 n)))))
+
+(define (strings-taken thunk)
+  ;; how many copies of a line @thunk takes for its places
+  (let ((n (syntax-row-strings-taken)))
+    (thunk)
+    (- (syntax-row-strings-taken) n)))
+
+(define (test-one-line-outline)
+  ;; many names on one line, as in a minified file: one copy of the line, not
+  ;; one per name, which took gigabytes (not the time nor the memory here)
+  (check-group "the definitions on one long line")
+  (unless (treesit-cached? "javascript") (treesit-generate-cache "javascript"))
+  (let* ((n 200)
+         (line (apply string-append
+                      (map (lambda (i)
+                             (string-append "function f" (number->string i)
+                                            "(){} "))
+                           (.. 0 n))))
+         (doc (stree->tree `(document ,line)))
+         (id (treesit-language "javascript"))
+         (r '())
+         (calls (strings-taken
+                 (lambda () (set! r (syntax-outline doc "javascript" id))))))
+    (check= (length r) n)
+    (check= (cadr (car r)) "f0")
+    (check= (cadr (cAr r)) (string-append "f" (number->string (- n 1))))
+    (check= calls 1))
+  ;; the same at the cursor, with the paths, in lines and in inline code
+  (for (doc (list `(document (cpp-code (document ,(cpp-line 200))))
+                  `(document (concat "a" (cpp ,(cpp-line 200))))))
+    (treesit-generate-cache "cpp")
+    (with-test-buffer doc
+      (lambda (u b)
+        (update-forced)
+        (apply-changes)
+        (let* ((t* (let down ((x (buffer-tree)))
+                     (cond ((tree-atomic? x)
+                            (if (> (string-length (tree->string x)) 100) x #f))
+                           (else (list-any down (tree-children x)))))))
+          (tree-go-to t* 0)
+          (update-forced)
+          (apply-changes)
+          (when (>= (tree-sitter-program-language "cpp") 0)
+            (let* ((r '())
+                   (calls (strings-taken
+                           (lambda () (set! r (syntax-outline-at-cursor))))))
+              (check= (length r) 200)
+              ;; (the names, and the paths in inline code)
+              (check-true (<= calls 2)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Master routine
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (treesit-test-failures)
   (check-suite "treesit")
@@ -1468,4 +1525,5 @@
   (test-scanners)
   (test-native)
   (test-outline-items)
+  (test-one-line-outline)
   (check-end))
