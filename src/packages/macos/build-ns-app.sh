@@ -127,7 +127,12 @@ echo "== making the application"
 make MACOS_BUNDLE
 
 app=../distr/TeXmacs.app
-packages/macos/check-app.sh "$app"
+# with --deps, the application is made for an older macOS
+if [ -n "$deps" ]; then
+  packages/macos/check-app.sh --sdk-newer-than-min "$app"
+else
+  packages/macos/check-app.sh "$app"
+fi
 echo "== $app is ready"
 
 if [ $dmg = yes ]; then

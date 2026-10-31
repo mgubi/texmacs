@@ -6,17 +6,38 @@
 # on the version of macOS given by LSMinimumSystemVersion (for each
 # architecture).
 #
-# Usage: packages/macos/check-app.sh TeXmacs.app
+# With --sdk-newer-than-min, the main program must also be linked against an
+# SDK newer than that version: an SDK equal to it means the linker was told
+# the wrong SDK (#662), and macOS then gives the program the behaviour of that
+# old version. The check depends only on the application, not on this machine.
+# It is for applications made for an older macOS (build-ns-app.sh --deps,
+# merge-universal.sh). Without --deps the minimal version is the version of
+# the machine, which may well be the SDK or newer, and the rule does not apply.
+#
+# Usage: packages/macos/check-app.sh [--sdk-newer-than-min] TeXmacs.app
 
 set -e
 
-app="$1"
-[ -d "$app/Contents" ] || { echo "usage: $0 TeXmacs.app" >&2; exit 1; }
+sdk_rule=no
+[ "${1:-}" = --sdk-newer-than-min ] && { sdk_rule=yes; shift; }
+app="${1:-}"
+[ -d "$app/Contents" ] || { echo "usage: $0 [--sdk-newer-than-min] TeXmacs.app" >&2; exit 1; }
 
 codesign --verify --deep --strict "$app"
 plist="$app/Contents/Info.plist"
 plutil -lint "$plist" > /dev/null
-min=$(plutil -extract LSMinimumSystemVersion raw "$plist")
+# a version: 13, 13.0 or 13.0.1
+is_version () { [[ "$1" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; }
+min=$(plutil -extract LSMinimumSystemVersion raw "$plist" 2> /dev/null) || min=""
+if ! is_version "$min"; then
+  echo "error: $plist: LSMinimumSystemVersion is missing or not a version (\"$min\")" >&2
+  exit 1
+fi
+if [ $sdk_rule = yes ]; then
+  echo "SDK rule: the main program must be linked against an SDK newer than macOS $min"
+else
+  echo "SDK rule: skipped (no --sdk-newer-than-min)"
+fi
 
 # a version as a number, for the comparisons (12.0.1 -> 120001)
 num () { local IFS=.; set -- $1 0 0; echo $(($1 * 10000 + $2 * 100 + $3)); }
@@ -41,6 +62,7 @@ inside () { # path
   case "$p" in "$app_real"/*) return 0;; *) return 1;; esac
 }
 app_real=$(cd "$app" && pwd -P)
+main_seen=no
 
 status=0
 while IFS= read -r f; do
@@ -88,7 +110,27 @@ while IFS= read -r f; do
       echo "error: ${f#$app/} ($a) needs macOS $v (LSMinimumSystemVersion: $min)" >&2
       status=1
     fi
-    echo "${f#$app/}: $a, macOS $v"
+    # the SDK the program is linked against (#662: -Wl,-macosx_version_min
+    # made it the minimal version, 13.0, so NSImage took EPS files as in
+    # macOS 13); otool says n/a when the program does not record it
+    s=$(otool -arch "$a" -l "$f" |
+        awk '/LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX/ {c=1}
+             c && $1 == "sdk" {print $2; exit}')
+    if [ "$f" = "$exe" ]; then
+      main_seen=yes
+      if ! is_version "$s"; then
+        echo "error: ${f#$app/} ($a) does not say its SDK (\"$s\")" >&2
+        status=1
+      elif [ $sdk_rule = yes ] && [ $(num "$s") -le $(num "$min") ]; then
+        echo "error: ${f#$app/} ($a) is linked against the SDK of macOS $s, not newer than LSMinimumSystemVersion ($min)" >&2
+        status=1
+      fi
+    fi
+    echo "${f#$app/}: $a, macOS $v, SDK $s"
   done
 done < <(find "$app/Contents" -type f \( -perm -u+x -o -name "*.dylib" -o -name "*.so" \))
+if [ $main_seen = no ]; then
+  echo "error: the main program ${exe#$app/} is not an executable Mach-O file" >&2
+  status=1
+fi
 exit $status
