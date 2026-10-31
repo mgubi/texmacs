@@ -755,6 +755,9 @@ latex_symbol_to_tree (string s) {
   if (s == "") return "";
   if (s[0] == '\\') {
     s= s(1,N(s));
+    // \string read as the argument of a macro, as in \gobble\string#1:
+    // a tag "string" would be read as an atomic tree (#658)
+    if (s == "string") return "";
     if ((s == "ldots" || s == "dots" || s == "dotso")
         && (command_type ("!mode") != "math")) return "...";
     if (s == "\n")     return tree (APPLY, "!emptyline");
