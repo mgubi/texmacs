@@ -60,7 +60,9 @@
     (<menu|Document> menu) are merged as well: a package or a setting added,
     changed or removed on one side only is taken over. When the same
     setting or the main style was changed differently on both sides, your
-    version is kept, and this counts as a conflict.
+    version is kept, and this counts as a conflict, which the message at
+    the bottom of the window names. The packages added by your coauthor
+    come after yours, in the order of their document.
 
     <item*|<menu|Mark as resolved>>Save the document and tell <name|Git>
     that its conflicts are resolved. If some differences were not processed
@@ -82,8 +84,9 @@
 
   During a rebase (see <hlink|working with coauthors|man-git-remote.en.tm>),
   the roles are reversed: <name|Git> considers the commits of your
-  coauthors as the base, so that <menu|Mine> and <menu|Theirs> are
-  swapped.
+  coauthors as the base, so that your version is displayed as the new one
+  (in green); <menu|Mine> and <menu|Keep my version> still retain your
+  version.
 
   <paragraph*|Merging from the command line>
 

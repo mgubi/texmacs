@@ -96,61 +96,137 @@
   (let loop ((i (- end 1)) (acc '()))
     (if (< i start) acc (loop (- i 1) (cons (vector-ref v i) acc)))))
 
-(define (chunk-alignment o x)
-  ;; How one side changed the chunk @o of the ancestor into its chunk @x:
-  ;; a vector which tells for each element of @o whether it is kept, and a
-  ;; vector with the elements inserted before each element of @o (the last
-  ;; entry: those inserted at the end).  The elements which replace removed
-  ;; ones are inserted before the first of them.
+;; Each side changes a chunk of the ancestor by hunks (start end ins side):
+;; the elements of the ancestor from start to end (excluded) are replaced
+;; by the elements ins; for a pure insertion, start = end.  The hunks of
+;; the two sides which overlap form groups, which are merged as a whole.
+
+(define (hunk-start h) (car h))
+(define (hunk-end h) (cadr h))
+(define (hunk-ins h) (caddr h))
+(define (hunk-side h) (cadddr h))
+(define (hunk-insertion? h) (== (hunk-start h) (hunk-end h)))
+
+(define (chunk-hunks o x side)
+  ;; The hunks by which @side changes the chunk @o of the ancestor into @x
   (let* ((vo (list->vector o))
          (vx (list->vector x))
          (m (lcs-match vo vx))
          (n (vector-length vo))
-         (kept (make-vector n #f))
-         (ins (make-vector (+ n 1) '())))
-    (let loop ((i 0) (j 0) (g 0))
-      (cond ((>= i n)
-             (vector-set! ins g (subvector->list vx j (vector-length vx))))
-            ((vector-ref m i)
-             (with k (vector-ref m i)
-               (vector-set! ins g (subvector->list vx j k))
-               (vector-set! kept i #t)
-               (loop (+ i 1) (+ k 1) (+ i 1))))
-            (else (loop (+ i 1) j g))))
-    (cons kept ins)))
+         (nx (vector-length vx)))
+    ;; s: the first element of the ancestor after the last kept one
+    (let loop ((i 0) (j 0) (s 0) (acc '()))
+      (if (or (>= i n) (vector-ref m i))
+          (let* ((k (if (>= i n) nx (vector-ref m i)))
+                 (ins (subvector->list vx j k))
+                 (acc* (if (and (== s i) (null? ins)) acc
+                           (cons (list s i ins side) acc))))
+            (if (>= i n)
+                (reverse acc*)
+                (loop (+ i 1) (+ k 1) (+ i 1) acc*)))
+          (loop (+ i 1) j s acc)))))
 
-(define (merge-chunk-elements o a b)
-  ;; Merge the chunks element by element of the ancestor, or #f when the
-  ;; two sides conflict: when they insert different elements at the same
-  ;; place, or when they both remove an element next to which one of them
-  ;; inserts others (a change against a removal).  Otherwise, the result
-  ;; has the insertions of each side and the elements kept by both.
-  (let* ((n (length o))
-         (vo (list->vector o))
-         (al (chunk-alignment o a))
-         (bl (chunk-alignment o b))
-         (ka (car al)) (ia (cdr al))
-         (kb (car bl)) (ib (cdr bl))
-         (ins? (lambda (i) (or (nnull? (vector-ref ia i))
-                               (nnull? (vector-ref ib i))))))
-    (let loop ((i 0) (acc '()))
-      (let* ((xa (vector-ref ia i))
-             (xb (vector-ref ib i))
-             (x (cond ((null? xa) xb)
-                      ((null? xb) xa)
-                      ((== xa xb) xa)
-                      (else #f))))
-        (cond ((not x) #f)
-              ((>= i n) (reverse (append (reverse x) acc)))
-              ((and (not (vector-ref ka i)) (not (vector-ref kb i))
-                    (or (ins? i) (ins? (+ i 1))))
-               #f)
-              (else
-                (loop (+ i 1)
-                      (append (if (and (vector-ref ka i) (vector-ref kb i))
-                                  (list (vector-ref vo i))
-                                  '())
-                              (reverse x) acc))))))))
+(define (hunk<? h1 h2)
+  (or (< (hunk-start h1) (hunk-start h2))
+      (and (== (hunk-start h1) (hunk-start h2))
+           (< (hunk-end h1) (hunk-end h2)))))
+
+(define (merge-hunk-lists l1 l2)
+  (let loop ((l1 l1) (l2 l2) (acc '()))
+    (cond ((null? l1) (append (reverse acc) l2))
+          ((null? l2) (append (reverse acc) l1))
+          ((hunk<? (car l2) (car l1)) (loop l1 (cdr l2) (cons (car l2) acc)))
+          (else (loop (cdr l1) l2 (cons (car l1) acc))))))
+
+(define (hunk-joins? h g ge)
+  ;; Does the hunk @h overlap the group @g which ends at @ge?  Hunks which
+  ;; only touch are independent, except when both insert elements at the
+  ;; same place and one of them is a pure insertion (the order is unclear)
+  (or (< (hunk-start h) ge)
+      (and (== (hunk-start h) ge)
+           (nnull? (hunk-ins h))
+           (nnot (list-find g (lambda (m)
+                                (and (!= (hunk-side m) (hunk-side h))
+                                     (== (hunk-end m) ge)
+                                     (nnull? (hunk-ins m))
+                                     (or (hunk-insertion? m)
+                                         (hunk-insertion? h)))))))))
+
+(define (side-span vo s e hunks)
+  ;; The elements of the ancestor from @s to @e, with the @hunks applied
+  (let loop ((i s) (l hunks) (acc '()))
+    (if (null? l)
+        (append (reverse acc) (subvector->list vo i e))
+        (with h (car l)
+          (loop (hunk-end h) (cdr l)
+                (append (reverse (hunk-ins h))
+                        (reverse (subvector->list vo i (hunk-start h)))
+                        acc))))))
+
+(define (contains? h1 h2)
+  (and (<= (hunk-start h1) (hunk-start h2))
+       (>= (hunk-end h1) (hunk-end h2))))
+
+(define (same-tag? o a b)
+  (and (pair? o) (pair? a) (pair? b)
+       (== (car o) (car a)) (== (car o) (car b))))
+
+(define (paired-changes x y vo)
+  ;; Do the hunks @x and @y both replace the first elements of their ranges
+  ;; one by one by elements with the same tags, the rest being removed?
+  (let* ((s (hunk-start x))
+         (l (length (hunk-ins x))))
+    (and (== s (hunk-start y))
+         (> l 0)
+         (== l (length (hunk-ins y)))
+         (== l (min (- (hunk-end x) s) (- (hunk-end y) s)))
+         (list-and (map same-tag? (subvector->list vo s (+ s l))
+                        (hunk-ins x) (hunk-ins y))))))
+
+(define (merge-group tag vo gs ge g)
+  ;; Merge a group of overlapping hunks, from @gs to @ge
+  (let* ((ha (list-filter g (lambda (h) (== (hunk-side h) 'a))))
+         (hb (list-filter g (lambda (h) (== (hunk-side h) 'b))))
+         (sa (side-span vo gs ge ha))
+         (sb (side-span vo gs ge hb))
+         (one? (and (== (length ha) 1) (== (length hb) 1)))
+         (x (and one? (car ha)))
+         (y (and one? (car hb))))
+    (cond ((null? hb) sa)
+          ((null? ha) sb)
+          ((== sa sb) sa)
+          ((and one? (== (hunk-ins x) (hunk-ins y)) (contains? x y))
+           ;; the same change, and more removals on one side
+           sa)
+          ((and one? (== (hunk-ins x) (hunk-ins y)) (contains? y x))
+           sb)
+          ((and one? (paired-changes x y vo))
+           ;; both sides changed the same elements (with the same tags) and
+           ;; one of them removed more: the elements are merged in turn
+           (with l (length (hunk-ins x))
+             (map merge-versions
+                  (subvector->list vo (hunk-start x) (+ (hunk-start x) l))
+                  (hunk-ins x) (hunk-ins y))))
+          (else
+            ;; a conflict, shown as the differences between ours and theirs
+            (with d (compare-versions (version-normalize (cons tag sa))
+                                      (version-normalize (cons tag sb)))
+              (if (tm-is? d tag) (cdr d) (list d)))))))
+
+(define (merge-hunks tag o ha hb)
+  (let* ((vo (list->vector o))
+         (n (vector-length vo)))
+    (let loop ((l (merge-hunk-lists ha hb)) (pos 0) (acc '()))
+      (if (null? l)
+          (append (reverse acc) (subvector->list vo pos n))
+          (let group ((g (list (car l))) (ge (hunk-end (car l))) (r (cdr l)))
+            (if (and (pair? r) (hunk-joins? (car r) g ge))
+                (group (cons (car r) g) (max ge (hunk-end (car r))) (cdr r))
+                (let* ((gs (hunk-start (car l)))
+                       (m (merge-group tag vo gs ge (reverse g))))
+                  (loop r ge (append (reverse m)
+                                     (reverse (subvector->list vo pos gs))
+                                     acc)))))))))
 
 (define (merge-chunk tag o a b)
   ;; Merge the unstable chunks o, a and b (lists of children of tag)
@@ -163,13 +239,9 @@
          ;; Replacements of elements: merge them one by one
          ;; NOTE: single words of a concatenation are not merged any further
          (map merge-versions o a b))
-        ((merge-chunk-elements o a b) => identity)
         (else
-          ;; Conflicting changes: shown as differences between ours and
-          ;; theirs
-          (with d (compare-versions (version-normalize (cons tag a))
-                                    (version-normalize (cons tag b)))
-            (if (tm-is? d tag) (cdr d) (list d))))))
+          ;; The changes of each side, against the ancestor (#676)
+          (merge-hunks tag o (chunk-hunks o a 'a) (chunk-hunks o b 'b)))))
 
 (tm-define (merge-versions-list tag o a b)
   (:synopsis "Three way merge of the lists of children @o, @a and @b of @tag")
@@ -298,7 +370,8 @@
 
 (define (merge-styles o a b)
   ;; The main style is merged as a value, the packages as a set:
-  ;; (styles . conflicts)
+  ;; (styles . conflicts), the conflicts being '() or '("style")
+  ;; NOTE: our order of the packages is kept, theirs are added at the end
   (let* ((main (merge-value (and (pair? o) (car o))
                             (and (pair? a) (car a))
                             (and (pair? b) (car b))))
@@ -311,7 +384,7 @@
                              (lambda (x) (and (nin? x removed)
                                               (!= x (car main)))))))
     (cons (if (car main) (cons (car main) packs) packs)
-          (if (cdr main) 1 0))))
+          (if (cdr main) '("style") '()))))
 
 (define (initial-list doc)
   ;; The initial environment of @doc, as a list of (key value)
@@ -321,7 +394,7 @@
         '())))
 
 (define (merge-initials o a b)
-  ;; Key by key: (environment . conflicts)
+  ;; Key by key: (environment . conflicting keys)
   (let* ((keys (list-remove-duplicates (map car (append a b))))
          (val (lambda (l k) (and-with x (assoc k l) (cadr x))))
          (l (map (lambda (k) (cons k (merge-value (val o k) (val a k)
@@ -329,7 +402,7 @@
                  keys)))
     (cons (map (lambda (x) (list (car x) (cadr x)))
                (list-filter l cadr))
-          (length (list-filter l cddr)))))
+          (map car (list-filter l cddr)))))
 
 (define (document-set-part doc tag new after?)
   ;; Replace the part @tag of @doc by @new (#f: remove it); a new part is
@@ -355,9 +428,11 @@
 (tm-define (merge-documents o a b)
   (:synopsis "Three way merge of the complete documents @a and @b")
   ;; @o, @a, @b: strees of complete documents, @o being the common ancestor.
-  ;; The result is the merged document and the number of conflicts.  The
-  ;; body is merged as by merge-versions, the style packages as a set, and
-  ;; the initial environment key by key; a conflicting change of the
+  ;; The result is (merged-document conflicts kept): the number of
+  ;; conflicts, and the parts of the preamble for which ours was kept
+  ;; ("style" for the main style, the keys of the initial environment).
+  ;; The body is merged as by merge-versions, the style packages as a set,
+  ;; and the initial environment key by key; a conflicting change of the
   ;; preamble keeps our version (@a) and counts as one conflict.  The other
   ;; parts (references, auxiliary data...) are ours.
   (let* ((body (merge-versions (document-body o) (document-body a)
@@ -382,4 +457,5 @@
                                     ,@(map (cut cons 'associate <>)
                                            (car in)))))
                    #t))))
-    (cons doc (+ (merge-conflicts body) (cdr st) (cdr in)))))
+    (with kept (append (cdr st) (cdr in))
+      (list doc (+ (merge-conflicts body) (length kept)) kept))))

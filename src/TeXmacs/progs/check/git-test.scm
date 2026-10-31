@@ -743,6 +743,35 @@
                '(document "A." "X." "C.") #f 1)
   (check-merge '(document "A." "C.") '(document "A." "X." "C.")
                '(document "A." "Y." "C.") #f 1)
+  ;; a change of a side next to a removal of the other side (audit of #676)
+  (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "C2." "Y.")
+               '(document "Z." "B." "Y.") #f 1)
+  (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "B." "Y.")
+               '(document "Z." "C2." "Y.") #f 1)
+  ;; NOTE: ambiguous (C2. may replace B. or C.), so that it conflicts, as
+  ;; with the textual merge of Git
+  (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "C2." "Y.")
+               '(document "Z." "C." "Y.") #f 1)
+  ;; the conflict is limited to the overlapping changes
+  (check-merge '(document "Z." "B." "C." "Y." "W.")
+               '(document "Z." "C2." "Y." "W.")
+               '(document "Z." "B." "Y." "W2.")
+               '(document "Z." (version-both (document "C2.") (document "B."))
+                          "Y." "W2.") 1)
+  ;; the same change on both sides, with more removals on one side
+  (check-merge '(document "A." "B." "C." "D.") '(document "A." "B2." "D.")
+               '(document "A." "B2." "C." "D.") '(document "A." "B2." "D.") 0)
+  (check-merge '(document "A." "B." "C." "D.") '(document "A." "B2." "C." "D.")
+               '(document "A." "B2." "D.") '(document "A." "B2." "D.") 0)
+  ;; an element changed on both sides is merged in turn
+  (check-merge '(document "A." (section "Short intro") "C." "D." "E.")
+               '(document "A." (section "Short introduction") "C." "E.")
+               '(document "A." (section "Long intro") "D." "E.")
+               '(document "A." (section "Long introduction") "E.") 0)
+  (check-merge '(document "A." (section "Short intro") "C." "D." "E.")
+               '(document "A." (section "Long intro") "D." "E.")
+               '(document "A." (section "Short introduction") "C." "E.")
+               '(document "A." (section "Long introduction") "E.") 0)
   (check= (merge-conflicts '(document (version-both "a" "b") "c"
                                       (concat (version-old "d"))))
           2)
@@ -760,31 +789,51 @@
                              (doc "generic" '() "A!" "B.")
                              (doc '(tuple "generic" "french")
                                   (list (fbs "11")) "A." "B!"))
-            (cons (doc '(tuple "generic" "french") (list (fbs "11"))
-                       "A!" "B!") 0))
+            (list (doc '(tuple "generic" "french") (list (fbs "11"))
+                       "A!" "B!") 0 '()))
     (check= (merge-documents (doc '(tuple "article" "number-europe")
                                   (list (fbs "10") (pm "paper")) "A.")
                              (doc '(tuple "article" "number-europe" "french")
                                   (list (fbs "10")) "A.")
                              (doc '(tuple "book" "number-europe")
                                   (list (fbs "12") (pm "paper")) "A."))
-            (cons (doc '(tuple "book" "number-europe" "french")
-                       (list (fbs "12")) "A.") 0))
+            (list (doc '(tuple "book" "number-europe" "french")
+                       (list (fbs "12")) "A.") 0 '()))
     (check= (merge-documents (doc '(tuple "article" "french") '() "A.")
                              (doc "article" '() "A.")
                              (doc '(tuple "article" "french" "dutch") '()
                                   "A."))
-            (cons (doc '(tuple "article" "dutch") '() "A.") 0))
+            (list (doc '(tuple "article" "dutch") '() "A.") 0 '()))
     ;; a change of the same key, or of the main style, on both sides keeps
     ;; ours and is a conflict
     (check= (merge-documents (doc "generic" (list (fbs "10")) "A.")
                              (doc "generic" (list (fbs "11")) "A.")
                              (doc "generic" (list (fbs "12")) "A."))
-            (cons (doc "generic" (list (fbs "11")) "A.") 1))
+            (list (doc "generic" (list (fbs "11")) "A.") 1
+                  '("font-base-size")))
     (check= (merge-documents (doc "generic" '() "A.")
                              (doc "article" '() "A.")
                              (doc "book" '() "A."))
-            (cons (doc "article" '() "A.") 1)))
+            (list (doc "article" '() "A.") 1 '("style")))
+    (check= (merge-documents (doc "generic" (list (fbs "10")) "A." "B.")
+                             (doc "generic" (list (fbs "11")) "A!" "B.")
+                             (doc "generic" (list (fbs "12")) "A." "B!"))
+            (list (doc "generic" (list (fbs "11")) "A!" "B!") 1
+                  '("font-base-size")))
+    ;; the message of Resolve conflict names the settings where ours was
+    ;; kept
+    (check= (git-resolve-message 0 '())
+            "Merged automatically; check the result, then mark as resolved")
+    (check= (git-resolve-message 1 '("font-base-size"))
+            (string-append "Merged automatically, but the settings "
+                           "font-base-size were changed on both sides; "
+                           "yours were kept; check the result, then mark "
+                           "as resolved"))
+    (check= (git-resolve-message 3 '("style"))
+            (string-append "2 conflicting changes: keep my version or "
+                           "their version of each, the settings the style "
+                           "were changed on both sides; yours were kept; "
+                           "then mark as resolved")))
   (with doc '(document (TeXmacs "2.1") (style "generic") (body (document "A.")))
     (check= (document-body doc) '(document "A."))
     (check= (document-body (document-set-body doc '(document "B.")))
@@ -856,8 +905,19 @@
           (check-true (in? "Keep my version" l))
           (check-true (in? "Keep their version" l))
           (check-false (in? "Old version" l)))))
+    (check= (git-mine-version DR) 0)
     (git-run DR "merge" "--abort")
     (git-invalidate DR)
+    ;; during a rebase, the user's version is the new one (theirs for Git)
+    (sh (path "drv") "git checkout -q conflict && git rebase main"
+        " > /dev/null 2>&1")
+    (git-invalidate DR)
+    (check-true (git-rebasing? DR))
+    (check= (git-mine-version DR) 1)
+    (sh (path "drv") "git rebase --abort && git checkout -q main")
+    (git-invalidate DR)
+    (check-false (git-rebasing? DR))
+    (check= (git-mine-version DR) 0)
     (with-document DP
       (lambda ()
         (with l (menu-strings '(link version-retain-menu))

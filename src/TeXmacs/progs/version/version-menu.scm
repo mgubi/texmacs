@@ -243,14 +243,17 @@
 
 (define (resolving-conflict?)
   ;; In a document with a merge conflict, the old version is ours and the
-  ;; new one theirs (see git-resolve-conflict)
+  ;; new one theirs (see git-resolve-conflict), swapped during a rebase
   (and (git-document?) (git-state? 'conflicted)))
+
+(define (mine) (git-mine-version (current-git-root)))
+(define (theirs) (- 1 (mine)))
 
 (menu-bind version-retain-menu
   ("Current version" (version-retain 'current))
   (assuming (resolving-conflict?)
-    ("Keep my version" (version-retain 0))
-    ("Keep their version" (version-retain 1)))
+    ("Keep my version" (version-retain (mine)))
+    ("Keep their version" (version-retain (theirs))))
   (assuming (not (resolving-conflict?))
     ("Old version" (version-retain 0))
     ("New version" (version-retain 1))))
@@ -266,8 +269,10 @@
     (-> "Show"
 	("Both versions" (version-show 'version-both))
         (assuming (resolving-conflict?)
-          ("My version" (version-show 'version-old))
-          ("Their version" (version-show 'version-new)))
+          ("My version" (version-show (if (== (mine) 0) 'version-old
+                                          'version-new)))
+          ("Their version" (version-show (if (== (mine) 0) 'version-new
+                                             'version-old))))
         (assuming (not (resolving-conflict?))
           ("Old version" (version-show 'version-old))
           ("New version" (version-show 'version-new))))

@@ -253,7 +253,11 @@ mode** reduces the menus to:
    the style packages are merged as a set and the initial environment
    (the settings of the Document menu) key by key; a change of the same
    setting, or of the main style, on both sides keeps yours and counts as
-   a conflict;
+   a conflict, which the message names. Within a block of paragraphs,
+   the changes of each side against the ancestor (hunks) are merged when
+   they do not overlap; overlapping changes conflict, except identical
+   ones (one side may remove more) and elements with the same tag changed
+   on both sides, which are merged in turn;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 
@@ -404,8 +408,12 @@ shell fallback, Windows and submodules.
 * The commit dialog, panel and menus are covered by the offscreen tests
   (built, opened, menus expanded), but haven't been used by hand in a
   normal session.
-* During a rebase, git's "ours" is the upstream and "theirs" your commits,
-  so in *Resolve conflict* the Mine/Theirs labels are swapped.
+* During a rebase, git's "ours" is the upstream and "theirs" your commits:
+  the old (red) version of a conflict is then the upstream one, and *Mine*
+  / *Keep my version* retain the new one (`git-mine-version`).
+* The style packages are merged as a set: packages which only theirs added
+  go at the end, and a reordering of the packages by theirs only is not
+  taken over (our order is kept).
 * On X11, the background commands run synchronously, through the shell.
   On Windows and Android they run synchronously too, only the callback is
   delayed, and they can't be cancelled.

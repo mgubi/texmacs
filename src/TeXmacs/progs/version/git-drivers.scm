@@ -48,7 +48,7 @@
          (with r (merge-documents o a b)
            (and (not (tree-export (stree->tree (car r)) (driver-url ours)
                                   "texmacs"))
-                (cdr r))))))
+                (cadr r))))))
 
 (tm-define (git-textual-merge base ours theirs)
   ;; When the structured merge fails (e.g. for a document which cannot be

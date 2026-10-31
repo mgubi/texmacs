@@ -388,12 +388,29 @@
                                "texmacs"))
          (and (document-body doc) doc))))
 
-(define (resolve-message n)
-  (if (== n 0)
-      "Merged automatically; check the result, then mark as resolved"
-      (string-append (number->string n) " conflicting changes: keep my "
-                     "version or their version of each, "
-                     "then mark as resolved")))
+(define (kept-description kept)
+  (string-recompose (map (lambda (k) (if (== k "style") "the style" k)) kept)
+                    ", "))
+
+(tm-define (git-resolve-message n kept)
+  (:synopsis "The message after merging with @n conflicts")
+  ;; @kept: the parts of the preamble changed on both sides, where our
+  ;; version was kept (they count among the @n conflicts)
+  (let* ((m (- n (length kept)))
+         (k (if (null? kept) ""
+                (string-append "the settings " (kept-description kept)
+                               " were changed on both sides; yours "
+                               "were kept"))))
+    (cond ((== n 0)
+           "Merged automatically; check the result, then mark as resolved")
+          ((== m 0)
+           (string-append "Merged automatically, but " k
+                          "; check the result, then mark as resolved"))
+          (else
+            (string-append (number->string m) " conflicting changes: keep "
+                           "my version or their version of each, "
+                           (if (null? kept) "" (string-append k "; "))
+                           "then mark as resolved")))))
 
 (tm-define (git-resolve-conflict name)
   (:synopsis "Merge our and their versions of the conflicting file @name")
@@ -419,15 +436,16 @@
                   (buffer-set name (stree->tree (car r)))
                   (version-first-difference)
                   (version-review-open)
-                  ;; NOTE: the conflicts of the preamble keep our version
-                  (set-message (resolve-message (cdr r)) "Resolve conflict"))
+                  (set-message (git-resolve-message (cadr r) (caddr r))
+                               "Resolve conflict"))
                 (begin
                   (buffer-set name (stree->tree ours))
                   (compare-with-newer (string->url
                                        (version-revision-url name "THEIRS")))
-                  (set-message (resolve-message
+                  (set-message (git-resolve-message
                                 (length (tree-search (buffer-tree)
-                                                     version-markup?)))
+                                                     version-markup?))
+                                '())
                                "Resolve conflict")))))))
 
 (tm-define (git-mark-resolved-now name)
