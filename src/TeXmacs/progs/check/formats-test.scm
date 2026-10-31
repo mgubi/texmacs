@@ -211,6 +211,35 @@
   (check= (st (generic->texmacs "x" "texmacs-document"))
           '(error "bad format or data")))
 
+;; <string|abc> is a tag like <foo|abc> (see test-string-tag in trees-test): it
+;; used to crash the loading of a .tm file, or to give random bytes (#678).
+(define (test-tm-string-tag)
+  (check-group "the tag string in a tm document")
+  (let* ((body '(document (concat "x" (string "abc") "y" (string)
+                                  (compound "string" "z"))))
+         (doc (tmfile body))
+         (text (export doc "texmacs-document")))
+    (check-true (contains? text "<string|abc>"))
+    (check-true (contains? text "<string>"))
+    (check-true (contains? text "<compound|string|z>"))
+    (check= (import text "texmacs-document") doc)
+    (check= (round-trip doc "texmacs-document") doc)
+    (check= (round-trip doc "tmml-document") doc)
+    (check= (round-trip doc "stm-document") doc))
+  (check= (import "<string|abc>" "texmacs-snippet") '(document (string "abc")))
+  (check= (import "<\\string>\n  abc\n</string>" "texmacs-snippet")
+          '(document (string (document "abc"))))
+  (check= (export '(string "abc") "texmacs-snippet") "<string|abc>")
+  (check= (import "(document (string \"abc\"))" "stm-snippet")
+          '(document (string "abc")))
+  ;; through the upgrade of the documents of old versions
+  (for-each (lambda (form)
+              (with text (string-append "<TeXmacs|1.0.0>\n\n<style|generic>\n\n"
+                                        "<\\body>\n  " form "\n</body>\n")
+                (check= (assoc 'body (cdr (import text "texmacs-document")))
+                        '(body (document (string "abc"))))))
+            '("<string|abc>" "<apply|string|abc>" "<expand|string|abc>")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Scheme format
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -830,6 +859,7 @@
   (test-tm-parse)
   (test-tm-round-trip)
   (test-tm-document)
+  (test-tm-string-tag)
   (test-stm)
   (test-tmml-serialize)
   (test-tmml-parse)

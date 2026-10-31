@@ -1044,6 +1044,65 @@
      (check-true (tree-possible-arity? (sub 0) 2))
      (check-false (tree-possible-arity? (sub 0) 3)))))
 
+;; A macro may be called string, as any other name: the name used to give the
+;; label of the atomic trees, of arity zero, and \string + return crashed (#678).
+(define (hybrid-string)
+  (go-end)
+  (update-forced)
+  (apply-changes)
+  (make-hybrid)
+  (insert "string")
+  (activate-hybrid #f)
+  (update-forced)
+  (apply-changes)
+  (tree->stree (buffer-get-body (current-buffer))))
+
+(define (test-string-macro)
+  (check-group "a macro called string")
+  (with-document
+   (doc-with '("generic") '(document (string "ab") "z")
+             '("string" (macro "x" (concat "[" (arg "x") "]"))))
+   (lambda ()
+     (update-menus)
+     (check= (tag-minimal-arity 'string) 1)
+     (check= (tag-maximal-arity 'string) 1)
+     (check-true (tree-label-macro? 'string))
+     (check-true (tree-label-extension? 'string))
+     (check= (ev (T '(string "ab"))) "[ab]")
+     (check= (ev (T '(compound "string" "ab"))) "[ab]")
+     (check= (tree->stree (sub 0)) '(string "ab"))
+     (check= (hybrid-string)
+             '(document (string "ab") (concat "z" (string ""))))))
+  ;; map-args makes trees from the name of a tag
+  (with-document
+   (doc-with '("generic") '(document "z")
+             '("string" (macro "x" (concat "[" (arg "x") "]")))
+             '("wrap" (xmacro "a" (map-args "identity" "string" "a")))
+             '("each" (xmacro "a" (map-args "string" "concat" "a"))))
+   (lambda ()
+     (check= (ev (T '(wrap "ab"))) "[ab]")
+     (check= (ev (T '(each "ab" "cd"))) "[ab][cd]")))
+  ;; activating an inactive compound tag gives the tag
+  (with-document
+   (doc-with '("generic") '(document (inactive (compound "string" "ab"))))
+   (lambda ()
+     (go-to (at 0 0 1 1))
+     (activate)
+     (update-forced)
+     (check= (tree->stree (buffer-get-body (current-buffer)))
+             '(document (string "ab")))))
+  ;; without a macro, it is an unknown command, as for any other name
+  (with-document
+   (doc-with '("generic") '(document "z"))
+   (lambda ()
+     (check= (hybrid-string)
+             '(document (concat "z" (inactive (hybrid "string")))))))
+  ;; in the source mode, it is a new tag
+  (with-document
+   (doc-with '("source") '(document "z"))
+   (lambda ()
+     (check= (hybrid-string) '(document (concat "z" (string)))))))
+
 ;; The accessible children decide where the cursor can be: go-to puts the
 ;; cursor anywhere, cursor-accessible? tells whether it may stay there.
 (define (test-drd-cursor)
@@ -1187,6 +1246,7 @@
   (run-group test-own-package)
   (run-group test-main-styles)
   (run-group test-drd-user-macros)
+  (run-group test-string-macro)
   (run-group test-drd-cursor)
   (remove-tmp-dir)
   (check-end))

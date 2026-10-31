@@ -771,7 +771,7 @@
   (check= (lt "\\newcommand{\\g}[1]{}\\g\\string y")
           '(concat (assign "g" (macro "1" "")) (g "") "y"))
   ;; a tag named "string" from an environment
-  (check= (lt "\\begin{string}x\\end{string}") '(compound "string" "x")))
+  (check= (lt "\\begin{string}x\\end{string}") '(string "x")))
 
 ;; groups and arguments nested very deep: the parser recursed once per
 ;; level and overflowed the stack (#658); the levels beyond 128 are skipped
