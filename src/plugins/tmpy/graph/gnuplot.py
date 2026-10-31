@@ -10,6 +10,7 @@
 ## in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 
 import os
+from glob       import glob
 from subprocess import Popen, PIPE, STDOUT
 from .graph     import Graph
 from ..protocol import *
@@ -17,13 +18,17 @@ from ..compat   import *
 
 def has_ghostscript():
     """Whether TeXmacs can show EPS images: it converts them with
-    Ghostscript (macOS no longer renders PostScript)"""
-    for gs in ["gs", "gswin64c", "gswin32c"]:
-        if which(gs) is not None:
-            return True
-    # the Ghostscript of the Windows installer of TeXmacs
+    Ghostscript (macOS no longer renders PostScript). The same places as
+    gs_executable in Plugins/Ghostscript/gs_utilities.cpp"""
+    if which("gs") is not None or which("gs.exe") is not None:
+        return True
+    # a copy in the package of TeXmacs (GS_EXE)
     tm = os.environ.get("TEXMACS_PATH", "")
-    return tm != "" and os.path.exists(os.path.join(tm, "bin", "gs.exe"))
+    for gs in ["gs", "gs.exe"]:
+        if tm != "" and os.path.exists(os.path.join(tm, "bin", gs)):
+            return True
+    # the usual installation on Windows
+    return len(glob("C:\\Program Files*\\gs\\gs*\\bin\\gswin*c.exe")) > 0
 
 class Gnuplot(Graph):
     def __init__(self, name = "gnuplot"):
