@@ -21,6 +21,16 @@ have the details, and the problems go to the
   commands afterwards. The checks of the Cocoa interface
   (`tests/cocoa/check.sh`) also cover the dialogs with negative sizes and
   such an error (#666).
+- **Rotated text and big glyphs** (desktop and browser): rotations and
+  the other transformations of `gr-transform` are drawn the right way round
+  by the GPU renderer (Cocoa and Vue) and by the MuPDF renderer (the CPU
+  path of Vue and of the browser), which turned them the other way and
+  displaced them; a big wide brace (an overbrace of 26 terms at zoom 6) no
+  longer stops TeXmacs with "out of memory" (the sizes of the glyphs were
+  16-bit numbers); big glyphs with an outline are no longer dropped under a
+  transformation or a pattern; and the textures of big glyphs over their
+  bound release the least recently drawn ones instead of the whole cache
+  of glyphs (#659).
 - **Cocoa: tooltips on the icon bars** (desktop, Cocoa interface): the
   buttons of the icon bars show their balloon text as a tooltip again; the
   hover highlight of a button removed the tracking areas of its tooltip
