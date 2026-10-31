@@ -148,6 +148,7 @@ join (glyph gl1, glyph gl2) {
   int x2= max (gl1->width- gl1->xoff, gl2->width- gl2->xoff);
   int y2= max (gl1->yoff, gl2->yoff);
   glyph bmr (x2-x1, y2-y1, -x1, y2, max (gl1->depth, gl2->depth));
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
 
   int i, j, dx, dy;
   dx= -gl1->xoff- x1, dy= y2- gl1->yoff;
@@ -318,6 +319,7 @@ padded (glyph gl, int l, int t, int r, int b) {
   int i, j;
   int ww= gl->width, hh= gl->height;
   glyph bmr (ww+l+r, hh+t+b, gl->xoff+l, gl->yoff+t, gl->depth);
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
   for (j=0; j<hh+t+b; j++)
     for (i=0; i<ww+l+r; i++)
       bmr->set_x (i, j, 0);
@@ -421,6 +423,7 @@ hor_extend (glyph gl, int pos, int by) {
     if (pos >= (ww>>2) && pos < (3*ww>>2)) break;
   }
   glyph bmr (ww+ by, hh, gl->xoff, gl->yoff, gl->depth);
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
   for (j=0; j<hh; j++)
     for (i=0; i<(ww+by); i++)
       bmr->set_x (i, j, gl->get_x (i<pos? i: (i<pos+by? pos: i-by), j));
@@ -450,6 +453,7 @@ ver_extend (glyph gl, int pos, int by) {
   int i, j;
   int ww= gl->width, hh= gl->height;
   glyph bmr (ww, hh+by, gl->xoff, gl->yoff, gl->depth);
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
   for (j=0; j<(hh+by); j++)
     for (i=0; i<ww; i++)
       bmr->set_x (i, j, gl->get_x (i, j<pos? j: (j<pos+by? pos: j-by)));
