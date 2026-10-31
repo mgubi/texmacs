@@ -28,6 +28,12 @@ glyph_rep::glyph_rep (int w2, int h2, int xoff2, int yoff2,
   status   = status2;
   artistic = 0;
 
+  // a glyph too large for its raster (made at a huge zoom) is empty rather
+  // than an allocation which fails and stops TeXmacs, #659
+  if (width < 0 || height < 0 ||
+      ((double) width) * ((double) height) > (double) (1 << 28)) {
+    width= height= 0;
+  }
   int i, n= (depth==1? (width*height+7)/8: width*height);
   raster= tm_new_array<N8> (n);
   for (i=0; i<n; i++) raster[i]=0;

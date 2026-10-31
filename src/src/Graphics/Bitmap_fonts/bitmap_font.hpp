@@ -36,9 +36,9 @@ typedef metric_struct metric[1];
 struct glyph_rep: concrete_struct {
   unsigned int index;        // physical index of glyph in font
   short depth;               // number of bits per pixel >= depth
-  short width, height;       // width and height in pixels
-  short xoff, yoff;          // offset of origin
-  short lwidth;              // logical width of character
+  int   width, height;       // width and height in pixels (not short: the
+  int   xoff, yoff;          // glyphs of the wide braces of the virtual
+  int   lwidth;              // fonts at a large zoom are wider, #659)
   short status;              // status for extensible characters
   short artistic;            // result of applying an artistic effect
   N8*   raster;              // character definition
