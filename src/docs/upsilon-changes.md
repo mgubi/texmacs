@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **macOS: the applications linked against the current SDK** (desktop,
+  Cocoa and Vue): the disk images were linked against the SDK of macOS 13,
+  their minimal version, so macOS gave them the behaviour of macOS 13 (for
+  instance blank plots, #582); they now use the SDK of the build machine,
+  and the minimum version stays macOS 13.0 (#662).
+- **Gnuplot: PNG plots without Ghostscript** (desktop): the gnuplot
+  sessions make PNG images, and say so at their start, when Ghostscript
+  (`gs`), which TeXmacs needs to show EPS images, is not installed; before,
+  each plot showed as a question mark. The documentation of the Gnuplot and
+  Maxima plug-ins says that their plots need Ghostscript (#662).
 - **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
   these colors of the program were transparent. A text with an unknown color
   name was invisible, on the screen and in a PDF: it is black now, as in Qt;

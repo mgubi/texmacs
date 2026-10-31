@@ -4,7 +4,10 @@
 # signature, its Info.plist, that it only uses the libraries of macOS and
 # its own ones, and that its code (the programs of the plugins too) runs
 # on the version of macOS given by LSMinimumSystemVersion (for each
-# architecture).
+# architecture). The main program must also be linked against an SDK newer
+# than that version: an SDK equal to it means the linker was told the wrong
+# SDK (#662), and macOS then gives the program the behaviour of that old
+# version. The check depends only on the application, not on this machine.
 #
 # Usage: packages/macos/check-app.sh TeXmacs.app
 
@@ -41,6 +44,7 @@ inside () { # path
   case "$p" in "$app_real"/*) return 0;; *) return 1;; esac
 }
 app_real=$(cd "$app" && pwd -P)
+main_seen=no
 
 status=0
 while IFS= read -r f; do
@@ -88,7 +92,27 @@ while IFS= read -r f; do
       echo "error: ${f#$app/} ($a) needs macOS $v (LSMinimumSystemVersion: $min)" >&2
       status=1
     fi
-    echo "${f#$app/}: $a, macOS $v"
+    # the SDK the program is linked against (#662: -Wl,-macosx_version_min
+    # made it the minimal version, 13.0, so NSImage took EPS files as in
+    # macOS 13); otool says n/a when the program does not record it
+    s=$(otool -arch "$a" -l "$f" |
+        awk '/LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX/ {c=1}
+             c && $1 == "sdk" {print $2; exit}')
+    if [ "$f" = "$exe" ]; then
+      main_seen=yes
+      if ! [[ "$s" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+        echo "error: ${f#$app/} ($a) does not say its SDK (\"$s\")" >&2
+        status=1
+      elif [ $(num "$s") -le $(num "$min") ]; then
+        echo "error: ${f#$app/} ($a) is linked against the SDK of macOS $s, not newer than LSMinimumSystemVersion ($min)" >&2
+        status=1
+      fi
+    fi
+    echo "${f#$app/}: $a, macOS $v, SDK $s"
   done
 done < <(find "$app/Contents" -type f \( -perm -u+x -o -name "*.dylib" -o -name "*.so" \))
+if [ $main_seen = no ]; then
+  echo "error: the main program ${exe#$app/} is not an executable Mach-O file" >&2
+  status=1
+fi
 exit $status

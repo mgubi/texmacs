@@ -538,7 +538,8 @@ every program and library of the application, for each architecture, only
 uses the libraries of macOS and its own (the references `@rpath`,
 `@loader_path` and `@executable_path` must lead to files of the
 application, and no library path leads outside), and does not need a
-version of macOS after `LSMinimumSystemVersion`. The sources of the
+version of macOS after `LSMinimumSystemVersion`; the main program must be
+linked against an SDK newer than that version (#662). The sources of the
 libraries are checked with their SHA-256 (in `build-deps.sh`).
 
 The version is 12.0. The sources compile down to 10.13 (the oldest target
