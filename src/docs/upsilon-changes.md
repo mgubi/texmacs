@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
+  these colors of the program were transparent. A text with an unknown color
+  name was invisible, on the screen and in a PDF: it is black now, as in Qt;
+  the unknown colors of graphics are black too, and the informative flags
+  in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
+  (#656).
 - **Search and Replace next to hidden content** (desktop): a replacement
   next to a hidden (folded) tag stays in its place instead of going inside
   the tag (#590); going to a hit inside hidden content shows it in a step
