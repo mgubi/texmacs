@@ -151,6 +151,96 @@
 (tm-define current-save-source (url-none))
 (tm-define current-save-target (url-none))
 
+;; The document which is being converted and the file which is being written:
+;; set by buffer_export and export_tree in C++ for the time of the conversion,
+;; none otherwise (a conversion for the clipboard writes no file)
+
+(tm-define (save-source-swap u)
+  (with old current-save-source
+    (set! current-save-source u)
+    old))
+
+(tm-define (save-target-swap u)
+  (with old current-save-target
+    (set! current-save-target u)
+    old))
+
+(tm-define (save-source-url)
+  (if (url-none? current-save-source) (current-buffer) current-save-source))
+
+(tm-define (save-target-url)
+  (if (url-none? current-save-target) (save-source-url) current-save-target))
+
+(tm-define (url-drop-suffix u)
+  (with suf (url-suffix u)
+    (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
+
+;; The images of a conversion which writes no file are not for the user (the
+;; text for an AI, the MathJax of a formula, a label): they go to the temporary
+;; folder, under the absolute name. Only a copy to the clipboard keeps them, for
+;; the pasted text: next to the document, when it is a file in a folder of the
+;; user which can be written, where the bare name will do, otherwise in a folder
+;; of the home, which remains after TeXmacs as the pasted text does. The name
+;; comes from the document and the content, so that the same copy uses the same
+;; file instead of leaving a new one each time.
+
+(tm-define copying-to-clipboard? #f)
+
+(tm-define (copying-to-clipboard-swap flag)
+  (with old copying-to-clipboard?
+    (set! copying-to-clipboard? flag)
+    old))
+
+(tm-define (folder-writable? dir)
+  ;; really writing: (url-test? dir "w") only looks at the permission bits,
+  ;; which it finds on /etc as well
+  (with u (url-append dir (string-append ".texmacs-write-test-"
+                                         (number->string (texmacs-time))))
+    (string-save "" u)
+    (and (url-exists? u)
+         (begin (system-remove u) #t))))
+
+(define (document-folder)
+  (let* ((b (current-buffer))
+         (dir (url-head b)))
+    (and (not (url-none? b))
+         (not (url-scratch? b))
+         (not (url-rooted-web? b))
+         (not (url-rooted-tmfs? b))
+         (url-exists? b)
+         (not (url-descends? dir (get-texmacs-path)))
+         (folder-writable? dir)
+         dir)))
+
+(define (clipboard-image-names key suffix)
+  (let* ((dir (document-folder))
+         (folder (or dir (string->url "$TEXMACS_HOME_PATH/system/images")))
+         (id (list 'tuple (url->string (current-buffer)) key))
+         (name (string-append "image-" (tree-hash (tm->tree id)) suffix))
+         (u (url-append folder name))
+         (s (if dir name (url->unix u))))
+    (when (not (url-exists? folder)) (system-mkdir folder))
+    (set-message `(concat "Image of the copy: " (verbatim ,(url->system u)))
+                 "Copy")
+    (values u s)))
+
+(define loose-image-serial 0)
+
+(tm-define (loose-image-names key suffix)
+  ;; the url and the name in the text of an image with the given @suffix, for
+  ;; a conversion without target; @key identifies the content
+  (if copying-to-clipboard?
+      (clipboard-image-names key suffix)
+      (begin
+        (set! loose-image-serial (+ loose-image-serial 1))
+        (with u (url-append (url-temp-dir)
+                            (string-append "image-"
+                                           (number->string loose-image-serial)
+                                           suffix))
+          (if (url-exists? u)
+              (loose-image-names key suffix)
+              (values u (url->unix u)))))))
+
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))
 
@@ -206,8 +296,6 @@
 
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
-  (set! current-save-source name)
-  (set! current-save-target name)
   (with vname `(verbatim ,(url->system name))
     (cond ((url-scratch? name)
            (choose-file
@@ -344,8 +432,6 @@
     (set! to (string-replace to ":" "-"))
     (set! to (string-replace to ";" "-"))
     (set! to (url-relative (buffer-get-master name) to)))
-  (if (url? name) (set! current-save-source name))
-  (if (url? to) (set! current-save-target to))
   (export-buffer-check-permissions name to fm opts))
 
 (tm-define (export-buffer to)

@@ -1006,6 +1006,11 @@
   (dynamic (focus-document-menu t))
   (-> "Cite TeXmacs" (link cite-texmacs-menu))
   (dynamic (focus-document-extra-menu t))
+  ;; a source file: the focus is the buffer, and the entries of its code
+  ;; are those of a code block (progs/code/code-menu.scm)
+  (assuming (and (in-prog?) (code-cursor-lines))
+    ---
+    (dynamic (focus-extra-menu t)))
   ---
   ("Help" (focus-help)))
 

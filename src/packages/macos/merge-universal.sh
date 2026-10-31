@@ -29,7 +29,7 @@ sign="${SIGN_IDENTITY:--}"
 find "$out/Contents/Resources/lib" -name "*.dylib" -exec codesign --force $ts -s "$sign" {} \; 2> /dev/null || true
 codesign --force $ts --deep -s "$sign" "$out"
 
-"$here/check-app.sh" "$out"
+"$here/check-app.sh" --sdk-newer-than-min "$out"
 echo "== $out is ready"
 
 if [ -n "$dmg" ]; then

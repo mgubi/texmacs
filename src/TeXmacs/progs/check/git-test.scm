@@ -73,6 +73,24 @@
                              paragraphs))
                  "</body>\n"))
 
+(define (tm-doc style init . paragraphs)
+  ;; a .tm file with the style @style (a string, as in <style|...>), the
+  ;; initial environment @init (a list of (key value)) and the paragraphs
+  (string-append "<TeXmacs|2.1>\n\n<style|" style ">\n\n<\\body>\n"
+                 (apply string-append
+                        (map (lambda (p) (string-append "  " p "\n\n"))
+                             paragraphs))
+                 "</body>\n"
+                 (if (null? init) ""
+                     (string-append
+                      "\n<\\initial>\n  <\\collection>\n"
+                      (apply string-append
+                             (map (lambda (x)
+                                    (string-append "    <associate|" (car x)
+                                                   "|" (cadr x) ">\n"))
+                                  init))
+                      "  </collection>\n</initial>\n"))))
+
 (define (run-group thunk)
   ;; an error in a group counts as one failure
   (with r (check-run thunk)
@@ -695,10 +713,102 @@
                '(document "A." "B!" "C.") #f 1)
   (check-merge '(document "A." "B.") '(document "B.") '(document "B.")
                '(document "B.") 0)
+  ;; different insertions at the same place conflict
+  (check-merge '(document "f is continuous on X.")
+               '(document "f is uniformly continuous on X.")
+               '(document "f is bounded continuous on X.") #f 1)
+  ;; FIXME: changes of the two sides in nearby blocks conflict (#676, item
+  ;; 1; merge-chunk in version-merge.scm compares the chunks of ours and
+  ;; theirs without the ancestor): (merge-versions '(document "A." "B." "C."
+  ;; "D.") '(document "A." "C." "D.") '(document "A." "B." "C2." "D."))
+  ;; gives 1 conflict, expected (document "A." "C2." "D.").
   (check= (merge-conflicts '(document (version-both "a" "b") "c"
                                       (concat (version-old "d"))))
           2)
   (check= (merge-conflicts "plain") 0)
+  ;; the preamble: style packages as a set, the initial environment key by
+  ;; key (#676)
+  (let* ((doc (lambda (style init . body)
+                `(document (TeXmacs "2.1") (style ,style)
+                           (body (document ,@body))
+                           ,@(if (null? init) '()
+                                 `((initial (collection ,@init)))))))
+         (fbs (lambda (v) `(associate "font-base-size" ,v)))
+         (pm (lambda (v) `(associate "page-medium" ,v))))
+    (check= (merge-documents (doc "generic" '() "A." "B.")
+                             (doc "generic" '() "A!" "B.")
+                             (doc '(tuple "generic" "french")
+                                  (list (fbs "11")) "A." "B!"))
+            (list (doc '(tuple "generic" "french") (list (fbs "11"))
+                       "A!" "B!") 0 '()))
+    (check= (merge-documents (doc '(tuple "article" "number-europe")
+                                  (list (fbs "10") (pm "paper")) "A.")
+                             (doc '(tuple "article" "number-europe" "french")
+                                  (list (fbs "10")) "A.")
+                             (doc '(tuple "book" "number-europe")
+                                  (list (fbs "12") (pm "paper")) "A."))
+            (list (doc '(tuple "book" "number-europe" "french")
+                       (list (fbs "12")) "A.") 0 '()))
+    (check= (merge-documents (doc '(tuple "article" "french") '() "A.")
+                             (doc "article" '() "A.")
+                             (doc '(tuple "article" "french" "dutch") '()
+                                  "A."))
+            (list (doc '(tuple "article" "dutch") '() "A.") 0 '()))
+    ;; a change of the same key, or of the main style, on both sides keeps
+    ;; ours and is a conflict
+    (check= (merge-documents (doc "generic" (list (fbs "10")) "A.")
+                             (doc "generic" (list (fbs "11")) "A.")
+                             (doc "generic" (list (fbs "12")) "A."))
+            (list (doc "generic" (list (fbs "11")) "A.") 1
+                  '("font-base-size")))
+    (check= (merge-documents (doc "generic" '() "A.")
+                             (doc "article" '() "A.")
+                             (doc "book" '() "A."))
+            (list (doc "article" '() "A.") 1 '("style")))
+    (check= (merge-documents (doc "generic" (list (fbs "10")) "A." "B.")
+                             (doc "generic" (list (fbs "11")) "A!" "B.")
+                             (doc "generic" (list (fbs "12")) "A." "B!"))
+            (list (doc "generic" (list (fbs "11")) "A!" "B!") 1
+                  '("font-base-size")))
+    ;; a document without a style part keeps the style of the base; the
+    ;; main style never comes from the packages
+    (check= (merge-documents (doc "article" '() "A.")
+                             '(document (TeXmacs "2.1") (body (document "A.")))
+                             (doc '(tuple "book" "french") '() "A."))
+            (list '(document (TeXmacs "2.1")
+                             (style (tuple "book" "french"))
+                             (body (document "A.")))
+                  0 '()))
+    ;; packages which are not names are kept
+    (check= (merge-documents (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x") "p") '() "A."))
+            (list (doc '(tuple "g" (macro "x") "p") '() "A.") 0 '()))
+    (check= (merge-documents (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x") "q") '() "A.")
+                             (doc "g" '() "A."))
+            (list (doc '(tuple "g" "q") '() "A.") 0 '()))
+    ;; the message of Resolve conflict names the settings where ours was
+    ;; kept
+    (check= (git-resolve-message 0 '() 0)
+            "Merged automatically; check the result, then mark as resolved")
+    (check= (git-resolve-message 1 '("font-base-size") 0)
+            '(concat "Merged automatically" "; "
+                     (replace "settings changed on both sides, where your version was kept: %1"
+                              (verbatim "font-base-size"))
+                     "; " "check the result, then mark as resolved"))
+    ;; during a rebase, Git's ours (kept) is the upstream
+    (check= (git-resolve-message 3 '("style" "font-base-size") 1)
+            '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
+                              "1")
+                     "; "
+                     (replace "settings changed on both sides, where the upstream version was kept: %1"
+                              (verbatim "style, font-base-size"))
+                     "; " "then mark as resolved"))
+    (check= (git-resolve-message 2 '() 0)
+            '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
+                              "2")
+                     "; " "then mark as resolved")))
   (with doc '(document (TeXmacs "2.1") (style "generic") (body (document "A.")))
     (check= (document-body doc) '(document "A."))
     (check= (document-body (document-set-body doc '(document "B.")))
@@ -731,7 +841,8 @@
       " && git checkout -q -b theirs")
   (string-save (tm "The quick brown fox leaps.") (dir "drv/paper.tm"))
   (sh (path "drv") "git commit -q -a -m theirs && git checkout -q -b conflict")
-  (string-save (tm "The fast brown fox leaps.") (dir "drv/paper.tm"))
+  (string-save (tm-doc "<tuple|generic|french>" '() "The fast brown fox leaps.")
+               (dir "drv/paper.tm"))
   (sh (path "drv") "git commit -q -a -m conflict && git checkout -q main")
   (string-save (tm "The slow brown fox jumps.") (dir "drv/paper.tm"))
   (sh (path "drv") "git commit -q -a -m ours")
@@ -755,7 +866,36 @@
     (git-merge-branch DR "conflict")
     (check= (git-file-state DP) 'conflicted)
     (check-true (string-contains? (string-load DP) "<version-both|"))
-    (git-run DR "merge" "--abort"))
+    ;; their packages are kept by the driver (#676)
+    ;; NOTE: git-resolve-conflict is not called here, since it opens the
+    ;; review tool, which saves the geometry of the window in the preferences
+    (check-true (string-contains? (string-load DP) "<style|<tuple|generic|french>>"))
+    ;; while resolving, the menus speak of my and their versions (#676)
+    (with-document DP
+      (lambda ()
+        (with l (menu-strings '(link version-retain-menu))
+          (check-true (in? "Keep my version" l))
+          (check-true (in? "Keep their version" l))
+          (check-false (in? "Old version" l)))))
+    (check= (git-mine-version DR) 0)
+    (git-run DR "merge" "--abort")
+    (git-invalidate DR)
+    ;; during a rebase, the user's version is the new one (theirs for Git)
+    (sh (path "drv") "git checkout -q conflict && git rebase main"
+        " > /dev/null 2>&1")
+    (git-invalidate DR)
+    (check-true (git-rebasing? DR))
+    (check= (git-mine-version DR) 1)
+    (sh (path "drv") "git rebase --abort && git checkout -q main")
+    (git-invalidate DR)
+    (check-false (git-rebasing? DR))
+    (check= (git-mine-version DR) 0)
+    (with-document DP
+      (lambda ()
+        (with l (menu-strings '(link version-retain-menu))
+          (check-true (in? "Old version" l))
+          (check-false (in? "Keep my version" l)))))
+    (buffer-close DP))
   ;; the merge of files, as the driver does it
   (let ((o (dir "m-base.tm")) (a (dir "m-ours.tm")) (b (dir "m-theirs.tm")))
     (string-save (tm "A." "B.") o)
@@ -764,7 +904,42 @@
     (check= (git-merge-files (url->system o) (url->system a) (url->system b))
             0)
     (check-true (string-contains? (string-load a) "A!"))
-    (check-true (string-contains? (string-load a) "B!")))
+    (check-true (string-contains? (string-load a) "B!"))
+    ;; the preamble of their version is merged too (#676)
+    (string-save (tm-doc "generic" '() "A." "B.") o)
+    (string-save (tm-doc "generic" '(("page-medium" "paper")) "A!" "B.") a)
+    (string-save (tm-doc "<tuple|generic|french>" '(("font-base-size" "11"))
+                         "A." "B!") b)
+    (check= (git-merge-files (url->system o) (url->system a) (url->system b))
+            0)
+    (with t (tree->stree (tree-import a "texmacs"))
+      (check= (document-body t) '(document "A!" "B!"))
+      (check= (list-find (cdr t) (cut tm-is? <> 'style))
+              '(style (tuple "generic" "french")))
+      (check= (list-find (cdr t) (cut tm-is? <> 'initial))
+              '(initial (collection (associate "page-medium" "paper")
+                                    (associate "font-base-size" "11")))))
+    ;; a conflicting change of the preamble keeps ours and is reported
+    (string-save (tm-doc "generic" '(("font-base-size" "10")) "A.") o)
+    (string-save (tm-doc "generic" '(("font-base-size" "11")) "A.") a)
+    (string-save (tm-doc "generic" '(("font-base-size" "12")) "A.") b)
+    (check= (git-merge-files (url->system o) (url->system a) (url->system b))
+            1)
+    (check-true (string-contains? (string-load a) "<associate|font-base-size|11>")))
+  ;; outside a trusted folder, nothing is installed, and this is said (#676)
+  (make-repo (path "drv-untrusted"))
+  (with DU (dir "drv-untrusted")
+    (check-false (git-trusted? DU))
+    (with r (git-install-merge-driver-now DU)
+      (check-false (car r))
+      (check-true (string-contains? (cdr r) "not trusted")))
+    (check-false (url-exists? (url-append DU ".gitattributes")))
+    (check= (sh (path "drv-untrusted")
+                "git config --get merge.texmacs.driver || echo none")
+            "none\n"))
+  (with r (git-install-merge-driver-now (dir "drv"))
+    (check-true (car r))
+    (check= (cdr r) "TeXmacs documents will be merged structurally"))
   ;; the textual merge, when the structured one is not possible
   (let ((o (dir "m-base.txt")) (a (dir "m-ours.txt")) (b (dir "m-theirs.txt")))
     (string-save "line\n" o)

@@ -363,7 +363,7 @@ get_utf8_code (string c) {
   string uc= strict_cork_to_utf8 (c);
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
-  if (pos == N(uc)) return code;
+  if (pos > 0 && pos == N(uc)) return code;
   else return -1;
 }
 

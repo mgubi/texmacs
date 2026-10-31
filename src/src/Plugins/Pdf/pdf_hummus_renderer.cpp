@@ -336,9 +336,12 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
   LogConfiguration log= LogConfiguration::DefaultLogConfiguration();
   bool compress= true;
   PDFCreationSettings settings (compress, true); //, EncryptionOptions("user", 4, "owner"));
-    status = pdfWriter.StartPDF(as_charp(concretize (pdf_file_name)), ePDFVersion, log, settings);
+  // A relative name stands for the current directory, as in save_string
+  url target= pdf_file_name;
+  if (!is_rooted_name (target)) target= resolve (target, "");
+    status = pdfWriter.StartPDF(as_charp(concretize (target)), ePDFVersion, log, settings);
 	if (status != PDFHummus::eSuccess) {
-		convert_error << "failed to start PDF\n";
+		convert_error << "failed to start PDF " << pdf_file_name << "\n";
 		started=false;
 	} else {
 		started=true;

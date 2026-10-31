@@ -30,6 +30,15 @@
     <item>Portable to many systems.
   </itemize>
 
+  <\note*>
+    The plots of <name|Maxima> in <TeXmacs> (<verbatim|tm_plot2d>,
+    <verbatim|tm_draw2d>, ...) are <name|PostScript> images made by
+    <name|Gnuplot>, which <TeXmacs> shows by converting them with
+    <name|Ghostscript> (the program <verbatim|gs>; on <name|macOS> for
+    instance <verbatim|brew install ghostscript>). Without it, a plot shows
+    as a question mark.
+  </note*>
+
   <tmdoc-copyright|1998\U2021|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

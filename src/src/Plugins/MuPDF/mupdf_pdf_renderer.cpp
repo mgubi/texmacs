@@ -418,7 +418,10 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
     convert_warning << "MuPDF could not subset the fonts: "
                     << fz_caught_message (ctx) << LF;
   }
-  c_string name (concretize (pdf_file_name)); // not in fz_try: a longjmp
+  // A relative name stands for the current directory, as in save_string
+  url target= pdf_file_name;
+  if (!is_rooted_name (target)) target= resolve (target, "");
+  c_string name (concretize (target)); // not in fz_try: a longjmp
   pdf_write_options opts= pdf_default_write_options;
   opts.do_compress= 1;
   opts.do_compress_images= 1;

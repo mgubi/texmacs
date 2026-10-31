@@ -37,6 +37,7 @@
 (define tmhtml-image-cache (make-ahash-table))
 (define tmhtml-image-root-url (unix->url "image"))
 (define tmhtml-image-root-string "image")
+(define tmhtml-image-loose? #t)
 (define tmhtml-site-version #f)
 (define tmhtml-web-formats (list "gif" "jpg" "jpeg" "png" "bmp" "svg"))
 
@@ -53,18 +54,16 @@
   (set! tmhtml-image-embed?
 	(== (assoc-ref opts "texmacs->html:image-embed") "on"))
   (set! tmhtml-image-cache (make-ahash-table))
-  (let* ((suffix (url-suffix current-save-target))
-	 (n (+ (string-length suffix) 1)))
-    (if (in? suffix '("html" "xhtml" "htm"))
-	(begin
-	  (set! tmhtml-image-serial 0)
-	  (set! tmhtml-image-root-url (url-unglue current-save-target n))
-	  (set! tmhtml-image-root-string
-		(url->unix (url-tail tmhtml-image-root-url))))
-	(begin
-	  (set! tmhtml-image-serial 0)
-	  (set! tmhtml-image-root-url (unix->url "image"))
-	  (set! tmhtml-image-root-string "image")))))
+  (set! tmhtml-image-serial 0)
+  (set! tmhtml-image-loose? (url-none? current-save-target))
+  (if tmhtml-image-loose?
+      (begin
+	(set! tmhtml-image-root-url (unix->url "image"))
+	(set! tmhtml-image-root-string "image"))
+      (begin
+	(set! tmhtml-image-root-url (url-drop-suffix current-save-target))
+	(set! tmhtml-image-root-string
+	      (url->unix (url-tail tmhtml-image-root-url))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Empty handler and strings
@@ -1042,7 +1041,7 @@
 
 (define (tmhtml-include l)
   (if (or (npair? l) (nstring? (car l))) '()
-      (with u (url-relative current-save-source (unix->url (car l)))
+      (with u (url-relative (save-source-url) (unix->url (car l)))
 	(if (not (url-exists? u)) '()
 	    (with-global current-save-source u
 	      (with t (tree-inclusion u)
@@ -1311,13 +1310,15 @@
   (map (lambda (id) `(h:a (@ (id ,(cork->html (cadr id))))))
        (tmhtml-collect-labels x)))
 
-(define (tmhtml-image-names ext)
+(define (tmhtml-image-names ext key)
   (set! tmhtml-image-serial (+ tmhtml-image-serial 1))
   (let* ((postfix (string-append
 		   "-" (number->string tmhtml-image-serial) "." ext))
 	 (name-url (url-glue tmhtml-image-root-url postfix))
 	 (name-string (string-append tmhtml-image-root-string postfix)))
-    (values name-url name-string)))
+    (if tmhtml-image-loose?
+	(loose-image-names key (string-append "." ext))
+	(values name-url name-string))))
 
 (define (magic-png-number)
   (let* ((css (get-preference "texmacs->html:css-stylesheet"))
@@ -1334,7 +1335,7 @@
 	 (l2 (if (null? l1) l1 (list (car l1)))))
     (with cached (ahash-ref tmhtml-image-cache x)
       (if (not cached)
-	  (receive (name-url name-string) (tmhtml-image-names "png")
+	  (receive (name-url name-string) (tmhtml-image-names "png" x)
 	    ;;(display* x " -> " name-url ", " name-string "\n")
 	    (let* ((extents (print-snippet name-url x #t))
                    (m (magic-png-number))
@@ -1389,13 +1390,13 @@
   ;; make sure image is accessible from html
   ;; FIXME: we should replace ~, environment variables, etc.
   (let* ((un  (unix->url name))
-         (u (url-relative current-save-target un))
+         (u (url-relative (save-target-url) un))
          (suf (url-suffix un)))
     (if (url-exists? u)
         name
       (with u1 (url-relative (current-buffer-url) un)
         (if (url-exists? u1)
-          (receive (name-url name-string) (tmhtml-image-names suf)
+          (receive (name-url name-string) (tmhtml-image-names suf name)
             (system-copy u1 name-url)
             name-string)
            name))))) ;; image does not exist, can't do much
@@ -1432,7 +1433,8 @@
               (string? (caddar l)))
          ;; embedded web image
          (receive (name-url name-string)
-	          (tmhtml-image-names (url-suffix (cork->utf8 (caddar l))))
+	          (tmhtml-image-names (url-suffix (cork->utf8 (caddar l)))
+				      (cadr (cadar l)))
 	   (string-save (cadr (cadar l)) name-url)
 	   (with h (tmhtml-image (cons name-string (cdr l)))
 	     (if tmhtml-image-embed?

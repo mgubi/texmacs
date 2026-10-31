@@ -220,7 +220,6 @@
     [sideScroll setDrawsBackground: NO];
     [sideScroll setHasVerticalScroller: YES];
     [sideScroll setAutohidesScrollers: YES];
-    [sideScroll setScrollerStyle: NSScrollerStyleOverlay];
     sideView = [[TMFlippedView alloc] init];
     [sideScroll setDocumentView: sideView];
     [sidePane addSubview: sideScroll];
@@ -524,13 +523,30 @@
   return [[shownArray objectAtIndex: i] boolValue] && [[row subviews] count] > 0;
 }
 
-- (CGFloat) sideWidth
+- (CGFloat) sideScrollerWidth:(CGFloat) height
+{
+  // The room which the scroller of the columns needs when their pane has
+  // this height (the same condition as the autohiding of the scroller): a
+  // legacy scroller takes the right of the scroll view, and would be over
+  // the last column; an overlay one is shown for a moment over the icons,
+  // and takes no room (#683)
+  if ([NSScroller preferredScrollerStyle] != NSScrollerStyleLegacy) return 0;
+  CGFloat h = 0;
+  for (NSUInteger i = 0; i < 2; i++)
+    if ([self sideShown: i])
+      h = MAX (h, [[rowArray objectAtIndex: i] fittingSize].height);
+  if (h <= height) return 0;
+  return [NSScroller scrollerWidthForControlSize: NSControlSizeRegular
+                                   scrollerStyle: NSScrollerStyleLegacy];
+}
+
+- (CGFloat) sideWidth:(CGFloat) height
 {
   CGFloat w = 0;
   for (NSUInteger i = 0; i < 2; i++)
     if ([self sideShown: i])
       w += [[rowArray objectAtIndex: i] fittingSize].width;
-  return w > 0? w + 1: 0;   // and the hairline
+  return w > 0? w + [self sideScrollerWidth: height] + 1: 0;   // and the hairline
 }
 
 - (void) layoutSide
@@ -556,10 +572,28 @@
     h = MAX (h, sz.height);
   }
   CGFloat w = MAX (0, pr.size.width - 1);
+  [sideScroll setScrollerStyle: [NSScroller preferredScrollerStyle]];
   [sideScroll setFrame: NSMakeRect (right? 1: 0, 0, w, pr.size.height)];
-  [sideView setFrame: NSMakeRect (0, 0, w, MAX (h, pr.size.height))];
+  [sideView setFrame: NSMakeRect (0, 0, MAX (0, w - [self sideScrollerWidth: pr.size.height]),
+                                  MAX (h, pr.size.height))];
   [sideLine setFrame: NSMakeRect (right? 0: w, 0, 1, pr.size.height)];
   [sidePane setHidden: x == 0];
+}
+
+- (void) printSide
+{
+  // for the scripted tests (the step side-bars, ns_tm_widget.mm)
+  CGFloat rows = 0;
+  for (NSView *row in [sideView subviews])
+    rows = MAX (rows, NSMaxX ([sidePane convertRect: [row frame] fromView: sideView]));
+  NSScroller *sc = [sideScroll verticalScroller];
+  NSRect f = [sidePane convertRect: [sc frame] fromView: sideScroll];
+  fprintf (stderr, "NSTEST side-bars style %s pane %.0fx%.0f rows-right %.0f "
+           "document %.0f scroller %s %.0f\n",
+           [sideScroll scrollerStyle] == NSScrollerStyleLegacy? "legacy": "overlay",
+           [sidePane frame].size.width, [sidePane frame].size.height, rows,
+           [sideView frame].size.height,
+           !sc || [sc isHidden]? "hidden": "shown", NSMinX (f));
 }
 
 - (NSView*) rowForMenu:(NSMenu*) menu

@@ -21,6 +21,16 @@
     5.2.7 work fine.
   </warning*>
 
+  <\note*>
+    The plots are EPS images by default, which <TeXmacs> shows by
+    converting them with <name|Ghostscript> (the program <verbatim|gs>; on
+    <name|macOS> for instance <verbatim|brew install ghostscript>). When
+    <name|Ghostscript> is not found, the session says so at its start and
+    makes PNG images instead. A first line <verbatim|% -output png> (or
+    <verbatim|eps>, <verbatim|svg>) in an input chooses the format of its
+    plot.
+  </note*>
+
   <tmdoc-copyright|2011, 2014|Joris van der Hoeven|Miguel de Benito Delgado>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

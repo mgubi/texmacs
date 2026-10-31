@@ -14,6 +14,37 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **LaTeX and HTML export** (desktop): no crash with an embedded image on
+  Edit > Copy to > LaTeX or with a target which cannot be written; the images
+  always go next to the exported file, also from scripts and under any name;
+  a copy to the clipboard never overwrites a different file, reuses the file
+  of the same image, says where it is, and names an image which exists; a
+  linked image is found when exporting to another folder (#697).
+- **macOS: the applications linked against the current SDK** (desktop,
+  Cocoa and Vue): the disk images were linked against the SDK of macOS 13,
+  their minimal version, so macOS gave them the behaviour of macOS 13 (for
+  instance blank plots, #582); they now use the SDK of the build machine,
+  and the minimum version stays macOS 13.0 (#662).
+- **Gnuplot: PNG plots without Ghostscript** (desktop): the gnuplot
+  sessions make PNG images, and say so at their start, when Ghostscript
+  (`gs`), which TeXmacs needs to show EPS images, is not installed; before,
+  each plot showed as a question mark. The documentation of the Gnuplot and
+  Maxima plug-ins says that their plots need Ghostscript (#662).
+- **Structured merge of documents** (desktop): the style packages and
+  the settings of the document (initial environment) of the other side
+  are no longer lost, in *Resolve conflict* and in the Git merge driver (a
+  setting changed on both sides keeps Git's ours, and the message says
+  which);
+  in a folder which is not trusted, *Merge documents structurally* says
+  that nothing was installed instead of reporting success; while
+  resolving a conflict, Version › Retain offers *Keep my version* and
+  *Keep their version* instead of Old and New version, which keep your
+  version also during a rebase, where Git swaps ours and theirs (#676).
+- **Cocoa: the scroller of the icon bars in two columns** (desktop, Cocoa
+  interface): when the scroll bars are always shown (System Settings) and the
+  columns at the left or the right of the document are taller than the
+  window, the bar widens by the width of the scroller, which no longer
+  covers the last column (#683).
 - **Cocoa: a console which opens by itself leaves the focus to the document**
   (desktop, Cocoa interface): when a warning opens the "Error messages" window,
   the document stays the window in use, and what is typed or asked for next goes
@@ -25,6 +56,13 @@ have the details, and the problems go to the
   the unknown colors of graphics are black too, and the informative flags
   in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
   (#656).
+- **The menu Focus in source files** (desktop and browser): in a `.cpp`, a
+  `.py`, a `.scm`, a `.json`... it now has the entries for program code
+  (Definitions, Outline, Go to definition, Folds, the syntax and server
+  entries), as in a code block. The definitions of a large file are found
+  much faster (6666 functions: 40 ms instead of 2.7 s, also for the page
+  Outline and Go to definition); the submenu Definitions shows the first 500
+  of them, then All definitions, which opens the page Outline (#698).
 - **The menu Focus in code blocks** (desktop and browser): its entries for
   program code (Definitions, Outline, Go to definition, Folds, the syntax
   and server entries) are back; they were lost at each start, and TeXmacs
@@ -38,6 +76,18 @@ have the details, and the problems go to the
   also in Replace one, which stays one step of undo (#591); a pattern made
   only of a wildcard no longer leaves "Match left" on a theorem or a table
   cell alone in its paragraph (#589).
+- **Replace All next to blocks** (desktop): Replace All always ends, also
+  on a document of empty paragraphs which a pattern of empty paragraphs
+  matches, and a match next to a block (a theorem, a table) which the
+  replacement keeps is replaced instead of left (#687).
+- **A change of style in every view** (desktop): a package added by the
+  document itself (natbib for a bibliography) reaches all the views of the
+  buffer, not only the current one (#535).
+- **A `raw-data` tag without arguments** (desktop): saving a document with
+  it no longer crashes TeXmacs (#685).
+- **Hyphenation of Bulgarian, Russian and Ukrainian** (desktop and
+  browser): the decoding of the hyphenation patterns stops at the end of
+  its string, instead of reading past it (#686).
 - **A tag named `string`** (desktop): a tag or macro named `string` works
   like any other; it no longer gives random content or crashes when a
   document with it is loaded (#678).
