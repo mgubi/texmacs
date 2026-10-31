@@ -338,6 +338,10 @@ pipe_link_rep::start () {
   }
   if (pid==0) { // the child
     setsid();
+    // an interrupt is not ignored in the plugin (a TeXmacs started with
+    // SIGINT ignored, as by `sh ... &', would pass that on)
+    signal (SIGINT, SIG_DFL);
+    signal (SIGQUIT, SIG_DFL);
     close (pp_in  [OUT]);
     close (pp_out [IN ]);
     close (pp_err [IN ]);
