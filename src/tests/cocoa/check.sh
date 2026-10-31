@@ -214,7 +214,9 @@ verdict sizes "negative sizes of dialogs: one warning for each place (#650)" siz
 
 # (columns) TEXMACS_NS_SCROLLERS: the setting of the system for this process
 # only. In a low window the side bar widens by the scroller, which is at the
-# right of the columns; in a high one there is no scroller and no extra room
+# right of the columns; in a high one there is no scroller and no extra room.
+# Both in the same window: the Welcome of the new home may come in front after
+# the first step (the steps follow the window of the last resize)
 export TEXMACS_NS_BARS=left TEXMACS_NS_SCROLLERS=always
 run columns "" "resize:800,300;side-bars;resize:800,1000;side-bars" '(display "")'
 unset TEXMACS_NS_BARS TEXMACS_NS_SCROLLERS
@@ -231,6 +233,7 @@ columns_ok () {
   [ "$(echo "$low" | sed 's/.*pane \([0-9]*\)x.*/\1/')" -gt "$(echo "$high" | sed 's/.*pane \([0-9]*\)x.*/\1/')" ]
 }
 verdict columns "the scroller of the icon bars in columns is beside them (#683)" columns_ok
+grep -a 'NSTEST \(side-bars\|columns of\)' "$out/columns.log" | sed 's/^/         /'
 
 # (raise) a command of the interface which throws a C++ error (cpp-error),
 # run by the update which -[TMDocView scrolled:] forces: the error is
