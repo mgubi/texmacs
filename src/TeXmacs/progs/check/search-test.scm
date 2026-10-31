@@ -2584,6 +2584,87 @@
                           (string? (widget 'replace-skip-message)))))
                 '((document "xyz a1b") #t))))))
 
+;; Replace next to a tag whose border has no cursor position (hidden): when
+;; the cut of the match left the tag alone in its paragraph, or the match
+;; started right after it, the editor corrected the cursor into the tag,
+;; and the replacement went into it (#590); a hit inside it, shown by the
+;; search, changed the document outside the history of undo, and cancelled
+;; the hits and the reference of the search: Replace one did not go on
+;; after its replacement (#591)
+(define (search-in-buffer doc what)
+  ;; the real search of the widget (perform-search*) in a buffer holding
+  ;; doc, in source mode if test-source-mode?: the body afterwards, the
+  ;; number of steps of undo, the body after one undo, and whether the hits
+  ;; and the reference of the search are still there after the search
+  (with-search-buffers doc what ""
+    (lambda (u)
+      (ahash-set! (widget 'search-filter-table)
+                  (current-buffer) (stree->tree '(attr)))
+      (when test-source-mode? (init-env "mode" "src"))
+      (clear-undo-history)
+      ((widget 'perform-search*))
+      (let* ((res (tm->stree (buffer-get-body u)))
+             (n (undo-possibilities))
+             (kept? (and (nnull? (get-alt-selection "alternate"))
+                         (nnull? (get-alt-selection "search-reference")))))
+        (undo 0)
+        (list res n (tm->stree (buffer-get-body u)) kept?)))))
+
+(define (test-replace-next-to-hidden)
+  (check-group "replace next to hidden content")
+  (with-search-mode 'replace
+    (lambda ()
+      (check-replace-rows
+        '(((document (concat "a1x" (hidden "b"))) "a1x" "Z"
+           (document (concat "Z" (hidden "b"))))
+          ((document (concat (hidden "b") "a1x")) "a1x" "Z"
+           (document (concat (hidden "b") "Z")))
+          ((document (concat (hidden "b") "a1x" (hidden "c"))) "a1x"
+           (strong "Q")
+           (document (concat (hidden "b") (strong "Q") (hidden "c"))))
+          ((document (concat "a1x" (hidden "b"))) "a1x" ""
+           (document (hidden "b")))
+          ((document (concat (hidden "b") "a1x")) "a1x" ""
+           (document (hidden "b")))
+          ;; the hit inside the tag shows it (an undoable change)
+          ((document (concat "a1x" (hidden "a2x")))
+           (concat "a" (wildcard "w") "x") "Z"
+           (document (concat "Z" (shown "Z"))))
+          ((document (concat "a1x" (hidden (concat "a2x" (hidden "b")))))
+           (concat "a" (wildcard "w") "x") "Z"
+           (document (concat "Z" (shown (concat "Z" (hidden "b"))))))
+          ;; (as before)
+          ((document (concat "a1x" (strong "b"))) "a1x" "Z"
+           (document (concat "Z" (strong "b"))))))
+      ;; Replace one shows the next hit, Replace All only where it ends
+      (with doc '(document (concat "a1x" (hidden "a2x") "a3x"))
+        (check= (replace-one-repeatedly doc '(concat "a" (wildcard "w") "x")
+                                        "Z")
+                '(document (concat "Z" (shown "Z") "Z")))
+        (check= (replace-all-in-buffer doc '(concat "a" (wildcard "w") "x")
+                                       "Z")
+                (list '(document (concat "Z" (hidden "Z") "Z")) doc)))))
+  (with-search-mode 'search
+    (lambda ()
+      ;; going to a hit inside hidden content shows it, in a step of undo,
+      ;; and keeps the hits and the reference of the search
+      (check= (search-in-buffer '(document (concat "x " (hidden "a2x")))
+                                "a2x")
+              '((document (concat "x " (shown "a2x"))) 1
+                (document (concat "x " (hidden "a2x"))) #t))
+      (with-test-source-mode
+        (lambda ()
+          (check= (search-in-buffer '(document (concat (folded "q" "a2x")
+                                                       "a3x"))
+                                    "a2x")
+                  '((document (concat (unfolded "q" "a2x") "a3x")) 1
+                    (document (concat (folded "q" "a2x") "a3x")) #t))))
+      ;; (nothing to show: nothing changes)
+      (check= (search-in-buffer '(document (concat "x " (strong "a2x")))
+                                "a2x")
+              '((document (concat "x " (strong "a2x"))) 0
+                (document (concat "x " (strong "a2x"))) #t)))))
+
 ;; Replace one, then Replace All: Replace All goes on after the replacement,
 ;; as Replace one does; it took the hit which ends there, and replaced in
 ;; the replacement (#596)
@@ -2764,6 +2845,7 @@
   (test-replace-wildcards)
   (test-replace-in-buffers)
   (test-replace-filters)
+  (test-replace-next-to-hidden)
   (test-replace-failures)
   (test-replace-empty-matches)
   (test-lone-wildcard)

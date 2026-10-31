@@ -168,10 +168,32 @@
              (pos (if (list-starts? cp p) (list-tail cp (length p)) (list))))
         (tree-search-tree-at t what p pos limit)))))
 
+;; Going to a hit in hidden content (hidden, folded, a switch) shows it, a
+;; change of the document: it was made outside the history of undo, so that
+;; undo did not hide it again, and it cancelled the hits, the reference of
+;; the search and the selected hit, so that Replace one did not go on after
+;; its replacement (#591)
+
+(define editing? #f)  ;; inside with-editing: a step of undo, of Replace
+
+(define (show-hidden-at-cursor)
+  ;; show the hidden content which holds the cursor (cursor-show-hidden):
+  ;; a step of undo of its own, or a part of the step of Replace. It only
+  ;; changes the labels of tags, not the paths: the hits, the reference
+  ;; and the selection are kept
+  (let* ((alt (get-alt-selection "alternate"))
+         (ref (get-alt-selection "search-reference"))
+         (sel (and (selection-active-any?)
+                   (list (selection-get-start) (selection-get-end)))))
+    (if editing? (cursor-show-hidden) (with-editing cursor-show-hidden))
+    (when (nnull? alt) (set-alt-selection "alternate" alt))
+    (when (nnull? ref) (set-alt-selection "search-reference" ref))
+    (when sel (selection-set-range-set sel))))
+
 (define (go-to* p)
   (go-to p)
   (when (and (not (cursor-accessible?)) (not (in-source?)))
-    (cursor-show-hidden)
+    (show-hidden-at-cursor)
     (delayed
       (:pause 50)
       (set! search-serial (+ search-serial 1))
@@ -560,6 +582,36 @@
                                     (list-tail (cadr sel) n))
            (cons* (append p (car r)) (append p (cadr r)) (cddr r))))))
 
+;; The cut of a match may leave a tag next to it alone in its paragraph
+;; (the formula of the two is no more), and the editor then corrects the
+;; cursor into that tag if its border has no cursor position (an inner
+;; border, as hidden): the replacement went into the tag (#590)
+
+(define (tags-around p)
+  ;; the tags of the buffer (not formulas or documents) which hold the
+  ;; position p inside them (not at their border: (cDr p) is a string, or
+  ;; the tag which p is before or after), the outermost first
+  (let* ((r (tree->path (buffer-tree))))
+    (let loop ((q (cDr (cDr p))) (l (list)))
+      (if (or (not (list-starts? q r)) (== q r)) l
+          (with u (path->tree q)
+            (loop (cDr q)
+                  (if (or (tree-atomic? u) (tree-in? u '(concat document))) l
+                      (cons u l))))))))
+
+(define (out-of-new-tags p old)
+  ;; the position p, before or after the outermost tag around it which is
+  ;; not one of the tags old (those which held the start of the match
+  ;; before the cut): where the match was, not inside that tag
+  (with new (list-filter (tags-around p)
+                         (lambda (u) (not (list-or (map (cut tree-eq? u <>)
+                                                        old)))))
+    (if (null? new) p
+        (let* ((u (car new))
+               (q (tree->path u)))
+          (append q (if (== (list-tail p (length q)) (path-end u '()))
+                        '(1) '(0)))))))
+
 (define (replace-hit sel by what)
   ;; replace the hit sel of what by by: the match in it which Replace
   ;; replaces (see replace-match), exactly (the selection of the editor
@@ -579,8 +631,14 @@
                                         replace-trace))))
           (go-to a)
           ;; (an empty match: nothing to remove)
-          (when (path-less? a b) (clipboard-cut-between a b))
-          (insert-go-to (tree-copy by*) (path-end by* '()))
+          (when (path-less? a b)
+            (with old (tags-around a)
+              (clipboard-cut-between a b)
+              (go-to (out-of-new-tags (cursor-path) old))))
+          ;; (nothing to insert: the editor would correct the cursor into
+          ;; a tag next to it, which the end of Replace then shows)
+          (when (not (tm-equal? by* ""))
+            (insert-go-to (tree-copy by*) (path-end by* '())))
           (list a b))
         (begin
           (go-to (cadr sel))
@@ -616,7 +674,13 @@
   ;; confirm, as the handlers of the keyboard and the mouse of the kernel do
   ;; after an error (edit_keyboard.cpp, edit_mouse.cpp)
   (start-editing)
-  (with r (catch #t thunk
+  (with r (catch #t
+            (lambda ()
+              (with old editing?
+                (dynamic-wind
+                  (lambda () (set! editing? #t))
+                  thunk
+                  (lambda () (set! editing? old)))))
             (lambda args
               (cancel-editing)
               (end-editing)
@@ -1090,7 +1154,7 @@
   (when toolbar-db-active?
     (db-show-toolbar))
   (when (and (not (cursor-accessible?)) (not (in-source?)))
-    (cursor-show-hidden)))
+    (with-editing cursor-show-hidden)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Replace toolbar
