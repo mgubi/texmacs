@@ -138,19 +138,36 @@
           ((hunk<? (car l2) (car l1)) (loop l1 (cdr l2) (cons (car l2) acc)))
           (else (loop (cdr l1) l2 (cons (car l1) acc))))))
 
+(define (prefix? l1 l2)
+  (and (<= (length l1) (length l2)) (== l1 (sublist l2 0 (length l1)))))
+
+(define (suffix? l1 l2)
+  (and (<= (length l1) (length l2))
+       (== l1 (sublist l2 (- (length l2) (length l1)) (length l2)))))
+
+(define (same-insertion? x y)
+  ;; Is the pure insertion @x also made by the hunk @y, next to it?
+  (and (hunk-insertion? x) (nnull? (hunk-ins x))
+       (or (and (== (hunk-start y) (hunk-start x))
+                (prefix? (hunk-ins x) (hunk-ins y)))
+           (and (== (hunk-end y) (hunk-start x))
+                (suffix? (hunk-ins x) (hunk-ins y))))))
+
 (define (hunk-joins? h g ge)
   ;; Does the hunk @h overlap the group @g which ends at @ge?  Hunks which
-  ;; only touch are independent, except when both insert elements at the
-  ;; same place and one of them is a pure insertion (the order is unclear)
+  ;; only touch are independent (an insertion goes before a change which
+  ;; starts at the same place, after one which ends there), except two
+  ;; insertions at the same place, whose order is unclear, and an insertion
+  ;; which the other side also made next to it
   (or (< (hunk-start h) ge)
       (and (== (hunk-start h) ge)
-           (nnull? (hunk-ins h))
            (nnot (list-find g (lambda (m)
                                 (and (!= (hunk-side m) (hunk-side h))
-                                     (== (hunk-end m) ge)
-                                     (nnull? (hunk-ins m))
-                                     (or (hunk-insertion? m)
-                                         (hunk-insertion? h)))))))))
+                                     (or (and (hunk-insertion? h)
+                                              (hunk-insertion? m)
+                                              (== (hunk-start m) ge))
+                                         (same-insertion? h m)
+                                         (same-insertion? m h)))))))))
 
 (define (side-span vo s e hunks)
   ;; The elements of the ancestor from @s to @e, with the @hunks applied
@@ -167,21 +184,51 @@
   (and (<= (hunk-start h1) (hunk-start h2))
        (>= (hunk-end h1) (hunk-end h2))))
 
-(define (same-tag? o a b)
-  (and (pair? o) (pair? a) (pair? b)
-       (== (car o) (car a)) (== (car o) (car b))))
+(define (same-kind? tag o a b)
+  ;; Can @o, @a and @b be merged in turn?  They have the same tag, or are
+  ;; paragraphs of text (but not words of a concatenation)
+  (or (and (pair? o) (pair? a) (pair? b)
+           (== (car o) (car a)) (== (car o) (car b)))
+      (and (!= tag 'concat) (textual? o) (textual? a) (textual? b))))
 
-(define (paired-changes x y vo)
+(define (tree-words t)
+  (cond ((string? t) (list-filter (string-decompose t " ") (cut != <> "")))
+        ((pair? t) (apply append (map tree-words (cdr t))))
+        (else '())))
+
+(define (similarity t u)
+  ;; The number of words of @t which are also in @u
+  (with wu (tree-words u)
+    (length (list-filter (tree-words t) (cut in? <> wu)))))
+
+(define (closest? z i s e vo)
+  ;; Is @z closer to the i-th element of the ancestor than to the other
+  ;; ones from @s to @e?
+  (with k (similarity z (vector-ref vo i))
+    (let loop ((j s))
+      (cond ((>= j e) #t)
+            ((and (!= j i) (>= (similarity z (vector-ref vo j)) k)) #f)
+            (else (loop (+ j 1)))))))
+
+(define (paired-changes tag x y vo)
   ;; Do the hunks @x and @y both replace the first elements of their ranges
-  ;; one by one by elements with the same tags, the rest being removed?
+  ;; one by one, the rest being removed?  The new elements must have the
+  ;; tags of the old ones and be closer to them than to the other removed
+  ;; elements (#676)
   (let* ((s (hunk-start x))
-         (l (length (hunk-ins x))))
+         (l (length (hunk-ins x)))
+         (e (max (hunk-end x) (hunk-end y))))
     (and (== s (hunk-start y))
          (> l 0)
          (== l (length (hunk-ins y)))
          (== l (min (- (hunk-end x) s) (- (hunk-end y) s)))
-         (list-and (map same-tag? (subvector->list vo s (+ s l))
-                        (hunk-ins x) (hunk-ins y))))))
+         (let loop ((i 0) (lx (hunk-ins x)) (ly (hunk-ins y)))
+           (or (>= i l)
+               (and (same-kind? tag (vector-ref vo (+ s i)) (car lx) (car ly))
+                    (or (== e (+ s l))
+                        (and (closest? (car lx) (+ s i) s e vo)
+                             (closest? (car ly) (+ s i) s e vo)))
+                    (loop (+ i 1) (cdr lx) (cdr ly))))))))
 
 (define (merge-group tag vo gs ge g)
   ;; Merge a group of overlapping hunks, from @gs to @ge
@@ -195,13 +242,15 @@
     (cond ((null? hb) sa)
           ((null? ha) sb)
           ((== sa sb) sa)
+          ((and one? (same-insertion? x y)) sb)
+          ((and one? (same-insertion? y x)) sa)
           ((and one? (== (hunk-ins x) (hunk-ins y)) (contains? x y))
            ;; the same change, and more removals on one side
            sa)
           ((and one? (== (hunk-ins x) (hunk-ins y)) (contains? y x))
            sb)
-          ((and one? (paired-changes x y vo))
-           ;; both sides changed the same elements (with the same tags) and
+          ((and one? (paired-changes tag x y vo))
+           ;; both sides changed the same elements (of the same kind) and
            ;; one of them removed more: the elements are merged in turn
            (with l (length (hunk-ins x))
              (map merge-versions

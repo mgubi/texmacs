@@ -255,9 +255,14 @@ mode** reduces the menus to:
    setting, or of the main style, on both sides keeps yours and counts as
    a conflict, which the message names. Within a block of paragraphs,
    the changes of each side against the ancestor (hunks) are merged when
-   they do not overlap; overlapping changes conflict, except identical
-   ones (one side may remove more) and elements with the same tag changed
-   on both sides, which are merged in turn;
+   they do not overlap (an insertion next to a change of the other side
+   goes before or after it; two different insertions at the same place
+   conflict); overlapping changes conflict, except identical ones (one
+   side may remove more, or also insert the same paragraph next to its
+   change) and elements of the same kind (same tag, or both text) changed
+   on both sides, provided each new element is closer (in shared words)
+   to its old element than to the others removed; these are merged in
+   turn;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 
@@ -411,6 +416,13 @@ shell fallback, Windows and submodules.
 * During a rebase, git's "ours" is the upstream and "theirs" your commits:
   the old (red) version of a conflict is then the upstream one, and *Mine*
   / *Keep my version* retain the new one (`git-mine-version`).
+* Large changes: the matching of the paragraphs (longest common
+  subsequence, `max-lcs-size` in `version-merge.scm`) is quadratic and
+  limited to 4 million pairs; beyond (about 2000 by 2000 paragraphs which
+  differ between the common start and end), only the common start and end
+  are matched, and the middle becomes one change per side: with edits
+  everywhere in 3000 paragraphs, about 15 s and some 1000 conflicts.
+  Raising the limit costs memory and time quadratically.
 * The style packages are merged as a set: packages which only theirs added
   go at the end, and a reordering of the packages by theirs only is not
   taken over (our order is kept).

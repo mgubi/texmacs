@@ -743,6 +743,32 @@
                '(document "A." "X." "C.") #f 1)
   (check-merge '(document "A." "C.") '(document "A." "X." "C.")
                '(document "A." "Y." "C.") #f 1)
+  ;; a change next to an insertion of the other side (audit of #676)
+  (check-merge '(document "A." "B." "C.") '(document "A." "B2." "C.")
+               '(document "A." "B." "X." "C.") '(document "A." "B2." "X." "C.") 0)
+  (check-merge '(document "A." "B." "C.") '(document "A." "B." "X." "C.")
+               '(document "A." "B2." "C.") '(document "A." "B2." "X." "C.") 0)
+  (check-merge '(document "A." "B." "C.") '(document "A." "B2." "C.")
+               '(document "A." "X." "B." "C.") '(document "A." "X." "B2." "C.") 0)
+  (check-merge '(document "A." "B." "C.") '(document "A." "X." "B." "C.")
+               '(document "A." "B2." "C.") '(document "A." "X." "B2." "C.") 0)
+  (check-merge '(document "The quick fox jumps.")
+               '(document "The slow fox jumps.")
+               '(document "The quick red fox jumps.")
+               '(document "The slow red fox jumps.") 0)
+  (check-merge '(document "The quick fox jumps.")
+               '(document "The quick red fox jumps.")
+               '(document "The slow fox jumps.")
+               '(document "The slow red fox jumps.") 0)
+  ;; the same paragraph inserted on both sides, next to a change of one
+  (check-merge '(document "A." "F.") '(document "A." "S." "F2.")
+               '(document "A." "S." "F.") '(document "A." "S." "F2.") 0)
+  (check-merge '(document "A." "F.") '(document "A." "S." "F.")
+               '(document "A." "S." "F2.") '(document "A." "S." "F2.") 0)
+  (check-merge '(document "A." "F.") '(document "A." "F2." "S.")
+               '(document "A." "F." "S.") '(document "A." "F2." "S.") 0)
+  (check-merge '(document "F." "G.") '(document "S." "F." "G.")
+               '(document "S.") '(document "S.") 0)
   ;; a change of a side next to a removal of the other side (audit of #676)
   (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "C2." "Y.")
                '(document "Z." "B." "Y.") #f 1)
@@ -772,6 +798,19 @@
                '(document "A." (section "Long intro") "D." "E.")
                '(document "A." (section "Short introduction") "C." "E.")
                '(document "A." (section "Long introduction") "E.") 0)
+  (check-merge '(document "A." "Short intro here." "C." "E.")
+               '(document "A." "Short introduction here." "E.")
+               '(document "A." "Long intro here." "C." "E.")
+               '(document "A." "Long introduction here." "E.") 0)
+  ;; but not when the new element is closer to another removed one
+  (check-merge '(document "Z." (section "p q r s") (section "p q r t") "Y.")
+               '(document "Z." (section "p q r t u") "Y.")
+               '(document "Z." (section "z p q r s") (section "p q r t") "Y.")
+               #f 3)
+  (check-merge '(document "Z." (section "p q r s") (section "p q r t") "Y.")
+               '(document "Z." (section "z p q r s") (section "p q r t") "Y.")
+               '(document "Z." (section "p q r t u") "Y.")
+               #f 3)
   (check= (merge-conflicts '(document (version-both "a" "b") "c"
                                       (concat (version-old "d"))))
           2)
@@ -822,18 +861,25 @@
                   '("font-base-size")))
     ;; the message of Resolve conflict names the settings where ours was
     ;; kept
-    (check= (git-resolve-message 0 '())
+    (check= (git-resolve-message 0 '() 0)
             "Merged automatically; check the result, then mark as resolved")
-    (check= (git-resolve-message 1 '("font-base-size"))
-            (string-append "Merged automatically, but the settings "
-                           "font-base-size were changed on both sides; "
-                           "yours were kept; check the result, then mark "
-                           "as resolved"))
-    (check= (git-resolve-message 3 '("style"))
-            (string-append "2 conflicting changes: keep my version or "
-                           "their version of each, the settings the style "
-                           "were changed on both sides; yours were kept; "
-                           "then mark as resolved")))
+    (check= (git-resolve-message 1 '("font-base-size") 0)
+            '(concat "Merged automatically" "; "
+                     (replace "Settings changed on both sides, where your version was kept: %1"
+                              (verbatim "font-base-size"))
+                     "; " "check the result, then mark as resolved"))
+    ;; during a rebase, Git's ours (kept) is the upstream
+    (check= (git-resolve-message 3 '("style" "font-base-size") 1)
+            '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
+                              "1")
+                     "; "
+                     (replace "Settings changed on both sides, where the upstream version was kept: %1"
+                              (verbatim "style, font-base-size"))
+                     "; " "then mark as resolved"))
+    (check= (git-resolve-message 2 '() 0)
+            '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
+                              "2")
+                     "; " "then mark as resolved")))
   (with doc '(document (TeXmacs "2.1") (style "generic") (body (document "A.")))
     (check= (document-body doc) '(document "A."))
     (check= (document-body (document-set-body doc '(document "B.")))

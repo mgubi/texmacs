@@ -388,29 +388,30 @@
                                "texmacs"))
          (and (document-body doc) doc))))
 
-(define (kept-description kept)
-  (string-recompose (map (lambda (k) (if (== k "style") "the style" k)) kept)
-                    ", "))
-
-(tm-define (git-resolve-message n kept)
+(tm-define (git-resolve-message n kept mine)
   (:synopsis "The message after merging with @n conflicts")
-  ;; @kept: the parts of the preamble changed on both sides, where our
-  ;; version was kept (they count among the @n conflicts)
+  ;; @kept: the parts of the preamble changed on both sides, where Git's
+  ;; ours was kept (they count among the @n conflicts); @mine: 0 when ours
+  ;; is the version of the user, 1 during a rebase (ours is the upstream).
+  ;; The result is translated by set-message.
   (let* ((m (- n (length kept)))
-         (k (if (null? kept) ""
-                (string-append "the settings " (kept-description kept)
-                               " were changed on both sides; yours "
-                               "were kept"))))
+         (names (string-recompose kept ", "))
+         (body (if (== m 0) "Merged automatically"
+                   `(replace "Conflicts to resolve: %1; keep my version or their version of each"
+                             ,(number->string m))))
+         (pre (cond ((null? kept) #f)
+                    ((== mine 0)
+                     `(replace "Settings changed on both sides, where your version was kept: %1"
+                               (verbatim ,names)))
+                    (else
+                      `(replace "Settings changed on both sides, where the upstream version was kept: %1"
+                                (verbatim ,names)))))
+         (end (if (== m 0) "check the result, then mark as resolved"
+                  "then mark as resolved")))
     (cond ((== n 0)
            "Merged automatically; check the result, then mark as resolved")
-          ((== m 0)
-           (string-append "Merged automatically, but " k
-                          "; check the result, then mark as resolved"))
-          (else
-            (string-append (number->string m) " conflicting changes: keep "
-                           "my version or their version of each, "
-                           (if (null? kept) "" (string-append k "; "))
-                           "then mark as resolved")))))
+          (pre `(concat ,body "; " ,pre "; " ,end))
+          (else `(concat ,body "; " ,end)))))
 
 (tm-define (git-resolve-conflict name)
   (:synopsis "Merge our and their versions of the conflicting file @name")
@@ -436,7 +437,9 @@
                   (buffer-set name (stree->tree (car r)))
                   (version-first-difference)
                   (version-review-open)
-                  (set-message (git-resolve-message (cadr r) (caddr r))
+                  (set-message (git-resolve-message
+                                (cadr r) (caddr r)
+                                (git-mine-version (git-root name)))
                                "Resolve conflict"))
                 (begin
                   (buffer-set name (stree->tree ours))
@@ -445,7 +448,7 @@
                   (set-message (git-resolve-message
                                 (length (tree-search (buffer-tree)
                                                      version-markup?))
-                                '())
+                                '() 0)
                                "Resolve conflict")))))))
 
 (tm-define (git-mark-resolved-now name)
