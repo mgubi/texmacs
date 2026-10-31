@@ -259,7 +259,7 @@ proc_stat (const char* pid, char& st, int& pgrp) {
 bool
 QTMPipeLink::groupAlive (qint64 pg) {
   // whether a process of the group pg is left, not counting zombies (EPERM:
-  // a member which we may not signal)
+  // a member which we may not signal; on macOS also a group of zombies only)
   if (pg <= 0) return false;
   if (::killpg ((pid_t) pg, 0) == -1) return errno == EPERM;
 #ifdef __linux__
@@ -291,8 +291,12 @@ QTMPipeLink::groupAlive (qint64 pg) {
 void
 QTMPipeLink::forgetEndedGroup () {
   // the group of a program which has exited, once it is gone (whose number
-  // may then be another's)
-  if (group > 0 && state () == QProcess::NotRunning && !groupAlive (group))
+  // may then be another's); killpg alone, not groupAlive: it is called by
+  // process_all_pipes at each update, and the full scan of /proc would run
+  // as long as a member of the group lives (members which are zombies only
+  // delay this, which is safe: their group number is not reused meanwhile)
+  if (group > 0 && state () == QProcess::NotRunning &&
+      ::killpg ((pid_t) group, 0) == -1 && errno != EPERM)
     group= 0;
 }
 
