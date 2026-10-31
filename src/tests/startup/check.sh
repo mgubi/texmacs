@@ -178,8 +178,8 @@ quit ()" \
 # The clipboard commands under -headless, which runs a QCoreApplication: the
 # clipboard of Qt has no platform there, and copying crashed (#708). The
 # selections are kept by TeXmacs itself: a copy, also exported to LaTeX, is
-# read back (also by the key extern) and pasted, and a cleared selection is
-# empty.
+# read back (also by the key extern) and pasted, a cleared selection is
+# empty, and no image is reported as put on the clipboard.
 cat > "$out/startup-clip.scm" <<'EOF'
 (define (copies)
   ;; the number of copies of the sentence of startup-a.tm in the buffer
@@ -207,6 +207,12 @@ cat > "$out/startup-clip.scm" <<'EOF'
   (display* "CHECK paste " (copies) "\n")
   (clipboard-clear "primary")
   (display* "CHECK clear " (tree->stree (clipboard-get "primary")) "\n")
+  ;; no image is put on a clipboard which is not there
+  (display* "CHECK graphics "
+            (graphics-file-to-clipboard
+             (system->url (string-append (getenv "TEXMACS_PATH")
+                                         "/misc/images/fancy-c.png")))
+            "\n")
   (buffer-pretend-saved u)
   (buffer-close u))
 EOF
@@ -217,6 +223,7 @@ extern #t
 latex #t
 paste 2
 clear none
+graphics #f
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-clip.scm")'
 
