@@ -620,8 +620,14 @@ edit_select_rep::selection_set (string key, tree t, bool persistant) {
     if (selection_export == "latex") t= exec_latex (t, tp);
     if ((selection_export == "latex") && (mode == "math"))
       t= compound ("math", t);
-    if (selection_export != "default")
+    if (selection_export != "default") {
+      // The images of a real copy are kept for the pasted text
+      object old_copying;
+      if (key == "primary")
+        old_copying= call ("copying-to-clipboard-swap", object (true));
       s= tree_to_generic (t, selection_export * "-snippet");
+      if (key == "primary") call ("copying-to-clipboard-swap", old_copying);
+    }
     else {
       s= tree_to_generic (t, "texmacs-snippet");
       tree tmp;
