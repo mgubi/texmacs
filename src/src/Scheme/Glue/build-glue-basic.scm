@@ -932,6 +932,7 @@
   (buffer-attach-notifier attach_buffer_notifier (void url))
   (buffer-has-name? buffer_has_name (bool url))
   (buffer-aux? is_aux_buffer (bool url))
+  (buffer-forget-history buffer_forget_history (void url))
   (buffer-embedded? is_embedded_buffer (bool url))
   (buffer-import buffer_import (bool url url string))
   (buffer-load buffer_load (bool url))
