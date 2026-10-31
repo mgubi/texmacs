@@ -732,6 +732,81 @@
           '("LaTeX import: \\zqdw not expanded, too many nested expansions"))
   (check= (latex-import-warnings "\\newcommand{\\foo}[1]{<#1>}\\foo{x}") '()))
 
+;; \string gives the next token as text: it was imported as a tag named
+;; "string", which is the label of the atomic trees, and the import gave a
+;; random byte (#658, texinfo.tex). In a definition or an argument, a brace
+;; after it still opens or closes a group, as TeX counted it when it read
+;; that text; in a group which TeX executes, it is only a character.
+(define (test-import-string)
+  (check-group "import: \\string")
+  (check= (lt "\\edef\\mylbrace{\\iftrue \\string{\\else}\\fi}")
+          '(assign "mylbrace" (macro (concat (iftrue) "{" (else) (fi)))))
+  (check= (lt "\\edef\\myrbrace{\\iffalse{\\else\\string}\\fi}x")
+          '(concat (assign "myrbrace"
+                           (macro (concat (iffalse (concat (else) "}")) (fi))))
+                   "x"))
+  (check= (lt "a\\string{b") "a{b")
+  (check= (lt "a\\string}b") "a}b")
+  (check= (lt "a\\string\\foo b\\string\\{") "a\\foob\\{")
+  (check= (lt "a\\string&b\\string$c\\string#d\\string_e\\string<f")
+          "a&b$c#d_e<less>f")
+  ;; two backslashes, which were read as a command with an empty name:
+  ;; the tag could not be exported
+  (check= (lt "a\\string\\\\b") "a\\\\b")
+  (check= (convert (lt "a\\string\\\\b") "texmacs-stree" "latex-snippet")
+          "a\\textbackslash\\textbackslash b")
+  ;; in math, \textbackslash gives nothing; a backslash which is not between
+  ;; two operands was dropped by the homoglyphs of tree_correct.cpp
+  (check= (lt "$\\string\\alpha$") '(math "<backslash>*alpha"))
+  (check= (lt "$\\backslash$") '(math "<backslash>"))
+  (check= (lt "$a\\backslash b$") '(math "a<setminus>b"))
+  ;; in an executed group
+  (check= (lt "{\\tt\\string{}rest")
+          '(concat (with "font-family" "tt" "{") "rest"))
+  (check= (lt "{\\ttfamily \\string}}rest")
+          '(concat (with "font-family" "tt" "}") "rest"))
+  ;; in an argument
+  (check= (lt "\\textbf{a\\string}b") '(concat (with "font-series" "bold" "a}") "b"))
+  ;; \string read as the argument of a macro (\gobble\string#1 in texinfo)
+  (check= (lt "\\newcommand{\\g}[1]{}\\g\\string y")
+          '(concat (assign "g" (macro "1" "")) (g "") "y"))
+  ;; a tag named "string" from an environment
+  (check= (lt "\\begin{string}x\\end{string}") '(compound "string" "x")))
+
+;; groups and arguments nested very deep: the parser recursed once per
+;; level and overflowed the stack (#658); the levels beyond 128 are skipped
+(define (test-import-deep-nesting)
+  (check-group "import: deep nesting")
+  (let ((b (make-string 100 #\{)) (e (make-string 100 #\})))
+    (check= (lt (string-append "a" b "x" e "b")) "axb"))
+  (let ((b (make-string 20000 #\{)) (e (make-string 20000 #\})))
+    (check= (lt (string-append "a" b "x" e "b")) "ab")
+    (check= (lt (string-append "$" b "x" e "$")) "")
+    (check= (latex-import-warnings (string-append "a" b "x" e "b"))
+            '("LaTeX import: groups nested more than 128 deep skipped")))
+  ;; a } in a comment or \verb of a skipped group does not end it
+  (let ((b (make-string 130 #\{)) (e (make-string 130 #\})))
+    (check= (lt (string-append "a" b "x%}\n\\verb|}|\\verb*+}+" e "b")) "ab"))
+  ;; the bodies of macros count from 0, but not without limit: a chain of 99
+  ;; macros with a side effect and 120 groups each
+  (with name (lambda (i)
+               (string-append "\\m" (string (integer->char (+ 97 (quotient i 26))))
+                              (string (integer->char (+ 97 (remainder i 26))))))
+    (with chain (string-append
+                 (apply string-append
+                        (map (lambda (i)
+                               (string-append "\\newcommand{" (name i)
+                                              "}{\\newcommand{\\q}{}"
+                                              (make-string 120 #\{) (name (+ i 1))
+                                              (make-string 120 #\}) "}"))
+                             (iota 99)))
+                 "\\newcommand{" (name 99) "}{x}" (name 0) " y")
+      (check= (list-tail (lt chain) 101) '((maa) "y"))
+      (check= (latex-import-warnings chain)
+              '("LaTeX import: groups nested more than 512 deep skipped"))))
+  (with b (apply string-append (make-list 1000 "\\textbf{"))
+    (check= (lt (string-append "a" b "x" (make-string 1000 #\}) "b")) "ab")))
+
 (define (all-debug-messages)
   (tree-children (get-debug-messages "Debugging console" 100000000)))
 
@@ -1311,6 +1386,8 @@
   (test-import-environments)
   (test-import-macros)
   (test-import-recursive-macros)
+  (test-import-string)
+  (test-import-deep-nesting)
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)
