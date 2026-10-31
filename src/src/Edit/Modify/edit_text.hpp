@@ -27,6 +27,9 @@ public:
   ~edit_text_rep ();
 
   /********************************* text ************************************/
+  bool accepts_paragraphs (path p);
+  bool can_insert_at (tree t, path p);
+  bool insert_return (int& depth);
   bool insert_return ();
   void remove_return (path p);
   void insert_tree (tree t, path p_in_t);

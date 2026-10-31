@@ -405,6 +405,7 @@ public:
   /* public routines from edit_text */
   virtual void correct (path p) = 0;
   virtual void correct_concat (path p, int done=0) = 0;
+  virtual bool can_insert_at (tree t, path p) = 0;
   virtual bool insert_return () = 0;
   virtual void remove_return (path p) = 0;
   virtual void insert_tree (tree t, path p_in_t) = 0;
