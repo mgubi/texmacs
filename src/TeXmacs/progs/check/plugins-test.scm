@@ -131,6 +131,39 @@
   (:launch "sh -c \"trap '' INT TERM; exec sleep 97\"")
   (:serializer ,raw-serialize))
 
+;; runs its program as a child of the shell (without exec), with another
+;; one in the background, as a script which starts a plugin may: stopping
+;; or interrupting the plugin reaches them too (its process group); the
+;; test finds them by the arguments of the sleeps
+(plugin-configure tmtestgroup
+  (:launch "sh -c \"sleep 613 & sleep 614; cat\"")
+  (:serializer ,raw-serialize))
+
+;; cleans up when it is asked to terminate: it writes a file a little later
+;; (the test finds its process by the argument 615)
+(define grace-file
+  (url->system (url-append (url-concretize "$TEXMACS_HOME_PATH")
+                           "plugins-test-grace")))
+
+(plugin-configure tmtestgrace
+  (:launch ,(string-append "sh -c \"trap 'sleep 1; echo done > "
+                           grace-file "; exit 0' TERM; "
+                           "sleep 615 & wait\""))
+  (:serializer ,raw-serialize))
+
+;; the same, by a program which is not the first process of the plugin (that
+;; one, cat, ends at once): it writes on the output of the plugin while it
+;; cleans up, which it may do as long as it runs (argument 616)
+(define grace-file2
+  (url->system (url-append (url-concretize "$TEXMACS_HOME_PATH")
+                           "plugins-test-grace2")))
+
+(plugin-configure tmtestgracepipe
+  (:launch ,(string-append "sh -c \"(trap 'sleep 0.3; echo bye; "
+                           "echo bye >&2; echo done > " grace-file2
+                           "; exit 0' TERM; sleep 616 & wait) & exec cat\""))
+  (:serializer ,raw-serialize))
+
 ;; two variants, the session name chooses the variant
 (plugin-configure tmtestvariants
   (:launch "v1" "cat")
@@ -1255,16 +1288,78 @@
       ;; the interface is not blocked until the process is killed (2 s)
       (check-true (< (- (texmacs-time) start) 1000)))
     (check= (connection-status "tmtestterm" "plugins-test-term") 0)
-    ;; without Qt pipes (pipe_link.cpp), it is killed after 2 s, and
-    ;; reaped, by the event loop in TeXmacs; here (no event loop), by the
-    ;; next start or stop of a plugin. With Qt pipes, connection-stop kills
-    ;; it at once and reaps it (QTMPipeLink::killProcess)
+    ;; it is killed after 2 s, and reaped, by the event loop in TeXmacs;
+    ;; here (no event loop), by the next start or stop of a plugin (Qt
+    ;; pipes killed it at once, with no time to clean up)
     (pause "2.2")
     (check= (start* "tmtestecho" "plugins-test-term2") "ok")
     (connection-stop "tmtestecho" "plugins-test-term2")
     ;; (pid-alive? counts a zombie as ended)
     (when pid
-      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000)))))
+      (check-true (wait-until (lambda () (not (pid-alive? pid))) 3000))))
+
+  (check-group "processes: the group of a plugin")
+  ;; the plugin is started in a process group of its own, which is stopped
+  ;; as a whole: the programs which its script started end with it (with Qt
+  ;; pipes, they were left running)
+  (check= (start* "tmtestgroup" "plugins-test-group1") "ok")
+  (check-true (wait-until (lambda () (and (== (sleepers "613") 1)
+                                          (== (sleepers "614") 1)))
+                          5000))
+  (connection-stop "tmtestgroup" "plugins-test-group1")
+  (check= (connection-status "tmtestgroup" "plugins-test-group1") 0)
+  (check-true (wait-until (lambda () (and (== (sleepers "613") 0)
+                                          (== (sleepers "614") 0)))
+                          3000))
+  ;; an interrupt reaches the whole group too: the program in the
+  ;; foreground ends (the one in the background ignores SIGINT, as the
+  ;; programs which sh starts in the background do), as the shell itself
+  (check= (start* "tmtestgroup" "plugins-test-group2") "ok")
+  (check-true (wait-until (lambda () (and (== (sleepers "613") 1)
+                                          (== (sleepers "614") 1)))
+                          5000))
+  (connection-interrupt "tmtestgroup" "plugins-test-group2")
+  (check-true (wait-until (lambda () (== (sleepers "614") 0)) 3000))
+  (connection-stop "tmtestgroup" "plugins-test-group2")
+  (check-true (wait-until (lambda () (== (sleepers "613") 0)) 3000))
+
+  (check-group "processes: a plugin which cleans up when stopped")
+  ;; SIGTERM, then SIGKILL only 2 s later: the plugin has time to clean up
+  ;; (with Qt pipes, SIGKILL followed SIGTERM at once)
+  (when (url-exists? (system->url grace-file))
+    (system-remove (system->url grace-file)))
+  (let ((before (zombies)))
+    (check= (start* "tmtestgrace" "plugins-test-grace") "ok")
+    (check-true (wait-until (lambda () (== (sleepers "615") 1)) 5000))
+    (with start (texmacs-time)
+      (connection-stop "tmtestgrace" "plugins-test-grace")
+      ;; the interface does not wait until the plugin has cleaned up (1 s;
+      ;; the stop waits 50 ms, with a margin for loaded machines)
+      (check-true (< (- (texmacs-time) start) 800)))
+    (check= (connection-status "tmtestgrace" "plugins-test-grace") 0)
+    (check-true (wait-until (lambda () (url-exists? (system->url grace-file)))
+                            3000))
+    (check-true (wait-until (lambda () (== (sleepers "615") 0)) 3000))
+    ;; the process, which has ended, is reaped by the next start or stop
+    ;; of a plugin (no event loop here)
+    (pause "0.2")
+    (check= (start* "tmtestecho" "plugins-test-grace2") "ok")
+    (connection-stop "tmtestecho" "plugins-test-grace2")
+    (check= (- (zombies) before) 0))
+  (when (url-exists? (system->url grace-file))
+    (system-remove (system->url grace-file)))
+  ;; the output of the plugin stays open meanwhile: the program which
+  ;; cleans up does not die of SIGPIPE when it writes there
+  (when (url-exists? (system->url grace-file2))
+    (system-remove (system->url grace-file2)))
+  (check= (start* "tmtestgracepipe" "plugins-test-gracepipe") "ok")
+  (check-true (wait-until (lambda () (== (sleepers "616") 1)) 5000))
+  (connection-stop "tmtestgracepipe" "plugins-test-gracepipe")
+  (check-true (wait-until (lambda () (url-exists? (system->url grace-file2)))
+                          3000))
+  (check-true (wait-until (lambda () (== (sleepers "616") 0)) 3000))
+  (when (url-exists? (system->url grace-file2))
+    (system-remove (system->url grace-file2))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
