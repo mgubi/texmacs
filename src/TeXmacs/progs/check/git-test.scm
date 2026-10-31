@@ -769,6 +769,34 @@
                '(document "A." "F." "S.") '(document "A." "F2." "S.") 0)
   (check-merge '(document "F." "G.") '(document "S." "F." "G.")
                '(document "S.") '(document "S.") 0)
+  ;; a paragraph removed and another inserted at the same place is not a
+  ;; change of the paragraph (third audit of #676)
+  (check-merge '(document "S." "Third para here." "Fourth para there." "E.")
+               '(document "S." "Third para here." "Fourth para there, edited." "E.")
+               '(document "S." "Fourth para there." "Why new." "E.")
+               '(document "S." "Fourth para there, edited." "Why new." "E.") 0)
+  (check-merge '(document "S." "Third para here." "Fourth para there." "E.")
+               '(document "S." "Fourth para there." "Why new." "E.")
+               '(document "S." "Third para here." "Fourth para there, edited." "E.")
+               '(document "S." "Fourth para there, edited." "Why new." "E.") 0)
+  (check-merge '(document "A." "B.") '(document "A." "S.") '(document "S." "B.")
+               #f 2)
+  (check-merge '(document "P one two." "P three four.")
+               '(document "P one two five." "P three four six.")
+               '(document "P one two." "P three four seven.")
+               '(document "P one two five."
+                          (concat "P three four " (version-both "six." "seven.")))
+               1)
+  ;; an element inserted on both sides is never duplicated
+  (check-merge '(document "Cee para.") '(document "Shared new.")
+               '(document "Cee para." "Yy new." "Shared new.")
+               '(document (version-both (document (version-suppressed))
+                                        (document "Cee para." "Yy new."))
+                          "Shared new.") 1)
+  (check-merge '(document "E.") '(document "X." "S." "E.") '(document "S.")
+               #f 2)
+  (check-merge '(document "A." "E." "E.") '(document "A." "S." "E.")
+               '(document "S." "E." "E.") #f 2)
   ;; a change of a side next to a removal of the other side (audit of #676)
   (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "C2." "Y.")
                '(document "Z." "B." "Y.") #f 1)
@@ -865,7 +893,7 @@
             "Merged automatically; check the result, then mark as resolved")
     (check= (git-resolve-message 1 '("font-base-size") 0)
             '(concat "Merged automatically" "; "
-                     (replace "Settings changed on both sides, where your version was kept: %1"
+                     (replace "settings changed on both sides, where your version was kept: %1"
                               (verbatim "font-base-size"))
                      "; " "check the result, then mark as resolved"))
     ;; during a rebase, Git's ours (kept) is the upstream
@@ -873,7 +901,7 @@
             '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
                               "1")
                      "; "
-                     (replace "Settings changed on both sides, where the upstream version was kept: %1"
+                     (replace "settings changed on both sides, where the upstream version was kept: %1"
                               (verbatim "style, font-base-size"))
                      "; " "then mark as resolved"))
     (check= (git-resolve-message 2 '() 0)

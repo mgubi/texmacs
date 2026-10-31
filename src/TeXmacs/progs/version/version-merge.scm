@@ -157,8 +157,8 @@
   ;; Does the hunk @h overlap the group @g which ends at @ge?  Hunks which
   ;; only touch are independent (an insertion goes before a change which
   ;; starts at the same place, after one which ends there), except two
-  ;; insertions at the same place, whose order is unclear, and an insertion
-  ;; which the other side also made next to it
+  ;; insertions at the same place, whose order is unclear, and insertions
+  ;; of the same elements by the two sides
   (or (< (hunk-start h) ge)
       (and (== (hunk-start h) ge)
            (nnot (list-find g (lambda (m)
@@ -167,7 +167,14 @@
                                               (hunk-insertion? m)
                                               (== (hunk-start m) ge))
                                          (same-insertion? h m)
-                                         (same-insertion? m h)))))))))
+                                         (same-insertion? m h)
+                                         ;; elements inserted on both sides
+                                         ;; must not be duplicated
+                                         (and (== (hunk-end m) ge)
+                                              (nnot (list-find
+                                                     (hunk-ins h)
+                                                     (cut in? <>
+                                                          (hunk-ins m)))))))))))))
 
 (define (side-span vo s e hunks)
   ;; The elements of the ancestor from @s to @e, with the @hunks applied
@@ -196,18 +203,35 @@
         ((pair? t) (apply append (map tree-words (cdr t))))
         (else '())))
 
-(define (similarity t u)
-  ;; The number of words of @t which are also in @u
-  (with wu (tree-words u)
-    (length (list-filter (tree-words t) (cut in? <> wu)))))
+(define (word-table t)
+  (with h (make-ahash-table)
+    (for-each (lambda (w) (ahash-set! h w #t)) (tree-words t))
+    h))
 
-(define (closest? z i s e vo)
+(define (word-tables vo)
+  ;; The words of the elements of @vo, computed when needed
+  (cons vo (make-vector (vector-length vo) #f)))
+
+(define (word-table-ref tabs j)
+  (or (vector-ref (cdr tabs) j)
+      (with h (word-table (vector-ref (car tabs) j))
+        (vector-set! (cdr tabs) j h)
+        h)))
+
+(define (similarity zw tabs j)
+  ;; The number of the words @zw (of a new element) which are words of the
+  ;; j-th element of the ancestor
+  (with h (word-table-ref tabs j)
+    (length (list-filter zw (cut ahash-ref h <>)))))
+
+(define (closest? z i s e tabs)
   ;; Is @z closer to the i-th element of the ancestor than to the other
   ;; ones from @s to @e?
-  (with k (similarity z (vector-ref vo i))
+  (let* ((zw (tree-words z))
+         (k (similarity zw tabs i)))
     (let loop ((j s))
       (cond ((>= j e) #t)
-            ((and (!= j i) (>= (similarity z (vector-ref vo j)) k)) #f)
+            ((and (!= j i) (>= (similarity zw tabs j) k)) #f)
             (else (loop (+ j 1)))))))
 
 (define (paired-changes tag x y vo)
@@ -217,7 +241,8 @@
   ;; elements (#676)
   (let* ((s (hunk-start x))
          (l (length (hunk-ins x)))
-         (e (max (hunk-end x) (hunk-end y))))
+         (e (max (hunk-end x) (hunk-end y)))
+         (tabs (word-tables vo)))
     (and (== s (hunk-start y))
          (> l 0)
          (== l (length (hunk-ins y)))
@@ -225,10 +250,28 @@
          (let loop ((i 0) (lx (hunk-ins x)) (ly (hunk-ins y)))
            (or (>= i l)
                (and (same-kind? tag (vector-ref vo (+ s i)) (car lx) (car ly))
-                    (or (== e (+ s l))
-                        (and (closest? (car lx) (+ s i) s e vo)
-                             (closest? (car ly) (+ s i) s e vo)))
+                    (or (== e (+ s 1))
+                        (and (closest? (car lx) (+ s i) s e tabs)
+                             (closest? (car ly) (+ s i) s e tabs)))
                     (loop (+ i 1) (cdr lx) (cdr ly))))))))
+
+(define (positional? tag o a b)
+  ;; Can the chunks @o, @a and @b (of the same length) be merged element
+  ;; by element?  Each element is either unchanged on a side, or replaced
+  ;; by one of the same kind which is closer to it than to the others
+  ;; (a paragraph removed and another inserted are not a change, #676)
+  (let* ((vo (list->vector o))
+         (n (vector-length vo))
+         (tabs (word-tables vo))
+         (ok? (lambda (i oi z)
+                (or (== z oi)
+                    (and (same-kind? tag oi z z)
+                         (or (== n 1) (closest? z i 0 n tabs)))))))
+    (let loop ((i 0) (o o) (a a) (b b))
+      (or (null? o)
+          (and (ok? i (car o) (car a))
+               (ok? i (car o) (car b))
+               (loop (+ i 1) (cdr o) (cdr a) (cdr b)))))))
 
 (define (merge-group tag vo gs ge g)
   ;; Merge a group of overlapping hunks, from @gs to @ge
@@ -283,8 +326,7 @@
         ((== o a) b)
         ((== o b) a)
         ((and (== (length o) (length a)) (== (length o) (length b))
-              (or (!= tag 'concat) (> (length o) 1)
-                  (and (pair? (car a)) (pair? (car b)))))
+              (positional? tag o a b))
          ;; Replacements of elements: merge them one by one
          ;; NOTE: single words of a concatenation are not merged any further
          (map merge-versions o a b))

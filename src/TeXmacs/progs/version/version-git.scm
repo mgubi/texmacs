@@ -401,10 +401,10 @@
                              ,(number->string m))))
          (pre (cond ((null? kept) #f)
                     ((== mine 0)
-                     `(replace "Settings changed on both sides, where your version was kept: %1"
+                     `(replace "settings changed on both sides, where your version was kept: %1"
                                (verbatim ,names)))
                     (else
-                      `(replace "Settings changed on both sides, where the upstream version was kept: %1"
+                      `(replace "settings changed on both sides, where the upstream version was kept: %1"
                                 (verbatim ,names)))))
          (end (if (== m 0) "check the result, then mark as resolved"
                   "then mark as resolved")))

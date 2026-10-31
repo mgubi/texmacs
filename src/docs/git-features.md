@@ -256,13 +256,16 @@ mode** reduces the menus to:
    a conflict, which the message names. Within a block of paragraphs,
    the changes of each side against the ancestor (hunks) are merged when
    they do not overlap (an insertion next to a change of the other side
-   goes before or after it; two different insertions at the same place
-   conflict); overlapping changes conflict, except identical ones (one
+   goes before or after it; two different insertions at the same place,
+   or insertions of the same paragraph by both sides next to each other,
+   conflict instead of duplicating it); overlapping changes conflict, except identical ones (one
    side may remove more, or also insert the same paragraph next to its
    change) and elements of the same kind (same tag, or both text) changed
    on both sides, provided each new element is closer (in shared words)
    to its old element than to the others removed; these are merged in
-   turn;
+   turn. The same test decides whether blocks of the same length are
+   merged paragraph by paragraph: a paragraph removed and another one
+   inserted at its place is not a change of the paragraph;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 
