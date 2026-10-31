@@ -2506,6 +2506,22 @@
         (check= (car (replace-all-in-buffer (car row) (cadr row)
                                             (caddr row)))
                 `(document ,(cadddr row))))
+      ;; (the same in a document inside a tag: a theorem, a cell)
+      (for (row '(((theorem (document "ab" "" "" "ef")) (document "" "") ""
+                   (theorem (document "abef")))
+                  ((theorem (document "ab" "" "" "ef")) (document "" "") "Z"
+                   (theorem (document "abZZZef")))
+                  ((theorem (document "a" "" "" "" "b")) (document "" "") ""
+                   (theorem (document "ab")))
+                  ((theorem (document "ab" "" "" "ef"))
+                   (document (wildcard "w") (wildcard "v")) "X"
+                   (theorem (document "XXX")))
+                  ((tabular (table (row (cell (document "ab" "" "" "ef")))))
+                   (document "" "") ""
+                   (tabular (table (row (cell (document "abef"))))))))
+        (check= (car (replace-all-in-buffer `(document ,(car row)) (cadr row)
+                                            (caddr row)))
+                `(document ,(cadddr row))))
       ;; (the rest of the text is a hit)
       (check= (tree-search-from (stree->tree '(document (theorem (document
                                                                    "ab"

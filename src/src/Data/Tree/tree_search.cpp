@@ -2198,6 +2198,19 @@ token_between (tree u, path a, path b) {
   return false;
 }
 
+static bool
+crosses_break (tree u, path a, path b) {
+  // do the positions a and b of u lie in different paragraphs of a
+  // document of u, at any depth (the body of a theorem, a cell)?
+  while (!is_nil (a) && !is_nil (b) && !is_nil (a->next) &&
+         !is_nil (b->next) && a->item == b->item &&
+         !is_atomic (u) && a->item < N(u)) {
+    u= u[a->item]; a= a->next; b= b->next;
+  }
+  return is_document (u) && !is_nil (a) && !is_nil (b) &&
+         !is_nil (a->next) && !is_nil (b->next) && a->item != b->item;
+}
+
 static array<path>
 search_in_cut (tree t, tree what, path p, path q, int limit,
                bool after_empty, bool filtered) {
@@ -2238,14 +2251,14 @@ search_in_cut (tree t, tree what, path p, path q, int limit,
       // (a hit which takes no token of t is empty: the rest of a tag alone
       // in its paragraph after the end of its text, which a trailing
       // wildcard carries to the end of the paragraph, and which Replace
-      // left with a message, #589. In a document, for a pattern of several
-      // paragraphs, a hit from one paragraph to another takes the break
-      // between them, which is not a token of token_between)
+      // left with a message, #589. For a pattern of several paragraphs, a
+      // hit from one paragraph of a document to another, at any depth,
+      // takes the break between them, which is not a token of
+      // token_between)
       if (!is_nil (q) && !token_before (c, h1) &&
           (after_empty ||
            (!token_between (t, u1, u2) &&
-            !(!para && !is_nil (u1) && !is_nil (u2) &&
-              u1->item != u2->item))))
+            !(!para && crosses_break (t, u1, u2)))))
         continue;
       path m1= p * u1, m2= p * u2;
       path w= p * uncut (t, q, w1, lv);
