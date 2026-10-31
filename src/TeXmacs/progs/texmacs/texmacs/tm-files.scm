@@ -151,15 +151,57 @@
 (tm-define current-save-source (url-none))
 (tm-define current-save-target (url-none))
 
+;; The document which is being converted and the file which is being written:
+;; set by buffer_export and export_tree in C++ for the time of the conversion,
+;; none otherwise (a conversion for the clipboard writes no file)
+
+(tm-define (save-source-swap u)
+  (with old current-save-source
+    (set! current-save-source u)
+    old))
+
 (tm-define (save-target-swap u)
-  ;; the file which a converter is writing, set by export_tree in C++ for the
-  ;; time of a conversion; returns the previous one
   (with old current-save-target
     (set! current-save-target u)
     old))
 
-(tm-define (save-source-set u)
-  (set! current-save-source u))
+(tm-define (save-source-url)
+  (if (url-none? current-save-source) (current-buffer) current-save-source))
+
+(tm-define (save-target-url)
+  (if (url-none? current-save-target) (save-source-url) current-save-target))
+
+(tm-define (url-drop-suffix u)
+  (with suf (url-suffix u)
+    (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
+
+;; The images of a conversion which writes no file go next to the document,
+;; where the pasted text finds them, with a name which is still free. When the
+;; document is not in a folder of the user which can be written, they go to a
+;; folder of the home, not to the temporary one, which goes away with TeXmacs
+;; while the pasted text remains; the text then needs the absolute name.
+
+(define (document-folder)
+  (let* ((b (current-buffer))
+         (dir (url-head b)))
+    (and (not (url-none? b))
+         (not (url-scratch? b))
+         (not (url-rooted-web? b))
+         (not (url-rooted-tmfs? b))
+         (url-exists? b)
+         (url-test? dir "w")
+         (not (url-descends? dir (get-texmacs-path)))
+         dir)))
+
+(tm-define (loose-images-root)
+  ;; the url and the name to give to the images, which get a suffix
+  (with dir (document-folder)
+    (if dir
+        (values (url-append dir "image") "image")
+        (let* ((folder (string->url "$TEXMACS_HOME_PATH/system/images"))
+               (root (url-append folder "image")))
+          (when (not (url-exists? folder)) (system-mkdir folder))
+          (values root (url->unix root))))))
 
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))
@@ -211,8 +253,6 @@
 
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
-  (set! current-save-source name)
-  (set! current-save-target name)
   (with vname `(verbatim ,(url->system name))
     (cond ((url-scratch? name)
            (choose-file
@@ -332,7 +372,6 @@
     (set! to (string-replace to ":" "-"))
     (set! to (string-replace to ";" "-"))
     (set! to (url-relative (buffer-get-master name) to)))
-  (if (url? name) (set! current-save-source name))
   (export-buffer-check-permissions name to fm opts))
 
 (tm-define (export-buffer to)

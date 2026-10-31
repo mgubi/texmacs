@@ -647,8 +647,12 @@ buffer_export (url name, url dest, string fm) {
     doc << compound ("links", links);
 
   // The converters find the images linked by the document next to its source
-  if (fm != "texmacs" && fm != "stm") call ("save-source-set", object (name));
-  return export_tree (doc, dest, fm);
+  bool has_source= (fm != "texmacs" && fm != "stm");
+  object old_source;
+  if (has_source) old_source= call ("save-source-swap", object (name));
+  bool r= export_tree (doc, dest, fm);
+  if (has_source) call ("save-source-swap", old_source);
+  return r;
 }
 
 // The macros of a document are expanded by the editor of a view on it; a

@@ -2040,20 +2040,42 @@
 (define (has-text? what s)
   (>= (string-search-forwards what 0 s) 0))
 
-(define (check-latex-image root suffix)
-  ;; the file @root.@suffix of the temporary directory shows its image, which
-  ;; is next to it, is called after it, and holds the picture
-  (let* ((tex (url-append (temp-dir) (string-append root "." suffix)))
-         (image (string-append root "-1." (eps-suffix)))
-         (u (url-append (temp-dir) image))
-         (doc (if (url-exists? tex) (string-load tex) ""))
-         (s (if (url-exists? u) (string-load u) "")))
-    (check-true (has-text? (string-append "{" image "}") doc))
+(define (check-image-file u)
+  ;; @u holds the picture
+  (with s (if (url-exists? u) (string-load u) "")
     (cond ((== (eps-suffix) "eps") (check-true (string-starts? s "%!PS")))
           ((supports-native-pdf?)
            (check-true (string-starts? s "%PDF-"))
            (check-true (has-text? "/Subtype /Image" s)))
           (else (check-true (!= s ""))))))
+
+(define (check-latex-image root suffix)
+  ;; the file @root.@suffix of the temporary directory shows its image, which
+  ;; is next to it and is called after it
+  (let* ((tex (url-append (temp-dir)
+                          (if (== suffix "") root
+                              (string-append root "." suffix))))
+         (image (string-append root "-1." (eps-suffix)))
+         (doc (if (url-exists? tex) (string-load tex) "")))
+    (check-true (has-text? (string-append "{" image "}") doc))
+    (check-image-file (url-append (temp-dir) image))))
+
+(define (first-free-image folder ext)
+  ;; the first name image-N.@ext which is not taken in @folder
+  (let loop ((n 1))
+    (with name (string-append "image-" (number->string n) "." ext)
+      (if (url-exists? (url-append folder name)) (loop (+ n 1)) name))))
+
+(define (linked-image-size image exporter)
+  ;; the size of the image file of a document which links @image, exported
+  ;; by @exporter to a folder of its own
+  (with-sample-buffer `(document (image ,image "1cm" "" "" ""))
+    (lambda (name)
+      (let* ((dir (url-append (temp-dir) name))
+             (img (url-append dir (string-append "x-1." (eps-suffix)))))
+        (system-mkdir dir)
+        (exporter (url-append dir "x.tex"))
+        (if (url-exists? img) (url-size img) 0)))))
 
 (define (test-export-images)
   (check-group "export: the images go next to the target")
@@ -2089,7 +2111,60 @@
                                     (url-append (temp-dir) "script.html")
                                     "html"))
         (check-true (url-exists? (url-append (temp-dir) "script-1.png")))
-        (set! current-save-source source))))
+        (check-true (== current-save-source source))
+        ;; any other name
+        (check-false (buffer-export (current-buffer)
+                                    (url-append (temp-dir) "text.txt")
+                                    "latex"))
+        (check-latex-image "text" "txt")
+        (check-false (buffer-export (current-buffer)
+                                    (url-append (temp-dir) "notes")
+                                    "latex"))
+        (check-latex-image "notes" "")
+        ;; saving does not make a target for the next conversion
+        (save-buffer)
+        (check-true (== current-save-target target)))))
+  (check-group "conversion for the clipboard: the images")
+  (let* ((dir (url-append (temp-dir) "clipboard"))
+         (ext (eps-suffix))
+         (taken (url-append dir (string-append "image-1." ext)))
+         (html-taken (url-append dir "image-1.png"))
+         (doc (url-append dir "doc.tm"))
+         (sample (embedded-image-sample))
+         (old (current-buffer)))
+    (system-mkdir dir)
+    (string-save (export-png) (url-append dir "export-linked.png"))
+    (string-save "THE FILE OF THE USER" taken)
+    (string-save "THE FILE OF THE USER" html-taken)
+    (string-save (serialize-texmacs (stree->tree (tmfile "x"))) doc)
+    (load-buffer doc :strict)
+    (with s (export sample "latex-snippet")
+      ;; next to the document, under a free name
+      (check= (string-load taken) "THE FILE OF THE USER")
+      (check-true (has-text? (string-append "{image-2." ext "}") s))
+      (check-image-file (url-append dir (string-append "image-2." ext))))
+    (with s (export sample "html-snippet")
+      (check= (string-load html-taken) "THE FILE OF THE USER")
+      (check-true (has-text? "image-2.png" s))
+      (check-true (url-exists? (url-append dir "image-2.png"))))
+    ;; a linked image is the one of the document
+    (with s (export '(document (image "export-linked.png" "1cm" "" "" ""))
+                    "latex-snippet")
+      (check-true (has-text? "{export-linked.png}" s)))
+    (buffer-close doc)
+    ;; a document which is not on disk: an absolute name of the home
+    (with u (new-buffer)
+      (switch-to-buffer u)
+      (let* ((folder (string->url "$TEXMACS_HOME_PATH/system/images"))
+             (image (first-free-image folder ext))
+             (file (url-append folder image))
+             (s (export sample "latex-snippet")))
+        (check-true (has-text? (string-append "{" (url->unix file) "}") s))
+        (check-image-file file)
+        (system-remove file))
+      (buffer-pretend-saved u)
+      (buffer-close u))
+    (when (buffer-exists? old) (switch-to-buffer old)))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)
@@ -2110,28 +2185,30 @@
       (images-skip "relative target" "no native PDF writer")
       (let* ((rel (system->url "convert-more-test-697.pdf"))
              (abs (url-append (url-pwd) rel)))
-        (system-remove abs)
-        (print-snippet rel (stree->tree '(document "x")) #t)
-        (check-true (url-exists? abs))
-        (system-remove abs)))
+        ;; the only file outside the temporary directory, removed at once
+        (if (or (url-exists? abs) (not (url-test? (url-pwd) "w")))
+            (images-skip "relative target" "current directory not writable")
+            (begin
+              (print-snippet rel (stree->tree '(document "x")) #t)
+              (check-true (url-exists? abs))
+              (system-remove abs)))))
   (check-group "export: a linked image next to the document")
   (string-save (export-png) (url-append (temp-dir) "export-linked.png"))
   (if (not (url-exists-in-path? "gs"))
       (images-skip "linked image" "gs is needed to convert the png")
-      (let ((sizes
-             ;; the second image does not exist
-             (map (lambda (image)
-                    (with-sample-buffer `(document (image ,image "1cm" "" "" ""))
-                      (lambda (name)
-                        (let* ((dir (url-append (temp-dir) name))
-                               (img (url-append dir "x-1.pdf")))
-                          (system-mkdir dir)
-                          (buffer-export (current-buffer)
-                                         (url-append dir "x.tex") "latex")
-                          (if (url-exists? img) (url-size img) 0)))))
-                  (list "export-linked.png" "export-missing.png"))))
-        ;; not the placeholder of a missing image
-        (check-true (!= (car sizes) (cadr sizes))))))
+      (let* ((buffer-exporter*
+              (lambda (u) (buffer-export (current-buffer) u "latex")))
+             (tree-exporter
+              (lambda (u) (tree-export (buffer-tree) u "latex")))
+             ;; the size of the placeholder of a missing image
+             (missing (linked-image-size "export-missing.png"
+                                         buffer-exporter*)))
+        (check-true (!= (linked-image-size "export-linked.png"
+                                           buffer-exporter*)
+                        missing))
+        (check-true (!= (linked-image-size "export-linked.png"
+                                           tree-exporter)
+                        missing)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

@@ -43,6 +43,7 @@
 (define tmtex-auto-consume 0)
 (define tmtex-image-root-url (unix->url "image"))
 (define tmtex-image-root-string "image")
+(define tmtex-image-loose? #t)
 (define tmtex-appendices? #f)
 (define tmtex-indirect-bib? #f)
 (define tmtex-mathjax? #f)
@@ -128,15 +129,11 @@
 ;; Initialization from options
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmtex-image-target? u)
-  ;; the images go next to a file which is written in LaTeX; another target
-  ;; is a document saved earlier (for instance when copying to the clipboard)
-  (and (not (url-none? u))
-       (in? (url-suffix u) '("tex" "ltx" "latex" ""))))
-
-(define (tmtex-drop-suffix u)
-  (with suf (url-suffix u)
-    (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
+(define (tmtex-image-target? opts)
+  ;; the images go next to the file which is written, if it is in LaTeX, which
+  ;; is not the case of the formulas for MathJax in an HTML file
+  (and (not (url-none? current-save-target))
+       (!= (assoc-ref opts "texmacs->latex:mathjax") "on")))
 
 (define (tmtex-initialize opts)
   (set! tmtex-ref-cnt 1)
@@ -147,10 +144,11 @@
   (set! tmtex-auto-produce 0)
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
-  (if (tmtex-image-target? current-save-target)
+  (set! tmtex-image-loose? (not (tmtex-image-target? opts)))
+  (if (not tmtex-image-loose?)
       (begin
         (set! tmtex-image-root-url
-              (tmtex-drop-suffix (tmtex-drop-suffix current-save-target)))
+              (url-drop-suffix (url-drop-suffix current-save-target)))
         (set! tmtex-image-root-string
               (url->unix (url-tail tmtex-image-root-url))))
       (begin
@@ -1798,11 +1796,17 @@
 
 (define (tmtex-eps-names)
   (set! tmtex-serial (+ tmtex-serial 1))
+  (when tmtex-image-loose?
+    (receive (root name) (loose-images-root)
+      (set! tmtex-image-root-url root)
+      (set! tmtex-image-root-string name)))
   (let* ((suffix (if (get-boolean-preference "native pdf") ".pdf" ".eps"))
          (postfix (string-append "-" (number->string tmtex-serial) suffix))
          (name-url (url-glue tmtex-image-root-url postfix))
          (name-string (string-append tmtex-image-root-string postfix)))
-    (values name-url name-string)))
+    (if (and tmtex-image-loose? (url-exists? name-url))
+        (tmtex-eps-names)
+        (values name-url name-string))))
 
 (define (tmtex-eps x)
   (if (tmtex-math-mode?) (set! x `(with "mode" "math" ,x)))
@@ -1838,7 +1842,7 @@
   (tmtex-eps (cons 'graphics l)))
 
 (define (tmtex-as-eps name)
-  (let* ((u (url-relative current-save-target (unix->url name)))
+  (let* ((u (url-relative (save-target-url) (unix->url name)))
          (suffix (url-suffix u))
          (fm (string-append (format-from-suffix suffix) "-file")))
     (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg")))
@@ -1849,7 +1853,7 @@
         (receive (name-url name-string) (tmtex-eps-names)
           ;; an image which is not next to the target is next to the document
           (when (or (string-starts? name "..") (not (url-exists? u)))
-            (set! u (url-relative current-save-source (unix->url name))))
+            (set! u (url-relative (save-source-url) (unix->url name))))
           (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
                         "postscript-file")
             (convert-to-file u fm nfm name-url))
