@@ -20,6 +20,17 @@
 #elif !defined(OS_ANDROID)
 #include <wordexp.h>
 #endif
+#ifndef OS_MINGW
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#endif
+
+// NOTE: on Unix, the program is started in a process group of its own
+// (setsid in the child), which is stopped or interrupted as a whole, as in
+// pipe_link.cpp: a plugin started by a script which runs its program as a
+// child (without exec) leaves nothing behind. Windows has no process groups
+// for QProcess: there, only the process itself is stopped.
 
 static string
 debug_io_string (QByteArray s) {
@@ -45,15 +56,49 @@ BEGIN_SLOT
 END_SLOT
 }
 
-QTMPipeLink::QTMPipeLink (string cmd2) : cmd (cmd2), outbuf (""), errbuf ("") {}
+#ifndef OS_MINGW
+// in the child: a group of its own, where an interrupt is not ignored (a
+// TeXmacs started with SIGINT ignored, as by `sh ... &', passes that on)
+static void
+new_group () {
+  ::setsid ();
+  ::signal (SIGINT, SIG_DFL);
+  ::signal (SIGQUIT, SIG_DFL);
+}
+#endif
+
+QTMPipeLink::QTMPipeLink (string cmd2):
+  cmd (cmd2), outbuf (""), errbuf (""), feed_cmd (NULL), group (0)
+{
+#ifndef OS_MINGW
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+  setChildProcessModifier ([] () { new_group (); });
+#endif
+#endif
+}
+
+#if !defined (OS_MINGW) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+void
+QTMPipeLink::setupChildProcess () {
+  new_group ();
+}
+#endif
 
 QTMPipeLink::~QTMPipeLink () {
+#ifdef OS_MINGW
   killProcess (1000);
+#else
+  killGroup ();
+#endif
 }
 
 bool
 QTMPipeLink::launchCmd () {
+#ifdef OS_MINGW
   if (state () != QProcess::NotRunning) killProcess (1000);
+#else
+  if (state () != QProcess::NotRunning || group > 0) killGroup ();
+#endif
 
   QString raw = utf8_to_qstring(cmd);
   QString program;
@@ -105,6 +150,14 @@ QTMPipeLink::launchCmd () {
 
   bool ok = waitForStarted();
   if (ok) {
+#ifndef OS_MINGW
+    // (the process leads its group: the group has its number)
+#if QT_VERSION < QT_VERSION_CHECK(5, 3, 0)
+    group= (qint64) pid ();
+#else
+    group= processId ();
+#endif
+#endif
     // NOTE: unique, since a process which exited by itself is started
     // again without disconnecting (see killProcess)
     connect(this, SIGNAL(readyReadStandardOutput()), SLOT(readErrOut()),
@@ -159,4 +212,75 @@ QTMPipeLink::killProcess (int msecs) {
   }
 #endif
 }
+
+#ifndef OS_MINGW
+bool
+QTMPipeLink::hasEnded () {
+  // whether the process is reaped and its group is gone (EPERM: a member
+  // which we may not signal)
+  if (state () != QProcess::NotRunning && !waitForFinished (0)) return false;
+  if (group > 0 && (::killpg ((pid_t) group, 0) == 0 || errno != ESRCH))
+    return false;
+  group= 0;
+  return true;
+}
+
+bool
+QTMPipeLink::askToEnd () {
+  // Ask the group to terminate (SIGTERM), and wait for it 50 ms at most:
+  // whether it has ended. A program which takes longer (or ignores SIGTERM)
+  // is killed later by killGroup, see reap_ending_links in qt_pipe_link.cpp
+  disconnect (SIGNAL(readyReadStandardOutput ()), this, SLOT(readErrOut ()));
+  disconnect (SIGNAL(readyReadStandardError ()), this, SLOT(readErrOut ()));
+  if (group <= 0 || ::killpg ((pid_t) group, SIGTERM) == -1) {
+    // no group (any more): only the process, if it still runs
+    group= 0;
+    if (state () != QProcess::NotRunning) {
+      kill ();
+      waitForFinished (1000);
+    }
+    return true;
+  }
+  for (int i=0; i<5; i++) {
+    if (hasEnded ()) return true;
+    // NOTE: the process itself is reaped by QProcess (waitForFinished),
+    // never by waitpid here; while it is not, its group exists
+    if (state () != QProcess::NotRunning) waitForFinished (10);
+    else usleep (10000);
+  }
+  return hasEnded ();
+}
+
+void
+QTMPipeLink::killGroup () {
+  // kill the group at once, and reap the process
+  disconnect (SIGNAL(readyReadStandardOutput ()), this, SLOT(readErrOut ()));
+  disconnect (SIGNAL(readyReadStandardError ()), this, SLOT(readErrOut ()));
+  if (group > 0 && (::killpg ((pid_t) group, 0) == 0 || errno == EPERM))
+    ::killpg ((pid_t) group, SIGKILL);
+  group= 0;
+  if (state () != QProcess::NotRunning) {
+    kill ();
+    // (QProcess reaps the process only when it notices its end, in the
+    // event loop or in a wait, see killProcess)
+    waitForFinished (1000);
+  }
+}
+
+void
+QTMPipeLink::interruptGroup () {
+  if (group > 0 && ::killpg ((pid_t) group, SIGINT) != -1) return;
+#if QT_VERSION < QT_VERSION_CHECK(5, 3, 0)
+  qint64 pid= (qint64) this->pid ();
+#else
+  qint64 pid= processId ();
+#endif
+  if (pid <= 0 || ::kill ((pid_t) pid, SIGINT) == 0) return;
+  // (ESRCH: the process has just ended, and is not reaped yet)
+  int err= errno;
+  if (err != ESRCH)
+    qt_error << "Interrupt not successful, pid: " << pid
+             << " return code: " << err << "\n";
+}
+#endif
 

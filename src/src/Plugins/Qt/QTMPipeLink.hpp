@@ -27,6 +27,7 @@ public:
   string outbuf;
   string errbuf;
   command* feed_cmd;
+  qint64 group;  // the process group of the program and all it starts (Unix)
 
   QTMPipeLink (string);
   ~QTMPipeLink ();
@@ -41,6 +42,17 @@ public:
   void feedBuf (ProcessChannel);
   bool listenChannel (ProcessChannel, int msecs);
   void killProcess (int msecs);
+#ifndef OS_MINGW
+  bool askToEnd ();
+  bool hasEnded ();
+  void killGroup ();
+  void interruptGroup ();
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+protected:
+  void setupChildProcess () override;
+#endif
+#endif
 };
 
 #endif // QTM_PIPE_LINK
