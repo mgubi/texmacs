@@ -2164,6 +2164,40 @@ token_before (tree u, path h) {
   return h->item < N(u) && token_before (u[h->item], h->next);
 }
 
+static bool
+token_between (tree u, path a, path b) {
+  // is there a token of u (a character or a tag) between the positions a
+  // and b (nil: the start, the end of u)? A tag which a or b is inside is
+  // not one: a hit from the end of the text of a tag to after it (a
+  // trailing wildcard carries it to the end of the formula of a tag alone
+  // in its paragraph) takes no token, as an empty hit
+  if (is_atomic (u))
+    return (is_nil (b)? N(u->label): b->item) > (is_nil (a)? 0: a->item);
+  bool flat= is_concat (u) || is_document (u);
+  if (!flat) {
+    // (a position before or after u)
+    if (!is_nil (a) && is_nil (a->next)) {
+      if (a->item != 0) return false;
+      a= path ();
+    }
+    if (!is_nil (b) && is_nil (b->next)) {
+      if (b->item == 0) return false;
+      b= path ();
+    }
+    if (is_nil (a) && is_nil (b)) return true;
+  }
+  int k1= (is_nil (a)? 0: a->item), k2= (is_nil (b)? N(u) - 1: b->item);
+  for (int k= max (k1, 0); k<=k2 && k<N(u); k++) {
+    if (!flat && !is_content_child (u, k)) continue;
+    path sa= (k == k1 && !is_nil (a))? a->next: path ();
+    path sb= (k == k2 && !is_nil (b))? b->next: path ();
+    if (is_nil (sa) && is_nil (sb)? has_tokens (u[k]):
+        token_between (u[k], sa, sb))
+      return true;
+  }
+  return false;
+}
+
 static array<path>
 search_in_cut (tree t, tree what, path p, path q, int limit,
                bool after_empty, bool filtered) {
@@ -2200,9 +2234,15 @@ search_in_cut (tree t, tree what, path p, path q, int limit,
         h1= h1->next; h2= h2->next;
         w1= (is_nil (w1) || w1->item != 0? h1: w1->next);
       }
-      if (!is_nil (q) && (after_empty || h1 == h2) && !token_before (c, h1))
+      path u1= uncut (t, q, h1, lv), u2= uncut (t, q, h2, lv);
+      // (a hit which takes no token of t is empty: the rest of a tag alone
+      // in its paragraph after the end of its text, which a trailing
+      // wildcard carries to the end of the paragraph, and which Replace
+      // left with a message, #589)
+      if (!is_nil (q) && (after_empty || !token_between (t, u1, u2)) &&
+          !token_before (c, h1))
         continue;
-      path m1= p * uncut (t, q, h1, lv), m2= p * uncut (t, q, h2, lv);
+      path m1= p * u1, m2= p * u2;
       path w= p * uncut (t, q, w1, lv);
       if (filtered && !is_nil (cur) &&
           (w == cur || before_position (w, cur)))

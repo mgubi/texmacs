@@ -2465,7 +2465,62 @@
         (check= (tree-search-from (stree->tree doc)
                                   (stree->tree '(strong (wildcard "w")))
                                   '() '(0 0) 1 #t #t)
-                '((0 1 0) (0 1 1) (0 1 0)))))))
+                '((0 1 0) (0 1 1) (0 1 0))))
+      ;; a tag alone in its paragraph (a theorem, a table): after the last
+      ;; paragraph of its text, the rest of the tag takes no token, and is
+      ;; no hit; it was one, from the end of that text to after the tag
+      ;; (a trailing wildcard carries a hit to the end of the paragraph),
+      ;; which Replace left with "Match left" (#589)
+      (let* ((thm '(document (theorem (document "ab" "cd"))))
+             (tab '(document (tabular (table (row (cell (document "ab"
+                                                                   "cd"))))))))
+        (for (w '((wildcard "w") (concat (wildcard "w"))
+                  (concat (wildcard "w") (wildcard "v"))))
+          (check= (tree-search-from (stree->tree thm) (stree->tree w)
+                                    '() '(0 0 1 2) 1 #f #t)
+                  '())
+          (check= (tree-search-from (stree->tree tab) (stree->tree w)
+                                    '() '(0 0 0 0 0 1 2) 1 #f #t)
+                  '())
+          (for (row `((,thm (document (theorem (document "X" "X"))))
+                      (,tab (document (tabular (table (row (cell (document
+                                                                   "X"
+                                                                   "X")))))))
+                      ((document "ab" (theorem (document "x" "y")))
+                       (document "X" (theorem (document "X" "X"))))))
+            (check= (replace-with-messages (car row) w "X")
+                    (list (cadr row) '() '())))))
+      ;; (the rest of the text is a hit)
+      (check= (tree-search-from (stree->tree '(document (theorem (document
+                                                                   "ab"
+                                                                   "cd"))))
+                                (stree->tree '(concat (wildcard "w")))
+                                '() '(0 0 1 1) 1 #f #t)
+              '((0 0 1 1) (0 0 1 2) (0 0 1 0))))))
+
+(define (replace-with-messages doc what by)
+  ;; the result of Replace All in a buffer holding doc, and the messages of
+  ;; the hits left by Replace All and by Replace one again and again
+  (let* ((run (lambda (all?)
+                (with-search-buffers doc what by
+                  (lambda (u)
+                    (ahash-set! (widget 'search-filter-table)
+                                (current-buffer) (stree->tree '(attr)))
+                    ((widget 'perform-search*))
+                    (let loop ((i 0) (msgs (list)))
+                      (widget '(set! replace-skip-message #f))
+                      (with old (tm->stree (buffer-get-body u))
+                        (if all? (replace-all) (replace-one))
+                        (let* ((m (widget 'replace-skip-message))
+                               (msgs (if m (cons m msgs) msgs)))
+                          (if (or all? (>= i 20)
+                                  (== (tm->stree (buffer-get-body u)) old))
+                              (list (tm->stree (buffer-get-body u))
+                                    (reverse msgs))
+                              (loop (+ i 1) msgs)))))))))
+         (all (run #t))
+         (one (run #f)))
+    (list (car all) (cadr all) (cadr one))))
 
 ;; The wildcards of a region pattern take their values in the region, as its
 ;; content; the values were looked for by the literal parts around the
