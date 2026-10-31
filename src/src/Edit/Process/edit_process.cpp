@@ -216,7 +216,9 @@ edit_process_rep::generate_bibliography (
     if (supports_db ())
       (void) call (string ("bib-attach"), bib, bib_t, bib_file, xbib_file);
     if (uses_natbib (t) && !defined_at_init ("cite-author-year-package")) {
-      tree st= get_style ();
+      // (a copy: << appends in place, and change_style would then find the
+      // style unchanged and give it to no other view, #535)
+      tree st= copy (get_style ());
       if (is_atomic (st)) st= tuple (st);
       bool missing= true;
       for (int i=0; i<N(st); i++)
