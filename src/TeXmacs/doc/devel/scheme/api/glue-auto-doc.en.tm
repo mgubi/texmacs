@@ -6651,6 +6651,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-forget-history <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|buffer_forget_history> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-embedded? <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

@@ -20,6 +20,7 @@
 #include "merge_sort.hpp"
 #include "scheme.hpp"
 #include "iterator.hpp"
+#include "archiver.hpp"
 #include <time.h>
 
 array<tm_buffer> bufs;
@@ -391,6 +392,17 @@ get_last_save_buffer (url name) {
   }
   //cout << "Get last save " << name << " -> " << buf->buf->last_save << "\n";
   return (int) buf->buf->last_save;
+}
+
+void
+buffer_forget_history (url name) {
+  // A generated page which is made again (an outline at each edit...): its
+  // former contents have no meaning any more, and their copies in the history
+  // of its views would stay for ever (35 MB per edit for an outline of 12800
+  // definitions). NOT in set_buffer_tree: the editors in widgets are made
+  // again with it, and what was typed there can be undone
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) global_forget_document (buf->rp);
 }
 
 bool

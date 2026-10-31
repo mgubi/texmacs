@@ -56,13 +56,18 @@ have the details, and the problems go to the
   the unknown colors of graphics are black too, and the informative flags
   in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
   (#656).
+- **Definitions in very large files** (desktop and browser): Definitions and
+  Go to definition no longer take gigabytes of memory on a file with
+  thousands of definitions on one line, which could freeze the machine. The
+  page Outline no longer keeps a copy of itself at each edit; it shows the
+  first 5000 definitions and says so.
 - **The menu Focus in source files** (desktop and browser): in a `.cpp`, a
   `.py`, a `.scm`, a `.json`... it now has the entries for program code
   (Definitions, Outline, Go to definition, Folds, the syntax and server
   entries), as in a code block. The definitions of a large file are found
   much faster (6666 functions: 40 ms instead of 2.7 s, also for the page
   Outline and Go to definition); the submenu Definitions shows the first 500
-  of them, then All definitions, which opens the page Outline (#698).
+  of them, then More definitions, which opens the page Outline (#698).
 - **The menu Focus in code blocks** (desktop and browser): its entries for
   program code (Definitions, Outline, Go to definition, Folds, the syntax
   and server entries) are back; they were lost at each start, and TeXmacs

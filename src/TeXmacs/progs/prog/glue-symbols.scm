@@ -856,6 +856,7 @@
 "buffer-attach-notifier"
 "buffer-has-name?"
 "buffer-aux?"
+"buffer-forget-history"
 "buffer-embedded?"
 "buffer-import"
 "buffer-load"
