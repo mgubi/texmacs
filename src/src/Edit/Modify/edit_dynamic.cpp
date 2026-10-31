@@ -669,7 +669,9 @@ edit_dynamic_rep::make_return_after () {
     q= path_up (q);
     if (!(rp < q)) return false;
   }
-  if (tp == start (et, q)) return false;
+  // (before a tag at the start of the paragraph which has no cursor position
+  // there, as hidden, the start of the paragraph is inside the tag)
+  if (correct_cursor (et, tp) == start (et, q)) return false;
   return insert_return ();
 }
 

@@ -7491,6 +7491,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(can-insert-at? <scm-arg|content> <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|can_insert_at> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(temp-proof-fix)>
 <explain-synopsis|no synopsis>
   <|explain>
