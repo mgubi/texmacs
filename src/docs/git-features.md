@@ -362,8 +362,11 @@ conflict is smaller.
 | P / Q | Q / P | P / Q2 | conflict | a move next to a change, as with Git |
 
 **Known limits.** Moves are only recognized next to a change of the other
-side; a paragraph moved far away and changed or removed by the other side
-behaves as with `git merge` (the moved copy stays). The similarity is a
+side, and only for an unchanged copy at the top of the hunk; a paragraph moved
+far away, moved and edited, or moved into a new block, and changed, moved or
+removed by the other side, can be kept twice or stay although it was removed.
+`git merge` does the same, except that it happens to conflict when the moved
+copy lands right next to a change. The similarity is a
 heuristic: a rewrite which shares half of its real words with the old
 paragraph is merged word by word, where only changes with a word in between
 can merge. The comparison of near-identical insertions is per chunk. Very
