@@ -38,6 +38,18 @@ have the details, and the problems go to the
   also in Replace one, which stays one step of undo (#591); a pattern made
   only of a wildcard no longer leaves "Match left" on a theorem or a table
   cell alone in its paragraph (#589).
+- **Replace All next to blocks** (desktop): Replace All always ends, also
+  on a document of empty paragraphs which a pattern of empty paragraphs
+  matches, and a match next to a block (a theorem, a table) which the
+  replacement keeps is replaced instead of left (#687).
+- **A change of style in every view** (desktop): a package added by the
+  document itself (natbib for a bibliography) reaches all the views of the
+  buffer, not only the current one (#535).
+- **A `raw-data` tag without arguments** (desktop): saving a document with
+  it no longer crashes TeXmacs (#685).
+- **Hyphenation of Bulgarian, Russian and Ukrainian** (desktop and
+  browser): the decoding of the hyphenation patterns stops at the end of
+  its string, instead of reading past it (#686).
 - **A tag named `string`** (desktop): a tag or macro named `string` works
   like any other; it no longer gives random content or crashes when a
   document with it is loaded (#678).

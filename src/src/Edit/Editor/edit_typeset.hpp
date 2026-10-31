@@ -114,6 +114,7 @@ public:
   tree     commit_animation (tree t);
 
   void     change_style (tree style);
+  void     change_style_local (tree style);
   tree     get_init_all ();
   void     init_env (string var, tree by);
   void     init_default (string var);
