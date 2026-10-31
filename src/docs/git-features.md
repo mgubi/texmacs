@@ -245,7 +245,7 @@ mode** reduces the menus to:
 2. applies automatically every change made on only one side. This works
    at the level of paragraphs, words, markup such as sections, and math.
    Git would report a conflict for two different edits in the same line;
-   here they merge;
+   here they merge, when they do not touch (section 5a);
 3. shows the remaining **real conflicts** with the usual comparison
    markup: old (red) is yours, new (green) is theirs. You step through
    them with the Version menu or the shortcuts, retaining one side each
@@ -275,6 +275,100 @@ If there is no common ancestor (the file was added on both sides), a
 two-way comparison is shown instead.
 
 ---
+
+### 5a. Which changes merge, and which conflict (#676)
+
+**The principle:** a silent wrong merge is much worse than a conflict the
+user resolves by hand. The merge is clean only for what is unambiguous;
+everything else conflicts. (A first attempt, in PR #691, kept making more
+cases clean and each audit found new silent wrong merges; its rules are not
+reused. The code: `merge-chunk` and below in `version/version-merge.scm`.)
+
+The children of a `document` or a `concat` are aligned as in `diff3`: the
+elements kept by both sides are anchors, and only the *chunks* between
+anchors can conflict. A chunk changed by one side only takes that side.
+
+**In a paragraph (`concat` or string)**, the elements are words and spaces.
+
+- Changes of the two sides **touch** when no word separates them, that is,
+  when they are in the same chunk or are separated by a single space: they
+  conflict, whatever they are. A space next to markup does not count as
+  touching: in *Let* `<math>` *be.*, the formula and the next word merge.
+- One element with markup, changed on both sides, is merged further.
+
+**Between blocks (`document`)**, each side changes a chunk by *hunks*: the
+elements of the ancestor between two elements which this side keeps are
+replaced by new ones. The hunks of both sides are compared by their places
+in the ancestor:
+
+1. *Different elements, touching*: two replacements or removals are
+   independent, since each one is anchored by what the other side keeps,
+   and their order is forced.
+2. *An insertion touching a replacement* of the other side: it is placed by
+   the edited element, so that the replacement must be 1-for-1 (n-for-n) and
+   its element next to the insertion must be *paired* with the old one.
+3. *Two insertions at the same place*: identical ones come out once;
+   otherwise they conflict.
+4. *The same elements replaced by both sides*, with all the hunks being
+   n-for-n: the positions are merged one by one. A position where both new
+   elements are paired with the old one is merged in turn (word by word);
+   otherwise it is a conflict of this position alone. A new element which
+   belongs to another old element shows a shift: the positions in between
+   conflict together.
+5. *Anything else that overlaps* (such as a removal against an edit)
+   conflicts.
+
+Two elements are **paired** when they have the same kind (the same tag, or
+both text) and share at least half of the *real words* of the smaller one,
+and when no other old element nearby shares as many. Real words have at
+least 4 letters and are no stop words (`the`, `that`, `dans`...), in lower
+case and without the punctuation around them. A text without any real word
+(*Let x+y be.*) is compared by its short words. This also holds for a single
+element. The words are indexed by packets of 32 old elements, and a new
+element is compared with the two packets near its place, which makes the
+pairing linear.
+
+Certainty also requires:
+
+- **No repeated or moved paragraphs next to a touching:** when an element
+  next to a hunk is also in it, the hunk could equally be one place further,
+  and when a hunk brings an element of the ancestor, it is a move. Either way
+  the touching hunks conflict.
+- **Near-identical paragraphs are the same paragraph:** when new elements of
+  the two sides (not edits of an old one) in a chunk are similar, the chunk
+  conflicts, whatever their places, instead of having them twice.
+
+A conflict is shown like before: the differences of ours and theirs
+(`compare-versions`), for the elements concerned. When a chunk has a single
+group of hunks, or near-identical paragraphs, this is exactly the old output
+for the chunk; otherwise the certain groups of the chunk are merged and the
+conflict is smaller.
+
+| Base | Ours | Theirs | Result | Why |
+|------|------|--------|--------|-----|
+| A / B / C / D | A / C / D | A / B / C2 / D | A / C2 / D | removal and replacement of different blocks (#676) |
+| A / T / C | A / T / C2 | A / T+label / todo / C | A / T+label / todo / C2 | two replacements, touching (#676) |
+| The map is continuous. / Last. | The map is uniformly continuous. / Last. | The map is continuous. / New remark. / Last. | The map is uniformly continuous. / New remark. / Last. | an edit next to an insertion |
+| A. / B. | A. / X. / B. | A. / B2. | conflict | the same, but no real words: not certain that B2. is an edit |
+| B. | B. / B2. | D. | conflict | D. may be a rewrite: where does B2. go? |
+| The quick fox jumps. | The slow fox jumps. | The quick red fox jumps. | conflict | touching words, across a space |
+| f is continuous on X. | f is uniformly continuous on X. | f is bounded on X. | conflict | not *f is uniformly bounded on X.* |
+| The quick brown fox. | The slow brown fox. | The quick red fox. | conflict | touching words |
+| The quick brown fox jumps. | The slow brown fox jumps. | The quick brown fox leaps. | The slow brown fox leaps. | a word in between |
+| The map is continuous. | The map is uniformly continuous. | The set is open. | conflict | only short and stop words in common |
+| Alpha beta / Gamma delta / Theta iota | Alpha beta, A / Gamma delta, A / Theta iota, A | New text / Gamma delta / Theta iota | ⟨Alpha beta, A\|New text⟩ / Gamma delta, A / Theta iota, A | n-for-n: a local conflict |
+| Intro / Concl. | Intro / Thanks for coments / Concl. | Intro / Thanks for comments / Concl. revised | conflict | near-identical insertions, not twice |
+| P / P | P | P2 / P | conflict | which P was removed? |
+| P / Q | Q / P | P / Q2 | conflict | a move next to a change, as with Git |
+
+**Known limits.** Moves are only recognized next to a change of the other
+side; a paragraph moved far away and changed or removed by the other side
+behaves as with `git merge` (the moved copy stays). The similarity is a
+heuristic: a rewrite which shares half of its real words with the old
+paragraph is merged word by word, where only changes with a word in between
+can merge. The comparison of near-identical insertions is per chunk. Very
+large changes (more than 4 million elements compared by the longest common
+subsequence) keep the behaviour of the common ends only.
 
 ## 6. Structured merges from the command line
 

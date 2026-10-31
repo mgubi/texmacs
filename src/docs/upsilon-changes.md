@@ -12,6 +12,16 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 1 November 2026
+
+- **Structured merge of documents** (desktop): fewer spurious conflicts. A
+  block removed or changed by one side next to a block changed by the other,
+  and an edit next to a new paragraph of the other side, now merge cleanly.
+  Fewer silent mistakes as well: paragraphs are only merged word by word if
+  they share enough real words, changes which touch inside a paragraph always
+  conflict (also two neighbouring words), and in a long list of changed
+  paragraphs a conflict stays with its paragraph (#676).
+
 ## 31 October 2026
 
 - **LaTeX and HTML export** (desktop): no crash with an embedded image on

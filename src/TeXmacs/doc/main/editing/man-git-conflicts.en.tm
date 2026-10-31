@@ -56,6 +56,15 @@
     and <menu|Keep their version>) and <menu|Version|Differences|Show>. You
     may of course also edit the text of the conflict directly.
 
+    Changes which are clearly independent are merged, also in neighbouring
+    paragraphs: for instance a paragraph removed by you and the next one
+    changed by your coauthor, or a paragraph edited by you and a new one
+    added next to it by your coauthor. When <TeXmacs> cannot be sure of what
+    belongs to what, it prefers a conflict to a wrong merge. This happens for
+    changes in neighbouring words of a paragraph, for a paragraph changed on
+    both sides into texts without enough words in common, or for almost the
+    same paragraph added by both of you.
+
     Besides the text, the style packages and the settings of the document
     (<menu|Document> menu) are merged as well: a package or a setting added,
     changed or removed on one side only is taken over. When the same
