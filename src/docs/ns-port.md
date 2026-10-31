@@ -366,6 +366,11 @@ fade).
   no check: `to_nsstring`, `to_nsstring_utf8` and `to_label` never return
   `nil`. An icon which is not found (`to_nsimage`, a button or an item
   without its picture) is reported once on `debug-aqua`;
+* `gui_set_next_window_without_focus` (a console which opens by itself): the
+  window is shown by `orderFront:`, not `makeKeyAndOrderFront:`. Its canvas
+  takes the first responder of its window, but gets the focus, and its editor
+  becomes the current one, only when the window becomes the key window
+  (`windowDidBecomeKey:` of `TMView`), by a click for instance (#679);
 * `tests/cocoa/check.sh` checks a French dialog title (#468), the close
   of the console with several tabs (#619) and an idle console (#620); it
   runs on the Cocoa disk image in `upsilon-macos.yml`.

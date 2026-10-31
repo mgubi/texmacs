@@ -420,7 +420,7 @@ void
 gui_set_next_window_as_popup () {}
 #endif
 
-#if !defined (QTTEXMACS) && !defined (VUETEXMACS)
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS) && !defined (AQUATEXMACS)
 void
 gui_set_next_window_without_focus () {}
 #endif

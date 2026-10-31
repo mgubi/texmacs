@@ -1130,7 +1130,18 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *   resize:<w>,<h>    the size of the contents of the main window
  *   front:<title>     the window with this title becomes the main window
  *   main:<title>      as if it became the main window (the notification)
- *   windows           prints the windows (title, frame, main, shown)
+ *   activate          TeXmacs becomes the active application: its key window
+ *                     gets the keyboard again, and no window changes
+ *   click:<title>     a click in the middle of the window with this title,
+ *                     as a posted event: it becomes the key window
+ *   windows           prints whether TeXmacs is the active application, and
+ *                     the windows (title, frame, main, key, shown)
+ *   wait:<title>      the next steps wait for the window with this title to
+ *                     be shown, at most 20 seconds
+ *   type:<text>       the characters as key events to the key window; prints
+ *                     whether TeXmacs is active, and the titles of the key
+ *                     and main windows (it does not activate TeXmacs, which
+ *                     may itself give it a key window)
  *   menubar[:<depth>] prints the menu bar (as TEXMACS_NS_MENUS)
  *   menu              prints the last menu which was shown (a pop-up menu)
  *   cancel            closes the menu which is shown
@@ -1245,6 +1256,8 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
 @interface TMWindowTester : NSObject
 - (void) step: (NSTimer*) timer;
 - (void) doStep: (NSTimer*) timer;
+- (void) printWindows;
+- (void) typeText: (NSString*) text;
 @end
 
 @implementation TMWindowTester
@@ -1269,6 +1282,49 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     [self doStep: timer];
   NS_ENTRY_END ("the window test (TEXMACS_NS_WINDOW_TEST)")
 }
+- (void) printWindows
+{
+  fprintf (stderr, "NSTEST active %s\n", [NSApp isActive]? "yes": "no");
+  fprintf (stderr, "NSTEST nr_windows %d\n", nr_windows);
+  for (NSWindow* w in [NSApp windows]) {
+    if (is_nil (ns_window_widget_of (w))) continue;
+    NSRect f= [w frame];
+    NSRect c= [w contentRectForFrameRect: f];
+    fprintf (stderr, "NSTEST window '%s' %s%s%s%s%s%sat %.0f,%.0f content %.0fx%.0f\n",
+             [[w title] UTF8String], [w isVisible]? "shown ": "hidden ",
+             ns_test_menu_state (w),
+             [w isMainWindow]? "main ": "",
+             [w isKeyWindow]? "key ": "",
+             ([w styleMask] & NSWindowStyleMaskFullScreen)? "full-screen ": "",
+             [w level] > NSNormalWindowLevel? "on-top ": "",
+             f.origin.x, main_screen_height () - NSMaxY (f),
+             c.size.width, c.size.height);
+  }
+}
+- (void) typeText: (NSString*) text
+{
+  NSWindow* key= [NSApp keyWindow];
+  fprintf (stderr, "NSTEST active %s\n", [NSApp isActive]? "yes": "no");
+  fprintf (stderr, "NSTEST type to '%s', main '%s'\n",
+           key? [[key title] UTF8String]: "",
+           [NSApp mainWindow]? [[[NSApp mainWindow] title] UTF8String]: "");
+  for (NSUInteger i=0; key && i<[text length]; i++) {
+    NSString* c= [text substringWithRange: NSMakeRange (i, 1)];
+    for (int up=0; up<2; up++)
+      [NSApp postEvent:
+         [NSEvent keyEventWithType: up? NSEventTypeKeyUp: NSEventTypeKeyDown
+                          location: NSZeroPoint
+                     modifierFlags: 0
+                         timestamp: [[NSProcessInfo processInfo] systemUptime]
+                      windowNumber: [key windowNumber]
+                           context: nil
+                        characters: c
+       charactersIgnoringModifiers: c
+                         isARepeat: NO
+                           keyCode: 0]
+               atStart: NO];
+  }
+}
 - (void) doStep: (NSTimer*) timer
 {
   static int step= 0;
@@ -1283,6 +1339,14 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     st= [st substringToIndex: colon.location];
   }
   NSArray* nums= [arg componentsSeparatedByString: @","];
+  if ([st isEqualToString: @"wait"]) {
+    static int waited= 0;
+    bool shown= false;
+    for (NSWindow* w in [NSApp windows])
+      if ([w isVisible] && [[w title] isEqualToString: arg]) shown= true;
+    if (!shown && ++waited < 20) { step--; return; }
+    waited= 0;
+  }
   NSWindow* win= ns_test_main_window ();
   if ([st isEqualToString: @"close"] || [st isEqualToString: @"fullscreen"])
     for (NSWindow* w in [NSApp windows])
@@ -1304,6 +1368,29 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
       if ([w isVisible] && [[w title] isEqualToString: arg])
         [w makeKeyAndOrderFront: nil];
   }
+  else if ([st isEqualToString: @"activate"])
+    [NSApp activateIgnoringOtherApps: YES];
+  else if ([st isEqualToString: @"click"]) {
+    [NSApp activateIgnoringOtherApps: YES];
+    for (NSWindow* w in [NSApp windows])
+      if ([w isVisible] && [[w title] isEqualToString: arg]) {
+        NSRect c= [[w contentView] bounds];
+        NSPoint p= NSMakePoint (NSMidX (c), NSMidY (c));
+        for (int up=0; up<2; up++)
+          [NSApp postEvent:
+             [NSEvent mouseEventWithType: up? NSEventTypeLeftMouseUp
+                                            : NSEventTypeLeftMouseDown
+                                location: p
+                           modifierFlags: 0
+                               timestamp: [[NSProcessInfo processInfo] systemUptime]
+                            windowNumber: [w windowNumber]
+                                 context: nil
+                             eventNumber: 0
+                              clickCount: 1
+                                pressure: 1.0]
+                   atStart: NO];
+      }
+  }
   else if ([st isEqualToString: @"main"]) {
     // as if the window became the main one (when TeXmacs is not active,
     // macOS does not change the main window)
@@ -1312,22 +1399,8 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
         [[NSNotificationCenter defaultCenter]
           postNotificationName: NSWindowDidBecomeMainNotification object: w];
   }
-  else if ([st isEqualToString: @"windows"]) {
-    fprintf (stderr, "NSTEST nr_windows %d\n", nr_windows);
-    for (NSWindow* w in [NSApp windows]) {
-      if (is_nil (ns_window_widget_of (w))) continue;
-      NSRect f= [w frame];
-      NSRect c= [w contentRectForFrameRect: f];
-      fprintf (stderr, "NSTEST window '%s' %s%s%s%s%sat %.0f,%.0f content %.0fx%.0f\n",
-               [[w title] UTF8String], [w isVisible]? "shown ": "hidden ",
-               ns_test_menu_state (w),
-               [w isMainWindow]? "main ": "",
-               ([w styleMask] & NSWindowStyleMaskFullScreen)? "full-screen ": "",
-               [w level] > NSNormalWindowLevel? "on-top ": "",
-               f.origin.x, main_screen_height () - NSMaxY (f),
-               c.size.width, c.size.height);
-    }
-  }
+  else if ([st isEqualToString: @"windows"]) [self printWindows];
+  else if ([st isEqualToString: @"type"]) [self typeText: arg];
   else if ([st isEqualToString: @"menubar"])
     ns_test_print_menu ([NSApp mainMenu], 0, [arg length] > 0? [arg intValue]: 0);
   else if ([st isEqualToString: @"menu"]) ns_test_print_menu (ns_test_menu, 0, 0);

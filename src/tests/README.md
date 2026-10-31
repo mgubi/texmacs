@@ -360,14 +360,25 @@ slash without variants (Fira Math) keeps being stretched.
 
 `tests/cocoa/check.sh`, run from the top of the source tree of a Cocoa
 build (`--with-gui=cocoa`), or with `BIN=` the executable of a
-`TeXmacs.app`, starts TeXmacs six times (about 15 seconds each, in
+`TeXmacs.app`, starts TeXmacs several times (about 15 seconds each, in
 homes of their own) and checks failures which used to be silent or to
 abort it (#621): a dialog title with accents in French (#468), closing the
 console with several tabs (#619), an idle console, which must not be
 typeset again and again (#620), the tooltips of the icon bars (#637),
 dialogs with negative sizes (one warning for each place, and the dialogs
 are shown) and an error thrown at an entry point from AppKit (reported
-once, and TeXmacs goes on, #650, #666). It also fails on any other error
+once, and TeXmacs goes on, #650, #666), a document of 7*10^6 points scrolled
+to its end, the window queries of a console and a console which opens at its
+end (#661). Two more cases check the focus of
+the console: when it opens by itself on a warning, the document stays the key
+and main window and the current buffer, and gets the keys typed; a click, or
+opening it from the menu, gives it the focus; its close leaves the document
+focused (#679). Any case may take the keyboard from whoever works on the screen
+(macOS may make a process active when its parent Terminal is, and the windows
+are shown), but these two ask for it several times: they run on GitHub Actions or with
+`TM_COCOA_FOCUS=1` (`0` turns them off), and are skipped otherwise. A case in
+which TeXmacs says it is not active is skipped, except on GitHub Actions, where
+it fails; a crash always fails. It also fails on any other error
 caught at an entry point from AppKit, except known harmless messages (a
 list in the script, extended with `TM_COCOA_HARMLESS`, an extended regular
 expression). The windows are shown: Cocoa has no offscreen mode. The
