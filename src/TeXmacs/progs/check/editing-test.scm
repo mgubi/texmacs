@@ -800,6 +800,56 @@
         (edit (selection-set (at 0 1) (at 0 2)))
         (edit (insert by))
         (check= (body) '(document "aP" "Qc"))))
+    ;; a selection which starts inside a tag and ends outside it: the cut
+    ;; starts before the tag, where paragraphs can go
+    ;; (setting a clipboard cancels the selection)
+    (clipboard-set "editing-test" (stree->tree by))
+    (for-each
+      (lambda (x)
+        (let* ((how (car x)) (res (cdr x)))
+          (with-buffer-body '(document (concat "some " (strong "bold")
+                                               " text after"))
+            (lambda ()
+              (edit (selection-set (at 0 1 0 1) (at 0 2 4)))
+              (edit (how))
+              (check= (body) (car res))))
+          (with-buffer-body '(document (concat "some " (strong "bold") " t")
+                                       "next")
+            (lambda ()
+              (edit (selection-set (at 0 1 0 1) (at 1 2)))
+              (edit (how))
+              (check= (body) (cadr res))))))
+      (list (list (lambda () (clipboard-paste "editing-test"))
+                  '(document "some P" "Qt after")
+                  '(document "some P" "Qxt"))
+            (list (lambda () (insert '(quotation (document "P" "Q"))))
+                  '(document "some " (quotation (document "P" "Q")) "t after")
+                  '(document "some " (quotation (document "P" "Q")) "xt"))))
+    (clipboard-clear "editing-test")
+    ;; a block after text, before a tag which holds paragraphs: not in the tag
+    (let* ((block '(quotation (document "P" "Q"))))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document (concat "w" ,tag)) '(0 0 1)
+                    `(document "w" ,block ,tag)))
+        '((hidden (document "b" "c")) (ignore (document "b" "c"))
+          (freeze (document "b" "c")) (shown (document "b" "c"))
+          (hidden "b") (strong "b")))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document (concat "w" ,tag "z")) '(0 0 1)
+                    `(document "w" ,block (concat ,tag "z"))))
+        '((hidden (document "b" "c")) (freeze (document "b" "c")) (strong "b"))))
+    ;; before the table format of a tabular, a position of scripts only:
+    ;; nothing there, and no stray concat
+    (check-at (lambda () (insert by))
+              '(document (tabular (tformat (table (row (cell "a")))))) '(0 0 0)
+              '(document (tabular (tformat (table (row (cell "a")))))))
+    (check-at kbd-return
+              '(document (tabular (tformat (table (row (cell "a")))))) '(0 0 0)
+              '(document (tabular (tformat (table (row (cell "a")))))))
     ;; can-insert-at?
     (with-buffer-body '(document (concat "t " (strong "ab"))
                                  (tabular (tformat (table (row (cell "c"))))))

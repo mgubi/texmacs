@@ -2870,6 +2870,12 @@
             ((document "u" (concat "a1x" (hidden "b")) "v") "a1x"
              (quotation (document "P" "Q"))
              (document "u" (quotation (document "P" "Q")) (hidden "b") "v"))
+            ;; a block after text, before a tag holding paragraphs: not in
+            ;; the tag, which stays hidden
+            ((document (concat "wa1x" (hidden (document "b" "c")))) "a1x"
+             (quotation (document "P" "Q"))
+             (document "w" (quotation (document "P" "Q"))
+                       (hidden (document "b" "c"))))
             ;; no place for paragraphs: all is left
             ,@(map (lambda (x) `((document ,x) "a1x" ,by (document ,x)))
                    (list (tab "a1x") (tab "wa1xw")

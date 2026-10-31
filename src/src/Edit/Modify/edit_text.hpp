@@ -17,6 +17,7 @@ class edit_text_rep: virtual public editor_rep {
 protected:
   void correct_concat (path p, int done=0);
   void correct (path p);
+  int  return_depth;
   bool pure_line (path p);
   bool accepts_return (path p);
   path prepare_for_insert ();
@@ -29,7 +30,6 @@ public:
   /********************************* text ************************************/
   bool accepts_paragraphs (path p);
   bool can_insert_at (tree t, path p);
-  bool insert_return (int& depth);
   bool insert_return ();
   void remove_return (path p);
   void insert_tree (tree t, path p_in_t);
