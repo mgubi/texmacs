@@ -814,6 +814,31 @@ ns_tm_embedded_widget_rep::send (slot s, blackbox val) {
 
 blackbox
 ns_tm_embedded_widget_rep::query (slot s, int type_id) {
+  switch (s) {
+    // the window of an embedded editor (a console, a texmacs-input) has no
+    // bars and no prompt: as qt_tm_embedded_widget_rep. Its canvas does
+    // not answer these: the empty answer was a "type mismatch" in the
+    // menus built while the editor of a console was the current one, as
+    // visible-header? in the View menu (#661)
+    case SLOT_HEADER_VISIBILITY:
+    case SLOT_MAIN_ICONS_VISIBILITY:
+    case SLOT_MODE_ICONS_VISIBILITY:
+    case SLOT_FOCUS_ICONS_VISIBILITY:
+    case SLOT_USER_ICONS_VISIBILITY:
+    case SLOT_FOOTER_VISIBILITY:
+    case SLOT_SIDE_TOOLS_VISIBILITY:
+    case SLOT_LEFT_TOOLS_VISIBILITY:
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    case SLOT_EXTRA_TOOLS_VISIBILITY:
+    case SLOT_INTERACTIVE_MODE:
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (false);
+    case SLOT_INTERACTIVE_INPUT:
+      check_type_id<string> (type_id, s);
+      return close_box<string> ("#f");
+    default:
+      break;
+  }
   if (!is_nil (main_widget)) return main_widget->query (s, type_id);
   return ns_widget_rep::query (s, type_id);
 }

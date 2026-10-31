@@ -14,6 +14,14 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: very tall documents, the console, the View menu** (desktop,
+  Cocoa interface): a document taller than 5,000,000 points (a few hundred
+  pages at a high zoom) could not be scrolled to its end; the frame now
+  goes up to 10,000,000 points, and a taller document gets a warning
+  instead of being cut silently. The console opens at its last message
+  even when no window of TeXmacs has the keyboard focus, and the View menu
+  no longer fails ("Error in menu") when it is built while the console is
+  the current editor (#661).
 - **Cocoa: tooltips on the icon bars** (desktop, Cocoa interface): the
   buttons of the icon bars show their balloon text as a tooltip again; the
   hover highlight of a button removed the tracking areas of its tooltip
