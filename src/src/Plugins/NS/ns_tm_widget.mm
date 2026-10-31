@@ -243,6 +243,10 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   [[NSNotificationCenter defaultCenter] addObserver: wh
       selector: @selector(notify:)
           name: @"TMIconBarsChanged" object: nil];
+  // the scroll bars of the system (legacy ones take room in the side bar)
+  [[NSNotificationCenter defaultCenter] addObserver: wh
+      selector: @selector(notify:)
+          name: NSPreferredScrollerStyleDidChangeNotification object: nil];
   // NOTE: the window comes later (see plain_window_widget)
   NSArray* names= @[NSWindowDidBecomeMainNotification,
                     NSWindowDidEnterFullScreenNotification,
@@ -399,10 +403,10 @@ void ns_tm_widget_rep::layout()
   int place= ns_icon_bars_place ();
   [bc setSide: place != 0];
   [bc setRight: place == 2];
-  CGFloat bars_w= visibility[0]? [bc sideWidth]: 0;
+  CGFloat bars_h= max (0.0, r.size.height - foot_h);
+  CGFloat bars_w= visibility[0]? [bc sideWidth: bars_h]: 0;
   CGFloat bars_x= place == 2? r.size.width - bars_w: 0;
-  [[bc sideBar] setFrame: NSMakeRect (bars_x, foot_h, bars_w,
-                                      max (0.0, r.size.height - foot_h))];
+  [[bc sideBar] setFrame: NSMakeRect (bars_x, foot_h, bars_w, bars_h)];
   [[bc sideBar] setHidden: bars_w == 0];
   [bc layoutSide];
   if (place != 2) r.origin.x += bars_w;
@@ -1127,7 +1131,9 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *                     the full screen button of macOS (toggleFullScreen:)
  *   move:<x>,<y>      the top left corner of the main window (in points,
  *                     from the top left of the main screen)
- *   resize:<w>,<h>    the size of the contents of the main window
+ *   resize:<w>,<h>    the size of the contents of the main window, or of the
+ *                     window of the last resize (another window may have
+ *                     come in front, as the Welcome of a new home)
  *   front:<title>     the window with this title becomes the main window
  *   main:<title>      as if it became the main window (the notification)
  *   windows           prints the windows (title, frame, main, shown)
@@ -1142,6 +1148,8 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *   eval:<scheme>     evaluates a Scheme expression (delayed)
  *   side-scroll:<y>   scrolls the side tools which are shown to y
  *   side-pos          prints the scroll position of the side tools
+ *   side-bars         prints the columns of the icon bars and their scroller,
+ *                     in the window of the last resize if there was one
  *   scroll[:<title>]  prints the size of the documents of the editors of the
  *                     main window (or of the window with this title), their
  *                     visible part, and whether it is at their end
@@ -1288,6 +1296,11 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     for (NSWindow* w in [NSApp windows])
       if ([arg length] > 0 && [w isVisible] && [[w title] isEqualToString: arg])
         win= w;
+  // (only compared: the window of the last resize may have been closed)
+  static NSWindow* resized= nil;
+  if ([st isEqualToString: @"resize"] || [st isEqualToString: @"side-bars"])
+    for (NSWindow* w in [NSApp windows])
+      if (w == resized && [w isVisible]) win= w;
   fprintf (stderr, "NSTEST step %s\n", [[steps objectAtIndex: step-1] UTF8String]);
   if ([st isEqualToString: @"close"]) [win performClose: nil];
   else if ([st isEqualToString: @"fullscreen"]) [win toggleFullScreen: nil];
@@ -1295,9 +1308,11 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     [win setFrameTopLeftPoint:
        NSMakePoint ([[nums objectAtIndex: 0] doubleValue],
                     main_screen_height () - [[nums objectAtIndex: 1] doubleValue])];
-  else if ([st isEqualToString: @"resize"] && [nums count] == 2)
+  else if ([st isEqualToString: @"resize"] && [nums count] == 2) {
+    resized= win;
     [win setContentSize: NSMakeSize ([[nums objectAtIndex: 0] doubleValue],
                                      [[nums objectAtIndex: 1] doubleValue])];
+  }
   else if ([st isEqualToString: @"front"]) {
     [NSApp activateIgnoringOtherApps: YES];
     for (NSWindow* w in [NSApp windows])
@@ -1395,6 +1410,19 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
         [[NSNotificationCenter defaultCenter]
           postNotificationName: NSViewBoundsDidChangeNotification
                         object: [v superview]];
+        break;
+      }
+      [todo addObjectsFromArray: [v subviews]];
+    }
+  }
+  else if ([st isEqualToString: @"side-bars"]) {
+    fprintf (stderr, "NSTEST columns of '%s'\n", [[win title] UTF8String]);
+    NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: [TMSplitHandle class]] && ((TMSplitHandle*) v)->wid) {
+        [((TMSplitHandle*) v)->wid->bc printSide];
         break;
       }
       [todo addObjectsFromArray: [v subviews]];

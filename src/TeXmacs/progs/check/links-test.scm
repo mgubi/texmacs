@@ -2565,6 +2565,59 @@
        (check= (file-body "wvm.tm") '(document "intro 4" (include "wva.tm")))
        (check= (assoc-ref (file-init "wvm.tm") "font-base-size") "12")))))
 
+;; The style belongs to the buffer of the part view too (#535): a style set
+;; in one view of the buffer and saved from another one (switch-to-buffer)
+;; goes into the master, also from the part view of an included file, and
+;; the master open in two views gets it (buffer-set-style) in both.
+(define (test-part-views-style)
+  (check-group "part view: style in the views of a buffer")
+  (let* ((m (tmp "wvm.tm"))
+         (a (tmp "wva.tm"))
+         (p (system->url (part-url m a)))
+         (q (system->url (part-url m m)))
+         (us '(tuple "book" "number-us")))
+    ;; the view of the master
+    (run-group
+     (lambda ()
+       (write-views-master)
+       (load-buffer q)
+       (update-forced)
+       (switch-to-buffer q)
+       (check= (length (buffer->views q)) 2)
+       (edit (set-style-tree (stree->tree us)))
+       (switch-to-buffer q)
+       (check= (tree->stree (get-style-tree)) us)
+       (check-true (buffer-modified? q))
+       (save-buffer q)
+       (check= (part-save-message) "Saved wvm.tm")
+       (check= (file-style "wvm.tm") us)
+       (check-false (buffer-modified? q))))
+    ;; the view of an included file, with the master open in two views
+    (run-group
+     (lambda ()
+       (write-views-master)
+       (load-buffer m)
+       (update-forced)
+       (switch-to-buffer m)
+       (check= (length (buffer->views m)) 2)
+       (load-buffer p)
+       (update-forced)
+       (switch-to-buffer p)
+       (check= (length (buffer->views p)) 2)
+       (edit (set-style-tree (stree->tree us)))
+       (switch-to-buffer p)
+       (check= (tree->stree (get-style-tree)) us)
+       (save-buffer p)
+       (check= (part-save-message) "Saved wva.tm, wvm.tm")
+       (check= (file-style "wvm.tm") us)
+       (check= (file-style "wva.tm") "book")
+       (check-false (buffer-modified? m))
+       (switch-to-buffer m)
+       (check= (tree->stree (get-style-tree)) us)
+       (switch-to-buffer m)
+       (check= (tree->stree (get-style-tree)) us)
+       (check= (tmfile-extract (buffer-get m) 'style) us)))))
+
 ;; The part tmfs opens a file of a project as a document of its own: its
 ;; url names the master and the file, its body is shared with the file and
 ;; its environment marks it as a part.
@@ -3126,6 +3179,7 @@
   (run-group test-part-master-init)
   (run-group test-part-init-three-way)
   (run-group test-part-views-init)
+  (run-group test-part-views-style)
   (run-group test-part-view-menu)
   (run-group test-parts-tmfs)
   (run-group test-document-parts)
