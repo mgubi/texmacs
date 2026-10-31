@@ -904,6 +904,8 @@
 (tm-widget (version-review-contents win)
   (let* ((u (window->buffer win))
          (conflict? (review-conflict? u))
+         ;; during a rebase, the user's version is the new one
+         (mine (if conflict? (git-mine-version (git-root u)) 0))
          (l (review-differences u))
          (n (length l))
          (i (review-index l))
@@ -924,15 +926,17 @@
           // // (text "Keep:")
           (when i
             ((eval (if conflict? "Mine" "Old"))
-             (review-do (lambda () (version-retain 0))))
+             (review-do (lambda () (version-retain mine))))
             ((eval (if conflict? "Theirs" "New"))
-             (review-do (lambda () (version-retain 1)))))
+             (review-do (lambda () (version-retain (- 1 mine))))))
           // // (text "Show:")
           ("Both" (review-do (lambda () (version-show 'version-both))))
           ((eval (if conflict? "Mine" "Old"))
-           (review-do (lambda () (version-show 'version-old))))
+           (review-do (lambda () (version-show (if (== mine 0) 'version-old
+                                                   'version-new)))))
           ((eval (if conflict? "Theirs" "New"))
-           (review-do (lambda () (version-show 'version-new)))))
+           (review-do (lambda () (version-show (if (== mine 0) 'version-new
+                                                   'version-old))))))
       >>
       (if conflict?
           ("Mark as resolved" (git-mark-resolved u)))
