@@ -24,6 +24,35 @@
         (code code-complete)
         (code code-menu)))
 
+(define (test-focus-menu)
+  ;; the entries of the code in the menu Focus: code-menu.scm loads the
+  ;; master routine of focus-extra-menu first, else the master replaces
+  ;; them when it is loaded later (#684)
+  (check-group "the menu Focus")
+  (let ((defs (ahash-ref tm-defined-module 'focus-extra-menu)))
+    (check-true (in? '(code code-menu) defs))
+    ;; the newest first: the master comes last
+    (check= (cAr defs) '(generic generic-menu)))
+  (let* ((u (url-append (url-temp-dir) "code-focus-test.tm"))
+         (old (current-buffer)))
+    (string-save (string-append "<TeXmacs|2.1.4>\n\n<style|generic>\n\n"
+                                "<\\body>\n  Text.\n\n  <\\cpp-code>\n"
+                                "    int f () {\n\n    }\n  </cpp-code>\n"
+                                "</body>\n") u)
+    (load-buffer u)
+    (update-forced)
+    (tree-go-to (car (select (buffer-tree) '(:* cpp-code))) 0 0 0)
+    (update-forced)
+    (code-provider-set! 'outline 'test 0 (lambda () #t) (lambda () '()))
+    (check-true (in-prog?))
+    (check-true (string-contains? (object->string
+                                   (menu-expand '(dynamic (focus-menu))))
+                                  "Outline"))
+    (code-provider-remove! 'outline 'test)
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (system-remove u)))
+
 (define (test-providers)
   (check-group "providers")
   (let ((asked '()))
@@ -300,6 +329,7 @@
   ;; (the providers by rank, whatever the preferences code:<feature> of
   ;; the user say)
   (code-ignore-preferences! #t)
+  (test-focus-menu)
   (test-completion)
   (test-diagnostics)
   (test-navigation)

@@ -19,6 +19,18 @@ have the details, and the problems go to the
   the document stays the window in use, and what is typed or asked for next goes
   to it, as in the other interfaces. A click in the console gives it the focus,
   and a console opened from the Debug menu takes it at once (#679).
+- **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
+  these colors of the program were transparent. A text with an unknown color
+  name was invisible, on the screen and in a PDF: it is black now, as in Qt;
+  the unknown colors of graphics are black too, and the informative flags
+  in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
+  (#656).
+- **The menu Focus in code blocks** (desktop and browser): its entries for
+  program code (Definitions, Outline, Go to definition, Folds, the syntax
+  and server entries) are back; they were lost at each start, and TeXmacs
+  no longer prints the warning "conditional master routine
+  focus-extra-menu" on the terminal, nor the one of `parser-feature` when
+  the first file is a JSON file (#684).
 - **Search and Replace next to hidden content** (desktop): a replacement
   next to a hidden (folded) tag stays in its place instead of going inside
   the tag (#590); going to a hit inside hidden content shows it in a step

@@ -22,6 +22,9 @@
 #            warning of a typesetting loop, #620)
 #   tips     the buttons of the icon bars keep the tracking areas of their
 #            tooltips when theirs is updated (#637)
+#   colors   without a window (-headless): an unknown color name gives an
+#            opaque black, also in a PDF (black, white... of colors.cpp are
+#            set, #656)
 #   sizes    two dialogs with a glue and a resize of negative sizes: the
 #            sizes given to AppKit are replaced, with one warning on
 #            debug-aqua for each place in all, and the dialogs are shown
@@ -189,6 +192,28 @@ tips_ok () {
   echo "$after" | grep -aq ": $n buttons with a tooltip, $n hover areas, [1-9]"
 }
 verdict tips "tooltips of the icon bars survive an update (#637)" tips_ok
+
+# (colors) -headless: no window is shown, and TeXmacs is never the active
+# application
+home="$homes/colors-home"
+rm -rf "${homes:?}/colors-home"
+mkdir -p "$home"
+printf '<TeXmacs|2.1.5>\n\n<\\body>\n  <with|color|nosuchcolor|some text>\n</body>\n' \
+  > "$home/colors.tm"
+HOME="$home" CFFIXED_USER_HOME="$home" TEXMACS_HOME_PATH="$home" \
+  perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -headless "$home/colors.tm" -x \
+  "(begin (display* \"CHECK color \" (named-color->rgba \"nosuchcolor\") \"\\n\") (print-to-file \"$home/colors.pdf\") (display \"CHECK alive\\n\") (quit-TeXmacs))" \
+  > "$out/colors.log" 2>&1
+echo "exit status $?" >> "$out/colors.log"
+colors_ok () {
+  fail="not an opaque black: $(grep -a 'CHECK color' "$out/colors.log")"
+  grep -aq '^CHECK color (0 0 0 255)' "$out/colors.log" || return 1
+  fail="no PDF"
+  [ -s "$home/colors.pdf" ] || return 1
+  fail="a transparent color in the PDF (/ca 0)"
+  ! grep -aqE '/ca 0([^.0-9]|$)' "$home/colors.pdf"
+}
+verdict colors "an unknown color name is an opaque black, on the screen and in a PDF (#656)" colors_ok
 
 # (sizes) the glue and the resize of two dialogs have negative sizes: the
 # lengths are replaced by 0 for AppKit, with one warning for each place
