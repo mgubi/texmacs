@@ -661,6 +661,19 @@
   (or (nnot (git-rev-parse root "MERGE_HEAD"))
       (nnot (git-rev-parse root "REBASE_HEAD"))))
 
+(tm-define (git-rebasing? root)
+  (:synopsis "Is a rebase stopped by a conflict in @root?")
+  ;; NOTE: during a rebase, Git's ours is the upstream and theirs the
+  ;; commits being replayed, that is, the commits of the user
+  (nnot (git-rev-parse root "REBASE_HEAD")))
+
+(tm-define (git-mine-version root)
+  (:synopsis "Which version of a conflict in @root is the user's (0 or 1)")
+  ;; In the documents of a conflict, the old version (0) is ours and the
+  ;; new one (1) theirs, except during a rebase
+  (git-memo root 'mine-version
+            (lambda () (if (and root (git-rebasing? root)) 1 0))))
+
 (tm-define (git-merge-message root)
   (:synopsis "The prepared message for the merge in progress, or #f")
   (and-with out (git-output root "rev-parse" "--git-path" "MERGE_MSG")

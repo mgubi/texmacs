@@ -214,3 +214,125 @@
   (cons 'document
         (map (lambda (x) (if (tm-func? x 'body 1) `(body ,body) x))
              (cdr doc))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Complete documents: the body, the style and the initial environment
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (merge-value o a b)
+  ;; Three way merge of values (#f: absent): (value . conflict?)
+  (cond ((== a b) (cons a #f))
+        ((== o a) (cons b #f))
+        ((== o b) (cons a #f))
+        (else (cons a #t))))
+
+(define (document-part doc tag)
+  (list-find (cdr doc) (cut tm-is? <> tag)))
+
+(define (style-list doc)
+  ;; The style and the packages of @doc, as a list, or #f when @doc has no
+  ;; style part.  The packages which are not names (macros...) are kept as
+  ;; they are, and compared as a whole (#676)
+  (with s (document-part doc 'style)
+    (cond ((not s) #f)
+          ((not (pair? (cdr s))) '())
+          ((tm-is? (cadr s) 'tuple) (cdadr s))
+          (else (list (cadr s))))))
+
+(define (merge-styles o a b)
+  ;; The main style is merged as a value, the packages as a set:
+  ;; (styles . conflicts), the conflicts being '() or '("style")
+  ;; NOTE: our order of the packages is kept, theirs are added at the end
+  (let* ((main (merge-value (and (pair? o) (car o))
+                            (and (pair? a) (car a))
+                            (and (pair? b) (car b))))
+         (po (if (pair? o) (cdr o) '()))
+         (pa (if (pair? a) (cdr a) '()))
+         (pb (if (pair? b) (cdr b) '()))
+         (removed (list-filter po (lambda (x) (or (nin? x pa) (nin? x pb)))))
+         (added (list-filter pb (lambda (x) (and (nin? x po) (nin? x pa)))))
+         (packs (list-filter (append pa added)
+                             (lambda (x) (and (nin? x removed)
+                                              (!= x (car main)))))))
+    (cond ((car main)
+           (cons (cons (car main) packs) (if (cdr main) '("style") '())))
+          ((null? packs) (cons '() (if (cdr main) '("style") '())))
+          ;; NOTE: the main style never comes from the packages
+          (else (cons a '("style"))))))
+
+(define (initial-list doc)
+  ;; The initial environment of @doc, as a list of (key value)
+  (with i (document-part doc 'initial)
+    (if (and i (tm-func? i 'initial 1) (tm-is? (cadr i) 'collection))
+        (map cdr (list-filter (cdadr i) (cut tm-func? <> 'associate 2)))
+        '())))
+
+(define (merge-initials o a b)
+  ;; Key by key: (environment . conflicting keys)
+  (let* ((keys (list-remove-duplicates (map car (append a b))))
+         (val (lambda (l k) (and-with x (assoc k l) (cadr x))))
+         (l (map (lambda (k) (cons k (merge-value (val o k) (val a k)
+                                                  (val b k))))
+                 keys)))
+    (cons (map (lambda (x) (list (car x) (cadr x)))
+               (list-filter l cadr))
+          (map car (list-filter l cddr)))))
+
+(define (document-set-part doc tag new after?)
+  ;; Replace the part @tag of @doc by @new (#f: remove it); a new part is
+  ;; put before the body, or after it if @after?
+  (cond ((document-part doc tag)
+         (cons 'document
+               (apply append
+                      (map (lambda (x)
+                             (cond ((not (tm-is? x tag)) (list x))
+                                   (new (list new))
+                                   (else '())))
+                           (cdr doc)))))
+        ((not new) doc)
+        (else
+          (cons 'document
+                (apply append
+                       (map (lambda (x)
+                              (cond ((not (tm-func? x 'body 1)) (list x))
+                                    (after? (list x new))
+                                    (else (list new x))))
+                            (cdr doc)))))))
+
+(tm-define (merge-documents o a b)
+  (:synopsis "Three way merge of the complete documents @a and @b")
+  ;; @o, @a, @b: strees of complete documents, @o being the common ancestor.
+  ;; The result is (merged-document conflicts kept): the number of
+  ;; conflicts, and the parts of the preamble for which ours was kept
+  ;; ("style" for the main style, the keys of the initial environment).
+  ;; The body is merged as by merge-versions, the style packages as a set,
+  ;; and the initial environment key by key; a conflicting change of the
+  ;; preamble keeps our version (@a) and counts as one conflict.  The other
+  ;; parts (references, auxiliary data...) are ours.
+  (let* ((body (merge-versions (document-body o) (document-body a)
+                               (document-body b)))
+         ;; a document without a style part is unchanged against the base
+         (so (or (style-list o) '()))
+         (sa (or (style-list a) so))
+         (st (merge-styles so sa (or (style-list b) so)))
+         (ia (initial-list a))
+         (in (merge-initials (initial-list o) ia (initial-list b)))
+         (doc (document-set-body a body))
+         (doc (if (== (car st) sa) doc
+                  (document-set-part
+                   doc 'style
+                   (list 'style (if (and (== (length (car st)) 1)
+                                         (string? (car (car st))))
+                                    (car (car st))
+                                    (cons 'tuple (car st))))
+                   #f)))
+         (doc (if (== (car in) ia) doc
+                  (document-set-part
+                   doc 'initial
+                   (and (nnull? (car in))
+                        `(initial (collection
+                                    ,@(map (cut cons 'associate <>)
+                                           (car in)))))
+                   #t))))
+    (with kept (append (cdr st) (cdr in))
+      (list doc (+ (merge-conflicts body) (length kept)) kept))))
