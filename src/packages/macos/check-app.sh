@@ -4,22 +4,40 @@
 # signature, its Info.plist, that it only uses the libraries of macOS and
 # its own ones, and that its code (the programs of the plugins too) runs
 # on the version of macOS given by LSMinimumSystemVersion (for each
-# architecture). The main program must also be linked against an SDK newer
-# than that version: an SDK equal to it means the linker was told the wrong
-# SDK (#662), and macOS then gives the program the behaviour of that old
-# version. The check depends only on the application, not on this machine.
+# architecture).
 #
-# Usage: packages/macos/check-app.sh TeXmacs.app
+# With --sdk-newer-than-min, the main program must also be linked against an
+# SDK newer than that version: an SDK equal to it means the linker was told
+# the wrong SDK (#662), and macOS then gives the program the behaviour of that
+# old version. The check depends only on the application, not on this machine.
+# It is for applications made for an older macOS (build-ns-app.sh --deps,
+# merge-universal.sh). Without --deps the minimal version is the version of
+# the machine, which may well be the SDK or newer, and the rule does not apply.
+#
+# Usage: packages/macos/check-app.sh [--sdk-newer-than-min] TeXmacs.app
 
 set -e
 
-app="$1"
-[ -d "$app/Contents" ] || { echo "usage: $0 TeXmacs.app" >&2; exit 1; }
+sdk_rule=no
+[ "${1:-}" = --sdk-newer-than-min ] && { sdk_rule=yes; shift; }
+app="${1:-}"
+[ -d "$app/Contents" ] || { echo "usage: $0 [--sdk-newer-than-min] TeXmacs.app" >&2; exit 1; }
 
 codesign --verify --deep --strict "$app"
 plist="$app/Contents/Info.plist"
 plutil -lint "$plist" > /dev/null
-min=$(plutil -extract LSMinimumSystemVersion raw "$plist")
+# a version: 13, 13.0 or 13.0.1
+is_version () { [[ "$1" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; }
+min=$(plutil -extract LSMinimumSystemVersion raw "$plist" 2> /dev/null) || min=""
+if ! is_version "$min"; then
+  echo "error: $plist: LSMinimumSystemVersion is missing or not a version (\"$min\")" >&2
+  exit 1
+fi
+if [ $sdk_rule = yes ]; then
+  echo "SDK rule: the main program must be linked against an SDK newer than macOS $min"
+else
+  echo "SDK rule: skipped (no --sdk-newer-than-min)"
+fi
 
 # a version as a number, for the comparisons (12.0.1 -> 120001)
 num () { local IFS=.; set -- $1 0 0; echo $(($1 * 10000 + $2 * 100 + $3)); }
@@ -100,10 +118,10 @@ while IFS= read -r f; do
              c && $1 == "sdk" {print $2; exit}')
     if [ "$f" = "$exe" ]; then
       main_seen=yes
-      if ! [[ "$s" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+      if ! is_version "$s"; then
         echo "error: ${f#$app/} ($a) does not say its SDK (\"$s\")" >&2
         status=1
-      elif [ $(num "$s") -le $(num "$min") ]; then
+      elif [ $sdk_rule = yes ] && [ $(num "$s") -le $(num "$min") ]; then
         echo "error: ${f#$app/} ($a) is linked against the SDK of macOS $s, not newer than LSMinimumSystemVersion ($min)" >&2
         status=1
       fi

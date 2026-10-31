@@ -45,9 +45,9 @@
   statically for an older <name|macOS> and either architecture,
   <source-link|merge-universal.sh|packages/macos/merge-universal.sh> merges two applications into a
   universal one, and <source-link|check-app.sh|packages/macos/check-app.sh> checks the signature,
-  that only system libraries and those of the bundle are used, and that the
-  main program is linked against an <abbr|SDK> newer than the minimal version
-  of <name|macOS>. The
+  that only system libraries and those of the bundle are used, and, for an
+  application made for an older <name|macOS>, that the main program is linked
+  against an <abbr|SDK> newer than its minimal version. The
   continuous integration workflow <verbatim|.github/workflows/upsilon-macos.yml>
   does all this on the branch <verbatim|upsilon_ci>, for the <name|Cocoa> and
   the <name|Vue> ports and both architectures, and publishes the two disk
