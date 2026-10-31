@@ -164,6 +164,44 @@
     (check-false (tree-func? (tree-ref t 0) 'string))
     (check-false (tree-func? '(frac "a" "b") 'frac))))
 
+;; The tag "string" is an ordinary tag, although the atomic trees say "string"
+;; as their label: a compound tree must never be built with the label of the
+;; atomic trees, it was read as a string made of the bytes of a pointer (#678).
+(define (test-string-tag)
+  (check-group "the tag string")
+  (with t (stree->tree '(string "abc"))
+    (check-true (tree-compound? t))
+    (check-false (tree-atomic? t))
+    (check= (tree-arity t) 1)
+    (check= (tree-label t) 'string)
+    (check= (st (tree-ref t 0)) "abc")
+    (check= (st t) '(string "abc"))
+    (check= (st (tree-copy t)) '(string "abc")))
+  (with t (stree->tree '(string))
+    (check-true (tree-compound? t))
+    (check= (tree-arity t) 0)
+    (check= (st t) '(string)))
+  (check-true (tree-compound? (tree 'string "abc")))
+  (check= (st (tree 'string "abc")) '(string "abc"))
+  (check= (st (stree->tree '(concat "x" (string "abc" (frac "a" "b")) "y")))
+          '(concat "x" (string "abc" (frac "a" "b")) "y"))
+  (check= (st (stree->tree '(compound "string" "abc")))
+          '(compound "string" "abc"))
+  (with t (stree->tree '(frac "a" "b"))
+    (tree-assign-node! t 'string)
+    (check-true (tree-compound? t))
+    (check= (st t) '(string "a" "b")))
+  ;; the atomic trees do not change
+  (with t (stree->tree "abc")
+    (check-true (tree-atomic? t))
+    (check= (tree-label t) 'string)
+    (check= (st t) "abc"))
+  ;; the other labels of the start of the table are ordinary compound trees
+  (for-each (lambda (s)
+              (check-true (tree-compound? (stree->tree s)))
+              (check= (st (stree->tree s)) s))
+            '((unknown "a") (uninit) (error "a") (raw-data "a"))))
+
 ;; functions of the glue which build new trees out of old ones
 (define (test-building)
   (check-group "building")
@@ -847,6 +885,7 @@
   (test-access)
   (test-tree-ref)
   (test-predicates)
+  (test-string-tag)
   (test-building)
   (test-search)
   (test-map)

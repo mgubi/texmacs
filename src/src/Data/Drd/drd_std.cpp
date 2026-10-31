@@ -80,7 +80,8 @@ var_repeat (int arity, int extra, int child_mode= CHILD_UNIFORM) {
 
 static void
 init (tree_label l, string name, tag_info ti) {
-  STD_CODE(name)= (int) l;
+  // the .tm reader takes the labels from STD_CODE: see make_tree_label
+  if (l != TMSTRING) STD_CODE(name)= (int) l;
   make_tree_label (l, name);
   std_drd->info (l)= ti;
   std_drd->freeze_arity (l);
