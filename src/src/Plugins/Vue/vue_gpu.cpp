@@ -977,8 +977,28 @@ public:
   void clip_box (int& x1, int& y1, int& x2, int& y2) {
     SI ax1, ay1, ax2, ay2;
     get_clipping (ax1, ay1, ax2, ay2);
-    x1= (int) to_x (ax1); x2= (int) to_x (ax2);
-    y1= (int) -to_y (ay2); y2= (int) -to_y (ay1); }
+    if (trs.empty ()) {
+      x1= (int) to_x (ax1); x2= (int) to_x (ax2);
+      y1= (int) -to_y (ay2); y2= (int) -to_y (ay1);
+      return;
+    }
+    // under a transformation, the clip is in its space (as for the
+    // renderers which give it to their device): the box of its image, within
+    // the clip of the device when the transformation was made (m[6..9])
+    const std::vector<double>& m= trs.back ();
+    double cx[2]= { to_x (ax1), to_x (ax2) }, cy[2]= { to_y (ay1), to_y (ay2) };
+    float bx1= 1e30f, by1= 1e30f, bx2= -1e30f, by2= -1e30f;
+    for (int i= 0; i < 2; i++)
+      for (int j= 0; j < 2; j++) {
+        float dx, dy;
+        device (cx[i], cy[j], dx, dy);
+        bx1= min (bx1, dx); by1= min (by1, dy);
+        bx2= max (bx2, dx); by2= max (by2, dy);
+      }
+    x1= max ((int) floor (bx1), (int) m[6]); y1= max ((int) floor (by1), (int) m[7]);
+    x2= min ((int) ceil (bx2), (int) m[8]); y2= min ((int) ceil (by2), (int) m[9]);
+    if (x2 < x1) x2= x1;
+    if (y2 < y1) y2= y1; }
   bool ready () { return ensure_target (t); }
 
   // a quad of user space corners (x1, y1) bottom left, (x2, y2) top right
@@ -1072,7 +1092,10 @@ gpu_renderer_rep::set_transformation (frame fr) {
   SI cx1, cy1, cx2, cy2;
   get_clipping (cx1, cy1, cx2, cy2);
   rectangle oclip (cx1, cy1, cx2, cy2);
-  frame cv= scaling (point (pixel, -pixel), point (-ox, -oy));
+  // in the user space of to_x and to_y, whose y is up (the other renderers
+  // conjugate with their device space, y down: made there and applied here,
+  // the transformation was a rotation the other way, displaced, #659)
+  frame cv= scaling (point (pixel, pixel), point (-ox, -oy));
   frame tr= invert (cv) * fr * cv;
   point o = tr (point (0.0, 0.0));
   point ux= tr (point (1.0, 0.0)) - o;
@@ -1087,6 +1110,10 @@ gpu_renderer_rep::set_transformation (frame fr) {
       p[0]*m[4] + p[2]*m[5] + p[4], p[1]*m[4] + p[3]*m[5] + p[5] };
     m= c;
   }
+  // and the clip of the device now, which bounds what is drawn under it
+  int s1, s2, s3, s4;
+  clip_box (s1, s2, s3, s4);
+  m.push_back (s1); m.push_back (s2); m.push_back (s3); m.push_back (s4);
   trs.push_back (m);
   rectangle nclip= fr [oclip];
   clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
