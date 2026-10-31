@@ -151,6 +151,19 @@
                            "sleep 615 & wait\""))
   (:serializer ,raw-serialize))
 
+;; the same, by a program which is not the first process of the plugin (that
+;; one, cat, ends at once): it writes on the output of the plugin while it
+;; cleans up, which it may do as long as it runs (argument 616)
+(define grace-file2
+  (url->system (url-append (url-concretize "$TEXMACS_HOME_PATH")
+                           "plugins-test-grace2")))
+
+(plugin-configure tmtestgracepipe
+  (:launch ,(string-append "sh -c \"(trap 'sleep 0.3; echo bye; "
+                           "echo bye >&2; echo done > " grace-file2
+                           "; exit 0' TERM; sleep 616 & wait) & exec cat\""))
+  (:serializer ,raw-serialize))
+
 ;; two variants, the session name chooses the variant
 (plugin-configure tmtestvariants
   (:launch "v1" "cat")
@@ -1325,7 +1338,19 @@
     (connection-stop "tmtestecho" "plugins-test-grace2")
     (check= (- (zombies) before) 0))
   (when (url-exists? (system->url grace-file))
-    (system-remove (system->url grace-file))))
+    (system-remove (system->url grace-file)))
+  ;; the output of the plugin stays open meanwhile: the program which
+  ;; cleans up does not die of SIGPIPE when it writes there
+  (when (url-exists? (system->url grace-file2))
+    (system-remove (system->url grace-file2)))
+  (check= (start* "tmtestgracepipe" "plugins-test-gracepipe") "ok")
+  (check-true (wait-until (lambda () (== (sleepers "616") 1)) 5000))
+  (connection-stop "tmtestgracepipe" "plugins-test-gracepipe")
+  (check-true (wait-until (lambda () (url-exists? (system->url grace-file2)))
+                          3000))
+  (check-true (wait-until (lambda () (== (sleepers "616") 0)) 3000))
+  (when (url-exists? (system->url grace-file2))
+    (system-remove (system->url grace-file2))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

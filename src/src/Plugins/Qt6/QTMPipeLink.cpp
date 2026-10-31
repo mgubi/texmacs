@@ -25,12 +25,20 @@
 #include <signal.h>
 #include <errno.h>
 #endif
+#ifdef QTM_PIPE_GROUPS
+#include <stdio.h>
+#include <string.h>
+#ifdef __linux__
+#include <dirent.h>
+#endif
+#endif
 
 // NOTE: on Unix, the program is started in a process group of its own
 // (setsid in the child), which is stopped or interrupted as a whole, as in
 // pipe_link.cpp: a plugin started by a script which runs its program as a
 // child (without exec) leaves nothing behind. Windows has no process groups
-// for QProcess: there, only the process itself is stopped.
+// for QProcess (nor Android here): there, only the process itself is
+// stopped.
 
 static string
 debug_io_string (QByteArray s) {
@@ -56,7 +64,7 @@ BEGIN_SLOT
 END_SLOT
 }
 
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
 // in the child: a group of its own, where an interrupt is not ignored (a
 // TeXmacs started with SIGINT ignored, as by `sh ... &', passes that on)
 static void
@@ -70,14 +78,14 @@ new_group () {
 QTMPipeLink::QTMPipeLink (string cmd2):
   cmd (cmd2), outbuf (""), errbuf (""), feed_cmd (NULL), group (0)
 {
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
   setChildProcessModifier ([] () { new_group (); });
 #endif
 #endif
 }
 
-#if !defined (OS_MINGW) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+#if defined (QTM_PIPE_GROUPS) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 void
 QTMPipeLink::setupChildProcess () {
   new_group ();
@@ -85,19 +93,19 @@ QTMPipeLink::setupChildProcess () {
 #endif
 
 QTMPipeLink::~QTMPipeLink () {
-#ifdef OS_MINGW
-  killProcess (1000);
-#else
+#ifdef QTM_PIPE_GROUPS
   killGroup ();
+#else
+  killProcess (1000);
 #endif
 }
 
 bool
 QTMPipeLink::launchCmd () {
-#ifdef OS_MINGW
-  if (state () != QProcess::NotRunning) killProcess (1000);
-#else
+#ifdef QTM_PIPE_GROUPS
   if (state () != QProcess::NotRunning || group > 0) killGroup ();
+#else
+  if (state () != QProcess::NotRunning) killProcess (1000);
 #endif
 
   QString raw = utf8_to_qstring(cmd);
@@ -150,7 +158,7 @@ QTMPipeLink::launchCmd () {
 
   bool ok = waitForStarted();
   if (ok) {
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
     // (the process leads its group: the group has its number)
 #if QT_VERSION < QT_VERSION_CHECK(5, 3, 0)
     group= (qint64) pid ();
@@ -213,16 +221,61 @@ QTMPipeLink::killProcess (int msecs) {
 #endif
 }
 
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
+// NOTE: the group is waited for before any wait of Qt: once Qt sees that the
+// program has ended (in a wait, or in the event loop), it closes its ends of
+// the pipes, and a member of the group which still cleans up then dies of
+// SIGPIPE when it writes there. Qt reaps the program at once on macOS (by
+// the SIGCHLD handler of forkfd), but only in a wait or in the event loop on
+// Linux (where it learns of the end by a pidfd): a group whose program is a
+// zombie is ended. Once a group is gone, its number may be that of a new
+// process: it is checked before each signal, and forgotten (group 0) once it
+// is gone
+
+bool
+QTMPipeLink::groupAlive (qint64 pg) {
+  // whether a process of the group pg is left, not counting zombies (EPERM:
+  // a member which we may not signal)
+  if (pg <= 0) return false;
+#ifdef __linux__
+  DIR* dir= opendir ("/proc");
+  if (dir != NULL) {
+    bool found= false;
+    while (!found) {
+      struct dirent* e= readdir (dir);
+      if (e == NULL) break;
+      if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
+      char path[64], buf[512];
+      snprintf (path, sizeof (path), "/proc/%s/stat", e->d_name);
+      FILE* f= fopen (path, "r");
+      if (f == NULL) continue;
+      size_t n= fread (buf, 1, sizeof (buf) - 1, f);
+      fclose (f);
+      buf[n]= '\0';
+      // pid (command) state ppid pgrp ...: the command may hold parentheses
+      char* q= strrchr (buf, ')');
+      char st;
+      int ppid, pgrp;
+      if (q != NULL && sscanf (q + 1, " %c %d %d", &st, &ppid, &pgrp) == 3)
+        found= (pgrp == (int) pg && st != 'Z' && st != 'X');
+    }
+    closedir (dir);
+    return found;
+  }
+#endif
+  return ::killpg ((pid_t) pg, 0) == 0 || errno == EPERM;
+}
+
 bool
 QTMPipeLink::hasEnded () {
-  // whether the process is reaped and its group is gone (EPERM: a member
-  // which we may not signal)
-  if (state () != QProcess::NotRunning && !waitForFinished (0)) return false;
-  if (group > 0 && (::killpg ((pid_t) group, 0) == 0 || errno != ESRCH))
-    return false;
-  group= 0;
-  return true;
+  // whether the group is gone and the process reaped
+  if (group > 0) {
+    if (groupAlive (group)) return false;
+    group= 0;
+    // (the program has ended: the wait only reaps it)
+    if (state () != QProcess::NotRunning) waitForFinished (1000);
+  }
+  return state () == QProcess::NotRunning || waitForFinished (0);
 }
 
 bool
@@ -232,7 +285,7 @@ QTMPipeLink::askToEnd () {
   // is killed later by killGroup, see reap_ending_links in qt_pipe_link.cpp
   disconnect (SIGNAL(readyReadStandardOutput ()), this, SLOT(readErrOut ()));
   disconnect (SIGNAL(readyReadStandardError ()), this, SLOT(readErrOut ()));
-  if (group <= 0 || ::killpg ((pid_t) group, SIGTERM) == -1) {
+  if (!groupAlive (group) || ::killpg ((pid_t) group, SIGTERM) == -1) {
     // no group (any more): only the process, if it still runs
     group= 0;
     if (state () != QProcess::NotRunning) {
@@ -241,13 +294,7 @@ QTMPipeLink::askToEnd () {
     }
     return true;
   }
-  for (int i=0; i<5; i++) {
-    if (hasEnded ()) return true;
-    // NOTE: the process itself is reaped by QProcess (waitForFinished),
-    // never by waitpid here; while it is not, its group exists
-    if (state () != QProcess::NotRunning) waitForFinished (10);
-    else usleep (10000);
-  }
+  for (int i=0; i<5 && groupAlive (group); i++) usleep (10000);
   return hasEnded ();
 }
 
@@ -256,8 +303,7 @@ QTMPipeLink::killGroup () {
   // kill the group at once, and reap the process
   disconnect (SIGNAL(readyReadStandardOutput ()), this, SLOT(readErrOut ()));
   disconnect (SIGNAL(readyReadStandardError ()), this, SLOT(readErrOut ()));
-  if (group > 0 && (::killpg ((pid_t) group, 0) == 0 || errno == EPERM))
-    ::killpg ((pid_t) group, SIGKILL);
+  if (groupAlive (group)) ::killpg ((pid_t) group, SIGKILL);
   group= 0;
   if (state () != QProcess::NotRunning) {
     kill ();
@@ -266,7 +312,9 @@ QTMPipeLink::killGroup () {
     waitForFinished (1000);
   }
 }
+#endif
 
+#ifndef OS_MINGW
 void
 QTMPipeLink::interruptGroup () {
   if (group > 0 && ::killpg ((pid_t) group, SIGINT) != -1) return;

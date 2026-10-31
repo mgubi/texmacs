@@ -77,7 +77,7 @@ qt_pipe_link_rep::~qt_pipe_link_rep () {
 * Ending the processes
 ******************************************************************************/
 
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
 // The processes which were asked to terminate and have not ended yet (with
 // their groups), and the times when they are killed: their QProcess is
 // handed over to here, and the link gets a new one
@@ -88,11 +88,12 @@ static pid_t ending_owner= 0;  // the process of TeXmacs (not a fork of it)
 static void
 kill_ending_groups () {
   // at an exit which skips close_all_pipes (exit from Scheme): the groups
-  // which are left are killed at once (Qt may be gone: only the signals)
+  // which are left are killed at once (Qt may be gone: only the signals;
+  // a group which is gone may have the number of another process)
   if (getpid () != ending_owner) return;
   for (int i=0; i<N(ending_link); i++) {
     qint64 group= ((QTMPipeLink*) ending_link[i])->group;
-    if (group > 0) ::killpg ((pid_t) group, SIGKILL);
+    if (QTMPipeLink::groupAlive (group)) ::killpg ((pid_t) group, SIGKILL);
   }
 }
 
@@ -105,10 +106,8 @@ reap_ending_links (bool wait) {
   for (int i=0; i<N(ending_link); i++) {
     QTMPipeLink* p= (QTMPipeLink*) ending_link[i];
     if (wait)
-      while (!p->hasEnded () && texmacs_time () - ending_kill_at[i] < 0) {
-        if (p->state () != QProcess::NotRunning) p->waitForFinished (10);
-        else usleep (10000);
-      }
+      while (!p->hasEnded () && texmacs_time () - ending_kill_at[i] < 0)
+        usleep (10000);
     if (p->hasEnded ()) delete p;
     else if (wait || texmacs_time () - ending_kill_at[i] >= 0) {
       p->killGroup ();
@@ -130,7 +129,7 @@ qt_pipe_link_rep::end_process () {
   // and is given up to 2 s to do so, after which what is left of it is
   // killed, as in pipe_link.cpp: only the first 50 ms are waited for here,
   // the rest by reap_ending_links, so that the interface is not blocked
-#ifdef OS_MINGW
+#ifndef QTM_PIPE_GROUPS
   PipeLink->killProcess (0);
 #else
   if (PipeLink->state () == QProcess::NotRunning && PipeLink->group <= 0)
@@ -156,11 +155,11 @@ qt_pipe_link_rep::end_process () {
 
 string
 qt_pipe_link_rep::start () {
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
   reap_ending_links (false);
 #endif
   if (alive) return "busy";
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
   // (what is left of the group of a process which exited by itself)
   end_process ();
 #endif
@@ -211,7 +210,7 @@ qt_pipe_link_rep::read (int channel) {
                                          PipeLink->getOutbuf ());
     if (other == "") {
       alive= false;
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
       // (what is left of its group, as in pipe_link.cpp)
       end_process ();
 #endif
@@ -271,7 +270,7 @@ qt_pipe_link_rep::interrupt () {
 
 void
 qt_pipe_link_rep::stop () {
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
   reap_ending_links (false);
 #endif
   end_process ();
@@ -296,14 +295,17 @@ close_all_pipes () {
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     qt_pipe_link_rep* con= (qt_pipe_link_rep*) it->next();
-    if (con->alive) {
-      // (all are asked to terminate first, then waited for together: at
-      // most about 2 s in all, not 2 s for each)
-      con->end_process ();
-      con->alive= false;
-    }
+#ifdef QTM_PIPE_GROUPS
+    // (all are asked to terminate first, then waited for together: at most
+    // about 2 s in all, not 2 s for each; also what is left of the group
+    // of a plugin which exited by itself)
+    con->end_process ();
+    con->alive= false;
+#else
+    if (con->alive) con->stop ();
+#endif
   }
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
   reap_ending_links (true);
 #endif
   close_all_cmdlines ();
@@ -312,7 +314,7 @@ close_all_pipes () {
 
 void
 process_all_pipes () {
-#ifndef OS_MINGW
+#ifdef QTM_PIPE_GROUPS
   if (N(ending_link) > 0) reap_ending_links (false);
 #endif
   iterator<pointer> it= iterate (pipe_link_set);
