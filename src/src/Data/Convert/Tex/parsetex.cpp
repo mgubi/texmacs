@@ -50,6 +50,9 @@ string verbatim_escape (string s);
 // overflow the stack (#658). Real documents stay far below (TeX itself
 // allows 255 groups, the deepest of a corpus of 80 files was 19).
 #define MAX_PARSE_DEPTH 128
+// the same limit over the expansions of macros, whose bodies count from 0
+// (MAX_EXPAND_DEPTH bodies of MAX_PARSE_DEPTH levels would be too many)
+#define MAX_TOTAL_DEPTH 512
 
 struct latex_parser {
   int level;
@@ -65,12 +68,17 @@ struct latex_parser {
   // groups nested in the text being parsed (the body of a macro being
   // expanded counts from 0: expansions nest at most MAX_EXPAND_DEPTH deep)
   int nesting;
+  int total_depth; // the same, counted through the expansions
   bool too_deep_reported;
-  int open_braces; // groups being parsed which a } closes
+  // Definitions and arguments being parsed: TeX has read their text and
+  // counted its braces, also one after \string. A group which TeX executes
+  // is not counted: there \string makes a brace a mere character.
+  int counted_braces;
+  bool group_next; // the next parse is that of an executed group
   latex_parser (bool unicode2):
     level (0), unicode (unicode2), expanding (0), expand_depth (0),
-    expansion_skipped (false), nesting (0), too_deep_reported (false),
-    open_braces (0) {}
+    expansion_skipped (false), nesting (0), total_depth (0),
+    too_deep_reported (false), counted_braces (0), group_next (false) {}
   void latex_error (string s, int i, string message);
 
   bool is_opening_option (char c);
@@ -209,11 +217,14 @@ latex_parser::parse (string s, int& i, string stop, int change) {
   int n= N(s);
   tree t (CONCAT);
 
-  if (nesting >= MAX_PARSE_DEPTH) return parse_too_deep (s, i, stop);
+  int braces= (stop == "}" && !group_next? 1: 0);
+  group_next= false;
+  if (nesting >= MAX_PARSE_DEPTH || total_depth >= MAX_TOTAL_DEPTH)
+    return parse_too_deep (s, i, stop);
   level++;
   nesting++;
-  int braces= (stop == "}"? 1: 0);
-  open_braces += braces;
+  total_depth++;
+  counted_braces += braces;
   command_type ->extend ();
   command_arity->extend ();
   command_def  ->extend ();
@@ -266,7 +277,10 @@ latex_parser::parse (string s, int& i, string stop, int change) {
     }
     case '#':
       i++;
-      if (i==n) { nesting--; open_braces -= braces; return t; }
+      if (i==n) {
+        nesting--; total_depth--; counted_braces -= braces;
+        return t;
+      }
       if (is_numeric (s[i])) {
         t << s (i-1, i+1);
         i++;
@@ -384,6 +398,7 @@ latex_parser::parse (string s, int& i, string stop, int change) {
     case '{': {
       i++;
       t << tree (TUPLE, "\\begingroup");
+      group_next= true;
       t << parse (s, i, "}", change);
       t << tree (TUPLE, "\\endgroup");
       if ((i<n) && (s[i]=='}')) i++;
@@ -472,7 +487,8 @@ latex_parser::parse (string s, int& i, string stop, int change) {
 
   level--;
   nesting--;
-  open_braces -= braces;
+  total_depth--;
+  counted_braces -= braces;
   if (change > 0) {
     command_type ->merge ();
     command_arity->merge ();
@@ -1310,10 +1326,10 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
                           "too many nested expansions":
                           "inside its own expansion") << LF;
     }
-    int saved_nesting= nesting, saved_braces= open_braces;
+    int saved_nesting= nesting, saved_braces= counted_braces;
     if (expands && !recursive) {
       expanding (cmd)++; expand_depth++;
-      nesting= 0; open_braces= 0;
+      nesting= 0; counted_braces= 0;
     }
     if (recursive);
     else if (N(body) > 0 && latex_type (cmd) == "side-effect!"
@@ -1339,7 +1355,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     if (expands && !recursive) {
       expand_depth--;
       if (--expanding (cmd) == 0) expanding->reset (cmd);
-      nesting= saved_nesting; open_braces= saved_braces;
+      nesting= saved_nesting; counted_braces= saved_braces;
     }
   }
 
@@ -1380,20 +1396,21 @@ tree
 latex_parser::parse_string_token (string s, int& i) {
   // \string: the next token as text. It used to be read as an unknown
   // command \string{...}, and a tag named "string" is the label of the
-  // atomic trees: a random byte was imported (#658). A brace after it is
-  // left to the parser, where it still opens or closes a group, as TeX
-  // counts it when it reads the body of a definition.
+  // atomic trees: a random byte was imported (#658). Inside a definition or
+  // an argument, a brace after it stays in the source, where it opens or
+  // closes a group, as TeX counted it when it read that text; in a group
+  // which TeX executes, it is only a character.
   int n= N(s);
   if (i >= n) return "";
   char c= s[i];
-  if (c == '{') return char_as_text (c);
-  if (c == '}') {
-    // outside of the groups, a } is text for the parser too
-    if (open_braces == 0) i++;
+  if (c == '{' || c == '}') {
+    if (counted_braces == 0) i++;
     return char_as_text (c);
   }
   if (c == '\\') {
-    tree bs= tuple ("\\textbackslash");
+    // the backslash of math: \textbackslash is lost in math mode
+    tree bs= tuple (command_type ["!mode"] == "math"?
+                    "\\backslash": "\\textbackslash");
     int start= ++i;
     if (i < n && is_tex_alpha (s[i])) {
       while (i < n && is_tex_alpha (s[i])) i++;
@@ -1403,6 +1420,7 @@ latex_parser::parse_string_token (string s, int& i) {
     }
     if (i == n) return bs;
     i++;
+    if (s[start] == '\\') return concat (bs, bs);
     return concat (bs, char_as_text (s[start]));
   }
   // (a % still starts a comment, which TeX skips before \string reads)
@@ -1424,7 +1442,18 @@ latex_parser::parse_too_deep (string s, int& i, string stop) {
     char c= s[i];
     if (c == '\\') {
       if (depth == 0 && stop == "\\egroup" && test (s, i, "\\egroup")) break;
-      i+= 2;
+      if (test (s, i, "\\verb") && i+5 < n && !is_tex_alpha (s[i+5])) {
+        i+= 5;
+        if (i+1 < n && s[i] == '*') i++;
+        char delim= s[i++];
+        while (i < n && s[i] != delim) i++;
+        i++;
+      }
+      else i+= 2;
+      continue;
+    }
+    if (c == '%') {
+      while (i < n && s[i] != '\n') i++;
       continue;
     }
     if (depth == 0 &&
@@ -1439,7 +1468,9 @@ latex_parser::parse_too_deep (string s, int& i, string stop) {
   if (!too_deep_reported) {
     too_deep_reported= true;
     convert_warning << "LaTeX import: groups nested more than "
-                    << MAX_PARSE_DEPTH << " deep skipped" << LF;
+                    << (nesting >= MAX_PARSE_DEPTH?
+                        MAX_PARSE_DEPTH: MAX_TOTAL_DEPTH)
+                    << " deep skipped" << LF;
   }
   return "";
 }
