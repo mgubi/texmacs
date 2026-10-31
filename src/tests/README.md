@@ -367,7 +367,9 @@ console with several tabs (#619), an idle console, which must not be
 typeset again and again (#620), the tooltips of the icon bars (#637),
 dialogs with negative sizes (one warning for each place, and the dialogs
 are shown) and an error thrown at an entry point from AppKit (reported
-once, and TeXmacs goes on, #650, #666). Two more cases check the focus of
+once, and TeXmacs goes on, #650, #666), a document of 7*10^6 points scrolled
+to its end, the window queries of a console and a console which opens at its
+end (#661). Two more cases check the focus of
 the console: when it opens by itself on a warning, the document stays the key
 and main window and the current buffer, and gets the keys typed; a click, or
 opening it from the menu, gives it the focus; its close leaves the document

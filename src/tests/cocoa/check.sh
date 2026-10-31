@@ -30,6 +30,16 @@
 #            the interface run by the update of -[TMDocView scrolled:]) is
 #            reported once, and TeXmacs goes on: later commands and updates
 #            run (#650, #666)
+#   tall     a document of 7*10^6 points (150000 cm in papyrus mode, taller
+#            than the old cap of the frames, 5*10^6 points) is scrolled to
+#            its end by go-end (the test aid "scroll" of the window test)
+#            (#661)
+#   header   the window queries of the menus (visible-header?...) with the
+#            editor of a console as the current one: false, not a "type
+#            mismatch" (#661)
+#   console  the console opens at its end (a race before the fix: the end
+#            waited for an editor with the keyboard focus, so that this one
+#            failed now and then only) (#661)
 #   quiet    a warning from a delayed command opens the console, without
 #            the focus: the document stays the key and main window and the
 #            current buffer, and gets the keys typed. A click gives the
@@ -44,7 +54,7 @@
 #
 # Every case also fails on an error caught at an entry point from AppKit
 # ("Cocoa: an error was caught", "Cocoa: an Objective-C exception",
-# "Throwing"), on an abort and on a timeout (TM_TEST_TIMEOUT seconds,
+# "Throwing"), on a "type mismatch", on an abort and on a timeout (TM_TEST_TIMEOUT seconds,
 # default 60), except the errors which the case provokes itself and those
 # of the list of known harmless messages below (extended with
 # TM_COCOA_HARMLESS, an extended regular expression). The windows are shown
@@ -105,7 +115,7 @@ verdict () {
   why=""
   grep -aq '^CHECK alive' "$log" || why="TeXmacs did not reach its quit"
   grep -aq '^exit status 0$' "$log" || why="$why; $(tail -1 "$log")"
-  errors=$(grep -aE 'Cocoa: an (error|Objective-C exception) was caught|terminating due to|Throwing ' "$log")
+  errors=$(grep -aE 'Cocoa: an (error|Objective-C exception) was caught|terminating due to|Throwing |type mismatch' "$log")
   allowed=$(printf '%s\n%s\n' "$harmless" "$expected" | grep -v '^$' | paste -sd '|' -)
   [ -n "$allowed" ] && errors=$(echo "$errors" | grep -avE "$allowed")
   [ -n "$errors" ] &&
@@ -217,6 +227,56 @@ raise_ok () {
     sed -n '/^CHECK raise/,$p' "$log" | grep -aq '^CHECK later'
 }
 verdict raise "an error at an entry point is reported once, TeXmacs goes on (#650)" raise_ok
+
+# (tall) the document is there before the go-end, the scroll steps come after
+cat > "$out/tall.tm" <<'EOF'
+<TeXmacs|2.1>
+
+<style|generic>
+
+<\body>
+  Top
+
+  <vspace|150000cm>
+
+  The end
+</body>
+
+<\initial>
+  <\collection>
+    <associate|page-medium|papyrus>
+  </collection>
+</initial>
+EOF
+run tall "" "scroll:tall.tm;scroll:tall.tm;scroll:tall.tm;scroll:tall.tm;scroll:tall.tm;scroll:tall.tm" \
+    "(begin (load-buffer \"$out/tall.tm\") (delayed (:pause 2500) (go-end)))"
+tall_ok () {
+  last=$(grep -a "NSTEST scroll 'tall.tm'" "$out/tall.log" | tail -1)
+  fail="not at the end of a document taller than 5*10^6 points: $last"
+  h=$(echo "$last" | sed -n 's/.* document [0-9]*x\([0-9]*\) .*/\1/p')
+  [ "${h:-0}" -gt 5000000 ] && echo "$last" | grep -aq 'at-end$'
+}
+verdict tall "a document of 7*10^6 points scrolls to its end (#661)" tall_ok
+
+# (header)
+probe='(with-buffer (string->url "tmfs://aux/console-error-messages-all") (display* "HEADER " (list (visible-header?) (visible-footer?) (visible-icon-bar? 0) (visible-side-tools? 0) (visible-bottom-tools? 0)) "\n"))'
+run header "" "" "(begin (debug-message \"std-warning\" \"hello\n\") (open-error-messages) (delayed (:pause 2000) $probe))"
+header_ok () {
+  fail="no answer: $(grep -a '^HEADER' "$out/header.log")"
+  grep -aq '^HEADER (#f #f #f #f #f)' "$out/header.log"
+}
+verdict header "the window queries of a console, the View menu (#661)" header_ok
+
+# (console)
+lines='(for-each (lambda (i) (debug-message "std-warning" (string-append "line " (number->string i) "\n"))) (iota 80))'
+run console "" "windows;scroll:Error messages;scroll:Error messages;scroll:Error messages;scroll:Error messages;scroll:Error messages;scroll:Error messages" \
+    "(begin $lines (open-error-messages))"
+console_ok () {
+  last=$(grep -a "NSTEST scroll 'Error messages'" "$out/console.log" | tail -1)
+  fail="the console is not at its end: $last"
+  echo "$last" | grep -aq 'at-end$'
+}
+verdict console "the console opens at its end (#661)" console_ok
 
 # (quiet, focused) the document comes a few seconds after the start, in the
 # window of the welcome message of a fresh home. The focus needs TeXmacs to
