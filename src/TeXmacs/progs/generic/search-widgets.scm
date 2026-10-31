@@ -814,8 +814,9 @@
                 (selection-cancel))))))))
 
 (define (tree-size t)
-  ;; the characters and the nodes of t
-  (if (tree-atomic? t) (string-length (tree->string t))
+  ;; the characters and the nodes of t (a string is a node too: an empty
+  ;; paragraph is a step of Replace All)
+  (if (tree-atomic? t) (+ 1 (string-length (tree->string t)))
       (let loop ((k (- (tree-arity t) 1)) (s 1))
         (if (< k 0) s
             (loop (- k 1) (+ s (tree-size (tree-ref t k))))))))

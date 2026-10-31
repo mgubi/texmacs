@@ -2977,7 +2977,17 @@
   (with-search-mode 'replace
     (lambda ()
       (check-replace-rows
-        '(;; the cases of the issue
+        '(;; many empty paragraphs: each one is a step of Replace All, which
+          ;; the guard counts (it stopped early when it counted characters
+          ;; only)
+          ((document "" "" "" "" "" "" "" "" "" "") (document "" "") ""
+           (document ""))
+          ((document "" "" "" "" "" "" "" "" "" "") (document "" "") "Z"
+           (document "ZZZZZZZZZ"))
+          ((document "a" "" "" "" "" "" "" "" "" "")
+           (document "" "" "") ""
+           (document "a" ""))
+          ;; the cases of the issue
           ((document "x" (theorem (document "ab" "" "" "ef")) "y")
            (document "" "") ""
            (document "x" (theorem (document "abef")) "y"))
