@@ -20,6 +20,7 @@
 #include "merge_sort.hpp"
 #include "scheme.hpp"
 #include "iterator.hpp"
+#include "archiver.hpp"
 #include <time.h>
 
 array<tm_buffer> bufs;
@@ -285,6 +286,12 @@ set_buffer_tree (url name, tree doc) {
     string old_project= buf->data->project->label;
     tree body= detach_data (doc, buf->data);
     assign (buf->rp, body);
+    // An auxiliary page which is made again (an outline at each edit...): its
+    // former contents have no meaning any more, and their copies in the
+    // history of its views would stay for ever (35 MB per edit for an outline
+    // of 12800 definitions)
+    if (starts (as_string (name), "tmfs://aux/") && is_aux_buffer (name))
+      global_forget_document (buf->rp);
     set_buffer_data (name, buf->data);
     buf->buf->title= propose_title (old_title, name, body);
     if (buf->data->project != "" && buf->data->project != old_project) {

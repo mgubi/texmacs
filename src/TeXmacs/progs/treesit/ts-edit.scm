@@ -105,8 +105,12 @@
 (define row-strings-taken 0)
 
 (define-public (syntax-row-strings-taken)
-  ;; how many copies of a line the places in a region have asked for (tests)
+  ;; how many copies of a line were taken (tests)
   row-strings-taken)
+
+(define (taken-string t)
+  (set! row-strings-taken (+ row-strings-taken 1))
+  (tree->string t))
 
 (define (row-strings root)
   ;; a function which gives the string of a row of the region @root, and keeps
@@ -117,9 +121,8 @@
     (lambda (r)
       (when (not (eqv? r row))
         (set! row r)
-        (set! row-strings-taken (+ row-strings-taken 1))
         (set! s (cond ((tree-is? root 'document) (line-string root r))
-                      ((tree-atomic? root) (tree->string root))
+                      ((tree-atomic? root) (taken-string root))
                       (else ""))))
       s)))
 
@@ -852,7 +855,7 @@
 
 (define (line-string doc row)
   (let ((t (tree-ref doc row)))
-    (if (and t (tree-atomic? t)) (tree->string t) "")))
+    (if (and t (tree-atomic? t)) (taken-string t) "")))
 
 (define (line-indent doc row)
   (let* ((s (line-string doc row)) (n (string-length s)))

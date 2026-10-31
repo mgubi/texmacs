@@ -1458,6 +1458,31 @@
     (thunk)
     (- (syntax-row-strings-taken) n)))
 
+;; (syntax errors: one line broken at many places)
+(define (test-one-line-errors)
+  (check-group "the syntax errors on one long line")
+  (unless (treesit-cached? "cpp") (treesit-generate-cache "cpp"))
+  (with-test-buffer
+      `(document (cpp-code (document ,(apply string-append
+                                             (map (lambda (i) "int ) ; ")
+                                                  (.. 0 100))))))
+    (lambda (u b)
+      (update-forced)
+      (apply-changes)
+      (let ((leaf (let down ((x (buffer-tree)))
+                    (cond ((tree-atomic? x)
+                           (if (> (string-length (tree->string x)) 100) x #f))
+                          (else (list-any down (tree-children x)))))))
+        (tree-go-to leaf 0)
+        (update-forced)
+        (apply-changes)
+        (when (>= (tree-sitter-program-language "cpp") 0)
+          (let* ((r '())
+                 (calls (strings-taken
+                         (lambda () (set! r (syntax-errors-at-cursor))))))
+            (check-true (> (length r) 10))
+            (check= calls 1)))))))
+
 (define (test-one-line-outline)
   ;; many names on one line, as in a minified file: one copy of the line, not
   ;; one per name, which took gigabytes (not the time nor the memory here)
@@ -1481,7 +1506,7 @@
   ;; the same at the cursor, with the paths, in lines and in inline code
   (for (doc (list `(document (cpp-code (document ,(cpp-line 200))))
                   `(document (concat "a" (cpp ,(cpp-line 200))))))
-    (treesit-generate-cache "cpp")
+    (unless (treesit-cached? "cpp") (treesit-generate-cache "cpp"))
     (with-test-buffer doc
       (lambda (u b)
         (update-forced)
@@ -1499,7 +1524,8 @@
                            (lambda () (set! r (syntax-outline-at-cursor))))))
               (check= (length r) 200)
               ;; (the names, and the paths in inline code)
-              (check-true (<= calls 2)))))))))
+              (check-true (<= calls 2))
+              (check-true (<= (strings-taken syntax-definitions-at-cursor) 2)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
@@ -1526,4 +1552,5 @@
   (test-native)
   (test-outline-items)
   (test-one-line-outline)
+  (test-one-line-errors)
   (check-end))

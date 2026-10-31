@@ -49,7 +49,7 @@
   (string-append (caddr e) " (" (cadr e) ")"))
 
 ;; A menu with thousands of items takes seconds to make, and nobody can read
-;; it: the page of the outline has them all.
+;; it: the page of the outline has more of them.
 (define definitions-menu-max 500)
 
 (tm-define (code-definitions-menu-items)
@@ -66,7 +66,7 @@
   (for (e (code-definitions-menu-items))
     (assuming (== e 'all)
       ---
-      ("All definitions" (code-outline)))
+      ("More definitions" (code-outline)))
     (assuming (!= e 'all)
       ((eval (string-append (make-string (* 2 (car e)) #\space) (entry-label e)))
        (go-to (list-ref e 4))))))
@@ -84,9 +84,21 @@
       (switch-to-buffer u)
       (go-to p))))
 
-(define (outline-body u entries)
+;; Each line of the page takes about 70 KB once typeset, kept while the page is
+;; open, and the page is made again after each edit: it says when it stops.
+(define outline-page-max 5000)
+
+(tm-define (code-outline-body u entries*)
+  (:synopsis "The body of the page of the outline with @entries* of the file @u")
+  (let* ((n (length entries*))
+         (more? (> n outline-page-max))
+         (entries (if more? (list-head entries* outline-page-max) entries*)))
   `(document
     (strong (concat "Outline of " (verbatim ,(url->system (url-tail u)))))
+    ,@(if more?
+          (list (string-append "The first " (number->string outline-page-max)
+                               " of " (number->string n) " definitions"))
+          '())
     ,@(if (null? entries) '("No definitions")
           (map (lambda (e)
                  `(action (concat
@@ -100,11 +112,11 @@
                           ,(string-append "(code-go-to "
                                           (object->string (url->string u)) " '"
                                           (object->string (list-ref e 4)) ")")))
-               entries))))
+               entries)))))
 
 (define (outline-document u entries)
   `(document (style (tuple "generic"))
-             (body ,(outline-body u entries))))
+             (body ,(code-outline-body u entries))))
 
 (tm-define (code-outline)
   (:synopsis "Shows the outline of the code at the cursor on a page")
