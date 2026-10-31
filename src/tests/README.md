@@ -360,14 +360,19 @@ slash without variants (Fira Math) keeps being stretched.
 
 `tests/cocoa/check.sh`, run from the top of the source tree of a Cocoa
 build (`--with-gui=cocoa`), or with `BIN=` the executable of a
-`TeXmacs.app`, starts TeXmacs three times (about 15 seconds each, in
+`TeXmacs.app`, starts TeXmacs six times (about 15 seconds each, in
 homes of their own) and checks failures which used to be silent or to
 abort it (#621): a dialog title with accents in French (#468), closing the
-console with several tabs (#619) and an idle console, which must not be
-typeset again and again (#620). It also fails on any error caught at an
-entry point from AppKit. The windows are shown: Cocoa has no offscreen
-mode. The workflow `upsilon-macos.yml` runs it on the application of the
-Cocoa disk image.
+console with several tabs (#619), an idle console, which must not be
+typeset again and again (#620), the tooltips of the icon bars (#637),
+dialogs with negative sizes (one warning for each place, and the dialogs
+are shown) and an error thrown at an entry point from AppKit (reported
+once, and TeXmacs goes on, #650, #666). It also fails on any other error
+caught at an entry point from AppKit, except known harmless messages (a
+list in the script, extended with `TM_COCOA_HARMLESS`, an extended regular
+expression). The windows are shown: Cocoa has no offscreen mode. The
+workflow `upsilon-macos.yml` runs it on the application of the Cocoa disk
+image.
 
 ## Other tools
 
