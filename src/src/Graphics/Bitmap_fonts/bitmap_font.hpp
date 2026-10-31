@@ -63,12 +63,17 @@ CONCRETE_NULL_CODE(glyph);
 
 inline int
 glyph_rep::get_1 (int i, int j) {
+  // (nothing outside: an empty glyph is one too large for its raster)
+  if (((unsigned) i) >= ((unsigned) width) ||
+      ((unsigned) j) >= ((unsigned) height)) return 0;
   int bit= j*width+i;
   return (raster[bit>>3] >> (bit&7)) & 1;
 }
 
 inline void
 glyph_rep::set_1 (int i, int j, int with) {
+  if (((unsigned) i) >= ((unsigned) width) ||
+      ((unsigned) j) >= ((unsigned) height)) return;
   int bit= j*width+i;
   if (with==0) raster[bit>>3] &= ~(1 << (bit&7));
   else raster[bit>>3] |= (1 << (bit&7));

@@ -30,8 +30,11 @@ glyph_rep::glyph_rep (int w2, int h2, int xoff2, int yoff2,
 
   // a glyph too large for its raster (made at a huge zoom) is empty rather
   // than an allocation which fails and stops TeXmacs, #659
+  // (the operations on glyphs then write nothing into it: see set_x)
   if (width < 0 || height < 0 ||
       ((double) width) * ((double) height) > (double) (1 << 28)) {
+    cerr << "TeXmacs] a glyph of " << w2 << " x " << h2
+                << " pixels is too large or invalid, left empty\n";
     width= height= 0;
   }
   int i, n= (depth==1? (width*height+7)/8: width*height);
@@ -64,6 +67,7 @@ glyph_rep::get_x (int i, int j) {
 
 void
 glyph_rep::set_x (int i, int j, int with) {
+  if (width == 0 || height == 0) return; // (empty: too large, see above)
   if ((i<0) || (i>=width)) FAILED ("bad x-index");
   if ((j<0) || (j>=height)) FAILED ("bad y-index");
   if (depth==1) {

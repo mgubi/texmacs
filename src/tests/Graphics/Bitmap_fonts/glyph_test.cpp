@@ -12,6 +12,7 @@
 #include "bitmap_font.hpp"
 
 glyph join (glyph gl1, glyph gl2);
+glyph hor_extend (glyph gl, int pos, int by);
 
 // a glyph wider than a short: the wide braces of the virtual fonts at a
 // large zoom, joined from pieces (#659: the width wrapped to a negative
@@ -40,9 +41,39 @@ test_too_large () {
   CHECK_EQ (n->width, 0);
 }
 
+// the operations whose result is too large give an empty glyph, without
+// writing into it (a FAILED "bad x-index" left the window blank)
+static void
+test_ops_too_large () {
+  glyph h (20000, 1, 0, 1);
+  glyph v (1, 20000, 0, 20000);
+  h->set_x (0, 0, 1);
+  v->set_x (0, 0, 1);
+  bool ok= true;
+  glyph j;
+  try { j= join (h, v); } catch (...) { ok= false; }
+  CHECK_MSG (ok, "join of 20000x1 and 1x20000 failed");
+  if (ok) {
+    CHECK_EQ (j->width, 0);
+    CHECK_EQ (j->get_x (0, 0), 0);
+  }
+  glyph t (10, 30000, 0, 30000);
+  t->set_x (5, 5, 1);
+  glyph e;
+  ok= true;
+  try { e= hor_extend (t, 5, 10000); } catch (...) { ok= false; }
+  CHECK_MSG (ok, "hor_extend of 10x30000 by 10000 failed");
+  if (ok) CHECK_EQ (e->width, 0);
+  // and the raw accessors of an empty glyph do nothing
+  glyph z (100000, 100000, 0, 0);
+  z->set_1 (5, 5, 1);
+  CHECK_EQ (z->get_1 (5, 5), 0);
+}
+
 int
 main () {
   RUN (test_wide);
   RUN (test_too_large);
+  RUN (test_ops_too_large);
   return test_report ();
 }
