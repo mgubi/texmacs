@@ -34,12 +34,44 @@
 (define check-count 0)
 (define check-failure-count 0)
 
+;; Tests must not write preferences, but the main window notes its geometry
+;; in them when it is placed, and any update or saved preference then writes
+;; them to the disk. At the end of a suite, the geometry goes back to what the
+;; file said when the suite started, and a file which did not exist and has
+;; nothing else in it is removed. Any other preference which a suite leaves
+;; behind stays in the file, where it can be seen.
+(define preferences-file "$TEXMACS_HOME_PATH/system/preferences.scm")
+(define preferences-at-start #f)
+
+(define (preferences-note-start)
+  ;; the pairs of the file, #f if there is no file
+  (set! preferences-at-start
+        (and (url-exists? preferences-file)
+             (string->object (string-append "("
+                                            (string-load preferences-file)
+                                            ")")))))
+
+(define (preferences-forget-geometry)
+  (for-each (lambda (what)
+              (let* ((key (string-append what " TeXmacs"))
+                     (old (and preferences-at-start
+                               (assoc key preferences-at-start))))
+                (cond (old (cpp-set-preference key (cadr old)))
+                      ((cpp-has-preference? key) (cpp-reset-preference key)))))
+            '("abscissa" "ordinate" "width" "height"))
+  (save-preferences)
+  (when (and (not preferences-at-start)
+             (url-exists? preferences-file)
+             (== (string-load preferences-file) ""))
+    (system-remove preferences-file)))
+
 (tm-define (check-suite name)
   (:synopsis "Start the test suite @name")
   (set! check-suite-name name)
   (set! check-group-name "")
   (set! check-count 0)
   (set! check-failure-count 0)
+  (preferences-note-start)
   (display* "Test suite of " name "\n")
   (force-output))
 
@@ -150,6 +182,7 @@
 
 (tm-define (check-end)
   (:synopsis "End the test suite and return its number of failures")
+  (preferences-forget-geometry)
   (display* "Total: " (number->string check-count) " checks, "
             (number->string check-failure-count) " failed\n")
   (force-output)
