@@ -2660,6 +2660,26 @@
                     (list res n (tm->stree (buffer-get-body u))))))
               '((document (concat "Z" (shown "a2x"))) 1
                 (document (concat "a1x" (hidden "a2x")))))
+      ;; in a read-only document, Replace one replaces nothing, but the
+      ;; search goes on: the hits are kept, the next one is selected and
+      ;; shown (as before, without a step of undo)
+      (check= (with-search-buffers '(document (concat "a1x" (hidden "a2x")))
+                '(concat "a" (wildcard "w") "x") "Z"
+                (lambda (u)
+                  (ahash-set! (widget 'search-filter-table)
+                              (current-buffer) (stree->tree '(attr)))
+                  (clear-undo-history)
+                  (buffer-set-read-only u #t)
+                  ((widget 'perform-search*))
+                  (replace-one)
+                  (with r (list (tm->stree (buffer-get-body u))
+                                (undo-possibilities)
+                                (length (get-alt-selection "alternate"))
+                                (selection-active-any?)
+                                (cursor-accessible?))
+                    (buffer-set-read-only u #f)
+                    r)))
+              '((document (concat "a1x" (shown "a2x"))) 0 4 #t #t))
       ;; Replace one shows the next hit, Replace All only where it ends
       (with doc '(document (concat "a1x" (hidden "a2x") "a3x"))
         (check= (replace-one-repeatedly doc '(concat "a" (wildcard "w") "x")
@@ -2690,6 +2710,19 @@
                   '((document (concat (unfolded "q" "a2x") "a3x")) 1
                     (document (concat (folded "q" "a2x") "a3x")) #t
                     ((0 0 1 0) (0 0 1 3))))))
+      ;; a switch which shows a hit may wrap a branch next to it, whose
+      ;; hits then move: they are not set again as they were (the search
+      ;; which go-to* schedules finds them again)
+      (with-search-buffers '(document (concat "x " (tiny-switch (hidden "a2x")
+                                                                "a3x")))
+        "a" ""
+        (lambda (u)
+          (ahash-set! (widget 'search-filter-table)
+                      (current-buffer) (stree->tree '(attr)))
+          ((widget 'perform-search*))
+          (check-true
+           (list-and (map (lambda (p) (tree-atomic? (path->tree (cDr p))))
+                          (get-alt-selection "alternate"))))))
       ;; (nothing to show: nothing changes)
       (check= (search-in-buffer '(document (concat "x " (strong "a2x")))
                                 "a2x")
