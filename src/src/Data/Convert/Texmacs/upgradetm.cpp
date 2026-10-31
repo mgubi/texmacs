@@ -1790,6 +1790,15 @@ upgrade_expand (tree t, tree_label WHICH_EXPAND) {
     string s= t[0]->label;
     if (s == "quote") s= s * "-env";
     tree_label l= make_tree_label (s);
+    if (l == TMSTRING) {
+      // "string" names the label of the atomic trees: a compound tree
+      // with it would be read as a string (#658)
+      tree r (COMPOUND, n+1);
+      r[0]= s;
+      for (i=0; i<n; i++)
+        r[i+1]= upgrade_expand (t[i+1], WHICH_EXPAND);
+      return r;
+    }
     tree r (l, n);
     for (i=0; i<n; i++)
       r[i]= upgrade_expand (t[i+1], WHICH_EXPAND);
@@ -1839,6 +1848,15 @@ upgrade_apply (tree t) {
     int i, n= N(t)-1;
     string s= t[0]->label;
     tree_label l= make_tree_label (s);
+    if (l == TMSTRING) {
+      // "string" names the label of the atomic trees: a compound tree
+      // with it would be read as a string (#658)
+      tree r (COMPOUND, n+1);
+      r[0]= s;
+      for (i=0; i<n; i++)
+        r[i+1]= upgrade_apply (t[i+1]);
+      return r;
+    }
     tree r (l, n);
     for (i=0; i<n; i++)
       r[i]= upgrade_apply (t[i+1]);

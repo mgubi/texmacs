@@ -45,6 +45,14 @@ string verbatim_escape (string s);
 ******************************************************************************/
 
 #define MAX_EXPAND_DEPTH 100
+// groups and arguments nested deeper than this are skipped: the parser
+// and the conversion after it recurse once or more per level, and would
+// overflow the stack (#658). Real documents stay far below (TeX itself
+// allows 255 groups, the deepest of a corpus of 80 files was 19).
+#define MAX_PARSE_DEPTH 128
+// the same limit over the expansions of macros, whose bodies count from 0
+// (MAX_EXPAND_DEPTH bodies of MAX_PARSE_DEPTH levels would be too many)
+#define MAX_TOTAL_DEPTH 512
 
 struct latex_parser {
   int level;
@@ -57,9 +65,20 @@ struct latex_parser {
   hashmap<string,int> expanding;
   int expand_depth;
   hashmap<string,bool> expansion_skipped; // reported once per macro
+  // groups nested in the text being parsed (the body of a macro being
+  // expanded counts from 0: expansions nest at most MAX_EXPAND_DEPTH deep)
+  int nesting;
+  int total_depth; // the same, counted through the expansions
+  bool too_deep_reported;
+  // Definitions and arguments being parsed: TeX has read their text and
+  // counted its braces, also one after \string. A group which TeX executes
+  // is not counted: there \string makes a brace a mere character.
+  int counted_braces;
+  bool group_next; // the next parse is that of an executed group
   latex_parser (bool unicode2):
     level (0), unicode (unicode2), expanding (0), expand_depth (0),
-    expansion_skipped (false) {}
+    expansion_skipped (false), nesting (0), total_depth (0),
+    too_deep_reported (false), counted_braces (0), group_next (false) {}
   void latex_error (string s, int i, string message);
 
   bool is_opening_option (char c);
@@ -82,6 +101,8 @@ struct latex_parser {
   tree parse_alltt       (string s, int& i, string end, string env,
                           tree opt= tree (CONCAT));
   tree parse_char_code   (string s, int& i);
+  tree parse_string_token (string s, int& i);
+  tree parse_too_deep    (string s, int& i, string stop);
 
   tree parse             (string s, int change);
 };
@@ -196,7 +217,14 @@ latex_parser::parse (string s, int& i, string stop, int change) {
   int n= N(s);
   tree t (CONCAT);
 
+  int braces= (stop == "}" && !group_next? 1: 0);
+  group_next= false;
+  if (nesting >= MAX_PARSE_DEPTH || total_depth >= MAX_TOTAL_DEPTH)
+    return parse_too_deep (s, i, stop);
   level++;
+  nesting++;
+  total_depth++;
+  counted_braces += braces;
   command_type ->extend ();
   command_arity->extend ();
   command_def  ->extend ();
@@ -249,7 +277,10 @@ latex_parser::parse (string s, int& i, string stop, int change) {
     }
     case '#':
       i++;
-      if (i==n) return t;
+      if (i==n) {
+        nesting--; total_depth--; counted_braces -= braces;
+        return t;
+      }
       if (is_numeric (s[i])) {
         t << s (i-1, i+1);
         i++;
@@ -367,6 +398,7 @@ latex_parser::parse (string s, int& i, string stop, int change) {
     case '{': {
       i++;
       t << tree (TUPLE, "\\begingroup");
+      group_next= true;
       t << parse (s, i, "}", change);
       t << tree (TUPLE, "\\endgroup");
       if ((i<n) && (s[i]=='}')) i++;
@@ -454,6 +486,9 @@ latex_parser::parse (string s, int& i, string stop, int change) {
   }
 
   level--;
+  nesting--;
+  total_depth--;
+  counted_braces -= braces;
   if (change > 0) {
     command_type ->merge ();
     command_arity->merge ();
@@ -835,6 +870,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
   int begin_parse= i;
   // cout << cmd << " [" << latex_type (cmd) << ", "
   // << command_type ["!mode"] << ", " << latex_arity (cmd) << "]" << LF;
+  if (cmd == "\\string") return parse_string_token (s, i);
   if (cmd == "\\gdef" || cmd == "\\xdef" || cmd == "\\edef") cmd= "\\def";
   if (cmd == "\\def" && i < N(s) && s[i] == '\\') delimdef = true;
   if (cmd == "\\newcommand") cmd= "\\def";
@@ -1290,7 +1326,11 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
                           "too many nested expansions":
                           "inside its own expansion") << LF;
     }
-    if (expands && !recursive) { expanding (cmd)++; expand_depth++; }
+    int saved_nesting= nesting, saved_braces= counted_braces;
+    if (expands && !recursive) {
+      expanding (cmd)++; expand_depth++;
+      nesting= 0; counted_braces= 0;
+    }
     if (recursive);
     else if (N(body) > 0 && latex_type (cmd) == "side-effect!"
         && !occurs (cmd, body[0]))
@@ -1315,6 +1355,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     if (expands && !recursive) {
       expand_depth--;
       if (--expanding (cmd) == 0) expanding->reset (cmd);
+      nesting= saved_nesting; counted_braces= saved_braces;
     }
   }
 
@@ -1337,6 +1378,101 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
 
   if (mbox_flag) command_type ("!mode") = "math";
   return t;
+}
+
+static tree
+char_as_text (char c) {
+  // a character which the parser would read as markup, as text
+  switch (c) {
+  case '{': case '}': case '&': case '$': case '#': case '%': case '_':
+    return tuple ("\\" * string (c));
+  case '<': return tuple ("\\<less>");
+  case '>': return tuple ("\\<gtr>");
+  default: return string (c);
+  }
+}
+
+tree
+latex_parser::parse_string_token (string s, int& i) {
+  // \string: the next token as text. It used to be read as an unknown
+  // command \string{...}, and a tag named "string" is the label of the
+  // atomic trees: a random byte was imported (#658). Inside a definition or
+  // an argument, a brace after it stays in the source, where it opens or
+  // closes a group, as TeX counted it when it read that text; in a group
+  // which TeX executes, it is only a character.
+  int n= N(s);
+  if (i >= n) return "";
+  char c= s[i];
+  if (c == '{' || c == '}') {
+    if (counted_braces == 0) i++;
+    return char_as_text (c);
+  }
+  if (c == '\\') {
+    // the backslash of math: \textbackslash is lost in math mode
+    tree bs= tuple (command_type ["!mode"] == "math"?
+                    "\\backslash": "\\textbackslash");
+    int start= ++i;
+    if (i < n && is_tex_alpha (s[i])) {
+      while (i < n && is_tex_alpha (s[i])) i++;
+      int end= i;
+      while (i < n && s[i] == ' ') i++;
+      return concat (bs, s (start, end));
+    }
+    if (i == n) return bs;
+    i++;
+    if (s[start] == '\\') return concat (bs, bs);
+    return concat (bs, char_as_text (s[start]));
+  }
+  // (a % still starts a comment, which TeX skips before \string reads)
+  if (c == '#' && i+1 < n && (is_digit (s[i+1]) || s[i+1] == '#'))
+    return ""; // a parameter of a macro: \string applies to its value
+  if (c == '&' || c == '$' || c == '#' || c == '_' || c == '^' || c == '~') {
+    i++;
+    return char_as_text (c);
+  }
+  return ""; // other characters are text for the parser too
+}
+
+tree
+latex_parser::parse_too_deep (string s, int& i, string stop) {
+  // skip the rest of the group, up to its end at this level; kept as text,
+  // its braces would recurse as deep in the conversion of math (brackets)
+  int n= N(s), depth= 0;
+  while (i < n) {
+    char c= s[i];
+    if (c == '\\') {
+      if (depth == 0 && stop == "\\egroup" && test (s, i, "\\egroup")) break;
+      if (test (s, i, "\\verb") && i+5 < n && !is_tex_alpha (s[i+5])) {
+        i+= 5;
+        if (i+1 < n && s[i] == '*') i++;
+        char delim= s[i++];
+        while (i < n && s[i] != delim) i++;
+        i++;
+      }
+      else i+= 2;
+      continue;
+    }
+    if (c == '%') {
+      while (i < n && s[i] != '\n') i++;
+      continue;
+    }
+    if (depth == 0 &&
+        (c == '}' || (N(stop) == 1 && c == stop[0]) ||
+         (c == '$' && (stop == "$$" || stop == "denom"))))
+      break;
+    if (c == '{') depth++;
+    else if (c == '}') depth--;
+    i++;
+  }
+  if (i > n) i= n;
+  if (!too_deep_reported) {
+    too_deep_reported= true;
+    convert_warning << "LaTeX import: groups nested more than "
+                    << (nesting >= MAX_PARSE_DEPTH?
+                        MAX_PARSE_DEPTH: MAX_TOTAL_DEPTH)
+                    << " deep skipped" << LF;
+  }
+  return "";
 }
 
 tree
