@@ -301,6 +301,16 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|31 October 2026>
+
+  <\itemize>
+    <item>In a source file (<verbatim|.cpp>, <verbatim|.py>, <verbatim|.json>,
+    and so on), the menu <menu|Focus> has the entries for program code, as in
+    a code block: <menu|Definitions>, <menu|Outline>, <menu|Go to definition>,
+    <menu|Folds>. The definitions of a large file are found much faster, and
+    <menu|Definitions> shows the first 500 of them.
+  </itemize>
+
   <paragraph|28 October 2026>
 
   <\itemize>
