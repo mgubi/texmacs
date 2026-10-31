@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: TeXmacs goes on after an error in a scroll** (desktop, Cocoa
+  interface): an error during an update forced by AppKit (a scroll or a
+  resize of a document, a change of the appearance) is reported as before,
+  but TeXmacs no longer stops updating its windows and running its
+  commands afterwards. The checks of the Cocoa interface
+  (`tests/cocoa/check.sh`) also cover the dialogs with negative sizes and
+  such an error (#666).
 - **Rotated text and big glyphs** (desktop and browser): rotations and
   the other transformations of `gr-transform` are drawn the right way round
   by the GPU renderer (Cocoa and Vue) and by the MuPDF renderer (the CPU

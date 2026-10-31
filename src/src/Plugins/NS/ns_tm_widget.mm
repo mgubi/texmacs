@@ -1147,6 +1147,12 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *                     which have a tooltip, and their tracking areas (ours
  *                     for the hover highlight, those of AppKit), then updates
  *                     their tracking areas and prints them again (#637)
+ *   scroll-eval:<scheme>
+ *                     queues a Scheme expression as a command of the
+ *                     interface, then the clip view of the document of the
+ *                     main window says that it scrolled: the update of
+ *                     TeXmacs, and the command, run in -[TMDocView
+ *                     scrolled:] (#666)
  ******************************************************************************/
 
 static NSMenu* ns_test_menu= nil;  // the last menu which was shown
@@ -1375,6 +1381,22 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
   }
   else if ([st isEqualToString: @"eval"])
     exec_delayed (scheme_cmd (from_nsstring (arg)));
+  else if ([st isEqualToString: @"scroll-eval"]) {
+    the_gui->process_command (as_command (scheme_cmd (from_nsstring (arg))));
+    NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: NSClassFromString (@"TMDocView")] &&
+          [[v superview] isKindOfClass: [NSClipView class]]) {
+        [[NSNotificationCenter defaultCenter]
+          postNotificationName: NSViewBoundsDidChangeNotification
+                        object: [v superview]];
+        break;
+      }
+      [todo addObjectsFromArray: [v subviews]];
+    }
+  }
   else if ([st isEqualToString: @"side-width"]) {
     // as the handle of the right side tools
     NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
