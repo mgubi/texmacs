@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: a console which opens by itself leaves the focus to the document**
+  (desktop, Cocoa interface): when a warning opens the "Error messages" window,
+  the document stays the window in use, and what is typed or asked for next goes
+  to it, as in the other interfaces. A click in the console gives it the focus,
+  and a console opened from the Debug menu takes it at once (#679).
 - **Cocoa: TeXmacs goes on after an error in a scroll** (desktop, Cocoa
   interface): an error during an update forced by AppKit (a scroll or a
   resize of a document, a change of the appearance) is reported as before,

@@ -360,14 +360,20 @@ slash without variants (Fira Math) keeps being stretched.
 
 `tests/cocoa/check.sh`, run from the top of the source tree of a Cocoa
 build (`--with-gui=cocoa`), or with `BIN=` the executable of a
-`TeXmacs.app`, starts TeXmacs six times (about 15 seconds each, in
+`TeXmacs.app`, starts TeXmacs several times (about 15 seconds each, in
 homes of their own) and checks failures which used to be silent or to
 abort it (#621): a dialog title with accents in French (#468), closing the
 console with several tabs (#619), an idle console, which must not be
 typeset again and again (#620), the tooltips of the icon bars (#637),
 dialogs with negative sizes (one warning for each place, and the dialogs
 are shown) and an error thrown at an entry point from AppKit (reported
-once, and TeXmacs goes on, #650, #666). It also fails on any other error
+once, and TeXmacs goes on, #650, #666). Two more cases check the focus of
+the console: when it opens by itself on a warning, the document stays the key
+and main window and the current buffer, and gets the keys typed; a click, or
+opening it from the menu, gives it the focus; its close leaves the document
+focused (#679). They make TeXmacs the active application, which takes the
+keyboard from whoever works on the screen: they run in CI or with
+`TM_COCOA_FOCUS=1`, and are skipped otherwise. It also fails on any other error
 caught at an entry point from AppKit, except known harmless messages (a
 list in the script, extended with `TM_COCOA_HARMLESS`, an extended regular
 expression). The windows are shown: Cocoa has no offscreen mode. The

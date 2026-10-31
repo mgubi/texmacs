@@ -30,6 +30,17 @@
 #            the interface run by the update of -[TMDocView scrolled:]) is
 #            reported once, and TeXmacs goes on: later commands and updates
 #            run (#650, #666)
+#   quiet    a warning from a delayed command opens the console, without
+#            the focus: the document stays the key and main window and the
+#            current buffer, and gets the keys typed. A click gives the
+#            console the focus, and its close gives it back (#679, #619)
+#   focused  the console which the user opens takes the focus (#679)
+#
+# The last two make TeXmacs the active application again and again, for about
+# 35 seconds, which takes the keyboard from whoever works on that screen (keys
+# typed then go into the test document): they run in CI, or with
+# TM_COCOA_FOCUS=1. They are told to be skipped otherwise, and when TeXmacs does
+# not manage to become active; do not use the screen while they run.
 #
 # Every case also fails on an error caught at an entry point from AppKit
 # ("Cocoa: an error was caught", "Cocoa: an Objective-C exception",
@@ -68,7 +79,7 @@ expected=''
 
 # run <case> <language> <window test steps> <scheme expression> [<scheme
 # definitions>]: TeXmacs in a fresh home, the definitions at the start, the
-# expression after 2.5 s, the quit after 14 s
+# expression after 2.5 s, the quit after 14 s (or quit_after ms, for this run)
 run () {
   name=$1; lang=$2; steps=$3; x=$4; defs=${5:-}
   home="$homes/$name-home"
@@ -81,9 +92,10 @@ run () {
   HOME="$home" CFFIXED_USER_HOME="$home" \
   TEXMACS_HOME_PATH="$home" TEXMACS_NS_WINDOW_TEST="$steps" \
     perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -x \
-    "(begin $defs (delayed (:pause 2500) $x) (delayed (:pause 14000) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
+    "(begin $defs (delayed (:pause 2500) $x) (delayed (:pause ${quit_after:-14000}) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
     > "$out/$name.log" 2>&1
   echo "exit status $?" >> "$out/$name.log"
+  quit_after=
 }
 
 # verdict <case> <description> <condition (a command)>
@@ -205,6 +217,75 @@ raise_ok () {
     sed -n '/^CHECK raise/,$p' "$log" | grep -aq '^CHECK later'
 }
 verdict raise "an error at an entry point is reported once, TeXmacs goes on (#650)" raise_ok
+
+# (quiet, focused) the document comes a few seconds after the start, in the
+# window of the welcome message of a fresh home. The focus needs TeXmacs to
+# be the active application, which the steps ask for just before they look
+# (another application may take over, and an editor without the focus has no
+# idle time, which a console opening by itself waits for). When TeXmacs never
+# gets there, the case says so instead of failing: nothing can be seen of the
+# focus
+cat > "$out/quiet.tm" <<'EOF'
+<TeXmacs|2.1>
+
+<style|generic>
+
+<\body>
+  Top
+</body>
+EOF
+focus_defs='(tm-define (cocoa-check-state) (display* "CHECK current " (url-tail (current-buffer)) " " (tree->stree (buffer-get-body (current-buffer))) "\n"))'
+focus_steps='front:quiet.tm;front:quiet.tm;front:quiet.tm;windows:activate'
+state='eval:(cocoa-check-state)'
+is_active () {
+  grep -aq "^NSTEST type to '[^']" "$out/$1.log"
+}
+
+focus_cases=${CI:-}${TM_COCOA_FOCUS:-}
+
+warnings='(for-each (lambda (ch) (debug-message ch (string-append ch " line\n"))) (list "std-warning" "debug-io" "debug-automatic"))'
+quit_after=28000
+[ -n "$focus_cases" ] && run quiet "" "$focus_steps;eval:$warnings;activate;windows;$state;type:xy;$state;$state;click:Error messages;windows;$state;$state;close:Error messages;windows;type:zw;$state;$state" \
+    "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
+quiet_ok () {
+  log="$out/quiet.log"
+  opened=$(sed -n '1,/NSTEST step click:/p' "$log")
+  fail="the console did not open"
+  echo "$opened" | grep -aq "^NSTEST window 'Error messages' shown" || return 1
+  fail="the console took the focus: $(echo "$opened" | grep -a "^NSTEST window 'Error messages' shown" | head -1)"
+  ! echo "$opened" | grep -aqE "^NSTEST window 'Error messages' shown .*(main|key) " || return 1
+  fail="the current buffer changed: $(echo "$opened" | grep -a '^CHECK current' | grep -av '<url quiet.tm>' | head -1 | cut -c1-80)"
+  ! echo "$opened" | grep -a '^CHECK current' | grep -avq '<url quiet.tm>' || return 1
+  fail="the document did not stay the key and main window: $(echo "$opened" | grep -a '^NSTEST type to')"
+  echo "$opened" | grep -aq "^NSTEST type to 'quiet.tm', main 'quiet.tm'" || return 1
+  fail="the document did not get the keys typed: $(echo "$opened" | grep -a '^CHECK current' | tail -1 | cut -c1-80)"
+  echo "$opened" | grep -aq '^CHECK current <url quiet.tm> .*xyTop"' || return 1
+  clicked=$(sed -n '/NSTEST step click:/,/NSTEST step close:/p' "$log")
+  fail="a click did not give the console the focus: $(echo "$clicked" | grep -a "^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  echo "$clicked" | grep -aq '^CHECK current <url console-' || return 1
+  closed=$(sed -n '/NSTEST step close:/,$p' "$log")
+  fail="its close did not leave the document focused: $(echo "$closed" | grep -a "^NSTEST window 'Error\|^NSTEST type to\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  ! echo "$closed" | grep -aq "^NSTEST window 'Error messages' shown" &&
+    echo "$closed" | grep -aq "^NSTEST type to 'quiet.tm', main 'quiet.tm'" &&
+    echo "$closed" | grep -aq '^CHECK current <url quiet.tm> .*xyzwTop"'
+}
+desc="a console which opens by itself leaves the focus to the document (#679)"
+if [ -z "$focus_cases" ]; then echo "  skip   $desc: set TM_COCOA_FOCUS=1"
+elif is_active quiet; then verdict quiet "$desc" quiet_ok
+else echo "  skip   $desc: TeXmacs is not the active application"; fi
+
+[ -n "$focus_cases" ] && run focused "" "$focus_steps;eval:(open-error-messages);activate;type:a;$state;$state" \
+    "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
+focused_ok () {
+  log="$out/focused.log"
+  fail="the console opened by the user did not take the focus: $(grep -a "^NSTEST type to\|^CHECK current" "$log" | cut -c1-80 | tr '\n' ' ')"
+  grep -aq "^NSTEST type to 'Error messages', main 'Error messages'" "$log" &&
+    grep -aq '^CHECK current <url console-' "$log"
+}
+desc="a console opened by the user takes the focus (#679)"
+if [ -z "$focus_cases" ]; then echo "  skip   $desc: set TM_COCOA_FOCUS=1"
+elif is_active focused; then verdict focused "$desc" focused_ok
+else echo "  skip   $desc: TeXmacs is not the active application"; fi
 
 echo "$failed of $total failed"
 [ "$failed" = 0 ]
