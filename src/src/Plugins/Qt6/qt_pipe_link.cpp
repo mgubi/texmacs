@@ -317,6 +317,10 @@ process_all_pipes () {
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     qt_pipe_link_rep* con= (qt_pipe_link_rep*) it->next();
+#ifdef QTM_PIPE_GROUPS
+    // (a program which exited by itself, and was not read since)
+    con->PipeLink->forgetEndedGroup ();
+#endif
     if (con->alive) con->apply_command ();
   }
   process_all_cmdlines ();

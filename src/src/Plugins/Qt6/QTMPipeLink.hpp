@@ -57,6 +57,7 @@ public:
   bool askToEnd ();
   bool hasEnded ();
   void killGroup ();
+  void forgetEndedGroup ();
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 protected:

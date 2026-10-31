@@ -223,22 +223,54 @@ QTMPipeLink::killProcess (int msecs) {
 }
 
 #ifdef QTM_PIPE_GROUPS
-// NOTE: the group is waited for before any wait of Qt: once Qt sees that the
-// program has ended (in a wait, or in the event loop), it closes its ends of
-// the pipes, and a member of the group which still cleans up then dies of
-// SIGPIPE when it writes there. Qt reaps the program at once on macOS (by
-// the SIGCHLD handler of forkfd), but only in a wait or in the event loop on
-// Linux (where it learns of the end by a pidfd): a group whose program is a
-// zombie is ended. Once a group is gone, its number may be that of a new
-// process: it is checked before each signal, and forgotten (group 0) once it
-// is gone
+// NOTE: the group is waited for before any wait of Qt made here: once Qt
+// sees that the program has ended, it closes its ends of the pipes, and a
+// member of the group which still cleans up then dies of SIGPIPE when it
+// writes there. This covers only the waits of TeXmacs (a stop, the scripts
+// and the suites, which run no event loop): in the interface, the event
+// loop of Qt may notice the end of the program by itself and close the
+// pipes, and a member which writes there during its 2 s may still get
+// SIGPIPE. Qt reaps the program at once on macOS, and on Linux with Qt 5
+// (by the SIGCHLD handler of forkfd); on Linux with Qt 6, only in a wait or
+// in the event loop (it learns of the end by a pidfd): a group whose
+// program is a zombie is ended. Once a group is gone, its number may be
+// that of a new process: it is checked before each signal, and forgotten
+// (group 0) once it is gone, also when the program exited by itself (see
+// forgetEndedGroup)
+
+#ifdef __linux__
+static bool
+proc_stat (const char* pid, char& st, int& pgrp) {
+  // the state and the process group of the process pid, from /proc
+  char path[64], buf[512];
+  snprintf (path, sizeof (path), "/proc/%s/stat", pid);
+  FILE* f= fopen (path, "r");
+  if (f == NULL) return false;
+  size_t n= fread (buf, 1, sizeof (buf) - 1, f);
+  fclose (f);
+  buf[n]= '\0';
+  // pid (command) state ppid pgrp ...: the command may hold parentheses
+  char* q= strrchr (buf, ')');
+  int ppid;
+  return q != NULL && sscanf (q + 1, " %c %d %d", &st, &ppid, &pgrp) == 3;
+}
+#endif
 
 bool
 QTMPipeLink::groupAlive (qint64 pg) {
   // whether a process of the group pg is left, not counting zombies (EPERM:
   // a member which we may not signal)
   if (pg <= 0) return false;
+  if (::killpg ((pid_t) pg, 0) == -1) return errno == EPERM;
 #ifdef __linux__
+  // the group exists, but its members may all be zombies: its leader is
+  // looked at first, and all processes only if it is a zombie or gone
+  char name[32], st;
+  int  pgrp;
+  snprintf (name, sizeof (name), "%d", (int) pg);
+  if (proc_stat (name, st, pgrp) && pgrp == (int) pg &&
+      st != 'Z' && st != 'X')
+    return true;
   DIR* dir= opendir ("/proc");
   if (dir != NULL) {
     bool found= false;
@@ -246,25 +278,22 @@ QTMPipeLink::groupAlive (qint64 pg) {
       struct dirent* e= readdir (dir);
       if (e == NULL) break;
       if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
-      char path[64], buf[512];
-      snprintf (path, sizeof (path), "/proc/%s/stat", e->d_name);
-      FILE* f= fopen (path, "r");
-      if (f == NULL) continue;
-      size_t n= fread (buf, 1, sizeof (buf) - 1, f);
-      fclose (f);
-      buf[n]= '\0';
-      // pid (command) state ppid pgrp ...: the command may hold parentheses
-      char* q= strrchr (buf, ')');
-      char st;
-      int ppid, pgrp;
-      if (q != NULL && sscanf (q + 1, " %c %d %d", &st, &ppid, &pgrp) == 3)
+      if (proc_stat (e->d_name, st, pgrp))
         found= (pgrp == (int) pg && st != 'Z' && st != 'X');
     }
     closedir (dir);
     return found;
   }
 #endif
-  return ::killpg ((pid_t) pg, 0) == 0 || errno == EPERM;
+  return true;
+}
+
+void
+QTMPipeLink::forgetEndedGroup () {
+  // the group of a program which has exited, once it is gone (whose number
+  // may then be another's)
+  if (group > 0 && state () == QProcess::NotRunning && !groupAlive (group))
+    group= 0;
 }
 
 bool
@@ -318,7 +347,10 @@ QTMPipeLink::killGroup () {
 #ifndef OS_MINGW
 void
 QTMPipeLink::interruptGroup () {
-  if (group > 0 && ::killpg ((pid_t) group, SIGINT) != -1) return;
+#ifdef QTM_PIPE_GROUPS
+  forgetEndedGroup ();
+  if (groupAlive (group) && ::killpg ((pid_t) group, SIGINT) != -1) return;
+#endif
 #if QT_VERSION < QT_VERSION_CHECK(5, 3, 0)
   qint64 pid= (qint64) this->pid ();
 #else
