@@ -249,7 +249,14 @@ mode** reduces the menus to:
 3. shows the remaining **real conflicts** with the usual comparison
    markup: old (red) is yours, new (green) is theirs. You step through
    them with the Version menu or the shortcuts, retaining one side each
-   time;
+   time (**Version → Retain → Keep my version / Keep their version**);
+   the style packages are merged as a set and the initial environment
+   (the settings of the Document menu) key by key; a change of the same
+   setting, or of the main style, on both sides keeps git's "ours" (yours
+   in a merge, the upstream one during a rebase) and counts as a
+   conflict, which the message names; packages which are not plain names
+   (such as macros) are kept as opaque elements of the set, and a
+   document without a style part is taken as unchanged against the base;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 
@@ -284,7 +291,9 @@ documents structurally, which takes about a second per document. Any
 remaining conflicts are written into the file as TeXmacs difference
 markup instead of `<<<<<<<` text markers, so the document still opens
 and can be resolved in TeXmacs. Collaborators who have not installed the
-driver get git's usual text merge.
+driver get git's usual text merge. The driver merges the preamble (style
+packages, initial environment) like *Resolve conflict*. In a folder which
+is not trusted, nothing is configured and the message says so.
 
 ---
 
@@ -331,6 +340,7 @@ and the snapshot functions in `git-blame.scm` and `git-project.scm`.)
 | `(async-evaluate-system argv input callback)` → id | C++ glue | Runs a command without a shell in the background; `callback` receives `(code stdout stderr)`. |
 | `(async-evaluate-cancel id)` | C++ glue | Terminates such a command and its process group. |
 | `(merge-versions base ours theirs)`, `(merge-conflicts t)` | `version-merge.scm` | Structured 3-way merge of strees. |
+| `(merge-documents base ours theirs)` | `version-merge.scm` | 3-way merge of complete documents (body, style packages, initial environment): `(document conflicts kept)`. |
 | `(version-match l1 l2)` | `version-merge.scm` | Longest common subsequence of two lists, as a vector of matching indices. |
 | `(version-normalize t)`, `(version-denormalize t)` | `version-compare.scm` | Public wrappers around the comparison helpers. |
 | `(version-notify-saved name)` | `tm-files.scm` | Hook called after a document is saved. |
@@ -395,8 +405,22 @@ shell fallback, Windows and submodules.
 * The commit dialog, panel and menus are covered by the offscreen tests
   (built, opened, menus expanded), but haven't been used by hand in a
   normal session.
-* During a rebase, git's "ours" is the upstream and "theirs" your commits,
-  so in *Resolve conflict* the Mine/Theirs labels are swapped.
+* During a rebase, git's "ours" is the upstream and "theirs" your commits:
+  the old (red) version of a conflict is then the upstream one, and *Mine*
+  / *Keep my version* retain the new one (`git-mine-version`).
+* Changes of the two sides in nearby paragraphs (one side deletes a
+  paragraph, the other changes the next one) still conflict: the
+  differing parts between paragraphs common to the three versions are
+  compared ours against theirs, without the ancestor (#676, item 1).
+* Large changes: the matching of the paragraphs (longest common
+  subsequence, `max-lcs-size` in `version-merge.scm`) is quadratic and
+  limited to 4 million pairs; beyond (about 2000 by 2000 paragraphs which
+  differ between the common start and end), only the common start and end
+  are matched, and the middle is compared as a whole. Raising the limit
+  costs memory and time quadratically.
+* The style packages are merged as a set: packages which only theirs added
+  go at the end, and a reordering of the packages by theirs only is not
+  taken over (our order is kept).
 * On X11, the background commands run synchronously, through the shell.
   On Windows and Android they run synchronously too, only the callback is
   delayed, and they can't be cancelled.

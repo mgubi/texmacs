@@ -14,6 +14,21 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Structured merge of documents** (desktop): the style packages and
+  the settings of the document (initial environment) of the other side
+  are no longer lost, in *Resolve conflict* and in the Git merge driver (a
+  setting changed on both sides keeps Git's ours, and the message says
+  which);
+  in a folder which is not trusted, *Merge documents structurally* says
+  that nothing was installed instead of reporting success; while
+  resolving a conflict, Version › Retain offers *Keep my version* and
+  *Keep their version* instead of Old and New version, which keep your
+  version also during a rebase, where Git swaps ours and theirs (#676).
+- **Cocoa: the scroller of the icon bars in two columns** (desktop, Cocoa
+  interface): when the scroll bars are always shown (System Settings) and the
+  columns at the left or the right of the document are taller than the
+  window, the bar widens by the width of the scroller, which no longer
+  covers the last column (#683).
 - **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
   these colors of the program were transparent. A text with an unknown color
   name was invisible, on the screen and in a PDF: it is black now, as in Qt;
