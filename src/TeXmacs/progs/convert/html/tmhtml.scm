@@ -1298,18 +1298,14 @@
   (map (lambda (id) `(h:a (@ (id ,(cork->html (cadr id))))))
        (tmhtml-collect-labels x)))
 
-(define (tmhtml-image-names ext)
+(define (tmhtml-image-names ext key)
   (set! tmhtml-image-serial (+ tmhtml-image-serial 1))
-  (when tmhtml-image-loose?
-    (receive (root name) (loose-images-root)
-      (set! tmhtml-image-root-url root)
-      (set! tmhtml-image-root-string name)))
   (let* ((postfix (string-append
 		   "-" (number->string tmhtml-image-serial) "." ext))
 	 (name-url (url-glue tmhtml-image-root-url postfix))
 	 (name-string (string-append tmhtml-image-root-string postfix)))
-    (if (and tmhtml-image-loose? (url-exists? name-url))
-	(tmhtml-image-names ext)
+    (if tmhtml-image-loose?
+	(loose-image-names key (string-append "." ext))
 	(values name-url name-string))))
 
 (define (magic-png-number)
@@ -1327,7 +1323,7 @@
 	 (l2 (if (null? l1) l1 (list (car l1)))))
     (with cached (ahash-ref tmhtml-image-cache x)
       (if (not cached)
-	  (receive (name-url name-string) (tmhtml-image-names "png")
+	  (receive (name-url name-string) (tmhtml-image-names "png" x)
 	    ;;(display* x " -> " name-url ", " name-string "\n")
 	    (let* ((extents (print-snippet name-url x #t))
                    (m (magic-png-number))
@@ -1388,7 +1384,7 @@
         name
       (with u1 (url-relative (current-buffer-url) un)
         (if (url-exists? u1)
-          (receive (name-url name-string) (tmhtml-image-names suf)
+          (receive (name-url name-string) (tmhtml-image-names suf name)
             (system-copy u1 name-url)
             name-string)
            name))))) ;; image does not exist, can't do much
@@ -1405,7 +1401,8 @@
               (string? (caddar l)))
          ;; embedded web image, extract it    
          (receive (name-url name-string)
-                  (tmhtml-image-names (url-suffix (cork->utf8 (caddar l))))
+                  (tmhtml-image-names (url-suffix (cork->utf8 (caddar l)))
+                                      (cadr (cadar l)))
            (string-save (cadr (cadar l)) name-url)
            (tmhtml-image (cons name-string (cdr l)))))
         ((nstring? (first l))

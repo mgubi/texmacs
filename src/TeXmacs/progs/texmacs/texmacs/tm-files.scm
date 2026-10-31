@@ -175,11 +175,30 @@
   (with suf (url-suffix u)
     (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
 
-;; The images of a conversion which writes no file go next to the document,
-;; where the pasted text finds them, with a name which is still free. When the
-;; document is not in a folder of the user which can be written, they go to a
-;; folder of the home, not to the temporary one, which goes away with TeXmacs
-;; while the pasted text remains; the text then needs the absolute name.
+;; The images of a conversion which writes no file are not for the user (the
+;; text for an AI, the MathJax of a formula, a label): they go to the temporary
+;; folder, under the absolute name. Only a copy to the clipboard keeps them, for
+;; the pasted text: next to the document, when it is a file in a folder of the
+;; user which can be written, where the bare name will do, otherwise in a folder
+;; of the home, which remains after TeXmacs as the pasted text does. The name
+;; comes from the document and the content, so that the same copy uses the same
+;; file instead of leaving a new one each time.
+
+(tm-define copying-to-clipboard? #f)
+
+(tm-define (copying-to-clipboard-swap flag)
+  (with old copying-to-clipboard?
+    (set! copying-to-clipboard? flag)
+    old))
+
+(tm-define (folder-writable? dir)
+  ;; really writing: (url-test? dir "w") only looks at the permission bits,
+  ;; which it finds on /etc as well
+  (with u (url-append dir (string-append ".texmacs-write-test-"
+                                         (number->string (texmacs-time))))
+    (string-save "" u)
+    (and (url-exists? u)
+         (begin (system-remove u) #t))))
 
 (define (document-folder)
   (let* ((b (current-buffer))
@@ -189,19 +208,38 @@
          (not (url-rooted-web? b))
          (not (url-rooted-tmfs? b))
          (url-exists? b)
-         (url-test? dir "w")
          (not (url-descends? dir (get-texmacs-path)))
+         (folder-writable? dir)
          dir)))
 
-(tm-define (loose-images-root)
-  ;; the url and the name to give to the images, which get a suffix
-  (with dir (document-folder)
-    (if dir
-        (values (url-append dir "image") "image")
-        (let* ((folder (string->url "$TEXMACS_HOME_PATH/system/images"))
-               (root (url-append folder "image")))
-          (when (not (url-exists? folder)) (system-mkdir folder))
-          (values root (url->unix root))))))
+(define (clipboard-image-names key suffix)
+  (let* ((dir (document-folder))
+         (folder (or dir (string->url "$TEXMACS_HOME_PATH/system/images")))
+         (id (list 'tuple (url->string (current-buffer)) key))
+         (name (string-append "image-" (tree-hash (tm->tree id)) suffix))
+         (u (url-append folder name))
+         (s (if dir name (url->unix u))))
+    (when (not (url-exists? folder)) (system-mkdir folder))
+    (set-message `(concat "Image of the copy: " (verbatim ,(url->system u)))
+                 "Copy")
+    (values u s)))
+
+(define loose-image-serial 0)
+
+(tm-define (loose-image-names key suffix)
+  ;; the url and the name in the text of an image with the given @suffix, for
+  ;; a conversion without target; @key identifies the content
+  (if copying-to-clipboard?
+      (clipboard-image-names key suffix)
+      (begin
+        (set! loose-image-serial (+ loose-image-serial 1))
+        (with u (url-append (url-temp-dir)
+                            (string-append "image-"
+                                           (number->string loose-image-serial)
+                                           suffix))
+          (if (url-exists? u)
+              (loose-image-names key suffix)
+              (values u (url->unix u)))))))
 
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))

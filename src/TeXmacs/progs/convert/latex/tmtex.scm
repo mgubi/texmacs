@@ -1794,23 +1794,19 @@
         ((== (car l) "even") `(ifthispageodd "" ,(tmtex (cadr l))))
         (else "")))
 
-(define (tmtex-eps-names)
+(define (tmtex-eps-names key)
   (set! tmtex-serial (+ tmtex-serial 1))
-  (when tmtex-image-loose?
-    (receive (root name) (loose-images-root)
-      (set! tmtex-image-root-url root)
-      (set! tmtex-image-root-string name)))
   (let* ((suffix (if (get-boolean-preference "native pdf") ".pdf" ".eps"))
          (postfix (string-append "-" (number->string tmtex-serial) suffix))
          (name-url (url-glue tmtex-image-root-url postfix))
          (name-string (string-append tmtex-image-root-string postfix)))
-    (if (and tmtex-image-loose? (url-exists? name-url))
-        (tmtex-eps-names)
+    (if tmtex-image-loose?
+        (loose-image-names key suffix)
         (values name-url name-string))))
 
 (define (tmtex-eps x)
   (if (tmtex-math-mode?) (set! x `(with "mode" "math" ,x)))
-  (receive (name-url name-string) (tmtex-eps-names)
+  (receive (name-url name-string) (tmtex-eps-names x)
     (let* ((extents (print-snippet name-url x #t))
            (unit (* (/ 1.0 60984.0) (/ 600.0 (tenth extents))))
            (x3 (* unit (first extents)))
@@ -1850,7 +1846,7 @@
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
           (list 'includegraphics name))
-        (receive (name-url name-string) (tmtex-eps-names)
+        (receive (name-url name-string) (tmtex-eps-names name)
           ;; an image which is not next to the target is next to the document
           (when (or (string-starts? name "..") (not (url-exists? u)))
             (set! u (url-relative (save-source-url) (unix->url name))))

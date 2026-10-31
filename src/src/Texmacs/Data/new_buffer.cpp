@@ -606,7 +606,11 @@ export_tree (tree doc, url u, string fm) {
   // The converters write the images of the document next to their target
   bool has_target= (fm != "texmacs" && fm != "stm");
   object old_target;
-  if (has_target) old_target= call ("save-target-swap", object (u));
+  if (has_target) {
+    // A converter passes the target on to programs, which need its full name
+    url target= is_rooted_name (u)? u: resolve (u, "");
+    old_target= call ("save-target-swap", object (target));
+  }
   string s= tree_to_generic (aux, fm * "-document");
   if (has_target) call ("save-target-swap", old_target);
   if (s == "* error: unknown format *") return true;
