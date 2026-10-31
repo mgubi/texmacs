@@ -146,7 +146,7 @@
                            "plugins-test-grace")))
 
 (plugin-configure tmtestgrace
-  (:launch ,(string-append "sh -c \"trap 'sleep 0.3; echo done > "
+  (:launch ,(string-append "sh -c \"trap 'sleep 1; echo done > "
                            grace-file "; exit 0' TERM; "
                            "sleep 615 & wait\""))
   (:serializer ,raw-serialize))
@@ -1325,8 +1325,9 @@
     (check-true (wait-until (lambda () (== (sleepers "615") 1)) 5000))
     (with start (texmacs-time)
       (connection-stop "tmtestgrace" "plugins-test-grace")
-      ;; the interface does not wait until the plugin has cleaned up
-      (check-true (< (- (texmacs-time) start) 300)))
+      ;; the interface does not wait until the plugin has cleaned up (1 s;
+      ;; the stop waits 50 ms, with a margin for loaded machines)
+      (check-true (< (- (texmacs-time) start) 800)))
     (check= (connection-status "tmtestgrace" "plugins-test-grace") 0)
     (check-true (wait-until (lambda () (url-exists? (system->url grace-file)))
                             3000))
