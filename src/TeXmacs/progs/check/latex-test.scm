@@ -732,6 +732,43 @@
           '("LaTeX import: \\zqdw not expanded, too many nested expansions"))
   (check= (latex-import-warnings "\\newcommand{\\foo}[1]{<#1>}\\foo{x}") '()))
 
+;; \string gives the next token as text: it was imported as a tag named
+;; "string", which is the label of the atomic trees, and the import gave a
+;; random byte (#658, texinfo.tex). A brace after it still opens or closes
+;; a group, as TeX counts it in the body of a definition.
+(define (test-import-string)
+  (check-group "import: \\string")
+  (check= (lt "\\edef\\mylbrace{\\iftrue \\string{\\else}\\fi}")
+          '(assign "mylbrace" (macro (concat (iftrue) "{" (else) (fi)))))
+  (check= (lt "\\edef\\myrbrace{\\iffalse{\\else\\string}\\fi}x")
+          '(concat (assign "myrbrace"
+                           (macro (concat (iffalse (concat (else) "}")) (fi))))
+                   "x"))
+  (check= (lt "a\\string{b") "a{b")
+  (check= (lt "a\\string}b") "a}b")
+  (check= (lt "a\\string\\foo b\\string\\{") "a\\foob\\{")
+  (check= (lt "a\\string&b\\string$c\\string#d\\string_e\\string<f")
+          "a&b$c#d_e<less>f")
+  ;; \string read as the argument of a macro (\gobble\string#1 in texinfo)
+  (check= (lt "\\newcommand{\\g}[1]{}\\g\\string y")
+          '(concat (assign "g" (macro "1" "")) (g "") "y"))
+  ;; a tag named "string" from an environment
+  (check= (lt "\\begin{string}x\\end{string}") '(compound "string" "x")))
+
+;; groups and arguments nested very deep: the parser recursed once per
+;; level and overflowed the stack (#658); the levels beyond 128 are skipped
+(define (test-import-deep-nesting)
+  (check-group "import: deep nesting")
+  (let ((b (make-string 100 #\{)) (e (make-string 100 #\})))
+    (check= (lt (string-append "a" b "x" e "b")) "axb"))
+  (let ((b (make-string 20000 #\{)) (e (make-string 20000 #\})))
+    (check= (lt (string-append "a" b "x" e "b")) "ab")
+    (check= (lt (string-append "$" b "x" e "$")) "")
+    (check= (latex-import-warnings (string-append "a" b "x" e "b"))
+            '("LaTeX import: groups nested more than 128 deep skipped")))
+  (with b (apply string-append (make-list 1000 "\\textbf{"))
+    (check= (lt (string-append "a" b "x" (make-string 1000 #\}) "b")) "ab")))
+
 (define (all-debug-messages)
   (tree-children (get-debug-messages "Debugging console" 100000000)))
 
@@ -1311,6 +1348,8 @@
   (test-import-environments)
   (test-import-macros)
   (test-import-recursive-macros)
+  (test-import-string)
+  (test-import-deep-nesting)
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)
