@@ -33,6 +33,7 @@ protected:
   string orig_name;  //!< Unique name assigned to the window.
   command quit;      //!< Command to be executed when the window is closed.
   bool fake;         //!< Whether this truly is a window (or a docked widget).
+  bool without_focus; //!< Shown without becoming the key window.
   
 
 public:
