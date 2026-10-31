@@ -35,6 +35,13 @@ have the details, and the problems go to the
   the unknown colors of graphics are black too, and the informative flags
   in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
   (#656).
+- **The menu Focus in source files** (desktop and browser): in a `.cpp`, a
+  `.py`, a `.scm`, a `.json`... it now has the entries for program code
+  (Definitions, Outline, Go to definition, Folds, the syntax and server
+  entries), as in a code block. The definitions of a large file are found
+  much faster (6666 functions: 40 ms instead of 2.7 s, also for the page
+  Outline and Go to definition); the submenu Definitions shows the first 500
+  of them, then All definitions, which opens the page Outline (#698).
 - **The menu Focus in code blocks** (desktop and browser): its entries for
   program code (Definitions, Outline, Go to definition, Folds, the syntax
   and server entries) are back; they were lost at each start, and TeXmacs

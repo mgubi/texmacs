@@ -53,6 +53,104 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (system-remove u)))
 
+(define (focus-menu-count name)
+  ;; how many times the entry @name is in the menu Focus
+  (string-count-occurrences (string-append "\"" name "\"")
+                            (object->string (menu-expand '(dynamic (focus-menu))))))
+
+(define (with-loaded-file name text proc)
+  ;; @proc with the file @name of content @text as the current buffer
+  (let* ((u (url-append (url-temp-dir) name))
+         (old (current-buffer)))
+    (string-save text u)
+    (load-buffer u)
+    (update-forced)
+    (apply-changes)
+    (proc)
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (system-remove u)))
+
+(define (test-focus-source-files)
+  ;; in a source file the focus is the buffer itself (#698): the entries of
+  ;; the code come with those of the document, only there
+  (check-group "the menu Focus in source files")
+  (let ((asked 0)
+        (widget (lambda (m) (make-menu-widget (list 'vertical m) 0))))
+    (code-provider-set! 'outline 'test 0 (lambda () #t)
+                        (lambda () (set! asked (+ asked 1)) '()))
+    (for (f '(("code-focus-test.py" "def f(x):\n  return x\n")
+              ("code-focus-test.scm" "(define (f x) x)\n")
+              ("code-focus-test.json" "{\"a\": 1}\n")))
+      (with-loaded-file (car f) (cadr f)
+        (lambda ()
+          (check-true (in-prog?))
+          (check-true (tree-is-buffer? (focus-tree)))
+          (check= (focus-menu-count "Definitions") 1)
+          (check= (focus-menu-count "Outline") 1)
+          (check= (focus-menu-count "Go to definition") 1)
+          (check= (focus-menu-count "Folds") 1)
+          ;; (the entries of the document stay)
+          (check= (focus-menu-count "Cite TeXmacs") 1)
+          (check= (focus-menu-count "Help") 1)
+          ;; the outline is asked for when Definitions opens, not when the
+          ;; menus are made again (while typing) or when Focus opens
+          (set! asked 0)
+          (check-true (widget '(link focus-menu)))
+          (check-true (widget '(link texmacs-menu)))
+          (check-true (widget '(link texmacs-focus-icons)))
+          (update-menus)
+          (check= asked 0)
+          (check-true (widget '(dynamic (code-definitions-menu))))
+          (check= asked 1))))
+    ;; not in a document: at the level of the buffer...
+    (with-loaded-file "code-focus-test-2.tm"
+      (string-append "<TeXmacs|2.1.4>\n\n<style|generic>\n\n"
+                     "<\\body>\n  Text.\n\n  <\\cpp-code>\n"
+                     "    int f () {\n\n    }\n  </cpp-code>\n"
+                     "</body>\n")
+      (lambda ()
+        (check-false (in-prog?))
+        (check-true (tree-is-buffer? (focus-tree)))
+        (for (name '("Definitions" "Outline" "Go to definition" "Folds"))
+          (check= (focus-menu-count name) 0))
+        (check= (focus-menu-count "Cite TeXmacs") 1)
+        ;; ... and in a code block, once
+        (tree-go-to (car (select (buffer-tree) '(:* cpp-code))) 0 0 0)
+        (update-forced)
+        (apply-changes)
+        (check-true (in-prog?))
+        (check-false (tree-is-buffer? (focus-tree)))
+        (check= (focus-menu-count "Outline") 1)
+        (check= (focus-menu-count "Cite TeXmacs") 0)))
+    ;; nor in a plain text file
+    (with-loaded-file "code-focus-test-3.txt" "Some text.\n"
+      (lambda ()
+        (check-false (in-prog?))
+        (check= (focus-menu-count "Outline") 0)))
+    (code-provider-remove! 'outline 'test)))
+
+(define (test-definitions-menu)
+  ;; a menu with thousands of definitions would take seconds to make: the
+  ;; first ones, then the page of the outline which has them all (#698)
+  (check-group "the menu Definitions")
+  (let* ((entries (lambda (n)
+                    (map (lambda (i)
+                           (list 0 "function" (number->string i) "" '(0 0)))
+                         (.. 0 n))))
+         (l '()))
+    (code-provider-set! 'outline 'test 0 (lambda () #t) (lambda () l))
+    (set! l (entries 500))
+    (check= (length (code-definitions-menu-items)) 500)
+    (check-false (in? 'all (code-definitions-menu-items)))
+    (set! l (entries 501))
+    (let ((m (code-definitions-menu-items)))
+      (check= (length m) 501)
+      (check= (cAr m) 'all)
+      (check= (cAr (cDr m)) (list-ref l 499)))
+    (check-true (make-menu-widget '(vertical (dynamic (code-definitions-menu))) 0))
+    (code-provider-remove! 'outline 'test)))
+
 (define (test-providers)
   (check-group "providers")
   (let ((asked '()))
@@ -330,6 +428,8 @@
   ;; the user say)
   (code-ignore-preferences! #t)
   (test-focus-menu)
+  (test-focus-source-files)
+  (test-definitions-menu)
   (test-completion)
   (test-diagnostics)
   (test-navigation)

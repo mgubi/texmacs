@@ -45,7 +45,11 @@ the other, and one without both is the TeXmacs of `upsilon_texmacs`.
   there (`notify_cursor_in_fold`). Both run in `edit_cursor.cpp`.
 - Scheme commands overloaded by both with `tm-define` (indentation, brackets,
   selection, moves): the last one loaded wins.
-- The Focus menu: entries of both. The keys std ( and std ): the folds of
+- The Focus menu: entries of both, in a code block (`focus-extra-menu`, the
+  focus is the tag) and in a source file (the focus is the buffer: the
+  variant of `standard-focus-menu` in `generic/document-menu.scm` calls
+  `focus-extra-menu` when the cursor is in lines of program code). The keys
+  std ( and std ): the folds of
   tree-sitter (prog-kbd.scm) and those of the LSP (lsp-kbd.scm, mode in-lsp%,
   which wins in the files which a server follows).
 - Positions: tree-sitter counts bytes of the Cork strings, the LSP UTF-16
