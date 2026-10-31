@@ -175,5 +175,57 @@ completer (bib-knuth)
 quit ()" \
       -x "$atquit" -x '(load "startup-bib.scm")' -q
 
+# The clipboard commands under -headless, which runs a QCoreApplication: the
+# clipboard of Qt has no platform there, and copying crashed (#708). The
+# selections are kept by TeXmacs itself: a copy, also exported to LaTeX, is
+# read back (also by the key extern) and pasted, a cleared selection is
+# empty, and no image is reported as put on the clipboard.
+cat > "$out/startup-clip.scm" <<'EOF'
+(define (copies)
+  ;; the number of copies of the sentence of startup-a.tm in the buffer
+  (with s (object->string (tree->stree (buffer-tree)))
+    (let loop ((pos 0) (n 0))
+      (with i (string-search-forwards "startup checks" pos s)
+        (if (< i 0) n (loop (+ i 1) (+ n 1)))))))
+(define (clipboard-kept? which)
+  (string-contains? (object->string (tree->stree (clipboard-get which)))
+                    "startup checks"))
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (update-forced)
+  (select-all)
+  (clipboard-copy "primary")
+  (display* "CHECK copy " (clipboard-kept? "primary") "\n")
+  ;; "extern" is "primary", as with a window (ai-paste reads it)
+  (display* "CHECK extern " (clipboard-kept? "extern") "\n")
+  (clipboard-copy-export "latex" "primary")
+  (display* "CHECK latex " (clipboard-kept? "primary") "\n")
+  (go-end)
+  (clipboard-paste "primary")
+  (update-forced)
+  (display* "CHECK paste " (copies) "\n")
+  (clipboard-clear "primary")
+  (display* "CHECK clear " (tree->stree (clipboard-get "primary")) "\n")
+  ;; no image is put on a clipboard which is not there
+  (display* "CHECK graphics "
+            (graphics-file-to-clipboard
+             (system->url (string-append (getenv "TEXMACS_PATH")
+                                         "/misc/images/fancy-c.png")))
+            "\n")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+
+check "headless: the clipboard commands keep the selection (#708)" \
+      "copy #t
+extern #t
+latex #t
+paste 2
+clear none
+graphics #f
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-clip.scm")'
+
 echo "Total: $total checks, $failed failed"
 exit $status
