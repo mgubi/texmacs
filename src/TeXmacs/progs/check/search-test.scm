@@ -2955,11 +2955,131 @@
               (check= (car r) exp)
               (check= (cadr r) doc))))))))
 
+;; A pattern of several paragraphs next to a block (#687): the cut of the
+;; paragraph break between a paragraph and a theorem joins them, and the
+;; editor makes a paragraph of the theorem again. The document was as before,
+;; the match still there, and Replace All and Replace one found it again and
+;; again: they never ended. Such a match is left, with a message, and nothing
+;; is inserted. A guard stops Replace All after more steps than twice the
+;; size of the document
+(define block-left "Match left: the editor keeps it, next to a block")
+
+(define (with-no-change-detection thunk)
+  ;; thunk, with Replace blind to a replacement which changes nothing
+  (let* ((old (widget 'range-unchanged?)))
+    (dynamic-wind
+      (lambda () (widget '(set! range-unchanged? (lambda args #f))))
+      thunk
+      (lambda () ((widget '(lambda (f) (set! range-unchanged? f))) old)))))
+
+(define (test-replace-next-to-blocks)
+  (check-group "replace next to a block")
+  (with-search-mode 'replace
+    (lambda ()
+      (check-replace-rows
+        '(;; the cases of the issue
+          ((document "x" (theorem (document "ab" "" "" "ef")) "y")
+           (document "" "") ""
+           (document "x" (theorem (document "abef")) "y"))
+          ((document "ab" (theorem (document "" "")) "ef")
+           (document "" "") ""
+           (document "ab" (theorem (document "")) "ef"))
+          ((document "ab" "" (theorem (document "cd")) "" "ef")
+           (document "" "") ""
+           (document "ab" (theorem (document "cd")) "ef"))
+          ;; only breaks next to a block: nothing replaced, also with a
+          ;; replacement, which was inserted again and again
+          ((document "x" (theorem (document "ab")) "y")
+           (document "" "") ""
+           (document "x" (theorem (document "ab")) "y"))
+          ((document "x" (theorem (document "ab")) "y")
+           (document "" "") "Z"
+           (document "x" (theorem (document "ab")) "y"))
+          ((document (theorem (document "a")) (theorem (document "b")))
+           (document "" "") ""
+           (document (theorem (document "a")) (theorem (document "b"))))
+          ;; the breaks inside the block are replaced
+          ((document "x" (theorem (document "ab" "cd")) "y")
+           (document "" "") "Z"
+           (document "x" (theorem (document "abZcd")) "y"))
+          ((document "x" (proof (document "a" "")) "" "y")
+           (document "" "") ""
+           (document "x" (proof (document "a")) "y"))
+          ((document "ab" "" (theorem (document "cd")) "" "ef")
+           (document "" "") (document "" "")
+           (document "ab" "" (theorem (document "cd")) "" "ef"))
+          ;; a table is not a block: the paragraphs are joined
+          ((document "x" (tabular (table (row (cell (document "a" "" "b")))))
+                     "y")
+           (document "" "") ""
+           (document (concat "x" (tabular (table (row (cell (document "ab")))))
+                             "y")))))
+      ;; the message of the match left, by Replace All and by Replace one
+      (check= (replace-with-messages
+                '(document "x" (theorem (document "ab")) "y")
+                '(document "" "") "Z")
+              (list '(document "x" (theorem (document "ab")) "y")
+                    (list block-left) (list block-left)))
+      ;; the guard: blind to the replacements which change nothing, Replace
+      ;; All stops, with a message, in one step of undo
+      (with-no-change-detection
+        (lambda ()
+          (for (c '(((document "x" (theorem (document "ab" "" "" "ef")) "y")
+                     "")
+                    ((document "x" (theorem (document "ab")) "y") "Z")))
+            (widget '(set! replace-skip-message #f))
+            (with r (replace-all-in-buffer (car c) '(document "" "") (cadr c))
+              (check= (cadr r) (car c))
+              (check= (widget 'replace-skip-message)
+                      "Replace All stopped: it would not end"))))))))
+
+(define (random-block-paragraph d)
+  ;; a paragraph: a short string, maybe empty, or a block of paragraphs
+  (if (and (> d 0) (< (random-next 10) 3))
+      (list (random-pick '(theorem proof))
+            `(document ,@(map (lambda (i) (random-block-paragraph (- d 1)))
+                              (iota (+ 1 (random-next 3))))))
+      (random-pick '("" "" "a" "ab" "b"))))
+
+(define (random-block-case)
+  ;; a document of paragraphs and blocks, a pattern of several paragraphs
+  (let* ((w '(wildcard "w")) (v '(wildcard "v"))
+         (doc (simplified `(document ,@(map (lambda (i)
+                                              (random-block-paragraph 2))
+                                            (iota (+ 1 (random-next 5)))))))
+         (what (random-pick `((document "" "") (document "" "" "")
+                              (document ,w "") (document "" ,w)
+                              (document "a" "") (document "" "b")
+                              (document ,w ,v))))
+         (by (random-pick '("" "Z" (document "" "") (document "Z" "")))))
+    (list doc what by '())))
+
+(define (random-block-failures n seed)
+  ;; the cases among n random ones of random-block-case which fail a check
+  ;; of random-case-problems, but for the matches left next to a block
+  (set-random-seed! seed)
+  (set! random-upper? #f)
+  (with-search-mode-value 'replace
+    (lambda ()
+      (let loop ((i 0) (bad (list)))
+        (if (>= i n) (reverse bad)
+            (let* ((c (random-block-case))
+                   (p (list-filter (random-case-problems c)
+                                   (lambda (x)
+                                     (!= x (list 'skip block-left))))))
+              (loop (+ i 1) (if (null? p) bad (cons (list c p) bad)))))))))
+
 (define (test-replace-random)
   (check-group "replace random")
   (let* ((t0 (texmacs-time))
          (bad (random-replace-failures 200 543)))
     (display* "    replace random: 200 cases in " (- (texmacs-time) t0)
+              " ms\n")
+    (check= bad '()))
+  ;; patterns of several paragraphs among blocks (#687)
+  (let* ((t0 (texmacs-time))
+         (bad (random-block-failures 60 687)))
+    (display* "    replace random blocks: 60 cases in " (- (texmacs-time) t0)
               " ms\n")
     (check= bad '())))
 
@@ -3002,5 +3122,6 @@
   (test-lone-wildcard)
   (test-replace-region-wildcards)
   (test-replace-followups)
+  (test-replace-next-to-blocks)
   (test-replace-random)
   (check-end))

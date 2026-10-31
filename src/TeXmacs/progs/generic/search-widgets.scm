@@ -649,17 +649,72 @@
           (append q (if (== (list-tail p (length q)) (path-end u '()))
                         '(1) '(0)))))))
 
+;; A replacement may leave the document as it was: the cut of a paragraph
+;; break next to a block (a theorem, which a paragraph cannot hold) joins
+;; the two paragraphs, and the editor makes a paragraph of the block again.
+;; The match was then still there, after the cursor, and Replace, which
+;; goes on from the end of its replacement, found it again and again:
+;; Replace All never ended (#687). Such a match is left, as one which
+;; Replace cannot replace
+
+(define (range-holder a b)
+  ;; the path of the deepest tree which holds the positions a and b
+  (let loop ((x (cDr a)) (y (cDr b)) (r (list)))
+    (if (and (pair? x) (pair? y) (== (car x) (car y)))
+        (loop (cdr x) (cdr y) (cons (car x) r))
+        (reverse r))))
+
+(define (range-content t a b n)
+  ;; what a replacement of the range from a to b can change in t, the tree
+  ;; at depth n which holds it: in a document or a formula, its number of
+  ;; children and those from the one of a to the one of b (as copies: the
+  ;; editor changes the trees in place); in a string, its length (a cut
+  ;; in it removes characters); else all of t
+  (cond ((tree-atomic? t) (string-length (tree->string t)))
+        ((and (tree-in? t '(document concat))
+              (> (length a) (+ n 1)) (> (length b) (+ n 1)))
+         (let* ((k1 (list-ref a n))
+                (k2 (min (list-ref b n) (- (tree-arity t) 1))))
+           (cons (tree-arity t)
+                 (let loop ((k k2) (l (list)))
+                   (if (< k k1) l
+                       (loop (- k 1)
+                             (cons (tm->stree (tree-ref t k)) l)))))))
+        (else (tm->stree t))))
+
+(define (range-state a b)
+  ;; the document around the range from a to b, before its replacement
+  ;; (see range-unchanged?)
+  (let* ((c (range-holder a b))
+         (t (path->tree c)))
+    (list t c (range-content t a b (length c)))))
+
+(define (range-unchanged? s a b)
+  ;; did the replacement of the range from a to b leave the document as it
+  ;; was in the state s (see range-state)?
+  (let* ((t (car s))
+         (c (cadr s)))
+    (and (== (tree->path t) c)
+         (== (range-content t a b (length c)) (caddr s)))))
+
 (define (replace-hit sel by what)
   ;; replace the hit sel of what by by: the match in it which Replace
   ;; replaces (see replace-match), exactly (the selection of the editor
   ;; moves the ends of a range next to a script over its base, which was
   ;; lost), or leave it with a message: the range replaced, or #f if left
   (let* ((rm (replace-current-range sel what))
-         (by* (and rm (adjust-by* by what (caddr rm) (cadddr rm)))))
+         (by* (and rm (adjust-by* by what (caddr rm) (cadddr rm))))
+         (leave (lambda (p msg)
+                  (go-to p)
+                  ;; (the message, also for the tests)
+                  (set! replace-skip-message msg)
+                  (set-message replace-skip-message "Replace")
+                  #f)))
     (if by*
         (let* ((a (car rm))
                (b (cadr rm))
-               (by* (tm->tree by*)))
+               (by* (tm->tree by*))
+               (before (and (path-less? a b) (range-state a b))))
           (when replace-trace
             (let* ((t (buffer-tree))
                    (n (length (tree->path t))))
@@ -672,21 +727,25 @@
             (with old (tags-around a)
               (clipboard-cut-between a b)
               (go-to (out-of-new-tags (cursor-path) old))))
-          ;; (nothing to insert: the editor would correct the cursor into
-          ;; a tag next to it, which the end of Replace then shows)
-          (when (not (tm-equal? by* ""))
-            (insert-go-to (tree-copy by*) (path-end by* '())))
-          (list a b))
-        (begin
-          (go-to (cadr sel))
-          ;; (the message, also for the tests)
-          (set! replace-skip-message
-            (cond ((not rm) "Match left: not one, or it crosses a tag")
-                  ((not (tm-func? what 'concat))
-                   "Match left: it would lose the rest of a tag")
-                  (else "Match left: its wildcards have no values")))
-          (set-message replace-skip-message "Replace")
-          #f))))
+          (if (and before (range-unchanged? before a b))
+              ;; (the cut left the document as it was: the match is left,
+              ;; and nothing is inserted, #687)
+              (begin
+                (when (pair? replace-trace)
+                  (set! replace-trace (cdr replace-trace)))
+                (leave b "Match left: the editor keeps it, next to a block"))
+              (begin
+                ;; (nothing to insert: the editor would correct the cursor
+                ;; into a tag next to it, which the end of Replace then
+                ;; shows)
+                (when (not (tm-equal? by* ""))
+                  (insert-go-to (tree-copy by*) (path-end by* '())))
+                (list a b))))
+        (leave (cadr sel)
+               (cond ((not rm) "Match left: not one, or it crosses a tag")
+                     ((not (tm-func? what 'concat))
+                      "Match left: it would lose the rest of a tag")
+                     (else "Match left: its wildcards have no values"))))))
 
 (define (current-hit cur what)
   ;; the hit which Replace replaces from cur: after a replacement, the next
@@ -754,25 +813,45 @@
             (if r (selection-set-range-set (list (car r) (cadr r)))
                 (selection-cancel))))))))
 
+(define (tree-size t)
+  ;; the characters and the nodes of t
+  (if (tree-atomic? t) (string-length (tree->string t))
+      (let loop ((k (- (tree-arity t) 1)) (s 1))
+        (if (< k 0) s
+            (loop (- k 1) (+ s (tree-size (tree-ref t k))))))))
+
 (define (replace-all-hits by)
   ;; Replace one again and again, from the reference: each step goes on in
-  ;; the text after its match, which a match which is not empty shortens,
-  ;; and after an empty one the next starts at least one character later
-  ;; (see next-hit), so it ends. The first hit: after a replacement, the
-  ;; next one in the text after it, as Replace one goes on (the hit which
-  ;; ends there would replace in the replacement, #596), else the first from
-  ;; a search of the document now (the hits of the widget can be partial)
+  ;; the text after its match, which a match which is not empty shortens
+  ;; (a replacement which changes nothing goes on after the match, see
+  ;; replace-hit), and after an empty one the next starts at least one
+  ;; character later (see next-hit), so it ends. The first hit: after a
+  ;; replacement, the next one in the text after it, as Replace one goes on
+  ;; (the hit which ends there would replace in the replacement, #596),
+  ;; else the first from a search of the document now (the hits of the
+  ;; widget can be partial). A guard, so that it ends whatever the editor
+  ;; does with a replacement (#687): each step takes at least one
+  ;; character, tag or paragraph break of the text after it, so there are
+  ;; fewer steps than twice the size of the document; else it stops, with a
+  ;; message
   (let* ((what (search-tree))
          (t (buffer-tree))
-         (cur (get-search-reference #t)))
+         (cur (get-search-reference #t))
+         (bound (* 2 (+ (tree-size t) 1))))
     (let loop ((sel (if (replace-continues? cur)
                         (next-hit cur what)
                         (first-accepted-hit
                           (tree-perform-search t what (tree->path t) 1000000)
-                          cur))))
-      (when sel
-        (replace-step sel by what)
-        (loop (next-hit (cursor-path) what))))
+                          cur)))
+               (n 0))
+      (cond ((not sel) (noop))
+            ((>= n bound)
+             (set! replace-skip-message
+                   "Replace All stopped: it would not end")
+             (set-message replace-skip-message "Replace"))
+            (else
+              (replace-step sel by what)
+              (loop (next-hit (cursor-path) what) (+ n 1)))))
     ;; (the place where it ended shown, if hidden)
     (go-to* (cursor-path))))
 
