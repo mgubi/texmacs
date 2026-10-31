@@ -919,6 +919,8 @@ encode_as_utf8 (unsigned int code) {
 
 unsigned int
 decode_from_utf8 (string s, int& i) {
+  // nothing to decode at the end of s: the result is 0, and i does not move
+  if (i >= N(s)) return 0;
   unsigned char c = s[i];
   if ((0x80 & c) == 0) {
     // 0x0ddddddd
