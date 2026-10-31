@@ -285,6 +285,8 @@ bool
 qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   QClipboard *cb = system_clipboard ();
   if (cb == NULL) {
+    // as below: "extern" is the selection "primary" (ai-paste)
+    if (key == "extern") key= "primary";
     s = "";
     t = "none";
     if (!selection_t->contains (key)) return false;

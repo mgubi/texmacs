@@ -178,7 +178,8 @@ quit ()" \
 # The clipboard commands under -headless, which runs a QCoreApplication: the
 # clipboard of Qt has no platform there, and copying crashed (#708). The
 # selections are kept by TeXmacs itself: a copy, also exported to LaTeX, is
-# pasted back, and a cleared selection is empty.
+# read back (also by the key extern) and pasted, and a cleared selection is
+# empty.
 cat > "$out/startup-clip.scm" <<'EOF'
 (define (copies)
   ;; the number of copies of the sentence of startup-a.tm in the buffer
@@ -196,6 +197,8 @@ cat > "$out/startup-clip.scm" <<'EOF'
   (select-all)
   (clipboard-copy "primary")
   (display* "CHECK copy " (clipboard-kept? "primary") "\n")
+  ;; "extern" is "primary", as with a window (ai-paste reads it)
+  (display* "CHECK extern " (clipboard-kept? "extern") "\n")
   (clipboard-copy-export "latex" "primary")
   (display* "CHECK latex " (clipboard-kept? "primary") "\n")
   (go-end)
@@ -210,6 +213,7 @@ EOF
 
 check "headless: the clipboard commands keep the selection (#708)" \
       "copy #t
+extern #t
 latex #t
 paste 2
 clear none
