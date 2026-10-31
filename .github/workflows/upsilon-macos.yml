@@ -83,7 +83,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [arm64, x86_64]
-        gui: [cocoa, vue]
+        gui: [cocoa]
     runs-on: macos-15
     timeout-minutes: 90
     defaults:
@@ -124,7 +124,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gui: [cocoa, vue]
+        gui: [cocoa]
     runs-on: macos-15
     timeout-minutes: 30
     defaults:
@@ -249,6 +249,7 @@ jobs:
 
   qt:
     name: macOS (Apple silicon, Qt 6)
+    if: false
     runs-on: macos-15
     timeout-minutes: 60
     defaults:

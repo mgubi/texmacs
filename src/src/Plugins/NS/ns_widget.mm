@@ -374,7 +374,7 @@ ns_window_widget_rep::send (slot s, blackbox val) {
         if (flag && is_headless ());
         // NOTE: its canvas gets the focus, and its editor becomes the current
         // one, only when the window becomes the key window (TMView)
-        else if (flag && without_focus)
+        else if (flag && without_focus && !getenv ("TM_AUDIT_NO_FIX"))
           [win orderFront: nil];
         else if (flag)
           [win makeKeyAndOrderFront: nil];

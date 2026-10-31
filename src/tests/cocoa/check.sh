@@ -419,5 +419,49 @@ focused_ok () {
 }
 focus_verdict focused "a console opened by the user takes the focus (#679)" focused_ok
 
+# ---------------- audit of #681, throwaway branch ----------------
+echo "AUDIT begin"
+saved_failed=$failed; saved_total=$total
+cp "$out/quiet.log" "$out/fixed-quiet.log"; cp "$out/focused.log" "$out/fixed-focused.log"
+export TM_AUDIT_NO_FIX=1
+quit_after=50000
+run quiet "" "$focus_steps;eval:$warnings;activate;wait:Error messages;activate;windows;$state;activate;type:xy;$state;click:Error messages;windows;$state;close:Error messages;windows;activate;windows;$state;type:zw;$state;$focus_quit" \
+    "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
+focus_verdict quiet "AUDIT-NEG quiet, final script, fix disabled" quiet_ok
+quit_after=50000
+run focused "" "$focus_steps;eval:(open-error-messages);wait:Error messages;activate;windows;type:a;$state;close:Error messages;windows;activate;windows;$state;type:zw;$state;$focus_quit" \
+    "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
+focus_verdict focused "AUDIT-NEG focused, final script, fix disabled" focused_ok
+cp "$out/quiet.log" "$out/neg-quiet.log"; cp "$out/focused.log" "$out/neg-focused.log"
+unset TM_AUDIT_NO_FIX
+failed=$saved_failed; total=$saved_total
+
+cp "$out/quiet.tm" "$out/quiet2.tm"
+sed 's/150000cm/300000cm/' "$out/tall.tm" > "$out/tall2.tm"
+bg='eval:(eval-system "/usr/bin/open -a Calculator")'
+ld="(load-buffer \"$out/quiet.tm\")"
+probe () { quit_after=50000; run "$1" "" "$2" "$ld" "$focus_defs"; echo "AUDIT probe $1: $(tail -1 "$out/$1.log")"; }
+open_q="$focus_steps;eval:$warnings;activate;wait:Error messages;activate;windows"
+# the quiet console opens at its end?
+probe p1-qend "$focus_steps;eval:$lines;activate;wait:Error messages;activate;windows;scroll:Error messages;scroll:Error messages;scroll:Error messages;$state;$focus_quit"
+# closed without having been clicked; a new warning opens it again
+probe p2-qclose "$open_q;close:Error messages;windows;$state;type:zw;$state;eval:$warnings;wait:Error messages;windows;$state;$focus_quit"
+# a warning while another application is active
+probe p3-qbgopen "$focus_steps;$bg;windows;windows;windows;eval:$warnings;windows;windows;windows;windows;windows;windows;activate;wait:Error messages;windows;$state;type:zw;$state;$focus_quit"
+# an active console closed while another application is active
+probe p4-cbgclose "$focus_steps;eval:(open-error-messages);wait:Error messages;activate;windows;$bg;windows;windows;windows;close:Error messages;windows;windows;activate;windows;$state;type:zw;$state;$focus_quit"
+# a quiet console, another application, back
+probe p5-qbgreact "$open_q;$bg;windows;windows;windows;activate;windows;$state;type:zw;$state;$focus_quit"
+# the flag left set (as after a throw): a document window, then a dialog
+probe p6-gapw "$focus_steps;eval:(gui-set-next-window-without-focus);eval:(load-buffer-in-new-window \"$out/quiet2.tm\");wait:quiet2.tm;windows;$state;type:zw;$state;click:quiet2.tm;windows;$state;eval:(open-preferences);windows;windows;windows;$state;$focus_quit"
+probe p7-gapd "$focus_steps;eval:(gui-set-next-window-without-focus);eval:(open-preferences);windows;windows;windows;$state;type:zw;$state;$focus_quit"
+# the repro of the issue, with and without the fix
+ld="(begin (load-buffer \"$out/tall2.tm\") (delayed (:pause 2500) (go-end)))"
+repro="wait:tall2.tm;front:tall2.tm;activate;windows;windows;windows;windows;activate;wait:Error messages;activate;windows;scroll:tall2.tm;scroll:tall2.tm;eval:(display* \"CHECK current \" (url-tail (current-buffer)) \"\\n\");$focus_quit"
+probe p8-repro "$repro"
+export TM_AUDIT_NO_FIX=1
+probe p9-repro-neg "$repro"
+unset TM_AUDIT_NO_FIX
+echo "AUDIT end"
 echo "$failed of $total failed"
 [ "$failed" = 0 ]
