@@ -415,8 +415,11 @@ glyph
 hor_extend (glyph gl, int pos, int by) {
   int i, j;
   int ww= gl->width, hh= gl->height;
+  // (an empty glyph, e.g. one too large for its raster: as it is, #659)
+  if (ww <= 0 || hh <= 0) return gl;
   bool ok= false;
-  while (!ok) { // hack for corrupted pfb translations
+  int tries= 0; // (a blank column of a glyph 1 pixel wide: no end, #659)
+  while (!ok && tries++ <= ww + 1) { // hack for corrupted pfb translations
     for (j=0; j<hh; j++)
       ok= ok || (gl->get_x (pos, j) != 0);
     if (!ok) pos += (pos < (ww>>1)? 1: -1);
@@ -434,8 +437,11 @@ glyph
 hor_take (glyph gl, int pos, int nr) {
   int i, j;
   int ww= gl->width, hh= gl->height;
+  // (an empty glyph, e.g. one too large for its raster: as it is, #659)
+  if (ww <= 0 || hh <= 0) return gl;
   bool ok= false;
-  while (!ok) { // hack for corrupted pfb translations
+  int tries= 0; // (a blank column of a glyph 1 pixel wide: no end, #659)
+  while (!ok && tries++ <= ww + 1) { // hack for corrupted pfb translations
     for (j=0; j<hh; j++)
       ok= ok || (gl->get_x (pos, j) != 0);
     if (!ok) pos += (pos < (ww>>1)? 1: -1);

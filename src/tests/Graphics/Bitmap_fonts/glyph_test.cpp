@@ -13,6 +13,8 @@
 
 glyph join (glyph gl1, glyph gl2);
 glyph hor_extend (glyph gl, int pos, int by);
+glyph hor_take (glyph gl, int pos, int nr);
+#include <unistd.h>
 
 // a glyph wider than a short: the wide braces of the virtual fonts at a
 // large zoom, joined from pieces (#659: the width wrapped to a negative
@@ -70,10 +72,30 @@ test_ops_too_large () {
   CHECK_EQ (z->get_1 (5, 5), 0);
 }
 
+// hor_extend and hor_take of an empty glyph, or of a blank glyph 1 pixel
+// wide, return (their search of a column with ink went on forever: the
+// alarm ends the test then)
+static void
+test_extend_empty () {
+  alarm (20);
+  glyph z (100000, 100000, 0, 0);
+  glyph e= hor_extend (z, -1, 100);
+  CHECK_EQ (e->height, 0);
+  glyph t= hor_take (z, -1, 10);
+  CHECK_EQ (t->height, 0);
+  glyph b (1, 5, 0, 5);
+  glyph be= hor_extend (b, 0, 3);
+  CHECK_EQ (be->width, 4);
+  glyph bt= hor_take (b, 0, 3);
+  CHECK (bt->width <= 3);
+  alarm (0);
+}
+
 int
 main () {
   RUN (test_wide);
   RUN (test_too_large);
   RUN (test_ops_too_large);
+  RUN (test_extend_empty);
   return test_report ();
 }
