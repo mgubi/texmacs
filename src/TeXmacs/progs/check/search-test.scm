@@ -2428,7 +2428,7 @@
       ;; match, and the start of the whole hit, which the filter judges)
       (with from (lambda (doc what)
                    (tree-search-from (stree->tree doc) (stree->tree what)
-                                     '() '(0 0 0) 1 #t))
+                                     '() '(0 0 0) 1 #t #t))
         (check= (from '(document (concat (hrule) (hrule) (hrule) "a")) "a")
                 '((0 3 0) (0 3 1) (0 3 0)))
         (check= (from '(document (concat (label "") (label "") (label "")
@@ -2464,7 +2464,7 @@
       (with doc '(document (concat (strong "x") (strong "y") (strong "z")))
         (check= (tree-search-from (stree->tree doc)
                                   (stree->tree '(strong (wildcard "w")))
-                                  '() '(0 0) 1 #t)
+                                  '() '(0 0) 1 #t #t)
                 '((0 1 0) (0 1 1) (0 1 0)))))))
 
 ;; The wildcards of a region pattern take their values in the region, as its
@@ -2670,6 +2670,35 @@
                 ((document (concat "q" (strong "xabzb")))
                  (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
                  (document (concat "q" (strong "<xa><z>"))))))))
+        ;; without a filter, Replace does not look for the start of the
+        ;; hit which the search shows, which only the filter judges (a
+        ;; search of the whole paragraph at each step, #618): the same
+        ;; replacements
+        (with-test-filter '(attr)
+          (lambda ()
+            (check-replace-rows
+              `(((document (concat "p" (math "xab") "q" (math "yab") "s"))
+                 ,what ,by
+                 (document (concat "p" (math "<xa|>") "q" (math "<ya|>")
+                                   "s")))
+                ((document (concat "p" (math "xabzb")))
+                 (concat (wildcard "w") "b") (concat "<" (wildcard "w") ">")
+                 (document (concat "p" (math "<xa><z>"))))))))
+        (check= (map (lambda (filter)
+                       (with-search-buffers '(document "a") "a" "b"
+                         (lambda (u)
+                           (ahash-set! (widget 'search-filter-table)
+                                       (current-buffer) (stree->tree filter))
+                           ((widget 'search-filter-accepts-all?)))))
+                     '((attr) (attr "mode" "text")))
+                '(#t #f))
+        (with from (lambda (filtered?)
+                     (tree-search-from (stree->tree '(document "xazb"))
+                                       (stree->tree
+                                         '(concat (wildcard "w") "b"))
+                                       '() '(0 2) 1 #f filtered?))
+          (check= (from #t) '((0 2) (0 4) (0 0)))
+          (check= (from #f) '((0 2) (0 4) (0 2))))
         (with-test-filter '(attr "mode" "math")
           (lambda ()
             (check= (shown doc) '())
