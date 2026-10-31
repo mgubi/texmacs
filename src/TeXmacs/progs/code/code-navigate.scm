@@ -93,26 +93,27 @@
   (let* ((n (length entries*))
          (more? (> n outline-page-max))
          (entries (if more? (list-head entries* outline-page-max) entries*)))
-  `(document
-    (strong (concat "Outline of " (verbatim ,(url->system (url-tail u)))))
-    ,@(if more?
-          (list (string-append "The first " (number->string outline-page-max)
-                               " of " (number->string n) " definitions"))
-          '())
-    ,@(if (null? entries) '("No definitions")
-          (map (lambda (e)
-                 `(action (concat
-                           ,(make-string (* 4 (car e)) #\space)
-                           (with "color" "#606060" ,(cadr e))
-                           " "
-                           (strong (verbatim ,(caddr e)))
-                           ,@(if (== (cadddr e) "") '()
-                                 (list " " `(with "color" "#606060"
-                                              (verbatim ,(cadddr e))))))
-                          ,(string-append "(code-go-to "
-                                          (object->string (url->string u)) " '"
-                                          (object->string (list-ref e 4)) ")")))
-               entries)))))
+    `(document
+      (strong (concat "Outline of " (verbatim ,(url->system (url-tail u)))))
+      ,@(if more?
+            (list (string-append "The first " (number->string outline-page-max)
+                                 " of " (number->string n) " definitions: "
+                                 "Search and Go to definition reach the others"))
+            '())
+      ,@(if (null? entries) '("No definitions")
+            (map (lambda (e)
+                   `(action (concat
+                             ,(make-string (* 4 (car e)) #\space)
+                             (with "color" "#606060" ,(cadr e))
+                             " "
+                             (strong (verbatim ,(caddr e)))
+                             ,@(if (== (cadddr e) "") '()
+                                   (list " " `(with "color" "#606060"
+                                                (verbatim ,(cadddr e))))))
+                            ,(string-append "(code-go-to "
+                                            (object->string (url->string u)) " '"
+                                            (object->string (list-ref e 4)) ")")))
+                 entries)))))
 
 (define (outline-document u entries)
   `(document (style (tuple "generic"))

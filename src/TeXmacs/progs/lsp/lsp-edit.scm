@@ -1093,7 +1093,9 @@
   (when log-client
     (with u (log-page)
       (if (buffer-exists? u)
-          (buffer-set-body u (stree->tree (log-body log-client)))
+          (begin
+            (buffer-set-body u (stree->tree (log-body log-client)))
+            (buffer-forget-history u))
           (set! log-client #f)))))
 
 (tm-define (lsp-client-log-changed c)
@@ -1165,7 +1167,9 @@
   (when diags-uri
     (with u (diags-page)
       (if (buffer-exists? u)
-          (buffer-set-body u (stree->tree (diags-body diags-uri)))
+          (begin
+            (buffer-set-body u (stree->tree (diags-body diags-uri)))
+            (buffer-forget-history u))
           (set! diags-uri #f)))))
 
 (tm-define (lsp-diagnostics-changed uri)
