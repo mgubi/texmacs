@@ -24,7 +24,8 @@
 #include <stdlib.h>
 
 #define SCREEN_PIXEL (PIXEL)
-const float invpix =  1.0/SCREEN_PIXEL;
+// (a double: a float lost the points of a tall document, #661)
+const double invpix =  1.0/SCREEN_PIXEL;
 
 coord4 from_nsrect (NSRect rect)
 {
@@ -40,8 +41,10 @@ coord4 from_nsrect (NSRect rect)
 
 NSRect to_nsrect(coord4 p)
 {
-	return NSMakeRect (p.x1*invpix, -p.x4*invpix,
-                     (p.x3-p.x1+SCREEN_PIXEL-1)*invpix, (p.x4-p.x2+SCREEN_PIXEL-1)*invpix);
+  // (the sizes in double: those of extents beyond +-2^30 overflowed an SI)
+  return NSMakeRect (p.x1*invpix, -p.x4*invpix,
+                     ((double) p.x3 - p.x1 + SCREEN_PIXEL - 1)*invpix,
+                     ((double) p.x4 - p.x2 + SCREEN_PIXEL - 1)*invpix);
 }
 
 NSPoint to_nspoint (coord2 p)

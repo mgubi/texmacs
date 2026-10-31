@@ -350,7 +350,19 @@ fade).
   windows (`SLOT_SIZE`, `SLOT_POSITION`), the frames of the canvas and of
   its document view, the size hints, and the constants of the constraints
   of the glues, the resize widgets, the fields and the pop-up buttons;
-  `ns_decode_length` reports bad lengths too. The titles and labels need
+  `ns_decode_length` reports bad lengths too. The document view of an
+  editor is cut at that bound (10^7 points) silently for the embedded
+  widgets with infinite extents; a document taller than that (about 7000
+  A4 pages at a zoom of 100%, 280 at 2500%) gets a `std-warning` once for
+  each editor, since its end cannot be shown (the canvas, which follows
+  the visible part, is bound to it too). Before #661 the frame was cut
+  at 5*10^6 points without a word; checked up to 10^7 points with
+  `TEXMACS_NS_WINDOW_TEST=scroll` (the sizes of the documents and their
+  visible parts) and `TEXMACS_NS_SNAPSHOT`: the end is reached by
+  `go-end` and drawn. The window of an embedded editor (a console)
+  answers the queries of the bars and of the prompt (`false`), as in Qt:
+  the menus built while it was the current editor failed on
+  `visible-header?` (#661). The titles and labels need
   no check: `to_nsstring`, `to_nsstring_utf8` and `to_label` never return
   `nil`. An icon which is not found (`to_nsimage`, a button or an item
   without its picture) is reported once on `debug-aqua`;
