@@ -27282,10 +27282,10 @@ printf '%s\n' "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
   unset ${!LC_MERGE_FLAGS_*}
 
 
-  LC_MERGE_FLAGS_list="-Wl,-macosx_version_min,$withval"
+  LC_MERGE_FLAGS_list="-mmacosx-version-min=$withval"
   if [[ "LDFLAGS" =~ $(echo "(^|_)LIBS") ]]
   then
-  LC_PREPEND_LIST_nlist="-Wl,-macosx_version_min,$withval"
+  LC_PREPEND_LIST_nlist="-mmacosx-version-min=$withval"
   #pop the old list
 
   LC_GETPOP_FLAG_sepa=-

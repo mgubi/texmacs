@@ -41,6 +41,8 @@ inside () { # path
   case "$p" in "$app_real"/*) return 0;; *) return 1;; esac
 }
 app_real=$(cd "$app" && pwd -P)
+# the SDK of the compilers here (the program must be linked against it)
+sdk=$(xcrun --show-sdk-version 2> /dev/null || true)
 
 status=0
 while IFS= read -r f; do
@@ -88,7 +90,18 @@ while IFS= read -r f; do
       echo "error: ${f#$app/} ($a) needs macOS $v (LSMinimumSystemVersion: $min)" >&2
       status=1
     fi
-    echo "${f#$app/}: $a, macOS $v"
+    # the SDK the program is linked against: macOS gives the program the
+    # behaviour of that version (#662: -Wl,-macosx_version_min made it
+    # the minimal version, 13.0, so NSImage took EPS files as in macOS 13)
+    s=$(otool -arch "$a" -l "$f" |
+        awk '/LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX/ {c=1}
+             c && $1 == "sdk" {print $2; exit}')
+    if [ "$f" = "$exe" ] && [ -n "$s" ] && [ -n "$sdk" ] &&
+       [ "${s%%.*}" -lt "${sdk%%.*}" ]; then
+      echo "error: ${f#$app/} ($a) is linked against the SDK of macOS $s (the SDK here: $sdk)" >&2
+      status=1
+    fi
+    echo "${f#$app/}: $a, macOS $v, SDK $s"
   done
 done < <(find "$app/Contents" -type f \( -perm -u+x -o -name "*.dylib" -o -name "*.so" \))
 exit $status
