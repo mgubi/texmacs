@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: the scroller of the icon bars in two columns** (desktop, Cocoa
+  interface): when the scroll bars are always shown (System Settings) and the
+  columns at the left or the right of the document are taller than the
+  window, the bar widens by the width of the scroller, which no longer
+  covers the last column (#683).
 - **Search and Replace next to hidden content** (desktop): a replacement
   next to a hidden (folded) tag stays in its place instead of going inside
   the tag (#590); going to a hit inside hidden content shows it in a step
