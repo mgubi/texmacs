@@ -14,13 +14,9 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
-- **Structured merge of documents** (desktop): changes of the two sides
-  in nearby paragraphs (one side deletes a paragraph, the other changes
-  the next one; one side inserts a paragraph next to one the other
-  changes; a label and a new paragraph on one side, a change just after
-  on the other) merge without conflict; the style packages and the
-  settings of the document (initial environment) of the other side are no
-  longer lost, in *Resolve conflict* and in the Git merge driver (a
+- **Structured merge of documents** (desktop): the style packages and
+  the settings of the document (initial environment) of the other side
+  are no longer lost, in *Resolve conflict* and in the Git merge driver (a
   setting changed on both sides keeps Git's ours, and the message says
   which);
   in a folder which is not trusted, *Merge documents structurally* says

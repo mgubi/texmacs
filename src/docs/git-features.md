@@ -253,19 +253,7 @@ mode** reduces the menus to:
    the style packages are merged as a set and the initial environment
    (the settings of the Document menu) key by key; a change of the same
    setting, or of the main style, on both sides keeps yours and counts as
-   a conflict, which the message names. Within a block of paragraphs,
-   the changes of each side against the ancestor (hunks) are merged when
-   they do not overlap (an insertion next to a change of the other side
-   goes before or after it; two different insertions at the same place,
-   or insertions of the same paragraph by both sides next to each other,
-   conflict instead of duplicating it); overlapping changes conflict, except identical ones (one
-   side may remove more, or also insert the same paragraph next to its
-   change) and elements of the same kind (same tag, or both text) changed
-   on both sides, provided each new element is closer (in shared words)
-   to its old element than to the others removed; these are merged in
-   turn. The same test decides whether blocks of the same length are
-   merged paragraph by paragraph: a paragraph removed and another one
-   inserted at its place is not a change of the paragraph;
+   a conflict, which the message names;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 
@@ -277,8 +265,6 @@ Examples:
 | A. / B. / C. | A**!** / B. / C. | A. / B. / C**!** | A! / B. / C! |
 | (section Intro) Text. | (section Introduction) Text. | (section Intro) Text, more. | (section Introduction) Text, more. |
 | Let *x+y* be. | Let *x+z* be. | Let *x+y* be given. | Let *x+z* be given. |
-| A. / B. / C. / D. | A. / C. / D. | A. / B. / C**2**. / D. | A. / C2. / D. (one side deleted B., the other changed C.) |
-| A. / (theorem T.) / C. | A. / (theorem T.) / C**2**. | A. / (theorem **label** T.) / **(todo x)** / C. | A. / (theorem label T.) / (todo x) / C2. |
 | The quick fox. | The slow fox. | The lazy fox. | The ⟨slow\|lazy⟩ fox, with one conflict to resolve |
 
 If the document was deleted on one side, you are told to edit it by hand.
@@ -351,7 +337,7 @@ and the snapshot functions in `git-blame.scm` and `git-project.scm`.)
 | `(async-evaluate-system argv input callback)` → id | C++ glue | Runs a command without a shell in the background; `callback` receives `(code stdout stderr)`. |
 | `(async-evaluate-cancel id)` | C++ glue | Terminates such a command and its process group. |
 | `(merge-versions base ours theirs)`, `(merge-conflicts t)` | `version-merge.scm` | Structured 3-way merge of strees. |
-| `(merge-documents base ours theirs)` | `version-merge.scm` | 3-way merge of complete documents (body, style packages, initial environment): `(document . conflicts)`. |
+| `(merge-documents base ours theirs)` | `version-merge.scm` | 3-way merge of complete documents (body, style packages, initial environment): `(document conflicts kept)`. |
 | `(version-match l1 l2)` | `version-merge.scm` | Longest common subsequence of two lists, as a vector of matching indices. |
 | `(version-normalize t)`, `(version-denormalize t)` | `version-compare.scm` | Public wrappers around the comparison helpers. |
 | `(version-notify-saved name)` | `tm-files.scm` | Hook called after a document is saved. |
@@ -419,13 +405,16 @@ shell fallback, Windows and submodules.
 * During a rebase, git's "ours" is the upstream and "theirs" your commits:
   the old (red) version of a conflict is then the upstream one, and *Mine*
   / *Keep my version* retain the new one (`git-mine-version`).
+* Changes of the two sides in nearby paragraphs (one side deletes a
+  paragraph, the other changes the next one) still conflict: the
+  differing parts between paragraphs common to the three versions are
+  compared ours against theirs, without the ancestor (#676, item 1).
 * Large changes: the matching of the paragraphs (longest common
   subsequence, `max-lcs-size` in `version-merge.scm`) is quadratic and
   limited to 4 million pairs; beyond (about 2000 by 2000 paragraphs which
   differ between the common start and end), only the common start and end
-  are matched, and the middle becomes one change per side: with edits
-  everywhere in 3000 paragraphs, about 15 s and some 1000 conflicts.
-  Raising the limit costs memory and time quadratically.
+  are matched, and the middle is compared as a whole. Raising the limit
+  costs memory and time quadratically.
 * The style packages are merged as a set: packages which only theirs added
   go at the end, and a reordering of the packages by theirs only is not
   taken over (our order is kept).
