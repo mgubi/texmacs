@@ -102,6 +102,14 @@
         ;;(display* p " ~> " new-env "\n")
         (check-same? (tm-children new-env) (tm-children old-env)))))
 
+(define (search-filter-accepts-all?)
+  ;; does the filter of the search accept every hit (see
+  ;; accept-search-result?)? Then Replace need not find the start of the
+  ;; hit which it judges (see next-hit, #618)
+  (or (== (get-init "mode") "src")
+      (with filter (get-search-filter)
+        (or (not filter) (null? (tm-children filter))))))
+
 (define (filter-search-results sels)
   ;; (iterative: a document may have tens of thousands of hits, #596)
   (let loop ((l sels) (r (list)))
@@ -520,9 +528,11 @@
   ;; before a change is kept across it), which the filter of the search
   ;; accepts: the search goes on after the hits which it rejects. The filter
   ;; judges the start of the whole hit, as for the hits which the search
-  ;; shows, not that of the match in it (#596)
+  ;; shows, not that of the match in it (#596); without a filter, nothing
+  ;; judges it, and it is not looked for (#618)
   (let* ((t (buffer-tree))
-         (p (tree->path t)))
+         (p (tree->path t))
+         (filtered? (not (search-filter-accepts-all?))))
     (and (list-starts? cur p)
          ;; (after an empty match, the next one starts at least one token
          ;; later: Replace, which goes on after its replacement, ends)
@@ -531,7 +541,8 @@
                                  (cadr replace-last))))
            ;; (one hit: its match, and the start of the whole hit)
            (with l (with-search-access-mode
-                     (lambda () (tree-search-from t what p from 1 empty?)))
+                     (lambda ()
+                       (tree-search-from t what p from 1 empty? filtered?)))
              (cond ((< (length l) 3) #f)
                    ((accept-search-result? (caddr l)) (list (car l) (cadr l)))
                    ;; (no empty hit at from: tree-search-from leaves it out)

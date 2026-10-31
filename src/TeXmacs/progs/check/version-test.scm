@@ -976,13 +976,16 @@
       (check= (version-register g) "Added file")
       (version-commit g msg)
       (check= (git-file-state g) 'unmodified)
-      ;; (read from a file: on Windows, eval-system decodes the output of
-      ;; the command in the OEM code page, windows64_system.cpp, which
-      ;; garbles the utf8 written by git, issue #641)
+      ;; the message as git stored it (written to a file by git)...
       (with out (tmp-name "message.txt")
         (git-sh "log -1 --pretty=%s --output=\"" out "\"")
         (check= (string-load (system->url out))
-                (string-append (cork->utf8 msg) "\n"))))
+                (string-append (cork->utf8 msg) "\n")))
+      ;; ... and as eval-system reads it from the output of git (on
+      ;; Windows, the output used to be decoded in the OEM code page,
+      ;; which garbled the utf8 of git, #641)
+      (check= (git-sh "log -1 --pretty=%s")
+              (string-append (cork->utf8 msg) "\n")))
     ;; a renamed file: the status gives the new and the old name
     (with new (string-append "new " fb)
       (git-sh "mv \"" fb "\" \"" new "\"")

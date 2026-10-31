@@ -2163,7 +2163,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(tree-search-from <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int> <scm-arg|bool>)>
+    <scm|(tree-search-from <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int> <scm-arg|bool> <scm-arg|bool>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|search_from> which returns

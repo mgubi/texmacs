@@ -12,6 +12,18 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 31 October 2026
+
+- **Windows: the output of commands in UTF-8** (desktop): the output of
+  the programs TeXmacs runs (git, pandoc, Python, the LaTeX tools...) is
+  read as UTF-8 when it is valid UTF-8, and in the OEM code page of the
+  system otherwise; before, accented letters in it came out garbled, e.g.
+  in the log of Git (#641).
+- **Replace All faster without a filter** (desktop): searching without a
+  filter, with an empty one, or in a source document no longer searches
+  the paragraph again at each hit, about 1.5 to 1.8 times faster in long
+  paragraphs (part of #618).
+
 ## 30 October 2026
 
 - **HTML export with MathJax: accents and aligned formulas** (desktop):

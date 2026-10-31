@@ -3386,13 +3386,14 @@ tmg_tree_search_tree_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm a
 }
 
 tmscm
-tmg_tree_search_from (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6) {
+tmg_tree_search_from (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6, tmscm arg7) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-search-from");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-search-from");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-search-from");
   TMSCM_ASSERT_PATH (arg4, TMSCM_ARG4, "tree-search-from");
   TMSCM_ASSERT_INT (arg5, TMSCM_ARG5, "tree-search-from");
   TMSCM_ASSERT_BOOL (arg6, TMSCM_ARG6, "tree-search-from");
+  TMSCM_ASSERT_BOOL (arg7, TMSCM_ARG7, "tree-search-from");
 
   content in1= tmscm_to_content (arg1);
   content in2= tmscm_to_content (arg2);
@@ -3400,9 +3401,10 @@ tmg_tree_search_from (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5
   path in4= tmscm_to_path (arg4);
   int in5= tmscm_to_int (arg5);
   bool in6= tmscm_to_bool (arg6);
+  bool in7= tmscm_to_bool (arg7);
 
   // TMSCM_DEFER_INTS;
-  array_path out= search_from (in1, in2, in3, in4, in5, in6);
+  array_path out= search_from (in1, in2, in3, in4, in5, in6, in7);
   // TMSCM_ALLOW_INTS;
 
   return array_path_to_tmscm (out);
@@ -12754,7 +12756,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-search-sections",  tmg_tree_search_sections, 1, 0, 0);
   tmscm_install_procedure ("tree-search-tree",  tmg_tree_search_tree, 4, 0, 0);
   tmscm_install_procedure ("tree-search-tree-at",  tmg_tree_search_tree_at, 5, 0, 0);
-  tmscm_install_procedure ("tree-search-from",  tmg_tree_search_from, 6, 0, 0);
+  tmscm_install_procedure ("tree-search-from",  tmg_tree_search_from, 7, 0, 0);
   tmscm_install_procedure ("tree-search-replace-match",  tmg_tree_search_replace_match, 4, 0, 0);
   tmscm_install_procedure ("tree-spell",  tmg_tree_spell, 4, 0, 0);
   tmscm_install_procedure ("tree-spell*",  tmg_tree_spell_dot, 4, 0, 0);

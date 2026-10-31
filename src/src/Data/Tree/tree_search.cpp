@@ -2201,12 +2201,13 @@ token_before (tree u, path h) {
 
 static array<path>
 search_in_cut (tree t, tree what, path p, path q, int limit,
-               bool after_empty) {
+               bool after_empty, bool filtered) {
   // the first hits of what in t at p (a paragraph, or a document for a
   // pattern of several paragraphs) after the position q in it (see
   // search_from). At q (not nil), no empty hit (after a match, which may
   // end there), and no hit at all after an empty match (after_empty): the
-  // hits at the start, before any token, are left out
+  // hits at the start, before any token, are left out. The start of the
+  // hit which the search shows only if filtered (see shown_start)
   bool para= !is_document (t);
   array<cut_level> lv;
   tree c= cut_before (t, q, lv);
@@ -2238,7 +2239,8 @@ search_in_cut (tree t, tree what, path p, path q, int limit,
         continue;
       path m1= p * uncut (t, q, h1, lv), m2= p * uncut (t, q, h2, lv);
       path w= p * uncut (t, q, w1, lv);
-      if (!is_nil (cur) && (w == cur || before_position (w, cur)))
+      if (filtered && !is_nil (cur) &&
+          (w == cur || before_position (w, cur)))
         w= shown_start (t, what, p, cur, m1, m2, shown, searched);
       add_hit (r, m1, m2, w, cur);
     }
@@ -2250,7 +2252,7 @@ search_in_cut (tree t, tree what, path p, path q, int limit,
 
 array<path>
 search_from (tree t, tree what, path p, path cur, int limit,
-             bool after_empty) {
+             bool after_empty, bool filtered) {
   // the first hits (at most limit) of what in t at p (a paragraph, or the
   // document) from the position cur on, as the search finds them in the
   // text which comes after cur, each one narrowed to the match which
@@ -2259,9 +2261,12 @@ search_from (tree t, tree what, path p, path cur, int limit,
   // the match, and the start of the whole hit, which the filter of the
   // search (mode, language) judges, as for the hits which it shows: for
   // the rest of a hit which goes on before cur, the start of the hit which
-  // the search shows now (#596). In a document, the paragraph of cur and then the
-  // next ones, until there are hits (a pattern of several paragraphs: the
-  // document after cur at once). At cur, no empty match (one which ends
+  // the search shows now (#596), which costs a search of the whole
+  // paragraph: only if filtered, when the filter of the search judges the
+  // hits; else the start of the hit in the text after cur (#618). In a
+  // document, the paragraph of cur and then the next ones, until there are
+  // hits (a pattern of several paragraphs: the document after cur at
+  // once). At cur, no empty match (one which ends
   // there, the previous match, is not followed by one), and after an empty
   // match at cur (after_empty), none at all: the next one starts at least
   // one character or tag later, so that Replace, which goes on after its
@@ -2275,12 +2280,13 @@ search_from (tree t, tree what, path p, path cur, int limit,
   path q= cur / p;
   if (!is_position (t, q)) return r;
   if (!is_document (t) || is_document (what))
-    return search_in_cut (t, what, p, q, limit, after_empty);
+    return search_in_cut (t, what, p, q, limit, after_empty, filtered);
   if (is_nil (q)) return r;
   for (int k=q->item; k<N(t) && N(r) == 0; k++)
     r= (k == q->item?
-        search_in_cut (t[k], what, p * k, q->next, limit, after_empty):
-        search_in_cut (t[k], what, p * k, path (), limit, false));
+        search_in_cut (t[k], what, p * k, q->next, limit, after_empty,
+                       filtered):
+        search_in_cut (t[k], what, p * k, path (), limit, false, filtered));
   return r;
 }
 
