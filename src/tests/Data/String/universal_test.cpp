@@ -18,6 +18,11 @@
 #include "universal.hpp"
 #include "converter.hpp"
 
+// the helpers of hyphenate.cpp, which has no header for them
+string sub_str (string s, int i, int len, bool utf8);
+int str_ind (string s, int ind, bool utf8);
+int str_length (string s, bool utf8);
+
 /******************************************************************************
 * Helpers
 ******************************************************************************/
@@ -147,6 +152,68 @@ test_utf8_invalid () {
   CHECK_EQ (decode_from_utf8 ("\xc0\xaf", i), (unsigned int) 0x2F);
   i= 0;
   CHECK_EQ (decode_from_utf8 ("\xed\xa0\x80", i), (unsigned int) 0xD800);
+}
+
+// at or past the end of a string there is nothing to decode: the result is 0
+// and the position does not move (the end of "abcd" is the end of its block)
+static void
+test_utf8_decode_at_end () {
+  int i= 0;
+  CHECK_EQ (decode_from_utf8 ("", i), (unsigned int) 0);
+  CHECK_EQ (i, 0);
+  const char* strs[]= { "abcd", "a\xc3\xa9", "\xe4\xb8\xad", "abcdefgh", 0 };
+  for (int k=0; strs[k] != 0; k++) {
+    string s= strs[k];
+    i= N(s);
+    CHECK_EQ (decode_from_utf8 (s, i), (unsigned int) 0);
+    CHECK_EQ (i, N(s));
+    i= N(s) + 3;
+    CHECK_EQ (decode_from_utf8 (s, i), (unsigned int) 0);
+    CHECK_EQ (i, N(s) + 3);
+  }
+}
+
+// every prefix of a sequence is decoded up to its end, always advancing, so
+// that a loop while (i < N(s)) ends on truncated input
+static void
+test_utf8_decode_truncated () {
+  const char* whole[]= {
+    "\xc3\xa9", "\xe4\xb8\xad", "\xf0\x9f\x98\x80",
+    "a\xc3\xa9", "ab\xe4\xb8\xad", "abc\xf0\x9f\x98\x80", 0 };
+  for (int k=0; whole[k] != 0; k++) {
+    string w= whole[k];
+    for (int n=0; n<=N(w); n++) {
+      string s= w (0, n);
+      int i= 0, steps= 0;
+      while (i < N(s) && steps <= N(s)) {
+        int old= i;
+        (void) decode_from_utf8 (s, i);
+        CHECK_MSG (i > old && i <= N(s),
+                   "decoding of " * bytes (s) * " from " * as_string (old) *
+                   " goes to " * as_string (i));
+        steps++;
+      }
+      CHECK_EQ (i, N(s));
+    }
+  }
+}
+
+// the characters of a word for the hyphenation (hyphenate.cpp) stop at its end
+static void
+test_utf8_hyphenation_helpers () {
+  string s= "a\xc3\xa9\xe4\xb8\xad";
+  for (int utf8=0; utf8<2; utf8++) {
+    CHECK_EQ (str_ind (s, 100, utf8), N(s));
+    CHECK_BYTES (sub_str (s, 0, 100, utf8), s);
+    CHECK_BYTES (sub_str (s, N(s), 2, utf8), "");
+    CHECK_BYTES (sub_str ("", 0, 2, utf8), "");
+    CHECK_EQ (str_ind ("", 2, utf8), 0);
+  }
+  CHECK_EQ (str_ind (s, 2, true), 3);
+  CHECK_BYTES (sub_str (s, 1, 1, true), "\xc3\xa9");
+  CHECK_EQ (str_length (s, true), 3);
+  CHECK_EQ (str_length (s, false), N(s));
+  CHECK_EQ (str_length ("\xe4\xb8", true), 2);
 }
 
 /******************************************************************************
@@ -504,6 +571,9 @@ main () {
   RUN (test_utf8_boundaries);
   RUN (test_utf8_decode_sequence);
   RUN (test_utf8_invalid);
+  RUN (test_utf8_decode_at_end);
+  RUN (test_utf8_decode_truncated);
+  RUN (test_utf8_hyphenation_helpers);
   RUN (test_utf8_to_cork_known);
   RUN (test_utf8_to_cork_invalid);
   RUN (test_cork_to_utf8_known);

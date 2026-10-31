@@ -1066,7 +1066,11 @@
     ("slovak" "najneobhospodarovavatelnejsimi")
     ("slovene" "dezoksiribonukleinska")
     ("croatian" "prijestolonasljednikovica")
-    ("esperanto" "malsanulejestrinoj")))
+    ("esperanto" "malsanulejestrinoj")
+    ;; the languages whose patterns are in UTF-8 (make_ucs_text_language)
+    ("russian" "<#434><#43E><#441><#442><#43E><#43F><#440><#438><#43C><#435><#447><#430><#442><#435><#43B><#44C><#43D><#43E><#441><#442><#44C>")
+    ("ukrainian" "<#43F><#440><#438><#440><#43E><#434><#43E><#437><#43D><#430><#432><#441><#442><#432><#43E>")
+    ("bulgarian" "<#435><#43B><#435><#43A><#442><#440><#438><#444><#438><#43A><#430><#446><#438><#44F>")))
 
 (define (test-hyphenation)
   (check-group "hyphenation patterns")
@@ -1077,6 +1081,12 @@
                    (url-append "$TEXMACS_PATH/langs/natural/hyphen"
                                (string-append "hyphen." (cadr p)))))))
           '())
+  ;; selecting a language loads its patterns, which read past the end of
+  ;; those ending in a digit, in the languages with UTF-8 patterns (#686;
+  ;; this only shows in a build with the address sanitizer)
+  (for-each (lambda (lan)
+              (check-true (> (width `(with "language" ,lan "x")) 0)))
+            (cons* "american" "verbatim" supported-languages))
   ;; the languages whose words are broken (none is left out)
   (check= (list-filter
            long-words
