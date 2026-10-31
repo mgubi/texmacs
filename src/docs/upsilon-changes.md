@@ -14,6 +14,10 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: tooltips on the icon bars** (desktop, Cocoa interface): the
+  buttons of the icon bars show their balloon text as a tooltip again; the
+  hover highlight of a button removed the tracking areas of its tooltip
+  (#637).
 - **Windows: the output of commands in UTF-8** (desktop): the output of
   the programs TeXmacs runs (git, pandoc, Python, the LaTeX tools...) is
   read as UTF-8 when it is valid UTF-8, and in the OEM code page of the

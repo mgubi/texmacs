@@ -20,6 +20,8 @@
 #            close button: TeXmacs goes on, without an error (#619, #628)
 #   idle     the console left idle: it is not typeset again and again (no
 #            warning of a typesetting loop, #620)
+#   tips     the buttons of the icon bars keep the tracking areas of their
+#            tooltips when theirs is updated (#637)
 #
 # Every case also fails on an error caught at an entry point from AppKit
 # ("Cocoa: an error was caught", "Cocoa: an Objective-C exception"), on an
@@ -117,6 +119,23 @@ idle_ok () {
   ! grep -aq 'typeset again from scratch' "$out/idle.log"
 }
 verdict idle "an idle console is not typeset again and again (#620)" idle_ok
+
+# (tips) the main icon bar has buttons with a tooltip (New, Open...); each
+# has one tracking area for its hover highlight and, while its tooltip is
+# active, some of AppKit: they must survive an update of the tracking areas
+run tips "" "windows;bar-tips" "(display \"\")"
+tips_ok () {
+  before=$(grep -a 'NSTEST bar-tips before' "$out/tips.log")
+  after=$(grep -a 'NSTEST bar-tips after' "$out/tips.log")
+  fail="no buttons with a tooltip: $before"
+  n=$(echo "$before" | sed -n 's/.*: \([0-9]*\) buttons.*/\1/p')
+  [ "${n:-0}" -gt 0 ] || return 1
+  fail="the tracking areas changed: '$before' then '$after'"
+  [ "${before#*before}" = "${after#*after}" ] || return 1
+  fail="the buttons have no tooltip areas, or not one hover area each: $after"
+  echo "$after" | grep -aq ": $n buttons with a tooltip, $n hover areas, [1-9]"
+}
+verdict tips "tooltips of the icon bars survive an update (#637)" tips_ok
 
 echo "$failed of $total failed"
 [ "$failed" = 0 ]

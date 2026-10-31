@@ -1143,6 +1143,10 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *   side-scroll:<y>   scrolls the side tools which are shown to y
  *   side-pos          prints the scroll position of the side tools
  *   side-width:<w>    the width of the right side tools (as with the handle)
+ *   bar-tips          prints the buttons of the icon bars of the main window
+ *                     which have a tooltip, and their tracking areas (ours
+ *                     for the hover highlight, those of AppKit), then updates
+ *                     their tracking areas and prints them again (#637)
  ******************************************************************************/
 
 static NSMenu* ns_test_menu= nil;  // the last menu which was shown
@@ -1195,6 +1199,32 @@ static void
 ns_test_pull_buttons (NSView* v, NSMutableArray* a) {
   if ([v isKindOfClass: NSClassFromString (@"TMPullButton")]) [a addObject: v];
   for (NSView* sub in [v subviews]) ns_test_pull_buttons (sub, a);
+}
+
+static void
+ns_test_bar_buttons (NSView* v, NSMutableArray* a) {
+  if ([v isKindOfClass: NSClassFromString (@"TMBarButton")] &&
+      [[v toolTip] length] > 0) [a addObject: v];
+  for (NSView* sub in [v subviews]) ns_test_bar_buttons (sub, a);
+}
+
+static void
+ns_test_print_bar_tips (NSWindow* win, const char* when) {
+  NSMutableArray* a= [NSMutableArray array];
+  if (win) ns_test_bar_buttons ([win contentView], a);
+  int ours= 0, others= 0;
+  NSString* owner= @"none";
+  for (NSView* b in a)
+    for (NSTrackingArea* ta in [b trackingAreas])
+      if ([ta owner] == b &&
+          ([ta options] & NSTrackingMouseEnteredAndExited)) ours++;
+      else {
+        others++;
+        owner= NSStringFromClass ([[ta owner] class]);
+      }
+  fprintf (stderr, "NSTEST bar-tips %s: %d buttons with a tooltip, "
+           "%d hover areas, %d other areas (of %s)\n", when, (int) [a count],
+           ours, others, [owner UTF8String]);
 }
 
 static void
@@ -1335,6 +1365,13 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     if (n >= 0 && n < (int) [a count])
       [[a objectAtIndex: n] performSelector: @selector(performClick:)
                                  withObject: nil afterDelay: 0];
+  }
+  else if ([st isEqualToString: @"bar-tips"]) {
+    ns_test_print_bar_tips (win, "before");
+    NSMutableArray* a= [NSMutableArray array];
+    if (win) ns_test_bar_buttons ([win contentView], a);
+    for (NSView* b in a) { [b updateTrackingAreas]; [b updateTrackingAreas]; }
+    ns_test_print_bar_tips (win, "after");
   }
   else if ([st isEqualToString: @"eval"])
     exec_delayed (scheme_cmd (from_nsstring (arg)));

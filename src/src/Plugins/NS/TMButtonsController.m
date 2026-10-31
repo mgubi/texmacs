@@ -39,6 +39,7 @@
 @public
   NSMenuItem *item;
   BOOL hover;
+  NSTrackingArea *hoverArea;  // ours, for the hover highlight (retained)
 }
 @end
 
@@ -46,17 +47,24 @@
 - (void) dealloc
 {
   [item release];
+  [hoverArea release];
   [super dealloc];
 }
 
+// NOTE: only our own tracking area is replaced: the view has other ones,
+// those of AppKit for its tooltip (#637)
 - (void) updateTrackingAreas
 {
-  for (NSTrackingArea *ta in [self trackingAreas]) [self removeTrackingArea: ta];
-  [self addTrackingArea:
-     [[[NSTrackingArea alloc] initWithRect: NSZeroRect
-         options: NSTrackingMouseEnteredAndExited | NSTrackingActiveInActiveApp |
-                  NSTrackingInVisibleRect
-           owner: self userInfo: nil] autorelease]];
+  if (hoverArea) {
+    [self removeTrackingArea: hoverArea];
+    [hoverArea release];
+  }
+  hoverArea=
+    [[NSTrackingArea alloc] initWithRect: NSZeroRect
+       options: NSTrackingMouseEnteredAndExited | NSTrackingActiveInActiveApp |
+                NSTrackingInVisibleRect
+         owner: self userInfo: nil];
+  [self addTrackingArea: hoverArea];
   [super updateTrackingAreas];
 }
 - (void) mouseEntered: (NSEvent*) e { (void) e; hover= YES; [self setNeedsDisplay: YES]; }
