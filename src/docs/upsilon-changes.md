@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **macOS: the applications linked against the current SDK** (desktop,
+  Cocoa and Vue): the disk images were linked against the SDK of macOS 13,
+  their minimal version, so macOS gave them the behaviour of macOS 13 (for
+  instance blank plots, #582); they now use the SDK of the build machine
+  and still run from macOS 13 (#662).
+- **Gnuplot: PNG plots without Ghostscript** (desktop): the gnuplot
+  sessions make PNG images, and say so at their start, when Ghostscript
+  (`gs`), which TeXmacs needs to show EPS images, is not installed; before,
+  each plot showed as a question mark. The documentation of the Gnuplot and
+  Maxima plug-ins says that their plots need Ghostscript (#662).
 - **Cocoa: tooltips on the icon bars** (desktop, Cocoa interface): the
   buttons of the icon bars show their balloon text as a tooltip again; the
   hover highlight of a button removed the tracking areas of its tooltip

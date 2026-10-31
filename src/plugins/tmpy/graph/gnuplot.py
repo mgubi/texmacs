@@ -15,11 +15,24 @@ from .graph     import Graph
 from ..protocol import *
 from ..compat   import *
 
+def has_ghostscript():
+    """Whether TeXmacs can show EPS images: it converts them with
+    Ghostscript (macOS no longer renders PostScript)"""
+    for gs in ["gs", "gswin64c", "gswin32c"]:
+        if which(gs) is not None:
+            return True
+    # the Ghostscript of the Windows installer of TeXmacs
+    tm = os.environ.get("TEXMACS_PATH", "")
+    return tm != "" and os.path.exists(os.path.join(tm, "bin", "gs.exe"))
+
 class Gnuplot(Graph):
     def __init__(self, name = "gnuplot"):
         super(Gnuplot, self).__init__()
         self.name = name
-        self.default_output = "eps"
+        # EPS (vector) plots need Ghostscript in TeXmacs, else a plot
+        # would show as "?": PNG then (#662)
+        self.has_gs = has_ghostscript()
+        self.default_output = "eps" if self.has_gs else "png"
         self.default_width = "0.8par"
 
     def greet(self):
@@ -32,6 +45,10 @@ class Gnuplot(Graph):
                     self.message = ret.decode()
             except OSError:
                 pass
+            if not self.has_gs:
+                self.message += ("Ghostscript (gs) was not found: the plots "
+                                 "are PNG images. Install Ghostscript for "
+                                 "vector (EPS) plots.\n")
         super(Gnuplot, self).greet()
 
     def evaluate(self, code):
@@ -49,7 +66,7 @@ set autoscale
             image = self.get_png()
             self.pre_code = """
 reset
-set terminal pngcairo enhanced
+set terminal pngcairo enhanced size 1280,960 fontscale 2 linewidth 2
 set output 
 set output '%s'
 set size 1,1
