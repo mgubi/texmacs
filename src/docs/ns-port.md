@@ -541,31 +541,34 @@ every program and library of the application, for each architecture, only
 uses the libraries of macOS and its own (the references `@rpath`,
 `@loader_path` and `@executable_path` must lead to files of the
 application, and no library path leads outside), and does not need a
-version of macOS after `LSMinimumSystemVersion`. The sources of the
+version of macOS after `LSMinimumSystemVersion`; for an application made for
+an older macOS (`--deps`, `merge-universal.sh`), the main program must be
+linked against an SDK newer than that version (#662). The sources of the
 libraries are checked with their SHA-256 (in `build-deps.sh`).
 
-The version is 12.0. The sources compile down to 10.13 (the oldest target
-of the current Xcode) for x86_64, except for a few calls, all in the
+The version is 13.0 in CI (12.0 is the default of `--min-macos`). The
+sources compile down to 10.13 (the oldest target of the current Xcode) for x86_64, except for a few calls, all in the
 tool bars: `separatorColor` and `controlAccentColor` (10.14) and the symbol
 images (11.0), which would need `@available`.
 
 ### Continuous integration
 
-`.github/workflows/macos-ns.yml` (GitHub Actions, macOS 15 runners) does
+`.github/workflows/upsilon-macos.yml` (GitHub Actions, macOS 15 runners) does
 the above: a job per architecture builds the libraries (cached, until
 `build-deps.sh` changes) and the application, and a last job merges them
-into `TeXmacs-<version>-universal.dmg`, then starts the application of the
+into `TeXmacs-<version>-<gui>-universal.dmg`, then starts the application of the
 disk image with each architecture (x86_64 under Rosetta), a test home,
 `TEXMACS_NS_SNAPSHOT` and the document `packages/macos/ci-colors.tm` (big
 red text) on the command line: the run fails unless a window shows the red
 text (`packages/macos/png-has-red.py`). The disk
 image and the snapshots are artifacts of the run. The disk image is signed
 ad hoc: after installing it elsewhere, `xattr -dr com.apple.quarantine
-/Applications/TeXmacs.app`. It runs on the branch `ns_ci` only (the work in
-`wip_other_guis` triggers nothing):
+"/Applications/TeXmacs Upsilon.app"`. It runs on the branch `upsilon_ci`,
+which publishes, or by hand on any branch, which does not:
 
 ```sh
-git push origin wip_other_guis:ns_ci
+git push origin upsilon_texmacs:upsilon_ci
+gh workflow run upsilon-macos.yml --ref <branch>
 ```
 
 or by hand from the Actions tab.
