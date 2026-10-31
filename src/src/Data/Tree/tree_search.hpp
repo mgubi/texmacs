@@ -19,7 +19,7 @@ range_set previous_search_hit (range_set sel, path cur, bool strict);
 range_set next_search_hit (range_set sel, path cur, bool strict);
 range_set navigate_search_hit (path cur, bool fw, bool extreme, bool strict);
 array<path> search_from (tree t, tree what, path p, path cur, int limit,
-                         bool after_empty);
+                         bool after_empty, bool filtered);
 array<tree> search_replace_match (tree t, tree what, path p1, path p2);
 
 range_set spell_with_cache (string lan, tree t, path p, int limit= 1000000);
