@@ -18,7 +18,8 @@ have the details, and the problems go to the
   program code (Definitions, Outline, Go to definition, Folds, the syntax
   and server entries) are back; they were lost at each start, and TeXmacs
   no longer prints the warning "conditional master routine
-  focus-extra-menu" on the terminal (#684).
+  focus-extra-menu" on the terminal, nor the one of `parser-feature` when
+  the first file is a JSON file (#684).
 - **Search and Replace next to hidden content** (desktop): a replacement
   next to a hidden (folded) tag stays in its place instead of going inside
   the tag (#590); going to a hit inside hidden content shows it in a step

@@ -136,6 +136,12 @@ check "headless: a file of program code, with no warning at the start" \
       "quit (startup-code.cpp)" \
       -headless -x "$atquit" startup-code.cpp
 
+printf '{"a": true}\n' > "$out/startup-data.json"
+
+check "a JSON file, with no warning at the start" \
+      "quit (startup-data.json)" \
+      -q -x "$atquit" startup-data.json
+
 check "a document with math, with no warning at the start" \
       "quit (startup-math.tm)" \
       -q -x "$atquit" startup-math.tm
