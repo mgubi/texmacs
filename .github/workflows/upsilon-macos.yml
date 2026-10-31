@@ -207,9 +207,9 @@ jobs:
           exit $status
 
       # failures of the Cocoa interface which used to be silent or to abort
-      # TeXmacs (#621): a French dialog title, closing the console, an idle
-      # console; with the application of the disk image (arm64, the
-      # architecture of the runner), about a minute
+      # TeXmacs (#621), and the focus of the console (#679): the cases are
+      # listed at the head of the script; with the application of the disk
+      # image (arm64, the architecture of the runner), about 4 minutes
       - name: Cocoa checks (tests/cocoa/check.sh)
         if: matrix.gui == 'cocoa'
         run: |
@@ -225,6 +225,14 @@ jobs:
           [ $status = 0 ] || tail -40 tests/build/cocoa/*.log
           hdiutil detach "$mnt"
           exit $status
+
+      # also when they pass: what the windows did (key, main, active)
+      - uses: actions/upload-artifact@v7
+        if: always() && matrix.gui == 'cocoa'
+        with:
+          name: cocoa-check-logs
+          path: src/tests/build/cocoa/*.log
+          if-no-files-found: warn
 
       # not zipped: the artifact downloads as the .dmg
       - uses: actions/upload-artifact@v7

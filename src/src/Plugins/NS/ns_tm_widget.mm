@@ -1134,12 +1134,14 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *                     gets the keyboard again, and no window changes
  *   click:<title>     a click in the middle of the window with this title,
  *                     as a posted event: it becomes the key window
- *   windows[:activate]
- *                     prints the windows (title, frame, main, key, shown);
- *                     with activate, once TeXmacs has become active
- *   type:<text>       TeXmacs becomes active, and the characters go as key
- *                     events to its key window; the titles of the key and
- *                     main windows are printed
+ *   windows           prints whether TeXmacs is the active application, and
+ *                     the windows (title, frame, main, key, shown)
+ *   wait:<title>      the next steps wait for the window with this title to
+ *                     be shown, at most 20 seconds
+ *   type:<text>       the characters as key events to the key window; prints
+ *                     whether TeXmacs is active, and the titles of the key
+ *                     and main windows (it does not activate TeXmacs, which
+ *                     may itself give it a key window)
  *   menubar[:<depth>] prints the menu bar (as TEXMACS_NS_MENUS)
  *   menu              prints the last menu which was shown (a pop-up menu)
  *   cancel            closes the menu which is shown
@@ -1282,6 +1284,7 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
 }
 - (void) printWindows
 {
+  fprintf (stderr, "NSTEST active %s\n", [NSApp isActive]? "yes": "no");
   fprintf (stderr, "NSTEST nr_windows %d\n", nr_windows);
   for (NSWindow* w in [NSApp windows]) {
     if (is_nil (ns_window_widget_of (w))) continue;
@@ -1300,17 +1303,8 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
 }
 - (void) typeText: (NSString*) text
 {
-  // once TeXmacs is active (another application may be in the way for a
-  // while): without a key window, the keys go nowhere
-  static int tries= 0;
   NSWindow* key= [NSApp keyWindow];
-  if (!key && tries++ < 8) {
-    [NSApp activateIgnoringOtherApps: YES];
-    [self performSelector: @selector(typeText:) withObject: text
-               afterDelay: 0.25];
-    return;
-  }
-  tries= 0;
+  fprintf (stderr, "NSTEST active %s\n", [NSApp isActive]? "yes": "no");
   fprintf (stderr, "NSTEST type to '%s', main '%s'\n",
            key? [[key title] UTF8String]: "",
            [NSApp mainWindow]? [[[NSApp mainWindow] title] UTF8String]: "");
@@ -1345,6 +1339,14 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     st= [st substringToIndex: colon.location];
   }
   NSArray* nums= [arg componentsSeparatedByString: @","];
+  if ([st isEqualToString: @"wait"]) {
+    static int waited= 0;
+    bool shown= false;
+    for (NSWindow* w in [NSApp windows])
+      if ([w isVisible] && [[w title] isEqualToString: arg]) shown= true;
+    if (!shown && ++waited < 20) { step--; return; }
+    waited= 0;
+  }
   NSWindow* win= ns_test_main_window ();
   if ([st isEqualToString: @"close"] || [st isEqualToString: @"fullscreen"])
     for (NSWindow* w in [NSApp windows])
@@ -1397,14 +1399,7 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
         [[NSNotificationCenter defaultCenter]
           postNotificationName: NSWindowDidBecomeMainNotification object: w];
   }
-  else if ([st isEqualToString: @"windows"]) {
-    if ([arg isEqualToString: @"activate"]) {
-      [NSApp activateIgnoringOtherApps: YES];
-      [self performSelector: @selector(printWindows) withObject: nil
-                 afterDelay: 0.3];
-    }
-    else [self printWindows];
-  }
+  else if ([st isEqualToString: @"windows"]) [self printWindows];
   else if ([st isEqualToString: @"type"]) [self typeText: arg];
   else if ([st isEqualToString: @"menubar"])
     ns_test_print_menu ([NSApp mainMenu], 0, [arg length] > 0? [arg intValue]: 0);

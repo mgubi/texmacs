@@ -374,8 +374,10 @@ the console: when it opens by itself on a warning, the document stays the key
 and main window and the current buffer, and gets the keys typed; a click, or
 opening it from the menu, gives it the focus; its close leaves the document
 focused (#679). They make TeXmacs the active application, which takes the
-keyboard from whoever works on the screen: they run in CI or with
-`TM_COCOA_FOCUS=1`, and are skipped otherwise. It also fails on any other error
+keyboard from whoever works on the screen: they run on GitHub Actions or with
+`TM_COCOA_FOCUS=1` (`0` turns them off), and are skipped otherwise. A case in
+which TeXmacs says it is not active is skipped, except on GitHub Actions, where
+it fails; a crash always fails. It also fails on any other error
 caught at an entry point from AppKit, except known harmless messages (a
 list in the script, extended with `TM_COCOA_HARMLESS`, an extended regular
 expression). The windows are shown: Cocoa has no offscreen mode. The
