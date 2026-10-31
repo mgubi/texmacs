@@ -309,7 +309,7 @@ get_buffer_tree (url name) {
 tree
 get_buffer_style (url name) {
   // the style of the buffer, in its most recent view (each editor keeps a
-  // copy of its own)
+  // copy of its own, which change_style gives all the views: #535)
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return "";
   if (N(buf->vws) == 0) return copy (buf->data->style);
@@ -320,7 +320,8 @@ get_buffer_style (url name) {
 
 void
 set_buffer_style (url name, tree style) {
-  // the style of the buffer, in its data and in all its views
+  // the style of the buffer, in its data and in all its views (the first
+  // change_style gives it to all of them: #535)
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return;
   buf->data->style= copy (style);

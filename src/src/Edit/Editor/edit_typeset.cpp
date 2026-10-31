@@ -75,9 +75,9 @@ edit_typeset_rep::set_data (new_data data) {
 
 void
 edit_typeset_rep::get_data (new_data& data) {
-  data->style= get_style ();
   // copies: the editor changes its own maps in place (init_env), and the
-  // buffer's data must not follow the changes of one view (#528)
+  // buffer's data must not follow the changes of one view (#528, #535)
+  data->style= copy (get_style ());
   data->init = copy (get_init ());
   data->fin  = copy (get_fin ());
   data->ref  = get_ref ();
@@ -1048,14 +1048,36 @@ edit_typeset_rep::commit_animation (tree t) {
 * Initialization
 ******************************************************************************/
 
+// The style is a property of the buffer, as its initial environment: a
+// change made in one view goes to the buffer's data, from which new views
+// start, and to the other views of the buffer, which are marked modified
+// too (#535).
+
+static void
+style_buffer_views (tm_buffer buf, tree style) {
+  // the buffer's data and all its views get the style @style; the view
+  // which made the change has it already. An editor whose view was deleted
+  // (delete_view) has no buffer.
+  if (buf == NULL) return;
+  buf->data->style= copy (style);
+  for (int i=0; i<N(buf->vws); i++)
+    buf->vws[i]->ed->change_style_local (style);
+}
+
 void
 edit_typeset_rep::change_style (tree t) {
-  bool changed= (the_style != t);
+  if (the_style == t) return;
+  change_style_local (t);
+  style_buffer_views (buf, t);
+}
+
+void
+edit_typeset_rep::change_style_local (tree t) {
+  // the change of change_style in one view of the buffer
+  if (the_style == t) return;
   the_style= copy (t);
-  if (changed) {
-    require_save ();
-    notify_change (THE_ENVIRONMENT);
-  }
+  require_save ();
+  notify_change (THE_ENVIRONMENT);
 }
 
 void
@@ -1065,9 +1087,11 @@ edit_typeset_rep::init_style () {
 
 void
 edit_typeset_rep::init_style (string name) {
-  if ((name == "none") || (name == "") || (name == "style")) the_style= TUPLE;
-  else if (arity (the_style) == 0) the_style= tree (TUPLE, name);
-  else the_style= tree (TUPLE, name) * the_style (1, N(the_style));
+  tree st;
+  if ((name == "none") || (name == "") || (name == "style")) st= TUPLE;
+  else if (arity (the_style) == 0) st= tree (TUPLE, name);
+  else st= tree (TUPLE, name) * the_style (1, N(the_style));
+  change_style (st);
   require_save ();
   notify_change (THE_ENVIRONMENT);
 }
