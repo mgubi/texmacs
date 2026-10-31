@@ -70,9 +70,14 @@ ns_bench_now () {
 {
   if (!wid || [[self superview] isKindOfClass: [NSClipView class]])
     return NSMakeSize (NSViewNoIntrinsicMetric, NSViewNoIntrinsicMetric);
-  SI w= 0, h= 0;
-  wid->handle_get_size_hint (w, h);
-  return to_nssize (w, h);
+  // (in a layout of the window, which may come after the events)
+  NSSize r= NSMakeSize (NSViewNoIntrinsicMetric, NSViewNoIntrinsicMetric);
+  NS_ENTRY_BEGIN
+    SI w= 0, h= 0;
+    wid->handle_get_size_hint (w, h);
+    r= ns_safe_size (to_nssize (w, h), "-[TMDocView intrinsicContentSize]");
+  NS_ENTRY_END ("-[TMDocView intrinsicContentSize]")
+  return r;
 }
 
 - (void) viewDidMoveToSuperview
@@ -130,8 +135,11 @@ ns_bench_now () {
   // The canvas moves to the visible part, and TeXmacs updates at once so
   // that the canvas is repainted before it is displayed
   // NOTE: not while the window is being built (there may be no editor yet)
+  // (a scroll or a resize of the clip view, also in a layout after the
+  // events)
   (void) n;
   if (!wid) return;
+  NS_ENTRY_BEGIN
   NSClipView* clip= (NSClipView*) [self superview];
   if ([self followsEnd] && [clip isKindOfClass: [NSClipView class]]) {
     NSRect b= [clip bounds];
@@ -141,8 +149,9 @@ ns_bench_now () {
     lastClip= b.size;
   }
   wid->follow_visible_part ();
-  if (wid->has_store () && [NSApp isRunning] && [self window])
+  if (wid && wid->has_store () && [NSApp isRunning] && [self window])
     the_gui->force_update ();
+  NS_ENTRY_END ("-[TMDocView scrolled:]")
 }
 @end
 
@@ -215,7 +224,11 @@ ns_bench_now () {
     if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
     done= true;
   NS_ENTRY_END ("the presentation of a canvas drawn by the GPU")
-  if (!done) { wid->gpu_dirty= false; [self sleep]; }
+  if (!done) {
+    // (the widget may have been deleted by what failed: then stop is done)
+    if (wid) wid->gpu_dirty= false;
+    [self sleep];
+  }
   ns_bench_display += ns_bench_now () - t;
   if (dbg) fprintf (stderr, "PRESENT %.3f ms at %.3f\n", 1000 * (ns_bench_now () - t), t);
 }
@@ -374,6 +387,7 @@ ns_simple_widget_rep::follow_visible_part () {
   if (![doc window]) return;
   NSRect r= NSIntersectionRect ([doc visibleRect], [doc bounds]);
   if (NSIsEmptyRect (r)) return;
+  r= ns_safe_rect (r, "ns_simple_widget_rep::follow_visible_part");
   if (!NSEqualRects (r, [view frame])) [view setFrame: r];
   // NOTE: as QTMWidget::resizeEventBis, TeXmacs is told when the viewport
   // changes its size (the documents whose size follows the one of the
@@ -582,7 +596,8 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       // (an embedded editor at its end stays there, see keepEnd; the state
       // before the new size, which the clip view notifies)
       BOOL was_at_end= ((TMDocView*) doc)->atEnd;
-      [doc setFrameSize: rect.size];
+      [doc setFrameSize: ns_safe_size (rect.size,
+                           "ns_simple_widget_rep::send (SLOT_EXTENTS)")];
       if (was_at_end && [(TMDocView*) doc followsEnd])
         [(TMDocView*) doc keepEnd];
       {
@@ -606,7 +621,8 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord2>(val, s);
       coord2 sz = open_box<coord2> (val);
-      [doc setFrameSize: to_nssize (sz)]; // FIXME?
+      [doc setFrameSize: ns_safe_size (to_nssize (sz),
+                           "ns_simple_widget_rep::send (SLOT_SIZE)")]; // FIXME?
       follow_visible_part ();
     }
       break;

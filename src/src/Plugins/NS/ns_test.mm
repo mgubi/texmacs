@@ -371,7 +371,9 @@ choose (NSMenuItem* mi) {
   static bool running= false; // not again while a step runs (a nested loop)
   if (running) return;
   running= true;
-  call ("gui-test-pump");
+  NS_ENTRY_BEGIN
+    call ("gui-test-pump");
+  NS_ENTRY_END ("the scripted test (gui-test-pump)")
   running= false;
 }
 - (void) beginTracking: (NSNotification*) n

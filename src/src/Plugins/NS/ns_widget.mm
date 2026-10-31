@@ -185,12 +185,18 @@ ns_widget_rep::popup_window_widget (string s) {
   // As QTMWindow::closeEvent: the window stays, the quit command (for the
   // main windows safely-kill-window, for the dialogs their deleter) closes
   // it if need be. Without a command, the window is only hidden.
+  // NOTE: performClose: and the close button of a window in a sheet or
+  // in a test (TEXMACS_NS_WINDOW_TEST) do not always come in an event; an
+  // error leaves the window open (#621)
   (void) sender;
   if (!wid) return YES;
-  command q= wid->get_quit ();
-  if (is_nil (q)) return YES;
-  the_gui->process_command (q);
-  return NO;
+  BOOL r= NO;
+  NS_ENTRY_BEGIN
+    command q= wid->get_quit ();
+    if (is_nil (q)) r= YES;
+    else the_gui->process_command (q);
+  NS_ENTRY_END ("-[TMWindowController windowShouldClose:]")
+  return r;
 }
 
 - (BOOL) remembersGeometry
@@ -205,12 +211,15 @@ ns_widget_rep::popup_window_widget (string s) {
 {
   // As QTMWindow::moveEvent (the top left corner, from the top left of the
   // main screen)
+  // (also when the screens change, without an event)
   (void) n;
   if (![self remembersGeometry]) return;
-  NSRect f= [[self window] frame];
-  coord2 p= from_nspoint (NSMakePoint (f.origin.x,
-                                       main_screen_height () - NSMaxY (f)));
-  notify_window_move (wid->get_nickname (), p.x1, p.x2);
+  NS_ENTRY_BEGIN
+    NSRect f= [[self window] frame];
+    coord2 p= from_nspoint (NSMakePoint (f.origin.x,
+                                         main_screen_height () - NSMaxY (f)));
+    notify_window_move (wid->get_nickname (), p.x1, p.x2);
+  NS_ENTRY_END ("-[TMWindowController windowDidMove:]")
 }
 
 - (void) windowDidResize: (NSNotification*) n
@@ -219,10 +228,12 @@ ns_widget_rep::popup_window_widget (string s) {
   // one set by SLOT_SIZE (Qt takes the frame and tolerates the difference)
   (void) n;
   if (![self remembersGeometry]) return;
-  NSWindow* win= [self window];
-  NSSize sz= [win contentRectForFrameRect: [win frame]].size;
-  coord2 p= from_nssize (sz);
-  notify_window_resize (wid->get_nickname (), p.x1, p.x2);
+  NS_ENTRY_BEGIN
+    NSWindow* win= [self window];
+    NSSize sz= [win contentRectForFrameRect: [win frame]].size;
+    coord2 p= from_nssize (sz);
+    notify_window_resize (wid->get_nickname (), p.x1, p.x2);
+  NS_ENTRY_END ("-[TMWindowController windowDidResize:]")
 }
 @end
 
@@ -304,7 +315,8 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       NSWindow *win = [wc window];
       if (win) {
         NSSize size = to_nssize (p);
-        if (!ns_check_size (size, "ns_window_widget_rep::send (SLOT_SIZE)"))
+        if (ns_fix_size (size, "ns_window_widget_rep::send (SLOT_SIZE)",
+                         100000.0))
           debug_aqua << "  (window " << orig_name << ")\n";
         [win setContentSize: size];
       }
@@ -321,7 +333,8 @@ ns_window_widget_rep::send (slot s, blackbox val) {
         // bottom left
         NSPoint pt= to_nspoint (p);
         pt.y= main_screen_height () - pt.y;
-        if (!ns_check_point (pt, "ns_window_widget_rep::send (SLOT_POSITION)"))
+        if (ns_fix_point (pt, "ns_window_widget_rep::send (SLOT_POSITION)",
+                          100000.0))
           debug_aqua << "  (window " << orig_name << ")\n";
         [win setFrameTopLeftPoint: pt];
       }
@@ -515,10 +528,16 @@ ns_window_widget_rep::write (slot s, blackbox index, widget w) {
 
 - (void) dismiss
 {
+  // NOTE: called by the monitor of the events, before they are sent (not
+  // under sendEvent:); the quit command may delete the widget, which
+  // releases the panel: it stays until the end of the event (#621)
   if (![self isVisible]) return;
+  [[self retain] autorelease];
   [self stopMonitoring];
   [self orderOut: nil];
-  if (wid && !is_nil (wid->quit)) wid->quit ();
+  NS_ENTRY_BEGIN
+    if (wid && !is_nil (wid->quit)) wid->quit ();
+  NS_ENTRY_END ("-[TMPopupPanel dismiss]")
 }
 
 - (void) dealloc
@@ -582,7 +601,9 @@ ns_popup_widget_rep::send (slot s, blackbox val) {
     case SLOT_SIZE:
     {
       check_type<coord2>(val, s);
-      NSSize sz= to_nssize (open_box<coord2> (val));
+      NSSize sz= ns_safe_size (to_nssize (open_box<coord2> (val)),
+                               "ns_popup_widget_rep::send (SLOT_SIZE)",
+                               100000.0);
       NSRect f= [p frame];
       [p setFrame: NSMakeRect (f.origin.x, NSMaxY (f) - sz.height,
                                sz.width, sz.height) display: NO];
@@ -594,6 +615,7 @@ ns_popup_widget_rep::send (slot s, blackbox val) {
       check_type<coord2>(val, s);
       NSPoint pt= to_nspoint (open_box<coord2> (val));
       pt.y= main_screen_height () - pt.y;
+      ns_fix_point (pt, "ns_popup_widget_rep::send (SLOT_POSITION)", 100000.0);
       [p setFrameTopLeftPoint: pt];
       // keep it on the screen
       NSScreen* scr= [p screen]? [p screen]: [NSScreen mainScreen];

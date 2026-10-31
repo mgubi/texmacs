@@ -57,6 +57,8 @@
 
 - (NSImage*) image
 {
+  // NOTE: also when the menus are drawn or searched, outside of the events
+  NS_ENTRY_BEGIN
   // The image of an item drawn by a simple widget is computed lazily
   NSImage *img = [super image];
   if ((!img) && (wid)) {
@@ -69,6 +71,9 @@
     [self setWidget:NULL];
   }
   return img;
+  NS_ENTRY_END ("-[TMMenuItem image]")
+  [self setWidget: NULL]; // (not again)
+  return [super image];
 }
 @end
 
