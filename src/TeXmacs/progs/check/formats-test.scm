@@ -246,6 +246,49 @@
 
 ;; stm is the TeXmacs tree written as a Scheme expression, and gives back
 ;; every tree, inline or block, unchanged.
+;; raw-data holds the bytes of an embedded file, written <#hexadecimal> in a tm
+;; file. Without its argument, which only a hand-written or damaged file has,
+;; it crashed the writer, and in the tmml format it was an error; a <#...> next
+;; to other content made the reader lose the whole body (#685).
+(define (test-tm-raw-data)
+  (check-group "the tag raw-data in a tm document")
+  (for-each
+   (lambda (body)
+     (with doc (tmfile `(document ,body))
+       (check= (import (export doc "texmacs-document") "texmacs-document") doc)
+       (check= (round-trip doc "tmml-document") doc)
+       (check= (round-trip doc "stm-document") doc)))
+   '((raw-data)
+     (raw-data "")
+     (raw-data "a\xff")
+     (raw-data (em "q"))
+     (concat "x " (raw-data) " y")
+     (concat "x " (raw-data "") " y")
+     (concat "x " (raw-data "a") " y " (raw-data "b"))
+     (concat "x " (raw-data (em "q")) " y")
+     (image (tuple (raw-data) "png") "1cm" "" "" "")
+     (image (tuple (raw-data "") "png") "1cm" "" "" "")
+     (image (tuple (raw-data "a") "png") "1cm" "" "" "")))
+  (check= (export '(raw-data) "texmacs-snippet") "<raw-data>")
+  (check= (export '(raw-data "") "texmacs-snippet") "<#>")
+  (check= (export '(raw-data "a\xff") "texmacs-snippet") "<#61FF>")
+  (check= (export '(raw-data (em "q")) "texmacs-snippet") "<raw-data|<em|q>>")
+  (check= (export '(concat "x " (raw-data) " y") "texmacs-snippet")
+          "x <raw-data> y")
+  (check= (import "x <#61> y" "texmacs-snippet")
+          '(document (concat "x " (raw-data "a") " y")))
+  (check= (import "<foo|<#61> c|b>" "texmacs-snippet")
+          '(document (foo (concat (raw-data "a") " c") "b")))
+  (check= (import "<\\foo>\n  <#61>\n</foo>" "texmacs-snippet")
+          '(document (foo (document (raw-data "a")))))
+  ;; a file which ends inside the tag
+  (check= (import "<#" "texmacs-snippet") '(document (raw-data "")))
+  (check= (import "a<#" "texmacs-snippet")
+          '(document (concat "a" (raw-data ""))))
+  ;; the other formats have no raw data: the text around it is kept
+  (check= (export '(concat "x " (raw-data) " y") "verbatim-snippet") "x  y")
+  (check= (export '(concat "x " (raw-data) " y") "html-snippet") "x  y"))
+
 (define (test-stm)
   (check-group "stm")
   (check= (export '(frac "a" (sqrt "b")) "stm-snippet")
@@ -860,6 +903,7 @@
   (test-tm-round-trip)
   (test-tm-document)
   (test-tm-string-tag)
+  (test-tm-raw-data)
   (test-stm)
   (test-tmml-serialize)
   (test-tmml-parse)
