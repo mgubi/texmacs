@@ -1723,6 +1723,10 @@ make_main_menu () {
 void gui_open (int& argc, char** argv)
   // start the gui
 {
+  // black, white, red... are set here, as in the other ports without
+  // QTTEXMACS: without this, they are all 0, a transparent black, which is
+  // what the unknown color names give (#656)
+  initialize_colors ();
   if (!NSApp) {
     // initialize app (an instance of TMApplication)
     [TMApplication sharedApplication];
