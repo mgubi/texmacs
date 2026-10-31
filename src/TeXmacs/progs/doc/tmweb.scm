@@ -58,7 +58,6 @@
 
 (define (tmweb-convert-file tm-file html-file)
   (with-aux tm-file
-    (if (url? html-file) (set! current-save-target html-file))
     (export-buffer-main (current-buffer) html-file "html" (list :overwrite))))
 
 (define (needs-update? src dest update?)

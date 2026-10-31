@@ -99,8 +99,7 @@
   <section|Interaction with the editor>
 
   Exporting a buffer (<scm|export-buffer-main> in
-  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>) sets the global variables
-  <scm|current-save-source> and <scm|current-save-target> and then calls
+  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>) calls
   the <c++> routine <cpp|buffer_export> in
   <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>. For the <name|HTML> format, this
   routine first replaces the body by <cpp|exec_html> of the body, so that
@@ -112,7 +111,9 @@
   The resulting document is passed to <cpp|export_tree>, which calls
   <cpp|tree_to_generic> and hence the <scheme> converters. Image file
   names produced during the export are derived from
-  <scm|current-save-target>.
+  <scm|current-save-target>: <cpp|buffer_export> and <cpp|export_tree> set
+  this variable and <scm|current-save-source> for the time of the
+  conversion only, and restore them afterwards.
 
   Importing goes through <cpp|generic_to_tree> with the format
   <verbatim|latex-document> or <verbatim|html-document>. The same converters
