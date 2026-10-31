@@ -23,7 +23,10 @@
         (code code-fold)
         (code code-navigate)
         (code code-diagnostics)
-        (code code-complete)))
+        (code code-complete)
+        ;; the master routine of focus-extra-menu, which comes before the
+        ;; variant below: else it is defined later and replaces this variant
+        (generic generic-menu)))
 
 (tm-menu (code-server-menu))
 (tm-menu (code-syntax-menu))

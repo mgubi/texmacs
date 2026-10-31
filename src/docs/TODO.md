@@ -115,9 +115,7 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   in Vue only (tests `footer-menus` and `footer-variants`); the Cocoa build
   compiles but its footer was not tried by hand. A right click on a tag of
   the footer does nothing now (the left click gives its menu, Focus menu
-  included). At start-up the log says `warning: conditional master routine
-  focus-extra-menu` (the code menu of `wip_code` hooks into the Focus menu
-  of every tag): harmless, not traced.
+  included).
 - **Windows: a typesetting crash when a highlighter is installed late**
   (a tree-sitter or LSP highlighter which starts after the document was
   typeset). Seen on the Windows CI only; not reproduced elsewhere, and not
