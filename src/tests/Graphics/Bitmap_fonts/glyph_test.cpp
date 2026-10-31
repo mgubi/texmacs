@@ -14,7 +14,9 @@
 glyph join (glyph gl1, glyph gl2);
 glyph hor_extend (glyph gl, int pos, int by);
 glyph hor_take (glyph gl, int pos, int nr);
+#ifndef OS_MINGW
 #include <unistd.h>
+#endif
 
 // a glyph wider than a short: the wide braces of the virtual fonts at a
 // large zoom, joined from pieces (#659: the width wrapped to a negative
@@ -77,7 +79,9 @@ test_ops_too_large () {
 // alarm ends the test then)
 static void
 test_extend_empty () {
+#ifndef OS_MINGW
   alarm (20);
+#endif
   glyph z (100000, 100000, 0, 0);
   glyph e= hor_extend (z, -1, 100);
   CHECK_EQ (e->height, 0);
@@ -88,7 +92,9 @@ test_extend_empty () {
   CHECK_EQ (be->width, 4);
   glyph bt= hor_take (b, 0, 3);
   CHECK (bt->width <= 3);
+#ifndef OS_MINGW
   alarm (0);
+#endif
 }
 
 int

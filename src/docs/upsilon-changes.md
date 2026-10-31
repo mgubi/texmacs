@@ -19,6 +19,20 @@ have the details, and the problems go to the
   the document stays the window in use, and what is typed or asked for next goes
   to it, as in the other interfaces. A click in the console gives it the focus,
   and a console opened from the Debug menu takes it at once (#679).
+- **Search and Replace next to hidden content** (desktop): a replacement
+  next to a hidden (folded) tag stays in its place instead of going inside
+  the tag (#590); going to a hit inside hidden content shows it in a step
+  of undo, so that undo hides it again, and the search goes on after it,
+  also in Replace one, which stays one step of undo (#591); a pattern made
+  only of a wildcard no longer leaves "Match left" on a theorem or a table
+  cell alone in its paragraph (#589).
+- **A tag named `string`** (desktop): a tag or macro named `string` works
+  like any other; it no longer gives random content or crashes when a
+  document with it is loaded (#678).
+- **LaTeX import: `\string` and deep nesting** (desktop): `\string` gives
+  its next token as text, as in TeX (no more random byte from
+  `\string{`), a math `\backslash` alone is kept, and groups nested more
+  than 128 deep are skipped with a warning instead of crashing (#658).
 - **Cocoa: TeXmacs goes on after an error in a scroll** (desktop, Cocoa
   interface): an error during an update forced by AppKit (a scroll or a
   resize of a document, a change of the appearance) is reported as before,
