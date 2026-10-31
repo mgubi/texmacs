@@ -14,6 +14,23 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Cocoa: TeXmacs goes on after an error in a scroll** (desktop, Cocoa
+  interface): an error during an update forced by AppKit (a scroll or a
+  resize of a document, a change of the appearance) is reported as before,
+  but TeXmacs no longer stops updating its windows and running its
+  commands afterwards. The checks of the Cocoa interface
+  (`tests/cocoa/check.sh`) also cover the dialogs with negative sizes and
+  such an error (#666).
+- **Rotated text and big glyphs** (desktop and browser): rotations and
+  the other transformations of `gr-transform` are drawn the right way round
+  by the GPU renderer (Cocoa and Vue) and by the MuPDF renderer (the CPU
+  path of Vue and of the browser), which turned them the other way and
+  displaced them; a big wide brace (an overbrace of 26 terms at zoom 6) no
+  longer stops TeXmacs with "out of memory" (the sizes of the glyphs were
+  16-bit numbers); big glyphs with an outline are no longer dropped under a
+  transformation or a pattern; and the textures of big glyphs over their
+  bound release the least recently drawn ones instead of the whole cache
+  of glyphs (#659).
 - **Cocoa: very tall documents, the console, the View menu** (desktop,
   Cocoa interface): a document taller than 5,000,000 points (a few hundred
   pages at a high zoom) could not be scrolled to its end; the frame now

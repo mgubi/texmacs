@@ -22,12 +22,23 @@
 #            warning of a typesetting loop, #620)
 #   tips     the buttons of the icon bars keep the tracking areas of their
 #            tooltips when theirs is updated (#637)
+#   sizes    two dialogs with a glue and a resize of negative sizes: the
+#            sizes given to AppKit are replaced, with one warning on
+#            debug-aqua for each place in all, and the dialogs are shown
+#            (#621, #650, #666)
+#   raise    an error thrown in an entry point from AppKit (a command of
+#            the interface run by the update of -[TMDocView scrolled:]) is
+#            reported once, and TeXmacs goes on: later commands and updates
+#            run (#650, #666)
 #
 # Every case also fails on an error caught at an entry point from AppKit
-# ("Cocoa: an error was caught", "Cocoa: an Objective-C exception"), on an
-# abort and on a timeout (TM_TEST_TIMEOUT seconds, default 60). The windows
-# are shown (Cocoa has no offscreen mode): run it in a session where they
-# may appear for a few seconds. The logs stay in tests/build/cocoa.
+# ("Cocoa: an error was caught", "Cocoa: an Objective-C exception",
+# "Throwing"), on an abort and on a timeout (TM_TEST_TIMEOUT seconds,
+# default 60), except the errors which the case provokes itself and those
+# of the list of known harmless messages below (extended with
+# TM_COCOA_HARMLESS, an extended regular expression). The windows are shown
+# (Cocoa has no offscreen mode): run it in a session where they may appear
+# for a few seconds. The logs stay in tests/build/cocoa.
 
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
@@ -46,10 +57,20 @@ mkdir -p "$out"
 total=0
 failed=0
 
-# run <case> <language> <window test steps> <scheme expression>: TeXmacs in
-# a fresh home, the expression after 2.5 s, the quit after 14 s
+# the errors which do not fail a case (extended regular expressions, one
+# per line): known harmless messages, none so far
+harmless='
+'
+[ -n "${TM_COCOA_HARMLESS:-}" ] && harmless="$harmless
+$TM_COCOA_HARMLESS"
+# the errors which the next case provokes (set before its verdict)
+expected=''
+
+# run <case> <language> <window test steps> <scheme expression> [<scheme
+# definitions>]: TeXmacs in a fresh home, the definitions at the start, the
+# expression after 2.5 s, the quit after 14 s
 run () {
-  name=$1; lang=$2; steps=$3; x=$4
+  name=$1; lang=$2; steps=$3; x=$4; defs=${5:-}
   home="$homes/$name-home"
   rm -rf "${homes:?}/$name-home"
   mkdir -p "$home/system"
@@ -60,7 +81,7 @@ run () {
   HOME="$home" CFFIXED_USER_HOME="$home" \
   TEXMACS_HOME_PATH="$home" TEXMACS_NS_WINDOW_TEST="$steps" \
     perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -x \
-    "(begin (delayed (:pause 2500) $x) (delayed (:pause 14000) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
+    "(begin $defs (delayed (:pause 2500) $x) (delayed (:pause 14000) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
     > "$out/$name.log" 2>&1
   echo "exit status $?" >> "$out/$name.log"
 }
@@ -72,8 +93,12 @@ verdict () {
   why=""
   grep -aq '^CHECK alive' "$log" || why="TeXmacs did not reach its quit"
   grep -aq '^exit status 0$' "$log" || why="$why; $(tail -1 "$log")"
-  grep -aqE 'Cocoa: an (error|Objective-C exception) was caught|terminating due to|Throwing ' "$log" &&
-    why="$why; an error was caught: $(grep -aE 'Cocoa: an|terminating|Throwing ' "$log" | head -3 | tr '\n' ' ')"
+  errors=$(grep -aE 'Cocoa: an (error|Objective-C exception) was caught|terminating due to|Throwing ' "$log")
+  allowed=$(printf '%s\n%s\n' "$harmless" "$expected" | grep -v '^$' | paste -sd '|' -)
+  [ -n "$allowed" ] && errors=$(echo "$errors" | grep -avE "$allowed")
+  [ -n "$errors" ] &&
+    why="$why; an error was caught: $(echo "$errors" | head -3 | tr '\n' ' ')"
+  expected=''
   shift
   desc=$1; shift
   "$@" || why="$why; $fail"
@@ -136,6 +161,50 @@ tips_ok () {
   echo "$after" | grep -aq ": $n buttons with a tooltip, $n hover areas, [1-9]"
 }
 verdict tips "tooltips of the icon bars survive an update (#637)" tips_ok
+
+# (sizes) the glue and the resize of two dialogs have negative sizes: the
+# lengths are replaced by 0 for AppKit, with one warning for each place
+# (ns_safe_length, ns_safe_size) in all the run, and the dialogs are shown.
+# (ns_decode_length also warns about the lengths of the resize, each time
+# they are decoded: not counted here)
+widget='(tm-widget (cocoa-check-sizes cmd) (resize "-100px" "-20px" (glue #f #f -10 -20)) (text "Bad sizes"))'
+run sizes "" "windows;windows;windows" \
+    '(begin (dialogue-window cocoa-check-sizes noop "Bad sizes") (dialogue-window cocoa-check-sizes noop "Bad sizes again"))' \
+    "$widget"
+sizes_ok () {
+  for title in "Bad sizes" "Bad sizes again"; do
+    fail="the dialog '$title' is not shown"
+    grep -aq "NSTEST window '$title' shown" "$out/sizes.log" || return 1
+  done
+  for place in glue_widget resize_widget; do
+    n=$(grep -ac "debug-aqua, make_widget ($place): a bad \(length\|size\) for AppKit" "$out/sizes.log")
+    fail="$n warnings for the sizes of make_widget ($place), not one"
+    [ "$n" = 1 ] || return 1
+  done
+}
+verdict sizes "negative sizes of dialogs: one warning for each place (#650)" sizes_ok
+
+# (raise) a command of the interface which throws a C++ error (cpp-error),
+# run by the update which -[TMDocView scrolled:] forces: the error is
+# reported once, at that entry point, and the commands and the updates go
+# on (another scroll, a delayed command, the quit)
+run raise "" 'windows;scroll-eval:(begin (display "CHECK raise\n") (cpp-error));scroll-eval:(display "CHECK scrolled again\n");eval:(display "CHECK later\n");windows' \
+    '(display "")'
+expected='Throwing an error occurred
+Cocoa: an error was caught in -\[TMDocView scrolled:\]'
+raise_ok () {
+  log="$out/raise.log"
+  fail="the error was not thrown"
+  grep -aq '^CHECK raise' "$log" || return 1
+  n=$(grep -ac '^Throwing an error occurred' "$log")
+  m=$(grep -acF 'Cocoa: an error was caught in -[TMDocView scrolled:]' "$log")
+  fail="the error was reported $n and $m times, not once at -[TMDocView scrolled:]: $(grep -a 'Cocoa: an' "$log" | head -2 | tr '\n' ' ')"
+  [ "$n" = 1 ] && [ "$m" = 1 ] || return 1
+  fail="no command after the error"
+  sed -n '/^CHECK raise/,$p' "$log" | grep -aq '^CHECK scrolled again' &&
+    sed -n '/^CHECK raise/,$p' "$log" | grep -aq '^CHECK later'
+}
+verdict raise "an error at an entry point is reported once, TeXmacs goes on (#650)" raise_ok
 
 echo "$failed of $total failed"
 [ "$failed" = 0 ]

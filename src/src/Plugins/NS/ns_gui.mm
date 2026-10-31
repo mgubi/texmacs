@@ -763,8 +763,14 @@ ns_gui_rep::update_failed () {
 
 void
 ns_gui_rep::force_update () {
+  // NOTE: from an entry point of AppKit (-[TMDocView scrolled:], the
+  // appearance observer...), which reports an error of the update: the
+  // updates must go on after it, as after an error in the timer (#666)
   if (updating) needing_update = true;
-  else          update();
+  else {
+    try { update(); }
+    catch (...) { update_failed (); throw; }
+  }
 }
 
 void
