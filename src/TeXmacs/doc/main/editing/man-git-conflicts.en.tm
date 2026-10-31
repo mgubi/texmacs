@@ -60,7 +60,8 @@
     (<menu|Document> menu) are merged as well: a package or a setting added,
     changed or removed on one side only is taken over. When the same
     setting or the main style was changed differently on both sides, your
-    version is kept, and this counts as a conflict, which the message at
+    version is kept (during a rebase, the version of your coauthors, see
+    below), and this counts as a conflict, which the message at
     the bottom of the window names. The packages added by your coauthor
     come after yours, in the order of their document.
 
@@ -86,7 +87,9 @@
   the roles are reversed: <name|Git> considers the commits of your
   coauthors as the base, so that your version is displayed as the new one
   (in green); <menu|Mine> and <menu|Keep my version> still retain your
-  version.
+  version. For the settings and the main style changed on both sides,
+  however, the version of your coauthors is kept, and the message says
+  so.
 
   <paragraph*|Merging from the command line>
 

@@ -155,6 +155,9 @@
                  (git-run root "config" "merge.texmacs.driver"
                           (git-merge-driver-command))
                  r1)))
+    (when (and (git-ok? r1) (not (git-ok? r2)))
+      ;; no driver half configured
+      (git-run root "config" "--unset" "merge.texmacs.name"))
     (if (not (git-ok? r2))
         (cons #f (with msg (git-message r2)
                    (if (== msg "") "Git could not be configured" msg)))

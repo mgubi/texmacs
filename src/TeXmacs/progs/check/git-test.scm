@@ -770,6 +770,24 @@
                              (doc "generic" (list (fbs "12")) "A." "B!"))
             (list (doc "generic" (list (fbs "11")) "A!" "B!") 1
                   '("font-base-size")))
+    ;; a document without a style part keeps the style of the base; the
+    ;; main style never comes from the packages
+    (check= (merge-documents (doc "article" '() "A.")
+                             '(document (TeXmacs "2.1") (body (document "A.")))
+                             (doc '(tuple "book" "french") '() "A."))
+            (list '(document (TeXmacs "2.1")
+                             (style (tuple "book" "french"))
+                             (body (document "A.")))
+                  0 '()))
+    ;; packages which are not names are kept
+    (check= (merge-documents (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x") "p") '() "A."))
+            (list (doc '(tuple "g" (macro "x") "p") '() "A.") 0 '()))
+    (check= (merge-documents (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x") "q") '() "A.")
+                             (doc "g" '() "A."))
+            (list (doc '(tuple "g" "q") '() "A.") 0 '()))
     ;; the message of Resolve conflict names the settings where ours was
     ;; kept
     (check= (git-resolve-message 0 '() 0)
@@ -848,13 +866,10 @@
     (git-merge-branch DR "conflict")
     (check= (git-file-state DP) 'conflicted)
     (check-true (string-contains? (string-load DP) "<version-both|"))
-    ;; their packages are kept, by the driver and when resolving (#676)
+    ;; their packages are kept by the driver (#676)
+    ;; NOTE: git-resolve-conflict is not called here, since it opens the
+    ;; review tool, which saves the geometry of the window in the preferences
     (check-true (string-contains? (string-load DP) "<style|<tuple|generic|french>>"))
-    (git-resolve-conflict DP)
-    (check= (tree->stree (buffer-get-body DP))
-            '(document (concat "The " (version-both "slow" "fast")
-                               " brown fox leaps.")))
-    (check= (get-init-tree "language") (tree "french"))
     ;; while resolving, the menus speak of my and their versions (#676)
     (with-document DP
       (lambda ()

@@ -252,8 +252,11 @@ mode** reduces the menus to:
    time (**Version → Retain → Keep my version / Keep their version**);
    the style packages are merged as a set and the initial environment
    (the settings of the Document menu) key by key; a change of the same
-   setting, or of the main style, on both sides keeps yours and counts as
-   a conflict, which the message names;
+   setting, or of the main style, on both sides keeps git's "ours" (yours
+   in a merge, the upstream one during a rebase) and counts as a
+   conflict, which the message names; packages which are not plain names
+   (such as macros) are kept as opaque elements of the set, and a
+   document without a style part is taken as unchanged against the base;
 4. **Mark as resolved** warns if some differences remain, then saves the
    document and stages it.
 

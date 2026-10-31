@@ -230,12 +230,14 @@
   (list-find (cdr doc) (cut tm-is? <> tag)))
 
 (define (style-list doc)
-  ;; The style and the packages of @doc, as a list of strings
+  ;; The style and the packages of @doc, as a list, or #f when @doc has no
+  ;; style part.  The packages which are not names (macros...) are kept as
+  ;; they are, and compared as a whole (#676)
   (with s (document-part doc 'style)
-    (cond ((not (and s (pair? (cdr s)))) '())
-          ((string? (cadr s)) (list (cadr s)))
-          ((tm-is? (cadr s) 'tuple) (list-filter (cdadr s) string?))
-          (else '()))))
+    (cond ((not s) #f)
+          ((not (pair? (cdr s))) '())
+          ((tm-is? (cadr s) 'tuple) (cdadr s))
+          (else (list (cadr s))))))
 
 (define (merge-styles o a b)
   ;; The main style is merged as a value, the packages as a set:
@@ -252,8 +254,11 @@
          (packs (list-filter (append pa added)
                              (lambda (x) (and (nin? x removed)
                                               (!= x (car main)))))))
-    (cons (if (car main) (cons (car main) packs) packs)
-          (if (cdr main) '("style") '()))))
+    (cond ((car main)
+           (cons (cons (car main) packs) (if (cdr main) '("style") '())))
+          ((null? packs) (cons '() (if (cdr main) '("style") '())))
+          ;; NOTE: the main style never comes from the packages
+          (else (cons a '("style"))))))
 
 (define (initial-list doc)
   ;; The initial environment of @doc, as a list of (key value)
@@ -306,15 +311,18 @@
   ;; parts (references, auxiliary data...) are ours.
   (let* ((body (merge-versions (document-body o) (document-body a)
                                (document-body b)))
-         (sa (style-list a))
-         (st (merge-styles (style-list o) sa (style-list b)))
+         ;; a document without a style part is unchanged against the base
+         (so (or (style-list o) '()))
+         (sa (or (style-list a) so))
+         (st (merge-styles so sa (or (style-list b) so)))
          (ia (initial-list a))
          (in (merge-initials (initial-list o) ia (initial-list b)))
          (doc (document-set-body a body))
          (doc (if (== (car st) sa) doc
                   (document-set-part
                    doc 'style
-                   (list 'style (if (== (length (car st)) 1)
+                   (list 'style (if (and (== (length (car st)) 1)
+                                         (string? (car (car st))))
                                     (car (car st))
                                     (cons 'tuple (car st))))
                    #f)))
