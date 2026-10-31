@@ -2490,6 +2490,22 @@
                        (document "X" (theorem (document "X" "X"))))))
             (check= (replace-with-messages (car row) w "X")
                     (list (cadr row) '() '())))))
+      ;; a pattern of several paragraphs: a hit which is only the break
+      ;; between two paragraphs is no empty hit (the check of #589 left such
+      ;; hits out, and Replace stopped)
+      (check= (tree-search-from (stree->tree '(document "ab" "" "" "ef"))
+                                (stree->tree '(document "" ""))
+                                '() '(1 0) 2 #f #f)
+              '((1 0) (2 0) (1 0) (2 0) (3 0) (2 0)))
+      (for (row '(((document "ab" "" "" "ef") (document "" "") "" "abef")
+                  ((document "ab" "" "" "ef") (document "" "") "Z"
+                   "abZZZef")
+                  ((document "a" "" "" "" "b") (document "" "") "" "ab")
+                  ((document "ab" "" "" "ef")
+                   (document (wildcard "w") (wildcard "v")) "X" "XXX")))
+        (check= (car (replace-all-in-buffer (car row) (cadr row)
+                                            (caddr row)))
+                `(document ,(cadddr row))))
       ;; (the rest of the text is a hit)
       (check= (tree-search-from (stree->tree '(document (theorem (document
                                                                    "ab"
