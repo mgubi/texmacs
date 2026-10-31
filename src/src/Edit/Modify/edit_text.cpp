@@ -126,15 +126,34 @@ edit_text_rep::accepts_return (path p) {
 
 bool
 edit_text_rep::insert_return () {
-  if (accepts_return (path_up (tp)))
-    insert_node (path_up (tp) * 0, CONCAT);
+  int depth;
+  return insert_return (depth);
+}
+
+bool
+edit_text_rep::insert_return (int& depth) {
+  // depth: the length of the path of the new paragraph, the head of tp (the
+  // cursor may be inside a tag at the start of that paragraph)
+  if (accepts_return (path_up (tp))) {
+    // At the border of a tag which has no cursor position there (an inner
+    // border, as hidden), the change corrects the cursor into the tag: the
+    // tag would be split, not its paragraph
+    path q= path_up (tp);
+    int  l= last_item (tp);
+    insert_node (q * 0, CONCAT);
+    go_to (q * path (0, l));
+  }
   path p= path_up (tp, 2);
   if (!is_concat (subtree (et, p))) return true;
   if (!accepts_return (p)) return true;
   if (!is_document (subtree (et, path_up (p)))) {
+    int l= last_item (tp);
+    path q= path_up (tp);
     insert_node (p * 0, DOCUMENT);
-    p= path_up (tp, 2);
+    p= p * 0;
+    go_to (p * path (last_item (q), l));
   }
+  depth= N (p);
 
   if (is_atomic (subtree (et, path_up (tp)))) split (tp);
   if (last_item (tp)==right_index (subtree (et, path_up (tp))))
@@ -162,6 +181,30 @@ edit_text_rep::remove_return (path p) {
 /******************************************************************************
 * Inserting a simple formula or tree
 ******************************************************************************/
+
+bool
+edit_text_rep::accepts_paragraphs (path p) {
+  // can insert_return make a new paragraph at the cursor position p?
+  if (accepts_return (path_up (p))) return true;
+  path q= path_up (p, 2);
+  return is_concat (subtree (et, q)) && accepts_return (q);
+}
+
+bool
+edit_text_rep::can_insert_at (tree t, path p) {
+  // can t be inserted at the cursor position p? Not paragraphs inside a
+  // line: in a tag of a line, a cell of a table without paragraphs, a formula
+  if (!(rp < p) || !is_inside (et, p)) return false;
+  if (is_document (t)) return accepts_paragraphs (p);
+  if (!is_multi_paragraph (t)) return true;
+  // (see make_return_after: a block goes before its paragraph)
+  path q= p;
+  while (!is_document (subtree (et, path_up (q)))) {
+    q= path_up (q);
+    if (!(rp < q)) return true;
+  }
+  return correct_cursor (et, p) == start (et, q) || accepts_paragraphs (p);
+}
 
 path
 edit_text_rep::prepare_for_insert () {
@@ -202,7 +245,16 @@ edit_text_rep::prepare_for_insert () {
 
 void
 edit_text_rep::insert_tree (tree t, path p_in_t) {
-  if (!as_bool (call ("like-emacs?"))) selection_cut ("none");
+  bool cut= !as_bool (call ("like-emacs?"));
+  if (is_multi_paragraph (t) &&
+      !can_insert_at (t, cut && selection_active_any ()?
+                         selection_get_start (): tp))
+    {
+      // (nothing changes: the selection is not cut for nothing)
+      set_message ("Several paragraphs cannot be inserted here", "insert");
+      return;
+    }
+  if (cut) selection_cut ("none");
   if (is_atomic (t) && (p_in_t == end (t)) &&
       is_atomic (subtree (et, path_up (tp))))
     insert (tp, t);
@@ -211,8 +263,9 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
         accepts_return (path_up (tp)) &&
         !is_func (subtree (et, path_up (tp, 2)), DOCUMENT))
       insert_node (path_up (tp) * 0, DOCUMENT);
-    if (insert_return ()) return;
-    path p= search_parent_upwards (DOCUMENT);
+    int depth;
+    if (insert_return (depth)) return;
+    path p= head (tp, depth);
     bool empty= (subtree (et, p) == "");
     if (empty) remove (p, 1);
     insert (p, t);

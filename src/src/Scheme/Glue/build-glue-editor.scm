@@ -64,6 +64,7 @@
   (activate-symbol activate_symbol (void))
   (make-return-before make_return_before (void))
   (make-return-after make_return_after (bool))
+  (can-insert-at? can_insert_at (bool content path))
   (temp-proof-fix temp_proof_fix (void))
 
   ;; document-wide modifications

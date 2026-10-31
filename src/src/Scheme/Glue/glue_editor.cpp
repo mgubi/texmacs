@@ -494,6 +494,21 @@ tmg_make_return_after () {
 }
 
 tmscm
+tmg_can_insert_atP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "can-insert-at?");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "can-insert-at?");
+
+  content in1= tmscm_to_content (arg1);
+  path in2= tmscm_to_path (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->can_insert_at (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_temp_proof_fix () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->temp_proof_fix ();
@@ -3772,6 +3787,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("activate-symbol",  tmg_activate_symbol, 0, 0, 0);
   tmscm_install_procedure ("make-return-before",  tmg_make_return_before, 0, 0, 0);
   tmscm_install_procedure ("make-return-after",  tmg_make_return_after, 0, 0, 0);
+  tmscm_install_procedure ("can-insert-at?",  tmg_can_insert_atP, 2, 0, 0);
   tmscm_install_procedure ("temp-proof-fix",  tmg_temp_proof_fix, 0, 0, 0);
   tmscm_install_procedure ("get-full-env",  tmg_get_full_env, 0, 0, 0);
   tmscm_install_procedure ("get-all-inits",  tmg_get_all_inits, 0, 0, 0);

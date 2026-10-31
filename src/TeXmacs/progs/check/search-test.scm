@@ -2816,6 +2816,100 @@
               '((document (concat "x " (strong "a2x"))) 0
                 (document (concat "x " (strong "a2x"))) #t ((0 1 0 0) (0 1 0 3)))))))
 
+;; Replace by several paragraphs next to a tag whose border has no cursor
+;; position: the editor corrected the cursor into the tag while it made the
+;; new paragraph, and refused: the match was cut, and the replacement lost
+;; (#675). Where the editor really refuses paragraphs (inside a line, in a
+;; cell without paragraphs, in a formula), the match is left, with a message
+(define (test-replace-by-paragraphs)
+  (check-group "replace by several paragraphs next to a tag")
+  (with-search-mode 'replace
+    (lambda ()
+      (let* ((by '(document "P" "Q"))
+             (tab (lambda (x) `(tabular (tformat (table (row (cell ,x)
+                                                             (cell "c"))))))))
+        (for-each
+          (lambda (tag)
+            (check-replace-rows
+              `(((document (concat "a1x" ,tag)) "a1x" ,by
+                 (document "P" (concat "Q" ,tag)))
+                ((document (concat ,tag "a1x")) "a1x" ,by
+                 (document (concat ,tag "P") "Q"))
+                ((document "u" (concat "a1x" ,tag) "v") "a1x" ,by
+                 (document "u" "P" (concat "Q" ,tag) "v"))
+                ((document "u" (concat ,tag "a1x") "v") "a1x" ,by
+                 (document "u" (concat ,tag "P") "Q" "v"))
+                ((document (concat ,tag "a1x" ,tag)) "a1x" ,by
+                 (document (concat ,tag "P") (concat "Q" ,tag)))
+                ;; several matches
+                ((document (concat "a1x" ,tag) (concat ,tag "a1x") "a1x")
+                 "a1x" ,by
+                 (document "P" (concat "Q" ,tag)
+                           (concat ,tag "P") "Q" "P" "Q")))))
+          `((hidden "b") (freeze "b") (unfreeze "b") (ignore "b") (shown "b")
+            (table (row (cell "b"))) (expand* "foo" "b")
+            ;; (a border with a cursor position: as before)
+            (strong "b") ,(tab "b")))
+        (check-replace-rows
+          `(;; the tag is not shown: the cursor is no more inside it
+            ;; (and it holds paragraphs, which get nothing)
+            ((document (concat "a1x" (hidden (document "b" "c")))) "a1x" ,by
+             (document "P" (concat "Q" (hidden (document "b" "c")))))
+            ;; a place which holds paragraphs, inside a tag
+            ((document (quotation (document (concat "a1x" (hidden "b")))))
+             "a1x" ,by
+             (document (quotation (document "P" (concat "Q" (hidden "b"))))))
+            ((document (with "color" "red" (concat "a1x" (hidden "b"))))
+             "a1x" ,by
+             (document (with "color" "red"
+                         (document "P" (concat "Q" (hidden "b"))))))
+            ((document ,(tab '(document (concat "a1x" (hidden "b")))))
+             "a1x" ,by
+             (document ,(tab '(document "P" (concat "Q" (hidden "b"))))))
+            ;; a block
+            ((document "u" (concat "a1x" (hidden "b")) "v") "a1x"
+             (quotation (document "P" "Q"))
+             (document "u" (quotation (document "P" "Q")) (hidden "b") "v"))
+            ;; no place for paragraphs: all is left
+            ,@(map (lambda (x) `((document ,x) "a1x" ,by (document ,x)))
+                   (list (tab "a1x") (tab "wa1xw")
+                         (tab '(concat "a1x" (hidden "b")))
+                         '(concat "t " (strong "a1x"))
+                         '(concat "t " (with "color" "red"
+                                         (concat "a1x" (hidden "b"))))
+                         '(concat "t " (math "a1x+b"))))
+            ;; those, among others which are replaced
+            ((document (concat "a1x" (hidden "b")) ,(tab "a1x") "a1x") "a1x"
+             ,by
+             (document "P" (concat "Q" (hidden "b")) ,(tab "a1x") "P" "Q"))
+            ;; (a single paragraph goes everywhere, as before)
+            ((document ,(tab "a1x")) "a1x" "Z" (document ,(tab "Z")))))
+        ;; the message of the match left
+        (check= (with-search-buffers `(document ,(tab "a1x")) "a1x" by
+                  (lambda (u)
+                    (ahash-set! (widget 'search-filter-table)
+                                (current-buffer) (stree->tree '(attr)))
+                    (widget '(set! replace-skip-message #f))
+                    ((widget 'perform-search*))
+                    (replace-one)
+                    (widget 'replace-skip-message)))
+                "Match left: several paragraphs cannot go here")
+        ;; Replace one is one step of undo
+        (check= (with-search-buffers '(document (concat "a1x" (hidden "b")))
+                  "a1x" by
+                  (lambda (u)
+                    (ahash-set! (widget 'search-filter-table)
+                                (current-buffer) (stree->tree '(attr)))
+                    (clear-undo-history)
+                    ((widget 'perform-search*))
+                    (replace-one)
+                    (let* ((res (tm->stree (buffer-get-body u)))
+                           (n (undo-possibilities)))
+                      (undo 0)
+                      (list res n (tm->stree (buffer-get-body u))))))
+                '((document "P" (concat "Q" (hidden "b"))) 1
+                  (document (concat "a1x" (hidden "b")))))))))
+
 ;; Replace one, then Replace All: Replace All goes on after the replacement,
 ;; as Replace one does; it took the hit which ends there, and replaced in
 ;; the replacement (#596)
@@ -3127,6 +3221,7 @@
   (test-replace-in-buffers)
   (test-replace-filters)
   (test-replace-next-to-hidden)
+  (test-replace-by-paragraphs)
   (test-replace-failures)
   (test-replace-empty-matches)
   (test-lone-wildcard)
