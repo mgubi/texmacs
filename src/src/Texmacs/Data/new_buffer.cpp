@@ -603,7 +603,12 @@ export_tree (tree doc, url u, string fm) {
       }
   // END hook
   if (fm == "generic") fm= "verbatim";
+  // The converters write the images of the document next to their target
+  bool has_target= (fm != "texmacs" && fm != "stm");
+  object old_target;
+  if (has_target) old_target= call ("save-target-swap", object (u));
   string s= tree_to_generic (aux, fm * "-document");
+  if (has_target) call ("save-target-swap", old_target);
   if (s == "* error: unknown format *") return true;
   return save_string (u, s);
 }
@@ -640,7 +645,9 @@ buffer_export (url name, url dest, string fm) {
   tree links= as_tree (call ("get-link-locations", arg1, arg2));
   if (N (links) != 0)
     doc << compound ("links", links);
-  
+
+  // The converters find the images linked by the document next to its source
+  if (fm != "texmacs" && fm != "stm") call ("save-source-set", object (name));
   return export_tree (doc, dest, fm);
 }
 

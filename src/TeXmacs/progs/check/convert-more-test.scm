@@ -2019,6 +2019,121 @@
           (check-true (has? "/URI (https://example.org/a\\\\b)"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The images written by an export
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; #697: the converters put the images next to the file which they write, and
+;; only knew that file when called through export-buffer-main; a target which
+;; cannot be written crashed in make_eps.
+
+(define (export-png)
+  (string-load (url-append "$TEXMACS_PATH/misc/images" "fancy-c.png")))
+
+(define (embedded-image-sample)
+  `(document (concat "a" (image (tuple (raw-data ,(export-png)) "png")
+                                "1cm" "" "" "")
+                     "b")))
+
+(define (eps-suffix)
+  (if (get-boolean-preference "native pdf") "pdf" "eps"))
+
+(define (has-text? what s)
+  (>= (string-search-forwards what 0 s) 0))
+
+(define (check-latex-image root suffix)
+  ;; the file @root.@suffix of the temporary directory shows its image, which
+  ;; is next to it, is called after it, and holds the picture
+  (let* ((tex (url-append (temp-dir) (string-append root "." suffix)))
+         (image (string-append root "-1." (eps-suffix)))
+         (u (url-append (temp-dir) image))
+         (doc (if (url-exists? tex) (string-load tex) ""))
+         (s (if (url-exists? u) (string-load u) "")))
+    (check-true (has-text? (string-append "{" image "}") doc))
+    (cond ((== (eps-suffix) "eps") (check-true (string-starts? s "%!PS")))
+          ((supports-native-pdf?)
+           (check-true (string-starts? s "%PDF-"))
+           (check-true (has-text? "/Subtype /Image" s)))
+          (else (check-true (!= s ""))))))
+
+(define (test-export-images)
+  (check-group "export: the images go next to the target")
+  (with-sample-buffer (embedded-image-sample)
+    (lambda (name)
+      (let ((target current-save-target)
+            (source current-save-source))
+        ;; called directly, as from a script
+        (check-false (buffer-export (current-buffer)
+                                    (url-append (temp-dir) "script.tex")
+                                    "latex"))
+        (check-latex-image "script" "tex")
+        (check-true (== current-save-target target))
+        ;; each export has its own images, also after another one
+        (check-false (buffer-export (current-buffer)
+                                    (url-append (temp-dir) "script2.tex")
+                                    "latex"))
+        (check-latex-image "script2" "tex")
+        ;; as from the menu File > Export
+        ((buffer-exporter "latex") (url-append (temp-dir) "menu.tex"))
+        (check-latex-image "menu" "tex")
+        (check-true (== current-save-target target))
+        (check-false (tree-export (buffer-tree)
+                                  (url-append (temp-dir) "tree.tex") "latex"))
+        (check-latex-image "tree" "tex")
+        ;; a name without the suffix tex
+        (check-false (buffer-export (current-buffer)
+                                    (url-append (temp-dir) "other.ltx")
+                                    "latex"))
+        (check-latex-image "other" "ltx")
+        ;; html
+        (check-false (buffer-export (current-buffer)
+                                    (url-append (temp-dir) "script.html")
+                                    "html"))
+        (check-true (url-exists? (url-append (temp-dir) "script-1.png")))
+        (set! current-save-source source))))
+  (check-group "export: a target which cannot be written is an error")
+  (with-sample-buffer (embedded-image-sample)
+    (lambda (name)
+      (let* ((dir (url-append (temp-dir) "no-such-folder"))
+             (snippet (stree->tree '(document "x")))
+             (none (url-append dir (string-append "x." (eps-suffix))))
+             (extents (print-snippet none snippet #t)))
+        ;; the size of the snippet is known all the same
+        (check= (length extents) 10)
+        (check-false (url-exists? none))
+        (check-true (buffer-export (current-buffer)
+                                   (url-append dir "x.tex") "latex"))
+        (check-true (buffer-export (current-buffer)
+                                   (url-append dir "x.pdf") "pdf"))
+        (check-false (url-exists? dir)))))
+  (check-group "export: a relative target is in the current directory")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "relative target" "no native PDF writer")
+      (let* ((rel (system->url "convert-more-test-697.pdf"))
+             (abs (url-append (url-pwd) rel)))
+        (system-remove abs)
+        (print-snippet rel (stree->tree '(document "x")) #t)
+        (check-true (url-exists? abs))
+        (system-remove abs)))
+  (check-group "export: a linked image next to the document")
+  (string-save (export-png) (url-append (temp-dir) "export-linked.png"))
+  (if (not (url-exists-in-path? "gs"))
+      (images-skip "linked image" "gs is needed to convert the png")
+      (let ((sizes
+             ;; the second image does not exist
+             (map (lambda (image)
+                    (with-sample-buffer `(document (image ,image "1cm" "" "" ""))
+                      (lambda (name)
+                        (let* ((dir (url-append (temp-dir) name))
+                               (img (url-append dir "x-1.pdf")))
+                          (system-mkdir dir)
+                          (buffer-export (current-buffer)
+                                         (url-append dir "x.tex") "latex")
+                          (if (url-exists? img) (url-size img) 0)))))
+                  (list "export-linked.png" "export-missing.png"))))
+        ;; not the placeholder of a missing image
+        (check-true (!= (car sizes) (cadr sizes))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -2036,6 +2151,7 @@
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
-                  test-serialize-special test-big-document test-pdf-export))
+                  test-serialize-special test-big-document test-pdf-export
+                  test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

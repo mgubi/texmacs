@@ -128,6 +128,16 @@
 ;; Initialization from options
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmtex-image-target? u)
+  ;; the images go next to a file which is written in LaTeX; another target
+  ;; is a document saved earlier (for instance when copying to the clipboard)
+  (and (not (url-none? u))
+       (in? (url-suffix u) '("tex" "ltx" "latex" ""))))
+
+(define (tmtex-drop-suffix u)
+  (with suf (url-suffix u)
+    (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
+
 (define (tmtex-initialize opts)
   (set! tmtex-ref-cnt 1)
   (set! tmtex-env (make-ahash-table))
@@ -137,14 +147,10 @@
   (set! tmtex-auto-produce 0)
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
-  (if (== (url-suffix current-save-target) "tex")
+  (if (tmtex-image-target? current-save-target)
       (begin
-        (set! tmtex-image-root-url (url-unglue current-save-target 4))
-        (with suf (url-suffix tmtex-image-root-url)
-          (when (!= suf "")
-            (set! tmtex-image-root-url
-                  (url-unglue tmtex-image-root-url
-                              (+ (string-length suf) 1)))))
+        (set! tmtex-image-root-url
+              (tmtex-drop-suffix (tmtex-drop-suffix current-save-target)))
         (set! tmtex-image-root-string
               (url->unix (url-tail tmtex-image-root-url))))
       (begin
@@ -1841,7 +1847,8 @@
           (set! name (string-replace name "file://" ""))
           (list 'includegraphics name))
         (receive (name-url name-string) (tmtex-eps-names)
-          (when (string-starts? name "..")
+          ;; an image which is not next to the target is next to the document
+          (when (or (string-starts? name "..") (not (url-exists? u)))
             (set! u (url-relative current-save-source (unix->url name))))
           (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
                         "postscript-file")

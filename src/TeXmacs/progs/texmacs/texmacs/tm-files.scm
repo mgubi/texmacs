@@ -151,6 +151,16 @@
 (tm-define current-save-source (url-none))
 (tm-define current-save-target (url-none))
 
+(tm-define (save-target-swap u)
+  ;; the file which a converter is writing, set by export_tree in C++ for the
+  ;; time of a conversion; returns the previous one
+  (with old current-save-target
+    (set! current-save-target u)
+    old))
+
+(tm-define (save-source-set u)
+  (set! current-save-source u))
+
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))
 
@@ -323,7 +333,6 @@
     (set! to (string-replace to ";" "-"))
     (set! to (url-relative (buffer-get-master name) to)))
   (if (url? name) (set! current-save-source name))
-  (if (url? to) (set! current-save-target to))
   (export-buffer-check-permissions name to fm opts))
 
 (tm-define (export-buffer to)
