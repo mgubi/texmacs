@@ -264,10 +264,14 @@
     (with i (string-search-forwards what pos s)
       (if (< i 0) n (loop (+ i (string-length what)) (+ n 1))))))
 
-(define (html-of-buffer body . opts)
-  ;; the HTML of a document as File > Export makes it: the macros of the
-  ;; style are expanded by the editor (html-expand), then converted
-  (let* ((tm (url-append (temp-dir) "labels.tm"))
+(define sample-number 0)
+
+(define (with-sample-buffer body thunk)
+  ;; @thunk applied to @body loaded in a buffer of its own, from a file of
+  ;; its own (a name never used before: no stale file cache), then closed
+  (set! sample-number (+ sample-number 1))
+  (let* ((name (string-append "sample-" (number->string sample-number)))
+         (tm (url-append (temp-dir) (string-append name ".tm")))
          (old (current-buffer))
          (before (buffer-list)))
     (string-save (serialize-texmacs
@@ -275,14 +279,58 @@
                                           (style "article") (body ,body))))
                  tm)
     (load-buffer tm :strict)
-    (with r (apply convert (cons* (html-expand (buffer-tree))
-                                  "texmacs-tree" "html-snippet" opts))
+    (with r (thunk name)
       (for (b (buffer-list))
         (when (nin? b before)
           (buffer-pretend-saved b)
           (buffer-close b)))
       (when (buffer-exists? old) (switch-to-buffer old))
       r)))
+
+(define (html-of-buffer body . opts)
+  ;; the HTML of a document as File > Export makes it for the labels: the
+  ;; macros of the style are expanded by the editor (html-expand), then
+  ;; converted
+  (with-sample-buffer body
+    (lambda (name)
+      (apply convert (cons* (html-expand (buffer-tree))
+                            "texmacs-tree" "html-snippet" opts)))))
+
+(define (with-converter-options opts thunk)
+  ;; the export of a buffer takes the options of the converters from the
+  ;; preferences: they are set in memory only (not saved), as the
+  ;; preferences dialog would set them, then restored exactly
+  (let* ((olds (map (lambda (p)
+                      (list (car p) (cpp-has-preference? (car p))
+                            (get-preference (car p))))
+                    opts)))
+    (for (p opts)
+      (cpp-set-preference (car p) (cdr p))
+      (notify-preference (car p)))
+    (with r (check-run thunk)
+      (for (o olds)
+        (if (cadr o)
+            (cpp-set-preference (car o) (caddr o))
+            (cpp-reset-preference (car o)))
+        (notify-preference (car o)))
+      r)))
+
+(define (html-export-of-buffer body . opts)
+  ;; the HTML file of a document exported as by File > Export > Html:
+  ;; buffer-export (exec_html on the view, attach_data, the converter of
+  ;; html files, with current-save-target set to the file)
+  (with-sample-buffer body
+    (lambda (name)
+      (let ((html (url-append (temp-dir) (string-append name ".html")))
+            (source current-save-source)
+            (target current-save-target))
+        (with-converter-options opts
+          (lambda ()
+            (export-buffer-main (current-buffer) html "html"
+                                (list :overwrite))))
+        (set! current-save-source source)
+        (set! current-save-target target)
+        (if (url-exists? html) (string-load html) "")))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
@@ -322,31 +370,51 @@
 
 ;; A label inside a formula gives one anchor in front of the formula, with
 ;; MathJax as with MathML (which both drop the label tag), and the
-;; references link to it (#588, #617).
+;; references link to it (#588, #617). Checked on the HTML of the converter,
+;; and on the file of the export of the buffer, as File > Export makes it
+;; (#666).
+(define (check-formula-labels where mathjax? s labels refs)
+  ;; the formula is MathJax or MathML
+  (check= (list where (if mathjax?
+                          (or (string-occurs? "\\(" s)
+                              (string-occurs? "\\begin{" s))
+                          (string-occurs? "<math" s)))
+          (list where #t))
+  (for (l labels)
+    (check= (list where l (occurrences (string-append "<a id=\"" l "\">") s))
+            (list where l 1)))
+  (for (l refs)
+    (check= (list where l (occurrences (string-append "href=\"#" l "\"") s))
+            (list where l 1))))
+
 (define (test-html-formula-labels)
   (check-group "html labels in formulas")
+  (with before (std-converter-options "texmacs-stree" "html-stree")
+    (test-html-formula-labels-with)
+    ;; the options of the export are those of before
+    (check= (std-converter-options "texmacs-stree" "html-stree") before)))
+
+(define (test-html-formula-labels-with)
   (for (opts (list (list (cons "texmacs->html:mathjax" "on")
                          (cons "texmacs->html:mathml" "off"))
                    (list (cons "texmacs->html:mathjax" "off")
                          (cons "texmacs->html:mathml" "on"))))
     (with mathjax? (== (cdar opts) "on")
       (for (sample formula-label-samples)
-        (let ((s (apply html-of-buffer (car sample) opts))
-              (where (list (if mathjax? "mathjax" "mathml") (car sample))))
-          ;; the formula is MathJax or MathML
-          (check= (list where (if mathjax?
-                                  (or (string-occurs? "\\(" s)
-                                      (string-occurs? "\\begin{" s))
-                                  (string-occurs? "<math" s)))
-                  (list where #t))
-          (for (l (cadr sample))
-            (check= (list where l (occurrences
-                                   (string-append "<a id=\"" l "\">") s))
-                    (list where l 1)))
-          (for (l (caddr sample))
-            (check= (list where l (occurrences
-                                   (string-append "href=\"#" l "\"") s))
-                    (list where l 1))))))))
+        (with (body labels refs) sample
+          (with kind (if mathjax? "mathjax" "mathml")
+            (check-formula-labels (list kind body)
+                                  mathjax? (apply html-of-buffer body opts)
+                                  labels refs)
+            (with s (apply html-export-of-buffer body opts)
+              (check-formula-labels (list kind "export" body)
+                                    mathjax? s labels refs)
+              ;; a whole document, which loads MathJax or not
+              (check= (list kind "export" body
+                            (string-occurs? "<html" s)
+                            (string-occurs? "</html>" s)
+                            (string-occurs? "npm/mathjax" s))
+                      (list kind "export" body #t #t mathjax?)))))))))
 
 ;; The LaTeX of the MathJax formulas uses only the macros and environments
 ;; of MathJax 3 (TeX input, packages base and ams): the accents of the

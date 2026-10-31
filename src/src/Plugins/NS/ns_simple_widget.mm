@@ -240,7 +240,7 @@ ns_simple_widget_rep::ns_simple_widget_rep ()
   gpu_presenter (NULL), gpu_dirty (false),
   zoom_now (0), zoom_pending (false), zoom_image (NULL),
   zoom_rect (NSZeroRect), zoom_origin (NSZeroPoint), zoom_ratio (1),
-  extents (coord4 (0, 0, 0, 0)),
+  extents (coord4 (0, 0, 0, 0)), too_large_said (false),
   last_viewport (NSZeroSize) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
@@ -574,11 +574,27 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       coord4 p = open_box<coord4> (val);
       extents= p;
       NSRect rect = to_nsrect (p);
-      // NOTE: the scroll view centers the document when it is smaller; the
-      // sizes remain within the limits of AppKit (some embedded widgets have
-      // infinite extents)
-      rect.size.width = min (rect.size.width , 5000000.0);
-      rect.size.height= min (rect.size.height, 5000000.0);
+      // NOTE: the scroll view centers the document when it is smaller. The
+      // frame stays within NS_HUGE_FRAME (10^7 points): some embedded
+      // widgets have infinite extents, and the canvas, placed on the
+      // visible part, is bound to it as well (follow_visible_part; Core
+      // Animation places the layers in floats). A document taller than
+      // that (about 7000 A4 pages at a zoom of 100%, 280 at 2500%) cannot
+      // be scrolled to its end: said once for each editor (#661; the bound
+      // was 5*10^6 points, silently)
+      if ((rect.size.width > NS_HUGE_FRAME ||
+           rect.size.height > NS_HUGE_FRAME) && !too_large_said &&
+          p.x1 > MINUS_INFINITY / 2 && p.x2 > MINUS_INFINITY / 2 &&
+          p.x3 < PLUS_INFINITY / 2 && p.x4 < PLUS_INFINITY / 2) {
+        too_large_said= true;
+        std_warning << "the document is too large for the window ("
+                    << (SI) rect.size.width << " x "
+                    << (SI) rect.size.height << " points, at most "
+                    << (SI) NS_HUGE_FRAME << "): its end cannot be shown, "
+                    << "zoom out to see it\n";
+      }
+      rect.size.width = min (rect.size.width , (CGFloat) NS_HUGE_FRAME);
+      rect.size.height= min (rect.size.height, (CGFloat) NS_HUGE_FRAME);
       {
         // NOTE: a page which follows the size of the clip view (a page
         // "automatic") is up to a point larger, from the roundings between

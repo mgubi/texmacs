@@ -24,6 +24,57 @@ have the details, and the problems go to the
   (`gs`), which TeXmacs needs to show EPS images, is not installed; before,
   each plot showed as a question mark. The documentation of the Gnuplot and
   Maxima plug-ins says that their plots need Ghostscript (#662).
+- **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
+  these colors of the program were transparent. A text with an unknown color
+  name was invisible, on the screen and in a PDF: it is black now, as in Qt;
+  the unknown colors of graphics are black too, and the informative flags
+  in brown (of a `no-break`, an `if-page-break`...) are shown, as in Qt
+  (#656).
+- **The menu Focus in code blocks** (desktop and browser): its entries for
+  program code (Definitions, Outline, Go to definition, Folds, the syntax
+  and server entries) are back; they were lost at each start, and TeXmacs
+  no longer prints the warning "conditional master routine
+  focus-extra-menu" on the terminal, nor the one of `parser-feature` when
+  the first file is a JSON file (#684).
+- **Search and Replace next to hidden content** (desktop): a replacement
+  next to a hidden (folded) tag stays in its place instead of going inside
+  the tag (#590); going to a hit inside hidden content shows it in a step
+  of undo, so that undo hides it again, and the search goes on after it,
+  also in Replace one, which stays one step of undo (#591); a pattern made
+  only of a wildcard no longer leaves "Match left" on a theorem or a table
+  cell alone in its paragraph (#589).
+- **A tag named `string`** (desktop): a tag or macro named `string` works
+  like any other; it no longer gives random content or crashes when a
+  document with it is loaded (#678).
+- **LaTeX import: `\string` and deep nesting** (desktop): `\string` gives
+  its next token as text, as in TeX (no more random byte from
+  `\string{`), a math `\backslash` alone is kept, and groups nested more
+  than 128 deep are skipped with a warning instead of crashing (#658).
+- **Cocoa: TeXmacs goes on after an error in a scroll** (desktop, Cocoa
+  interface): an error during an update forced by AppKit (a scroll or a
+  resize of a document, a change of the appearance) is reported as before,
+  but TeXmacs no longer stops updating its windows and running its
+  commands afterwards. The checks of the Cocoa interface
+  (`tests/cocoa/check.sh`) also cover the dialogs with negative sizes and
+  such an error (#666).
+- **Rotated text and big glyphs** (desktop and browser): rotations and
+  the other transformations of `gr-transform` are drawn the right way round
+  by the GPU renderer (Cocoa and Vue) and by the MuPDF renderer (the CPU
+  path of Vue and of the browser), which turned them the other way and
+  displaced them; a big wide brace (an overbrace of 26 terms at zoom 6) no
+  longer stops TeXmacs with "out of memory" (the sizes of the glyphs were
+  16-bit numbers); big glyphs with an outline are no longer dropped under a
+  transformation or a pattern; and the textures of big glyphs over their
+  bound release the least recently drawn ones instead of the whole cache
+  of glyphs (#659).
+- **Cocoa: very tall documents, the console, the View menu** (desktop,
+  Cocoa interface): a document taller than 5,000,000 points (a few hundred
+  pages at a high zoom) could not be scrolled to its end; the frame now
+  goes up to 10,000,000 points, and a taller document gets a warning
+  instead of being cut silently. The console opens at its last message
+  even when no window of TeXmacs has the keyboard focus, and the View menu
+  no longer fails ("Error in menu") when it is built while the console is
+  the current editor (#661).
 - **Cocoa: tooltips on the icon bars** (desktop, Cocoa interface): the
   buttons of the icon bars show their balloon text as a tooltip again; the
   hover highlight of a button removed the tracking areas of its tooltip

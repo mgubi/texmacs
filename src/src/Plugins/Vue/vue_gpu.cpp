@@ -140,8 +140,11 @@ struct glyph_slot {
   bool mupdf;           // rendered by MuPDF: placed by dx, dy instead
   int dx, dy;           // its top left corner from the origin (pixels, y down)
   bool big;             // too large for the atlas: drawn from its outline,
-                        // or from its tiles when it has none
-  std::vector<big_tile> tiles; // (the glyphs of the virtual fonts, #623)
+                        // or from its tiles when it has none (the glyphs of
+                        // the virtual fonts, #623) or when the outline cannot
+                        // be used (a transformation, a pattern: made then)
+  std::vector<big_tile> tiles;
+  unsigned long long last; // when its tiles were last drawn (their eviction)
 };
 
 struct slug_glyph {
@@ -174,6 +177,7 @@ struct gpu_state {
   int mode= 2;                  // 1: texture, 2: atlas, 3: atlas * pattern
   float porig_x= 0, porig_y= 0, ptile_w= 1, ptile_h= 1; // the pattern (3)
   gpu_texture tex= NULL;
+  gpu_texture cov= NULL;        // the coverage, when not the atlas (a tile)
   int sx1= 0, sy1= 0, sx2= 0, sy2= 0; // the clip (device pixels)
   // the atlas of the glyphs, with a white corner for the fills
   gpu_texture atlas= NULL;
@@ -381,10 +385,38 @@ clear_atlas () {
   for (auto& e: G.glyphs)
     for (big_tile& t: e.second.tiles) G.B->delete_texture (t.tex);
   G.big_bytes= 0;
-  if (G.mode == 2) G.tex= NULL; // (it may have been one of them)
+  G.cov= NULL; // (it may have been one of them)
   G.glyphs.clear ();
   G.fonts.clear ();
   G.ax= 4; G.ay= 0; G.arow= 4;
+}
+
+// the tiles of the big glyphs, but those of 'keep', least recently drawn
+// first, until 'need' more bytes keep them within a bound (the atlas of the
+// small glyphs stays)
+static void
+evict_tiles (size_t need, const glyph_slot* keep) {
+  const size_t max_bytes= (size_t) 64 << 20;
+  bool flushed= false;
+  while (G.big_bytes + need > max_bytes) {
+    glyph_slot* old= NULL;
+    for (auto& e: G.glyphs)
+      if (e.second.big && !e.second.tiles.empty () && &e.second != keep &&
+          (old == NULL || e.second.last < old->last))
+        old= &e.second;
+    if (old == NULL) break;
+    if (!flushed) {
+      // what is queued uses them
+      gpu_flush_all ();
+      G.cov= NULL;
+      flushed= true;
+    }
+    for (big_tile& bt: old->tiles) {
+      G.B->delete_texture (bt.tex);
+      G.big_bytes -= (size_t) bt.w * bt.h;
+    }
+    old->tiles.clear (); // (made again when it is drawn)
+  }
 }
 
 bool
@@ -418,9 +450,9 @@ flush_quads () {
   if (G.verts.empty () || G.target == NULL) { G.verts.clear (); return; }
   gpu_target* t= G.target;
   gpu_pass p= make_pass (t, G.sx1, G.sy1, G.sx2, G.sy2);
-  // (the coverage of a quad of mode 2 is the atlas, or the texture of the
-  // tile of a big glyph given as its texture)
-  gpu_texture cov= (G.mode == 2 && G.tex != NULL) ? G.tex : G.atlas;
+  // (the coverage of a quad of modes 2 and 3 is the atlas, or the texture
+  // of the tile of a big glyph)
+  gpu_texture cov= (G.cov != NULL) ? G.cov : G.atlas;
   gpu_quads q= { G.mode, G.mode == 2 ? NULL : G.tex, cov,
                  G.porig_x, G.porig_y, G.ptile_w, G.ptile_h,
                  G.verts.data (), (int) (G.verts.size () / 8) };
@@ -555,18 +587,20 @@ static void flush_vectors ();
 // start or go on with a batch for the target, mode, texture and clip
 static void
 batch (gpu_target* t, int mode, gpu_texture tex, int x1, int y1, int x2, int y2,
-       float pox= 0, float poy= 0, float ptw= 1, float pth= 1) {
+       float pox= 0, float poy= 0, float ptw= 1, float pth= 1,
+       gpu_texture cov= NULL) {
   if (G.pending) flush_vectors ();
-  if (G.target != t || G.mode != mode || G.tex != tex ||
+  if (G.target != t || G.mode != mode || G.tex != tex || G.cov != cov ||
       G.sx1 != x1 || G.sy1 != y1 || G.sx2 != x2 || G.sy2 != y2 ||
       (mode == 3 && (G.porig_x != pox || G.porig_y != poy ||
                      G.ptile_w != ptw || G.ptile_h != pth))) {
     flush_quads ();
-    G.target= t; G.mode= mode; G.tex= tex;
+    G.target= t; G.mode= mode; G.tex= tex; G.cov= cov;
     G.sx1= x1; G.sy1= y1; G.sx2= x2; G.sy2= y2;
     G.porig_x= pox; G.porig_y= poy; G.ptile_w= ptw; G.ptile_h= pth;
     if (on_screen (t)) {
-      long long st[6]= { mode, (long long) (size_t) tex, x1, y1, x2, y2 };
+      long long st[7]= { mode, (long long) (size_t) tex, x1, y1, x2, y2,
+                         (long long) (size_t) cov };
       float pt[4]= { pox, poy, ptw, pth };
       feed (st); feed (pt);
     }
@@ -977,17 +1011,37 @@ public:
   void clip_box (int& x1, int& y1, int& x2, int& y2) {
     SI ax1, ay1, ax2, ay2;
     get_clipping (ax1, ay1, ax2, ay2);
-    x1= (int) to_x (ax1); x2= (int) to_x (ax2);
-    y1= (int) -to_y (ay2); y2= (int) -to_y (ay1); }
+    if (trs.empty ()) {
+      x1= (int) to_x (ax1); x2= (int) to_x (ax2);
+      y1= (int) -to_y (ay2); y2= (int) -to_y (ay1);
+      return;
+    }
+    // under a transformation, the clip is in its space (as for the
+    // renderers which give it to their device): the box of its image, within
+    // the clip of the device when the transformation was made (m[6..9])
+    const std::vector<double>& m= trs.back ();
+    double cx[2]= { to_x (ax1), to_x (ax2) }, cy[2]= { to_y (ay1), to_y (ay2) };
+    float bx1= 1e30f, by1= 1e30f, bx2= -1e30f, by2= -1e30f;
+    for (int i= 0; i < 2; i++)
+      for (int j= 0; j < 2; j++) {
+        float dx, dy;
+        device (cx[i], cy[j], dx, dy);
+        bx1= min (bx1, dx); by1= min (by1, dy);
+        bx2= max (bx2, dx); by2= max (by2, dy);
+      }
+    x1= max ((int) floor (bx1), (int) m[6]); y1= max ((int) floor (by1), (int) m[7]);
+    x2= min ((int) ceil (bx2), (int) m[8]); y2= min ((int) ceil (by2), (int) m[9]);
+    if (x2 < x1) x2= x1;
+    if (y2 < y1) y2= y1; }
   bool ready () { return ensure_target (t); }
 
   // a quad of user space corners (x1, y1) bottom left, (x2, y2) top right
   void user_quad (double x1, double y1, double x2, double y2, int mode, gpu_texture tex,
                   float u0, float v0, float u1, float v1,
-                  float r, float g, float b, float a) {
+                  float r, float g, float b, float a, gpu_texture cov= NULL) {
     int s1, s2, s3, s4;
     clip_box (s1, s2, s3, s4);
-    batch (t, mode, tex, s1, s2, s3, s4);
+    batch (t, mode, tex, s1, s2, s3, s4, 0, 0, 1, 1, cov);
     float px[4], py[4];
     device (x1, y2, px[0], py[0]); device (x2, y2, px[1], py[1]);
     device (x1, y1, px[2], py[2]); device (x2, y1, px[3], py[3]);
@@ -1072,7 +1126,10 @@ gpu_renderer_rep::set_transformation (frame fr) {
   SI cx1, cy1, cx2, cy2;
   get_clipping (cx1, cy1, cx2, cy2);
   rectangle oclip (cx1, cy1, cx2, cy2);
-  frame cv= scaling (point (pixel, -pixel), point (-ox, -oy));
+  // in the user space of to_x and to_y, whose y is up (the other renderers
+  // conjugate with their device space, y down: made there and applied here,
+  // the transformation was a rotation the other way, displaced, #659)
+  frame cv= scaling (point (pixel, pixel), point (-ox, -oy));
   frame tr= invert (cv) * fr * cv;
   point o = tr (point (0.0, 0.0));
   point ux= tr (point (1.0, 0.0)) - o;
@@ -1087,6 +1144,10 @@ gpu_renderer_rep::set_transformation (frame fr) {
       p[0]*m[4] + p[2]*m[5] + p[4], p[1]*m[4] + p[3]*m[5] + p[5] };
     m= c;
   }
+  // and the clip of the device now, which bounds what is drawn under it
+  int s1, s2, s3, s4;
+  clip_box (s1, s2, s3, s4);
+  m.push_back (s1); m.push_back (s2); m.push_back (s3); m.push_back (s4);
   trs.push_back (m);
   rectangle nclip= fr [oclip];
   clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
@@ -1262,18 +1323,22 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   };
   if (G.slug_on && trs.empty () && !pattern && outline ()) return;
   glyph_key k { (void*) fng.rep, c };
-  auto it= G.glyphs.find (k);
-  if (it == G.glyphs.end ()) {
-    // the glyph of a FreeType font rendered at its size in shades of grey,
-    // made as bold as the bitmap of TeXmacs (rendered at std_shrinkf times
-    // its size in black and white and shrunk, which thickens its strokes),
-    // as the Qt port draws it, at the cost of one rasterization; or that
-    // bitmap itself (TEXMACS_VUE_GLYPHS=texmacs, and the fonts with no
-    // file); or the glyph rendered by MuPDF, as the MuPDF renderer draws it
-    // (TEXMACS_VUE_GLYPHS=mupdf: lighter)
-    string mcov;
-    int mw= 0, mh= 0, mx= 0, my= 0;
-    bool from_mupdf=
+  // the glyph of a FreeType font rendered at its size in shades of grey,
+  // made as bold as the bitmap of TeXmacs (rendered at std_shrinkf times
+  // its size in black and white and shrunk, which thickens its strokes),
+  // as the Qt port draws it, at the cost of one rasterization; or that
+  // bitmap itself (TEXMACS_VUE_GLYPHS=texmacs, and the fonts with no
+  // file); or the glyph rendered by MuPDF, as the MuPDF renderer draws it
+  // (TEXMACS_VUE_GLYPHS=mupdf: lighter)
+  string mcov;
+  int mw= 0, mh= 0, mx= 0, my= 0;
+  bool from_mupdf= false, rasterized= false;
+  glyph gl;
+  SI xo= 0, yo= 0;
+  int w= 0, h= 0;
+  auto rasterize= [&] () {
+    if (rasterized) return true;
+    from_mupdf=
 #ifdef USE_MUPDF
       (G.glyph_source == 1 &&
        mupdf_glyph_bitmap (fng->res_name, c, mcov, mw, mh, mx, my)) ||
@@ -1281,55 +1346,58 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       (G.glyph_source == 2 &&
        tt_glyph_coverage (fng, c, std_shrinkf, G.ft_flags, G.ft_bold,
                           mcov, mw, mh, mx, my));
-    glyph gl;
-    SI xo= 0, yo= 0;
-    int w, h;
     if (from_mupdf) { w= mw; h= mh; }
     else {
       glyph pre_gl= fng->get (c);
-      if (is_nil (pre_gl)) return;
+      if (is_nil (pre_gl)) return false;
       gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
       w= gl->width; h= gl->height;
     }
-    // the coverage of the glyph, w by h pixels (y down)
-    auto coverage= [&] (std::vector<unsigned char>& cov) {
-      cov.resize ((size_t) w * h);
-      if (from_mupdf) memcpy (cov.data (), &mcov[0], (size_t) w * h);
-      else {
-        int nr_cols= std_shrinkf * std_shrinkf;
-        if (nr_cols >= 64) nr_cols= 64;
-        for (int j= 0; j < h; j++)
-          for (int i= 0; i < w; i++)
-            cov[j*w + i]= (unsigned char) min (255, (255 * gl->get_x (i, j)) / nr_cols);
+    rasterized= true;
+    return true;
+  };
+  // the coverage of the glyph, w by h pixels (y down)
+  auto coverage= [&] (std::vector<unsigned char>& cov) {
+    cov.resize ((size_t) w * h);
+    if (from_mupdf) memcpy (cov.data (), &mcov[0], (size_t) w * h);
+    else {
+      int nr_cols= std_shrinkf * std_shrinkf;
+      if (nr_cols >= 64) nr_cols= 64;
+      for (int j= 0; j < h; j++)
+        for (int i= 0; i < w; i++)
+          cov[j*w + i]= (unsigned char) min (255, (255 * gl->get_x (i, j)) / nr_cols);
+    }
+  };
+  // the tiles of a big glyph, textures of their own (the least recently
+  // drawn tiles of other glyphs go first when they would exceed a bound)
+  auto make_tiles= [&] (glyph_slot& big) {
+    evict_tiles ((size_t) w * h, &big);
+    std::vector<unsigned char> cov;
+    coverage (cov);
+    int side= min (G.B->max_texture_side (), ATLAS);
+    if (side <= 0) side= ATLAS; // (no limit known: else no progress)
+    std::vector<unsigned char> part;
+    for (int ty= 0; ty < h; ty += side)
+      for (int tx= 0; tx < w; tx += side) {
+        int tw= min (side, w - tx), th= min (side, h - ty);
+        part.resize ((size_t) tw * th);
+        for (int j= 0; j < th; j++)
+          memcpy (&part[(size_t) j * tw], &cov[(size_t) (ty + j) * w + tx], tw);
+        gpu_texture tex= G.B->new_texture (tw, th, GPU_R8, true, false, part.data ());
+        if (tex == NULL) continue;
+        big.tiles.push_back ({ tex, tx, ty, tw, th });
+        G.big_bytes += (size_t) tw * th;
       }
-    };
+  };
+  auto it= G.glyphs.find (k);
+  if (it == G.glyphs.end ()) {
+    if (!rasterize ()) return;
     // a glyph of more than 512 pixels (a large zoom): from its outline,
     // remembered so as not to be rendered again; a glyph without an outline
     // (the big delimiters and the wide braces of the virtual fonts, made of
-    // pieces, #623; every glyph without MuPDF) in tiles, textures of their
-    // own, made once
+    // pieces, #623; every glyph without MuPDF) in tiles, made below
     if (w > 512 || h > 512) {
-      glyph_slot big= { 0, 0, w, h, xo, yo, from_mupdf, mx, my, true, {} };
-      if (slug_lookup (fng, c) == NULL) {
-        if (G.big_bytes > (size_t) 64 << 20) clear_atlas (); // (a bound)
-        std::vector<unsigned char> cov;
-        coverage (cov);
-        int side= min (G.B->max_texture_side (), ATLAS);
-        if (side <= 0) side= ATLAS; // (no limit known: else no progress)
-        std::vector<unsigned char> part;
-        for (int ty= 0; ty < h; ty += side)
-          for (int tx= 0; tx < w; tx += side) {
-            int tw= min (side, w - tx), th= min (side, h - ty);
-            part.resize ((size_t) tw * th);
-            for (int j= 0; j < th; j++)
-              memcpy (&part[(size_t) j * tw], &cov[(size_t) (ty + j) * w + tx], tw);
-            gpu_texture tex= G.B->new_texture (tw, th, GPU_R8, true, false, part.data ());
-            if (tex == NULL) continue;
-            big.tiles.push_back ({ tex, tx, ty, tw, th });
-            G.big_bytes += (size_t) tw * th;
-          }
-      }
-      G.glyphs[k]= big;
+      G.glyphs[k]= { 0, 0, w, h, xo, yo, from_mupdf, mx, my, true, {}, 0 };
       G.fonts.push_back (fng);
       it= G.glyphs.find (k);
     }
@@ -1343,18 +1411,22 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
         if (G.mode == 2) flush_quads ();
         G.B->update_texture (G.atlas, G.ax, G.ay, w, h, cov.data ());
       }
-      G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my, false };
+      G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my, false, {}, 0 };
       G.fonts.push_back (fng);
       G.ax += w + 1; G.arow= max (G.arow, h);
       it= G.glyphs.find (k);
     }
   }
-  const glyph_slot& s= it->second;
-  if (s.big && s.tiles.empty ()) {
-    if (trs.empty () && !pattern) outline ();
-    return;
-  }
+  glyph_slot& s= it->second;
   if (s.w <= 0 || s.h <= 0) return;
+  if (s.big && s.tiles.empty ()) {
+    // from its outline when it has one, except under a transformation or
+    // with a pattern, where it is drawn from tiles as a glyph without one
+    if (trs.empty () && !pattern && outline ()) return;
+    if (!rasterize () || w != s.w || h != s.h) return;
+    make_tiles (s);
+    if (s.tiles.empty ()) { s.w= 0; return; } // (no textures: given up)
+  }
   // placed as the MuPDF renderer places its glyphs: rendered by MuPDF from
   // the origin, or as its images of the bitmaps of TeXmacs
   double left, bottom;
@@ -1367,16 +1439,37 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     bottom= to_y (y + s.yo * std_shrinkf - s.h * pixel);
   }
   if (s.big) {
-    // its tiles, in the color of the pen (also for a pattern, for now)
+    // its tiles, in the color of the pen, or filled with its pattern
+    s.last= ++G.tick;
+    double top= bottom + s.h;
+    if (pattern) {
+      brush br= pen->get_brush ();
+      cached_texture* ct= pattern_texture (br, brushpx == -1 ? pixel : brushpx);
+      if (ct == NULL) return;
+      int s1, s2, s3, s4;
+      clip_box (s1, s2, s3, s4);
+      float a= br->get_alpha () / 255.f;
+      for (const big_tile& bt: s.tiles) {
+        batch (t, 3, ct->tex, s1, s2, s3, s4,
+               (float) to_x (0), (float) -to_y (0), (float) ct->w, (float) ct->h,
+               bt.tex);
+        double x1= left + bt.x, x2= left + bt.x + bt.w;
+        double y1= top - bt.y - bt.h, y2= top - bt.y;
+        float px[4], py[4];
+        device (x1, y2, px[0], py[0]); device (x2, y2, px[1], py[1]);
+        device (x1, y1, px[2], py[2]); device (x2, y1, px[3], py[3]);
+        quad (px, py, 0, 0, 1, 1, a, a, a, a);
+      }
+      return;
+    }
     int r, g, b, a;
     get_rgb_color (fg, r, g, b, a);
     if (get_reverse_colors ()) reverse (r, g, b);
     float fa= a / 255.f;
-    double top= bottom + s.h;
-    for (const big_tile& t: s.tiles)
-      user_quad (left + t.x, top - t.y - t.h, left + t.x + t.w, top - t.y,
-                 2, t.tex, 0, 0, 1, 1,
-                 r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa);
+    for (const big_tile& bt: s.tiles)
+      user_quad (left + bt.x, top - bt.y - bt.h, left + bt.x + bt.w, top - bt.y,
+                 2, NULL, 0, 0, 1, 1,
+                 r / 255.f * fa, g / 255.f * fa, b / 255.f * fa, fa, bt.tex);
     return;
   }
   float A= (float) ATLAS;

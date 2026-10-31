@@ -93,7 +93,10 @@ QTMPipeLink::launchCmd () {
   program = "/bin/sh";
   args << "-c" << raw;
 #if QT_VERSION >= 0x060000
-  setChildProcessModifier ([] () { ::setsid (); });
+  // (an interrupt is not ignored there: a TeXmacs started with SIGINT
+  // ignored, as by `sh ... &', would pass that on to the plugin)
+  setChildProcessModifier ([] () {
+    ::setsid (); ::signal (SIGINT, SIG_DFL); ::signal (SIGQUIT, SIG_DFL); });
 #endif
 #else
   QStringList list = QProcess::splitCommand(raw);
@@ -267,6 +270,8 @@ QTMPipeLink::killProcess (int msecs) {
 void
 QTMPipeLink::setupChildProcess () {
   ::setsid ();
+  ::signal (SIGINT, SIG_DFL);
+  ::signal (SIGQUIT, SIG_DFL);
 }
 #endif
 

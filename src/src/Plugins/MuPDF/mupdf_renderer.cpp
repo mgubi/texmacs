@@ -539,7 +539,10 @@ mupdf_renderer_rep::set_transformation (frame fr) {
   get_clipping (cx1, cy1, cx2, cy2);
   rectangle oclip (cx1, cy1, cx2, cy2);
 
-  frame cv= scaling (point (pixel, -pixel), point (-ox, -oy));
+  // in the user space of to_x and to_y, whose y is up (the ctm of begin
+  // flips it), as the PDF renderers: conjugated with a space whose y is
+  // down, the rotations went the other way, displaced (#659)
+  frame cv= scaling (point (pixel, pixel), point (-ox, -oy));
   frame tr= invert (cv) * fr * cv;
   point o = tr (point (0.0, 0.0));
   point ux= tr (point (1.0, 0.0)) - o;

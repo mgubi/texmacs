@@ -2465,7 +2465,94 @@
         (check= (tree-search-from (stree->tree doc)
                                   (stree->tree '(strong (wildcard "w")))
                                   '() '(0 0) 1 #t #t)
-                '((0 1 0) (0 1 1) (0 1 0)))))))
+                '((0 1 0) (0 1 1) (0 1 0))))
+      ;; a tag alone in its paragraph (a theorem, a table): after the last
+      ;; paragraph of its text, the rest of the tag takes no token, and is
+      ;; no hit; it was one, from the end of that text to after the tag
+      ;; (a trailing wildcard carries a hit to the end of the paragraph),
+      ;; which Replace left with "Match left" (#589)
+      (let* ((thm '(document (theorem (document "ab" "cd"))))
+             (tab '(document (tabular (table (row (cell (document "ab"
+                                                                   "cd"))))))))
+        (for (w '((wildcard "w") (concat (wildcard "w"))
+                  (concat (wildcard "w") (wildcard "v"))))
+          (check= (tree-search-from (stree->tree thm) (stree->tree w)
+                                    '() '(0 0 1 2) 1 #f #t)
+                  '())
+          (check= (tree-search-from (stree->tree tab) (stree->tree w)
+                                    '() '(0 0 0 0 0 1 2) 1 #f #t)
+                  '())
+          (for (row `((,thm (document (theorem (document "X" "X"))))
+                      (,tab (document (tabular (table (row (cell (document
+                                                                   "X"
+                                                                   "X")))))))
+                      ((document "ab" (theorem (document "x" "y")))
+                       (document "X" (theorem (document "X" "X"))))))
+            (check= (replace-with-messages (car row) w "X")
+                    (list (cadr row) '() '())))))
+      ;; a pattern of several paragraphs: a hit which is only the break
+      ;; between two paragraphs is no empty hit (the check of #589 left such
+      ;; hits out, and Replace stopped)
+      (check= (tree-search-from (stree->tree '(document "ab" "" "" "ef"))
+                                (stree->tree '(document "" ""))
+                                '() '(1 0) 2 #f #f)
+              '((1 0) (2 0) (1 0) (2 0) (3 0) (2 0)))
+      (for (row '(((document "ab" "" "" "ef") (document "" "") "" "abef")
+                  ((document "ab" "" "" "ef") (document "" "") "Z"
+                   "abZZZef")
+                  ((document "a" "" "" "" "b") (document "" "") "" "ab")
+                  ((document "ab" "" "" "ef")
+                   (document (wildcard "w") (wildcard "v")) "X" "XXX")))
+        (check= (car (replace-all-in-buffer (car row) (cadr row)
+                                            (caddr row)))
+                `(document ,(cadddr row))))
+      ;; (the same in a document inside a tag: a theorem, a cell)
+      (for (row '(((theorem (document "ab" "" "" "ef")) (document "" "") ""
+                   (theorem (document "abef")))
+                  ((theorem (document "ab" "" "" "ef")) (document "" "") "Z"
+                   (theorem (document "abZZZef")))
+                  ((theorem (document "a" "" "" "" "b")) (document "" "") ""
+                   (theorem (document "ab")))
+                  ((theorem (document "ab" "" "" "ef"))
+                   (document (wildcard "w") (wildcard "v")) "X"
+                   (theorem (document "XXX")))
+                  ((tabular (table (row (cell (document "ab" "" "" "ef")))))
+                   (document "" "") ""
+                   (tabular (table (row (cell (document "abef"))))))))
+        (check= (car (replace-all-in-buffer `(document ,(car row)) (cadr row)
+                                            (caddr row)))
+                `(document ,(cadddr row))))
+      ;; (the rest of the text is a hit)
+      (check= (tree-search-from (stree->tree '(document (theorem (document
+                                                                   "ab"
+                                                                   "cd"))))
+                                (stree->tree '(concat (wildcard "w")))
+                                '() '(0 0 1 1) 1 #f #t)
+              '((0 0 1 1) (0 0 1 2) (0 0 1 0))))))
+
+(define (replace-with-messages doc what by)
+  ;; the result of Replace All in a buffer holding doc, and the messages of
+  ;; the hits left by Replace All and by Replace one again and again
+  (let* ((run (lambda (all?)
+                (with-search-buffers doc what by
+                  (lambda (u)
+                    (ahash-set! (widget 'search-filter-table)
+                                (current-buffer) (stree->tree '(attr)))
+                    ((widget 'perform-search*))
+                    (let loop ((i 0) (msgs (list)))
+                      (widget '(set! replace-skip-message #f))
+                      (with old (tm->stree (buffer-get-body u))
+                        (if all? (replace-all) (replace-one))
+                        (let* ((m (widget 'replace-skip-message))
+                               (msgs (if m (cons m msgs) msgs)))
+                          (if (or all? (>= i 20)
+                                  (== (tm->stree (buffer-get-body u)) old))
+                              (list (tm->stree (buffer-get-body u))
+                                    (reverse msgs))
+                              (loop (+ i 1) msgs)))))))))
+         (all (run #t))
+         (one (run #f)))
+    (list (car all) (cadr all) (cadr one))))
 
 ;; The wildcards of a region pattern take their values in the region, as its
 ;; content; the values were looked for by the literal parts around the
@@ -2583,6 +2670,151 @@
                     (list (tm->stree (buffer-get-body u))
                           (string? (widget 'replace-skip-message)))))
                 '((document "xyz a1b") #t))))))
+
+;; Replace next to a tag whose border has no cursor position (hidden): when
+;; the cut of the match left the tag alone in its paragraph, or the match
+;; started right after it, the editor corrected the cursor into the tag,
+;; and the replacement went into it (#590); a hit inside it, shown by the
+;; search, changed the document outside the history of undo, and cancelled
+;; the hits and the reference of the search: Replace one did not go on
+;; after its replacement (#591)
+(define (search-in-buffer doc what . read-only?)
+  ;; the real search of the widget (perform-search*) in a buffer holding
+  ;; doc, in source mode if test-source-mode? (read-only if read-only?):
+  ;; the body afterwards, the number of steps of undo, the body after one
+  ;; undo, whether the hits and the reference of the search are still there
+  ;; after the search, and the selected hit (relative to the buffer)
+  (with-search-buffers doc what ""
+    (lambda (u)
+      (ahash-set! (widget 'search-filter-table)
+                  (current-buffer) (stree->tree '(attr)))
+      (when test-source-mode? (init-env "mode" "src"))
+      (clear-undo-history)
+      (when (and (pair? read-only?) (car read-only?))
+        (buffer-set-read-only u #t))
+      ((widget 'perform-search*))
+      (let* ((res (tm->stree (buffer-get-body u)))
+             (n (undo-possibilities))
+             (kept? (and (nnull? (get-alt-selection "alternate"))
+                         (nnull? (get-alt-selection "search-reference"))))
+             (k (length (tree->path (buffer-tree))))
+             (sel (if (selection-active-any?)
+                      (list (list-tail (selection-get-start) k)
+                            (list-tail (selection-get-end) k))
+                      (list))))
+        (buffer-set-read-only u #f)
+        (undo 0)
+        (list res n (tm->stree (buffer-get-body u)) kept? sel)))))
+
+(define (test-replace-next-to-hidden)
+  (check-group "replace next to hidden content")
+  (with-search-mode 'replace
+    (lambda ()
+      (check-replace-rows
+        '(((document (concat "a1x" (hidden "b"))) "a1x" "Z"
+           (document (concat "Z" (hidden "b"))))
+          ((document (concat (hidden "b") "a1x")) "a1x" "Z"
+           (document (concat (hidden "b") "Z")))
+          ((document (concat (hidden "b") "a1x" (hidden "c"))) "a1x"
+           (strong "Q")
+           (document (concat (hidden "b") (strong "Q") (hidden "c"))))
+          ((document (concat "a1x" (hidden "b"))) "a1x" ""
+           (document (hidden "b")))
+          ((document (concat (hidden "b") "a1x")) "a1x" ""
+           (document (hidden "b")))
+          ;; the hit inside the tag shows it (an undoable change)
+          ((document (concat "a1x" (hidden "a2x")))
+           (concat "a" (wildcard "w") "x") "Z"
+           (document (concat "Z" (shown "Z"))))
+          ((document (concat "a1x" (hidden (concat "a2x" (hidden "b")))))
+           (concat "a" (wildcard "w") "x") "Z"
+           (document (concat "Z" (shown (concat "Z" (hidden "b"))))))
+          ;; (as before)
+          ((document (concat "a1x" (strong "b"))) "a1x" "Z"
+           (document (concat "Z" (strong "b"))))))
+      ;; Replace one, which shows the next hit, is one step of undo
+      (check= (with-search-buffers '(document (concat "a1x" (hidden "a2x")))
+                '(concat "a" (wildcard "w") "x") "Z"
+                (lambda (u)
+                  (ahash-set! (widget 'search-filter-table)
+                              (current-buffer) (stree->tree '(attr)))
+                  (clear-undo-history)
+                  ((widget 'perform-search*))
+                  (replace-one)
+                  (let* ((res (tm->stree (buffer-get-body u)))
+                         (n (undo-possibilities)))
+                    (undo 0)
+                    (list res n (tm->stree (buffer-get-body u))))))
+              '((document (concat "Z" (shown "a2x"))) 1
+                (document (concat "a1x" (hidden "a2x")))))
+      ;; in a read-only document, Replace one replaces nothing, but the
+      ;; search goes on: the hits are kept, the next one is selected and
+      ;; shown (as before, without a step of undo)
+      (check= (with-search-buffers '(document (concat "a1x" (hidden "a2x")))
+                '(concat "a" (wildcard "w") "x") "Z"
+                (lambda (u)
+                  (ahash-set! (widget 'search-filter-table)
+                              (current-buffer) (stree->tree '(attr)))
+                  (clear-undo-history)
+                  (buffer-set-read-only u #t)
+                  ((widget 'perform-search*))
+                  (replace-one)
+                  (with r (list (tm->stree (buffer-get-body u))
+                                (undo-possibilities)
+                                (length (get-alt-selection "alternate"))
+                                (selection-active-any?)
+                                (cursor-accessible?))
+                    (buffer-set-read-only u #f)
+                    r)))
+              '((document (concat "a1x" (shown "a2x"))) 0 4 #t #t))
+      ;; Replace one shows the next hit, Replace All only where it ends
+      (with doc '(document (concat "a1x" (hidden "a2x") "a3x"))
+        (check= (replace-one-repeatedly doc '(concat "a" (wildcard "w") "x")
+                                        "Z")
+                '(document (concat "Z" (shown "Z") "Z")))
+        (check= (replace-all-in-buffer doc '(concat "a" (wildcard "w") "x")
+                                       "Z")
+                (list '(document (concat "Z" (hidden "Z") "Z")) doc)))))
+  (with-search-mode 'search
+    (lambda ()
+      ;; going to a hit inside hidden content shows it, in a step of undo,
+      ;; and keeps the hits and the reference of the search
+      (check= (search-in-buffer '(document (concat "x " (hidden "a2x")))
+                                "a2x")
+              '((document (concat "x " (shown "a2x"))) 1
+                (document (concat "x " (hidden "a2x"))) #t ((0 1 0 0) (0 1 0 3))))
+      ;; in a read-only document, shown as before (the end of a step of
+      ;; undo would cancel it), and without a step of undo
+      (check= (search-in-buffer '(document (concat "x " (hidden "a2x")))
+                                "a2x" #t)
+              '((document (concat "x " (shown "a2x"))) 0
+                (document (concat "x " (shown "a2x"))) #t ((0 1 0 0) (0 1 0 3))))
+      (with-test-source-mode
+        (lambda ()
+          (check= (search-in-buffer '(document (concat (folded "q" "a2x")
+                                                       "a3x"))
+                                    "a2x")
+                  '((document (concat (unfolded "q" "a2x") "a3x")) 1
+                    (document (concat (folded "q" "a2x") "a3x")) #t
+                    ((0 0 1 0) (0 0 1 3))))))
+      ;; a switch which shows a hit may wrap a branch next to it, whose
+      ;; hits then move: they are not set again as they were (the search
+      ;; which go-to* schedules finds them again)
+      (with-search-buffers '(document (concat "x " (tiny-switch (hidden "a2x")
+                                                                "a3x")))
+        "a" ""
+        (lambda (u)
+          (ahash-set! (widget 'search-filter-table)
+                      (current-buffer) (stree->tree '(attr)))
+          ((widget 'perform-search*))
+          (check-true
+           (list-and (map (lambda (p) (tree-atomic? (path->tree (cDr p))))
+                          (get-alt-selection "alternate"))))))
+      ;; (nothing to show: nothing changes)
+      (check= (search-in-buffer '(document (concat "x " (strong "a2x")))
+                                "a2x")
+              '((document (concat "x " (strong "a2x"))) 0
+                (document (concat "x " (strong "a2x"))) #t ((0 1 0 0) (0 1 0 3)))))))
 
 ;; Replace one, then Replace All: Replace All goes on after the replacement,
 ;; as Replace one does; it took the hit which ends there, and replaced in
@@ -2764,6 +2996,7 @@
   (test-replace-wildcards)
   (test-replace-in-buffers)
   (test-replace-filters)
+  (test-replace-next-to-hidden)
   (test-replace-failures)
   (test-replace-empty-matches)
   (test-lone-wildcard)

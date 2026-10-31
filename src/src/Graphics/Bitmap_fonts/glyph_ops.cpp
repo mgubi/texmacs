@@ -148,6 +148,7 @@ join (glyph gl1, glyph gl2) {
   int x2= max (gl1->width- gl1->xoff, gl2->width- gl2->xoff);
   int y2= max (gl1->yoff, gl2->yoff);
   glyph bmr (x2-x1, y2-y1, -x1, y2, max (gl1->depth, gl2->depth));
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
 
   int i, j, dx, dy;
   dx= -gl1->xoff- x1, dy= y2- gl1->yoff;
@@ -318,6 +319,7 @@ padded (glyph gl, int l, int t, int r, int b) {
   int i, j;
   int ww= gl->width, hh= gl->height;
   glyph bmr (ww+l+r, hh+t+b, gl->xoff+l, gl->yoff+t, gl->depth);
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
   for (j=0; j<hh+t+b; j++)
     for (i=0; i<ww+l+r; i++)
       bmr->set_x (i, j, 0);
@@ -413,14 +415,18 @@ glyph
 hor_extend (glyph gl, int pos, int by) {
   int i, j;
   int ww= gl->width, hh= gl->height;
+  // (an empty glyph, e.g. one too large for its raster: as it is, #659)
+  if (ww <= 0 || hh <= 0) return gl;
   bool ok= false;
-  while (!ok) { // hack for corrupted pfb translations
+  int tries= 0; // (a blank column of a glyph 1 pixel wide: no end, #659)
+  while (!ok && tries++ <= ww + 1) { // hack for corrupted pfb translations
     for (j=0; j<hh; j++)
       ok= ok || (gl->get_x (pos, j) != 0);
     if (!ok) pos += (pos < (ww>>1)? 1: -1);
     if (pos >= (ww>>2) && pos < (3*ww>>2)) break;
   }
   glyph bmr (ww+ by, hh, gl->xoff, gl->yoff, gl->depth);
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
   for (j=0; j<hh; j++)
     for (i=0; i<(ww+by); i++)
       bmr->set_x (i, j, gl->get_x (i<pos? i: (i<pos+by? pos: i-by), j));
@@ -431,8 +437,11 @@ glyph
 hor_take (glyph gl, int pos, int nr) {
   int i, j;
   int ww= gl->width, hh= gl->height;
+  // (an empty glyph, e.g. one too large for its raster: as it is, #659)
+  if (ww <= 0 || hh <= 0) return gl;
   bool ok= false;
-  while (!ok) { // hack for corrupted pfb translations
+  int tries= 0; // (a blank column of a glyph 1 pixel wide: no end, #659)
+  while (!ok && tries++ <= ww + 1) { // hack for corrupted pfb translations
     for (j=0; j<hh; j++)
       ok= ok || (gl->get_x (pos, j) != 0);
     if (!ok) pos += (pos < (ww>>1)? 1: -1);
@@ -450,6 +459,7 @@ ver_extend (glyph gl, int pos, int by) {
   int i, j;
   int ww= gl->width, hh= gl->height;
   glyph bmr (ww, hh+by, gl->xoff, gl->yoff, gl->depth);
+  if (bmr->width == 0 || bmr->height == 0) return bmr; // (too large, #659)
   for (j=0; j<(hh+by); j++)
     for (i=0; i<ww; i++)
       bmr->set_x (i, j, gl->get_x (i, j<pos? j: (j<pos+by? pos: j-by)));

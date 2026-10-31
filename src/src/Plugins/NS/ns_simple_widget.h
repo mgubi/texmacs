@@ -121,6 +121,7 @@ public:
   void follow_visible_part ();  //!< the canvas follows the scrolling
   NSRect viewport ();           //!< the visible part, as in Qt
   coord4 extents;               //!< the extents of the document
+  bool too_large_said;          //!< its frame was cut at NS_HUGE_FRAME
   void invalidate_all ();       //!< also for the benchmark (ns_gui.mm)
   static void invalidate_every (); //!< all the widgets (change of theme)
   bool is_invalid ();

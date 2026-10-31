@@ -1142,11 +1142,20 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *   eval:<scheme>     evaluates a Scheme expression (delayed)
  *   side-scroll:<y>   scrolls the side tools which are shown to y
  *   side-pos          prints the scroll position of the side tools
+ *   scroll[:<title>]  prints the size of the documents of the editors of the
+ *                     main window (or of the window with this title), their
+ *                     visible part, and whether it is at their end
  *   side-width:<w>    the width of the right side tools (as with the handle)
  *   bar-tips          prints the buttons of the icon bars of the main window
  *                     which have a tooltip, and their tracking areas (ours
  *                     for the hover highlight, those of AppKit), then updates
  *                     their tracking areas and prints them again (#637)
+ *   scroll-eval:<scheme>
+ *                     queues a Scheme expression as a command of the
+ *                     interface, then the clip view of the document of the
+ *                     main window says that it scrolled: the update of
+ *                     TeXmacs, and the command, run in -[TMDocView
+ *                     scrolled:] (#666)
  ******************************************************************************/
 
 static NSMenu* ns_test_menu= nil;  // the last menu which was shown
@@ -1375,6 +1384,22 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
   }
   else if ([st isEqualToString: @"eval"])
     exec_delayed (scheme_cmd (from_nsstring (arg)));
+  else if ([st isEqualToString: @"scroll-eval"]) {
+    the_gui->process_command (as_command (scheme_cmd (from_nsstring (arg))));
+    NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: NSClassFromString (@"TMDocView")] &&
+          [[v superview] isKindOfClass: [NSClipView class]]) {
+        [[NSNotificationCenter defaultCenter]
+          postNotificationName: NSViewBoundsDidChangeNotification
+                        object: [v superview]];
+        break;
+      }
+      [todo addObjectsFromArray: [v subviews]];
+    }
+  }
   else if ([st isEqualToString: @"side-width"]) {
     // as the handle of the right side tools
     NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
@@ -1406,6 +1431,33 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
         }
         fprintf (stderr, "NSTEST side tools at %g (height %g)\n",
                  [c bounds].origin.y, [[(NSScrollView*) v documentView] frame].size.height);
+      }
+      else [todo addObjectsFromArray: [v subviews]];
+    }
+  }
+  else if ([st isEqualToString: @"scroll"]) {
+    // the scroll views of the editors of the main window (or of the window
+    // with this title): the size of the document, the visible part, and
+    // whether it is at the end (#661)
+    for (NSWindow* w in [NSApp windows])
+      if ([arg length] > 0 && [w isVisible] && [[w title] isEqualToString: arg])
+        win= w;
+    Class dc= NSClassFromString (@"TMDocView");
+    NSMutableArray* todo= [NSMutableArray array];
+    if ([win contentView]) [todo addObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: [NSScrollView class]] &&
+          [[(NSScrollView*) v documentView] isKindOfClass: dc] &&
+          ![v isHiddenOrHasHiddenAncestor]) {
+        NSRect d= [[(NSScrollView*) v documentView] frame];
+        NSRect b= [[(NSScrollView*) v contentView] bounds];
+        fprintf (stderr, "NSTEST scroll '%s' document %.0fx%.0f visible "
+                 "%.0f,%.0f %.0fx%.0f%s\n", [[win title] UTF8String],
+                 d.size.width, d.size.height, b.origin.x, b.origin.y,
+                 b.size.width, b.size.height,
+                 NSMaxY (b) >= d.size.height - 1? " at-end": "");
       }
       else [todo addObjectsFromArray: [v subviews]];
     }

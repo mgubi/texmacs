@@ -334,8 +334,12 @@
     (for (u (console-buffers-of kind))
       (buffer-set-read-only u #t))
     ;; the consoles begin at the end, the latest messages, and follow them
+    ;; (at the next round, once the window is made; not (:idle 1): the idle
+    ;; time of an editor is 0 while it has not the keyboard focus, so that
+    ;; the end waited for a window of TeXmacs to get it, and the console
+    ;; opened at its top when it did not, #661)
     (delayed
-      (:idle 1)
+      (:pause 1)
       (for (u (console-buffers-of kind))
         (console-go-end u)))))
 

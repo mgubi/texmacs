@@ -15,6 +15,11 @@
 # quits. A run which does not exit with status 0 (a crash at the exit)
 # prints the line "exit status <n>" after the expected ones.
 #
+# A warning "conditional master routine" in a run also fails the case: a
+# module which adds a variant to a routine must load the module of its
+# master routine first, else the master replaces the variant when it comes
+# (#684). (Printed after the expected lines, like the exit status.)
+#
 # The harness must give the same output under Guile and s7: the lists of
 # strings are printed as one string, (a b), since display* prints the
 # quotes of the strings in a list under s7; the exit is hooked by on-exit,
@@ -62,6 +67,8 @@ check () {
   code=$?
   got=$(grep -a '^CHECK ' "$out/$total.out" | sed 's/^CHECK //')
   [ $code -eq 0 ] || got=$(printf '%s\nexit status %s' "$got" "$code")
+  warned=$(grep -ah 'conditional master routine' "$out/$total.out" "$out/$total.err")
+  [ -z "$warned" ] || got=$(printf '%s\n%s' "$got" "$warned")
   if [ "$got" = "$expected" ]; then
     echo "  ok     $name"
   else
@@ -108,6 +115,36 @@ check "headless: -X does not quit" \
       "one ()
 two ()" \
       -headless -X -x "$(show one)" -x "(delayed (delayed $(show two) (exit 0)))"
+
+# (the modules of the modes are loaded as needed: another order of loading)
+cat > "$out/startup-math.tm" <<'EOF'
+<TeXmacs|2.1.4>
+
+<style|generic>
+
+<\body>
+  <math|x+y>
+</body>
+EOF
+printf 'int f () {\n  return 1;\n}\n' > "$out/startup-code.cpp"
+
+check "a file of program code, with no warning at the start (#684)" \
+      "quit (startup-code.cpp)" \
+      -q -x "$atquit" startup-code.cpp
+
+check "headless: a file of program code, with no warning at the start" \
+      "quit (startup-code.cpp)" \
+      -headless -x "$atquit" startup-code.cpp
+
+printf '{"a": true}\n' > "$out/startup-data.json"
+
+check "a JSON file, with no warning at the start" \
+      "quit (startup-data.json)" \
+      -q -x "$atquit" startup-data.json
+
+check "a document with math, with no warning at the start" \
+      "quit (startup-math.tm)" \
+      -q -x "$atquit" startup-math.tm
 
 # A script which leaves a buffer shown again with its cursor in a generated
 # bibliography: its focus toolbar has an input field with a completer, and
