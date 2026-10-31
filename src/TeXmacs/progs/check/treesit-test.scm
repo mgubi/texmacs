@@ -881,6 +881,19 @@
               '(("class" "A" (0 6)) ("function" "f" (1 8))))
       (check= (outline "c" '("struct s { int a; };" "int f(int x) { return x; }"))
               '(("class" "s" (0 7)) ("function" "f" (1 4))))
+      ;; (a name for two definitions: a function in a module is a method and
+      ;; a function; the next definition keeps its own name)
+      (check= (outline "rust" '("mod m { fn x() { struct P; } }"))
+              '(("module" "m" (0 4)) ("method" "x" (0 11)) ("class" "P" (0 24))))
+      (check= (outline "c" '("typedef struct N { int a; } M;"))
+              '(("type" "N" (0 15))))
+      ;; (a very long line: the definition after it is not taken for the one
+      ;; which has the same column modulo 2^20)
+      (check= (outline "javascript"
+                       (list (string-append (make-string 1048567 #\space)
+                                            "function a(){} function")
+                             "b(){}"))
+              '(("function" "a" (0 1048576)) ("function" "b" (1 0))))
       (check= (outline "julia" '("module M" "f(x) = 1" "function g(y)" "end" "end"))
               '(("module" "M" (0 7)) ("function" "f" (1 0)) ("function" "g" (2 9))))
       (check= (outline "scheme" '("(define (f x) x)" "(tm-define g 1)"))
@@ -1375,6 +1388,66 @@
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The names of the definitions, without a grammar
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (point-leq? a b)
+  (or (< (car a) (car b))
+      (and (== (car a) (car b)) (<= (cadr a) (cadr b)))))
+
+(define (outline-items defs names)
+  ;; (kind name) with the name given by the place of its capture
+  (map (lambda (i) (list (car i) (cadr i)))
+       (syntax-outline-items defs names point-leq?
+                             (lambda (start end) (object->string start)))))
+
+(define (test-outline-items)
+  (check-group "the names of the definitions")
+  (let ((n1 '((0 4) (0 5)))
+        (n2 '((3 4) (3 5))))
+    ;; a name is that of one definition only, also when they are not one
+    ;; after the other
+    (check= (outline-items '(("function" (0 0) (5 0)) ("class" (0 0) (5 0))
+                             ("function" (0 1) (5 0)))
+                           (list n1))
+            '(("function" "(0 4)")))
+    ;; the name of the second definition is the same one, not the next one,
+    ;; which stays for the third
+    (check= (outline-items '(("function" (0 0) (5 0)) ("class" (0 0) (5 0))
+                             ("type" (3 0) (4 0)))
+                           (list n1 n2))
+            '(("function" "(0 4)") ("type" "(3 4)")))
+    ;; the same kind and name just after itself
+    (check= (map cadr (syntax-outline-items
+                       '(("function" (0 0) (1 0)) ("function" (2 0) (3 0)))
+                       '(((0 0) (0 1)) ((2 0) (2 1)))
+                       point-leq? (lambda (start end) "f")))
+            '("f"))
+    ;; no name inside; a name which goes beyond the definition
+    (check= (outline-items '(("function" (0 0) (0 3))) (list n1)) '())
+    (check= (outline-items '(("function" (0 0) (0 5))
+                             ("class" (1 0) (2 0)))
+                           '(((0 4) (0 9)) ((1 2) (1 3))))
+            '(("class" "(1 2)")))
+    ;; points on lines of any length
+    (check= (outline-items '(("function" (0 1048576) (0 1048580))
+                             ("function" (1 0) (1 4)))
+                           '(((0 1048576) (0 1048577)) ((1 0) (1 1))))
+            '(("function" "(0 1048576)") ("function" "(1 0)"))))
+  ;; once through the names: the number of comparisons, not the time
+  (let* ((n 3000)
+         (count 0)
+         (leq? (lambda (a b) (set! count (+ count 1)) (point-leq? a b)))
+         (rows (.. 0 n))
+         (defs (map (lambda (i) (list "function" (list i 0) (list i 9))) rows))
+         (names (map (lambda (i) (list (list i 4) (list i 5))) rows)))
+    (check= (length (syntax-outline-items defs names leq?
+                                          (lambda (start end)
+                                            (object->string start))))
+            n)
+    (check-true (< count (* 6 n)))))
+
 (tm-define (treesit-test-failures)
   (check-suite "treesit")
   (test-helpers)
@@ -1394,4 +1467,5 @@
   (test-edit)
   (test-scanners)
   (test-native)
+  (test-outline-items)
   (check-end))

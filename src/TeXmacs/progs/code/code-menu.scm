@@ -16,7 +16,8 @@
 ;; it is, then those of a server only (code-server-menu, which the adapter
 ;; of the servers gives: progs/lsp/lsp-code.scm), then those of the syntax
 ;; tree (code-syntax-menu, which tree-sitter gives: progs/treesit/ts-edit.scm).
-;; Without one of them, its entries are not there.
+;; Without one of them, the entries of a server or of the syntax tree are not
+;; there; those of the features are greyed when no provider can serve them.
 
 (texmacs-module (code code-menu)
   (:use (code code-features)

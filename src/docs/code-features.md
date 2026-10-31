@@ -48,7 +48,9 @@ the other, and one without both is the TeXmacs of `upsilon_texmacs`.
 - The Focus menu: entries of both, in a code block (`focus-extra-menu`, the
   focus is the tag) and in a source file (the focus is the buffer: the
   variant of `standard-focus-menu` in `generic/document-menu.scm` calls
-  `focus-extra-menu` when the cursor is in lines of program code). The keys
+  `focus-extra-menu` when the cursor is in lines of program code; this also
+  concerns a `.tm` document whose initial environment has the mode `prog`,
+  not the style `code` alone). The keys
   std ( and std ): the folds of
   tree-sitter (prog-kbd.scm) and those of the LSP (lsp-kbd.scm, mode in-lsp%,
   which wins in the files which a server follows).

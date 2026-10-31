@@ -1003,8 +1003,45 @@
         "")))
 
 (define (point-key p)
-  ;; a key for the point @p in a hash table
-  (+ (* 1048576 (car p)) (cadr p)))
+  ;; a key for the point @p in a hash table (a column does not reach 2^32:
+  ;; it is a position in a string, on a line of any length)
+  (+ (* 4294967296 (car p)) (cadr p)))
+
+(define-public (syntax-outline-items defs names leq? text)
+  ;; the definitions @defs (kind start end) with their names, from the captures
+  ;; @names (start end), both in the order of the text: (kind name start end
+  ;; def-start). The name is the first capture inside the definition, @text
+  ;; gives the string between two points, @leq? compares points. Once through
+  ;; the lists: a file may have thousands of definitions
+  (let loop ((l defs) (rest names) (seen (make-ahash-table)) (acc '()))
+    (if (null? l) (reverse acc)
+        (let* ((d (car l))
+               (rest* (let skip ((r rest))
+                        (if (and (pair? r) (not (leq? (cadr d) (car (car r)))))
+                            (skip (cdr r))
+                            r)))
+               ;; (rest* stays at this name: it may also be the name of the
+               ;; next definition)
+               (n (let find ((r rest*))
+                    (cond ((null? r) #f)
+                          ((not (leq? (car (car r)) (caddr d))) #f)
+                          ((leq? (cadr (car r)) (caddr d)) (car r))
+                          (else (find (cdr r))))))
+               (item (and n (list (car d) (text (car n) (cadr n))
+                                  (car n) (caddr d) (cadr d))))
+               (key (and item (point-key (car n)))))
+          ;; (not twice the same name, nor a definition of the same kind and
+          ;; name just after itself: the equations of a function of Haskell
+          ;; are definitions of their own)
+          (if (and item
+                   (not (ahash-ref seen key))
+                   (not (and (pair? acc)
+                             (== (car (car acc)) (car item))
+                             (== (cadr (car acc)) (cadr item)))))
+              (begin
+                (ahash-set! seen key #t)
+                (loop (cdr l) rest* seen (cons item acc)))
+              (loop (cdr l) rest* seen acc))))))
 
 (define-public (syntax-outline root lan id)
   ;; the definitions of a region of the program language lan (language id
@@ -1019,37 +1056,11 @@
                (defs (list-filter caps (lambda (c) (string-starts? (cap-name c)
                                                                    "definition."))))
                (nms (list-filter caps (lambda (c) (== (cap-name c) "name")))))
-          ;; (once through the names and the definitions, which are in the
-          ;; order of the text: a file may have thousands of definitions)
-          (let loop ((l defs) (rest nms) (seen (make-ahash-table)) (acc '()))
-            (if (null? l) (reverse acc)
-                (let* ((d (car l))
-                       (rest* (let skip ((r rest))
-                                (if (and (pair? r)
-                                         (not (point<=? (cadr d) (cadr (car r)))))
-                                    (skip (cdr r))
-                                    r)))
-                       (n (let find ((r rest*))
-                            (cond ((null? r) #f)
-                                  ((not (point<=? (cadr (car r)) (caddr d))) #f)
-                                  ((point<=? (caddr (car r)) (caddr d)) (car r))
-                                  (else (find (cdr r))))))
-                       (item (and n (list (string-drop (cap-name d) 11)
-                                          (region-text root (cadr n) (caddr n))
-                                          (cadr n) (caddr d) (cadr d))))
-                       (key (and item (point-key (caddr item)))))
-                  ;; (not twice the same name, nor a definition of the same
-                  ;; kind and name just after itself: the equations of a
-                  ;; function of Haskell are definitions of their own)
-                  (if (and item
-                           (not (ahash-ref seen key))
-                           (not (and (pair? acc)
-                                     (== (car (car acc)) (car item))
-                                     (== (cadr (car acc)) (cadr item)))))
-                      (begin
-                        (ahash-set! seen key #t)
-                        (loop (cdr l) rest* seen (cons item acc)))
-                      (loop (cdr l) rest* seen acc)))))))))
+          (syntax-outline-items
+           (map (lambda (d) (cons (string-drop (cap-name d) 11) (cdr d))) defs)
+           (map cdr nms)
+           point<=?
+           (lambda (start end) (region-text root start end)))))))
 
 (define (cursor-outline)
   ;; (ctx id definitions) for the code at the cursor, or #f
