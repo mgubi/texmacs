@@ -254,9 +254,31 @@ qt_gui_rep::~qt_gui_rep()  {
  * interclient communication
  ******************************************************************************/
 
+static QClipboard*
+system_clipboard () {
+  // the clipboard of the system, or NULL without one: the headless mode
+  // runs a QCoreApplication, and QGuiApplication::clipboard () then gives
+  // a clipboard without a platform, which crashes when it is used (#708);
+  // the selections are only kept in selection_t and selection_s then
+  if (headless_mode ||
+      qobject_cast<QGuiApplication*> (QCoreApplication::instance ()) == NULL)
+    return NULL;
+  return QGuiApplication::clipboard ();
+}
+
 bool
 qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
-  QClipboard *cb = QApplication::clipboard ();
+  QClipboard *cb = system_clipboard ();
+  if (cb == NULL) {
+    // as below: "extern" is the selection "primary" (ai-paste)
+    if (key == "extern") key= "primary";
+    s = "";
+    t = "none";
+    if (!selection_t->contains (key)) return false;
+    t = copy (selection_t [key]);
+    s = copy (selection_s [key]);
+    return true;
+  }
   QClipboard::Mode mode = QClipboard::Clipboard;
   bool direct_selection= (key == "extern");
   if (direct_selection) key= "primary";
@@ -382,7 +404,8 @@ qt_gui_rep::set_selection (string key, tree t,
   selection_t (key)= copy (t);
   selection_s (key)= copy (s);
   
-  QClipboard *cb = QApplication::clipboard ();
+  QClipboard *cb = system_clipboard ();
+  if (cb == NULL) return true;
   QClipboard::Mode mode = QClipboard::Clipboard;
   if (key == "primary");
   else if (key == "mouse" && cb->supportsSelection())
@@ -443,7 +466,8 @@ qt_gui_rep::clear_selection (string key) {
   selection_t->reset (key);
   selection_s->reset (key);
   
-  QClipboard *cb = QApplication::clipboard();
+  QClipboard *cb = system_clipboard ();
+  if (cb == NULL) return;
   QClipboard::Mode mode = QClipboard::Clipboard;
   if (key == "primary");
   else if (key == "mouse" && cb->supportsSelection())
@@ -1147,12 +1171,13 @@ clear_selection (string key) {
 
 bool
 qt_gui_rep::put_graphics_on_clipboard (url file) {
+  QClipboard *clipboard = system_clipboard ();
+  if (clipboard == NULL) return false;
   string extension = suffix (file) ;
   
     // for bitmaps this works :
   if ((extension == "bmp") || (extension == "png") ||
       (extension == "jpg") || (extension == "jpeg")) {
-    QClipboard *clipboard = QApplication::clipboard();
     c_string tmp (concretize (file));
     clipboard->setImage (QImage (QString (tmp)));
   }
@@ -1175,7 +1200,6 @@ qt_gui_rep::put_graphics_on_clipboard (url file) {
     QMimeData *mymimeData = new QMimeData;
     mymimeData->setData (mime, rawdata);
     
-    QClipboard *clipboard = QApplication::clipboard();
     clipboard->setMimeData (mymimeData);// default mode = QClipboard::Clipboard
   }
   return true;

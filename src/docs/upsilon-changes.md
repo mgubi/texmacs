@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Replace and paste** (desktop): several paragraphs next to a hidden tag are
+  no longer lost, and that tag stays hidden; where paragraphs cannot go, the
+  match is left with a message, and an insertion changes nothing and keeps the
+  selection (#675).
+- **Copy to LaTeX on Windows** (desktop): the name of an image keeps its drive
+  (`D:/a/...`), and a name in `\includegraphics` stays on one line (#717).
+- **Clipboard** (desktop): the clipboard commands no longer crash under
+  `-headless` (#708).
+
 - **LaTeX and HTML export** (desktop): no crash with an embedded image on
   Edit > Copy to > LaTeX or with a target which cannot be written; the images
   always go next to the exported file, also from scripts and under any name;

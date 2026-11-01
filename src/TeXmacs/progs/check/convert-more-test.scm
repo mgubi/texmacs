@@ -2194,11 +2194,35 @@
       (check-image-file (system->url first))
       (check-true (url-descends? (system->url first) (url-temp-dir)))
       (check-false (== first second))
-      (check-true (string-starts? second (url->unix (url-temp-dir))))
+      ;; a name which LaTeX can read on Windows too: a drive and slashes
+      (check-true (string-starts? second (image-name-for-program (url-temp-dir))))
+      (check-false (has-text? "\\" second))
+      ;; Windows: the drive, its colon and a slash (X:/), only there
+      (when (os-mingw?)
+        (check-true (and (> (string-length second) 3)
+                         (char-alphabetic? (string-ref second 0))
+                         (== (substring second 1 3) ":/"))))
       (export sample "html-snippet")
       (check= (length (folder-files dir)) before))
     (buffer-close doc)
     (when (buffer-exists? old) (switch-to-buffer old)))
+  (check-group "the name of an image in LaTeX stays as it is")
+  (check= (slashes-of-name "D:\\a\\b\\x.pdf") "D:/a/b/x.pdf")
+  (check= (slashes-of-name "/a/b c/x.pdf") "/a/b c/x.pdf")
+  ;; through the conversion: a long name with spaces is not broken
+  (with-sample-buffer (embedded-image-sample)
+    (lambda (name)
+      (let* ((root "a long name with spaces so that the line must be broken at once")
+             (tex (url-append (temp-dir) (string-append root ".tex"))))
+        (check-false (buffer-export (current-buffer) tex "latex"))
+        (check-true (has-text? (string-append "{" root "-1." (eps-suffix) "}")
+                               (if (url-exists? tex) (string-load tex) ""))))))
+  ;; a space, a letter which is not ASCII, an underscore: no escapes, no break
+  (with name (string-append "/some/long/folder with a space/and_an_underscore/"
+                            "and a long name so that the line must be broken/"
+                            "h\xc3\xa9/image-1.pdf")
+    (check= (serialize-latex `(includegraphics (!file-name ,name)))
+            (string-append "\\includegraphics{" name "}")))
   (check-group "conversion for MathJax: the images are temporary")
   (let* ((formula `(document (math (concat "x+" (graphics ""
                                                   (point "0" "0")

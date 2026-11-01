@@ -167,6 +167,9 @@
     <item*|<scm|!invariant>, <scm|!marker>>Verbatim <LaTeX> source reused
     by the conservative converter, and the source tracking markers
     <verbatim|{\\btm{...}}> and <verbatim|{\\etm{...}}>.
+
+    <item*|<scm|!file-name>>The name of a file, as in <scm|includegraphics>,
+    written as it is.
   </description-paragraphs>
 
   Any other list is serialized as a command application by
