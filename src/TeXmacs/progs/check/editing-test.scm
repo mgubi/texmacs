@@ -1032,6 +1032,85 @@
         ;; (a path which is not in the document)
         (check-false (can-insert-at? (stree->tree by) (at 7 7)))))))
 
+;; The start of a line which begins with a tag with an inner border (hidden)
+;; is the position just after the tag, and the keyboard reaches it: go-start,
+;; go-left from the next character. Return there, and the paragraphs and
+;; blocks inserted there, aborted TeXmacs (#712): the line was split in the
+;; string, which put an empty string beside the tag, and the cursor was then
+;; corrected into the tag. A crash aborts the whole suite, so the group is
+;; run just after test-insert-paragraphs.
+(define (test-insert-line-start)
+  (check-group "insert at the start of a line")
+  (let* ((by '(document "P" "Q"))
+         (block '(quotation (document "P" "Q")))
+         ;; the action and the document it makes from the tag
+         (cases
+          (list (cons (lambda () (kbd-return))
+                      (lambda (tag) `(document ,tag "z")))
+                (cons (lambda () (insert-raw-return))
+                      (lambda (tag) `(document ,tag "z")))
+                (cons (lambda () (insert by))
+                      (lambda (tag) `(document (concat ,tag "P") "Qz")))
+                (cons (lambda () (insert block))
+                      (lambda (tag) `(document ,tag ,block "z")))
+                (cons (lambda () (make 'itemize))
+                      (lambda (tag)
+                        `(document ,tag (itemize (document "")) "z"))))))
+    (for-each
+      (lambda (tag)
+        (for-each
+          (lambda (x)
+            (with-buffer-body `(document (concat ,tag "z"))
+              (lambda ()
+                ;; the position is reached by the keyboard: applying the
+                ;; changes to the view puts the cursor of go-start there
+                (edit (go-start))
+                (apply-changes)
+                (check= (cursor) '(0 1 0))
+                (edit ((car x)))
+                (check= (body) ((cdr x) tag))
+                (edit (undo 0))
+                (check= (body) `(document (concat ,tag "z"))))))
+          cases))
+      '((hidden "b") (hidden (document "b" "c"))))))
+
+;; A selection which ends at the border of the table, in the table (a path
+;; which is the prefix of the start of the selection) made raw_cut index
+;; past the end of the path and abort TeXmacs (#712). The cut goes to the
+;; end of the table; what an insertion of paragraphs does to such a
+;; selection is the business of the check of the selected cells.
+(define (test-selection-table-border)
+  (check-group "selection ending at a table border")
+  (let* ((tab '(tabular (tformat (table (row (cell "ab") (cell "cd"))
+                                        (row (cell (document "ef" "gh"))
+                                             (cell (strong "ij")))))))
+         (cleared '(document (tabular (tformat (table
+                      (row (cell "ab") (cell "cd"))
+                      (row (cell "") (cell ""))))))))
+    (with-buffer-body `(document ,tab)
+      (lambda ()
+        (edit (selection-set (at 0 0 0 1 0 0 0 0) (at 0 0 0 1)))
+        (edit (clipboard-cut "editing-test"))
+        (check= (body) cleared)
+        (edit (undo 0))
+        (check= (body) `(document ,tab))))
+    ;; the other border: the cut starts at the start of the table
+    (with-buffer-body `(document ,tab)
+      (lambda ()
+        (edit (selection-set (at 0 0 0 0) (at 0 0 0 0 1 0 0)))
+        (edit (clipboard-cut "editing-test"))
+        (check-true (tm-func? (cadr (body)) 'tabular))
+        (edit (undo 0))
+        (check= (body) `(document ,tab))))
+    ;; an insertion of paragraphs on such a selection does not abort, and
+    ;; leaves a table
+    (with-buffer-body `(document ,tab)
+      (lambda ()
+        (edit (selection-set (at 0 0 0 1 0 0 0 0) (at 0 0 0 1)))
+        (edit (insert '(document "P" "Q")))
+        (check-true (tm-func? (cadr (body)) 'tabular))))
+    (clipboard-clear "editing-test")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection and clipboard
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1855,6 +1934,8 @@
   (test-load)
   (test-insert)
   (test-insert-paragraphs)
+  (test-insert-line-start)
+  (test-selection-table-border)
   (test-cursor)
   (test-bad-cursor)
   (test-mouse-long)

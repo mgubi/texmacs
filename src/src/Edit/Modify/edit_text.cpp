@@ -150,10 +150,17 @@ edit_text_rep::insert_return () {
   }
   return_depth= N (p);
 
-  if (is_atomic (subtree (et, path_up (tp)))) split (tp);
-  if (last_item (tp)==right_index (subtree (et, path_up (tp))))
-    split (path_inc (path_up (tp)));
-  else split (path_up (tp));
+  // (where to split the line, found before the string is split: splitting
+  // it at its start or end puts an empty string beside a tag with an inner
+  // border, as hidden, and the change then corrects the cursor into that tag)
+  path q= path_up (tp);
+  if (is_atomic (subtree (et, q))) {
+    split (tp);
+    split (path_inc (q));
+  }
+  else if (last_item (tp)==right_index (subtree (et, q)))
+    split (path_inc (q));
+  else split (q);
   go_to (correct_cursor (et, path_inc (p) * 0));
   correct_concat (p);
   correct_concat (path_inc (p));
