@@ -570,6 +570,19 @@ edit_select_rep::selection_raw_get (string key) {
 }
 
 void
+edit_select_rep::selection_get_state (range_set& sel, bool& sg, bool& sh,
+                                      path& mid) {
+  sel= cur_sel; sg= selecting; sh= shift_selecting; mid= copy (mid_p);
+}
+
+void
+edit_select_rep::selection_set_state (range_set sel, bool sg, bool sh,
+                                      path mid) {
+  cur_sel= sel; selecting= sg; shift_selecting= sh; mid_p= mid;
+  notify_change (THE_SELECTION);
+}
+
+void
 edit_select_rep::selection_set_start (path p) {
   if (!selection_active_any ()) {
     if (rp < start (cur_sel)) select (start (cur_sel), start (cur_sel));
@@ -798,8 +811,21 @@ void
 edit_select_rep::raw_cut (path p1, path p2) {
   if (p2 == p1) return;
   path p = common (p1, p2);
-  tree t = subtree (et, p);
   int  n = N(p);
+  if (N(p1) == n || N(p2) == n) {
+    // One path is the left or the right border of a tag and the other one
+    // is inside it, as the end (tformat table 1) of a selection which starts
+    // in the second row of the table: the border is not a position inside
+    // the tag. The cut goes to the start or to the end of the tag (#712).
+    path q1= p1, q2= p2;
+    if (N(p1) == n) q1= (last_item (p1) == 0? start (et, path_up (p1)):
+                                              end (et, path_up (p1)));
+    if (N(p2) == n) q2= (last_item (p2) == 0? start (et, path_up (p2)):
+                                              end (et, path_up (p2)));
+    if (q1 != p1 || q2 != p2) raw_cut (q1, q2);
+    return;
+  }
+  tree t = subtree (et, p);
   int  i1= p1[n];
   int  i2= p2[n];
 
