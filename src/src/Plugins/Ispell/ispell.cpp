@@ -63,11 +63,12 @@ ispeller_rep::start () {
 
   string locale = language_to_locale (lan);
 
-  // a language without locale (klingon) has no dictionary: not English, as
-  // the library would take for the default, but the same error as the
-  // program (ispell_exe.cpp) gives
-  if (locale == "") {
-    error_msg = "Error: no dictionary installed for " * lan;
+  // a language which TeXmacs has no locale for (klingon: language_to_locale
+  // gives en_US for all of them) has no dictionary: not English, as the
+  // library would take, but an error, as the hunspell checker (and the
+  // misc-modules suite) have it
+  if (locale == "en_US" && lan != "english" && lan != "american") {
+    error_msg = "Error: no dictionary for " * lan;
     std_error << error_msg << "\nThe corresponding text is not checked\n";
     unavailable = true;
     return error_msg;
