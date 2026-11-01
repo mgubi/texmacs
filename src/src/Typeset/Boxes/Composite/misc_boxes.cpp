@@ -135,7 +135,6 @@ struct page_box_rep: composite_box_rep {
   void redraw_background (renderer ren);
   void pre_display (renderer& ren);
   void post_display (renderer& ren);
-  void display (renderer ren);
   void clear_incomplete (rectangles& rs, SI pixel, int i, int i1, int i2);
   void collect_page_numbers (hashmap<string,tree>& h, tree page);
   void collect_page_colors (array<brush>& bs, array<rectangle>& rs);
@@ -191,6 +190,14 @@ void
 page_box_rep::display_background (renderer ren) {
   if (page_bgc->get_type () != brush_none) {
     brush bgc= ren->get_background ();
+    if (page_bgc->get_type () == brush_pattern && ren->is_screen) {
+      // NOTE: the screen is repainted rectangle by rectangle and keeps the
+      // previous paint; the transparent parts of a pattern would show it
+      // (a checkerboard of leftovers, translucent parts painted twice).
+      // Like the paper of a print, start from the colour of the pattern.
+      ren->set_background (brush (page_bgc->get_color ()));
+      ren->clear (x1, y1, x2, y2);
+    }
     ren->set_background (page_bgc);
     ren->clear_pattern (x1, y1, x2, y2);
     ren->set_background (bgc);
@@ -210,19 +217,17 @@ page_box_rep::pre_display (renderer& ren) {
   display_background (ren);
   old_page= ren->cur_page;
   ren->set_page_nr (page_nr);
+  // NOTE: the decorations (header, footer, watermarks, background images)
+  // are drawn below the text, which is drawn by redraw after pre_display
+  if (!is_nil (decoration)) {
+    rectangles rs;
+    decoration->redraw (ren, path (), rs);
+  }
 }
 
 void
 page_box_rep::post_display (renderer& ren) {
   ren->set_page_nr (old_page);
-}
-
-void
-page_box_rep::display (renderer ren) {
-  if (!is_nil (decoration)) {
-    rectangles rs;
-    decoration->redraw (ren, path (), rs);
-  }
 }
 
 void
