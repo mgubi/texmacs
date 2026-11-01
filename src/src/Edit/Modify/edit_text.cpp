@@ -13,6 +13,7 @@
 #include "file.hpp"
 #include "analyze.hpp"
 #include "scheme.hpp"
+#include "patch.hpp"
 
 /******************************************************************************
 * Constructors and destructors
@@ -242,19 +243,72 @@ edit_text_rep::prepare_for_insert () {
 void
 edit_text_rep::insert_tree (tree t, path p_in_t) {
   bool cut= !as_bool (call ("like-emacs?"));
+  bool tested= false;   // the paragraphs were tested for the cut selection
+  bool cells = false;   // the selection is a selection of cells
+  path old_tp= tp;
+  range_set old_sel;
+  bool old_selecting= false, old_shift= false;
+  path old_mid;
+  // The cut of cells may leave no place for the paragraphs: it is made
+  // between marks of the history of this buffer, to be cancelled alone
+  struct cut_mark_rep {
+    edit_text_rep* ed; double m; bool on;
+    cut_mark_rep (): ed (NULL), m (0), on (false) {}
+    ~cut_mark_rep () { if (on) ed->mark_end (m); }
+  } cut_mark;
   if (is_multi_paragraph (t)) {
     // (where selection_cut will leave the cursor: it corrects the range)
     path ip= tp;
-    if (cut && selection_active_any ())
-      ip= selection_active_table ()? selection_get_start ()
-                                   : selection_var_get_start ();
+    if (cut && selection_active_any ()) {
+      if (selection_active_table ()) {
+        // (the cut empties the cells: see below)
+        ip  = selection_get_start ();
+        selection_get_state (old_sel, old_selecting, old_shift, old_mid);
+        cells= true;
+      }
+      else {
+        ip    = selection_var_get_start ();
+        tested= true;
+      }
+    }
     if (!can_insert_at (t, ip)) {
       // (nothing changes: the selection is not cut for nothing)
       set_message ("Several paragraphs cannot be inserted here", "insert");
       return;
     }
   }
+  if (cells) {
+    cut_mark.ed= this; cut_mark.m= new_marker (); cut_mark.on= true;
+    mark_start (cut_mark.m);
+  }
   if (cut) selection_cut ("none");
+  if (cells && !can_insert_at (t, tp)) {
+    // The cut left no place for paragraphs (the cells are not block cells,
+    // or they lost their format): the cut is undone, the cells are not
+    // cleared for nothing (only the changes since the mark)
+    cut_mark.on= false;
+    mark_cancel (cut_mark.m);
+    go_to (old_tp);
+    selection_set_state (old_sel, old_selecting, old_shift, old_mid);
+    set_message ("Several paragraphs cannot replace cells", "insert");
+    return;
+  }
+  if (tested && !can_insert_at (t, tp)) {
+    // The cut leaves the cursor in the tag next to the range when it removes
+    // the text up to the tag (a tag with an inner border, as hidden): the
+    // paragraphs go at the border of that tag, where the range began
+    for (path u= path_up (tp); rp < u; u= path_up (u))
+      if (is_compound (subtree (et, u))) {
+        path q;
+        if (tp == end (et, u)) q= u * 1;
+        else if (tp == start (et, u)) q= u * 0;
+        else continue;
+        if (can_insert_at (t, q)) {
+          go_to (q);
+          break;
+        }
+      }
+  }
   if (is_atomic (t) && (p_in_t == end (t)) &&
       is_atomic (subtree (et, path_up (tp))))
     insert (tp, t);

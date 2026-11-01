@@ -2871,6 +2871,14 @@
                  (document "u" (concat ,tag "P") "Q" "v"))
                 ((document (concat ,tag "a1x" ,tag)) "a1x" ,by
                  (document (concat ,tag "P") (concat "Q" ,tag)))
+                ;; the match is part of the text next to the tag, or all of
+                ;; it with text beyond (#711)
+                ((document (concat "z" ,tag "a1xb")) "a1x" ,by
+                 (document (concat "z" ,tag "P") "Qb"))
+                ((document (concat "ba1x" ,tag "z")) "a1x" ,by
+                 (document "bP" (concat "Q" ,tag "z")))
+                ((document (concat "z" ,tag "a1x") "next") "a1x" ,by
+                 (document (concat "z" ,tag "P") "Q" "next"))
                 ;; several matches
                 ((document (concat "a1x" ,tag) (concat ,tag "a1x") "a1x")
                  "a1x" ,by

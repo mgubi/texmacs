@@ -800,6 +800,177 @@
         (edit (selection-set (at 0 1) (at 0 2)))
         (edit (insert by))
         (check= (body) '(document "aP" "Qc"))))
+    ;; a selection cut up to a tag with an inner border (it starts right
+    ;; after the tag, or ends right before it): the cut leaves the cursor in
+    ;; the tag, the paragraphs go at the border of the tag (#711)
+    (let* ((block '(quotation (document "P" "Q")))
+           (try (lambda (how doc a b res)
+                  (with-buffer-body doc
+                    (lambda ()
+                      (clipboard-set "editing-test" (stree->tree by))
+                      (edit (selection-set (apply at a) (apply at b)))
+                      (edit (how))
+                      (check= (body) res)
+                      (edit (undo 0))
+                      (check= (body) doc))))))
+      (for-each
+        (lambda (tag)
+          (for-each
+            (lambda (how)
+              (try how `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 3)
+                   `(document (concat "z" ,tag "P") "Q"))
+              (try how `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 2)
+                   `(document (concat "z" ,tag "P") "Qc"))
+              (try how `(document (concat "abc" ,tag "z")) '(0 0 0) '(0 0 3)
+                   `(document "P" (concat "Q" ,tag "z")))
+              (try how `(document (concat "z" ,tag "abc")) '(0 0 0) '(0 0 1)
+                   `(document "P" (concat "Q" ,tag "abc"))))
+            (list (lambda () (insert by))
+                  (lambda () (clipboard-paste "editing-test"))))
+          (try (lambda () (insert block))
+               `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 3)
+               `(document (concat "z" ,tag) ,block))
+          (try (lambda () (insert block))
+               `(document (concat "abc" ,tag "z")) '(0 0 0) '(0 0 3)
+               `(document ,block (concat ,tag "z"))))
+        '((hidden "b") (freeze "b") (unfreeze "b") (ignore "b") (shown "b")
+          (table (row (cell "b"))) (expand* "foo" "b"))))
+    ;; a selection of cells: the cut empties the cells, which then have no
+    ;; place for paragraphs; nothing changes, and the selection is kept
+    (let* ((cells '(document (tabular (tformat (table (row
+                      (cell (document "ef" "gh")) (cell (strong "ij"))))))))
+           (a '(0 0 0 0 0 0 0 0)) (b '(0 0 0 0 1 0 0 2)))
+      (for-each
+        (lambda (how)
+          (with-buffer-body cells
+            (lambda ()
+              (buffer-pretend-saved (current-buffer))
+              (clipboard-set "editing-test" (stree->tree by))
+              (let ((n (undo-possibilities)))
+                (edit (selection-set (apply at a) (apply at b)))
+                (edit (how))
+                (check= (body) cells)
+                (check-true (selection-active-any?))
+                ;; (no undo entry, and not modified)
+                (check= (undo-possibilities) n)
+                (check-false (buffer-modified? (current-buffer))))
+              (edit (selection-cancel)))))
+        (list (lambda () (insert by))
+              (lambda () (insert '(quotation (document "P" "Q"))))
+              (lambda () (clipboard-paste "editing-test"))))
+      ;; text still replaces the cells
+      (with-buffer-body cells
+        (lambda ()
+          (edit (selection-set (apply at a) (apply at b)))
+          (edit (insert "xx"))
+          (check= (body) '(document (tabular (tformat (table (row
+                                       (cell "xx"))))))))))
+    ;; the refusal cancels the cut only: changes made earlier in the same
+    ;; editing step, here and in another buffer, stay and can be undone;
+    ;; the redo list is kept
+    (let* ((doc '(document "hello" (tabular (tformat (table (row
+                   (cell (document "ef" "gh")) (cell (strong "ij"))))))))
+           (typed (cons 'document (cons "helloXY" (cddr doc))))
+           (ca '(1 0 0 0 0 0 0 0)) (cb '(1 0 0 0 1 0 0 2)))
+      (for-each
+        (lambda (how)
+          (with-buffer-body doc
+            (lambda ()
+              (clipboard-set "editing-test" (stree->tree by))
+              (edit (go-to (at 0 5))
+                    (insert "XY")
+                    (selection-set (apply at ca) (apply at cb))
+                    (how))
+              (check= (body) typed)
+              (check-true (selection-active-table?))
+              (edit (selection-cancel))
+              (edit (undo 0))
+              (check= (body) doc))))
+        (list (lambda () (insert by))
+              (lambda () (insert '(quotation (document "P" "Q"))))
+              (lambda () (clipboard-paste "editing-test"))))
+      (with-buffer-body doc
+        (lambda ()
+          (let* ((a (current-buffer)) (b (new-buffer)))
+            (switch-to-buffer* b)
+            (buffer-set-body b (stree->tree '(document "bee")))
+            (go-start)
+            (update-forced)
+            (switch-to-buffer* a)
+            (update-forced)
+            (clipboard-set "editing-test" (stree->tree by))
+            (edit (switch-to-buffer* b)
+                  (go-to (append (buffer-path) '(0 3)))
+                  (insert "ZZ")
+                  (switch-to-buffer* a)
+                  (selection-set (apply at ca) (apply at cb))
+                  (insert by))
+            (check= (body) doc)
+            (switch-to-buffer* b)
+            (check= (body) '(document "beeZZ"))
+            (switch-to-buffer* a)
+            (edit (selection-cancel)))))
+      ;; no earlier change: nothing to undo, redo kept, a saved buffer stays
+      ;; saved and the selection is the same
+      (with-buffer-body doc
+        (lambda ()
+          (clipboard-set "editing-test" (stree->tree by))
+          (edit (go-to (at 0 5)) (insert "XY"))
+          (edit (undo 0))
+          (buffer-pretend-saved (current-buffer))
+          (let ((n (undo-possibilities)) (r (redo-possibilities)))
+            (edit (selection-set (apply at ca) (apply at cb)))
+            (let ((s (list (selection-get-start) (selection-get-end))))
+              (edit (insert by))
+              (check= (body) doc)
+              (check= (undo-possibilities) n)
+              (check= (redo-possibilities) r)
+              (check-false (buffer-modified? (current-buffer)))
+              (check= (list (selection-get-start) (selection-get-end)) s))
+            (edit (selection-cancel))))))
+    ;; block cells (hyphenated cells, wide-tabular): the cleared first cell
+    ;; holds paragraphs again, so they go in when it was a document; with a
+    ;; plain first cell nothing changes
+    (let* ((rows (lambda (c1) `(table (row (cell ,c1) (cell "cd"))
+                                      (row (cell "ef") (cell "gh")))))
+           ;; (all the cells are made documents)
+           (done (lambda (c1) `(table (row (cell ,c1) (cell (document "")))
+                                      (row (cell (document "ef"))
+                                           (cell (document "gh"))))))
+           (hy (lambda (m c1) `(document (tabular (tformat
+                  (cwith "1" "-1" "1" "-1" "cell-hyphen" ,m) ,c1)))))
+           (wide (lambda (c1) `(document (wide-tabular (tformat ,c1)))))
+           (tried (lambda (doc a b how res)
+                    (with-buffer-body doc
+                      (lambda ()
+                        (clipboard-set "editing-test" (stree->tree by))
+                        (let ((before (body)))
+                          (edit (selection-set (apply at a) (apply at b)))
+                          (edit (how))
+                          (check= (body) (or res before))
+                          (when res
+                            (edit (undo 0))
+                            (check= (body) before))
+                          (when (not res)
+                            (check-true (selection-active-any?)))
+                          (edit (selection-cancel))))))))
+      (for-each
+        (lambda (how)
+          (for-each
+            (lambda (m)
+              (tried (hy m (rows '(document "ab" "a2"))) '(0 0 1 0 0 0 0 0)
+                     '(0 0 1 0 1 0 1) how
+                     (hy m (done '(document "P" "Q"))))
+              (tried (hy m (rows "ab")) '(0 0 1 0 0 0 0) '(0 0 1 0 1 0 1)
+                     how #f))
+            '("t" "b" "c"))
+          (tried (wide (rows '(document "ab" "a2"))) '(0 0 0 0 0 0 0 0)
+                 '(0 0 0 0 1 0 1) how (wide (done '(document "P" "Q"))))
+          (tried (wide (rows "ab")) '(0 0 0 0 0 0 0) '(0 0 0 0 1 0 1)
+                 how #f))
+        (list (lambda () (insert by))
+              (lambda () (clipboard-paste "editing-test")))))
+    (clipboard-clear "editing-test")
     ;; a selection which starts inside a tag and ends outside it: the cut
     ;; starts before the tag, where paragraphs can go
     ;; (setting a clipboard cancels the selection)
