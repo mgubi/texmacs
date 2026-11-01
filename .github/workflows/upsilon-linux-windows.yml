@@ -186,28 +186,39 @@ jobs:
           echo "GSD=$(cygpath -u '${{ runner.temp }}')/gs-deps" >> "$GITHUB_ENV"
           echo "ASP=$(cygpath -u '${{ runner.temp }}')/aspell-deps" >> "$GITHUB_ENV"
 
-      - name: Cache of Ghostscript and Aspell
+      - name: Cache of Ghostscript
         id: gs-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            ${{ runner.temp }}\gs-deps
-            ${{ runner.temp }}\aspell-deps
-          key: gs-aspell-windows-${{ hashFiles('src/packages/build-gs.sh', 'src/packages/windows/build-aspell.sh') }}
+          path: ${{ runner.temp }}\gs-deps
+          key: gs-windows-${{ hashFiles('src/packages/build-gs.sh') }}
 
-      - name: Ghostscript and Aspell
+      - name: Ghostscript
         if: steps.gs-cache.outputs.cache-hit != 'true'
-        run: |
-          packages/build-gs.sh "$GSD"
-          packages/windows/build-aspell.sh "$ASP"
+        run: packages/build-gs.sh "$GSD"
 
       - uses: actions/cache/save@v4
         if: steps.gs-cache.outputs.cache-hit != 'true'
         with:
-          path: |
-            ${{ runner.temp }}\gs-deps
-            ${{ runner.temp }}\aspell-deps
+          path: ${{ runner.temp }}\gs-deps
           key: ${{ steps.gs-cache.outputs.cache-primary-key }}
+
+      - name: Cache of Aspell
+        id: asp-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: aspell-windows-${{ hashFiles('src/packages/windows/build-aspell.sh') }}
+
+      - name: Aspell
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        run: packages/windows/build-aspell.sh "$ASP"
+
+      - uses: actions/cache/save@v4
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: ${{ steps.asp-cache.outputs.cache-primary-key }}
 
       - name: Configure
         run: |
@@ -627,28 +638,39 @@ jobs:
           echo "GSD=$(cygpath -u '${{ runner.temp }}')/gs-deps" >> "$GITHUB_ENV"
           echo "ASP=$(cygpath -u '${{ runner.temp }}')/aspell-deps" >> "$GITHUB_ENV"
 
-      - name: Cache of Ghostscript and Aspell
+      - name: Cache of Ghostscript
         id: gs-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            ${{ runner.temp }}\gs-deps
-            ${{ runner.temp }}\aspell-deps
-          key: gs-aspell-windows-${{ hashFiles('src/packages/build-gs.sh', 'src/packages/windows/build-aspell.sh') }}
+          path: ${{ runner.temp }}\gs-deps
+          key: gs-windows-${{ hashFiles('src/packages/build-gs.sh') }}
 
-      - name: Ghostscript and Aspell
+      - name: Ghostscript
         if: steps.gs-cache.outputs.cache-hit != 'true'
-        run: |
-          packages/build-gs.sh "$GSD"
-          packages/windows/build-aspell.sh "$ASP"
+        run: packages/build-gs.sh "$GSD"
 
       - uses: actions/cache/save@v4
         if: steps.gs-cache.outputs.cache-hit != 'true'
         with:
-          path: |
-            ${{ runner.temp }}\gs-deps
-            ${{ runner.temp }}\aspell-deps
+          path: ${{ runner.temp }}\gs-deps
           key: ${{ steps.gs-cache.outputs.cache-primary-key }}
+
+      - name: Cache of Aspell
+        id: asp-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: aspell-windows-${{ hashFiles('src/packages/windows/build-aspell.sh') }}
+
+      - name: Aspell
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        run: packages/windows/build-aspell.sh "$ASP"
+
+      - uses: actions/cache/save@v4
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: ${{ steps.asp-cache.outputs.cache-primary-key }}
 
       # NOTE: saved once built, even when TeXmacs does not build
       - name: Cache of the libraries
