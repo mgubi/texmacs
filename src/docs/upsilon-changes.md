@@ -49,6 +49,10 @@ have the details, and the problems go to the
   `gs.exe` is not called `gswin64c.exe`, so the TeX tools which look for that
   name (`epstopdf`, `ps2pdf` of a TeX distribution) do not find it (#662).
 
+- **Images with an effect in Vue**: an image or a pattern with an effect
+  (a recoloring, say) was read after it had been freed, which gave wrong
+  colors and sometimes a crash. Found by the tests of the page background.
+
 - **Shell scripts** (desktop): a `.sh`, `.bash` or `.zsh` file opens as shell
   code, as a `.lua` file opens as Lua code: highlighting by tree-sitter,
   structured editing and the language server, and it is saved byte for byte
