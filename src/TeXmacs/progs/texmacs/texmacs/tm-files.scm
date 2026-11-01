@@ -297,6 +297,44 @@
            #t)
           (else #f))))
 
+;; The typesetting of a buffer which failed (edit_typeset_rep::typeset_sub):
+;; the document was replaced by an empty one, and a copy of it saved in
+;; $TEXMACS_HOME_PATH/system/recovered. Saving the buffer over its file
+;; would replace the file by what is left, so that it is asked first.
+(define typeset-failed-buffers (make-ahash-table))
+
+(tm-define (typeset-failure-recover name msg)
+  (:synopsis "Save the document of a buffer whose typesetting failed")
+  (ahash-set! typeset-failed-buffers (url->string name) #t)
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (tail (url->string (url-tail name)))
+         (safe (list->string
+                (map (lambda (c)
+                       (if (or (char-alphabetic? c) (char-numeric? c)
+                               (in? c '(#\. #\- #\_)))
+                           c #\_))
+                     (string->list tail))))
+         (file (url-append dir (string-append
+                                (number->string (texmacs-time))
+                                "-" (if (== safe "") "buffer" safe)
+                                (if (== (url-suffix tail) "tm") "" ".tm"))))
+         (saved (catch #t
+                  (lambda ()
+                    (system-mkdir dir)
+                    (not (buffer-export name file "texmacs")))
+                  (lambda args #f))))
+    (set-message
+     `(concat "The document could not be typeset (" ,msg "), and was "
+              "replaced by an empty one. "
+              ,(if saved
+                   `(concat "A copy was saved in " (verbatim ,(url->system file)) ".")
+                   "Its copy could not be saved: close it without saving."))
+     "Typesetting failure")
+    (and saved (url->system file))))
+
+(tm-define (typeset-failed-buffer? name)
+  (ahash-ref typeset-failed-buffers (url->string name)))
+
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
   (with vname `(verbatim ,(url->system name))
@@ -314,6 +352,12 @@
            (save-buffer-post name opts))
           ((cannot-write? name "Save file")
            (noop))
+          ((typeset-failed-buffer? name)
+           (user-confirm "The document could not be typeset and was replaced by an empty one. Really save it over the file?" #f
+             (lambda (answ)
+               (when answ
+                 (ahash-remove! typeset-failed-buffers (url->string name))
+                 (save-buffer-check-permissions name opts)))))
           ((and (url-test? name "fr")
                 (and-with mod-t (url-last-modified name)
                   (and-with save-t (buffer-last-save name)

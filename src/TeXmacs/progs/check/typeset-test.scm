@@ -1254,12 +1254,27 @@
 ;; A document whose typesetting fails is replaced by an empty one, and the
 ;; typesetting goes on, in it and in the other buffers (the bridges which
 ;; were recording what they read when it failed do not record any more).
+;; The text is not lost silently (#704): a copy of the document is saved
+;; in the system folder of the home, and saving the buffer over its file
+;; is asked first.
 (define (test-typesetting-failure)
   (check-group "typesetting failure")
-  (with-typeset-body
-   '(document "first" "second" (anim-compose) "third")
-   (lambda ()
-     (check= (tree->stree (buffer-tree)) '(document ""))))
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (files (lambda () (map url->system (url-read-directory dir "*.tm"))))
+         (before (files)))
+    (with-typeset-body
+     '(document "first" "second" (anim-compose) "third")
+     (lambda ()
+       (check= (tree->stree (buffer-tree)) '(document ""))
+       (check-true (typeset-failed-buffer? (current-buffer)))
+       ;; the copy of the document, made before it was replaced
+       (let ((new (filter (lambda (f) (not (member f before))) (files))))
+         (check-true (pair? new))
+         (when (pair? new)
+           (let ((text (string-load (car new))))
+             (check-true (string-contains? text "second"))
+             (check-true (string-contains? text "anim-compose"))
+             (check-true (string-contains? text "third"))))))))
   (with-typeset-body
    '(document "one" "two" "three")
    (lambda ()
@@ -1267,6 +1282,55 @@
      (update-forced)
      (check= (tree->stree (buffer-tree)) '(document "one" "two again" "three"))
      (check-true (> (rect-x2 (rect 1)) (rect-x1 (rect 1)))))))
+
+;; A document with nothing to show on a page, such as one made of hidden
+;; content only, is typeset as an empty page and keeps its tree: it
+;; used to throw "empty composite box" (papyrus: "unexpected situation") and
+;; to be replaced by an empty document (#704).
+(define (test-hidden-documents)
+  (check-group "documents without visible content")
+  (let ((typeset-as-it-is (lambda (doc medium)
+    (with-typeset-body
+     doc
+     (lambda ()
+       (init-env "page-medium" medium)
+       (update-forced)
+       (check= (tree->stree (buffer-tree)) doc)
+       (check= (get-page-count) 1)
+       ;; a visible line added, then removed again
+       (tree-insert (buffer-tree) (length (cdr doc)) '("visible"))
+       (update-forced)
+       (check= (tree->stree (buffer-tree)) (append doc '("visible")))
+       (check-true (> (rect-x2 (rect (length (cdr doc))))
+                      (rect-x1 (rect (length (cdr doc))))))
+       (tree-remove (buffer-tree) (length (cdr doc)) 1)
+       (update-forced)
+       (check= (tree->stree (buffer-tree)) doc))))))
+  (for-each
+   (lambda (medium)
+     (for-each
+      (lambda (doc) (typeset-as-it-is doc medium))
+      '((document (hidden "secret text"))
+        (document (concat (hidden "b")))
+        (document (hidden "a") (hidden "b"))
+        (document (with "color" "red" (hidden "x")))
+        (document (shown "x"))
+        (document (ignore "x"))
+        (document (freeze "x"))
+        (document (concat "" (hidden "b")))
+        (document))))
+   '("paper" "papyrus" "automatic")))
+  ;; the text of the first repro of #704: all of it replaced
+  (with-typeset-body
+   '(document (concat "a1x" (hidden "b")))
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 0 0) "")
+     (update-forced)
+     (check= (tree->stree (buffer-tree)) '(document (concat "" (hidden "b"))))
+     ;; and undone
+     (tree-set (tree-ref (buffer-tree) 0 0) "a1x")
+     (update-forced)
+     (check= (tree->stree (buffer-tree)) '(document (concat "a1x" (hidden "b")))))))
 
 ;; A length in a unit made by a macro of the document: when the macro
 ;; changes, what the environment derived from the length changes too (the
@@ -3274,6 +3338,7 @@
   (test-pages-kept)
   (test-long-document-without-pages)
   (test-typesetting-failure)
+  (test-hidden-documents)
   (test-derived-state)
   (test-renumbering-labels)
   (test-label-names)
