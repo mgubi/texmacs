@@ -72,8 +72,19 @@ TeXmacs_lazy_catcher (void *data, SCM tag, SCM throw_args) {
   return SCM_UNSPECIFIED; /* never returns */
 }
 
+static int caught_errors= 0;
+
+int
+scheme_caught_errors () {
+  // the number of errors caught so far at the calls from C++ to Scheme,
+  // which then give the error as their result: a caller can tell that an
+  // empty result comes from an error (#705)
+  return caught_errors;
+}
+
 SCM
 TeXmacs_catcher (void *data, SCM tag, SCM args) {
+  caught_errors++;  // seen by scheme_caught_errors (#705)
   (void) data;
   return scm_cons (tag, args);
 }
