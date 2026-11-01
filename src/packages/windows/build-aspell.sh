@@ -78,8 +78,12 @@ f=$(fetch "$ASPELL_URL" $ASPELL_SHA256)
 mkdir "$work/aspell"
 tar xf "$f" -C "$work/aspell" --strip-components 1
 cd "$work/aspell"
-# static (it goes into texmacs.exe), no translations
-./configure --prefix="$prefix" --enable-static --disable-shared --disable-nls
+# static (it goes into texmacs.exe), no translations; on Windows (MSYS2) the
+# prefix as Windows writes it (D:/a/...): aspell.exe, a Windows program, finds
+# its data folder there when the dictionaries are built, where it cannot
+# open /d/a/...
+if command -v cygpath > /dev/null 2>&1; then wprefix=$(cygpath -m "$prefix"); else wprefix="$prefix"; fi
+./configure --prefix="$wprefix" --enable-static --disable-shared --disable-nls
 make -j"$jobs"
 make install
 cp COPYING "$lic/Aspell-COPYING"
