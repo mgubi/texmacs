@@ -1,5 +1,6 @@
 ("(Re)Build autocompletion index" "(Ri)Crea indice di completamento automatico")
 ("A modifier" "modificatore A")
+("Base color:" "Colore di base:")
 ("GNU" "GNU")
 ("H modifier" "modificatore H")
 ("LaTeX" "LaTeX")

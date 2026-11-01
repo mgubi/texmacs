@@ -612,7 +612,7 @@ init_std_drd () {
   init (BACKUP, "backup",
         fixed (2) -> regular (0));
   init (_PATTERN, "pattern",
-        options (3, 1, DETAILED) -> returns_color () ->
+        options (3, 2, DETAILED) -> returns_color () ->
         url_type (0));
   init (GRADIENT, "gradient",
         fixed (3) -> returns_color ());           // not yet implemented

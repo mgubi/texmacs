@@ -1246,6 +1246,19 @@ tmg_get_hex_color (tmscm arg1) {
 }
 
 tmscm
+tmg_paper_color (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "paper-color");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_paper_color (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_named_color_2xcolormap (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "named-color->xcolormap");
 
@@ -11736,6 +11749,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("force-load-translations",  tmg_force_load_translations, 2, 0, 0);
   tmscm_install_procedure ("color",  tmg_color, 1, 0, 0);
   tmscm_install_procedure ("get-hex-color",  tmg_get_hex_color, 1, 0, 0);
+  tmscm_install_procedure ("paper-color",  tmg_paper_color, 1, 0, 0);
   tmscm_install_procedure ("named-color->xcolormap",  tmg_named_color_2xcolormap, 1, 0, 0);
   tmscm_install_procedure ("rgba->named-color",  tmg_rgba_2named_color, 1, 0, 0);
   tmscm_install_procedure ("named-color->rgba",  tmg_named_color_2rgba, 1, 0, 0);

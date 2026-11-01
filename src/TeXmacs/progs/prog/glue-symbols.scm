@@ -133,6 +133,7 @@
 "force-load-translations"
 "color"
 "get-hex-color"
+"paper-color"
 "named-color->xcolormap"
 "rgba->named-color"
 "named-color->rgba"

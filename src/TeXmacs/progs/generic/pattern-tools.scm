@@ -134,8 +134,11 @@
 
 (define (set-effect key kind apply? . args)
   (with col (get-color key)
-    (set-color key `(pattern ,(cadr col) ,(caddr col) ,(cadddr col)
-                         ,@(set-effect* key (cddddr col) apply? kind args)))))
+    (with tail (set-effect* key (if (pattern-effect col)
+                                    (list (pattern-effect col))
+                                    (list))
+                            apply? kind args)
+      (set-color key (pattern-set-effect col (and (nnull? tail) (car tail)))))))
 
 (define (get-effect* key eff kind)
   (cond ((or (npair? eff) (npair? (cdr eff))) #f)
@@ -144,8 +147,13 @@
 
 (define (get-effect key kind)
   (with col (get-color key)
-    (with eff (and (nnull? (cddddr col)) (car (cddddr col)))
-      (get-effect* key eff kind))))
+    (get-effect* key (pattern-effect col) kind)))
+
+(define (set-base key base)
+  (set-color key (pattern-set-base (get-color key) base)))
+
+(define (get-base key)
+  (pattern-base (get-color key)))
 
 (define (set-recolor key recol)
   (set-effect key 'eff-recolor (nnot recol) recol))
@@ -270,6 +278,23 @@
       ((icon "tm_add.xpm") (inc-skin key)))
     >>))
 
+(tm-widget (pattern-base-options key)
+  (hlist
+    (when (get-base key)
+      (enum (set-base key answer)
+            (list (or (get-base key) "")
+                  "black" "white" "grey" "red" "green" "blue"
+                  "yellow" "cyan" "magenta" "orange" "brown" "")
+            (or (get-base key) "") "15em"))
+    // // //
+    (toggle (set-base key (and answer (default-base-color)))
+            (nnot (get-base key)))
+    // // //
+    ((icon "tm_color.xpm")
+     (interactive-color (cut set-base key <>)
+                        (list (or (get-base key) ""))))
+    >>))
+
 (tm-widget (pattern-blur-options key)
   (hlist
     (when (get-blur key)
@@ -343,6 +368,8 @@
           (dynamic (pattern-recolor-options key)))
         (item (text "Skin:")
           (dynamic (pattern-skin-options key)))
+        (item (text "Base color:")
+          (dynamic (pattern-base-options key)))
         ;; TODO: the blur effect changes the image size;
         ;; one needs a blur that wraps around torically
         ;;(item (text "Blur:")
@@ -380,6 +407,8 @@
           (dynamic (pattern-recolor-options key)))
         (item (text "Skin:")
           (dynamic (pattern-skin-options key)))
+        (item (text "Base color:")
+          (dynamic (pattern-base-options key)))
         ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
