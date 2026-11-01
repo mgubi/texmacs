@@ -135,7 +135,10 @@ esac
 [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF" || fail "no PDF with an EPS image: the gs of the package was not used"
 # the gs which TeXmacs runs (its debug output, gs_utilities.cpp): the one of
 # the package
-if tr '\\' / < "$out" | tr -d '\r' | grep -F "gs executable: " | grep -qF "gs executable: $want"; then
+# (in an AppImage, the name gs alone: AppRun puts its usr/bin first in the PATH,
+# before the failing gs of this script)
+if tr '\\' / < "$out" | tr -d '\r' | grep -F "gs executable: " | grep -qF "gs executable: $want" ||
+   { [ -n "$appdir" ] && grep -qx "TeXmacs\] debug-convert, gs executable: gs" "$out"; }; then
   ok "TeXmacs runs the gs of the package for its conversions: $(tr '\\' / < "$out" | tr -d '\r' | grep -F 'gs executable: ' | head -1 | cut -d: -f2- | cut -c1-120)"
 else
   fail "TeXmacs did not run the gs of the package ($want) for a conversion"
