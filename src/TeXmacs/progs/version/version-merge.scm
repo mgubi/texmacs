@@ -160,9 +160,11 @@
 (define key-table (make-ahash-table))
 (define seen-table (make-ahash-table))
 (define seen-stamp 0)
+(define tree-keys-table (make-ahash-table))
 
 (define (reset-key-tables)
   (set! key-table (make-ahash-table))
+  (set! tree-keys-table (make-ahash-table))
   (set! seen-table (make-ahash-table)))
 
 (define (word-key w)
@@ -172,10 +174,20 @@
         (ahash-set! key-table w k)
         k)))
 
+(define (text-children t)
+  ;; The children of the markup @t which are text of the document: not the
+  ;; names of labels and files, the attributes of with, the formats of tables
+  (cond ((in? (car t) '(with tformat)) (list (cAr t)))
+        ((== (car t) 'hlink) (list (cadr t)))
+        ((in? (car t) '(label reference pageref image include specific
+                        action cite nocite)) '())
+        (else (cdr t))))
+
 (define (for-each-word t f)
   (cond ((string? t)
          (for-each (lambda (w) (f (word-key w))) (string-decompose t " ")))
-        ((pair? t) (for-each (lambda (x) (for-each-word x f)) (cdr t)))))
+        ((pair? t) (for-each (lambda (x) (for-each-word x f))
+                             (text-children t)))))
 
 (define (tree-keys-if t pred?)
   ;; The words of @t which satisfy @pred?, each one once
@@ -189,12 +201,20 @@
           (set! acc (cons k acc)))))
     acc))
 
+(define (tree-keys* t)
+  (with real (tree-keys-if t (lambda (k) (>= (string-length k) min-word-length)))
+    (if (null? real) (all-keys t) real)))
+
 (define (tree-keys t)
   ;; The real words of @t, each one once: neither short nor stop words.  A
   ;; text without any real word (such as "Let x+y be.") has only short ones,
   ;; which then count, for this text and for those compared with it
-  (with real (tree-keys-if t (lambda (k) (>= (string-length k) min-word-length)))
-    (if (null? real) (all-keys t) real)))
+  (if (string? t)
+      (or (ahash-ref tree-keys-table t)
+          (with keys (tree-keys* t)
+            (ahash-set! tree-keys-table t keys)
+            keys))
+      (tree-keys* t)))
 
 (define (all-keys t)
   (tree-keys-if t (lambda (k) (!= k ""))))
@@ -218,10 +238,11 @@
           ((ahash-ref h (car l)) (loop (cdr l) (+ c 1)))
           (else (loop (cdr l) c)))))
 
-(define (enough-shared? c n1 n2)
-  ;; At least half of the words of the smaller set are shared
+(define (enough-shared? c n1 n2 short?)
+  ;; At least half of the words of the smaller set are shared, and more than
+  ;; one real word (a single one proves nothing)
   (with n (min n1 n2)
-    (and (> n 0) (>= (* 2 c) n))))
+    (and (> n 0) (>= (* 2 c) n) (or short? (> c 1)))))
 
 (define (near-identical? x y)
   ;; Are the elements @x and @y the same paragraph?
@@ -233,7 +254,15 @@
                   (kx (if short? (all-keys x) kx0))
                   (ky (if short? (all-keys y) ky0)))
              (enough-shared? (shared-count kx (keys-table ky))
-                             (length kx) (length ky))))))
+                             (length kx) (length ky) short?)))))
+
+(define (enough-words? t)
+  ;; Can @t be recognized in a new text, or does it have too few real words?
+  (with keys (tree-keys t)
+    (and (not (short-keys? keys)) (pair? keys) (pair? (cdr keys)))))
+
+(define (shared-words x y)
+  (shared-count (tree-keys x) (keys-table (tree-keys y))))
 
 ;; The words of the elements are indexed by packets of this many elements,
 ;; made when needed: a new element is compared with the elements near its
@@ -281,6 +310,8 @@
                        (all-keys z)
                        (tree-keys z)))
              (nz (length keys))
+             (short? (or (short-keys? keys)
+                         (and own (vector-ref shorts own))))
              (touched '()))
         (for-each
          (lambda (w)
@@ -296,14 +327,15 @@
          keys)
         (let* ((c (if own (vector-ref counts own) 0))
                (sim? (and own
-                          (enough-shared? c nz (vector-ref sizes own))
+                          (enough-shared? c nz (vector-ref sizes own) short?)
                           (same-kind? (vector-ref v i) z))))
           (let loop ((l touched) (top 0) (best #f) (bestc 0))
             (if (pair? l)
                 (let* ((k (car l))
                        (ck (vector-ref counts k))
                        (ok? (and (!= k own)
-                                 (enough-shared? ck nz (vector-ref sizes k))
+                                 (enough-shared? ck nz (vector-ref sizes k)
+                                                 short?)
                                  (same-kind? (vector-ref v (+ s k)) z))))
                   (vector-set! counts k 0)
                   (cond ((== k own) (loop (cdr l) top best bestc))
@@ -370,45 +402,76 @@
         (with old (vector->list vo)
           (nnot (list-find (hunk-ins h) (cut in? <> old)))))))
 
-(define (certain-edit? vo r i ins)
+(define (certain-edit? pairing r i ins)
   ;; Does the hunk @r, next to the insertion of the elements @ins by the
   ;; other side, surely edit its element number @i?  This places @ins.
   (and (hunk-one-for-one? r)
        (let* ((s (hunk-start r))
-              (z (list-ref (hunk-ins r) (- i s)))
-              (pairing (make-pairing vo s (hunk-end r))))
+              (z (list-ref (hunk-ins r) (- i s))))
          (and (== (pairing z i) 'paired)
               (not (list-find ins (cut near-identical? <> z)))))))
 
-(define (touching-joins? vo h m ge)
+(define (anchor-survives? vo pairing i ins)
+  ;; A removal next to the element number @i relies on it: it must stay in
+  ;; the new elements @ins of the other side.  An element with too few real
+  ;; words can't be recognized, and it is then taken as changed.
+  (or (not (enough-words? (vector-ref vo i)))
+      (nnot (list-find ins (lambda (z) (== (pairing z i) 'paired))))))
+
+(define (removal-touching-joins? vo pairing h m ge)
+  ;; Can the removal by one side and the hunk of the other side, touching at
+  ;; @ge, lose everything?  Each one relies on what the other one changes.
+  (let* ((o1 (vector-ref vo (- ge 1)))
+         (o2 (vector-ref vo ge)))
+    (cond ((and (null? (hunk-ins h)) (null? (hunk-ins m))) #t)
+          ((near-identical? o1 o2) #t)
+          ((null? (hunk-ins m))
+           (not (anchor-survives? vo pairing ge (hunk-ins h))))
+          (else (not (anchor-survives? vo pairing (- ge 1) (hunk-ins m)))))))
+
+(define (same-new-text? vo h m ge)
+  ;; Do the two sides make the same text of two neighbouring elements?  It
+  ;; is closer to each other than to what each one was
+  (let* ((z1 (cAr (hunk-ins m)))
+         (z2 (car (hunk-ins h))))
+    (or (== z1 z2)
+        (and (near-identical? z1 z2)
+             (with c (shared-words z1 z2)
+               (and (> c (shared-words z1 (vector-ref vo (- ge 1))))
+                    (> c (shared-words z2 (vector-ref vo ge)))))))))
+
+(define (touching-joins? vo pairing h m ge)
   ;; The hunks @h and @m of different sides touch at @ge, @m coming first.
-  ;; Two replacements stay apart: each one is anchored by the elements kept
-  ;; by the other side.  An insertion goes before or after a replacement
-  ;; only if the latter surely edits the element next to it.
+  ;; Two replacements stay apart: each one is anchored by the element kept by
+  ;; the other side, provided that this element stays (see above).  An
+  ;; insertion goes before or after a replacement only if the latter surely
+  ;; edits the element next to it.
   (let* ((hi? (hunk-insertion? h))
          (mi? (hunk-insertion? m)))
     (cond ((and hi? mi?) #t)
           ((or (hunk-uncertain? vo h) (hunk-uncertain? vo m)) #t)
-          (hi? (not (certain-edit? vo m (- ge 1) (hunk-ins h))))
-          (mi? (not (certain-edit? vo h ge (hunk-ins m))))
-          (else #f))))
+          (hi? (not (certain-edit? pairing m (- ge 1) (hunk-ins h))))
+          (mi? (not (certain-edit? pairing h ge (hunk-ins m))))
+          ((or (null? (hunk-ins h)) (null? (hunk-ins m)))
+           (removal-touching-joins? vo pairing h m ge))
+          (else (same-new-text? vo h m ge)))))
 
-(define (hunk-joins? vo h g ge)
+(define (hunk-joins? vo pairing h g ge)
   ;; Does the hunk @h go with the group @g which ends at @ge?
   (or (< (hunk-start h) ge)
       (and (== (hunk-start h) ge)
            (nnot (list-find g (lambda (m)
                                 (and (!= (hunk-side m) (hunk-side h))
                                      (== (hunk-end m) ge)
-                                     (touching-joins? vo h m ge))))))))
+                                     (touching-joins? vo pairing h m ge))))))))
 
-(define (hunk-groups vo l)
+(define (hunk-groups vo pairing l)
   ;; Groups the hunks of the two sides which have to be merged together
   (let loop ((l l) (acc '()))
     (if (null? l)
         (reverse acc)
         (let group ((g (list (car l))) (ge (hunk-end (car l))) (r (cdr l)))
-          (if (and (pair? r) (hunk-joins? vo (car r) g ge))
+          (if (and (pair? r) (hunk-joins? vo pairing (car r) g ge))
               (group (cons (car r) g) (max ge (hunk-end (car r))) (cdr r))
               (loop r (cons (reverse g) acc)))))))
 
@@ -427,7 +490,13 @@
 ;; Replacements of the same elements by both sides
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (merge-positions tag vo s e sa sb)
+(define (same-container? o a b)
+  ;; Blocks with a body, like theorems: the rules apply inside, to each
+  ;; paragraph, whatever remains in common in the whole
+  (and (same-shape? o a b)
+       (nnot (list-find (cdr o) (cut tm-is? <> 'document)))))
+
+(define (merge-positions tag vo pairing s e sa sb)
   ;; Both sides replace the elements from @s to @e one by one, with the
   ;; elements @sa and @sb: they are merged element by element, and a conflict
   ;; stays local.  A new element closer to another old one shows that the
@@ -435,16 +504,16 @@
   (let* ((n (- e s))
          (va (list->vector sa))
          (vb (list->vector sb))
-         (pairing (make-pairing vo s e))
          (state (make-vector n 'take))
          (far (make-vector n #f)))
     (define (mark-far! k j)
       ;; @k and @j (an index in @vo) do not correspond
-      (let* ((j* (- j s))
-             (lo (min k j*))
-             (hi (max k j*))
-             (x (vector-ref far lo)))
-        (vector-set! far lo (if x (max x hi) hi))))
+      (when (and (>= j s) (< j e))
+        (let* ((j* (- j s))
+               (lo (min k j*))
+               (hi (max k j*))
+               (x (vector-ref far lo)))
+          (vector-set! far lo (if x (max x hi) hi)))))
     (define (check-neighbour k)
       ;; An element changed by one side only, next to a conflict
       (when (and (>= k 0) (< k n) (== (vector-ref state k) 'take))
@@ -459,14 +528,21 @@
       (let* ((oi (vector-ref vo (+ s k)))
              (x (vector-ref va k))
              (y (vector-ref vb k)))
-        (when (not (or (== x oi) (== y oi) (== x y)))
-          (let* ((sx (pairing x (+ s k)))
-                 (sy (pairing y (+ s k))))
-            (when (integer? sx) (mark-far! k sx))
-            (when (integer? sy) (mark-far! k sy))
-            (vector-set! state k
-                         (if (and (== sx 'paired) (== sy 'paired))
-                             'merge 'conflict))))))
+        (cond ((or (== x oi) (== y oi) (== x y)) #f)
+              ((and (== n 1) (same-container? oi x y))
+               ;; no other position: do not read the whole block at each level
+               (vector-set! state k 'merge))
+              (else
+                (let* ((sx (pairing x (+ s k)))
+                       (sy (pairing y (+ s k))))
+                  (when (integer? sx) (mark-far! k sx))
+                  (when (integer? sy) (mark-far! k sy))
+                  (vector-set!
+                   state k
+                   (cond ((and (== sx 'paired) (== sy 'paired)) 'merge)
+                         ((or (integer? sx) (integer? sy)) 'conflict)
+                         ((same-container? oi x y) 'merge)
+                         (else 'conflict))))))))
     (do ((k 0 (+ k 1))) ((>= k n))
       (when (== (vector-ref state k) 'conflict)
         (check-neighbour (- k 1))
@@ -491,7 +567,7 @@
                 (loop (+ k 1)
                       (with st (vector-ref state k)
                         (cond ((== st 'merge)
-                               (cons (merge-versions oi x y) acc))
+                               (cons (merge-paired oi x y) acc))
                               ((== st 'conflict)
                                (append (reverse (chunk-conflict tag (list x)
                                                                 (list y)))
@@ -519,39 +595,51 @@
         ((and (vector-ref ma j) (vector-ref mb j)) j)
         (else (next-stable ma mb (+ j 1) n))))
 
+(define (next-word vo ma mb j)
+  ;; The first element from @j on which is not a space kept by both sides
+  ;; without anything in between
+  (if (and (< j (vector-length vo)) (== (vector-ref vo j) " ")
+           (vector-ref ma j) (vector-ref mb j)
+           (or (== j 0)
+               (and (== (vector-ref ma j) (+ (vector-ref ma (- j 1)) 1))
+                    (== (vector-ref mb j) (+ (vector-ref mb (- j 1)) 1)))))
+      (next-word vo ma mb (+ j 1))
+      j))
+
 (define (words-touch? vo va vb ma mb io j ia ja ib jb)
-  ;; Is the element @j only the space between words changed by a side
-  ;; before it and by the other side after it?  A change next to markup
-  ;; is not concerned (Let <math> be: the formula and the word are apart).
+  ;; Are the element @j and the next ones only the spaces between words of
+  ;; the ancestor changed by a side before them and by the other side after
+  ;; them?  A change next to markup of the ancestor is not concerned (Let
+  ;; <math> be: the formula and the word are apart).
   (and (== (vector-ref vo j) " ")
        (let* ((no (vector-length vo))
-              (j2 (next-stable ma mb (+ j 1) no))
+              (j1 (next-word vo ma mb (+ j 1)))
+              (j2 (next-stable ma mb j1 no))
+              (ja1 (+ ja (- j1 j)))
+              (jb1 (+ jb (- j1 j)))
               (ja2 (if (< j2 no) (vector-ref ma j2) (vector-length va)))
               (jb2 (if (< j2 no) (vector-ref mb j2) (vector-length vb)))
-              (j1 (+ j 1)) (ja1 (+ ja 1)) (jb1 (+ jb 1))
               (la? (range-changed? vo io j va ia ja))
               (lb? (range-changed? vo io j vb ib jb))
               (ra? (range-changed? vo j1 j2 va ja1 ja2))
               (rb? (range-changed? vo j1 j2 vb jb1 jb2)))
          (and (or (and la? rb?) (and lb? ra?))
-              (range-strings? vo io j2)
-              (range-strings? va ia ja2)
-              (range-strings? vb ib jb2)))))
+              (range-strings? vo io j2)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Merging a chunk of blocks
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (new-elements vo h)
-  ;; The elements of the hunk @h which are not edits of an old element
+(define (new-and-edits pairing h)
+  ;; The elements of the hunk @h as (new . edits): the latter are edits of
+  ;; an old element
   (if (hunk-one-for-one? h)
-      (let* ((s (hunk-start h))
-             (pairing (make-pairing vo s (hunk-end h))))
-        (let loop ((i s) (l (hunk-ins h)) (acc '()))
-          (cond ((null? l) (reverse acc))
-                ((== (pairing (car l) i) 'paired) (loop (+ i 1) (cdr l) acc))
-                (else (loop (+ i 1) (cdr l) (cons (car l) acc))))))
-      (hunk-ins h)))
+      (let loop ((i (hunk-start h)) (l (hunk-ins h)) (new '()) (edits '()))
+        (cond ((null? l) (cons new edits))
+              ((== (pairing (car l) i) 'paired)
+               (loop (+ i 1) (cdr l) new (cons (car l) edits)))
+              (else (loop (+ i 1) (cdr l) (cons (car l) new) edits))))
+      (cons (hunk-ins h) '())))
 
 (define (near-identical-lists? l1 l2)
   ;; Is an element of @l1 the same paragraph as an element of @l2?
@@ -570,37 +658,45 @@
           ((>= (hunk-start (car l)) e) #f)
           (else (loop (cdr l) (max e (hunk-end (car l))))))))
 
-(define (merge-blocks tag vo va vb ma mb io eo ia ea ib eb a b)
+(define (same-text-twice? new-a edits-a new-b edits-b)
+  ;; Is new text of a side also in the new text of the other one?
+  (or (near-identical-lists? (append new-a edits-a) new-b)
+      (near-identical-lists? new-a edits-b)))
+
+(define (merge-blocks tag vo pairing va vb ma mb io eo ia ea ib eb a b)
   ;; Merge the unstable chunk from @io to @eo of the ancestor, which has been
   ;; changed by both sides into the chunks @a and @b
-  (reset-key-tables)
   (let* ((ha (chunk-hunks va ma io eo ia ea 'a))
          (hb (chunk-hunks vb mb io eo ib eb 'b))
-         (groups (hunk-groups vo (merge-hunk-lists ha hb)))
-         (new-a '())
-         (new-b '()))
+         (groups (hunk-groups vo pairing (merge-hunk-lists ha hb)))
+         (new-a '()) (edits-a '())
+         (new-b '()) (edits-b '()))
+    (define (note-a! h)
+      (with x (new-and-edits pairing h)
+        (set! new-a (append (car x) new-a))
+        (set! edits-a (append (cdr x) edits-a))))
+    (define (note-b! h)
+      (with x (new-and-edits pairing h)
+        (set! new-b (append (car x) new-b))
+        (set! edits-b (append (cdr x) edits-b))))
     (define (merge-group g)
-      ;; The merge of a group of hunks, from @gs to @ge
+      ;; The merge of a group of hunks
       (let* ((gs (hunk-start (car g)))
              (ge (apply max (map hunk-end g)))
              (ga (list-filter g (lambda (h) (== (hunk-side h) 'a))))
              (gb (list-filter g (lambda (h) (== (hunk-side h) 'b)))))
-        (cond ((null? gb)
-               (set! new-a (append (new-elements vo (car ga)) new-a))
-               (hunk-ins (car ga)))
-              ((null? ga)
-               (set! new-b (append (new-elements vo (car gb)) new-b))
-               (hunk-ins (car gb)))
+        (cond ((null? gb) (note-a! (car ga)) (hunk-ins (car ga)))
+              ((null? ga) (note-b! (car gb)) (hunk-ins (car gb)))
               (else
                 (let* ((sa (side-span vo gs ge ga))
                        (sb (side-span vo gs ge gb)))
                   (cond ((== sa sb) sa)
                         ((replacements-overlap? g)
-                         (merge-positions tag vo gs ge sa sb))
+                         (merge-positions tag vo pairing gs ge sa sb))
                         (else (chunk-conflict tag sa sb))))))))
     (let loop ((l groups) (pos io) (acc '()))
       (if (null? l)
-          (if (near-identical-lists? new-a new-b)
+          (if (same-text-twice? new-a edits-a new-b edits-b)
               ;; the same paragraph, added by both sides, would be there twice
               (chunk-conflict tag a b)
               (append (reverse acc) (subvector->list vo pos eo)))
@@ -613,7 +709,7 @@
                           (reverse (subvector->list vo pos gs))
                           acc)))))))
 
-(define (merge-chunk tag vo va vb ma mb io eo ia ea ib eb)
+(define (merge-chunk tag vo pairing va vb ma mb io eo ia ea ib eb)
   ;; Merge the unstable chunks from @io to @eo of @vo, from @ia to @ea of @va
   ;; and from @ib to @eb of @vb (children of @tag)
   (let* ((o (subvector->list vo io eo))
@@ -630,7 +726,8 @@
                     (pair? (car a)) (pair? (car b)))
                (map merge-versions o a b)
                (chunk-conflict tag a b)))
-          (else (merge-blocks tag vo va vb ma mb io eo ia ea ib eb a b)))))
+          (else (merge-blocks tag vo pairing va vb ma mb
+                              io eo ia ea ib eb a b)))))
 
 (tm-define (merge-versions-list tag o a b)
   (:synopsis "Three way merge of the lists of children @o, @a and @b of @tag")
@@ -641,11 +738,15 @@
          (vb (list->vector b))
          (ma (lcs-match vo va))
          (mb (lcs-match vo vb))
-         (no (vector-length vo)))
+         (no (vector-length vo))
+         ;; the pairing looks at the old elements around each one, also
+         ;; outside its chunk: it is the same for the whole list
+         (pairing (and (!= tag 'concat) (make-pairing vo 0 no))))
+    (when pairing (reset-key-tables))
     (let loop ((io 0) (ia 0) (ib 0) (j 0) (acc '()))
       (cond ((>= j no)
              (reverse
-              (append (reverse (merge-chunk tag vo va vb ma mb
+              (append (reverse (merge-chunk tag vo pairing va vb ma mb
                                             io no ia (vector-length va)
                                             ib (vector-length vb)))
                       acc)))
@@ -656,7 +757,7 @@
                                           ib (vector-ref mb j)))))
              (let* ((ja (vector-ref ma j))
                     (jb (vector-ref mb j))
-                    (chunk (merge-chunk tag vo va vb ma mb
+                    (chunk (merge-chunk tag vo pairing va vb ma mb
                                         io j ia ja ib jb)))
                (loop (+ j 1) (+ ja 1) (+ jb 1) (+ j 1)
                      (cons (vector-ref vo j)
@@ -690,6 +791,19 @@
         (compare-versions a b)
         `(tformat ,@f ,(merge-versions (cAr o) (cAr a) (cAr b))))))
 
+(define (merge-texts o a b)
+  (version-normalize
+   (cons 'concat (merge-versions-list 'concat
+                                      (cdr (as-concat o))
+                                      (cdr (as-concat a))
+                                      (cdr (as-concat b))))))
+
+(define (merge-paired o a b)
+  ;; Merge elements known to be related
+  (cond ((== a b) a)
+        ((and (textual? o) (textual? a) (textual? b)) (merge-texts o a b))
+        (else (merge-versions o a b))))
+
 (tm-define (merge-versions o a b)
   (:synopsis "Three way merge of @a and @b with common ancestor @o")
   (cond ((== a b) a)
@@ -700,11 +814,10 @@
           (cons 'document (merge-versions-list 'document
                                                (cdr o) (cdr a) (cdr b)))))
         ((and (textual? o) (textual? a) (textual? b))
-         (version-normalize
-          (cons 'concat (merge-versions-list 'concat
-                                             (cdr (as-concat o))
-                                             (cdr (as-concat a))
-                                             (cdr (as-concat b))))))
+         ;; texts changed on both sides are merged only if they stay related
+         (if (and (near-identical? o a) (near-identical? o b))
+             (merge-texts o a b)
+             (compare-versions a b)))
         ((and (tm-is? o 'tformat) (tm-is? a 'tformat) (tm-is? b 'tformat))
          (merge-tformat o a b))
         ((same-shape? o a b)

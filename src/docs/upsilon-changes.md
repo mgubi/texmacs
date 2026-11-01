@@ -18,9 +18,10 @@ have the details, and the problems go to the
   block removed or changed by one side next to a block changed by the other,
   and an edit next to a new paragraph of the other side, now merge cleanly.
   Fewer silent mistakes as well: paragraphs are only merged word by word if
-  they share enough real words, changes which touch inside a paragraph always
-  conflict (also two neighbouring words), and in a long list of changed
-  paragraphs a conflict stays with its paragraph (#676).
+  they share enough real words, changes of neighbouring words of a paragraph
+  conflict, each side removing one of two neighbouring paragraphs conflicts,
+  and in a long list of changed paragraphs a conflict stays with its
+  paragraph (#676).
 
 ## 31 October 2026
 

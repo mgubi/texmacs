@@ -291,19 +291,30 @@ anchors can conflict. A chunk changed by one side only takes that side.
 **In a paragraph (`concat` or string)**, the elements are words and spaces.
 
 - Changes of the two sides **touch** when no word separates them, that is,
-  when they are in the same chunk or are separated by a single space: they
-  conflict, whatever they are. A space next to markup does not count as
-  touching: in *Let* `<math>` *be.*, the formula and the next word merge.
+  when they are in the same chunk or are separated only by spaces: they
+  conflict, also when one replaces a word by markup. Spaces next to markup of
+  the ancestor do not count as touching: in *Let* `<math>` *be.*, the formula
+  and the next word merge.
 - One element with markup, changed on both sides, is merged further.
+- A text directly below other markup (the string of `(theorem "...")`,
+  `section`, `cell`), changed on both sides, is merged word by word only if
+  both new texts are similar to the old one.
 
 **Between blocks (`document`)**, each side changes a chunk by *hunks*: the
 elements of the ancestor between two elements which this side keeps are
 replaced by new ones. The hunks of both sides are compared by their places
 in the ancestor:
 
-1. *Different elements, touching*: two replacements or removals are
-   independent, since each one is anchored by what the other side keeps,
-   and their order is forced.
+1. *Different elements, touching*: two replacements are independent: each
+   one is anchored by what the other side keeps and changes only, their order
+   is forced and nothing is lost. A removal needs more, since what it relies
+   on must really stay: two touching removals conflict (each side removes the
+   anchor of the other, and nothing would remain), a removal conflicts when
+   the two old elements are variants of each other, and when its neighbour is
+   not paired with a new element of the other side. A neighbour with fewer
+   than two real words can't be recognized and does not count (*A. / B. / C.*:
+   the removal of B. and C. to C2. merge). Neighbours rewritten by each side
+   into the same text conflict.
 2. *An insertion touching a replacement* of the other side: it is placed by
    the edited element, so that the replacement must be 1-for-1 (n-for-n) and
    its element next to the insertion must be *paired* with the old one.
@@ -311,22 +322,26 @@ in the ancestor:
    otherwise they conflict.
 4. *The same elements replaced by both sides*, with all the hunks being
    n-for-n: the positions are merged one by one. A position where both new
-   elements are paired with the old one is merged in turn (word by word);
-   otherwise it is a conflict of this position alone. A new element which
-   belongs to another old element shows a shift: the positions in between
-   conflict together.
+   elements are paired with the old one, or which is a block with a body
+   (`theorem` with its `document`: the rules apply to its paragraphs), is
+   merged in turn; otherwise it is a conflict of this position alone. A new
+   element which belongs to another old element shows a shift: the positions
+   in between conflict together.
 5. *Anything else that overlaps* (such as a removal against an edit)
    conflicts.
 
 Two elements are **paired** when they have the same kind (the same tag, or
-both text) and share at least half of the *real words* of the smaller one,
-and when no other old element nearby shares as many. Real words have at
-least 4 letters and are no stop words (`the`, `that`, `dans`...), in lower
-case and without the punctuation around them. A text without any real word
-(*Let x+y be.*) is compared by its short words. This also holds for a single
-element. The words are indexed by packets of 32 old elements, and a new
-element is compared with the two packets near its place, which makes the
-pairing linear.
+both text), share at least half of the *real words* of the smaller one and
+more than one real word, and when no other old element nearby (also outside
+the chunk) shares as many. Real words have at least 4
+letters and are no stop words (`the`, `that`, `dans`...), in lower case and
+without the punctuation around them. Only text counts: not the names of labels
+and images, the attributes of `with`, the formats of tables. A text without
+any real word (*Let x+y be.*) is compared by its short words. This also holds
+for a single element, so that a paragraph with a single real word is never
+paired. The words are indexed by packets of 32 old elements of the list, and a
+new element is compared with the two packets near its place (at least 16
+elements on each side), which makes the pairing linear.
 
 Certainty also requires:
 
@@ -334,9 +349,11 @@ Certainty also requires:
   next to a hunk is also in it, the hunk could equally be one place further,
   and when a hunk brings an element of the ancestor, it is a move. Either way
   the touching hunks conflict.
-- **Near-identical paragraphs are the same paragraph:** when new elements of
-  the two sides (not edits of an old one) in a chunk are similar, the chunk
-  conflicts, whatever their places, instead of having them twice.
+- **Near-identical paragraphs are the same paragraph:** when a new element of
+  a side (not an edit of an old one) is similar to new text of the other side
+  in the chunk, also an edit (one side adds a paragraph, the other the same
+  sentence to the next paragraph), the chunk conflicts, whatever their places,
+  instead of having it twice.
 
 A conflict is shown like before: the differences of ours and theirs
 (`compare-versions`), for the elements concerned. When a chunk has a single
@@ -348,7 +365,11 @@ conflict is smaller.
 |------|------|--------|--------|-----|
 | A / B / C / D | A / C / D | A / B / C2 / D | A / C2 / D | removal and replacement of different blocks (#676) |
 | A / T / C | A / T / C2 | A / T+label / todo / C | A / T+label / todo / C2 | two replacements, touching (#676) |
-| The map is continuous. / Last. | The map is uniformly continuous. / Last. | The map is continuous. / New remark. / Last. | The map is uniformly continuous. / New remark. / Last. | an edit next to an insertion |
+| The function is continuous. / Last. | The function is uniformly continuous. / Last. | The function is continuous. / New remark. / Last. | The function is uniformly continuous. / New remark. / Last. | an edit next to an insertion |
+| The map is continuous. / Last. | The map is uniformly continuous. / Last. | The map is continuous. / New remark. / Last. | conflict | only one real word in common |
+| First alpha. / Second beta. | Second beta. | First alpha. | conflict | each side removes the anchor of the other |
+| P / P\' | P\' | P / We discuss another topic. | conflict | a removal, and its neighbour is rewritten |
+| Alpha words. / Delta words. | Alpha words, edited. / S / Delta words. | Alpha words. / S Delta words. | conflict | S would be there twice |
 | A. / B. | A. / X. / B. | A. / B2. | conflict | the same, but no real words: not certain that B2. is an edit |
 | B. | B. / B2. | D. | conflict | D. may be a rewrite: where does B2. go? |
 | The quick fox jumps. | The slow fox jumps. | The quick red fox jumps. | conflict | touching words, across a space |
@@ -361,17 +382,31 @@ conflict is smaller.
 | P / P | P | P2 / P | conflict | which P was removed? |
 | P / Q | Q / P | P / Q2 | conflict | a move next to a change, as with Git |
 
-**Known limits.** Moves are only recognized next to a change of the other
-side, and only for an unchanged copy at the top of the hunk; a paragraph moved
-far away, moved and edited, or moved into a new block, and changed, moved or
-removed by the other side, can be kept twice or stay although it was removed.
-`git merge` does the same, except that it happens to conflict when the moved
-copy lands right next to a change. The similarity is a
-heuristic: a rewrite which shares half of its real words with the old
-paragraph is merged word by word, where only changes with a word in between
-can merge. The comparison of near-identical insertions is per chunk. Very
-large changes (more than 4 million elements compared by the longest common
-subsequence) keep the behaviour of the common ends only.
+**Known limits.**
+
+- Decided by the maintainer, merging cleanly: a removal next to an edit of the
+  next paragraph, a removed theorem with an edited proof, a proof added next
+  to a rewritten theorem. The markup does not link a proof to its theorem, so
+  that syntax can't tell what to do. (Variants of each other, or a neighbour
+  rewritten, do conflict: rule 1.)
+- A paragraph kept by both sides is an anchor: when each side removes a
+  different paragraph around it, as in *P / K / Q* with *K / Q* and *P / K*,
+  the result is *K*, as with `git merge`.
+- Markup of the ancestor separates words: in *Let* `<math|x>` *be*, the formula
+  changed by one side and the next word by the other merge.
+- Moves are only recognized next to a change of the other side, and only for
+  an unchanged copy at the top of the hunk. A paragraph moved far away, moved
+  and edited, or moved into a new block, and changed, moved or removed by the
+  other side, can be kept twice or stay although it was removed. `git merge`
+  does the same, except that it happens to conflict when the moved copy lands
+  right next to a change.
+- The similarity is a heuristic: a rewrite which shares half of its real words
+  with the old paragraph is merged word by word, where only changes with a word
+  in between can merge. A paragraph with a single real word is never paired, so
+  that an edit of it next to other changes conflicts.
+- The comparison of near-identical new text is per chunk.
+- Very large changes (more than 4 million elements compared by the longest
+  common subsequence) keep the behaviour of the common ends only.
 
 ## 6. Structured merges from the command line
 
@@ -505,10 +540,6 @@ shell fallback, Windows and submodules.
 * During a rebase, git's "ours" is the upstream and "theirs" your commits:
   the old (red) version of a conflict is then the upstream one, and *Mine*
   / *Keep my version* retain the new one (`git-mine-version`).
-* Changes of the two sides in nearby paragraphs (one side deletes a
-  paragraph, the other changes the next one) still conflict: the
-  differing parts between paragraphs common to the three versions are
-  compared ours against theirs, without the ancestor (#676, item 1).
 * Large changes: the matching of the paragraphs (longest common
   subsequence, `max-lcs-size` in `version-merge.scm`) is quadratic and
   limited to 4 million pairs; beyond (about 2000 by 2000 paragraphs which

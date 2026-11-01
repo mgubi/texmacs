@@ -1029,6 +1029,130 @@
   (check-merge '(document (section "The main results"))
                '(document (section "The main results here"))
                '(document "The main results") #f 1)
+  ;; each side removes a different one of two touching paragraphs: nothing
+  ;; of them would remain (audit of #715)
+  (check-merge '(document "First paragraph alpha." "Second paragraph beta.")
+               '(document "Second paragraph beta.")
+               '(document "First paragraph alpha.") #f 2)
+  (check-merge '(document "First paragraph alpha." "Second paragraph beta.")
+               '(document "First paragraph alpha.")
+               '(document "Second paragraph beta.") #f 2)
+  (check-merge '(document "Aaaa one." "Bbbb two." "Cccc three." "Dddd four."
+                          "Eeee five." "Ffff six.")
+               '(document "Aaaa one." "Cccc three." "Eeee five.")
+               '(document "Bbbb two." "Dddd four." "Ffff six.") #f 1)
+  (check-merge '(document "I." (theorem (document "Aaaa one." "Bbbb two.")) "E.")
+               '(document "I." (theorem (document "Aaaa one.")) "E.")
+               '(document "I." (theorem (document "Bbbb two.")) "E.") #f 1)
+  (let* ((p "The map f is continuous on the whole space X.")
+         (q "The map f is continuous on all of the space X.")
+         (x "We now discuss an unrelated topic instead of this."))
+    ;; variants of each other
+    (check-merge `(document "I." ,p ,q "E.") `(document "I." ,q "E.")
+                 `(document "I." ,p "E.") #f 2)
+    ;; a removal which relies on a paragraph that the other side rewrites
+    (check-merge `(document "I." ,p ,q "E.") `(document "I." ,q "E.")
+                 `(document "I." ,p ,x "E.") #f 3)
+    (check-merge `(document "I." ,p ,q "E.") `(document "I." ,p ,x "E.")
+                 `(document "I." ,q "E.") #f 3)
+    ;; a new text closer to the removed paragraph than to its own
+    (check-merge '(document "The compact operator acts on Hilbert spaces."
+                            "The bounded functional vanishes on Banach subspaces.")
+                 '(document "The compact operator acts on Hilbert spaces.")
+                 '(document "The compact operator acts, the bounded functional vanishes on Banach subspaces."
+                            "The bounded functional vanishes on Banach subspaces.")
+                 #f 3))
+  ;; decided: a removal next to an edit of the next paragraph, a removed
+  ;; theorem with an edited proof and a proof added next to a rewritten
+  ;; theorem merge; the markup does not link a proof to its theorem
+  (check-merge '(document "Let f be a continuous function on X."
+                          "Then f is bounded on X and attains its maximum.")
+               '(document "Then f is bounded on X and attains its maximum.")
+               '(document "Let f be a continuous function on X."
+                          "Then f is bounded on X and attains its minimum.")
+               '(document "Then f is bounded on X and attains its minimum.") 0)
+  (check-merge '(document (theorem (document "Every continuous function is bounded."))
+                          (proof (document "Use the covering argument.")))
+               '(document (proof (document "Use the covering argument.")))
+               '(document (theorem (document "Every continuous function is bounded."))
+                          (proof (document "Use the finite covering argument.")))
+               '(document (proof (document "Use the finite covering argument."))) 0)
+  (check-merge '(document (theorem (document "Every continuous function is bounded on compact sets.")) "End.")
+               '(document (theorem (document "Every continuous function is bounded on compact sets."))
+                          (proof (document "By compactness.")) "End.")
+               '(document (theorem (document "Not every continuous function is bounded on noncompact sets.")) "End.")
+               '(document (theorem (document "Not every continuous function is bounded on noncompact sets."))
+                          (proof (document "By compactness.")) "End.") 0)
+  ;; the same text added by both sides, through hunks of several kinds
+  (let* ((s "Note that the constant depends on the dimension.")
+         (k "Alpha beta gamma words.")
+         (l "Delta epsilon zeta words.")
+         (ls (string-append s " " l)))
+    (check-merge `(document ,k ,l) `(document "Alpha beta gamma words, edited." ,s ,l)
+                 `(document ,k ,ls) #f 3)
+    (check-merge `(document ,k ,l) `(document ,k ,ls)
+                 `(document "Alpha beta gamma words, edited." ,s ,l) #f 3)
+    (check-merge `(document ,k ,l) `(document ,k ,s ,l) `(document ,k ,ls) #f 2)
+    (check-merge `(document ,k ,l)
+                 `(document ,k "Delta epsilon zeta words, edited." ,s)
+                 `(document ,(string-append k " " s) ,l) #f 3)
+    (check-merge `(document ,k ,l) `(document ,s "Fresh words of ours here." ,l)
+                 `(document ,k ,ls) #f 3))
+  ;; neighbours rewritten into the same text by each side
+  (check-merge '(document "I." "The main theorem holds for smooth functions."
+                          "The main lemma holds for smooth functions." "E.")
+               '(document "I." "The main statement holds for smooth functions."
+                          "The main lemma holds for smooth functions." "E.")
+               '(document "I." "The main theorem holds for smooth functions."
+                          "The main statement holds for smooth functions." "E.")
+               #f 2)
+  ;; pairing by text only, and by more than one real word
+  (check-merge '(document (theorem (document (concat (label "thm-main-result") "Short old."))) "End.")
+               '(document (theorem (document (concat (label "thm-main-result") "Short old.")))
+                          (proof (document "Obvious.")) "End.")
+               '(document (theorem (document (concat (label "thm-main-result") "Unrelated claim."))) "End.")
+               #f 2)
+  (check-merge '(document (with "font-series" "bold" "Old note.") "End.")
+               '(document (with "font-series" "bold" "Old note.") "Fresh remark." "End.")
+               '(document (with "font-series" "bold" "Unrelated idea.") "End.")
+               #f 2)
+  (check-merge '(document (image "figure-one.png" "0.5par" "" "" "") "End.")
+               '(document (image "figure-one.png" "0.5par" "" "" "") "Fresh remark." "End.")
+               '(document (image "figure-one.png" "0.8par" "" "" "") "End.")
+               #f 2)
+  (check-merge '(document "See the theorem." "End words.")
+               '(document "See the theorem." "It follows from compactness." "End words.")
+               '(document "A different theorem about measure spaces has nothing to do with this."
+                          "End words.")
+               #f 1)
+  ;; another old element is closer
+  (let* ((o1 "The compact operator acts on Hilbert spaces.")
+         (o2 "The bounded functional vanishes on Banach subspaces."))
+    (check-merge `(document ,o1 ,o2) `(document ,o1 "Fresh remark here." ,o2)
+                 `(document "The compact operator acts, the bounded functional vanishes on Banach subspaces."
+                            ,o2) #f 3))
+  ;; a word replaced by markup, and several spaces, still touch
+  (check-merge '(document "The quick fox jumps.") '(document "The slow fox jumps.")
+               '(document (concat "The quick " (em "cat") " jumps.")) #f 1)
+  (check-merge '(document "The quick  fox jumps.") '(document "The slow  fox jumps.")
+               '(document "The quick  red jumps.") #f 1)
+  ;; the pairing also holds for texts below a document
+  (check-merge '(theorem "The map f is continuous on all spaces")
+               '(theorem "The map f is continuous on all sets")
+               '(theorem "This set g was open on all spaces") #f 2)
+  (check-merge '(theorem "The bounded map f is continuous on all spaces")
+               '(theorem "The bounded map f is continuous on all sets")
+               '(theorem "The nice bounded map f is continuous on all spaces")
+               '(theorem "The nice bounded map f is continuous on all sets") 0)
+  ;; inside a block with a body, the rules apply to the paragraphs
+  (check-merge '(document (theorem (document "Para one alpha beta gamma." "Para two delta epsilon zeta."
+                                             "Para three theta iota kappa." "Para four lambda sigma omega.")))
+               '(document (theorem (document "Rewritten first totally unrelated." "Rewritten second totally unrelated."
+                                             "Rewritten third totally different." "Para four lambda sigma omega.")))
+               '(document (theorem (document "Para one alpha beta gamma." "Para two delta epsilon zeta."
+                                             "Para three theta iota kappa." "Para four lambda sigma changed.")))
+               '(document (theorem (document "Rewritten first totally unrelated." "Rewritten second totally unrelated."
+                                             "Rewritten third totally different." "Para four lambda sigma changed."))) 0)
   ;; a paragraph moved next to a change of the other side conflicts, as
   ;; with Git
   (check-merge '(document "Alpha beta gamma." "Delta epsilon zeta.")
