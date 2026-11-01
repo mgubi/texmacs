@@ -381,7 +381,8 @@ jobs:
           # the Ghostscript of the application runs, with no gs of the system
           # (#662)
           app="../distr/$name.app"
-          packages/bundled-tools/check.sh -r "$PWD/$app/Contents/Resources/share/TeXmacs" \
+          # (the Qt of macdeployqt has no offscreen platform)
+          TM_CHECK_QPA= packages/bundled-tools/check.sh -r "$PWD/$app/Contents/Resources/share/TeXmacs" \
             -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$PWD/$app/Contents/MacOS/TeXmacs"
 
       - uses: actions/upload-artifact@v4

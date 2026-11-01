@@ -111,6 +111,18 @@ run_timeout () {
   wait $pid 2> /dev/null
 }
 
+# with absolute paths, as TeXmacs gives them (on Windows with backslashes,
+# and the options it adds: a title, -c code...)
+for form in native windows; do
+  [ $form = windows ] && { [ $windows = yes ] || continue; }
+  if [ $form = windows ]; then in=$(cygpath -w "$work/test.eps"); outp=$(cygpath -w "$work/abs-w.pdf")
+  else in="$n_work/test.eps"; outp="$n_work/abs-n.pdf"; fi
+  (cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" TMPDIR="$n_work" PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
+     -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 "-sOutputFile=$outp" "$in" > gs-abs.log 2>&1) &&
+    ok "an EPS file with an absolute path ($form) converted to PDF" ||
+    { fail "gs does not convert the EPS file with an absolute path ($form: $in)"; tail -10 "$work/gs-abs.log"; }
+done
+
 echo "== TeXmacs: $*"
 what=ghostscript
 [ $aspell = yes ] && what="ghostscript aspell"
