@@ -25,10 +25,16 @@
   (url-exists-in-path? "pdftocairo"))
 
 (tm-define (gs-binary)
-  (let* ((n1 "$TEXMACS_PATH\\bin\\gs.exe;c:\\Program F*\\gs\\gs*\\gswin*c.exe")
-         (n2 "$TEXMACS_PATH/bin/gs:gs")
-         (name (if (os-mingw?) n1 n2)))
-    (url->system (url-resolve-in-path name))))
+  ;; the choice of the C++ code (gs_embedded: the gs of the package, or the
+  ;; installed one for a folder the package's gs cannot name), so that the
+  ;; two always agree; without Ghostscript in the build, look in the path
+  (let ((c (gs-executable)))
+    (if (not (== c ""))
+        (url->system (url-resolve-in-path c))
+        (let* ((n1 "$TEXMACS_PATH\\bin\\gs.exe;c:\\Program F*\\gs\\gs*\\gswin*c.exe")
+               (n2 "$TEXMACS_PATH/bin/gs:gs")
+               (name (if (os-mingw?) n1 n2)))
+          (url->system (url-resolve-in-path name))))))
 
 (tm-define (has-gs?)
   (url-exists? (gs-binary)))

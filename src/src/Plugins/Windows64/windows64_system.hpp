@@ -138,6 +138,13 @@ bool texmacs_getenv(string variable_name, string &variable_value);
 string texmacs_short_path(string path);
 
 /*
+ * @brief Whether a UTF-8 string has a letter which the ANSI code page of the
+ *        system (the one the programs built for Unix on Windows use for the
+ *        names of files, e.g. Ghostscript of the package) cannot represent
+ */
+bool texmacs_not_in_ansi(string s);
+
+/*
  * @brief Proxy function to the setenv function with UTF-8 encoded strings
  */
 bool texmacs_setenv(string variable_name, string new_value);

@@ -131,7 +131,9 @@ for f in freetype/LICENSE.TXT freetype/docs/FTL.TXT freetype/docs/GPLv2.TXT \
   if [ -f "$f" ]; then
     cp "$f" "$prefix/share/licenses/ghostscript/third-party/$(dirname "$f" | sed 's|/|-|g')-$(basename "$f")"
   else
-    echo "warning: no $f in the sources of Ghostscript" >&2
+    # (an error: after a version bump, a license must not be dropped silently)
+    echo "error: no $f in the sources of Ghostscript (its license is shipped)" >&2
+    exit 1
   fi
 done
 ls "$prefix/share/licenses/ghostscript/third-party"

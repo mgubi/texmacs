@@ -40,6 +40,29 @@
                   (number->string (string-length (string-load (system->url pdf))))
                   "0"))))
 
+;; the conversions of the Scheme side which run gs (gs-convert: EPS to EPS;
+;; pdf-file->gs-raster: PDF to PNG), with no window: they use gs-binary, which
+;; must agree with the C++ code. They need direct.pdf (made by check.sh)
+(define (cbt-wait u)
+  (let ((t0 (texmacs-time)))
+    (while (and (not (url-exists? u)) (< (- (texmacs-time) t0) 15000)) #t)))
+
+(define (cbt-scheme dir)
+  (let ((src (system->url (string-append dir "/test.eps")))
+        (eps (system->url (string-append dir "/scheme-out.eps")))
+        (pdf (system->url (string-append dir "/direct.pdf")))
+        (png (system->url (string-append dir "/scheme-out.png"))))
+    (catch #t
+      (lambda ()
+        (gs-convert src (list (cons 'dest eps)))
+        (cbt-wait eps)
+        (cbt-line "scheme-eps" (if (url-exists? eps) "yes" "no"))
+        (pdf-file->gs-raster pdf (list (cons 'dest png)))
+        (cbt-wait png)
+        (cbt-line "scheme-png" (if (url-exists? png) "yes" "no"))
+        (cbt-line "scheme-eps-run" "ok"))
+      (lambda args (cbt-line "scheme-eps-run" args)))))
+
 ;; the spell checker: dictionaries found, words known and unknown
 (define (cbt-spell)
   (for-each
@@ -72,7 +95,7 @@
 (define (bundled-tools-check dir . what)
   (catch #t
     (lambda ()
-      (when (member "ghostscript" what) (cbt-eps dir))
+      (when (member "ghostscript" what) (cbt-scheme dir) (cbt-eps dir))
       (when (member "aspell" what) (cbt-spell) (cbt-spell-external))
       (when (member "external" what) (cbt-spell-external)))
     (lambda args (cbt-line "error" args)))

@@ -87,6 +87,7 @@
 "cpp-error"
 "supports-native-pdf?"
 "supports-ghostscript?"
+"gs-executable"
 "rescue-mode?"
 "scheme-dialect"
 "get-texmacs-path"

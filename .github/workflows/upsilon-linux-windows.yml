@@ -871,6 +871,13 @@ jobs:
               case "$lang" in DICTIONARIES=*|'"'|'') continue;; esac
               echo "$name.tar.bz2"
             done; } > wanted.txt
+          # (a parse that finds nothing must not pass with the archives of gs
+          # and Aspell alone)
+          [ -n "$gsv" ] && [ -n "$aspv" ] ||
+            { echo "error: no GS_VERSION or ASPELL_VERSION in the scripts"; exit 1; }
+          ndict=$(grep -c '\.tar\.bz2$' wanted.txt || true)
+          [ "$ndict" -gt 0 ] ||
+            { echo "error: no dictionary read from $asp_script (DICTIONARIES)"; exit 1; }
           missing=0
           while read -r f; do
             echo "$assets" | grep -qxF "$f" || { echo "error: $f is not in the release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; missing=1; }

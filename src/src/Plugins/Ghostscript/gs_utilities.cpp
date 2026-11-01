@@ -49,15 +49,20 @@ gs_system () {
 #endif
 
 #ifdef OS_MINGW
-// A name with letters outside ASCII: gs of the package, a program of Unix built
-// for Windows, opens its files with the ANSI functions of Windows (the code page
-// of the system), which cannot name such a folder (a user name in Cyrillic on a
-// Western system).
+// A name with a letter which the ANSI code page of the system cannot represent:
+// gs of the package, a program of Unix built for Windows, opens its files with
+// the ANSI functions of Windows, which cannot name such a folder (a user name
+// in Cyrillic on a Western system). Letters of the code page (u with a
+// diaeresis on a Western system) work with it.
 static bool
-gs_non_ascii (string s) {
+gs_unnameable (string s) {
+#ifdef OS_MINGW64
+  return texmacs_not_in_ansi (s);
+#else
   for (int i= 0; i<N(s); i++)
     if ((unsigned char) s[i] >= 128) return true;
   return false;
+#endif
 }
 #endif
 
@@ -67,8 +72,8 @@ gs_embedded () {
   // With such a name in the home of TeXmacs or in its folder, the gs installed
   // in Program Files, if there is one (not tried: whether it handles these names
   // is not known), before the one of the package, which cannot
-  if (gs_non_ascii (get_env ("TEXMACS_HOME_PATH")) ||
-      gs_non_ascii (get_env ("TEXMACS_PATH"))) {
+  if (gs_unnameable (get_env ("TEXMACS_HOME_PATH")) ||
+      gs_unnameable (get_env ("TEXMACS_PATH"))) {
     string sys= gs_system ();
     if (sys != "gs.exe") return sys;
   }
@@ -87,7 +92,7 @@ gs_embedded () {
   return gs_system ();
 }
 
-static string
+string
 gs_executable () {
   static string cmd;
   // init had to be postponed because of TEXMACS_PATH initialization

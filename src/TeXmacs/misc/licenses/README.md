@@ -90,8 +90,9 @@ built with need: FreeType, libpng, libjpeg of the Independent JPEG Group, zlib,
 Little CMS (lcms2mt), OpenJPEG, jbig2dec, libtiff, Brotli, extract. The
 `LICENSE` of Ghostscript names none of them: their license files, taken from
 their folders in the sources, are in `ghostscript/third-party/` of the
-packages (`<library>-<file>`). Several have a copy here as well, which the
-packages have too: FreeType (`FreeType-LICENSE.txt`, `FreeType-FTL.txt`), libpng
+packages (`<library>-<file>`); those are the exact texts of the version built
+into `gs`. Several libraries have a file here as well (which the packages have
+too), not always the same text: FreeType (`FreeType-LICENSE.txt`, `FreeType-FTL.txt`), libpng
 (`libpng-LICENSE.txt`), libjpeg (`libjpeg-IJG-README.txt`), Little CMS
 (`lcms2-MIT.txt`), OpenJPEG (`OpenJPEG-BSD-2-Clause.txt`), zlib
 (`zlib-LICENSE.txt`), Brotli (`brotli-MIT.txt`); jbig2dec and extract are under the

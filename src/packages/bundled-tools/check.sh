@@ -80,6 +80,15 @@ echo "== the licenses in $root/misc/licenses"
 [ -f "$root/misc/licenses/ghostscript/LICENSE" ] && [ -f "$root/misc/licenses/ghostscript/COPYING" ] &&
   ok "the license of Ghostscript (ghostscript/LICENSE, COPYING)" ||
   { fail "no license of Ghostscript in $root/misc/licenses/ghostscript"; ls -R "$root/misc/licenses/ghostscript" 2>&1 | head -5; }
+# the licenses of the libraries built into gs (build-gs.sh: <library>-<file>)
+tp="$root/misc/licenses/ghostscript/third-party"
+tp_ok=yes
+for f in freetype-LICENSE.TXT freetype-docs-FTL.TXT freetype-docs-GPLv2.TXT libpng-LICENSE \
+         zlib-LICENSE jpeg-README lcms2mt-COPYING openjpeg-LICENSE jbig2dec-LICENSE \
+         tiff-LICENSE.md brotli-LICENSE extract-COPYING; do
+  [ -s "$tp/$f" ] || { tp_ok=no; fail "no license of a library of Ghostscript: ghostscript/third-party/$f"; }
+done
+[ $tp_ok = yes ] && ok "the licenses of the libraries of Ghostscript (ghostscript/third-party)"
 [ -f "$root/misc/licenses/README.md" ] && [ -f "$root/misc/licenses/AGPL-3.0.txt" ] &&
   ok "README.md and AGPL-3.0.txt" || fail "no README.md or AGPL-3.0.txt in $root/misc/licenses"
 if [ $aspell = yes ]; then
@@ -270,14 +279,91 @@ if [ $windows = yes ]; then
     { fail "no PDF with TMPDIR unset (TMPDIR in TeXmacs: $(val tmpdir))"; tail -10 "$out"; }
   # the user name is in the path of the home of TeXmacs, where gs reads and
   # writes its files too (the ANSI functions of Windows): with letters of the
-  # code page (ü) and outside it (Cyrillic, on a Western system)
+  # code page (ü, on a Western system) the gs of the package works; with
+  # letters outside it (Cyrillic) it cannot, and TeXmacs takes the gs installed
+  # in Program Files if there is one (gs_embedded). The runner has none: a fake
+  # one, a program which records that it was run, is put where gs_system looks
+  # (C:\Program Files\gs\gs*\bin\gswin*c.exe), and removed after.
   home0="$n_home"
+  acp=$(reg query 'HKLM\SYSTEM\CurrentControlSet\Control\Nls\CodePage' /v ACP 2> /dev/null |
+        tr -d '\r' | awk '/ACP/ {print $3}')
+  echo "== TEXMACS_HOME_PATH with letters in and outside the code page ($acp)"
+  fakedir="/c/Program Files/gs"
+  fakeexe="$fakedir/gscheck/bin/gswin64c.exe"
+  fakemark="$work/fake-gs-called"
+  fake=no
+  preexisting=no
+  if [ -e "$fakedir" ]; then
+    preexisting=yes
+    echo "note: C:\\Program Files\\gs exists on this machine: the installed-gs choice is not tried (UNTESTED)"
+  else
+    cc=${CC:-gcc}
+    cat > "$work/fake-gs.c" << 'EOT'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+int main (int argc, char** argv) {
+  const char* m= getenv ("FAKE_GS_MARK");
+  int i;
+  if (m != NULL) { FILE* f= fopen (m, "a"); if (f != NULL) { fprintf (f, "called\n"); fclose (f); } }
+  for (i= 1; i < argc; i++)
+    if (strcmp (argv[i], "--version") == 0) { printf ("9.99\n"); return 0; }
+  return 99;
+}
+EOT
+    if $cc -o "$n_work/fake-gs.exe" "$n_work/fake-gs.c" 2> "$work/cc-gs.log" &&
+       mkdir -p "$fakedir/gscheck/bin" && cp "$work/fake-gs.exe" "$fakeexe"; then
+      fake=yes
+    else
+      fail "no fake gs in Program Files (compiler or permission)"; head -5 "$work/cc-gs.log"
+    fi
+  fi
+  remove_fake () {
+    if [ $fake = yes ]; then
+      rm -f "$fakeexe"; rmdir "$fakedir/gscheck/bin" "$fakedir/gscheck" "$fakedir" 2> /dev/null
+      fake=no
+    fi
+  }
+  trap 'remove_fake; rm -rf "$work"' EXIT
   for h in "home ü" "home-ж"; do
     mkdir -p "$work/$h"; n_home=$(native "$work/$h")
-    run_tm "$work/texmacs-h.log" ghostscript "" ""
-    if [ "$(val pdf)" = yes ]; then ok "an EPS image written to PDF with TEXMACS_HOME_PATH=.../$h"
-    else echo "note: no PDF with TEXMACS_HOME_PATH=.../$h (gs and the ANSI functions of Windows)"; fi
+    rm -f "$fakemark"
+    FAKE_GS_MARK="$n_work/fake-gs-called" run_tm "$work/texmacs-h.log" ghostscript "" ""
+    sys_gs=no; [ -e "$fakemark" ] && sys_gs=yes
+    chosen=$(val gs-binary | tr '\\' /)
+    # the letters outside the code page: the installed gs, if the fake is there
+    if [ "$h" = "home-ж" ] && [ $fake = yes ]; then
+      case "$chosen" in
+        *"Program Files/gs/gscheck/bin/gswin64c.exe") ok "gs-binary (Scheme) is the installed gs for a home outside the code page: $chosen";;
+        *) fail "gs-binary is $chosen for $h, not the installed gs";;
+      esac
+      tr '\\' / < "$out" | tr -d '\r' | grep -F "gs executable: " | grep -qF "Program Files/gs/gscheck/bin/gswin64c.exe" &&
+        ok "gs_embedded (C++) took the installed gs for $h" ||
+        { fail "gs_embedded did not take the installed gs for $h"; grep -F "gs executable" "$out" | head -3; }
+      [ $sys_gs = yes ] && ok "the installed gs was run (by C++ and the Scheme conversions)" ||
+        fail "the installed gs was not run for $h"
+      [ "$(val scheme-eps-run)" = ok ] || fail "the Scheme conversions did not run for $h: $(val scheme-eps-run)"
+    # the letters of the code page: the gs of the package, whatever is installed
+    elif [ "$h" = "home ü" ] && [ "$acp" = 1252 ]; then
+      case "$chosen" in
+        "$n_root"*) ok "gs-binary (Scheme) is the gs of the package for $h";;
+        *) fail "gs-binary is $chosen for $h, not the gs of the package";;
+      esac
+      tr '\\' / < "$out" | tr -d '\r' | grep -F "gs executable: " | grep -qF "gs executable: $n_root" &&
+        ok "gs_embedded (C++) took the gs of the package for $h" ||
+        { fail "gs_embedded did not take the gs of the package for $h"; grep -F "gs executable" "$out" | head -3; }
+      [ $sys_gs = no ] && ok "the installed gs was not run for $h" || fail "the installed gs was run for $h"
+      [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF with TEXMACS_HOME_PATH=.../$h" ||
+        fail "no PDF with TEXMACS_HOME_PATH=.../$h"
+      [ "$(val scheme-eps)" = yes ] && [ "$(val scheme-png)" = yes ] &&
+        ok "the Scheme conversions (gs-convert, pdf-file->gs-raster) with the gs of the package" ||
+        fail "the Scheme conversions failed with the gs of the package: $(val scheme-eps) $(val scheme-png) $(val scheme-eps-run)"
+    elif [ "$(val pdf)" = yes ]; then ok "an EPS image written to PDF with TEXMACS_HOME_PATH=.../$h"
+    else echo "note: no PDF with TEXMACS_HOME_PATH=.../$h (gs and the ANSI functions of Windows; no installed gs here, or the code page is not 1252)"; fi
   done
+  remove_fake
+  [ $preexisting = no ] && [ -e "$fakedir" ] && fail "the fake gs was not removed from Program Files"
+  trap 'rm -rf "$work"' EXIT
   n_home="$home0"
   # TEMP: with a space (C:\Users\John Smith\...), with letters of the code
   # page, outside it; the short name (8.3) of the folder with letters outside

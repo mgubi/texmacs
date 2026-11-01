@@ -29,6 +29,7 @@ typedef unsigned int uint;
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"
+#include "gs_utilities.hpp"
 #include "locale.hpp"
 #include "iterator.hpp"
 #include "Freetype/tt_tools.hpp"
@@ -159,6 +160,15 @@ supports_ghostscript () {
   return true;
 #else
   return false;
+#endif
+}
+
+string
+get_gs_executable () {
+#ifdef USE_GS
+  return gs_executable ();
+#else
+  return "";
 #endif
 }
 

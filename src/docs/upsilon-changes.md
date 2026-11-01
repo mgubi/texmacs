@@ -39,11 +39,12 @@ have the details, and the problems go to the
   is not asked); `gs` of the package keeps its temporary files in the folder
   of `TEMP` (`TMPDIR` is set for TeXmacs and the programs it starts, which
   read it before `TEMP`: Python...), or, when that name has letters outside
-  ASCII, in its short name or in `C:\Users\Public`. Limits: `gs` of the package
+  ASCII, in its short name or in `%SystemRoot%\Temp`. Limits: `gs` of the package
   opens its files with the ANSI functions of Windows, so with a user name (the
-  home of TeXmacs, or the folder of TeXmacs) outside the code page of the
-  system TeXmacs runs the `gs` which is installed in Program Files, if there is
-  one (not tried), else the one of the package, which cannot convert; a `gs`
+  home of TeXmacs, or the folder of TeXmacs) with a letter the ANSI code page of
+  the system cannot represent (Cyrillic on a Western system; u with a diaeresis is fine on one) TeXmacs runs the `gs` which is installed in Program Files, if there is
+  one (the choice is tested in the CI with a stand-in program; a real `gs` with
+  such names is not), else the one of the package, which cannot convert; a `gs`
   which writes a lot of messages still stalls TeXmacs for 30 s (#655); the
   `gs.exe` is not called `gswin64c.exe`, so the TeX tools which look for that
   name (`epstopdf`, `ps2pdf` of a TeX distribution) do not find it (#662).
@@ -53,6 +54,7 @@ have the details, and the problems go to the
   structured editing and the language server, and it is saved byte for byte
   (the `#!` line, the tabs, the last newline), where it was a plain text
   document before, with its tabs expanded (#734).
+
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
   block removed or changed by one side next to a block changed by the other,
   and an edit next to a new paragraph of the other side, now merge cleanly.
