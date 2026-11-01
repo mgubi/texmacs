@@ -33,6 +33,15 @@ make_screen (renderer& ren, color previous) {
   return pic;
 }
 
+// on a screen renderer, every 16th box painted asks the window whether the
+// painting is interrupted: there is none here
+extern int nr_painted;
+static void
+paint (box page, renderer ren, rectangles& rs) {
+  nr_painted= 0;
+  page->redraw (ren, path (), rs);
+}
+
 static box
 rect_box (int x1, int y1, int x2, int y2, color c) {
   array<SI> x, y;
@@ -72,7 +81,7 @@ test_decorations_below_text () {
   renderer ren;
   picture pic= make_screen (ren, white);
   rectangles rs;
-  page->redraw (ren, path (), rs);
+  paint (page, ren, rs);
   int r, g, b;
   rgb_of (pic, 20, 12, r, g, b);   // text and decoration
   CHECK_EQ (r + g + b, 0);
@@ -116,11 +125,11 @@ test_pattern_background () {
     renderer ren;
     picture pic= make_screen (ren, prevs[i]);
     rectangles rs;
-    page->redraw (ren, path (), rs);
+    paint (page, ren, rs);
     if (i == 0) {   // painted twice: the translucent part is not darker
       int r0, g0, b0;
       rgb_of (pic, 30, 20, r0, g0, b0);
-      page->redraw (ren, path (), rs);
+      paint (page, ren, rs);
       rgb_of (pic, 30, 20, r[i][1], g[i][1], b[i][1]);
       CHECK_EQ (r0, r[i][1]);
       CHECK_EQ (b0, b[i][1]);
@@ -141,9 +150,43 @@ test_pattern_background () {
   remove (u);
 }
 
+// the colour under the pattern (4th argument) is opaque, whatever its alpha
+// or the opacity of the brush, and white when it is not a colour
+static void
+test_pattern_clear_color () {
+  if (get_env ("TEXMACS_HOME_PATH") == "")
+    SKIP ("TEXMACS_HOME_PATH is not set");
+  url u= save_pattern ();
+  string name= as_string (u);
+  tree p1 (_PATTERN, name, "100%", "100%", "#00ff0080");
+  tree p2 (_PATTERN, name, "100%", "100%", "blue");
+  tree p3 (_PATTERN, name, "100%", "100%", "none");
+  tree p4 (_PATTERN, name, "100%", "100%", "");
+  tree ps[4]= { p1, p2, p3, p4 };
+  int alphas[4]= { 255, 128, 255, 255 };
+  int want[4][3]= { {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {255, 255, 255} };
+  for (int i= 0; i < 4; i++) {
+    box page= make_page (brush (ps[i], alphas[i]),
+                         empty_box (path (), 0, 0, 0, 0), box ());
+    renderer ren;
+    picture pic= make_screen (ren, rgb_color (255, 0, 0));
+    rectangles rs;
+    paint (page, ren, rs);
+    paint (page, ren, rs);
+    int r, g, b;
+    rgb_of (pic, 10, 20, r, g, b);   // transparent part of the image
+    CHECK_MSG (r == want[i][0] && g == want[i][1] && b == want[i][2],
+               "case " * as_string (i) * ": " * as_string (r) * ","
+               * as_string (g) * "," * as_string (b));
+    tm_delete (ren);
+  }
+  remove (u);
+}
+
 int
 main () {
   RUN (test_decorations_below_text);
   RUN (test_pattern_background);
+  RUN (test_pattern_clear_color);
   return test_report ();
 }

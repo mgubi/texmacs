@@ -194,8 +194,16 @@ page_box_rep::display_background (renderer ren) {
       // NOTE: the screen is repainted rectangle by rectangle and keeps the
       // previous paint; the transparent parts of a pattern would show it
       // (a checkerboard of leftovers, translucent parts painted twice).
-      // Like the paper of a print, start from the colour of the pattern.
-      ren->set_background (brush (page_bgc->get_color ()));
+      // Like the paper of a print, start from the colour of the pattern
+      // (its optional 4th argument), opaque, and white if it is missing or
+      // not a colour (such as an effect or none).
+      tree pat= page_bgc->get_pattern ();
+      color c= white;
+      if (N(pat) == 4 && is_atomic (pat[3]) && is_color_name (pat[3]->label))
+        c= named_color (pat[3]->label);
+      int r, g, b, a;
+      get_rgb_color (c, r, g, b, a);
+      ren->set_background (brush (rgb_color (r, g, b)));
       ren->clear (x1, y1, x2, y2);
     }
     ren->set_background (page_bgc);
