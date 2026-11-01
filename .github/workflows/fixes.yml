@@ -277,6 +277,13 @@ jobs:
           ../.github/fixes/macos-identity.sh ../distr/TeXmacs.app
           rm -rf "../distr/TeXmacs Fixes.app"
           mv ../distr/TeXmacs.app "../distr/TeXmacs Fixes.app"
+          # Homebrew's libraries target macOS 15 (its Sequoia bottles, also
+          # for Intel): the minimum is 15.0, not the macOS of the runner,
+          # which configure puts there (#733); --with-osx would also change
+          # the flags of the build, the step "Minimum macOS" checks the
+          # libraries
+          plutil -replace LSMinimumSystemVersion -string 15.0 \
+            "../distr/TeXmacs Fixes.app/Contents/Info.plist"
           codesign --force --deep -s - "../distr/TeXmacs Fixes.app"
 
       - name: TeXmacs starts and runs a command
@@ -288,6 +295,9 @@ jobs:
             > "$home/log.txt" 2>&1 || true
           tail -30 "$home/log.txt"
           [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+
+      - name: Minimum macOS
+        run: ../.github/fixes/check-min-macos.sh "../distr/TeXmacs Fixes.app"
 
       - name: Disk image
         run: |
