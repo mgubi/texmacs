@@ -54,6 +54,11 @@ have the details, and the problems go to the
   structured editing and the language server, and it is saved byte for byte
   (the `#!` line, the tabs, the last newline), where it was a plain text
   document before, with its tabs expanded (#734).
+- **The macOS Qt package** (desktop): it declares macOS 15.0 as its minimum
+  (any macOS 15), which the bundled Homebrew libraries need, instead of the
+  version of the machine which built it (15.8.2). No Mac with macOS 13 or 14
+  could run it, and none is now told it can; the build checks that no
+  bundled file needs more than the declared minimum (#733).
 
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
   block removed or changed by one side next to a block changed by the other,

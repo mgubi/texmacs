@@ -273,7 +273,7 @@ It has one job per platform, each limited to 60 minutes. Each job:
 | Platform | Runner and dependencies | Artifact |
 |---|---|---|
 | Linux | Ubuntu 24.04, Qt 6 and libraries from apt | `texmacs-linux-x86_64`: a tarball of `TeXmacs/` |
-| macOS | macOS 14 (Apple silicon), Qt 6 and libraries from Homebrew | `texmacs-macos-arm64`: the zipped `TeXmacs.app` (unsigned) |
+| macOS | macOS 15 (Apple silicon), Qt 6 and libraries from Homebrew (the package declares macOS 15.0 as its minimum, which they need) | `texmacs-macos-arm64`: the zipped `TeXmacs.app` (unsigned) |
 | Windows | MSYS2 MinGW-w64, Qt 6 and libraries from MSYS2 | `texmacs-windows-x86_64`: the zipped `WINDOWS_BUNDLE` folder |
 
 A full run takes about 15 minutes for Linux and macOS, and 20–25 minutes for

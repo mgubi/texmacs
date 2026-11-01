@@ -64,7 +64,7 @@ the commit it was built from.
 
 * **macOS** (Apple silicon and Intel, macOS 13 or later): the Cocoa and
   the Vue applications as universal disk images, and Qt 6 for Apple
-  silicon (`.github/workflows/upsilon-macos.yml`). They are signed ad hoc and
+  silicon, macOS 15 or later (`.github/workflows/upsilon-macos.yml`). They are signed ad hoc and
   not notarized: open the application from its context menu the first
   time, or run `xattr -dr com.apple.quarantine /Applications/TeXmacs.app`.
 * **Linux** (built on Ubuntu 24.04, x86_64) and **Windows** (MSYS2
