@@ -72,6 +72,17 @@ else
   run_path="$work/shim:$PATH"
 fi
 
+echo "== the licenses in $root/misc/licenses"
+[ -f "$root/misc/licenses/ghostscript/LICENSE" ] && [ -f "$root/misc/licenses/ghostscript/COPYING" ] &&
+  ok "the license of Ghostscript (ghostscript/LICENSE, COPYING)" ||
+  { fail "no license of Ghostscript in $root/misc/licenses/ghostscript"; ls -R "$root/misc/licenses/ghostscript" 2>&1 | head -5; }
+[ -f "$root/misc/licenses/README.md" ] && [ -f "$root/misc/licenses/AGPL-3.0.txt" ] &&
+  ok "README.md and AGPL-3.0.txt" || fail "no README.md or AGPL-3.0.txt in $root/misc/licenses"
+if [ $aspell = yes ]; then
+  [ -f "$root/misc/licenses/aspell/Aspell-COPYING" ] && [ -f "$root/misc/licenses/aspell/dict-en-Copyright" ] &&
+    ok "the licenses of Aspell and its dictionaries" || fail "no license of Aspell in $root/misc/licenses/aspell"
+fi
+
 echo "== the program: $gs"
 [ -f "$gs" ] || { fail "$gs does not exist"; exit 1; }
 [ -x "$gs" ] || fail "$gs is not executable"

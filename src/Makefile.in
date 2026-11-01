@@ -491,6 +491,7 @@ MACOS_BUNDLE: TEXMACS
 	$(CP) TeXmacs $(MACOS_PACKAGE_RESOURCES)/share
 	$(RM) $(MACOS_PACKAGE_TEXMACS)/bin/texmacs.bin
 	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(MACOS_PACKAGE_TEXMACS)/bin/;fi
+# (cp, not CP: with rsync, -R means --relative)
 # (Ghostscript of the package, built by packages/build-gs.sh: GS_BUNDLE is
 # its gs, GS_LICENSES the folder with its license; gs_utilities.cpp runs
 # the bin/gs of the TeXmacs folder before the one of the system)
@@ -500,7 +501,7 @@ MACOS_BUNDLE: TEXMACS
 	fi
 	if test -n "$(GS_LICENSES)"; then \
 	  $(MKDIR) $(MACOS_PACKAGE_TEXMACS)/misc/licenses/ghostscript; \
-	  $(CP) -R "$(GS_LICENSES)"/* $(MACOS_PACKAGE_TEXMACS)/misc/licenses/ghostscript/; \
+	  cp -R "$(GS_LICENSES)"/. $(MACOS_PACKAGE_TEXMACS)/misc/licenses/ghostscript/; \
 	fi
 	if test -n "@GUILE_DATA_PATH@"; then \
 	  find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(MACOS_PACKAGE_TEXMACS)/progs/ \; ; \
@@ -592,15 +593,15 @@ WINDOWS_BUNDLE: TEXMACS WINDOWS_PDB
 	if test -n "$(GS_BUNDLE)"; then $(CP) "$(GS_BUNDLE)" $(WINDOWS_BUILD_BIN_DIR)/gs.exe; fi
 	if test -n "$(ASPELL_DATA)"; then \
 		$(RM) -r $(WINDOWS_BUILD_DIR)/aspell-0.60; \
-		$(CP) -r "$(ASPELL_DATA)" $(WINDOWS_BUILD_DIR)/aspell-0.60; \
+		cp -R "$(ASPELL_DATA)" $(WINDOWS_BUILD_DIR)/aspell-0.60; \
 	fi
 	if test -n "$(GS_LICENSES)"; then \
 		$(MKDIR) $(WINDOWS_BUILD_DIR)/misc/licenses/ghostscript; \
-		$(CP) -r "$(GS_LICENSES)"/* $(WINDOWS_BUILD_DIR)/misc/licenses/ghostscript/; \
+		cp -R "$(GS_LICENSES)"/. $(WINDOWS_BUILD_DIR)/misc/licenses/ghostscript/; \
 	fi
 	if test -n "$(ASPELL_LICENSES)"; then \
 		$(MKDIR) $(WINDOWS_BUILD_DIR)/misc/licenses/aspell; \
-		$(CP) -r "$(ASPELL_LICENSES)"/* $(WINDOWS_BUILD_DIR)/misc/licenses/aspell/; \
+		cp -R "$(ASPELL_LICENSES)"/. $(WINDOWS_BUILD_DIR)/misc/licenses/aspell/; \
 	fi
 	for f in $(WINDOWS_BUILD_BIN_DIR)/*.exe;do $(WINDOWS_PACKAGE_SRC)/copydll.sh $$f;done
 	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(WINDOWS_BUILD_DIR)/bin
