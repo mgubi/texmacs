@@ -327,6 +327,13 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   tm_delete (ren);
 
 #ifdef USE_GS
+  // through Ghostscript, the target is written by a conversion: an old
+  // file under its name is removed first, so that it does not pass for the
+  // new one when the conversion fails
+  if ((!use_pdf () && pdf) || (!use_ps () && ps)) {
+    if (ok && exists (orig)) ::remove (orig);
+    ok= ok && !exists (orig);
+  }
   if (!use_pdf () && pdf) {
     if (ok) gs_to_pdf (name, orig, landsc, h/cm, w/cm);
     ::remove (name);
