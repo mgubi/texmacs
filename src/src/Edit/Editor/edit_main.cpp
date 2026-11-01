@@ -349,8 +349,14 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
 
 void
 edit_main_rep::print_to_file (url name, string first, string last) {
+  int old_stamp= last_modified (name, false);
   print_doc (name, false, as_int (first), as_int (last));
-  set_message ("Done printing", "print to file");
+  int new_stamp= last_modified (name, false);
+  if (new_stamp <= old_stamp)
+    set_message (concat ("Could not save ",
+                         verbatim (as_string (name, URL_SYSTEM))),
+                 "print to file");
+  else set_message ("Done printing", "print to file");
 }
 
 void

@@ -611,9 +611,13 @@ export_tree (tree doc, url u, string fm) {
     url target= is_rooted_name (u)? u: resolve (u, "");
     old_target= call ("save-target-swap", object (target));
   }
-  string s= tree_to_generic (aux, fm * "-document");
+  // A converter which fails (an error, or no conversion) writes no file
+  object r= call ("texmacs->generic", aux, fm * "-document");
   if (has_target) call ("save-target-swap", old_target);
-  if (s == "* error: unknown format *") return true;
+  if (!is_string (r)) return true;
+  string s= as_string (r);
+  if (s == "* error: unknown format *" ||
+      s == "Error: bad format or data") return true;
   return save_string (u, s);
 }
 

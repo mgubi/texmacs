@@ -390,9 +390,20 @@
 (define (export-buffer-export name to fm opts)
   ;;(display* "export-buffer-export " name ", " to ", " fm "\n")
   (with vto `(verbatim ,(url->system to))
-    (if (buffer-export name to fm)
-        (set-message `(concat "Could not save " ,vto) "Export file")
-        (set-message `(concat "Exported to " ,vto) "Export file"))))
+    (image-write-failures-reset)
+    (let* ((failed? (buffer-export name to fm))
+           (images (image-write-failures)))
+      (image-write-failures-reset)
+      (cond (failed?
+             (set-message `(concat "Could not save " ,vto) "Export file"))
+            ((nnull? images)
+             ;; the text is there, but it names images which are not (#705)
+             (set-message `(concat "Exported to " ,vto ", but an image could"
+                                   " not be written: "
+                                   (verbatim ,(url->system (car images))))
+                          "Export file"))
+            (else
+             (set-message `(concat "Exported to " ,vto) "Export file"))))))
 
 (define (export-buffer-check-permissions name to fm opts)
   ;;(display* "export-buffer-check-permissions " name ", " to ", " fm "\n")
