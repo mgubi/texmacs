@@ -242,12 +242,20 @@ edit_text_rep::prepare_for_insert () {
 void
 edit_text_rep::insert_tree (tree t, path p_in_t) {
   bool cut= !as_bool (call ("like-emacs?"));
+  bool tested= false;   // the paragraphs were tested for the cut selection
   if (is_multi_paragraph (t)) {
     // (where selection_cut will leave the cursor: it corrects the range)
     path ip= tp;
-    if (cut && selection_active_any ())
-      ip= selection_active_table ()? selection_get_start ()
-                                   : selection_var_get_start ();
+    if (cut && selection_active_any ()) {
+      if (selection_active_table ()) {
+        // the cut empties the cells: a cell without paragraphs has no place
+        // for paragraphs, and the cells would be cleared for nothing
+        set_message ("Several paragraphs cannot replace cells", "insert");
+        return;
+      }
+      ip    = selection_var_get_start ();
+      tested= true;
+    }
     if (!can_insert_at (t, ip)) {
       // (nothing changes: the selection is not cut for nothing)
       set_message ("Several paragraphs cannot be inserted here", "insert");
@@ -255,6 +263,22 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
     }
   }
   if (cut) selection_cut ("none");
+  if (tested && !can_insert_at (t, tp)) {
+    // The cut leaves the cursor in the tag next to the range when it removes
+    // the text up to the tag (a tag with an inner border, as hidden): the
+    // paragraphs go at the border of that tag, where the range began
+    for (path u= path_up (tp); rp < u; u= path_up (u))
+      if (is_compound (subtree (et, u))) {
+        path q;
+        if (tp == end (et, u)) q= u * 1;
+        else if (tp == start (et, u)) q= u * 0;
+        else continue;
+        if (can_insert_at (t, q)) {
+          go_to (q);
+          break;
+        }
+      }
+  }
   if (is_atomic (t) && (p_in_t == end (t)) &&
       is_atomic (subtree (et, path_up (tp))))
     insert (tp, t);

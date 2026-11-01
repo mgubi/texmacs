@@ -800,6 +800,72 @@
         (edit (selection-set (at 0 1) (at 0 2)))
         (edit (insert by))
         (check= (body) '(document "aP" "Qc"))))
+    ;; a selection cut up to a tag with an inner border (it starts right
+    ;; after the tag, or ends right before it): the cut leaves the cursor in
+    ;; the tag, the paragraphs go at the border of the tag (#711)
+    (let* ((block '(quotation (document "P" "Q")))
+           (try (lambda (how doc a b res)
+                  (with-buffer-body doc
+                    (lambda ()
+                      (clipboard-set "editing-test" (stree->tree by))
+                      (edit (selection-set (apply at a) (apply at b)))
+                      (edit (how))
+                      (check= (body) res)
+                      (edit (undo 0))
+                      (check= (body) doc))))))
+      (for-each
+        (lambda (tag)
+          (for-each
+            (lambda (how)
+              (try how `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 3)
+                   `(document (concat "z" ,tag "P") "Q"))
+              (try how `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 2)
+                   `(document (concat "z" ,tag "P") "Qc"))
+              (try how `(document (concat "abc" ,tag "z")) '(0 0 0) '(0 0 3)
+                   `(document "P" (concat "Q" ,tag "z")))
+              (try how `(document (concat "z" ,tag "abc")) '(0 0 0) '(0 0 1)
+                   `(document "P" (concat "Q" ,tag "abc"))))
+            (list (lambda () (insert by))
+                  (lambda () (clipboard-paste "editing-test"))))
+          (try (lambda () (insert block))
+               `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 3)
+               `(document (concat "z" ,tag) ,block))
+          (try (lambda () (insert block))
+               `(document (concat "abc" ,tag "z")) '(0 0 0) '(0 0 3)
+               `(document ,block (concat ,tag "z"))))
+        '((hidden "b") (freeze "b") (unfreeze "b") (ignore "b") (shown "b")
+          (table (row (cell "b"))) (expand* "foo" "b"))))
+    ;; a selection of cells: the cut empties the cells, which then have no
+    ;; place for paragraphs; nothing changes, and the selection is kept
+    (let* ((cells '(document (tabular (tformat (table (row
+                      (cell (document "ef" "gh")) (cell (strong "ij"))))))))
+           (a '(0 0 0 0 0 0 0 0)) (b '(0 0 0 0 1 0 0 2)))
+      (for-each
+        (lambda (how)
+          (with-buffer-body cells
+            (lambda ()
+              (buffer-pretend-saved (current-buffer))
+              (clipboard-set "editing-test" (stree->tree by))
+              (let ((n (undo-possibilities)))
+                (edit (selection-set (apply at a) (apply at b)))
+                (edit (how))
+                (check= (body) cells)
+                (check-true (selection-active-any?))
+                ;; (no undo entry, and not modified)
+                (check= (undo-possibilities) n)
+                (check-false (buffer-modified? (current-buffer))))
+              (edit (selection-cancel)))))
+        (list (lambda () (insert by))
+              (lambda () (insert '(quotation (document "P" "Q"))))
+              (lambda () (clipboard-paste "editing-test"))))
+      ;; text still replaces the cells
+      (with-buffer-body cells
+        (lambda ()
+          (edit (selection-set (apply at a) (apply at b)))
+          (edit (insert "xx"))
+          (check= (body) '(document (tabular (tformat (table (row
+                                       (cell "xx"))))))))))
+    (clipboard-clear "editing-test")
     ;; a selection which starts inside a tag and ends outside it: the cut
     ;; starts before the tag, where paragraphs can go
     ;; (setting a clipboard cancels the selection)
