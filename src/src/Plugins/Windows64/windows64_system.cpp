@@ -224,6 +224,16 @@ bool texmacs_getenv(string var_name, string &var_value) {
   return true;
 }
 
+string texmacs_short_path(string path) {
+  std::wstring wide = texmacs_utf8_to_wide(path);
+  DWORD n = GetShortPathNameW(wide.c_str(), nullptr, 0);
+  if (n == 0) return path;
+  std::vector<wchar_t> buf(n);
+  DWORD m = GetShortPathNameW(wide.c_str(), buf.data(), n);
+  if (m == 0 || m >= n) return path;
+  return texmacs_wide_to_utf8(std::wstring(buf.data(), m));
+}
+
 bool texmacs_setenv(string var_name, string new_value) {
   std::wstring wide_var_name = texmacs_utf8_to_wide(var_name);
   std::wstring wide_new_value = texmacs_utf8_to_wide(new_value);

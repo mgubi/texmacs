@@ -53,7 +53,13 @@ gs_embedded () {
   string tmp= get_env ("TEXMACS_PATH");
   if (N (tmp) != 0) {
     url gs= url_system (tmp) * url_system (GS_EXE);
+    // (a file without the permission to run is not used: the gs of the
+    // system then; Windows has no such bit)
+#ifdef OS_MINGW
     if (exists (gs)) return concretize (gs);
+#else
+    if (exists (gs) && is_of_type (gs, "x")) return concretize (gs);
+#endif
   }
   return gs_system ();
 }
@@ -425,6 +431,19 @@ gs_to_eps (url image, url eps) {
   gs_fix_bbox (eps, 0, 0, bx2-bx1, by2-by1);
 }
 
+// The messages of gs for the conversions which only look at their result file:
+// into the null device, not the pipe of windows_system, which is read after the
+// end of gs (a long trace of errors filled it: a wait of 30 s, #655). A gs
+// which does not know -sstderr takes it for a string, as it takes any -sNAME=.
+static string
+gs_null_output () {
+#ifdef OS_MINGW
+  return " -sstdout=NUL -sstderr=NUL ";
+#else
+  return " -sstdout=/dev/null -sstderr=/dev/null ";
+#endif
+}
+
 // This conversion is appropriate for eps images
 // (originally implemented in pdf_image_rep::flush)
 void  
@@ -441,7 +460,7 @@ gs_to_pdf (url image, url pdf, int w, int h) {
   double scale_y = h/((double)(by2-by1));
 
   cmd= gs_prefix ();
-  cmd << " -dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite ";
+  cmd << " -dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite " << gs_null_output ();
   cmd << "-dAutoRotatePages=/None ";
   cmd << "-dCompatibilityLevel=" << pdf_version () << " ";
   cmd << " -sOutputFile=" << sys_concretize (resolve (pdf, "")) << " ";
@@ -470,7 +489,7 @@ gs_to_pdf (url doc, url pdf, bool landscape, double paper_h, double paper_w) {
   if (DEBUG_CONVERT)
     debug_convert << "gs_to_pdf, converting " << doc << " into " << pdf <<LF;
   string cmd= gs_prefix ();
-  cmd << "-dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite ";
+  cmd << "-dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite " << gs_null_output ();
   cmd << "-dCompatibilityLevel=" << pdf_version () << " ";
   if (landscape)
     cmd << "-dDEVICEWIDTHPOINTS=" << as_string ((int) (28.36*paper_h+ 0.5))
@@ -502,7 +521,7 @@ gs_to_ps (url doc, url ps, bool landscape, double paper_h, double paper_w) {
   if (DEBUG_CONVERT)
     debug_convert << "gs_to_ps, converting " << doc << " into " << ps << LF;
   string cmd= gs_prefix ();
-  cmd << "-dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=ps2write ";
+  cmd << "-dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=ps2write " << gs_null_output ();
   if (landscape)
     cmd << "-dDEVICEWIDTHPOINTS=" << as_string ((int) (28.36*paper_h+ 0.5))
       << " -dDEVICEHEIGHTPOINTS=" << as_string ((int) (28.36*paper_w+ 0.5));

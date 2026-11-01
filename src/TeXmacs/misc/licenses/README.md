@@ -73,8 +73,11 @@ their licenses in `misc/licenses/system` when they were made with them
 ## Programs of others which the packages bring
 
 Ghostscript and Aspell are programs and libraries of others which the
-packages of TeXmacs Upsilon bring, unmodified, built from their released
-sources by `packages/build-gs.sh` and `packages/windows/build-aspell.sh`:
+packages of TeXmacs Upsilon bring, built from their released
+sources by `packages/build-gs.sh` and `packages/windows/build-aspell.sh`, not
+modified but for one line of `base/mkromfs.c` of Ghostscript, which
+`build-gs.sh` changes (with `perl`) to build the `gs.exe` of the Windows
+packages (read the script for what it does):
 
 | Program | Packages | Version | License | Files |
 |---|---|---|---|---|
@@ -86,12 +89,13 @@ Ghostscript has the libraries of its sources built in (FreeType, libpng,
 libjpeg of the Independent JPEG Group, zlib, Little CMS, OpenJPEG, jbig2dec,
 libtiff, Brotli...): their licenses are the ones of the folders of the
 archive below (`LICENSE` of Ghostscript lists them). TeXmacs runs `gs` as a
-program of its own, beside TeXmacs (a GPL 3 or later program), which the
-AGPL 3 and the GPL 3 allow (section 13 of both); the AGPL asks for the
-corresponding source of the program, below.
+program of its own, beside TeXmacs (a GPL 3 or later program); section 13 of
+both licenses is about combining them (the maintainers have to confirm that
+this is what they allow). The AGPL asks for the corresponding source of the
+program, below.
 
 **The corresponding source** of Ghostscript, Aspell and the dictionaries, the
-exact archives the packages were built from (none modified, checked against
+exact archives the packages were built from (as they are at their authors, checked against
 the SHA-256 of the scripts above), are the assets of the release
 <https://github.com/mgubi/texmacs/releases/tag/upsilon-sources>, added when a
 version changes (`.github/workflows/upsilon-macos.yml`, job `sources`). They

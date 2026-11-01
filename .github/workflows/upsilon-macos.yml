@@ -393,7 +393,8 @@ jobs:
 
   # The corresponding source of the programs of others which the packages
   # bring under the AGPL (Ghostscript) and the LGPL (Aspell, its dictionaries),
-  # unmodified: their archives, checked against the SHA-256 of the build
+  # unmodified (but one line of mkromfs.c for the gs.exe of Windows, changed by
+  # packages/build-gs.sh): their archives, checked against the SHA-256 of the build
   # scripts, kept as the assets of the release upsilon-sources (made once,
   # each file added when its version is new, none replaced). The packages
   # say where they are (misc/licenses/README.md of the TeXmacs folder, #662)
@@ -435,7 +436,7 @@ jobs:
           if ! gh release view "$tag" > /dev/null 2>&1; then
             gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
               --title "TeXmacs Upsilon, sources of the programs of others" \
-              --notes "The exact source archives of the programs of others which the packages of TeXmacs Upsilon bring: Ghostscript (GNU Affero General Public License 3), Aspell (GNU Lesser General Public License 2.1) and its dictionaries (their own free licenses), as the build scripts download them (packages/build-gs.sh, packages/windows/build-aspell.sh), none modified. The sources of TeXmacs Upsilon itself are at https://github.com/${GH_REPO}. Written offer: the same archives, on request to the maintainer of the repository, for three years from the release of a package which has the program."
+              --notes "The exact source archives of the programs of others which the packages of TeXmacs Upsilon bring: Ghostscript (GNU Affero General Public License 3), Aspell (GNU Lesser General Public License 2.1) and its dictionaries (their own free licenses), as the build scripts download them (packages/build-gs.sh, packages/windows/build-aspell.sh), not modified but for one line of mkromfs.c, which packages/build-gs.sh changes when it builds the gs.exe of the Windows packages (see the script). The sources of TeXmacs Upsilon itself are at https://github.com/${GH_REPO}. Written offer: the same archives, on request to the maintainer of the repository, for three years from the release of a package which has the program."
           fi
           have=$(gh release view "$tag" --json assets -q '.assets[].name')
           while read -r file url sha; do
@@ -450,8 +451,10 @@ jobs:
     # the files of macOS in the pre-release upsilon-latest; the Linux and
     # Windows packages are added to it by upsilon-linux-windows.yml. Each
     # workflow replaces and removes only its own files
-    needs: [dmg, qt]
-    if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success'
+    # (the sources of the programs of others first: a package is not published
+    # before them, #662)
+    needs: [dmg, qt, sources]
+    if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success' && needs.sources.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -492,7 +495,9 @@ jobs:
             \`TeXmacs-*-vue-universal.dmg\`, the Vue interface, drawn by the
             GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
             \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only.
-            Signed ad hoc and not notarized: macOS refuses to open them the
+            Signed ad hoc and not notarized (when they are, the program \`gs\`
+            of the application will need the option of the hardened runtime
+            for its own signature, as it is a program of its own). macOS refuses to open them the
             first time. Open the application from its context menu (Open),
             or allow it in System Settings > Privacy & Security, or remove
             the quarantine: \`xattr -dr com.apple.quarantine /Applications/TeXmacs.app\`

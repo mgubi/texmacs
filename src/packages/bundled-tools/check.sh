@@ -124,23 +124,30 @@ run_timeout () {
 
 # with absolute paths, as TeXmacs gives them (on Windows with backslashes,
 # and the options it adds: a title, -c code...)
+# (the messages of gs into the null device: the options of gs_utilities.cpp)
+if [ $windows = yes ]; then nullout="-sstdout=NUL -sstderr=NUL"; else nullout="-sstdout=/dev/null -sstderr=/dev/null"; fi
 for form in native windows; do
   [ $form = windows ] && { [ $windows = yes ] || continue; }
   if [ $form = windows ]; then in=$(cygpath -w "$work/test.eps"); outp=$(cygpath -w "$work/abs-w.pdf")
   else in="$n_work/test.eps"; outp="$n_work/abs-n.pdf"; fi
-  (cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" TMPDIR="$n_work" PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
+  (cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" TMPDIR="$n_work" PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER $nullout \
      -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 "-sOutputFile=$outp" "$in" > gs-abs.log 2>&1) &&
     ok "an EPS file with an absolute path ($form) converted to PDF" ||
     { fail "gs does not convert the EPS file with an absolute path ($form: $in)"; tail -10 "$work/gs-abs.log"; }
 done
 
-echo "== TeXmacs: $*"
-what=ghostscript
-[ $aspell = yes ] && what="ghostscript aspell"
-args=""
-for w in $what; do args="$args \"$w\""; done
-out="$work/texmacs.log"
-(cd "$work" && export TEXMACS_HOME_PATH="$n_home" TEXMACS_PATH="$n_root" &&
+# one run of TeXmacs (the PATH of the check, the home in the scratch folder;
+# TMPDIR is never set, as a real user has none: TEMP is the folder $3 if given,
+# $4 is put first in the PATH); the log is $out
+run_tm () { # log what temp extra_path
+  local what="$2" temp="$3" extra="$4" args="" w
+  for w in $what; do args="$args \"$w\""; done
+  out="$1"
+  rm -f "$work/eps-doc.pdf" "$work/eps-doc.tm"
+  (cd "$work" && export TEXMACS_HOME_PATH="$n_home" TEXMACS_PATH="$n_root" &&
+   unset TMPDIR &&
+   if [ -n "$temp" ]; then export TEMP="$(native "$temp")" TMP="$(native "$temp")"; fi &&
+   if [ -n "$extra" ]; then run_path="$extra:$run_path"; fi &&
    # (Qt without a window, unless TM_CHECK_QPA says otherwise, even empty:
    # the Qt of an AppImage has no offscreen plugin, nor Windows runs need it)
    if [ -n "${TM_CHECK_QPA+x}" ]; then
@@ -148,9 +155,16 @@ out="$work/texmacs.log"
    elif [ $windows = no ]; then export QT_QPA_PLATFORM=offscreen; fi &&
    run_timeout 300 "$@" -x '(load "check.scm")' \
    -x "(bundled-tools-check \"$n_work\" $args)" > "$out" 2>&1)
-[ $windows = yes ] && taskkill //F //IM texmacs.exe > /dev/null 2>&1
-grep "^CHECK" "$out" | tr -d '\r'
+  [ $windows = yes ] && taskkill //F //IM texmacs.exe > /dev/null 2>&1
+  return 0
+}
 val () { grep "^CHECK $1 " "$out" | head -1 | tr -d '\r' | cut -d' ' -f3-; }
+
+echo "== TeXmacs: $*"
+what=ghostscript
+[ $aspell = yes ] && what="ghostscript aspell"
+run_tm "$work/texmacs.log" "$what" "" ""
+grep "^CHECK" "$out" | tr -d '\r'
 grep -q "^CHECK done yes" "$out" || { fail "TeXmacs did not run the check"; tail -30 "$out"; }
 [ -z "$(val error)" ] || fail "an error in the check: $(val error)"
 used=$(val gs-binary | tr '\\' /); appdir=$(val appdir)
@@ -187,6 +201,66 @@ if [ $aspell = yes ]; then
     [ "$(val spell-$l-start)" = ok ] && ok "dictionary for $l" || fail "no dictionary for $l: $(val spell-$l-start)"
     [ "$(val spell-$l-good)" = yes ] && ok "$l: a word is known" || fail "$l: a word is not known"
     [ "$(val spell-$l-bad)" = no ] && ok "$l: a misspelling is found" || fail "$l: a misspelling is not found"
+  done
+  # a language outside the dictionaries of the package: no external checker on
+  # this machine, a clear error (the external route is tried, not an English
+  # dictionary); one there: it works
+  ext=$(val ext-greek-start)
+  if command -v hunspell > /dev/null 2>&1 || command -v aspell > /dev/null 2>&1; then
+    echo "note: this machine has an external spell checker (Greek: $ext)"
+  else
+    case "$ext" in Error:*) ok "Greek (no dictionary in the package, no external checker): $ext";;
+      *) fail "Greek should give an error here, not \"$ext\"";; esac
+  fi
+  # with an external checker (a fake hunspell: the protocol of ispell -a, one
+  # line "*" for a word, a suggestion for those with zzz), built here
+  cc=${CC:-gcc}
+  if command -v $cc > /dev/null 2>&1; then
+    mkdir -p "$work/fakebin"
+    cat > "$work/fake-ispell.c" << 'EOT'
+#include <stdio.h>
+#include <string.h>
+int main (void) {
+  char line[4096];
+  printf ("@(#) International Ispell Version 3.1.20 (but really a fake)\n");
+  fflush (stdout);
+  while (fgets (line, sizeof (line), stdin)) {
+    if (line[0] == '^') {
+      if (strstr (line, "zzz")) printf ("& zzzz 1 0: yyyy\n\n");
+      else printf ("*\n\n");
+      fflush (stdout);
+    }
+  }
+  return 0;
+}
+EOT
+    fe=hunspell; [ $windows = yes ] && fe=hunspell.exe
+    if $cc -o "$work/fakebin/$fe" "$work/fake-ispell.c"; then
+      run_tm "$work/texmacs-ext.log" external "" "$work/fakebin"
+      grep "^CHECK ext" "$out" | tr -d '\r'
+      [ "$(val ext-greek-start)" = ok ] && [ "$(val ext-greek-good)" = yes ] && [ "$(val ext-greek-bad)" = no ] &&
+        ok "Greek goes to the external spell checker (the dictionaries of the package do not have it)" ||
+        { fail "Greek does not reach the external spell checker: $(val ext-greek-start)"; tail -15 "$out"; }
+    else
+      echo "note: no fake external spell checker (the compiler failed): the fallback is not tried"
+    fi
+  else
+    echo "note: no C compiler: the fallback to an external spell checker is not tried"
+  fi
+fi
+
+# Windows: gs.exe makes its temporary files in $TMPDIR (set by TeXmacs from TEMP
+# when it is unset, as it is for a real user), with the ANSI functions of Windows
+if [ $windows = yes ]; then
+  echo "== TEMP, TMPDIR unset"
+  run_tm "$work/texmacs-t0.log" ghostscript "" ""
+  [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF, TMPDIR unset (TeXmacs sets it: $(val tmpdir))" ||
+    { fail "no PDF with TMPDIR unset (TMPDIR in TeXmacs: $(val tmpdir))"; tail -10 "$out"; }
+  for t in "tmp dir ü" "tmp-ж"; do
+    mkdir -p "$work/$t"
+    run_tm "$work/texmacs-t1.log" ghostscript "$work/$t" ""
+    [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF with TEMP=.../$t (TMPDIR in TeXmacs: $(val tmpdir))" ||
+      { fail "no PDF with TEMP=.../$t (TMPDIR in TeXmacs: $(val tmpdir))"; grep -v "^CHECK" "$out" | tr -d '\r' | tail -8; }
   done
 fi
 [ $status = 0 ] && echo "== the bundled tools are fine" || echo "== FAILED"

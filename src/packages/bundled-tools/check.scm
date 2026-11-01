@@ -57,11 +57,23 @@
      ("french" "bonjour" "bonjuor")
      ("german" "Sprache" "Spracle"))))
 
+;; a language which the dictionaries of the package do not have (Greek): the
+;; external spell checker which the user has (hunspell, aspell), else a clear
+;; error
+(define (cbt-spell-external)
+  (let ((r (single-spell-start "greek")))
+    (cbt-line "ext-greek-start" r)
+    (when (== r "ok")
+      (cbt-line "ext-greek-good" (if (spell-check? "greek" "kalimera") "yes" "no"))
+      (cbt-line "ext-greek-bad" (if (spell-check? "greek" "zzzz") "yes" "no"))
+      (single-spell-done "greek"))))
+
 (define (bundled-tools-check dir . what)
   (catch #t
     (lambda ()
       (when (member "ghostscript" what) (cbt-eps dir))
-      (when (member "aspell" what) (cbt-spell)))
+      (when (member "aspell" what) (cbt-spell) (cbt-spell-external))
+      (when (member "external" what) (cbt-spell-external)))
     (lambda args (cbt-line "error" args)))
   (cbt-line "done" "yes")
   (quit-TeXmacs))

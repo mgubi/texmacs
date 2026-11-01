@@ -180,8 +180,8 @@ ispell_decode (string lan, string s) {
   return utf8_to_cork (s);
 }
 
-string
-ispell_start (string lan) {
+static string
+ispell_lib_start (string lan) {
   if (DEBUG_IO) debug_spell << "Start " << lan << "\n";
   ispeller sc= ispeller (lan);
   if (is_nil (sc)) sc= tm_new<ispeller_rep> (lan);
@@ -189,13 +189,13 @@ ispell_start (string lan) {
   return res;
 }
 
-tree
-ispell_check (string lan, string s) {
+static tree
+ispell_lib_check (string lan, string s) {
   if (DEBUG_IO) debug_spell << "Check " << s << "\n";
   ispeller sc= ispeller (lan);
   
   if (is_nil (sc)) {
-    string message= ispell_start (lan);
+    string message= ispell_lib_start (lan);
     if (starts (message, "Error: ")) return message;
     sc = ispeller(lan);
   }
@@ -205,26 +205,98 @@ ispell_check (string lan, string s) {
   return sc->check(s);
 }
 
-void
-ispell_accept (string lan, string s) {
+static void
+ispell_lib_accept (string lan, string s) {
   if (DEBUG_IO) debug_spell << "Accept " << s << "\n";
   ispeller sc= ispeller (lan);
   if (!is_nil (sc)) sc->accept(s);
 }
 
-void
-ispell_insert (string lan, string s) {
+static void
+ispell_lib_insert (string lan, string s) {
   if (DEBUG_IO) debug_spell << "Insert " << s << "\n";
   ispeller sc= ispeller (lan);
   if (!is_nil (sc)) sc->insert(s);
 }
 
-void
-ispell_done (string lan) {
+static void
+ispell_lib_done (string lan) {
   if (DEBUG_IO) debug_spell << "End " << lan << "\n";
   ispeller sc= ispeller (lan);
   if (!is_nil (sc)) {
       sc->save_all();
   }
 }
+
+/******************************************************************************
+* The library, and the external program for the languages it has no dictionary of
+******************************************************************************/
+
+// What the package has: the dictionaries of the library. A language they do
+// not cover (Greek, Czech...) is spell checked by a Hunspell or an Aspell
+// which the user has installed (ispell_exe.cpp, compiled under the names
+// ispell_exe_*), as before the library; the error of the library is given
+// when there is none.
+#if !USE_HUNSPELL
+string ispell_exe_start (string lan);
+tree   ispell_exe_check (string lan, string s);
+void   ispell_exe_accept (string lan, string s);
+void   ispell_exe_insert (string lan, string s);
+void   ispell_exe_done (string lan);
+
+static hashmap<string,bool> ispell_external (false);
+static hashmap<string,bool> ispell_no_external (false);   // tried, none
+
+string
+ispell_start (string lan) {
+  if (ispell_external->contains (lan)) return ispell_exe_start (lan);
+  string res= ispell_lib_start (lan);
+  if (!starts (res, "Error: ")) return res;
+  if (ispell_no_external->contains (lan)) return res;
+  string ext= ispell_exe_start (lan);
+  if (starts (ext, "Error: ")) {
+    ispell_no_external (lan)= true;
+    return res;
+  }
+  if (DEBUG_IO) debug_spell << "Using the external spell checker for " << lan << "\n";
+  ispell_external (lan)= true;
+  return ext;
+}
+
+tree
+ispell_check (string lan, string s) {
+  if (!ispell_external->contains (lan)) {
+    tree t= ispell_lib_check (lan, s);
+    if (!(is_atomic (t) && starts (as_string (t), "Error: "))) return t;
+    string st= ispell_start (lan);   // the external program, if there is one
+    if (!ispell_external->contains (lan)) return t;
+  }
+  return ispell_exe_check (lan, s);
+}
+
+void
+ispell_accept (string lan, string s) {
+  if (ispell_external->contains (lan)) ispell_exe_accept (lan, s);
+  else ispell_lib_accept (lan, s);
+}
+
+void
+ispell_insert (string lan, string s) {
+  if (ispell_external->contains (lan)) ispell_exe_insert (lan, s);
+  else ispell_lib_insert (lan, s);
+}
+
+void
+ispell_done (string lan) {
+  if (ispell_external->contains (lan)) ispell_exe_done (lan);
+  else ispell_lib_done (lan);
+}
+#else
+string ispell_start (string lan) { return ispell_lib_start (lan); }
+tree   ispell_check (string lan, string s) { return ispell_lib_check (lan, s); }
+void   ispell_accept (string lan, string s) { ispell_lib_accept (lan, s); }
+void   ispell_insert (string lan, string s) { ispell_lib_insert (lan, s); }
+void   ispell_done (string lan) { ispell_lib_done (lan); }
+#endif
+
 #endif

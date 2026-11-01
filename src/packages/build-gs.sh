@@ -22,8 +22,8 @@
 # PREFIX/share/licenses/ghostscript has the license of the sources.
 #
 # Ghostscript is under the GNU Affero General Public License 3 (the program
-# is not modified here: TeXmacs runs it as a program of its own, beside the
-# GPL 3 program, which is mere aggregation). The sources of the version in
+# is not modified here, but for one line of mkromfs.c on Windows (below);
+# TeXmacs runs it as a program of its own, beside TeXmacs). The sources of the version in
 # the packages are the archive given below, which the release of the
 # packages keeps (misc/licenses/README.md of the TeXmacs folder).
 
@@ -113,7 +113,9 @@ case "$os" in
 esac
 [ -f "bin/$exe" ] || { echo "error: the build made no bin/$exe" >&2; ls bin; exit 1; }
 cp "bin/$exe" "$prefix/bin/$exe"
-[ "$os" = Darwin ] || strip "$prefix/bin/$exe"
+# (macOS: strip -x, the local symbols only, keeps what the signature needs and
+# saves a few percent; the program is signed again with the application)
+if [ "$os" = Darwin ]; then strip -x "$prefix/bin/$exe"; else strip "$prefix/bin/$exe"; fi
 cp LICENSE "$prefix/share/licenses/ghostscript/LICENSE"
 cp doc/COPYING "$prefix/share/licenses/ghostscript/COPYING"
 

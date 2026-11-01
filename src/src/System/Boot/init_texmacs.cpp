@@ -363,10 +363,30 @@ init_env_vars () {
 #ifdef OS_MINGW
   // The gs.exe of the package (Ghostscript, built as a program of Unix on
   // Windows) makes its temporary files in $TMPDIR, else in /tmp, which Windows
-  // has not: the same folder as the other programs (TEMP) then
-  if (get_env ("TMPDIR") == "" && get_env ("TEMP") != "" &&
-      exists (url ("$TEXMACS_PATH/bin/gs.exe")))
-    set_env ("TMPDIR", get_env ("TEMP"));
+  // has not: the folder of the other programs (TEMP) then. It reads that
+  // folder and opens its files with the ANSI functions of Windows, which
+  // cannot name a folder with letters outside the code page of the system (a
+  // user name in Cyrillic or Chinese on a Western system): its short name
+  // (8.3, ASCII) then, or else the folder Public of Windows.
+  if (get_env ("TMPDIR") == "" && exists (url ("$TEXMACS_PATH/bin/gs.exe"))) {
+    string tmp= get_env ("TEMP");
+    if (tmp == "") tmp= get_env ("TMP");
+    bool ascii= true;
+    for (int i=0; i<N(tmp); i++) if ((unsigned char) tmp[i] >= 128) ascii= false;
+#ifdef OS_MINGW64
+    if (!ascii && tmp != "") {
+      string sh= texmacs_short_path (tmp);
+      ascii= true;
+      for (int i=0; i<N(sh); i++) if ((unsigned char) sh[i] >= 128) ascii= false;
+      if (ascii) tmp= sh;
+    }
+#endif
+    if (!ascii) {
+      tmp= get_env ("PUBLIC");
+      for (int i=0; i<N(tmp); i++) if ((unsigned char) tmp[i] >= 128) tmp= "";
+    }
+    if (tmp != "") set_env ("TMPDIR", tmp);
+  }
 #endif
   url lib_path= get_env_path ("LD_LIBRARY_PATH") | plugin_path ("lib");
   set_env_path ("LD_LIBRARY_PATH", lib_path);

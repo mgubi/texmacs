@@ -845,6 +845,22 @@ jobs:
           merge-multiple: true
           path: dist
 
+      # the packages have Ghostscript (AGPL) and Aspell: their source archives
+      # must be in the release upsilon-sources (made by the job sources of
+      # upsilon-macos.yml, which is not in this workflow) before the packages are
+      # published (#662); else run that workflow first
+      - name: The sources of the programs of others are published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          assets=$(gh release view upsilon-sources --json assets -q '.assets[].name') ||
+            { echo "error: no release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; exit 1; }
+          for a in 'ghostscript-.*\.tar\.gz' 'aspell-0.*\.tar\.gz'; do
+            echo "$assets" | grep -q "^$a$" ||
+              { echo "error: no $a in the release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; exit 1; }
+          done
+
       - name: The files of Linux and Windows in upsilon-latest
         env:
           GH_TOKEN: ${{ github.token }}
