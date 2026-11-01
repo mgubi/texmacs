@@ -144,7 +144,8 @@ if [ -f "$gs" ]; then
   fi
   for a in $(lipo -archs "$gs"); do
     if arch -$a /usr/bin/true 2> /dev/null; then
-      v=$(cd / && env -i PATH=/usr/bin:/bin arch -$a "$gs" --version 2>&1) || v="(fails)"
+      gs_abs="$app_real/${gs#$app/}"
+      v=$(cd / && env -i PATH=/usr/bin:/bin arch -$a "$gs_abs" --version 2>&1) || v="(fails)"
       if [[ "$v" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
         echo "${gs#$app/} ($a) runs: Ghostscript $v"
       else
