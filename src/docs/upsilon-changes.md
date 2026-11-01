@@ -28,7 +28,9 @@ have the details, and the problems go to the
   licenses (Ghostscript is under the AGPL 3) and where their source archives
   are (the release `upsilon-sources`) are in `misc/licenses/README.md` of the
   TeXmacs folder. The Linux `tar.gz` files still use the `gs` of the system.
-  Part of #662.
+  Also fixed on Windows: the conversions made with `gs` (an EPS image into
+  the PDF, PDF into PostScript) waited for nothing, and looked for their result
+  before `gs` had written it, with any `gs` (#662).
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
   block removed or changed by one side next to a block changed by the other,
   and an edit next to a new paragraph of the other side, now merge cleanly.
