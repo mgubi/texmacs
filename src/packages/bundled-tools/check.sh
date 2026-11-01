@@ -236,14 +236,15 @@ int main (void) {
 }
 EOT
     fe=hunspell; [ $windows = yes ] && fe=hunspell.exe
-    if $cc -o "$work/fakebin/$fe" "$work/fake-ispell.c"; then
+    # (native paths: MSYS2 does not convert the arguments here)
+    if $cc -o "$n_work/fakebin/$fe" "$n_work/fake-ispell.c" 2> "$work/cc.log"; then
       run_tm "$work/texmacs-ext.log" external "" "$work/fakebin"
       grep "^CHECK ext" "$out" | tr -d '\r'
       [ "$(val ext-greek-start)" = ok ] && [ "$(val ext-greek-good)" = yes ] && [ "$(val ext-greek-bad)" = no ] &&
         ok "Greek goes to the external spell checker (the dictionaries of the package do not have it)" ||
         { fail "Greek does not reach the external spell checker: $(val ext-greek-start)"; tail -15 "$out"; }
     else
-      echo "note: no fake external spell checker (the compiler failed): the fallback is not tried"
+      fail "no fake external spell checker (the compiler failed)"; head -5 "$work/cc.log"
     fi
   else
     echo "note: no C compiler: the fallback to an external spell checker is not tried"
@@ -257,6 +258,17 @@ if [ $windows = yes ]; then
   run_tm "$work/texmacs-t0.log" ghostscript "" ""
   [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF, TMPDIR unset (TeXmacs sets it: $(val tmpdir))" ||
     { fail "no PDF with TMPDIR unset (TMPDIR in TeXmacs: $(val tmpdir))"; tail -10 "$out"; }
+  # the user name is in the path of the home of TeXmacs, where gs reads and
+  # writes its files too (the ANSI functions of Windows): with letters of the
+  # code page (ü) and outside it (Cyrillic, on a Western system)
+  home0="$n_home"
+  for h in "home ü" "home-ж"; do
+    mkdir -p "$work/$h"; n_home=$(native "$work/$h")
+    run_tm "$work/texmacs-h.log" ghostscript "" ""
+    if [ "$(val pdf)" = yes ]; then ok "an EPS image written to PDF with TEXMACS_HOME_PATH=.../$h"
+    else echo "note: no PDF with TEXMACS_HOME_PATH=.../$h (gs and the ANSI functions of Windows)"; fi
+  done
+  n_home="$home0"
   for t in "tmp dir ü" "tmp-ж"; do
     mkdir -p "$work/$t"
     run_tm "$work/texmacs-t1.log" ghostscript "$work/$t" ""
