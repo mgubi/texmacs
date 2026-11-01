@@ -3383,7 +3383,9 @@
   (incl-clear-dir)
   (system-mkdir (system->url incl-dir))
   (string-save "x" (incl-file "s.mp3"))
-  (let* ((snd `(sound ,(url->system (incl-file "s.mp3"))))
+  ;; (a url made from a label reads ":" as a separator of paths: the name
+  ;; in the tree is /D/a/b on Windows, not the system form D:\a\b)
+  (let* ((snd `(sound ,(url->unix (incl-file "s.mp3"))))
          (sound-h (lambda (f s) (box `(with "font" ,f "font-size" ,s ,snd) "h")))
          (x-h (lambda (f s) (box `(with "font" ,f "font-size" ,s "x") "h"))))
     (check= (box snd "w") '(0))
