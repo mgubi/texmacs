@@ -149,7 +149,37 @@
               'pattern))
     ;; a missing image: the base color, else white
     (check= (ev '(pattern "no-such-image.png" "1cm" "100@" "" "blue")) "blue")
-    (check= (ev '(pattern "no-such-image.png" "1cm" "100@")) "white")))
+    ;; no base color: the paper, which is the background color of the document
+    ;; if it is a color, and else the default of bg-color (white)
+    (with lo (lambda (t)
+               (letrec ((down (lambda (r) (cond ((string? r) (string-downcase r))
+                                                ((pair? r) (map down r))
+                                                (else r)))))
+                 (down (ev t))))
+      (check= (lo '(pattern "no-such-image.png" "1cm" "100@")) "#ffffff")
+      (check= (lo '(with "bg-color" "#202020"
+                     (pattern "no-such-image.png" "1cm" "100@")))
+              '(with "bg-color" "#202020" "#202020"))
+      ;; invalid sizes are another way not to make a pattern
+      (check= (lo '(with "bg-color" "#202020"
+                     (pattern "neutral-pattern.png" "bad" "bad")))
+              '(with "bg-color" "#202020" "#202020"))
+      ;; the base color first
+      (check= (lo '(with "bg-color" "#202020"
+                     (pattern "no-such-image.png" "1cm" "100@" "" "red")))
+              '(with "bg-color" "#202020" "red"))
+      ;; the background is a pattern whose image is missing: its base color,
+      ;; else the default, and no recursion
+      (check= (lo '(with "bg-color" (pattern "no-such-image.png" "1cm" "1cm"
+                                              "" "#102030")
+                     (pattern "no-such-image-2.png" "1cm" "100@")))
+              '(with "bg-color" "#102030" "#102030"))
+      (check= (lo '(with "bg-color" (pattern "no-such-image.png" "1cm" "1cm")
+                     (pattern "no-such-image-2.png" "1cm" "100@")))
+              '(with "bg-color" "#ffffff" "#ffffff"))
+      ;; the same answer as the C++ function of the selector
+      (check= (lo '(pattern "no-such-image.png" "1cm" "100@"))
+              (string-downcase (paper-color ""))))))
 
 (define (run-group thunk)
   ;; an error in a group is one failure

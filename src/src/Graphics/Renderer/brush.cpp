@@ -150,6 +150,10 @@ paper_color (brush bg) {
 
 string
 get_paper_color (tree bg) {
+  // only a color or a pattern is a background: anything else (not yet
+  // known, none, an unevaluated macro argument) leaves the default
+  if (is_atomic (bg) && !is_color_name (bg->label)) bg= "";
+  else if (is_compound (bg) && !is_func (bg, _PATTERN)) bg= "";
   return get_hex_color (paper_color (brush (bg)));
 }
 

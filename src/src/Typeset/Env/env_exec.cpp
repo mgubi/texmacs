@@ -2410,6 +2410,15 @@ edit_env_rep::exec_get_attachment (tree t) {
   return lookup ("a" * key);
 }
 
+// What stands for a pattern which cannot be made (no image, bad sizes) or
+// which is off: its base color if it has a valid one, else the paper, which
+// is read from the background color without evaluating it
+static tree
+pattern_fallback (tree base, tree bg) {
+  if (base != "") return base;
+  return tree (get_paper_color (bg));
+}
+
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (_ERROR, "bad pattern");
@@ -2429,7 +2438,7 @@ edit_env_rep::exec_pattern (tree t) {
   url image= pattern_file (base_file_name, label);
   if (is_none (image)) {
     (void) picture_lookup ('q', label, image, 0, 0);
-    return base != ""? base: tree ("white");
+    return pattern_fallback (base, env [BG_COLOR]);
   }
   int imw_pt, imh_pt;
   image_size (image, imw_pt, imh_pt);
@@ -2437,7 +2446,7 @@ edit_env_rep::exec_pattern (tree t) {
   double pt= ((double) dpi*PIXEL) / 72.0;
   SI imw= (SI) (((double) imw_pt) * pt);
   SI imh= (SI) (((double) imh_pt) * pt);
-  if (imw <= 0 || imh <= 0) return base != ""? base: tree ("white");
+  if (imw <= 0 || imh <= 0) return pattern_fallback (base, env [BG_COLOR]);
   if (N(t)<3) return tree (_ERROR, "bad pattern");
   string w= exec_string (t[1]);
   string h= exec_string (t[2]);
@@ -2453,13 +2462,13 @@ edit_env_rep::exec_pattern (tree t) {
     if (is_int (h)) w= as_string ((SI) ((as_double (h) * imw) / imh));
     else if (is_percentage (h))
       w= as_string (100.0 * (as_percentage (h) * imw) / imh) * "@";
-    else return base != ""? base: tree ("white");
+    else return pattern_fallback (base, env [BG_COLOR]);
   }
   else if (h == "" && w != "") {
     if (is_int (w)) h= as_string ((SI) ((as_double (w) * imh) / imw));
     else if (is_percentage (w))
       h= as_string (100.0 * (as_percentage (w) * imh) / imw) * "@";
-    else return base != ""? base: tree ("white");
+    else return pattern_fallback (base, env [BG_COLOR]);
   }
   else if (w == "" && h == "") {
     w= as_string (imw);
@@ -2467,7 +2476,7 @@ edit_env_rep::exec_pattern (tree t) {
   }
   else if ((!is_int (w) && !is_percentage (w) && !is_percentage (w, "@")) ||
 	   (!is_int (h) && !is_percentage (h) && !is_percentage (h, "@")))
-    return base != ""? base: tree ("white");
+    return pattern_fallback (base, env [BG_COLOR]);
   tree r (_PATTERN, as_string (image), w, h);
   if (N(t) >= 4) r << exec (t[3]);
   if (N(t) == 5) r << arg5;

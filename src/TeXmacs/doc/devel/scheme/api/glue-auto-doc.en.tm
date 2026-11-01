@@ -867,6 +867,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(paper-color <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_paper_color> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(named-color-\<gtr\>xcolormap <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

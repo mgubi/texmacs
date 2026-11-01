@@ -64,6 +64,8 @@ bool  get_pattern_base (tree pattern, color& c);
 // else the default of the environment variable bg-color.
 color paper_color (brush bg);
 string get_paper_color (tree bg);    // the same, for a tree, as #rrggbb
+                                     // (never recursive: the base of a
+                                     // pattern is read, not evaluated)
 
 // On a screen, which keeps the previous paint and shows the grey squares of
 // the device below transparent parts, clears the rectangle with the paper
