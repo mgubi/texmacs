@@ -30,7 +30,7 @@ typedef unsigned int uint;
 #include "convert.hpp"
 #include "file.hpp"
 #ifdef USE_GS
-#include "gs_utilities.hpp"
+#include "Ghostscript/gs_utilities.hpp"
 #endif
 #include "locale.hpp"
 #include "iterator.hpp"
