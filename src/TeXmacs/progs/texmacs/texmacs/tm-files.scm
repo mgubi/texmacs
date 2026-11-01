@@ -305,16 +305,21 @@
 ;; it is asked first (the flag, see typeset-failed-buffer? in tm-server.scm).
 
 (define (recovered-file-name dir tail)
-  (let* ((stamp (pretty-time (current-time)))
+  ;; names of ASCII letters and digits only (a name of the buffer with
+  ;; accents is a string of bytes, of which some are letters and some not),
+  ;; of at most 80 characters for the buffer
+  (let* ((ok? (lambda (c)
+                (and (< (char->integer c) 128)
+                     (or (char-alphabetic? c) (char-numeric? c)
+                         (in? c '(#\. #\-))))))
          (clean (lambda (str)
                   (list->string
-                   (map (lambda (c)
-                          (if (or (char-alphabetic? c) (char-numeric? c)
-                                  (in? c '(#\. #\-)))
-                              c #\_))
+                   (map (lambda (c) (if (ok? c) c #\_))
                         (string->list str)))))
-         (base (string-append (clean stamp) "-"
-                              (let* ((t (clean tail)))
+         (short (lambda (str)
+                  (if (> (string-length str) 80) (substring str 0 80) str)))
+         (base (string-append (clean (pretty-time (current-time))) "-"
+                              (let* ((t (short (clean tail))))
                                 (if (== t "") "buffer" t))))
          (base (if (== (url-suffix base) "tm") base (string-append base ".tm"))))
     (let try ((k 1))
@@ -328,20 +333,24 @@
   (:synopsis "Save the document of a buffer whose typesetting failed")
   (typeset-failure-flag name)
   (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
-         (file (recovered-file-name dir (url->string (url-tail name))))
-         (saved (catch #t
-                  (lambda ()
-                    (system-mkdir dir)
-                    (not (buffer-export name file "texmacs")))
-                  (lambda args #f))))
+         (export (lambda (tail)
+                   (with file (recovered-file-name dir tail)
+                     (and (catch #t
+                            (lambda ()
+                              (system-mkdir dir)
+                              (not (buffer-export name file "texmacs")))
+                            (lambda args #f))
+                          file))))
+         ;; (if the name of the buffer is not accepted, a plain one)
+         (file (or (export (url->string (url-tail name))) (export "buffer"))))
     (set-message
      `(concat "The document could not be typeset (" ,msg "), and was "
               "replaced by an empty one. "
-              ,(if saved
+              ,(if file
                    `(concat "A copy was saved in " (verbatim ,(url->system file)) ".")
                    "Its copy could not be saved: close it without saving."))
      "Typesetting failure")
-    (and saved (url->system file))))
+    (and file (url->system file))))
 
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
@@ -360,12 +369,13 @@
            (save-buffer-post name opts))
           ((cannot-write? name "Save file")
            (noop))
-          ((typeset-failed-buffer? name)
+          ((and (typeset-failed-buffer? name) (nin? :typeset-failed opts))
            (user-confirm "The document could not be typeset and was replaced by an empty one. Really save it over the file?" #f
              (lambda (answ)
                (when answ
-                 (typeset-failure-forget name)
-                 (save-buffer-check-permissions name opts)))))
+                 ;; (the flag is cleared by the save)
+                 (save-buffer-check-permissions
+                  name (cons :typeset-failed opts))))))
           ((and (url-test? name "fr")
                 (and-with mod-t (url-last-modified name)
                   (and-with save-t (buffer-last-save name)

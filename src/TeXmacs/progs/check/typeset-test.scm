@@ -1293,7 +1293,21 @@
       (check-true (string-contains? (string-load (url->system file)) "keep this"))
       (buffer-close file)
       (check-false (typeset-failed-buffer? file))
-      (system-remove file)))
+      (system-remove file))
+    ;; the copy is made also for the buffers of a name with accents (bytes
+    ;; of UTF-8, not all of them letters) and of a very long name
+    (for-each
+     (lambda (tail)
+       (let ((file (url->url (string-append "$TEXMACS_HOME_PATH/system/" tail))))
+         (buffer-set-body file (stree->tree '(document "text")))
+         (let ((copy (typeset-failure-recover file "test")))
+           (check-true (string? copy))
+           (when (string? copy)
+             (check-true (url-exists? (url->url copy)))
+             (system-remove (url->url copy))))
+         (buffer-close file)))
+     (list "d\xc3\xa9j\xc3\xa0.tm"
+           (string-append (make-string 240 #\a) ".tm"))))
   (with-typeset-body
    '(document "one" "two" "three")
    (lambda ()
