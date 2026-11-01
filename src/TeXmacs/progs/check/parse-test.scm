@@ -991,7 +991,20 @@
     ("echo $HOME # c"
      `(("echo" ,black) ("$HOME" ,black) ("#" ,black) ("c" ,black)))
     ("echo $# args"
-     `(("echo" ,black) ("$#" ,black) ("args" ,black)))))
+     `(("echo" ,black) ("$#" ,black) ("args" ,black))))
+  ;; without tree-sitter, // and /* */ of paths are no comments (they are
+  ;; those of default-lang.scm, which shell-lang.scm removes)
+  ;; (tree-sitter is off in these groups, see below)
+  (let* ((lines '("curl https://example.com/x -o f" "ls /tmp/*.txt" "echo after"
+                    "rm */foo" "echo end"))
+           (r (highlight "shell" lines)))
+      (check-true (and (list? r) (== (length r) (length lines))))
+      (when (and (list? r) (== (length r) (length lines)))
+        (for-each (lambda (line runs)
+                    (check-equal (string-append "shell: " line)
+                                 (lambda () (list-remove-duplicates (map cadr runs)))
+                                 (list black)))
+                  lines r))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tables of the languages
