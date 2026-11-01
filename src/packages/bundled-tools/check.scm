@@ -61,6 +61,7 @@
 ;; external spell checker which the user has (hunspell, aspell), else a clear
 ;; error
 (define (cbt-spell-external)
+  (debug-set "io" #t)
   (let ((r (single-spell-start "greek")))
     (cbt-line "ext-greek-start" r)
     (when (== r "ok")

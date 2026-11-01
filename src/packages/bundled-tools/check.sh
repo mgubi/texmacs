@@ -238,11 +238,12 @@ EOT
     fe=hunspell; [ $windows = yes ] && fe=hunspell.exe
     # (native paths: MSYS2 does not convert the arguments here)
     if $cc -o "$n_work/fakebin/$fe" "$n_work/fake-ispell.c" 2> "$work/cc.log"; then
+      printf '^abc\n^zzzz\n' | "$work/fakebin/$fe" | tr -d '\r' | head -c 200 | od -c | head -4
       run_tm "$work/texmacs-ext.log" external "" "$work/fakebin"
       grep "^CHECK ext" "$out" | tr -d '\r'
       [ "$(val ext-greek-start)" = ok ] && [ "$(val ext-greek-good)" = yes ] && [ "$(val ext-greek-bad)" = no ] &&
         ok "Greek goes to the external spell checker (the dictionaries of the package do not have it)" ||
-        { fail "Greek does not reach the external spell checker: $(val ext-greek-start)"; tail -15 "$out"; }
+        { fail "Greek does not reach the external spell checker: $(val ext-greek-start)"; grep -v "^CHECK" "$out" | tr -d '\r' | tail -25; }
     else
       fail "no fake external spell checker (the compiler failed)"; head -5 "$work/cc.log"
     fi
