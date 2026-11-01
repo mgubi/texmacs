@@ -29,6 +29,8 @@
 # runs with TEXMACS_HOME_PATH there too.
 
 here=$(cd "$(dirname "$0")" && pwd)
+# (MSYS2: no conversion of -dPDFSETTINGS=/prepress into a Windows path)
+export MSYS2_ARG_CONV_EXCL='*'
 root="" gs="" version="" aspell=no
 while getopts "r:g:v:a" o; do
   case $o in
@@ -113,7 +115,8 @@ what=ghostscript
 args=""
 for w in $what; do args="$args \"$w\""; done
 out="$work/texmacs.log"
-(cd "$work" && export TEXMACS_HOME_PATH="$(native "$work/home")" TEXMACS_PATH="$(native "$root")" \
+n_home=$(native "$work/home"); n_root=$(native "$root"); n_work=$(native "$work")
+(cd "$work" && export TEXMACS_HOME_PATH="$n_home" TEXMACS_PATH="$n_root" \
    PATH="$run_path" &&
    # (Qt without a window, unless TM_CHECK_QPA says otherwise, even empty:
    # the Qt of an AppImage has no offscreen plugin, nor Windows runs need it)
@@ -121,14 +124,14 @@ out="$work/texmacs.log"
      if [ -n "$TM_CHECK_QPA" ]; then export QT_QPA_PLATFORM="$TM_CHECK_QPA"; fi
    elif [ $windows = no ]; then export QT_QPA_PLATFORM=offscreen; fi &&
    run_timeout 300 "$@" -x '(load "check.scm")' \
-   -x "(bundled-tools-check \"$(native "$work")\" $args)" > "$out" 2>&1)
+   -x "(bundled-tools-check \"$n_work\" $args)" > "$out" 2>&1)
 [ $windows = yes ] && taskkill //F //IM texmacs.exe > /dev/null 2>&1
 grep "^CHECK" "$out" | tr -d '\r'
 val () { grep "^CHECK $1 " "$out" | head -1 | tr -d '\r' | cut -d' ' -f3-; }
 grep -q "^CHECK done yes" "$out" || { fail "TeXmacs did not run the check"; tail -30 "$out"; }
 [ -z "$(val error)" ] || fail "an error in the check: $(val error)"
 used=$(val gs-binary | tr '\\' /); appdir=$(val appdir)
-want="$(native "$root")"; [ -n "$appdir" ] && want="$appdir"
+want="$n_root"; [ -n "$appdir" ] && want="$appdir"
 case "$used" in
   "$want"*) ok "TeXmacs runs the gs of the package: $used";;
   *) fail "TeXmacs runs $used, not the gs of the package ($want)";;
