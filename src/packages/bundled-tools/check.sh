@@ -150,7 +150,7 @@ case "$used" in
 esac
 if [ "$(val pdf)" = yes ]; then ok "an EPS image written to PDF"
 else
-  fail "no PDF with an EPS image: the gs of the package was not used"
+  fail "no PDF with an EPS image: the gs of the package was not used (TMPDIR: $(val tmpdir))"
   grep -v "^CHECK" "$out" | tr -d '\r' | tail -25
 fi
 # the gs which TeXmacs runs (its debug output, gs_utilities.cpp): the one of

@@ -485,6 +485,7 @@ gs_to_pdf (url doc, url pdf, bool landscape, double paper_h, double paper_w) {
   // incorrectly referring to the name of the temporary file
   // so we add some PS code to override the PDF document title with
   // the name of the PDF file.
+  if (DEBUG_CONVERT) debug_convert << "gs_to_pdf, launching" << LF << cmd << LF;
   system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (pdf))

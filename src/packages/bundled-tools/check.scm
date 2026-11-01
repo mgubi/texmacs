@@ -23,6 +23,7 @@
     (debug-set "convert" #t)
     (cbt-line "gs-binary" (gs-binary))
     (cbt-line "appdir" (or (getenv "APPDIR") ""))
+    (cbt-line "tmpdir" (or (getenv "TMPDIR") ""))
     (cbt-line "has-gs" (if (has-gs?) "yes" "no"))
     (string-save
      (string-append
