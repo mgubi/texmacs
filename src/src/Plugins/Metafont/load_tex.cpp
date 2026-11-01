@@ -300,7 +300,7 @@ rubber_fix (tex_font_metric tfm, font_glyphs& pk) {
   }
 }
 
-void
+bool
 load_tex (string family, int size, int dpi, int dsize,
 	  tex_font_metric& tfm, font_glyphs& pk)
 {
@@ -313,7 +313,7 @@ load_tex (string family, int size, int dpi, int dsize,
     {
       bench_cumul ("load tex font");
       rubber_fix (tfm, pk);
-      return;
+      return true;
     }
   if (DEBUG_VERBOSE) {
     debug_fonts << "Font " << family << size
@@ -325,7 +325,7 @@ load_tex (string family, int size, int dpi, int dsize,
       load_tex_pk ("ecrm", size, dpi, 10, tfm, pk))
     {
       bench_cumul ("load tex font");
-      return;
+      return false; // (the family is not there, ecrm takes its place)
     }
 #ifdef OS_WIN32
   else {
@@ -337,7 +337,7 @@ load_tex (string family, int size, int dpi, int dsize,
 	load_tex_pk ("ecrm", 10, 600, 10, tfm, pk))
       {
 	bench_cumul ("load tex font");
-	return;
+	return false;
       }
   }
 #endif
@@ -345,4 +345,5 @@ load_tex (string family, int size, int dpi, int dsize,
   failed_error << "Could not open " << name << "\n";
   FAILED ("Tex seems not to be installed properly");
   bench_cumul ("load tex font");
+  return false;
 }

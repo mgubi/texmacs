@@ -3236,6 +3236,36 @@
       (check= (typeset-check-mismatches) mismatches))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Fixed loads of the TeX font cmr (#436)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A sound box has no width, and the height of the x of the current font
+;; (it was that of cmr, whatever the font of the text; the shipped Fira Sans
+;; and Libertine are in the font database only once it is built, else the
+;; same fallback font serves for both sides of a check).
+;; The source tags are drawn with cmsy, which is used only if it was found:
+;; else ecrm takes its place, where the angle brackets are letters (tex-font-
+;; found? asks; a family which does not exist is not tried, since mktextfm
+;; takes seconds to fail for it).
+(define (test-fixed-cmr-loads)
+  (check-group "fixed loads of cmr")
+  (check-true (tex-font-found? "cmr" 10 600 10))
+  (check-true (tex-font-found? "cmsy" 10 600 10))
+  (check-true (tex-font-found? "cmsy" 7 600 10))
+  (incl-clear-dir)
+  (system-mkdir (system->url incl-dir))
+  (string-save "x" (incl-file "s.mp3"))
+  (let* ((snd `(sound ,(url->system (incl-file "s.mp3"))))
+         (sound-h (lambda (f s) (box `(with "font" ,f "font-size" ,s ,snd) "h")))
+         (x-h (lambda (f s) (box `(with "font" ,f "font-size" ,s "x") "h"))))
+    (check= (box snd "w") '(0))
+    (for (f '("Fira Sans" "Linux Libertine" "roman"))
+      (check= (sound-h f "1") (x-h f "1"))
+      (check= (sound-h f "2") (x-h f "2"))))
+  (system-remove (incl-file "s.mp3"))
+  (incl-clear-dir))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3255,7 +3285,8 @@
      (test-text-boxes)
      (test-math-boxes)
      (test-line-breaking)
-     (test-hyphenation)))
+     (test-hyphenation)
+     (test-fixed-cmr-loads)))
   (test-environment)
   (test-numbering)
   (test-renumbering)

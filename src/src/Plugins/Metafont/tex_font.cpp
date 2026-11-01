@@ -69,6 +69,7 @@ struct tex_font_rep: font_rep {
   font_glyphs      pk;
   double           unit;
   bool             exec;             // execute ligature and kerning program?
+  bool             found;            // family found (else ecrm took its place)
 
   tex_font_rep (string name, int status,
 		string family, int size, int dpi, int dsize);
@@ -113,7 +114,7 @@ tex_font_rep::tex_font_rep (string name, int status2,
   string family2, int size2, int dpi2, int dsize2):
   font_rep (name), status (status2), dsize (dsize2)
 {
-  load_tex (family2, size2, dpi2, dsize, tfm, pk);
+  found= load_tex (family2, size2, dpi2, dsize, tfm, pk);
 
   family       = family2;
   type         = FONT_TYPE_TEX;
@@ -1117,6 +1118,12 @@ tex_font (string family, int size, int dpi, int dsize) {
     ":" * as_string (dsize);
   return make (font, name,
     tm_new<tex_font_rep> (name, TEX_ANY, family, size, dpi, dsize));
+}
+
+bool
+tex_font_found (string family, int size, int dpi, int dsize) {
+  font fn= tex_font (family, size, dpi, dsize);
+  return ((tex_font_rep*) fn.rep)->found;
 }
 
 font

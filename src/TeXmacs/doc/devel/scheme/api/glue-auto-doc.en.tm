@@ -419,6 +419,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tex-font-found? <scm-arg|string> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tex_font_found> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(eval-system <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

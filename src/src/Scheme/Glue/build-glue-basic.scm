@@ -68,6 +68,7 @@
   (plugin-list plugin_list (scheme_tree))
   (set-fast-environments set_fast_environments (void bool))
   (font-exists-in-tt? tt_font_exists (bool string))
+  (tex-font-found? tex_font_found (bool string int int int))
   (eval-system eval_system (string string))
   (var-eval-system var_eval_system (string string))
   (evaluate-system evaluate_system
