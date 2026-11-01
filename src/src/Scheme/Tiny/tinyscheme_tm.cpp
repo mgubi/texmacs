@@ -115,6 +115,13 @@ initialize_scheme () {
 
 }
 
+int
+scheme_caught_errors () {
+  // the number of errors caught at the calls from C++ to Scheme (#705):
+  // TinyScheme catches none there (see below), so none are counted
+  return 0;
+}
+
 #if 0
 /******************************************************************************
  * Catching errors (with thanks to Dale P. Smith)
@@ -129,19 +136,8 @@ TeXmacs_lazy_catcher (void *data, scm tag, scm throw_args) {
 	return scm_UNSPECIFIED; /* never returns */
 }
 
-static int caught_errors= 0;
-
-int
-scheme_caught_errors () {
-  // the number of errors caught so far at the calls from C++ to Scheme,
-  // which then give the error as their result: a caller can tell that an
-  // empty result comes from an error (#705)
-  return caught_errors;
-}
-
 scm
 TeXmacs_catcher (void *data, scm tag, scm args) {
-	caught_errors++;  // seen by scheme_caught_errors (#705)
 	(void) data;
 	return scm_cons (tag, args);
 }
