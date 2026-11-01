@@ -243,18 +243,23 @@ void
 edit_text_rep::insert_tree (tree t, path p_in_t) {
   bool cut= !as_bool (call ("like-emacs?"));
   bool tested= false;   // the paragraphs were tested for the cut selection
+  bool cells = false;   // the selection is a selection of cells
+  path old_tp= tp, sel1, sel2;
   if (is_multi_paragraph (t)) {
     // (where selection_cut will leave the cursor: it corrects the range)
     path ip= tp;
     if (cut && selection_active_any ()) {
       if (selection_active_table ()) {
-        // the cut empties the cells: a cell without paragraphs has no place
-        // for paragraphs, and the cells would be cleared for nothing
-        set_message ("Several paragraphs cannot replace cells", "insert");
-        return;
+        // (the cut empties the cells: see below)
+        ip  = selection_get_start ();
+        sel1= selection_get_start ();
+        sel2= selection_get_end ();
+        cells= true;
       }
-      ip    = selection_var_get_start ();
-      tested= true;
+      else {
+        ip    = selection_var_get_start ();
+        tested= true;
+      }
     }
     if (!can_insert_at (t, ip)) {
       // (nothing changes: the selection is not cut for nothing)
@@ -263,6 +268,17 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
     }
   }
   if (cut) selection_cut ("none");
+  if (cells && !can_insert_at (t, tp)) {
+    // The cut left no place for paragraphs (the cells are not block cells,
+    // or they lost their format): the cut is undone, the cells are not
+    // cleared for nothing
+    cancel_editing ();
+    go_to (old_tp);
+    selection_set_start (sel1);
+    selection_set_end (sel2);
+    set_message ("Several paragraphs cannot replace cells", "insert");
+    return;
+  }
   if (tested && !can_insert_at (t, tp)) {
     // The cut leaves the cursor in the tag next to the range when it removes
     // the text up to the tag (a tag with an inner border, as hidden): the

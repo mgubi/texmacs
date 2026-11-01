@@ -865,6 +865,48 @@
           (edit (insert "xx"))
           (check= (body) '(document (tabular (tformat (table (row
                                        (cell "xx"))))))))))
+    ;; block cells (hyphenated cells, wide-tabular): the cleared first cell
+    ;; holds paragraphs again, so they go in when it was a document; with a
+    ;; plain first cell nothing changes
+    (let* ((rows (lambda (c1) `(table (row (cell ,c1) (cell "cd"))
+                                      (row (cell "ef") (cell "gh")))))
+           ;; (all the cells are made documents)
+           (done (lambda (c1) `(table (row (cell ,c1) (cell (document "")))
+                                      (row (cell (document "ef"))
+                                           (cell (document "gh"))))))
+           (hy (lambda (m c1) `(document (tabular (tformat
+                  (cwith "1" "-1" "1" "-1" "cell-hyphen" ,m) ,c1)))))
+           (wide (lambda (c1) `(document (wide-tabular (tformat ,c1)))))
+           (tried (lambda (doc a b how res)
+                    (with-buffer-body doc
+                      (lambda ()
+                        (clipboard-set "editing-test" (stree->tree by))
+                        (let ((before (body)))
+                          (edit (selection-set (apply at a) (apply at b)))
+                          (edit (how))
+                          (check= (body) (or res before))
+                          (when res
+                            (edit (undo 0))
+                            (check= (body) before))
+                          (when (not res)
+                            (check-true (selection-active-any?)))
+                          (edit (selection-cancel))))))))
+      (for-each
+        (lambda (how)
+          (for-each
+            (lambda (m)
+              (tried (hy m (rows '(document "ab" "a2"))) '(0 0 1 0 0 0 0 0)
+                     '(0 0 1 0 1 0 1) how
+                     (hy m (done '(document "P" "Q"))))
+              (tried (hy m (rows "ab")) '(0 0 1 0 0 0 0) '(0 0 1 0 1 0 1)
+                     how #f))
+            '("t" "b" "c"))
+          (tried (wide (rows '(document "ab" "a2"))) '(0 0 0 0 0 0 0 0)
+                 '(0 0 0 0 1 0 1) how (wide (done '(document "P" "Q"))))
+          (tried (wide (rows "ab")) '(0 0 0 0 0 0 0) '(0 0 0 0 1 0 1)
+                 how #f))
+        (list (lambda () (insert by))
+              (lambda () (clipboard-paste "editing-test")))))
     (clipboard-clear "editing-test")
     ;; a selection which starts inside a tag and ends outside it: the cut
     ;; starts before the tag, where paragraphs can go
