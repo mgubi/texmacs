@@ -613,9 +613,25 @@ append_to (url what, url to) {
     std_warning << "Append failed for " << to << LF;
 }
 
+static void
+rmdir_sub (url u) {
+  if (is_none (u)) return;
+  if (is_or (u)) {
+    rmdir_sub (u[1]);
+    rmdir_sub (u[2]);
+    return;
+  }
+  // remove () of the C library does not remove a folder on Windows
+  string _u = concretize (u);
+  if (!texmacs_rmdir (_u) && DEBUG_AUTO) {
+    std_warning << "Remove failed: " << strerror (errno) << LF;
+    std_warning << "Folder was: " << u << LF;
+  }
+}
+
 void
 rmdir (url u) {
-  remove_sub (expand (complete (u, "dr")));
+  rmdir_sub (expand (complete (u, "dr")));
 }
 
 void

@@ -2241,24 +2241,24 @@
   (check-group "export: the name of an image, as it is (#706)")
   ;; an absolute name with spaces and an accented letter, long enough for the
   ;; line to be wrapped: the text has it whole (not h{\'e}, nor on two lines)
-  (let* ((dir (string-append (url->system (temp-dir))
+  (let* ((dir (string-append (url->unix (temp-dir))
                              "/a folder with a rather long name, so that"
                              " the line is wrapped, h"
                              (string (integer->char 195) (integer->char 169))))
          (name (string-append dir "/linked.png")))
-    (system-mkdir (system->url dir))
-    (string-save (export-png) (system->url name))
+    (system-mkdir (unix->url dir))
+    (string-save (export-png) (unix->url name))
     (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
       (check-true (has-text? (string-append "{" name "}") s))))
   ;; a %, which LaTeX would read as a comment, is given by a macro; the
   ;; space which ends the macro is skipped, and \space gives a space after %
-  (let* ((dir (url->system (temp-dir)))
+  (let* ((dir (url->unix (temp-dir)))
          (text (lambda (n)
                  (export `(document (image ,(string-append dir "/" n)
                                            "1cm" "" "" ""))
                          "latex-snippet"))))
     (for (n (list "50%done.png" "a% b.png"))
-      (string-save (export-png) (system->url (string-append dir "/" n))))
+      (string-save (export-png) (unix->url (string-append dir "/" n))))
     (check-true (has-text? "/50\\csname @percentchar\\endcsname done.png}"
                            (text "50%done.png")))
     (check-true (has-text? "/a\\csname @percentchar\\endcsname \\space b.png}"
@@ -2347,7 +2347,11 @@
         (with-global set-message capture
           (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
         (check-true (has-text? "an image could" (last-message)))
-        (check-true (has-text? (url->system image) (last-message)))
+        ;; the message is written as a Scheme string: a \ of the name doubled
+        (check-true (has-text? (let* ((o (object->string (url->system image)))
+                                      (n (string-length o)))
+                                 (substring o 1 (- n 1)))
+                               (last-message)))
         (check= (image-write-failures) '())
         (system-rmdir image)
         ;; and when it can be written, as usual
