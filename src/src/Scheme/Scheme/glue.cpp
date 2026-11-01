@@ -29,7 +29,9 @@ typedef unsigned int uint;
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"
+#ifdef USE_GS
 #include "gs_utilities.hpp"
+#endif
 #include "locale.hpp"
 #include "iterator.hpp"
 #include "Freetype/tt_tools.hpp"
