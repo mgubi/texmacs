@@ -146,16 +146,22 @@ evaluate_get_binding (tree t) {
 tree
 evaluate_pattern (tree t) {
   url base_file_name (as_string (std_env ["base-file-name"]));
+  // a valid base color stands for the image if it is missing
+  tree base= "", arg5= "";
+  if (N(t) == 5) {
+    arg5= evaluate (t[4]);
+    if (is_atomic (arg5) && is_color_name (arg5->label)) base= arg5;
+  }
   url im= evaluate_string (t[0]);
   url image= resolve_pattern (relative (base_file_name, im));
-  if (is_none (image)) return "white";
+  if (is_none (image)) return base != ""? base: tree ("white");
   int imw_pt, imh_pt;
   int dpi= as_int (as_string (std_env ["dpi"]));
   image_size (image, imw_pt, imh_pt);
   double pt= ((double) dpi*PIXEL) / 72.0;
   SI imw= (SI) (((double) imw_pt) * pt);
   SI imh= (SI) (((double) imh_pt) * pt);
-  if (imw <= 0 || imh <= 0) return "white";
+  if (imw <= 0 || imh <= 0) return base != ""? base: tree ("white");
   string w= evaluate_string (t[1]);
   string h= evaluate_string (t[2]);
   if (is_length (w))
@@ -170,13 +176,13 @@ evaluate_pattern (tree t) {
     if (is_int (h)) w= as_string ((SI) ((as_double (h) * imw) / imh));
     else if (is_percentage (h))
       w= as_string (100.0 * (as_percentage (h) * imw) / imh) * "@";
-    else return "white";
+    else return base != ""? base: tree ("white");
   }
   else if (h == "" && w != "") {
     if (is_int (w)) h= as_string ((SI) ((as_double (w) * imh) / imw));
     else if (is_percentage (w))
       h= as_string (100.0 * (as_percentage (w) * imh) / imw) * "@";
-    else return "white";
+    else return base != ""? base: tree ("white");
   }
   else if (w == "" && h == "") {
     w= as_string (imw);
@@ -184,10 +190,10 @@ evaluate_pattern (tree t) {
   }
   else if ((!is_int (w) && !is_percentage (w)) ||
 	   (!is_int (h) && !is_percentage (h)))
-    return "white";
+    return base != ""? base: tree ("white");
   tree r (_PATTERN, as_string (image), w, h);
   if (N(t) >= 4) r << evaluate (t[3]);
-  if (N(t) == 5) r << evaluate (t[4]);
+  if (N(t) == 5) r << arg5;
   return r;
 }
 

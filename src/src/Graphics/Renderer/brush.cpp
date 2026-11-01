@@ -130,6 +130,41 @@ get_pattern_base (tree pattern, color& c) {
   return true;
 }
 
+extern hashmap<string,tree> default_env;
+void initialize_default_env ();
+
+color
+paper_color (brush bg) {
+  color c;
+  if (bg->get_type () == brush_color) c= bg->get_color ();
+  else if (bg->get_type () == brush_pattern &&
+           get_pattern_base (bg->get_pattern (), c));
+  else {
+    initialize_default_env ();
+    c= named_color (as_string (default_env [string ("bg-color")]));
+  }
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  return rgb_color (r, g, b);
+}
+
+string
+get_paper_color (tree bg) {
+  return get_hex_color (paper_color (brush (bg)));
+}
+
+void
+clear_pattern_paper (renderer ren, brush pat, brush under,
+                     SI x1, SI y1, SI x2, SI y2) {
+  color base;
+  if (!ren->is_screen || pat->get_type () != brush_pattern ||
+      get_pattern_base (pat->get_pattern (), base)) return;
+  brush old= ren->get_background ();
+  ren->set_background (brush (paper_color (under)));
+  ren->clear (x1, y1, x2, y2);
+  ren->set_background (old);
+}
+
 static brush_rep*
 make_brush (bool b) {
   if (b) return tm_new<color_brush_rep> (white);

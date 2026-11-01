@@ -266,6 +266,32 @@ test_pattern_nested () {
   remove (u);
 }
 
+// the background of the document (bg-color) is a pattern, in a window which
+// is not in paper mode: it is painted by rectangles over the device and the
+// earlier paint, like the page
+extern void clear_pattern_rectangles (renderer ren, rectangle m, rectangles l);
+
+static void
+test_pattern_rectangles () {
+  if (get_env ("TEXMACS_HOME_PATH") == "")
+    SKIP ("TEXMACS_HOME_PATH is not set");
+  url u= save_pattern ();
+  rectangle m (0, -W*PX, W*PX, 0);
+  rectangles rs (rectangle (0, -W*PX, W*PX, 0));
+  renderer ren;
+  picture pic= make_screen (ren, rgb_color (255, 0, 0));
+  ren->set_background (brush (make_pattern (u, ""), 255));
+  clear_pattern_rectangles (ren, m, rs);
+  CHECK (is_rgb (pic, 10, 20, 255, 255, 255));   // the paper
+  tm_delete (ren);
+  pic= make_screen (ren, rgb_color (255, 0, 0));
+  ren->set_background (brush (make_pattern (u, "", "blue"), 255));
+  clear_pattern_rectangles (ren, m, rs);
+  CHECK (is_rgb (pic, 10, 20, 0, 0, 255));       // its base color
+  tm_delete (ren);
+  remove (u);
+}
+
 int
 main () {
   RUN (test_decorations_below_text);
@@ -273,5 +299,6 @@ main () {
   RUN (test_pattern_base_color);
   RUN (test_pattern_paper);
   RUN (test_pattern_nested);
+  RUN (test_pattern_rectangles);
   return test_report ();
 }

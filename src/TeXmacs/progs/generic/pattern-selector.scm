@@ -27,27 +27,45 @@
 ;; document is transparent, and one on the page shows the paper.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The color of an old document, which only stands for the image when patterns
+;; are switched off, is kept (as 4th argument) unless an effect replaces it.
+
 (define-public (pattern-effect col)
   (and (pair? col) (eq? (car col) 'pattern) (>= (length col) 5)
        (pair? (list-ref col 4)) (list-ref col 4)))
+
+(define (pattern-legacy col)
+  (and (pair? col) (eq? (car col) 'pattern) (>= (length col) 5)
+       (string? (list-ref col 4)) (!= (list-ref col 4) "")
+       (list-ref col 4)))
 
 (define-public (pattern-base col)
   (and (pair? col) (eq? (car col) 'pattern) (>= (length col) 6)
        (string? (list-ref col 5)) (!= (list-ref col 5) "")
        (list-ref col 5)))
 
+;; The 4th argument is the effect, else the color of an old document; an
+;; empty base is no base.
 (define-public (pattern-build name w h eff base)
-  (cond (base `(pattern ,name ,w ,h ,(or eff "") ,base))
-        (eff `(pattern ,name ,w ,h ,eff))
-        (else `(pattern ,name ,w ,h))))
+  (with base* (and (string? base) (!= base "") base)
+    (cond (base* `(pattern ,name ,w ,h ,(or eff "") ,base*))
+          (eff `(pattern ,name ,w ,h ,eff))
+          (else `(pattern ,name ,w ,h)))))
 
 (define-public (pattern-set-base col base)
   (pattern-build (cadr col) (caddr col) (cadddr col)
-                 (pattern-effect col) base))
+                 (or (pattern-effect col) (pattern-legacy col)) base))
 
 (define-public (pattern-set-effect col eff)
   (pattern-build (cadr col) (caddr col) (cadddr col)
-                 eff (pattern-base col)))
+                 (or eff (pattern-legacy col)) (pattern-base col)))
+
+(define-public (default-base-color)
+  ;; the base color which a new choice starts from: the paper, which is what
+  ;; the page shows under a pattern without base color (the same as the C++
+  ;; code, paper_color in Graphics/Renderer/brush.cpp)
+  (paper-color (catch #t (lambda () (get-init-tree "bg-color"))
+                 (lambda args ""))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Name conversions
@@ -91,6 +109,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define global-picture? #f)
+;; is the base color a field which works? Only for backgrounds
+(define global-base-ok? #t)
 (define global-gradient? #f)
 (define global-pattern-color `(pattern "neutral-pattern.png" "1cm" "100@"))
 
@@ -165,13 +185,6 @@
 (define (get-effect kind)
   (with col (get-color)
     (get-effect* (pattern-effect col) kind)))
-
-(define (default-base-color)
-  ;; the base color which a new choice starts from: the background of the
-  ;; document if that is a plain color
-  (with bg (catch #t (lambda () (tree->stree (get-init-tree "bg-color")))
-                  (lambda args #f))
-    (if (and (string? bg) (!= bg "")) bg "white")))
 
 (define (set-base base)
   (set-color (pattern-set-base (get-color) base)))
@@ -396,8 +409,8 @@
                   (link pattern-recolor-options))
                 (item (text "Skin:")
                   (link pattern-skin-options))
-                (item (text "Base color:")
-                  (link pattern-base-options))
+                (item (assuming global-base-ok? (text "Base color:"))
+                  (assuming global-base-ok? (link pattern-base-options)))
                 ;; TODO: the blur effect changes the image size;
                 ;; one needs a blur that wraps around torically
                 ;;(item (text "Blur:")
@@ -435,8 +448,8 @@
                   (link pattern-recolor-options))
                 (item (text "Skin:")
                   (link pattern-skin-options))
-                (item (text "Base color:")
-                  (link pattern-base-options))
+                (item (assuming global-base-ok? (text "Base color:"))
+                  (assuming global-base-ok? (link pattern-base-options)))
                 )))
           ======
           (glue #f #t 0 0))))
@@ -450,8 +463,13 @@
                     (insert-preferred-list "my patterns" col 16))
                 (cmd col)))))))
 
-(tm-define (open-pattern-selector cmd w)
+(tm-define (open-pattern-selector cmd w . opts)
   (:interactive #t)
+  ;; the option :no-base is for colors which are not backgrounds, where a
+  ;; base color is not painted: the base of an earlier choice is dropped
+  (set! global-base-ok? (not (in? :no-base opts)))
+  (when (not global-base-ok?)
+    (set! global-pattern-color (pattern-set-base global-pattern-color #f)))
   (when (or global-picture? global-gradient?
             (== (get-name) "neutral-pattern.png"))
     (set! global-picture? #f)
@@ -462,6 +480,7 @@
 
 (tm-define (open-gradient-selector cmd . opt-old)
   (:interactive #t)
+  (set! global-base-ok? #t)
   (when (or global-picture? (not global-gradient?)
             (== (get-name) "neutral-pattern.png"))
     (set! global-picture? #f)
@@ -474,6 +493,7 @@
 
 (tm-define (open-background-picture-selector cmd . opt-old)
   (:interactive #t)
+  (set! global-base-ok? #t)
   (when (or (not global-picture?) global-gradient?
             (== (get-name) "neutral-pattern.png"))
     (set! global-picture? #t)

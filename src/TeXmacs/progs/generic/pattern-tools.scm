@@ -149,11 +149,6 @@
   (with col (get-color key)
     (get-effect* key (pattern-effect col) kind)))
 
-(define (default-base-color)
-  (with bg (catch #t (lambda () (tree->stree (get-init-tree "bg-color")))
-                  (lambda args #f))
-    (if (and (string? bg) (!= bg "")) bg "white")))
-
 (define (set-base key base)
   (set-color key (pattern-set-base (get-color key) base)))
 
