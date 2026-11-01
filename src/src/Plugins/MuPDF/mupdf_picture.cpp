@@ -889,7 +889,8 @@ mupdf_apply_effect (fz_pixmap* pix, tree eff, SI pixel) {
     picture pic= e->apply (a, pixel);
     picture dest= as_mupdf_picture (pic);
     mupdf_picture_rep* rep= (mupdf_picture_rep*) dest->get_handle ();
-    fz_pixmap* tpix= rep->pix;
+    // (the pictures drop their pixmaps at the end of this block)
+    fz_pixmap* tpix= fz_keep_pixmap (mupdf_context (), rep->pix);
     fz_drop_pixmap (mupdf_context (), pix);
     pix= tpix;
   }
