@@ -1,0 +1,46 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MODULE      : shell-lang.scm
+;; DESCRIPTION : the shell language (sh, bash, zsh)
+;; COPYRIGHT   : (C) 2026  Massimiliano Gubinelli
+;;
+;; This software falls under the GNU general public license version 3 or later.
+;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The keywords for the highlighting by the tokenizer of TeXmacs, until the
+;; tables of tree-sitter are ready (progs/treesit); this file also makes
+;; shell a program language of TeXmacs (prog_lang_exists), so that a .sh file
+;; is opened as code.
+
+(texmacs-module (shell-lang)
+  (:use (prog default-lang)))
+
+(tm-define (parser-feature lan key)
+  (:require (and (== lan "shell") (== key "keyword")))
+  `(,(string->symbol key)
+    (keyword "if" "then" "else" "elif" "fi" "case" "esac" "for" "select"
+      "while" "until" "do" "done" "in" "function" "time" "coproc")
+    (keyword_control "return" "break" "continue" "exit")
+    (declare_function "function")
+    (constant "true" "false")))
+
+(tm-define (parser-feature lan key)
+  (:require (and (== lan "shell") (== key "operator")))
+  `(,(string->symbol key)
+    (operator
+      "=" "+=" "==" "!=" "<" ">" ">>" "<<" "|" "||" "&&" "&" ";" ";;" "!"
+      "-eq" "-ne" "-lt" "-le" "-gt" "-ge")
+    (operator_openclose "{" "[" "(" ")" "]" "}")))
+
+(tm-define (parser-feature lan key)
+  (:require (and (== lan "shell") (== key "string")))
+  `(,(string->symbol key)
+    (escape_sequences "\\" "\"" "'" "n" "t" "r" "$" "`")))
+
+(tm-define (parser-feature lan key)
+  (:require (and (== lan "shell") (== key "comment")))
+  `(,(string->symbol key)
+    (inline "#")))

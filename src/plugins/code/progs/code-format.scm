@@ -57,3 +57,4 @@
 (define-code-format yaml "YAML" "yaml" "yml")
 (define-code-format haskell "Haskell source code" "hs")
 (define-code-format ocaml "OCaml source code" "ml" "mli")
+(define-code-format shell "Shell script" "sh" "bash" "zsh")

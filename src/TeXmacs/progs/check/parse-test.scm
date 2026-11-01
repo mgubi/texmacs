@@ -982,9 +982,13 @@
     ("int x = 1; // c"
      `(("int" ,black) ("x" ,black) ("=" ,black) ("1;" ,black) ("//" ,black)
        ("c" ,black))))
+  ;; (shell has a format and shell-lang.scm since #734: its comments are colored)
+  (check-lines "latex"
+    ("x = 1 % c"
+     `(("x" ,black) ("=" ,black) ("1" ,black) ("%" ,black) ("c" ,black))))
   (check-lines "shell"
     ("echo $HOME # c"
-     `(("echo" ,black) ("$HOME" ,black) ("#" ,black) ("c" ,black)))))
+     `(("echo" ,black) ("$HOME" ,black) ("#" ,env-comment) ("c" ,env-comment)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tables of the languages

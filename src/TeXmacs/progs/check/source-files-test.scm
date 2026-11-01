@@ -73,7 +73,26 @@
   (with x (string-append "def f():\n" tab "return 1\n")
     (check= (round-trip "a.py" x) x))
   (with x (string-append "(define (f)\n" tab "1)\n")
-    (check= (round-trip "a.scm" x) x)))
+    (check= (round-trip "a.scm" x) x))
+  ;; shell scripts (#734): the #! line, a tab and the last newline are kept
+  (with x (string-append "#!/bin/bash\n# c\nfor f in *.txt; do\n" tab
+                         "echo \"$f\" | wc -l\ndone\n")
+    (for (name '("a.sh" "a.bash" "a.zsh"))
+      (check= (round-trip name x) x))
+    (check= (round-trip "b.sh" (substring x 0 (- (string-length x) 1)))
+            (substring x 0 (- (string-length x) 1)))))
+
+(define (test-shell-files)
+  (check-group "shell scripts")
+  ;; a .sh file is a source file of the language shell (#734), as .lua is lua
+  (check= (map url-format (map (lambda (n) (url-append dir n))
+                               '("a.sh" "a.bash" "a.zsh" "a.lua")))
+          '("shell" "shell" "shell" "lua"))
+  (in-file "s.sh" "#!/bin/sh\necho hi\n"
+    (lambda ()
+      (check= (get-init "prog-language") "shell")
+      (check= (get-init "mode") "prog")
+      (check= (get-style-list) '("code")))))
 
 (define (test-lines)
   (check-group "the lines of a source file")
@@ -138,6 +157,7 @@
   (check-suite "source-files")
   (system-mkdir dir)
   (test-round-trips)
+  (test-shell-files)
   (test-lines)
   (test-indentation)
   (check-end))

@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 1 November 2026
 
+- **Shell scripts** (desktop): a `.sh`, `.bash` or `.zsh` file opens as shell
+  code, as a `.lua` file opens as Lua code: highlighting by tree-sitter,
+  structured editing and the language server, and it is saved byte for byte
+  (the `#!` line, the tabs, the last newline), where it was a plain text
+  document before, with its tabs expanded (#734).
+
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
   block removed or changed by one side next to a block changed by the other,
   and an edit next to a new paragraph of the other side, now merge cleanly.
