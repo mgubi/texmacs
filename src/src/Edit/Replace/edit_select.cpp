@@ -570,6 +570,19 @@ edit_select_rep::selection_raw_get (string key) {
 }
 
 void
+edit_select_rep::selection_get_state (range_set& sel, bool& sg, bool& sh,
+                                      path& mid) {
+  sel= cur_sel; sg= selecting; sh= shift_selecting; mid= copy (mid_p);
+}
+
+void
+edit_select_rep::selection_set_state (range_set sel, bool sg, bool sh,
+                                      path mid) {
+  cur_sel= sel; selecting= sg; shift_selecting= sh; mid_p= mid;
+  notify_change (THE_SELECTION);
+}
+
+void
 edit_select_rep::selection_set_start (path p) {
   if (!selection_active_any ()) {
     if (rp < start (cur_sel)) select (start (cur_sel), start (cur_sel));

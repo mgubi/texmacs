@@ -865,6 +865,69 @@
           (edit (insert "xx"))
           (check= (body) '(document (tabular (tformat (table (row
                                        (cell "xx"))))))))))
+    ;; the refusal cancels the cut only: changes made earlier in the same
+    ;; editing step, here and in another buffer, stay and can be undone;
+    ;; the redo list is kept
+    (let* ((doc '(document "hello" (tabular (tformat (table (row
+                   (cell (document "ef" "gh")) (cell (strong "ij"))))))))
+           (typed (cons 'document (cons "helloXY" (cddr doc))))
+           (ca '(1 0 0 0 0 0 0 0)) (cb '(1 0 0 0 1 0 0 2)))
+      (for-each
+        (lambda (how)
+          (with-buffer-body doc
+            (lambda ()
+              (clipboard-set "editing-test" (stree->tree by))
+              (edit (go-to (at 0 5))
+                    (insert "XY")
+                    (selection-set (apply at ca) (apply at cb))
+                    (how))
+              (check= (body) typed)
+              (check-true (selection-active-table?))
+              (edit (selection-cancel))
+              (edit (undo 0))
+              (check= (body) doc))))
+        (list (lambda () (insert by))
+              (lambda () (insert '(quotation (document "P" "Q"))))
+              (lambda () (clipboard-paste "editing-test"))))
+      (with-buffer-body doc
+        (lambda ()
+          (let* ((a (current-buffer)) (b (new-buffer)))
+            (switch-to-buffer* b)
+            (buffer-set-body b (stree->tree '(document "bee")))
+            (go-start)
+            (update-forced)
+            (switch-to-buffer* a)
+            (update-forced)
+            (clipboard-set "editing-test" (stree->tree by))
+            (edit (switch-to-buffer* b)
+                  (go-to (append (buffer-path) '(0 3)))
+                  (insert "ZZ")
+                  (switch-to-buffer* a)
+                  (selection-set (apply at ca) (apply at cb))
+                  (insert by))
+            (check= (body) doc)
+            (switch-to-buffer* b)
+            (check= (body) '(document "beeZZ"))
+            (switch-to-buffer* a)
+            (edit (selection-cancel)))))
+      ;; no earlier change: nothing to undo, redo kept, a saved buffer stays
+      ;; saved and the selection is the same
+      (with-buffer-body doc
+        (lambda ()
+          (clipboard-set "editing-test" (stree->tree by))
+          (edit (go-to (at 0 5)) (insert "XY"))
+          (edit (undo 0))
+          (buffer-pretend-saved (current-buffer))
+          (let ((n (undo-possibilities)) (r (redo-possibilities)))
+            (edit (selection-set (apply at ca) (apply at cb)))
+            (let ((s (list (selection-get-start) (selection-get-end))))
+              (edit (insert by))
+              (check= (body) doc)
+              (check= (undo-possibilities) n)
+              (check= (redo-possibilities) r)
+              (check-false (buffer-modified? (current-buffer)))
+              (check= (list (selection-get-start) (selection-get-end)) s))
+            (edit (selection-cancel))))))
     ;; block cells (hyphenated cells, wide-tabular): the cleared first cell
     ;; holds paragraphs again, so they go in when it was a document; with a
     ;; plain first cell nothing changes

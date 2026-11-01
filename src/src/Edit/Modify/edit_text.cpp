@@ -13,6 +13,7 @@
 #include "file.hpp"
 #include "analyze.hpp"
 #include "scheme.hpp"
+#include "patch.hpp"
 
 /******************************************************************************
 * Constructors and destructors
@@ -244,7 +245,17 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
   bool cut= !as_bool (call ("like-emacs?"));
   bool tested= false;   // the paragraphs were tested for the cut selection
   bool cells = false;   // the selection is a selection of cells
-  path old_tp= tp, sel1, sel2;
+  path old_tp= tp;
+  range_set old_sel;
+  bool old_selecting= false, old_shift= false;
+  path old_mid;
+  // The cut of cells may leave no place for the paragraphs: it is made
+  // between marks of the history of this buffer, to be cancelled alone
+  struct cut_mark_rep {
+    edit_text_rep* ed; double m; bool on;
+    cut_mark_rep (): ed (NULL), m (0), on (false) {}
+    ~cut_mark_rep () { if (on) ed->mark_end (m); }
+  } cut_mark;
   if (is_multi_paragraph (t)) {
     // (where selection_cut will leave the cursor: it corrects the range)
     path ip= tp;
@@ -252,8 +263,7 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
       if (selection_active_table ()) {
         // (the cut empties the cells: see below)
         ip  = selection_get_start ();
-        sel1= selection_get_start ();
-        sel2= selection_get_end ();
+        selection_get_state (old_sel, old_selecting, old_shift, old_mid);
         cells= true;
       }
       else {
@@ -267,15 +277,19 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
       return;
     }
   }
+  if (cells) {
+    cut_mark.ed= this; cut_mark.m= new_marker (); cut_mark.on= true;
+    mark_start (cut_mark.m);
+  }
   if (cut) selection_cut ("none");
   if (cells && !can_insert_at (t, tp)) {
     // The cut left no place for paragraphs (the cells are not block cells,
     // or they lost their format): the cut is undone, the cells are not
-    // cleared for nothing
-    cancel_editing ();
+    // cleared for nothing (only the changes since the mark)
+    cut_mark.on= false;
+    mark_cancel (cut_mark.m);
     go_to (old_tp);
-    selection_set_start (sel1);
-    selection_set_end (sel2);
+    selection_set_state (old_sel, old_selecting, old_shift, old_mid);
     set_message ("Several paragraphs cannot replace cells", "insert");
     return;
   }
