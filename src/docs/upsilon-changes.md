@@ -14,14 +14,13 @@ have the details, and the problems go to the
 
 ## 2 November 2026
 
-- **The question dialog on Wayland** (Vue, Linux): the first frame of a new
-  window was presented in a buffer of its first size (200x200, taken when
-  the window was created), spread over the real size of the window, so the
-  dialog came out black with its contents flattened at its bottom (#376,
-  seen on GNOME). Mesa takes the new size of a window with its next buffer,
-  after a swap; where the frame was not drawn again, it stayed so until the
-  window was resized. A frame presented for another window size than the
-  one before is now drawn and presented once more.
+- **The question dialog on Wayland** (Vue, Linux): with software OpenGL on
+  mutter, sway and weston, the first frame of a new window was presented in
+  a buffer of its first size (200x200), spread over the real size of the
+  window: black, with its contents flattened at its bottom, as in #376. A
+  frame presented for another window size than the one before is now drawn
+  and presented once more. Not confirmed on GNOME with a GPU, where #376 was
+  reported: this may not be the whole of it.
 
 ## 1 November 2026
 

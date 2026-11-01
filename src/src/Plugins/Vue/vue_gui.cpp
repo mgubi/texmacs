@@ -2015,15 +2015,14 @@ vue_sdl_gpu_window_rep::process_redraw () {
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   vue_gpu_present (sdl_win);
   if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
-  // On Wayland, Mesa gives a window its new size when it takes its next
-  // back buffer, after a swap: a frame drawn into a buffer taken before
-  // the window had its size (the context is made current on the window
-  // as soon as it is created, 200x200, and until it is shown) is presented
-  // at that size, spread over the new one: the dialog of #376, black, its
-  // contents flattened at its bottom, which stayed so while nothing else
-  // changed it (a frame which draws what the last one drew is not
-  // presented). So a frame presented for another size than the previous
-  // one is drawn and presented once more, into a buffer of the new size.
+  // On Wayland, with software OpenGL (llvmpipe), the first frame of a window
+  // was seen in a buffer of the size it was created at (200x200, the context
+  // is made current then), spread over its real size: black, the contents
+  // flattened at the bottom, as in the picture of #376. It may stay so where
+  // nothing replaces that buffer, since a frame which draws what the last one
+  // drew is not presented. So a frame presented for another size than the
+  // previous one is drawn and presented once more. Whether a GPU driver
+  // behaves so was not seen: #376 may have more to it.
   if (dev_w != present_w || dev_h != present_h) {
     present_w= dev_w; present_h= dev_h;
     const char* driver= SDL_GetCurrentVideoDriver ();
