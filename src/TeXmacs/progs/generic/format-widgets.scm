@@ -231,7 +231,8 @@
 
 (define (page-this-bg-color-val col)
   (cond ((tm-atomic? col) "color")
-        ((and (tm-func? col 'pattern 3)
+        ((and (tm-is? col 'pattern)
+              (>= (tm-arity col) 3)
               (tm-equal? (tm-ref col 1) "100%")
               (tm-equal? (tm-ref col 2) "100%")) "picture")
         ((tm-is? col 'pattern) "pattern")

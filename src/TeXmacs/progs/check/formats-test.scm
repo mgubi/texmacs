@@ -420,6 +420,19 @@
   (check= (html '(concat "a" (next-line) "b")) "a<br />b")
   (check= (html '(hrule)) "<hr></hr>")
   (check= (html '(nbsp)) "&nbsp;")
+  ;; the background of a cell: a pattern of 3, 4 or 5 arguments, with the base
+  ;; color (opaque) as background-color
+  (with cell (lambda (pat)
+               (html `(tformat (cwith "1" "1" "1" "1" "cell-background" ,pat)
+                               (table (row (cell "a"))))))
+    (check= (cell '(pattern "a.png" "1cm" "1cm"))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm\">a</td></tr></tbody></table>")
+    (check= (cell '(pattern "a.png" "1cm" "1cm" (eff-recolor "0" "red")))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm\">a</td></tr></tbody></table>")
+    (check= (cell '(pattern "a.png" "1cm" "1cm" "" "#ffe0a080"))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm; background-color: #ffe0a0\">a</td></tr></tbody></table>")
+    (check= (cell '(pattern "a.png" "1cm" "1cm" "" "none"))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm\">a</td></tr></tbody></table>"))
   ;; the code environments keep their spaces and line breaks
   (check= (export '(code (document "x" "  y")) "html-snippet")
           "<pre class=\"verbatim\" xml:space=\"preserve\">\nx\n  y</pre>")

@@ -1254,12 +1254,60 @@
 ;; A document whose typesetting fails is replaced by an empty one, and the
 ;; typesetting goes on, in it and in the other buffers (the bridges which
 ;; were recording what they read when it failed do not record any more).
+;; The text is not lost silently (#704): a copy of the document is saved
+;; in the system folder of the home, and saving the buffer over its file
+;; is asked first.
 (define (test-typesetting-failure)
   (check-group "typesetting failure")
-  (with-typeset-body
-   '(document "first" "second" (anim-compose) "third")
-   (lambda ()
-     (check= (tree->stree (buffer-tree)) '(document ""))))
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (files (lambda () (map url->system (url-read-directory dir "*.tm"))))
+         (before (files)))
+    (with-typeset-body
+     '(document "first" "second" (anim-compose) "third")
+     (lambda ()
+       (check= (tree->stree (buffer-tree)) '(document ""))
+       (check-true (typeset-failed-buffer? (current-buffer)))
+       ;; the copy of the document, made before it was replaced
+       (let ((new (filter (lambda (f) (not (member f before))) (files))))
+         (check-true (pair? new))
+         (when (pair? new)
+           (let ((text (string-load (car new))))
+             (check-true (string-contains? text "second"))
+             (check-true (string-contains? text "anim-compose"))
+             (check-true (string-contains? text "third")))))))
+    ;; the flag which makes Save ask first (tm-files.scm) lives as long as
+    ;; the buffer (Save asks through the prompt of the footer, which a
+    ;; script cannot answer: it is not run here)
+    (let* ((file (url->url "$TEXMACS_HOME_PATH/system/typeset-failure-test.tm"))
+           (text (string-append
+                  "<TeXmacs|2.1.5>\n\n<style|<tuple|generic|1.0>>\n\n"
+                  "<\\body>\n  one\n\n  <anim-compose>\n\n  keep this\n"
+                  "</body>\n\n<\\initial>\n  <\\collection>\n  </collection>"
+                  "\n</initial>\n")))
+      (string-save text (url->system file))
+      (load-buffer file)
+      (switch-to-buffer* file)
+      (update-forced)
+      (check= (tree->stree (buffer-tree)) '(document ""))
+      (check-true (typeset-failed-buffer? file))
+      (check-true (string-contains? (string-load (url->system file)) "keep this"))
+      (buffer-close file)
+      (check-false (typeset-failed-buffer? file))
+      (system-remove file))
+    ;; the copy is made also for the buffers of a name with accents (bytes
+    ;; of UTF-8, not all of them letters) and of a very long name
+    (for-each
+     (lambda (tail)
+       (let ((file (url->url (string-append "$TEXMACS_HOME_PATH/system/" tail))))
+         (buffer-set-body file (stree->tree '(document "text")))
+         (let ((copy (typeset-failure-recover file "test")))
+           (check-true (string? copy))
+           (when (string? copy)
+             (check-true (url-exists? (url->url copy)))
+             (system-remove (url->url copy))))
+         (buffer-close file)))
+     (list "d\xc3\xa9j\xc3\xa0.tm"
+           (string-append (make-string 240 #\a) ".tm"))))
   (with-typeset-body
    '(document "one" "two" "three")
    (lambda ()
@@ -1267,6 +1315,76 @@
      (update-forced)
      (check= (tree->stree (buffer-tree)) '(document "one" "two again" "three"))
      (check-true (> (rect-x2 (rect 1)) (rect-x1 (rect 1)))))))
+
+;; A document with nothing to show on a page, such as one made of hidden
+;; content only, is typeset as an empty page and keeps its tree: it
+;; used to throw "empty composite box" (papyrus: "unexpected situation") and
+;; to be replaced by an empty document (#704).
+(define (test-hidden-documents)
+  (check-group "documents without visible content")
+  (let ((typeset-as-it-is (lambda (doc medium)
+    (with-typeset-body
+     doc
+     (lambda ()
+       (init-env "page-medium" medium)
+       (update-forced)
+       (check= (tree->stree (buffer-tree)) doc)
+       (check= (get-page-count) 1)
+       ;; a visible line added, then removed again
+       (tree-insert (buffer-tree) (length (cdr doc)) '("visible"))
+       (update-forced)
+       (check= (tree->stree (buffer-tree)) (append doc '("visible")))
+       (check-true (> (rect-x2 (rect (length (cdr doc))))
+                      (rect-x1 (rect (length (cdr doc))))))
+       (tree-remove (buffer-tree) (length (cdr doc)) 1)
+       (update-forced)
+       (check= (tree->stree (buffer-tree)) doc)
+       ;; a key typed at the start: no loop, the letter is in the document
+       ;; (the cursor is in the hidden content when it is all there is)
+       (go-start)
+       (insert "q")
+       (update-forced)
+       (check-true (string-contains? (object->string (tree->stree (buffer-tree)))
+                                     "q")))))))
+  (for-each
+   (lambda (medium)
+     (for-each
+      (lambda (doc) (typeset-as-it-is doc medium))
+      '((document (hidden "secret text"))
+        (document (concat (hidden "b")))
+        (document (hidden "a") (hidden "b"))
+        (document (with "color" "red" (hidden "x")))
+        (document (shown "x"))
+        (document (ignore "x"))
+        (document (freeze "x"))
+        (document (concat "" (hidden "b"))))))
+   '("paper" "papyrus" "automatic")))
+;; a document without paragraph holds an empty one (a key typed in it
+  ;; looped), in all the media
+  (for-each
+   (lambda (medium)
+     (with-typeset-body
+      '(document)
+      (lambda ()
+        (init-env "page-medium" medium)
+        (update-forced)
+        (check= (tree->stree (buffer-tree)) '(document ""))
+        (go-start)
+        (insert "q")
+        (update-forced)
+        (check= (tree->stree (buffer-tree)) '(document "q")))))
+   '("paper" "papyrus" "automatic"))
+  ;; the text of the first repro of #704: all of it replaced
+  (with-typeset-body
+   '(document (concat "a1x" (hidden "b")))
+   (lambda ()
+     (tree-set (tree-ref (buffer-tree) 0 0) "")
+     (update-forced)
+     (check= (tree->stree (buffer-tree)) '(document (concat "" (hidden "b"))))
+     ;; and undone
+     (tree-set (tree-ref (buffer-tree) 0 0) "a1x")
+     (update-forced)
+     (check= (tree->stree (buffer-tree)) '(document (concat "a1x" (hidden "b")))))))
 
 ;; A length in a unit made by a macro of the document: when the macro
 ;; changes, what the environment derived from the length changes too (the
@@ -2389,12 +2507,12 @@
     (check= (typeset-check-mismatches) 0)))
 
 ;; The page breaker sets to 0 the penalty of the last line before a change
-;; of the number of columns (breaker_prepare_items): on copies of the
+;; of the number of columns (breaker_prepare_items, and init_flows of the
+;; old breaker, preference "new style page breaking" off): on copies of the
 ;; lines, not on those which the bridges keep, which the check mode compares
 ;; with the lines typeset again (here the last line of the columns, which
-;; may not be broken from the equation which follows, #573)
-(define (test-lines-changed-by-breaker)
-  (check-group "lines changed by the page breaker")
+;; may not be broken from the equation which follows, #573, #664)
+(define (test-lines-changed-by-one-breaker)
   (for (after '((equation (document "x=y"))
                 (equation* (document "x=y"))
                 (concat "plain")))
@@ -2412,6 +2530,16 @@
          (tree-insert (buffer-tree) 2 (list (stree->tree "d")))
          (update-forced) (update-forced)
          (check= (typeset-check-mismatches) m0))))))
+
+(define (test-lines-changed-by-breaker)
+  (check-group "lines changed by the page breaker")
+  (test-lines-changed-by-one-breaker)
+  (check-group "lines changed by the old page breaker")
+  (with new (cpp-get-preference "new style page breaking" "on")
+    (dynamic-wind
+      (lambda () (cpp-set-preference "new style page breaking" "off"))
+      test-lines-changed-by-one-breaker
+      (lambda () (cpp-set-preference "new style page breaking" new)))))
 
 ;; A zoom typesets again only what reads the size of a pixel (px lengths,
 ;; the borders of ornaments, graphics: edit_env_rep::get_pixel), and uses the
@@ -3236,6 +3364,38 @@
       (check= (typeset-check-mismatches) mismatches))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Fixed loads of the TeX font cmr (#436)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A sound box has no width, and the height of the x of the current font
+;; (it was that of cmr, whatever the font of the text; the shipped Fira Sans
+;; and Libertine are in the font database only once it is built, else the
+;; same fallback font serves for both sides of a check).
+;; The source tags are drawn with cmsy, which is used only if it was found:
+;; else ecrm takes its place, where the angle brackets are letters (tex-font-
+;; found? asks; a family which does not exist is not tried, since mktextfm
+;; takes seconds to fail for it).
+(define (test-fixed-cmr-loads)
+  (check-group "fixed loads of cmr")
+  (check-true (tex-font-found? "cmr" 10 600 10))
+  (check-true (tex-font-found? "cmsy" 10 600 10))
+  (check-true (tex-font-found? "cmsy" 7 600 10))
+  (incl-clear-dir)
+  (system-mkdir (system->url incl-dir))
+  (string-save "x" (incl-file "s.mp3"))
+  ;; (a url made from a label reads ":" as a separator of paths: the name
+  ;; in the tree is /D/a/b on Windows, not the system form D:\a\b)
+  (let* ((snd `(sound ,(url->unix (incl-file "s.mp3"))))
+         (sound-h (lambda (f s) (box `(with "font" ,f "font-size" ,s ,snd) "h")))
+         (x-h (lambda (f s) (box `(with "font" ,f "font-size" ,s "x") "h"))))
+    (check= (box snd "w") '(0))
+    (for (f '("Fira Sans" "Linux Libertine" "roman"))
+      (check= (sound-h f "1") (x-h f "1"))
+      (check= (sound-h f "2") (x-h f "2"))))
+  (system-remove (incl-file "s.mp3"))
+  (incl-clear-dir))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3255,7 +3415,8 @@
      (test-text-boxes)
      (test-math-boxes)
      (test-line-breaking)
-     (test-hyphenation)))
+     (test-hyphenation)
+     (test-fixed-cmr-loads)))
   (test-environment)
   (test-numbering)
   (test-renumbering)
@@ -3274,6 +3435,7 @@
   (test-pages-kept)
   (test-long-document-without-pages)
   (test-typesetting-failure)
+  (test-hidden-documents)
   (test-derived-state)
   (test-renumbering-labels)
   (test-label-names)
