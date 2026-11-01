@@ -271,6 +271,7 @@
           (set-message `(concat "Could not save " ,vname) "Save file"))
         (begin
           (if (== (url-suffix name) "ts") (style-clear-cache))
+          (typeset-failure-forget name)
           (autosave-remove name)
           (buffer-notify-recent name)
           (set-message `(concat "Saved " ,vname) "Save file")
@@ -299,25 +300,35 @@
 
 ;; The typesetting of a buffer which failed (edit_typeset_rep::typeset_sub):
 ;; the document was replaced by an empty one, and a copy of it saved in
-;; $TEXMACS_HOME_PATH/system/recovered. Saving the buffer over its file
-;; would replace the file by what is left, so that it is asked first.
-(define typeset-failed-buffers (make-ahash-table))
+;; $TEXMACS_HOME_PATH/system/recovered (a copy is never overwritten). Saving
+;; the buffer over its file would replace the file by what is left, so that
+;; it is asked first (the flag, see typeset-failed-buffer? in tm-server.scm).
+
+(define (recovered-file-name dir tail)
+  (let* ((stamp (pretty-time (current-time)))
+         (clean (lambda (str)
+                  (list->string
+                   (map (lambda (c)
+                          (if (or (char-alphabetic? c) (char-numeric? c)
+                                  (in? c '(#\. #\-)))
+                              c #\_))
+                        (string->list str)))))
+         (base (string-append (clean stamp) "-"
+                              (let* ((t (clean tail)))
+                                (if (== t "") "buffer" t))))
+         (base (if (== (url-suffix base) "tm") base (string-append base ".tm"))))
+    (let try ((k 1))
+      (let* ((name (if (== k 1) base
+                       (string-append (substring base 0 (- (string-length base) 3))
+                                      "-" (number->string k) ".tm")))
+             (file (url-append dir name)))
+        (if (url-exists? file) (try (+ k 1)) file)))))
 
 (tm-define (typeset-failure-recover name msg)
   (:synopsis "Save the document of a buffer whose typesetting failed")
-  (ahash-set! typeset-failed-buffers (url->string name) #t)
+  (typeset-failure-flag name)
   (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
-         (tail (url->string (url-tail name)))
-         (safe (list->string
-                (map (lambda (c)
-                       (if (or (char-alphabetic? c) (char-numeric? c)
-                               (in? c '(#\. #\- #\_)))
-                           c #\_))
-                     (string->list tail))))
-         (file (url-append dir (string-append
-                                (number->string (texmacs-time))
-                                "-" (if (== safe "") "buffer" safe)
-                                (if (== (url-suffix tail) "tm") "" ".tm"))))
+         (file (recovered-file-name dir (url->string (url-tail name))))
          (saved (catch #t
                   (lambda ()
                     (system-mkdir dir)
@@ -331,9 +342,6 @@
                    "Its copy could not be saved: close it without saving."))
      "Typesetting failure")
     (and saved (url->system file))))
-
-(tm-define (typeset-failed-buffer? name)
-  (ahash-ref typeset-failed-buffers (url->string name)))
 
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
@@ -356,7 +364,7 @@
            (user-confirm "The document could not be typeset and was replaced by an empty one. Really save it over the file?" #f
              (lambda (answ)
                (when answ
-                 (ahash-remove! typeset-failed-buffers (url->string name))
+                 (typeset-failure-forget name)
                  (save-buffer-check-permissions name opts)))))
           ((and (url-test? name "fr")
                 (and-with mod-t (url-last-modified name)
@@ -520,6 +528,7 @@
 (tm-define (autosave-buffer name)
   ;;(display* "autosave-buffer " name "\n")
   (when (and (buffer-modified-since-autosave? name)
+             (not (typeset-failed-buffer? name))
              (url-autosave name "~"))
     ;;(display* "Autosave " name "\n")
     ;; FIXME: incorrectly autosaves after cursor movements only
@@ -646,7 +655,9 @@
           ((url-exists? name)
            (if (buffer-load name)
                (set-message `(concat "Could not load " ,vname) "Load file")
-               (load-buffer-open name opts)))
+               (begin
+                 (typeset-failure-forget name)
+                 (load-buffer-open name opts))))
           (else
             (with uname (if (string? name) (string->url name) name)
               (buffer-set-body name '(document ""))
@@ -737,7 +748,9 @@
           (with t (tree-import name (url-format name))
             (if (== t (tm->tree "error"))
                 (set-message "Error: file not found" "Revert buffer")
-                (buffer-set name t)))))))
+                (begin
+                  (typeset-failure-forget name)
+                  (buffer-set name t))))))))
 
 (tm-define (revert-buffer . l)
   (with name (if (null? l) (current-buffer) (car l))

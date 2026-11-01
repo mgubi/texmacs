@@ -1274,7 +1274,26 @@
            (let ((text (string-load (car new))))
              (check-true (string-contains? text "second"))
              (check-true (string-contains? text "anim-compose"))
-             (check-true (string-contains? text "third"))))))))
+             (check-true (string-contains? text "third")))))))
+    ;; the flag which makes Save ask first (tm-files.scm) lives as long as
+    ;; the buffer (Save asks through the prompt of the footer, which a
+    ;; script cannot answer: it is not run here)
+    (let* ((file (url->url "$TEXMACS_HOME_PATH/system/typeset-failure-test.tm"))
+           (text (string-append
+                  "<TeXmacs|2.1.5>\n\n<style|<tuple|generic|1.0>>\n\n"
+                  "<\\body>\n  one\n\n  <anim-compose>\n\n  keep this\n"
+                  "</body>\n\n<\\initial>\n  <\\collection>\n  </collection>"
+                  "\n</initial>\n")))
+      (string-save text (url->system file))
+      (load-buffer file)
+      (switch-to-buffer* file)
+      (update-forced)
+      (check= (tree->stree (buffer-tree)) '(document ""))
+      (check-true (typeset-failed-buffer? file))
+      (check-true (string-contains? (string-load (url->system file)) "keep this"))
+      (buffer-close file)
+      (check-false (typeset-failed-buffer? file))
+      (system-remove file)))
   (with-typeset-body
    '(document "one" "two" "three")
    (lambda ()
@@ -1305,7 +1324,14 @@
                       (rect-x1 (rect (length (cdr doc))))))
        (tree-remove (buffer-tree) (length (cdr doc)) 1)
        (update-forced)
-       (check= (tree->stree (buffer-tree)) doc))))))
+       (check= (tree->stree (buffer-tree)) doc)
+       ;; a key typed at the start: no loop, the letter is in the document
+       ;; (the cursor is in the hidden content when it is all there is)
+       (go-start)
+       (insert "q")
+       (update-forced)
+       (check-true (string-contains? (object->string (tree->stree (buffer-tree)))
+                                     "q")))))))
   (for-each
    (lambda (medium)
      (for-each
@@ -1317,9 +1343,23 @@
         (document (shown "x"))
         (document (ignore "x"))
         (document (freeze "x"))
-        (document (concat "" (hidden "b")))
-        (document))))
+        (document (concat "" (hidden "b"))))))
    '("paper" "papyrus" "automatic")))
+;; a document without paragraph holds an empty one (a key typed in it
+  ;; looped), in all the media
+  (for-each
+   (lambda (medium)
+     (with-typeset-body
+      '(document)
+      (lambda ()
+        (init-env "page-medium" medium)
+        (update-forced)
+        (check= (tree->stree (buffer-tree)) '(document ""))
+        (go-start)
+        (insert "q")
+        (update-forced)
+        (check= (tree->stree (buffer-tree)) '(document "q")))))
+   '("paper" "papyrus" "automatic"))
   ;; the text of the first repro of #704: all of it replaced
   (with-typeset-body
    '(document (concat "a1x" (hidden "b")))
