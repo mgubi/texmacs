@@ -340,8 +340,9 @@
   (output-invariant x))
 
 (define (texout-file-name x)
-  ;; as it is, on one line, whatever its spaces and its letters
-  (output-verbatim x))
+  ;; as it is, whatever its spaces and its letters; a name with a space is
+  ;; written on one line, the others are counted and may follow the text
+  (if (string-occurs? " " x) (output-verbatim x) (output-text x)))
 
 (define (texout-group x)
   (output-tex "{")
