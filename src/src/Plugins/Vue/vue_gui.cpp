@@ -1897,10 +1897,12 @@ class vue_sdl_gpu_window_rep : public vue_sdl_base_window_rep {
 public:
   renderer ren;
   unsigned long long presented; // the hash of the frame last presented
+  int present_w, present_h;     // the size in pixels of the window then
 
   vue_sdl_gpu_window_rep (vue_widget w, string name, bool popup= false,
                           SDL_Window* adopt= NULL)
-    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), presented (0) {
+    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), presented (0),
+      present_w (0), present_h (0) {
     with_window frame (this);
     Clay_SetMeasureTextFunction (ren_measure_text, this);
   }
@@ -2013,6 +2015,23 @@ vue_sdl_gpu_window_rep::process_redraw () {
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   vue_gpu_present (sdl_win);
   if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
+  // On Wayland, Mesa gives a window its new size when it takes its next
+  // back buffer, after a swap: a frame drawn into a buffer taken before
+  // the window had its size (the context is made current on the window
+  // as soon as it is created, 200x200, and until it is shown) is presented
+  // at that size, spread over the new one: the dialog of #376, black, its
+  // contents flattened at its bottom, which stayed so while nothing else
+  // changed it (a frame which draws what the last one drew is not
+  // presented). So a frame presented for another size than the previous
+  // one is drawn and presented once more, into a buffer of the new size.
+  if (dev_w != present_w || dev_h != present_h) {
+    present_w= dev_w; present_h= dev_h;
+    const char* driver= SDL_GetCurrentVideoDriver ();
+    if (driver != NULL && strcmp (driver, "wayland") == 0) {
+      presented= 0;
+      vue_gpu_deferred= true;
+    }
+  }
 }
 
 void
