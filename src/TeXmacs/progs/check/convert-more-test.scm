@@ -2029,6 +2029,12 @@
 (define (export-png)
   (string-load (url-append "$TEXMACS_PATH/misc/images" "fancy-c.png")))
 
+(define (for-latex n)
+  ;; the name in a document is /D/a/x.png on Windows; LaTeX reads D:/a/x.png
+  (if (os-mingw?)
+      (string-append (substring n 1 2) ":" (substring n 2 (string-length n)))
+      n))
+
 (define (embedded-image-sample)
   `(document (concat "a" (image (tuple (raw-data ,(export-png)) "png")
                                 "1cm" "" "" "")
@@ -2249,7 +2255,7 @@
     (system-mkdir (unix->url dir))
     (string-save (export-png) (unix->url name))
     (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
-      (check-true (has-text? (string-append "{" name "}") s))))
+      (check-true (has-text? (string-append "{" (for-latex name) "}") s))))
   ;; a %, which LaTeX would read as a comment, is given by a macro; the
   ;; space which ends the macro is skipped, and \space gives a space after %
   (let* ((dir (url->unix (temp-dir)))
@@ -2259,9 +2265,9 @@
                          "latex-snippet"))))
     (for (n (list "50%done.png" "a% b.png"))
       (string-save (export-png) (unix->url (string-append dir "/" n))))
-    (check-true (has-text? "/50\\csname @percentchar\\endcsname done.png}"
+    (check-true (has-text? (string-append (for-latex dir) "/50\\csname @percentchar\\endcsname done.png}")
                            (text "50%done.png")))
-    (check-true (has-text? "/a\\csname @percentchar\\endcsname \\space b.png}"
+    (check-true (has-text? (string-append (for-latex dir) "/a\\csname @percentchar\\endcsname \\space b.png}")
                            (text "a% b.png"))))
   (check-group "copy to the clipboard: the images of a real copy (#706)")
   ;; through selection_set, as Edit > Copy to > LaTeX: only a copy to the
