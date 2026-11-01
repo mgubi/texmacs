@@ -453,7 +453,9 @@ gs_to_pdf (url image, url pdf, int w, int h) {
   cmd << " -c \" grestore \"  ";
   if (DEBUG_CONVERT)
     debug_convert << "gs_to_pdf, launching" << LF << cmd << LF;
-  system (cmd);
+  // NOTE: waits for gs (system (cmd) does not on Windows: the PDF was
+  // looked for before gs had written it)
+  (void) eval_system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (pdf))
       debug_convert << "gs_to_pdf, generated PDF" << LF;
@@ -486,7 +488,7 @@ gs_to_pdf (url doc, url pdf, bool landscape, double paper_h, double paper_w) {
   // so we add some PS code to override the PDF document title with
   // the name of the PDF file.
   if (DEBUG_CONVERT) debug_convert << "gs_to_pdf, launching" << LF << cmd << LF;
-  system (cmd);
+  (void) eval_system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (pdf))
       debug_convert << "gs_to_pdf, generated PDF" << LF;
@@ -516,7 +518,7 @@ gs_to_ps (url doc, url ps, bool landscape, double paper_h, double paper_w) {
   // incorrectly referring to the name of the temporary file
   // so we add some PS code to override the PS document title with
   // the name of the PS file.
-  system (cmd);
+  (void) eval_system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (ps))
       debug_convert << "gs_to_ps, generated PS" << LF;
