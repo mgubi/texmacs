@@ -1120,6 +1120,15 @@
 	body ;; temporary fix for URLs like $TEXMACS_PATH/...
 	`((h:a (@ (href ,(tmhtml-suffix to))) ,@body)))))
 
+(define (tmhtml-hyperlink* l)
+  ;; a link with a title
+  (let ((r (tmhtml-hyperlink l))
+	(title (if (< (length l) 3) ""
+		   (cork->html (tmhtml-force-string (third l))))))
+    (if (and (list-1? r) (func? (car r) 'h:a) (!= title ""))
+	`((h:a (@ ,@(cdadar r) (title ,title)) ,@(cddar r)))
+	r)))
+
 (define (tmhtml-specific l)
   ;; raw HTML: <less> and <gtr> give its markup, the other characters
   ;; (Cork or <name>) are written in UTF-8 like the rest of the page
@@ -2024,6 +2033,7 @@
   (reference tmhtml-noop)
   (pageref tmhtml-noop)
   (hlink tmhtml-hyperlink)
+  (hlink* tmhtml-hyperlink*)
   (action tmhtml-action)
   (write tmhtml-noop)
   

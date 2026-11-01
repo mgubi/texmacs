@@ -2202,6 +2202,21 @@
 (define (tmtex-footnotemark s l)
   `(footnotemark (!option ,(tmtex (car l)))))
 
+;; The macros of the style markdown (styles/markdown.ts): what they display,
+;; without the text of the file which they keep
+(define (tmtex-md-body s l) (if (null? l) "" (tmtex (car l))))
+(define (tmtex-md-fence s l) (if (< (length l) 2) "" (tmtex (cadr l))))
+(define (tmtex-md-footnote s l)
+  (if (< (length l) 2) "" (tmtex-footnote s (cdr l))))
+(define (tmtex-md-h6 s l) (if (null? l) "" (tmtex `(subparagraph ,(car l)))))
+(define (tmtex-md-meta s l)
+  (cond ((< (length l) 2) "")
+        ((== (car l) "") (tmtex `(verbatim ,(cadr l))))
+        (else (with key (if (string? (car l)) (string-append (car l) ":")
+                            `(concat ,(car l) ":"))
+                (tmtex `(concat (strong ,key) " " ,(cadr l)))))))
+(define (tmtex-md-nothing s l) "")
+
 (define (filter-enunciation-due-to l)
   (cond ((func? l 'dueto) (list l))
         ((nlist>0? l) '())
@@ -3400,6 +3415,13 @@
   (jump-in (,tmtex-jump-in 1))
   (algorithm-indent (,tmtex-indent 1))
   ((:or footnote wide-footnote) (,tmtex-footnote 1))
+  ((:or md-source md-block-source md-image md-loose md-metadata)
+   (,tmtex-md-body -1))
+  (md-fence (,tmtex-md-fence -1))
+  (md-footnote (,tmtex-md-footnote -1))
+  (md-footnote-text (,tmtex-md-nothing -1))
+  (md-meta (,tmtex-md-meta -1))
+  (md-h6 (,tmtex-md-h6 -1))
   (footnotemark (,tmtex-default 0))
   (footnotemark* (,tmtex-footnotemark 1))
   ((:or description description-compact description-aligned

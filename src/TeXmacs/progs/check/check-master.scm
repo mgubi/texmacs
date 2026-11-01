@@ -38,6 +38,7 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
+        (check markdown-test)
         (check editing-test)
         (check read-only-test)
         (check typeset-test)
@@ -126,6 +127,7 @@
     ("search" search-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ("markdown" markdown-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ;; read-only buffers, and the console of the error messages (a window)
