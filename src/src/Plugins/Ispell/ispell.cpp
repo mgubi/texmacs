@@ -62,7 +62,17 @@ ispeller_rep::start () {
   if (unavailable) return error_msg;
 
   string locale = language_to_locale (lan);
-  
+
+  // a language without locale (klingon) has no dictionary: not English, as
+  // the library would take for the default, but the same error as the
+  // program (ispell_exe.cpp) gives
+  if (locale == "") {
+    error_msg = "Error: no dictionary installed for " * lan;
+    std_error << error_msg << "\nThe corresponding text is not checked\n";
+    unavailable = true;
+    return error_msg;
+  }
+
   config = new_aspell_config ();
 
   url aspell_path = url_system ("$TEXMACS_PATH/aspell-0.60");
