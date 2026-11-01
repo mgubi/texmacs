@@ -139,6 +139,7 @@ done
 # one run of TeXmacs (the PATH of the check, the home in the scratch folder;
 # TMPDIR is never set, as a real user has none: TEMP is the folder $3 if given,
 # $4 is put first in the PATH); the log is $out
+tm_cmd=("$@")   # the command which runs TeXmacs
 run_tm () { # log what temp extra_path
   local what="$2" temp="$3" extra="$4" args="" w
   for w in $what; do args="$args \"$w\""; done
@@ -153,7 +154,7 @@ run_tm () { # log what temp extra_path
    if [ -n "${TM_CHECK_QPA+x}" ]; then
      if [ -n "$TM_CHECK_QPA" ]; then export QT_QPA_PLATFORM="$TM_CHECK_QPA"; fi
    elif [ $windows = no ]; then export QT_QPA_PLATFORM=offscreen; fi &&
-   run_timeout 300 "$@" -x '(load "check.scm")' \
+   run_timeout 300 "${tm_cmd[@]}" -x '(load "check.scm")' \
    -x "(bundled-tools-check \"$n_work\" $args)" > "$out" 2>&1)
   [ $windows = yes ] && taskkill //F //IM texmacs.exe > /dev/null 2>&1
   return 0
