@@ -627,12 +627,10 @@ buffer_export (url name, url dest, string fm) {
   tm_view vw= concrete_view (get_recent_view (name));
   ASSERT (vw != NULL, "view expected");
 
-  if (fm == "postscript" || fm == "pdf") {
-    int old_stamp= last_modified (dest, false);
-    vw->ed->print_to_file (dest);
-    int new_stamp= last_modified (dest, false);
-    return new_stamp <= old_stamp;
-  }
+  if (fm == "postscript" || fm == "pdf")
+    // by what the printer says: a time stamp in seconds does not change
+    // when the same file is written twice in a second (#705)
+    return !vw->ed->print_doc (dest, false, 1, 1000000);
 
   tree body= subtree (the_et, vw->buf->rp);
   if (fm == "verbatim")

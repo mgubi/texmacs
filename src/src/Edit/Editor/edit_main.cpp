@@ -237,8 +237,9 @@ edit_main_rep::nr_pages () {
   return N (the_box[0]);
 }
 
-void
+bool
 edit_main_rep::print_doc (url name, bool conform, int first, int last) {
+  // true when the file was written (#705)
 #ifdef USE_GS
   bool ps  = (suffix (name) == "ps");
   bool pdf = (suffix (name) == "pdf");
@@ -303,8 +304,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   
   // Print pages
   renderer ren= printer (name, dpi, pages, page_type, landsc, w/cm, h/cm);
+  bool ok= ren->is_started ();
   
-  if (ren->is_started ()) {
+  if (ok) {
     int i;
     ren->set_metadata ("title", get_metadata ("title"));
     ren->set_metadata ("author", get_metadata ("author"));
@@ -326,12 +328,14 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
 
 #ifdef USE_GS
   if (!use_pdf () && pdf) {
-    gs_to_pdf (name, orig, landsc, h/cm, w/cm);
+    if (ok) gs_to_pdf (name, orig, landsc, h/cm, w/cm);
     ::remove (name);
+    ok= ok && exists (orig);
   }
   if (!use_ps () && ps) {
-    gs_to_ps (name, orig, landsc, h/cm, w/cm);
+    if (ok) gs_to_ps (name, orig, landsc, h/cm, w/cm);
     ::remove (name);
+    ok= ok && exists (orig);
   }
   if (ps || pdf)
     if (get_preference ("texmacs->pdf:check", "off") == "on") {
@@ -345,14 +349,12 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
 # endif
     }
 #endif
+  return ok;
 }
 
 void
 edit_main_rep::print_to_file (url name, string first, string last) {
-  int old_stamp= last_modified (name, false);
-  print_doc (name, false, as_int (first), as_int (last));
-  int new_stamp= last_modified (name, false);
-  if (new_stamp <= old_stamp)
+  if (!print_doc (name, false, as_int (first), as_int (last)))
     set_message (concat ("Could not save ",
                          verbatim (as_string (name, URL_SYSTEM))),
                  "print to file");

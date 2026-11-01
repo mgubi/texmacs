@@ -2247,7 +2247,7 @@
       (let* ((messages '())
              (capture (lambda (msg . args) (set! messages (cons msg messages))))
              (last-message (lambda () (object->string (car messages))))
-             (html (url-append (temp-dir) "failed.txt"))
+             (target (url-append (temp-dir) "failed.txt"))
              (tex (url-append (temp-dir) "image-failed.tex"))
              (image (url-append (temp-dir)
                                 (string-append "image-failed-1."
@@ -2255,12 +2255,12 @@
         ;; a conversion which fails: an error, and no file (not the text
         ;; "Error: bad format or data", nor an empty file for a converter
         ;; which throws)
-        (check-true (buffer-export (current-buffer) html "no-such-format"))
-        (check-false (url-exists? html))
+        (check-true (buffer-export (current-buffer) target "no-such-format"))
+        (check-false (url-exists? target))
         (with-global set-message capture
-          (export-buffer-main (current-buffer) html "no-such-format"
+          (export-buffer-main (current-buffer) target "no-such-format"
                               '(:overwrite)))
-        (check-false (url-exists? html))
+        (check-false (url-exists? target))
         (check-true (string-starts? (last-message) "(concat \"Could not save"))
         ;; the text is written, but not its image: said so
         (system-mkdir image)
@@ -2277,7 +2277,12 @@
         (with-global set-message capture
           (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
         (check-false (has-text? "an image could" (last-message)))
-        (check-image-file image))))
+        (check-image-file image)
+        ;; a PDF written twice in the same second is written both times
+        ;; (its time stamp, in seconds, does not change)
+        (with pdf (url-append (temp-dir) "twice.pdf")
+          (check-false (buffer-export (current-buffer) pdf "pdf"))
+          (check-false (buffer-export (current-buffer) pdf "pdf"))))))
   (check-group "export: a relative target is in the current directory")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
       (images-skip "relative target" "no native PDF writer")
