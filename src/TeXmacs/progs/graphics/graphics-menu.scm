@@ -341,7 +341,7 @@
       (pick-color (graphics-set-color answer)))
   ---
   ("Palette" (interactive-color (lambda (c) (graphics-set-color c)) '()))
-  ("Pattern" (open-pattern-selector graphics-set-color "1gu"))
+  ("Pattern" (open-pattern-selector graphics-set-color "1gu" :no-base))
   ("Other" (interactive graphics-set-color)))
 
 (menu-bind grid-color-axes-menu
@@ -536,7 +536,7 @@
       (pick-color (graphics-set-fill-color answer)))
   ---
   ("Palette" (interactive-color (lambda (c) (graphics-set-fill-color c)) '()))
-  ("Pattern" (open-pattern-selector graphics-set-fill-color "1gu"))
+  ("Pattern" (open-pattern-selector graphics-set-fill-color "1gu" :no-base))
   ("Other" (interactive graphics-set-fill-color)))
 
 (menu-bind graphics-text-halign-menu
@@ -1081,7 +1081,7 @@
       (pick-color (object-set-fill-color answer)))
   ---
   ("Palette" (interactive-color (lambda (c) (object-set-fill-color c)) '()))
-  ("Pattern" (open-pattern-selector object-set-fill-color "1gu"))
+  ("Pattern" (open-pattern-selector object-set-fill-color "1gu" :no-base))
   ("Other" (interactive object-set-fill-color)))
 
 (tm-menu (doc-at-mode-menu)

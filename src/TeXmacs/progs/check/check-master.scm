@@ -53,6 +53,7 @@
         (check typeset-test)
         (check opentype-typeset-test)
         (check emoji-test)
+        (check pattern-test)
         (check bibtex-test)
         (check csl-test)
         (check zotero-test)
@@ -163,6 +164,7 @@
     ("typeset" typeset-test-failures count)
     ("opentype-typeset" opentype-typeset-test-failures count)
     ("emoji" emoji-test-failures count)
+    ("pattern" pattern-test-failures count)
     ;; after editing: generating a bibliography or the auxiliary data of a
     ;; document processes the pending GUI events, among which those of the
     ;; views which editing closed (#174)

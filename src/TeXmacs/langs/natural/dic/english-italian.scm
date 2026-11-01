@@ -20,6 +20,7 @@
 ("API key of zotero.org" "chiave API di zotero.org")
 ("Asking zotero.org: %1 (%2 s)..." "Richiesta a zotero.org: %1 (%2 s)...")
 ("Asking zotero.org: %1..." "Richiesta a zotero.org: %1...")
+("Base color:" "Colore di base:")
 ("Conflicts to resolve: %1; keep my version or their version of each" "Conflitti da risolvere: %1; tieni la mia versione o la loro per ciascuno")
 ("GNU" "GNU")
 ("H modifier" "modificatore H")

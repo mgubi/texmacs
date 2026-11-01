@@ -220,6 +220,7 @@
 ("bar" "")
 ("bard" "")
 ("base" "")
+("Base color:" "")
 ("base level" "")
 ("baseline" "")
 ("bashkirian" "")

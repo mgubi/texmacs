@@ -455,6 +455,14 @@ pager_rep::pages_make () {
   skeleton sk=
     break_pages (l, ht, quality, fn_sep, fnote_sep, float_sep,
                  env->fn, env->first_page);
+  // a document whose items are all hidden (or which has none) has no
+  // pagelet: it is typeset as one empty page (in a skeleton of its own:
+  // the one found may be shared with the cache of the page breaks)
+  if (N(sk) == 0) {
+    skeleton one;
+    one << pagelet (ht);
+    sk= one;
+  }
   int i, n= N(sk);
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
@@ -472,6 +480,11 @@ pager_rep::papyrus_make () {
   skeleton sk=
     break_pages (l, ht, quality, fn_sep, fnote_sep, float_sep,
                  env->fn, env->first_page);
+  if (N(sk) == 0) {
+    skeleton one;
+    one << pagelet (ht);
+    sk= one;
+  }
   if (N(sk) != 1) {
     failed_error << "Number of pages: " << N(sk) << "\n";
     FAILED ("unexpected situation");
