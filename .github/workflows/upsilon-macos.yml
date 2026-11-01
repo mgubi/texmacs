@@ -292,8 +292,17 @@ jobs:
           name=$(packages/macos/upsilon-identity.sh ../distr/TeXmacs.app qt)
           rm -rf "../distr/$name.app"
           mv ../distr/TeXmacs.app "../distr/$name.app"
+          # Homebrew's libraries target macOS 15 (the Sequoia bottles): the
+          # minimum is 15.0, not the macOS of the runner, which configure
+          # puts there (#733); --with-osx would also change the flags of
+          # the build, the step "Minimum macOS" checks the libraries
+          plutil -replace LSMinimumSystemVersion -string 15.0 \
+            "../distr/$name.app/Contents/Info.plist"
           codesign --force --deep -s - "../distr/$name.app"
           ditto -c -k --keepParent "../distr/$name.app" texmacs-qt-macos-arm64.zip
+
+      - name: Minimum macOS
+        run: ../.github/fixes/check-min-macos.sh ../distr/*.app
 
       - uses: actions/upload-artifact@v4
         with:
@@ -346,7 +355,8 @@ jobs:
             see [src/docs/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/ns-port.md);
             \`TeXmacs-*-vue-universal.dmg\`, the Vue interface, drawn by the
             GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
-            \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only.
+            \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only, macOS 15
+            or later.
             Signed ad hoc and not notarized: macOS refuses to open them the
             first time. Open the application from its context menu (Open),
             or allow it in System Settings > Privacy & Security, or remove
