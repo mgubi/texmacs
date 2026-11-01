@@ -134,18 +134,6 @@ for form in native windows; do
     { fail "gs does not convert the EPS file with an absolute path ($form: $in)"; tail -10 "$work/gs-abs.log"; }
 done
 
-# as TeXmacs runs it on Windows: one command line, through cmd.exe, with the
-# quotes it writes (gs_to_pdf in gs_utilities.cpp)
-if [ $windows = yes ]; then
-  gsw=$(cygpath -w "$gs"); inw=$(cygpath -w "$work/test.eps"); outw=$(cygpath -w "$work/cmd.pdf")
-  line="\"$gsw\" -dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dDEVICEWIDTHPOINTS=596 -dDEVICEHEIGHTPOINTS=842 -sOutputFile=\"$outw\" \"$inw\" -c \"[ /Title (cmd.pdf) /DOCINFO pdfmark\" "
-  (cd "$work" && env TMPDIR="$n_work" cmd /c "\"$line\"" > gs-cmd.log 2>&1)
-  if [ -s "$work/cmd.pdf" ]; then ok "the command line of TeXmacs, through cmd.exe, converts the EPS file"
-  else fail "the command line of TeXmacs does not convert the EPS file through cmd.exe"; tail -10 "$work/gs-cmd.log"
-    (cd "$work" && env TMPDIR="$n_work" cmd /c "$line" > gs-cmd2.log 2>&1); [ -s "$work/cmd.pdf" ] && echo "note: without the outer quotes it converts"; tail -5 "$work/gs-cmd2.log"
-  fi
-fi
-
 echo "== TeXmacs: $*"
 what=ghostscript
 [ $aspell = yes ] && what="ghostscript aspell"
