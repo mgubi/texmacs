@@ -59,6 +59,7 @@ ok () { echo "ok: $*"; }
 # a path as the Windows programs print it (C:/...), else as it is
 native () { if [ $windows = yes ]; then cygpath -m "$1"; else echo "$1"; fi; }
 
+n_home=$(native "$work/home"); n_root=$(native "$root"); n_work=$(native "$work")
 cp "$here/test.eps" "$here/check.scm" "$work/"
 mkdir "$work/shim" "$work/home"
 if [ $windows = yes ]; then
@@ -74,13 +75,13 @@ fi
 echo "== the program: $gs"
 [ -f "$gs" ] || { fail "$gs does not exist"; exit 1; }
 [ -x "$gs" ] || fail "$gs is not executable"
-v=$(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" PATH="$clean_path" "$gs" --version | tr -d '\r')
+v=$(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" TMPDIR="$n_work" PATH="$clean_path" "$gs" --version | tr -d '\r')
 [ "$v" = "$version" ] && ok "gs --version: $v" || fail "gs --version says \"$v\", not $version"
-txt=$(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" PATH="$clean_path" "$gs" -q -dNOPAUSE -dBATCH -dSAFER \
+txt=$(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" TMPDIR="$n_work" PATH="$clean_path" "$gs" -q -dNOPAUSE -dBATCH -dSAFER \
         -sDEVICE=txtwrite -sOutputFile=- test.eps | tr -d '\r')
 case "$txt" in *"Hello Gs"*) ok "the text of the EPS file: $(echo $txt | head -c 40)";;
   *) fail "no text from the EPS file: $txt";; esac
-(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
+(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" TMPDIR="$n_work" PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
    -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -dEmbedAllFonts=true \
    -dCompressFonts=false -dCompressPages=false -dCompatibilityLevel=1.4 -dEPSCrop \
    -sOutputFile=direct.pdf test.eps > gs-pdf.log 2>&1) ||
@@ -99,7 +100,8 @@ fi
 # runs a command, killed after N seconds (macOS has no timeout)
 run_timeout () {
   local t=$1; shift
-  "$@" &
+  # (the PATH of the check only for the program: this function needs sleep)
+  ( PATH="$run_path"; exec "$@" ) &
   local pid=$! n=0
   while kill -0 $pid 2> /dev/null; do
     n=$((n + 1))
@@ -115,9 +117,7 @@ what=ghostscript
 args=""
 for w in $what; do args="$args \"$w\""; done
 out="$work/texmacs.log"
-n_home=$(native "$work/home"); n_root=$(native "$root"); n_work=$(native "$work")
-(cd "$work" && export TEXMACS_HOME_PATH="$n_home" TEXMACS_PATH="$n_root" \
-   PATH="$run_path" &&
+(cd "$work" && export TEXMACS_HOME_PATH="$n_home" TEXMACS_PATH="$n_root" &&
    # (Qt without a window, unless TM_CHECK_QPA says otherwise, even empty:
    # the Qt of an AppImage has no offscreen plugin, nor Windows runs need it)
    if [ -n "${TM_CHECK_QPA+x}" ]; then

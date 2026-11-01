@@ -360,6 +360,14 @@ init_env_vars () {
     bin_path= url_system (get_user_preference ("manual path")) | bin_path;
 
   set_env_path ("PATH", bin_path);
+#ifdef OS_MINGW
+  // The gs.exe of the package (Ghostscript, built as a program of Unix on
+  // Windows) makes its temporary files in $TMPDIR, else in /tmp, which Windows
+  // has not: the same folder as the other programs (TEMP) then
+  if (get_env ("TMPDIR") == "" && get_env ("TEMP") != "" &&
+      exists (url ("$TEXMACS_PATH/bin/gs.exe")))
+    set_env ("TMPDIR", get_env ("TEMP"));
+#endif
   url lib_path= get_env_path ("LD_LIBRARY_PATH") | plugin_path ("lib");
   set_env_path ("LD_LIBRARY_PATH", lib_path);
 
