@@ -2741,7 +2741,7 @@
 ((Tw\ Cen\ MT Bold\ Italic) ((TwentiethCentury.ttc 3 290348)))
 ((Tw\ Cen\ MT Italic) ((TwentiethCentury.ttc 2 290348)))
 ((Tw\ Cen\ MT Regular) ((TwentiethCentury.ttc 0 290348)))
-((Twemoji\ Mozilla Regular) ((TwemojiMozilla.ttf 0 1244336)))
+((Twemoji\ Mozilla Regular) ((TwemojiMozilla.ttf 0 1474284)))
 ((Type\ Embellishments\ One\ LET Embellishments\ One\ LET\ Plain) ((Type\ Embellishments\ One\ LET.ttf 0 89364)))
 ((Typicons Book) ((typicons.ttf 0 99920)))
 ((Ubuntu Bold) ((Ubuntu-B.ttf 0 312932)))

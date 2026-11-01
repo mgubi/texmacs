@@ -41,6 +41,7 @@
         (check editing-test)
         (check read-only-test)
         (check typeset-test)
+        (check emoji-test)
         (check bibtex-test)
         (check database-test)
         (check math-edit-test)
@@ -131,6 +132,7 @@
     ;; read-only buffers, and the console of the error messages (a window)
     ("read-only" read-only-test-failures count)
     ("typeset" typeset-test-failures count)
+    ("emoji" emoji-test-failures count)
     ;; after editing: generating a bibliography or the auxiliary data of a
     ;; document processes the pending GUI events, among which those of the
     ;; views which editing closed (#174)

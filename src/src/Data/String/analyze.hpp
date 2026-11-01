@@ -96,6 +96,13 @@ string tm_correct (string s);
 void   tm_char_forwards (string s, int& pos);
 void   tm_char_backwards (string s, int& pos);
 int    tm_char_next (string s, int pos);
+// the end of the character at pos, an emoji sequence taken whole (a family,
+// a flag, a skin tone, a keycap: what the emoji fonts draw as one picture)
+int    tm_grapheme_end (string s, int pos);
+// the start of the character (an emoji sequence taken whole) before pos
+int    tm_grapheme_start (string s, int pos);
+// whether pos is inside an emoji sequence, from start to end
+bool   tm_grapheme_inside (string s, int pos, int& start, int& end);
 int    tm_char_previous (string s, int pos);
 string tm_forward_access (string s, int i);
 string tm_backward_access (string s, int i);

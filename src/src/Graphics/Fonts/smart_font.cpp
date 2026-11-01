@@ -15,6 +15,9 @@
 #include "Freetype/tt_tools.hpp"
 #include "translator.hpp"
 #include "iterator.hpp"
+#include "Freetype/tt_file.hpp"
+#include "analyze.hpp"
+#include "boot.hpp" // get_user_preference
 
 bool virtually_defined (string c, string name);
 font smart_font_bis (string f, string v, string s, string sh, int sz,
@@ -723,6 +726,9 @@ struct smart_font_rep: font_rep {
   int    resolve (string c, string fam, int attempt);
   bool   is_italic_prime (string c);
   int    resolve_rubber (string c, string fam, int attempt);
+  int    emoji_font ();
+  int    resolve_emoji (string c);
+  int    emoji_before_selector (string s, int pos, int end, int next);
   int    resolve (string c);
   void   initialize_font (int nr);
   int    adjusted_dpi (string fam, string var, string ser, string sh, int att);
@@ -923,6 +929,7 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
           (pos+1 == N(s) || !is_alpha (s[pos+1])))
         next= italic_nr;
       else if (chv[c] == -1) next= resolve (s (pos, pos+1));
+      next= emoji_before_selector (s, pos, pos+1, next); // keycaps
       if (count == 1 && nr != -1 && next == nr) {
         // NOTE: rewrite strings like --- character by character if necessary
         if (sm->fn_rewr[nr] == REWRITE_SPECIAL) break;
@@ -936,7 +943,10 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
       tm_char_forwards (s, end);
       int next= cht[s (pos, end)];
       if (next == -1) next= resolve (s (pos, end));
-      if (count == 1 && nr != -1 && next == nr) {
+      next= emoji_before_selector (s, pos, end, next);
+      if (count == 1 && nr != -1 && next == nr &&
+          !is_tuple (sm->fn_spec[nr], "shipped-emoji")) {
+        // (the emoji font draws the bases of keycaps only with the rest)
         if (N(fn) <= nr || is_nil (fn[nr])) initialize_font (nr);
         if (!fn[nr]->supports (s (start, end))) break;
         pos= end;
@@ -958,6 +968,132 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
 bool
 is_italic_font (string master) {
   return contains (string ("italic"), master_features (master));
+}
+
+// The emoji font which comes with TeXmacs: a color font (COLR), whose emoji
+// look the same on every platform, and whose ligatures make one picture of
+// a sequence (a family, a flag, a skin tone)
+#define SHIPPED_EMOJI_FONT "TwemojiMozilla"
+
+// The emoji font: the shipped one (the preference "emoji font" at
+// "default"), the one of the system ("system": Apple Color Emoji, Segoe UI
+// Emoji, Noto Color Emoji), or a font by the name of its file; the shipped
+// one when the font asked for is not there. It is read when a font is
+// made: a change shows in the documents opened afterwards.
+static string
+emoji_font_name () {
+  string pref= get_user_preference ("emoji font", "default");
+  if (pref == "system") {
+    const char* names[]= { "Apple Color Emoji", "seguiemj",
+                           "NotoColorEmoji", "Noto Color Emoji" };
+    for (int i= 0; i < 4; i++)
+      if (tt_font_exists (names[i])) return names[i];
+  }
+  else if (pref != "default" && pref != "" && tt_font_exists (pref))
+    return pref;
+  return SHIPPED_EMOJI_FONT;
+}
+
+// The code point of c when it is one, -1 otherwise
+static int
+single_code (string c) {
+  if (N(c) < 4 || c[0] != '<' || c[1] != '#') return -1;
+  string uc= strict_cork_to_utf8 (c);
+  if (N(uc) == 0) return -1;
+  int pos= 0;
+  int code= decode_from_utf8 (uc, pos);
+  return (pos == N(uc))? code: -1;
+}
+
+// The characters which are emoji by default (the property
+// Emoji_Presentation of Unicode); the others (like U+2764, the heart) are
+// emoji only when followed by U+FE0F
+static bool
+is_emoji_presentation (int c) {
+  if (c < 0x231a) return false;
+  if (c >= 0x1f000) {
+    if (c >= 0x1f1e6 && c <= 0x1f1ff) return true;   // regional indicators
+    if (c >= 0x1f300 && c <= 0x1f64f) return true;   // pictographs, smileys
+    if (c >= 0x1f680 && c <= 0x1f6ff) return true;   // transport and map
+    if (c >= 0x1f7e0 && c <= 0x1f7eb) return true;   // colored circles
+    if (c >= 0x1f90c && c <= 0x1f9ff) return true;   // supplemental
+    if (c >= 0x1fa70 && c <= 0x1faff) return true;   // extended-A
+    return c == 0x1f004 || c == 0x1f0cf || c == 0x1f18e ||
+           (c >= 0x1f191 && c <= 0x1f19a) || c == 0x1f201 || c == 0x1f21a ||
+           c == 0x1f22f || (c >= 0x1f232 && c <= 0x1f236) ||
+           (c >= 0x1f238 && c <= 0x1f23a) || (c >= 0x1f250 && c <= 0x1f251);
+  }
+  if (c > 0x2b55) return false;
+  return c == 0x231a || c == 0x231b || (c >= 0x23e9 && c <= 0x23ec) ||
+         c == 0x23f0 || c == 0x23f3 || c == 0x25fd || c == 0x25fe ||
+         c == 0x2614 || c == 0x2615 || (c >= 0x2648 && c <= 0x2653) ||
+         c == 0x267f || c == 0x2693 || c == 0x26a1 || c == 0x26aa ||
+         c == 0x26ab || c == 0x26bd || c == 0x26be || c == 0x26c4 ||
+         c == 0x26c5 || c == 0x26ce || c == 0x26d4 || c == 0x26ea ||
+         c == 0x26f2 || c == 0x26f3 || c == 0x26f5 || c == 0x26fa ||
+         c == 0x26fd || c == 0x2705 || c == 0x270a || c == 0x270b ||
+         c == 0x2728 || c == 0x274c || c == 0x274e ||
+         (c >= 0x2753 && c <= 0x2755) || c == 0x2757 ||
+         (c >= 0x2795 && c <= 0x2797) || c == 0x27b0 || c == 0x27bf ||
+         c == 0x2b1b || c == 0x2b1c || c == 0x2b50 || c == 0x2b55;
+}
+
+// The characters which modify the emoji before them: the variation
+// selectors, the zero width joiner, the keycap and the tags (of the flags
+// of regions)
+static bool
+is_emoji_mark (int c) {
+  return (c >= 0xfe00 && c <= 0xfe0f) || c == 0x200d || c == 0x20e3 ||
+         (c >= 0xe0020 && c <= 0xe007f);
+}
+
+int
+smart_font_rep::emoji_font () {
+  if (!tt_font_exists (emoji_font_name ())) return -1;
+  tree key= tuple ("shipped-emoji");
+  int nr= sm->add_font (key, REWRITE_NONE);
+  initialize_font (nr);
+  return nr;
+}
+
+int
+smart_font_rep::resolve_emoji (string c) {
+  int nr= emoji_font ();
+  if (nr < 0) return -1;
+  // the marks are not drawn on their own (supports says no to them): the
+  // ligatures of the font take them with the emoji before them
+  if (is_emoji_mark (single_code (c)) || fn[nr]->supports (c))
+    return sm->add_char (tuple ("shipped-emoji"), c);
+  // an emoji which the font of the system has not (the regional indicators
+  // alone, a newer emoji): from the shipped font
+  if (emoji_font_name () == SHIPPED_EMOJI_FONT ||
+      !tt_font_exists (SHIPPED_EMOJI_FONT)) return -1;
+  tree key= tuple ("shipped-emoji", "shipped");
+  int snr= sm->add_font (key, REWRITE_NONE);
+  initialize_font (snr);
+  if (!fn[snr]->supports (c)) return -1;
+  return sm->add_char (key, c);
+}
+
+// A character followed by U+FE0F (the variation selector which asks for an
+// emoji) goes into the emoji font, with the selector, if that font has it
+int
+smart_font_rep::emoji_before_selector (string s, int pos, int end,
+                                       int next) {
+  if (end + 7 > N(s) || s[end] != '<' || s[end+1] != '#') return next;
+  string sel= locase_all (s (end, end + 7));
+  if (sel != "<#fe0f>") return next;
+  int nr= emoji_font ();
+  if (nr < 0 || nr == next) return next;
+  string c= s (pos, end);
+  // the bases of the keycaps, which the font only draws as ligatures (and
+  // a digit followed by U+FE0F alone stays a digit of the text)
+  if (N(c) == 1)
+    return ((is_digit (c[0]) || c[0] == '#' || c[0] == '*') &&
+            locase_all (s (end + 7, min (N(s), end + 14))) == "<#20e3>")?
+           nr: next;
+  if (!fn[nr]->supports (c)) return next;
+  return nr;
 }
 
 int
@@ -1253,6 +1389,16 @@ smart_font_rep::resolve (string c) {
     }
   }
 
+  // the emoji, from the emoji font which comes with TeXmacs, before any
+  // other font (some text fonts have a few of them in black and white)
+  if (starts (c, "<#")) {
+    int code= single_code (c);
+    if (is_emoji_presentation (code) || is_emoji_mark (code)) {
+      int nr= resolve_emoji (c);
+      if (nr >= 0) return nr;
+    }
+  }
+
   if (math_kind != 0) {
     string upc= substitute_upright (c);
     if (upc != "" && fn[SUBFONT_MAIN]->supports (upc)) {
@@ -1361,6 +1507,12 @@ smart_font_rep::resolve (string c) {
     return sm->add_char (tuple ("virtual", virt), c);
   }
 
+  // a symbol which no other font has, like an emoji which is text by default
+  if (starts (c, "<#")) {
+    int nr= resolve_emoji (c);
+    if (nr >= 0) return nr;
+  }
+
   //cout << "Error " << c << "\n";
   return sm->add_char (tuple ("error"), c);
 }
@@ -1459,6 +1611,9 @@ smart_font_rep::initialize_font (int nr) {
   }
   else if (a[0] == "ignore")
     fn[nr]= fn[SUBFONT_MAIN];
+  else if (a[0] == "shipped-emoji")
+    fn[nr]= adjust_subfont (unicode_font (N(a) > 1? string (SHIPPED_EMOJI_FONT):
+                                          emoji_font_name (), sz, dpi));
   else {
     int  ndpi= adjusted_dpi (a[0], a[1], a[2], a[3], as_int (a[4]));
     font cfn = closest_font (a[0], a[1], a[2], a[3], sz, ndpi, as_int (a[4]));

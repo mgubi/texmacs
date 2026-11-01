@@ -111,6 +111,8 @@
   ("gui theme" "default" notify-gui-theme)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-restart)
+  ;; the emoji: the shipped Twemoji, or those of the system (smart_font.cpp)
+  ("emoji font" "default" noop)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
   ("page medium" "paper" (lambda args (noop)))
   ("fast environments" "on" notify-fast-environments)

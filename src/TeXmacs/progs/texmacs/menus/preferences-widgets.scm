@@ -113,6 +113,10 @@
   ("normal" "Normal")
   ("large" "Large"))
 
+(define-preference-names-and-validate "emoji font"
+  ("default" "Twemoji, the same everywhere")
+  ("system" "Those of the system"))
+
 (define-preference-names-and-validate "gui:responsive tab mode"
   ("top" "Top tabs")
   ("side" "Side tabs")
@@ -178,6 +182,13 @@
       (enum (set-pretty-preference "gui scaling" answer)
             '("default" "0.25" "0.5" "1" "2" "3")
             (get-pretty-preference "gui scaling")
+            "18em"))
+    ;; the emoji font of smart_font.cpp (emoji_font_name), read when the
+    ;; fonts are made
+    (item (text "Emoji (from the next start):")
+      (enum (set-pretty-preference "emoji font" answer)
+            '("Twemoji, the same everywhere" "Those of the system")
+            (get-pretty-preference "emoji font")
             "18em"))
     (assuming (qt5-gui?)
       (meti (hlist // (text "Use retina fonts"))

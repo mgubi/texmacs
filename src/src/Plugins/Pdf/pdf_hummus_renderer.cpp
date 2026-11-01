@@ -169,6 +169,9 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   void compile_glyph (scheme_tree t);
   void begin_text ();
   void end_text ();
+  void begin_actual_text (string s);
+  void end_actual_text ();
+  void draw_invisible (int c, font_glyphs fn, SI x, SI y, double hscale);
   
   void begin_page();
   void end_page();
@@ -530,6 +533,34 @@ pdf_hummus_renderer_rep::end_text () {
     contentContext->ET();
     inText = false;
   }
+}
+
+// The span is in the text object, as the glyphs it covers (a drawing of
+// glyphs does not end the text object); marked content is of PDF 1.2, its
+// ActualText of 1.5, which the readers take whatever the version of the
+// file
+void
+pdf_hummus_renderer_rep::begin_actual_text (string s) {
+  begin_text ();
+  c_string hex (utf8_to_pdf_hex_string (s));
+  contentContext->WriteFreeCode ("/Span << /ActualText " +
+                                 std::string ((char*) hex) + " >> BDC ");
+}
+
+void
+pdf_hummus_renderer_rep::end_actual_text () {
+  contentContext->WriteFreeCode (" EMC\r\n");
+}
+
+void
+pdf_hummus_renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
+                                         double hscale) {
+  begin_text ();
+  contentContext->Tr (3);
+  if (hscale != 1.0) contentContext->Tz ((int) (100.0 * hscale + 0.5));
+  draw (c, fn, x, y);
+  if (hscale != 1.0) contentContext->Tz (100);
+  contentContext->Tr (0);
 }
 
 /******************************************************************************
@@ -1751,7 +1782,13 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     contentContext->WriteFreeCode (" EMC\r\n");
   }
   else {
-    if (cfid != NULL) {
+    if (cfid != NULL && ch >= 0xc000000) {
+      // a glyph drawn by its number (a layer of an emoji in color, whose
+      // characters are written as invisible glyphs) stands for none
+      glyphs.push_back (GlyphUnicodeMapping (gl_index, ULongVector ()));
+      contentContext->Tj (glyphs);
+    }
+    else if (cfid != NULL) {
       int uc= ch;
       if (EuropeanComputerModern_fonts->contains (cfn))
         uc= tex_glyph_unicode (ch, false);

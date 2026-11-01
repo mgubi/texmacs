@@ -138,6 +138,15 @@ public:
   virtual void embed_video (url u, int ms, bool repeat,
                             SI x1, SI y1, SI x2, SI y2);
   virtual void toc_entry (string kind, string title, SI x, SI y);
+  // the characters (in Cork) which the drawings until end_actual_text stand
+  // for, as the text of a PDF ("" for none: the layers of an emoji)
+  virtual void begin_actual_text (string s);
+  virtual void end_actual_text ();
+  // a glyph as text only, invisible (the characters of an emoji drawn in
+  // layers, for the text of a PDF), its width scaled by hscale: nothing on
+  // a screen
+  virtual void draw_invisible (int char_code, font_glyphs fn, SI x, SI y,
+                               double hscale= 1.0);
   virtual void set_metadata (string kind, string val);
 };
 

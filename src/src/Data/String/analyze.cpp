@@ -635,6 +635,120 @@ tm_char_backwards (string s, int& pos) {
   }
 }
 
+/******************************************************************************
+* Sequences of emoji: the characters which the emoji fonts draw as one
+* picture (a family joined by U+200D, a flag of two regional indicators, an
+* emoji with a skin tone or a variation selector, a keycap), one piece of
+* text for the typesetter (text_language.cpp) and one step of the cursor
+******************************************************************************/
+
+// the code point of the character <#XXXX> at pos, and its end
+static int
+code_at (string s, int pos, int& end) {
+  if (pos + 3 >= N(s) || s[pos] != '<' || s[pos+1] != '#') return -1;
+  int i= pos + 2;
+  while (i < N(s) && is_hex_digit (s[i])) i++;
+  if (i == pos + 2 || i >= N(s) || s[i] != '>') return -1;
+  end= i + 1;
+  return from_hexadecimal (s (pos + 2, i));
+}
+
+static bool
+is_regional_indicator (int c) {
+  return c >= 0x1f1e6 && c <= 0x1f1ff;
+}
+
+static int
+emoji_sequence_end (string s, int pos, int end) {
+  int e;
+  int c= code_at (s, pos, e);
+  if (c < 0x200) return end;
+  if (is_regional_indicator (c)) {
+    // a flag: two regional indicators
+    int f;
+    if (is_regional_indicator (code_at (s, end, f))) return f;
+    return end;
+  }
+  while (end < N(s)) {
+    int d= code_at (s, end, e);
+    if ((d >= 0xfe00 && d <= 0xfe0f) || (d >= 0x1f3fb && d <= 0x1f3ff) ||
+        (d >= 0xe0020 && d <= 0xe007f) || d == 0x20e3)
+      end= e;                           // selectors, skin tones, tags
+    else if (d == 0x200d && e < N(s)) {
+      end= e;                           // a joiner and what it joins
+      if (s[end] == '<') {
+        int f;
+        if (code_at (s, end, f) >= 0) end= f;
+        else break;
+      }
+      else end++;
+    }
+    else break;
+  }
+  return end;
+}
+
+static bool
+keycap_at (string s, int pos) {
+  if (pos >= N(s) || !(is_digit (s[pos]) || s[pos] == '#' || s[pos] == '*'))
+    return false;
+  int e;
+  int c= code_at (s, pos + 1, e);
+  if (c == 0xfe0f) c= code_at (s, e, e);
+  return c == 0x20e3;
+}
+
+int
+tm_grapheme_end (string s, int pos) {
+  if (pos >= N(s)) return N(s);
+  if (keycap_at (s, pos)) return emoji_sequence_end (s, pos + 1, pos + 1);
+  int end= pos;
+  tm_char_forwards (s, end);
+  return emoji_sequence_end (s, pos, end);
+}
+
+// a position before which the characters may begin a sequence of emoji but
+// not continue one: the first character before pos which is not <#XXXX>
+// beyond U+1FF (a letter, a digit, an accent), or the start
+static int
+grapheme_safe_start (string s, int pos) {
+  int p= pos;
+  while (p > 0) {
+    int q= p, e;
+    tm_char_backwards (s, q);
+    p= q;
+    if (code_at (s, q, e) < 0x200) break;
+  }
+  return p;
+}
+
+bool
+tm_grapheme_inside (string s, int pos, int& start, int& end) {
+  if (pos <= 0 || pos >= N(s)) return false;
+  int a= grapheme_safe_start (s, pos);
+  while (a < pos) {
+    int b= tm_grapheme_end (s, a);
+    if (b <= a) return false;
+    if (b > pos) { start= a; end= b; return true; }
+    a= b;
+  }
+  return false;
+}
+
+int
+tm_grapheme_start (string s, int pos) {
+  if (pos <= 0) return 0;
+  int a= grapheme_safe_start (s, pos);
+  while (a < pos) {
+    int b= tm_grapheme_end (s, a);
+    if (b <= a || b >= pos) return a;
+    a= b;
+  }
+  int p= pos;
+  tm_char_backwards (s, p);
+  return p;
+}
+
 int
 tm_char_next (string s, int pos) {
   tm_char_forwards (s, pos);
