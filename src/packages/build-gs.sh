@@ -84,6 +84,11 @@ case "$os" in
     export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
     opts="$opts --with-libiconv=native";;
 esac
+# the prefix named in gscdefs.c (the default folders of the program, unused
+# here): a Windows path of MSYS2 has backslashes, which C takes as escapes
+case "$os" in
+  MINGW*|MSYS*) opts="$opts --prefix=$(cygpath -m "$prefix")";;
+esac
 # NOTE: configure, make and make install on their own lines: set -e does
 # not stop "make && make install" when make fails
 ./configure $opts
