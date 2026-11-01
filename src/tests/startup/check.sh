@@ -227,5 +227,29 @@ graphics #f
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-clip.scm")'
 
+# A copy in a buffer which was never typeset (a script, no update-forced):
+# the selection is found in the boxes, which did not exist yet, and the
+# copy crashed in find_check_selection (#729).
+cat > "$out/startup-untypeset.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (select-all)
+  (clipboard-copy "primary")
+  (display* "CHECK copy "
+            (string-contains? (object->string (tree->stree
+                                               (clipboard-get "primary")))
+                              "startup checks")
+            "\n")
+  (clipboard-clear "primary")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+
+check "headless: a copy in a buffer which was never typeset (#729)" \
+      "copy #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-untypeset.scm")'
+
 echo "Total: $total checks, $failed failed"
 exit $status
