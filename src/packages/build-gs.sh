@@ -89,15 +89,17 @@ esac
 case "$os" in
   MINGW*|MSYS*) opts="$opts --prefix=$(cygpath -m "$prefix")";;
 esac
-# mkromfs, which builds the files compiled into gs, does not compile with
-# MinGW-w64 in this configuration: its dummy gp_stat_impl takes the struct
-# _stat64 of Windows, and gp.h declares it with struct stat (the official
-# builder of TeXmacs gets round it with --disable-compile-inits, but then the
-# program needs its folders of resources). The dummy is never called.
+# mkromfs, which builds the files compiled into gs, does not link with
+# MinGW-w64 in this configuration (the build of Unix on Windows): it has a
+# dummy gp_stat_impl, for the Windows build of Visual Studio, which takes the
+# struct _stat64 of Windows (gp.h declares it with struct stat) and which
+# gp_unifs.c, linked as well, defines again. The official builder of TeXmacs
+# gets round it with --disable-compile-inits, but then the program needs its
+# folders of resources, with an absolute path. The dummy is dropped.
 case "$os" in
   MINGW*|MSYS*)
-    sed -i 's/const char \*path, struct _stat64 \*buf)/const char *path, struct stat *buf)/' base/mkromfs.c
-    grep -n "gp_stat_impl" base/mkromfs.c;;
+    perl -0pi -e 's/#ifdef _WIN32\n(int gp_stat_impl)/#if 0\n$1/' base/mkromfs.c
+    grep -n -B1 "^int gp_stat_impl" base/mkromfs.c;;
 esac
 # NOTE: configure, make and make install on their own lines: set -e does
 # not stop "make && make install" when make fails
