@@ -17,6 +17,7 @@
 #include "../../Graphics/Types/frame.hpp"
 #include "image_files.hpp"
 #include "renderer.hpp"
+#include "colors.hpp"
 
 static hashmap<string,tree> local_ref ("?");
 static hashmap<string,tree> global_ref ("?");
