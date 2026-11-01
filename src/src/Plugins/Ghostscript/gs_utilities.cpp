@@ -33,31 +33,71 @@ gs_system () {
 #endif
 }
 
-#ifdef GS_EXE
-string
-gs_embedded () {
-  string cmd; // no need to resolve each time
-  
-  url tmp= url_system (get_env ("TEXMACS_PATH"));
-  url gs= tmp * url_system (GS_EXE);
-  if (exists (gs)) {
-    cmd= concretize (gs);
-  } else {
-    cmd= gs_system ();
-  }
-  return cmd;
+// The copy of Ghostscript in the package of TeXmacs (a program of its own,
+// bin/gs in the TeXmacs folder: Contents/Resources/share/TeXmacs on macOS,
+// TeXmacs-Windows on Windows), used before the one of the system. GS_EXE
+// (gs.m4, with a TeXmacs SDK) says another name for it. The packages of
+// Upsilon bring a gs with everything it needs built in (fonts, resources):
+// it changes nothing outside the package. On Linux, the AppImage has it in
+// usr/bin, the first of its PATH (AppRun).
+#ifndef GS_EXE
+#ifdef OS_MINGW
+#define GS_EXE "bin/gs.exe"
+#else
+#define GS_EXE "bin/gs"
+#endif
+#endif
+
+#ifdef OS_MINGW
+// A name with a letter which the ANSI code page of the system cannot represent:
+// gs of the package, a program of Unix built for Windows, opens its files with
+// the ANSI functions of Windows, which cannot name such a folder (a user name
+// in Cyrillic on a Western system). Letters of the code page (u with a
+// diaeresis on a Western system) work with it.
+static bool
+gs_unnameable (string s) {
+#ifdef OS_MINGW64
+  return texmacs_not_in_ansi (s);
+#else
+  for (int i= 0; i<N(s); i++)
+    if ((unsigned char) s[i] >= 128) return true;
+  return false;
+#endif
 }
 #endif
 
-static string
-gs_executable () {
-#ifdef GS_EXE
-  static string cmd;
-  if (N (cmd) == 0) cmd= gs_embedded ();
-  // init had to be postponed because of TEXMACS_PATH initialization
-#else
-  static string cmd= gs_system ();
+string
+gs_embedded () {
+#ifdef OS_MINGW
+  // With such a name in the home of TeXmacs or in its folder, the gs installed
+  // in Program Files, if there is one (not tried: whether it handles these names
+  // is not known), before the one of the package, which cannot
+  if (gs_unnameable (get_env ("TEXMACS_HOME_PATH")) ||
+      gs_unnameable (get_env ("TEXMACS_PATH"))) {
+    string sys= gs_system ();
+    if (sys != "gs.exe") return sys;
+  }
 #endif
+  string tmp= get_env ("TEXMACS_PATH");
+  if (N (tmp) != 0) {
+    url gs= url_system (tmp) * url_system (GS_EXE);
+    // (a file without the permission to run is not used: the gs of the
+    // system then; Windows has no such bit)
+#ifdef OS_MINGW
+    if (exists (gs)) return concretize (gs);
+#else
+    if (exists (gs) && is_of_type (gs, "x")) return concretize (gs);
+#endif
+  }
+  return gs_system ();
+}
+
+string
+gs_executable () {
+  static string cmd;
+  // init had to be postponed because of TEXMACS_PATH initialization
+  if (N (cmd) == 0) cmd= gs_embedded ();
+  if (DEBUG_CONVERT) debug_convert << "gs executable: " << cmd << LF;
   return cmd;
 }
 
@@ -374,6 +414,7 @@ gs_to_png (url image, url png, int w, int h) { //Achtung! w,h in pixels
     convert_error << "gs_to_png, failed for " << image <<LF;
     return false;
   }
+  if (DEBUG_CONVERT) debug_convert << "gs_to_png, generated PNG" << LF;
   return true;
 }
 
@@ -447,7 +488,9 @@ gs_to_pdf (url image, url pdf, int w, int h) {
   cmd << " -c \" grestore \"  ";
   if (DEBUG_CONVERT)
     debug_convert << "gs_to_pdf, launching" << LF << cmd << LF;
-  system (cmd);
+  // NOTE: waits for gs (system (cmd) does not on Windows: the PDF was
+  // looked for before gs had written it)
+  (void) eval_system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (pdf))
       debug_convert << "gs_to_pdf, generated PDF" << LF;
@@ -479,7 +522,8 @@ gs_to_pdf (url doc, url pdf, bool landscape, double paper_h, double paper_w) {
   // incorrectly referring to the name of the temporary file
   // so we add some PS code to override the PDF document title with
   // the name of the PDF file.
-  system (cmd);
+  if (DEBUG_CONVERT) debug_convert << "gs_to_pdf, launching" << LF << cmd << LF;
+  (void) eval_system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (pdf))
       debug_convert << "gs_to_pdf, generated PDF" << LF;
@@ -509,7 +553,7 @@ gs_to_ps (url doc, url ps, bool landscape, double paper_h, double paper_w) {
   // incorrectly referring to the name of the temporary file
   // so we add some PS code to override the PS document title with
   // the name of the PS file.
-  system (cmd);
+  (void) eval_system (cmd);
   if (DEBUG_CONVERT) {
     if (exists (ps))
       debug_convert << "gs_to_ps, generated PS" << LF;

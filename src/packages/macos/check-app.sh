@@ -14,6 +14,11 @@
 # merge-universal.sh). Without --deps the minimal version is the version of
 # the machine, which may well be the SDK or newer, and the rule does not apply.
 #
+# When the application has a Ghostscript (the program gs of its TeXmacs
+# folder, #662), its signature is verified and it must run alone (an empty
+# environment, from another folder) and say its version, with each of its
+# architectures this machine can run.
+#
 # Usage: packages/macos/check-app.sh [--sdk-newer-than-min] TeXmacs.app
 
 set -e
@@ -129,6 +134,29 @@ while IFS= read -r f; do
     echo "${f#$app/}: $a, macOS $v, SDK $s"
   done
 done < <(find "$app/Contents" -type f \( -perm -u+x -o -name "*.dylib" -o -name "*.so" \))
+gs="$app/Contents/Resources/share/TeXmacs/bin/gs"
+if [ -f "$gs" ]; then
+  if codesign --verify --strict "$gs" 2> /dev/null; then
+    echo "bin/gs: signature valid"
+  else
+    echo "error: the signature of ${gs#$app/} is not valid" >&2
+    status=1
+  fi
+  for a in $(lipo -archs "$gs"); do
+    if arch -$a /usr/bin/true 2> /dev/null; then
+      gs_abs="$app_real/${gs#$app/}"
+      v=$(cd / && env -i PATH=/usr/bin:/bin arch -$a "$gs_abs" --version 2>&1) || v="(fails)"
+      if [[ "$v" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "${gs#$app/} ($a) runs: Ghostscript $v"
+      else
+        echo "error: ${gs#$app/} ($a) does not run: $v" >&2
+        status=1
+      fi
+    else
+      echo "${gs#$app/} ($a): not run, this machine cannot run $a"
+    fi
+  done
+fi
 if [ $main_seen = no ]; then
   echo "error: the main program ${exe#$app/} is not an executable Mach-O file" >&2
   status=1

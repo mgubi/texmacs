@@ -70,6 +70,54 @@ on (on Windows those of MSYS2, on Linux those of Ubuntu): the bundles have
 their licenses in `misc/licenses/system` when they were made with them
 (`packages/collect-licenses.sh`).
 
+## Programs of others which the packages bring
+
+Ghostscript and Aspell are programs and libraries of others which the
+packages of TeXmacs Upsilon bring, built from their released
+sources by `packages/build-gs.sh` and `packages/windows/build-aspell.sh`, not
+modified but for one line of `base/mkromfs.c` of Ghostscript, which
+`build-gs.sh` changes (with `perl`) to build the `gs.exe` of the Windows
+packages (read the script for what it does):
+
+| Program | Packages | Version | License | Files |
+|---|---|---|---|---|
+| Ghostscript (Artifex Software), the program `gs`, which TeXmacs runs to convert EPS and PostScript images and to write PostScript | the macOS applications, the Windows bundles and installers, the AppImages | 10.07.0 | GNU Affero General Public License 3 or later; its fonts (URW base 35) under the same license with an exception for documents; its CMap files (Adobe) under a separate AGPL-compatible license | `Ghostscript-LICENSE.txt` (the notice of the sources, which says what is under what), `AGPL-3.0.txt`, and `ghostscript/` in the packages |
+| Aspell (Kevin Atkinson), the spell checker, as a library linked into TeXmacs | the Windows bundles and installers | 0.60.8.2 | GNU Lesser General Public License 2.1 | `LGPL-2.1.txt`, `aspell/Aspell-COPYING` in the packages |
+| the dictionaries of Aspell for English, French, German, Spanish, Italian, Portuguese (Portugal and Brazil), Dutch, Russian, Polish and Ukrainian | the Windows bundles and installers | see `build-aspell.sh` | free licenses, mostly the GNU GPL (some with others, see the files); they are data read by Aspell | `aspell/dict-<language>-Copyright` (and `-COPYING`, `-README`) in the packages |
+
+Ghostscript has the libraries of its sources built in, those the devices it is
+built with need: FreeType, libpng, libjpeg of the Independent JPEG Group, zlib,
+Little CMS (lcms2mt), OpenJPEG, jbig2dec, libtiff, Brotli, extract. The
+`LICENSE` of Ghostscript names none of them: their license files, taken from
+their folders in the sources, are in `ghostscript/third-party/` of the
+packages (`<library>-<file>`); those are the exact texts of the version built
+into `gs`. Several libraries have a file here as well (which the packages have
+too), not always the same text: FreeType (`FreeType-LICENSE.txt`, `FreeType-FTL.txt`), libpng
+(`libpng-LICENSE.txt`), libjpeg (`libjpeg-IJG-README.txt`), Little CMS
+(`lcms2-MIT.txt`), OpenJPEG (`OpenJPEG-BSD-2-Clause.txt`), zlib
+(`zlib-LICENSE.txt`), Brotli (`brotli-MIT.txt`); jbig2dec and extract are under the
+AGPL (`AGPL-3.0.txt`), and libtiff has its own license, which is only in
+`third-party/`. TeXmacs runs `gs` as a
+program of its own, beside TeXmacs (a GPL 3 or later program); section 13 of
+both licenses is about combining them (the maintainers have to confirm that
+this is what they allow). The AGPL asks for the corresponding source of the
+program, below.
+
+**The corresponding source** of Ghostscript, Aspell and the dictionaries, the
+exact archives the packages were built from (as they are at their authors,
+checked against the SHA-256 of the scripts above), are to be the assets of the
+release <https://github.com/mgubi/texmacs/releases/tag/upsilon-sources>, made
+by the job `sources` of `.github/workflows/upsilon-macos.yml` on the first build
+of the branch `upsilon_ci` and added to when a version changes (the release does
+not exist before that build; the workflows of the packages refuse to publish
+them before it). They
+are also at their authors: Ghostscript
+<https://github.com/ArtifexSoftware/ghostpdl-downloads/releases>, Aspell and
+its dictionaries <https://ftp.gnu.org/gnu/aspell>. A written offer: for
+three years from the release of a package which has one of these programs,
+the corresponding source is given to anyone who asks the maintainers of
+<https://github.com/mgubi/texmacs>.
+
 ## The sources
 
 The sources of TeXmacs Upsilon, with those of the components compiled into

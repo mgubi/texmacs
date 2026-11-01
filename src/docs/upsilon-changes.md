@@ -14,6 +14,41 @@ have the details, and the problems go to the
 
 ## 1 November 2026
 
+- **Ghostscript in the packages, Aspell in the Windows ones** (desktop): the
+  macOS applications (Cocoa and Vue, both architectures; Qt, Apple silicon
+  only), the Windows bundles and installers (Qt and Vue) and the AppImages
+  bring Ghostscript 10.07.0, the program TeXmacs runs to show EPS and
+  PostScript images and for PostScript output, with its fonts built in:
+  nothing to install, and it changes nothing outside the package. TeXmacs
+  runs the `gs` of its own folder before the one of the system (what the
+  checks of the CI run is an EPS image in a document, not a plug-in). The
+  Windows packages also bring the spell checker Aspell 0.60.8.2 (linked into
+  TeXmacs) and dictionaries for English, French, German, Spanish, Italian,
+  Portuguese (both), Dutch, Russian, Polish and Ukrainian, in `aspell-0.60`:
+  spell checking works without installing anything. In the Qt build the
+  other languages go to a Hunspell or an Aspell which the user has installed,
+  as before; the Vue build of Windows cannot run programs through pipes, so
+  it has only these eleven languages. The licenses (Ghostscript is under the
+  AGPL 3) and where the source archives will be (the release
+  `upsilon-sources`, made by the first build of `upsilon_ci`) are in
+  `misc/licenses/README.md` of the TeXmacs folder. The Linux `tar.gz` files
+  still use the `gs` of the system. On Windows: the conversions made with
+  `gs` (an EPS image into the PDF, PDF into PostScript) did not wait for it
+  and looked for their result before it was written, with any `gs` (every
+  64-bit Windows build runs a command without waiting for it when the output
+  is not asked); `gs` of the package keeps its temporary files in the folder
+  of `TEMP` (`TMPDIR` is set for TeXmacs and the programs it starts, which
+  read it before `TEMP`: Python...), or, when that name has letters outside
+  ASCII, in its short name or in `%SystemRoot%\Temp`. Limits: `gs` of the package
+  opens its files with the ANSI functions of Windows, so with a user name (the
+  home of TeXmacs, or the folder of TeXmacs) with a letter the ANSI code page of
+  the system cannot represent (Cyrillic on a Western system; u with a diaeresis is fine on one) TeXmacs runs the `gs` which is installed in Program Files, if there is
+  one (the choice is tested in the CI with a stand-in program; a real `gs` with
+  such names is not), else the one of the package, which cannot convert; a `gs`
+  which writes a lot of messages still stalls TeXmacs for 30 s (#655); the
+  `gs.exe` is not called `gswin64c.exe`, so the TeX tools which look for that
+  name (`epstopdf`, `ps2pdf` of a TeX distribution) do not find it (#662).
+
 - **Images with an effect in Vue**: an image or a pattern with an effect
   (a recoloring, say) was read after it had been freed, which gave wrong
   colors and sometimes a crash. Found by the tests of the page background.

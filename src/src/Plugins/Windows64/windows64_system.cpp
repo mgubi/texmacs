@@ -224,6 +224,34 @@ bool texmacs_getenv(string var_name, string &var_value) {
   return true;
 }
 
+string texmacs_short_path(string path) {
+  std::wstring wide = texmacs_utf8_to_wide(path);
+  DWORD n = GetShortPathNameW(wide.c_str(), nullptr, 0);
+  if (n == 0) return path;
+  std::vector<wchar_t> buf(n);
+  DWORD m = GetShortPathNameW(wide.c_str(), buf.data(), n);
+  if (m == 0 || m >= n) return path;
+  return texmacs_wide_to_utf8(std::wstring(buf.data(), m));
+}
+
+bool texmacs_not_in_ansi(string s) {
+  bool ascii = true;
+  for (int i = 0; i < N(s); i++)
+    if ((unsigned char)s[i] >= 128) ascii = false;
+  if (ascii) return false;
+  UINT cp = GetACP();
+  // UTF-8, UTF-7 and the code pages above 50000 (ISO-2022, GB18030...) cannot
+  // be asked for the default character; UTF-8 and GB18030 hold every letter
+  if (cp == CP_UTF8 || cp == CP_UTF7 || cp >= 50000) return false;
+  std::wstring wide = texmacs_utf8_to_wide(s);
+  if (wide.empty()) return false;
+  BOOL used = FALSE;
+  int n = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wide.c_str(),
+                              (int)wide.size(), nullptr, 0, nullptr, &used);
+  if (n == 0) return true;
+  return used != FALSE;
+}
+
 bool texmacs_setenv(string var_name, string new_value) {
   std::wstring wide_var_name = texmacs_utf8_to_wide(var_name);
   std::wstring wide_new_value = texmacs_utf8_to_wide(new_value);

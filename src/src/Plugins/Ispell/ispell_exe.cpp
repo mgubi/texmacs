@@ -16,7 +16,24 @@
 #include "convert.hpp"
 #include "locale.hpp"
 
-#if !USE_ASPELL && !USE_HUNSPELL
+// The route of the external program (hunspell or aspell run through a pipe).
+// With the library of Aspell (ispell.cpp) it is compiled as well, under other
+// names, as the fallback of the languages which the dictionaries of the
+// package do not have (ispell_lib_*: a Hunspell or an Aspell which the user
+// has installed, with its own dictionaries).
+#if !USE_HUNSPELL
+
+#if USE_ASPELL
+#define ispell_start ispell_exe_start
+#define ispell_check ispell_exe_check
+#define ispell_accept ispell_exe_accept
+#define ispell_insert ispell_exe_insert
+#define ispell_done ispell_exe_done
+#define ispell_encode ispell_exe_encode
+#define ispell_decode ispell_exe_decode
+#define ispeller ispeller_exe
+#define ispeller_rep ispeller_exe_rep
+#endif
 
 string ispell_encode (string lan, string s);
 string ispell_decode (string lan, string s);

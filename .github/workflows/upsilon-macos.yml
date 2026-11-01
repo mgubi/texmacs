@@ -7,6 +7,10 @@
 #     MuPDF, ThorVG) built for macOS 13 with packages/macos/build-deps.sh
 #     (cached, until it, misc/thorvg/build-thorvg.sh or the version of
 #     macOS change; S7 is in the sources);
+#   * gs (for arm64 and x86_64): Ghostscript, the program gs which TeXmacs
+#     runs for EPS and PostScript, built for macOS 13 with
+#     packages/build-gs.sh (cached; self-contained: fonts and resources
+#     built in), into every application (#662);
 #   * app (for each interface and architecture): TeXmacs.app with
 #     packages/macos/build-ns-app.sh;
 #   * dmg (for each interface): both applications merged
@@ -77,8 +81,40 @@ jobs:
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: packages/macos/build-deps.sh "$DEPS" ${{ matrix.arch }} "$MIN_MACOS" vue,tls
 
+  # Ghostscript for each architecture, in a cache of its own (its sources
+  # and its build do not depend on the other libraries)
+  gs:
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rosetta
+        if: matrix.arch == 'x86_64'
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license || arch -x86_64 /usr/bin/true
+
+      - name: Place of Ghostscript
+        run: echo "GSDIR=$RUNNER_TOOL_CACHE/texmacs-gs-${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+      - name: Cache of Ghostscript
+        id: gs-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.GSDIR }}
+          key: texmacs-gs-${{ matrix.arch }}-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/build-gs.sh') }}
+
+      - name: Ghostscript
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: packages/build-gs.sh "$GSDIR" ${{ matrix.arch }} "$MIN_MACOS"
+
   app:
-    needs: deps
+    needs: [deps, gs]
     strategy:
       fail-fast: false
       matrix:
@@ -107,10 +143,22 @@ jobs:
           key: texmacs-deps-maxs-${{ matrix.arch }}-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
           fail-on-cache-miss: true
 
+      # Ghostscript made by the job gs (the same key)
+      - name: Place of Ghostscript
+        run: echo "GSDIR=$RUNNER_TOOL_CACHE/texmacs-gs-${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+      - name: Ghostscript
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.GSDIR }}
+          key: texmacs-gs-${{ matrix.arch }}-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/build-gs.sh') }}
+          fail-on-cache-miss: true
+
       - name: TeXmacs.app
         run: |
           packages/macos/build-ns-app.sh --deps "$DEPS" --gui ${{ matrix.gui }} \
-            --scheme s7 --arch ${{ matrix.arch }} --min-macos "$MIN_MACOS"
+            --scheme s7 --arch ${{ matrix.arch }} --min-macos "$MIN_MACOS" \
+            --gs "$GSDIR"
           tar -C ../distr -czf ../distr/TeXmacs-${{ matrix.gui }}-${{ matrix.arch }}.tar.gz TeXmacs.app
 
       - uses: actions/upload-artifact@v7
@@ -206,6 +254,31 @@ jobs:
           hdiutil detach "$mnt"
           exit $status
 
+      # the Ghostscript of the application of the disk image, with each
+      # architecture: it runs alone and converts an EPS file with no gs of
+      # the system, and TeXmacs runs it for an EPS image (#662)
+      - name: Bundled tools (Ghostscript)
+        run: |
+          mnt=$(mktemp -d)
+          for i in 1 2 3 4 5; do
+            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" && break
+            [ $i = 5 ] && exit 1
+            sleep $((i * 10))
+          done
+          version=$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)
+          app="$mnt/$APP_NAME.app"
+          ls -l "$app/Contents/Resources/share/TeXmacs/bin/gs"
+          lipo -archs "$app/Contents/Resources/share/TeXmacs/bin/gs"
+          ls "$app/Contents/Resources/share/TeXmacs/misc/licenses/ghostscript"
+          status=0
+          for a in arm64 x86_64; do
+            echo "== $a"
+            packages/bundled-tools/check.sh -r "$app/Contents/Resources/share/TeXmacs" \
+              -v "$version" -- arch -$a "$app/Contents/MacOS/TeXmacs" -headless || status=1
+          done
+          hdiutil detach "$mnt"
+          exit $status
+
       # failures of the Cocoa interface which used to be silent or to abort
       # TeXmacs (#621), and the focus of the console (#679): the cases are
       # listed at the head of the script; with the application of the disk
@@ -249,6 +322,7 @@ jobs:
 
   qt:
     name: macOS (Apple silicon, Qt 6)
+    needs: gs
     runs-on: macos-15
     timeout-minutes: 60
     defaults:
@@ -282,11 +356,21 @@ jobs:
           TM_TEST_HOME: ${{ runner.temp }}/startup-home
         run: tests/startup/check.sh
 
+      # Ghostscript for Apple silicon, made by the job gs
+      - name: Ghostscript
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.tool_cache }}/texmacs-gs-arm64
+          key: texmacs-gs-arm64-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/build-gs.sh') }}
+          fail-on-cache-miss: true
+
       - name: Bundle
         run: |
           # bundle-libs.sh does not handle Homebrew's /opt/homebrew, so the
           # libraries, frameworks and plugins are deployed with macdeployqt
-          make MACOS_BUNDLE MACOS_DEPLOY=none
+          GSDIR="$RUNNER_TOOL_CACHE/texmacs-gs-arm64"
+          make MACOS_BUNDLE MACOS_DEPLOY=none GS_BUNDLE="$GSDIR/bin/gs" \
+            GS_LICENSES="$GSDIR/share/licenses/ghostscript"
           "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
           # the name and the identity of Upsilon, signed again (ad hoc)
           name=$(packages/macos/upsilon-identity.sh ../distr/TeXmacs.app qt)
@@ -300,6 +384,12 @@ jobs:
             "../distr/$name.app/Contents/Info.plist"
           codesign --force --deep -s - "../distr/$name.app"
           ditto -c -k --keepParent "../distr/$name.app" texmacs-qt-macos-arm64.zip
+          # the Ghostscript of the application runs, with no gs of the system
+          # (#662)
+          app="../distr/$name.app"
+          # (the Qt of macdeployqt has no offscreen platform)
+          TM_CHECK_QPA= packages/bundled-tools/check.sh -r "$PWD/$app/Contents/Resources/share/TeXmacs" \
+            -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$PWD/$app/Contents/MacOS/TeXmacs"
 
       - name: Minimum macOS
         run: ../.github/fixes/check-min-macos.sh ../distr/*.app
@@ -310,12 +400,70 @@ jobs:
           path: src/texmacs-qt-macos-arm64.zip
           retention-days: 14
 
+  # The corresponding source of the programs of others which the packages
+  # bring under the AGPL (Ghostscript) and the LGPL (Aspell, its dictionaries),
+  # unmodified (but one line of mkromfs.c for the gs.exe of Windows, changed by
+  # packages/build-gs.sh): their archives, checked against the SHA-256 of the build
+  # scripts, kept as the assets of the release upsilon-sources (made once,
+  # each file added when its version is new, none replaced). The packages
+  # say where they are (misc/licenses/README.md of the TeXmacs folder, #662)
+  sources:
+    if: github.ref == 'refs/heads/upsilon_ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The release upsilon-sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -e
+          tag=upsilon-sources
+          work="$RUNNER_TEMP/sources"
+          mkdir -p "$work"
+          cd "$work"
+          gs_script="$GITHUB_WORKSPACE/src/packages/build-gs.sh"
+          asp_script="$GITHUB_WORKSPACE/src/packages/windows/build-aspell.sh"
+          gsv=$(sed -n 's/^GS_VERSION=//p' "$gs_script")
+          gssha=$(sed -n 's/^GS_SHA256=//p' "$gs_script")
+          aspv=$(sed -n 's/^ASPELL_VERSION=//p' "$asp_script")
+          aspsha=$(sed -n 's/^ASPELL_SHA256=//p' "$asp_script")
+          # file, url, SHA-256 of each archive
+          {
+            echo "ghostscript-$gsv.tar.gz https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs${gsv//./}/ghostscript-$gsv.tar.gz $gssha"
+            echo "aspell-$aspv.tar.gz https://ftp.gnu.org/gnu/aspell/aspell-$aspv.tar.gz $aspsha"
+            sed -n '/^DICTIONARIES="/,/^"/p' "$asp_script" | while read -r lang name sha; do
+              case "$lang" in DICTIONARIES=*|'"'|'') continue;; esac
+              echo "$name.tar.bz2 https://ftp.gnu.org/gnu/aspell/dict/$lang/$name.tar.bz2 $sha"
+            done
+          } > list.txt
+          cat list.txt
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+              --title "TeXmacs Upsilon, sources of the programs of others" \
+              --notes "The exact source archives of the programs of others which the packages of TeXmacs Upsilon bring: Ghostscript (GNU Affero General Public License 3), Aspell (GNU Lesser General Public License 2.1) and its dictionaries (their own free licenses), as the build scripts download them (packages/build-gs.sh, packages/windows/build-aspell.sh), not modified but for one line of mkromfs.c, which packages/build-gs.sh changes when it builds the gs.exe of the Windows packages (see the script). The sources of TeXmacs Upsilon itself are at https://github.com/${GH_REPO}. Written offer: the same archives, on request to the maintainer of the repository, for three years from the release of a package which has the program."
+          fi
+          have=$(gh release view "$tag" --json assets -q '.assets[].name')
+          while read -r file url sha; do
+            echo "$have" | grep -qx "$file" && { echo "$file: already there"; continue; }
+            curl -sSfL --retry 3 -o "$file" "$url"
+            [ "$(sha256sum "$file" | cut -d' ' -f1)" = "$sha" ] ||
+              { echo "error: wrong SHA-256 for $file"; exit 1; }
+            gh release upload "$tag" "$file"
+          done < list.txt
+
   release:
     # the files of macOS in the pre-release upsilon-latest; the Linux and
     # Windows packages are added to it by upsilon-linux-windows.yml. Each
     # workflow replaces and removes only its own files
-    needs: [dmg, qt]
-    if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success'
+    # (the sources of the programs of others first: a package is not published
+    # before them, #662)
+    needs: [dmg, qt, sources]
+    if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success' && needs.sources.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -357,7 +505,9 @@ jobs:
             GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
             \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only, macOS 15
             or later.
-            Signed ad hoc and not notarized: macOS refuses to open them the
+            Signed ad hoc and not notarized (when they are, the program \`gs\`
+            of the application will need the option of the hardened runtime
+            for its own signature, as it is a program of its own). macOS refuses to open them the
             first time. Open the application from its context menu (Open),
             or allow it in System Settings > Privacy & Security, or remove
             the quarantine: \`xattr -dr com.apple.quarantine /Applications/TeXmacs.app\`
@@ -370,6 +520,11 @@ jobs:
           * Windows (x86_64): \`texmacs-windows-x86_64.zip\` (Qt 6) and
             \`texmacs-vue-windows-x86_64.zip\` (Vue): unpack, and run
             \`TeXmacs-Windows\\bin\\texmacs.exe\`.
+
+          Every package has Ghostscript (AGPL 3; on Windows also Aspell, LGPL
+          2.1, with dictionaries): their licenses are in \`misc/licenses\` of
+          the TeXmacs folder, and their exact source archives are the assets
+          of the release [upsilon-sources](https://github.com/${GH_REPO}/releases/tag/upsilon-sources).
 
           The macOS files were built by [this run](https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}).
           EOF

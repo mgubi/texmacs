@@ -7,6 +7,7 @@
 #   2. run with TEXMACS_PATH set to another tree, as the installer of the
 #      stock TeXmacs leaves it: TeXmacs Upsilon must use its own and run a
 #      command given with -x;
+#   2b. its Ghostscript and Aspell are those of the package (#662);
 #   3. uninstalled: its folder must be gone, and it must have written no
 #      TEXMACS_PATH into the environment of the user.
 #
@@ -50,6 +51,13 @@ TEXMACS_HOME_PATH="$whome" TEXMACS_PATH='C:\Program Files\TeXmacs' \
   > "$home/log.txt" 2>&1 || true
 tail -20 "$home/log.txt"
 [ -f "$home/ok" ] || { echo "error: the installed TeXmacs did not run the command"; exit 1; }
+
+echo "== 2b. Ghostscript and Aspell of the installed program, with no gs of the system"
+# (-e: the Qt build runs external spell checkers through pipes, the Vue build
+# does not on Windows)
+ext=; [ "$gui" = qt ] && ext=-e
+packages/bundled-tools/check.sh -a $ext -r "$app" \
+  -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$app/bin/texmacs.exe"
 
 echo "== 3. uninstalled"
 "$app/unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
