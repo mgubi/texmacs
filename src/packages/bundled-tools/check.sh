@@ -63,7 +63,7 @@ if [ $windows = yes ]; then
   clean_path='/c/Windows/System32:/c/Windows'
   run_path="$clean_path"
 else
-  printf '#!/bin/sh\necho "the gs of the system was used" >&2\nexit 99\n' > "$work/shim/gs"
+  printf '#!/bin/sh\necho used > "%s/shim-used"\necho "the gs of the system was used" >&2\nexit 99\n' "$work" > "$work/shim/gs"
   chmod +x "$work/shim/gs"
   clean_path="$work/shim:/usr/bin:/bin"
   run_path="$work/shim:$PATH"
@@ -126,17 +126,27 @@ grep "^CHECK" "$out" | tr -d '\r'
 val () { grep "^CHECK $1 " "$out" | head -1 | tr -d '\r' | cut -d' ' -f3-; }
 grep -q "^CHECK done yes" "$out" || { fail "TeXmacs did not run the check"; tail -30 "$out"; }
 [ -z "$(val error)" ] || fail "an error in the check: $(val error)"
-used=$(val gs-binary); appdir=$(val appdir)
+used=$(val gs-binary | tr '\\' /); appdir=$(val appdir)
 want="$(native "$root")"; [ -n "$appdir" ] && want="$appdir"
 case "$used" in
   "$want"*) ok "TeXmacs runs the gs of the package: $used";;
   *) fail "TeXmacs runs $used, not the gs of the package ($want)";;
 esac
 [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF" || fail "no PDF with an EPS image: the gs of the package was not used"
+# the gs which TeXmacs runs (its debug output, gs_utilities.cpp): the one of
+# the package
+if tr '\\' / < "$out" | tr -d '\r' | grep -F "gs executable: " | grep -qF "gs executable: $want"; then
+  ok "TeXmacs runs the gs of the package for its conversions: $(tr '\\' / < "$out" | tr -d '\r' | grep -F 'gs executable: ' | head -1 | cut -d: -f2- | cut -c1-120)"
+else
+  fail "TeXmacs did not run the gs of the package ($want) for a conversion"
+  grep -F "gs executable" "$out" | head -3
+fi
+[ -e "$work/shim-used" ] && fail "the gs of the system was run"
+# (the PDF of Qt is written by Qt: its Producer is not Ghostscript)
 if [ -f "$work/eps-doc.pdf" ] && LC_ALL=C grep -aq "Ghostscript $version" "$work/eps-doc.pdf"; then
   ok "the PDF was written by Ghostscript $version"
 else
-  fail "the PDF does not say Ghostscript $version"
+  echo "note: the PDF does not say Ghostscript $version (written by Qt?)"
 fi
 if [ $aspell = yes ]; then
   for l in english french german; do

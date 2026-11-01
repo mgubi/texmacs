@@ -19,6 +19,8 @@
   (let* ((doc (string-append dir "/eps-doc.tm"))
          (pdf (string-append dir "/eps-doc.pdf"))
          (u (system->url doc)))
+    ;; the command lines of the conversions are in the log
+    (debug-set "convert" #t)
     (cbt-line "gs-binary" (gs-binary))
     (cbt-line "appdir" (or (getenv "APPDIR") ""))
     (cbt-line "has-gs" (if (has-gs?) "yes" "no"))

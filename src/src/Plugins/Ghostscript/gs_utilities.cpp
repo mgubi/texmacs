@@ -63,6 +63,7 @@ gs_executable () {
   static string cmd;
   // init had to be postponed because of TEXMACS_PATH initialization
   if (N (cmd) == 0) cmd= gs_embedded ();
+  if (DEBUG_CONVERT) debug_convert << "gs executable: " << cmd << LF;
   return cmd;
 }
 
