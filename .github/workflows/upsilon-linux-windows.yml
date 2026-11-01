@@ -264,7 +264,7 @@ jobs:
       - name: Bundled tools (Ghostscript, Aspell)
         run: |
           root=$(cd ../distr/TeXmacs-Windows && pwd)
-          packages/bundled-tools/check.sh -a -r "$root" \
+          packages/bundled-tools/check.sh -a -e -r "$root" \
             -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$root/bin/texmacs.exe"
 
       # the installer (Inno Setup): made, installed, run and uninstalled

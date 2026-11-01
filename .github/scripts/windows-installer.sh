@@ -53,7 +53,10 @@ tail -20 "$home/log.txt"
 [ -f "$home/ok" ] || { echo "error: the installed TeXmacs did not run the command"; exit 1; }
 
 echo "== 2b. Ghostscript and Aspell of the installed program, with no gs of the system"
-packages/bundled-tools/check.sh -a -r "$app" \
+# (-e: the Qt build runs external spell checkers through pipes, the Vue build
+# does not on Windows)
+ext=; [ "$gui" = qt ] && ext=-e
+packages/bundled-tools/check.sh -a $ext -r "$app" \
   -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$app/bin/texmacs.exe"
 
 echo "== 3. uninstalled"

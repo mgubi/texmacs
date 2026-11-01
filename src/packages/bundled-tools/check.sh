@@ -10,6 +10,10 @@
 #   -v VERSION  the version of Ghostscript the package has (10.07.0)
 #   -a          also the spell checker (the Windows packages): dictionaries
 #               for English, French and German, found and used
+#   -e          with -a: Greek, which the dictionaries of the package do not
+#               have, goes to an external Hunspell or Aspell (a fake one is
+#               built); the builds which run programs through pipes (Qt, not
+#               Vue on Windows: "pipes not implemented")
 #   TEXMACS...  the command which runs TeXmacs, with its options (it gets
 #               -x commands added): the program of the package, under
 #               xvfb-run, with -headless...
@@ -31,10 +35,10 @@
 here=$(cd "$(dirname "$0")" && pwd)
 # (MSYS2: no conversion of -dPDFSETTINGS=/prepress into a Windows path)
 export MSYS2_ARG_CONV_EXCL='*'
-root="" gs="" version="" aspell=no
-while getopts "r:g:v:a" o; do
+root="" gs="" version="" aspell=no external=no
+while getopts "r:g:v:ae" o; do
   case $o in
-    r) root="$OPTARG";; g) gs="$OPTARG";; v) version="$OPTARG";; a) aspell=yes;;
+    r) root="$OPTARG";; g) gs="$OPTARG";; v) version="$OPTARG";; a) aspell=yes;; e) external=yes;;
     *) exit 2;;
   esac
 done
@@ -216,7 +220,9 @@ if [ $aspell = yes ]; then
   # with an external checker (a fake hunspell: the protocol of ispell -a, one
   # line "*" for a word, a suggestion for those with zzz), built here
   cc=${CC:-gcc}
-  if command -v $cc > /dev/null 2>&1; then
+  if [ $external = no ]; then
+    echo "note: no external spell checker in this build (no pipes to programs): the fallback is not tried"
+  elif command -v $cc > /dev/null 2>&1; then
     mkdir -p "$work/fakebin"
     cat > "$work/fake-ispell.c" << 'EOT'
 #include <stdio.h>
