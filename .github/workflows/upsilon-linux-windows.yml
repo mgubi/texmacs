@@ -849,6 +849,10 @@ jobs:
       # must be in the release upsilon-sources (made by the job sources of
       # upsilon-macos.yml, which is not in this workflow) before the packages are
       # published (#662); else run that workflow first
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/packages
+
       - name: The sources of the programs of others are published
         env:
           GH_TOKEN: ${{ github.token }}
@@ -856,10 +860,23 @@ jobs:
         run: |
           assets=$(gh release view upsilon-sources --json assets -q '.assets[].name') ||
             { echo "error: no release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; exit 1; }
-          for a in 'ghostscript-.*\.tar\.gz' 'aspell-0.*\.tar\.gz'; do
-            echo "$assets" | grep -q "^$a$" ||
-              { echo "error: no $a in the release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; exit 1; }
-          done
+          gs_script=src/packages/build-gs.sh
+          asp_script=src/packages/windows/build-aspell.sh
+          gsv=$(sed -n 's/^GS_VERSION=//p' "$gs_script")
+          aspv=$(sed -n 's/^ASPELL_VERSION=//p' "$asp_script")
+          # the archives of the versions which the packages have: Ghostscript,
+          # Aspell and each dictionary (the names of upsilon-macos.yml, job sources)
+          { echo "ghostscript-$gsv.tar.gz"; echo "aspell-$aspv.tar.gz";
+            sed -n '/^DICTIONARIES="/,/^"/p' "$asp_script" | while read -r lang name sha; do
+              case "$lang" in DICTIONARIES=*|'"'|'') continue;; esac
+              echo "$name.tar.bz2"
+            done; } > wanted.txt
+          missing=0
+          while read -r f; do
+            echo "$assets" | grep -qxF "$f" || { echo "error: $f is not in the release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; missing=1; }
+          done < wanted.txt
+          [ $missing = 0 ] || exit 1
+          echo "the $(wc -l < wanted.txt) source archives are in the release upsilon-sources"
 
       - name: The files of Linux and Windows in upsilon-latest
         env:

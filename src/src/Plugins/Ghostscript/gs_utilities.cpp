@@ -48,8 +48,31 @@ gs_system () {
 #endif
 #endif
 
+#ifdef OS_MINGW
+// A name with letters outside ASCII: gs of the package, a program of Unix built
+// for Windows, opens its files with the ANSI functions of Windows (the code page
+// of the system), which cannot name such a folder (a user name in Cyrillic on a
+// Western system).
+static bool
+gs_non_ascii (string s) {
+  for (int i= 0; i<N(s); i++)
+    if ((unsigned char) s[i] >= 128) return true;
+  return false;
+}
+#endif
+
 string
 gs_embedded () {
+#ifdef OS_MINGW
+  // With such a name in the home of TeXmacs or in its folder, the gs installed
+  // in Program Files, if there is one (not tried: whether it handles these names
+  // is not known), before the one of the package, which cannot
+  if (gs_non_ascii (get_env ("TEXMACS_HOME_PATH")) ||
+      gs_non_ascii (get_env ("TEXMACS_PATH"))) {
+    string sys= gs_system ();
+    if (sys != "gs.exe") return sys;
+  }
+#endif
   string tmp= get_env ("TEXMACS_PATH");
   if (N (tmp) != 0) {
     url gs= url_system (tmp) * url_system (GS_EXE);
@@ -386,6 +409,7 @@ gs_to_png (url image, url png, int w, int h) { //Achtung! w,h in pixels
     convert_error << "gs_to_png, failed for " << image <<LF;
     return false;
   }
+  if (DEBUG_CONVERT) debug_convert << "gs_to_png, generated PNG" << LF;
   return true;
 }
 

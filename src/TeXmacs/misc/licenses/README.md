@@ -85,20 +85,31 @@ packages (read the script for what it does):
 | Aspell (Kevin Atkinson), the spell checker, as a library linked into TeXmacs | the Windows bundles and installers | 0.60.8.2 | GNU Lesser General Public License 2.1 | `LGPL-2.1.txt`, `aspell/Aspell-COPYING` in the packages |
 | the dictionaries of Aspell for English, French, German, Spanish, Italian, Portuguese (Portugal and Brazil), Dutch, Russian, Polish and Ukrainian | the Windows bundles and installers | see `build-aspell.sh` | free licenses, mostly the GNU GPL (some with others, see the files); they are data read by Aspell | `aspell/dict-<language>-Copyright` (and `-COPYING`, `-README`) in the packages |
 
-Ghostscript has the libraries of its sources built in (FreeType, libpng,
-libjpeg of the Independent JPEG Group, zlib, Little CMS, OpenJPEG, jbig2dec,
-libtiff, Brotli...): their licenses are the ones of the folders of the
-archive below (`LICENSE` of Ghostscript lists them). TeXmacs runs `gs` as a
+Ghostscript has the libraries of its sources built in, those the devices it is
+built with need: FreeType, libpng, libjpeg of the Independent JPEG Group, zlib,
+Little CMS (lcms2mt), OpenJPEG, jbig2dec, libtiff, Brotli, extract. The
+`LICENSE` of Ghostscript names none of them: their license files, taken from
+their folders in the sources, are in `ghostscript/third-party/` of the
+packages (`<library>-<file>`). Several have a copy here as well, which the
+packages have too: FreeType (`FreeType-LICENSE.txt`, `FreeType-FTL.txt`), libpng
+(`libpng-LICENSE.txt`), libjpeg (`libjpeg-IJG-README.txt`), Little CMS
+(`lcms2-MIT.txt`), OpenJPEG (`OpenJPEG-BSD-2-Clause.txt`), zlib
+(`zlib-LICENSE.txt`), Brotli (`brotli-MIT.txt`); jbig2dec and extract are under the
+AGPL (`AGPL-3.0.txt`), and libtiff has its own license, which is only in
+`third-party/`. TeXmacs runs `gs` as a
 program of its own, beside TeXmacs (a GPL 3 or later program); section 13 of
 both licenses is about combining them (the maintainers have to confirm that
 this is what they allow). The AGPL asks for the corresponding source of the
 program, below.
 
 **The corresponding source** of Ghostscript, Aspell and the dictionaries, the
-exact archives the packages were built from (as they are at their authors, checked against
-the SHA-256 of the scripts above), are the assets of the release
-<https://github.com/mgubi/texmacs/releases/tag/upsilon-sources>, added when a
-version changes (`.github/workflows/upsilon-macos.yml`, job `sources`). They
+exact archives the packages were built from (as they are at their authors,
+checked against the SHA-256 of the scripts above), are to be the assets of the
+release <https://github.com/mgubi/texmacs/releases/tag/upsilon-sources>, made
+by the job `sources` of `.github/workflows/upsilon-macos.yml` on the first build
+of the branch `upsilon_ci` and added to when a version changes (the release does
+not exist before that build; the workflows of the packages refuse to publish
+them before it). They
 are also at their authors: Ghostscript
 <https://github.com/ArtifexSoftware/ghostpdl-downloads/releases>, Aspell and
 its dictionaries <https://ftp.gnu.org/gnu/aspell>. A written offer: for

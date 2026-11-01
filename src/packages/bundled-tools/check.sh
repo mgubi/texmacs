@@ -193,11 +193,16 @@ else
   grep -F "gs executable" "$out" | head -3
 fi
 [ -e "$work/shim-used" ] && fail "the gs of the system was run"
-# (the PDF of Qt is written by Qt: its Producer is not Ghostscript)
+# gs did the work on the EPS image: the PDF written by it (its Producer, Vue),
+# or its conversion logged as done (gs_to_pdf, gs_to_png: the PNG of the image
+# which Cocoa and Qt put in the PDF)
 if [ -f "$work/eps-doc.pdf" ] && LC_ALL=C grep -aq "Ghostscript $version" "$work/eps-doc.pdf"; then
   ok "the PDF was written by Ghostscript $version"
+elif tr -d '\r' < "$out" | grep -q "gs_to_pdf, generated PDF\|gs_to_png, generated PNG"; then
+  ok "gs converted the EPS image: $(tr -d '\r' < "$out" | grep -o 'gs_to_pdf, generated PDF\|gs_to_png, generated PNG' | sort -u | tr '\n' ' ')"
 else
-  echo "note: the PDF does not say Ghostscript $version (written by Qt?)"
+  fail "nothing says that gs converted the EPS image (the PDF is not by Ghostscript $version, no gs_to_pdf or gs_to_png done)"
+  tr -d '\r' < "$out" | grep "gs_to_\|image_to_\|gs cmd\|convert-error" | head -10
 fi
 if [ $aspell = yes ]; then
   for l in english french german; do
@@ -274,12 +279,22 @@ if [ $windows = yes ]; then
     else echo "note: no PDF with TEXMACS_HOME_PATH=.../$h (gs and the ANSI functions of Windows)"; fi
   done
   n_home="$home0"
-  for t in "tmp dir ü" "tmp-ж"; do
-    mkdir -p "$work/$t"
-    run_tm "$work/texmacs-t1.log" ghostscript "$work/$t" ""
-    [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF with TEMP=.../$t (TMPDIR in TeXmacs: $(val tmpdir))" ||
-      { fail "no PDF with TEMP=.../$t (TMPDIR in TeXmacs: $(val tmpdir))"; grep -v "^CHECK" "$out" | tr -d '\r' | tail -8; }
+  # TEMP: with a space (C:\Users\John Smith\...), with letters of the code
+  # page, outside it; the short name (8.3) of the folder with letters outside
+  # ASCII is used only on a volume which makes them (the runner's D: does not:
+  # the last case tries the user's folder of C:)
+  ctemp="$(cygpath -u "$LOCALAPPDATA")/Temp"
+  for t in "$work/tmp John Smith" "$work/tmp dir ü" "$work/tmp-ж" "$ctemp/bundled-tools ü"; do
+    mkdir -p "$t"
+    run_tm "$work/texmacs-t1.log" ghostscript "$t" ""
+    [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF with TEMP=.../$(basename "$t") (TMPDIR in TeXmacs: $(val tmpdir))" ||
+      { fail "no PDF with TEMP=.../$(basename "$t") (TMPDIR in TeXmacs: $(val tmpdir))"; grep -v "^CHECK" "$out" | tr -d '\r' | tail -8; }
+    case "$(val tmpdir)" in
+      *~*) echo "note: the short name (8.3) of TEMP was used: $(val tmpdir)"; short_used=yes;;
+    esac
   done
+  rmdir "$ctemp/bundled-tools ü" 2> /dev/null
+  [ "${short_used:-no}" = yes ] || echo "note: the short name (8.3) branch of GetShortPathNameW was not used in any case"
 fi
 [ $status = 0 ] && echo "== the bundled tools are fine" || echo "== FAILED"
 exit $status

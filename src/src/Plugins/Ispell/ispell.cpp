@@ -64,9 +64,12 @@ ispeller_rep::start () {
   string locale = language_to_locale (lan);
 
   // a language which TeXmacs has no locale for (klingon: language_to_locale
-  // gives en_US for all of them) has no dictionary: not English, as the
-  // library would take, but an error, as the hunspell checker (and the
-  // misc-modules suite) have it
+  // gives en_US for all of them) has no dictionary in the library: an error,
+  // not English, as the library would take (and as the Hunspell checker and the
+  // misc-modules suite have it). The caller then tries the external program
+  // (ispell_start below), which is given the same name, with the locale en_US:
+  // a checker which the user has installed may well check such a language as
+  // English, as it did before the library.
   if (locale == "en_US" && lan != "english" && lan != "american") {
     error_msg = "Error: no dictionary for " * lan;
     std_error << error_msg << "\nThe corresponding text is not checked\n";

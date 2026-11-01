@@ -367,7 +367,11 @@ init_env_vars () {
   // folder and opens its files with the ANSI functions of Windows, which
   // cannot name a folder with letters outside the code page of the system (a
   // user name in Cyrillic or Chinese on a Western system): its short name
-  // (8.3, ASCII) then, or else the folder Public of Windows.
+  // (8.3, ASCII) then, or else the folder Temp of Windows (C:\Windows\Temp,
+  // where users may create files but, by default, not read those of others;
+  // not the folder Public, which the other users of the machine can read).
+  // TMPDIR is read by the programs which TeXmacs starts as well, before TEMP
+  // (Python...): they get the same folder.
   if (get_env ("TMPDIR") == "" && exists (url ("$TEXMACS_PATH/bin/gs.exe"))) {
     string tmp= get_env ("TEMP");
     if (tmp == "") tmp= get_env ("TMP");
@@ -382,8 +386,9 @@ init_env_vars () {
     }
 #endif
     if (!ascii) {
-      tmp= get_env ("PUBLIC");
+      tmp= get_env ("SystemRoot");
       for (int i=0; i<N(tmp); i++) if ((unsigned char) tmp[i] >= 128) tmp= "";
+      if (tmp != "") tmp= tmp * "\\Temp";
     }
     if (tmp != "") set_env ("TMPDIR", tmp);
   }

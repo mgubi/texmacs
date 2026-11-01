@@ -99,7 +99,10 @@ esac
 case "$os" in
   MINGW*|MSYS*)
     perl -0pi -e 's/#ifdef _WIN32\n(int gp_stat_impl)/#if 0\n$1/' base/mkromfs.c
-    grep -n -B1 "^int gp_stat_impl" base/mkromfs.c;;
+    # (the line before the dummy must be #if 0 now: else the sources are not
+    # those this was written for)
+    grep -B1 "^int gp_stat_impl" base/mkromfs.c | grep -q '^#if 0$' ||
+      { echo "error: base/mkromfs.c is not as build-gs.sh expects (gp_stat_impl)" >&2; exit 1; };;
 esac
 # NOTE: configure, make and make install on their own lines: set -e does
 # not stop "make && make install" when make fails
@@ -118,6 +121,20 @@ cp "bin/$exe" "$prefix/bin/$exe"
 if [ "$os" = Darwin ]; then strip -x "$prefix/bin/$exe"; else strip "$prefix/bin/$exe"; fi
 cp LICENSE "$prefix/share/licenses/ghostscript/LICENSE"
 cp doc/COPYING "$prefix/share/licenses/ghostscript/COPYING"
+# the licenses of the libraries of its sources which are built into the
+# program (the LICENSE of Ghostscript names none of them): the files of their
+# folders, as <library>-<file>
+mkdir -p "$prefix/share/licenses/ghostscript/third-party"
+for f in freetype/LICENSE.TXT freetype/docs/FTL.TXT freetype/docs/GPLv2.TXT \
+         libpng/LICENSE zlib/LICENSE jpeg/README lcms2mt/COPYING openjpeg/LICENSE \
+         jbig2dec/LICENSE tiff/LICENSE.md brotli/LICENSE extract/COPYING; do
+  if [ -f "$f" ]; then
+    cp "$f" "$prefix/share/licenses/ghostscript/third-party/$(dirname "$f" | sed 's|/|-|g')-$(basename "$f")"
+  else
+    echo "warning: no $f in the sources of Ghostscript" >&2
+  fi
+done
+ls "$prefix/share/licenses/ghostscript/third-party"
 
 echo "== $prefix/bin/$exe"
 ls -l "$prefix/bin/$exe"
