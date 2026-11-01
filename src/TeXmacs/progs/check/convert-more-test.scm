@@ -2260,6 +2260,53 @@
     (string-save (export-png) (system->url name))
     (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
       (check-true (has-text? (string-append "{" name "}") s))))
+  ;; a %, which LaTeX would read as a comment, is given by a macro; the
+  ;; space which ends the macro is skipped, and \space gives a space after %
+  (let* ((dir (url->system (temp-dir)))
+         (text (lambda (n)
+                 (export `(document (image ,(string-append dir "/" n)
+                                           "1cm" "" "" ""))
+                         "latex-snippet"))))
+    (for (n (list "50%done.png" "a% b.png"))
+      (string-save (export-png) (system->url (string-append dir "/" n))))
+    (check-true (has-text? "/50\\csname @percentchar\\endcsname done.png}"
+                           (text "50%done.png")))
+    (check-true (has-text? "/a\\csname @percentchar\\endcsname \\space b.png}"
+                           (text "a% b.png"))))
+  (check-group "copy to the clipboard: the images of a real copy (#706)")
+  ;; through selection_set, as Edit > Copy to > LaTeX: only a copy to the
+  ;; clipboard (primary) keeps its image next to the document, not one to
+  ;; the selection of the mouse; on the offscreen platform only, whose
+  ;; clipboard is that of the process, not the one of the developer
+  (if (!= (getenv "QT_QPA_PLATFORM") "offscreen")
+      (images-skip "real copy" "not on the offscreen platform")
+      (let* ((dir (url-append (temp-dir) "real-copy"))
+             (doc (url-append dir "doc.tm"))
+             (old (current-buffer))
+             (images (lambda ()
+                       (list-filter (map (lambda (u) (url->string (url-tail u)))
+                                         (folder-files dir))
+                                    (lambda (s) (string-starts? s "image-"))))))
+        (system-mkdir dir)
+        (string-save (serialize-texmacs
+                      (stree->tree `(document (TeXmacs ,(texmacs-version))
+                                              (style "generic")
+                                              (body ,(embedded-image-sample)))))
+                     doc)
+        (load-buffer doc :strict)
+        (switch-to-buffer doc)
+        ;; the selection is found in the boxes (without them: a crash)
+        (update-forced)
+        (select-all)
+        (clipboard-copy-export "latex" "mouse")
+        (check= (images) '())
+        (clipboard-copy-export "latex" "primary")
+        (check= (length (images)) 1)
+        (clipboard-clear "primary")
+        (clipboard-clear "mouse")
+        (buffer-pretend-saved doc)
+        (buffer-close doc)
+        (when (buffer-exists? old) (switch-to-buffer old))))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)

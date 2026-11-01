@@ -339,10 +339,18 @@
 (define (texout-invariant x)
   (output-invariant x))
 
+(define (texout-file-name-percent x)
+  ;; a % of the name, which LaTeX would read as a comment, by a macro which
+  ;; gives it (#706); the space after \endcsname ends it and is skipped, as
+  ;; would be a space of the name there: \space gives that one
+  (string-replace (string-replace x "% " "%\\space ")
+                  "%" "\\csname @percentchar\\endcsname "))
+
 (define (texout-file-name x)
   ;; as it is, whatever its spaces and its letters; a name with a space is
   ;; written on one line, the others are counted and may follow the text
-  (if (string-occurs? " " x) (output-verbatim x) (output-text x)))
+  (with y (texout-file-name-percent x)
+    (if (string-occurs? " " y) (output-verbatim y) (output-text y))))
 
 (define (texout-group x)
   (output-tex "{")
