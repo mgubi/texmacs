@@ -631,9 +631,17 @@ export_tree (tree doc, url u, string fm) {
     url target= is_rooted_name (u)? u: resolve (u, "");
     old_target= call ("save-target-swap", object (target));
   }
-  string s= tree_to_generic (aux, fm * "-document");
+  // A converter which fails (an error, or no conversion) writes no file;
+  // an error inside a conversion made in C++ (LaTeX) is caught there and
+  // gives an empty text, which is then no conversion either
+  int errors= scheme_caught_errors ();
+  object r= call ("texmacs->generic", aux, fm * "-document");
   if (has_target) call ("save-target-swap", old_target);
-  if (s == "* error: unknown format *") return true;
+  if (!is_string (r)) return true;
+  string s= as_string (r);
+  if (s == "* error: unknown format *" ||
+      s == "Error: bad format or data") return true;
+  if (s == "" && scheme_caught_errors () > errors) return true;
   return save_string (u, s);
 }
 
@@ -643,12 +651,10 @@ buffer_export (url name, url dest, string fm) {
   tm_view vw= concrete_view (get_recent_view (name));
   ASSERT (vw != NULL, "view expected");
 
-  if (fm == "postscript" || fm == "pdf") {
-    int old_stamp= last_modified (dest, false);
-    vw->ed->print_to_file (dest);
-    int new_stamp= last_modified (dest, false);
-    return new_stamp <= old_stamp;
-  }
+  if (fm == "postscript" || fm == "pdf")
+    // by what the printer says: a time stamp in seconds does not change
+    // when the same file is written twice in a second (#705)
+    return !vw->ed->print_doc (dest, false, 1, 1000000);
 
   tree body= subtree (the_et, vw->buf->rp);
   if (fm == "verbatim")

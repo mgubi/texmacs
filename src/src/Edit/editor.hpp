@@ -627,7 +627,7 @@ public:
   virtual void notify_page_change () = 0;
   virtual string get_metadata (string kind) = 0;
   virtual int  nr_pages () = 0;
-  virtual void print_doc (url ps_name, bool to_file, int first, int last) = 0;
+  virtual bool print_doc (url ps_name, bool to_file, int first, int last) = 0;
   virtual void print_to_file (url ps_name,
 			      string first="1", string last="1000000") = 0;
   virtual void print_buffer (string first="1", string last="1000000") = 0;

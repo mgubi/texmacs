@@ -21,6 +21,7 @@ class patch;
 
 void start_scheme (int argc, char** argv, void (*call_back) (int, char**));
 void initialize_scheme ();
+int  scheme_caught_errors ();
 string scheme_init_file (); // initialization file of the Scheme backend
 
 class object_rep : concrete_struct {

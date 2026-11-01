@@ -1916,7 +1916,9 @@
 (define (tmtex-eps x)
   (if (tmtex-math-mode?) (set! x `(with "mode" "math" ,x)))
   (receive (name-url name-string) (tmtex-eps-names x)
-    (let* ((extents (print-snippet name-url x #t))
+    (let* ((cleared? (image-target-clear name-url))
+           (extents (print-snippet name-url x #t))
+           (written (image-target-written name-url cleared?))
            (unit (* (/ 1.0 60984.0) (/ 600.0 (tenth extents))))
            (x3 (* unit (first extents)))
            (y3 (* unit (second extents)))
@@ -1962,9 +1964,11 @@
           ;; an image which is not next to the target is next to the document
           (when (or (string-starts? name "..") (not (url-exists? u)))
             (set! u (url-relative (save-source-url) (unix->url name))))
-          (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
-                        "postscript-file")
-            (convert-to-file u fm nfm name-url))
+          (let ((nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
+                         "postscript-file"))
+                (cleared? (image-target-clear name-url)))
+            (convert-to-file u fm nfm name-url)
+            (image-target-written name-url cleared?))
           (list 'includegraphics (list '!file-name name-string))))))
 
 (define (tmtex-image-length len)

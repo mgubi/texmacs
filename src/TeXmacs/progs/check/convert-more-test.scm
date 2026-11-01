@@ -2288,6 +2288,71 @@
       (buffer-pretend-saved u)
       (buffer-close u))
     (when (buffer-exists? old) (switch-to-buffer old)))
+  (check-group "export: the name of an image, as it is (#706)")
+  ;; an absolute name with spaces and an accented letter, long enough for the
+  ;; line to be wrapped: the text has it whole (not h{\'e}, nor on two lines)
+  (let* ((dir (string-append (url->system (temp-dir))
+                             "/a folder with a rather long name, so that"
+                             " the line is wrapped, h"
+                             (string (integer->char 195) (integer->char 169))))
+         (name (string-append dir "/linked.png")))
+    (system-mkdir (system->url dir))
+    (string-save (export-png) (system->url name))
+    (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
+      (check-true (has-text? (string-append "{" name "}") s))))
+  ;; a %, which LaTeX would read as a comment, is given by a macro; the
+  ;; space which ends the macro is skipped, and \space gives a space after %
+  (let* ((dir (url->system (temp-dir)))
+         (text (lambda (n)
+                 (export `(document (image ,(string-append dir "/" n)
+                                           "1cm" "" "" ""))
+                         "latex-snippet"))))
+    (for (n (list "50%done.png" "a% b.png"))
+      (string-save (export-png) (system->url (string-append dir "/" n))))
+    (check-true (has-text? "/50\\csname @percentchar\\endcsname done.png}"
+                           (text "50%done.png")))
+    (check-true (has-text? "/a\\csname @percentchar\\endcsname \\space b.png}"
+                           (text "a% b.png"))))
+  (check-group "copy to the clipboard: the images of a real copy (#706)")
+  ;; through selection_set, as Edit > Copy to > LaTeX: only a copy to the
+  ;; clipboard (primary) keeps its image next to the document, not one to
+  ;; the selection of the mouse; on the offscreen platform only, whose
+  ;; clipboard is that of the process, not the one of the developer
+  (if (!= (getenv "QT_QPA_PLATFORM") "offscreen")
+      (images-skip "real copy" "not on the offscreen platform")
+      (let* ((dir (url-append (temp-dir) "real-copy"))
+             (doc (url-append dir "doc.tm"))
+             (old (current-buffer))
+             (images (lambda ()
+                       (list-filter (map (lambda (u) (url->string (url-tail u)))
+                                         (folder-files dir))
+                                    (lambda (s) (string-starts? s "image-"))))))
+        (system-mkdir dir)
+        (string-save (serialize-texmacs
+                      (stree->tree `(document (TeXmacs ,(texmacs-version))
+                                              (style "generic")
+                                              (body ,(embedded-image-sample)))))
+                     doc)
+        (load-buffer doc :strict)
+        ;; the buffer is closed and the selections cleared also after an
+        ;; error, which would otherwise leave them to the next suites
+        (dynamic-wind
+          (lambda () #f)
+          (lambda ()
+            (switch-to-buffer doc)
+            ;; the selection is found in the boxes (without them: a crash)
+            (update-forced)
+            (select-all)
+            (clipboard-copy-export "latex" "mouse")
+            (check= (images) '())
+            (clipboard-copy-export "latex" "primary")
+            (check= (length (images)) 1))
+          (lambda ()
+            (clipboard-clear "primary")
+            (clipboard-clear "mouse")
+            (buffer-pretend-saved doc)
+            (buffer-close doc)
+            (when (buffer-exists? old) (switch-to-buffer old))))))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)
@@ -2303,6 +2368,55 @@
         (check-true (buffer-export (current-buffer)
                                    (url-append dir "x.pdf") "pdf"))
         (check-false (url-exists? dir)))))
+  (check-group "export: a failure is reported, and leaves no file (#705)")
+  (with-sample-buffer (embedded-image-sample)
+    (lambda (name)
+      (let* ((messages '())
+             (capture (lambda (msg . args) (set! messages (cons msg messages))))
+             (last-message (lambda () (object->string (car messages))))
+             (target (url-append (temp-dir) "failed.txt"))
+             (tex (url-append (temp-dir) "image-failed.tex"))
+             (image (url-append (temp-dir)
+                                (string-append "image-failed-1."
+                                               (eps-suffix)))))
+        ;; a conversion which fails: an error, and no file (not the text
+        ;; "Error: bad format or data", nor an empty file for a converter
+        ;; which throws)
+        (check-true (buffer-export (current-buffer) target "no-such-format"))
+        (check-false (url-exists? target))
+        (with-global set-message capture
+          (export-buffer-main (current-buffer) target "no-such-format"
+                              '(:overwrite)))
+        (check-false (url-exists? target))
+        (check-true (string-starts? (last-message) "(concat \"Could not save"))
+        ;; the text is written, but not its image: said so
+        (system-mkdir image)
+        (image-write-failures-reset)
+        (check-false (buffer-export (current-buffer) tex "latex"))
+        (check= (image-write-failures) (list image))
+        (with-global set-message capture
+          (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
+        (check-true (has-text? "an image could" (last-message)))
+        (check-true (has-text? (url->system image) (last-message)))
+        (check= (image-write-failures) '())
+        (system-rmdir image)
+        ;; and when it can be written, as usual
+        (with-global set-message capture
+          (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
+        (check-false (has-text? "an image could" (last-message)))
+        (check-image-file image)
+        ;; a LaTeX conversion which fails inside its C++ part gives an empty
+        ;; text: no file either (a sqrt without argument fails in tmtex)
+        (check-true (tree-export (stree->tree '(document (sqrt))) target
+                                 "latex"))
+        (check-false (url-exists? target))
+        (check-false (buffer-export (current-buffer) target "latex"))
+        (check-true (url-exists? target))
+        ;; a PDF written twice in the same second is written both times
+        ;; (its time stamp, in seconds, does not change)
+        (with pdf (url-append (temp-dir) "twice.pdf")
+          (check-false (buffer-export (current-buffer) pdf "pdf"))
+          (check-false (buffer-export (current-buffer) pdf "pdf"))))))
   (check-group "export: a relative target is in the current directory")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
       (images-skip "relative target" "no native PDF writer")
