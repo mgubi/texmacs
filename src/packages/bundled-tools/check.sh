@@ -74,13 +74,13 @@ fi
 echo "== the program: $gs"
 [ -f "$gs" ] || { fail "$gs does not exist"; exit 1; }
 [ -x "$gs" ] || fail "$gs is not executable"
-v=$(cd "$work" && env -i PATH="$clean_path" "$gs" --version | tr -d '\r')
+v=$(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" PATH="$clean_path" "$gs" --version | tr -d '\r')
 [ "$v" = "$version" ] && ok "gs --version: $v" || fail "gs --version says \"$v\", not $version"
-txt=$(cd "$work" && env -i PATH="$clean_path" "$gs" -q -dNOPAUSE -dBATCH -dSAFER \
+txt=$(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" PATH="$clean_path" "$gs" -q -dNOPAUSE -dBATCH -dSAFER \
         -sDEVICE=txtwrite -sOutputFile=- test.eps | tr -d '\r')
 case "$txt" in *"Hello Gs"*) ok "the text of the EPS file: $(echo $txt | head -c 40)";;
   *) fail "no text from the EPS file: $txt";; esac
-(cd "$work" && env -i PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
+(cd "$work" && env -i MSYS2_ARG_CONV_EXCL="*" PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
    -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -dEmbedAllFonts=true \
    -dCompressFonts=false -dCompressPages=false -dCompatibilityLevel=1.4 -dEPSCrop \
    -sOutputFile=direct.pdf test.eps > gs-pdf.log 2>&1) ||
@@ -136,7 +136,11 @@ case "$used" in
   "$want"*) ok "TeXmacs runs the gs of the package: $used";;
   *) fail "TeXmacs runs $used, not the gs of the package ($want)";;
 esac
-[ "$(val pdf)" = yes ] && ok "an EPS image written to PDF" || fail "no PDF with an EPS image: the gs of the package was not used"
+if [ "$(val pdf)" = yes ]; then ok "an EPS image written to PDF"
+else
+  fail "no PDF with an EPS image: the gs of the package was not used"
+  grep -v "^CHECK" "$out" | tr -d '\r' | tail -25
+fi
 # the gs which TeXmacs runs (its debug output, gs_utilities.cpp): the one of
 # the package
 # (in an AppImage, the name gs alone: AppRun puts its usr/bin first in the PATH,
