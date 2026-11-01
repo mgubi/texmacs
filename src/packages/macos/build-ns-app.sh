@@ -17,6 +17,11 @@
 #                         for the connections to the servers: GnuTLS),
 #                         instead of the ones of the system (Homebrew): the
 #                         application then runs on older versions of macOS
+#   --gs PREFIX           the Ghostscript made by packages/build-gs.sh in PREFIX
+#                         (for the same architecture and version of macOS):
+#                         its gs goes into the application (bin of the
+#                         TeXmacs folder), which runs it before the one of
+#                         the system, and its license with it (#662)
 #   --arch ARCH           arm64 or x86_64 (default: the one of the machine;
 #                         x86_64 on Apple silicon is built under Rosetta)
 #   --min-macos VERSION   the oldest version of macOS, with --deps (the
@@ -39,6 +44,7 @@ scheme=guile
 mupdf=""
 thorvg=""
 deps=""
+gs=""
 arch=$(uname -m)
 min=12.0
 sign=""
@@ -55,6 +61,7 @@ while [ $# -gt 0 ]; do
     --mupdf) mupdf="$2"; shift 2;;
     --thorvg) thorvg="$2"; shift 2;;
     --deps) deps="$2"; shift 2;;
+    --gs) gs="$2"; shift 2;;
     --arch) arch="$2"; shift 2;;
     --min-macos) min="$2"; shift 2;;
     --sign) sign="$2"; shift 2;;
@@ -124,7 +131,13 @@ echo "== building TeXmacs"
 make -j "$jobs"
 
 echo "== making the application"
-make MACOS_BUNDLE
+if [ -n "$gs" ]; then
+  gs=$(cd "$gs" && pwd)
+  [ -x "$gs/bin/gs" ] || { echo "error: no $gs/bin/gs (packages/build-gs.sh)" >&2; exit 1; }
+  make MACOS_BUNDLE GS_BUNDLE="$gs/bin/gs" GS_LICENSES="$gs/share/licenses/ghostscript"
+else
+  make MACOS_BUNDLE
+fi
 
 app=../distr/TeXmacs.app
 # with --deps, the application is made for an older macOS

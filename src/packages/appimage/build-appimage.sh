@@ -11,6 +11,11 @@
 # excludelist), and with "qt" Qt and its plugins (linuxdeploy-plugin-qt,
 # QMAKE in the environment). LIBDIR is where libraries which are not those of
 # the system are found (SDL3 and SDL3_ttf of misc/vue/build-deps.sh for Vue).
+# GS_BIN (the gs made by packages/build-gs.sh, with its licenses in
+# GS_LICENSES) goes into usr/bin, which AppRun puts first in the PATH: the
+# Ghostscript of the AppImage is the one TeXmacs and the programs it starts
+# find, whatever the system has (#662). It is a program with everything
+# built in: no library, no folder of resources, nothing in LD_LIBRARY_PATH.
 # appimagetool then makes the AppImage, with the static runtime of type 2,
 # which needs no libfuse2 on the system.
 #
@@ -46,6 +51,12 @@ mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib" "$APPDIR/usr/share"
 cp packages/appimage/AppRun "$APPDIR/AppRun"
 chmod 755 "$APPDIR/AppRun"
 cp TeXmacs/bin/texmacs.bin TeXmacs/bin/tm_gs "$APPDIR/usr/bin/"
+if [ -n "${GS_BIN:-}" ]; then
+  cp "$GS_BIN" "$APPDIR/usr/bin/gs"
+  chmod 755 "$APPDIR/usr/bin/gs"
+else
+  echo "build-appimage.sh: no GS_BIN, the AppImage has no Ghostscript" >&2
+fi
 for f in TeXmacs/plugins/*/bin/*; do [ -f "$f" ] && cp "$f" "$APPDIR/usr/bin/"; done
 # the command of the desktop entry (below), through AppRun
 printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/../../AppRun" "$@"\n' > "$APPDIR/usr/bin/texmacs-upsilon"
@@ -89,6 +100,12 @@ fi
 # drivers of OpenGL (Mesa, its llvmpipe) need its newer symbols, and an
 # older libstdc++ loaded first left TeXmacs without OpenGL
 rm -f "$APPDIR"/usr/lib/libstdc++.so* "$APPDIR"/usr/lib/libgcc_s.so*
+
+# the license of Ghostscript
+if [ -n "${GS_LICENSES:-}" ]; then
+  mkdir -p "$APPDIR/usr/share/TeXmacs/misc/licenses/ghostscript"
+  cp -R "$GS_LICENSES"/. "$APPDIR/usr/share/TeXmacs/misc/licenses/ghostscript/"
+fi
 
 # the licenses of the libraries of the system which were brought
 packages/collect-licenses.sh "$APPDIR/usr/lib" "$APPDIR/usr/share/TeXmacs/misc/licenses/system"

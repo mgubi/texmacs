@@ -33,31 +33,36 @@ gs_system () {
 #endif
 }
 
-#ifdef GS_EXE
+// The copy of Ghostscript in the package of TeXmacs (a program of its own,
+// bin/gs in the TeXmacs folder: Contents/Resources/share/TeXmacs on macOS,
+// TeXmacs-Windows on Windows), used before the one of the system. GS_EXE
+// (gs.m4, with a TeXmacs SDK) says another name for it. The packages of
+// Upsilon bring a gs with everything it needs built in (fonts, resources):
+// it changes nothing outside the package. On Linux, the AppImage has it in
+// usr/bin, the first of its PATH (AppRun).
+#ifndef GS_EXE
+#ifdef OS_MINGW
+#define GS_EXE "bin/gs.exe"
+#else
+#define GS_EXE "bin/gs"
+#endif
+#endif
+
 string
 gs_embedded () {
-  string cmd; // no need to resolve each time
-  
-  url tmp= url_system (get_env ("TEXMACS_PATH"));
-  url gs= tmp * url_system (GS_EXE);
-  if (exists (gs)) {
-    cmd= concretize (gs);
-  } else {
-    cmd= gs_system ();
+  string tmp= get_env ("TEXMACS_PATH");
+  if (N (tmp) != 0) {
+    url gs= url_system (tmp) * url_system (GS_EXE);
+    if (exists (gs)) return concretize (gs);
   }
-  return cmd;
+  return gs_system ();
 }
-#endif
 
 static string
 gs_executable () {
-#ifdef GS_EXE
   static string cmd;
-  if (N (cmd) == 0) cmd= gs_embedded ();
   // init had to be postponed because of TEXMACS_PATH initialization
-#else
-  static string cmd= gs_system ();
-#endif
+  if (N (cmd) == 0) cmd= gs_embedded ();
   return cmd;
 }
 

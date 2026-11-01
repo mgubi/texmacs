@@ -19,6 +19,14 @@
 #     packages/windows/TeXmacs-Upsilon.iss, .github/scripts/windows-installer.sh),
 #     installed, run and uninstalled: beside the stock TeXmacs, it has its
 #     own folder and identity and writes no TEXMACS_PATH.
+# Every package brings Ghostscript (packages/build-gs.sh, the program gs with
+# its fonts and resources built in: macOS in upsilon-macos.yml, the Windows
+# bundles and installers, the AppImages), and the Windows ones also Aspell and
+# dictionaries (packages/windows/build-aspell.sh: linked into TeXmacs, the
+# dictionaries in the folder aspell-0.60), checked with
+# packages/bundled-tools/check.sh, with no gs of the system (#662). The tar.gz
+# files of Linux do not have them: they use the system, as the programs
+# they start do.
 # A state of upsilon_texmacs is built by moving upsilon_ci to it,
 #   git push -f origin upsilon_texmacs:upsilon_ci
 # NOTE: keep the jobs linux and windows as in ci.yml, which comes from wip_s7
@@ -169,6 +177,37 @@ jobs:
             mingw-w64-x86_64-gnutls
             mingw-w64-x86_64-sqlite3
             mingw-w64-x86_64-gnupg
+            mingw-w64-x86_64-gettext-runtime
+
+      # Ghostscript and Aspell, built from their sources (cached: the key
+      # follows their scripts), for the bundle and the installer (#662)
+      - name: Place of Ghostscript and Aspell
+        run: |
+          echo "GSD=$(cygpath -u '${{ runner.temp }}')/gs-deps" >> "$GITHUB_ENV"
+          echo "ASP=$(cygpath -u '${{ runner.temp }}')/aspell-deps" >> "$GITHUB_ENV"
+
+      - name: Cache of Ghostscript and Aspell
+        id: gs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ runner.temp }}\gs-deps
+            ${{ runner.temp }}\aspell-deps
+          key: gs-aspell-windows-${{ hashFiles('src/packages/build-gs.sh', 'src/packages/windows/build-aspell.sh') }}
+
+      - name: Ghostscript and Aspell
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: |
+          packages/build-gs.sh "$GSD"
+          packages/windows/build-aspell.sh "$ASP"
+
+      - uses: actions/cache/save@v4
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ${{ runner.temp }}\gs-deps
+            ${{ runner.temp }}\aspell-deps
+          key: ${{ steps.gs-cache.outputs.cache-primary-key }}
 
       - name: Configure
         run: |
@@ -177,8 +216,12 @@ jobs:
           # qmake, Qt defines QT_NEEDS_QMAIN and replaces main
           # With pkg-config, Qt's flags no longer bring in Winsock (ws2_32),
           # which the socket code needs; configure should add it for MinGW
+          # (Aspell: its library is linked into TeXmacs, and TeXmacs finds
+          # its dictionaries in the folder aspell-0.60 of the package)
           ./configure --with-scheme=s7 --with-qt-find-method=pkgconfig \
-            --with-gnutls QMAKE=/mingw64/bin/qmake6 LIBS=-lws2_32
+            --with-gnutls QMAKE=/mingw64/bin/qmake6 LIBS="-lws2_32 -lstdc++" \
+            CPPFLAGS="-I$ASP/include" LDFLAGS="-L$ASP/lib"
+          grep -i "aspell" config.log | grep -i "USE_ASPELL\|support enabled\|not found" | head -5
 
       - name: Build
         run: |
@@ -196,9 +239,22 @@ jobs:
           export PATH="$QT6_BIN:$PATH"
           # with Qt found by pkg-config, configure does not set the plugin
           # directory, and the bundle needs at least platforms/qwindows.dll
-          make WINDOWS_BUNDLE QT_PLUGINS_PATH=/mingw64/share/qt6/plugins
+          make WINDOWS_BUNDLE QT_PLUGINS_PATH=/mingw64/share/qt6/plugins \
+            GS_BUNDLE="$GSD/bin/gs.exe" GS_LICENSES="$GSD/share/licenses/ghostscript" \
+            ASPELL_DATA="$ASP/lib/aspell-0.60" ASPELL_LICENSES="$ASP/share/licenses/aspell"
           ls ../distr/TeXmacs-Windows/bin/platforms
+          # what Ghostscript and Aspell add to the bundle
+          ls -l ../distr/TeXmacs-Windows/bin/gs.exe
+          du -sk ../distr/TeXmacs-Windows/aspell-0.60 ../distr/TeXmacs-Windows
           (cd ../distr && zip -qr "$GITHUB_WORKSPACE/texmacs-windows-x86_64.zip" TeXmacs-Windows)
+          ls -l "$GITHUB_WORKSPACE/texmacs-windows-x86_64.zip"
+
+      # Ghostscript and Aspell of the bundle, with no gs of the system
+      - name: Bundled tools (Ghostscript, Aspell)
+        run: |
+          root=$(cd ../distr/TeXmacs-Windows && pwd)
+          packages/bundled-tools/check.sh -a -r "$root" \
+            -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$root/bin/texmacs.exe"
 
       # the installer (Inno Setup): made, installed, run and uninstalled
       - name: Installer
@@ -401,6 +457,25 @@ jobs:
           path: /opt/vue-deps
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
+      # Ghostscript for the AppImage: built here (glibc of Ubuntu 22.04, as
+      # TeXmacs), cached; a program with everything built in (#662)
+      - name: Cache of Ghostscript
+        id: gs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/gs-deps
+          key: gs-appimage-2204-${{ hashFiles('src/packages/build-gs.sh') }}
+
+      - name: Ghostscript
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: packages/build-gs.sh /opt/gs-deps
+
+      - uses: actions/cache/save@v4
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        with:
+          path: /opt/gs-deps
+          key: ${{ steps.gs-cache.outputs.cache-primary-key }}
+
       - name: Configure
         run: |
           if [ "${{ matrix.gui }}" = qt ]; then
@@ -418,8 +493,10 @@ jobs:
       - name: AppImage
         run: |
           export QMAKE=/usr/lib/qt6/bin/qmake
-          packages/appimage/build-appimage.sh ${{ matrix.gui }} \
+          GS_BIN=/opt/gs-deps/bin/gs GS_LICENSES=/opt/gs-deps/share/licenses/ghostscript \
+            packages/appimage/build-appimage.sh ${{ matrix.gui }} \
             texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage "$DEPS/lib"
+          ls -l /opt/gs-deps/bin/gs
 
       - uses: actions/upload-artifact@v4
         with:
@@ -444,6 +521,10 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
+      # (the scripts of the checks; no git in the container: checkout takes
+      # the archive of the commit)
+      - uses: actions/checkout@v4
+
       - name: A desktop without packages of development
         run: |
           apt-get update
@@ -486,6 +567,25 @@ jobs:
               { echo "error: TeXmacs does not draw with OpenGL"; exit 1; }
           fi
 
+      # Ghostscript of the AppImage (usr/bin/gs, the first of the PATH of
+      # AppRun): it runs alone, and TeXmacs runs it for an EPS image; this
+      # system has no Ghostscript, and a gs which fails comes first in the
+      # PATH after it (#662)
+      - name: Bundled Ghostscript
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          app="$PWD/texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage"
+          ! command -v gs || { echo "error: this system has a gs"; exit 1; }
+          x=$(mktemp -d)
+          (cd "$x" && "$app" --appimage-extract > /dev/null)
+          ls -l "$x/squashfs-root/usr/bin/gs"
+          ls "$x/squashfs-root/usr/share/TeXmacs/misc/licenses/ghostscript"
+          xvfb-run -a -s "-screen 0 1600x1200x24" \
+            src/packages/bundled-tools/check.sh -g "$x/squashfs-root/usr/bin/gs" \
+              -r "$x/squashfs-root/usr/share/TeXmacs" \
+              -v "$(sed -n 's/^GS_VERSION=//p' src/packages/build-gs.sh)" -- "$app"
+
   windows-vue:
     name: Windows (MSYS2 MinGW-w64, Vue, GPU)
     runs-on: windows-latest
@@ -518,6 +618,37 @@ jobs:
             mingw-w64-x86_64-sdl3
             mingw-w64-x86_64-sdl3-ttf
             mingw-w64-x86_64-gnutls
+            mingw-w64-x86_64-gettext-runtime
+
+      # Ghostscript and Aspell, built from their sources (cached: the key
+      # follows their scripts), for the bundle and the installer (#662)
+      - name: Place of Ghostscript and Aspell
+        run: |
+          echo "GSD=$(cygpath -u '${{ runner.temp }}')/gs-deps" >> "$GITHUB_ENV"
+          echo "ASP=$(cygpath -u '${{ runner.temp }}')/aspell-deps" >> "$GITHUB_ENV"
+
+      - name: Cache of Ghostscript and Aspell
+        id: gs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ runner.temp }}\gs-deps
+            ${{ runner.temp }}\aspell-deps
+          key: gs-aspell-windows-${{ hashFiles('src/packages/build-gs.sh', 'src/packages/windows/build-aspell.sh') }}
+
+      - name: Ghostscript and Aspell
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: |
+          packages/build-gs.sh "$GSD"
+          packages/windows/build-aspell.sh "$ASP"
+
+      - uses: actions/cache/save@v4
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ${{ runner.temp }}\gs-deps
+            ${{ runner.temp }}\aspell-deps
+          key: ${{ steps.gs-cache.outputs.cache-primary-key }}
 
       # NOTE: saved once built, even when TeXmacs does not build
       - name: Cache of the libraries
@@ -547,16 +678,30 @@ jobs:
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
             --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
-            LIBS=-lws2_32 CC=clang CXX=clang++
+            LIBS="-lws2_32 -lstdc++" CC=clang CXX=clang++ \
+            CPPFLAGS="-I$ASP/include" LDFLAGS="-L$ASP/lib"
 
       - name: Build
         run: make -k -j"$(nproc)"
 
       - name: Bundle
         run: |
-          make WINDOWS_BUNDLE
+          make WINDOWS_BUNDLE \
+            GS_BUNDLE="$GSD/bin/gs.exe" GS_LICENSES="$GSD/share/licenses/ghostscript" \
+            ASPELL_DATA="$ASP/lib/aspell-0.60" ASPELL_LICENSES="$ASP/share/licenses/aspell"
           ls ../distr/TeXmacs-Windows/bin
+          # what Ghostscript and Aspell add to the bundle
+          ls -l ../distr/TeXmacs-Windows/bin/gs.exe
+          du -sk ../distr/TeXmacs-Windows/aspell-0.60 ../distr/TeXmacs-Windows
           (cd ../distr && zip -qr "$(cygpath -u "$GITHUB_WORKSPACE")/texmacs-vue-windows-x86_64.zip" TeXmacs-Windows)
+          ls -l "$(cygpath -u "$GITHUB_WORKSPACE")/texmacs-vue-windows-x86_64.zip"
+
+      # Ghostscript and Aspell of the bundle, with no gs of the system
+      - name: Bundled tools (Ghostscript, Aspell)
+        run: |
+          root=$(cd ../distr/TeXmacs-Windows && pwd)
+          packages/bundled-tools/check.sh -a -r "$root" \
+            -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$root/bin/texmacs.exe"
 
       # the installer (Inno Setup): made, installed, run and uninstalled
       - name: Installer

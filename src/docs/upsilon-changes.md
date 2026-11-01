@@ -14,6 +14,21 @@ have the details, and the problems go to the
 
 ## 1 November 2026
 
+- **Ghostscript in every package, Aspell in the Windows ones** (desktop): the
+  macOS applications (Cocoa, Vue and Qt, both architectures), the Windows
+  bundles and installers (Qt and Vue) and the AppImages bring Ghostscript
+  10.07.0, the program TeXmacs runs for EPS and PostScript images and for
+  PostScript output (plots of Gnuplot, Maxima, Graphviz, TikZ, XYpic...), with
+  its fonts built in: nothing to install, and it changes nothing outside the
+  package. TeXmacs runs the `gs` of its own folder before the one of the
+  system. The Windows packages also bring the spell checker Aspell 0.60.8.2
+  (linked into TeXmacs) and dictionaries for English, French, German,
+  Spanish, Italian, Portuguese (both), Dutch, Russian, Polish and Ukrainian,
+  in `aspell-0.60`: spell checking works without installing anything. Their
+  licenses (Ghostscript is under the AGPL 3) and where their source archives
+  are (the release `upsilon-sources`) are in `misc/licenses/README.md` of the
+  TeXmacs folder. The Linux `tar.gz` files still use the `gs` of the system.
+  Part of #662.
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
   block removed or changed by one side next to a block changed by the other,
   and an edit next to a new paragraph of the other side, now merge cleanly.

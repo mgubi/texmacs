@@ -23,9 +23,12 @@
 
   <\note*>
     The plots are EPS images by default, which <TeXmacs> shows by
-    converting them with <name|Ghostscript> (the program <verbatim|gs>; on
-    <name|macOS> for instance <verbatim|brew install ghostscript>). When
-    <name|Ghostscript> is not found, the session says so at its start and
+    converting them with <name|Ghostscript> (the program <verbatim|gs>). The
+    packages of <TeXmacs> Upsilon (the <name|macOS> applications, the
+    <name|Windows> bundles and installers, the <name|AppImage>s) bring it;
+    elsewhere it is the one of the system, for instance <verbatim|brew
+    install ghostscript> on <name|macOS>. When <name|Ghostscript> is not
+    found, the session says so at its start and
     makes PNG images instead. A first line <verbatim|% -output png> (or
     <verbatim|eps>, <verbatim|svg>) in an input chooses the format of its
     plot.

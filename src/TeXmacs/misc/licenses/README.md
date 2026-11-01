@@ -70,6 +70,38 @@ on (on Windows those of MSYS2, on Linux those of Ubuntu): the bundles have
 their licenses in `misc/licenses/system` when they were made with them
 (`packages/collect-licenses.sh`).
 
+## Programs of others which the packages bring
+
+Ghostscript and Aspell are programs and libraries of others which the
+packages of TeXmacs Upsilon bring, unmodified, built from their released
+sources by `packages/build-gs.sh` and `packages/windows/build-aspell.sh`:
+
+| Program | Packages | Version | License | Files |
+|---|---|---|---|---|
+| Ghostscript (Artifex Software), the program `gs`, which TeXmacs runs to convert EPS and PostScript images and to write PostScript | the macOS applications, the Windows bundles and installers, the AppImages | 10.07.0 | GNU Affero General Public License 3 or later; its fonts (URW base 35) under the same license with an exception for documents; its CMap files (Adobe) under a separate AGPL-compatible license | `Ghostscript-LICENSE.txt` (the notice of the sources, which says what is under what), `AGPL-3.0.txt`, and `ghostscript/` in the packages |
+| Aspell (Kevin Atkinson), the spell checker, as a library linked into TeXmacs | the Windows bundles and installers | 0.60.8.2 | GNU Lesser General Public License 2.1 | `LGPL-2.1.txt`, `aspell/Aspell-COPYING` in the packages |
+| the dictionaries of Aspell for English, French, German, Spanish, Italian, Portuguese (Portugal and Brazil), Dutch, Russian, Polish and Ukrainian | the Windows bundles and installers | see `build-aspell.sh` | free licenses, mostly the GNU GPL (some with others, see the files); they are data read by Aspell | `aspell/dict-<language>-Copyright` (and `-COPYING`, `-README`) in the packages |
+
+Ghostscript has the libraries of its sources built in (FreeType, libpng,
+libjpeg of the Independent JPEG Group, zlib, Little CMS, OpenJPEG, jbig2dec,
+libtiff, Brotli...): their licenses are the ones of the folders of the
+archive below (`LICENSE` of Ghostscript lists them). TeXmacs runs `gs` as a
+program of its own, beside TeXmacs (a GPL 3 or later program), which the
+AGPL 3 and the GPL 3 allow (section 13 of both); the AGPL asks for the
+corresponding source of the program, below.
+
+**The corresponding source** of Ghostscript, Aspell and the dictionaries, the
+exact archives the packages were built from (none modified, checked against
+the SHA-256 of the scripts above), are the assets of the release
+<https://github.com/mgubi/texmacs/releases/tag/upsilon-sources>, added when a
+version changes (`.github/workflows/upsilon-macos.yml`, job `sources`). They
+are also at their authors: Ghostscript
+<https://github.com/ArtifexSoftware/ghostpdl-downloads/releases>, Aspell and
+its dictionaries <https://ftp.gnu.org/gnu/aspell>. A written offer: for
+three years from the release of a package which has one of these programs,
+the corresponding source is given to anyone who asks the maintainers of
+<https://github.com/mgubi/texmacs>.
+
 ## The sources
 
 The sources of TeXmacs Upsilon, with those of the components compiled into

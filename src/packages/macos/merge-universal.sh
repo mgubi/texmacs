@@ -27,6 +27,10 @@ done < <(find "$out/Contents" -type f)
 sign="${SIGN_IDENTITY:--}"
 [ "$sign" = - ] && ts="" || ts="--timestamp"
 find "$out/Contents/Resources/lib" -name "*.dylib" -exec codesign --force $ts -s "$sign" {} \; 2> /dev/null || true
+# the program gs of the package (Ghostscript, #662), in Resources, where --deep
+# does not sign it: lipo has made its signature invalid
+gs="$out/Contents/Resources/share/TeXmacs/bin/gs"
+[ -f "$gs" ] && codesign --force $ts -s "$sign" "$gs"
 codesign --force $ts --deep -s "$sign" "$out"
 
 "$here/check-app.sh" --sdk-newer-than-min "$out"

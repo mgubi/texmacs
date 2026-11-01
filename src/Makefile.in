@@ -491,6 +491,17 @@ MACOS_BUNDLE: TEXMACS
 	$(CP) TeXmacs $(MACOS_PACKAGE_RESOURCES)/share
 	$(RM) $(MACOS_PACKAGE_TEXMACS)/bin/texmacs.bin
 	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(MACOS_PACKAGE_TEXMACS)/bin/;fi
+# (Ghostscript of the package, built by packages/build-gs.sh: GS_BUNDLE is
+# its gs, GS_LICENSES the folder with its license; gs_utilities.cpp runs
+# the bin/gs of the TeXmacs folder before the one of the system)
+	if test -n "$(GS_BUNDLE)"; then \
+	  $(CP) "$(GS_BUNDLE)" $(MACOS_PACKAGE_TEXMACS)/bin/gs; \
+	  $(CHMOD) 755 $(MACOS_PACKAGE_TEXMACS)/bin/gs; \
+	fi
+	if test -n "$(GS_LICENSES)"; then \
+	  $(MKDIR) $(MACOS_PACKAGE_TEXMACS)/misc/licenses/ghostscript; \
+	  $(CP) -R "$(GS_LICENSES)"/* $(MACOS_PACKAGE_TEXMACS)/misc/licenses/ghostscript/; \
+	fi
 	if test -n "@GUILE_DATA_PATH@"; then \
 	  find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(MACOS_PACKAGE_TEXMACS)/progs/ \; ; \
 	  $(CHMOD) -R go=rX $(MACOS_PACKAGE_TEXMACS)/progs/ice-9; \
@@ -509,15 +520,20 @@ MACOS_BUNDLE: TEXMACS
 	@# (--deep does not sign the libraries in Resources/lib, and macOS
 	@# kills the processes which load a library with a broken signature;
 	@# there are none when they are linked statically)
+	@# (the program gs, in Resources, which --deep does not sign either)
 	@if test -n "@SIGNID@";then \
 		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
 			codesign --force --timestamp -s @SIGNID@ {} + &&\
+		if test -f $(MACOS_PACKAGE_TEXMACS)/bin/gs; then \
+			codesign --force --timestamp -s @SIGNID@ $(MACOS_PACKAGE_TEXMACS)/bin/gs; fi &&\
 		codesign --force --timestamp --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
 		echo "Bundle successfully signed" ||\
 		{ echo "Signing failed"; exit 1; }; \
 	else \
 		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
 			codesign --force -s - {} + &&\
+		if test -f $(MACOS_PACKAGE_TEXMACS)/bin/gs; then \
+			codesign --force -s - $(MACOS_PACKAGE_TEXMACS)/bin/gs; fi &&\
 		codesign --force --deep -s - $(MACOS_PACKAGE_APP) &&\
 		echo "Bundle signed ad hoc (no identity given to configure)" ||\
 		{ echo "Signing failed"; exit 1; }; fi
@@ -569,6 +585,23 @@ WINDOWS_BUNDLE: TEXMACS WINDOWS_PDB
 		$(CP) -r $(TMREPO)/lib/aspell-* $(WINDOWS_BUILD_DIR); \
 	fi
 	if test -x "@GS_EXE@"; then $(CP) @GS_EXE@ $(WINDOWS_BUILD_BIN_DIR)/;fi
+# (Ghostscript and Aspell of the package, built by packages/build-gs.sh and
+# packages/windows/build-aspell.sh: GS_BUNDLE is gs.exe, ASPELL_DATA the
+# folder aspell-0.60 with the dictionaries, which ispell.cpp finds in the
+# TeXmacs folder; GS_LICENSES and ASPELL_LICENSES have their licenses)
+	if test -n "$(GS_BUNDLE)"; then $(CP) "$(GS_BUNDLE)" $(WINDOWS_BUILD_BIN_DIR)/gs.exe; fi
+	if test -n "$(ASPELL_DATA)"; then \
+		$(RM) -r $(WINDOWS_BUILD_DIR)/aspell-0.60; \
+		$(CP) -r "$(ASPELL_DATA)" $(WINDOWS_BUILD_DIR)/aspell-0.60; \
+	fi
+	if test -n "$(GS_LICENSES)"; then \
+		$(MKDIR) $(WINDOWS_BUILD_DIR)/misc/licenses/ghostscript; \
+		$(CP) -r "$(GS_LICENSES)"/* $(WINDOWS_BUILD_DIR)/misc/licenses/ghostscript/; \
+	fi
+	if test -n "$(ASPELL_LICENSES)"; then \
+		$(MKDIR) $(WINDOWS_BUILD_DIR)/misc/licenses/aspell; \
+		$(CP) -r "$(ASPELL_LICENSES)"/* $(WINDOWS_BUILD_DIR)/misc/licenses/aspell/; \
+	fi
 	for f in $(WINDOWS_BUILD_BIN_DIR)/*.exe;do $(WINDOWS_PACKAGE_SRC)/copydll.sh $$f;done
 	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(WINDOWS_BUILD_DIR)/bin
 	if test -n "@GUILE_DATA_PATH@"; then find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(WINDOWS_BUILD_DIR)/progs/ \; ; fi
