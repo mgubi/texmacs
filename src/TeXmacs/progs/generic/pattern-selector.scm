@@ -17,6 +17,39 @@
   (:use (generic format-widgets)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The tree of a pattern: (pattern name width height [effect [base]])
+;;
+;; The 4th argument is an effect (recolor, skin...). In old documents it may
+;; be a color, which only stands for the image when patterns are switched off.
+;; The 5th argument is the base color: the opaque color painted under the
+;; image, so that its transparent parts show it. A pattern with a base color
+;; and no effect has "" as effect. Without base color, a pattern nested in a
+;; document is transparent, and one on the page shows the paper.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (pattern-effect col)
+  (and (pair? col) (eq? (car col) 'pattern) (>= (length col) 5)
+       (pair? (list-ref col 4)) (list-ref col 4)))
+
+(define-public (pattern-base col)
+  (and (pair? col) (eq? (car col) 'pattern) (>= (length col) 6)
+       (string? (list-ref col 5)) (!= (list-ref col 5) "")
+       (list-ref col 5)))
+
+(define-public (pattern-build name w h eff base)
+  (cond (base `(pattern ,name ,w ,h ,(or eff "") ,base))
+        (eff `(pattern ,name ,w ,h ,eff))
+        (else `(pattern ,name ,w ,h))))
+
+(define-public (pattern-set-base col base)
+  (pattern-build (cadr col) (caddr col) (cadddr col)
+                 (pattern-effect col) base))
+
+(define-public (pattern-set-effect col eff)
+  (pattern-build (cadr col) (caddr col) (cadddr col)
+                 eff (pattern-base col)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Name conversions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -118,8 +151,11 @@
 
 (define (set-effect kind apply? . args)
   (with col (get-color)
-    (set-color `(pattern ,(cadr col) ,(caddr col) ,(cadddr col)
-                         ,@(set-effect* (cddddr col) apply? kind args)))))
+    (with tail (set-effect* (if (pattern-effect col)
+                                (list (pattern-effect col))
+                                (list))
+                            apply? kind args)
+      (set-color (pattern-set-effect col (and (nnull? tail) (car tail)))))))
 
 (define (get-effect* eff kind)
   (cond ((or (npair? eff) (npair? (cdr eff))) #f)
@@ -128,8 +164,20 @@
 
 (define (get-effect kind)
   (with col (get-color)
-    (with eff (and (nnull? (cddddr col)) (car (cddddr col)))
-      (get-effect* eff kind))))
+    (get-effect* (pattern-effect col) kind)))
+
+(define (default-base-color)
+  ;; the base color which a new choice starts from: the background of the
+  ;; document if that is a plain color
+  (with bg (catch #t (lambda () (tree->stree (get-init-tree "bg-color")))
+                  (lambda args #f))
+    (if (and (string? bg) (!= bg "")) bg "white")))
+
+(define (set-base base)
+  (set-color (pattern-set-base (get-color) base)))
+
+(define (get-base)
+  (pattern-base (get-color)))
 
 (define (set-recolor recol)
   (set-effect 'eff-recolor (nnot recol) recol))
@@ -254,6 +302,23 @@
 	((icon "tm_add.xpm") (inc-skin)))
       >>)))
 
+(tm-widget (pattern-base-options)
+  (with base (get-base)
+    (hlist
+      (when base
+        (enum (set-base answer)
+              (list (or base "")
+                    "black" "white" "grey" "red" "green" "blue"
+                    "yellow" "cyan" "magenta" "orange" "brown" "")
+              (or base "") "15em"))
+      // // //
+      (toggle (set-base (and answer (default-base-color)))
+              (nnot (get-base)))
+      // // //
+      ((icon "tm_color.xpm")
+       (interactive-color set-base (list (or base ""))))
+      >>)))
+
 (tm-widget (pattern-blur-options)
   (with blur (get-blur)
     (hlist
@@ -331,6 +396,8 @@
                   (link pattern-recolor-options))
                 (item (text "Skin:")
                   (link pattern-skin-options))
+                (item (text "Base color:")
+                  (link pattern-base-options))
                 ;; TODO: the blur effect changes the image size;
                 ;; one needs a blur that wraps around torically
                 ;;(item (text "Blur:")
@@ -368,6 +435,8 @@
                   (link pattern-recolor-options))
                 (item (text "Skin:")
                   (link pattern-skin-options))
+                (item (text "Base color:")
+                  (link pattern-base-options))
                 )))
           ======
           (glue #f #t 0 0))))

@@ -16,6 +16,8 @@
 #include "colors.hpp"
 #include "file.hpp"
 #include "sys_utils.hpp"
+#include "vars.hpp"
+#include "hashmap.hpp"
 #include <QImage>
 #include <QColor>
 
@@ -24,12 +26,14 @@
 static const int PX= 5 * PIXEL;
 static const int W = 40;   // the page: W x W pixels
 
+// the background of the renderer is that of the document (bg-color)
 static picture
-make_screen (renderer& ren, color previous) {
+make_screen (renderer& ren, color previous, brush doc_bg= brush (white)) {
   picture pic= native_picture (W, W, 0, 0);
   ren= picture_renderer (pic, 1.0);
   ren->set_background (brush (previous));
   ren->clear (0, -W*PX, W*PX, 0);
+  ren->set_background (doc_bg);
   return pic;
 }
 
@@ -108,6 +112,9 @@ save_pattern () {
   return u;
 }
 
+extern hashmap<string,tree> default_env;
+void initialize_default_env ();
+
 // the page background is a pattern with transparency: it is painted over
 // the screen of the previous paint (the window is repainted by rectangles,
 // more than once), and must not show it: the same result whatever was there
@@ -150,36 +157,112 @@ test_pattern_background () {
   remove (u);
 }
 
-// the colour under the pattern (4th argument) is opaque, whatever its alpha
-// or the opacity of the brush, and white when it is not a colour
+static tree
+make_pattern (url u, tree eff, string base= "") {
+  tree p (_PATTERN, as_string (u), "100%", "100%");
+  if (eff != tree ("") || base != "") p << eff;
+  if (base != "") p << tree (base);
+  return p;
+}
+
 static void
-test_pattern_clear_color () {
+paint_page (picture& pic, renderer& ren, tree pat, int alpha, color previous,
+            brush doc_bg, bool screen= true) {
+  box page= make_page (brush (pat, alpha),
+                       empty_box (path (), 0, 0, 0, 0), box ());
+  pic= make_screen (ren, previous, doc_bg);
+  ren->is_screen= screen;
+  rectangles rs;
+  paint (page, ren, rs);
+  paint (page, ren, rs);
+}
+
+static bool
+is_rgb (picture pic, int x, int y, int r0, int g0, int b0, int tol= 2) {
+  int r, g, b;
+  rgb_of (pic, x, y, r, g, b);
+  return abs (r - r0) <= tol && abs (g - g0) <= tol && abs (b - b0) <= tol;
+}
+
+// the base color (5th argument) is painted under the image, opaque, whatever
+// its alpha or the opacity of the brush, whatever was there, also twice
+static void
+test_pattern_base_color () {
   if (get_env ("TEXMACS_HOME_PATH") == "")
     SKIP ("TEXMACS_HOME_PATH is not set");
   url u= save_pattern ();
-  string name= as_string (u);
-  tree p1 (_PATTERN, name, "100%", "100%", "#00ff0080");
-  tree p2 (_PATTERN, name, "100%", "100%", "blue");
-  tree p3 (_PATTERN, name, "100%", "100%", "none");
-  tree p4 (_PATTERN, name, "100%", "100%", "");
-  tree ps[4]= { p1, p2, p3, p4 };
-  int alphas[4]= { 255, 128, 255, 255 };
-  int want[4][3]= { {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {255, 255, 255} };
-  for (int i= 0; i < 4; i++) {
-    box page= make_page (brush (ps[i], alphas[i]),
-                         empty_box (path (), 0, 0, 0, 0), box ());
-    renderer ren;
-    picture pic= make_screen (ren, rgb_color (255, 0, 0));
-    rectangles rs;
-    paint (page, ren, rs);
-    paint (page, ren, rs);
-    int r, g, b;
-    rgb_of (pic, 10, 20, r, g, b);   // transparent part of the image
-    CHECK_MSG (r == want[i][0] && g == want[i][1] && b == want[i][2],
-               "case " * as_string (i) * ": " * as_string (r) * ","
-               * as_string (g) * "," * as_string (b));
-    tm_delete (ren);
-  }
+  picture pic; renderer ren;
+  color red= rgb_color (255, 0, 0);
+  brush doc (white);
+  paint_page (pic, ren, make_pattern (u, "", "#00ff0080"), 255, red, doc);
+  CHECK (is_rgb (pic, 10, 20, 0, 255, 0));
+  tm_delete (ren);
+  paint_page (pic, ren, make_pattern (u, "", "blue"), 128, red, doc);
+  CHECK (is_rgb (pic, 10, 20, 0, 0, 255));
+  tm_delete (ren);
+  // in a print too (the paper is then white and painted by the printer)
+  paint_page (pic, ren, make_pattern (u, "", "blue"), 255, red, doc, false);
+  CHECK (is_rgb (pic, 10, 20, 0, 0, 255));
+  tm_delete (ren);
+  // an effect and a base color together: the image is recolored red (the
+  // translucent part is red at 25% over the base color)
+  tree eff (EFF_RECOLOR, "0", "red");
+  paint_page (pic, ren, make_pattern (u, eff, "blue"), 255, red, doc);
+  CHECK (is_rgb (pic, 10, 20, 0, 0, 255));
+  CHECK (is_rgb (pic, 30, 20, 64, 0, 191, 4));
+  tm_delete (ren);
+  // not a color: none, empty (no base color)
+  paint_page (pic, ren, make_pattern (u, "", "none"), 255, red, doc);
+  CHECK (is_rgb (pic, 10, 20, 255, 255, 255));
+  tm_delete (ren);
+  remove (u);
+}
+
+// no base color: on a screen the page starts from the paper, which is the
+// background color of the document if that is a color, and else the default
+// of bg-color in the environment (a setting), never from the earlier paint
+static void
+test_pattern_paper () {
+  if (get_env ("TEXMACS_HOME_PATH") == "")
+    SKIP ("TEXMACS_HOME_PATH is not set");
+  url u= save_pattern ();
+  picture pic; renderer ren;
+  color red= rgb_color (255, 0, 0);
+  tree pat= make_pattern (u, "");
+  paint_page (pic, ren, pat, 255, red, brush (rgb_color (0, 128, 0)));
+  CHECK (is_rgb (pic, 10, 20, 0, 128, 0));
+  tm_delete (ren);
+  initialize_default_env ();
+  tree old= default_env [BG_COLOR];
+  default_env (BG_COLOR)= tree ("#ff8000");
+  paint_page (pic, ren, pat, 255, red, brush (false));
+  CHECK (is_rgb (pic, 10, 20, 255, 128, 0));
+  tm_delete (ren);
+  default_env (BG_COLOR)= old;
+  // an old pattern with a color as 4th argument: it is no base color
+  tree pat4 (_PATTERN, as_string (u), "100%", "100%", "blue");
+  paint_page (pic, ren, pat4, 255, red, brush (white));
+  CHECK (is_rgb (pic, 10, 20, 255, 255, 255));
+  tm_delete (ren);
+  remove (u);
+}
+
+// a pattern nested in the page (a cell, with|bg-color): transparent when
+// no base color was chosen, over the base color when there is one
+static void
+test_pattern_nested () {
+  if (get_env ("TEXMACS_HOME_PATH") == "")
+    SKIP ("TEXMACS_HOME_PATH is not set");
+  url u= save_pattern ();
+  renderer ren;
+  picture pic= make_screen (ren, rgb_color (255, 0, 0));
+  ren->set_background (brush (make_pattern (u, ""), 255));
+  ren->clear_pattern (0, -W*PX, W*PX, 0);
+  CHECK (is_rgb (pic, 10, 20, 255, 0, 0));   // still the earlier paint
+  ren->set_background (brush (make_pattern (u, "", "blue"), 255));
+  ren->clear_pattern (0, -W*PX, W*PX, 0);
+  CHECK (is_rgb (pic, 10, 20, 0, 0, 255));
+  tm_delete (ren);
   remove (u);
 }
 
@@ -187,6 +270,8 @@ int
 main () {
   RUN (test_decorations_below_text);
   RUN (test_pattern_background);
-  RUN (test_pattern_clear_color);
+  RUN (test_pattern_base_color);
+  RUN (test_pattern_paper);
+  RUN (test_pattern_nested);
   return test_report ();
 }

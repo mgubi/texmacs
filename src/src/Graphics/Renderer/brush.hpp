@@ -50,6 +50,13 @@ inline bool operator != (const brush& a, const brush& b) { return !(a == b); }
 
 brush mix (brush b1, double a1, brush b2, double a2);
 
+// The base color of a pattern (its optional 5th argument): the opaque color
+// painted under the image, so that the transparent parts of the image show
+// it and not what was there. False if there is none, or if the argument is
+// not a color (none, empty...). The 4th argument is an effect, or, in old
+// documents, a color which only stands for the image when patterns are off.
+bool  get_pattern_base (tree pattern, color& c);
+
 url   resolve_pattern (url im);
 void  get_pattern_data (url& u, SI& w, SI& h, tree& eff, brush br, SI pixel);
 

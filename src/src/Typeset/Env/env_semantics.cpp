@@ -633,15 +633,15 @@ edit_env_rep::update_pattern_mode () {
   no_patterns= (get_string (NO_PATTERNS) == "true");
   if (no_patterns) {
     tree c= env[COLOR];
-    if (is_func (c, _PATTERN, 4)) env (COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (COLOR)= exec (c);
     c= env[BG_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (BG_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (BG_COLOR)= exec (c);
     c= env[FILL_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (FILL_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (FILL_COLOR)= exec (c);
     c= env[ORNAMENT_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (ORNAMENT_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (ORNAMENT_COLOR)= exec (c);
     c= env[ORNAMENT_EXTRA_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (ORNAMENT_EXTRA_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (ORNAMENT_EXTRA_COLOR)= exec (c);
     update_color ();
   }
 }

@@ -186,7 +186,8 @@ evaluate_pattern (tree t) {
 	   (!is_int (h) && !is_percentage (h)))
     return "white";
   tree r (_PATTERN, as_string (image), w, h);
-  if (N(t) == 4) r << evaluate (t[3]);
+  if (N(t) >= 4) r << evaluate (t[3]);
+  if (N(t) == 5) r << evaluate (t[4]);
   return r;
 }
 

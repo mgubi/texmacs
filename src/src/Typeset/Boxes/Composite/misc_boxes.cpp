@@ -13,6 +13,7 @@
 #include "Boxes/construct.hpp"
 #include "Boxes/change.hpp"
 #include "colors.hpp"
+#include "vars.hpp"
 
 /******************************************************************************
 * A page box contains a main box and decorations
@@ -186,26 +187,43 @@ page_box_rep::find_child (SI x, SI y, SI delta, bool force) {
   return m;
 }
 
+extern hashmap<string,tree> default_env;
+
+// The paper: the color under the transparent parts of a pattern on the page
+// when none was chosen for the pattern. It is the background color of the
+// document (bg-color) if that is a plain color, and the default of the
+// environment variable bg-color otherwise (a pattern, none).
+static color
+paper_color (brush bg) {
+  color c;
+  if (bg->get_type () == brush_color) c= bg->get_color ();
+  else if (bg->get_type () == brush_pattern &&
+           get_pattern_base (bg->get_pattern (), c));
+  else c= named_color (as_string (default_env [BG_COLOR]));
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  return rgb_color (r, g, b);
+}
+
 void
 page_box_rep::display_background (renderer ren) {
-  if (page_bgc->get_type () != brush_none) {
-    brush bgc= ren->get_background ();
-    if (page_bgc->get_type () == brush_pattern && ren->is_screen) {
-      // NOTE: the screen is repainted rectangle by rectangle and keeps the
-      // previous paint; the transparent parts of a pattern would show it
-      // (a checkerboard of leftovers, translucent parts painted twice).
-      // Like the paper of a print, start from the colour of the pattern
-      // (its optional 4th argument), opaque, and white if it is missing or
-      // not a colour (such as an effect or none).
-      tree pat= page_bgc->get_pattern ();
-      color c= white;
-      if (N(pat) == 4 && is_atomic (pat[3]) && is_color_name (pat[3]->label))
-        c= named_color (pat[3]->label);
-      int r, g, b, a;
-      get_rgb_color (c, r, g, b, a);
-      ren->set_background (brush (rgb_color (r, g, b)));
+  brush bgc= ren->get_background ();
+  brush pat= page_bgc->get_type () != brush_none? page_bgc: bgc;
+  if (pat->get_type () == brush_pattern && ren->is_screen) {
+    // NOTE: the screen is repainted rectangle by rectangle and keeps the
+    // previous paint; the transparent parts of a pattern would show it
+    // (a checkerboard of leftovers, translucent parts painted twice).
+    // Like the paper of a print, start from an opaque color: the base color
+    // of the pattern if it has one (clear_pattern paints it itself), else
+    // the paper.
+    color base;
+    if (!get_pattern_base (pat->get_pattern (), base)) {
+      ren->set_background (brush (paper_color (bgc)));
       ren->clear (x1, y1, x2, y2);
+      ren->set_background (bgc);
     }
+  }
+  if (page_bgc->get_type () != brush_none) {
     ren->set_background (page_bgc);
     ren->clear_pattern (x1, y1, x2, y2);
     ren->set_background (bgc);

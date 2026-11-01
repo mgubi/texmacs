@@ -120,6 +120,16 @@ brush_rep::get_pattern_url () {
 * Constructors
 ******************************************************************************/
 
+bool
+get_pattern_base (tree pattern, color& c) {
+  if (!is_func (pattern, _PATTERN, 5) || !is_atomic (pattern[4])) return false;
+  if (!is_color_name (pattern[4]->label)) return false;
+  int r, g, b, a;
+  get_rgb_color (named_color (pattern[4]->label), r, g, b, a);
+  c= rgb_color (r, g, b);
+  return true;
+}
+
 static brush_rep*
 make_brush (bool b) {
   if (b) return tm_new<color_brush_rep> (white);
@@ -150,6 +160,10 @@ make_brush (tree p, int a) {
   else {
     color c= white;
     if (N(p) == 4) c= named_color (as_string (p[3]), a);
+    else if (N(p) == 5) {
+      color base;
+      if (get_pattern_base (p, base)) c= base;
+    }
     return tm_new<pattern_brush_rep> (c, p, a);
   }
 }

@@ -2413,7 +2413,12 @@ edit_env_rep::exec_get_attachment (tree t) {
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (_ERROR, "bad pattern");
-  if (no_patterns && N(t) == 4 && is_atomic (t[3])) return exec (t[3]);
+  if (no_patterns && N(t) >= 4) {
+    // the colour which stands for the image: the base colour, else the 4th
+    // argument if it is a colour
+    if (N(t) == 5 && is_atomic (t[4])) return exec (t[4]);
+    if (is_atomic (t[3])) return exec (t[3]);
+  }
   string label= exec_string (t[0]);
   url image= pattern_file (base_file_name, label);
   if (is_none (image)) {
@@ -2458,7 +2463,8 @@ edit_env_rep::exec_pattern (tree t) {
 	   (!is_int (h) && !is_percentage (h) && !is_percentage (h, "@")))
     return "white";
   tree r (_PATTERN, as_string (image), w, h);
-  if (N(t) == 4) r << exec (t[3]);
+  if (N(t) >= 4) r << exec (t[3]);
+  if (N(t) == 5) r << exec (t[4]);
   return r;
 }
 
