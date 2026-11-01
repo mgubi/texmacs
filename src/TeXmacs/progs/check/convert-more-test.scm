@@ -2064,6 +2064,16 @@
   (url->list (url-expand (url-complete (url-append dir (url-wildcard "*"))
                                        "fr"))))
 
+(define (with-user-function name fun thunk)
+  ;; @thunk with the function @name, which C++ calls by its name in
+  ;; guile-user (where tm-define puts it), replaced by @fun
+  (let* ((m (resolve-module '(guile-user)))
+         (old (module-ref m name)))
+    (dynamic-wind
+      (lambda () (module-set! m name fun))
+      thunk
+      (lambda () (module-set! m name old)))))
+
 (define (image-name-in s)
   ;; the name in the last braces opened in the LaTeX @s: the includegraphics
   (with b (string-search-backwards "{" (string-length s) s)
@@ -2250,6 +2260,59 @@
     (string-save (export-png) (system->url name))
     (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
       (check-true (has-text? (string-append "{" name "}") s))))
+  ;; a %, which LaTeX would read as a comment, is given by a macro; the
+  ;; space which ends the macro is skipped, and \space gives a space after %
+  (let* ((dir (url->system (temp-dir)))
+         (text (lambda (n)
+                 (export `(document (image ,(string-append dir "/" n)
+                                           "1cm" "" "" ""))
+                         "latex-snippet"))))
+    (for (n (list "50%done.png" "a% b.png"))
+      (string-save (export-png) (system->url (string-append dir "/" n))))
+    (check-true (has-text? "/50\\csname @percentchar\\endcsname done.png}"
+                           (text "50%done.png")))
+    (check-true (has-text? "/a\\csname @percentchar\\endcsname \\space b.png}"
+                           (text "a% b.png"))))
+  (check-group "copy to the clipboard: the images of a real copy (#706)")
+  ;; through selection_set, as Edit > Copy to > LaTeX: only a copy to the
+  ;; clipboard (primary) keeps its image next to the document, not one to
+  ;; the selection of the mouse; on the offscreen platform only, whose
+  ;; clipboard is that of the process, not the one of the developer
+  (if (!= (getenv "QT_QPA_PLATFORM") "offscreen")
+      (images-skip "real copy" "not on the offscreen platform")
+      (let* ((dir (url-append (temp-dir) "real-copy"))
+             (doc (url-append dir "doc.tm"))
+             (old (current-buffer))
+             (images (lambda ()
+                       (list-filter (map (lambda (u) (url->string (url-tail u)))
+                                         (folder-files dir))
+                                    (lambda (s) (string-starts? s "image-"))))))
+        (system-mkdir dir)
+        (string-save (serialize-texmacs
+                      (stree->tree `(document (TeXmacs ,(texmacs-version))
+                                              (style "generic")
+                                              (body ,(embedded-image-sample)))))
+                     doc)
+        (load-buffer doc :strict)
+        ;; the buffer is closed and the selections cleared also after an
+        ;; error, which would otherwise leave them to the next suites
+        (dynamic-wind
+          noop
+          (lambda ()
+            (switch-to-buffer doc)
+            ;; the selection is found in the boxes (without them: a crash)
+            (update-forced)
+            (select-all)
+            (clipboard-copy-export "latex" "mouse")
+            (check= (images) '())
+            (clipboard-copy-export "latex" "primary")
+            (check= (length (images)) 1))
+          (lambda ()
+            (clipboard-clear "primary")
+            (clipboard-clear "mouse")
+            (buffer-pretend-saved doc)
+            (buffer-close doc)
+            (when (buffer-exists? old) (switch-to-buffer old))))))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)
@@ -2302,6 +2365,15 @@
           (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
         (check-false (has-text? "an image could" (last-message)))
         (check-image-file image)
+        ;; a LaTeX conversion which fails inside its C++ part (which calls
+        ;; texmacs->latex-document) gives an empty text: no file either
+        (with-user-function 'texmacs->latex-document
+                            (lambda args (error "the conversion fails"))
+          (lambda ()
+            (check-true (buffer-export (current-buffer) target "latex"))
+            (check-false (url-exists? target))))
+        (check-false (buffer-export (current-buffer) target "latex"))
+        (check-true (url-exists? target))
         ;; a PDF written twice in the same second is written both times
         ;; (its time stamp, in seconds, does not change)
         (with pdf (url-append (temp-dir) "twice.pdf")

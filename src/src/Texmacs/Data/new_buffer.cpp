@@ -611,13 +611,17 @@ export_tree (tree doc, url u, string fm) {
     url target= is_rooted_name (u)? u: resolve (u, "");
     old_target= call ("save-target-swap", object (target));
   }
-  // A converter which fails (an error, or no conversion) writes no file
+  // A converter which fails (an error, or no conversion) writes no file;
+  // an error inside a conversion made in C++ (LaTeX) is caught there and
+  // gives an empty text, which is then no conversion either
+  int errors= scheme_caught_errors ();
   object r= call ("texmacs->generic", aux, fm * "-document");
   if (has_target) call ("save-target-swap", old_target);
   if (!is_string (r)) return true;
   string s= as_string (r);
   if (s == "* error: unknown format *" ||
       s == "Error: bad format or data") return true;
+  if (s == "" && scheme_caught_errors () > errors) return true;
   return save_string (u, s);
 }
 

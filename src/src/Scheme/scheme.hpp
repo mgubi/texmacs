@@ -21,6 +21,7 @@ class patch;
 
 void start_scheme (int argc, char** argv, void (*call_back) (int, char**));
 void initialize_scheme ();
+int  scheme_caught_errors ();
 
 class object_rep : concrete_struct {
   friend class object;
