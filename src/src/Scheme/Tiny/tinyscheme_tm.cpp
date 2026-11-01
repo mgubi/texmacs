@@ -115,13 +115,6 @@ initialize_scheme () {
 
 }
 
-int
-scheme_caught_errors () {
-  // the number of errors caught at the calls from C++ to Scheme (#705):
-  // TinyScheme catches none there (see below), so none are counted
-  return 0;
-}
-
 #if 0
 /******************************************************************************
  * Catching errors (with thanks to Dale P. Smith)
