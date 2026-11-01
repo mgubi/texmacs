@@ -2238,6 +2238,18 @@
       (buffer-pretend-saved u)
       (buffer-close u))
     (when (buffer-exists? old) (switch-to-buffer old)))
+  (check-group "export: the name of an image, as it is (#706)")
+  ;; an absolute name with spaces and an accented letter, long enough for the
+  ;; line to be wrapped: the text has it whole (not h{\'e}, nor on two lines)
+  (let* ((dir (string-append (url->system (temp-dir))
+                             "/a folder with a rather long name, so that"
+                             " the line is wrapped, h"
+                             (string (integer->char 195) (integer->char 169))))
+         (name (string-append dir "/linked.png")))
+    (system-mkdir (system->url dir))
+    (string-save (export-png) (system->url name))
+    (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
+      (check-true (has-text? (string-append "{" name "}") s))))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)
@@ -2253,6 +2265,48 @@
         (check-true (buffer-export (current-buffer)
                                    (url-append dir "x.pdf") "pdf"))
         (check-false (url-exists? dir)))))
+  (check-group "export: a failure is reported, and leaves no file (#705)")
+  (with-sample-buffer (embedded-image-sample)
+    (lambda (name)
+      (let* ((messages '())
+             (capture (lambda (msg . args) (set! messages (cons msg messages))))
+             (last-message (lambda () (object->string (car messages))))
+             (target (url-append (temp-dir) "failed.txt"))
+             (tex (url-append (temp-dir) "image-failed.tex"))
+             (image (url-append (temp-dir)
+                                (string-append "image-failed-1."
+                                               (eps-suffix)))))
+        ;; a conversion which fails: an error, and no file (not the text
+        ;; "Error: bad format or data", nor an empty file for a converter
+        ;; which throws)
+        (check-true (buffer-export (current-buffer) target "no-such-format"))
+        (check-false (url-exists? target))
+        (with-global set-message capture
+          (export-buffer-main (current-buffer) target "no-such-format"
+                              '(:overwrite)))
+        (check-false (url-exists? target))
+        (check-true (string-starts? (last-message) "(concat \"Could not save"))
+        ;; the text is written, but not its image: said so
+        (system-mkdir image)
+        (image-write-failures-reset)
+        (check-false (buffer-export (current-buffer) tex "latex"))
+        (check= (image-write-failures) (list image))
+        (with-global set-message capture
+          (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
+        (check-true (has-text? "an image could" (last-message)))
+        (check-true (has-text? (url->system image) (last-message)))
+        (check= (image-write-failures) '())
+        (system-rmdir image)
+        ;; and when it can be written, as usual
+        (with-global set-message capture
+          (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
+        (check-false (has-text? "an image could" (last-message)))
+        (check-image-file image)
+        ;; a PDF written twice in the same second is written both times
+        ;; (its time stamp, in seconds, does not change)
+        (with pdf (url-append (temp-dir) "twice.pdf")
+          (check-false (buffer-export (current-buffer) pdf "pdf"))
+          (check-false (buffer-export (current-buffer) pdf "pdf"))))))
   (check-group "export: a relative target is in the current directory")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
       (images-skip "relative target" "no native PDF writer")
