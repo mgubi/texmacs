@@ -1186,6 +1186,13 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   //time_t t1= texmacs_time ();
   typeset_prepare ();
   eb= empty_box (reverse (rp));
+  // a document without any paragraph has no position for the cursor (a
+  // key pressed in it loops, #704): it holds an empty paragraph, as the
+  // recovery of a typesetting failure used to leave it
+  if (is_func (subtree (et, rp), DOCUMENT, 0)) {
+    assign (rp, tree (DOCUMENT, ""));
+    ::notify_assign (ttt, path(), subtree (et, rp));
+  }
   // saves memory
   bench_start ("typeset");
 #ifdef USE_EXCEPTIONS
@@ -1197,6 +1204,9 @@ edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   catch (string msg) {
     the_exception= msg;
     std_error << "Typesetting failure, resetting to empty document\n";
+    // the text of the document is not lost silently: a copy of it is saved
+    // and the user is told (see typeset-failure-recover in tm-files.scm)
+    (void) call ("typeset-failure-recover", buf->buf->name, msg);
     assign (rp, tree (DOCUMENT, ""));
     ::notify_assign (ttt, path(), subtree (et, rp));
     eb= ::typeset (ttt, x1, y1, x2, y2);    

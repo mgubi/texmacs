@@ -2706,10 +2706,40 @@
         (undo 0)
         (list res n (tm->stree (buffer-get-body u)) kept? sel)))))
 
+(define (replace-type-undo doc what by)
+  ;; Replace in a buffer holding doc, then typeset, type a letter, typeset:
+  ;; the body after each step
+  (with-search-buffers doc what by
+    (lambda (u)
+      (ahash-set! (widget 'search-filter-table)
+                  (current-buffer) (stree->tree '(attr)))
+      (clear-undo-history)
+      ((widget 'perform-search*))
+      (replace-one)
+      (update-forced)
+      (let* ((r1 (tm->stree (buffer-get-body u)))
+             (n (begin (insert "y") (update-forced) (undo-possibilities)))
+             (r2 (tm->stree (buffer-get-body u))))
+        (list r1 r2)))))
+
 (define (test-replace-next-to-hidden)
   (check-group "replace next to hidden content")
   (with-search-mode 'replace
     (lambda ()
+      ;; the document typeset after the replacement (repro 2 of #704: the
+      ;; hidden content alone in the document was replaced by an empty one)
+      (check= (list (replace-type-undo '(document (concat "a1x" (hidden "b")))
+                                       "a1x" "")
+                    (replace-type-undo '(document (concat "a1x" (hidden "b")))
+                                       "a1x" "Z")
+                    (replace-type-undo '(document (concat "a1x" (hidden "b")))
+                                       "a1x" '(document "P" "Q")))
+              '(((document (hidden "b"))
+                 (document (concat "y" (hidden "b"))))
+                ((document (concat "Z" (hidden "b")))
+                 (document (concat "Zy" (hidden "b"))))
+                ((document "P" (concat "Q" (hidden "b")))
+                 (document "P" (concat "Qy" (hidden "b"))))))
       (check-replace-rows
         '(((document (concat "a1x" (hidden "b"))) "a1x" "Z"
            (document (concat "Z" (hidden "b"))))
