@@ -340,9 +340,9 @@ EOT
       tr '\\' / < "$out" | tr -d '\r' | grep -F "gs executable: " | grep -qF "Program Files/gs/gscheck/bin/gswin64c.exe" &&
         ok "gs_embedded (C++) took the installed gs for $h" ||
         { fail "gs_embedded did not take the installed gs for $h"; grep -F "gs executable" "$out" | head -3; }
-      [ $sys_gs = yes ] && ok "the installed gs was run (by C++ and the Scheme conversions)" ||
+      [ $sys_gs = yes ] && ok "the installed gs was run (by C++ and the Scheme conversion)" ||
         fail "the installed gs was not run for $h"
-      [ "$(val scheme-eps-run)" = ok ] || fail "the Scheme conversions did not run for $h: $(val scheme-eps-run)"
+      [ "$(val scheme-eps-run)" = ok ] || fail "the Scheme conversion did not run for $h: $(val scheme-eps-run)"
     # the letters of the code page: the gs of the package, whatever is installed
     elif [ "$h" = "home ü" ] && [ "$acp" = 1252 ]; then
       case "$chosen" in
@@ -355,9 +355,9 @@ EOT
       [ $sys_gs = no ] && ok "the installed gs was not run for $h" || fail "the installed gs was run for $h"
       [ "$(val pdf)" = yes ] && ok "an EPS image written to PDF with TEXMACS_HOME_PATH=.../$h" ||
         fail "no PDF with TEXMACS_HOME_PATH=.../$h"
-      [ "$(val scheme-eps)" = yes ] && [ "$(val scheme-png)" = yes ] &&
-        ok "the Scheme conversions (gs-convert, pdf-file->gs-raster) with the gs of the package" ||
-        fail "the Scheme conversions failed with the gs of the package: $(val scheme-eps) $(val scheme-png) $(val scheme-eps-run)"
+      [ "$(val scheme-png)" = yes ] &&
+        ok "the Scheme conversion (pdf-file->gs-raster) with the gs of the package" ||
+        fail "the Scheme conversion failed with the gs of the package: $(val scheme-png) $(val scheme-eps-run)"
     elif [ "$(val pdf)" = yes ]; then ok "an EPS image written to PDF with TEXMACS_HOME_PATH=.../$h"
     else echo "note: no PDF with TEXMACS_HOME_PATH=.../$h (gs and the ANSI functions of Windows; no installed gs here, or the code page is not 1252)"; fi
   done

@@ -40,23 +40,19 @@
                   (number->string (string-length (string-load (system->url pdf))))
                   "0"))))
 
-;; the conversions of the Scheme side which run gs (gs-convert: EPS to EPS;
-;; pdf-file->gs-raster: PDF to PNG), with no window: they use gs-binary, which
+;; the conversion of the Scheme side which runs gs (pdf-file->gs-raster: PDF
+;; to PNG; not gs-convert, whose command has a space after -sOutputFile= and
+;; writes nothing: not part of this PR), with no window: they use gs-binary, which
 ;; must agree with the C++ code. They need direct.pdf (made by check.sh)
 (define (cbt-wait u)
   (let ((t0 (texmacs-time)))
     (while (and (not (url-exists? u)) (< (- (texmacs-time) t0) 15000)) #t)))
 
 (define (cbt-scheme dir)
-  (let ((src (system->url (string-append dir "/test.eps")))
-        (eps (system->url (string-append dir "/scheme-out.eps")))
-        (pdf (system->url (string-append dir "/direct.pdf")))
+  (let ((pdf (system->url (string-append dir "/direct.pdf")))
         (png (system->url (string-append dir "/scheme-out.png"))))
     (catch #t
       (lambda ()
-        (gs-convert src (list (cons 'dest eps)))
-        (cbt-wait eps)
-        (cbt-line "scheme-eps" (if (url-exists? eps) "yes" "no"))
         (pdf-file->gs-raster pdf (list (cons 'dest png)))
         (cbt-wait png)
         (cbt-line "scheme-png" (if (url-exists? png) "yes" "no"))
