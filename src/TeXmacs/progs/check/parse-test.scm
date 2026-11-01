@@ -982,13 +982,16 @@
     ("int x = 1; // c"
      `(("int" ,black) ("x" ,black) ("=" ,black) ("1;" ,black) ("//" ,black)
        ("c" ,black))))
-  ;; (shell has a format and shell-lang.scm since #734: its comments are colored)
   (check-lines "latex"
     ("x = 1 % c"
      `(("x" ,black) ("=" ,black) ("1" ,black) ("%" ,black) ("c" ,black))))
+  ;; (shell has a format and shell-lang.scm since #734, without tables: the
+  ;; tokenizer would take $# for a comment; tree-sitter colors it)
   (check-lines "shell"
     ("echo $HOME # c"
-     `(("echo" ,black) ("$HOME" ,black) ("#" ,env-comment) ("c" ,env-comment)))))
+     `(("echo" ,black) ("$HOME" ,black) ("#" ,black) ("c" ,black)))
+    ("echo $# args"
+     `(("echo" ,black) ("$#" ,black) ("args" ,black)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tables of the languages

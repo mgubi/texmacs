@@ -88,6 +88,10 @@
   (check= (map url-format (map (lambda (n) (url-append dir n))
                                '("a.sh" "a.bash" "a.zsh" "a.lua")))
           '("shell" "shell" "shell" "lua"))
+  ;; (the name ends by "source code": not in the Import and Export menus, as
+  ;; the other languages)
+  (check-false (member "shell" (converters-to-special "texmacs-file" "-file" #f)))
+  (check-false (member "shell" (converters-from-special "texmacs-file" "-file" #f)))
   (in-file "s.sh" "#!/bin/sh\necho hi\n"
     (lambda ()
       (check= (get-init "prog-language") "shell")

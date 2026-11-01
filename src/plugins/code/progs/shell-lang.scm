@@ -10,37 +10,11 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The keywords for the highlighting by the tokenizer of TeXmacs, until the
-;; tables of tree-sitter are ready (progs/treesit); this file also makes
-;; shell a program language of TeXmacs (prog_lang_exists), so that a .sh file
-;; is opened as code.
+;; This file makes shell a program language of TeXmacs (prog_lang_exists), so
+;; that a .sh file is opened as code (#734). It has no tables of the
+;; tokenizer on purpose: the shell is highlighted by tree-sitter (grammar
+;; bash); without it, shell is not colored and its lines break as before (a
+;; tokenizer for the shell would take $# and ${#a} for comments).
 
 (texmacs-module (shell-lang)
   (:use (prog default-lang)))
-
-(tm-define (parser-feature lan key)
-  (:require (and (== lan "shell") (== key "keyword")))
-  `(,(string->symbol key)
-    (keyword "if" "then" "else" "elif" "fi" "case" "esac" "for" "select"
-      "while" "until" "do" "done" "in" "function" "time" "coproc")
-    (keyword_control "return" "break" "continue" "exit")
-    (declare_function "function")
-    (constant "true" "false")))
-
-(tm-define (parser-feature lan key)
-  (:require (and (== lan "shell") (== key "operator")))
-  `(,(string->symbol key)
-    (operator
-      "=" "+=" "==" "!=" "<" ">" ">>" "<<" "|" "||" "&&" "&" ";" ";;" "!"
-      "-eq" "-ne" "-lt" "-le" "-gt" "-ge")
-    (operator_openclose "{" "[" "(" ")" "]" "}")))
-
-(tm-define (parser-feature lan key)
-  (:require (and (== lan "shell") (== key "string")))
-  `(,(string->symbol key)
-    (escape_sequences "\\" "\"" "'" "n" "t" "r" "$" "`")))
-
-(tm-define (parser-feature lan key)
-  (:require (and (== lan "shell") (== key "comment")))
-  `(,(string->symbol key)
-    (inline "#")))
