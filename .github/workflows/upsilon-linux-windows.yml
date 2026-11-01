@@ -581,7 +581,7 @@ jobs:
           (cd "$x" && "$app" --appimage-extract > /dev/null)
           ls -l "$x/squashfs-root/usr/bin/gs"
           ls "$x/squashfs-root/usr/share/TeXmacs/misc/licenses/ghostscript"
-          xvfb-run -a -s "-screen 0 1600x1200x24" \
+          TM_CHECK_QPA= xvfb-run -a -s "-screen 0 1600x1200x24" \
             src/packages/bundled-tools/check.sh -g "$x/squashfs-root/usr/bin/gs" \
               -r "$x/squashfs-root/usr/share/TeXmacs" \
               -v "$(sed -n 's/^GS_VERSION=//p' src/packages/build-gs.sh)" -- "$app"

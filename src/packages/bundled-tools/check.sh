@@ -24,7 +24,8 @@
 #     and typesets an EPS image into a PDF, which is written by that gs
 #     (its Producer says the version);
 #  3. with -a: spell checking.
-# Everything is written in a scratch folder, which is removed; TeXmacs
+# (TM_CHECK_QPA: the Qt platform: empty for the default, else its name; the
+# default is offscreen, but on Windows.) Everything is written in a scratch folder, which is removed; TeXmacs
 # runs with TEXMACS_HOME_PATH there too.
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -112,7 +113,12 @@ args=""
 for w in $what; do args="$args \"$w\""; done
 out="$work/texmacs.log"
 (cd "$work" && export TEXMACS_HOME_PATH="$(native "$work/home")" TEXMACS_PATH="$(native "$root")" \
-   PATH="$run_path" QT_QPA_PLATFORM=offscreen &&
+   PATH="$run_path" &&
+   # (Qt without a window, unless TM_CHECK_QPA says otherwise, even empty:
+   # the Qt of an AppImage has no offscreen plugin, nor Windows runs need it)
+   if [ -n "${TM_CHECK_QPA+x}" ]; then
+     if [ -n "$TM_CHECK_QPA" ]; then export QT_QPA_PLATFORM="$TM_CHECK_QPA"; fi
+   elif [ $windows = no ]; then export QT_QPA_PLATFORM=offscreen; fi &&
    run_timeout 300 "$@" -x '(load "check.scm")' \
    -x "(bundled-tools-check \"$(native "$work")\" $args)" > "$out" 2>&1)
 [ $windows = yes ] && taskkill //F //IM texmacs.exe > /dev/null 2>&1
