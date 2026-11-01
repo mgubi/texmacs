@@ -1959,6 +1959,13 @@
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
+          ;; on Windows a document holds /D/a/x.png (url->delta-unix), which
+          ;; LaTeX reads as a path from the root of the drive: D:/a/x.png
+          (when (and (os-mingw?) (>= (string-length name) 3)
+                     (== (string-ref name 0) #\/)
+                     (char-alphabetic? (string-ref name 1))
+                     (== (string-ref name 2) #\/))
+            (set! name (image-name-for-program (unix->url name))))
           (list 'includegraphics (list '!file-name name)))
         (receive (name-url name-string) (tmtex-eps-names name)
           ;; an image which is not next to the target is next to the document
