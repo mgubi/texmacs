@@ -9555,6 +9555,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(html-math-snippet <scm-arg|content> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_math_snippet> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(html-math-defs)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_math_defs> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
     <scm|(graphics-file-to-clipboard <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

@@ -17,6 +17,7 @@
 #include "convert.hpp"
 #include "connect.hpp"
 #include "typesetter.hpp"
+#include "Html_math/html_math.hpp"
 #include "drd_std.hpp"
 #include "message.hpp"
 #include <setjmp.h>
@@ -413,24 +414,14 @@ edit_main_rep::export_ps (url name, string first, string last) {
                  "export postscript");
 }
 
-array<SI>
-edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
+box
+edit_main_rep::snippet_box (tree t, bool conserve_preamble) {
   tree buft= subtree (et, rp);
   if (conserve_preamble)
     if (is_document (buft) && is_compound (buft[0], "hide-preamble"))
       t= tree (SURROUND, buft[0], "", t);
 
-  string s= suffix (name);
-  bool bitmap=
-    (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
-#ifndef QTTEXMACS
-  bitmap= false;
-#endif
-  bool ps= (s == "ps" || s == "eps");
-  if (use_pdf ()) ps= (ps || s == "pdf");
-
   typeset_prepare ();
-  int dpi= as_int (printing_dpi);
   tree old_dpi= env->read (DPI);
   tree old_info_flag= env->read (INFO_FLAG);
   env->write (DPI, printing_dpi);
@@ -443,7 +434,40 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   env->write (INFO_FLAG, old_info_flag);
   env->style_init_env ();
   env->update ();
-  
+  return b;
+}
+
+scheme_tree
+edit_main_rep::html_math_snippet (tree t, bool conserve_preamble) {
+  box b= snippet_box (t, conserve_preamble);
+  int dpi= as_int (printing_dpi);
+  SI  em = (SI) (env->get_int (FONT_BASE_SIZE) * (dpi / 72.0) * PIXEL);
+  renderer ren= html_math_renderer (em);
+  rectangles rs;
+  b->redraw (ren, path (0), rs);
+  scheme_tree r= html_math_svg (ren, b->x1, b->y1, b->x2, b->y2);
+  tm_delete (ren);
+  return r;
+}
+
+scheme_tree
+edit_main_rep::html_math_defs () {
+  return ::html_math_defs ();
+}
+
+array<SI>
+edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
+  string s= suffix (name);
+  bool bitmap=
+    (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
+#ifndef QTTEXMACS
+  bitmap= false;
+#endif
+  bool ps= (s == "ps" || s == "eps");
+  if (use_pdf ()) ps= (ps || s == "pdf");
+
+  box b= snippet_box (t, conserve_preamble);
+  int dpi= as_int (printing_dpi);
   if (b->x4 - b->x3 >= 5*PIXEL && b->y4 - b->y3 >= 5*PIXEL) {
     if (bitmap) make_raster_image (name, b, 5.0);
     else if (ps) make_eps (name, b, dpi);

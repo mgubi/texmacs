@@ -506,6 +506,7 @@ file (GLOB_RECURSE TeXmacs_Std_Plugins_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Database/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Freetype/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Gnutls/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Html_math/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Ghostscript/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Ispell/*.cpp"

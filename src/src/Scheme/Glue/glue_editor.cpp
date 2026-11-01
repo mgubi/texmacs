@@ -3460,6 +3460,30 @@ tmg_print_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_html_math_snippet (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "html-math-snippet");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "html-math-snippet");
+
+  content in1= tmscm_to_content (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= get_current_editor()->html_math_snippet (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_html_math_defs () {
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= get_current_editor()->html_math_defs ();
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
 tmg_graphics_file_to_clipboard (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "graphics-file-to-clipboard");
 
@@ -4043,6 +4067,8 @@ initialize_glue_editor () {
   tmscm_install_procedure ("print",  tmg_print, 0, 0, 0);
   tmscm_install_procedure ("print-pages",  tmg_print_pages, 2, 0, 0);
   tmscm_install_procedure ("print-snippet",  tmg_print_snippet, 3, 0, 0);
+  tmscm_install_procedure ("html-math-snippet",  tmg_html_math_snippet, 2, 0, 0);
+  tmscm_install_procedure ("html-math-defs",  tmg_html_math_defs, 0, 0, 0);
   tmscm_install_procedure ("graphics-file-to-clipboard",  tmg_graphics_file_to_clipboard, 1, 0, 0);
   tmscm_install_procedure ("export-postscript",  tmg_export_postscript, 1, 0, 0);
   tmscm_install_procedure ("export-pages-postscript",  tmg_export_pages_postscript, 3, 0, 0);

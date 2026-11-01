@@ -1219,6 +1219,8 @@
 "print"
 "print-pages"
 "print-snippet"
+"html-math-snippet"
+"html-math-defs"
 "graphics-file-to-clipboard"
 "export-postscript"
 "export-pages-postscript"

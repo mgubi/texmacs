@@ -627,6 +627,8 @@ public:
   virtual void export_ps (url ps_name,
 			  string first="1", string last="1000000") = 0;
   virtual array<SI> print_snippet (url u, tree t, bool conserve_preamble) = 0;
+  virtual scheme_tree html_math_snippet (tree t, bool conserve_preamble) = 0;
+  virtual scheme_tree html_math_defs () = 0;
   virtual bool graphics_file_to_clipboard (url output) = 0;
   virtual void footer_eval (string s) = 0;
   virtual tree the_line () = 0;

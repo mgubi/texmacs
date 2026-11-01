@@ -19,6 +19,14 @@
 
 RESOURCE(tt_face);
 
+// The index in the font of a character code of tt_font_glyphs: from
+// 0xc000000 on, direct glyph indices (the variants of OpenType math fonts).
+inline FT_UInt
+decode_index (FT_Face face, int i) {
+  if (i < 0xc000000) return ft_get_char_index (face, i);
+  return i - 0xc000000;
+}
+
 struct tt_face_rep: rep<tt_face> {
   bool bad_face = true;
   FT_Face ft_face = nullptr;

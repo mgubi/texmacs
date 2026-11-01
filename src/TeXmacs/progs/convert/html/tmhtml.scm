@@ -31,6 +31,9 @@
 (define tmhtml-css? #t)
 (define tmhtml-mathjax? #f)
 (define tmhtml-mathml? #f)
+(define tmhtml-static-math? #f)
+(define tmhtml-static-cache (make-ahash-table))
+(define tmhtml-in-file? #f)
 (define tmhtml-images? #f)
 (define tmhtml-image-serial 0)
 (define tmhtml-image-cache (make-ahash-table))
@@ -50,6 +53,11 @@
 	(== (assoc-ref opts "texmacs->html:mathml") "on"))
   (set! tmhtml-images?
 	(== (assoc-ref opts "texmacs->html:images") "on"))
+  (set! tmhtml-static-math?
+	(== (assoc-ref opts "texmacs->html:static-math") "on"))
+  (set! tmhtml-static-cache (make-ahash-table))
+  (set! tmhtml-in-file? #f)
+  (when tmhtml-static-math? (html-math-defs))
   (set! tmhtml-image-cache (make-ahash-table))
   (set! tmhtml-image-serial 0)
   (set! tmhtml-image-loose? (url-none? current-save-target))
@@ -199,6 +207,7 @@
     (with-extract-sub w var post)))
 
 (define (tmhtml-file l)
+  (set! tmhtml-in-file? #t)
   ;; This handler is special:
   ;; Since !file is a special node used only at the top of trees
   ;; it produces a single node, and not a nodeset like other handlers.
@@ -288,7 +297,7 @@
 		  (content ,(string-append "TeXmacs " (texmacs-version)))))
        ,css
        ,@xhead)
-      (h:body ,@body))))
+      (h:body ,@(tmhtml-static-defs) ,@body))))
 
 (define (tmhtml-finalize-document top)
   ;; @top must be a node produced by tmhtml-file
@@ -1639,6 +1648,33 @@
         (else (tmhtml-mathjax-formula* x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Static formulas: typeset here and written as SVG (Plugins/Html_math)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (tmhtml-static-defs)
+  ;; the outlines of the glyphs used so far, once for the whole document
+  (with defs (html-math-defs)
+    (if (null? defs) '() (list defs))))
+
+(define (tmhtml-static-svg x)
+  (or (ahash-ref tmhtml-static-cache x)
+      (with svg (html-math-snippet
+                 `(with "mode" "math" "magnification" "1" ,x) #t)
+        (ahash-set! tmhtml-static-cache x svg)
+        svg)))
+
+(define (tmhtml-static-formula x)
+  (with svg (tmhtml-static-svg x)
+    (cond ((nnull? svg)
+           (if tmhtml-in-file?
+               (list svg)
+               (cons svg (tmhtml-static-defs))))
+          ((!= tmhtml-image-root-string "image")
+           (tmhtml-png `(with "mode" "math" ,x)))
+          (else (list `(m:math (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
+                               ,(texmacs->mathml x tmhtml-env)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Equation arrays
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1904,7 +1940,10 @@
   ;; Main conversion function.
   ;; Takes a TeXmacs tree in Scheme notation and produce a SXML node-set.
   ;; All handler functions have a similar prototype.
-  (cond ((and tmhtml-mathjax? (ahash-ref tmhtml-env :math))
+  (cond ((and tmhtml-static-math? (ahash-ref tmhtml-env :math))
+         (append (tmhtml-math-labels x)
+                 (tmhtml-static-formula x)))
+        ((and tmhtml-mathjax? (ahash-ref tmhtml-env :math))
          (append (tmhtml-math-labels x)
                  (tmhtml-mathjax-formula x)))
         ((and tmhtml-mathml? (ahash-ref tmhtml-env :math))

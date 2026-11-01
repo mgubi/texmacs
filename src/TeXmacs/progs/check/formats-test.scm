@@ -464,7 +464,7 @@
     (check= (sort (map car opts) string<?)
             '("texmacs->html:css" "texmacs->html:css-stylesheet"
               "texmacs->html:images" "texmacs->html:mathjax"
-              "texmacs->html:mathml"))
+              "texmacs->html:mathml" "texmacs->html:static-math"))
     (for-each (lambda (p)
                 (check= (cons (car p) (get-preference (car p))) p))
               opts)))

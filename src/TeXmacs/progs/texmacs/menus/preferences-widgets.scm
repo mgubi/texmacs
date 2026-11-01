@@ -397,9 +397,18 @@
 
 ;; Html ----------
 
+(define (export-formulas-as-static on?)
+  (set-boolean-preference "texmacs->html:static-math" on?)
+  (when on?
+    (set-boolean-preference "texmacs->html:mathjax" #f)
+    (set-boolean-preference "texmacs->html:mathml" #f)
+    (set-boolean-preference "texmacs->html:images" #f)
+    (refresh-now "texmacs to html")))
+
 (define (export-formulas-as-mathjax on?)
   (set-boolean-preference "texmacs->html:mathjax" on?)
   (when on?
+    (set-boolean-preference "texmacs->html:static-math" #f)
     (set-boolean-preference "texmacs->html:mathml" #f)
     (set-boolean-preference "texmacs->html:images" #f)
     (refresh-now "texmacs to html")))
@@ -407,6 +416,7 @@
 (define (export-formulas-as-mathml on?)
   (set-boolean-preference "texmacs->html:mathml" on?)
   (when on?
+    (set-boolean-preference "texmacs->html:static-math" #f)
     (set-boolean-preference "texmacs->html:mathjax" #f)
     (set-boolean-preference "texmacs->html:images" #f)
     (refresh-now "texmacs to html")))
@@ -414,6 +424,7 @@
 (define (export-formulas-as-images on?)
   (set-boolean-preference "texmacs->html:images" on?)
   (when on?
+    (set-boolean-preference "texmacs->html:static-math" #f)
     (set-boolean-preference "texmacs->html:mathjax" #f)
     (set-boolean-preference "texmacs->html:mathml" #f)
     (refresh-now "texmacs to html")))
@@ -427,6 +438,9 @@
       (meti (hlist // (text "Use CSS for more advanced formatting"))
         (toggle (set-boolean-preference "texmacs->html:css" answer)
                 (get-boolean-preference "texmacs->html:css")))
+      (meti (hlist // (text "Export mathematical formulas as static SVG"))
+        (toggle (export-formulas-as-static answer)
+                (get-boolean-preference "texmacs->html:static-math")))
       (meti (hlist // (text "Export mathematical formulas as MathJax"))
         (toggle (export-formulas-as-mathjax answer)
                 (get-boolean-preference "texmacs->html:mathjax")))

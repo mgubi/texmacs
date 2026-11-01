@@ -71,6 +71,9 @@ public:
   void print_buffer (string first="1", string last="1000000");
   void export_ps (url ps_name, string first="1", string last="1000000");
   array<SI> print_snippet (url u, tree t, bool conserve_preamble);
+  box snippet_box (tree t, bool conserve_preamble);
+  scheme_tree html_math_snippet (tree t, bool conserve_preamble);
+  scheme_tree html_math_defs ();
   bool graphics_file_to_clipboard (url output);
   void footer_eval (string s);
   tree the_line ();

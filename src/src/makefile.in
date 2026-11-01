@@ -124,6 +124,7 @@ scheme_src   := $(call findsrc_in,Scheme,Scheme Guile)
 pdf_src      := $(call findsrc_in,Plugins,@CONFIG_PDF@)
 pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
+html_math_src := $(call findsrc_in,Plugins,Html_math)
 gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
 
 make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
@@ -255,6 +256,7 @@ typeset_obj  := $(call makeobj,$(typeset_src))
 style_obj    := $(call makeobj,$(style_src))
 pdf_obj      := $(call makeobj,$(pdf_src))
 freetype_obj := $(call makeobj,$(freetype_src))
+html_math_obj := $(call makeobj,$(html_math_src))
 gnutls_obj   := $(call makeobj,$(gnutls_src))
 
 # To enforce some degree of modularity, each object file must be
@@ -330,6 +332,8 @@ $(pdf_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(pdf_incl) $(CXXFREETYPE) $(CXXPDF) $(CXXGUI))
 $(freetype_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
+$(html_math_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
 $(gnutls_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gnutls_incl) $(CXXGNUTLS) $(CXXQT))
 $(texmacs_c_deps):   Objects/%.o: %.c
@@ -392,7 +396,7 @@ uses_edit     := $(edit_obj)
 uses_scheme   := $(scheme_obj)
 uses_texmacs  := $(texmacs_obj)
 uses_pdf      := $(pdf_obj)
-uses_freetype := $(freetype_obj)
+uses_freetype := $(freetype_obj) $(html_math_obj)
 uses_gnutls   := $(gnutls_obj)
 #"uses_windowsres" is defined above
 

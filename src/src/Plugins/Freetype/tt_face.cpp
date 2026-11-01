@@ -27,12 +27,6 @@ RESOURCE_CODE(tt_face);
 inline int tt_round (int l) { return ((l+0x400020) >> 6) - 0x10000; }
 inline SI tt_si (int l) { return l<<2; }
 
-inline FT_UInt
-decode_index (FT_Face face, int i) {
-  if (i < 0xc000000) return ft_get_char_index (face, i);
-  return i - 0xc000000;  
-}
-
 /******************************************************************************
 * Freetype faces
 ******************************************************************************/

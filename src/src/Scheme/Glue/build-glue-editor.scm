@@ -347,6 +347,8 @@
   (print print_buffer (void))
   (print-pages print_buffer (void string string))
   (print-snippet print_snippet (array_SI url content bool))
+  (html-math-snippet html_math_snippet (scheme_tree content bool))
+  (html-math-defs html_math_defs (scheme_tree))
   (graphics-file-to-clipboard graphics_file_to_clipboard (bool url))
   (export-postscript export_ps (void url))
   (export-pages-postscript export_ps (void url string string))
