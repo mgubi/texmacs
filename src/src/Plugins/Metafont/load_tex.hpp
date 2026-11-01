@@ -14,7 +14,8 @@
 #include "load_tfm.hpp"
 #include "load_pk.hpp"
 
-void load_tex (string family, int size, int dpi, int dsize,
+bool load_tex (string family, int size, int dpi, int dsize,
 	       tex_font_metric& tfm, font_glyphs& pk);
+// true if the family was found, false if ecrm took its place
 
 #endif // defined LOAD_TEX_H
