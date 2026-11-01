@@ -344,7 +344,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     ::remove (name);
     ok= ok && exists (orig);
   }
-  if (ps || pdf)
+  if (ok && (ps || pdf))
     if (get_preference ("texmacs->pdf:check", "off") == "on") {
 # if QT_VERSION >= 0x060000
       system_wait ("Checking exported file '" *
