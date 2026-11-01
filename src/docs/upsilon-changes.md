@@ -32,9 +32,8 @@ have the details, and the problems go to the
   folder. The Linux `tar.gz` files still use the `gs` of the system. Also
   fixed on Windows: in the Vue build the conversions made with `gs` (an EPS
   image into the PDF, PDF into PostScript) did not wait for `gs` and looked
-  for their result before it was written, with any `gs`; `gs` writes its
-  messages to the null device there (#655 is the 30 s stall when it writes a
-  lot). The Windows `gs.exe` is not called `gswin64c.exe`: the TeX tools which
+  for their result before it was written, with any `gs` (a `gs` which writes
+  a lot of messages still stalls TeXmacs for 30 s, #655). The Windows `gs.exe` is not called `gswin64c.exe`: the TeX tools which
   look for that name (`epstopdf`, `ps2pdf` of a TeX distribution) do not find
   it (#662).
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
