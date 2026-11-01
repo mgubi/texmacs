@@ -247,7 +247,9 @@ int main (int argc, char** argv) {
   }
 #if !defined (OS_MACOS) 
 #if defined(QTTEXMACS) && QT_VERSION < 0x060000
-  if (get_env ("WAYLAND_DISPLAY") == "") {
+  // without Wayland, X11; but a platform which was asked for, such as the
+  // offscreen one of the tests, is kept (#732)
+  if (get_env ("WAYLAND_DISPLAY") == "" && get_env ("QT_QPA_PLATFORM") == "") {
     set_env ("QT_QPA_PLATFORM", "xcb"); // todo : remove ?
     set_env ("XDG_SESSION_TYPE", "x11");
   }
