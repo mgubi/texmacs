@@ -126,7 +126,44 @@
   <|explain>
     The background color for your document, as specified in
     <menu|Document|Colors|Background>. Besides colors, the background may
-    also be a pattern, a gradient or a picture.
+    also be a pattern, a gradient or a picture; a pattern is made with the
+    <markup|pattern> primitive (see below). The background of a single page
+    is <src-var|page-this-bg-color>, which may be a color or a pattern as
+    well.
+  </explain>
+
+  <\explain>
+    <explain-macro|pattern|file|width|height|effect|base><explain-synopsis|image
+    used as a color>
+  <|explain>
+    A color made from the image <src-arg|file>, repeated as a tile of the
+    given <src-arg|width> and <src-arg|height> (lengths, or percentages of
+    the box which is painted, such as <verbatim|100%>, or <verbatim|100@>
+    for the size which keeps the proportions). It can be used wherever a
+    color is expected: <src-var|bg-color>, <src-var|page-this-bg-color>,
+    <src-var|color>, <src-var|cell-background>, <markup|decorated>...
+
+    The optional argument <src-arg|effect> is an effect which is applied to
+    the image (recoloring, skin...), as done in the pattern selector. In old
+    documents it may also be a color: it then only stands for the image when
+    patterns are switched off (<src-var|no-patterns>), in themes for
+    instance, and it is not used otherwise.
+
+    The optional argument <src-arg|base> is a color which is painted, opaque,
+    under the image, so that the transparent parts of the image show it and
+    not what lies behind. It is chosen with <samp|Base color> in the pattern
+    selector. An empty <src-arg|effect> (<verbatim|""> in the source) can
+    be used when there is only a base color. The base color is painted on
+    the screen as in print. Without base color, a pattern which is nested in
+    the document (in a cell, in <markup|decorated>...) is transparent. A
+    pattern which makes the background of a page is painted on the paper:
+    the background color <src-var|bg-color> of the document if it is a
+    plain color, and the default of <src-var|bg-color> otherwise, so that
+    a transparent image does not show what the screen held before, and looks
+    as in the PDF.
+
+    Older versions of TeXmacs ignore the <src-arg|base> argument, and the
+    <src-arg|effect> too when there is one.
   </explain>
 
   <\explain>

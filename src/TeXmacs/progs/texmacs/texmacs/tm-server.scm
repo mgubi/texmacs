@@ -303,7 +303,21 @@
 ;; Killing buffers, windows and TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The buffers whose typesetting failed, and whose document was replaced by
+;; an empty one (typeset-failure-recover in tm-files.scm)
+(define typeset-failed-buffers (make-ahash-table))
+
+(tm-define (typeset-failure-flag name)
+  (ahash-set! typeset-failed-buffers (url->string name) #t))
+
+(tm-define (typeset-failure-forget name)
+  (ahash-remove! typeset-failed-buffers (url->string name)))
+
+(tm-define (typeset-failed-buffer? name)
+  (ahash-ref typeset-failed-buffers (url->string name)))
+
 (tm-define (buffer-close name)
+  (typeset-failure-forget name)
   (cpp-buffer-close name))
 
 (tm-define (buffers-modified?)

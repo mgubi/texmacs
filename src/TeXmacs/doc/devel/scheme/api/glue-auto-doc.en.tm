@@ -571,6 +571,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tex-font-found? <scm-arg|string> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tex_font_found> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(eval-system <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1071,6 +1079,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_hex_color> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(paper-color <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_paper_color> which returns
     <scm|string>.
   </explain>
 

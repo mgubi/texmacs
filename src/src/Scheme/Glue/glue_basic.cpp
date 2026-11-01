@@ -735,6 +735,25 @@ tmg_font_exists_in_ttP (tmscm arg1) {
 }
 
 tmscm
+tmg_tex_font_foundP (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tex-font-found?");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tex-font-found?");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "tex-font-found?");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "tex-font-found?");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+  int in4= tmscm_to_int (arg4);
+
+  // TMSCM_DEFER_INTS;
+  bool out= tex_font_found (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_eval_system (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "eval-system");
 
@@ -1556,6 +1575,19 @@ tmg_get_hex_color (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   string out= get_hex_color (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_paper_color (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "paper-color");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_paper_color (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -12570,6 +12602,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("plugin-list",  tmg_plugin_list, 0, 0, 0);
   tmscm_install_procedure ("set-fast-environments",  tmg_set_fast_environments, 1, 0, 0);
   tmscm_install_procedure ("font-exists-in-tt?",  tmg_font_exists_in_ttP, 1, 0, 0);
+  tmscm_install_procedure ("tex-font-found?",  tmg_tex_font_foundP, 4, 0, 0);
   tmscm_install_procedure ("eval-system",  tmg_eval_system, 1, 0, 0);
   tmscm_install_procedure ("var-eval-system",  tmg_var_eval_system, 1, 0, 0);
   tmscm_install_procedure ("evaluate-system",  tmg_evaluate_system, 4, 0, 0);
@@ -12633,6 +12666,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("force-load-translations",  tmg_force_load_translations, 2, 0, 0);
   tmscm_install_procedure ("color",  tmg_color, 1, 0, 0);
   tmscm_install_procedure ("get-hex-color",  tmg_get_hex_color, 1, 0, 0);
+  tmscm_install_procedure ("paper-color",  tmg_paper_color, 1, 0, 0);
   tmscm_install_procedure ("named-color->xcolormap",  tmg_named_color_2xcolormap, 1, 0, 0);
   tmscm_install_procedure ("rgba->named-color",  tmg_rgba_2named_color, 1, 0, 0);
   tmscm_install_procedure ("named-color->rgba",  tmg_named_color_2rgba, 1, 0, 0);

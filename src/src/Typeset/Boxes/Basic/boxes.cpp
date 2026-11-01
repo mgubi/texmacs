@@ -525,6 +525,9 @@ void
 clear_pattern_rectangles (renderer ren, rectangle m, rectangles l) {
   while (!is_nil (l)) {
     rectangle r (l->item);
+    brush bg= ren->get_background ();
+    clear_pattern_paper (ren, bg, bg, r->x1- ren->ox, r->y1- ren->oy,
+                         r->x2- ren->ox, r->y2- ren->oy);
     ren->clear_pattern (m->x1- ren->ox, m->y1- ren->oy,
 			m->x2- ren->ox, m->y2- ren->oy,
                         r->x1- ren->ox, r->y1- ren->oy,

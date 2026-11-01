@@ -1162,13 +1162,26 @@
 	      (set! html (cons `(style ,style) html))))
 	`((@ ,@html)))))
 
+;; the base color of a pattern (5th argument), opaque, under the image
+(define (html-css-pattern-base x)
+  (and (tm-func? x 'pattern 5)
+       (with c (tmhtml-force-string (tm-ref x 4))
+         (and (!= c "") (!= c "none")
+              (with h (tmcolor->htmlcolor c)
+                (string-append "background-color: "
+                               (if (and (string-starts? h "#")
+                                        (== (string-length h) 9))
+                                   (substring h 0 7)
+                                   h)))))))
+
 (define (html-css-pattern x)
   (let* ((u (tmhtml-force-string (cadr x)))
          (w (or (tmlength->htmllength (caddr x) #t) "100%"))
          (h (or (tmlength->htmllength (cadddr x) #t) "100%"))
          (im (string-append "background: url('" u "')"))
-         (sz (string-append "background-size: " w " " h)))
-    (string-append im "; " sz)))
+         (sz (string-append "background-size: " w " " h))
+         (base (html-css-pattern-base x)))
+    (string-append im "; " sz (if base (string-append "; " base) ""))))
 
 (define (length-attr what x . opt)
   (with len (tmlength->htmllength x #t)
@@ -1193,7 +1206,9 @@
                ((tm-atomic? (cadr x))
                 (string-append "background-color: "
                                (tmbgcolor->htmlbgcolor (cadr x))))
-               ((tm-func? (cadr x) 'pattern 3)
+               ((or (tm-func? (cadr x) 'pattern 3)
+                    (tm-func? (cadr x) 'pattern 4)
+                    (tm-func? (cadr x) 'pattern 5))
                 (html-css-pattern (cadr x)))
                (else #f)))
 	((== (car x) "cell-lborder") (border-attr "border-left" (cadr x)))

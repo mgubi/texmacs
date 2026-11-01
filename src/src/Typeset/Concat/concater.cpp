@@ -62,7 +62,10 @@ concater_rep::ghost (string s, path ip, color col) {
   }
   
   string fn_name= "cmr";
-  if (N(s)==1) {
+  int sz= env->get_script_size (env->fn_size, env->index_level);
+  int dpi= (int) (env->magn*env->dpi);
+  if (N(s)==1 && tex_font_found ("cmsy", sz, dpi)) {
+    // (without cmsy, ecrm takes its place, where "h" is a letter)
     if (s[0] == '<') { fn_name= "cmsy"; s= "h"; }
     else if (s[0] == '>') { fn_name= "cmsy"; s= "i"; }
     else if (s[0] == '|') { fn_name= "cmsy"; s= "j"; }
@@ -70,8 +73,7 @@ concater_rep::ghost (string s, path ip, color col) {
     else if (s[0] == '{') { fn_name= "cmsy"; s= "f"; }
     else if (s[0] == '}') { fn_name= "cmsy"; s= "g"; }
   }
-  int sz= env->get_script_size (env->fn_size, env->index_level);
-  font gfn (tex_font (fn_name, sz, (int) (env->magn*env->dpi)));
+  font gfn (tex_font (fn_name, sz, dpi));
   box b= text_box (decorate (ip), 0, s, gfn, col);
   array<box> bs (1);
   bs[0]= b;
