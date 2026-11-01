@@ -1961,7 +1961,7 @@ mupdf_pdf_renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
   w= ((w + pixel - 1) / pixel) * pixel;
   h= ((h + pixel - 1) / pixel) * pixel;
   tree eff= "";
-  if (N(pattern) == 4 && is_compound (pattern[3])) eff= pattern[3];
+  if (N(pattern) >= 4 && is_compound (pattern[3])) eff= pattern[3];
   // -----------------------------------------------------------------------
   if (w <= 0 || h <= 0) return;
   // the tile: the file itself, or the picture its effect makes of it

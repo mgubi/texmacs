@@ -24,6 +24,41 @@ have the details, and the problems go to the
   version of the machine which built it (15.8.2). No Mac with macOS 13 or 14
   could run it, and none is now told it can; the build checks that no
   bundled file needs more than the declared minimum (#733).
+- **Paste over a selection**: several paragraphs or a block no
+  longer lose the selection. Next to a hidden, frozen or ignored tag the
+  paragraphs go at the border of the tag, and over a selection of cells which
+  cannot take paragraphs nothing changes and a message says so (#711).
+- **Return at the start of a line**: Return and the insertion of
+  paragraphs or blocks at the start of a line which begins with a hidden tag
+  no longer abort TeXmacs, nor does a selection ending at the border of a
+  table (#712).
+- **Documents with only hidden content**: a document made only of
+  hidden content (or empty, or `ignore` only) is typeset as an empty page and
+  keeps its text, instead of being silently replaced by an empty document; a
+  document with no paragraph gets an empty one. When a typesetting failure
+  still resets a document, a dated copy is first saved in `system/recovered`
+  of the home folder, the footer says so, Save asks before overwriting the
+  file, and autosave skips the buffer (#704).
+- **Page decorations and backgrounds**: header and footer (and the watermarks
+  and background images they hold) are drawn below the text (#609). A
+  background picture or pattern with transparency starts from the paper on
+  screen and no longer shows a checkerboard (#616), and a "Base color" can be
+  chosen in the pattern and background picture selectors: it is painted under
+  the image, opaque, on screen and in print, and stored as a 5th argument of
+  `pattern`.
+- **Source view without the TeX fonts**: the brackets and bars of the tags are
+  no longer letters (`<em|word>` instead of `hemjwordi`); a sound box takes
+  the x-height of the current font, not that of cmr (#436).
+- **Export and print failures** (desktop): a failed conversion to LaTeX or
+  another format writes no file and is reported, also for Export as PDF,
+  printing and Export as PostScript, and an image which could not be written
+  is named in the message (#705). A `%` in the name of an image is written so
+  that LaTeX reads it, on Windows an absolute image name is written as
+  `D:/...`, and on Windows a folder can be removed by `system-rmdir` (#706).
+- **Linux, Qt 5** (desktop): a platform asked for by `QT_QPA_PLATFORM` is kept
+  (#732).
+- **The old page breaker** (internal): with "New style page breaking" off, it
+  no longer changes the lines kept by the typesetter in place (#664).
 
 - **Structured merge of documents** (desktop): fewer spurious conflicts. A
   block removed or changed by one side next to a block changed by the other,
