@@ -723,6 +723,144 @@
       (with (x y) (mouse-point-at 1 0)
         (check= (mouse-click (+ x 150000) y) '(1 6))))))
 
+;; Several paragraphs inserted at the border of a tag which has no cursor
+;; position there (an inner border, as hidden): the editor corrected the
+;; cursor into the tag while it made the new paragraph, then refused, and
+;; the paragraphs were lost; Return did nothing either (#675)
+(define (test-insert-paragraphs)
+  (check-group "insert paragraphs")
+  (let* ((by '(document "P" "Q"))
+         (check-at
+          (lambda (how doc p res)
+            (with-buffer-body doc
+              (lambda ()
+                (edit (go-to (apply at p)))
+                (edit (how))
+                (check= (body) res)
+                ;; (nothing changed: nothing to undo)
+                (when (!= res doc)
+                  (edit (undo 0))
+                  (check= (body) doc)))))))
+    (for-each
+      (lambda (how)
+        (for-each
+          (lambda (tag)
+            (check-at how `(document "u" ,tag "v") '(1 0)
+                      `(document "u" "P" (concat "Q" ,tag) "v"))
+            (check-at how `(document "u" ,tag "v") '(1 1)
+                      `(document "u" (concat ,tag "P") "Q" "v"))
+            (check-at how `(document (concat ,tag "z")) '(0 0 0)
+                      `(document "P" (concat "Q" ,tag "z")))
+            (check-at how `(document (concat "z" ,tag)) '(0 1 1)
+                      `(document (concat "z" ,tag "P") "Q")))
+          '((hidden "b") (freeze "b") (hidden (document "b" "c")) (strong "b")))
+        ;; no place for paragraphs: nothing changes
+        (for-each
+          (lambda (x)
+            (check-at how `(document ,(car x)) (cdr x) `(document ,(car x))))
+          '(((concat "t " (strong "ab")) 0 1 0 1)
+            ((concat "t " (math "ab")) 0 1 0 1)
+            ((tabular (tformat (table (row (cell "ab")))))
+             0 0 0 0 0 0 1))))
+      (list (lambda () (insert by))
+            (lambda ()
+              (clipboard-set "editing-test" (stree->tree by))
+              (clipboard-paste "editing-test"))))
+    (clipboard-clear "editing-test")
+    ;; a block goes before or after the tag, not into it
+    (let* ((block '(quotation (document "P" "Q"))))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document "u" ,tag "v") '(1 0)
+                    `(document "u" ,block ,tag "v"))
+          (check-at (lambda () (insert block))
+                    `(document "u" ,tag "v") '(1 1)
+                    `(document "u" ,tag ,block "v")))
+        '((hidden "b") (hidden (document "b" "c")) (strong "b"))))
+    ;; Return
+    (for-each
+      (lambda (tag)
+        (check-at kbd-return `(document "u" ,tag "v") '(1 0)
+                  `(document "u" "" ,tag "v"))
+        (check-at kbd-return `(document "u" ,tag "v") '(1 1)
+                  `(document "u" ,tag "" "v")))
+      '((hidden "b") (hidden (document "b" "c")) (strong "b")))
+    ;; a refused insertion does not remove the selection
+    (with-buffer-body '(document (concat "t " (strong "abc")))
+      (lambda ()
+        (edit (selection-set (at 0 1 0 1) (at 0 1 0 2)))
+        (edit (insert by))
+        (check= (body) '(document (concat "t " (strong "abc"))))
+        (check-true (selection-active-any?))
+        (edit (selection-cancel))))
+    ;; where it is possible, a selection is replaced
+    (with-buffer-body '(document "abc")
+      (lambda ()
+        (edit (selection-set (at 0 1) (at 0 2)))
+        (edit (insert by))
+        (check= (body) '(document "aP" "Qc"))))
+    ;; a selection which starts inside a tag and ends outside it: the cut
+    ;; starts before the tag, where paragraphs can go
+    ;; (setting a clipboard cancels the selection)
+    (clipboard-set "editing-test" (stree->tree by))
+    (for-each
+      (lambda (x)
+        (let* ((how (car x)) (res (cdr x)))
+          (with-buffer-body '(document (concat "some " (strong "bold")
+                                               " text after"))
+            (lambda ()
+              (edit (selection-set (at 0 1 0 1) (at 0 2 4)))
+              (edit (how))
+              (check= (body) (car res))))
+          (with-buffer-body '(document (concat "some " (strong "bold") " t")
+                                       "next")
+            (lambda ()
+              (edit (selection-set (at 0 1 0 1) (at 1 2)))
+              (edit (how))
+              (check= (body) (cadr res))))))
+      (list (list (lambda () (clipboard-paste "editing-test"))
+                  '(document "some P" "Qt after")
+                  '(document "some P" "Qxt"))
+            (list (lambda () (insert '(quotation (document "P" "Q"))))
+                  '(document "some " (quotation (document "P" "Q")) "t after")
+                  '(document "some " (quotation (document "P" "Q")) "xt"))))
+    (clipboard-clear "editing-test")
+    ;; a block after text, before a tag which holds paragraphs: not in the tag
+    (let* ((block '(quotation (document "P" "Q"))))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document (concat "w" ,tag)) '(0 0 1)
+                    `(document "w" ,block ,tag)))
+        '((hidden (document "b" "c")) (ignore (document "b" "c"))
+          (freeze (document "b" "c")) (shown (document "b" "c"))
+          (hidden "b") (strong "b")))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document (concat "w" ,tag "z")) '(0 0 1)
+                    `(document "w" ,block (concat ,tag "z"))))
+        '((hidden (document "b" "c")) (freeze (document "b" "c")) (strong "b"))))
+    ;; before the table format of a tabular, a position of scripts only:
+    ;; nothing there, and no stray concat
+    (check-at (lambda () (insert by))
+              '(document (tabular (tformat (table (row (cell "a")))))) '(0 0 0)
+              '(document (tabular (tformat (table (row (cell "a")))))))
+    (check-at kbd-return
+              '(document (tabular (tformat (table (row (cell "a")))))) '(0 0 0)
+              '(document (tabular (tformat (table (row (cell "a")))))))
+    ;; can-insert-at?
+    (with-buffer-body '(document (concat "t " (strong "ab"))
+                                 (tabular (tformat (table (row (cell "c"))))))
+      (lambda ()
+        (check-true (can-insert-at? (stree->tree by) (at 0 0 1)))
+        (check-false (can-insert-at? (stree->tree by) (at 0 1 0 1)))
+        (check-false (can-insert-at? (stree->tree by) (at 1 0 0 0 0 0 1)))
+        (check-true (can-insert-at? (stree->tree "x") (at 0 1 0 1)))
+        ;; (a path which is not in the document)
+        (check-false (can-insert-at? (stree->tree by) (at 7 7)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection and clipboard
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1545,6 +1683,7 @@
   (test-embedded-close)
   (test-load)
   (test-insert)
+  (test-insert-paragraphs)
   (test-cursor)
   (test-bad-cursor)
   (test-mouse-long)

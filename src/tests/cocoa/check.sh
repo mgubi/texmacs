@@ -36,10 +36,37 @@
 #            the interface run by the update of -[TMDocView scrolled:]) is
 #            reported once, and TeXmacs goes on: later commands and updates
 #            run (#650, #666)
+#   tall     a document of 7*10^6 points (150000 cm in papyrus mode, taller
+#            than the old cap of the frames, 5*10^6 points) is scrolled to
+#            its end by go-end (the test aid "scroll" of the window test)
+#            (#661)
+#   header   the window queries of the menus (visible-header?...) with the
+#            editor of a console as the current one: false, not a "type
+#            mismatch" (#661)
+#   console  the console opens at its end (a race before the fix: the end
+#            waited for an editor with the keyboard focus, so that this one
+#            failed now and then only) (#661)
+#   quiet    a warning from a delayed command opens the console, without
+#            the focus: the document stays the key and main window and the
+#            current buffer, and gets the keys typed. A click gives the
+#            console the focus, and its close gives it back (#679, #619)
+#   focused  the console which the user opens takes the focus, and its close
+#            leaves the document focused (#679)
+#
+# Any case may take the keyboard from whoever works on that screen: macOS may
+# make a process active when its parent, a Terminal for instance, is, and every
+# window is shown (TEXMACS_NS_SNAPSHOT, which these cases do not use, also calls
+# activateIgnoringOtherApps). The last two go further: they ask for it several
+# times, for about 40 seconds (keys typed then go into the test document), so
+# they run on GitHub Actions (GITHUB_ACTIONS=true) or with TM_COCOA_FOCUS=1, not
+# with TM_COCOA_FOCUS=0, and are told to be skipped otherwise. Where they run,
+# one in which TeXmacs says it is not active is skipped on the screen of a person
+# (who may have taken the focus) and fails on GitHub Actions, where that would
+# mean that the focus is never tested. Do not use the screen during this script.
 #
 # Every case also fails on an error caught at an entry point from AppKit
 # ("Cocoa: an error was caught", "Cocoa: an Objective-C exception",
-# "Throwing"), on an abort and on a timeout (TM_TEST_TIMEOUT seconds,
+# "Throwing"), on a "type mismatch", on an abort and on a timeout (TM_TEST_TIMEOUT seconds,
 # default 60), except the errors which the case provokes itself and those
 # of the list of known harmless messages below (extended with
 # TM_COCOA_HARMLESS, an extended regular expression). The windows are shown
@@ -74,7 +101,7 @@ expected=''
 
 # run <case> <language> <window test steps> <scheme expression> [<scheme
 # definitions>]: TeXmacs in a fresh home, the definitions at the start, the
-# expression after 2.5 s, the quit after 14 s
+# expression after 2.5 s, the quit after 14 s (or quit_after ms, for this run)
 run () {
   name=$1; lang=$2; steps=$3; x=$4; defs=${5:-}
   home="$homes/$name-home"
@@ -87,9 +114,10 @@ run () {
   HOME="$home" CFFIXED_USER_HOME="$home" \
   TEXMACS_HOME_PATH="$home" TEXMACS_NS_WINDOW_TEST="$steps" \
     perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -x \
-    "(begin $defs (delayed (:pause 2500) $x) (delayed (:pause 14000) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
+    "(begin $defs (delayed (:pause 2500) $x) (delayed (:pause ${quit_after:-14000}) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
     > "$out/$name.log" 2>&1
   echo "exit status $?" >> "$out/$name.log"
+  quit_after=
 }
 
 # verdict <case> <description> <condition (a command)>
@@ -99,7 +127,7 @@ verdict () {
   why=""
   grep -aq '^CHECK alive' "$log" || why="TeXmacs did not reach its quit"
   grep -aq '^exit status 0$' "$log" || why="$why; $(tail -1 "$log")"
-  errors=$(grep -aE 'Cocoa: an (error|Objective-C exception) was caught|terminating due to|Throwing ' "$log")
+  errors=$(grep -aE 'Cocoa: an (error|Objective-C exception) was caught|terminating due to|Throwing |type mismatch' "$log")
   allowed=$(printf '%s\n%s\n' "$harmless" "$expected" | grep -v '^$' | paste -sd '|' -)
   [ -n "$allowed" ] && errors=$(echo "$errors" | grep -avE "$allowed")
   [ -n "$errors" ] &&
@@ -256,6 +284,166 @@ raise_ok () {
     sed -n '/^CHECK raise/,$p' "$log" | grep -aq '^CHECK later'
 }
 verdict raise "an error at an entry point is reported once, TeXmacs goes on (#650)" raise_ok
+
+# (tall) the document is there before the go-end, the scroll steps come after
+cat > "$out/tall.tm" <<'EOF'
+<TeXmacs|2.1>
+
+<style|generic>
+
+<\body>
+  Top
+
+  <vspace|150000cm>
+
+  The end
+</body>
+
+<\initial>
+  <\collection>
+    <associate|page-medium|papyrus>
+  </collection>
+</initial>
+EOF
+run tall "" "scroll:tall.tm;scroll:tall.tm;scroll:tall.tm;scroll:tall.tm;scroll:tall.tm;scroll:tall.tm" \
+    "(begin (load-buffer \"$out/tall.tm\") (delayed (:pause 2500) (go-end)))"
+tall_ok () {
+  last=$(grep -a "NSTEST scroll 'tall.tm'" "$out/tall.log" | tail -1)
+  fail="not at the end of a document taller than 5*10^6 points: $last"
+  h=$(echo "$last" | sed -n 's/.* document [0-9]*x\([0-9]*\) .*/\1/p')
+  [ "${h:-0}" -gt 5000000 ] && echo "$last" | grep -aq 'at-end$'
+}
+verdict tall "a document of 7*10^6 points scrolls to its end (#661)" tall_ok
+
+# (header)
+probe='(with-buffer (string->url "tmfs://aux/console-error-messages-all") (display* "HEADER " (list (visible-header?) (visible-footer?) (visible-icon-bar? 0) (visible-side-tools? 0) (visible-bottom-tools? 0)) "\n"))'
+run header "" "" "(begin (debug-message \"std-warning\" \"hello\n\") (open-error-messages) (delayed (:pause 2000) $probe))"
+header_ok () {
+  fail="no answer: $(grep -a '^HEADER' "$out/header.log")"
+  grep -aq '^HEADER (#f #f #f #f #f)' "$out/header.log"
+}
+verdict header "the window queries of a console, the View menu (#661)" header_ok
+
+# (console)
+lines='(for-each (lambda (i) (debug-message "std-warning" (string-append "line " (number->string i) "\n"))) (iota 80))'
+run console "" "windows;scroll:Error messages;scroll:Error messages;scroll:Error messages;scroll:Error messages;scroll:Error messages;scroll:Error messages" \
+    "(begin $lines (open-error-messages))"
+console_ok () {
+  last=$(grep -a "NSTEST scroll 'Error messages'" "$out/console.log" | tail -1)
+  fail="the console is not at its end: $last"
+  echo "$last" | grep -aq 'at-end$'
+}
+verdict console "the console opens at its end (#661)" console_ok
+
+# (quiet, focused) the document comes a few seconds after the start, in the
+# window of the welcome message of a fresh home, and the console when TeXmacs
+# has the focus (an editor without the focus has no idle time, which a console
+# opening by itself waits for): the steps wait for them. The state is read
+# after one explicit activate, whose effect is only the application: but it
+# may give back a key window which was lost, so that the step just after the
+# close of the console, without it, is checked when TeXmacs was active
+cat > "$out/quiet.tm" <<'EOF'
+<TeXmacs|2.1>
+
+<style|generic>
+
+<\body>
+  Top
+</body>
+EOF
+focus_defs='(tm-define (cocoa-check-state) (display* "CHECK current " (url-tail (current-buffer)) " " (tree->stree (buffer-get-body (current-buffer))) "\n"))'
+focus_steps='wait:quiet.tm;front:quiet.tm;activate;windows'
+state='eval:(cocoa-check-state)'
+focus_quit='eval:(begin (display "CHECK alive\n") (quit-TeXmacs))'
+on_actions=
+[ "${GITHUB_ACTIONS:-}" = true ] && on_actions=1
+case "${TM_COCOA_FOCUS:-}" in
+  1) focus_cases=1 ;;
+  0) focus_cases= ;;
+  *) focus_cases=$on_actions ;;
+esac
+
+# focus_verdict <case> <description> <condition>: a case which crashed or did
+# not reach its quit has failed, whatever else it says. Otherwise TeXmacs must
+# have been active each time the case looked (the step after the close of the
+# console is judged by the condition)
+focus_verdict () {
+  log="$out/$1.log"
+  if [ -z "$focus_cases" ]; then
+    echo "  skip   $2: set TM_COCOA_FOCUS=1"
+  elif grep -aq '^CHECK alive' "$log" && grep -aq '^exit status 0$' "$log" &&
+       sed '/NSTEST step close:/,/NSTEST step activate/d' "$log" |
+         grep -aq '^NSTEST active no$'; then
+    if [ -n "$on_actions" ]; then
+      total=$((total + 1))
+      failed=$((failed + 1))
+      echo "  FAILED $2: TeXmacs did not become the active application on this runner"
+    else
+      echo "  skip   $2: TeXmacs is not the active application"
+    fi
+  else
+    verdict "$@"
+  fi
+}
+
+# close_ok <log> <the text which the document has at the end>: after the close
+# of the console, the keys typed go to the document
+close_ok () {
+  # just after the close, before anything activates TeXmacs
+  closing=$(sed -n '/NSTEST step close:/,/NSTEST step activate/p' "$1")
+  if echo "$closing" | grep -aq '^NSTEST active yes$'; then
+    fail="its close left no key window in the active TeXmacs: $(echo "$closing" | grep -a "^NSTEST window" | cut -c1-80 | tr '\n' ' ')"
+    echo "$closing" | grep -aq "^NSTEST window 'quiet.tm' shown .*main key " || return 1
+  fi
+  closed=$(sed -n '/NSTEST step close:/,$p' "$1" | sed '1,/NSTEST step activate/d')
+  fail="its close did not leave the document focused: $(echo "$closed" | grep -a "^NSTEST window\|^NSTEST type to\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  ! echo "$closed" | grep -aq "^NSTEST window 'Error messages' shown" &&
+    echo "$closed" | grep -aq "^NSTEST window 'quiet.tm' shown .*main key " &&
+    echo "$closed" | grep -aq "^NSTEST type to 'quiet.tm', main 'quiet.tm'" &&
+    echo "$closed" | grep -aq "^CHECK current <url quiet.tm> .*$2\""
+}
+
+warnings='(for-each (lambda (ch) (debug-message ch (string-append ch " line\n"))) (list "std-warning" "debug-io" "debug-automatic"))'
+quit_after=50000
+[ -n "$focus_cases" ] && run quiet "" "$focus_steps;eval:$warnings;activate;wait:Error messages;activate;windows;$state;activate;type:xy;$state;click:Error messages;windows;$state;close:Error messages;windows;activate;windows;$state;type:zw;$state;$focus_quit" \
+    "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
+quiet_ok () {
+  log="$out/quiet.log"
+  opened=$(sed -n '1,/NSTEST step click:/p' "$log")
+  fail="the console did not open"
+  echo "$opened" | grep -aq "^NSTEST window 'Error messages' shown" || return 1
+  fail="the console took the focus: $(echo "$opened" | grep -a "^NSTEST window 'Error messages' shown" | head -1)"
+  ! echo "$opened" | grep -aqE "^NSTEST window 'Error messages' shown .*(main|key) " || return 1
+  fail="the current buffer changed: $(echo "$opened" | grep -a '^CHECK current' | grep -av '<url quiet.tm>' | head -1 | cut -c1-80)"
+  ! echo "$opened" | grep -a '^CHECK current' | grep -avq '<url quiet.tm>' || return 1
+  fail="the document did not stay the key and main window"
+  echo "$opened" | sed -n '/NSTEST step wait:Error messages/,$p' |
+    grep -aq "^NSTEST window 'quiet.tm' shown .*main key " || return 1
+  fail="the keys did not go to the document: $(echo "$opened" | grep -a '^NSTEST type to')"
+  echo "$opened" | grep -aq "^NSTEST type to 'quiet.tm', main 'quiet.tm'" || return 1
+  fail="the document did not get the keys typed: $(echo "$opened" | grep -a '^CHECK current' | tail -1 | cut -c1-80)"
+  echo "$opened" | grep -aq '^CHECK current <url quiet.tm> .*xyTop"' || return 1
+  clicked=$(sed -n '/NSTEST step click:/,/NSTEST step close:/p' "$log")
+  fail="a click did not give the console the focus: $(echo "$clicked" | grep -a "^NSTEST window 'Error\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  echo "$clicked" | grep -aq "^NSTEST window 'Error messages' shown .*main key " &&
+    echo "$clicked" | grep -aq '^CHECK current <url console-' || return 1
+  close_ok "$log" xyzwTop
+}
+focus_verdict quiet "a console which opens by itself leaves the focus to the document (#679)" quiet_ok
+
+quit_after=50000
+[ -n "$focus_cases" ] && run focused "" "$focus_steps;eval:(open-error-messages);wait:Error messages;activate;windows;type:a;$state;close:Error messages;windows;activate;windows;$state;type:zw;$state;$focus_quit" \
+    "(load-buffer \"$out/quiet.tm\")" "$focus_defs"
+focused_ok () {
+  log="$out/focused.log"
+  opened=$(sed -n '1,/NSTEST step close:/p' "$log")
+  fail="the console opened by the user did not take the focus: $(echo "$opened" | grep -a "^NSTEST window 'Error\|^NSTEST type to\|^CHECK current" | cut -c1-80 | tr '\n' ' ')"
+  echo "$opened" | grep -aq "^NSTEST window 'Error messages' shown .*main key " &&
+    echo "$opened" | grep -aq "^NSTEST type to 'Error messages', main 'Error messages'" &&
+    echo "$opened" | grep -aq '^CHECK current <url console-' || return 1
+  close_ok "$log" zwTop
+}
+focus_verdict focused "a console opened by the user takes the focus (#679)" focused_ok
 
 echo "$failed of $total failed"
 [ "$failed" = 0 ]

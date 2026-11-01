@@ -1933,7 +1933,7 @@
            (opt `(!option ,(string-append "width=" ww ",height=" hh)))
            (rat (/ y3 (- y4 y3)))
            (dy `(!concat ,(number->string rat) (height)))
-           (rb `(raisebox ,dy (includegraphics ,opt ,name-string))))
+           (rb `(raisebox ,dy (includegraphics ,opt (!file-name ,name-string)))))
       ;; TODO: top and bottom margins
       ;;(display* name-url ": " x1 ", " y1 "; " x2 ", " y2 "\n")
       ;;(display* name-url ": " x3 ", " y3 "; " x4 ", " y4 "\n")
@@ -1957,7 +1957,7 @@
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
-          (list 'includegraphics name))
+          (list 'includegraphics (list '!file-name name)))
         (receive (name-url name-string) (tmtex-eps-names name)
           ;; an image which is not next to the target is next to the document
           (when (or (string-starts? name "..") (not (url-exists? u)))
@@ -1965,7 +1965,7 @@
           (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
                         "postscript-file")
             (convert-to-file u fm nfm name-url))
-          (list 'includegraphics name-string)))))
+          (list 'includegraphics (list '!file-name name-string))))))
 
 (define (tmtex-image-length len)
   (let* ((s (force-string len))

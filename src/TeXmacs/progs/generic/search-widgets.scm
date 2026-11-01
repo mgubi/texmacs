@@ -710,7 +710,19 @@
                   (set! replace-skip-message msg)
                   (set-message replace-skip-message "Replace")
                   #f)))
-    (if by*
+    (cond
+      ((not by*)
+       (leave (cadr sel)
+              (cond ((not rm) "Match left: not one, or it crosses a tag")
+                    ((not (tm-func? what 'concat))
+                     "Match left: it would lose the rest of a tag")
+                    (else "Match left: its wildcards have no values"))))
+      ;; (the editor refuses paragraphs inside a line: in a tag of a line, a
+      ;; cell without paragraphs, a formula; the match would be cut for
+      ;; nothing, #675)
+      ((not (can-insert-at? (tm->tree by*) (car rm)))
+       (leave (cadr sel) "Match left: several paragraphs cannot go here"))
+      (else
         (let* ((a (car rm))
                (b (cadr rm))
                (by* (tm->tree by*))
@@ -740,12 +752,7 @@
                 ;; shows)
                 (when (not (tm-equal? by* ""))
                   (insert-go-to (tree-copy by*) (path-end by* '())))
-                (list a b))))
-        (leave (cadr sel)
-               (cond ((not rm) "Match left: not one, or it crosses a tag")
-                     ((not (tm-func? what 'concat))
-                      "Match left: it would lose the rest of a tag")
-                     (else "Match left: its wildcards have no values"))))))
+                (list a b))))))))
 
 (define (current-hit cur what)
   ;; the hit which Replace replaces from cur: after a replacement, the next

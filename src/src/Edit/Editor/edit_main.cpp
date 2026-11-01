@@ -483,8 +483,8 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
 bool
 edit_main_rep::graphics_file_to_clipboard (url name) {
 #ifdef QTTEXMACS
-  the_gui->put_graphics_on_clipboard (name);
-  return true;
+  // false without a clipboard of the system (-headless, #708)
+  return the_gui->put_graphics_on_clipboard (name);
 #elif defined (AQUATEXMACS)
   bool ns_put_graphics_on_clipboard (url file);
   return ns_put_graphics_on_clipboard (name);

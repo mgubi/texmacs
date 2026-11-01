@@ -27,7 +27,9 @@
 ;; configurations of Git are ignored (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM,
 ;; with Git 2.32 or newer), so that the settings of the user
 ;; (commit.gpgsign, hooks...) do not matter. The preferences which the
-;; suite changes are put back at the end.
+;; suite changes are put back at the end, and the dialogue which explains a
+;; failure is built but not opened, since a window saves its geometry in the
+;; preferences.
 ;; The asynchronous commands (fetch, pull, push, clone) need the event loop,
 ;; and are checked by src/docs/tests/git-gui-test.scm instead.
 
@@ -35,6 +37,7 @@
   (:use (check check-lib)
         (version version-tmfs)
         (version version-git)
+        (version git-widgets)
         (version version-merge)
         (version git-drivers)
         (version git-blame)
@@ -116,6 +119,24 @@
         (set-preference (car x) (cdr x))
         (reset-preference (car x)))))
 
+;; The dialogues of the suite are kept here instead of being opened: for each
+;; one its name and the text of its widget, which is really built
+(define keep-dialogues? #f)
+(define dialogues '())
+
+(tm-define (dialogue-window menu-promise cmd name . opts)
+  (:require keep-dialogues?)
+  (set! dialogues (rcons dialogues (cons name (object->string
+                                               (menu-promise noop))))))
+
+(define (check-failure-dialogue explanation)
+  ;; the failure of the last command was explained in one dialogue, where
+  ;; there is a window (see git-show-failure in git-widgets.scm)
+  (when (and (not (headless?)) (current-window))
+    (check= (map car dialogues) '("Git"))
+    (check-true (and (pair? dialogues)
+                     (string-contains? (cdar dialogues) explanation))))
+  (set! dialogues '()))
 
 ;; The main repository, with a space in its name and in a subdirectory
 (define R #f)
@@ -531,7 +552,12 @@
             '("feature" "later" "main" "wt"))
     (check= (map git-branch-name (list-filter l git-branch-current?))
             '("main")))
+  (set! dialogues '())
+  ;; a name which could be an option never reaches Git
   (check-false (git-switch-branch R "-f"))
+  (check= dialogues '())
+  (check-false (git-switch-branch R "no-such-branch"))
+  (check-failure-dialogue "Git could not complete this operation.")
   (check= (git-current-branch R) "main")
   (git-create-tag R "v1" "First version")
   (check= (map git-branch-name (git-tags R)) '("v1"))
@@ -577,7 +603,9 @@
   (git-commit-staged R "c2")
   (check-false (git-merging? R))
   (check-false (git-merge-message R))
+  (set! dialogues '())
   (git-merge-branch R "c1")
+  (check-failure-dialogue "Some parts were changed on both sides.")
   (check= (git-file-state (file "c.txt")) 'conflicted)
   (check-true (git-merging? R))
   (check-true (string-starts? (car (git-merge-message R)) "Merge branch"))
@@ -1735,6 +1763,31 @@
 ;; Main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (run-groups)
+  (setup)
+  (run-group test-subroutines)
+  (run-group test-trust)
+  (run-group test-detection)
+  (run-group test-pinning)
+  (run-group test-states)
+  (run-group test-history)
+  (run-group test-pages)
+  (run-group test-branches)
+  (run-group test-conflicts)
+  (run-group test-upstream)
+  (run-group test-merge)
+  (run-group test-merge-rules)
+  (run-group test-driver)
+  (run-group test-unsaved)
+  (run-group test-safety)
+  (run-group test-restore)
+  (run-group test-signing)
+  (run-group test-project)
+  (run-group test-names)
+  (run-group test-shortcuts)
+  (run-group test-new-repositories)
+  (run-group test-robustness))
+
 (tm-define (git-test-failures)
   (check-suite "git")
   (cond
@@ -1747,29 +1800,10 @@
      (display* "  git is not available, the suite is skipped\n"))
     (else
       (save-preferences)
-      (setup)
-      (run-group test-subroutines)
-      (run-group test-trust)
-      (run-group test-detection)
-      (run-group test-pinning)
-      (run-group test-states)
-      (run-group test-history)
-      (run-group test-pages)
-      (run-group test-branches)
-      (run-group test-conflicts)
-      (run-group test-upstream)
-      (run-group test-merge)
-      (run-group test-merge-rules)
-      (run-group test-driver)
-      (run-group test-unsaved)
-      (run-group test-safety)
-      (run-group test-restore)
-      (run-group test-signing)
-      (run-group test-project)
-      (run-group test-names)
-      (run-group test-shortcuts)
-      (run-group test-new-repositories)
-      (run-group test-robustness)
+      (set! keep-dialogues? #t)
+      ;; an error outside the groups also comes back here
+      (run-group run-groups)
+      (set! keep-dialogues? #f)
       (restore-preferences)
       (version-tool-reset)
       (shell "rm -rf '" T "'")))

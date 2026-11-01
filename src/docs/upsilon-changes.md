@@ -25,6 +25,15 @@ have the details, and the problems go to the
 
 ## 31 October 2026
 
+- **Replace and paste** (desktop): several paragraphs next to a hidden tag are
+  no longer lost, and that tag stays hidden; where paragraphs cannot go, the
+  match is left with a message, and an insertion changes nothing and keeps the
+  selection (#675).
+- **Copy to LaTeX on Windows** (desktop): the name of an image keeps its drive
+  (`D:/a/...`), and a name in `\includegraphics` stays on one line (#717).
+- **Clipboard** (desktop): the clipboard commands no longer crash under
+  `-headless` (#708).
+
 - **LaTeX and HTML export** (desktop): no crash with an embedded image on
   Edit > Copy to > LaTeX or with a target which cannot be written; the images
   always go next to the exported file, also from scripts and under any name;
@@ -56,6 +65,11 @@ have the details, and the problems go to the
   columns at the left or the right of the document are taller than the
   window, the bar widens by the width of the scroller, which no longer
   covers the last column (#683).
+- **Cocoa: a console which opens by itself leaves the focus to the document**
+  (desktop, Cocoa interface): when a warning opens the "Error messages" window,
+  the document stays the window in use, and what is typed or asked for next goes
+  to it, as in the other interfaces. A click in the console gives it the focus,
+  and a console opened from the Debug menu takes it at once (#679).
 - **Cocoa: the colors black, white, red...** (desktop, Cocoa interface):
   these colors of the program were transparent. A text with an unknown color
   name was invisible, on the screen and in a PDF: it is black now, as in Qt;

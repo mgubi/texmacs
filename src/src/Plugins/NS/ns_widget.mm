@@ -239,6 +239,15 @@ ns_widget_rep::popup_window_widget (string s) {
 
 extern int nr_windows;
 
+// the next window made is shown without the keyboard focus (a console which
+// opens by itself): the keys typed in the document stay there
+static bool next_window_without_focus= false;
+
+void
+gui_set_next_window_without_focus () {
+  next_window_without_focus= true;
+}
+
 CGFloat
 main_screen_height () {
   return [[[NSScreen screens] firstObject] frame].size.height;
@@ -255,8 +264,10 @@ ns_window_widget_of (NSWindow* win) {
 
 ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
                                             command _quit, bool _fake)
-: ns_widget_rep (window_widget), orig_name (_name), quit (_quit), fake (_fake)
+: ns_widget_rep (window_widget), orig_name (_name), quit (_quit), fake (_fake),
+  without_focus (next_window_without_focus)
 {
+  next_window_without_focus= false;
   add_child (abstract(wid));
   // HACK: don't increment window count for side tools or any other fake windows
   if (!fake) ++nr_windows;
@@ -361,6 +372,10 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       if (win) {
         // headless (-headless): the windows are made, but never shown
         if (flag && is_headless ());
+        // NOTE: its canvas gets the focus, and its editor becomes the current
+        // one, only when the window becomes the key window (TMView)
+        else if (flag && without_focus)
+          [win orderFront: nil];
         else if (flag)
           [win makeKeyAndOrderFront: nil];
         else

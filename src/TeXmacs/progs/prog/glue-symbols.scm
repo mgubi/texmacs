@@ -1028,6 +1028,7 @@
 "activate-symbol"
 "make-return-before"
 "make-return-after"
+"can-insert-at?"
 "temp-proof-fix"
 "get-full-env"
 "get-all-inits"
