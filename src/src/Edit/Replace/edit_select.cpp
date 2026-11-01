@@ -414,6 +414,9 @@ edit_select_rep::selection_get_subtable (
 
 selection
 edit_select_rep::compute_selection (path p1, path p2) {
+  // the selection is found in the boxes: a buffer which was never typeset
+  // (a script, without a window) has none yet (#729)
+  if (is_nil (eb)) typeset_forced ();
   int row1, col1, row2, col2;
   path fp;
   if (is_table_selection (et, p1, p2, true))
