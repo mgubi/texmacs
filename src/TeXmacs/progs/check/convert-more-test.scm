@@ -2064,6 +2064,16 @@
   (url->list (url-expand (url-complete (url-append dir (url-wildcard "*"))
                                        "fr"))))
 
+(define (with-user-function name fun thunk)
+  ;; @thunk with the function @name, which C++ calls by its name in
+  ;; guile-user (where tm-define puts it), replaced by @fun
+  (let* ((m (resolve-module '(guile-user)))
+         (old (module-ref m name)))
+    (dynamic-wind
+      (lambda () (module-set! m name fun))
+      thunk
+      (lambda () (module-set! m name old)))))
+
 (define (image-name-in s)
   ;; the name in the last braces opened in the LaTeX @s: the includegraphics
   (with b (string-search-backwards "{" (string-length s) s)
@@ -2302,6 +2312,15 @@
           (export-buffer-main (current-buffer) tex "latex" '(:overwrite)))
         (check-false (has-text? "an image could" (last-message)))
         (check-image-file image)
+        ;; a LaTeX conversion which fails inside its C++ part (which calls
+        ;; texmacs->latex-document) gives an empty text: no file either
+        (with-user-function 'texmacs->latex-document
+                            (lambda args (error "the conversion fails"))
+          (lambda ()
+            (check-true (buffer-export (current-buffer) target "latex"))
+            (check-false (url-exists? target))))
+        (check-false (buffer-export (current-buffer) target "latex"))
+        (check-true (url-exists? target))
         ;; a PDF written twice in the same second is written both times
         ;; (its time stamp, in seconds, does not change)
         (with pdf (url-append (temp-dir) "twice.pdf")

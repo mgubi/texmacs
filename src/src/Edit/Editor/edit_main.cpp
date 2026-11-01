@@ -372,7 +372,12 @@ void
 edit_main_rep::print_buffer (string first, string last) {
   url target;
   target= use_pdf ()? url_temp (".pdf"): url_temp (".ps");
-  print_doc (target, false, as_int (first), as_int (last));
+  if (!print_doc (target, false, as_int (first), as_int (last))) {
+    // nothing to send to the printer (#705)
+    set_message ("Could not print: the document could not be written",
+                 "print buffer");
+    return;
+  }
   system (get_printing_cmd (), target);  // Send the document to the printer
   set_message ("Done printing", "print buffer");
   ::remove (target);
@@ -402,7 +407,10 @@ edit_main_rep::print_buffer (string first, string last) {
 
 void
 edit_main_rep::export_ps (url name, string first, string last) {
-  print_doc (name, true, as_int (first), as_int (last));
+  if (!print_doc (name, true, as_int (first), as_int (last)))
+    set_message (concat ("Could not save ",
+                         verbatim (as_string (name, URL_SYSTEM))),
+                 "export postscript");
 }
 
 array<SI>
