@@ -476,6 +476,7 @@
         ((== (car x) '!verbatim) (texout-verbatim (cadr x)))
         ((== (car x) '!verbatim*) (texout-verbatim* (cadr x)))
         ((== (car x) '!invariant) (texout-invariant (cadr x)))
+        ((== (car x) '!unbroken) (output-verbatim (cadr x)))
         ((== (car x) '!arg) (texout-arg (cadr x)))
         ((== (car x) '!group) (texout-group (cons '!append (cdr x))))
         ((== (car x) '!marker) (texout-marker (cadr x) (caddr x)))

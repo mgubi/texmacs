@@ -2214,6 +2214,18 @@
       (buffer-pretend-saved u)
       (buffer-close u))
     (when (buffer-exists? old) (switch-to-buffer old)))
+  (check-group "export: the name of an image, as it is (#706)")
+  ;; an absolute name with spaces and an accented letter, long enough for the
+  ;; line to be wrapped: the text has it whole (not h{\'e}, nor on two lines)
+  (let* ((dir (string-append (url->system (temp-dir))
+                             "/a folder with a rather long name, so that"
+                             " the line is wrapped, h"
+                             (string (integer->char 195) (integer->char 169))))
+         (name (string-append dir "/linked.png")))
+    (system-mkdir (system->url dir))
+    (string-save (export-png) (system->url name))
+    (with s (export `(document (image ,name "1cm" "" "" "")) "latex-snippet")
+      (check-true (has-text? (string-append "{" name "}") s))))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)

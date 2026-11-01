@@ -1794,6 +1794,12 @@
         ((== (car l) "even") `(ifthispageodd "" ,(tmtex (cadr l))))
         (else "")))
 
+(define (tmtex-file-name name)
+  ;; the name of a file, as it is and where it is: the serializer would
+  ;; encode its letters (h{\'e} for an accented letter) and break the line
+  ;; at its spaces, which LaTeX does not read as the same name (#706)
+  `(!unbroken ,name))
+
 (define (tmtex-eps-names key)
   (set! tmtex-serial (+ tmtex-serial 1))
   (let* ((suffix (if (get-boolean-preference "native pdf") ".pdf" ".eps"))
@@ -1824,7 +1830,8 @@
            (opt `(!option ,(string-append "width=" ww ",height=" hh)))
            (rat (/ y3 (- y4 y3)))
            (dy `(!concat ,(number->string rat) (height)))
-           (rb `(raisebox ,dy (includegraphics ,opt ,name-string))))
+           (rb `(raisebox ,dy (includegraphics ,opt
+                                                ,(tmtex-file-name name-string)))))
       ;; TODO: top and bottom margins
       ;;(display* name-url ": " x1 ", " y1 "; " x2 ", " y2 "\n")
       ;;(display* name-url ": " x3 ", " y3 "; " x4 ", " y4 "\n")
@@ -1845,7 +1852,7 @@
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
-          (list 'includegraphics name))
+          (list 'includegraphics (tmtex-file-name name)))
         (receive (name-url name-string) (tmtex-eps-names name)
           ;; an image which is not next to the target is next to the document
           (when (or (string-starts? name "..") (not (url-exists? u)))
@@ -1853,7 +1860,7 @@
           (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
                         "postscript-file")
             (convert-to-file u fm nfm name-url))
-          (list 'includegraphics name-string)))))
+          (list 'includegraphics (tmtex-file-name name-string))))))
 
 (define (tmtex-image-length len)
   (let* ((s (force-string len))
