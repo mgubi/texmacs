@@ -92,7 +92,7 @@ struct page_breaker_rep {
                     font fn, int fp);
 
   void init_flows (int start, int end);
-  void init_flows (array<page_item> l, int start, int end, path p, path flb);
+  bool init_flows (array<page_item>& l, int start, int end, path p, path flb);
   void show_penalties ();
 
   bool correct_break (vbreak br, int id);
@@ -259,11 +259,18 @@ page_breaker_rep::init_flows (int start, int end) {
   init_flows (l, start, end, path (), path ());
 }
 
-void
+// The penalty of the last item of each stream is set to 0. The items and
+// the streams (lazy_vstream) are those of the bridges, which use them again
+// and compare them in the check mode: what is changed is copied first, the
+// item and the stream above it up to the array l of the breaker, which the
+// pager got from typesetter_rep::typeset as a copy of its own. The result
+// tells whether the array l has been changed.
+bool
 page_breaker_rep::init_flows (
-  array<page_item> l, int start, int end, path p, path flb)
+  array<page_item>& l, int start, int end, path p, path flb)
 {
   int i;
+  bool changed= false;
   for (i=start; i<end; i++) {
     path fl= flb * l[i]->nr_cols;
     if (!flow_id->contains (fl)) {
@@ -287,7 +294,12 @@ page_breaker_rep::init_flows (
     flow_cor [id] << space (bot_cor, bod_cor, top_cor);
     flow_tot [id] << (nr==0? space(0): flow_tot[id][nr-1]) + flow_ht[id][nr];
     flow_cont[id] << (nr==0? 1: flow_cont[id][nr-1] + (cont? 0: 1));
-    if ((i==end-1) || (l[i]->nr_cols!=l[i+1]->nr_cols)) l[i]->penalty=0;
+    if ((i==end-1) || (l[i]->nr_cols!=l[i+1]->nr_cols))
+      if (l[i]->penalty != 0) {
+        l[i]= copy (l[i]);
+        l[i]->penalty= 0;
+        changed= true;
+      }
   }
 
   for (i=start; i<end; i++) {
@@ -296,12 +308,19 @@ page_breaker_rep::init_flows (
     for (j=0; j<k; j++) {
       int ch= -1;
       lazy_vstream ins= (lazy_vstream) l[i]->fl[j];
-      array<page_item> sub_l= ins->l;
+      array<page_item> sub_l= copy (ins->l);
       if (is_tuple (ins->channel, "footnote")) ch= 0;
       else if (is_tuple (ins->channel, "float")) ch= 1;
-      init_flows (sub_l, 0, N(sub_l), p * path (i, j), fl * ch);
+      if (init_flows (sub_l, 0, N(sub_l), p * path (i, j), fl * ch)) {
+        array<lazy> new_fl= copy (l[i]->fl);
+        new_fl[j]= lazy_vstream (ins->ip, ins->channel, sub_l, ins->sb);
+        l[i]= copy (l[i]);
+        l[i]->fl= new_fl;
+        changed= true;
+      }
     }
   }
+  return changed;
 }
 
 void
