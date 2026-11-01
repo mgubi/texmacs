@@ -78,10 +78,11 @@ txt=$(cd "$work" && env -i PATH="$clean_path" "$gs" -q -dNOPAUSE -dBATCH -dSAFER
         -sDEVICE=txtwrite -sOutputFile=- test.eps | tr -d '\r')
 case "$txt" in *"Hello Gs"*) ok "the text of the EPS file: $(echo $txt | head -c 40)";;
   *) fail "no text from the EPS file: $txt";; esac
-(cd "$work" && env -i PATH="$clean_path" "$gs" -q -dNOPAUSE -dBATCH -dSAFER \
+(cd "$work" && env -i PATH="$clean_path" "$gs" -dNOPAUSE -dBATCH -dSAFER \
    -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -dEmbedAllFonts=true \
    -dCompressFonts=false -dCompressPages=false -dCompatibilityLevel=1.4 -dEPSCrop \
-   -sOutputFile=direct.pdf test.eps) || fail "gs does not convert the EPS file"
+   -sOutputFile=direct.pdf test.eps > gs-pdf.log 2>&1) ||
+  { fail "gs does not convert the EPS file"; tail -15 "$work/gs-pdf.log"; }
 if [ -s "$work/direct.pdf" ] && head -c 4 "$work/direct.pdf" | grep -q '%PDF'; then
   ok "the EPS file converted to PDF ($(wc -c < "$work/direct.pdf" | tr -d ' ') bytes)"
   # the fonts of the EPS file (Helvetica, Times) are the URW fonts built in
