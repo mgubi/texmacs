@@ -2389,12 +2389,12 @@
     (check= (typeset-check-mismatches) 0)))
 
 ;; The page breaker sets to 0 the penalty of the last line before a change
-;; of the number of columns (breaker_prepare_items): on copies of the
+;; of the number of columns (breaker_prepare_items, and init_flows of the
+;; old breaker, preference "new style page breaking" off): on copies of the
 ;; lines, not on those which the bridges keep, which the check mode compares
 ;; with the lines typeset again (here the last line of the columns, which
-;; may not be broken from the equation which follows, #573)
-(define (test-lines-changed-by-breaker)
-  (check-group "lines changed by the page breaker")
+;; may not be broken from the equation which follows, #573, #664)
+(define (test-lines-changed-by-one-breaker)
   (for (after '((equation (document "x=y"))
                 (equation* (document "x=y"))
                 (concat "plain")))
@@ -2412,6 +2412,16 @@
          (tree-insert (buffer-tree) 2 (list (stree->tree "d")))
          (update-forced) (update-forced)
          (check= (typeset-check-mismatches) m0))))))
+
+(define (test-lines-changed-by-breaker)
+  (check-group "lines changed by the page breaker")
+  (test-lines-changed-by-one-breaker)
+  (check-group "lines changed by the old page breaker")
+  (with new (cpp-get-preference "new style page breaking" "on")
+    (dynamic-wind
+      (lambda () (cpp-set-preference "new style page breaking" "off"))
+      test-lines-changed-by-one-breaker
+      (lambda () (cpp-set-preference "new style page breaking" new)))))
 
 ;; A zoom typesets again only what reads the size of a pixel (px lengths,
 ;; the borders of ornaments, graphics: edit_env_rep::get_pixel), and uses the
