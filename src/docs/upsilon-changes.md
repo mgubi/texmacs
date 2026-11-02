@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 2 November 2026
 
+- **The dark surround of the pages** (Cocoa): in the dark appearance the
+  background around the pages, grey in the light one, is the dark tone
+  30,30,32 of the Vue interface (it stayed mid grey). It follows the
+  preference "gui theme" (light, dark or default) and the appearance of
+  the system while TeXmacs runs, in the windows already open too. The
+  frame of the pages reads `tm_background` at each repaint instead of at
+  typesetting (shared code; not checked on Qt or Vue).
 - **Less memory in some runs** (Scheme heap): the heap of cells of s7 was
   quadrupled, from 8M to 32M cells (0.9 to 2.5 GB of memory), in about half
   of the runs of the test suites `kbd-menu` and `search`, when C++ was

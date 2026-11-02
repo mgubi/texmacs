@@ -639,6 +639,28 @@ ns_follow_theme () {
   [NSApp setAppearance: a];
 }
 
+// The surround of the pages (tm_background): mid grey in the light
+// appearance, a dark tone in the dark one (30,30,32, as the canvas of the
+// theme of Vue). It follows the effective appearance of the application,
+// so the theme of the preferences (ns_follow_theme) and that of the
+// system. The scroll views of the windows take the new colour (see
+// TMCanvasChanged in ns_tm_widget.mm); the pages are drawn with it at each
+// repaint.
+static bool
+ns_follow_canvas () {
+  static string current= "?";
+  string now= ns_icon_theme ();
+  if (now == current) return false;
+  bool first= (current == "?");
+  current= now;
+  tm_background= (now == "dark")? rgb_color (30, 30, 32)
+                                : rgb_color (160, 160, 160);
+  if (!first)
+    [[NSNotificationCenter defaultCenter]
+      postNotificationName: @"TMCanvasChanged" object: nil];
+  return !first;
+}
+
 // The place of the icon bars (the preference "icon bars"): the windows are
 // laid out again when it changes (they read it, see ns_icon_bars_place)
 int ns_icon_bars_place (); // ns_tm_widget.mm
@@ -717,6 +739,7 @@ ns_gui_rep::update () {
     if (vue_gpu_follow_glyph_settings ()) glyphs= true;
     if (glyphs) ns_simple_widget_rep::invalidate_every ();
     ns_follow_theme ();
+    if (ns_follow_canvas ()) ns_simple_widget_rep::invalidate_every ();
     ns_follow_icon_bars ();
     if (ns_follow_icon_set ()) {
       ns_simple_widget_rep::invalidate_every ();
@@ -1758,6 +1781,7 @@ void gui_open (int& argc, char** argv)
     debug_aqua << "the application was made before gui_open: the exceptions "
                << "of the events are not reported\n";
   ns_follow_theme ();
+  ns_follow_canvas ();
   static TMAppearanceObserver* observer= [[TMAppearanceObserver alloc] init];
   (void) observer;
   if (!pool) {

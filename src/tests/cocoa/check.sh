@@ -32,6 +32,10 @@
 #   columns  the icon bars in two columns, taller than the window, with the
 #            scroll bars which are always shown: the scroller is beside the
 #            last column, not over it (#683)
+#   canvas   the surround of the pages (tm_background) follows the theme: 30,30,32
+#            in the dark one, 160,160,160 in the light one, also in the
+#            scroll views of the window, and it changes while TeXmacs runs
+#            when the preference "gui theme" does
 #   raise    an error thrown in an entry point from AppKit (a command of
 #            the interface run by the update of -[TMDocView scrolled:]) is
 #            reported once, and TeXmacs goes on: later commands and updates
@@ -118,6 +122,7 @@ run () {
   mkdir -p "$home/system"
   prefs=""
   [ -n "$lang" ] && prefs="(\"language\" \"$lang\")"
+  [ -n "${gui_theme:-}" ] && prefs="$prefs (\"gui theme\" \"$gui_theme\")"
   [ -n "${debug_menu:-}" ] && prefs="$prefs (\"debugging tool\" \"on\")"
   [ -n "$prefs" ] &&
     printf '(%s)\n' "$prefs" > "$home/system/preferences.scm"
@@ -274,6 +279,38 @@ columns_ok () {
 }
 verdict columns "the scroller of the icon bars in columns is beside them (#683)" columns_ok
 grep -a 'NSTEST \(side-bars\|columns of\)' "$out/columns.log" | sed 's/^/         /'
+
+# (canvas) the colour around the pages, in the scroll views of the main
+# window too (the test aid "canvas" prints it): dark in the dark theme, mid
+# grey in the light one, and at a change of the preference while running
+gui_theme=dark
+run canvas-dark "" "canvas;canvas" '(display "")'
+gui_theme=light
+run canvas-light "" "canvas;canvas" '(display "")'
+gui_theme=light
+run canvas-live "" 'canvas;eval:(set-preference "gui theme" "dark");canvas;canvas;eval:(set-preference "gui theme" "light");canvas;canvas' '(display "")'
+gui_theme=
+canvas_line () {  # <case> <n>: the n-th line of the test aid
+  grep -a 'NSTEST canvas' "$out/$1.log" | sed -n "$2p"
+}
+canvas_is () {  # <case> <n> <r,g,b>: tm_background and the views follow it
+  l=$(canvas_line "$1" "$2")
+  fail="$1: $2th canvas line is '$l', not tm_background $3 on the scroll views"
+  case "$l" in
+    *"tm_background $3 scroll views: "[1-9]*" canvas "*" white 0 other") return 0 ;;
+  esac
+  return 1
+}
+canvas_dark_ok () { canvas_is canvas-dark 1 30,30,32 && canvas_is canvas-dark 2 30,30,32; }
+canvas_light_ok () { canvas_is canvas-light 1 160,160,160 && canvas_is canvas-light 2 160,160,160; }
+canvas_live_ok () {
+  canvas_is canvas-live 1 160,160,160 && canvas_is canvas-live 3 30,30,32 &&
+    canvas_is canvas-live 5 160,160,160
+}
+verdict canvas-dark "the surround of the pages is dark in the dark theme" canvas_dark_ok
+verdict canvas-light "the surround of the pages is mid grey in the light theme" canvas_light_ok
+verdict canvas-live "the surround of the pages follows a change of the theme while running" canvas_live_ok
+grep -ah 'NSTEST canvas' "$out"/canvas-*.log | sed 's/^/         /'
 
 # (raise) a command of the interface which throws a C++ error (cpp-error),
 # run by the update which -[TMDocView scrolled:] forces: the error is
