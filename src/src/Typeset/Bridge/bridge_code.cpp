@@ -78,6 +78,33 @@ bridge_code_rep::my_exec_until (path p) {
   (void) p;
 }
 
+// Is the line of a paragraph of one code box the box in a phrase box, which
+// can be made for another box in the same way? (Then 'it' is the line and x
+// where the box is in it; not when the paragraph made more, as decorations)
+static bool
+code_template (array<page_item> l, box cb, page_item& it, SI& x) {
+  int k= -1;
+  for (int i=0; i<N(l); i++)
+    if (l[i]->type == PAGE_LINE_ITEM) {
+      if (k >= 0) return false;
+      k= i;
+    }
+  if (k < 0 || N(l) != 1) return false;
+  box b= l[k]->b;
+  if (N(l[k]->fl) != 0 || b->subnr () != 1) return false;
+  if (b->subbox (0).operator-> () != cb.operator-> ()) return false;
+  x= b->sx (0);
+  array<box> bs (1); bs[0]= cb;
+  array<SI> sp (1); sp[0]= x;
+  box r= phrase_box (b->ip, bs, sp);
+  if (r->x1 != b->x1 || r->y1 != b->y1 || r->x2 != b->x2 || r->y2 != b->y2 ||
+      r->x3 != b->x3 || r->y3 != b->y3 || r->x4 != b->x4 || r->y4 != b->y4 ||
+      r->sx (0) != x || r->sy (0) != b->sy (0))
+    return false;
+  it= l[k];
+  return true;
+}
+
 void
 bridge_code_rep::my_typeset (int desired_status) {
   (void) desired_status;
@@ -123,13 +150,34 @@ bridge_code_rep::my_typeset (int desired_status) {
 
   // each box as a paragraph (in paper mode, one per line: they are then
   // stacked, and the pages broken, as the paragraphs of a document), with
-  // the line items of the bridges around before the first and after the last
+  // the line items of the bridges around before the first and after the last.
+  // The paragraphs of the lines between the first and the last are all
+  // alike: one of them is typeset, and the others are made as it was (the
+  // making of a paragraph reads the environment, some 30 us a line)
+  int N1= N(bs) - 1;
+  page_item    tpl;  // the line of the paragraph of the line 1,
+  SI           tpl_x= 0; // where the box of the line is in it,
+  stack_border tpl_sb; // and its border
+  bool         tpl_ok= false;
   for (int i=0; i<N(bs); i++) {
+    if (tpl_ok && i < N1) {
+      array<box> one (1); one[0]= bs[i];
+      array<SI> sp (1); sp[0]= tpl_x;
+      box b= phrase_box (tpl->b->ip, one, sp);
+      array<page_item> l2 (1);
+      l2[0]= page_item (tpl->type, b, tpl->spc, tpl->penalty,
+                        tpl->fl, tpl->nr_cols, tpl->t);
+      ttt->insert_stack (l2, tpl_sb);
+      continue;
+    }
     lazy_paragraph par (env, ip);
     if (i == 0) par->a= ttt->a;
     par->a << line_item (STD_ITEM, OP_SKIP, bs[i], HYPH_INVALID);
-    if (i == N(bs) - 1) par->a << ttt->b;
+    if (i == N1) par->a << ttt->b;
     par->format_paragraph ();
+    if (i == 1 && i < N1) tpl_ok= code_template (par->sss->l, bs[i],
+                                                 tpl, tpl_x);
+    if (i == 1 && tpl_ok) tpl_sb= par->sss->sb; // (merge_stack only reads it)
     ttt->insert_stack (par->sss->l, par->sss->sb);
   }
 }
