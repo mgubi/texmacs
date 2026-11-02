@@ -686,7 +686,8 @@
 (define large-load-confirmed? #f)
 
 ;; Set by the tests, which run without a window, to be asked as if there
-;; was one
+;; was one: #t, or the procedure (prompt default cont) which asks in place of
+;; user-confirm (a stub cannot replace user-confirm itself under s7)
 (tm-define large-load-test-interactive? #f)
 (tm-define (set-large-load-test-interactive! flag)
   (set! large-load-test-interactive? flag))
@@ -735,7 +736,10 @@
              (msg (replace "The file %1 is large (%2 MB). Opening it may take a long time and a lot of memory. Open it anyway?"
                            (url->system name) (number->string mb))))
         ;; answering no (or escape) leaves everything as it was
-        (user-confirm msg #f
+        ((if (procedure? large-load-test-interactive?)
+             large-load-test-interactive?
+             user-confirm)
+         msg #f
           (lambda (answ)
             (when answ
               (dynamic-wind

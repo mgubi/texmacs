@@ -855,18 +855,17 @@
          (line (apply string-append
                       (make-list 40 "(define (f x) (+ x 1111111111111111111111111111111111111))   ")))
          (n (+ 1 (quotient large-source-file-size (string-length line))))
-         (old-confirm user-confirm))
+         )
     (string-save (apply string-append
                         (map (lambda (i) (string-append line "\n")) (iota n)))
                  (url->system f))
     (write-doc "from-large.tm" '("article") '() '("text"))
     (open "from-large.tm")
     (let ((here (current-buffer)) (cur (cursor)))
-      (set! user-confirm
-            (lambda (prompt default cont)
-              (set! large-asked (+ large-asked 1))
-              (set! large-pending cont)))
-      (set-large-load-test-interactive! #t)
+      (set-large-load-test-interactive!
+       (lambda (prompt default cont)
+         (set! large-asked (+ large-asked 1))
+         (set! large-pending cont)))
       (set! large-asked 0)
       ;; deferred question, not answered yet
       (go-to-url (string-append (url->system f) "?line=3"))
@@ -917,7 +916,6 @@
         (system-remove decoy)
         (system-remove other))
       (set-large-load-test-interactive! #f)
-      (set! user-confirm old-confirm)
       (switch-to-buffer here))))
 
 ;; The loci of a typeset document: their identifiers are on their bodies,

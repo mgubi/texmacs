@@ -536,11 +536,11 @@
                  (url->system f))
     (string-save "int x;\n" (url->system g))
     (switch-to-buffer* u)
-    (set-large-load-test-interactive! #t)
-    (with-global user-confirm
-        (lambda (prompt default cont)
-          (set! asked (+ asked 1))
-          (set! pending cont))
+    (set-large-load-test-interactive!
+     (lambda (prompt default cont)
+       (set! asked (+ asked 1))
+       (set! pending cont)))
+    (begin
       (with-global load-buffer
           (lambda (name . opts) (set! calls (rcons calls (list 'current name))))
         (with-global load-buffer-in-new-window
