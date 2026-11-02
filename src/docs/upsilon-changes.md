@@ -35,6 +35,15 @@ have the details, and the problems go to the
   commit is read from git at each `make` (and each CMake build) and only the
   file `System/Boot/build_revision.cpp` depends on it; with no git or in a
   source tarball nothing changes (`Custom ...`).
+- **Cocoa: the menus which macOS computes by itself** (desktop, Cocoa
+  interface): when macOS computes all the menus without opening them
+  (Spotlight, Apple Intelligence), the error of a menu, such as the
+  deliberate one of Debug > Miscellaneous > Provoke menu error, no longer
+  fills the Error messages window; it is only logged, and shown there when
+  the user really opens that menu. The window queries of the View menu
+  (header, icon bars, side tools, status bar) answer "hidden" for any
+  window without a header, not only for the embedded editors of the console
+  (#720).
 
 - **The question dialog on Wayland** (Vue, Linux): with software OpenGL on
   mutter, sway and weston, the first frame of a new window was presented in

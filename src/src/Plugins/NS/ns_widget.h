@@ -137,13 +137,7 @@ public:
   /// what slots must implement each ns_widget.
   virtual void send (slot s, blackbox val);
   
-  virtual blackbox query (slot s, int type_id) {
-    (void) type_id;
-    if (DEBUG_QT)
-      debug_qt << "ns_widget_rep::query(), unhandled " << slot_name (s)
-      << " for widget of type: " << type_as_string() << LF;
-    return blackbox ();
-  }
+  virtual blackbox query (slot s, int type_id);
   
   virtual widget read (slot s, blackbox index) {
     (void) index;

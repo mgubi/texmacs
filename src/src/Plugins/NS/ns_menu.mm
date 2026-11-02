@@ -81,11 +81,35 @@
 * TMLazyMenu
 ******************************************************************************/
 
+extern string the_report; // (basic.cpp)
+
+// whether a menu is being tracked (the menu bar, a pop-up, the keyboard)
+static BOOL ns_menu_tracking= NO;
+int ns_menu_stats[4]= {0, 0, 0, 0};
+
+
 @implementation TMLazyMenu
++ (void)initialize
+{
+  if (self != [TMLazyMenu class]) return;
+  NSNotificationCenter* c= [NSNotificationCenter defaultCenter];
+  [c addObserverForName: NSMenuDidBeginTrackingNotification object: nil
+     queue: nil usingBlock: ^(NSNotification* n) {
+       (void) n; ns_menu_tracking= YES; ns_menu_stats[0]++; }];
+  [c addObserverForName: NSMenuDidEndTrackingNotification object: nil
+     queue: nil usingBlock: ^(NSNotification* n) {
+       (void) n; ns_menu_tracking= NO; ns_menu_stats[1]++; }];
+}
+
 - (void)setPromise:(promise_rep<widget> *)p
 {
   if (pm) { DEC_COUNT_NULL(pm); }  pm = p;  INC_COUNT_NULL(pm);
   [self setDelegate:self];
+}
+
+- (promise_rep<widget> *)promise
+{
+  return pm;
 }
 
 - (void)dealloc
@@ -108,24 +132,46 @@
   // string by tm_throw; an Objective-C exception) must not cross AppKit,
   // which would abort TeXmacs (macOS computes all the menus at once, e.g.
   // when Spotlight opens). As QTMLazyMenu::force (BEGIN_SLOT/END_SLOT) and
-  // the other entry points (NS_ENTRY_BEGIN/END): caught and reported; the
-  // menu gets a disabled item which says so
+  // the other entry points (NS_ENTRY_BEGIN/END): caught; the menu gets a
+  // disabled item which says so. The error is not shown yet: macOS also
+  // computes the menus without opening them (-[NSMenu _simulateOpening:]),
+  // and the errors would fill the window of the error messages while one
+  // does nothing with the menus (#720). It is kept, logged, and shown by
+  // menuWillOpen: if the menu is really opened.
   bool failed= false;
+  failure= ""; failure_report= "";
   try {
     @try {
       widget w = pm->eval();
       menu2 = to_nsmenu (w);
     }
     @catch (NSException* e) {
-      ns_report_exception ("a menu", e); failed= true; }
+      failure= from_nsstring_utf8 ([e name]) * ", " *
+               from_nsstring_utf8 ([e reason]);
+      failure_report= "Objective-C exception " * failure;
+      NSArray* st= [e callStackSymbols];
+      for (NSUInteger i= 0; i < [st count] && i < 30; i++)
+        failure_report << "\n  " << from_nsstring_utf8 ([st objectAtIndex: i]);
+      failed= true; }
   }
   catch (string& s) {
-    ns_report_exception ("a menu", s); failed= true; }
+    failure= s; failure_report= the_report; failed= true; }
   catch (std::exception& x) {
-    ns_report_exception ("a menu", string (x.what ())); failed= true; }
+    failure= string (x.what ()); failed= true; }
   catch (...) {
-    ns_report_exception ("a menu", string ("an unknown C++ exception"));
-    failed= true; }
+    failure= "an unknown C++ exception"; failed= true; }
+  if (failed) {
+    if (N (failure) == 0) failure= "an error";
+    // (tm_throw has set these for its error; the report is ours)
+    the_exception= ""; the_report= "";
+    // (once for the same error in a row: a scan repeats it for each menu)
+    static string last_logged;
+    if (failure != last_logged) {
+      last_logged= failure;
+      cout << "Cocoa: an error was caught while a menu was computed (shown "
+           << "if the menu is opened): " << failure << LF;
+    }
+  }
   if (failed || !menu2) {
     [menu removeAllItems];
     NSMenuItem *itm = [[[NSMenuItem alloc]
@@ -142,6 +188,41 @@
     [menu2 removeItem:itm];
     [menu addItem:itm];
   }
+}
+
+- (void)menuWillOpen:(NSMenu *)menu
+{
+  // macOS also computes the menus without showing them
+  // (-[NSMenu _simulateOpening:], with Spotlight or Apple Intelligence),
+  // and for these it calls menuNeedsUpdate: and menuWillOpen: one after
+  // the other, in the same call, and not menuDidClose: (checked on macOS
+  // 15.7). So these two do not tell a real opening. The tracking of the
+  // menus does: NSMenuDidBeginTrackingNotification comes before the menu
+  // is computed, whatever opens it (the menu bar, a key, a pop-up). The
+  // error is shown at once when the menu opens in a tracking, and in any
+  // case when it closes (menuDidClose:), which a real opening always ends
+  // with: it is never lost. A scan neither tracks nor closes, so nothing
+  // is shown (#720). If a scan did one of them, the error would be shown:
+  // a repeated message rather than a hidden one.
+  (void) menu;
+  ns_menu_stats[2]++;
+  if (N (failure) > 0 && ns_menu_tracking) [self reportFailure];
+}
+
+- (void)menuDidClose:(NSMenu *)menu
+{
+  (void) menu;
+  ns_menu_stats[3]++;
+  [self reportFailure];
+}
+
+- (void)reportFailure
+{
+  if (N (failure) == 0) return;
+  string what= failure, report= failure_report;
+  failure= ""; failure_report= "";
+  the_exception= what; the_report= report;
+  ns_report_exception ("a menu", what);
 }
 
 - (BOOL)menuHasKeyEquivalent:(NSMenu *)menu forEvent:(NSEvent *)event

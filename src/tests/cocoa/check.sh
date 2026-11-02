@@ -43,6 +43,15 @@
 #   header   the window queries of the menus (visible-header?...) with the
 #            editor of a console as the current one: false, not a "type
 #            mismatch" (#661)
+#   queries  the window queries of the View menu (header, icon bars, side
+#            tools, status bar, prompt) to the widget of the window of the
+#            console, and of the other windows: false, not a "type
+#            mismatch" (#720)
+#   menus    the menus computed by macOS without opening them (-[NSMenu
+#            _simulateOpening:], Spotlight and Apple Intelligence) do not
+#            fill the console with their errors (Debug > Miscellaneous >
+#            Provoke menu error), and that menu, really opened (a tracking),
+#            shows its error in the console (#720)
 #   console  the console opens at its end (a race before the fix: the end
 #            waited for an editor with the keyboard focus, so that this one
 #            failed now and then only) (#661)
@@ -107,8 +116,11 @@ run () {
   home="$homes/$name-home"
   rm -rf "${homes:?}/$name-home"
   mkdir -p "$home/system"
-  [ -n "$lang" ] &&
-    printf '(("language" "%s"))\n' "$lang" > "$home/system/preferences.scm"
+  prefs=""
+  [ -n "$lang" ] && prefs="(\"language\" \"$lang\")"
+  [ -n "${debug_menu:-}" ] && prefs="$prefs (\"debugging tool\" \"on\")"
+  [ -n "$prefs" ] &&
+    printf '(%s)\n' "$prefs" > "$home/system/preferences.scm"
   # (HOME and CFFIXED_USER_HOME: the defaults of macOS are not those of
   # the user either)
   HOME="$home" CFFIXED_USER_HOME="$home" \
@@ -323,6 +335,50 @@ header_ok () {
   grep -aq '^HEADER (#f #f #f #f #f)' "$out/header.log"
 }
 verdict header "the window queries of a console, the View menu (#661)" header_ok
+
+# (queries) the widgets of the windows of TeXmacs answer false to the queries
+# of the View menu
+run queries "" "queries;queries" "(open-error-messages)"
+queries_ok () {
+  fail="no answer for the console: $(grep -a "NSTEST queries" "$out/queries.log" | head -2 | tr '\n' ' ')"
+  grep -aq "^NSTEST queries 'Error messages': 0 0 0 0 0 0 0 0 0 0 0$" "$out/queries.log" || return 1
+  fail="a query failed: $(grep -a "NSTEST queries.*error" "$out/queries.log" | head -1)"
+  ! grep -aq "NSTEST queries.*error" "$out/queries.log"
+}
+verdict queries "the window queries of the View menu answer false in every window (#720)" queries_ok
+
+# (menus) a scan of the menus by macOS (two times), then the menu of the
+# deliberate error really opened. The number of the messages of the console
+# is printed after each
+errdefs='(tm-define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
+debug_menu=1
+run menus "" "eval:(cocoa-check-errors 'before);scan;scan;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
+    "(open-error-messages)" "$errdefs"
+debug_menu=
+menus_ok () {
+  # (what the notifications of tracking and the delegate calls did for the
+  # scan and for the opening, for the log of the job)
+  grep -a '^NSTEST stats' "$out/menus.log" | sed 's/^/         /'
+  fail="no scan"
+  grep -aq '^NSTEST scan done' "$out/menus.log" || return 1
+  # (the helper defined by the -x of the run; a missing one only shows in
+  # the log as an unbound variable)
+  fail="the helper cocoa-check-errors was not defined: $(grep -a 'unbound variable cocoa-check-errors' "$out/menus.log" | head -1)"
+  ! grep -aq 'unbound variable cocoa-check-errors' "$out/menus.log" || return 1
+  count () { grep -a "^CHECK errors $1 " "$out/menus.log" | head -1 | cut -d' ' -f4; }
+  before=$(count before); scanned=$(count scanned); opened=$(count opened)
+  fail="no counts of the messages: '$before' '$scanned' '$opened'"
+  [ -n "$before" ] && [ -n "$scanned" ] && [ -n "$opened" ] || return 1
+  fail="the scan of the menus put errors in the console: $before before, $scanned after"
+  [ "$scanned" = "$before" ] || return 1
+  fail="the menu really opened did not show its error: $scanned after the scan, $opened after"
+  [ "$opened" -gt "$scanned" ] || return 1
+  n=$(grep -ac 'caught while a menu was computed' "$out/menus.log")
+  fail="a scan logs without bound: $n lines"
+  [ "$n" -le 6 ]
+}
+expected='Throwing |caught while a menu was computed|caught in a menu|widget expected'
+verdict menus "the errors of menus computed by macOS are not shown, those of menus opened are (#720)" menus_ok
 
 # (console)
 lines='(for-each (lambda (i) (debug-message "std-warning" (string-append "line " (number->string i) "\n"))) (iota 80))'

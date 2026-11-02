@@ -1169,6 +1169,18 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *                     which have a tooltip, and their tracking areas (ours
  *                     for the hover highlight, those of AppKit), then updates
  *                     their tracking areas and prints them again (#637)
+ *   queries[:<title>] the window queries of the View menu (header, icon bars,
+ *                     side and bottom tools, status bar, prompt) to the
+ *                     widget of the window with this title (or of every
+ *                     window): each is false, not a "type mismatch" (#720)
+ *   scan              as macOS does for Spotlight and Apple Intelligence:
+ *                     computes all the menus of the menu bar without
+ *                     opening them (-[NSMenu _simulateOpening:] when AppKit
+ *                     has it, else menuNeedsUpdate: then menuWillOpen:)
+ *                     (#720)
+ *   track:<a/b/c>     opens the menu of this path in the menu bar for about
+ *                     a second, in a tracking of the menu (as a pop-up),
+ *                     then closes it (#720)
  *   scroll-eval:<scheme>
  *                     queues a Scheme expression as a command of the
  *                     interface, then the clip view of the document of the
@@ -1187,6 +1199,103 @@ ns_test_main_window () {
   for (NSWindow* win in [NSApp orderedWindows])
     if ([win isVisible] && !is_nil (ns_window_widget_of (win))) return win;
   return nil;
+}
+
+static void
+ns_test_stats (const char* label) {
+  // (#720) what the tracking notifications and the delegate calls did
+  fprintf (stderr, "NSTEST stats %s: tracking-begin %d tracking-end %d "
+           "menuWillOpen %d menuDidClose %d\n", label, ns_menu_stats[0],
+           ns_menu_stats[1], ns_menu_stats[2], ns_menu_stats[3]);
+}
+
+static void
+ns_test_scan_menu (NSMenu* m, int depth) {
+  // (the menus of TeXmacs are made when they are computed)
+  if (!m || depth > 6) return;
+  SEL sim= NSSelectorFromString (@"_simulateOpening:");
+  id d= [m delegate];
+  if (depth == 0) ; // (the main menu refuses: "Population ... unnecessary")
+  else if ([m respondsToSelector: sim]) [m performSelector: sim withObject: nil];
+  else if (d) {
+    if ([d respondsToSelector: @selector(menuNeedsUpdate:)])
+      [d menuNeedsUpdate: m];
+    if ([d respondsToSelector: @selector(menuWillOpen:)])
+      [d menuWillOpen: m];
+  }
+  for (NSMenuItem* mi in [m itemArray])
+    ns_test_scan_menu ([mi submenu], depth + 1);
+}
+
+@interface TMTestCancel : NSObject
+{ NSMenu* menu; }
+- (id) initWith: (NSMenu*) m;
+- (void) fire: (NSTimer*) t;
+@end
+
+@implementation TMTestCancel
+- (id) initWith: (NSMenu*) m { self= [super init]; menu= m; return self; }
+- (void) fire: (NSTimer*) t { (void) t; [menu cancelTracking]; }
+@end
+
+static void
+ns_test_track_menu (NSString* path) {
+  NSMenu* m= [NSApp mainMenu];
+  for (NSString* title in [path componentsSeparatedByString: @"/"]) {
+    if (m && [m delegate] &&
+        [[m delegate] respondsToSelector: @selector(menuNeedsUpdate:)])
+      [[m delegate] menuNeedsUpdate: m];
+    NSMenu* found= nil;
+    for (NSMenuItem* mi in [m itemArray])
+      if ([mi submenu] && [[mi title] isEqualToString: title])
+        found= [mi submenu];
+    m= found;
+    if (!m) { fprintf (stderr, "NSTEST track: no menu '%s'\n", [path UTF8String]); return; }
+  }
+  if (![m isKindOfClass: [TMLazyMenu class]]) {
+    fprintf (stderr, "NSTEST track: not a lazy menu '%s'\n", [path UTF8String]);
+    return;
+  }
+  // a menu of its own with the same definition, a pop-up
+  TMLazyMenu* t= [[[TMLazyMenu alloc] initWithTitle: [m title]] autorelease];
+  [t setPromise: [(TMLazyMenu*) m promise]];
+  TMTestCancel* c= [[[TMTestCancel alloc] initWith: t] autorelease];
+  NSTimer* timer= [NSTimer timerWithTimeInterval: 1.0 target: c
+                                        selector: @selector(fire:)
+                                        userInfo: nil repeats: NO];
+  [[NSRunLoop currentRunLoop] addTimer: timer forMode: NSRunLoopCommonModes];
+  ns_test_stats ("before track");
+  fprintf (stderr, "NSTEST track: begin '%s'\n", [path UTF8String]);
+  [t popUpMenuPositioningItem: nil atLocation: NSMakePoint (200, 200)
+                       inView: nil];
+  fprintf (stderr, "NSTEST track: end '%s'\n", [path UTF8String]);
+  ns_test_stats ("after track");
+}
+
+static void
+ns_test_queries (NSString* title) {
+  for (NSWindow* win in [NSApp windows]) {
+    widget w= ns_window_widget_of (win);
+    if (is_nil (w)) continue;
+    if ([title length] > 0 && ![[win title] isEqualToString: title]) continue;
+    string r;
+    try {
+      r << as_string (get_header_visibility (w)) << " "
+        << as_string (get_footer_visibility (w)) << " "
+        << as_string (get_main_icons_visibility (w)) << " "
+        << as_string (get_mode_icons_visibility (w)) << " "
+        << as_string (get_focus_icons_visibility (w)) << " "
+        << as_string (get_user_icons_visibility (w)) << " "
+        << as_string (get_side_tools_visibility (w)) << " "
+        << as_string (get_left_tools_visibility (w)) << " "
+        << as_string (get_bottom_tools_visibility (w)) << " "
+        << as_string (get_extra_tools_visibility (w)) << " "
+        << as_string (get_interactive_mode (w));
+    }
+    catch (string& e) { r= "error: " * e; }
+    fprintf (stderr, "NSTEST queries '%s': %s\n", [[win title] UTF8String],
+             as_charp (r));
+  }
 }
 
 static void
@@ -1418,6 +1527,14 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
   else if ([st isEqualToString: @"type"]) [self typeText: arg];
   else if ([st isEqualToString: @"menubar"])
     ns_test_print_menu ([NSApp mainMenu], 0, [arg length] > 0? [arg intValue]: 0);
+  else if ([st isEqualToString: @"queries"]) ns_test_queries (arg);
+  else if ([st isEqualToString: @"scan"]) {
+    ns_test_stats ("before scan");
+    ns_test_scan_menu ([NSApp mainMenu], 0);
+    ns_test_stats ("after scan");
+    fprintf (stderr, "NSTEST scan done\n");
+  }
+  else if ([st isEqualToString: @"track"]) ns_test_track_menu (arg);
   else if ([st isEqualToString: @"menu"]) ns_test_print_menu (ns_test_menu, 0, 0);
   else if ([st isEqualToString: @"cancel"]) [ns_test_menu cancelTracking];
   else if ([st isEqualToString: @"begin-tracking"])
