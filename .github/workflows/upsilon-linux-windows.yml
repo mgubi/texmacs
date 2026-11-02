@@ -259,6 +259,15 @@ jobs:
           test -f "$BIN" || BIN=TeXmacs/bin/texmacs.bin.exe
           ../.github/scripts/run-tests.sh "$BIN"
 
+      # the command line and the exit after a script, one TeXmacs process per
+      # case (a crash at the exit on Windows only, #783); also when a suite
+      # failed (the packaging steps then do not run)
+      - name: The startup checks
+        if: ${{ !cancelled() }}
+        env:
+          TM_TEST_TIMEOUT: 300
+        run: sh tests/startup/check.sh
+
       - name: Bundle
         run: |
           export PATH="$QT6_BIN:$PATH"
