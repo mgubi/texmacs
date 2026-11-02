@@ -654,6 +654,56 @@
        (> (tree-arity b) 0)
        (== (tree-label (tree-ref b 0)) 'gpg-passphrase-encrypted-buffer)))
 
+;; Large source files (#710). Opening a source-code or plain-text file costs
+;; about 7 KB of memory per line and a long first display: measured on
+;; Linux, Qt 5 offscreen, s7, upsilon with tree-sitter, the 19.8 MB parser.c
+;; (677,603 lines) peaks at 4.45 GB and takes 122 s to be displayed; the same
+;; text as .txt peaks at 3.2 GB and takes 72 s; a 1.5 MB minified JavaScript
+;; file takes 830 MB. From 5 MB the user is asked before the file is read.
+(tm-define large-source-file-size (* 5 1024 1024))
+
+;; The formats loaded as text: plain text ("generic" is also what a file with
+;; an unknown suffix gets) and source code. These are the formats of
+;; prog/prog-format.scm, of the plugins code, python, mathemagix, caas,
+;; octave and scilab (see the lazy-format lines of init-texmacs.scm), those
+;; which a branch does not have are ignored. A new source-code format must be
+;; added here. Not texmacs, latex, html, pdf, images... which are converted,
+;; and whose cost is not that of the lines of a text.
+(define large-source-formats
+  '("generic" "verbatim" "code" "scheme" "python" "mathemagix" "caas"
+    "octave" "scilab" "c" "cpp" "julia" "scala" "java" "javascript" "dot"
+    "json" "csv" "go" "lean" "lua" "rust" "typescript" "css" "toml" "yaml"
+    "ocaml" "haskell" "shell"))
+
+(tm-define (large-source-file? size fm)
+  (:synopsis "Is a file of @size bytes in the format @fm a large source file?")
+  (and (integer? size) (string? fm)
+       (>= size large-source-file-size)
+       (in? fm large-source-formats)))
+
+(define (load-buffer-ask-large? name opts)
+  ;; only for the calls which ask for it (:confirm-large, from the menus,
+  ;; the dialog of File > Open, the links and the files opened by the
+  ;; system), never in a script, with -x, -c, in headless mode or when there
+  ;; is no window to ask in
+  (and (in? :confirm-large opts)
+       (not (headless?))
+       (> (windows-number) 0)
+       (not (url-rooted-web? name))
+       (not (url-rooted-tmfs? name))
+       (not (buffer-exists? name))
+       (url-test? name "f")
+       (large-source-file? (url-size name) (url-format name))))
+
+(define (load-buffer-confirm-large name opts k)
+  (if (load-buffer-ask-large? name opts)
+      (let* ((mb (quotient (+ (url-size name) 524288) 1048576))
+             (msg (replace "The file %1 is large (%2 MB). Opening it may take a long time and a lot of memory. Open it anyway?"
+                           (url->system name) (number->string mb))))
+        ;; answering no (or escape) leaves everything as it was
+        (user-confirm msg #f (lambda (answ) (when answ (k)))))
+      (k)))
+
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
@@ -728,7 +778,8 @@
       (if (current-buffer)
           (set! name (url-relative (current-buffer) name))
           (set! name (url-append (url-pwd) name))))
-  (load-buffer-check-autosave name opts))
+  (load-buffer-confirm-large name opts
+    (lambda () (load-buffer-check-autosave name opts))))
 
 (tm-define (load-buffer name . opts)
   (:argument name smart-file "File name")
@@ -781,12 +832,12 @@
   (cond ((url-rooted-protocol? name "mailto") (load-external name))
         ((buffer-exists? name) (switch-to-buffer name))
         ((buffer-external? name) (load-external name))
-        ((url-rooted-web? (current-buffer)) (load-buffer name))
-        (else (load-buffer name))))
+        ((url-rooted-web? (current-buffer)) (load-buffer name :confirm-large))
+        (else (load-buffer name :confirm-large))))
 
 (tm-define (open-buffer)
   (:synopsis "Open a new file")
-  (choose-file load-buffer "Load file" ""))
+  (choose-file (lambda (u) (load-buffer u :confirm-large)) "Load file" ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reverting buffers
@@ -858,7 +909,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (open-in-window)
-  (choose-file load-buffer-in-new-window "Load file" ""))
+  (choose-file (lambda (u) (load-buffer-in-new-window u :confirm-large))
+               "Load file" ""))
 
 (tm-define (open-document)
   (if (window-per-buffer?) (open-in-window) (open-buffer)))

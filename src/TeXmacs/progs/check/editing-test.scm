@@ -463,6 +463,50 @@
     (check-false (buffer-exists? f))
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; The question before a large source file (#710): a source-code or
+;; plain-text file of 5 MB or more. The predicate is tested at the threshold
+;; and for the formats; a call with :confirm-large from a script (no window,
+;; headless) loads a small file at once, without any question.
+(define (test-load-large)
+  (check-group "load-large")
+  (let ((n large-source-file-size))
+    (check= n (* 5 1024 1024))
+    (check-false (large-source-file? 0 "cpp"))
+    (check-false (large-source-file? (- n 1) "cpp"))
+    (check-true (large-source-file? n "cpp"))
+    (check-true (large-source-file? (+ n 1) "cpp"))
+    (check-true (large-source-file? (* 20 n) "cpp"))
+    (check-false (large-source-file? (- n 1) "generic"))
+    (check-true (large-source-file? n "generic"))
+    (check-true (large-source-file? (+ n 1) "verbatim"))
+    (check-true (large-source-file? n "python"))
+    (check-true (large-source-file? n "scheme"))
+    ;; not the converted formats, nor the documents
+    (check-false (large-source-file? (* 100 n) "texmacs"))
+    (check-false (large-source-file? (* 100 n) "latex"))
+    (check-false (large-source-file? (* 100 n) "html"))
+    (check-false (large-source-file? (* 100 n) "pdf"))
+    (check-false (large-source-file? (* 100 n) "stm"))
+    (check-false (large-source-file? #f "cpp"))
+    ;; the formats of the files by their suffix
+    (for-each
+     (lambda (name)
+       (check-true (large-source-file? n (url-format (string->url name)))))
+     '("a.c" "a.h" "a.cpp" "a.hpp" "a.txt" "a.py" "a.scm" "a.js" "a.java"
+       "a.json" "a.csv" "a.rs" "a.go" "a.sh" "a.yaml" "a.hs" "a.ml" "a.lua"
+       "a.css" "Makefile" "a"))
+    (check-false (large-source-file? n (url-format (string->url "a.tm"))))
+    (check-false (large-source-file? n (url-format (string->url "a.tex"))))
+    (check-false (large-source-file? n (url-format (string->url "a.pdf")))))
+  (let ((f (tmp-file* "load-large.c"))
+        (old (current-buffer)))
+    (string-save "int main () { return 0; }\n" (url->system f))
+    (load-buffer f :confirm-large)
+    (check= (current-buffer) f)
+    (check-true (buffer-exists? f))
+    (buffer-close f)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2017,6 +2061,7 @@
   (test-embedded)
   (test-embedded-close)
   (test-load)
+  (test-load-large)
   (test-insert)
   (test-insert-paragraphs)
   (test-insert-line-start)
