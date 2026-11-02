@@ -310,5 +310,58 @@ check "a closed buffer gives back the memory of its editor (#713)" \
 freed #t" \
       -x '(load "startup-close.scm")'
 
+# The command which closes an embedded editor (texmacs-input) when its
+# window is deleted kept the view of its buffer: when the buffer had been
+# closed before, it read the deleted view and crashed (#775). A widget made
+# again with the same name takes over the buffer and its view: deleting the
+# window of the former widget must not close the buffer which the new one
+# shows. The steps run from the event loop, which deletes the windows.
+cat > "$out/startup-embedded.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (embedded name doc)
+  ;; a window with a texmacs-input on the buffer name
+  (let ((win (alt-window-handle))
+        (in (widget-texmacs-input doc '(style "generic") name)))
+    (alt-window-create-plain win in "startup-embedded")
+    (alt-window-show win)
+    win))
+(define u1 (string->url "tmfs://aux/startup-embedded-1"))
+(define u2 (string->url "tmfs://aux/startup-embedded-2"))
+(define w1 #f)
+(define w2 #f)
+(define w3 #f)
+(define (step1)
+  (set! w1 (embedded u1 '(document "one")))
+  (later step2))
+(define (step2)
+  (buffer-close u1)
+  (display* "CHECK buffer closed " (buffer-exists? u1) "\n")
+  (alt-window-delete w1)
+  (set! w2 (embedded u2 '(document "two")))
+  (later step3))
+(define (step3)
+  (set! w3 (embedded u2 '(document "three")))
+  (later step4))
+(define (step4)
+  (alt-window-delete w2)
+  (display* "CHECK reused buffer kept " (buffer-exists? u2) "\n")
+  (alt-window-delete w3)
+  (display* "CHECK reused buffer closed " (buffer-exists? u2) "\n")
+  (set! done #t))
+(later step1)
+EOF
+
+check "an embedded buffer closed before its window, and one made again (#775)" \
+      "buffer closed #f
+reused buffer kept #t
+reused buffer closed #f" \
+      -x '(load "startup-embedded.scm")'
+
 echo "Total: $total checks, $failed failed"
 exit $status
