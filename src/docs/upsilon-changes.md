@@ -17,7 +17,7 @@ have the details, and the problems go to the
 - **The commit a build comes from** (desktop, #753): `TeXmacs -v` prints
   `Revision ebf1221c79 2026-11-01T00:41:00Z` (the abbreviated commit and its
   time in UTC) instead of `SVN version Custom ...`, and so do
-  `(texmacs-version-release "revision")` and Help > About > Browse. On macOS
+  `(texmacs-version-release "revision")` and Help > About > Summary. On macOS
   the `Info.plist` has `CFBundleVersion` `ebf1221c79`, with
   `CFBundleShortVersionString` still `2.1.5` (displays of "short (bundle)"
   read `2.1.5 (ebf1221c79)`). The

@@ -5,8 +5,6 @@
 <\body>
   <tmdoc-title|About GNU <TeXmacs>-<TeXmacs-version>>
 
-  Revision: <with|font-family|tt|<TeXmacs-version-release|revision>>
-
   <\traverse>
     <branch|Summary|about-summary.en.tm>
 

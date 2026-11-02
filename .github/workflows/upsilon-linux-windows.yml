@@ -251,7 +251,7 @@ jobs:
           make -j"$(nproc)"
 
       - name: Revision of the build (#753)
-        run: ../.github/scripts/check-revision.sh -
+        run: ../.github/scripts/check-revision.sh --no-run TeXmacs/bin/texmacs.bin
 
       - name: Run the regression suites
         run: |
@@ -733,7 +733,7 @@ jobs:
           make -k -j"$(nproc)"
 
       - name: Revision of the build (#753)
-        run: ../.github/scripts/check-revision.sh -
+        run: ../.github/scripts/check-revision.sh --no-run TeXmacs/bin/texmacs.bin
 
       - name: Bundle
         run: |
