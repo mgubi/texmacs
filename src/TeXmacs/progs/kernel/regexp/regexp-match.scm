@@ -250,7 +250,14 @@
     (cond ((not c) (match-compiled-new pattern))
           ((== c :once)
            (set! match-compile-budget 256)
-           (match-compiled-set! pattern (or (match-compile (list pattern)) #t)))
+           ;; (an error here, as of a keyword such as :x1/0 which is no number
+           ;; for string->number, need not be one for match: it may not get there)
+           (match-compiled-set!
+            pattern
+            (or (catch #t
+                  (lambda () (match-compile (list pattern)))
+                  (lambda args #f))
+                #t)))
           (else c))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

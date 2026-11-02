@@ -876,12 +876,22 @@
     (check= (match? long long) '(()))
     (check= (match? 'a deep) #f)
     (check= (match? 'a deep) #f))
-  (let ((empty-1 (list 'b (string->keyword "")))
-        (empty-2 (list (string->keyword ""))))
-    (check= (match? 'a empty-1) #f)
-    (check= (match? 'a empty-1) #f)
-    (check= (match? 'a empty-2) #f)
-    (check= (match? 'a empty-2) #f))
+  ;; (S7 has no empty keyword)
+  (with empty (catch #t (lambda () (string->keyword "")) (lambda args #f))
+    (when empty
+      (let ((empty-1 (list 'b empty))
+            (empty-2 (list empty)))
+        (check= (match? 'a empty-1) #f)
+        (check= (match? 'a empty-1) #f)
+        (check= (match? 'a empty-2) #f)
+        (check= (match? 'a empty-2) #f))))
+  ;; keywords of which string->number does not like the end, not reached
+  (for-each
+   (lambda (pat)
+     (check= (match? 'a pat) #f)
+     (check= (match? 'a pat) #f)
+     (check= (match? 'a pat) #f))
+   '((b :x1/0) (b :x1e400) (b (:x1/0))))
   ;; patterns made at each use, more of them than are kept
   (let loop ((i 0) (ok? #t))
     (if (< i 5000)
