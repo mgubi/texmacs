@@ -11,20 +11,25 @@ as the free list was used up (mgubi/texmacs#719). resize_heap_to takes
 a negative size to mean "grow by that many cells"; the forced growth
 now adds an eighth of the heap (64000 cells at least).
 
+The new cells are entered in the heap 32 at a time (Loop_8 of 4
+statements), so the heap size must stay a multiple of 32: resize_heap_to
+rounds the requested amount up to one.
+
 --- a/s7.c
 +++ b/s7.c
-@@ -8343,7 +8343,9 @@
+@@ -8343,7 +8343,10 @@
  	    __func__, func, line, old_free, old_size, size, sc->gc_resize_heap_fraction, (s7_int)(floor(sc->heap_size * sc->gc_resize_heap_fraction)));
  #endif
  
 -  if (size == 0)
 +  if (size < 0)
-+    sc->heap_size += (-size);            /* TeXmacs: grow by that many cells (see try_to_call_gc) */
++    sc->heap_size += 32 * ((-size + 31) / 32);  /* TeXmacs: grow by that many cells (see try_to_call_gc), rounded up to a multiple
++                                                 *   of 32: the loop below fills 32 cells per iteration (Loop_8 of 4) */
 +  else if (size == 0)
      {
        if ((old_free < old_size * sc->gc_resize_heap_by_4_fraction) &&
  	  (sc->max_heap_size > (sc->heap_size * 4)))
-@@ -8455,7 +8457,11 @@
+@@ -8455,7 +8458,11 @@
  #if s7_Debugging
        fprintf(stderr, "%s[%d]: forced resize from %s[%d]\n", __func__, __LINE__, func, line);
  #endif
@@ -37,3 +42,12 @@ now adds an eighth of the heap (64000 cells at least).
      }
    else
      {
+@@ -84090,7 +84097,7 @@
+     {
+       const bool old_gc_off = sc->gc_off;
+       /* room for the copy first (one pair for each pair of the set), above the trigger of new_cell: with the
+-       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow, by 4, and a heap never shrinks
++       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow (by an eighth since patch 0008), and a heap never shrinks
+        */
+       check_free_heap_size(sc, hash_table_entries(cddr(entry)) + Gc_Trigger_Size + 8);
+       sc->gc_off = true;                    /* the pieces of the copy are not yet protected */

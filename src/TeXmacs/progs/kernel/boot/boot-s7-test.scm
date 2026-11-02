@@ -350,6 +350,22 @@
               (set! boot-test-expansions (+ boot-test-expansions 1))
               `(+ ,@args)))))
 
+;; 0008: with the collector off, a full heap grows by an eighth (#719)
+(define (boot-test-forced-growth)
+  ;; the heap sizes before and after building more pairs than there are free
+  ;; cells with the collector off (the cells are freed again afterwards); each
+  ;; step of the loop takes two cells, a pair and an integer
+  (let* ((old (*s7* 'heap-size))
+         (n (quotient (+ (*s7* 'free-heap-size) 400000) 2)))
+    (gc #f)
+    (let loop ((i 0) (l '()))
+      (if (< i n)
+          (loop (+ i 1) (cons #t l))
+          (set! l #f)))
+    (gc #t)
+    (gc)
+    (list old (*s7* 'heap-size))))
+
 ;; 0004: (string-ref a 0) on a parameter (a trap in WebAssembly only)
 (define (boot-test-first-char a b) (string-ref a 0))
 (define (boot-test-first-char-of x) (boot-test-first-char x (+ 1 2)))
@@ -438,6 +454,13 @@
    (test "unshadow-global! needs a binding in the rootlet"
          (unshadow-global! (inlet 'boot-test-unbound-name 1) 'boot-test-unbound-name)
          #f)
+   ;; 0008
+   (test "the heap grows by less than 2 when the collector is off and it is full"
+         (with r (boot-test-forced-growth)
+           (and (> (cadr r) (car r)) (< (cadr r) (* 2 (car r)))))
+         #t)
+   (test "the heap size stays a multiple of 32"
+         (modulo (*s7* 'heap-size) 32) 0)
    ;; 0004
    (test "string-ref of 0 on a parameter"
          (list (boot-test-first-char-of "abc") (boot-test-first-char-of "xyz"))
