@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 2 November 2026
 
+- **Less memory in some runs** (Scheme heap): the heap of cells of s7 was
+  quadrupled, from 8M to 32M cells (0.9 to 2.5 GB of memory), in about half
+  of the runs of the test suites `kbd-menu` and `search`, when C++ was
+  building a Scheme list just as the free cells ran out; a heap never
+  shrinks. It now grows by an eighth then (s7 patch 0008, #719).
+
 - **The question dialog on Wayland** (Vue, Linux): with software OpenGL on
   mutter, sway and weston, the first frame of a new window was presented in
   a buffer of its first size (200x200), spread over the real size of the
