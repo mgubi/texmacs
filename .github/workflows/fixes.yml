@@ -305,8 +305,19 @@ jobs:
           stage=$(mktemp -d)
           cp -R "../distr/TeXmacs Fixes.app" "$stage/"
           ln -s /Applications "$stage/Applications"
-          hdiutil create -volname "TeXmacs Fixes" -srcfolder "$stage" -ov \
-            -format UDZO "$GITHUB_WORKSPACE/texmacs-fixes-${version:-2.1.5}-macos-${{ matrix.arch }}.dmg"
+          dmg="$GITHUB_WORKSPACE/texmacs-fixes-${version:-2.1.5}-macos-${{ matrix.arch }}.dmg"
+          # NOTE: again when it fails: on the runners of GitHub, hdiutil
+          # sometimes finds the files busy ("create failed - Resource
+          # busy"), being scanned; a partial image is removed first. The
+          # failure stays when all the tries fail.
+          for i in 1 2 3 4 5; do
+            rm -f "$dmg"
+            hdiutil create -volname "TeXmacs Fixes" -srcfolder "$stage" -ov \
+              -format UDZO "$dmg" && break
+            [ $i = 5 ] && exit 1
+            echo "== hdiutil failed, again in $((i * 10)) seconds"
+            sleep $((i * 10))
+          done
           ls -la "$GITHUB_WORKSPACE"/*.dmg
 
       - uses: actions/upload-artifact@v4
