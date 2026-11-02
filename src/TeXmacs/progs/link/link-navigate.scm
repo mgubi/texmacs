@@ -500,8 +500,7 @@
 ;; What the handlers of @u load when it is a link to a file: the pair of the
 ;; absolute file and of @u with that file in place of its (maybe relative)
 ;; name, the query kept, or #f when they do something else (a web page, an
-;; external viewer, several candidates, a file: url with a query, which is
-;; loaded whole by http-root-handler). The name is resolved here, once: the
+;; external viewer, several candidates). The name is resolved here, once: the
 ;; question may be answered after the current buffer has changed.
 (define (url-query-suffix s)
   (let* ((m (string-length s))
@@ -522,7 +521,6 @@
                 (!= "" (url->system b))
                 (not (url-rooted-web? b))
                 (not (buffer-external? b))
-                (or (== root "default") (== suffix ""))
                 (let ((abs (load-buffer-resolve-name b)))
                   (cons abs
                         (if (== suffix "") u
@@ -535,8 +533,10 @@
            (list default-root-handler default-post-handler))
           ((== root "tmfs") 
            (list tmfs-root-handler (lambda (x) (noop))))
-          ((== root "file") ;; TODO: to be refined
-           (list http-root-handler http-post-handler))
+          ((== root "file")
+           ;; a file: url is a file, loaded, with the query or the anchor
+           ;; applied after the load, as the url of the system (#772)
+           (list default-root-handler default-post-handler))
           ((or (== root "http") (== root "https") (== root "doi"))
            (list http-root-handler http-post-handler))
           ((== root "mailto")
