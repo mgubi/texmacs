@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 2 November 2026
 
+- **A question before a very large source file** (desktop applications):
+  opening a source-code or plain-text file of 5 MB or more from File >
+  Open, the recent files, a link or the system first asks whether to open
+  it, because it may take a long time and a lot of memory; No is the
+  default and leaves everything as it was. Scripts and the command line
+  don't ask (#710).
+- **Scripted runs no longer crash on exit on Windows** (Qt): `texmacs a.tm
+  b.tm -q` and similar runs did their work, then ended with a segmentation
+  fault, since the fix of the memory of closed buffers.
 - **The dark surround of the pages** (Cocoa): in the dark appearance the
   background around the pages, grey in the light one, is the dark tone
   30,30,32 of the Vue interface (it stayed mid grey). It follows the
