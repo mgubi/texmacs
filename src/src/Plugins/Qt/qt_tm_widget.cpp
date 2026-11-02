@@ -960,6 +960,15 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
       if (q) q->hide();
       QLayout* l = centralwidget()->layout();
       if (l && q) l->removeWidget(q);
+      // The QTMWidget of a view which is replaced is still a child of the
+      // central widget and keeps the widget of the view (the editor, with
+      // its typeset boxes) alive through QTMWidget::tmwid: it is never
+      // shown again (as_qwidget makes a new one) and must be deleted, else
+      // closing a buffer frees nothing (#713)
+      if (q && main_widget->type == simple_widget) {
+        q->setParent (nullptr);
+        q->deleteLater ();
+      }
 
       q = concrete(w)->as_qwidget(mainwindow());   // force creation of the new QWidget
       if (l && q) l->addWidget(q);

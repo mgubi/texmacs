@@ -774,6 +774,11 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
       if (q) q->hide();
       QLayout* l = mainLayout;
       if (l && q) l->removeWidget(q);
+      // see the same place in Plugins/Qt/qt_tm_widget.cpp (#713)
+      if (q && main_widget->type == simple_widget) {
+        q->setParent (nullptr);
+        q->deleteLater ();
+      }
 
       q = concrete(w)->as_qwidget(mainwindow());   // force creation of the new QWidget
       if (l && q) l->addWidget(q);
