@@ -27,6 +27,11 @@
 * when it is needed; the colours of the syntax are asked to the language when
 * the line is drawn, for the lines which are visible only.
 *
+* A box of one line (in paper mode, see bridge_code.cpp) holds the line
+* itself, and its path is the one which the line keeps (obtain_ip), which
+* is renumbered in place when lines are inserted or removed before it: the
+* box of a line which did not change can be used again in the next pass.
+*
 * (prototype: no wrapping of long lines.)
 ******************************************************************************/
 
@@ -38,16 +43,23 @@ struct code_box_rep: public box_rep {
   language lan;
   hashmap<string,color> cols; // the colours given as variables
   SI       pitch;  // the distance between two baselines
+  bool     single; // one line, held as 'one' (and ip is its path)
+  tree     one;
 
   code_box_rep (path ip, tree doc, int i0, int i1, font fn, pencil pen,
                 language lan, hashmap<string,color> cols, SI pitch, SI width);
+  code_box_rep (path lip, tree one, font fn, pencil pen, language lan,
+                hashmap<string,color> cols, SI pitch, SI width);
+  void   set_extents (SI width);
   operator tree () { return "code lines"; }
 
   int    nr_lines () { return i1 - i0; }
+  tree   line_tree (int k) { return single? one: doc[i0+k]; }
   string line (int k) {
-    tree t= doc[i0+k];
+    tree t= line_tree (k);
     return is_atomic (t)? t->label: string (""); }
-  path   line_ip (int k) { return descend (descend (ip, 0), i0+k); }
+  path   line_ip (int k) {
+    return single? ip: descend (descend (ip, 0), i0+k); }
   SI     base (int k) { return -k * pitch; }
   box    line_box (int k) { return text_box (line_ip (k), 0, line (k), fn, pen); }
   int    line_at (SI y);
@@ -77,8 +89,24 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int i12, font fn2,
                             pencil pen2, language lan2,
                             hashmap<string,color> cols2, SI pitch2, SI width):
   box_rep (ip2), doc (doc2), i0 (i02), i1 (max (i12, i02+1)),
-  fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (pitch2)
+  fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (pitch2),
+  single (false)
 {
+  set_extents (width);
+}
+
+code_box_rep::code_box_rep (path lip, tree one2, font fn2, pencil pen2,
+                            language lan2, hashmap<string,color> cols2,
+                            SI pitch2, SI width):
+  box_rep (lip), doc (tree (DOCUMENT)), i0 (0), i1 (1),
+  fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (pitch2),
+  single (true), one (one2)
+{
+  set_extents (width);
+}
+
+void
+code_box_rep::set_extents (SI width) {
   x1= x3= 0;
   x2= x4= width;
   y1= y3= base (nr_lines () - 1) + fn->y1;
@@ -105,7 +133,7 @@ code_box_rep::display (renderer ren) {
   int ka= line_at (cy2), kb= line_at (cy1);
   color fg= pen->get_color ();
   for (int k= ka; k <= kb; k++) {
-    tree t= doc[i0+k];
+    tree t= line_tree (k);
     if (!is_atomic (t) || N(t->label) == 0) continue;
     string s= t->label;
     int n= N(s);
@@ -158,6 +186,14 @@ code_box_rep::find_box_path (path p, bool& found) {
   found= false;
   path me= reverse (ip);
   if (!is_accessible (ip)) return path (0, 0);
+  if (single) {
+    // p: the path of the line, and the position in it
+    if (N(p) == N(me) + 1 && path_up (p) == me) {
+      found= true;
+      return path (0, max (0, min (last_item (p), N (line (0)))));
+    }
+    return path (0, 0);
+  }
   if (N(p) == N(me) + 3 && path_up (p, 3) == me && p[N(me)] == 0) {
     int i= p[N(me)+1], pos= last_item (p);
     if (i >= i0 && i < i1) {
@@ -226,4 +262,10 @@ code_box (path ip, tree doc, int i0, int i1, font fn, pencil pen,
           language lan, hashmap<string,color> cols, SI pitch, SI width) {
   return tm_new<code_box_rep> (ip, doc, i0, i1, fn, pen, lan, cols,
                                pitch, width);
+}
+
+box
+code_line_box (path lip, tree line, font fn, pencil pen, language lan,
+               hashmap<string,color> cols, SI pitch, SI width) {
+  return tm_new<code_box_rep> (lip, line, fn, pen, lan, cols, pitch, width);
 }

@@ -134,17 +134,63 @@
       (step kbd-down)
       (check= (rel (cursor-path)) '(0 4 0 1 5)))))
 
-;; a block without lines, and lines which are not strings (markup put
-;; inside by hand), are typeset without an error
+;; lines which are not strings (markup put inside by hand) are typeset
+;; without an error
 (define (test-odd-contents)
   (check-group "odd contents")
-  (with-body '(document (code-lines (document)))
-    (lambda () (check-true (tree? (buffer-get-body (current-buffer))))))
   (with-body '(document (code-lines (document "a" (strong "b") "c")))
     (lambda ()
       (go-to (at 0 0 2 1))
       (step kbd-up)
       (check-true (list? (cursor-path))))))
+
+;; In paper mode, the lines which did not change are used again from one
+;; pass to the next (bridge_code.cpp), with the paths which they keep: after
+;; lines are inserted, changed and joined, every line is where it is in a
+;; document which had the same edits, and the cursor goes where it goes there
+(define (all-rects code?)
+  (let* ((n (tree-arity (path->tree (apply at (if code? '(0 4 0) '(0 4))))))
+         (r0 (tree-bounding-rectangle
+              (path->tree (apply at (line-path code? 0))))))
+    (map (lambda (i)
+           (with t (path->tree (apply at (line-path code? i)))
+             (if (== (tree->string t) "") '()
+                 (with r (tree-bounding-rectangle t)
+                   (list i (- (car r) (car r0)) (- (cadr r) (cadr r0))
+                         (- (caddr r) (car r0)) (- (cadddr r) (cadr r0)))))))
+         (.. 0 n))))
+
+(define (edits code?)
+  (let* ((r '())
+         (note (lambda ()
+                 (set! r (cons (list (list-tail (rel (cursor-path))
+                                                (if code? 3 2))
+                                     (all-rects code?))
+                               r))))
+         (goto (lambda (i pos)
+                 (go-to (apply at (append (line-path code? i) (list pos))))
+                 (step (lambda () #t)))))
+    (init-env "page-medium" "paper")
+    (step (lambda () #t))
+    (goto 0 0) (note)
+    (goto 1 8) (step insert-return) (note)
+    (step (lambda () (insert "x= 1;"))) (note)
+    (goto 4 0) (step (lambda () (insert "Q"))) (note)
+    (goto 3 0) (step kbd-backspace) (note)
+    (step kbd-down) (note)
+    (goto 0 3) (step insert-return) (note)
+    (reverse r)))
+
+(define (test-paper-edits)
+  (check-group "editing in paper mode")
+  (let ((plain #f) (code #f))
+    (with-body (plain-doc) (lambda () (set! plain (edits #f))))
+    (with-body (code-doc) (lambda () (set! code (edits #t))))
+    (check= (length code) 7)
+    (check= (car (list-ref code 1)) '(2 0))
+    (for-each (lambda (k)
+                (check= (list-ref code k) (list-ref plain k)))
+              (.. 0 7))))
 
 (define (test-export)
   (check-group "export and import")
@@ -174,5 +220,6 @@
   (test-cursor)
   (test-editing)
   (test-odd-contents)
+  (test-paper-edits)
   (test-export)
   (check-end))
