@@ -30,7 +30,7 @@
     <\src-comment>
       Ornaments: the standard borders are black, and the background of
       titles white
-    </\src-comment>
+    </src-comment>
   </active*>
 
   <assign|dark-mode-ornament-sunny-color|#8a8a94>
@@ -44,7 +44,7 @@
       Highlighters which do not know themes (those with the colors of the
       preferences) and the flags of the editor get colors which are
       readable on the dark paper
-    </\src-comment>
+    </src-comment>
   </active*>
 
   <assign|adapt-dark-colors|true>
@@ -53,7 +53,7 @@
     <\src-comment>
       Colors of the source tags: the standard ones are blue, dark green,
       brown or black, which are not readable on a dark paper
-    </\src-comment>
+    </src-comment>
   </active*>
 
   <assign|src-tag-color|#7fb2ff>
