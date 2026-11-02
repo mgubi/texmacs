@@ -435,6 +435,14 @@ widget responsive_icon_tabs_widget (array<url> us, array<widget> ts, array<widge
   wid->add_children (bs);
   return abstract (wid);
 }
+qt_wrapped_widget_rep::~qt_wrapped_widget_rep () {
+  // A widget which is let go without SLOT_DESTROY (the side tools which are
+  // made again, #776) still runs its quit command, which closes the buffer
+  // of an embedded editor: later, from the event queue, not in the middle
+  // of the update of the menus
+  if (!is_nil (quit) && the_gui != NULL) the_gui->process_command (quit);
+}
+
 widget wrapped_widget (widget w, command cmd) {
   if (headless_mode) return headless_widget ();
   return tm_new<qt_wrapped_widget_rep> (w, cmd);

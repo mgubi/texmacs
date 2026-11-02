@@ -135,6 +135,7 @@ public:
     : tmwid (_tmwid), quit (_quit) {
     add_child (tmwid);
   }
+  ~qt_wrapped_widget_rep ();
   QWidget* as_qwidget (QWidget* parent_widget) { return concrete(tmwid)->as_qwidget(parent_widget); }
   void send (slot s, blackbox val) {
     switch (s) {

@@ -246,11 +246,17 @@ close_embedded_command_rep::apply () {
     tm_view v= concrete_view (vs[i]);
     if (v != NULL && v->win == win) vw= v;
   }
-  array<url> a= windows_list ();
-  url foc= main_win;
-  if (is_none (foc) || !contains (foc, a))
-    foc= (N(a) == 0? url_none (): a[0]);
-  if (!is_none (foc)) window_focus (foc);
+  // the focus goes back to the master window when it is in this widget;
+  // else it stays where it is (the command also runs when side tools
+  // which are made again let their former widgets go, #776)
+  tm_view cur= concrete_view (get_current_view_safe ());
+  if (cur == NULL || cur->win == win) {
+    array<url> a= windows_list ();
+    url foc= main_win;
+    if (is_none (foc) || !contains (foc, a))
+      foc= (N(a) == 0? url_none (): a[0]);
+    if (!is_none (foc)) window_focus (foc);
+  }
   window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
   if (vw != NULL) {
     ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
@@ -428,8 +434,11 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   object umenu= eval ("'" * menu);
   if (which == 10 || which == 11) w= make_menu_widget (umenu, 400, 1000);
   else w= make_menu_widget (umenu);
-  if (menu_caching)
-    if (which >= 10 || as_bool (call ("cache-menu?", xmenu))) {
+  // (the cache is only read for the menus and the icon bars, which < 10:
+  // the widgets of the side and bottom tools were kept for nothing, with
+  // the buffers of their texmacs-input, #776)
+  if (menu_caching && which < 10)
+    if (as_bool (call ("cache-menu?", xmenu))) {
       //if (which == 10) cout << which << " -> cached" << LF;
       //cout << which << " -> cached" << LF;
       menu_cache (xmenu)= w;
