@@ -809,6 +809,60 @@
   (ahash-remove! match-term :structures-test-abs)
   (check= (ahash-ref match-term :structures-test-ab) #f))
 
+;; match? compiles the simple patterns, and has to agree with match on all
+;; of them: the same result for each object, at the first and the later uses.
+(define (match-general x pat)
+  (with sols (match (list x) (list pat) '())
+    (if (null? sols) #f sols)))
+
+(define (test-match-compiled)
+  (let ((objects
+         `(a b "a" "ab" "" 1 2 #t #\a () (a) (b) (a b) (a b c) (a b c d)
+           ("a" b) (1 "x") (a (b)) (a (b c)) ((a) b) (rsub "i") (x (rsub "i"))
+           (x (rsub "i") (rsup "j")) (x (rsub "i") y)
+           ,(stree->tree '(rsub "i")) ,(stree->tree '(concat "a" "b"))
+           (a ,(stree->tree '(rsub "i"))) (a "bc") ("bc" a)))
+        (patterns
+         '(a "a" 1 () (a) (a b) (b a) (a :*) (:* a) (:*) (:%0) (:%1) (:%2)
+           (:%3) (:%1 :*) (:%2 :*) (:%0 a) (:%1 b) (a :%1) (a :%2 d) :%1 :*
+           (()) (a ()) ((a)) ((a) b) (a (b)) (a (:%1)) (a (b :*)) (a (:%1 :*))
+           (:%1 (rsub :%1) :*) (:%1 (rsub :%1) (rsup :%1) :*)
+           (rsub :%1) (:%1 (:%1)) (:%1 (#\b :*)) (:%1 (#\b #\c)) (#\a)
+           (:string?) (:string? :*) (:symbol? :%1) (:number? :*) :symbol?
+           (a (:string?)) ((:symbol?) :*)
+           ;; those which remain for match
+           ('x) ('x 'x) ('x 'y) (a 'x) (:%1 'x) ((:or a b)) ((:or a b) :*)
+           ((:and :symbol? a)) ((:not a)) ((:not a) :*) ((:repeat a))
+           ((:repeat a) b) ((:group a b)) ((:group a) :*) ((:quote a))
+           (a ('x)) ((:or (a) (b))))))
+    (define (check-all)
+      (for-each
+       (lambda (pat)
+         (for-each
+          (lambda (x)
+            (check= (cons* x pat (match? x pat))
+                    (cons* x pat (match-general x pat))))
+          objects))
+       patterns))
+    (check-all)
+    (check-all))
+  ;; a keyword may become a term of a grammar after its use as a predicate
+  (let ((pat '(:symbol? :*)))
+    (check= (match? '(a) pat) '(()))
+    (define-regexp-grammar (:symbol? b))
+    (check= (match? '(a) pat) #f)
+    (check= (match? '(b) pat) '(()))
+    (ahash-remove! match-term :symbol?)
+    (check= (match? '(a) pat) '(())))
+  ;; patterns made at each use, more of them than are kept
+  (let loop ((i 0) (ok? #t))
+    (if (< i 5000)
+        (loop (+ i 1)
+              (and ok?
+                   (== (match? (list i) (list i)) '(()))
+                   (not (match? (list i) (list (+ i 1))))))
+        (check-true ok?))))
+
 ;; tm-select gives the subtrees at the end of a path pattern, of which the
 ;; elements are child indices, tags (the children with that tag), :%n (any
 ;; n levels down), :* (any number of levels) and special patterns.
@@ -1064,6 +1118,7 @@
   (run-group "positions" test-positions)
   (run-group "tree pointers" test-tree-pointers)
   (run-group "pattern matching" test-match)
+  (run-group "compiled patterns" test-match-compiled)
   (run-group "selection" test-select)
   (run-group "logic programming" test-logic)
   (run-group "secure evaluation" test-secure)
