@@ -275,6 +275,7 @@ Scheme/S7/s7.c
 Scheme/S7/s7_tm.cpp
 Scheme/Scheme/glue.cpp
 Scheme/Scheme/object.cpp
+System/Boot/build_revision.cpp
 System/Boot/init_texmacs.cpp
 System/Boot/init_upgrade.cpp
 System/Boot/preferences.cpp

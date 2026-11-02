@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "glue.hpp"
+#include "build_revision.hpp"
 #include "gui_test.hpp"
 
 // the glue type uint (see build-glue): the C library of macOS declares it,
@@ -85,7 +86,7 @@ texmacs_version (string which) {
   if (which == "stable") return TM_STABLE;
   if (which == "devel-release") return TM_DEVEL_RELEASE;
   if (which == "stable-release") return TM_STABLE_RELEASE;
-  if (which == "revision") return TEXMACS_REVISION;
+  if (which == "revision") return get_build_revision ();
   return TEXMACS_VERSION;
 }
 

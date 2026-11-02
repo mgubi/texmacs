@@ -25,6 +25,16 @@ have the details, and the problems go to the
   a window (Go > Hidden). It now takes the place of the buffer only while
   that is still the untitled, unmodified one of the startup; else it gets a
   new window (part of #739). The Vue build is not changed here.
+- **The commit a build comes from** (desktop, #753): `TeXmacs -v` prints
+  `Revision ebf1221c79 2026-11-01T00:41:00Z` (the abbreviated commit and its
+  time in UTC) instead of `SVN version Custom ...`, and so do
+  `(texmacs-version-release "revision")` and Help > About > Summary. On macOS
+  the `Info.plist` has `CFBundleVersion` `ebf1221c79`, with
+  `CFBundleShortVersionString` still `2.1.5` (displays of "short (bundle)"
+  read `2.1.5 (ebf1221c79)`). The
+  commit is read from git at each `make` (and each CMake build) and only the
+  file `System/Boot/build_revision.cpp` depends on it; with no git or in a
+  source tarball nothing changes (`Custom ...`).
 
 - **The question dialog on Wayland** (Vue, Linux): with software OpenGL on
   mutter, sway and weston, the first frame of a new window was presented in
