@@ -688,6 +688,22 @@ static std::wstring ConsoleOutputToWide(const std::string& str) {
     return wstrTo;
 }
 
+/* Reads a pipe to its end (EOF or error) into a string. */
+struct PipeReader {
+  HANDLE pipe;
+  std::string* data;
+};
+
+static DWORD WINAPI PipeReaderProc(LPVOID param) {
+  PipeReader* r = (PipeReader*) param;
+  DWORD bytesRead;
+  CHAR buffer[4096];
+  while (ReadFile(r->pipe, buffer, sizeof(buffer), &bytesRead, NULL) &&
+         bytesRead > 0)
+    r->data->append(buffer, bytesRead);
+  return 0;
+}
+
 int windows_system(string cmd, string *cmdout, string *cmderr) {
 
   SECURITY_ATTRIBUTES sa;
@@ -765,35 +781,52 @@ int windows_system(string cmd, string *cmdout, string *cmderr) {
     return 0;
   }
 
-  // We wait for the application to finish before reading the output
-  // todo : this should be done asynchronously, 
-  // because it can freeze the application
-  WaitForSingleObject(pi.hProcess, 30000);
-
-  // Close the write pipe handle so the child process stops reading
-  // and we can read the output (reset, else ScopedHandle closes them
-  // a second time, maybe closing another object which got the value)
+  // Close our copies of the write ends at once (reset, else ScopedHandle
+  // closes them a second time, maybe closing another object which got the
+  // value): the pipes then reach EOF when the child, and the processes it
+  // started with these handles, have closed theirs.
   CloseHandle(hOutWrite.h);
   hOutWrite.h = 0;
   CloseHandle(hErrWrite.h);
   hErrWrite.h = 0;
 
-  DWORD bytesRead;
-  CHAR buffer[4096];
+  // Read stdout and stderr while the process runs (#655): a command which
+  // writes more than the pipe buffer would block on its write, and one
+  // which fills stderr while we read stdout would never end. Stderr is read
+  // by a thread, stdout here; the process is waited for only afterwards.
+  // Both are always drained, also when the caller wants only one of them.
   std::string raw_stdout, raw_stderr;
-
-  while (ReadFile(hOutRead.h, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
-    raw_stdout.append(buffer, bytesRead);
+  PipeReader err_reader;
+  err_reader.pipe = hErrRead.h;
+  err_reader.data = &raw_stderr;
+  ScopedHandle hThread;
+  hThread.h = CreateThread(NULL, 0, PipeReaderProc, &err_reader, 0, NULL);
+  if (hThread.h == NULL) {
+    std_warning << "failed to create the reader thread of '" << cmd << "'" << LF;
+    // the child could block on a full pipe: end it rather than hang
+    TerminateProcess(pi.hProcess, 1);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return 1;
   }
-    
-  while (ReadFile(hErrRead.h, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
-    raw_stderr.append(buffer, bytesRead);
+  PipeReader out_reader;
+  out_reader.pipe = hOutRead.h;
+  out_reader.data = &raw_stdout;
+  PipeReaderProc(&out_reader);
+  WaitForSingleObject(hThread.h, INFINITE);
+
+  // Both pipes are at EOF. The process normally ends at once; a command
+  // which closed its output and keeps running is waited for 30 s as before
+  // (the limit of the old code), not longer.
+  DWORD exitCode = 1;
+  if (WaitForSingleObject(pi.hProcess, 30000) == WAIT_OBJECT_0) {
+    if (!GetExitCodeProcess(pi.hProcess, &exitCode)) exitCode = 1;
   }
-
-  WaitForSingleObject(pi.hProcess, 30000);
-
-  DWORD exitCode;
-  GetExitCodeProcess(pi.hProcess, &exitCode);
+  else {
+    // still running: no exit status yet (not STILL_ACTIVE, 259)
+    std_warning << "command '" << cmd << "' still runs after 30 s" << LF;
+    exitCode = 1;
+  }
   CloseHandle(pi.hProcess);
   CloseHandle(pi.hThread);
 
