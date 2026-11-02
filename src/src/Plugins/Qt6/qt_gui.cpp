@@ -671,18 +671,16 @@ gui_start_loop () {
   the_gui->event_loop ();
 }
 
-/* Called when TeXmacs quits, before the process ends. The objects given to
-   deleteLater (a canvas whose view was replaced, a toolbar...) and not yet
-   deleted when the event loop ends must not be left to the teardown of the
-   process: on Windows, _exit runs the shutdown of the DLLs, where Qt sends
-   the pending deferred deletes (the stack from gdb on the Windows CI: the
-   destructor ~QTMWidget under ntdll!LdrShutdownProcess, called from the
-   event dispatch of Qt6Core) and ~QWidget crashes. On the other systems _exit
-   ends the process at once. The pending requests are dropped: the objects
-   are never deleted, the process ends. */
 void
-gui_forget_deferred_deletes () {
-  QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
+qt_forget_deferred_deletes () {
+  // (called when TeXmacs quits, before _exit: the widgets given to
+  // deleteLater and not yet deleted are forgotten, not deleted. On Windows
+  // _exit runs the shutdown of the DLLs, where Qt delivers the pending
+  // deferred deletes, and ~QWidget crashes (gdb on the Windows CI:
+  // ~QTMWidget under ntdll!LdrShutdownProcess). A script given by -x runs
+  // before the event loop gets to delete them. Harmless to call twice)
+  if (QCoreApplication::instance () != NULL)
+    QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
 
 void

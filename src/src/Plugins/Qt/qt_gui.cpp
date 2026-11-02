@@ -135,7 +135,10 @@ qt_forget_deferred_deletes () {
   // the thread-local objects of Qt are gone before any exit handler is
   // called, and so are the static objects made after this handler was
   // registered, as the list of the active scrollers of QScroller, made by
-  // the first one deleted. The quit of TeXmacs, _exit, deletes nothing)
+  // the first one deleted. The quit of TeXmacs calls this too, before _exit:
+  // on Windows _exit runs the shutdown of the DLLs, where Qt delivers the
+  // pending deferred deletes and ~QWidget crashes; calling it twice, here
+  // and by the exit handler, is harmless)
   if (QCoreApplication::instance () != NULL)
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
@@ -690,20 +693,6 @@ void
 gui_start_loop () {
   // start the main loop
   the_gui->event_loop ();
-}
-
-/* Called when TeXmacs quits, before the process ends. The objects given to
-   deleteLater (a canvas whose view was replaced, a toolbar...) and not yet
-   deleted when the event loop ends must not be left to the teardown of the
-   process: on Windows, _exit runs the shutdown of the DLLs, where Qt sends
-   the pending deferred deletes (the stack from gdb on the Windows CI: the
-   destructor ~QTMWidget under ntdll!LdrShutdownProcess, called from the
-   event dispatch of Qt6Core) and ~QWidget crashes. On the other systems _exit
-   ends the process at once. The pending requests are dropped: the objects
-   are never deleted, the process ends. */
-void
-gui_forget_deferred_deletes () {
-  QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
 
 void
