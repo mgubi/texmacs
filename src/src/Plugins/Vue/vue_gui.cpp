@@ -1897,10 +1897,12 @@ class vue_sdl_gpu_window_rep : public vue_sdl_base_window_rep {
 public:
   renderer ren;
   unsigned long long presented; // the hash of the frame last presented
+  int present_w, present_h;     // the size in pixels of the window then
 
   vue_sdl_gpu_window_rep (vue_widget w, string name, bool popup= false,
                           SDL_Window* adopt= NULL)
-    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), presented (0) {
+    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), presented (0),
+      present_w (0), present_h (0) {
     with_window frame (this);
     Clay_SetMeasureTextFunction (ren_measure_text, this);
   }
@@ -2013,6 +2015,22 @@ vue_sdl_gpu_window_rep::process_redraw () {
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   vue_gpu_present (sdl_win);
   if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
+  // On Wayland, with software OpenGL (llvmpipe), the first frame of a window
+  // was seen in a buffer of the size it was created at (200x200, the context
+  // is made current then), spread over its real size: black, the contents
+  // flattened at the bottom, as in the picture of #376. It may stay so where
+  // nothing replaces that buffer, since a frame which draws what the last one
+  // drew is not presented. So a frame presented for another size than the
+  // previous one is drawn and presented once more. Whether a GPU driver
+  // behaves so was not seen: #376 may have more to it.
+  if (dev_w != present_w || dev_h != present_h) {
+    present_w= dev_w; present_h= dev_h;
+    const char* driver= SDL_GetCurrentVideoDriver ();
+    if (driver != NULL && strcmp (driver, "wayland") == 0) {
+      presented= 0;
+      vue_gpu_deferred= true;
+    }
+  }
 }
 
 void

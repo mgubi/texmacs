@@ -12,6 +12,16 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 2 November 2026
+
+- **The question dialog on Wayland** (Vue, Linux): with software OpenGL on
+  mutter, sway and weston, the first frame of a new window was presented in
+  a buffer of its first size (200x200), spread over the real size of the
+  window: black, with its contents flattened at its bottom, as in #376. A
+  frame presented for another window size than the one before is now drawn
+  and presented once more. Not confirmed on GNOME with a GPU, where #376 was
+  reported: this may not be the whole of it.
+
 ## 1 November 2026
 
 - **Ghostscript in the packages, Aspell in the Windows ones** (desktop): the
