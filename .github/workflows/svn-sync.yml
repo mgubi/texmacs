@@ -11,6 +11,7 @@
 # rejected and svn_sync stays as it was. The state before this workflow is
 # kept in backup/svn_sync-r15774.
 # A scheduled workflow runs only from the default branch of the repository.
+# Documented in svn-sync.md (this folder).
 # In a container of Ubuntu: on the runner, git comes from a PPA, newer than
 # the one the git-svn package of Ubuntu depends on.
 
