@@ -85,6 +85,7 @@ extern string the_report; // (basic.cpp)
 
 // whether a menu is being tracked (the menu bar, a pop-up, the keyboard)
 static BOOL ns_menu_tracking= NO;
+int ns_menu_stats[4]= {0, 0, 0, 0};
 
 
 @implementation TMLazyMenu
@@ -94,10 +95,10 @@ static BOOL ns_menu_tracking= NO;
   NSNotificationCenter* c= [NSNotificationCenter defaultCenter];
   [c addObserverForName: NSMenuDidBeginTrackingNotification object: nil
      queue: nil usingBlock: ^(NSNotification* n) {
-       (void) n; ns_menu_tracking= YES; }];
+       (void) n; ns_menu_tracking= YES; ns_menu_stats[0]++; }];
   [c addObserverForName: NSMenuDidEndTrackingNotification object: nil
      queue: nil usingBlock: ^(NSNotification* n) {
-       (void) n; ns_menu_tracking= NO; }];
+       (void) n; ns_menu_tracking= NO; ns_menu_stats[1]++; }];
 }
 
 - (void)setPromise:(promise_rep<widget> *)p
@@ -204,12 +205,14 @@ static BOOL ns_menu_tracking= NO;
   // is shown (#720). If a scan did one of them, the error would be shown:
   // a repeated message rather than a hidden one.
   (void) menu;
+  ns_menu_stats[2]++;
   if (N (failure) > 0 && ns_menu_tracking) [self reportFailure];
 }
 
 - (void)menuDidClose:(NSMenu *)menu
 {
   (void) menu;
+  ns_menu_stats[3]++;
   [self reportFailure];
 }
 

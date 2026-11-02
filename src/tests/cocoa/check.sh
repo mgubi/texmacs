@@ -350,14 +350,21 @@ verdict queries "the window queries of the View menu answer false in every windo
 # (menus) a scan of the menus by macOS (two times), then the menu of the
 # deliberate error really opened. The number of the messages of the console
 # is printed after each
-errdefs='(define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
+errdefs='(tm-define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
 debug_menu=1
 run menus "" "eval:(cocoa-check-errors 'before);scan;scan;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
     "(open-error-messages)" "$errdefs"
 debug_menu=
 menus_ok () {
+  # (what the notifications of tracking and the delegate calls did for the
+  # scan and for the opening, for the log of the job)
+  grep -a '^NSTEST stats' "$out/menus.log" | sed 's/^/         /'
   fail="no scan"
   grep -aq '^NSTEST scan done' "$out/menus.log" || return 1
+  # (the helper defined by the -x of the run; a missing one only shows in
+  # the log as an unbound variable)
+  fail="the helper cocoa-check-errors was not defined: $(grep -a 'unbound variable cocoa-check-errors' "$out/menus.log" | head -1)"
+  ! grep -aq 'unbound variable cocoa-check-errors' "$out/menus.log" || return 1
   count () { grep -a "^CHECK errors $1 " "$out/menus.log" | head -1 | cut -d' ' -f4; }
   before=$(count before); scanned=$(count scanned); opened=$(count opened)
   fail="no counts of the messages: '$before' '$scanned' '$opened'"

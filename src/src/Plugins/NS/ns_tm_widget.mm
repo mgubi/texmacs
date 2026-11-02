@@ -1202,6 +1202,14 @@ ns_test_main_window () {
 }
 
 static void
+ns_test_stats (const char* label) {
+  // (#720) what the tracking notifications and the delegate calls did
+  fprintf (stderr, "NSTEST stats %s: tracking-begin %d tracking-end %d "
+           "menuWillOpen %d menuDidClose %d\n", label, ns_menu_stats[0],
+           ns_menu_stats[1], ns_menu_stats[2], ns_menu_stats[3]);
+}
+
+static void
 ns_test_scan_menu (NSMenu* m, int depth) {
   // (the menus of TeXmacs are made when they are computed)
   if (!m || depth > 6) return;
@@ -1256,10 +1264,12 @@ ns_test_track_menu (NSString* path) {
                                         selector: @selector(fire:)
                                         userInfo: nil repeats: NO];
   [[NSRunLoop currentRunLoop] addTimer: timer forMode: NSRunLoopCommonModes];
+  ns_test_stats ("before track");
   fprintf (stderr, "NSTEST track: begin '%s'\n", [path UTF8String]);
   [t popUpMenuPositioningItem: nil atLocation: NSMakePoint (200, 200)
                        inView: nil];
   fprintf (stderr, "NSTEST track: end '%s'\n", [path UTF8String]);
+  ns_test_stats ("after track");
 }
 
 static void
@@ -1519,7 +1529,9 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
     ns_test_print_menu ([NSApp mainMenu], 0, [arg length] > 0? [arg intValue]: 0);
   else if ([st isEqualToString: @"queries"]) ns_test_queries (arg);
   else if ([st isEqualToString: @"scan"]) {
+    ns_test_stats ("before scan");
     ns_test_scan_menu ([NSApp mainMenu], 0);
+    ns_test_stats ("after scan");
     fprintf (stderr, "NSTEST scan done\n");
   }
   else if ([st isEqualToString: @"track"]) ns_test_track_menu (arg);

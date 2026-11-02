@@ -31,6 +31,10 @@ class ns_simple_widget_rep;
 - (void)doit;
 @end
 
+/*! Counts for the tests (#720): the tracking notifications of menus, and
+    the calls of menuWillOpen: and menuDidClose: of the lazy menus. */
+extern int ns_menu_stats[4]; // begin, end, willOpen, didClose
+
 /*! A menu whose items are computed each time it is shown. */
 @interface TMLazyMenu : NSMenu <NSMenuDelegate>
 {
