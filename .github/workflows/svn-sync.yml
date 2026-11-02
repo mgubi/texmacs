@@ -11,6 +11,8 @@
 # rejected and svn_sync stays as it was. The state before this workflow is
 # kept in backup/svn_sync-r15774.
 # A scheduled workflow runs only from the default branch of the repository.
+# In a container of Ubuntu: on the runner, git comes from a PPA, newer than
+# the one the git-svn package of Ubuntu depends on.
 
 name: Sync svn_sync from Savannah
 
@@ -30,20 +32,27 @@ jobs:
   sync:
     name: Fetch the new SVN revisions
     runs-on: ubuntu-24.04
+    container: ubuntu:24.04
     timeout-minutes: 60
     env:
+      DEBIAN_FRONTEND: noninteractive
       SVN_URL: https://svn.savannah.gnu.org/svn/texmacs/trunk
       SVN_ROOT: svn+ssh://svn.sv.gnu.org/texmacs/trunk
     steps:
+      # (before the checkout, which needs git for a clone)
+      - name: Install git and git-svn
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git git-svn ca-certificates
+
       - uses: actions/checkout@v4
         with:
           ref: svn_sync
           fetch-depth: 0
 
-      - name: Install git-svn
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends git-svn
+      # (the checkout belongs to the runner's user, the container runs as root)
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Fetch
         run: |
