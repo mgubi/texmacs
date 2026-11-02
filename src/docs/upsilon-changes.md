@@ -18,8 +18,9 @@ have the details, and the problems go to the
   `Revision ebf1221c79 2026-11-01T00:41:00Z` (the abbreviated commit and its
   time in UTC) instead of `SVN version Custom ...`, and so do
   `(texmacs-version-release "revision")` and Help > About > Browse. On macOS
-  the `Info.plist` has `CFBundleVersion` `2.1.5 (ebf1221c79)` (Finder, Get
-  Info, the About panel), `CFBundleShortVersionString` stays `2.1.5`. The
+  the `Info.plist` has `CFBundleVersion` `ebf1221c79`, with
+  `CFBundleShortVersionString` still `2.1.5` (displays of "short (bundle)"
+  read `2.1.5 (ebf1221c79)`). The
   commit is read from git at each `make` (and each CMake build) and only the
   file `System/Boot/build_revision.cpp` depends on it; with no git or in a
   source tarball nothing changes (`Custom ...`).

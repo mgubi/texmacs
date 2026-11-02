@@ -306,7 +306,7 @@ deps:
 # a tarball, the header is empty and TEXMACS_REVISION ("Custom ...") stays.
 Objects/git_revision.hpp: FORCE
 	@mkdir -p Objects
-	@$(tmsrc)/../misc/scripts/git-revision.sh --header $@ $(tmsrc)/..
+	@tr -d '\r' < $(tmsrc)/../misc/scripts/git-revision.sh | sh -s -- --header $@ $(tmsrc)/..
 
 Objects/build_revision.o: Objects/git_revision.hpp
 Objects/build_revision.o: CPPFLAGS += -IObjects

@@ -164,7 +164,7 @@ elseif (APPLE AND QTTEXMACS)
     RELEASE_OUTPUT_NAME ${TeXmacs_binary_name}
     RUNTIME_OUTPUT_DIRECTORY ${TEXMACS_BINARY_DIR}
   )
-  # CFBundleVersion with the git commit, "2.1.5 (ebf1221c79)" (#753)
+  # CFBundleVersion with the git commit, the hash (#753)
   add_custom_command (TARGET ${TeXmacs_binary_name} POST_BUILD
     COMMAND sh ${TEXMACS_SOURCE_DIR}/packages/macos/set-bundle-revision.sh
       "$<TARGET_BUNDLE_CONTENT_DIR:${TeXmacs_binary_name}>/Info.plist"

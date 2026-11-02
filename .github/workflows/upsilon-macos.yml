@@ -212,7 +212,7 @@ jobs:
           ls -l "$dmg"
 
       # the commit of the build is in the application (#753): CFBundleVersion
-      # "2.1.5 (hash)" (Finder, Get Info), the signature is still valid, and
+      # the hash, the signature is still valid, and
       # TeXmacs -v says it too
       - name: Revision of the application
         run: |
@@ -220,7 +220,7 @@ jobs:
           app="../distr/$APP_NAME.app"
           plutil -p "$app/Contents/Info.plist" | grep -E 'CFBundle(Short)?Version|GetInfoString'
           v=$(plutil -extract CFBundleVersion raw "$app/Contents/Info.plist")
-          case "$v" in *"($want)") ;; *) echo "error: CFBundleVersion is \"$v\", not the commit $want"; exit 1;; esac
+          [ "$v" = "$want" ] || { echo "error: CFBundleVersion is \"$v\", not the commit $want"; exit 1; }
           codesign --verify --deep --strict "$app"
           out=$(TEXMACS_HOME_PATH=$(mktemp -d) "$app/Contents/MacOS/TeXmacs" -v)
           echo "$out"
