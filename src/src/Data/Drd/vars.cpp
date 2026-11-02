@@ -118,6 +118,7 @@ string DEFINED_COLOR ("defined-color");
 string MISC_LEXEME_COLOR ("misc-lexeme-color");
 string ALT_KEYWORD_COLOR ("alt-keyword-color");
 string ALT_CONSTANT_COLOR ("alt-constant-color");
+string ADAPT_DARK_COLORS ("adapt-dark-colors");
 
 /******************************************************************************
 * Environment variables for paragraphs

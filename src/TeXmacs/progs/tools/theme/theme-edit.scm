@@ -19,9 +19,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (basic-themes)
-  (list "blackboard" "bluish" "boring-white" "dark-vador" "granite"
-        "ice" "manila-paper" "metal" "pale-blue" "parchment"
-        "pine" "reddish" "ridged-paper" "rough-paper"
+  ;; "dark-mode" and "programmer" are only here: beamer and poster have
+  ;; their own lists (fold-edit.scm, poster-edit.scm), which they keep
+  (list "blackboard" "bluish" "boring-white" "dark-mode" "dark-vador"
+        "granite" "ice" "manila-paper" "metal" "pale-blue" "parchment"
+        "pine" "programmer" "reddish" "ridged-paper" "rough-paper"
         "xperiment"))
 
 (tm-define (current-basic-theme)

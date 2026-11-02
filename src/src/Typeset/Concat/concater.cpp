@@ -10,6 +10,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include <math.h>
 #include "concater.hpp"
 #include "analyze.hpp"
 #include "file.hpp"
@@ -81,8 +82,50 @@ concater_rep::ghost (string s, path ip, color col) {
                   composite_box (decorate (ip), bs), HYPH_INVALID);
 }
 
+static double
+relative_luminance (int r, int g, int b) {
+  double v[3]= { r / 255.0, g / 255.0, b / 255.0 };
+  for (int i=0; i<3; i++)
+    v[i]= (v[i] <= 0.03928? v[i] / 12.92: pow ((v[i] + 0.055) / 1.055, 2.4));
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+
+static double
+contrast_ratio (double l1, double l2) {
+  if (l1 < l2) { double t= l1; l1= l2; l2= t; }
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+color
+concater_rep::adapt_color (color c) {
+  // when adapt-dark-colors is set: lighten the (literal) color c, towards
+  // white, until its contrast with the plain background is at least 4.5
+  // (WCAG); the colors which have it, and all colors on a bright
+  // background, are kept
+  if (!env->get_bool (ADAPT_DARK_COLORS)) return c;
+  tree bg= env->read (BG_COLOR);
+  if (!is_atomic (bg) || bg == "") return c;
+  int r, g, b, a, br, bgr, bb, ba;
+  get_rgb_color (named_color (bg->label), br, bgr, bb, ba);
+  double lb= relative_luminance (br, bgr, bb);
+  if (lb > 0.2) return c;
+  get_rgb_color (c, r, g, b, a);
+  if (contrast_ratio (relative_luminance (r, g, b), lb) >= 4.5) return c;
+  double lo= 0.0, hi= 1.0;
+  for (int i=0; i<12; i++) {
+    double t= (lo + hi) / 2;
+    int r2= r + (int) ((255 - r) * t), g2= g + (int) ((255 - g) * t);
+    int b2= b + (int) ((255 - b) * t);
+    if (contrast_ratio (relative_luminance (r2, g2, b2), lb) >= 4.5) hi= t;
+    else lo= t;
+  }
+  return rgb_color (r + (int) ((255 - r) * hi), g + (int) ((255 - g) * hi),
+                    b + (int) ((255 - b) * hi), a);
+}
+
 void
 concater_rep::flag_ok (string s, path ip, color col) {
+  col= adapt_color (col);
   path dip = decorate_right (ip);
   SI h= 4*env->fn->wfn/5;
   int r, g, b, a;
