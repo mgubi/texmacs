@@ -433,6 +433,40 @@ ns_window_widget_rep::send (slot s, blackbox val) {
 
 
 blackbox
+ns_widget_rep::query (slot s, int type_id) {
+  // A widget which is not the main widget of a document window (ns_tm_widget,
+  // which answers these itself) has no header, no icon bars, no side tools,
+  // no status bar and no prompt: the window queries of the View menu
+  // (visible-header?...) get false, not an empty answer, which was a "type
+  // mismatch" in open_box<bool> as soon as such a window (the Error
+  // messages, an auxiliary window) was the current one (#661, #720)
+  switch (s) {
+  case SLOT_HEADER_VISIBILITY:
+  case SLOT_MAIN_ICONS_VISIBILITY:
+  case SLOT_MODE_ICONS_VISIBILITY:
+  case SLOT_FOCUS_ICONS_VISIBILITY:
+  case SLOT_USER_ICONS_VISIBILITY:
+  case SLOT_FOOTER_VISIBILITY:
+  case SLOT_SIDE_TOOLS_VISIBILITY:
+  case SLOT_LEFT_TOOLS_VISIBILITY:
+  case SLOT_BOTTOM_TOOLS_VISIBILITY:
+  case SLOT_EXTRA_TOOLS_VISIBILITY:
+  case SLOT_INTERACTIVE_MODE:
+    check_type_id<bool> (type_id, s);
+    return close_box<bool> (false);
+  case SLOT_INTERACTIVE_INPUT:
+    check_type_id<string> (type_id, s);
+    return close_box<string> ("#f");
+  default:
+    break;
+  }
+  if (DEBUG_QT)
+    debug_qt << "ns_widget_rep::query(), unhandled " << slot_name (s)
+    << " for widget of type: " << type_as_string() << LF;
+  return blackbox ();
+}
+
+blackbox
 ns_window_widget_rep::query (slot s, int type_id) {
   if (DEBUG_QT_WIDGETS)
     debug_widgets << "ns_window_widget_rep::query " << slot_name(s) << LF;
