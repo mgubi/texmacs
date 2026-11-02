@@ -463,6 +463,125 @@
     (check-false (buffer-exists? f))
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; The question before a large source file (#710): a source-code or
+;; plain-text file of 5 MB or more. The predicate is tested at the threshold
+;; and for the formats; a call with :confirm-large from a script (no window,
+;; headless) loads a small file at once, without any question.
+(define (test-load-large)
+  (check-group "load-large")
+  (let ((n large-source-file-size))
+    (check= n (* 5 1024 1024))
+    (check-false (large-source-file? 0 "cpp"))
+    (check-false (large-source-file? (- n 1) "cpp"))
+    (check-true (large-source-file? n "cpp"))
+    (check-true (large-source-file? (+ n 1) "cpp"))
+    (check-true (large-source-file? (* 20 n) "cpp"))
+    (check-false (large-source-file? (- n 1) "generic"))
+    (check-true (large-source-file? n "generic"))
+    (check-true (large-source-file? (+ n 1) "verbatim"))
+    (check-true (large-source-file? n "python"))
+    (check-true (large-source-file? n "scheme"))
+    ;; not the converted formats, nor the documents
+    (check-false (large-source-file? (* 100 n) "texmacs"))
+    (check-false (large-source-file? (* 100 n) "latex"))
+    (check-false (large-source-file? (* 100 n) "html"))
+    (check-false (large-source-file? (* 100 n) "pdf"))
+    (check-false (large-source-file? (* 100 n) "stm"))
+    (check-false (large-source-file? #f "cpp"))
+    ;; the formats of the files by their suffix
+    (for-each
+     (lambda (name)
+       (check-true (large-source-file? n (url-format (string->url name)))))
+     '("a.c" "a.h" "a.cpp" "a.hpp" "a.txt" "a.py" "a.scm" "a.js" "a.java"
+       "a.json" "a.csv" "a.rs" "a.go" "a.sh" "a.yaml" "a.hs" "a.ml" "a.lua"
+       "a.css" "Makefile" "a"))
+    (check-false (large-source-file? n (url-format (string->url "a.tm"))))
+    (check-false (large-source-file? n (url-format (string->url "a.tex"))))
+    (check-false (large-source-file? n (url-format (string->url "a.pdf")))))
+  ;; a sparse file of 3 GiB: file_size saturates instead of wrapping around
+  (let ((f (tmp-file* "sparse.c")))
+    (when (and (not (os-mingw?)) (not (os-win32?)))
+      (system (string-append "truncate -s 3G " (raw-quote (url->system f))))
+      (when (url-exists? f)
+        (check= (url-size f) 2147483647)
+        (check-true (large-source-file? (url-size f) (url-format f)))
+        (system-remove f))))
+  (let ((f (tmp-file* "load-large.c"))
+        (old (current-buffer)))
+    (string-save "int main () { return 0; }\n" (url->system f))
+    (load-buffer f :confirm-large)
+    (check= (current-buffer) f)
+    (check-true (buffer-exists? f))
+    (buffer-close f)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;; The files of the system (load-buffer-from-system) ask before the startup
+;; buffer is taken or a window is made, with the question stubbed to keep its
+;; continuation (a footer prompt, or Vue, answers later): no changes nothing
+;; (the startup buffer is still free for the next file), yes goes on.
+(define (test-load-from-system-large)
+  (check-group "load-from-system-large")
+  (let* ((f (tmp-file* "sys-large.c"))
+         (g (tmp-file* "sys-small.c"))
+         (old (current-buffer))
+         (u (new-buffer))
+         (calls '())
+         (pending #f)
+         (asked 0)
+         (line (apply string-append (make-list 40 "int x = 1111111111111111;   "))))
+    (string-save (apply string-append
+                        (map (lambda (i) (string-append line "\n"))
+                             (iota (+ 1 (quotient large-source-file-size
+                                                  (string-length line))))))
+                 (url->system f))
+    (string-save "int x;\n" (url->system g))
+    (switch-to-buffer* u)
+    (set-large-load-test-interactive!
+     (lambda (prompt default cont)
+       (set! asked (+ asked 1))
+       (set! pending cont)))
+    (begin
+      (with-global load-buffer
+          (lambda (name . opts) (set! calls (rcons calls (list 'current name))))
+        (with-global load-buffer-in-new-window
+            (lambda (name . opts) (set! calls (rcons calls (list 'new name))))
+          ;; the startup buffer, no: nothing happens, it stays free
+          (startup-buffer-release)
+          (load-buffer-from-system f)
+          (check= asked 1)
+          (check= calls '())
+          (pending #f)
+          (check= calls '())
+          (check-true (startup-buffer?))
+          (load-buffer-from-system g)
+          (check= asked 1)
+          (check= calls (list (list 'current g)))
+          ;; the startup buffer, yes (after the question, not before)
+          (set! calls '())
+          (startup-buffer-release)
+          (load-buffer-from-system f)
+          (check= calls '())
+          (check= (pending #t) (noop))
+          (check= asked 2)
+          (check= calls (list (list 'current f)))
+          ;; another buffer than the startup one: a window of its own
+          (set! calls '())
+          (startup-buffer-release)
+          (buffer-pretend-modified u)
+          (load-buffer-from-system f)
+          (check= asked 3)
+          (pending #f)
+          (check= calls '())
+          (load-buffer-from-system f)
+          (check= calls '())
+          (pending #t)
+          (check= asked 4)
+          (check= calls (list (list 'new f))))))
+    (set-large-load-test-interactive! #f)
+    (buffer-pretend-saved u)
+    (startup-buffer-release)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2017,6 +2136,8 @@
   (test-embedded)
   (test-embedded-close)
   (test-load)
+  (test-load-large)
+  (test-load-from-system-large)
   (test-insert)
   (test-insert-paragraphs)
   (test-insert-line-start)

@@ -654,6 +654,109 @@
        (> (tree-arity b) 0)
        (== (tree-label (tree-ref b 0)) 'gpg-passphrase-encrypted-buffer)))
 
+;; Large source files (#710). Opening a source-code or plain-text file costs
+;; about 7 KB of memory per line and a long first display: measured on
+;; Linux, Qt 5 offscreen, s7, upsilon with tree-sitter, the 19.8 MB parser.c
+;; (677,603 lines) peaks at 4.45 GB and takes 122 s to be displayed; the same
+;; text as .txt peaks at 3.2 GB and takes 72 s; a 1.5 MB minified JavaScript
+;; file takes 830 MB. From 5 MB the user is asked before the file is read.
+(tm-define large-source-file-size (* 5 1024 1024))
+
+;; The formats loaded as text: plain text ("generic" is also what a file with
+;; an unknown suffix gets) and source code. These are the formats of
+;; prog/prog-format.scm, of the plugins code, python, mathemagix, caas,
+;; octave and scilab (see the lazy-format lines of init-texmacs.scm), those
+;; which a branch does not have are ignored. A new source-code format must be
+;; added here. Not texmacs, latex, html, pdf, images... which are converted,
+;; and whose cost is not that of the lines of a text.
+(define large-source-formats
+  '("generic" "verbatim" "code" "scheme" "python" "mathemagix" "caas"
+    "octave" "scilab" "c" "cpp" "julia" "scala" "java" "javascript" "dot"
+    "json" "csv" "go" "lean" "lua" "rust" "typescript" "css" "toml" "yaml"
+    "ocaml" "haskell" "shell"))
+
+(tm-define (large-source-file? size fm)
+  (:synopsis "Is a file of @size bytes in the format @fm a large source file?")
+  (and (integer? size) (string? fm)
+       (>= size large-source-file-size)
+       (in? fm large-source-formats)))
+
+;; Set while the thunk of an answered question runs, so that the loads inside
+;; it do not ask again
+(define large-load-confirmed? #f)
+
+;; Set by the tests, which run without a window, to be asked as if there
+;; was one: #t, or the procedure (prompt default cont) which asks in place of
+;; user-confirm. (A first version stubbed user-confirm itself with with-global
+;; in the editing checks; on the Vue/s7 binary that run hung in the group, the
+;; stub apparently not reached; the hook does not depend on that.)
+(tm-define large-load-test-interactive? #f)
+(tm-define (set-large-load-test-interactive! flag)
+  (set! large-load-test-interactive? flag))
+
+(define (load-buffer-ask-large? name opts)
+  ;; only for the calls which ask for it (:confirm-large, from the menus,
+  ;; the dialog of File > Open, the links and the files opened by the
+  ;; system), never in a script, with -x, -c, in headless mode or when there
+  ;; is no window to ask in
+  (and (in? :confirm-large opts)
+       (not large-load-confirmed?)
+       (or large-load-test-interactive?
+           (and (not (headless?)) (> (windows-number) 0)))
+       (not (url-rooted-web? name))
+       (not (url-rooted-tmfs? name))
+       (not (buffer-exists? name))
+       (url-test? name "f")
+       (large-source-file? (url-size name) (url-format name))))
+
+(tm-define (load-buffer-resolve-name name)
+  (if (and (not (url-exists? name))
+           (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
+      (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
+  (if (not (url-rooted? name))
+      (if (current-buffer)
+          (set! name (url-relative (current-buffer) name))
+          (set! name (url-append (url-pwd) name))))
+  name)
+
+(tm-define (large-load-question? name)
+  (:synopsis "Is the question of a large source file asked for @name?")
+  (and name (load-buffer-ask-large? (load-buffer-resolve-name name)
+                                    '(:confirm-large))))
+
+(tm-define (confirm-large-load name thunk)
+  (:synopsis "Call @thunk, after the question for a large source file @name")
+  ;; thunk runs at once when no question is needed (@name is not a large
+  ;; source file, or #f, or the call is not interactive), otherwise only in
+  ;; the answer yes: the question may be answered later (a footer prompt),
+  ;; so what has to follow the load belongs in the thunk. The loads in the
+  ;; thunk do not ask again.
+  (if (and name (load-buffer-ask-large? (load-buffer-resolve-name name)
+                                        '(:confirm-large)))
+      (let* ((name (load-buffer-resolve-name name))
+             (mb (quotient (+ (url-size name) 524288) 1048576))
+             (msg (replace "The file %1 is large (%2 MB). Opening it may take a long time and a lot of memory. Open it anyway?"
+                           (url->system name) (number->string mb))))
+        ;; answering no (or escape) leaves everything as it was
+        ((if (procedure? large-load-test-interactive?)
+             large-load-test-interactive?
+             user-confirm)
+         msg #f
+          (lambda (answ)
+            (when answ
+              (dynamic-wind
+                (lambda () (set! large-load-confirmed? #t))
+                thunk
+                (lambda () (set! large-load-confirmed? #f))))
+            ;; no value: the footer prints what the continuation returns
+            (noop))))
+      (thunk)))
+
+(define (load-buffer-confirm-large name opts k)
+  (if (in? :confirm-large opts)
+      (confirm-large-load name k)
+      (k)))
+
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
@@ -721,14 +824,9 @@
 
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
-  (if (and (not (url-exists? name))
-           (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
-      (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
-  (if (not (url-rooted? name))
-      (if (current-buffer)
-          (set! name (url-relative (current-buffer) name))
-          (set! name (url-append (url-pwd) name))))
-  (load-buffer-check-autosave name opts))
+  (set! name (load-buffer-resolve-name name))
+  (load-buffer-confirm-large name opts
+    (lambda () (load-buffer-check-autosave name opts))))
 
 (tm-define (load-buffer name . opts)
   (:argument name smart-file "File name")
@@ -762,6 +860,11 @@
 
 (tm-define (load-buffer-from-system name)
   (:synopsis "Load a file given by the system (the Finder, the Dock, open)")
+  ;; a large source file asks first (#710), before the startup buffer is
+  ;; taken or a window is made: no is the end, with nothing changed
+  (confirm-large-load name (lambda () (load-buffer-from-system* name))))
+
+(define (load-buffer-from-system* name)
   ;; the untitled, unmodified buffer of the startup is replaced by the first
   ;; file, as the user did not touch it; any other file gets a window of its
   ;; own, not the one the user is working in (#739). The test is made when
@@ -781,12 +884,12 @@
   (cond ((url-rooted-protocol? name "mailto") (load-external name))
         ((buffer-exists? name) (switch-to-buffer name))
         ((buffer-external? name) (load-external name))
-        ((url-rooted-web? (current-buffer)) (load-buffer name))
-        (else (load-buffer name))))
+        ((url-rooted-web? (current-buffer)) (load-buffer name :confirm-large))
+        (else (load-buffer name :confirm-large))))
 
 (tm-define (open-buffer)
   (:synopsis "Open a new file")
-  (choose-file load-buffer "Load file" ""))
+  (choose-file (lambda (u) (load-buffer u :confirm-large)) "Load file" ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reverting buffers
@@ -858,7 +961,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (open-in-window)
-  (choose-file load-buffer-in-new-window "Load file" ""))
+  (choose-file (lambda (u) (load-buffer-in-new-window u :confirm-large))
+               "Load file" ""))
 
 (tm-define (open-document)
   (if (window-per-buffer?) (open-in-window) (open-buffer)))

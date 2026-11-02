@@ -840,6 +840,85 @@
   (check-true (buffer-exists? (tmp "other.tm")))
   (check= (cursor) '(0 0 1 1)))
 
+;; A link with a line into a large source file asks first (#710). The
+;; question may be answered later (a footer prompt): the load, the line and
+;; the word of the link then wait for the answer. With a stubbed question
+;; which keeps its continuation: nothing is loaded and the cursor of the
+;; current document does not move before the answer; no loads nothing, ever;
+;; yes loads the file and goes to the line.
+(define large-pending #f)
+(define large-asked 0)
+
+(define (test-link-large-file)
+  (check-group "links to a large file")
+  (let* ((f (tmp "large.scm"))
+         (line (apply string-append
+                      (make-list 40 "(define (f x) (+ x 1111111111111111111111111111111111111))   ")))
+         (n (+ 1 (quotient large-source-file-size (string-length line))))
+         )
+    (string-save (apply string-append
+                        (map (lambda (i) (string-append line "\n")) (iota n)))
+                 (url->system f))
+    (write-doc "from-large.tm" '("article") '() '("text"))
+    (open "from-large.tm")
+    (let ((here (current-buffer)) (cur (cursor)))
+      (set-large-load-test-interactive!
+       (lambda (prompt default cont)
+         (set! large-asked (+ large-asked 1))
+         (set! large-pending cont)))
+      (set! large-asked 0)
+      ;; deferred question, not answered yet
+      (go-to-url (string-append (url->system f) "?line=3"))
+      (check= large-asked 1)
+      (check-false (buffer-exists? f))
+      (check= (current-buffer) here)
+      (check= (cursor) cur)
+      ;; no: nothing
+      (large-pending #f)
+      (check-false (buffer-exists? f))
+      (check= (current-buffer) here)
+      (check= (cursor) cur)
+      ;; yes, after other things happened: loads, one question only
+      (go-to-url (string-append (url->system f) "?line=3"))
+      (check= large-asked 2)
+      ;; the continuation returns nothing that the footer would print
+      (check= (large-pending #t) (noop))
+      (check= large-asked 2)
+      (check-true (buffer-exists? f))
+      (check= (current-buffer) f)
+      (check= (cursor) '(3 0))
+      (buffer-close f)
+      (switch-to-buffer here)
+      ;; a relative link: it names the file of the directory of the buffer
+      ;; where it was followed, also when the buffer has changed before the
+      ;; answer (a decoy of the same name is in the directory of the other)
+      (let* ((dir (url-temp-dir))
+             (decoy (url-append dir "large.scm"))
+             (other (url-append dir "other2-710.tm")))
+        (string-save "(define decoy 1)\n" (url->system decoy))
+        (tree-export (stree->tree '(document (TeXmacs "2.1")
+                                             (style (tuple "article"))
+                                             (body (document "x"))))
+                     other "texmacs")
+        (set! large-asked 0)
+        (go-to-url "large.scm?line=3")
+        (check= large-asked 1)
+        (check-false (buffer-exists? f))
+        (load-buffer other)
+        (check= (current-buffer) other)
+        (large-pending #t)
+        (check= large-asked 1)
+        (check-true (buffer-exists? f))
+        (check-false (buffer-exists? decoy))
+        (check= (current-buffer) f)
+        (check= (cursor) '(3 0))
+        (buffer-close f)
+        (buffer-close other)
+        (system-remove decoy)
+        (system-remove other))
+      (set-large-load-test-interactive! #f)
+      (switch-to-buffer here))))
+
 ;; The loci of a typeset document: their identifiers are on their bodies,
 ;; and the links between them are found from either end.
 (define (test-loci)
@@ -3164,6 +3243,7 @@
   (run-group test-generate-one)
   (run-group test-hyperlinks)
   (run-group test-hyperlink-files)
+  (run-group test-link-large-file)
   (run-group test-loci)
   (run-group test-navigation)
   (run-group test-link-pages)

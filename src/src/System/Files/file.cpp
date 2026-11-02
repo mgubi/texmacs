@@ -402,7 +402,10 @@ file_size (url u) {
   if (is_rooted_tmfs (u)) return -1;
   struct_stat u_stat;
   if (get_attributes (u, &u_stat, true)) return -1;
-  return u_stat.st_size;
+  // st_size is 64 bits: saturate instead of wrapping around for 2 GiB or more
+  // (-1 stays "no file")
+  if ((long long) u_stat.st_size > (long long) 0x7fffffff) return 0x7fffffff;
+  return (int) u_stat.st_size;
 }
 
 int
