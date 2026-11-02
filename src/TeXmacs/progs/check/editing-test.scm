@@ -515,6 +515,73 @@
     (buffer-close f)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; The files of the system (load-buffer-from-system) ask before the startup
+;; buffer is taken or a window is made, with the question stubbed to keep its
+;; continuation (a footer prompt, or Vue, answers later): no changes nothing
+;; (the startup buffer is still free for the next file), yes goes on.
+(define (test-load-from-system-large)
+  (check-group "load-from-system-large")
+  (let* ((f (tmp-file* "sys-large.c"))
+         (g (tmp-file* "sys-small.c"))
+         (old (current-buffer))
+         (u (new-buffer))
+         (calls '())
+         (pending #f)
+         (asked 0)
+         (line (apply string-append (make-list 40 "int x = 1111111111111111;   "))))
+    (string-save (apply string-append
+                        (map (lambda (i) (string-append line "\n"))
+                             (iota (+ 1 (quotient large-source-file-size
+                                                  (string-length line))))))
+                 (url->system f))
+    (string-save "int x;\n" (url->system g))
+    (switch-to-buffer* u)
+    (set-large-load-test-interactive! #t)
+    (with-global user-confirm
+        (lambda (prompt default cont)
+          (set! asked (+ asked 1))
+          (set! pending cont))
+      (with-global load-buffer
+          (lambda (name . opts) (set! calls (rcons calls (list 'current name))))
+        (with-global load-buffer-in-new-window
+            (lambda (name . opts) (set! calls (rcons calls (list 'new name))))
+          ;; the startup buffer, no: nothing happens, it stays free
+          (startup-buffer-release)
+          (load-buffer-from-system f)
+          (check= asked 1)
+          (check= calls '())
+          (pending #f)
+          (check= calls '())
+          (check-true (startup-buffer?))
+          (load-buffer-from-system g)
+          (check= asked 1)
+          (check= calls (list (list 'current g)))
+          ;; the startup buffer, yes (after the question, not before)
+          (set! calls '())
+          (startup-buffer-release)
+          (load-buffer-from-system f)
+          (check= calls '())
+          (pending #t)
+          (check= asked 2)
+          (check= calls (list (list 'current f)))
+          ;; another buffer than the startup one: a window of its own
+          (set! calls '())
+          (startup-buffer-release)
+          (buffer-pretend-modified u)
+          (load-buffer-from-system f)
+          (check= asked 3)
+          (pending #f)
+          (check= calls '())
+          (load-buffer-from-system f)
+          (check= calls '())
+          (pending #t)
+          (check= asked 4)
+          (check= calls (list (list 'new f))))))
+    (set-large-load-test-interactive! #f)
+    (buffer-pretend-saved u)
+    (startup-buffer-release)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2070,6 +2137,7 @@
   (test-embedded-close)
   (test-load)
   (test-load-large)
+  (test-load-from-system-large)
   (test-insert)
   (test-insert-paragraphs)
   (test-insert-line-start)

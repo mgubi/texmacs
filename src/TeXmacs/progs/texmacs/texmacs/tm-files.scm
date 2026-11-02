@@ -706,7 +706,7 @@
        (url-test? name "f")
        (large-source-file? (url-size name) (url-format name))))
 
-(define (load-buffer-resolve-name name)
+(tm-define (load-buffer-resolve-name name)
   (if (and (not (url-exists? name))
            (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
       (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
@@ -715,6 +715,11 @@
           (set! name (url-relative (current-buffer) name))
           (set! name (url-append (url-pwd) name))))
   name)
+
+(tm-define (large-load-question? name)
+  (:synopsis "Is the question of a large source file asked for @name?")
+  (and name (load-buffer-ask-large? (load-buffer-resolve-name name)
+                                    '(:confirm-large))))
 
 (tm-define (confirm-large-load name thunk)
   (:synopsis "Call @thunk, after the question for a large source file @name")
@@ -847,6 +852,11 @@
 
 (tm-define (load-buffer-from-system name)
   (:synopsis "Load a file given by the system (the Finder, the Dock, open)")
+  ;; a large source file asks first (#710), before the startup buffer is
+  ;; taken or a window is made: no is the end, with nothing changed
+  (confirm-large-load name (lambda () (load-buffer-from-system* name))))
+
+(define (load-buffer-from-system* name)
   ;; the untitled, unmodified buffer of the startup is replaced by the first
   ;; file, as the user did not touch it; any other file gets a window of its
   ;; own, not the one the user is working in (#739). The test is made when

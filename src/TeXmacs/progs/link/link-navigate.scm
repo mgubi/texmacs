@@ -497,20 +497,37 @@
 (define (http-root-handler u)
   (load-browse-buffer u))
 
-;; The file which the handlers of @u load, or #f when they do something else
-;; (a web page, an external viewer, several candidates)
-(define (url-load-target u)
+;; What the handlers of @u load when it is a link to a file: the pair of the
+;; absolute file and of @u with that file in place of its (maybe relative)
+;; name, the query kept, or #f when they do something else (a web page, an
+;; external viewer, several candidates, a file: url with a query, which is
+;; loaded whole by http-root-handler). The name is resolved here, once: the
+;; question may be answered after the current buffer has changed.
+(define (url-query-suffix s)
+  (let* ((m (string-length s))
+         (h (or (string-index s #\#) m))
+         (a (or (string-index s #\?) m)))
+    (substring s (min h a) m)))
+
+(define (url-load-plan u)
   (with root (or (and (url-rooted? u) (url-root u)) "default")
     (and (in? root '("default" "file"))
          (not (url-rooted-protocol? u "mailto"))
          (not (url-or? (url-expand u)))
-         (let* ((base (car (process-url u)))
+         (let* ((s (url->system u))
+                (suffix (url-query-suffix s))
+                (base (car (process-url u)))
                 (b (if (string? base) (system->url base) base)))
            (and (not (url-none? b))
                 (!= "" (url->system b))
                 (not (url-rooted-web? b))
                 (not (buffer-external? b))
-                b)))))
+                (or (== root "default") (== suffix ""))
+                (let ((abs (load-buffer-resolve-name b)))
+                  (cons abs
+                        (if (== suffix "") u
+                            (system->url
+                             (string-append (url->system abs) suffix))))))))))
 
 (define (url-handlers u)
   (with root (or (and (url-rooted? u) (url-root u)) "default")
@@ -551,10 +568,14 @@
   ;; a link to a large source file asks first; what follows the load (the
   ;; line and the word of the link, the history) waits for the answer
   (with (action post) (url-handlers u)
-    (confirm-large-load (url-load-target u)
-      (lambda ()
-        (action u) (post u)
-        (if (nnull? opt-from) (cursor-history-add (cursor-path)))))))
+    (let* ((plan (url-load-plan u))
+           ;; the resolved name only when a question is asked
+           (ask? (and plan (large-load-question? (car plan))))
+           (u* (if ask? (cdr plan) u)))
+      (confirm-large-load (and ask? (car plan))
+        (lambda ()
+          (action u*) (post u*)
+          (if (nnull? opt-from) (cursor-history-add (cursor-path))))))))
 
 (define (execute-at cmd opt-location)
   (if (null? opt-location) (exec-delayed cmd)
