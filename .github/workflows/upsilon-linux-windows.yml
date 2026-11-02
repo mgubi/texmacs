@@ -817,6 +817,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # (first: a checkout deletes all that the workspace has, so also dist)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/packages
+
       - uses: actions/download-artifact@v4
         if: needs.linux.result == 'success'
         with:
@@ -849,10 +854,6 @@ jobs:
       # must be in the release upsilon-sources (made by the job sources of
       # upsilon-macos.yml, which is not in this workflow) before the packages are
       # published (#662); else run that workflow first
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: src/packages
-
       - name: The sources of the programs of others are published
         env:
           GH_TOKEN: ${{ github.token }}
@@ -889,6 +890,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          SOME_PASSED: ${{ contains(needs.*.result, 'success') }}
         run: |
           tag=upsilon-latest
           built="commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)"
@@ -908,7 +910,12 @@ jobs:
             esac
             files+=("$f#$l ($built)")
           done
-          [ ${#files[@]} -gt 0 ] || { echo "no package passed: nothing to publish"; exit 0; }
+          if [ ${#files[@]} -eq 0 ]; then
+            # (a job passed and its files are not here: not a quiet success)
+            [ "$SOME_PASSED" != true ] ||
+              { echo "error: a job passed, but dist has no package"; exit 1; }
+            echo "no package passed: nothing to publish"; exit 0
+          fi
           if ! gh release view "$tag" > /dev/null 2>&1; then
             # (the macOS workflow makes it, with its notes; it may not have yet)
             gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
