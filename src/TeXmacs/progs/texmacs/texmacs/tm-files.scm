@@ -688,6 +688,8 @@
 ;; Set by the tests, which run without a window, to be asked as if there
 ;; was one
 (tm-define large-load-test-interactive? #f)
+(tm-define (set-large-load-test-interactive! flag)
+  (set! large-load-test-interactive? flag))
 
 (define (load-buffer-ask-large? name opts)
   ;; only for the calls which ask for it (:confirm-large, from the menus,
