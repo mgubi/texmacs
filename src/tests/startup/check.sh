@@ -363,5 +363,51 @@ reused buffer kept #t
 reused buffer closed #f" \
       -x '(load "startup-embedded.scm")'
 
+# A link whose target has a wildcard: the pattern was loaded as the name of
+# a buffer, and url-glue (the autosave names) threw a C++ exception which
+# nothing catches under -x, so that TeXmacs aborted (#771). The check is
+# here, not in the suites, since a crash would take a whole suite run down;
+# here it is the status 134 of this one case. The files which match are the
+# candidates of the link: several give the page of disambiguation, one is
+# loaded (also with a query and as a file: url), none gives a message.
+mkdir -p "$out/startup-wild"
+printf 'a\nb\nc\nd\n' > "$out/startup-wild/wild1.scm"
+printf 'x\n' > "$out/startup-wild/wild2.scm"
+printf 'y\n' > "$out/startup-wild/solo1.scm"
+cat > "$out/startup-wild.scm" <<'EOF'
+(use-modules (link link-navigate))
+(define d (url->system (url-append (url-pwd) "startup-wild")))
+(define (page-text)
+  (with l (list-filter (buffer-list)
+                       (lambda (b) (== (url->string (url-tail b))
+                                       "Disambiguation page")))
+    (if (null? l) "" (object->string (tree->stree (buffer-get-body (car l)))))))
+(define (listed? s) (string-contains? (page-text) s))
+(go-to-url (string-append d "/wild*.scm"))
+(display* "CHECK several " (listed? "wild1.scm") " " (listed? "wild2.scm")
+          " " (listed? "solo1.scm") "\n")
+(define n (length (buffer-list)))
+(go-to-url (string-append d "/nothing*.scm"))
+(display* "CHECK none " (== n (length (buffer-list))) "\n")
+(go-to-url (string-append d "/solo*.scm"))
+(display* "CHECK one " (url->string (url-tail (current-buffer))) "\n")
+(buffer-close (current-buffer))
+(go-to-url (string-append d "/wild*.scm?line=3"))
+(display* "CHECK several-query " (listed? "wild1.scm") "\n")
+(go-to-url (string-append "file://" d "/wild*.scm"))
+(display* "CHECK file-root " (listed? "wild2.scm") "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "a link with a wildcard in its target does not abort TeXmacs (#771)" \
+      "several #t #t #f
+none #t
+one solo1.scm
+several-query #t
+file-root #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-wild.scm")'
+
 echo "Total: $total checks, $failed failed"
 exit $status
