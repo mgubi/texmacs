@@ -104,6 +104,13 @@ NSColor* to_nscolor (color col);
     if (wid) wid->layout();
   NS_ENTRY_END ("-[TMWidgetHelper notify:]")
 }
+- (void)canvasNotify:(NSNotification*)n
+{
+  (void) n;
+  NS_ENTRY_BEGIN
+    if (wid) wid->canvas_changed ();
+  NS_ENTRY_END ("-[TMWidgetHelper canvasNotify:]")
+}
 - (void)windowNotify:(NSNotification*)n
 {
   if (!wid || [n object] != [wid->view window]) return;
@@ -243,6 +250,10 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   [[NSNotificationCenter defaultCenter] addObserver: wh
       selector: @selector(notify:)
           name: @"TMIconBarsChanged" object: nil];
+  // a change of tm_background, the surround of the pages (the appearance)
+  [[NSNotificationCenter defaultCenter] addObserver: wh
+      selector: @selector(canvasNotify:)
+          name: @"TMCanvasChanged" object: nil];
   // the scroll bars of the system (legacy ones take room in the side bar)
   [[NSNotificationCenter defaultCenter] addObserver: wh
       selector: @selector(notify:)
@@ -903,6 +914,13 @@ ns_tm_widget_rep::window_became_main () {
 }
 
 void
+ns_tm_widget_rep::canvas_changed () {
+  // (the full screen mode keeps its black)
+  if (!full_screen) [sv setBackgroundColor: to_nscolor (tm_background)];
+  [sv setNeedsDisplay: YES];
+}
+
+void
 ns_tm_widget_rep::window_full_screen (bool flag) {
   // The full screen mode was entered or left with the controls of macOS (the
   // green button, the menus or escape): TeXmacs follows, as when it changes
@@ -1173,6 +1191,10 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *                     side and bottom tools, status bar, prompt) to the
  *                     widget of the window with this title (or of every
  *                     window): each is false, not a "type mismatch" (#720)
+ *   canvas            prints tm_background (the surround of the pages) and
+ *                     the background colors of the scroll views of the main
+ *                     window: how many are tm_background, white (embedded
+ *                     editors) or something else (stale)
  *   scan              as macOS does for Spotlight and Apple Intelligence:
  *                     computes all the menus of the menu bar without
  *                     opening them (-[NSMenu _simulateOpening:] when AppKit
@@ -1652,6 +1674,34 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
       }
       else [todo addObjectsFromArray: [v subviews]];
     }
+  }
+  else if ([st isEqualToString: @"canvas"]) {
+    int same= 0, white= 0, other= 0, tr, tg, tb, ta;
+    get_rgb_color (tm_background, tr, tg, tb, ta);
+    Class dc= NSClassFromString (@"TMDocView");
+    NSMutableArray* todo= [NSMutableArray array];
+    if ([win contentView]) [todo addObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: [NSScrollView class]] &&
+          [[(NSScrollView*) v documentView] isKindOfClass: dc] &&
+          [(NSScrollView*) v drawsBackground] &&
+          ![v isHiddenOrHasHiddenAncestor]) {
+        NSColor* c= [[(NSScrollView*) v backgroundColor]
+                      colorUsingColorSpace: [NSColorSpace sRGBColorSpace]];
+        int r= (int) round ([c redComponent] * 255);
+        int g= (int) round ([c greenComponent] * 255);
+        int b= (int) round ([c blueComponent] * 255);
+        if (r == 255 && g == 255 && b == 255) white++;
+        else if (r == tr && g == tg && b == tb) same++;
+        else other++;
+      }
+      [todo addObjectsFromArray: [v subviews]];
+    }
+    fprintf (stderr, "NSTEST canvas tm_background %d,%d,%d scroll views: "
+             "%d canvas %d white %d other\n",
+             tr, tg, tb, same, white, other);
   }
   else if ([st isEqualToString: @"scroll"]) {
     // the scroll views of the editors of the main window (or of the window

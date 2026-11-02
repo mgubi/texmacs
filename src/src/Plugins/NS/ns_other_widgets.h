@@ -129,6 +129,7 @@ public:
   void install_main_menu ();
   void window_became_main ();
   void window_full_screen (bool flag);
+  void canvas_changed ();
 };
 
 

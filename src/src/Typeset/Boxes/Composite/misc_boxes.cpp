@@ -325,6 +325,9 @@ void
 page_border_box_rep::display_background (renderer ren) {
   if (!ren->is_screen) return;
   brush bgc= ren->get_background ();
+  // the surround of the pages follows tm_background as it is now (it may
+  // change with the appearance of the system), except in full screen mode
+  color tmb= (this->tmb == black? black: tm_background);
   ren->set_background (tmb);
   SI X1= sx1(0), Y1= sy1(0), X2= sx2(0), Y2= sy2(0);
   if (X1 > x1) ren->clear_pattern (x1, y1, X1, y2);
