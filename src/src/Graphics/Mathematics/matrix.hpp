@@ -249,6 +249,7 @@ invert (matrix<T> m) {
   ASSERT (rows == cols, "invalid matrix dimensions");
   if (rows == 2) {
     T det= m (0, 0) * m (1, 1) - m (0, 1) * m (1, 0);
+    ASSERT (det != T(0), "matrix is not invertible");
     matrix<T> inv (T(0), rows, cols);
     inv (0, 0)=  m (1, 1) / det;
     inv (0, 1)= -m (0, 1) / det;

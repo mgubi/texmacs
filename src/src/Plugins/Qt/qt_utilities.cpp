@@ -1091,11 +1091,18 @@ qt_download_file(string _urlStr, string _outputFile) {
     return 1;
   }
 
+  // Give up when nothing is received for a while (by default 10s, as in
+  // qt_http.cpp): a server which takes the request and never answers, or
+  // a connection which is lost, would otherwise block TeXmacs for ever
   QNetworkRequest request(url);
+  string s= get_preference ("http request timeout");
+  int timeout= 10000;
+  if (is_int (s) && as_int (s) > 0) timeout= 1000 * as_int (s);
+  request.setTransferTimeout (timeout);
   QNetworkReply* reply = manager.get(request);
 
   QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-  loop.exec();
+  if (!reply->isFinished ()) loop.exec();
 
   if (reply->error() != QNetworkReply::NoError) {
     std_warning << "Error downloading file: " 

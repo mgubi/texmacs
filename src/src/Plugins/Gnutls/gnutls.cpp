@@ -68,7 +68,8 @@ static const string tm_x509_trusted_cas_path=
   "$TEXMACS_HOME_PATH/system/certificates/trusted-certificates.crt";
 
 static unsigned int cert_verify_flags = 0;
-static gnutls_rnd_level_t rnd_level= GNUTLS_RND_NONCE;
+// the passwords and their salts are secrets: the level of keys (#66)
+static gnutls_rnd_level_t rnd_level= GNUTLS_RND_KEY;
 
 static void
 tm_initialize_tls () {
@@ -1378,3 +1379,49 @@ string gnutls_generate_salt () {
 }
 
 #endif // USE_GNUTLS
+
+/******************************************************************************
+* Random numbers for secrets, with or without GnuTLS
+******************************************************************************/
+
+#include <limits.h>
+#if defined (OS_MINGW) || defined (OS_WIN32)
+// declared by stdlib.h only when _CRT_RAND_S is defined before it
+extern "C" int rand_s (unsigned int* r);
+#else
+#include <stdio.h>
+#endif
+
+// 32 random bits from the system, false when it has no secure source
+static bool
+system_random_u32 (uint32_t& r) {
+#if defined (OS_MINGW) || defined (OS_WIN32)
+  unsigned int x;
+  if (rand_s (&x) != 0) return false;
+  r= (uint32_t) x;
+  return true;
+#else
+  FILE* f= fopen ("/dev/urandom", "rb");
+  if (f == NULL) return false;
+  unsigned char b[4];
+  bool ok= fread (b, 1, 4, f) == 4;
+  fclose (f);
+  if (ok) r= ((uint32_t) b[0]) | (((uint32_t) b[1]) << 8) |
+             (((uint32_t) b[2]) << 16) | (((uint32_t) b[3]) << 24);
+  return ok;
+#endif
+}
+
+int
+secure_random_int (uint32_t limit) {
+  if (limit == 0) return 0;
+  if (gnutls_present ()) return gnutls_random_int (limit);
+  // the multiples of limit which fit in 32 bits, so that every value in
+  // [0, limit) is as likely (as gnutls_random_int)
+  const uint32_t ceil= UINT_MAX - (UINT_MAX % limit) - 1;
+  uint32_t r;
+  do {
+    if (!system_random_u32 (r)) return -1;
+  } while (r > ceil);
+  return (int) (r % limit);
+}

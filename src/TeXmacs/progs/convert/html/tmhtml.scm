@@ -36,6 +36,7 @@
 (define tmhtml-image-cache (make-ahash-table))
 (define tmhtml-image-root-url (unix->url "image"))
 (define tmhtml-image-root-string "image")
+(define tmhtml-image-loose? #t)
 (define tmhtml-site-version #f)
 (define tmhtml-web-formats (list "gif" "jpg" "jpeg" "png" "bmp" "svg"))
 
@@ -50,18 +51,16 @@
   (set! tmhtml-images?
 	(== (assoc-ref opts "texmacs->html:images") "on"))
   (set! tmhtml-image-cache (make-ahash-table))
-  (let* ((suffix (url-suffix current-save-target))
-	 (n (+ (string-length suffix) 1)))
-    (if (in? suffix '("html" "xhtml" "htm"))
-	(begin
-	  (set! tmhtml-image-serial 0)
-	  (set! tmhtml-image-root-url (url-unglue current-save-target n))
-	  (set! tmhtml-image-root-string
-		(url->unix (url-tail tmhtml-image-root-url))))
-	(begin
-	  (set! tmhtml-image-serial 0)
-	  (set! tmhtml-image-root-url (unix->url "image"))
-	  (set! tmhtml-image-root-string "image")))))
+  (set! tmhtml-image-serial 0)
+  (set! tmhtml-image-loose? (url-none? current-save-target))
+  (if tmhtml-image-loose?
+      (begin
+	(set! tmhtml-image-root-url (unix->url "image"))
+	(set! tmhtml-image-root-string "image"))
+      (begin
+	(set! tmhtml-image-root-url (url-drop-suffix current-save-target))
+	(set! tmhtml-image-root-string
+	      (url->unix (url-tail tmhtml-image-root-url))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Empty handler and strings
@@ -1039,7 +1038,7 @@
 
 (define (tmhtml-include l)
   (if (or (npair? l) (nstring? (car l))) '()
-      (with u (url-relative current-save-source (unix->url (car l)))
+      (with u (url-relative (save-source-url) (unix->url (car l)))
 	(if (not (url-exists? u)) '()
 	    (with-global current-save-source u
 	      (with t (tree-inclusion u)
@@ -1122,7 +1121,9 @@
 	`((h:a (@ (href ,(tmhtml-suffix to))) ,@body)))))
 
 (define (tmhtml-specific l)
-  (cond ((== (car l) "html") (list (tmstring->string (force-string (cadr l)))))
+  ;; raw HTML: <less> and <gtr> give its markup, the other characters
+  ;; (Cork or <name>) are written in UTF-8 like the rest of the page
+  (cond ((== (car l) "html") (list (cork->utf8 (force-string (cadr l)))))
 	((== (car l) "html*") (tmhtml (cadr l)))
 	((== (car l) "image") (tmhtml-png (cadr l)))
 	(else '())))
@@ -1149,13 +1150,26 @@
 	      (set! html (cons `(style ,style) html))))
 	`((@ ,@html)))))
 
+;; the base color of a pattern (5th argument), opaque, under the image
+(define (html-css-pattern-base x)
+  (and (tm-func? x 'pattern 5)
+       (with c (tmhtml-force-string (tm-ref x 4))
+         (and (!= c "") (!= c "none")
+              (with h (tmcolor->htmlcolor c)
+                (string-append "background-color: "
+                               (if (and (string-starts? h "#")
+                                        (== (string-length h) 9))
+                                   (substring h 0 7)
+                                   h)))))))
+
 (define (html-css-pattern x)
   (let* ((u (tmhtml-force-string (cadr x)))
          (w (or (tmlength->htmllength (caddr x) #t) "100%"))
          (h (or (tmlength->htmllength (cadddr x) #t) "100%"))
          (im (string-append "background: url('" u "')"))
-         (sz (string-append "background-size: " w " " h)))
-    (string-append im "; " sz)))
+         (sz (string-append "background-size: " w " " h))
+         (base (html-css-pattern-base x)))
+    (string-append im "; " sz (if base (string-append "; " base) ""))))
 
 (define (length-attr what x . opt)
   (with len (tmlength->htmllength x #t)
@@ -1180,7 +1194,9 @@
                ((tm-atomic? (cadr x))
                 (string-append "background-color: "
                                (tmbgcolor->htmlbgcolor (cadr x))))
-               ((tm-func? (cadr x) 'pattern 3)
+               ((or (tm-func? (cadr x) 'pattern 3)
+                    (tm-func? (cadr x) 'pattern 4)
+                    (tm-func? (cadr x) 'pattern 5))
                 (html-css-pattern (cadr x)))
                (else #f)))
 	((== (car x) "cell-lborder") (border-attr "border-left" (cadr x)))
@@ -1297,13 +1313,15 @@
   (map (lambda (id) `(h:a (@ (id ,(cork->html (cadr id))))))
        (tmhtml-collect-labels x)))
 
-(define (tmhtml-image-names ext)
+(define (tmhtml-image-names ext key)
   (set! tmhtml-image-serial (+ tmhtml-image-serial 1))
   (let* ((postfix (string-append
 		   "-" (number->string tmhtml-image-serial) "." ext))
 	 (name-url (url-glue tmhtml-image-root-url postfix))
 	 (name-string (string-append tmhtml-image-root-string postfix)))
-    (values name-url name-string)))
+    (if tmhtml-image-loose?
+	(loose-image-names key (string-append "." ext))
+	(values name-url name-string))))
 
 (define (magic-png-number)
   (let* ((css (get-preference "texmacs->html:css-stylesheet"))
@@ -1320,9 +1338,11 @@
 	 (l2 (if (null? l1) l1 (list (car l1)))))
     (with cached (ahash-ref tmhtml-image-cache x)
       (if (not cached)
-	  (receive (name-url name-string) (tmhtml-image-names "png")
+	  (receive (name-url name-string) (tmhtml-image-names "png" x)
 	    ;;(display* x " -> " name-url ", " name-string "\n")
-	    (let* ((extents (print-snippet name-url x #t))
+	    (let* ((cleared? (image-target-clear name-url))
+                   (extents (print-snippet name-url x #t))
+                   (written (image-target-written name-url cleared?))
                    (m (magic-png-number))
                    (unit (/ 6000.0 (* (ninth extents) (tenth extents) m)))
 		   (x3 (* (first extents) unit))
@@ -1375,13 +1395,13 @@
   ;; make sure image is accessible from html
   ;; FIXME: we should replace ~, environment variables, etc.
   (let* ((un  (unix->url name))
-         (u (url-relative current-save-target un))
+         (u (url-relative (save-target-url) un))
          (suf (url-suffix un)))
     (if (url-exists? u)
         name
       (with u1 (url-relative (current-buffer-url) un)
         (if (url-exists? u1)
-          (receive (name-url name-string) (tmhtml-image-names suf)
+          (receive (name-url name-string) (tmhtml-image-names suf name)
             (system-copy u1 name-url)
             name-string)
            name))))) ;; image does not exist, can't do much
@@ -1398,8 +1418,11 @@
               (string? (caddar l)))
          ;; embedded web image, extract it    
          (receive (name-url name-string)
-                  (tmhtml-image-names (url-suffix (cork->utf8 (caddar l))))
-           (string-save (cadr (cadar l)) name-url)
+                  (tmhtml-image-names (url-suffix (cork->utf8 (caddar l)))
+                                      (cadr (cadar l)))
+           (with cleared? (image-target-clear name-url)
+             (string-save (cadr (cadar l)) name-url)
+             (image-target-written name-url cleared?))
            (tmhtml-image (cons name-string (cdr l)))))
         ((nstring? (first l))
          ;; treat complex images as generic markup

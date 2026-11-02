@@ -108,11 +108,21 @@
 (tm-define (principal-section? t)
   (tm/section-detect? t (principal-section-predicate)))
 
+(define (part-alternative t)
+  ;; what a hidden part which starts with the section @t evaluates: the
+  ;; section, or for the copy of an included file (part views) the section
+  ;; with which the file starts, not a second copy of the file
+  (if (and (tm-func? t 'shared 3)
+           (tm-func? (tm-ref t 2) 'document)
+           (> (tm-arity (tm-ref t 2)) 0))
+      `(document ,(tm->stree (tm-ref t 2 0)))
+      `(document ,(tm->stree t))))
+
 (define (list->subpart l nr)
   (with sec? (tm/section-detect? (car l) short-principal-section-tag?)
     `(show-part ,(number->string nr)
 		(document ,@l)
-		,(if sec? `(document ,(tm->stree (car l))) ""))))
+		,(if sec? (part-alternative (car l)) ""))))
 
 (define (make-subparts l)
   (if (short-style?) l
@@ -123,7 +133,7 @@
   (with sec? (tm/section-detect? (car l) (principal-section-predicate))
     `(show-part ,(number->string nr)
 		(document ,(car l) ,@(make-subparts (cdr l)))
-		,(if sec? `(document ,(tm->stree (car l))) ""))))
+		,(if sec? (part-alternative (car l)) ""))))
 
 (tm-define (principal-sections-to-document-parts l)
   (with r (tm/section-split l (principal-section-predicate))

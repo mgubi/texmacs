@@ -88,6 +88,9 @@ bool gnutls_present ();
  ******************************************************************************/
 
 int gnutls_random_int (uint32_t limit);
+// uniform in [0, limit), from GnuTLS, else from the system (rand_s on
+// Windows, /dev/urandom elsewhere); -1 when there is no secure source
+int secure_random_int (uint32_t limit);
 
 /******************************************************************************
  * X.509 authentication

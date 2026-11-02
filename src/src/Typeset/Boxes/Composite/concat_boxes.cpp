@@ -78,6 +78,12 @@ concat_box_rep::operator tree () {
 * Routines for concatenation boxes
 ******************************************************************************/
 
+static bool
+is_marker_box (box b) {
+  return b->get_type () == TEXT_BOX && b->w () == 0 && b->y1 == b->y2 &&
+         N (b->get_leaf_string ()) == 0;
+}
+
 void
 concat_box_rep::position (array<SI> spc) {
   int i;
@@ -94,8 +100,22 @@ concat_box_rep::position (array<SI> spc) {
   bool ok= !indent;
   x1= y1= x3= y3= MAX_SI;
   x2= y2= x4= y4= -MAX_SI;
+  // (the markers, places for the cursor around the value of a macro
+  // argument, empty and without width or height, are in the horizontal
+  // extents, which say where the box begins and ends (a tab at the start of
+  // a line), but not in the heights nor in the ink, unless there is nothing
+  // else)
+  bool all= true;
   for (i=0; i<N(bs); i++)
-    if (!indent || sx2(i) > sx1(i)) {
+    if (!is_marker_box (bs[i])) all= false;
+  for (i=0; i<N(bs); i++)
+    if (!all && is_marker_box (bs[i])) {
+      if (!indent) {
+        x1= min (x1, sx1(i));
+        x2= max (x2, sx2(i));
+      }
+    }
+    else if (!indent || sx2(i) > sx1(i)) {
       ok= true;
       x1= min (x1, sx1(i));
       y1= min (y1, sy1(i));
@@ -267,12 +287,35 @@ concat_box_rep::rsup_correction () {
   return 0;
 }
 
+static int
+single_box (array<box> bs) {
+  // the only box of a concatenation which is not a marker, or -1: the
+  // markers around the value of a macro argument do not count
+  int i, n= N(bs), r= -1;
+  for (i=0; i<n; i++)
+    if (!is_marker_box (bs[i]) || n == 1) {
+      if (r >= 0) return -1;
+      r= i;
+    }
+  return r;
+}
+
+// The levels of the scripts of a concatenation are those of its boxes
+// which are not markers: the markers around the value of a macro argument,
+// glued to the base of a script, are text boxes in another font, whose
+// levels would place the script elsewhere.
+// A base glued to markers keeps its own levels (and not the bounds of the
+// concatenation, which for a base like "." would put the script on it)
+
 SI
 concat_box_rep::sub_lo_base (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sub_lo_base (level);
   SI  y= y2;
   for (i=0; i<n; i++)
-    y= min (y, bs[i]->sub_lo_base (level));
+    if (!is_marker_box (bs[i]))
+      y= min (y, bs[i]->sub_lo_base (level));
   if (y == y2) y= y1;
   return y;
 }
@@ -280,9 +323,12 @@ concat_box_rep::sub_lo_base (int level) {
 SI
 concat_box_rep::sub_hi_lim  (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sub_hi_lim (level);
   SI  y= y1;
   for (i=0; i<n; i++)
-    y= max (y, bs[i]->sub_hi_lim (level));
+    if (!is_marker_box (bs[i]))
+      y= max (y, bs[i]->sub_hi_lim (level));
   if (y == y1) y= y1 + (y2-y1)/4;
   return y;
 }
@@ -290,9 +336,12 @@ concat_box_rep::sub_hi_lim  (int level) {
 SI
 concat_box_rep::sup_lo_lim  (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sup_lo_lim (level);
   SI  y= y2;
   for (i=0; i<n; i++)
-    y= min (y, bs[i]->sup_lo_lim (level));
+    if (!is_marker_box (bs[i]))
+      y= min (y, bs[i]->sup_lo_lim (level));
   if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
@@ -300,9 +349,12 @@ concat_box_rep::sup_lo_lim  (int level) {
 SI
 concat_box_rep::sup_lo_base (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sup_lo_base (level);
   SI  y= y2;
   for (i=0; i<n; i++)
-    y= min (y, bs[i]->sup_lo_base (level));
+    if (!is_marker_box (bs[i]))
+      y= min (y, bs[i]->sup_lo_base (level));
   if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
@@ -310,9 +362,12 @@ concat_box_rep::sup_lo_base (int level) {
 SI
 concat_box_rep::sup_hi_lim  (int level) {
   int i=0, n=N(bs);
+  int k= single_box (bs);
+  if (k >= 0) return bs[k]->sup_hi_lim (level);
   SI  y= y1;
   for (i=0; i<n; i++)
-    y= max (y, bs[i]->sup_hi_lim (level));
+    if (!is_marker_box (bs[i]))
+      y= max (y, bs[i]->sup_hi_lim (level));
   if (y == y1) y= y2;
   return y;
 }
@@ -622,35 +677,19 @@ concat_box_rep::graphical_select (SI x1, SI y1, SI x2, SI y2) {
 
 class phrase_box_rep: public concat_box_rep {
 public:
-  rectangles* logs_ptr;
-  SI          ox, oy;
+  placed_box place;  // (it logs the areas to repaint: see boxes.hpp)
   phrase_box_rep (path ip, array<box> bs, array<SI> spc);
-  ~phrase_box_rep ();
-  void position_at (SI x, SI y, rectangles& change_log_ptr);
+  void position_at (SI x, SI y, repaint_log& log) {
+    place.place (this, x + x0, y + y0, log); }
+  void unplace (repaint_log& log) { place.unplace (this, log); }
+  void all_placed (SI x, SI y, array<box>& bs, array<rectangle>& rs) {
+    x += x0; y += y0;
+    bs << box (this); rs << rectangle (x + x3, y + y3, x + x4, y + y4); }
   void display (renderer ren);
 };
 
 phrase_box_rep::phrase_box_rep (path ip, array<box> bs, array<SI> spc):
-  concat_box_rep (ip, bs, spc, false), logs_ptr (NULL) {}
-
-phrase_box_rep::~phrase_box_rep () {
-  if (logs_ptr != NULL) {
-    rectangles& logs= *logs_ptr;
-    logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-    logs= rectangles (rectangle (0, 0, 0, 0), logs);
-    // cout << "  8=X " << rectangle (ox+x3, oy+y3, ox+x4, oy+y4) << "\n";
-  }
-}
-
-void
-phrase_box_rep::position_at (SI x, SI y, rectangles& logs) {
-  x += x0; y += y0;
-  if (logs_ptr == NULL) logs= rectangles (rectangle (0, 0, 0, 0), logs);
-  else logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-  ox= x; oy= y;
-  logs= rectangles (rectangle (ox+x3, oy+y3, ox+x4, oy+y4), logs);
-  logs_ptr= &logs;
-}
+  concat_box_rep (ip, bs, spc, false) {}
 
 void
 phrase_box_rep::display (renderer ren) {

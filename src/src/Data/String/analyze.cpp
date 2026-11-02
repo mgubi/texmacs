@@ -550,23 +550,25 @@ tm_encode (string s) {
 
 string
 tm_decode (string s) {
-  // TeXmacs encoding to verbatim
-  int i;
+  // TeXmacs encoding to verbatim: <less> and <gtr> become < and >;
+  // any other <name> (<alpha>, <#3B1>...) is kept as written, and so are
+  // an unterminated < and a bare >
+  int i, n= N(s);
   string r;
-  for (i=0; i<N(s); i++) {
+  for (i=0; i<n; i++) {
     if (s[i]=='<') {
       int j;
-      for (j=i+1; j<N(s); j++)
-        if (s[j]=='>') break;
-      if (j<N(s)) j++;
-      if (s(i,j) == "<less>") r << "<";
-      else if (s(i,j) == "<gtr>") r << ">";
-      else if (i+7==j && s[i+1]=='#' && s[j-1]=='>')
-        r << s(i, j);
-      i=j-1;
-      if (s[i]!='>') return r;
+      for (j=i+1; j<n; j++)
+        if (s[j]=='>' || s[j]=='<') break;
+      if (j<n && s[j]=='>') {
+        if (s(i,j+1) == "<less>") r << "<";
+        else if (s(i,j+1) == "<gtr>") r << ">";
+        else r << s(i,j+1);
+        i= j;
+      }
+      else r << s[i];
     }
-    else if (s[i]!='>') r << s[i];
+    else r << s[i];
   }
   return r;
 }

@@ -392,7 +392,7 @@ suspend (void)
   t->top = SCM_STACK_PTR (&t);
   /* save registers. */
   SCM_FLUSH_REGISTER_WINDOWS;
-  SCM_I_SETJMP (t->regs);
+  SCM_I_SAVE_REGISTERS (t->regs);
   return t;
 }
 
@@ -1769,6 +1769,15 @@ scm_init_thread_procs ()
  scm_c_define_gsubr (s_scm_current_thread, 0, 0, 0, (SCM (*)()) scm_current_thread); ;
  scm_c_define_gsubr (s_scm_all_threads, 0, 0, 0, (SCM (*)()) scm_all_threads); ;
  scm_c_define_gsubr (s_scm_thread_exited_p, 1, 0, 0, (SCM (*)()) scm_thread_exited_p); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if (0)
+  scm_c_define_gsubr (s_scm_mutex_owner, 1, 0, 0, (SCM (*)()) scm_mutex_owner); ;
+#endif
+#if (0)
+  scm_c_define_gsubr (s_scm_mutex_level, 1, 0, 0, (SCM (*)()) scm_mutex_level); ;
+#endif
 
 }
 

@@ -408,15 +408,20 @@ edit_select_rep::selection_get_subtable (
 {
   path fp= find_subtable_selection (et, start (cur_sel), end (cur_sel),
                                     row1, col1, row2, col2);
-  table_bound (fp, row1, col1, row2, col2);
+  if (!is_nil (fp)) table_bound (fp, row1, col1, row2, col2);
   return fp;
 }
 
 selection
 edit_select_rep::compute_selection (path p1, path p2) {
-  if (is_table_selection (et, p1, p2, true)) {
-    int row1, col1, row2, col2;
-    path fp= find_subtable_selection (et, p1, p2, row1, col1, row2, col2);
+  // the selection is found in the boxes: a buffer which was never typeset
+  // (a script, without a window) has none yet (#729)
+  if (is_nil (eb)) typeset_forced ();
+  int row1, col1, row2, col2;
+  path fp;
+  if (is_table_selection (et, p1, p2, true))
+    fp= find_subtable_selection (et, p1, p2, row1, col1, row2, col2);
+  if (!is_nil (fp)) {
     tree st= subtree (et, fp);
     table_bound (fp, row1, col1, row2, col2);
 
@@ -475,10 +480,13 @@ edit_select_rep::selection_get (path& p1, path& p2) {
   if (selection_active_table ()) {
     int row1, col1, row2, col2;
     path fp= selection_get_subtable (row1, col1, row2, col2);
-    p1= fp * 0;
-    p2= fp * 1;
+    if (!is_nil (fp)) {
+      p1= fp * 0;
+      p2= fp * 1;
+      return;
+    }
   }
-  else selection_correct (start (cur_sel), end (cur_sel), p1, p2);
+  selection_correct (start (cur_sel), end (cur_sel), p1, p2);
   /*
   selection sel; selection_get (sel);
   p1= sel->start;
@@ -516,17 +524,15 @@ edit_select_rep::selection_get () {
   if (selection_active_table ()) {
     int row1, col1, row2, col2;
     path fp= selection_get_subtable (row1, col1, row2, col2);
-    return table_get_subtable (fp, row1, col1, row2, col2);
+    if (!is_nil (fp)) return table_get_subtable (fp, row1, col1, row2, col2);
   }
-  else {
-    path p1, p2;
-    // cout << "Selecting...\n";
-    selection_get (p1, p2);
-    // cout << "Between paths: " << p1 << " and " << p2 << "\n";
-    tree t= selection_compute (et, p1, p2);
-    // cout << "Selection : " << t << "\n";
-    return simplify_correct (t);
-  }
+  path p1, p2;
+  // cout << "Selecting...\n";
+  selection_get (p1, p2);
+  // cout << "Between paths: " << p1 << " and " << p2 << "\n";
+  tree t= selection_compute (et, p1, p2);
+  // cout << "Selection : " << t << "\n";
+  return simplify_correct (t);
 }
 
 path
@@ -564,6 +570,19 @@ edit_select_rep::selection_raw_get (string key) {
   tree t; string s;
   (void) ::get_selection (key, t, s, "texmacs");
   return t;
+}
+
+void
+edit_select_rep::selection_get_state (range_set& sel, bool& sg, bool& sh,
+                                      path& mid) {
+  sel= cur_sel; sg= selecting; sh= shift_selecting; mid= copy (mid_p);
+}
+
+void
+edit_select_rep::selection_set_state (range_set sel, bool sg, bool sh,
+                                      path mid) {
+  cur_sel= sel; selecting= sg; shift_selecting= sh; mid_p= mid;
+  notify_change (THE_SELECTION);
 }
 
 void
@@ -617,8 +636,14 @@ edit_select_rep::selection_set (string key, tree t, bool persistant) {
     if (selection_export == "latex") t= exec_latex (t, tp);
     if ((selection_export == "latex") && (mode == "math"))
       t= compound ("math", t);
-    if (selection_export != "default")
+    if (selection_export != "default") {
+      // The images of a real copy are kept for the pasted text
+      object old_copying;
+      if (key == "primary")
+        old_copying= call ("copying-to-clipboard-swap", object (true));
       s= tree_to_generic (t, selection_export * "-snippet");
+      if (key == "primary") call ("copying-to-clipboard-swap", old_copying);
+    }
     else {
       s= tree_to_generic (t, "texmacs-snippet");
       // the verbatim variant is what another application receives: without
@@ -791,8 +816,21 @@ void
 edit_select_rep::raw_cut (path p1, path p2) {
   if (p2 == p1) return;
   path p = common (p1, p2);
-  tree t = subtree (et, p);
   int  n = N(p);
+  if (N(p1) == n || N(p2) == n) {
+    // One path is the left or the right border of a tag and the other one
+    // is inside it, as the end (tformat table 1) of a selection which starts
+    // in the second row of the table: the border is not a position inside
+    // the tag. The cut goes to the start or to the end of the tag (#712).
+    path q1= p1, q2= p2;
+    if (N(p1) == n) q1= (last_item (p1) == 0? start (et, path_up (p1)):
+                                              end (et, path_up (p1)));
+    if (N(p2) == n) q2= (last_item (p2) == 0? start (et, path_up (p2)):
+                                              end (et, path_up (p2)));
+    if (q1 != p1 || q2 != p2) raw_cut (q1, q2);
+    return;
+  }
+  tree t = subtree (et, p);
   int  i1= p1[n];
   int  i2= p2[n];
 

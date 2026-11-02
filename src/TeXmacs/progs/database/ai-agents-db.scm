@@ -84,7 +84,7 @@
 	      (with ids (db-search `(("type" "corrector") ("name" ,name)))
 		(if (null? ids) ""
 		    (with instructions (db-get-field (car ids) "instructions")
-		      (if instructions (car instructions) ""))))
+		      (if (nnull? instructions) (car instructions) ""))))
 	      (begin
 		(db-warning "AI corrector agent '" name "' not found")
 		(set-preference
@@ -100,7 +100,7 @@
 	      (with ids (db-search `(("type" "interlocutor") ("name" ,name)))
 		(if (null? ids) ""
 		    (with instructions (db-get-field (car ids) "instructions")
-		      (if instructions (car instructions) ""))))
+		      (if (nnull? instructions) (car instructions) ""))))
 	      (begin
 		(db-warning "AI interlocutor agent '" name "' not found")
 		(set-preference
@@ -116,7 +116,7 @@
 	      (with ids (db-search `(("type" "translator") ("name" ,name)))
 		(if (null? ids) ""
 		    (with instructions (db-get-field (car ids) "instructions")
-		      (if instructions (car instructions) ""))))
+		      (if (nnull? instructions) (car instructions) ""))))
 	      (begin
 		(db-warning "AI translator agent '" name "' not found")
 		(set-preference

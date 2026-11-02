@@ -72,7 +72,7 @@
 
   <assign|list-prefix|<macro|type|<if|<provides|<merge|<arg|type>|-list-prefix>>|<value|<merge|<arg|type>|-list-prefix>>|<arg|type>>>>
 
-  <assign|list-caption|<macro|type|cap|<with|caption-detailed|<value|caption-summarized>|<style-with|src-compact|none|<auto-label><write|<list-prefix|<arg|type>>|<tuple|normal|<arg|cap>|<pageref|<the-auto>>>>>>>>
+  <assign|list-caption|<macro|type|cap|<with|caption-detailed|<value|caption-summarized>|<style-with|src-compact|none|<auto-label><with|auto-written|<the-auto>|<write|<list-prefix|<arg|type>>|<tuple|normal|<arg|cap>|<pageref|<value|auto-written>>>>>>>>>
 
   <assign|render-caption|<\macro|type|name|cap>
     <\html-div-class|caption>

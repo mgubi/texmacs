@@ -251,6 +251,9 @@ closest_accessible_inside (tree t, path p, int dir) {
 bool
 is_shifted (tree t, path p, int dir= -1, bool flag= false) {
   if (dir == 0) return true;
+  // a path which is not in t, as in shift (#592, #599)
+  else if (is_nil (p) || (!is_atom (p) &&
+           (is_atomic (t) || p->item < 0 || p->item >= N(t)))) return false;
   else if (is_atom (p)) {
     if (flag) {
       if (dir < 0) return p->item != 0;
@@ -275,6 +278,8 @@ extreme (tree t, int dir) {
 path
 shift (tree t, path p, int dir) {
   if (dir == 0 || is_nil (p) || is_atom (p)) return p;
+  // a path which is not in t (the crash report of a bad cursor shifts it)
+  else if (is_atomic (t) || p->item < 0 || p->item >= N(t)) return p;
   else if (is_concat (t) && p->next == extreme (t[p->item], dir)) {
     for (int i= p->item + dir; i >= 0 && i < N(t); i += dir)
       if (the_drd -> is_accessible_child (t, i))

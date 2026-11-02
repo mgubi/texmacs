@@ -221,6 +221,9 @@
     `(document
        (dir-list ,(chat-rooms-table "My Chat Rooms" sname server entries)))))
 
+(tmfs-title-handler (chat-rooms sname doc)
+  (string-append "Chat rooms - " sname))
+
 (tmfs-load-handler (chat-rooms sname)
   (let* ((u (string-append "tmfs://chat-rooms/" sname))
          (base (string-append "tmfs://chat/" sname))
@@ -287,6 +290,9 @@
   (remote-file-browser-document
      `(document
         (dir-list ,(shared-table "Shared with me" entries)))))
+
+(tmfs-title-handler (shared sname doc)
+  (string-append "Shared resources - " sname))
 
 (tmfs-load-handler (shared sname)
   (let* ((u (string-append "tmfs://shared/" sname))

@@ -1786,6 +1786,15 @@ scm_init_ports ()
  scm_c_define_gsubr (s_scm_port_filename, 1, 0, 0, (SCM (*)()) scm_port_filename); ;
  scm_c_define_gsubr (s_scm_set_port_filename_x, 2, 0, 0, (SCM (*)()) scm_set_port_filename_x); ;
  scm_c_define_gsubr (s_scm_sys_make_void_port, 1, 0, 0, (SCM (*)()) scm_sys_make_void_port); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_pt_size, 0, 0, 0, (SCM (*)()) scm_pt_size); ;
+#endif
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_pt_member, 1, 0, 0, (SCM (*)()) scm_pt_member); ;
+#endif
 
 }
 

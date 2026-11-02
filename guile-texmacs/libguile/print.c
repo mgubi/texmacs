@@ -1200,6 +1200,12 @@ scm_init_print ()
  scm_c_define_gsubr (s_scm_port_with_print_state, 1, 1, 0, (SCM (*)()) scm_port_with_print_state); ;
  scm_c_define_gsubr (s_scm_get_print_state, 1, 0, 0, (SCM (*)()) scm_get_print_state); ;
 
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_current_pstate, 0, 0, 0, (SCM (*)()) scm_current_pstate); ;
+#endif
 
   scm_print_opts[SCM_PRINT_KEYWORD_STYLE_I].val = SCM_UNPACK (sym_reader);
 }

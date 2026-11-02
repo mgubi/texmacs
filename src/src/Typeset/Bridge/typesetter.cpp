@@ -11,6 +11,10 @@
 
 #include "Bridge/impl_typesetter.hpp"
 #include "iterator.hpp"
+#include "sys_utils.hpp" // get_env
+#include <chrono>
+
+extern tree the_et;
 
 /******************************************************************************
 * Constructor and destructor
@@ -22,6 +26,13 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   paper= (env->get_string (PAGE_MEDIUM) == "paper");
   br= make_bridge (this, et, ip);
   x1= y1= x2= y2=0;
+  kept_pages= tm_new<page_memo> ();
+  collect= false;
+  bindings_changed= false;
+}
+
+typesetter_rep::~typesetter_rep () {
+  tm_delete (kept_pages);
 }
 
 typesetter
@@ -105,6 +116,50 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 * Main typesetting routines
 ******************************************************************************/
 
+// see typesetter.hpp
+int typeset_check_mismatches= 0;
+int get_typeset_check_mismatches () { return typeset_check_mismatches; }
+int typeset_passes_total= 0;
+int typeset_redone_total= 0;
+int get_typeset_passes () { return typeset_passes_total; }
+int get_typeset_redone () { return typeset_redone_total; }
+void
+typeset_count_redone (int n) {
+  typeset_redone_total += n;
+  if (edit_profile.on) edit_profile.redone += n;
+}
+
+void
+typeset_cache_mismatch (string what) {
+  typeset_check_mismatches++;
+  failed_error << "What the " << what << " kept differs from what is made "
+               << "again" << LF;
+}
+
+int
+typeset_caches_mode () {
+  static int mode= -1;
+  if (mode < 0) {
+    string s= get_env ("TEXMACS_TYPESET_CACHES");
+    mode= (s == "off"? 0: (s == "check"? 2: 1));
+  }
+  return mode;
+}
+
+static bool
+edit_profile_wanted () {
+  string s= get_env ("TEXMACS_EDIT_PROFILE");
+  return s != "" && s != "off" && s != "0";
+}
+
+edit_profile_data edit_profile= { edit_profile_wanted () }; // (and zeros)
+
+double
+edit_profile_now () {
+  using namespace std::chrono;
+  return duration<double, std::milli> (steady_clock::now ().time_since_epoch ()).count ();
+}
+
 static rectangles
 requires_update (rectangles log) {
   rectangles rs;
@@ -128,17 +183,108 @@ typesetter_rep::determine_page_references (box b) {
     string var= it->next ();
     tree   val= copy (h[var]);
     tree   old= env->local_ref [var];
-    if (is_func (old, TUPLE, 2))
-      env->local_ref (var)= tuple (old[0], val);
-    else if (is_func (old, TUPLE, 3))
-      env->local_ref (var)= tuple (old[0], val, old[2]);
-    else env->local_ref (var)= tuple (old, val);
+    tree   now;
+    if (is_func (old, TUPLE, 2)) now= tuple (old[0], val);
+    else if (is_func (old, TUPLE, 3)) now= tuple (old[0], val, old[2]);
+    else now= tuple (old, val);
+    // (not written when it is there already: see labels_stamp)
+    if (!env->local_ref->contains (var) || old != now)
+      env->local_ref (var)= now;
     env->touched (var)= true;
   }
 }
 
+// A pass which is not complete does not clean the table of the references
+// (clean_unused in edit_typeset.cpp), and does not typeset again the
+// references before a binding which it changes: they were typeset with the
+// old value (#571). With the reuse by inputs, every bridge, typeset or used
+// again, writes its bindings in each pass (write_bindings): the root holds
+// all of them (out_bindings), and the pager writes those of the running
+// headers, kept or not (pages_bindings). drop_bindings compares them with
+// those of the pass before. A key which no one wrote in this pass is that
+// of a label which an edit removed: its entry of local_ref goes (the
+// auxiliary tables are not touched). A key which is new or has another
+// value (a label put back by an undo, an equation renumbered by an
+// insertion before it) keeps the entry as written. In both cases one more
+// pass is needed, which typesets again what looked the key up
+// (same_lookups: the stamp of the table changed), as a typesetting from
+// scratch would show it.
+
+static inline string
+binding_key (tree t) {
+  // the key of a binding of a record (<tuple|key|value|extra>), "" for an
+  // entry of an auxiliary table (<write|key|value>: see write_aux)
+  if (is_tuple (t) && N(t) >= 1 && is_atomic (t[0])) return t[0]->label;
+  return "";
+}
+
+static void
+note_bindings (hashmap<string,tree>& h, array<tree> l) {
+  // the bindings of @l by their keys (the last one wins)
+  for (int i=0; i<N(l); i++) {
+    string key= binding_key (l[i]);
+    if (key != "") h (key)= l[i];
+  }
+}
+
+static bool
+same_bindings (array<tree> l1, array<tree> l2) {
+  // (mostly the same trees: those of the bridges used again)
+  if (N(l1) != N(l2)) return false;
+  for (int i=0; i<N(l1); i++)
+    if (l1[i].operator-> () != l2[i].operator-> () && l1[i] != l2[i])
+      return false;
+  return true;
+}
+
+bool
+typesetter_rep::drop_bindings (array<tree> before, array<tree> pages_before) {
+  array<tree> now= br->out_bindings;
+  if (same_bindings (before, now) &&
+      same_bindings (pages_before, pages_bindings)) return false;
+  // (in the order in which they were written: the pages last)
+  hashmap<string,tree> old_h (UNINIT), new_h (UNINIT);
+  note_bindings (old_h, before);
+  note_bindings (old_h, pages_before);
+  note_bindings (new_h, now);
+  note_bindings (new_h, pages_bindings);
+  bool changed= false;
+  for (iterator<string> it= iterate (old_h); it->busy (); ) {
+    string key= it->next ();
+    if (new_h->contains (key) || !env->local_ref->contains (key)) continue;
+    env->local_ref->reset (key);
+    changed= true;
+  }
+  for (iterator<string> it= iterate (new_h); it->busy () && !changed; ) {
+    string key= it->next ();
+    if (!old_h->contains (key) || old_h[key] != new_h[key]) changed= true;
+  }
+  return changed;
+}
+
+// The document shows its preamble, or hides some of its parts: no pass is
+// complete, and the labels of what is hidden stay
+static bool
+hides_something (tree st) {
+  int i= 0, n= N(st);
+  if (n == 0) return false;
+  if (is_compound (st[0], "show-preamble")) return true;
+  if (is_compound (st[0], "hide-preamble")) i++;
+  for (; i<n; i++) {
+    if (is_compound (st[i], "hide-part")) return true;
+    if (!is_compound (st[i], "show-part")) break;
+  }
+  return false;
+}
+
 box
 typesetter_rep::typeset () {
+  // (the tree of the buffer, for the automatic labels: see exec_auto_id)
+  path rp= reverse (br->ip);
+  tree buffer= "";
+  if (!is_nil (rp) && rp->item >= 0 && has_subtree (the_et, path (rp->item)))
+    buffer= the_et[rp->item];
+  edit_env_rep::typesetting_pass pass (env.operator-> (), buffer);
   old_patch= hashmap<string,tree> (UNINIT);
   l        = array<page_item> ();
   sb       = stack_border ();
@@ -146,16 +292,17 @@ typesetter_rep::typeset () {
   b        = array<line_item> ();
   paper    = (env->get_string (PAGE_MEDIUM) == "paper");
 
-  // Test whether we are doing a complete typesetting
-  env->complete= br->my_typeset_will_be_complete ();
-  tree st= br->st;
-  int i= 0, n= N(st);
-  if (is_compound (st[0], "show-preamble")) { i++; env->complete= false; }
-  if (is_compound (st[0], "hide-preamble")) i++;
-  for (; i<n && env->complete; i++) {
-    if (is_compound (st[i], "hide-part")) env->complete= false;
-    if (!is_compound (st[i], "show-part")) break;
-  }
+  // Test whether we are doing a complete typesetting (or a pass which
+  // makes the tables again from the bridges, those used again writing
+  // their bindings and the entries of the auxiliary tables again: collect)
+  bool hides= hides_something (br->st);
+  env->complete= (collect || br->my_typeset_will_be_complete ()) && !hides;
+  // (the bindings of the last pass, see drop_bindings; a root which was
+  // never typeset has none, and all would look new)
+  bool track= !env->complete && !hides && typeset_inputs_mode () != 0 &&
+              br->version != 0;
+  array<tree> before= (track? br->out_bindings: array<tree> ());
+  array<tree> pages_before= pages_bindings;
 
   // Typeset
   if (env->complete) {
@@ -163,14 +310,46 @@ typesetter_rep::typeset () {
     env->missing  = hashmap<string,tree> (UNINIT);
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
+    env->rewritten= hashmap<string,tree> (UNINIT);
   }
-  br->typeset (PROCESSED+ WANTED_PARAGRAPH);
-  pager ppp= tm_new<pager_rep> (br->ip, env, l);
-  box rb= ppp->make_pages ();
+  env->rebound= false;
+  typeset_passes_total++;
+  double t0= edit_profile.on ? edit_profile_now () : 0;
+  {
+    shove_pass pass (shoves);
+    bridge_record_next= true;
+    bridge_macro_scope scope (false);
+    br->typeset (PROCESSED+ WANTED_PARAGRAPH);
+  }
+  double t1= edit_profile.on ? edit_profile_now () : 0;
+  // (an array of its own: the breaker changes some items in it, see
+  // breaker_prepare_items, and l shares its items with the bridges)
+  pager ppp= tm_new<pager_rep> (br->ip, env, copy (l));
+  ppp->memo= kept_pages;
+  box rb;
+  {
+    edit_env_rep::binding_record bindings (env.operator-> (), &pages_bindings);
+    rb= ppp->make_pages ();
+  }
   if (env->complete && paper) determine_page_references (rb);
   tm_delete (ppp);
+  bindings_changed= track && drop_bindings (before, pages_before);
+  if (edit_profile.on) {
+    edit_profile.bridges += t1 - t0;
+    edit_profile.pages   += edit_profile_now () - t1;
+    edit_profile.passes++;
+  }
   // env->complete= false;  // moved to edit_typeset_rep::typeset
   return rb;
+}
+
+// the length of the change log, without a recursion as deep as it is long
+// (N of a list: too deep for a browser after the first pass of a book)
+static int
+log_length (rectangles l) {
+  int n= 0;
+  for (; !is_nil (l); l= l->next) n++;
+  return n;
 }
 
 box
@@ -178,8 +357,15 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   x1= x1b; y1= y1b; x2=x2b; y2= y2b;
   box b= typeset ();
   // cout << "-------------------------------------------------------------\n";
-  b->position_at (0, 0, change_log);
+  double t0= edit_profile.on ? edit_profile_now () : 0;
+  repaint.start_pass ();
+  b->position_at (0, 0, repaint);
+  repaint.end_pass ();
+  rectangles change_log= repaint.rects;
+  repaint.rects= rectangles ();
+  if (edit_profile.on) edit_profile.lines += log_length (change_log) / 2;
   change_log= requires_update (change_log);
+  if (edit_profile.on) edit_profile.rects += log_length (change_log);
   rectangle r (0, 0, 0, 0);
   if (!is_nil (change_log)) r= least_upper_bound (change_log);
   array<brush> new_bgs;
@@ -189,8 +375,10 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
     if (new_bgs[i] != old_bgs[i])
       r= least_upper_bound (r, rs[i]);
   old_bgs= new_bgs;
+  if (edit_profile.on) edit_profile.changes += edit_profile_now () - t0;
+  if (typeset_caches_mode () == 2)
+    check_repaint (b, r, placed_boxes, placed_rects);
   x1b= r->x1; y1b= r->y1; x2b= r->x2; y2b= r->y2;
-  change_log= rectangles ();
   return b;
 }
 
@@ -201,7 +389,13 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
 void
 notify_assign (typesetter ttt, path p, tree u) {
   // cout << "Assign " << p << ", " << u << "\n";
-  if (is_nil (p)) ttt->br= make_bridge (ttt, u, ttt->br->ip);
+  if (is_nil (p)) {
+    ttt->br= make_bridge (ttt, u, ttt->br->ip);
+    // everything is to be made again, for a reason which may be none
+    // that the pager knows (fonts which arrived, in a browser): the
+    // pages of the last pass are forgotten too
+    *ttt->kept_pages= page_memo ();
+  }
   else ttt->br->notify_assign (p, u);
 }
 
@@ -236,7 +430,7 @@ notify_assign_node (typesetter ttt, path p, tree_label op) {
   int i, n= N(t);
   tree r (op, n);
   for (i=0; i<n; i++) r[i]= t[i];
-  if (is_nil (p)) ttt->br= make_bridge (ttt, r, ttt->br->ip);
+  if (is_nil (p)) notify_assign (ttt, p, r);
   else ttt->br->notify_assign (p, r);
 }
 
@@ -248,7 +442,7 @@ notify_insert_node (typesetter ttt, path p, tree t) {
   for (i=0; i<pos; i++) r[i]= t[i];
   r[pos]= subtree (ttt->br->st, path_up (p));
   for (i=pos; i<n; i++) r[i+1]= t[i];
-  if (is_nil (path_up (p))) ttt->br= make_bridge (ttt, r, ttt->br->ip);
+  if (is_nil (path_up (p))) notify_assign (ttt, path (), r);
   else ttt->br->notify_assign (path_up (p), r);
 }
 
@@ -256,7 +450,7 @@ void
 notify_remove_node (typesetter ttt, path p) {
   // cout << "Remove node " << p << "\n";
   tree t= subtree (ttt->br->st, p);
-  if (is_nil (path_up (p))) ttt->br= make_bridge (ttt, t, ttt->br->ip);
+  if (is_nil (path_up (p))) notify_assign (ttt, path (), t);
   else ttt->br->notify_assign (path_up (p), t);
 }
 

@@ -24,7 +24,10 @@ static tree_label next_tree_label= START_EXTENSIONS;
 void
 make_tree_label (tree_label l, string s) {
   CONSTRUCTOR_NAME ((int) l) = s;
-  CONSTRUCTOR_CODE (s)       = (int) l;
+  // TMSTRING is the label of the atomic trees, whose representation is not
+  // the one of compound trees: no tag name may give it. The tag "string" is
+  // an ordinary extension, with a label of its own (of the same name).
+  if (l != TMSTRING) CONSTRUCTOR_CODE (s)= (int) l;
 }
 
 tree_label

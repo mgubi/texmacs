@@ -192,7 +192,7 @@ edit_main_rep::get_metadata (string kind) {
       !is_none (resolve_in_path ("whoami")) &&
       !is_none (resolve_in_path ("finger")) &&
       !is_none (resolve_in_path ("sed"))) {
-    string val= var_eval_system ("finger `whoami` | sed -e '/Name/!d' -e 's/.*Name: //'");
+    string val= var_eval_system ("finger `whoami` 2> /dev/null | sed -e '/Name/!d' -e 's/.*Name: //'");
     if (N(val) > 1) return utf8_to_cork (val);
   }
   if (kind == "pseudo" &&
@@ -257,8 +257,9 @@ edit_main_rep::nr_pages () {
   return N (the_box[0]);
 }
 
-void
+bool
 edit_main_rep::print_doc (url name, bool conform, int first, int last) {
+  // true when the file was written (#705)
 #ifdef USE_GS
   bool ps  = (suffix (name) == "ps");
   bool pdf = (suffix (name) == "pdf");
@@ -272,6 +273,11 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   string medium = env->get_string (PAGE_MEDIUM);
   if (conform && (medium != "paper")) conform= false;
     // FIXME: better command for conform printing
+
+  // the hyperlinks are taken from the tables which the typesetting of the
+  // buffer fills (see box_rep::display_links), and a buffer which was just
+  // loaded (texmacs -c) has not been typeset yet
+  typeset_forced ();
 
   typeset_preamble ();
     // FIXME: when printing several files via aux buffers,
@@ -326,8 +332,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   
   // Print pages
   renderer ren= printer (name, dpi, pages, page_type, landsc, w/cm, h/cm);
+  bool ok= ren->is_started ();
   
-  if (ren->is_started ()) {
+  if (ok) {
     int i;
     ren->set_metadata ("title", get_metadata ("title"));
     ren->set_metadata ("author", get_metadata ("author"));
@@ -349,15 +356,24 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   delete_typesetter (ttt);
 
 #ifdef USE_GS
+  // through Ghostscript, the target is written by a conversion: an old
+  // file under its name is removed first, so that it does not pass for the
+  // new one when the conversion fails
+  if ((!use_pdf () && pdf) || (!use_ps () && ps)) {
+    if (ok && exists (orig)) ::remove (orig);
+    ok= ok && !exists (orig);
+  }
   if (!use_pdf () && pdf) {
-    gs_to_pdf (name, orig, landsc, h/cm, w/cm);
+    if (ok) gs_to_pdf (name, orig, landsc, h/cm, w/cm);
     ::remove (name);
+    ok= ok && exists (orig);
   }
   if (!use_ps () && ps) {
-    gs_to_ps (name, orig, landsc, h/cm, w/cm);
+    if (ok) gs_to_ps (name, orig, landsc, h/cm, w/cm);
     ::remove (name);
+    ok= ok && exists (orig);
   }
-  if (ps || pdf)
+  if (ok && (ps || pdf))
     if (get_preference ("texmacs->pdf:check", "off") == "on") {
 # if QT_VERSION >= 0x060000
       system_wait ("Checking exported file '" *
@@ -369,19 +385,28 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
 # endif
     }
 #endif
+  return ok;
 }
 
 void
 edit_main_rep::print_to_file (url name, string first, string last) {
-  print_doc (name, false, as_int (first), as_int (last));
-  set_message ("Done printing", "print to file");
+  if (!print_doc (name, false, as_int (first), as_int (last)))
+    set_message (concat ("Could not save ",
+                         verbatim (as_string (name, URL_SYSTEM))),
+                 "print to file");
+  else set_message ("Done printing", "print to file");
 }
 
 void
 edit_main_rep::print_buffer (string first, string last) {
   url target;
   target= use_pdf ()? url_temp (".pdf"): url_temp (".ps");
-  print_doc (target, false, as_int (first), as_int (last));
+  if (!print_doc (target, false, as_int (first), as_int (last))) {
+    // nothing to send to the printer (#705)
+    set_message ("Could not print: the document could not be written",
+                 "print buffer");
+    return;
+  }
   system (get_printing_cmd (), target);  // Send the document to the printer
   set_message ("Done printing", "print buffer");
   ::remove (target);
@@ -411,7 +436,10 @@ edit_main_rep::print_buffer (string first, string last) {
 
 void
 edit_main_rep::export_ps (url name, string first, string last) {
-  print_doc (name, true, as_int (first), as_int (last));
+  if (!print_doc (name, true, as_int (first), as_int (last)))
+    set_message (concat ("Could not save ",
+                         verbatim (as_string (name, URL_SYSTEM))),
+                 "export postscript");
 }
 
 array<SI>
@@ -470,8 +498,8 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
 bool
 edit_main_rep::graphics_file_to_clipboard (url name) {
 #ifdef QTTEXMACS
-  the_gui->put_graphics_on_clipboard (name);
-  return true;
+  // false without a clipboard of the system (-headless, #708)
+  return the_gui->put_graphics_on_clipboard (name);
 #elif defined (AQUATEXMACS)
   bool ns_put_graphics_on_clipboard (url file);
   return ns_put_graphics_on_clipboard (name);

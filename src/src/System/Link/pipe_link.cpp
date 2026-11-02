@@ -18,6 +18,7 @@
 #include "sys_utils.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
+#include "array.hpp"
 #include "tm_timer.hpp"
 #include "analyze.hpp"
 #include <stdio.h>
@@ -108,32 +109,104 @@ make_pipe_link (string cmd) {
 }
 
 #ifndef OS_MINGW
+// The children which were asked to terminate and have not ended yet: they
+// are killed when their time is up (see reap_ending_children)
+static array<int>    ending_pid;
+static array<bool>   ending_reaped;
+static array<time_t> ending_kill_at;
+
+static bool
+child_ended (int pid, bool& reaped) {
+  // The whole group is waited for, not only the child: a wrapper script
+  // often runs the program as a child of its own (without exec), and stops
+  // at once on SIGTERM while the program still cleans up
+  if (!reaped && waitpid (pid, NULL, WNOHANG) != 0) reaped= true;
+  return reaped && killpg (pid, 0) == -1;
+}
+
+static void
+kill_child (int pid, bool reaped) {
+  // (the group may have ended during the last pause: its number may then
+  // be another group's, unless the child is not reaped yet; EPERM: a
+  // member which we may not signal)
+  if (killpg (pid, 0) == 0 || errno == EPERM) killpg (pid, SIGKILL);
+  if (!reaped) waitpid (pid, NULL, 0);
+}
+
+static pid_t ending_owner= 0;  // the process of TeXmacs (not a fork of it)
+
+static void
+kill_ending_children () {
+  // at an exit which skips close_all_pipes (exit from Scheme): what is left
+  // is killed at once, without waiting until its time is up
+  if (getpid () != ending_owner) return;
+  for (int i=0; i<N(ending_pid); i++) {
+    bool reaped= ending_reaped[i];
+    if (!child_ended (ending_pid[i], reaped))
+      kill_child (ending_pid[i], reaped);
+  }
+  ending_pid    = array<int> ();
+  ending_reaped = array<bool> ();
+  ending_kill_at= array<time_t> ();
+}
+
 static void
 terminate_child (int pid) {
   // no process (fork failed, or none was made): killpg (-1, ...) fails, and
   // kill (-1, SIGKILL) below would kill every process of the user
   if (pid <= 0) return;
   // Ask the process group of the child to terminate, give it up to 2 s to
-  // do so, kill what is left of it otherwise, and reap the child. The whole
-  // group is waited for, not only the child: a wrapper script often runs
-  // the program as a child of its own (without exec), and stops at once on
-  // SIGTERM while the program still cleans up
+  // do so, and kill what is left of it otherwise. Only the first 50 ms are
+  // waited for here: a program which takes longer (or ignores SIGTERM) is
+  // killed and reaped later by reap_ending_children, so that the interface
+  // is not blocked meanwhile
   if (-1 != killpg (pid, SIGTERM)) {
     bool reaped= false;
-    for (int i=0; i<200; i++) {
-      if (!reaped && waitpid (pid, NULL, WNOHANG) != 0) reaped= true;
-      if (reaped && killpg (pid, 0) == -1) return;  // the group is gone
+    int  polls = 5;
+    for (int i=0; i<polls; i++) {
+      if (child_ended (pid, reaped)) return;
       usleep (10000);
     }
-    // (the group may have ended during the last pause: its number may then
-    // be another group's; EPERM: a member which we may not signal)
-    if (killpg (pid, 0) == 0 || errno == EPERM) killpg (pid, SIGKILL);
-    if (!reaped) waitpid (pid, NULL, 0);
+    if (ending_owner == 0) {
+      ending_owner= getpid ();
+      atexit (kill_ending_children);
+    }
+    ending_pid     << pid;
+    ending_reaped  << reaped;
+    ending_kill_at << (texmacs_time () + 2000 - 10 * polls);
   }
   else {
     kill (pid, SIGKILL);
     waitpid (pid, NULL, 0);
   }
+}
+
+static void
+reap_ending_children (bool wait) {
+  // the children of terminate_child which have ended are reaped, those whose
+  // time is up are killed; @wait: wait for them all (at the exit)
+  array<int>    pids;
+  array<bool>   reapeds;
+  array<time_t> kill_ats;
+  for (int i=0; i<N(ending_pid); i++) {
+    int  pid   = ending_pid[i];
+    bool reaped= ending_reaped[i];
+    if (wait)
+      while (!child_ended (pid, reaped) &&
+             texmacs_time () - ending_kill_at[i] < 0)
+        usleep (10000);
+    if (child_ended (pid, reaped)) continue;
+    if (wait || texmacs_time () - ending_kill_at[i] >= 0)
+      kill_child (pid, reaped);
+    else {
+      pids     << pid;
+      reapeds  << reaped;
+      kill_ats << ending_kill_at[i];
+    }
+  }
+  ending_pid    = pids;
+  ending_reaped = reapeds;
+  ending_kill_at= kill_ats;
 }
 #endif
 
@@ -174,6 +247,8 @@ close_all_pipes () {
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
     if (con->alive) {
+      // (all are asked to terminate first, then waited for together: at
+      // most about 2 s in all, not 2 s for each)
       terminate_child (con->pid);
       con->alive= false;
       remove_notifier (con->snout);
@@ -181,13 +256,22 @@ close_all_pipes () {
       con->close_fds ();
     }
   }
+  reap_ending_children (true);
 #endif
   close_all_cmdlines ();
   close_all_requests ();
 }
 
 void
+reap_pipe_children () {
+#ifndef OS_MINGW
+  if (N(ending_pid) > 0) reap_ending_children (false);
+#endif
+}
+
+void
 process_all_pipes () {
+  reap_pipe_children ();
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
@@ -268,6 +352,7 @@ program_found (string cmd) {
 string
 pipe_link_rep::start () {
 #ifndef OS_MINGW
+  reap_pipe_children ();
   if (alive) return "busy";
   if (DEBUG_AUTO) debug_io << "Launching '" << cmd << "'\n";
 #ifdef __EMSCRIPTEN__
@@ -483,6 +568,7 @@ pipe_link_rep::interrupt () {
 void
 pipe_link_rep::stop () {
 #ifndef OS_MINGW
+  reap_pipe_children ();
   if (!alive) return;
   terminate_child (pid);
   alive= false;

@@ -69,8 +69,12 @@ register_link (soft_link ln) {
   int i, n= N(ln->t);
   if (is_atomic (ln->t[0]))
     type_count (ln->t[0]->label) ++;
+  // the attributes of a link are not vertices: the typesetter gives every
+  // hyperlink an attribute (secure false), which was one vertex shared by
+  // all the hyperlinks of all the buffers, removed from one by one
   for (i=1; i<n; i++)
-    register_vertex (ln->t[i], ln);
+    if (!is_func (ln->t[i], ATTR))
+      register_vertex (ln->t[i], ln);
 }
 
 void
@@ -83,7 +87,8 @@ unregister_link (soft_link ln) {
       type_count->reset (ln->t[0]->label);
   }
   for (i=1; i<n; i++)
-    unregister_vertex (ln->t[i], ln);
+    if (!is_func (ln->t[i], ATTR))
+      unregister_vertex (ln->t[i], ln);
 }
 
 /******************************************************************************

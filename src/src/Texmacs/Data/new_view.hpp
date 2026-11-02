@@ -46,6 +46,7 @@ tm_view concrete_view (url name);
 url     abstract_view (tm_view vw);
 void    attach_view (url win_u, url u);
 void    detach_view (url u);
+void    update_window_names (url name);
 url     get_recent_view (url name, bool s, bool o, bool a, bool p);
 
 #endif // defined NEW_VIEW_H

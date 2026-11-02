@@ -24,6 +24,7 @@ typedef unsigned int uint;
 
 #include "boxes.hpp"
 #include "editor.hpp"
+#include "typesetter.hpp" // get_typeset_check_mismatches
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -1273,6 +1274,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "file.hpp"
 #include "image_files.hpp"
 #include "web_files.hpp"
+#include "data_cache.hpp"
 #include "sys_utils.hpp"
 #include "client_server.hpp"
 #include "analyze.hpp"

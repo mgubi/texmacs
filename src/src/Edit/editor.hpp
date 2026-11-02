@@ -151,6 +151,9 @@ public:
   editor_rep (server_rep* sv, tm_buffer buf);
   inline virtual ~editor_rep () {}
   bool is_current_editor ();
+  // what the event loop does after the events: applies the changes to the
+  // view (a zoom, the typesetting...), which a test may do at once
+  virtual void apply_pending_changes () = 0;
   
   /* public routines from edit_interface */
   virtual void suspend () = 0;
@@ -238,6 +241,8 @@ public:
   virtual void go_page_down () = 0;
   virtual void go_to (path p) = 0;
   virtual void go_to_correct (path p) = 0;
+  virtual void go_to_after_change (path p) = 0;
+  virtual void flush_cursor_hook () = 0;
   virtual void go_to_start (path p) = 0;
   virtual void go_to_end (path p) = 0;
   virtual void go_to_border (path p, bool at_start) = 0;
@@ -334,9 +339,13 @@ public:
   virtual void     init_style () = 0;
   virtual void     init_style (string style) = 0;
   virtual void     change_style (tree style) = 0;
+  virtual void     change_style_local (tree style) = 0;
   virtual tree     get_init_all () = 0;
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
+  virtual void     init_env_local (string var, tree by) = 0;
+  virtual void     init_default_local (string var) = 0;
+  virtual void     set_zoom (tree z) = 0;
   virtual tree     get_ref (string key) = 0;
   virtual tree     get_aux (string key) = 0;
   virtual tree     get_att (string key) = 0;
@@ -353,6 +362,11 @@ public:
   virtual void     typeset_forced () = 0;
   virtual void     typeset_invalidate (path p) = 0;
   virtual void     typeset_invalidate_all () = 0;
+  virtual void     typeset_invalidate_labels () = 0;
+  virtual void     typeset_invalidate_keep () = 0;
+  virtual void     typeset_invalidate_inclusions () = 0;
+  virtual void     typeset_invalidate_pictures () = 0;
+  virtual bool     typeset_renumber_labels () = 0;
   virtual void     typeset_invalidate_players (path p, bool reattach) = 0;
 
   /* public routines from edit_modify */
@@ -395,6 +409,7 @@ public:
   /* public routines from edit_text */
   virtual void correct (path p) = 0;
   virtual void correct_concat (path p, int done=0) = 0;
+  virtual bool can_insert_at (tree t, path p) = 0;
   virtual bool insert_return () = 0;
   virtual void remove_return (path p) = 0;
   virtual void insert_tree (tree t, path p_in_t) = 0;
@@ -539,6 +554,8 @@ public:
   virtual tree selection_get (string key) = 0;
   virtual void selection_set (string key, tree t, bool persistant= false) = 0;
   virtual void selection_set (tree t) = 0;
+  virtual void selection_get_state (range_set& sel, bool& sg, bool& sh, path& mid) = 0;
+  virtual void selection_set_state (range_set sel, bool sg, bool sh, path mid) = 0;
   virtual void selection_set_start (path p= path()) = 0;
   virtual void selection_set_end (path p= path()) = 0;
   virtual void selection_set_paths (path start, path end) = 0;
@@ -567,6 +584,11 @@ public:
   virtual range_set get_alt_selection (string s) = 0;
   virtual void cancel_alt_selection (string s) = 0;
   virtual void cancel_alt_selections () = 0;
+
+  /* the cursors of other users (live documents) */
+  virtual void set_user_cursor (string id, path p, string col, string name) = 0;
+  virtual void cancel_user_cursor (string id) = 0;
+  virtual void cancel_user_cursors () = 0;
 
   /* public routines from edit_replace */
   virtual bool inside (string what) = 0;
@@ -602,7 +624,7 @@ public:
   virtual void notify_page_change () = 0;
   virtual string get_metadata (string kind) = 0;
   virtual int  nr_pages () = 0;
-  virtual void print_doc (url ps_name, bool to_file, int first, int last) = 0;
+  virtual bool print_doc (url ps_name, bool to_file, int first, int last) = 0;
   virtual void print_to_file (url ps_name,
 			      string first="1", string last="1000000") = 0;
   virtual void print_buffer (string first="1", string last="1000000") = 0;

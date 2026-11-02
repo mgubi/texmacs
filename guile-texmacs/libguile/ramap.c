@@ -1238,6 +1238,12 @@ scm_init_ramap ()
  scm_c_define_gsubr (s_scm_array_map_x, 2, 0, 1, (SCM (*)()) scm_array_map_x); ;
  scm_c_define_gsubr (s_scm_array_for_each, 2, 0, 1, (SCM (*)()) scm_array_for_each); ;
  scm_c_define_gsubr (s_scm_array_index_map_x, 2, 0, 0, (SCM (*)()) scm_array_index_map_x); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if (0)
+  scm_c_define_subr (s_scm_array_equal_p, scm_tc7_rpsubr, scm_array_equal_p); ;
+#endif
 
   scm_add_feature (s_scm_array_for_each);
 }

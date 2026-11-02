@@ -37,17 +37,27 @@ template<class T, class U> struct hashentry {
   operator tree ();
 };
 
+// A new number at each call, for hashmap_rep::stamp
+inline unsigned long long new_hashmap_stamp () {
+  static unsigned long long last= 0;
+  return ++last; }
+
 template<class T, class U> class hashmap_rep: concrete_struct {
   int size;                  // size of hashmap (nr of entries)
   int n;                     // nr of keys (a power of two)
   int max;                   // mean number of entries per key
   U   init;                  // default entry
   list<hashentry<T,U> >* a;  // the array of entries
+  unsigned long long st;     // see stamp
 
 public:
   inline hashmap_rep (U init2, int n2=1, int max2=1):
     size(0), n(n2), max(max2), init(init2),
-    a(tm_new_array<list<hashentry<T,U> > > (n)) {}
+    a(tm_new_array<list<hashentry<T,U> > > (n)), st (new_hashmap_stamp ()) {}
+  // A number which is another one after each change of the hashmap (any
+  // write, bracket_rw included, which can write), and which no other
+  // hashmap had: when it is the same, so are the entries
+  inline unsigned long long stamp () { return st; }
   inline ~hashmap_rep () { tm_delete_array (a); }
   void resize (int n);
   void reset (T x);
@@ -56,6 +66,8 @@ public:
   bool contains (T x);
   bool empty ();
   U    bracket_ro (T x);
+  U*   find (T x);     // (the entry of x, or NULL: one lookup; for reading
+                       // only: a write through it would keep the stamp)
   U&   bracket_rw (T x);
   U&   bracket_rw_debug (T x);
   void join (hashmap<T,U> H);

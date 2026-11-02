@@ -12,7 +12,9 @@ export LD_LIBRARY_PATH="$APPDIR"/usr/lib
 #todo : only do it on specific distros
 #export LD_PRELOAD="$APPDIR"/usr/optional/exec.so
 
-prefix="$APPDIR"/usr/
+# (no final slash: a "//" in TEXMACS_PATH broke the programs which parse
+# the paths given to them, as Maxima on GCL 2.6.12, #511)
+prefix="$APPDIR"/usr
 exec_prefix="${prefix}"
 datarootdir="${prefix}/share"
 datadir="${datarootdir}"

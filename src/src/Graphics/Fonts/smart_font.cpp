@@ -41,6 +41,7 @@ RESOURCE(smart_map);
 #define REWRITE_UPRIGHT         9
 #define REWRITE_ITALIC         10
 #define REWRITE_IGNORE         11
+#define REWRITE_CORK           12
 
 struct smart_map_rep: rep<smart_map> {
   int chv[256];
@@ -347,7 +348,7 @@ get_utf8_code (string c) {
   string uc= strict_cork_to_utf8 (c);
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
-  if (pos == N(uc)) return code;
+  if (pos > 0 && pos == N(uc)) return code;
   else return -1;
 }
 
@@ -462,10 +463,17 @@ get_unicode_range (int code) {
   else if (code >= 0x380 && code <= 0x3ff) return "greek";
   else if (code >= 0x400 && code <= 0x4ff) return "cyrillic";
   else if (code >= 0x3000 && code <= 0x303f) return "cjk";
-  else if (code >= 0x4e00 && code <= 0x9fcc) return "cjk";
+  else if (code >= 0x3400 && code <= 0x4dbf) return "cjk"; // extension A
+  else if (code >= 0x4e00 && code <= 0x9fff) return "cjk";
+  else if (code >= 0xf900 && code <= 0xfaff) return "cjk"; // compatibility
   else if (code >= 0xff00 && code <= 0xffef) return "cjk";
+  else if (code >= 0x20000 && code <= 0x3134f) return "cjk"; // ext. B-G
   else if (code >= 0x3040 && code <= 0x309F) return "hiragana";
+  else if (code >= 0x30a0 && code <= 0x30ff) return "katakana";
+  else if (code >= 0x31f0 && code <= 0x31ff) return "katakana";
   else if (code >= 0xac00 && code <= 0xd7af) return "hangul";
+  else if (code >= 0x1100 && code <= 0x11ff) return "hangul"; // jamo
+  else if (code >= 0x3130 && code <= 0x318f) return "hangul";
   else if (code >= 0x2000 && code <= 0x23ff) return "mathsymbols";
   else if (code >= 0x2900 && code <= 0x2e7f) return "mathextra";
   else if (code >= 0x1d400 && code <= 0x1d7ff) return "mathletters";
@@ -491,9 +499,10 @@ in_unicode_range (string c, string range) {
   int code= decode_from_utf8 (uc, pos);
   string got= get_unicode_range (code);
   if (range == got) return range != "";
-  if (range == "cjk" && (got == "hangul" || got == "hiragana")) return true;
+  if (range == "cjk" &&
+      (got == "hangul" || got == "hiragana" || got == "katakana")) return true;
     // There are actually two ranges (cjk/hangul) for Korean characters and
-    // two ranges (cjk/hiragana) for Japanese characters
+    // three ranges (cjk/hiragana/katakana) for Japanese characters
     // For example, on macOS, `sys-korean` is expanded to `cjk=Apple SD Gothic Neo,roman`,
     // assuming that `Apple SD Gothic Neo` is the default korean font on macOS
   if (range == "mathlarge" || range == "mathbigop")
@@ -887,6 +896,8 @@ rewrite (string s, int kind) {
     return substitute_italic (s);
   case REWRITE_IGNORE:
     return "";
+  case REWRITE_CORK:
+    return utf8_to_cork (strict_cork_to_utf8 (s));
   default:
     return s;
   }
@@ -953,6 +964,10 @@ int
 smart_font_rep::resolve (string c, string fam, int attempt) {
   //cout << "Resolve " << c << " in " << fam << ", attempt " << attempt << "\n";
   array<string> a= trimmed_tokenize (fam, "=");
+  // the variant of a font chosen for the CJK range of a family such as
+  // cjk=Hiragino Kaku Gothic ProN,roman: a CJK variant, so that its
+  // characters keep their size (see adjusted_dpi)
+  string cvar= variant;
   if (N(a) >= 2) {
     array<string> given= logical_font (family, variant, series, rshape);
     fam= a[1];
@@ -965,7 +980,15 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         string wanted= locase_all (v[j]);
         if (wanted == "") ok= true;
         else if (contains (wanted, given)) ok= true;
-        else if (in_unicode_range (c, wanted)) ok= true;
+        else if (in_unicode_range (c, wanted)) {
+          ok= true;
+          string r= get_unicode_range (c);
+          if (r == "hiragana" || r == "katakana") r= "cjk";
+          if (wanted == "cjk" || wanted == "hangul" ||
+              wanted == "hiragana" || wanted == "katakana")
+            if (r == "cjk" || r == "hangul")
+              cvar= (variant == "rm"? r: variant * "-" * r);
+        }
         else if (wanted == substitute_math_letter (c, 2)) ok= true;
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
@@ -1003,8 +1026,10 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   }
 
   if (N(c) == 1 && is_alpha (c[0]) && ends (fam, " Math") && shape == "italic")
-    if (starts (fam, "TeX Gyre ") || starts (fam, "Stix "))
+    if (starts (fam, "TeX Gyre ") || starts (fam, "Stix ")) {
       fam= fam (0, N(fam) - 5);
+      if (fam == "Stix Two") fam= "Stix Two Text";
+    }
   
   if (attempt == 1) {
     bool ok= true;
@@ -1020,9 +1045,9 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         return sm->add_char (tuple ("main"), c);
     }
     else {
-      font cfn= closest_font (fam, variant, series, rshape, sz, dpi, 1);
+      font cfn= closest_font (fam, cvar, series, rshape, sz, dpi, 1);
       if (cfn->supports (c)) {
-        tree key= tuple (fam, variant, series, rshape, "1");
+        tree key= tuple (fam, cvar, series, rshape, "1");
         int nr= sm->add_font (key, REWRITE_NONE);
         initialize_font (nr);
         return sm->add_char (key, c);
@@ -1096,6 +1121,23 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   if (attempt > 1) {
     string range= get_unicode_range (c);
     int a= attempt - 1;
+    if (range == "hiragana" || range == "katakana") {
+      // No font is described by its kana in the font database: kana are
+      // searched in the fonts with CJK characters, first in the Japanese
+      // font of the system, so that they do not come from a Chinese font
+      range= "cjk";
+      string jfam= default_japanese_font_name ();
+      if (a == 1 && jfam != "roman" && jfam != fam) {
+        string v= (variant == "rm"? range: variant * "-" * range);
+        font cfn= closest_font (jfam, v, series, rshape, sz, dpi, 1);
+        if (cfn->supports (c)) {
+          tree key= tuple (jfam, v, series, rshape, "1");
+          int nr= sm->add_font (key, REWRITE_NONE);
+          initialize_font (nr);
+          return sm->add_char (key, c);
+        }
+      }
+    }
     string v;
     if (range == "") v= variant;
     else if (variant == "rm") v= range;
@@ -1189,6 +1231,27 @@ smart_font_rep::resolve (string c) {
   //     << ", " << series << ", " << shape << ", " << rshape
   //     << "; " << fn[SUBFONT_MAIN]->res_name << "; " << math_kind << "\n";
   array<string> a= trimmed_tokenize (family, ",");
+
+  if (starts (c, "<#") && ends (c, ">")) {
+    // a code point with a Cork equivalent in the upper half of the Cork
+    // encoding (e.g. <#E9>, the byte for e acute) is drawn with the font
+    // and glyph of the typed character; not below 128, where Unicode fonts
+    // read the bytes as ASCII (the Cork quotes ` and ' are curly in TeX
+    // fonts, grave and straight in Unicode fonts)
+    string cc= rewrite (c, REWRITE_CORK);
+    if (N(cc) == 1 && ((unsigned char) cc[0]) >= 128 &&
+        strict_cork_to_utf8 (cc) == strict_cork_to_utf8 (c)) {
+      int cnr= sm->chv[(int) (unsigned char) cc[0]];
+      if (cnr == -1) cnr= resolve (cc);
+      if (cnr >= 0 && cnr != SUBFONT_ERROR &&
+          sm->fn_rewr[cnr] == REWRITE_NONE) {
+        tree key= tuple ("cork", as_string (cnr));
+        int nr= sm->add_font (key, REWRITE_CORK);
+        initialize_font (nr);
+        return sm->add_char (key, c);
+      }
+    }
+  }
 
   if (math_kind != 0) {
     string upc= substitute_upright (c);
@@ -1311,6 +1374,11 @@ smart_font_rep::initialize_font (int nr) {
     fn[nr]= adjust_subfont (get_math_font (a[1], a[2], a[3], a[4]));
   else if (a[0] == "cyrillic")
     fn[nr]= adjust_subfont (get_cyrillic_font (a[1], a[2], a[3], a[4]));
+  else if (a[0] == "cork") {
+    int cnr= as_int (a[1]);
+    initialize_font (cnr);
+    fn[nr]= fn[cnr];
+  }
   else if (a[0] == "greek")
     fn[nr]= adjust_subfont (get_greek_font (a[1], a[2], a[3], a[4]));
   else if (a[0] == "subfont")
@@ -1415,9 +1483,19 @@ get_ex (string family, string variant, string series, string shape,
   else return as_int (ex);
 }
 
+static bool
+is_cjk_variant (string var) {
+  // the variants of the fallback fonts for CJK characters (see resolve)
+  return var == "cjk" || var == "hangul" ||
+         ends (var, "-cjk") || ends (var, "-hangul");
+}
+
 int
 smart_font_rep::adjusted_dpi (string fam, string var, string ser, string sh,
                               int attempt) {
+  // CJK characters fill the em square whatever the x-height of the Latin
+  // letters of their font: matching x-heights would shrink them (#196)
+  if (is_cjk_variant (var)) return dpi;
   int ex1= get_ex (mfam, variant, series, rshape, 1);
   int ex2= get_ex (fam, var, ser, sh, attempt);
   double zoom= 1.0;
@@ -1792,7 +1870,16 @@ smart_font (string family, string variant, string series, string shape,
             string tfam, string tvar, string tser, string tsh,
             int sz, int dpi) {
   if (!new_fonts) return find_font (family, variant, series, shape, sz, dpi);
-  if (tfam == "roman") tfam= family;
+  if (tfam == "roman") {
+    tfam= family;
+    // math-stix and the math fonts of TeX Gyre are those of the text fonts
+    // stix, bonum..., which their hand-tuned code recognizes by the names
+    // stix-..., bonum-... (#196): as when these are the text fonts too
+    if (tfam == "math-stix" || tfam == "math-bonum" ||
+        tfam == "math-pagella" || tfam == "math-schola" ||
+        tfam == "math-termes")
+      tfam= tfam (5, N(tfam));
+  }
   if (variant != "mr") {
     if (variant == "ms") tvar= "ss";
     if (variant == "mt") tvar= "tt";

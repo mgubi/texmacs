@@ -145,6 +145,11 @@
 ;; Quoting, escapes and spaces
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;; what escape-shell gives, posix on Unix (between double quotes on Windows)
+(define (sh s posix)
+  (if (or (os-mingw?) (os-win32?)) (string-append "\"" s "\"") posix))
+
 (define (test-string-quoting)
   ;; string-quote writes a Scheme string literal, string-unquote reads it
   (check= (string-quote "abc") "\"abc\"")
@@ -163,14 +168,16 @@
   ;; escape-verbatim turns newlines and tabs to spaces, drops control bytes
   (check= (escape-verbatim (cork #\a #\newline #\b #\tab #\c 7)) "a b c")
   (check= (escape-verbatim "") "")
-  ;; escape-shell protects the characters special to a POSIX shell
-  (check= (escape-shell "abc") "abc")
-  (check= (escape-shell "a b(c)$d") "a\\ b\\(c\\)\\$d")
-  (check= (escape-shell "x\ny") "x'\n'y")
-  (check= (escape-shell "a&b<c>d?") "a\\&b\\<c\\>d\\?")
-  (check= (escape-shell "a;b|c'd*e~f#g") "a\\;b\\|c\\'d\\*e\\~f\\#g")
+  ;; escape-shell protects the characters special to a POSIX shell (on
+  ;; Windows, it puts the string between double quotes)
+  (check= (escape-shell "abc") (sh "abc" "abc"))
+  (check= (escape-shell "a b(c)$d") (sh "a b(c)$d" "a\\ b\\(c\\)\\$d"))
+  (check= (escape-shell "x\ny") (sh "x\ny" "x'\n'y"))
+  (check= (escape-shell "a&b<c>d?") (sh "a&b<c>d?" "a\\&b\\<c\\>d\\?"))
+  (check= (escape-shell "a;b|c'd*e~f#g")
+          (sh "a;b|c'd*e~f#g" "a\\;b\\|c\\'d\\*e\\~f\\#g"))
   (check= (escape-shell "/usr/bin/x-y_z.1,2:3+4@5%6=7")
-          "/usr/bin/x-y_z.1,2:3+4@5%6=7")
+          (sh "/usr/bin/x-y_z.1,2:3+4@5%6=7" "/usr/bin/x-y_z.1,2:3+4@5%6=7"))
   ;; the shell reads the escaped string back unchanged
   (when (not (or (os-win32?) (os-mingw?)))
     (for (s (list "a b" "a;echo INJECTED" "it's" "x|y" "a*" "~/f" "#c"
@@ -239,6 +246,16 @@
   (check= (string->tmstring "") "")
   (check= (tmstring->string "a<less>b<gtr>c") "a<b>c")
   (check= (tmstring->string (string->tmstring "<x> < y >")) "<x> < y >")
+  ;; the characters written <#...> are kept, whatever their number of digits
+  (check= (tmstring->string "a<#E9>b<#2200>c<#1D54F>d")
+          "a<#E9>b<#2200>c<#1D54F>d")
+  ;; and so are the other character names, an unterminated < and a bare >
+  (check= (tmstring->string "x<alpha>y") "x<alpha>y")
+  (check= (tmstring->string "a<b") "a<b")
+  (check= (tmstring->string "a>b") "a>b")
+  (check= (tmstring->string "a<b<alpha>c") "a<b<alpha>c")
+  (for (s (list "a<b" ">" "<<>>" "<less>" "<alpha>"))
+    (check= (tmstring->string (string->tmstring s)) s))
   ;; object->tmstring writes an object as a string
   (check= (object->tmstring "x") "\"x\"")
   (check= (object->tmstring '(a "b" 1)) "(a \"b\" 1)"))
@@ -311,7 +328,8 @@
 ;; Urls as data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (us u) (url->string u))
+(define (us u) (check-unix (url->string u)))
+(define win? (or (os-mingw?) (os-win32?)))
 
 (define (test-url-syntax)
   ;; parts of a file name
@@ -325,20 +343,20 @@
   (check= (us (url-glue "a/b" ".tm")) "a/b.tm")
   (check= (us (url-unglue "a/b.tm" 3)) "a/b")
   (check= (us (url-glue (url-unglue "x/y.tex" 4) ".pdf")) "x/y.pdf")
-  ;; relative names
-  (check= (us (url-relative "/a/b/c.tm" "d.tm")) "/a/b/d.tm")
-  (check= (us (url-relative "/a/b/c.tm" "../d.tm")) "/a/d.tm")
-  (check= (us (url-delta "/a/b/c.tm" "/a/d/e.tm")) "../d/e.tm")
-  (check= (us (url-delta "/a/b/c.tm" "/a/b/e.tm")) "e.tm")
-  (check= (url-descends? "/a/b/c" "/a") #t)
-  (check= (url-descends? "/a/b" "/a/b") #t)
-  (check= (url-descends? "/a" "/a/b/c") #f)
-  (check= (url-descends? "/ab" "/a") #f)
+  ;; relative names (check-abs: /a/b on Unix, c:/a/b on Windows)
+  (check= (us (url-relative (check-abs "a/b/c.tm") "d.tm")) (check-abs "a/b/d.tm"))
+  (check= (us (url-relative (check-abs "a/b/c.tm") "../d.tm")) (check-abs "a/d.tm"))
+  (check= (us (url-delta (check-abs "a/b/c.tm") (check-abs "a/d/e.tm"))) "../d/e.tm")
+  (check= (us (url-delta (check-abs "a/b/c.tm") (check-abs "a/b/e.tm"))) "e.tm")
+  (check= (url-descends? (check-abs "a/b/c") (check-abs "a")) #t)
+  (check= (url-descends? (check-abs "a/b") (check-abs "a/b")) #t)
+  (check= (url-descends? (check-abs "a") (check-abs "a/b/c")) #f)
+  (check= (url-descends? (check-abs "ab") (check-abs "a")) #f)
   (check= (us (url-append "a/b" "../c")) "a/c")
-  (check= (us (url-append "/a/" "b")) "/a/b")
+  (check= (us (url-append (check-abs "a/") "b")) (check-abs "a/b"))
   (check= (us (url-parent)) "..")
   ;; roots and protocols
-  (check= (url-rooted? "/a/b") #t)
+  (check= (url-rooted? (check-abs "a/b")) #t)
   (check= (url-rooted? "a/b") #f)
   (check= (url-rooted? "http://www.texmacs.org/a") #t)
   (check= (url-rooted-web? "http://www.texmacs.org/a") #t)
@@ -348,7 +366,7 @@
   (check= (url-rooted-protocol? "http://x.org/a" "http") #t)
   (check= (url-rooted-protocol? "http://x.org/a" "ftp") #f)
   (check= (url-root "http://www.texmacs.org/a") "http")
-  (check= (url-root "/a/b") "default")
+  (check= (url-root (check-abs "a/b")) "default")
   (check= (url-root "a/b") "")
   (check= (us (url-unroot "http://www.texmacs.org/a/b")) "www.texmacs.org/a/b")
   (check= (us (root->url "http")) "http:/")
@@ -362,7 +380,9 @@
   ;; the names in an url tree are symbols
   (check= (url->stree "a/b") '(concat a b))
   (check= (url->stree (url-or "a" "b")) '(or a b))
-  (check= (url->stree "/a/b") '(concat (root default) (concat a b)))
+  (check= (url->stree (check-abs "a/b"))
+          (if win? '(concat (root default) (concat c (concat a b)))
+              '(concat (root default) (concat a b))))
   (check= (url->stree "http://x.org/a")
           (list 'concat '(root http) (list 'concat (string->symbol "x.org") 'a)))
   (check= (us (url-ref (url-or "a" (url-or "b" "c")) 1)) "a")
@@ -379,11 +399,22 @@
   (check= (url-format "a.html") "html")
   (check= (url-format "a.scm") "scheme")
   ;; system and unix names
-  (check= (url->system (system->url "/a/b c/d")) "/a/b c/d")
+  (check= (check-unix (url->system (system->url (check-abs "a/b c/d"))))
+          (check-abs "a/b c/d"))
   (check= (url->unix (unix->url "/a/b")) "/a/b")
   (check= (us (unix->url "a/b/c")) "a/b/c")
-  (check= (us (url-unix "/a" "b")) "/a/b")
+  ;; on Windows, /a is the drive a: (as in MSYS)
+  (check= (us (url-unix "/a" "b")) (if win? "a:/b" "/a/b"))
   (check= (url-secure? "/a/b") #f)
+  ;; the home directory is trusted, but not its temporary files and caches
+  (with home (lambda (x) (url-append (get-texmacs-home-path) x))
+    (check= (url-secure? (url-append (get-texmacs-path) "doc/a.tm")) #t)
+    (check= (url-secure? (home "texts/scratch/a.tm")) #t)
+    (check= (url-secure? (home "styles/a.ts")) #t)
+    (check= (url-secure? (home "system/tmpx/a.tm")) #t)
+    (check= (url-secure? (home "system/tmp/a.tm")) #f)
+    (check= (url-secure? (url-append (url-temp-dir) "a.tm")) #f)
+    (check= (url-secure? (home "system/cache/a.tm")) #f))
   (check= (url-scratch? (url-scratch "a" ".tm" 3)) #t)
   (check= (us (url-tail (url-scratch "a" ".tm" 3))) "a3.tm")
   (check= (url-scratch? "/a/b.tm") #f))
@@ -405,12 +436,14 @@
   (check= (list->tmfs (tmfs->list "x/y/z")) "x/y/z")
   (check= (strip-colon "c:/a/b") "c/a/b")
   (check= (strip-colon "/a/b") "/a/b")
-  (check= (url->tmfs-string "/a/b.tm") "file/a/b.tm")
+  (check= (url->tmfs-string (check-abs "a/b.tm"))
+          (if win? "file/c/a/b.tm" "file/a/b.tm"))
   (check= (url->tmfs-string "a/b.tm") "here/a/b.tm")
   (check= (url->tmfs-string "http://x.org/a") "http/x.org/a")
   (check= (url->tmfs-string (url-append (get-texmacs-path) "doc/x.tm"))
           "tm/doc/x.tm")
-  (check= (us (tmfs-string->url "file/a/b.tm")) "/a/b.tm")
+  (check= (us (tmfs-string->url (if win? "file/c/a/b.tm" "file/a/b.tm")))
+          (check-abs "a/b.tm"))
   (check= (us (tmfs-string->url "here/a/b.tm")) "a/b.tm")
   (check= (us (tmfs-string->url "http/x.org/a")) "http://x.org/a")
   (check= (tmfs-string->url "tm/doc/x.tm")
@@ -463,10 +496,10 @@
   (check= (tails (url-read-directory (tmp-dir) "*"))
           '("a.txt" "c.tm" "sub"))
   ;; concretizing gives the system name of an existing file
-  (check= (url-concretize (tmp-file "sub/d.txt"))
-          (string-append structures-dir "/sub/d.txt"))
-  (check= (url->system (url-concretize* (tmp-file "sub/d.txt")))
-          (string-append structures-dir "/sub/d.txt"))
+  (check= (check-unix (url-concretize (tmp-file "sub/d.txt")))
+          (check-unix (string-append structures-dir "/sub/d.txt")))
+  (check= (check-unix (url->system (url-concretize* (tmp-file "sub/d.txt"))))
+          (check-unix (string-append structures-dir "/sub/d.txt")))
   ;; wildcards, alternatives and searches
   (check= (tails (url->list (url-expand (url-complete
                    (url-append (tmp-dir) (url-wildcard "*.txt")) "r"))))
@@ -776,6 +809,98 @@
   (ahash-remove! match-term :structures-test-abs)
   (check= (ahash-ref match-term :structures-test-ab) #f))
 
+;; match? compiles the simple patterns, and has to agree with match on all
+;; of them: the same result for each object, at the first and the later uses.
+(define (match-general x pat)
+  (with sols (match (list x) (list pat) '())
+    (if (null? sols) #f sols)))
+
+(define (test-match-compiled)
+  (let ((objects
+         `(a b "a" "ab" "" 1 2 #t #\a () (a) (b) (a b) (a b c) (a b c d)
+           ("a" b) (1 "x") (a (b)) (a (b c)) ((a) b) (rsub "i") (x (rsub "i"))
+           (x (rsub "i") (rsup "j")) (x (rsub "i") y)
+           ,(stree->tree '(rsub "i")) ,(stree->tree '(concat "a" "b"))
+           (a ,(stree->tree '(rsub "i"))) (a "bc") ("bc" a)))
+        (patterns
+         '(a "a" 1 () (a) (a b) (b a) (a :*) (:* a) (:*) (:%0) (:%1) (:%2)
+           (:%3) (:%1 :*) (:%2 :*) (:%0 a) (:%1 b) (a :%1) (a :%2 d) :%1 :*
+           (()) (a ()) ((a)) ((a) b) (a (b)) (a (:%1)) (a (b :*)) (a (:%1 :*))
+           (:%1 (rsub :%1) :*) (:%1 (rsub :%1) (rsup :%1) :*)
+           (rsub :%1) (:%1 (:%1)) (:%1 (#\b :*)) (:%1 (#\b #\c)) (#\a)
+           (:string?) (:string? :*) (:symbol? :%1) (:number? :*) :symbol?
+           (a (:string?)) ((:symbol?) :*)
+           ;; those which remain for match
+           ('x) ('x 'x) ('x 'y) (a 'x) (:%1 'x) ((:or a b)) ((:or a b) :*)
+           ((:and :symbol? a)) ((:not a)) ((:not a) :*) ((:repeat a))
+           ((:repeat a) b) ((:group a b)) ((:group a) :*) ((:quote a))
+           (a ('x)) ((:or (a) (b))))))
+    (define (check-all)
+      (for-each
+       (lambda (pat)
+         (for-each
+          (lambda (x)
+            (check= (cons* x pat (match? x pat))
+                    (cons* x pat (match-general x pat))))
+          objects))
+       patterns))
+    (check-all)
+    (check-all))
+  ;; a keyword may become a term of a grammar after its use as a predicate
+  (let ((pat '(:symbol? :*)))
+    (check= (match? '(a) pat) '(()))
+    (check= (match? '(a) pat) '(())) ;; (compiled at the second use)
+    (define-regexp-grammar (:symbol? b))
+    (check= (match? '(a) pat) #f)
+    (check= (match? '(b) pat) '(()))
+    (ahash-remove! match-term :symbol?)
+    (check= (match? '(a) pat) '(())))
+  ;; a wrong rule leaves those before it defined, which then count
+  (let ((pat '(:symbol? :%1)))
+    (check= (match? '(a b) pat) '(()))
+    (check= (match? '(a b) pat) '(()))
+    (check-error (define-regexp-grammar-decls '((:symbol? b) bad)) #t)
+    (check= (match? '(a b) pat) (match-general '(a b) pat))
+    (check= (match? '(a b) pat) #f)
+    (ahash-remove! match-term :symbol?))
+  ;; compiling does not fail on what match does not read
+  (with cycle (list 'a)
+    (set-car! cycle cycle)
+    (check= (match? 'a cycle) #f)
+    (check= (match? 'a cycle) #f))
+  (let* ((long (let loop ((i 0) (l '()))
+                 (if (< i 20000) (loop (+ i 1) (cons i l)) l)))
+         (deep (let loop ((i 0) (l 'a))
+                 (if (< i 20000) (loop (+ i 1) (list l)) l))))
+    (check= (match? long long) '(()))
+    (check= (match? long long) '(()))
+    (check= (match? 'a deep) #f)
+    (check= (match? 'a deep) #f))
+  ;; (S7 has no empty keyword)
+  (with empty (catch #t (lambda () (string->keyword "")) (lambda args #f))
+    (when empty
+      (let ((empty-1 (list 'b empty))
+            (empty-2 (list empty)))
+        (check= (match? 'a empty-1) #f)
+        (check= (match? 'a empty-1) #f)
+        (check= (match? 'a empty-2) #f)
+        (check= (match? 'a empty-2) #f))))
+  ;; keywords of which string->number does not like the end, not reached
+  (for-each
+   (lambda (pat)
+     (check= (match? 'a pat) #f)
+     (check= (match? 'a pat) #f)
+     (check= (match? 'a pat) #f))
+   '((b :x1/0) (b :x1e400) (b (:x1/0))))
+  ;; patterns made at each use, more of them than are kept
+  (let loop ((i 0) (ok? #t))
+    (if (< i 5000)
+        (loop (+ i 1)
+              (and ok?
+                   (== (match? (list i) (list i)) '(()))
+                   (not (match? (list i) (list (+ i 1))))))
+        (check-true ok?))))
+
 ;; tm-select gives the subtrees at the end of a path pattern, of which the
 ;; elements are child indices, tags (the children with that tag), :%n (any
 ;; n levels down), :* (any number of levels) and special patterns.
@@ -814,6 +939,22 @@
     (check-true (tree? (car l)))
     (check= (tree->stree (car l)) "a")
     (check-true (tree-eq? (car l) (tree-ref t 0 0))))
+  ;; a document of 100,000 paragraphs: the children are gone through
+  ;; without a recursion per child, which overflowed the Guile stack (#418)
+  (let* ((n 100000)
+         (t (stree->tree
+             `(document ,@(map (lambda (i)
+                                 (if (= (modulo i 1000) 999)
+                                     `(strong ,(number->string i))
+                                     (number->string i)))
+                               (iota n))))))
+    (check= (tm-select t '(:* gpg-passphrase-encrypted-buffer)) '())
+    (check= (length (tm-select t '(:%1))) n)
+    (check= (map tree->stree (tm-select t '(:* strong 0)))
+            (map (lambda (i) (number->string (+ (* 1000 i) 999))) (iota 100)))
+    (check= (length (tm-select t '((:exclude em)))) 100)
+    (check= (map tree->stree (tm-select t '((:range 99997 100005))))
+            '("99997" "99998" (strong "99999"))))
   ;; select with two arguments is tm-select
   (check= (select '(document (strong "a")) '(strong 0)) '("a"))
   (check= (tm-ref '(document (strong "a") "b") 0 0) "a")
@@ -921,11 +1062,15 @@
 (define (test-secure)
   (check= (secure? '(+ 1 2)) #t)
   (check= (secure? "text") #t)
-  (check= (secure? 'symbol) #t)
+  ;; a free variable is secure only when it is a secure symbol: its value
+  ;; might be an insecure procedure (the checker of tm-secure.scm, #87)
+  (check= (secure? 'car) #t)
+  (check= (secure? 'symbol) #f)
   (check= (secure? '(system "ls")) #f)
   (check= (secure? '(string-append "a" (system "ls"))) #f)
   (check= (secure? '(if (string? "x") (string-append "a" "b") 3)) #t)
-  (check= (secure? '(cond ((null? x) 1) (else 2))) #t)
+  (check= (secure? '(lambda (x) (cond ((null? x) 1) (else 2)))) #t)
+  (check= (secure? '(cond ((null? x) 1) (else 2))) #f)
   (check= (secure? '(lambda (x) (car x))) #t)
   (check= (secure? '(lambda (x) (system x))) #f)
   (check= (secure? '(with x 1 (+ x 1))) #t)
@@ -1011,6 +1156,7 @@
   (run-group "positions" test-positions)
   (run-group "tree pointers" test-tree-pointers)
   (run-group "pattern matching" test-match)
+  (run-group "compiled patterns" test-match-compiled)
   (run-group "selection" test-select)
   (run-group "logic programming" test-logic)
   (run-group "secure evaluation" test-secure)

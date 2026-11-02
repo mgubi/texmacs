@@ -153,6 +153,9 @@ struct font_rep: rep<font> {
 
 string default_chinese_font_name ();
 string default_japanese_font_name ();
+array<string> windows_cjk_font_candidates (string lang);
+string windows_cjk_font (string lang);
+extern int font_database_generation;
 string default_korean_font_name ();
 
 font error_font (font fn);
@@ -184,6 +187,7 @@ font superposed_font (array<font> fns, int ref);
 font x_font (string family, int size, int dpi);
 font qt_font (string family, int size, int dpi);
 font tex_font (string fam, int size, int dpi, int dsize=10);
+bool tex_font_found (string fam, int size, int dpi, int dsize=10);
 font tex_cm_font (string fam, int size, int dpi, int dsize=10);
 font tex_ec_font (string fam, int size, int dpi, int dsize=10);
 font tex_la_font (string fam, int size, int dpi, int dsize=10);

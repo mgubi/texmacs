@@ -19,7 +19,7 @@ void imlib2_image_size (url u, int& w, int& h);
 
 #ifdef IMLIB2_X11TEXMACS
 #include <X11/Xlib.h>
-void imlib2_display (Display* dpy, Pixmap pm, url image, int w, int h);
+void imlib2_display (Display* dpy, Pixmap pm, url image, SI w, SI h);
 #endif
 
 #endif // IMLIB2_H

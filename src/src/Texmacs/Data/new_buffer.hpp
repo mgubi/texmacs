@@ -28,14 +28,13 @@ public:
   string fm;              // buffer format
   string title;           // buffer title (for menus)
   bool read_only;         // buffer is read only?
-  bool secure;            // is the buffer secure?
   int last_save;          // last time that the buffer was saved
   time_t last_visit;      // time that the buffer was visited last
 
   inline new_buffer_rep (url name2):
     name (name2), master (name2),
     fm ("texmacs"), title (as_string (tail (name))),
-    read_only (false), secure (is_secure (name2)),
+    read_only (false),
     last_save (- (int) (((unsigned int) (-1)) >> 1)),
     last_visit (texmacs_time ()) {}
 };
@@ -84,6 +83,8 @@ string get_title_buffer (url name);
 void set_buffer_tree (url name, tree doc);
 tree get_buffer_tree (url name);
 void set_buffer_body (url name, tree body);
+tree get_buffer_style (url name);
+void set_buffer_style (url name, tree style);
 tree get_buffer_body (url name);
 url new_buffer_in_new_window (url name, tree t, tree geom= "");
 int  get_last_save_buffer (url name);
@@ -91,6 +92,8 @@ void set_last_save_buffer (url name, int t);
 bool is_aux_buffer (url name);
 double last_visited (url name);
 bool buffer_modified (url name);
+void set_buffer_read_only (url name, bool flag);
+bool is_buffer_read_only (url name);
 bool buffer_modified_since_autosave (url name);
 void pretend_buffer_modified (url name);
 void pretend_buffer_saved (url name);

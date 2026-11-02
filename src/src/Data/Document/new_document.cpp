@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "new_document.hpp"
+#include "archiver.hpp"
 
 /******************************************************************************
 * Management of all edit trees
@@ -35,6 +36,7 @@ delete_document (path rp) {
 	  "NULL subtree in delete_document");
   assign (subtree (the_et, rp), UNINIT);
   clean_observers (subtree (the_et, rp));
+  global_forget_document (rp);
 }
 
 void

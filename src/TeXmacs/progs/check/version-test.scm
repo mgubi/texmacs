@@ -33,8 +33,10 @@
 ;;     git, by a .svn or .git directory above it) and dispatches to
 ;;     version-svn.scm or version-git.scm. The git part is checked on a
 ;;     throwaway repository in the temporary directory, always through
-;;     "git -c user.name=... -c user.email=...", never with a global
-;;     configuration; svn is only checked on files which are not under
+;;     "git -c user.name=... -c user.email=..." (or, for git-commit, the
+;;     configuration of the repository), never with a global one, once
+;;     with plain names and once with spaces in the names of the repository
+;;     and of the files; svn is only checked on files which are not under
 ;;     version control.
 
 (texmacs-module (check version-test)
@@ -57,14 +59,16 @@
   (system->url (tmp-name name)))
 
 (define (shell . l)
+  ;; a command line without shell syntax, in double quotes where needed:
+  ;; on Windows, eval-system starts the program itself, with no shell
   (eval-system (apply string-append l)))
 
 (define (reset-dir)
-  (shell "rm -rf '" version-dir "'")
+  (shell "rm -rf \"" version-dir "\"")
   (system-mkdir (system->url version-dir)))
 
 (define (remove-dir)
-  (shell "rm -rf '" version-dir "'"))
+  (shell "rm -rf \"" version-dir "\""))
 
 (define (tm-file body)
   ;; a .tm file with @body (lines of the body, already indented)
@@ -372,13 +376,12 @@
                                 '(document "a" (em "c")))
               '(document "a" (version-both (document (em "b"))
                                            (document (em "c")))))
-      ;; FIXME: the paragraphs of a difference with the block grain keep
-      ;; the words split by denormalize (version/version-compare.scm:242):
-      ;; (compare-versions '(document "b c") '(document "b x")) gives
-      ;; (document (version-both (document (concat "b" " " "c"))
-      ;; (document (concat "b" " " "x")))), expected
-      ;; (document (version-both (document "b c") (document "b x"))).
-      ))
+      ;; the paragraphs of a difference are whole, not split into words
+      (check= (compare-versions '(document "b c") '(document "b x"))
+              '(document (version-both (document "b c") (document "b x"))))
+      (check= (compare-versions '(document "a" "b c d") '(document "a" "b x d"))
+              '(document "a" (version-both (document "b c d")
+                                           (document "b x d"))))))
   (check-true (version-test-grain? "detailed"))
   (check= (compare-versions '(document "a" "b c") '(document "a" "b x"))
           '(document "a" (concat "b " (version-both "c" "x")))))
@@ -437,18 +440,28 @@
       (version-last-difference)
       (check= (cursor) '(1 4))
       (check-false (inside-version?))))
-  ;; FIXME: the first difference of a document which starts with one is
-  ;; skipped, go-start puts the cursor before the tag and path-next-tag
-  ;; goes to the border of the next tag (version/version-edit.scm:78):
-  ;; version-first-difference in (document (version-both "p" "q") "x")
-  ;; gives the cursor (0 0) outside the difference, expected (0 0 0)
-  ;; inside "p".
-  ;; FIXME: likewise the last difference of a document which ends with one
-  ;; is skipped (version/version-edit.scm:91): version-last-difference in
-  ;; (document "x" (version-both "p" "q")) gives the cursor (1 1) after
-  ;; the tag, outside the difference, expected inside "q"; with a
-  ;; difference earlier in the document it goes to the end of that one.
-  )
+  ;; a difference at the very start or end of the document is not skipped
+  (with-buffer-body '(document (version-both "p" "q") "x")
+    (lambda ()
+      (version-first-difference)
+      (check= (cursor) '(0 0 0))
+      (check= (innermost-version) '(version-both "p" "q"))
+      (version-last-difference)
+      (check= (cursor) '(0 1 1))))
+  (with-buffer-body '(document "x" (version-both "p" "q"))
+    (lambda ()
+      (version-last-difference)
+      (check= (cursor) '(1 1 1))
+      (check= (innermost-version) '(version-both "p" "q"))
+      (version-first-difference)
+      (check= (cursor) '(1 0 0))))
+  (with-buffer-body '(document (version-both "a" "b") "x"
+                               (version-both (document "p") (document "q")))
+    (lambda ()
+      (version-last-difference)
+      (check= (cursor) '(2 1 0 1))
+      (version-first-difference)
+      (check= (cursor) '(0 0 0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Showing the versions
@@ -748,10 +761,13 @@
 ;; The revisions of a file are tmfs urls tmfs://revision/<rev>/<file>.
 (define (test-revision-urls)
   (check-group "revision urls")
-  (let* ((f (system->url "/no-such-dir-version-test/file.tm"))
+  (let* ((f (system->url (check-abs "no-such-dir-version-test/file.tm")))
          (s (version-revision-url f "abc"))
          (r (string->url s)))
-    (check= s "tmfs://revision/abc/file/no-such-dir-version-test/file.tm")
+    ;; (the drive is a part of the name on Windows)
+    (check= s (if (or (os-mingw?) (os-win32?))
+                  "tmfs://revision/abc/file/c/no-such-dir-version-test/file.tm"
+                  "tmfs://revision/abc/file/no-such-dir-version-test/file.tm"))
     ;; a revision with a colon names the file itself
     (check= (version-revision-url f "abc:file/x/y.tm")
             "tmfs://revision/abc/file/x/y.tm")
@@ -770,29 +786,58 @@
 ;; Git
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the repository of the current run of test-git-sub
 (define git-dir (tmp-name "repo"))
+
+;; the root of the repository as git-root gives it, with / on Windows too
+(define git-root-dir (string-replace git-dir "\\" "/"))
+
+(define (set-git-dir! name)
+  (set! git-dir (tmp-name name))
+  (set! git-root-dir (string-replace git-dir "\\" "/")))
 
 (define (git-sh . l)
   ;; a git command in the throwaway repository, never configured globally
-  (apply shell "cd '" git-dir "' && git -c user.name=tester"
+  (apply shell "git -C \"" git-dir "\" -c user.name=tester"
          " -c user.email=tester@example.org " l))
 
 (define (git-available?)
-  (string-starts? (shell "git --version 2>/dev/null") "git version"))
+  (string-starts? (shell "git --version") "git version"))
 
 (define (test-git)
   (check-group "git")
   (if (not (git-available?))
       (display* "  git is not available, the group is skipped\n")
-      (run-group test-git-sub)))
+      (begin
+        (run-group test-git-arguments)
+        (set-git-dir! "repo")
+        (run-group (lambda () (test-git-sub "a.tm" "b.tm")))
+        (check-group "git, spaces in the names")
+        (set-git-dir! "my repo")
+        (run-group (lambda () (test-git-sub "a b.tm" "b c.tm"))))))
 
-(define (test-git-sub)
+(define (sq-quote s)
+  ;; @s as git rev-parse --sq-quote writes it
+  (string-append "'" (string-replace (string-replace s "'" "'\\''")
+                                     "!" "'\\!'")
+                 "'"))
+
+(define (test-git-arguments)
+  ;; the arguments quoted by version-quote reach git unchanged, through
+  ;; /bin/sh or, on Windows, the splitting of the command line by git
+  (for (s (list "plain" "" "a b" "it's" "$HOME" "`echo x`" "x!y" "%PATH%"
+                "say \"hi\"" "C:\\Users\\John Smith\\" "a\\\"b" "a\\\\b"))
+    (check= (shell "git rev-parse --sq-quote " (version-quote s))
+            (string-append " " (sq-quote s) "\n"))))
+
+(define (test-git-sub fa fb)
+  ;; @fa and @fb are the names of two files of the repository git-dir
   (system-mkdir (system->url git-dir))
-  (git-sh "init -q . && git -c user.name=tester"
-          " -c user.email=tester@example.org commit -q --allow-empty -m init")
+  (git-sh "init -q .")
+  (git-sh "commit -q --allow-empty -m init")
   (let* ((root (system->url git-dir))
-         (f (system->url (string-append git-dir "/a.tm")))
-         (g (system->url (string-append git-dir "/b.tm")))
+         (f (system->url (string-append git-dir "/" fa)))
+         (g (system->url (string-append git-dir "/" fb)))
          (doc1 (tm-file "  One.\n"))
          (doc2 (tm-file "  One more.\n")))
     (string-save doc1 (url->system f))
@@ -804,11 +849,13 @@
     (check-true (version-supports-git-style? f))
     (check-false (version-supports-svn-style? f))
     (check-true (version-supports-history? f))
-    (check= (git-root f) git-dir)
-    (check= (git-root root) git-dir)
+    (check= (git-root f) git-root-dir)
+    (check= (git-root root) git-root-dir)
     (check= (git-command f)
-            (string-append "git --work-tree=" git-dir
-                           " --git-dir=" git-dir "/.git"))
+            (string-append
+             "git " (version-quote (string-append "--work-tree=" git-root-dir))
+             " " (version-quote (string-append "--git-dir=" git-root-dir
+                                               "/.git"))))
     ;; an untracked file
     (check= (buffer-status f) "??")
     (check= (version-status f) "unknown")
@@ -816,19 +863,19 @@
     (check-false (buffer-to-unadd? f))
     (check-false (buffer-histed? f))
     (check-false (buffer-has-diff? f))
-    (check= (git-status root) '(("??" "a.tm")))
+    (check= (git-status root) (list (list "??" fa)))
     ;; registered
     (version-register f)
     (check= (buffer-status f) "A ")
     (check= (version-status f) "modified")
     (check-true (buffer-to-unadd? f))
     (check-false (buffer-to-add? f))
-    (check= (git-status root) '(("A " "a.tm")))
+    (check= (git-status root) (list (list "A " fa)))
     (version-unregister f)
     (check= (buffer-status f) "??")
     (version-register f)
     ;; committed
-    (git-sh "commit -q -m 'first commit'")
+    (git-sh "commit -q -m \"first commit\"")
     (check= (buffer-status f) "  ")
     (check= (version-status f) "unmodified")
     (check-true (buffer-histed? f))
@@ -847,7 +894,8 @@
         (check= (cadr m) "Author: tester <tester@example.org>")
         (check-true (in? "    first commit" m)))
       (check= (git-commit-diff root h0 h1)
-              `((7 0 (hlink "a.tm" ,(version-revision-url f h1)) 4)))
+              `((7 0 (hlink ,fa ,(version-revision-url f h1))
+                  ,(string-length fa))))
       ;; the log, newest first
       (with l (git-log root)
         (check= (length l) 2)
@@ -867,17 +915,18 @@
       (check-true (buffer-has-diff? f))
       (check-true (buffer-to-add? f))
       (check= (git-status root)
-              `((" M" (hlink "a.tm" ,(url->string (url-append root "a.tm"))))))
+              `((" M" (hlink ,fa ,(url->string (url-append root fa))))))
       (check= (version-revision f h1) doc1)
       ;; a second commit
-      (git-sh "commit -q -a -m 'second commit'")
+      (git-sh "commit -q -a -m \"second commit\"")
       (let ((h2 (git-master f)))
         (check-false (== h2 h1))
         (check= (git-commit-parent root h2) h1)
         (check= (version-revision f h2) doc2)
         (check= (version-revision f h1) doc1)
         (check= (git-commit-diff root h1 h2)
-                `((1 1 (hlink "a.tm" ,(version-revision-url f h2)) 4)))
+                `((1 1 (hlink ,fa ,(version-revision-url f h2))
+                  ,(string-length fa))))
         ;; the history of a file, newest first, with the current buffer
         ;; on the file (the history is relative to its repository)
         (let ((old (current-buffer)))
@@ -890,8 +939,9 @@
                           (string-append h1 ":" (url->tmfs-string f))))
             (check= (map cadr h) '("tester" "tester"))
             (check= (map cadddr h) '("second commit" "first commit")))
-          (check= (current-git-root) git-dir)
+          (check= (current-git-root) git-root-dir)
           (check= (git-commit-master) h2)
+          (check= (git-commit-file-parent fa h2) h1)
           ;; the revision url of a history entry
           (check= (version-revision-url f (string-append h1 ":"
                                                          (url->tmfs-string f)))
@@ -907,19 +957,19 @@
           (buffer-pretend-saved f)
           (buffer-close f)
           (when (buffer-exists? old) (switch-to-buffer old)))
-        ;; FIXME: version-history takes the repository of the current
-        ;; buffer instead of the one of the file (version/version-git.scm:
-        ;; 148, current-git-root): with a buffer outside the repository,
-        ;; (car (car (version-history f))) gives "<hash>:blank/a.tm",
-        ;; expected "<hash>:file/<repository>/a.tm".
-        ))
+        ;; the history is relative to the repository of the file, also
+        ;; when the current buffer is outside it
+        (check-false (== (current-git-root) git-root-dir))
+        (check= (map car (version-history f))
+                (list (string-append h2 ":" (url->tmfs-string f))
+                      (string-append h1 ":" (url->tmfs-string f))))))
     ;; a file which is not in the repository yet
     (string-save doc1 (url->system g))
     (check= (version-status g) "unknown")
-    (check= (git-status root) '(("??" "b.tm")))
+    (check= (git-status root) (list (list "??" fb)))
     (with c (git-status-content root)
       (check= (car c) 'document)
-      (check= (tm-ref c 2 0) '(document (tmfs-title "Git Status")
+      (check= (tm-ref c 2 0) `(document (tmfs-title "Git Status")
                                         (description-long
                                          (document
                                           (concat (item* "Changes to be committed")
@@ -927,7 +977,43 @@
                                           (concat (item* "Changes not staged for commit")
                                                   "")
                                           (concat (item* "Untracked files")
-                                                  (concat "b.tm" (new-line))))))))))
+                                                  (concat ,fb (new-line))))))))
+    ;; committed by git-commit, with the current buffer on the file
+    (version-register g)
+    ;; (the identity in the configuration of the throwaway repository only)
+    (git-sh "config user.name tester")
+    (git-sh "config user.email tester@example.org")
+    (git-sh "config commit.gpgsign false")
+    (let ((old (current-buffer))
+          (bufs (buffer-list))
+          ;; (a message in Cork, as typed in TeXmacs, given to git in UTF-8)
+          (msg (string-append "say \"hi\" to $HOME, it's a caf"
+                              (string (integer->char 233)))))
+      (load-buffer g)
+      (switch-to-buffer* g)
+      (git-commit msg)
+      ;; the message as git stored it (written to a file by git)...
+      (with out (tmp-name "message.txt")
+        (git-sh "log -1 --pretty=%s --output=\"" out "\"")
+        (check= (string-load (system->url out))
+                (string-append (cork->utf8 msg) "\n")))
+      ;; ... and as eval-system reads it from the output of git (on
+      ;; Windows, the output used to be decoded in the OEM code page,
+      ;; which garbled the UTF-8 of git, #641)
+      (check= (git-sh "log -1 --pretty=%s")
+              (string-append (cork->utf8 msg) "\n"))
+      (check= (buffer-status g) "  ")
+      (for (b (buffer-list))
+        (when (not (in? b bufs))
+          (buffer-pretend-saved b)
+          (buffer-close b)))
+      (when (buffer-exists? old) (switch-to-buffer old)))
+    ;; a renamed file: the status shows the new name ("<old> -> <new>",
+    ;; each name quoted by git when it has a space)
+    (with new (string-append (if (== fb "b.tm") "new-" "new ") fb)
+      (git-sh "mv \"" fb "\" \"" new "\"")
+      (check= (git-status root)
+              `(("R " (hlink ,new ,(url->string (url-append root new)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main

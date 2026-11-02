@@ -106,6 +106,11 @@ texmacs_dirent texmacs_readdir(TEXMACS_DIR dirp);
 int texmacs_stat(string filename, struct_stat* buf);
 
 /*
+ * @brief Proxy function to the lstat function (does not follow links)
+ */
+int texmacs_lstat(string filename, struct_stat* buf);
+
+/*
  * @brief Proxy function to the mkdir function
  * @return true if the directory was created successfully, false otherwise
  */

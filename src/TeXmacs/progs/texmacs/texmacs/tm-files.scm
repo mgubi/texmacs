@@ -151,6 +151,104 @@
 (tm-define current-save-source (url-none))
 (tm-define current-save-target (url-none))
 
+;; The document which is being converted and the file which is being written:
+;; set by buffer_export and export_tree in C++ for the time of the conversion,
+;; none otherwise (a conversion for the clipboard writes no file)
+
+(tm-define (save-source-swap u)
+  (with old current-save-source
+    (set! current-save-source u)
+    old))
+
+(tm-define (save-target-swap u)
+  (with old current-save-target
+    (set! current-save-target u)
+    old))
+
+(tm-define (save-source-url)
+  (if (url-none? current-save-source) (current-buffer) current-save-source))
+
+(tm-define (save-target-url)
+  (if (url-none? current-save-target) (save-source-url) current-save-target))
+
+(tm-define (url-drop-suffix u)
+  (with suf (url-suffix u)
+    (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
+
+;; The images of a conversion which writes no file are not for the user (the
+;; text for an AI, the MathJax of a formula, a label): they go to the temporary
+;; folder, under the absolute name. Only a copy to the clipboard keeps them, for
+;; the pasted text: next to the document, when it is a file in a folder of the
+;; user which can be written, where the bare name will do, otherwise in a folder
+;; of the home, which remains after TeXmacs as the pasted text does. The name
+;; comes from the document and the content, so that the same copy uses the same
+;; file instead of leaving a new one each time.
+
+(tm-define copying-to-clipboard? #f)
+
+(tm-define (copying-to-clipboard-swap flag)
+  (with old copying-to-clipboard?
+    (set! copying-to-clipboard? flag)
+    old))
+
+(tm-define (folder-writable? dir)
+  ;; really writing: (url-test? dir "w") only looks at the permission bits,
+  ;; which it finds on /etc as well
+  (with u (url-append dir (string-append ".texmacs-write-test-"
+                                         (number->string (texmacs-time))))
+    (string-save "" u)
+    (and (url-exists? u)
+         (begin (system-remove u) #t))))
+
+(define (document-folder)
+  (let* ((b (current-buffer))
+         (dir (url-head b)))
+    (and (not (url-none? b))
+         (not (url-scratch? b))
+         (not (url-rooted-web? b))
+         (not (url-rooted-tmfs? b))
+         (url-exists? b)
+         (not (url-descends? dir (get-texmacs-path)))
+         (folder-writable? dir)
+         dir)))
+
+(tm-define (slashes-of-name s)
+  (string-replace s "\\" "/"))
+
+(tm-define (image-name-for-program u)
+  ;; the absolute name of @u for LaTeX (and HTML), with slashes on Windows too;
+  ;; url->unix would drop the colon of the drive (/D/a/b)
+  (slashes-of-name (url->system u)))
+
+(define (clipboard-image-names key suffix)
+  (let* ((dir (document-folder))
+         (folder (or dir (string->url "$TEXMACS_HOME_PATH/system/images")))
+         (id (list 'tuple (url->string (current-buffer)) key))
+         (name (string-append "image-" (tree-hash (tm->tree id)) suffix))
+         (u (url-append folder name))
+         (s (if dir name (image-name-for-program u))))
+    (when (not (url-exists? folder)) (system-mkdir folder))
+    (set-message `(concat "Image of the copy: " (verbatim ,(url->system u)))
+                 "Copy")
+    (values u s)))
+
+(define loose-image-serial 0)
+
+(tm-define (loose-image-names key suffix)
+  ;; the url and the name in the text of an image with the given @suffix, for
+  ;; a conversion without target; @key identifies the content
+  (if copying-to-clipboard?
+      (clipboard-image-names key suffix)
+      (begin
+        (set! loose-image-serial (+ loose-image-serial 1))
+        (with u (url-append (url-temp-dir)
+                            (string-append "image-"
+                                           (number->string loose-image-serial)
+                                           suffix))
+          (if (url-exists? u)
+              (loose-image-names key suffix)
+              (values u (image-name-for-program u)))))))
+
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))
 
@@ -173,6 +271,7 @@
           (set-message `(concat "Could not save " ,vname) "Save file"))
         (begin
           (if (== (url-suffix name) "ts") (style-clear-cache))
+          (typeset-failure-forget name)
           (autosave-remove name)
           (buffer-notify-recent name)
           (set-message `(concat "Saved " ,vname) "Save file")
@@ -199,10 +298,62 @@
            #t)
           (else #f))))
 
+;; The typesetting of a buffer which failed (edit_typeset_rep::typeset_sub):
+;; the document was replaced by an empty one, and a copy of it saved in
+;; $TEXMACS_HOME_PATH/system/recovered (a copy is never overwritten). Saving
+;; the buffer over its file would replace the file by what is left, so that
+;; it is asked first (the flag, see typeset-failed-buffer? in tm-server.scm).
+
+(define (recovered-file-name dir tail)
+  ;; names of ASCII letters and digits only (a name of the buffer with
+  ;; accents is a string of bytes, of which some are letters and some not),
+  ;; of at most 80 characters for the buffer
+  (let* ((ok? (lambda (c)
+                (and (< (char->integer c) 128)
+                     (or (char-alphabetic? c) (char-numeric? c)
+                         (in? c '(#\. #\-))))))
+         (clean (lambda (str)
+                  (list->string
+                   (map (lambda (c) (if (ok? c) c #\_))
+                        (string->list str)))))
+         (short (lambda (str)
+                  (if (> (string-length str) 80) (substring str 0 80) str)))
+         (base (string-append (clean (pretty-time (current-time))) "-"
+                              (let* ((t (short (clean tail))))
+                                (if (== t "") "buffer" t))))
+         (base (if (== (url-suffix base) "tm") base (string-append base ".tm"))))
+    (let try ((k 1))
+      (let* ((name (if (== k 1) base
+                       (string-append (substring base 0 (- (string-length base) 3))
+                                      "-" (number->string k) ".tm")))
+             (file (url-append dir name)))
+        (if (url-exists? file) (try (+ k 1)) file)))))
+
+(tm-define (typeset-failure-recover name msg)
+  (:synopsis "Save the document of a buffer whose typesetting failed")
+  (typeset-failure-flag name)
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (export (lambda (tail)
+                   (with file (recovered-file-name dir tail)
+                     (and (catch #t
+                            (lambda ()
+                              (system-mkdir dir)
+                              (not (buffer-export name file "texmacs")))
+                            (lambda args #f))
+                          file))))
+         ;; (if the name of the buffer is not accepted, a plain one)
+         (file (or (export (url->string (url-tail name))) (export "buffer"))))
+    (set-message
+     `(concat "The document could not be typeset (" ,msg "), and was "
+              "replaced by an empty one. "
+              ,(if file
+                   `(concat "A copy was saved in " (verbatim ,(url->system file)) ".")
+                   "Its copy could not be saved: close it without saving."))
+     "Typesetting failure")
+    (and file (url->system file))))
+
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
-  (set! current-save-source name)
-  (set! current-save-target name)
   (with vname `(verbatim ,(url->system name))
     (cond ((url-scratch? name)
            (choose-file
@@ -218,6 +369,13 @@
            (save-buffer-post name opts))
           ((cannot-write? name "Save file")
            (noop))
+          ((and (typeset-failed-buffer? name) (nin? :typeset-failed opts))
+           (user-confirm "The document could not be typeset and was replaced by an empty one. Really save it over the file?" #f
+             (lambda (answ)
+               (when answ
+                 ;; (the flag is cleared by the save)
+                 (save-buffer-check-permissions
+                  name (cons :typeset-failed opts))))))
           ((and (url-test? name "fr")
                 (and-with mod-t (url-last-modified name)
                   (and-with save-t (buffer-last-save name)
@@ -302,9 +460,21 @@
 (define (export-buffer-export name to fm opts)
   ;;(display* "export-buffer-export " name ", " to ", " fm "\n")
   (with vto `(verbatim ,(url->system to))
-    (if (buffer-export name to fm)
-        (set-message `(concat "Could not save " ,vto) "Export file")
-        (set-message `(concat "Exported to " ,vto) "Export file"))))
+    (image-write-failures-reset)
+    (let* ((failed? (buffer-export name to fm))
+           (images (image-write-failures)))
+      (image-write-failures-reset)
+      (cond (failed?
+             (set-message `(concat "Could not save " ,vto) "Export file"))
+            ((nnull? images)
+             ;; the text is there, but it names images which are not (#705)
+             (with vim `(verbatim ,(url->system (car images)))
+               (set-message `(concat "Exported to " ,vto
+                                     ", but an image could not be written: "
+                                     ,vim)
+                            "Export file")))
+            (else
+             (set-message `(concat "Exported to " ,vto) "Export file"))))))
 
 (define (export-buffer-check-permissions name to fm opts)
   ;;(display* "export-buffer-check-permissions " name ", " to ", " fm "\n")
@@ -322,8 +492,6 @@
     (set! to (string-replace to ":" "-"))
     (set! to (string-replace to ";" "-"))
     (set! to (url-relative (buffer-get-master name) to)))
-  (if (url? name) (set! current-save-source name))
-  (if (url? to) (set! current-save-target to))
   (export-buffer-check-permissions name to fm opts))
 
 (tm-define (export-buffer to)
@@ -382,6 +550,7 @@
 (tm-define (autosave-buffer name)
   ;;(display* "autosave-buffer " name "\n")
   (when (and (buffer-modified-since-autosave? name)
+             (not (typeset-failed-buffer? name))
              (url-autosave name "~"))
     ;;(display* "Autosave " name "\n")
     ;; FIXME: incorrectly autosaves after cursor movements only
@@ -473,6 +642,18 @@
 ;; Loading buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (encrypted-buffer-body? b)
+  (:synopsis "Is @b the body of a document encrypted with a passphrase?")
+  ;; the body is (document (gpg-passphrase-encrypted-buffer enc)), see
+  ;; tree-export-encrypted and encrypted-buffer? in security/gpg/gpg-edit.scm
+  ;; (a lazy module, not loaded here). Only the first child is tested: a
+  ;; search of the whole document took seconds on long documents, and its
+  ;; recursion overflowed the Guile stack (#418).
+  (and (tree? b)
+       (== (tree-label b) 'document)
+       (> (tree-arity b) 0)
+       (== (tree-label (tree-ref b 0)) 'gpg-passphrase-encrypted-buffer)))
+
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
@@ -481,8 +662,7 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
-  (when (nnull? (select (buffer-get name)
-                        '(:* gpg-passphrase-encrypted-buffer)))
+  (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
     (when (!= master name)
@@ -497,7 +677,9 @@
           ((url-exists? name)
            (if (buffer-load name)
                (set-message `(concat "Could not load " ,vname) "Load file")
-               (load-buffer-open name opts)))
+               (begin
+                 (typeset-failure-forget name)
+                 (load-buffer-open name opts))))
           (else
             (with uname (if (string? name) (string->url name) name)
               (buffer-set-body name '(document ""))
@@ -558,7 +740,7 @@
   (:argument name smart-file "File name")
   (:default  name (propose-name-buffer))
   (if (buffer->window name)
-      (noop) ;;(window-focus (buffer->window name))
+      (switch-to-window (buffer->window name))
       (apply load-buffer-main (cons name (cons :new-window opts)))))
 
 (tm-define (load-browse-buffer name)
@@ -588,7 +770,9 @@
           (with t (tree-import name (url-format name))
             (if (== t (tm->tree "error"))
                 (set-message "Error: file not found" "Revert buffer")
-                (buffer-set name t)))))))
+                (begin
+                  (typeset-failure-forget name)
+                  (buffer-set name t))))))))
 
 (tm-define (revert-buffer . l)
   (with name (if (null? l) (current-buffer) (car l))
@@ -667,7 +851,7 @@
   (when (not (url-none? u))
     (if (window-per-buffer?)
         (if (buffer->window u)
-            (noop) ;;(window-focus (buffer->window u))
+            (switch-to-window (buffer->window u))
             (open-buffer-in-window u (buffer-get u) ""))
         (load-buffer u))))
 

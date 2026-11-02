@@ -5,8 +5,8 @@ pages: 1
 Chinese text in the default font, whose ideographs come from a system font found by the font
 fallback (on macOS, Songti):
 
-中文排版允许在任意两个汉字之间断行，但句号、逗号等标点不能出现在行首。这一段文字足够
-长，可以排成好几行，用来检查断行的规则。
+中文排版允许在任意两个汉字之间断行，但句号、逗号等标点不能出现在行首。这一段文字足
+够长，可以排成好几行，用来检查断行的规则。
 
 Japanese text in the Hiragino Kaku font of the Document > Font menu, with kanji, hiragana
 and katakana:
@@ -15,6 +15,11 @@ and katakana:
 の終わりで自動的に改行されます。
 
 Korean text in the Gothic font (AppleGothic) of the same menu:
+한국어문장입니다.
+Japanese text in the default font: the kana come from the Japanese font of the system found
+by the font fallback (on macOS, Hiragino), and the Korean syllables have the size of the text:
+
+ひらがなとカタカナを書きます。
 한국어문장입니다.
 Ideographs may also occur in a Latin paragraph, as in 中文(Chinese) and 日本(Japan).
 

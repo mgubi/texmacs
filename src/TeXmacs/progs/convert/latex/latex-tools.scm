@@ -546,13 +546,24 @@
          ((== 8 (string-length s)) (string-take s 6))
          (else s))))
 
+(tm-define (latex-color-name x)
+  "The name under which the color @x is defined in LaTeX"
+  (if (string-starts? x "#")
+      (string-append "tmhex" (html-color->latex-xcolor x))
+      (string-replace x " " "")))
+
 (define (latex-colors-defs colors)
-  (apply string-append
-         (map (lambda (x)
-                (string-append
-                  "\\definecolor{" (string-replace x " " "") "}{HTML}{"
-                  (html-color->latex-xcolor (get-hex-color x)) "}\n"))
-              colors)))
+  (let* ((l (map (lambda (x) (cons (latex-color-name x) x)) colors))
+         (u (list-remove-duplicates (map car l))))
+    (apply string-append
+           (map (lambda (name)
+                  (with x (cdr (assoc name l))
+                    (string-append
+                      "\\definecolor{" name "}{HTML}{"
+                      (html-color->latex-xcolor
+                        (if (string-starts? x "#") x (get-hex-color x)))
+                      "}\n")))
+                u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Building the preamble
@@ -627,12 +638,49 @@
          "")
         (else (cons (car x) (map latex-mathjax-pre (cdr x))))))
 
+(define (latex-mathjax-fill? x f)
+  ;; @x contains the brace filler @f, which tmtex-wide and tmtex-wide-star
+  ;; put in text mode above or below a formula
+  (or (func? x f 0)
+      (and (list? x) (nnull? x)
+           (list-or (map (cut latex-mathjax-fill? <> f) (cdr x))))))
+
+(define (latex-mathjax-script x)
+  ;; a script of \overset or \underset at the size of text (not of a
+  ;; script: in a subscript, the accent is bigger than its base)
+  `(!concat (textstyle) ,x))
+
+(define (latex-mathjax-under-accent acc)
+  ;; \underaccent{\hat}{x} of the accents package as \underset{\hat{}}{x}
+  (latex-mathjax-script
+   (latex-mathjax (if (and (pair? acc) (null? (cdr acc)))
+                      (list (car acc) "")
+                      acc))))
+
 (tm-define (latex-mathjax x)
   (:synopsis "Produce cleaner LaTeX for @x for use with MathJax, pass 2")
   (cond ((or (npair? x) (nlist? x)) x)
+        ;; \[...\] in a formula: the Html export makes an eqnarray* inside
+        ;; an equation an equation* (see ext-tmhtml-eqnarray*)
+        ((func? x '!eqn 1) (latex-mathjax (cadr x)))
         ((func? x 'ensuremath 1) (latex-mathjax (cadr x)))
         ((func? x 'hspace* 1) `(hspace ,(latex-mathjax (cadr x))))
         ((func? x 'mathbbm 1) `(mathbb ,(latex-mathjax (cadr x))))
+        ;; the accents of the accents package and of TeXmacs (#607)
+        ((func? x 'ring 1) `(mathring ,(latex-mathjax (cadr x))))
+        ((func? x 'invbreve 1) `(overparen ,(latex-mathjax (cadr x))))
+        ((func? x 'underaccent 2)
+         `(underset ,(latex-mathjax-under-accent (cadr x))
+                    ,(latex-mathjax (caddr x))))
+        ((and (func? x 'overset 2) (latex-mathjax-fill? (cadr x) 'upbracefill))
+         (with arg (latex-mathjax (caddr x))
+           `(overset ,(latex-mathjax-script `(underbrace (hphantom ,arg)))
+                     ,arg)))
+        ((and (func? x 'underset 2)
+              (latex-mathjax-fill? (cadr x) 'downbracefill))
+         (with arg (latex-mathjax (caddr x))
+           `(underset ,(latex-mathjax-script `(overbrace (hphantom ,arg)))
+                      ,arg)))
         ((func? x 'fill 0) "3cm")
         ((func? x 'newcommand) "")
         ((func? x 'custombinding) "")

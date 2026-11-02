@@ -30,7 +30,8 @@
 
 (texmacs-module (check latex-test)
   (:use (check check-lib)
-        (convert latex init-latex)))
+        (convert latex init-latex)
+        (convert latex tmtex-pdflatex)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -451,6 +452,21 @@
   (check= (lt "\\vspace{1cm}") '(vspace "1cm"))
   (check= (lt "\\bigskip") '(vspace "2fn")))
 
+;; Sources which end in the middle of a construct: the parser looked at the
+;; byte after the end of the source (#561). A normal build reads a harmless
+;; byte there; only a build with ASan (--enable-sanitizers=address
+;; --disable-fastalloc) aborts, and only for strings whose length is a
+;; multiple of 4 below 24 or a power of two, as all of these are.
+(define (lt-returns? s)
+  (with r (lt s) (or (string? r) (pair? r))))
+
+(define (test-import-truncated)
+  (check-group "import: sources which end too early")
+  (for (s (list "abc\\" "a\n  " "$a$$" "abc\\quad" "\\def" "xyz\\def\\"
+                "\\setlength{\\" "\\setlength x" "\\cmidrule[ab" "\\cmidrule(ab"
+                "\\multirow{22" "x  \\multirow" " x \\category"))
+    (check-true (lt-returns? s))))
+
 (define (test-import-lists)
   (check-group "import: lists")
   (check= (lt "\\begin{itemize}\n\\item a\n\\item b\n\\end{itemize}")
@@ -654,6 +670,158 @@
                                                           (document (arg "body")))))
                    (myenv "x"))))
 
+;; Macros whose definition uses themselves: the parser expands the side
+;; effects of a macro (its \def's), also inside the body of a definition,
+;; and expanded them again and again until the stack overflowed (#615,
+;; the table environments of jthread's tables.tex)
+(define (cyclic-defs n)
+  ;; \zqaa defines \x as \zqab, ..., the last one defines \x as \zqaa
+  (with name (lambda (i)
+               (string-append "\\zq"
+                              (string (integer->char (+ 97 (quotient i 26))))
+                              (string (integer->char (+ 97 (remainder i 26))))))
+    (apply string-append
+           (append (map (lambda (i)
+                          (string-append "\\def" (name i) "{\\def\\x{"
+                                         (name (modulo (+ i 1) n)) "}}"))
+                        (iota n))
+                   (list (name 0) " z")))))
+
+(define (test-import-recursive-macros)
+  (check-group "import: macros which use themselves")
+  ;; an environment which redefines a command as \end{col}\begin{col}
+  (with col (string-append "\\newenvironment{col}{\\renewcommand{\\cbreak}"
+                           "{\\end{col}\\begin{col}}}{}")
+    (check= (lt (string-append col "\\begin{col}a\\end{col}"))
+            '(concat (assign "col" (macro "body" (surround (assign "cbreak" (macro ""))
+                                                           "" (document (arg "body")))))
+                     (col "a")))
+    (check= (lt (string-append col "\\newenvironment{X}{\\begin{col}}{\\end{col}}"))
+            '(concat (assign "col" (macro "body" (surround (assign "cbreak" (macro ""))
+                                                           "" (document (arg "body")))))
+                     (assign "X" (macro "body" (col (document (arg "body"))))))))
+  ;; two macros which use each other
+  (check= (lt "\\def\\xa{\\def\\x{\\xb}}\\def\\xb{\\def\\y{\\xa}}\\xa z")
+          '(concat (assign "xa" (macro (assign "x" (macro (xb)))))
+                   (assign "xb" (macro (assign "y" (macro (xa)))))
+                   (xa) "z"))
+  ;; a cycle of 600 macros
+  (with r (lt (cyclic-defs 600))
+    (check-true (pair? r))
+    (check= (and (pair? r) (list-tail r (- (length r) 2))) '((zqaa) "z")))
+  ;; an environment which only begins another one, or changes the font:
+  ;; the arity of the shortcut was read from its name (t[1][0] instead of
+  ;; t[2][0] in parse_command), and crashed
+  (check= (lt "\\newenvironment{X}{\\begin{center}}{\\end{center}}\\begin{X}a\\end{X}")
+          '(concat (assign "X" (macro "body" (padded-center (document (arg "body")))))
+                   (X "a")))
+  (check= (lt "\\newenvironment{X}{\\bf}{}\\begin{X}a\\end{X}")
+          '(concat (assign "X" (macro "body" (surround "" "" (document (arg "body")))))
+                   (X "a")))
+  ;; a skipped expansion is reported on convert-warning, once per macro,
+  ;; environments by their LaTeX name
+  (check= (latex-import-warnings
+           "\\def\\xa{\\def\\x{\\xb}}\\def\\xb{\\def\\y{\\xa}}\\xa\\xa z")
+          '("LaTeX import: \\xa not expanded, inside its own expansion"))
+  (check= (latex-import-warnings
+           (string-append "\\newenvironment{col}{\\renewcommand{\\cbreak}"
+                          "{\\end{col}\\begin{col}}}{}"
+                          "\\newenvironment{X}{\\begin{col}}{\\end{col}}"))
+          '("LaTeX import: \\begin{col} not expanded, inside its own expansion"))
+  (check= (latex-import-warnings (cyclic-defs 600))
+          '("LaTeX import: \\zqdw not expanded, too many nested expansions"))
+  (check= (latex-import-warnings "\\newcommand{\\foo}[1]{<#1>}\\foo{x}") '()))
+
+;; \string gives the next token as text: it was imported as a tag named
+;; "string", which is the label of the atomic trees, and the import gave a
+;; random byte (#658, texinfo.tex). In a definition or an argument, a brace
+;; after it still opens or closes a group, as TeX counted it when it read
+;; that text; in a group which TeX executes, it is only a character.
+(define (test-import-string)
+  (check-group "import: \\string")
+  (check= (lt "\\edef\\mylbrace{\\iftrue \\string{\\else}\\fi}")
+          '(assign "mylbrace" (macro (concat (iftrue) "{" (else) (fi)))))
+  (check= (lt "\\edef\\myrbrace{\\iffalse{\\else\\string}\\fi}x")
+          '(concat (assign "myrbrace"
+                           (macro (concat (iffalse (concat (else) "}")) (fi))))
+                   "x"))
+  (check= (lt "a\\string{b") "a{b")
+  (check= (lt "a\\string}b") "a}b")
+  (check= (lt "a\\string\\foo b\\string\\{") "a\\foob\\{")
+  (check= (lt "a\\string&b\\string$c\\string#d\\string_e\\string<f")
+          "a&b$c#d_e<less>f")
+  ;; two backslashes, which were read as a command with an empty name:
+  ;; the tag could not be exported
+  (check= (lt "a\\string\\\\b") "a\\\\b")
+  (check= (convert (lt "a\\string\\\\b") "texmacs-stree" "latex-snippet")
+          "a\\textbackslash\\textbackslash b")
+  ;; in math, \textbackslash gives nothing; a backslash which is not between
+  ;; two operands was dropped by the homoglyphs of tree_correct.cpp
+  (check= (lt "$\\string\\alpha$") '(math "<backslash>*alpha"))
+  (check= (lt "$\\backslash$") '(math "<backslash>"))
+  (check= (lt "$a\\backslash b$") '(math "a<setminus>b"))
+  ;; in an executed group
+  (check= (lt "{\\tt\\string{}rest")
+          '(concat (with "font-family" "tt" "{") "rest"))
+  (check= (lt "{\\ttfamily \\string}}rest")
+          '(concat (with "font-family" "tt" "}") "rest"))
+  ;; in an argument
+  (check= (lt "\\textbf{a\\string}b") '(concat (with "font-series" "bold" "a}") "b"))
+  ;; \string read as the argument of a macro (\gobble\string#1 in texinfo)
+  (check= (lt "\\newcommand{\\g}[1]{}\\g\\string y")
+          '(concat (assign "g" (macro "1" "")) (g "") "y"))
+  ;; a tag named "string" from an environment
+  (check= (lt "\\begin{string}x\\end{string}") '(string "x")))
+
+;; groups and arguments nested very deep: the parser recursed once per
+;; level and overflowed the stack (#658); the levels beyond 128 are skipped
+(define (test-import-deep-nesting)
+  (check-group "import: deep nesting")
+  (let ((b (make-string 100 #\{)) (e (make-string 100 #\})))
+    (check= (lt (string-append "a" b "x" e "b")) "axb"))
+  (let ((b (make-string 20000 #\{)) (e (make-string 20000 #\})))
+    (check= (lt (string-append "a" b "x" e "b")) "ab")
+    (check= (lt (string-append "$" b "x" e "$")) "")
+    (check= (latex-import-warnings (string-append "a" b "x" e "b"))
+            '("LaTeX import: groups nested more than 128 deep skipped")))
+  ;; a } in a comment or \verb of a skipped group does not end it
+  (let ((b (make-string 130 #\{)) (e (make-string 130 #\})))
+    (check= (lt (string-append "a" b "x%}\n\\verb|}|\\verb*+}+" e "b")) "ab"))
+  ;; the bodies of macros count from 0, but not without limit: a chain of 99
+  ;; macros with a side effect and 120 groups each
+  (with name (lambda (i)
+               (string-append "\\m" (string (integer->char (+ 97 (quotient i 26))))
+                              (string (integer->char (+ 97 (remainder i 26))))))
+    (with chain (string-append
+                 (apply string-append
+                        (map (lambda (i)
+                               (string-append "\\newcommand{" (name i)
+                                              "}{\\newcommand{\\q}{}"
+                                              (make-string 120 #\{) (name (+ i 1))
+                                              (make-string 120 #\}) "}"))
+                             (iota 99)))
+                 "\\newcommand{" (name 99) "}{x}" (name 0) " y")
+      (check= (list-tail (lt chain) 101) '((maa) "y"))
+      (check= (latex-import-warnings chain)
+              '("LaTeX import: groups nested more than 512 deep skipped"))))
+  (with b (apply string-append (make-list 1000 "\\textbf{"))
+    (check= (lt (string-append "a" b "x" (make-string 1000 #\}) "b")) "ab")))
+
+(define (all-debug-messages)
+  (tree-children (get-debug-messages "Debugging console" 100000000)))
+
+(define (latex-import-warnings s)
+  ;; the "LaTeX import:" convert warnings of the import of the snippet @s
+  ;; (the messages before it are left in place)
+  (let ((n (length (all-debug-messages))))
+    (lt s)
+    (map (lambda (m) (tree->string (tree-ref m 1)))
+         (filter (lambda (m)
+                   (and (== (tree->string (tree-ref m 0)) "convert-warning")
+                        (string-starts? (tree->string (tree-ref m 1))
+                                        "LaTeX import:")))
+                 (list-tail (all-debug-messages) n)))))
+
 (define (test-import-unknown)
   (check-group "import: unknown commands and comments")
   ;; an unknown command is kept as a tag, its optional argument makes
@@ -742,6 +910,51 @@
           '(document (abstract-data (abstract (document "A"))) "a b"))
   (check= (cadr (assoc 'style (cdr (ld "\\documentclass{amsart}\\begin{document}x\\end{document}"))))
           '(tuple "amsart")))
+
+;; a source which is only text, without \begin{document}, parses to a
+;; single string: it crashed in filter_preamble and finalize_sections (#608)
+(define plain-text-dir
+  (string-append (url->system (url-temp-dir)) "/latex-plain-text"))
+
+(define (remove-plain-text-dir)
+  (with d (system->url plain-text-dir)
+    (when (url-exists? d)
+      (for-each system-remove (url-read-directory d "*"))
+      (system-rmdir d))))
+
+(define (import-tex-file text)
+  ;; the body of the buffer of a .tex file holding @text, opened as File >
+  ;; Open does
+  (let ((u (system->url (string-append plain-text-dir "/plain.tex")))
+        (before (buffer-list)))
+    (remove-plain-text-dir)
+    (system-mkdir (system->url plain-text-dir))
+    (string-save text u)
+    (load-buffer u)
+    (with r (and (buffer-exists? u) (tree->stree (buffer-get-body u)))
+      (when (buffer-exists? u)
+        (buffer-pretend-saved u)
+        (buffer-close u))
+      (remove-plain-text-dir)
+      (list r (== (buffer-list) before)))))
+
+(define (test-import-plain-text)
+  (check-group "import: documents which are only text")
+  (check= (body-of (ld "a")) '(document "a"))
+  (check= (body-of (ld "ab")) '(document "ab"))
+  (check= (body-of (ld "a b")) '(document "a b"))
+  (check= (body-of (ld "a\n")) '(document "a"))
+  (check= (body-of (ld "a\n\nb")) '(document "a" "b"))
+  (check= (body-of (ld "\\documentclass{article}x")) '(document "x"))
+  (check= (cadr (assoc 'style (cdr (ld "\\documentclass{article}x"))))
+          '(tuple "article" "std-latex"))
+  ;; the only paragraph of a document stays one paragraph
+  (check= (body-of (ld "\\begin{document}a \\emph{b}\\end{document}"))
+          '(document (concat "a " (em "b"))))
+  (check= (body-of (ld "a \\emph{b}")) '(document (concat "a " (em "b"))))
+  ;; the same through the import of a .tex file
+  (check= (import-tex-file "Only some text.\n")
+          '((document "Only some text.") #t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Round trips
@@ -846,6 +1059,210 @@
               "\\fbox{text $a$}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Struck and highlighted text, columns, colors by value
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; strike-through was \strikethrough and marked \marked, which LaTeX does
+;; not define; the columns needed multicol, and a color #rrggbb was written
+;; where xcolor wants a name (\colorbox{#f00})
+(define (test-export-strike-marked)
+  (check-group "export: struck and highlighted text")
+  (check= (tl '(strike-through "x")) "\\sout{x}")
+  (check= (tl '(marked "y")) "\\tmmarked{yellow}{y}")
+  (check= (tl '(with "marked-color" "#ff8800" (marked "z")))
+          "\\tmmarked{tmhexFF8800}{z}")
+  ;; in a formula, the formula goes in \text, as ulem works in text mode
+  (check= (tl '(math (concat "a+" (strike-through (concat "x" (rsup "2"))))))
+          "$a + \\text{\\sout{{$x^2$}}}$")
+  (check= (tl '(math (concat "b+" (marked (concat "y" (rsub "i"))))))
+          "$b + \\text{\\tmmarked{yellow}{{$y_i$}}}$")
+  (check= (tl '(colored-frame "#f00" "q")) "\\colorbox{tmhexFF0000}{q}")
+  (check= (tl '(colored-frame "Firebrick1" "q")) "\\colorbox{tmhexFF3030}{q}")
+  (check= (tl '(with "color" "#123456" "c")) "{\\color[HTML]{123456}c}")
+  ;; the line goes inside groups and font commands, where ulem can break
+  ;; it; a footnote is left without the line, and the items of a list get
+  ;; it one by one
+  (check= (tl '(strike-through (concat "a " (em "b") " c")))
+          "\\sout{a }{\\tmem{\\sout{b}}}\\sout{ c}")
+  (check= (tl '(strike-through (with "font-size" "1.41" "big")))
+          "{\\Large \\sout{big}}")
+  ;; struck and highlighted: the line over the color, in both orders
+  (check= (tl '(marked (strike-through "both"))) "\\tmmarked{yellow}{\\sout{both}}")
+  (check= (tl '(strike-through (marked "both"))) "\\tmmarked{yellow}{\\sout{both}}")
+  (check= (tl '(strike-through (with "font-shape" "italic" "it")))
+          "{\\itshape \\sout{it}}")
+  (check= (tl '(strike-through (concat "a" (footnote "f") "c")))
+          "\\sout{a}\\footnote{f}\\sout{c}")
+  (check-true (string-contains?
+               (tl '(strike-through (document "p" (itemize (document (concat (item) "a"))))))
+               "\\item \\sout{a}"))
+  ;; the line goes over the spaces between commands, and over the special
+  ;; characters and formulas with the text around them
+  (check= (tl '(strike-through "50% & #1"))  "\\sout{50\\% \\& \\#1}")
+  (check= (tl '(strike-through (concat "a" (math "x") "b"))) "\\sout{a{$x$}b}")
+  (check= (string-replace (tl '(marked (concat (em "b") " " (strong "c"))))
+                          "\n" " ")
+          (string-append "{\\tmem{\\tmmarked{yellow}{b}}}\\tmmarked{yellow}{ }"
+                         "{\\tmstrong{\\tmmarked{yellow}{c}}}"))
+  ;; a centered block, a description item and a verbatim block
+  (check= (tl '(strike-through (center (document "a b")))) "{\\center{\\sout{a b}}}")
+  (check-true (string-contains?
+               (tl '(strike-through (description (document (concat (item* "key") "val")))))
+               "\\item[key] \\sout{val}"))
+  (check-false (string-contains?
+                (tl '(strike-through (document "a" (verbatim (document "x" "y")))))
+                "\\sout{\n"))
+  ;; a displayed formula: each cell in \text, in display style
+  (check-true (string-contains?
+               (tl '(strike-through (document "a" (equation (document "x=1")))))
+               "\\text{\\sout{{$\\displaystyle x = 1$}}}"))
+  (check-true (string-contains?
+               (tl '(marked (document (equation* (document "x=1")))))
+               "\\[ \\text{\\tmmarked{yellow}{{$\\displaystyle x = 1$}}} \\]"))
+  (with s (tl '(strike-through
+                (align (document (table (row (cell "x") (cell "=1")))))))
+    (check-true (string-contains? s "\\text{\\sout{{$\\displaystyle x$}}} &"))
+    (check-true (string-contains? s "\\text{\\sout{{$\\displaystyle {}="))
+    (check-false (string-contains? s "\\sout{x}")))
+  (check-true (string-contains?
+               (tl '(strike-through (document (equation (document (concat (label "e") "x"))))))
+               "\\label{e}\\text{\\sout{{$\\displaystyle x$}}}"))
+  (with s (td '("article")
+              '(document (strike-through "x") (marked "y")
+                         (with "marked-color" "#ff8800" (marked "z"))
+                         (with "par-columns" "2" (document "a" "b"))
+                         (with "ornament-color" "#dddddd" (ornamented "o"))))
+    (check-true (string-contains? s "\\usepackage[normalem]{ulem}"))
+    (check-true (string-contains? s "multicol}"))
+    (check-true (string-contains? s "\\protected\\long\\def\\tmmarked#1#2{"))
+    (check-true (string-contains?
+                 s "\\pdfstringdefDisableCommands{\\def\\tmmarked#1#2{#2}}"))
+    (check-true (string-contains? s "\\definecolor{tmhexFF8800}{HTML}{FF8800}"))
+    (check-true (string-contains? s "\\definecolor{tmhexDDDDDD}{HTML}{DDDDDD}"))
+    (check-true (string-contains? s "[backgroundcolor=tmhexDDDDDD]"))
+    (check-false (string-contains? s "\\strikethrough"))
+    (check-false (string-contains? s "\\marked")))
+  ;; a color used twice, as #rrggbb and #rrggbbaa, is defined once
+  (with s (td '("article")
+              '(document (colored-frame "#8080ff" "a")
+                         (colored-frame "#8080ff80" "b")))
+    (check= (length (string-decompose s "\\definecolor{tmhex8080FF}")) 2)))
+
+(define (test-import-strike-marked)
+  (check-group "import: struck and highlighted text")
+  (check= (lt "\\sout{x}") '(strike-through "x"))
+  (check= (lt "\\tmmarked{yellow}{y}") '(marked "y"))
+  (check= (lt "\\tmmarked{tmhexFF8800}{z}")
+          '(with "marked-color" "#ff8800" (marked "z")))
+  (check= (lt "\\colorbox{tmhexFF0000}{q}") '(colored-frame "#ff0000" "q"))
+  (check= (lt "\\textcolor{tmhex123456}{c}") '(with "color" "#123456" "c"))
+  (check= (lt "\\textcolor{tmhexGGGGGG}{c}") '(with "color" "tmhexGGGGGG" "c"))
+  (for (x '((strike-through "x") (marked "y")
+            (with "marked-color" "#ff8800" (marked "z"))
+            (colored-frame "#ff0000" "q")))
+    (check-equal x (lambda () (round-trip x)) x)))
+
+;; the LaTeX of these tags is compiled by pdflatex, when it is installed:
+;; the lines of struck and highlighted text break, and formulas compile
+(define latex-pdf-dir
+  (string-append (url->system (url-temp-dir)) "/latex-test-pdf"))
+
+(define (latex-compile name doc)
+  (let* ((dir (system->url latex-pdf-dir))
+         (tex (url-append dir (string-append name ".tex")))
+         (log (url-append dir (string-append name ".log")))
+         (out (url-append dir (string-append name ".out"))))
+    (when (not (url-exists? dir)) (system-mkdir dir))
+    (string-save doc tex)
+    (with r (run-pdflatex tex)
+      (list r (if (url-exists? log) (string-load log) "")
+            (if (url-exists? out) (string-load out) "")))))
+
+(define (remove-latex-pdf-dir)
+  (with d (system->url latex-pdf-dir)
+    (when (url-exists? d)
+      (for-each system-remove (url-read-directory d "*"))
+      (system-rmdir d))))
+
+(define (test-compile-strike-marked)
+  (check-group "export: struck and highlighted text with pdflatex")
+  (if (not (url-exists-in-path? "pdflatex"))
+      (display "  (pdflatex is not installed: not compiled)\n")
+      (let* ((long (string-append
+                    "a long text which runs over several lines, so that "
+                    "its lines have to break, as in a deleted paragraph; "
+                    "a long text which runs over several lines, so that "
+                    "its lines have to break, as in a deleted paragraph"))
+             (doc (td '("article")
+                      `(document
+                         (strike-through ,long)
+                         (marked ,long)
+                         (with "marked-color" "#ff8800" (marked ,long))
+                         (concat "x " (marked (strike-through "both")) " "
+                                 (strike-through (concat "a " (marked "b")))
+                                 " " (marked (concat "y" (rsub "i")))
+                                 " " (strike-through (em "em"))
+                                 " " (marked (strong "s")))
+                         (math (concat "a+" (strike-through
+                                              (concat "x" (rsup "2")))))
+                         (math (concat "e" (rsup (marked (concat "y" (rsub "i"))))))
+                         (equation* (document (concat "c+" (marked (frac "1" "2")))))
+                         (strike-through (concat "a" (footnote "f") " c"))
+                         (strike-through (with "font-size" "1" (concat "x " (with "color" "#800000" ,long))))
+                         (marked (em (with "font-series" "bold" ,long)))
+                         (strike-through (concat "see " (hlink ,long "https://example.org")))
+                         (strike-through (tabular (table (row (cell "a") (cell "b")))))
+                         (marked (concat "a" (footnote "g") " c"))
+                         (strike-through (document "p" (itemize (document (concat (item) "a")))))
+                         (marked (document "p" (equation* (document "x"))))
+                         (marked (document "first paragraph" "second paragraph"))
+                         (strike-through (document "first paragraph" "second paragraph"))
+                         (section (concat "A " (strike-through "struck")
+                                          " " (marked "marked") " title"))
+                         (with "par-columns" "2" (document ,long))
+                         (colored-frame "#f00" "q")
+                         (with "ornament-color" "#dddddd" (ornamented "o"))
+                         ;; displayed formulas, centered blocks, lists of
+                         ;; descriptions, verbatim and code blocks
+                         (strike-through
+                          (document "a" (equation (document (concat (label "eq") "x=1")))
+                                    (align (document (table (row (cell "x") (cell "=1"))
+                                                            (row (cell "y") (cell "=2")))))
+                                    (eqnarray* (document (table (row (cell "x") (cell "=") (cell "1")))))
+                                    (gather (document (table (row (cell "z")))))
+                                    "b"))
+                         (marked (document (equation* (document (concat (frac "1" "2") "+" (big "sum") (rsub "i") "x" (rsub "i"))))
+                                           (align* (document (table (row (cell "u") (cell "=v")))))))
+                         (strike-through (center (document "centered" "text")))
+                         (marked (center (document "centered")))
+                         (strike-through (description (document (concat (item* "key") ,long))))
+                         (marked (description (document (concat (item* "key") "value"))))
+                         (strike-through (document "a" (verbatim (document "x_1 %" "y")) "b"))
+                         (marked (document (cpp-code (document "int x;")) "b"))
+                         ;; formulas with an & (matrices, cases, tables)
+                         (strike-through (equation* (document (concat "f(x)=" (choice (tformat (table (row (cell "1") (cell "x<gtr>0")) (row (cell "0") (cell "x<leqslant>0")))))))))
+                         (marked (equation* (document (concat "A=" (matrix (tformat (table (row (cell "1") (cell "2")) (row (cell "3") (cell "4")))))))))
+                         (strike-through (align (document (table (row (cell "B") (cell (concat "=" (matrix (tformat (table (row (cell "1") (cell "2"))))))))))))
+                         (marked (equation* (document (tabular (table (row (cell "a") (cell "b")))))))
+                         (strike-through (concat "a " (math (concat "A=" (matrix (tformat (table (row (cell "1") (cell "2"))))))) " b"))
+                         (math (concat "x+" (marked (matrix (tformat (table (row (cell "1") (cell "2"))))))))
+                         (strike-through (concat "50% & #1 " (with "mode" "math" "<ldots>")
+                                                 " " (em "e") " " (strong "s") " " ,long)))))
+             (r (latex-compile "strike-marked" doc))
+             (status (car r))
+             (log (cadr r))
+             (out (caddr r)))
+        (check-true (and status (car status)))
+        (check= (and status (cadr status)) 0)
+        (check-false (string-contains? log "Overfull \\hbox"))
+        (check-false (string-contains? log "Undefined control sequence"))
+        ;; the PDF bookmark of a title has its text, not the color
+        (check-true (string-contains?
+                     out "\\000m\\000a\\000r\\000k\\000e\\000d"))
+        (check-false (string-contains? out "\\000y\\000e\\000l"))
+        (remove-latex-pdf-dir))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -865,6 +1282,76 @@
       (check-true (>= (pos "text") 0))
       (check-true (< -1 (pos "\\begin{document}") (pos "\\section{A}")
                      (pos "\\end{document}"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Source tracking: the TeXmacs source attached to the LaTeX file
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The C++ converters (tracked_totex.cpp, conservative_*tex.cpp) read their
+;; options from the preferences, not from the options of convert: they are
+;; set in memory only, restored afterwards, and never saved.
+(define (with-preferences l thunk)
+  (let* ((olds (map (lambda (p)
+                      (list (car p) (cpp-has-preference? (car p))
+                            (get-preference (car p))))
+                    l)))
+    (for-each (lambda (p) (cpp-set-preference (car p) (cdr p))) l)
+    (with r (check-run thunk)
+      (for-each (lambda (o)
+                  (if (cadr o)
+                      (cpp-set-preference (car o) (caddr o))
+                      (cpp-reset-preference (car o))))
+                olds)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))))
+
+(define tracked-doc
+  '(document (TeXmacs "2.1.5") (style (tuple "article"))
+             (body (document (section "A") "Some text."))))
+
+(define tracked-begin "%%%%%%%%%% Begin TeXmacs source")
+(define tracked-end "%%%%%%%%%% End TeXmacs source")
+
+;; the export of tracked-doc with source tracking and the given value of
+;; "texmacs->latex:attach-tracking-info"
+(define (tracked-export attach)
+  (with r #f
+    (with-preferences
+     `(("texmacs->latex:source-tracking" . "on")
+       ("texmacs->latex:attach-tracking-info" . ,attach))
+     (lambda () (set! r (convert tracked-doc "texmacs-stree" "latex-document"))))
+    r))
+
+;; import with conservative source tracking
+(define (tracked-import s)
+  (with r #f
+    (with-preferences
+     '(("latex->texmacs:source-tracking" . "on")
+       ("latex->texmacs:conservative" . "on"))
+     (lambda () (set! r (ld s))))
+    r))
+
+(define (test-source-tracking)
+  (check-group "source tracking: attached TeXmacs source")
+  ;; NOTE: string-contains is Guile only
+  (let* ((pos (lambda (x s) (string-search-forwards x 0 s)))
+         (on (tracked-export "on"))
+         (off (tracked-export "off")))
+    (check-true (string? on))
+    (check-true (string? off))
+    ;; "on" (the default) keeps the block of TeXmacs source at the end
+    (check-true (>= (pos tracked-begin on) 0))
+    (check-true (>= (pos tracked-end on) 0))
+    ;; "off" leaves it out; the LaTeX itself is the same
+    (check= (pos tracked-begin off) -1)
+    (check= (pos tracked-end off) -1)
+    (check-true (>= (pos "\\section{A}" off) 0))
+    (check= off (substring on 0 (pos (string-append "\n" tracked-begin) on)))
+    ;; both import again, with or without the block
+    (check= (body-of (tracked-import on)) '(document (section "A") "Some text."))
+    (check= (body-of (tracked-import off))
+            '(document (section "A") "Some text."))
+    (check= (body-of (ld off)) '(document (section "A") "Some text."))))
 
 (tm-define (latex-test-failures)
   (check-suite "latex")
@@ -888,6 +1375,7 @@
   (test-import-special)
   (test-import-styles)
   (test-import-sections)
+  (test-import-truncated)
   (test-import-lists)
   (test-import-references)
   (test-import-math)
@@ -897,9 +1385,17 @@
   (test-import-tables)
   (test-import-environments)
   (test-import-macros)
+  (test-import-recursive-macros)
+  (test-import-string)
+  (test-import-deep-nesting)
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)
+  (test-import-plain-text)
+  (test-source-tracking)
   (test-round-trips)
   (test-export-without-view)
+  (test-export-strike-marked)
+  (test-import-strike-marked)
+  (test-compile-strike-marked)
   (check-end))

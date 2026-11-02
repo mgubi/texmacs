@@ -69,7 +69,7 @@ public:
   void destroy_event ();
   void invalidate_event (int x1, int y1, int x2, int y2);
   void key_event (string key);
-  void mouse_event (string ev, int x, int y, time_t t);
+  void mouse_event (string ev, SI x, SI y, time_t t);
   void focus_in_event ();
   void focus_out_event ();
   void repaint_invalid_regions ();

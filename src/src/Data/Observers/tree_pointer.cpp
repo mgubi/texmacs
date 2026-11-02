@@ -100,10 +100,13 @@ tree_pointer_rep::get_tree (tree& t) {
 bool
 tree_pointer_rep::set_tree (tree t) {
   if (ptr != t.rep) {
+    // (the list may hold the last reference to this observer: a tree
+    // pointer of Scheme which was collected without being detached)
+    observer self (this);
     tree ref (ptr);
-    remove_observer (ref->obs, observer (this));
+    remove_observer (ref->obs, self);
     ptr= t.rep;
-    insert_observer (t->obs, observer (this));
+    insert_observer (t->obs, self);
   }
   return true;
 }
@@ -171,9 +174,10 @@ tree_pointer_rep::notify_insert_node (tree& ref, int pos) {
   //cout << "Notify insert node " << ref << ", " << pos << "\n";
   (void) ref; (void) pos;
   if (flag) {
-    remove_observer (ref[pos]->obs, observer (this));
+    observer self (this);
+    remove_observer (ref[pos]->obs, self);
     ptr= ref.rep;
-    insert_observer (ref->obs, observer (this));    
+    insert_observer (ref->obs, self);
   }
   //cout << "position -> " << obtain_position (observer (this)) << "\n";
 }

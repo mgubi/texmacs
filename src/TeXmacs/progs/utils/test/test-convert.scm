@@ -245,10 +245,8 @@
       (when (should-update? tm-file pdf-file)
         (with-aux tm-file
           (display* "TeXmacs]   Exporting " x " to Pdf\n")
-          (set! current-save-target pdf-file)
           (export-buffer-main (current-buffer) pdf-file "pdf" opts)
           (display* "TeXmacs]   Exporting " x " to LaTeX\n")
-          (set! current-save-target tex-file)
           (export-buffer-main (current-buffer) tex-file "latex" opts))))))
 
 (define (has-documentclass? u)
@@ -281,7 +279,6 @@
             (update-current-buffer)
             (update-forced)
             (display* "TeXmacs]   Exporting " x " to Pdf\n")
-            (set! current-save-target pdf-file)
             (export-buffer-main (current-buffer) pdf-file "pdf" opts)))))))
 
 (define (test-arxiv-file x dir)
@@ -310,6 +307,8 @@
         (for-each (lambda (x) (test-file x dir type)) u5)))))
 
 (define (test-suite* orig-dir suffix next)
+  (when (url-none? (url-complete orig-dir "dr"))
+    (texmacs-error "test-suite" "~S is not a directory" orig-dir))
   (let* ((dir (url-expand (url-complete orig-dir "dr")))
          (head (url-head dir))
          (tail (url->string (url-tail dir)))

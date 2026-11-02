@@ -13,11 +13,14 @@
 #define IMPL_TYPESETTER_H
 #include "Bridge/bridge.hpp"
 
+struct page_memo;
 class typesetter_rep {
 public:
   edit_env&    env;
   bridge       br;
-  rectangles   change_log;
+  repaint_log  repaint;  // the areas to repaint (see boxes.hpp)
+  array<box>       placed_boxes; // and, in the check mode, the boxes which
+  array<rectangle> placed_rects; // logged in the last pass, with their areas
   array<brush> old_bgs;
 
   array<page_item> l;      // current lines
@@ -28,9 +31,17 @@ public:
   SI x1, y1, x2, y2;
   hashmap<string,tree> old_patch;
   bool paper;
+  page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
+  bool collect;            // a complete pass with the bridges used again
+  bool bindings_changed;   // the last pass removed, added or changed
+                           // bindings: one more pass (drop_bindings)
+  array<tree> pages_bindings; // those which the pager wrote in it
+
+  shove_memo shoves;        // memoized shoves
 
 public:
   typesetter_rep (edit_env& env, tree et, path ip);
+  ~typesetter_rep ();
 
   void insert_stack     (array<page_item> l, stack_border sb);
   void insert_parunit   (tree t, path ip);
@@ -42,6 +53,7 @@ public:
   void local_end     (array<page_item>& l, stack_border& sb);
 
   void determine_page_references (box b);
+  bool drop_bindings (array<tree> before, array<tree> pages_before);
   box  typeset ();
   box  typeset (SI& x1, SI& y1, SI& x2, SI& y2);
 };

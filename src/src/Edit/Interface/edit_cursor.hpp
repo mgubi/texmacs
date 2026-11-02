@@ -23,6 +23,9 @@ protected:
   cursor cu;         // the cursor
   cursor mv;         // "ghost cursor" position when moving cursor
   int    mv_status;  // cursor status during movements
+  int    nr_changed; // cursor corrections after changes since last flush
+  bool   hook_defer; // do not call notify-cursor-moved now
+  bool   hook_wait;  // a call of notify-cursor-moved was deferred
 
 protected:
   cursor& the_cursor ();
@@ -59,6 +62,8 @@ public:
   void go_to_here ();
   void go_to (path p);
   void go_to_correct (path p);
+  void go_to_after_change (path p);
+  void flush_cursor_hook ();
   void go_to_start (path p);
   void go_to_end (path p);
   void go_to_border (path p, bool at_start);

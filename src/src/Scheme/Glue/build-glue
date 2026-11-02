@@ -14,6 +14,3 @@ if test $# -ne 2 -a $# -ne 3; then
 fi
 
 $GUILE_BIN -l build-glue.scm -l $1 -c "(quit)" | cat > $2
-$GUILE_BIN -l build-glue.scm -l $1 -c "(quit)" | cat > $2
-$GUILE_BIN -l build-glue.scm -l $1 -c "(quit)" | cat > $2
-$GUILE_BIN -l build-glue.scm -l $1 -c "(quit)" | cat > $2

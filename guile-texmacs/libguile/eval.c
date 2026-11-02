@@ -6134,6 +6134,21 @@ scm_init_eval ()
  scm_c_define_gsubr (s_scm_eval_options_interface, 0, 1, 0, (SCM (*)()) scm_eval_options_interface); ;
  scm_c_define_gsubr (s_scm_evaluator_traps, 0, 1, 0, (SCM (*)()) scm_evaluator_traps); ;
 
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if !defined(DEVAL) && ((SCM_DEBUG_DEBUGGING_SUPPORT == 1))
+  scm_c_define_gsubr (s_scm_dbg_make_iloc, 3, 0, 0, (SCM (*)()) scm_dbg_make_iloc); ;
+#endif
+#if !defined(DEVAL) && ((SCM_DEBUG_DEBUGGING_SUPPORT == 1))
+  scm_c_define_gsubr (s_scm_dbg_iloc_p, 1, 0, 0, (SCM (*)()) scm_dbg_iloc_p); ;
+#endif
+#if !defined(DEVAL) && (0)
+  scm_make_synt (s_future, scm_i_makbimacro, scm_m_future);
+#endif
+#if !defined(DEVAL) && (0)
+  scm_sym_future = scm_permanent_object (scm_from_locale_symbol (s_future));
+#endif
 
   scm_add_feature ("delay");
 }

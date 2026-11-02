@@ -13,7 +13,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (convert html htmltm-test)
+  (:use (convert latex tmtex-pdflatex)
+        (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
         (convert tools tmlength-test)
@@ -33,56 +34,44 @@
         (check lists-test)
         (check base-test)
         (check trees-test)
+        (check search-test)
         (check define-test)
         (check latex-test)
         (check formats-test)
         (check editing-test)
+        (check read-only-test)
         (check typeset-test)
+        (check pattern-test)
         (check bibtex-test)
         (check database-test)
         (check math-edit-test)
         (check table-test)
+        (check fonts-test)
         (check text-structure-test)
         (check graphics-edit-test)
         (check version-test)
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
+        (check web-files-test)
         (check kbd-menu-test)
         (check structures-test)
         (check convert-more-test)
         (check parse-test)
         (check macro-drd-test)
         (check crypto-test)
-        (check plugins-test)))
+        (check plugins-test)
+        (kernel texmacs tm-secure-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (run-pdflatex tex-file)
-  (and (url-exists? tex-file)
-       (let* ((tex-dir  (url-head tex-file))
-              (pdf-file (url-glue (url-unglue tex-file 4) ".pdf"))
-              (log-file (url-glue (url-unglue tex-file 4) ".log"))
-              (cmd1 (string-append "cd " (system-url->string tex-dir)))
-              (cmd2 (string-append "pdflatex -interaction=batchmode "
-                                   (url->string (url-tail tex-file))))
-              (cmd  (string-append cmd1 "; " cmd2 " > /dev/null")))
-         (system-remove pdf-file)
-         (system-remove log-file)
-         (system cmd)
-         (and (url-exists? log-file)
-              (list (url-exists? pdf-file)
-                    (number-latex-errors log-file)
-                    (number-latex-pages log-file))))))
 
 (define (check-latex-export-one tm-file)
   (display* "Checking LaTeX export of " (url->string tm-file) "...\n")
   (with latex-file (url-glue (url-unglue tm-file 3) ".tex")
     (with-aux tm-file
       (system-remove latex-file)
-      (if (url? latex-file) (set! current-save-target latex-file))
       (export-buffer-main (current-buffer) latex-file
                           "latex" (list :overwrite))
       (display* "Checking LaTeX on " (url->string latex-file) "...\n")
@@ -130,15 +119,20 @@
     ("tm-convert" regtest-tm-convert error)
     ("regexp" regtest-regexp error)
     ("logic-query" regtest-logic-queries error)
+    ("secure" regtest-secure error)
     ("glue" glue-test-failures count)
     ("lists" lists-test-failures count)
     ("base" base-test-failures count)
     ("trees" trees-test-failures count)
+    ("search" search-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
+    ;; read-only buffers, and the console of the error messages (a window)
+    ("read-only" read-only-test-failures count)
     ("typeset" typeset-test-failures count)
+    ("pattern" pattern-test-failures count)
     ;; after editing: generating a bibliography or the auxiliary data of a
     ;; document processes the pending GUI events, among which those of the
     ;; views which editing closed (#174)
@@ -149,6 +143,7 @@
     ("convert-more" convert-more-test-failures count)
     ("math-edit" math-edit-test-failures count)
     ("table" table-test-failures count)
+    ("fonts" fonts-test-failures count)
     ("text-structure" text-structure-test-failures count)
     ("graphics-edit" graphics-edit-test-failures count)
     ;; makes a throwaway git repository in the temporary directory
@@ -161,6 +156,9 @@
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
     ("remote" remote-test-failures count)
+    ;; a local web server (python3) in the temporary directory, stopped at
+    ;; the end, and a buffer printed to PDF
+    ("web-files" web-files-test-failures count)
     ;; starts plugin processes (shell, python when present) and stops them
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys

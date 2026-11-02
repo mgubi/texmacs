@@ -87,12 +87,18 @@
       (when (tooltip-unmap? id)
         (tooltip-unmap id)))))
 
+(tm-define (keyboard-tooltips-key-pressed)
+  ;; a key closes the tooltips of the keyboard, unless they are shown again
+  ;; within 250ms. The overloads of keyboard-press for the modes which do
+  ;; not call the former ones (completion mode) call this function too (#583)
+  (for (id (tooltip-ids))
+    (when (== (cAr (tooltip-settings id)) "keyboard")
+      (tooltip-delayed-unmap id))))
+
 (tm-define (keyboard-press key time)
   (:require (nnull? tooltips))
   ;;(display* "Key event " key ", " time "\n")
-  (for (id (tooltip-ids))
-    (when (== (cAr (tooltip-settings id)) "keyboard")
-      (tooltip-delayed-unmap id)))
+  (keyboard-tooltips-key-pressed)
   (former key time))
 
 (tm-define (mouse-event key x y mods time data)

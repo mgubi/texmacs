@@ -39,10 +39,11 @@ concater_rep::control (tree t, path ip) {
 void
 concater_rep::marker (path ip) {
   if (is_decoration (ip)) ip= path (0, ip);
-  string fn_name= "cmr";
-  int sz= env->get_script_size (env->fn_size, env->index_level);
-  font gfn (tex_font (fn_name, sz, (int) (env->magn*env->dpi)));
-  box b= text_box (ip->next, ip->item, "", gfn, blue);
+  box b= text_box (ip->next, ip->item, "", env->fn, blue);
+  // (a place for the cursor, which takes its height from the current font:
+  // no extents of its own, which would change the boxes and the lines into
+  // which it is put, at the boundaries of a macro argument)
+  b->y1= b->y2= 0;
   a << line_item (MARKER_ITEM, OP_SKIP, b, HYPH_INVALID);
 }
 
@@ -61,7 +62,10 @@ concater_rep::ghost (string s, path ip, color col) {
   }
   
   string fn_name= "cmr";
-  if (N(s)==1) {
+  int sz= env->get_script_size (env->fn_size, env->index_level);
+  int dpi= (int) (env->magn*env->dpi);
+  if (N(s)==1 && tex_font_found ("cmsy", sz, dpi)) {
+    // (without cmsy, ecrm takes its place, where "h" is a letter)
     if (s[0] == '<') { fn_name= "cmsy"; s= "h"; }
     else if (s[0] == '>') { fn_name= "cmsy"; s= "i"; }
     else if (s[0] == '|') { fn_name= "cmsy"; s= "j"; }
@@ -69,8 +73,7 @@ concater_rep::ghost (string s, path ip, color col) {
     else if (s[0] == '{') { fn_name= "cmsy"; s= "f"; }
     else if (s[0] == '}') { fn_name= "cmsy"; s= "g"; }
   }
-  int sz= env->get_script_size (env->fn_size, env->index_level);
-  font gfn (tex_font (fn_name, sz, (int) (env->magn*env->dpi)));
+  font gfn (tex_font (fn_name, sz, dpi));
   box b= text_box (decorate (ip), 0, s, gfn, col);
   array<box> bs (1);
   bs[0]= b;
@@ -129,9 +132,14 @@ concater_rep::flag (string s, path ip, color col) {
 
 void
 concater_rep::print (space spc) {
+  // (on the last item which is not a marker: the space of an item merges
+  // with the spaces of the items around it (max), that of a marker after
+  // it would be added, after a script given by a macro argument)
   int n= N(a);
   if (n==0) return;
-  a[n-1]->spc= max (spc, a[n-1]->spc);
+  int i= n-1;
+  while (i > 0 && a[i]->type == MARKER_ITEM) i--;
+  a[i]->spc= max (spc, a[i]->spc);
 }
 
 void
@@ -688,6 +696,7 @@ concater_rep::typeset (tree t, path ip) {
     break;
   case GET_BINDING:
   case HAS_BINDING:
+  case AUTO_ID:
     typeset_executable (t, ip);
     break;
   case HIDDEN_BINDING:
@@ -921,6 +930,25 @@ typeset_marker (edit_env env, path ip) {
   return a;
 }
 
+static box
+concat_of_items (path ip, array<line_item> a) {
+  int i, n=N(a);
+  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
+  // (the spaces as in a line of a paragraph: the cursor after a macro, a
+  // macro argument or a with stays next to its content, and the space
+  // before the markers at the end does not count)
+  array<SI>  sp= carried_spaces (a);
+  array<box> items (n);
+  array<SI>  spc (n);
+  spc[0]=0;
+  for (i=0; i<n-1; i++) {
+    items[i]  = a[i]->b;
+    spc  [i+1]= sp[i];
+  }
+  items[i]= a[i]->b;
+  return concat_box (ip, items, spc);
+}
+
 box
 typeset_as_concat (edit_env env, tree t, path ip) {
   concater ccc= tm_new<concater_rep> (env, true);
@@ -929,21 +957,7 @@ typeset_as_concat (edit_env env, tree t, path ip) {
   array<line_item> a= ccc->a;
   tm_delete (ccc);
 
-  int i, n=N(a);
-  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
-  array<box> items (n);
-  array<SI>  spc (n);
-  if (n>0) {
-    spc[0]=0;
-    for (i=0; i<n-1; i++) {
-      items[i]  = a[i]->b;
-      spc  [i+1]= a[i]->spc->def;
-    }
-    items[i]= a[i]->b;
-  }
-  box b= concat_box (ip, items, spc);
-
-  return b;
+  return concat_of_items (ip, a);
 }
 
 box
@@ -954,21 +968,7 @@ typeset_as_concat (edit_env env, tree t, path ip, array<line_item>& a) {
   a= ccc->a;
   tm_delete (ccc);
 
-  int i, n=N(a);
-  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
-  array<box> items (n);
-  array<SI>  spc (n);
-  if (n>0) {
-    spc[0]=0;
-    for (i=0; i<n-1; i++) {
-      items[i]  = a[i]->b;
-      spc  [i+1]= a[i]->spc->def;
-    }
-    items[i]= a[i]->b;
-  }
-  box b= concat_box (ip, items, spc);
-
-  return b;
+  return concat_of_items (ip, a);
 }
 
 box

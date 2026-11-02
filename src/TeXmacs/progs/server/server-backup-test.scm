@@ -218,6 +218,38 @@
      '(1 #t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Test: registration of the periodic backup
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The registration needs a started server, and no server is started here:
+;; server-started? is replaced while server-backup-register runs. The task
+;; which it registers ends as soon as server-started? is false again.
+(define (register-as-started)
+  (with-global server-started? (lambda () #t)
+    (server-backup-register)))
+
+(define (regtest-backup-register)
+  (integration-test-group
+   "backup registration" "backup-register"
+   (begin
+     (save-backup-preferences!)
+     (set-preference "server service backup" "on")
+     (set-preference "server backup destination" test-backup-dest))
+   (restore-backup-preferences!)
+
+   (test "not registered while the server is not started"
+     (server-backup-register)
+     #f)
+   (test "registered for a started server"
+     (register-as-started)
+     #t)
+   (test "not registered when the service is off"
+     (begin
+       (set-preference "server service backup" "off")
+       (register-as-started))
+     #f)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main entry point
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -229,6 +261,7 @@
               (regtest-backup-prune)
               (regtest-backup-prune-safety-net)
               (regtest-backup-prune-empty)
-              (regtest-backup-run))))
+              (regtest-backup-run)
+              (regtest-backup-register))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of server-backup: ok\n")))

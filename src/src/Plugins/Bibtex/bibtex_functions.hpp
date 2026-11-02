@@ -27,7 +27,7 @@ scheme_tree bib_default_preserve_case (scheme_tree st);
 int    bib_text_length (scheme_tree st);
 bool   bib_empty (scheme_tree st, string f);
 scheme_tree bib_field (scheme_tree st, string field);
-list<string> bib_field_pages (scheme_tree st);
+tree   bib_field_pages (string p);
 void   bib_parse_fields (tree& t);
 scheme_tree bib_add_period (scheme_tree st);
 scheme_tree bib_locase_first (scheme_tree st);

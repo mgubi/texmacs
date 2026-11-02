@@ -126,7 +126,7 @@
   tmcodeinline)
 
 (logic-group latex-texmacs-2%
-  tmcolor
+  tmcolor tmmarked
   tmsummarizeddocumentation tmsummarizedgrouped tmsummarizedexplain
   tmsummarizedplain tmsummarizedtiny tmsummarizedraw tmsummarizedenv
   tmsummarizedstd tmsummarized

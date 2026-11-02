@@ -494,6 +494,21 @@ tmg_make_return_after () {
 }
 
 tmscm
+tmg_can_insert_atP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "can-insert-at?");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "can-insert-at?");
+
+  content in1= tmscm_to_content (arg1);
+  path in2= tmscm_to_path (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->can_insert_at (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_temp_proof_fix () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->temp_proof_fix ();
@@ -2576,6 +2591,47 @@ tmg_cancel_alt_selections () {
 }
 
 tmscm
+tmg_set_user_cursor (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-user-cursor");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "set-user-cursor");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "set-user-cursor");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "set-user-cursor");
+
+  string in1= tmscm_to_string (arg1);
+  path in2= tmscm_to_path (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->set_user_cursor (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cancel_user_cursor (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cancel-user-cursor");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_user_cursor (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cancel_user_cursors () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_user_cursors ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_clear_undo_history () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->clear_undo_history ();
@@ -3190,6 +3246,15 @@ tmg_update_forced () {
 }
 
 tmscm
+tmg_apply_changes () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->apply_pending_changes ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_update_path (tmscm arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-path");
 
@@ -3209,6 +3274,24 @@ tmg_update_current_buffer () {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_update_current_buffer_keep () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->typeset_invalidate_keep ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_renumber_auto_labels () {
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->typeset_renumber_labels ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
 }
 
 tmscm
@@ -3704,6 +3787,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("activate-symbol",  tmg_activate_symbol, 0, 0, 0);
   tmscm_install_procedure ("make-return-before",  tmg_make_return_before, 0, 0, 0);
   tmscm_install_procedure ("make-return-after",  tmg_make_return_after, 0, 0, 0);
+  tmscm_install_procedure ("can-insert-at?",  tmg_can_insert_atP, 2, 0, 0);
   tmscm_install_procedure ("temp-proof-fix",  tmg_temp_proof_fix, 0, 0, 0);
   tmscm_install_procedure ("get-full-env",  tmg_get_full_env, 0, 0, 0);
   tmscm_install_procedure ("get-all-inits",  tmg_get_all_inits, 0, 0, 0);
@@ -3880,6 +3964,9 @@ initialize_glue_editor () {
   tmscm_install_procedure ("get-alt-selection",  tmg_get_alt_selection, 1, 0, 0);
   tmscm_install_procedure ("cancel-alt-selection",  tmg_cancel_alt_selection, 1, 0, 0);
   tmscm_install_procedure ("cancel-alt-selections",  tmg_cancel_alt_selections, 0, 0, 0);
+  tmscm_install_procedure ("set-user-cursor",  tmg_set_user_cursor, 4, 0, 0);
+  tmscm_install_procedure ("cancel-user-cursor",  tmg_cancel_user_cursor, 1, 0, 0);
+  tmscm_install_procedure ("cancel-user-cursors",  tmg_cancel_user_cursors, 0, 0, 0);
   tmscm_install_procedure ("clear-undo-history",  tmg_clear_undo_history, 0, 0, 0);
   tmscm_install_procedure ("commit-changes",  tmg_commit_changes, 0, 0, 0);
   tmscm_install_procedure ("start-slave",  tmg_start_slave, 1, 0, 0);
@@ -3938,8 +4025,11 @@ initialize_glue_editor () {
   tmscm_install_procedure ("clear-local-info",  tmg_clear_local_info, 0, 0, 0);
   tmscm_install_procedure ("refresh-window",  tmg_refresh_window, 0, 0, 0);
   tmscm_install_procedure ("update-forced",  tmg_update_forced, 0, 0, 0);
+  tmscm_install_procedure ("apply-changes",  tmg_apply_changes, 0, 0, 0);
   tmscm_install_procedure ("update-path",  tmg_update_path, 1, 0, 0);
   tmscm_install_procedure ("update-current-buffer",  tmg_update_current_buffer, 0, 0, 0);
+  tmscm_install_procedure ("update-current-buffer-keep",  tmg_update_current_buffer_keep, 0, 0, 0);
+  tmscm_install_procedure ("renumber-auto-labels",  tmg_renumber_auto_labels, 0, 0, 0);
   tmscm_install_procedure ("update-players",  tmg_update_players, 2, 0, 0);
   tmscm_install_procedure ("generate-all-aux",  tmg_generate_all_aux, 0, 0, 0);
   tmscm_install_procedure ("generate-aux",  tmg_generate_aux, 1, 0, 0);

@@ -675,6 +675,12 @@ qt_simple_widget_rep::repaint_invalid_regions () {
   // repaint invalid rectangles
   {
     rectangles new_regions;
+    // only the part in the backing store is repainted: the rest is
+    // invalidated again when it is scrolled into view, and repainting the
+    // whole changed part of a long document would load all its pictures
+    QSize bsz= backingPixmap->size();
+    invalid_regions= invalid_regions &
+                     rectangles (rectangle (0, 0, bsz.width(), bsz.height()));
     if (!is_nil (invalid_regions)) {
       rectangle lub= least_upper_bound (invalid_regions);
       if (area (lub) < 1.2 * area (invalid_regions))
@@ -692,10 +698,12 @@ qt_simple_widget_rep::repaint_invalid_regions () {
       while (!is_nil (rects)) {
         rectangle r = copy (rects->item);
         rectangle r0 = rects->item;
-	QRect qr = QRect (r->x1 / pixel_ratio,
-			  r->y1 / pixel_ratio,
-                          (r->x2 - r->x1) / pixel_ratio,
-                          (r->y2 - r->y1) / pixel_ratio);
+        // rounded outwards, else the last row or column of a region that
+        // ends at the edge of the backing store is not repainted (dpr > 1)
+	QRect qr = QRectF (r->x1 / pixel_ratio,
+			   r->y1 / pixel_ratio,
+                           (r->x2 - r->x1) / pixel_ratio,
+                           (r->y2 - r->y1) / pixel_ratio).toAlignedRect ();
         //cout << "repainting " << r0 << "\n";
         ren->set_origin (ox, oy);
         ren->encode (r->x1, r->y1);

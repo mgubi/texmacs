@@ -219,6 +219,8 @@ bridge_compound_rep::my_typeset (int desired_status) {
     // /*IF_NON_CHILD_ENFORCING(st)*/ ttt->insert_marker (st, ip);
     if (!the_drd->is_child_enforcing (st))
       ttt->insert_marker (st, ip);
+    // (the body of an included file is a document of its own)
+    bridge_macro_scope scope (L(st) != INCLUDE);
     body->typeset (desired_status);
     env->macro_arg= env->macro_arg->next;
     env->macro_src= env->macro_src->next;
@@ -230,4 +232,9 @@ bridge_compound_rep::my_typeset (int desired_status) {
       ttt->insert_marker (st, ip);
     body->typeset (desired_status);
   }
+  // the loci of an included document are attached to the include (see
+  // build_locus), and they are made again at each typesetting of its body:
+  // the list of the observers of the include is simplified as after a
+  // modification, since it kept the empty slots of those removed (#408)
+  if (L(st) == INCLUDE) simplify_observers (st);
 }

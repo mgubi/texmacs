@@ -187,11 +187,19 @@
 	  (tree-go-to c :start)
 	  (table-go-to (+ row 1) (+ col 1))))))
 
+(define (cell-span var)
+  ;; the span of the cell at the cursor
+  (with s (string->number (cell-get-format var))
+    (if (and s (> s 1)) s 1)))
+
 (define (cell-move-relative c drow dcol)
+  ;; moving down or right, leave the rows and columns of a joined cell
   (let* ((r (tree-up c))
 	 (t (tree-up r))
-	 (row (+ (tree-index r) drow))
-	 (col (+ (tree-index c) dcol)))
+	 (row (+ (tree-index r) drow
+                 (if (> drow 0) (- (cell-span "cell-row-span") 1) 0)))
+	 (col (+ (tree-index c) dcol
+                 (if (> dcol 0) (- (cell-span "cell-col-span") 1) 0))))
     (cell-move-absolute c row col)))
 
 (tm-define (traverse-vertical t downwards?)

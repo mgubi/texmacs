@@ -55,6 +55,7 @@
       ("French" (set-preference "speech" "french")))
   ---
   (-> "Update"
+      ("Help" (help-caches-update))
       ("Inclusions" (inclusions-gc))
       ("Pictures" (picture-gc))
       ("Plugins" (reinit-plugin-cache))

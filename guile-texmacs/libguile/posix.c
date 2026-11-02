@@ -2158,6 +2158,117 @@ scm_init_posix ()
 #if HAVE_GETHOSTNAME
  scm_c_define_gsubr (s_scm_gethostname, 0, 0, 0, (SCM (*)()) scm_gethostname); ;
 #endif
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(HAVE_GETGROUPS)
+  scm_c_define_gsubr (s_scm_getgroups, 0, 0, 0, (SCM (*)()) scm_getgroups); ;
+#endif
+#if defined(HAVE_SETGROUPS)
+  scm_c_define_gsubr (s_scm_setgroups, 1, 0, 0, (SCM (*)()) scm_setgroups); ;
+#endif
+#if defined(HAVE_GETPWENT)
+  scm_c_define_gsubr (s_scm_getpwuid, 0, 1, 0, (SCM (*)()) scm_getpwuid); ;
+#endif
+#if defined(HAVE_SETPWENT)
+  scm_c_define_gsubr (s_scm_setpwent, 0, 1, 0, (SCM (*)()) scm_setpwent); ;
+#endif
+#if defined(HAVE_GETGRENT)
+  scm_c_define_gsubr (s_scm_getgrgid, 0, 1, 0, (SCM (*)()) scm_getgrgid); ;
+#endif
+#if defined(HAVE_GETGRENT)
+  scm_c_define_gsubr (s_scm_setgrent, 0, 1, 0, (SCM (*)()) scm_setgrent); ;
+#endif
+#if defined(HAVE_WAITPID)
+  scm_c_define_gsubr (s_scm_waitpid, 1, 1, 0, (SCM (*)()) scm_waitpid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_status_term_sig, 1, 0, 0, (SCM (*)()) scm_status_term_sig); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_status_stop_sig, 1, 0, 0, (SCM (*)()) scm_status_stop_sig); ;
+#endif
+#if defined(HAVE_GETPPID)
+  scm_c_define_gsubr (s_scm_getppid, 0, 0, 0, (SCM (*)()) scm_getppid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_getuid, 0, 0, 0, (SCM (*)()) scm_getuid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_getgid, 0, 0, 0, (SCM (*)()) scm_getgid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_geteuid, 0, 0, 0, (SCM (*)()) scm_geteuid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_getegid, 0, 0, 0, (SCM (*)()) scm_getegid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_setuid, 1, 0, 0, (SCM (*)()) scm_setuid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_setgid, 1, 0, 0, (SCM (*)()) scm_setgid); ;
+#endif
+#if !defined(__MINGW32__)
+  scm_c_define_gsubr (s_scm_seteuid, 1, 0, 0, (SCM (*)()) scm_seteuid); ;
+#endif
+#if defined(HAVE_SETEGID)
+  scm_c_define_gsubr (s_scm_setegid, 1, 0, 0, (SCM (*)()) scm_setegid); ;
+#endif
+#if defined(HAVE_GETPGRP)
+  scm_c_define_gsubr (s_scm_getpgrp, 0, 0, 0, (SCM (*)()) scm_getpgrp); ;
+#endif
+#if defined(HAVE_SETPGID)
+  scm_c_define_gsubr (s_scm_setpgid, 2, 0, 0, (SCM (*)()) scm_setpgid); ;
+#endif
+#if defined(HAVE_SETSID)
+  scm_c_define_gsubr (s_scm_setsid, 0, 0, 0, (SCM (*)()) scm_setsid); ;
+#endif
+#if defined(HAVE_TTYNAME)
+  scm_c_define_gsubr (s_scm_ttyname, 1, 0, 0, (SCM (*)()) scm_ttyname); ;
+#endif
+#if defined(HAVE_CTERMID)
+  scm_c_define_gsubr (s_scm_ctermid, 0, 0, 0, (SCM (*)()) scm_ctermid); ;
+#endif
+#if defined(HAVE_TCGETPGRP)
+  scm_c_define_gsubr (s_scm_tcgetpgrp, 1, 0, 0, (SCM (*)()) scm_tcgetpgrp); ;
+#endif
+#if defined(HAVE_TCSETPGRP)
+  scm_c_define_gsubr (s_scm_tcsetpgrp, 2, 0, 0, (SCM (*)()) scm_tcsetpgrp); ;
+#endif
+#if defined(HAVE_FORK)
+  scm_c_define_gsubr (s_scm_fork, 0, 0, 0, (SCM (*)()) scm_fork); ;
+#endif
+#if defined(HAVE_MKNOD)
+  scm_c_define_gsubr (s_scm_mknod, 4, 0, 0, (SCM (*)()) scm_mknod); ;
+#endif
+#if defined(HAVE_NICE)
+  scm_c_define_gsubr (s_scm_nice, 1, 0, 0, (SCM (*)()) scm_nice); ;
+#endif
+#if defined(HAVE_SYNC)
+  scm_c_define_gsubr (s_scm_sync, 0, 0, 0, (SCM (*)()) scm_sync); ;
+#endif
+#if (HAVE_CRYPT)
+  scm_c_define_gsubr (s_scm_crypt, 2, 0, 0, (SCM (*)()) scm_crypt); ;
+#endif
+#if (HAVE_CHROOT)
+  scm_c_define_gsubr (s_scm_chroot, 1, 0, 0, (SCM (*)()) scm_chroot); ;
+#endif
+#if (HAVE_CUSERID)
+  scm_c_define_gsubr (s_scm_cuserid, 0, 0, 0, (SCM (*)()) scm_cuserid); ;
+#endif
+#if (HAVE_GETPRIORITY)
+  scm_c_define_gsubr (s_scm_getpriority, 2, 0, 0, (SCM (*)()) scm_getpriority); ;
+#endif
+#if (HAVE_SETPRIORITY)
+  scm_c_define_gsubr (s_scm_setpriority, 3, 0, 0, (SCM (*)()) scm_setpriority); ;
+#endif
+#if (HAVE_GETPASS)
+  scm_c_define_gsubr (s_scm_getpass, 1, 0, 0, (SCM (*)()) scm_getpass); ;
+#endif
+#if (HAVE_SETHOSTNAME)
+  scm_c_define_gsubr (s_scm_sethostname, 1, 0, 0, (SCM (*)()) scm_sethostname); ;
+#endif
 
 }
 

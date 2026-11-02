@@ -35,6 +35,7 @@ typedef list<int> path;
 #define OBSERVER_WIDGET     9
 
 #define ADDENDUM_PLAYER     1
+#define ADDENDUM_AUTO_ID    2
 
 /******************************************************************************
 * The observer class
@@ -151,6 +152,7 @@ void remove_observer (observer& o, observer what);
 void attach_observer (tree& ref, observer o);
 void detach_observer (tree& ref, observer o);
 void clean_observers (tree& ref);
+void simplify_observers (tree& ref);
 
 path obtain_ip (tree& ref);
 void attach_ip (tree& ref, path ip);

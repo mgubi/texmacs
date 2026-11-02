@@ -1164,13 +1164,37 @@ struct transformed_curve_rep: public curve_rep {
   }
   point grad (double t, bool& error);
   double curvature (double t1, double t2) {
+    // no bound is known for the image of a curve
     (void) t1; (void) t2;
-    FAILED ("not yet implemented");
-    return 0.0;
+    return tm_infinity;
   }
+  void rectify_part (array<point>& a, double eps, double t0, double t1,
+                     int depth);
   int get_control_points (
     array<double>&abs, array<point>& pts, array<path>& cip);
 };
+
+void
+transformed_curve_rep::rectify_part (array<point>& a, double eps,
+                                     double t0, double t1, int depth) {
+  // the part between t0 and t1 is cut in two until it stays within eps of
+  // its chord at four points in between
+  int NUM= 5;
+  point p0= evaluate (t0);
+  point p1= evaluate (t1);
+  if (depth < 16)
+    for (int i=1; i<NUM; i++) {
+      double u= ((double) i) / ((double) NUM);
+      point pi = evaluate (t0 + u * (t1 - t0));
+      point pi2= p0 + u * (p1 - p0);
+      if (norm (pi2 - pi) >= eps) {
+        rectify_part (a, eps, t0, (t0 + t1) / 2, depth + 1);
+        rectify_part (a, eps, (t0 + t1) / 2, t1, depth + 1);
+        return;
+      }
+    }
+  a << p1;
+}
 
 void
 transformed_curve_rep::rectify_cumul (array<point>& a, double eps) {
@@ -1181,7 +1205,12 @@ transformed_curve_rep::rectify_cumul (array<point>& a, double eps) {
     // b starts with the starting point of the curve, left out
     for (i=1; i<k; i++) a << f(b[i]);
   }
-  else FAILED ("not yet implemented");
+  else {
+    // the image of a segment is not a segment: each component is cut
+    int i, k= max (n, 1);
+    for (i=0; i<k; i++)
+      rectify_part (a, eps, ((double) i) / k, ((double) (i+1)) / k, 0);
+  }
 }
 
 point

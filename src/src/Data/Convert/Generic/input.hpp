@@ -20,6 +20,7 @@ struct texmacs_input_rep: concrete_struct {
   string buf;                   // input buffer
   string format;                // current input format
   int    mode;                  // corresponding input mode
+  string chat;                  // session of a command line or request link
   string channel;               // current output channel
   tree   stack;                 // stack for nested blocks
   bool   ignore_verb;           // hack to enable completion with some plugins
@@ -44,7 +45,6 @@ struct texmacs_input_rep: concrete_struct {
   void html_flush (bool force= false);
   void ps_flush (bool force= false);
   void math_flush (bool force= false);
-  void ispell_flush (bool force= false);
   void channel_flush (bool force= false);
   void command_flush (bool force= false);
   void xformat_flush (bool force= false);
@@ -61,5 +61,7 @@ class texmacs_input {
   texmacs_input (string type);
 };
 CONCRETE_CODE(texmacs_input);
+
+void document_append (tree& doc, tree u);
 
 #endif // defined INPUT_H

@@ -243,52 +243,84 @@
 ;; Killing buffers, windows and TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The buffers whose typesetting failed, and whose document was replaced by
+;; an empty one (typeset-failure-recover in tm-files.scm)
+(define typeset-failed-buffers (make-ahash-table))
+
+(tm-define (typeset-failure-flag name)
+  (ahash-set! typeset-failed-buffers (url->string name) #t))
+
+(tm-define (typeset-failure-forget name)
+  (ahash-remove! typeset-failed-buffers (url->string name)))
+
+(tm-define (typeset-failed-buffer? name)
+  (ahash-ref typeset-failed-buffers (url->string name)))
+
 (tm-define (buffer-close name)
+  (typeset-failure-forget name)
   (cpp-buffer-close name))
 
 (tm-define (buffers-modified?)
   (list-or (map buffer-modified? (buffer-list))))
 
+(tm-define (buffer-close-question buf)
+  ;; the question when closing the modified buffer @buf
+  "The document has not been saved. Really close it?")
+
 (tm-define (safely-kill-buffer)
   (cond ((buffer-embedded? (current-buffer))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((buffer-modified? (current-buffer))
-         (user-confirm "The document has not been saved. Really close it?" #f  
+         (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
 
-(define (do-kill-window)
+(define (close-buffer-if-no-window buf confirmed?)
+  ;; a buffer may be shown in several windows (clone-window, a file loaded
+  ;; or imported twice): close it with its last window only. A modified
+  ;; buffer whose closing was not confirmed (another window showed it, and
+  ;; switched to another buffer in the meantime) stays open, without window
+  (when (and (null? (buffer->windows buf))
+             (or confirmed? (not (buffer-modified? buf))))
+    (buffer-close buf)))
+
+(define (last-window-on-modified-buffer? buf)
+  ;; ask about unsaved changes only when the buffer will be closed
+  (and (buffer-modified? buf)
+       (<= (length (buffer->windows buf)) 1)))
+
+(define (do-kill-window confirmed?)
   (with buf (current-buffer)
     (kill-window (current-window))
     (delayed
       (:idle 100)
-      (buffer-close buf))))
+      (close-buffer-if-no-window buf confirmed?))))
 
-(define (do-kill-window* u)
+(define (do-kill-window* u confirmed?)
  (with buf (window->buffer u)
    (kill-window u)
    (delayed
      (:idle 100)
-     (buffer-close buf))))
+     (close-buffer-if-no-window buf confirmed?))))
 
 (tm-define (safely-kill-window . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
          (alt-windows-delete (alt-window-search (current-buffer))))
-        ((<= (windows-number) 1)
+        ((<= (length (window-list)) 1)
          (safely-quit-TeXmacs))
         ((nnull? opt-name)
-         (if (buffer-modified? (window->buffer (car opt-name)))
+         (if (last-window-on-modified-buffer? (window->buffer (car opt-name)))
              (user-confirm
-                 "The document has not been saved. Really close it?" #f
+                 (buffer-close-question (window->buffer (car opt-name))) #f
                (lambda (answ)
-                 (when answ (do-kill-window* (car opt-name)))))
-             (do-kill-window* (car opt-name))))
-        ((buffer-modified? (current-buffer))
-         (user-confirm "The document has not been saved. Really close it?" #f
+                 (when answ (do-kill-window* (car opt-name) #t))))
+             (do-kill-window* (car opt-name) #f)))
+        ((last-window-on-modified-buffer? (current-buffer))
+         (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
-             (when answ (do-kill-window)))))
-        (else (do-kill-window))))
+             (when answ (do-kill-window #t)))))
+        (else (do-kill-window #f))))
 
 (tm-define (safely-quit-TeXmacs)
   (let* ((m (filter buffer-modified? (buffer-list)))

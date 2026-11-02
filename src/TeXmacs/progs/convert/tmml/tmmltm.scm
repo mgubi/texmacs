@@ -153,8 +153,16 @@
 			     (tmmltm-args (cdr args))))
 	  (else (cons tag (tmmltm-args args))))))
 
+(define (tmmltm-raw-data? x)
+  ;; the bytes in base 64; another raw-data (no argument, or markup, which
+  ;; only a hand-written or damaged file has) is a regular tag
+  (and (func? x 'raw-data 1)
+       (func? (cadr x) 'tm-arg)
+       (or (null? (cdadr x))
+           (and (null? (cddadr x)) (string? (cadadr x))))))
+
 (define (tmmltm-raw-data x)
-  `(raw-data ,(decode-base64 (second x))))
+  `(raw-data ,(if (null? (cdr x)) "" (decode-base64 (cadr x)))))
 
 (tm-define (tmmltm x)
   ;(display* "[tmmltm] ") (write x) (display* "\n")
@@ -167,7 +175,7 @@
 	((func? x '!document) (tmmltm-document (cdr x)))
 	((func? x '!concat) (tmmltm-concat (cdr x)))
 	((func? x 'with) (tmmltm-with x))
-	((func? x 'raw-data) (tmmltm-raw-data (second x)))
+	((tmmltm-raw-data? x) (tmmltm-raw-data (cadr x)))
 	((and (func? x 'tm-sym 1) (string? (cadr x)))
 	 (string-append "<" (cadr x) ">"))
 	(else (tmmltm-regular (car x) (cdr x)))))

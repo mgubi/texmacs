@@ -33,12 +33,7 @@
 		       "(" (number->string server) ")"))
       "Inactive connection"))
 
-(define (account->string server-name port pseudo)
-  (if (== server-name "")
-      (account->string "localhost" port pseudo)
-      (with x (string-append pseudo "@" server-name)
-	(if (== port "6561") x
-	    (string-append x ":" port)))))
+; (account->string: client-base.scm)
 
 (define-macro (with-post-reload . body) `(begin ,@body (revert-buffer-revert)))
 
@@ -113,6 +108,9 @@
   ("Join chat room" (chat-room-join-interactive server)))
 
 (tm-menu (remote-live-menu server)
+  ;; who else is in the live document (their cursors are shown in it)
+  (for (name (live-participants (current-buffer)))
+    (group (eval (client-sentence "Also here: %1" name))))
   ("Permissions" (open-permissions-editor server (current-buffer)))
   ("Share" (open-share-document-widget server (current-buffer))))
 
@@ -131,6 +129,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-menu (remote-submenu server)
+  ;; the state of the connection: connected (and how fast the server
+  ;; answers), or no answer for some time
+  (group (eval (client-connection-status server)))
   (dynamic (remote-home-menu server #f))
   ---
   (if (and (remote-file-name (current-buffer))
@@ -169,6 +170,11 @@
 
 (menu-bind client-menu
   (invisible (client-active-servers))
+  ;; the connections which were lost, until the user logs in again
+  (for (x (client-lost-connections))
+    (group (eval (client-sentence "Connection lost: %1"
+                                  (account->string (first x) (second x)
+                                                   (third x))))))
   (link client-start-menu)
   (with l (client-active-servers)
     ---
@@ -197,6 +203,25 @@
 ;; Main remote icon menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The icon of a connection says how it is: the cloud of the connection
+;; (the one of an administrator has a star) with a green badge while the
+;; server answers, an amber one while it does not; and, when no connection
+;; is left, the plain cloud, struck through if a connection was lost.
+(define (connection-icon server base)
+  `(icon ,(string-append base
+                         (if (== (client-connection-state server) :silent)
+                             "_silent.xpm" "_active.xpm"))))
+
+(define (connection-states)
+  ;; what the icons depend on: the menus are made again when it changes
+  (list (map client-connection-state (client-active-servers))
+        (client-lost-connections)))
+
+(define (lost-connection-balloon)
+  (with x (car (client-lost-connections))
+    (client-sentence "Connection lost: %1; log in again"
+                     (account->string (first x) (second x) (third x)))))
+
 (define current-server #f)
 
 (define (get-current-server)
@@ -217,12 +242,15 @@
 
 (tm-menu (remote-subicons server)
   (invisible (client-active-servers))
+  (invisible (connection-states))
   (assuming (not (server-connection-admin? server))
-    (=> (balloon (icon "tm_cloud.xpm") "Connection with server")
+    (=> (balloon (eval (connection-icon server "tm_cloud"))
+                 (eval (client-connection-status server)))
 	("Edit account" (open-account-editor server))
 	("Logout" (client-logout server))))
   (assuming (server-connection-admin? server)
-    (=> (balloon (icon "tm_cloud_admin.xpm") "Connection with server")
+    (=> (balloon (eval (connection-icon server "tm_cloud_admin"))
+                 (eval (client-connection-status server)))
 	("Edit Server Preferences" (load-remote-config-form server))
 	("User Management" (open-admin-accounts-editor server))
 	("Edit account" (open-account-editor server))
@@ -259,8 +287,14 @@
 (menu-bind remote-icons
   (invisible (client-active-servers))
   (invisible (get-current-server))
-  (assuming (null? (client-active-servers))
+  (invisible (connection-states))
+  (assuming (and (null? (client-active-servers))
+                 (null? (client-lost-connections)))
     (=> (balloon (icon "tm_cloud.xpm") "Connect with server")
+        (link client-start-menu)))
+  (assuming (and (null? (client-active-servers))
+                 (nnull? (client-lost-connections)))
+    (=> (balloon (icon "tm_cloud_lost.xpm") (eval (lost-connection-balloon)))
         (link client-start-menu)))
   (assuming (get-current-server)
     (dynamic (remote-subicons (get-current-server))))

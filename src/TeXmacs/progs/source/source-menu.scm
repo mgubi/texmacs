@@ -44,7 +44,7 @@
     ---
     ("Quote" (make 'quote))
     ("Quasi" (make 'quasi))
-    ("Quasiquote" (make 'quasi-quote))
+    ("Quasiquote" (make 'quasiquote))
     ("Unquote" (make 'unquote))
     ---
     ("Unevaluated value" (make 'quote-value))

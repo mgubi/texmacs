@@ -78,6 +78,8 @@ public:
   tree selection_get (string key);
   void selection_set (string key, tree t, bool persistant= false);
   void selection_set (tree t);
+  void selection_get_state (range_set& sel, bool& sg, bool& sh, path& mid);
+  void selection_set_state (range_set sel, bool sg, bool sh, path mid);
   void selection_set_start (path p= path());
   void selection_set_end (path p= path());
   void selection_set_paths (path start, path end);

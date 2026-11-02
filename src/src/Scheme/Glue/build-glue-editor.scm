@@ -64,6 +64,7 @@
   (activate-symbol activate_symbol (void))
   (make-return-before make_return_before (void))
   (make-return-after make_return_after (bool))
+  (can-insert-at? can_insert_at (bool content path))
   (temp-proof-fix temp_proof_fix (void))
 
   ;; document-wide modifications
@@ -257,6 +258,9 @@
   (get-alt-selection get_alt_selection (array_path string))
   (cancel-alt-selection cancel_alt_selection (void string))
   (cancel-alt-selections cancel_alt_selections (void))
+  (set-user-cursor set_user_cursor (void string path string string))
+  (cancel-user-cursor cancel_user_cursor (void string))
+  (cancel-user-cursors cancel_user_cursors (void))
 
   ;; undo and redo
   (clear-undo-history clear_undo_history (void))
@@ -325,8 +329,11 @@
   (clear-local-info clear_local_info (void))
   (refresh-window invalidate_all (void))
   (update-forced typeset_forced (void))
+  (apply-changes apply_pending_changes (void))
   (update-path typeset_invalidate (void path))
   (update-current-buffer typeset_invalidate_all (void))
+  (update-current-buffer-keep typeset_invalidate_keep (void))
+  (renumber-auto-labels typeset_renumber_labels (bool))
   (update-players typeset_invalidate_players (void path bool))
   (generate-all-aux generate_aux (void))
   (generate-aux generate_aux (void string))

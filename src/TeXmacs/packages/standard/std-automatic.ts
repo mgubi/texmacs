@@ -24,7 +24,11 @@
 
   <\active*>
     <\src-comment>
-      Automatically generated labels.
+      Automatically generated labels. Their numbers come from the
+      primitive auto-id, with which the labels keep their names when
+      others are added before them; the macro auto-id below takes its
+      place in a version of TeXmacs which does not have the primitive,
+      and numbers them with the counter.
     </src-comment>
   </active*>
 
@@ -34,9 +38,11 @@
 
   <assign|set-part|<macro|Id|body|<with|current-part|<merge|<value|current-part>|.|<arg|Id>>|auto-nr|0|<arg|body>>>>
 
-  <assign|the-auto|<macro|<merge|auto|<value|current-part>|-|<value|auto-nr>>>>
+  <assign|auto-id|<macro|what|<if|<equal|<arg|what>|new>|<inc-auto>|<value|auto-nr>>>>
 
-  <assign|auto-label|<macro|<inc-auto><label|<the-auto>>>>
+  <assign|the-auto|<macro|<merge|auto|<value|current-part>|-|<auto-id|last>>>>
+
+  <assign|auto-label|<macro|<auto-id|new><label|<the-auto>>>>
 
   <\active*>
     <\src-comment>
@@ -130,7 +136,7 @@
   toc entry>|dark green|what><assign|toc-next|<arg|what>>>>>
 
   <assign|toc-entry|<macro|type|what|<quasi|<style-with|src-compact|none|||<flag|<localize|table
-  of contents>|dark green|what><auto-label><write|<value|toc-prefix>|<compound|<unquote|<arg|type>>|<arg|what>|<pageref|<the-auto>>>><style-with|src-compact|none|<if|<equal|<value|toc-next>|>|<toc-notify|<arg|type>|<arg|what>>|<toc-notify|<arg|type>|<value|toc-next>><assign|toc-next|>>>>>>>
+  of contents>|dark green|what><auto-label><with|auto-written|<the-auto>|<write|<value|toc-prefix>|<compound|<unquote|<arg|type>>|<arg|what>|<pageref|<value|auto-written>>>>><style-with|src-compact|none|<if|<equal|<value|toc-next>|>|<toc-notify|<arg|type>|<arg|what>>|<toc-notify|<arg|type>|<value|toc-next>><assign|toc-next|>>>>>>>
 
   <assign|toc-main-1|<macro|what|<toc-entry|toc-strong-1|<arg|what>>>>
 
@@ -326,7 +332,7 @@
 
   <assign|part-info|<macro|name|<style-with|src-compact|none|<label|<merge|part:|<arg|name>>><write|parts|<tuple|<arg|name>|chapter-nr|<value|chapter-nr>|section-nr|<value|section-nr>|subsection-nr|<value|subsection-nr>>>>>>
 
-  <assign|shared|<macro|unique-id|mirror-id|body|<with|old-color|<value|locus-color>|locus-color|preserve|<locus|<id|<arg|mirror-id>>|<observer|<arg|unique-id>|mirror-notify>|<surround|<hidden|<part-info|<arg|unique-id>><extern|mirror-initialize|<quote-arg|xbody>>>|<right-flush>|<with|locus-color|<value|old-color>|<arg|body>>>>>>>
+  <assign|shared|<macro|unique-id|mirror-id|body|<with|old-color|<value|locus-color>|locus-color|preserve|<locus|<id|<arg|mirror-id>>|<observer|<arg|unique-id>|mirror-notify>|<surround|<hidden|<part-info|<arg|unique-id>><extern|mirror-initialize|<quote-arg|body>>>|<right-flush>|<with|locus-color|<value|old-color>|<arg|body>>>>>>>
 
   <assign|include|<macro|name|<\surround|<part-info|<arg|name>>|>
     <include*|<arg|name>>

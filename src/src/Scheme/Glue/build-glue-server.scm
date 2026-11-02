@@ -59,6 +59,7 @@
   (inclusions-gc inclusions_gc (void))
   (update-all-path typeset_update (void path))
   (update-all-buffers typeset_update_all (void))
+  (update-picture-buffers typeset_update_pictures (void))
   (set-message set_message (void content content))
   (set-message-temp set_message (void content content bool))
   (recall-message recall_message (void))

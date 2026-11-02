@@ -85,6 +85,7 @@ private:
   string loaded;
   string pending;
   int start_pending;
+  db_line_nrs removed_pending;  // saved lines removed in pending
   int time_stamp;
   
   hashmap<string,db_atom> key_encode;
@@ -114,6 +115,7 @@ private:
   db_constraint encode_constraint (tree q);
   db_constraints encode_constraints (tree q);
   db_atoms filter (db_atoms ids, tree qt, db_time t, query_args qargs);
+  db_atoms ids_at (db_time t);
   int compute_complexity (tree q);
   int ansatz_index (tree q);
   db_atoms ansatz (tree ql, db_time t);
@@ -125,6 +127,7 @@ private:
   void notify_removed_field (db_line_nr nr);
   void replay (string s);
   void replay (database clone, int start, bool all);
+  void replay_removals (database clone);
   database compress ();
   void initialize ();
   void purge ();

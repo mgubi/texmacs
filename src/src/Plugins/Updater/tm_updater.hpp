@@ -36,7 +36,7 @@ public:
   virtual bool isRunning () const   { return false; }
    
   virtual time_t lastCheck () const { return 0; }
-  virtual bool getCheckInterval () const { return interval; }
+  virtual int getCheckInterval () const { return interval; }
   virtual bool setCheckInterval (int hours) { (void) hours; return false; }
 };
 

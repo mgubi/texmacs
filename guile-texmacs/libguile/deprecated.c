@@ -1523,6 +1523,12 @@ scm_i_init_deprecated ()
  scm_c_define_gsubr (s_scm_guardian_destroyed_p, 1, 0, 0, (SCM (*)()) scm_guardian_destroyed_p); ;
  scm_c_define_gsubr (s_scm_guardian_greedy_p, 1, 0, 0, (SCM (*)()) scm_guardian_greedy_p); ;
  scm_c_define_gsubr (s_scm_destroy_guardian_x, 1, 0, 0, (SCM (*)()) scm_destroy_guardian_x); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if ((SCM_ENABLE_DEPRECATED == 1)) && (0)
+  scm_c_define_gsubr (s_scm_symbol_interned_p, 2, 0, 0, (SCM (*)()) scm_symbol_interned_p); ;
+#endif
 
 }
 

@@ -491,6 +491,8 @@ is_doc_data (tree t) {
 
 tree
 filter_preamble (tree t) {
+  // a source which is only text parses to a single string (#608)
+  if (!is_concat (t)) return t;
   int i, n=N(t);
   bool in_preamble= true;
   tree r (CONCAT);
@@ -752,6 +754,9 @@ latex_symbol_to_tree (string s) {
   if (s == "") return "";
   if (s[0] == '\\') {
     s= s(1,N(s));
+    // \string read as the argument of a macro, as in \gobble\string#1:
+    // a tag "string" would be read as an atomic tree (#658)
+    if (s == "string") return "";
     if ((s == "ldots" || s == "dots" || s == "dotso")
         && (command_type ("!mode") != "math")) return "...";
     if (s == "\n")     return tree (APPLY, "!emptyline");
@@ -1264,6 +1269,16 @@ string_arg (tree t, bool url) {
     //cout << "t= " << t << "\n";
     return "";
   }
+}
+
+static tree
+latex_color_arg (tree t) {
+  // the export defines a color #rrggbb under the name tmhexRRGGBB
+  if (!is_atomic (t) || N(t->label) != 11 || !starts (t->label, "tmhex"))
+    return t;
+  for (int i= 5; i < 11; i++)
+    if (!is_hex_digit (t->label[i])) return t;
+  return "#" * locase_all (t->label (5, 11));
 }
 
 tree
@@ -2106,8 +2121,17 @@ latex_command_to_tree (tree t) {
   if (is_tuple (t, "\\=", 1)) return latex_accent (t[1], "<bar>");   // macron
 
   if (is_tuple (t, "\\colorbox", 2))
-    return compound ("colored-frame", l2e (t[1]), l2e (t[2]));
-  if (is_tuple (t, "\\color", 1)) return tree (SET, COLOR, string_arg (t[1]));
+    return compound ("colored-frame",
+                     latex_color_arg (l2e (t[1])), l2e (t[2]));
+  if (is_tuple (t, "\\color", 1))
+    return tree (SET, COLOR, latex_color_arg (string_arg (t[1])));
+  if (is_tuple (t, "\\sout", 1)) return compound ("strike-through", l2e (t[1]));
+  if (is_tuple (t, "\\tmmarked", 2)) {
+    tree c= latex_color_arg (l2e (t[1]));
+    tree r= compound ("marked", l2e (t[2]));
+    if (c == "yellow") return r;
+    return tree (WITH, "marked-color", c, r);
+  }
   if (is_tuple (t, "\\color*", 2)) {
     string cm= string_arg (t[1]), val= string_arg (t[2]);
     if (cm == "HTML") val= "#"*val;
@@ -2124,8 +2148,8 @@ latex_command_to_tree (tree t) {
   }
 
   if (is_tuple (t, "\\textcolor", 2) || is_tuple (t, "\\tmcolor", 2))
-    return concat (tree (SET, COLOR, l2e (t[1])), l2e (t[2]),
-        tree (RESET, COLOR));
+    return concat (tree (SET, COLOR, latex_color_arg (l2e (t[1]))),
+                   l2e (t[2]), tree (RESET, COLOR));
 
   if (is_tuple (t, "\\key", 1)) return compound ("key", latex_key_arg (t[1]));
   if (is_tuple (t, "\\textnormalfont", 1)) return m2e (m2e (m2e (t,

@@ -205,9 +205,7 @@ concater_rep::typeset_sound (tree t, path ip) {
     sound= resolve (relative (env->base_file_name, sound_u));
   }
   if (!is_none (sound)) {
-    int sz= script (env->fn_size, env->index_level);
-    font gfn (tex_font ("cmr", sz, (int) (env->magn*env->dpi)));
-    print (sound_box (ip, pl, sound, gfn->yx));
+    print (sound_box (ip, pl, sound, env->fn->yx));
     flag ("sound", ip, brown);
   }
   else typeset_dynamic (tree (_ERROR, "bad sound", t[0]), ip);
@@ -232,7 +230,8 @@ concater_rep::typeset_video (tree t, path ip) {
     SI   h  = env->as_length (env->exec (t[2]));
     int  len= env->as_length (env->exec (t[3]));
     bool rep= env->exec (t[4]) != "false";
-    print (video_box (ip, pl, video, w, h, env->alpha, len, rep, env->pixel));
+    print (video_box (ip, pl, video, w, h, env->alpha, len, rep,
+                      env->zoom_pixel)); // (as for an image)
   }
   else typeset_dynamic (tree (_ERROR, "bad video", t[0]), ip);
 }

@@ -6,9 +6,9 @@ Inline formulas such as x2 + y2 = z2, a
 
 b,
 2
-p ,
+√,
 x
-3p , eiπ + 1 = 0 and P
+3√, eiπ + 1 = 0 and ∑
 
 k=1
 n
@@ -20,72 +20,75 @@ and must not change its spacing too much.
 
 2 Displayed formulas
 
-Z
+∫
 
-¡1
+-∞
 
-1
-e¡x2 dx =
+∞
+
+e-x2 dx =
 π
-p
+√
 (1)
 
 Equation (1) is the Gaussian integral.
 
 f(x) =
 
-(
+{
 
 x2
-if x > 0;
-¡x otherwise:
+if x ⩾0,
+-x otherwise.
 
 (a + b)2 = a2 + 2 a b + b2
 
-(a ¡ b)2 = a2 ¡ 2 a b + b2
+(a - b)2 = a2 - 2 a b + b2
 
 3 Matrices and delimiters
 
 A =
 
-0
+(
 
-B
-@
+(
+(
 
 1 2 3
 4 5 6
 7 8 9
 
-1
+)
 
-C
-A;
+)
+),
 det
 
-��
+((
+
 a b
 c d
 
-��
-= a d ¡ b c
+))
 
+= a d - b c
 
+||||
 
-P
+∑
 
 i=1
 n
 xi
 n
-¡ µ
+- μ
 
-    6 kxk1;
+|||| ⩽‖x‖∞,
 
-8
-<
+{
+{
 
-:
+{
 
 1
 1 +
@@ -94,45 +97,47 @@ n
 1 + 1
 x
 
-9
-=
+}
+}
 
-;
+}
 
 4 Accents, scripts and operators
 
-x^;
-x~;
-x¯;
-x + y;
-A B C;
+x^,
+x~,
+x¯,
+x + y,
+A B C,
 xi
 
-2;
-nCk;
+2,
+nCk,
 
-Y
+∏
 
 p prime
 
 1
-1 ¡ p¡s;
+1 - p-s,
 lim
-n!1
+n→∞
 
-�
+(
+
 1 + 1
 n
 
-�n
+)n
+
 = e
 
-   δ";
-¡∆ΘΛ ;
-R; C;
-F; g;
-a 2 A ⊆B;
-8" > 09δ > 0
+αβγδε,
+ΓΔΘΛΩ,
+ℝ, ℂ,
+ℱ, 𝔤,
+a ∈A ⊆B,
+∀ε > 0∃δ > 0
 
 Accents, scripts and operators
 1

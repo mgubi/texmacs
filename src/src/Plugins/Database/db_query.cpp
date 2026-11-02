@@ -93,13 +93,31 @@ database_rep::filter (db_atoms ids, tree qt, db_time t, query_args qargs) {
   //cout << "Query " << qt << ", limit= " << qargs.limit << ", offset= "<< qargs.offset << LF;
   db_constraints cs= encode_constraints (qt);
   //cout << "Encoded as " << cs << "\n";
-  if (N(cs) == 1 && N(cs) == 0) return db_atoms ();
+  if (N(cs) == 1 && N(cs[0]) == 0) return db_atoms ();
   db_atoms r;
-  for (int i=qargs.offset; i<N(ids); i++)
+  int skipped= 0;
+  for (int i=0; i<N(ids); i++)
     if (id_satisfies (ids[i], cs, t)) {
+      // the offset counts results, not candidates
+      if (skipped < qargs.offset) { skipped++; continue; }
       r << ids[i];
       if (qargs.limit > 0 && N(r) >= qargs.limit) break;
     }
+  return r;
+}
+
+db_atoms
+database_rep::ids_at (db_time t) {
+  // the entries which have a field at time t
+  if (t == 0) return ids_list;
+  db_atoms r;
+  for (int i=0; i<N(ids_list); i++) {
+    db_line_nrs nrs= id_lines[ids_list[i]];
+    for (int j=0; j<N(nrs); j++) {
+      db_line& l= db[nrs[j]];
+      if (l->created <= t && t < l->expires) { r << ids_list[i]; break; }
+    }
+  }
   return r;
 }
 
@@ -142,12 +160,12 @@ database_rep::ansatz (tree ql, db_time t) {
   if (!is_tuple (ql)) return db_atoms ();
   int a= ansatz_index (ql);
   //cout << "ansatz index: " << a << LF;
-  if (a < 0) return ids_list;
+  if (a < 0) return ids_at (t);
   tree q= ql[a];
   db_atoms idsl;
   hashset<db_atom> idss;
   db_constraint c= encode_constraint (q);
-  if (N(c) == 1 && c[0] == -2) return ids_list;
+  if (N(c) == 1 && c[0] == -2) return ids_at (t);
   if (N(c) <= 1) return db_atoms ();
   for (int i=1; i<N(c); i++) {
     db_atom val= c[i];
@@ -200,15 +218,24 @@ database_rep::query (tree ql, db_time t, query_args qargs) {
   //cout << "normalized query " << ql << ", " << t << ", " << qargs.limit << LF;
   db_atoms ids= ansatz (ql, t);
   //cout << "ansatz ids= " << ids << LF;
+  bool modified_flag= false;
   if (is_tuple (ql))
   //cout << "filtered ids= " << ids << LF;
     for (int i=0; i<N(ql); i++) {
       qargs.sort_flag= qargs.sort_flag || is_tuple (ql[i], "order", 2);
+      modified_flag= modified_flag || is_tuple (ql[i], "modified", 2);
     }
 
-  qargs.limit= max (qargs.limit, qargs.sort_flag? 1000: 0);
-  //cout << "limit= " << qargs.limit << ", offset= " << qargs.offset << LF;
-  ids= filter (ids, ql, t, qargs);
+  // when the results are sorted or filtered further, the offset and the
+  // limit apply at the end; at most 1000 entries are sorted
+  query_args fargs= qargs;
+  bool at_end= qargs.sort_flag || modified_flag;
+  if (at_end) {
+    fargs.offset= 0;
+    fargs.limit= qargs.sort_flag? max (qargs.offset + qargs.limit, 1000): 0;
+  }
+  //cout << "limit= " << fargs.limit << ", offset= " << fargs.offset << LF;
+  ids= filter (ids, ql, t, fargs);
   //cout << "filtered ids= " << ids << LF;
 
   for (int i=0; i<N(ql); i++) {
@@ -225,5 +252,10 @@ database_rep::query (tree ql, db_time t, query_args qargs) {
   //cout << "filtered on modified ids= " << ids << LF;
   ids= sort_results (ids, ql, t);
   //cout << "sorted ids= " << ids << LF;
+  if (at_end) {
+    int start= min (qargs.offset, N(ids));
+    int end= (qargs.limit > 0? min (start + qargs.limit, N(ids)): N(ids));
+    ids= range (ids, start, end);
+  }
   return ids;
 }

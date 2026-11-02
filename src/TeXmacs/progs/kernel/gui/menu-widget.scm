@@ -684,7 +684,7 @@
           (h (h-cmd)))
       (with (w1 w2 w3 hpos) (decode-resize w "left")
         (with (h1 h2 h3 vpos) (decode-resize h "top")
-          (with-global global-resize (list w1 w2 w3 hpos h1 h2 h3 hpos)
+          (with-global global-resize (list w1 w2 w3 hpos h1 h2 h3 vpos)
             (with inner (make-menu-items (list (cons 'vertical items)) style #f)
               (widget-resize (car inner) style
                              w1 h1 w2 h2 w3 h3 hpos vpos))))))))

@@ -124,6 +124,22 @@ tm_sleep () {
 * Constructor and geometry
 ******************************************************************************/
 
+void
+qt_forget_deferred_deletes () {
+  // (an exit of a script, (exit), from the event loop: the widgets which
+  // were to be deleted later, as the prompt of an interactive command or a
+  // closed window, are forgotten, not deleted; else Qt deletes them while
+  // it ends its threads and crashes. A script given by -x runs before the
+  // event loop of Qt starts, which deletes them only in a nested loop, so
+  // they can wait until the exit. Deleting them here is not safe either:
+  // the thread-local objects of Qt are gone before any exit handler is
+  // called, and so are the static objects made after this handler was
+  // registered, as the list of the active scrollers of QScroller, made by
+  // the first one deleted. The quit of TeXmacs, _exit, deletes nothing)
+  if (QCoreApplication::instance () != NULL)
+    QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
+}
+
 qt_gui_rep::qt_gui_rep (int &argc, char **argv):
 interrupted (false), waitWindow (NULL), popup_wid_time (0), q_translator (0),
 time_credit (100), do_check_events (false), updating (false), 
@@ -207,6 +223,10 @@ needing_update (false)
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
     retina_scale= as_double (get_user_preference ("retina-scale"));
+  // the style sheet of the theme was applied when the application was
+  // created (QTMApplication::load), when retina_scale was not yet known:
+  // apply it again, with its sizes scaled accordingly
+  if (!headless_mode && tm_style_sheet != "") init_style_sheet (qApp);
 #endif
 }
 
@@ -249,9 +269,31 @@ qt_gui_rep::~qt_gui_rep()  {
  * interclient communication
  ******************************************************************************/
 
+static QClipboard*
+system_clipboard () {
+  // the clipboard of the system, or NULL without one: the headless mode
+  // runs a QCoreApplication, and QGuiApplication::clipboard () then gives
+  // a clipboard without a platform, which crashes when it is used (#708);
+  // the selections are only kept in selection_t and selection_s then
+  if (headless_mode ||
+      qobject_cast<QGuiApplication*> (QCoreApplication::instance ()) == NULL)
+    return NULL;
+  return QGuiApplication::clipboard ();
+}
+
 bool
 qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
-  QClipboard *cb = QApplication::clipboard ();
+  QClipboard *cb = system_clipboard ();
+  if (cb == NULL) {
+    // as below: "extern" is the selection "primary" (ai-paste)
+    if (key == "extern") key= "primary";
+    s = "";
+    t = "none";
+    if (!selection_t->contains (key)) return false;
+    t = copy (selection_t [key]);
+    s = copy (selection_s [key]);
+    return true;
+  }
   QClipboard::Mode mode = QClipboard::Clipboard;
   bool direct_selection= (key == "extern");
   if (direct_selection) key= "primary";
@@ -377,7 +419,8 @@ qt_gui_rep::set_selection (string key, tree t,
   selection_t (key)= copy (t);
   selection_s (key)= copy (s);
   
-  QClipboard *cb = QApplication::clipboard ();
+  QClipboard *cb = system_clipboard ();
+  if (cb == NULL) return true;
   QClipboard::Mode mode = QClipboard::Clipboard;
   if (key == "primary");
   else if (key == "mouse" && cb->supportsSelection())
@@ -438,7 +481,8 @@ qt_gui_rep::clear_selection (string key) {
   selection_t->reset (key);
   selection_s->reset (key);
   
-  QClipboard *cb = QApplication::clipboard();
+  QClipboard *cb = system_clipboard ();
+  if (cb == NULL) return;
   QClipboard::Mode mode = QClipboard::Clipboard;
   if (key == "primary");
   else if (key == "mouse" && cb->supportsSelection())
@@ -1137,12 +1181,13 @@ clear_selection (string key) {
 
 bool
 qt_gui_rep::put_graphics_on_clipboard (url file) {
+  QClipboard *clipboard = system_clipboard ();
+  if (clipboard == NULL) return false;
   string extension = suffix (file) ;
   
     // for bitmaps this works :
   if ((extension == "bmp") || (extension == "png") ||
       (extension == "jpg") || (extension == "jpeg")) {
-    QClipboard *clipboard = QApplication::clipboard();
     c_string tmp (concretize (file));
     clipboard->setImage (QImage (QString (tmp)));
   }
@@ -1165,7 +1210,6 @@ qt_gui_rep::put_graphics_on_clipboard (url file) {
     QMimeData *mymimeData = new QMimeData;
     mymimeData->setData (mime, rawdata);
     
-    QClipboard *clipboard = QApplication::clipboard();
     clipboard->setMimeData (mymimeData);// default mode = QClipboard::Clipboard
   }
   return true;
@@ -1181,6 +1225,14 @@ void
 beep () {
     // Issue a beep
   QApplication::beep();
+}
+
+void
+image_gc (string name) {
+    // Garbage collect images of a given name; the Qt port keeps no image
+    // cache of its own (qt_pic_cache lives as long as the session), so
+    // there is nothing to collect
+  (void) name;
 }
 
 bool

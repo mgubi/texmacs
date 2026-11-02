@@ -19,7 +19,12 @@
 
 (tm-define bib-current-prefix "bib")
 (tm-define bib-style "plain")
-(tm-define bib-default-style "plain")
+
+;; The style on which each style falls back; "plain" for the others
+(define bib-style-fallback (make-ahash-table))
+
+(tm-define (bib-set-fallback s d)
+  (ahash-set! bib-style-fallback s d))
 
 (tm-define (bib-label what)
   `(label ,(string-append bib-current-prefix "-" what)))
@@ -31,7 +36,12 @@
   "")
 
 (tm-define (bib-mode? s)
-  (or (equal? bib-style s) (equal? bib-default-style s)))
+  ;; is s the current style or one of the styles on which it falls back?
+  (let loop ((x bib-style) (n 0))
+    (or (equal? x s)
+        (and (!= x "plain") (< n 100)
+             (loop (or (ahash-ref bib-style-fallback x) "plain")
+                   (+ n 1))))))
 
 (define (format-entries n x)
   (if (and (list? x) (nnull? x))
@@ -80,11 +90,11 @@
 (tm-define-macro (bib-define-style s d)
   (if (equal? s d)
       `(begin
-	 (set! bib-default-style ,s)
+	 (bib-set-fallback ,s ,d)
 	 (texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
 			 (bib-mode? ,s))))
       `(begin
-	 (set! bib-default-style ,d)
+	 (bib-set-fallback ,s ,d)
 	 (texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
 			 (bib-mode? ,s)
 			 ,(string->symbol (string-append "bib-" d "%")))))))
@@ -171,6 +181,19 @@
   `(with "font-shape" "italic" ,x))
 
 (tm-define (bib-translate s) `(localize ,s))
+
+(tm-define (bib-single-page? p)
+  ;; (bib-pages a) with one page, not pages kept as written ("12, 15--17"),
+  ;; as multi.page.check of BibTeX: no "-", "," or "+" in it
+  (and (== (length p) 2)
+       (or (nstring? (cadr p))
+           (list-and (map (lambda (c) (< (string-search-forwards c 0 (cadr p)) 0))
+                          (list "-" "," "+" (string (integer->char 21))))))))
+
+(tm-define (bib-page-range p)
+  ;; the text of (bib-pages a) or (bib-pages a b)
+  (if (== (length p) 2) (cadr p)
+      `(concat ,(cadr p) ,bib-range-symbol ,(caddr p))))
 
 (tm-define bib-range-symbol "")
 

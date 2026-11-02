@@ -20,6 +20,7 @@ int  get_nr_windows ();
 bool has_current_window ();
 url  get_current_window ();
 url  window_to_buffer (url win);
+url  window_to_file (url win);
 void window_set_buffer (url win, url name);
 void window_focus (url win);
 void switch_to_window (url win);

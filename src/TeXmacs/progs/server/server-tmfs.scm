@@ -356,9 +356,15 @@
                        (list :order "version-nr" #t))))))
 
 (define ((readable-by? uid) info)
+  ;; the permissions of a version are asked 5 seconds after its date, when
+  ;; they are all set. A version replaced before that is no longer there
+  ;; then (it was left out of the history of its file): for it, whether it
+  ;; ever was readable.
   (with (rid date name by msg) info
-    (with-time (+ (string->number date) 5)
-      (db-allow? rid uid "readable"))))
+    (with t (+ (string->number date) 5)
+      (if (with-time t (nnull? (db-get-field rid "type")))
+          (with-time t (db-allow? rid uid "readable"))
+          (with-time :always (db-allow? rid uid "readable"))))))
 
 (tm-service (remote-get-versions rname)
   ;;(display* "remote-get-versions " rname "\n")
@@ -483,16 +489,17 @@
              (list :error "Error: write access denied"))
             ((!= (version-get-number fid) (version-get-current vid))
              (list :error "Error: version number mismatch"))
-            ((== (string-load fname) doc) ;; no changes need to be saved
-             (list :unchanged fid))
             (else
-              (let* ((nr (version-next vid))
-                     (doc* (server-expand-cache-refs doc))
-                     (rid (remote-create uid rname vid nr doc msg)))
-                (copy-properties fid rid inherit-property?)
-                (db-remove-entry fid)
-                ;;(display* "Versions " rname ": " (version-get-versions vid) "\n")
-                (list :created rid))))))
+              (let* ((doc* (server-expand-cache-refs doc)))
+                (if (== (string-load fname) doc*) ;; no changes need to be saved
+                    (list :unchanged fid)
+                    (let* ((nr (version-next vid))
+                           (rid (remote-create uid rname vid nr doc* msg)))
+                      (copy-properties fid rid inherit-property?)
+                      (db-remove-entry fid)
+                      ;;(display* "Versions " rname ": "
+                      ;;          (version-get-versions vid) "\n")
+                      (list :created rid))))))))
 
 (tm-service (remote-file-save rname doc msg)
   ;;(display* "remote-file-save " rname ", " doc ", " msg "\n")

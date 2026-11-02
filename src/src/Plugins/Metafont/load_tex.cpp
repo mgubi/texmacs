@@ -73,6 +73,7 @@ try_tfm (string family, int size, int osize, tex_font_metric& tfm, bool make) {
   }
   // cout << "Tfm " << family << osize << " -> " << family << size << "\n";
   tfm= load_tfm (u, family, osize);
+  if (is_nil (tfm)) return false;
   if (size != osize)
     cache_set ("font_cache.scm",
 	       "tfm:" * family * as_string (osize), as_string (size));
@@ -204,6 +205,8 @@ try_pk (string family, int size, int dpi, int dsize,
   int tt_dpi = size<333? dpi : (size * dpi) / (100 * tt_size);
   string tt_name= tt_find_name (family, tt_size);
   if (tt_name != "") {
+    // FIXME: never true, tt_font_glyphs registers its glyphs under another
+    // name; harmless, since tt_font_glyphs finds its instance itself (#80)
     if (font_glyphs::instances -> contains (tt_name))
       pk= font_glyphs (tt_name);
     else pk= tt_font_glyphs (tt_name, tt_size, tt_dpi, tt_dpi);
@@ -297,7 +300,7 @@ rubber_fix (tex_font_metric tfm, font_glyphs& pk) {
   }
 }
 
-void
+bool
 load_tex (string family, int size, int dpi, int dsize,
 	  tex_font_metric& tfm, font_glyphs& pk)
 {
@@ -310,7 +313,7 @@ load_tex (string family, int size, int dpi, int dsize,
     {
       bench_cumul ("load tex font");
       rubber_fix (tfm, pk);
-      return;
+      return true;
     }
   if (DEBUG_VERBOSE) {
     debug_fonts << "Font " << family << size
@@ -322,7 +325,7 @@ load_tex (string family, int size, int dpi, int dsize,
       load_tex_pk ("ecrm", size, dpi, 10, tfm, pk))
     {
       bench_cumul ("load tex font");
-      return;
+      return false; // (the family is not there, ecrm takes its place)
     }
 #ifdef OS_WIN32
   else {
@@ -334,7 +337,7 @@ load_tex (string family, int size, int dpi, int dsize,
 	load_tex_pk ("ecrm", 10, 600, 10, tfm, pk))
       {
 	bench_cumul ("load tex font");
-	return;
+	return false;
       }
   }
 #endif
@@ -342,4 +345,5 @@ load_tex (string family, int size, int dpi, int dsize,
   failed_error << "Could not open " << name << "\n";
   FAILED ("Tex seems not to be installed properly");
   bench_cumul ("load tex font");
+  return false;
 }

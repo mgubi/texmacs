@@ -54,12 +54,16 @@ archiver::archiver (double author, path rp):
 
 void
 archiver_rep::clear () {
+  // NOTE: a document in its saved state remains so without its history
+  confirm ();
+  bool saved= conform_save ();
+  bool autosaved= conform_autosave ();
   archive= make_branches (0);
   current= make_compound (0);
   the_owner= 0;
   depth= 0;
-  last_save= -1;
-  last_autosave= -1;
+  last_save= (saved? 0: -1);
+  last_autosave= (autosaved? 0: -1);
 }
 
 void
@@ -110,6 +114,23 @@ global_cancel () {
     arch->simplify ();
   }
   pending_archs= hashset<pointer> ();
+}
+
+void
+global_forget_document (path rp) {
+  // The document at rp has been deleted (its buffer was closed): the
+  // archivers of its views must neither keep that deletion as a pending
+  // change, which a later global_cancel would undo by writing the closed
+  // document into a slot of the_et that a new buffer may use by then,
+  // nor keep a history for a document which no longer exists.
+  iterator<pointer> it = iterate (archs);
+  while (it->busy()) {
+    archiver_rep* arch= (archiver_rep*) it->next();
+    if (rp <= arch->rp) {
+      arch->clear ();
+      pending_archs->remove ((pointer) arch);
+    }
+  }
 }
 
 /******************************************************************************
@@ -179,6 +200,71 @@ cdr (patch p) {
 * Internal subroutines
 ******************************************************************************/
 
+static patch
+copy_for_apply (patch p) {
+  // the copy of the trees which a patch puts into the document (its
+  // modifications; its inverses, which ::apply does not use, are shared),
+  // with the numbers of the automatic labels of their tags: a tag which an
+  // undo or a redo brings back gives its labels the names they had (see
+  // copy_for_undo in commute.cpp)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    return patch (copy_for_undo (get_modification (p)), get_inverse (p));
+  case PATCH_COMPOUND:
+  case PATCH_BRANCH:
+    {
+      int i, n= N(p);
+      array<patch> r (n);
+      for (i=0; i<n; i++) r[i]= copy_for_apply (p[i]);
+      return patch (get_type (p) == PATCH_BRANCH, r);
+    }
+  case PATCH_BIRTH:
+    return p;
+  case PATCH_AUTHOR:
+    return patch (get_author (p), copy_for_apply (p[0]));
+  default:
+    FAILED ("unsupported patch type");
+  }
+  return p;
+}
+
+static patch
+apply_for_undo (patch p) {
+  // apply the patch p of an undo to the document, as copy_for_apply, and
+  // return its inverse, the patch of the redo. As invert (patch.cpp), but
+  // each modification of the inverse is made from the document just before
+  // the modification of p which it inverts is applied (invert in
+  // commute.cpp), instead of being the one which add stored: it holds copies
+  // of the trees which the undo removes, with the numbers of the automatic
+  // labels of their tags, so that a tag which a redo puts back gives its
+  // labels the names they had (the copies which add stores have none)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    {
+      modification m= get_modification (p);
+      modification i= invert (m, the_et);
+      ::apply (the_et, copy_for_undo (m));
+      return patch (i, m);
+    }
+  case PATCH_BRANCH:
+    ASSERT (N(p) <= 1, "ambiguous application");
+  case PATCH_COMPOUND:
+    {
+      int i, n= N(p);
+      array<patch> r (n);
+      for (i=0; i<n; i++) r[n-1-i]= apply_for_undo (p[i]);
+      return patch (get_type (p) == PATCH_BRANCH, r);
+    }
+  case PATCH_BIRTH:
+    return patch (get_author (p), !get_birth (p));
+  case PATCH_AUTHOR:
+    return patch (get_author (p), apply_for_undo (p[0]));
+  default:
+    FAILED ("unsupported patch type");
+  }
+  return p;
+}
+
 void
 archiver_rep::apply (patch p) {
   // apply a patch, while disabling versioning during the modifications
@@ -188,9 +274,27 @@ archiver_rep::apply (patch p) {
   bool global_old= busy_versioning;
   versioning= true;
   busy_versioning= true;
-  ::apply (p, the_et);
+  // the trees of the patch become part of the document: apply a copy, or
+  // later changes of the document in place would change the archive; the
+  // copy keeps the numbers of the automatic labels
+  ::apply (copy_for_apply (p), the_et);
   versioning= old;
   busy_versioning= global_old;
+}
+
+patch
+archiver_rep::apply_undo (patch p) {
+  // apply the patch of an undo, as apply, and return the patch of its redo
+  // (see apply_for_undo)
+  ASSERT (is_applicable (p, the_et), "invalid history");
+  bool old= versioning;
+  bool global_old= busy_versioning;
+  versioning= true;
+  busy_versioning= true;
+  patch q= apply_for_undo (p);
+  versioning= old;
+  busy_versioning= global_old;
+  return q;
 }
 
 void
@@ -281,7 +385,8 @@ archiver_rep::add (modification m) {
     //cout << "Change " << the_owner << " -> " << get_author () << "\n";
     confirm ();
   }
-  else the_owner= get_author ();
+  // also after a confirmation, which leaves no owner
+  the_owner= get_author ();
   modification i= invert (m, the_et);
   patch q (i, m);
   //cout << "Add [" << the_owner << "] " << q << "\n";
@@ -294,7 +399,8 @@ archiver_rep::start_slave (double a) {
     //cout << "Change " << the_owner << " -> " << get_author () << "\n";
     confirm ();
   }
-  else the_owner= get_author ();
+  // also after a confirmation, which leaves no owner
+  the_owner= get_author ();
   patch q (a, false);
   //cout << "Add [" << the_owner << "] " << q << "\n";
   current= patch (q, current);
@@ -320,12 +426,23 @@ archiver_rep::cancel () {
   }
 }
 
+bool
+archiver_rep::modifies () {
+  // (not only cursor positions)
+  return active () && nr_children (remove_set_cursor (current)) != 0;
+}
+
 void
 archiver_rep::confirm () {
   if (active ()) {
     current= patch (the_owner, compactify (current));
-    if (nr_children (remove_set_cursor (current)) == 0)
+    if (nr_children (remove_set_cursor (current)) == 0) {
+      // only cursor positions: nothing to archive, and no owner either, or
+      // the first change of the next step would be confirmed on its own,
+      // as a change of this owner
       current= make_compound (0);
+      the_owner= 0;
+    }
     if (active ()) {
       //cout << "Confirm " << current << "\n";
       archive= patch (current, archive);
@@ -432,8 +549,7 @@ archiver_rep::undo_one (int i) {
     ASSERT (i == 0, "index out of range");
     patch p= car (get_undo (archive));
     ASSERT (is_applicable (p, the_et), "history corrupted");
-    patch q= invert (p, the_et);
-    apply (p);
+    patch q= apply_undo (p);
     patch re1= patch (q, get_redo (archive));
     patch nx = cdr (get_undo (archive));
     patch re2= get_redo (nx);
@@ -561,7 +677,7 @@ has_marker (patch archive, double m) {
 }
 
 static patch
-remove_marker_bis (patch archive, double m) {
+remove_marker_bis (patch archive, double m, bool& ok) {
   ASSERT (nr_undo (archive) != 0, "marker not found");
   if (is_marker (car (get_undo (archive)), m, false)) {
 #ifdef ADVANCED_DEVELOPER_MODE
@@ -570,7 +686,8 @@ remove_marker_bis (patch archive, double m) {
     if (nr_redo (archive) != 0) {
       // NOTE: temporary fix: turn fatal error into warning
       cout << "TeXmacs] warning, cannot remove marker\n";
-      return make_compound (0);
+      ok= false;
+      return archive;
     }
 #endif
     return cdr (get_undo (archive));
@@ -578,20 +695,33 @@ remove_marker_bis (patch archive, double m) {
   else {
     patch un= get_undo (archive);
     patch re= get_redo (archive);
-    patch rem= remove_marker_bis (cdr (un), m);
+    patch rem= remove_marker_bis (cdr (un), m, ok);
     return make_history (patch (car (un), rem), re);
   }
 }
 
 static patch
 remove_marker (patch archive, double m) {
-  archive= compress (archive);
   if (!has_marker (archive, m)) {
     // NOTE: temporary fix of bug #60743: turn fatal error into warning
     cout << "TeXmacs] warning, marker not found\n";
-    return make_compound (0);
+    return archive;
   }
-  return remove_marker_bis (compress (archive), m);
+  // NOTE: the history remains as it is when the marker cannot be removed
+  bool ok= true;
+  patch removed= remove_marker_bis (compress (archive), m, ok);
+  return ok? removed: archive;
+}
+
+static int
+nr_steps (patch archive) {
+  // the number of successive changes which can be undone
+  int n= 0;
+  while (nr_undo (archive) != 0) {
+    n++;
+    archive= cdr (get_undo (archive));
+  }
+  return n;
 }
 
 void
@@ -611,8 +741,11 @@ archiver_rep::mark_end (double m) {
     //  cout << "CONFIRM: " << current << "\n";
     confirm ();
   }
+  // NOTE: besides the marker, the changes which were made since the marker
+  // and which are compressed into a single one no longer count in the depth
+  int n= nr_steps (archive);
   archive= remove_marker (archive, m);
-  depth--;
+  depth -= n - nr_steps (archive);
   simplify ();
   //show_all ();
 }
@@ -620,18 +753,21 @@ archiver_rep::mark_end (double m) {
 bool
 archiver_rep::mark_cancel (double m) {
   //cout << "Mark cancel " << m << "\n";
+  if (!has_marker (archive, m)) return false;
   cancel ();
   while (nr_undo (archive) != 0) {
     expose ();
     if (is_marker (car (get_undo (archive)), m, false)) {
+      int n= nr_steps (archive);
       archive= remove_marker (archive, m);
-      depth--;
+      depth -= n - nr_steps (archive);
       simplify ();
       return true;
     }
     if (get_author (car (get_undo (archive))) != the_author) {
+      int n= nr_steps (archive);
       archive= remove_marker (archive, m);
-      depth--;
+      depth -= n - nr_steps (archive);
       return false;
     }
     retract ();

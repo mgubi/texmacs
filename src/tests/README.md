@@ -114,7 +114,8 @@ moved.
 exits with their status:
 
 ```
-tests/scheme/check.sh                     # the regression suites
+tests/scheme/check.sh                     # the regression suites, and typeset-check
+tests/scheme/check.sh typeset-check       # the typeset suite in the check modes
 tests/scheme/check.sh integration         # the integration suites
 tests/scheme/check.sh glue tmhtml         # some suites, by name
 tests/scheme/check.sh path/to/foo-test.scm  # a suite not listed yet
@@ -125,7 +126,12 @@ regression suites, which `run-all-tests` runs, and the integration suites
 (server backup, cache, notifications and tmfs), which have side effects and
 which `run-integration-tests` runs. Both run every suite, also after one
 has failed, and return the number of failed suites; `run-regression-suite`
-runs one suite by name. `integration-test-group` adds the tests which
+runs one suite by name. `typeset-check` runs the `typeset` suite again
+with the caches of the typesetting in their check modes
+(`TEXMACS_TYPESET_READS=check`, `TEXMACS_TYPESET_CACHES=check` and the
+page switches), which make each cached result again and count the
+differences: its checks of `typeset-check-mismatches` find nothing
+otherwise. `integration-test-group` adds the tests which
 fail to `integration-failure-total`, which is how their failures are
 counted.
 
@@ -161,6 +167,14 @@ and mode, `former`, properties, modes and sub-modes, `lazy-define` and the
 module macros). What needs a buffer, the cursor or the GUI is left out;
 checks which fail because of a bug in the sources are left out with a
 `FIXME` at their place.
+
+`search-test.scm` tests the search engine of Edit > Search and Edit >
+Replace (`src/Data/Tree/tree_search.cpp`) on detached trees: text, tags
+(the examples of the manual), formulas, wildcards, select-region, patterns
+of several paragraphs, the limit on the hits and the search from a
+position, case-insensitive matching, each for the two ways of matching of
+Edit > Search and Edit > Replace, and the time of a search in a long
+formula.
 
 Three more test the document level. `latex-test.scm` converts to and from
 LaTeX (special characters, accents, structure, formulas, tables, theorems,

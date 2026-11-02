@@ -367,7 +367,7 @@ edit_table_rep::table_individualize (path fp, string var) {
             tree with (CWITH);
             with << as_string (i+1) << as_string (i+1)
                  << as_string (j+1) << as_string (j+1)
-                 << copy (st[k][4]) << copy (st[k][5]) << copy (st[k][6]);
+                 << copy (st[k][4]) << copy (st[k][5]);
             ins_format << with;
           }
         remove (fp * k, 1);
@@ -1436,6 +1436,7 @@ edit_table_rep::cell_set_format (string var, tree val) {
   if (selection_active_table (false)) {
     int row1, col1, row2, col2, rows, cols;
     path fp= selection_get_subtable (row1, col1, row2, col2);
+    if (is_nil (fp)) return;
     row1++; col1++; row2++; col2++;
     table_get_extents (fp, rows, cols);
     if (rows > row1 && row1 <= 2 && row2 == rows) row2= -1;
@@ -1476,6 +1477,7 @@ edit_table_rep::cell_del_format (string var) {
   if (selection_active_table (false)) {
     int row1, col1, row2, col2;
     path fp= selection_get_subtable (row1, col1, row2, col2);
+    if (is_nil (fp)) return;
     table_del_format (fp, row1+1, col1+1, row2+1, col2+1, var);
   }
   else {

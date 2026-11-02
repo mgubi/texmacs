@@ -177,11 +177,11 @@
   (check= (cAr (ev '(with "f" (macro "x" (arg "x" "1" "0"))
                       (f (tuple "a" (tuple "b" "c"))))))
           "b")
-  ;; FIXME: the error of an arg whose path leaves the argument is made
-  ;; with the label of a compound tree (Typeset/Env/env_exec.cpp:907,
-  ;; r->label after r= r[nr]): (with "f" (macro "x" (arg "x" "5"))
-  ;; (f (tuple "a"))) gives (error "arg ") followed by garbage bytes,
-  ;; expected (error "arg x").
+  ;; an arg whose path leaves the argument is an error, which names it
+  (check= (cAr (ev '(with "f" (macro "x" (arg "x" "5")) (f (tuple "a")))))
+          '(error "arg x"))
+  (check= (cAr (ev '(with "f" (macro "x" (arg "x" "0" "0")) (f (tuple "a")))))
+          '(error "arg x"))
   (check= (cAr (ev '(with "f" (xmacro "x" (concat (arg "x" "2") (arg "x" "0")))
                       (f "a" "b" "c"))))
           "ca")
@@ -1044,6 +1044,65 @@
      (check-true (tree-possible-arity? (sub 0) 2))
      (check-false (tree-possible-arity? (sub 0) 3)))))
 
+;; A macro may be called string, as any other name: the name used to give the
+;; label of the atomic trees, of arity zero, and \string + return crashed (#678).
+(define (hybrid-string)
+  (go-end)
+  (update-forced)
+  (apply-changes)
+  (make-hybrid)
+  (insert "string")
+  (activate-hybrid #f)
+  (update-forced)
+  (apply-changes)
+  (tree->stree (buffer-get-body (current-buffer))))
+
+(define (test-string-macro)
+  (check-group "a macro called string")
+  (with-document
+   (doc-with '("generic") '(document (string "ab") "z")
+             '("string" (macro "x" (concat "[" (arg "x") "]"))))
+   (lambda ()
+     (update-menus)
+     (check= (tag-minimal-arity 'string) 1)
+     (check= (tag-maximal-arity 'string) 1)
+     (check-true (tree-label-macro? 'string))
+     (check-true (tree-label-extension? 'string))
+     (check= (ev (T '(string "ab"))) "[ab]")
+     (check= (ev (T '(compound "string" "ab"))) "[ab]")
+     (check= (tree->stree (sub 0)) '(string "ab"))
+     (check= (hybrid-string)
+             '(document (string "ab") (concat "z" (string ""))))))
+  ;; map-args makes trees from the name of a tag
+  (with-document
+   (doc-with '("generic") '(document "z")
+             '("string" (macro "x" (concat "[" (arg "x") "]")))
+             '("wrap" (xmacro "a" (map-args "identity" "string" "a")))
+             '("each" (xmacro "a" (map-args "string" "concat" "a"))))
+   (lambda ()
+     (check= (ev (T '(wrap "ab"))) "[ab]")
+     (check= (ev (T '(each "ab" "cd"))) "[ab][cd]")))
+  ;; activating an inactive compound tag gives the tag
+  (with-document
+   (doc-with '("generic") '(document (inactive (compound "string" "ab"))))
+   (lambda ()
+     (go-to (at 0 0 1 1))
+     (activate)
+     (update-forced)
+     (check= (tree->stree (buffer-get-body (current-buffer)))
+             '(document (string "ab")))))
+  ;; without a macro, it is an unknown command, as for any other name
+  (with-document
+   (doc-with '("generic") '(document "z"))
+   (lambda ()
+     (check= (hybrid-string)
+             '(document (concat "z" (inactive (hybrid "string")))))))
+  ;; in the source mode, it is a new tag
+  (with-document
+   (doc-with '("source") '(document "z"))
+   (lambda ()
+     (check= (hybrid-string) '(document (concat "z" (string)))))))
+
 ;; The accessible children decide where the cursor can be: go-to puts the
 ;; cursor anywhere, cursor-accessible? tells whether it may stay there.
 (define (test-drd-cursor)
@@ -1080,14 +1139,15 @@
      (check-true (cursor-accessible?))
      (go-to (at 0 1))
      (check-true (cursor-accessible?))
-     ;; FIXME: path-next and path-previous (next_valid, previous_valid)
-     ;; go into the children which are not accessible: move_valid_bis
-     ;; (Data/Tree/tree_traverse.cpp:282) tests is_accessible_path on the
-     ;; whole cursor path, whose last item is a position and not a child,
-     ;; so that a cursor path is never seen as accessible and the move is
-     ;; made in source mode. In (concat "x" (label "lab") "y"),
-     ;; (path-next (buffer-tree) '(2 1 0)) gives (2 1 0 0), inside the
-     ;; label, where cursor-accessible? is false; expected (2 1 1).
+     ;; path-next and path-previous skip the children which are not
+     ;; accessible, and go into those which are
+     (check= (path-next (buffer-tree) '(2 0)) '(2 1))
+     (check= (path-previous (buffer-tree) '(2 1)) '(2 0))
+     (check= (path-next (buffer-tree) '(0 0 2)) '(0 1))
+     (check= (path-previous (buffer-tree) '(0 0 0)) '(0 0))
+     (check= (path-next (buffer-tree) '(5 0 1)) '(5 1))
+     (check= (path-next (buffer-tree) '(3 0)) '(3 0 0))
+     (check= (path-next (buffer-tree) '(5 0)) '(5 0 0))
      (go-to (at 2 0))
      (check-true (cursor-accessible?))
      (go-to (at 2 1))
@@ -1186,6 +1246,7 @@
   (run-group test-own-package)
   (run-group test-main-styles)
   (run-group test-drd-user-macros)
+  (run-group test-string-macro)
   (run-group test-drd-cursor)
   (remove-tmp-dir)
   (check-end))

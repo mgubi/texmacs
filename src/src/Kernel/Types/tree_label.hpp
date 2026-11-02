@@ -146,6 +146,10 @@ enum tree_label {
   APPLY, BEGIN, END, FUNC, ENV,
   AUTHORIZE, POSTSCRIPT,
 
+  // added since: after the others, whose numbers stay (a cache_ref sends
+  // the number of a tag to the clients: tree_cache::generate_cache_ref)
+  AUTO_ID,
+
   // user extensions
   START_EXTENSIONS
 };

@@ -277,7 +277,7 @@ homoglyph_correct (array<tree> a) {
         if (tp[j1] != SYMBOL_SKIP && tp[j1] != SYMBOL_SCRIPT) break;
       for (j2= i+1; j2<N(a); j2++)
         if (tp[j2] != SYMBOL_SKIP && tp[j2] != SYMBOL_SCRIPT) break;
-      if (j1 < 0 || j2 >= N(a));
+      if (j1 < 0 || j2 >= N(a)) r << a[i]; // not between two operands
       else if ((a[i] == "\\" ||
                 a[i] == "<backslash>") &&
                ((tp[j1] == SYMBOL_BASIC) ||

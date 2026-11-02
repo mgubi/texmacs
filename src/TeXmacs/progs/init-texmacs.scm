@@ -127,7 +127,7 @@
 
 ;(display "Booting utilities\n")
 (use-modules (utils library cpp-wrap))
-(lazy-define (utils library cursor) notify-cursor-moved)
+(lazy-define (utils library cursor) notify-cursor-moved notify-undo-redo)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
@@ -282,8 +282,7 @@
 (lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
-(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
-	   prog-menu prog-icons)
+(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -327,6 +326,8 @@
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)
+(lazy-menu (graphics graphics-menu) graphics-insert-menu graphics-focus-menu)
+(lazy-define (graphics graphics-group) graphics-selection-active?)
 (lazy-define (graphics graphics-utils) make-graphics)
 (lazy-define (graphics graphics-edit)
              graphics-busy?
@@ -362,8 +363,7 @@
            graphics-overlays-menu graphics-screens-menu
            graphics-focus-overlays-menu graphics-focus-overlays-icons)
 (lazy-menu (dynamic session-menu) insert-session-menu session-help-icons)
-(lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu
-           plugin-eval-menu plugin-eval-toggle-menu plugin-plot-menu)
+(lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu)
 (lazy-menu (dynamic calc-menu) calc-table-menu calc-insert-menu
            calc-icourse-menu)
 (lazy-menu (dynamic animate-menu) insert-animation-menu animate-toolbar)
@@ -385,6 +385,7 @@
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src
              docgrep-in-texts docgrep-in-recent)
+(lazy-define (doc help-funcs) help-caches-update)
 (lazy-define (doc tmdoc-search) tmdoc-search-style tmdoc-search-tag
              tmdoc-search-parameter tmdoc-search-scheme)
 (lazy-define (doc tmweb) youtube-select
@@ -447,6 +448,7 @@
 (lazy-define (database ai-agents-menu) open-ai-agents in-ai-agents?)
 (lazy-menu (database db-menu) db-menu db-toolbar)
 (lazy-tmfs-handler (database db-tmfs) db)
+(lazy-tmfs-handler (database bib-local) biblio)
 (lazy-keyboard (database bib-kbd) in-bib?)
 (tm-property (open-biblio) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -527,6 +529,7 @@
 (lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
+(lazy-define (tools ai ai-compress) with-compress-table compress-table-callback)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

@@ -19,7 +19,6 @@
 
 extern int  pastel;
 extern bool true_colors;
-extern bool reverse_color;
 
 extern color black, white, red, green, blue;
 extern color yellow, magenta, orange, brown, pink;
@@ -45,14 +44,8 @@ void   get_rgb_color (color col, int& r, int& g, int& b, int& a);
 color  xpm_color (string s);
   // get a color by its xpm description
 
-void   get_xpm_color (color col, string &s);
-  // get the XPM description of a color
-
 color  cmyk_color (int c, int m, int y, int k, int a= 255);
   // get a color by its CMYK components
-
-void   get_cmyk_color (color col, int& r, int& g, int& b, int& a);
-  // get the CMYK components of a color
 
 bool   is_color_name (string s);
 color  named_color (string s, int a= 255);
@@ -86,18 +79,5 @@ typedef struct {
   const char *name;
   int r,g,b;
 } rgb_record;
-
-/******************************************************************************
-* Color dictionnaries
-******************************************************************************/
-
-typedef hashmap<string,color> colorhash;
-static colorhash tm_ch, dvips_ch, x11_ch, xc_ch, svg_ch;
-inline color dvips_color (string s) {return dvips_ch[locase_all (s)];};
-inline color x11_color   (string s) {return x11_ch  [locase_all (s)];};
-inline color svg_color   (string s) {return svg_ch  [locase_all (s)];};
-inline color html_color  (string s) {return svg_ch  [locase_all (s)];};
-inline color tm_color    (string s) {return tm_ch   [locase_all (s)];};
-inline color xc_color    (string s) {return xc_ch   [locase_all (s)];};
 
 #endif // defined COLORS_H

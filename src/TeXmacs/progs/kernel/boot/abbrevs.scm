@@ -71,15 +71,17 @@
 
 (if (guile-c?)
     (define-public (save-object file value)
-      (pretty-print value (open-file (url-materialize file "") OPEN_WRITE))
-      (flush-all-ports))
+      (call-with-output-file (url-materialize file "")
+        (lambda (port) (pretty-print value port))))
     (define-public (save-object file value)
-      (write value (open-file (url-materialize file "") OPEN_WRITE))
-      (flush-all-ports)))
+      (call-with-output-file (url-materialize file "")
+        (lambda (port) (write value port)))))
 
 (define-public (load-object file)
   (let ((r (catch #t
-    (lambda () (read (open-file (url-materialize file "r") OPEN_READ)))
+    (lambda ()
+      (call-with-input-file (url-materialize file "r")
+        (lambda (port) (read port))))
     (lambda (key msg . err-msg)
       (let* ((msg (car err-msg))
 	     (args (cadr err-msg))
@@ -116,10 +118,16 @@
      ,@body))
 
 (define-public-macro (with-global var val . body)
-  (let ((old (gensym)) (new (gensym)))
+  ;; the variable is restored after an error too; lazy-catch rethrows from
+  ;; where the error happened, so that backtraces still point there
+  (let ((old (gensym)) (new (gensym)) (args (gensym)))
     `(let ((,old ,var))
        (set! ,var ,val)
-       (let ((,new (begin ,@body)))
+       (let ((,new (lazy-catch #t
+                          (lambda () ,@body)
+                          (lambda ,args
+                            (set! ,var ,old)
+                            (apply throw ,args)))))
          (set! ,var ,old)
          ,new))))
 

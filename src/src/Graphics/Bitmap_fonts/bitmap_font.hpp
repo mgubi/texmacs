@@ -36,9 +36,9 @@ typedef metric_struct metric[1];
 struct glyph_rep: concrete_struct {
   unsigned int index;        // physical index of glyph in font
   short depth;               // number of bits per pixel >= depth
-  short width, height;       // width and height in pixels
-  short xoff, yoff;          // offset of origin
-  short lwidth;              // logical width of character
+  int   width, height;       // width and height in pixels (not short: the
+  int   xoff, yoff;          // glyphs of the wide braces of the virtual
+  int   lwidth;              // fonts at a large zoom are wider, #659)
   short status;              // status for extensible characters
   short artistic;            // result of applying an artistic effect
   N8*   raster;              // character definition
@@ -63,12 +63,17 @@ CONCRETE_NULL_CODE(glyph);
 
 inline int
 glyph_rep::get_1 (int i, int j) {
+  // (nothing outside: an empty glyph is one too large for its raster)
+  if (((unsigned) i) >= ((unsigned) width) ||
+      ((unsigned) j) >= ((unsigned) height)) return 0;
   int bit= j*width+i;
   return (raster[bit>>3] >> (bit&7)) & 1;
 }
 
 inline void
 glyph_rep::set_1 (int i, int j, int with) {
+  if (((unsigned) i) >= ((unsigned) width) ||
+      ((unsigned) j) >= ((unsigned) height)) return;
   int bit= j*width+i;
   if (with==0) raster[bit>>3] &= ~(1 << (bit&7));
   else raster[bit>>3] |= (1 << (bit&7));

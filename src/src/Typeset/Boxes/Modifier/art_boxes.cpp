@@ -75,6 +75,12 @@ art_box_rep::display_image (renderer ren, url u, tree eff,
   ren->round (xr, yt);
   //}
   SI xw= xr - xl, yh= yt - yb;
+  // a piece without a width or a height is not drawn: a size of zero asks
+  // a renderer for the picture at its own size, and the piece of a shadow
+  // which a box has no room for (the left half of a "quarter" shadow, the
+  // top of one which only bends at the bottom) was drawn whole across the
+  // box (seen with the GPU renderer, in the browser)
+  if (xw <= 0 || yh <= 0) return;
   if (eff != "") {
     array<url> args;
     args << u;

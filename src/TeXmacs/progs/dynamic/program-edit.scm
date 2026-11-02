@@ -390,22 +390,6 @@
   (:require (== l "program"))
   (prog-field-parameters "program"))
 
-(tm-define (standard-parameters l)
-  (:require (== l "input"))
-  (prog-field-parameters "input"))
-
-(tm-define (standard-parameters l)
-  (:require (== l "output"))
-  (prog-field-parameters "output"))
-
-(tm-define (standard-parameters l)
-  (:require (== l "errput"))
-  (prog-field-parameters "errput"))
-
-(tm-define (standard-parameters l)
-  (:require (== l "textput"))
-  (prog-field-parameters "textput"))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

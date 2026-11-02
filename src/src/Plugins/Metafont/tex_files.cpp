@@ -144,8 +144,8 @@ make_tex_tfm (string name) {
   if (get_setting ("MAKETFM") == "maketfm"){
     if (name(N(name) - 4, N(name)) == ".tfm")
       name = name (0, N(name) - 4);
-    s = "maketfm --dest-dir \"" * get_env("$TEXMACS_HOME_PATH")
-      * "\\fonts\\tfm\" " * name;
+    s = "maketfm --dest-dir \""
+      * as_string (url ("$TEXMACS_HOME_PATH/fonts/tfm")) * "\" " * name;
     if (DEBUG_VERBOSE) debug_fonts << "Executing " << s << "\n";
     r= system (s);
   }
@@ -177,12 +177,12 @@ make_tex_pk (string name, int dpi, int design_dpi) {
   if (get_setting ("MAKEPK") == "makepk") {
 #ifdef OS_WIN32
     s = "makepk --dest-dir \""
-      * get_env("$TEXMACS_HOME_PATH") * "\\fonts\\pk\" "
+      * as_string (url ("$TEXMACS_HOME_PATH/fonts/pk")) * "\" "
       * name * " " * as_string(dpi) * " " * as_string(design_dpi)
       * " " * as_string(dpi) * "%//" * as_string(design_dpi);
 #else
     s = "makepk --dest-dir \""
-      * get_env("$TEXMACS_HOME_PATH") * "\\fonts\\pk\" "
+      * as_string (url ("$TEXMACS_HOME_PATH/fonts/pk")) * "\" "
       * name * " " * as_string(dpi) * " " * as_string(design_dpi)
       * " " * as_string(dpi) * "/" * as_string(design_dpi);
 #endif

@@ -211,12 +211,84 @@
   (check= (st (generic->texmacs "x" "texmacs-document"))
           '(error "bad format or data")))
 
+;; <string|abc> is a tag like <foo|abc> (see test-string-tag in trees-test): it
+;; used to crash the loading of a .tm file, or to give random bytes (#678).
+(define (test-tm-string-tag)
+  (check-group "the tag string in a tm document")
+  (let* ((body '(document (concat "x" (string "abc") "y" (string)
+                                  (compound "string" "z"))))
+         (doc (tmfile body))
+         (text (export doc "texmacs-document")))
+    (check-true (contains? text "<string|abc>"))
+    (check-true (contains? text "<string>"))
+    (check-true (contains? text "<compound|string|z>"))
+    (check= (import text "texmacs-document") doc)
+    (check= (round-trip doc "texmacs-document") doc)
+    (check= (round-trip doc "tmml-document") doc)
+    (check= (round-trip doc "stm-document") doc))
+  (check= (import "<string|abc>" "texmacs-snippet") '(document (string "abc")))
+  (check= (import "<\\string>\n  abc\n</string>" "texmacs-snippet")
+          '(document (string (document "abc"))))
+  (check= (export '(string "abc") "texmacs-snippet") "<string|abc>")
+  (check= (import "(document (string \"abc\"))" "stm-snippet")
+          '(document (string "abc")))
+  ;; through the upgrade of the documents of old versions
+  (for-each (lambda (form)
+              (with text (string-append "<TeXmacs|1.0.0>\n\n<style|generic>\n\n"
+                                        "<\\body>\n  " form "\n</body>\n")
+                (check= (assoc 'body (cdr (import text "texmacs-document")))
+                        '(body (document (string "abc"))))))
+            '("<string|abc>" "<apply|string|abc>" "<expand|string|abc>")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Scheme format
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; stm is the TeXmacs tree written as a Scheme expression, and gives back
 ;; every tree, inline or block, unchanged.
+;; raw-data holds the bytes of an embedded file, written <#hexadecimal> in a tm
+;; file. Without its argument, which only a hand-written or damaged file has,
+;; it crashed the writer, and in the tmml format it was an error; a <#...> next
+;; to other content made the reader lose the whole body (#685).
+(define (test-tm-raw-data)
+  (check-group "the tag raw-data in a tm document")
+  (for-each
+   (lambda (body)
+     (with doc (tmfile `(document ,body))
+       (check= (import (export doc "texmacs-document") "texmacs-document") doc)
+       (check= (round-trip doc "tmml-document") doc)
+       (check= (round-trip doc "stm-document") doc)))
+   '((raw-data)
+     (raw-data "")
+     (raw-data "a\xff")
+     (raw-data (em "q"))
+     (concat "x " (raw-data) " y")
+     (concat "x " (raw-data "") " y")
+     (concat "x " (raw-data "a") " y " (raw-data "b"))
+     (concat "x " (raw-data (em "q")) " y")
+     (image (tuple (raw-data) "png") "1cm" "" "" "")
+     (image (tuple (raw-data "") "png") "1cm" "" "" "")
+     (image (tuple (raw-data "a") "png") "1cm" "" "" "")))
+  (check= (export '(raw-data) "texmacs-snippet") "<raw-data>")
+  (check= (export '(raw-data "") "texmacs-snippet") "<#>")
+  (check= (export '(raw-data "a\xff") "texmacs-snippet") "<#61FF>")
+  (check= (export '(raw-data (em "q")) "texmacs-snippet") "<raw-data|<em|q>>")
+  (check= (export '(concat "x " (raw-data) " y") "texmacs-snippet")
+          "x <raw-data> y")
+  (check= (import "x <#61> y" "texmacs-snippet")
+          '(document (concat "x " (raw-data "a") " y")))
+  (check= (import "<foo|<#61> c|b>" "texmacs-snippet")
+          '(document (foo (concat (raw-data "a") " c") "b")))
+  (check= (import "<\\foo>\n  <#61>\n</foo>" "texmacs-snippet")
+          '(document (foo (document (raw-data "a")))))
+  ;; a file which ends inside the tag
+  (check= (import "<#" "texmacs-snippet") '(document (raw-data "")))
+  (check= (import "a<#" "texmacs-snippet")
+          '(document (concat "a" (raw-data ""))))
+  ;; the other formats have no raw data: the text around it is kept
+  (check= (export '(concat "x " (raw-data) " y") "verbatim-snippet") "x  y")
+  (check= (export '(concat "x " (raw-data) " y") "html-snippet") "x  y"))
+
 (define (test-stm)
   (check-group "stm")
   (check= (export '(frac "a" (sqrt "b")) "stm-snippet")
@@ -348,6 +420,19 @@
   (check= (html '(concat "a" (next-line) "b")) "a<br />b")
   (check= (html '(hrule)) "<hr></hr>")
   (check= (html '(nbsp)) "&nbsp;")
+  ;; the background of a cell: a pattern of 3, 4 or 5 arguments, with the base
+  ;; color (opaque) as background-color
+  (with cell (lambda (pat)
+               (html `(tformat (cwith "1" "1" "1" "1" "cell-background" ,pat)
+                               (table (row (cell "a"))))))
+    (check= (cell '(pattern "a.png" "1cm" "1cm"))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm\">a</td></tr></tbody></table>")
+    (check= (cell '(pattern "a.png" "1cm" "1cm" (eff-recolor "0" "red")))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm\">a</td></tr></tbody></table>")
+    (check= (cell '(pattern "a.png" "1cm" "1cm" "" "#ffe0a080"))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm; background-color: #ffe0a0\">a</td></tr></tbody></table>")
+    (check= (cell '(pattern "a.png" "1cm" "1cm" "" "none"))
+            "<table style=\"display: inline-table; vertical-align: middle\"><tbody><tr><td style=\"background: url('a.png'); background-size: 1cm 1cm\">a</td></tr></tbody></table>"))
   ;; the code environments keep their spaces and line breaks
   (check= (export '(code (document "x" "  y")) "html-snippet")
           "<pre class=\"verbatim\" xml:space=\"preserve\">\nx\n  y</pre>")
@@ -573,10 +658,10 @@
   (check= (export "<alpha><less><gtr>\xe9" "verbatim-snippet"
                   (cons "texmacs->verbatim:encoding" "cork"))
           "<alpha><less><gtr>\xe9")
-  ;; Latin-1 has no alpha, which is left out
+  ;; Latin-1 has no alpha, which becomes a ? (#90; it was left out)
   (check= (export "<alpha><less><gtr>\xe9" "verbatim-snippet"
                   (cons "texmacs->verbatim:encoding" "iso-8859-1"))
-          "<>\xe9")
+          "?<>\xe9")
   ;; a document of TeXmacs gives its body
   (check= (export (tmfile '(document "x" "y")) "verbatim-document") "x\ny"))
 
@@ -830,6 +915,8 @@
   (test-tm-parse)
   (test-tm-round-trip)
   (test-tm-document)
+  (test-tm-string-tag)
+  (test-tm-raw-data)
   (test-stm)
   (test-tmml-serialize)
   (test-tmml-parse)

@@ -126,10 +126,11 @@
 (menu-bind view-menu
   (if (not (window-per-buffer?))
       ("New window" (new-document*))
-      ("Open in new window" (open-document*))
-      ;;("Clone window" (clone-window))
-      ("Close window" (close-document*))
-      ---)
+      ("Open in new window" (open-document*)))
+  ("Clone window" (clone-window))
+  (if (not (window-per-buffer?))
+      ("Close window" (close-document*)))
+  ---
   ("Full screen mode"  (toggle-full-screen-edit-mode))
   ("Presentation mode" (toggle-full-screen-mode))
   ("Show panorama" (toggle-panorama-mode))

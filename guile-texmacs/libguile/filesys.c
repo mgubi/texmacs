@@ -1779,6 +1779,30 @@ scm_init_filesys ()
  scm_c_define_gsubr (s_scm_copy_file, 2, 0, 0, (SCM (*)()) scm_copy_file); ;
  scm_c_define_gsubr (s_scm_dirname, 1, 0, 0, (SCM (*)()) scm_dirname); ;
  scm_c_define_gsubr (s_scm_basename, 1, 1, 0, (SCM (*)()) scm_basename); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(HAVE_CHOWN)
+  scm_c_define_gsubr (s_scm_chown, 3, 0, 0, (SCM (*)()) scm_chown); ;
+#endif
+#if defined(S_ISLNK)
+  scm_sym_symlink = scm_permanent_object (scm_from_locale_symbol ("symlink"));
+#endif
+#if defined(HAVE_LINK)
+  scm_c_define_gsubr (s_scm_link, 2, 0, 0, (SCM (*)()) scm_link); ;
+#endif
+#if defined(HAVE_FCNTL)
+  scm_c_define_gsubr (s_scm_fcntl, 2, 1, 0, (SCM (*)()) scm_fcntl); ;
+#endif
+#if defined(HAVE_SYMLINK)
+  scm_c_define_gsubr (s_scm_symlink, 2, 0, 0, (SCM (*)()) scm_symlink); ;
+#endif
+#if defined(HAVE_READLINK)
+  scm_c_define_gsubr (s_scm_readlink, 1, 0, 0, (SCM (*)()) scm_readlink); ;
+#endif
+#if defined(HAVE_LSTAT)
+  scm_c_define_gsubr (s_scm_lstat, 1, 0, 0, (SCM (*)()) scm_lstat); ;
+#endif
 
 }
 

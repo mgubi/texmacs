@@ -119,6 +119,16 @@ renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2) {
 }
 
 void
+renderer_rep::embed_video (url u, int ms, bool repeat,
+                           SI x1, SI y1, SI x2, SI y2) {
+  // the animated image u is displayed in the rectangle, ms milliseconds per
+  // frame; renderers which can play videos (PDF) add it to their output,
+  // the others ignore it
+  (void) u; (void) ms; (void) repeat;
+  (void) x1; (void) y1; (void) x2; (void) y2;
+}
+
+void
 renderer_rep::toc_entry (string kind, string title, SI x, SI y) {
   (void) kind; (void) title;
   (void) x; (void) y;
@@ -410,6 +420,15 @@ renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
     get_clipping (cx1, cy1, cx2, cy2);
     extra_clipping (x1, y1, x2, y2);
 
+    // the base color, if one was chosen, is painted first, opaque: the
+    // transparent parts of the image show it, on a screen as in a print
+    color base;
+    if (get_pattern_base (pattern, base)) {
+      set_background (brush (base));
+      clear (x1, y1, x2, y2);
+      set_background (b);
+    }
+
     url u= b->get_pattern_url ();
     int imw_pt, imh_pt;
     image_size (u, imw_pt, imh_pt);
@@ -443,7 +462,7 @@ renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
     SI sx= -mx1;
     SI sy= -my2;
     tree eff= "";
-    if (N(pattern) == 4 && is_compound (pattern[3])) eff= pattern[3];
+    if (N(pattern) >= 4 && is_compound (pattern[3])) eff= pattern[3];
     scalable im= load_scalable_image (u, w+dw, h+dh, eff, pixel);
     for (int i= ((x1+sx)/w) - 1; i <= ((x2+sx)/w) + 1; i++)
       for (int j= ((y1+sy)/h) - 1; j <= ((y2+sy)/h) + 1; j++) {

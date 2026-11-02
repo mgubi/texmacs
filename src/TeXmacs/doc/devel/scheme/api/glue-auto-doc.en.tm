@@ -19,6 +19,30 @@ source code.
 \;
 
   <\explain>
+    <scm|(typeset-check-mismatches)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_check_mismatches> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(typeset-pass-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_passes> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(typeset-redone-count)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_typeset_redone> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -171,6 +195,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-set-next-window-without-focus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_set_next_window_without_focus> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(support-functionality? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -208,6 +240,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|default_japanese_font_name> which returns
     <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(windows-cjk-font-candidates <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|windows_cjk_font_candidates> which returns
+    <scm|array_string>.
   </explain>
 
   <\explain>
@@ -387,6 +427,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tex-font-found? <scm-arg|string> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tex_font_found> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(eval-system <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -416,6 +464,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|async_eval_system> which returns
     <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(async-eval-system-full <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_eval_system_full> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(async-eval-pending)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_eval_pending> which returns
+    <scm|void>.
   </explain>
 
   <\explain>
@@ -519,7 +583,7 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|mem_used> which returns
-    <scm|int>.
+    <scm|double>.
   </explain>
 
   <\explain>
@@ -815,6 +879,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_hex_color> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(paper-color <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_paper_color> which returns
     <scm|string>.
   </explain>
 
@@ -1462,7 +1534,7 @@ source code.
     <scm|(tree-children <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|A> which returns
+    Calls the <c++> function <cpp|tree_children> which returns
     <scm|array_tree>.
   </explain>
 
@@ -1824,6 +1896,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|search> which returns
     <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-search-from <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int> <scm-arg|bool> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_from> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-search-replace-match <scm-arg|content> <scm-arg|content> <scm-arg|path> <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|search_replace_match> which returns
+    <scm|array_tree>.
   </explain>
 
   <\explain>
@@ -4091,6 +4179,78 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(compress-table-select <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_select> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-new <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_new> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-open <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_open> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-free <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_free> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-size <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_size> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-table-keys)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_table_keys> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-key <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_key> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-engine <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_engine> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-chat-close <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat_close> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-command <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4691,6 +4851,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(url-declare-out-of-date <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|declare_out_of_date> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(url-temp)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4879,6 +5047,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|picture_cache_reset> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(remote-files-refresh)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|remote_files_refresh> which returns
     <scm|void>.
   </explain>
 
@@ -5191,6 +5367,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|gnutls_random_int> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(secure-random-number <scm-arg|uint>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|secure_random_int> which returns
     <scm|int>.
   </explain>
 
@@ -5851,6 +6035,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-get-style <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_buffer_style> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-style <scm-arg|url> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_style> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-set-master <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5928,6 +6128,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|pretend_buffer_saved> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-read-only <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_read_only> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-read-only? <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_buffer_read_only> which returns
+    <scm|bool>.
   </explain>
 
   <\explain>
@@ -6207,6 +6423,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|window_to_buffer> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
+    <scm|(window-\<gtr\>file <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_to_file> which returns
     <scm|url>.
   </explain>
 
@@ -6520,6 +6744,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|bib_text_length> which returns
     <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(bib-field-pages <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|bib_field_pages> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>
@@ -6915,6 +7147,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(update-picture-buffers)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_update_pictures> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(set-message <scm-arg|content> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -7271,6 +7511,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|make_return_after> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(can-insert-at? <scm-arg|content> <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|can_insert_at> which returns
     <scm|bool>.
   </explain>
 
@@ -8683,6 +8931,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(set-user-cursor <scm-arg|string> <scm-arg|path> <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_user_cursor> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(cancel-user-cursor <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|cancel_user_cursor> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(cancel-user-cursors)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|cancel_user_cursors> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(clear-undo-history)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9147,6 +9419,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(apply-changes)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|apply_pending_changes> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(update-path <scm-arg|path>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9160,6 +9440,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|typeset_invalidate_all> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(update-current-buffer-keep)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_invalidate_keep> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(renumber-auto-labels)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_renumber_labels> which returns
+    <scm|bool>.
   </explain>
 
   <\explain>

@@ -79,7 +79,7 @@
     ---
     ("Palette" (interactive-color setter '()))
     (if (allow-pattern-colors?)
-        ("Pattern" (open-pattern-selector setter "1cm")))
+        ("Pattern" (open-pattern-selector setter "1cm" :no-base)))
     ("Other" (make-interactive-with "color"))))
 
 (menu-bind horizontal-space-menu

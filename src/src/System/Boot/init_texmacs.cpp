@@ -146,9 +146,11 @@ url_temp_dir () {
 
 bool
 process_running (int pid) {
-  string cmd= "ps -p " * as_string (pid);
+  // only print the command name, without header; empty if pid is not running
+  // (the macOS bundle runs as .../MacOS/TeXmacs, hence the case folding)
+  string cmd= "ps -p " * as_string (pid) * " -o comm=";
   string ret= eval_system (cmd);
-  return occurs ("texmacs", ret) && occurs (as_string (pid), ret);
+  return occurs ("texmacs", locase_all (ret));
 }
 
 static void

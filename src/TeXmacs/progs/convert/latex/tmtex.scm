@@ -43,6 +43,7 @@
 (define tmtex-auto-consume 0)
 (define tmtex-image-root-url (unix->url "image"))
 (define tmtex-image-root-string "image")
+(define tmtex-image-loose? #t)
 (define tmtex-appendices? #f)
 (define tmtex-indirect-bib? #f)
 (define tmtex-mathjax? #f)
@@ -128,6 +129,12 @@
 ;; Initialization from options
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmtex-image-target? opts)
+  ;; the images go next to the file which is written, if it is in LaTeX, which
+  ;; is not the case of the formulas for MathJax in an HTML file
+  (and (not (url-none? current-save-target))
+       (!= (assoc-ref opts "texmacs->latex:mathjax") "on")))
+
 (define (tmtex-initialize opts)
   (set! tmtex-ref-cnt 1)
   (set! tmtex-env (make-ahash-table))
@@ -137,14 +144,11 @@
   (set! tmtex-auto-produce 0)
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
-  (if (== (url-suffix current-save-target) "tex")
+  (set! tmtex-image-loose? (not (tmtex-image-target? opts)))
+  (if (not tmtex-image-loose?)
       (begin
-        (set! tmtex-image-root-url (url-unglue current-save-target 4))
-        (with suf (url-suffix tmtex-image-root-url)
-          (when (!= suf "")
-            (set! tmtex-image-root-url
-                  (url-unglue tmtex-image-root-url
-                              (+ (string-length suf) 1)))))
+        (set! tmtex-image-root-url
+              (url-drop-suffix (url-drop-suffix current-save-target)))
         (set! tmtex-image-root-string
               (url->unix (url-tail tmtex-image-root-url))))
       (begin
@@ -528,6 +532,16 @@
          (cons (list (string->symbol " ")) (tmtex-text-list-space (cdr l))))
         (else (tmtex-text-list l))))
 
+;; the UTF-8 characters of the Cork character c. Cork and UTF-8 coincide on the
+;; printable ASCII characters, except the backquote (a left quote in Cork):
+;; they need no conversion, which the text and math exports did for every
+;; character (a call of string-convert per character)
+(define (tmtex-cork-char->utf8 c)
+  (let ((i (char->integer c)))
+    (if (and (>= i 32) (< i 127) (!= i 96))
+        (list c)
+        (string->list (string-convert (char->string c) "Cork" "UTF-8")))))
+
 (define (tmtex-text-list l)
   (if (null? l) l
       (let ((c (car l)))
@@ -565,8 +579,7 @@
               (else
                 (append
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (tmtex-text-list (cdr l))))))))
 
@@ -601,8 +614,7 @@
               (else
                 (with c
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (append c (tmtex-math-list (cdr l)))))))))
 
@@ -1585,12 +1597,15 @@
            (tmtex-decode-color (get-hex-color s) force-html))
           ((and (== cm "HTML") (nnull? force-html))
            `((!option "HTML") ,(html-color->latex-xcolor s)))
-          ((== cm "texmacs")
+          ((or (== cm "texmacs") (== cm "HTML"))
+           ;; (without force-html, the color is used by its name, as in
+           ;; \colorbox or the options of mdframed: a color #rrggbb is
+           ;; defined under the name tmhexRRGGBB)
            (when (nin? s tmtex-colors)
              (set! tmtex-colors (append (list s) tmtex-colors)))
-           (string-replace s " " ""))
+           (latex-color-name s))
           ((in? cm (list "x11names"))
-           (tmtex-decode-color (get-hex-color s) #t))
+           (apply tmtex-decode-color (cons (get-hex-color s) force-html)))
           (else
             (when (and (nin? cm tmtex-colormaps)
                        (!= cm "xcolor") (!= cm "none"))
@@ -1779,18 +1794,22 @@
         ((== (car l) "even") `(ifthispageodd "" ,(tmtex (cadr l))))
         (else "")))
 
-(define (tmtex-eps-names)
+(define (tmtex-eps-names key)
   (set! tmtex-serial (+ tmtex-serial 1))
   (let* ((suffix (if (get-boolean-preference "native pdf") ".pdf" ".eps"))
          (postfix (string-append "-" (number->string tmtex-serial) suffix))
          (name-url (url-glue tmtex-image-root-url postfix))
          (name-string (string-append tmtex-image-root-string postfix)))
-    (values name-url name-string)))
+    (if tmtex-image-loose?
+        (loose-image-names key suffix)
+        (values name-url name-string))))
 
 (define (tmtex-eps x)
   (if (tmtex-math-mode?) (set! x `(with "mode" "math" ,x)))
-  (receive (name-url name-string) (tmtex-eps-names)
-    (let* ((extents (print-snippet name-url x #t))
+  (receive (name-url name-string) (tmtex-eps-names x)
+    (let* ((cleared? (image-target-clear name-url))
+           (extents (print-snippet name-url x #t))
+           (written (image-target-written name-url cleared?))
            (unit (* (/ 1.0 60984.0) (/ 600.0 (tenth extents))))
            (x3 (* unit (first extents)))
            (y3 (* unit (second extents)))
@@ -1807,7 +1826,7 @@
            (opt `(!option ,(string-append "width=" ww ",height=" hh)))
            (rat (/ y3 (- y4 y3)))
            (dy `(!concat ,(number->string rat) (height)))
-           (rb `(raisebox ,dy (includegraphics ,opt ,name-string))))
+           (rb `(raisebox ,dy (includegraphics ,opt (!file-name ,name-string)))))
       ;; TODO: top and bottom margins
       ;;(display* name-url ": " x1 ", " y1 "; " x2 ", " y2 "\n")
       ;;(display* name-url ": " x3 ", " y3 "; " x4 ", " y4 "\n")
@@ -1821,21 +1840,31 @@
   (tmtex-eps (cons 'graphics l)))
 
 (define (tmtex-as-eps name)
-  (let* ((u (url-relative current-save-target (unix->url name)))
+  (let* ((u (url-relative (save-target-url) (unix->url name)))
          (suffix (url-suffix u))
          (fm (string-append (format-from-suffix suffix) "-file")))
     (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg")))
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
-          (list 'includegraphics name))
-        (receive (name-url name-string) (tmtex-eps-names)
-          (when (string-starts? name "..")
-            (set! u (url-relative current-save-source (unix->url name))))
-          (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
-                        "postscript-file")
-            (convert-to-file u fm nfm name-url))
-          (list 'includegraphics name-string)))))
+          ;; on Windows a document holds /D/a/x.png (url->delta-unix), which
+          ;; LaTeX reads as a path from the root of the drive: D:/a/x.png
+          (when (and (os-mingw?) (>= (string-length name) 3)
+                     (== (string-ref name 0) #\/)
+                     (char-alphabetic? (string-ref name 1))
+                     (== (string-ref name 2) #\/))
+            (set! name (image-name-for-program (unix->url name))))
+          (list 'includegraphics (list '!file-name name)))
+        (receive (name-url name-string) (tmtex-eps-names name)
+          ;; an image which is not next to the target is next to the document
+          (when (or (string-starts? name "..") (not (url-exists? u)))
+            (set! u (url-relative (save-source-url) (unix->url name))))
+          (let ((nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
+                         "postscript-file"))
+                (cleared? (image-target-clear name-url)))
+            (convert-to-file u fm nfm name-url)
+            (image-target-written name-url cleared?))
+          (list 'includegraphics (list '!file-name name-string))))))
 
 (define (tmtex-image-length len)
   (let* ((s (force-string len))
@@ -2386,6 +2415,192 @@
 (define (tmtex-fcolorbox s l)
   `(fcolorbox ,@(map tmtex-decode-color (cDr l)) ,(tmtex (cAr l))))
 
+;; Struck and highlighted text are drawn by ulem, whose lines break with
+;; the text, but not inside a group or the argument of a command, which
+;; ulem sets as one box. So the line goes inside: around each run of text
+;; of the argument (with its spaces, special characters, inline formulas
+;; and other commands), within its groups, font commands, colors, links and
+;; centered blocks, and through paragraphs, lists and tables. A footnote, a
+;; label, a list item, a verbatim block or a line break is left without
+;; the line (ulem does not accept them). Struck text inside highlighted
+;; text keeps its line, but not the reverse, as the inner line of ulem is
+;; drawn over the outer one. In a formula, the formula goes in
+;; \text{...$...$}, as ulem draws its lines in text mode only; a displayed
+;; formula is struck or highlighted so, piece by piece (its cells, the
+;; parts between its labels), in display style.
+(define tmtex-ulem-structure
+  '(!append !group !document !paragraph !table !row))
+
+(define tmtex-ulem-text-commands
+  '(textbf textit textsl textsc texttt textsf textrm textup textmd emph
+    tmem tmstrong tmtt tmname tmsamp tmabbr tmdfn tmkbd tmvar tmperson
+    tmcolor textcolor href foreignlanguage underline tmmarked center))
+
+(define tmtex-ulem-without
+  '(footnote label index item !nextline !newline !linefeed
+    !verb !verbatim !verbatim* !unindent
+    color fontsize selectfont fontfamily fontseries fontshape))
+
+;; special characters, which go with the text around them
+(define tmtex-ulem-characters
+  '(!nbsp !nbhyph ldots dots textbackslash textbar textasciitilde
+    textasciicircum textless textgreater textbullet textquotedbl
+    textquoteleft textquoteright textendash textemdash textdegree
+    textregistered texttrademark copyright S P dag ddag pounds euro
+    ss ae AE oe OE aa AA o O l L i j guillemotleft guillemotright
+    quotedblbase TeX LaTeX))
+
+;; the \tmtext... macros are boxes (\text): their declarations instead
+(define tmtex-ulem-declarations
+  '((tmtextrm . rmfamily) (tmtextsf . sffamily) (tmtexttt . ttfamily)
+    (tmtextmd . mdseries) (tmtextbf . bfseries) (tmtextup . upshape)
+    (tmtextsl . slshape) (tmtextit . itshape) (tmtextsc . scshape)))
+
+(define tmtex-ulem-math-environments
+  '("equation" "equation*" "align" "align*" "flalign" "flalign*"
+    "alignat" "alignat*" "gather" "gather*" "multline" "multline*"
+    "eqnarray" "eqnarray*" "leqnarray*"))
+
+(define tmtex-ulem-align-environments
+  '("align" "align*" "flalign" "flalign*" "alignat" "alignat*"))
+
+(define tmtex-ulem-math-without
+  '(label nonumber notag tag tag* !nextline !newline !linefeed))
+
+(define (tmtex-ulem-whitespace? x)
+  (and (string? x) (list-and (map char-whitespace? (string->list x)))))
+
+(define (tmtex-ulem-character? x)
+  (and (symbol? (car x)) (null? (cdr x))
+       (with s (symbol->string (car x))
+         (or (and (== (string-length s) 1)
+                  (not (char-alphabetic? (string-ref s 0))))
+             (in? (car x) tmtex-ulem-characters)))))
+
+(define (tmtex-ulem-kind x)
+  ;; how a piece is drawn: 'atom (in a run of text with the line), 'space,
+  ;; 'inside (the line goes inside) or 'without
+  (cond ((tmtex-ulem-whitespace? x) 'space)
+        ((string? x) 'atom)
+        ((npair? x) 'without)
+        ((pair? (car x)) (if (in? (caar x) '(!begin !begin*)) 'inside 'atom))
+        ((nsymbol? (car x)) 'atom)
+        ((in? (car x) '(!concat !eqn)) 'inside)
+        ((in? (car x) tmtex-ulem-structure) 'inside)
+        ((in? (car x) tmtex-ulem-without) 'without)
+        ((tmtex-ulem-character? x) 'atom)
+        ((null? (cdr x)) 'without)
+        ((and (assoc (car x) tmtex-ulem-declarations) (null? (cddr x))) 'inside)
+        ((in? (car x) tmtex-ulem-text-commands) 'inside)
+        (else 'atom)))
+
+(define (tmtex-ulem-group x)
+  ;; ulem reads its argument token by token, and stops at the & of a
+  ;; matrix or a table in a formula: a formula goes in a group, one box
+  (if (func? x '!math) `(!group ,x) x))
+
+(define (tmtex-ulem-runs cmd args l k)
+  ;; the consecutive atoms of a concatenation get one line
+  (cond ((null? l) l)
+        ((== (car k) 'atom)
+         (receive (r rest)
+             (list-break (map cons l k) (lambda (p) (!= (cdr p) 'atom)))
+           (cons (if (null? (cdr r)) `(,cmd ,@args ,(tmtex-ulem-group (caar r)))
+                     `(,cmd ,@args (!concat ,@(map tmtex-ulem-group
+                                                   (map car r)))))
+                 (tmtex-ulem-runs cmd args (map car rest) (map cdr rest)))))
+        (else (cons (tmtex-ulem-sink cmd args (car l))
+                    (tmtex-ulem-runs cmd args (cdr l) (cdr k))))))
+
+(define (tmtex-ulem-concat cmd args l)
+  ;; a space gets the line when the pieces on both sides have it
+  (if (null? l) l
+      (let* ((k (map tmtex-ulem-kind l))
+             (p (cons 'without (cDr k)))
+             (n (append (cdr k) (list 'without)))
+             (ok? (lambda (x) (in? x '(atom inside))))
+             (k* (map (lambda (k p n)
+                        (if (and (== k 'space) (ok? p) (ok? n)) 'atom k))
+                      k p n)))
+        (tmtex-ulem-runs cmd args l k*))))
+
+(define (tmtex-ulem-math-run cmd args pre l)
+  (if (list-and (map tmtex-ulem-whitespace? l)) l
+      (with l* (list-drop-right-while
+                (list-drop-while l tmtex-ulem-whitespace?)
+                tmtex-ulem-whitespace?)
+        (list `(text (,cmd ,@args
+                           (!group
+                            (!math (!concat (displaystyle) " " ,@pre ,@l*)))))))))
+
+(define (tmtex-ulem-math-concat cmd args pre l)
+  (receive (r rest)
+      (list-break l (lambda (y) (and (pair? y)
+                                     (in? (car y) tmtex-ulem-math-without))))
+    (append (tmtex-ulem-math-run cmd args pre r)
+            (if (null? rest) rest
+                (cons (car rest)
+                      (tmtex-ulem-math-concat cmd args '() (cdr rest)))))))
+
+(define (tmtex-ulem-math cmd args env x)
+  ;; a displayed formula, in the environment env
+  (cond ((tmtex-ulem-whitespace? x) x)
+        ((and (pair? x) (in? (car x) tmtex-ulem-math-without)) x)
+        ((or (func? x '!document) (func? x '!table))
+         (cons (car x) (map (cut tmtex-ulem-math cmd args env <>) (cdr x))))
+        ((func? x '!row)
+         ;; the right-hand cells of align start with a relation: {}
+         (cons '!row
+               (map (lambda (c i)
+                      (with pre (if (and (odd? i)
+                                         (in? env tmtex-ulem-align-environments))
+                                    '((!group "")) '())
+                        (cons '!concat
+                              (tmtex-ulem-math-concat cmd args pre
+                                                      (if (func? c '!concat)
+                                                          (cdr c) (list c))))))
+                    (cdr x) (iota (length (cdr x))))))
+        ((func? x '!concat)
+         (cons '!concat (tmtex-ulem-math-concat cmd args '() (cdr x))))
+        (else (cons '!concat (tmtex-ulem-math-concat cmd args '() (list x))))))
+
+(define (tmtex-ulem-sink cmd args x)
+  (with k (tmtex-ulem-kind x)
+    (cond ((== k 'atom) `(,cmd ,@args ,(tmtex-ulem-group x)))
+          ((!= k 'inside) x)
+          ((func? x '!concat)
+           (cons '!concat (tmtex-ulem-concat cmd args (cdr x))))
+          ((func? x '!eqn)
+           (list '!eqn (tmtex-ulem-math cmd args "" (cadr x))))
+          ((pair? (car x))
+           (with env (cadar x)
+             (cons (car x)
+                   (map (if (and (== (caar x) '!begin)
+                                 (in? env tmtex-ulem-math-environments))
+                            (cut tmtex-ulem-math cmd args env <>)
+                            (cut tmtex-ulem-sink cmd args <>))
+                        (cdr x)))))
+          ((in? (car x) tmtex-ulem-structure)
+           (cons (car x) (map (cut tmtex-ulem-sink cmd args <>) (cdr x))))
+          ((assoc (car x) tmtex-ulem-declarations)
+           `(!group (!append (,(cdr (assoc (car x) tmtex-ulem-declarations)))
+                             " " ,(tmtex-ulem-sink cmd args (cadr x)))))
+          (else `(,@(cDr x) ,(tmtex-ulem-sink cmd args (cAr x)))))))
+
+(define (tmtex-text-mode cmd . args)
+  (with x (cAr args)
+    (if (tmtex-math-mode?)
+        `(text (,cmd ,@(cDr args) (!group (!math ,x))))
+        (tmtex-ulem-sink cmd (cDr args) x))))
+
+(define (tmtex-strike-through s l)
+  (tmtex-text-mode 'sout (tmtex (car l))))
+
+(define (tmtex-marked s l)
+  (let* ((c (or (tmtex-env-get "marked-color") "yellow"))
+         (col (tmtex-decode-color (force-string c))))
+    (tmtex-text-mode 'tmmarked col (tmtex (car l)))))
+
 (define (tmtex-rotate s l)
   (let* ((body (tmtex (cadr l)))
          (body* (if (tmtex-math-mode?) `(ensuremath ,body) body)))
@@ -2501,6 +2716,25 @@
 (define (tmtex-eqnarray s l)
   (tmtex-env-set "mode" "math")
   (let ((r (tmtex-table-apply (string->symbol s) '() (car l))))
+    (tmtex-env-reset "mode")
+    r))
+
+(define (tmtex-aligned-columns? ha)
+  (or (null? ha)
+      (and (== (car ha) "r") (nnull? (cdr ha)) (== (cadr ha) "l")
+           (tmtex-aligned-columns? (cddr ha)))))
+
+(define (tmtex-equations-base s l)
+  ;; The Html export expands the arrays (aligned, align*, eqnarray*...)
+  ;; into equations-base, which reaches here inside MathJax formulas (#611):
+  ;; an aligned for columns aligned right and left in turn, else an array
+  (tmtex-env-set "mode" "math")
+  (let* ((p (tmtable-parser (car l)))
+         (ha (p 'cols 'halign))
+         (env (if (tmtex-aligned-columns? ha)
+                  '(!begin "aligned")
+                  `(!begin "array" ,(apply string-append ha))))
+         (r (list env (tmtex-table-make p))))
     (tmtex-env-reset "mode")
     r))
 
@@ -3255,6 +3489,7 @@
   ((:or eqnarray eqnarray* leqnarray*
         gather multline gather* multline* align
         flalign alignat align* flalign* alignat*) (,tmtex-eqnarray 1))
+  (equations-base (,tmtex-equations-base 1))
 
   (eq-number (,tmtex-default -1))
   (separating-space (,tmtex-hspace* 1))
@@ -3268,6 +3503,8 @@
   (boxed (,tmtex-boxed 1))
   (colored-frame (,tmtex-colored-frame 2))
   (fcolorbox (,tmtex-fcolorbox 3))
+  (strike-through (,tmtex-strike-through 1))
+  (marked (,tmtex-marked 1))
   (rotate (,tmtex-rotate 2))
   (condensed (,tmtex-style-first 1))
   (translate (,tmtex-translate 3))

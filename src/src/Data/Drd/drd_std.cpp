@@ -80,7 +80,8 @@ var_repeat (int arity, int extra, int child_mode= CHILD_UNIFORM) {
 
 static void
 init (tree_label l, string name, tag_info ti) {
-  STD_CODE(name)= (int) l;
+  // the .tm reader takes the labels from STD_CODE: see make_tree_label
+  if (l != TMSTRING) STD_CODE(name)= (int) l;
   make_tree_label (l, name);
   std_drd->info (l)= ti;
   std_drd->freeze_arity (l);
@@ -587,6 +588,8 @@ init_std_drd () {
         fixed (1, 1, BIFORM) ->
         string_type (0) -> name (0, "kind") ->
         string_type (1) -> name (1, "title"));
+  init (AUTO_ID, "auto-id",
+        options (0, 1));                      // see env_exec.cpp
   init (CACHE_REF, "cache-ref",
         fixed (2, 2, DETAILED) ->
         string_type (0) -> name (0, "hash") ->
@@ -609,7 +612,7 @@ init_std_drd () {
   init (BACKUP, "backup",
         fixed (2) -> regular (0));
   init (_PATTERN, "pattern",
-        options (3, 1, DETAILED) -> returns_color () ->
+        options (3, 2, DETAILED) -> returns_color () ->
         url_type (0));
   init (GRADIENT, "gradient",
         fixed (3) -> returns_color ());           // not yet implemented

@@ -70,6 +70,7 @@ struct lazy_hidden_rep: public lazy_rep {
   edit_env env;
   tree t;
   path ip;
+  array<line_item> items; // the body, typeset where it occurs
   lazy_hidden_rep (edit_env env, tree t, path ip);
   inline operator tree () { return "Hidden"; }
   lazy produce (lazy_type request, format fm);

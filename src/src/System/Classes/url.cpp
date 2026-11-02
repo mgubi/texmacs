@@ -772,6 +772,13 @@ descends (url u, url base) {
 
 bool
 is_secure (url u) {
+  // the temporary files and the caches of the home directory are not
+  // trusted, although $TEXMACS_SECURE_PATH holds the whole home directory:
+  // they hold files which TeXmacs did not write itself (downloads,
+  // documents extracted from PDF files...)
+  url untrusted= url ("$TEXMACS_HOME_PATH/system/tmp") |
+                 url ("$TEXMACS_HOME_PATH/system/cache");
+  if (descends (u, expand (untrusted))) return false;
   return descends (u, expand (url_path ("$TEXMACS_SECURE_PATH")));
 }
 
