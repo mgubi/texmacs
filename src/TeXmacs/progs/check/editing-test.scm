@@ -1754,6 +1754,7 @@
     (buffer-pretend-saved u)
     (for (x (buffer-list))
       (when (nin? x before) (buffer-close x)))
+    (startup-buffer-release)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;; The initial environment belongs to the buffer (#528): a change made in
