@@ -42,7 +42,10 @@ edit_typeset_rep::edit_typeset_rep ():
        buf->data->ref, (buf->prj==NULL? grefs: buf->prj->data->ref),
        buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux),
        buf->data->att, (buf->prj==NULL? buf->data->att: buf->prj->data->att)),
-  ttt (new_typesetter (env, subtree (et, rp), reverse (rp))) {
+  // The bridges of the document are made in set_data, which follows each
+  // creation of an editor (get_new_view) and replaces whatever the typesetter
+  // holds: the constructor makes bridges for an empty document only.
+  ttt (new_typesetter (env, tree (DOCUMENT), reverse (rp))) {
     init_update ();
 }
 
@@ -56,7 +59,10 @@ edit_typeset_rep::~edit_typeset_rep () {
 void
 edit_typeset_rep::set_data (new_data data) {
   set_style (data->style);
-  set_init  (data->init);
+  // not set_init: it would make the bridges of the whole document, and
+  // add_init below makes them again
+  init= hashmap<string,tree> (UNINIT);
+  init->join (data->init);
   set_fin   (data->fin);
   set_ref   (data->ref);
   set_aux   (data->aux);

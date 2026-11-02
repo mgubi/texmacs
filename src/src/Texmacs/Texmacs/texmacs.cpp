@@ -24,6 +24,7 @@
 
 #include "tm_ostream.hpp"
 #include "boot.hpp"
+#include "build_revision.hpp"
 #include "file.hpp"
 #include "server.hpp"
 #include "tm_timer.hpp"
@@ -391,7 +392,7 @@ set_global_options  (int argc, char** argv)  {
       else if ((s == "-v") || (s == "-version")) {
         cout << "\n";
         cout << "TeXmacs version " << TEXMACS_VERSION << "\n";
-        cout << "SVN version " << TEXMACS_REVISION << "\n";
+        cout << "Revision " << get_build_revision () << "\n";
         cout << TEXMACS_COPYRIGHT << "\n";
         cout << "\n";
         exit (0);

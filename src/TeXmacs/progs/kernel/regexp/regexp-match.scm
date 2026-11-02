@@ -136,6 +136,130 @@
 	      ((not (tm-equal? (car l) fpat)) '())
 	      (else (match (cdr l) (cdr pat) bl))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Compiling patterns for match?
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; OPTIMIZATION: match reads its pattern again at each step (it decodes the
+;; keywords from their names), and looks for all the solutions. Without
+;; variables and alternatives there is one solution at most, as match? asks:
+;; a pattern is compiled at its second use to a predicate on lists, which does
+;; the same as match on this pattern, several times as fast. Anything else
+;; goes on with match. Patterns are nearly always constants: a compiled
+;; pattern is kept for the pattern itself, by its identity. So a pattern must
+;; not be changed after its first use, and terms are to be added to match-term
+;; with define-regexp-grammar, which forgets what was compiled.
+
+(define (match-keyword-count fpat)
+  (string->number (string-tail (symbol->string (keyword->symbol fpat)) 1)))
+
+(define (match-compile-keyword fpat rest)
+  (cond
+   ((== fpat :*) (lambda (l) #t))
+   ((string-null? (symbol->string (keyword->symbol fpat))) #f)
+   (else
+      (let ((n (match-keyword-count fpat)))
+        (if (and (not n) (ahash-ref match-term fpat)) #f
+            (let ((k (match-compile rest)))
+              (cond ((not k) #f)
+                    ((== n 1)
+                     (lambda (l) (and (pair? l) (k (cdr l)))))
+                    (n
+                     (lambda (l)
+                       (and (>= (length l) n) (k (list-tail l n)))))
+                    (else
+                     (with symb (keyword->symbol fpat)
+                       (lambda (l)
+                         (and (pair? l)
+                              (apply (eval symb) (list (car l)))
+                              (k (cdr l)))))))))))))
+
+(define (match-compile-list fpat rest)
+  (let ((ffpat (car fpat)))
+    (and (not (and (keyword? ffpat) (ahash-ref match-table ffpat)))
+         (!= ffpat 'quote)
+         (let ((sub (match-compile fpat))
+               (k (match-compile rest)))
+           (and sub k
+                (lambda (l)
+                  (and (pair? l)
+                       (let ((h (car l)))
+                         (cond ((list? h) (sub h))
+                               ((compound-tree? h) (sub (tree->list h)))
+                               ((string? h) (sub (string->list h)))
+                               (else #f)))
+                       (k (cdr l)))))))))
+
+;; Compiling reads all of a pattern, whereas match reads what the object asks
+;; for: this bound leaves very long, very deep and cyclic patterns to match.
+(define match-compile-budget 0)
+
+(define (match-compile pat)
+  ;; a predicate on lists, or #f when match has to do this pattern
+  (set! match-compile-budget (- match-compile-budget 1))
+  (cond ((< match-compile-budget 0) #f)
+        ((null? pat) null?)
+        ((not (pair? pat)) #f)
+        (else
+         (let ((fpat (car pat)))
+           (cond ((keyword? fpat) (match-compile-keyword fpat (cdr pat)))
+                 ((and (list? fpat) (nnull? fpat))
+                  (match-compile-list fpat (cdr pat)))
+                 (else
+                  (with k (match-compile (cdr pat))
+                    (and k
+                         (lambda (l)
+                           (and (pair? l)
+                                (tm-equal? (car l) fpat)
+                                (k (cdr l))))))))))))
+
+;; Tables by identity, in Guile (hashq) and in S7; those of femtolisp compare
+;; with equal?, which does no harm: equal patterns compile to the same thing.
+(define match-hashq? (defined? 'hashq-ref))
+
+(define (match-new-table)
+  (if match-hashq? (make-hash-table 256) (make-hash-table 256 eq?)))
+
+;; (a pattern made at each use would make the table grow without this bound)
+(define match-compiled-max 4096)
+(define match-compiled (match-new-table))
+(define match-compiled-nr 0)
+
+(define (match-compiled-reset)
+  (set! match-compiled (match-new-table))
+  (set! match-compiled-nr 0))
+
+(define (match-compiled-set! pattern c)
+  (if match-hashq?
+      (hashq-set! match-compiled pattern c)
+      (hash-table-set! match-compiled pattern c))
+  c)
+
+(define (match-compiled-new pattern)
+  ;; a pattern made at each use is not worth compiling: only at the second use
+  (if (>= match-compiled-nr match-compiled-max) (match-compiled-reset))
+  (set! match-compiled-nr (+ match-compiled-nr 1))
+  (match-compiled-set! pattern :once)
+  #t)
+
+(define (match-compiled-for pattern)
+  ;; the predicate for a pattern, or #t for those which match has to do
+  (let ((c (if match-hashq?
+               (hashq-ref match-compiled pattern #f)
+               (hash-table-ref match-compiled pattern))))
+    (cond ((not c) (match-compiled-new pattern))
+          ((== c :once)
+           (set! match-compile-budget 256)
+           ;; (an error here, as of a keyword such as :x1/0 which is no number
+           ;; for string->number, need not be one for match: it may not get there)
+           (match-compiled-set!
+            pattern
+            (or (catch #t
+                  (lambda () (match-compile (list pattern)))
+                  (lambda args #f))
+                #t)))
+          (else c))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; User interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -145,6 +269,9 @@
     (if (== (length (cdr rule)) 1)
         (ahash-set! match-term (car rule) (cdr rule))
         (ahash-set! match-term (car rule) (list (cons :or (cdr rule))))))
+  ;; a keyword may be a predicate in what was compiled before
+  ;; (first: a rule which is wrong leaves those before it defined)
+  (match-compiled-reset)
   (for-each insert l))
 
 (define-public-macro (define-regexp-grammar . l)
@@ -153,5 +280,8 @@
 
 (define-public (match? x pattern)
   "Does @x match the pattern @pat?"
-  (let ((sols (match (list x) (list pattern) '())))
-    (if (null? sols) #f sols)))
+  (let ((c (match-compiled-for pattern)))
+    (if (procedure? c)
+        (and (c (list x)) (list '()))
+        (let ((sols (match (list x) (list pattern) '())))
+          (if (null? sols) #f sols)))))

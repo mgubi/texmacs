@@ -78,7 +78,12 @@ jobs:
         run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake CC=gcc CXX=g++
 
       - name: Build
-        run: make -j"$(nproc)"
+        run: |
+          git config --global --add safe.directory '*'
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
 
       # the C++ unit tests (tests/Makefile)
       - name: Unit tests
@@ -129,7 +134,12 @@ jobs:
         run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt5/bin/qmake CC=gcc CXX=g++
 
       - name: Build
-        run: make -j"$(nproc)"
+        run: |
+          git config --global --add safe.directory '*'
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
 
       - name: TeXmacs starts
         run: |
@@ -236,8 +246,12 @@ jobs:
 
       - name: Build
         run: |
+          git config --global --add safe.directory '*'
           export PATH="$QT6_BIN:$PATH"
           make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh --no-run TeXmacs/bin/texmacs.bin
 
       - name: Run the regression suites
         run: |
@@ -334,7 +348,12 @@ jobs:
 
       # NOTE: -k, so that a run shows all the files which do not compile
       - name: Build
-        run: make -k -j"$(nproc)"
+        run: |
+          git config --global --add safe.directory '*'
+          make -k -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
 
       - name: What the libraries export (when the build fails)
         if: failure()
@@ -499,7 +518,12 @@ jobs:
           fi
 
       - name: Build
-        run: make -j"$(nproc)"
+        run: |
+          git config --global --add safe.directory '*'
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
 
       - name: AppImage
         run: |
@@ -704,7 +728,12 @@ jobs:
             CPPFLAGS="-I$ASP/include" LDFLAGS="-L$ASP/lib"
 
       - name: Build
-        run: make -k -j"$(nproc)"
+        run: |
+          git config --global --add safe.directory '*'
+          make -k -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh --no-run TeXmacs/bin/texmacs.bin
 
       - name: Bundle
         run: |

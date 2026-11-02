@@ -1672,6 +1672,91 @@
                   (list g h))
         (system-rmdir (system->url sub))))))
 
+;; A file given by the system (the Finder, the Dock, open) replaces the buffer
+;; of the current window only while that is the untitled, unmodified buffer
+;; of the startup; else it gets a window of its own (#739). Files given at
+;; once go one after the other: the first takes the startup buffer, the
+;; others new windows. The loaders are replaced by recorders, as opening a
+;; real window does not follow headless.
+(define (test-open-from-system)
+  (check-group "files from the system: the startup buffer or a new window")
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (u (new-buffer))
+         (a (tmp-file* "sys-a.tm"))
+         (b (tmp-file* "sys-b.tm"))
+         (c (tmp-file* "sys-c.tm"))
+         (calls '())
+         (pending '())
+         (wait? #f)
+         (in-window #f)
+         (open-all
+          (lambda (names)
+            (set! calls '())
+            (startup-buffer-release)
+            (with-global load-buffer
+                (lambda (name . opts)
+                  (set! calls (rcons calls (list 'current name)))
+                  ;; the file takes the place of the buffer, at once or
+                  ;; later (an autosave question waits for an answer)
+                  (if wait?
+                      (set! pending (rcons pending name))
+                      (begin (buffer-rename u name) (set! u name))))
+              (with-global load-buffer-in-new-window
+                  (lambda (name . opts)
+                    (set! calls (rcons calls (list 'new name))))
+                (with-global buffer->window
+                    (lambda (name) (and (== name in-window) 'win))
+                  (for-each load-buffer-from-system names)))))))
+    (switch-to-buffer* u)
+    ;; the buffer of the startup: untitled and unmodified
+    (check-true (startup-buffer?))
+    ;; modified, it is not; unmodified again, it is
+    (buffer-pretend-modified u)
+    (check-false (startup-buffer?))
+    (buffer-pretend-saved u)
+    (check-true (startup-buffer?))
+    ;; a file which is already in a window is not loaded in the startup
+    ;; buffer (load-buffer-in-new-window switches to its window)
+    (set! in-window a)
+    (open-all (list a))
+    (check= calls `((new ,a)))
+    (set! in-window #f)
+    ;; a file which is loaded but hidden (no window) takes the startup buffer
+    (open-all (list c))
+    (check= calls `((current ,c)))
+    ;; several files at once: the first takes the startup buffer, the
+    ;; others get windows
+    (buffer-close u)
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (open-all (list a b c))
+    (check= calls `((current ,a) (new ,b) (new ,c)))
+    ;; later, a file never replaces the document of the window
+    (open-all (list b))
+    (check= calls `((new ,b)))
+    (buffer-close u)
+    ;; the first file waits for an answer (autosave): the second one,
+    ;; arriving before, must not take the same buffer
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (set! wait? #t)
+    (open-all (list a b))
+    (check= calls `((current ,a) (new ,b)))
+    (set! wait? #f)
+    (buffer-close u)
+    ;; nor does it replace an untitled buffer which was modified
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (buffer-pretend-modified u)
+    (open-all (list a))
+    (check= calls `((new ,a)))
+    (buffer-pretend-saved u)
+    (for (x (buffer-list))
+      (when (nin? x before) (buffer-close x)))
+    (startup-buffer-release)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;; The initial environment belongs to the buffer (#528): a change made in
 ;; one view of it (init-env, init-default) is in its other views, in
 ;; buffer-get and in the saved file, and in a view made after it; the
@@ -1951,6 +2036,7 @@
   (test-cancel-closed)
   (test-save)
   (test-save-as-window)
+  (test-open-from-system)
   (test-views-init)
   (test-views-style)
   (test-export)

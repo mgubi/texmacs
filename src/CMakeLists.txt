@@ -614,6 +614,17 @@ configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/System/config.h.cmake
 configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/System/tm_configure.hpp.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/src/System/tm_configure.hpp)
 
+# the git commit of the sources (#753): the header is made now and again at
+# each build (the target git_revision), rewritten only when the commit
+# changes, so that only src/System/Boot/build_revision.cpp is rebuilt
+set (TM_GIT_REVISION_CMD
+  ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+  -DOUT=${CMAKE_CURRENT_BINARY_DIR}/src/System/git_revision.hpp
+  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GitRevision.cmake)
+execute_process (COMMAND ${TM_GIT_REVISION_CMD})
+add_custom_target (git_revision ALL COMMAND ${TM_GIT_REVISION_CMD}
+  COMMENT "Reading the git revision" VERBATIM)
+
 ### --------------------------------------------------------------------
 ### Source Files
 ### --------------------------------------------------------------------

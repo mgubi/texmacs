@@ -14,6 +14,27 @@ have the details, and the problems go to the
 
 ## 2 November 2026
 
+- **Less memory in some runs** (Scheme heap): the heap of cells of s7 was
+  quadrupled, from 8M to 32M cells (0.9 to 2.5 GB of memory), in about half
+  of the runs of the test suites `kbd-menu` and `search`, when C++ was
+  building a Scheme list just as the free cells ran out; a heap never
+  shrinks. It now grows by an eighth then (s7 patch 0008, #719).
+- **Documents opened from the Finder** (macOS, Cocoa and Qt): the first
+  document opened from the Finder, the Dock or `open` during a session
+  replaced the document of the current window, which stayed loaded without
+  a window (Go > Hidden). It now takes the place of the buffer only while
+  that is still the untitled, unmodified one of the startup; else it gets a
+  new window (part of #739). The Vue build is not changed here.
+- **The commit a build comes from** (desktop, #753): `TeXmacs -v` prints
+  `Revision ebf1221c79 2026-11-01T00:41:00Z` (the abbreviated commit and its
+  time in UTC) instead of `SVN version Custom ...`, and so do
+  `(texmacs-version-release "revision")` and Help > About > Summary. On macOS
+  the `Info.plist` has `CFBundleVersion` `ebf1221c79`, with
+  `CFBundleShortVersionString` still `2.1.5` (displays of "short (bundle)"
+  read `2.1.5 (ebf1221c79)`). The
+  commit is read from git at each `make` (and each CMake build) and only the
+  file `System/Boot/build_revision.cpp` depends on it; with no git or in a
+  source tarball nothing changes (`Custom ...`).
 - **Cocoa: the menus which macOS computes by itself** (desktop, Cocoa
   interface): when macOS computes all the menus without opening them
   (Spotlight, Apple Intelligence), the error of a menu, such as the
