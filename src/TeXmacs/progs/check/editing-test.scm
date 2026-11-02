@@ -1681,23 +1681,33 @@
 (define (test-open-from-system)
   (check-group "files from the system: the startup buffer or a new window")
   (let* ((old (current-buffer))
+         (before (buffer-list))
          (u (new-buffer))
          (a (tmp-file* "sys-a.tm"))
          (b (tmp-file* "sys-b.tm"))
          (c (tmp-file* "sys-c.tm"))
          (calls '())
+         (pending '())
+         (wait? #f)
+         (in-window #f)
          (open-all
           (lambda (names)
             (set! calls '())
+            (startup-buffer-release)
             (with-global load-buffer
                 (lambda (name . opts)
                   (set! calls (rcons calls (list 'current name)))
-                  ;; the file takes the place of the buffer
-                  (buffer-rename u name))
+                  ;; the file takes the place of the buffer, at once or
+                  ;; later (an autosave question waits for an answer)
+                  (if wait?
+                      (set! pending (rcons pending name))
+                      (begin (buffer-rename u name) (set! u name))))
               (with-global load-buffer-in-new-window
                   (lambda (name . opts)
                     (set! calls (rcons calls (list 'new name))))
-                (for-each load-buffer-from-system names))))))
+                (with-global buffer->window
+                    (lambda (name) (and (== name in-window) 'win))
+                  (for-each load-buffer-from-system names)))))))
     (switch-to-buffer* u)
     ;; the buffer of the startup: untitled and unmodified
     (check-true (startup-buffer?))
@@ -1706,23 +1716,44 @@
     (check-false (startup-buffer?))
     (buffer-pretend-saved u)
     (check-true (startup-buffer?))
+    ;; a file which is already in a window is not loaded in the startup
+    ;; buffer (load-buffer-in-new-window switches to its window)
+    (set! in-window a)
+    (open-all (list a))
+    (check= calls `((new ,a)))
+    (set! in-window #f)
+    ;; a file which is loaded but hidden (no window) takes the startup buffer
+    (open-all (list c))
+    (check= calls `((current ,c)))
     ;; several files at once: the first takes the startup buffer, the
     ;; others get windows
+    (buffer-close u)
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
     (open-all (list a b c))
     (check= calls `((current ,a) (new ,b) (new ,c)))
     ;; later, a file never replaces the document of the window
     (open-all (list b))
     (check= calls `((new ,b)))
-    ;; nor does it replace an untitled buffer which was modified
     (buffer-close u)
-    (let ((v (new-buffer)))
-      (switch-to-buffer* v)
-      (buffer-pretend-modified v)
-      (set! u v)
-      (open-all (list a))
-      (check= calls `((new ,a)))
-      (buffer-pretend-saved v)
-      (buffer-close v))
+    ;; the first file waits for an answer (autosave): the second one,
+    ;; arriving before, must not take the same buffer
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (set! wait? #t)
+    (open-all (list a b))
+    (check= calls `((current ,a) (new ,b)))
+    (set! wait? #f)
+    (buffer-close u)
+    ;; nor does it replace an untitled buffer which was modified
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (buffer-pretend-modified u)
+    (open-all (list a))
+    (check= calls `((new ,a)))
+    (buffer-pretend-saved u)
+    (for (x (buffer-list))
+      (when (nin? x before) (buffer-close x)))
     (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;; The initial environment belongs to the buffer (#528): a change made in
