@@ -232,13 +232,27 @@ public:
         main_win= abstract_window (vw->ed->mvw->win);
       if (win_id != 0)
         window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
-  void apply ();
+  void close (bool dropped);
+  void apply () { close (false); }
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
 };
 
+class drop_embedded_command_rep: public command_rep {
+  // the same, when the widget is let go without being destroyed by its
+  // window (side tools made again, #776)
+  command keep;
+  close_embedded_command_rep* cmd;
+public:
+  drop_embedded_command_rep (command c):
+    keep (c), cmd ((close_embedded_command_rep*) c.rep) {}
+  void apply () { cmd->close (true); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<command drop_embedded>"; }
+};
+
 void
-close_embedded_command_rep::apply () {
+close_embedded_command_rep::close (bool dropped) {
   // the view of the buffer which is still shown by this widget, if any
   tm_view vw= NULL;
   array<url> vs= buffer_to_views (name);
@@ -246,11 +260,16 @@ close_embedded_command_rep::apply () {
     tm_view v= concrete_view (vs[i]);
     if (v != NULL && v->win == win) vw= v;
   }
-  array<url> a= windows_list ();
-  url foc= main_win;
-  if (is_none (foc) || !contains (foc, a))
-    foc= (N(a) == 0? url_none (): a[0]);
-  if (!is_none (foc)) window_focus (foc);
+  // the focus goes back to the master window; when the widget was let go
+  // (side tools made again, #776), only if the focus was in it
+  tm_view cur= concrete_view (get_current_view_safe ());
+  if (!dropped || cur == NULL || cur->win == win) {
+    array<url> a= windows_list ();
+    url foc= main_win;
+    if (is_none (foc) || !contains (foc, a))
+      foc= (N(a) == 0? url_none (): a[0]);
+    if (!is_none (foc)) window_focus (foc);
+  }
   window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
   if (vw != NULL) {
     ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
@@ -347,7 +366,14 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   // that window is being built (between window_handle and window_create);
   // the widgets of the side tools of a main window are in none
   command close_cmd= close_embedded_command (vw, name, pending_window_handle);
-  return wrapped_widget (win->wid, close_cmd);
+  // When the widget is let go without being destroyed by its window (side
+  // tools made again), a buffer without a name is closed too: nothing else
+  // can use it. A named buffer is left to the Scheme code which named it,
+  // which may use it further (the buffer of the search toolbar), #776
+  command drop_cmd= (is_none (wname)?
+                     command (tm_new<drop_embedded_command_rep> (close_cmd)):
+                     command ());
+  return wrapped_widget (win->wid, close_cmd, drop_cmd);
 }
 
 /******************************************************************************
@@ -428,8 +454,11 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   object umenu= eval ("'" * menu);
   if (which == 10 || which == 11) w= make_menu_widget (umenu, 400, 1000);
   else w= make_menu_widget (umenu);
-  if (menu_caching)
-    if (which >= 10 || as_bool (call ("cache-menu?", xmenu))) {
+  // (the cache is only read for the menus and the icon bars, which < 10:
+  // the widgets of the side and bottom tools were kept for nothing, with
+  // the buffers of their texmacs-input, #776)
+  if (menu_caching && which < 10)
+    if (as_bool (call ("cache-menu?", xmenu))) {
       //if (which == 10) cout << which << " -> cached" << LF;
       //cout << which << " -> cached" << LF;
       menu_cache (xmenu)= w;

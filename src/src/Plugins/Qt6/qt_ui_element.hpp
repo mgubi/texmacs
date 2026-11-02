@@ -130,11 +130,14 @@ public:
 class qt_wrapped_widget_rep : public qt_widget_rep {
   widget tmwid;
   command quit;
+  command drop;  // when it is let go before SLOT_DESTROY
 public:
-  qt_wrapped_widget_rep (widget _tmwid, command _quit)
-    : tmwid (_tmwid), quit (_quit) {
+  qt_wrapped_widget_rep (widget _tmwid, command _quit,
+                         command _drop= command ())
+    : tmwid (_tmwid), quit (_quit), drop (_drop) {
     add_child (tmwid);
   }
+  ~qt_wrapped_widget_rep ();
   QWidget* as_qwidget (QWidget* parent_widget) { return concrete(tmwid)->as_qwidget(parent_widget); }
   void send (slot s, blackbox val) {
     switch (s) {

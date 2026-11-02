@@ -226,6 +226,9 @@ widget icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs);
 widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies);
 widget responsive_icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs);
 widget wrapped_widget (widget w, command quit);
+widget wrapped_widget (widget w, command quit, command drop);
+  // the same, with a command to be called when it is let go without being
+  // destroyed (by its window); ports which do not know when ignore it
   // copy of w, but with a separate reference counter,
   // and with a command to be called upon destruction
 widget user_canvas_widget (widget wid, int style= 0);

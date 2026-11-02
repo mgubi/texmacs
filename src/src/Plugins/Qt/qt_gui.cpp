@@ -699,8 +699,10 @@ void
 gui_close () {
     // cleanly close the gui
   ASSERT (the_gui != NULL, "gui not yet open");
-  tm_delete (the_gui);
+  // (the widgets let go while it is deleted see no gui, #776)
+  qt_gui_rep* gui= the_gui;
   the_gui = NULL;
+  tm_delete (gui);
   
 #ifdef MACOSX_EXTENSIONS
   mac_end_remote();

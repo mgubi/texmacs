@@ -1083,13 +1083,21 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
       check_type_void (index, s);
     {
 #if QT_VERSION >= 0x050000
+      qt_widget former= side_tools_widget;
       side_tools_widget = concrete (w);
       QWidget* new_qwidget = side_tools_widget->as_qwidget(mainwindow());
       if (sideTools) {
           QScrollArea *scrollArea = dynamic_cast<QScrollArea*>(sideTools->widget());
           if (scrollArea) {
               QWidget* old_qwidget = scrollArea->widget();
-              if (old_qwidget) old_qwidget->deleteLater();
+              if (old_qwidget) {
+                // the former widget lives as long as its Qt widgets, which
+                // may still use it: it is no longer kept in the menu cache
+                // of the window (#776)
+                QObject::connect (old_qwidget, &QObject::destroyed,
+                                  [former] () { (void) former; });
+                old_qwidget->deleteLater();
+              }
               scrollArea->setWidget (new_qwidget);
           }
       }
@@ -1111,11 +1119,19 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
     case SLOT_LEFT_TOOLS:
       check_type_void (index, s);
     {
+      qt_widget former= left_tools_widget;
       left_tools_widget = concrete (w);
       QWidget* new_qwidget = left_tools_widget->as_qwidget(mainwindow());
       if (leftTools) {
         QWidget* old_qwidget = leftTools->widget();
-        if (old_qwidget) old_qwidget->deleteLater();
+        if (old_qwidget) {
+          // the former widget lives as long as its Qt widgets, which
+          // may still use it: it is no longer kept in the menu cache
+          // of the window (#776)
+          QObject::connect (old_qwidget, &QObject::destroyed,
+                            [former] () { (void) former; });
+          old_qwidget->deleteLater();
+        }
         leftTools->setWidget (new_qwidget);
       }
       update_visibility();
@@ -1135,11 +1151,19 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
     case SLOT_BOTTOM_TOOLS:
       check_type_void (index, s);
     {
+      qt_widget former= bottom_tools_widget;
       bottom_tools_widget = concrete (w);
       QWidget* new_qwidget = bottom_tools_widget->as_qwidget(mainwindow());
       if (bottomTools) {
           QWidget* old_qwidget = bottomTools->widget();
-          if (old_qwidget) old_qwidget->deleteLater();
+          if (old_qwidget) {
+            // the former widget lives as long as its Qt widgets, which
+            // may still use it: it is no longer kept in the menu cache
+            // of the window (#776)
+            QObject::connect (old_qwidget, &QObject::destroyed,
+                              [former] () { (void) former; });
+            old_qwidget->deleteLater();
+          }
           bottomTools->setWidget (new_qwidget);
       }
       update_visibility();
@@ -1159,11 +1183,19 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
     case SLOT_EXTRA_TOOLS:
       check_type_void (index, s);
     {
+      qt_widget former= extra_tools_widget;
       extra_tools_widget = concrete (w);
       QWidget* new_qwidget = extra_tools_widget->as_qwidget(mainwindow());
       if (extraTools) {
           QWidget* old_qwidget = extraTools->widget();
-          if (old_qwidget) old_qwidget->deleteLater();
+          if (old_qwidget) {
+            // the former widget lives as long as its Qt widgets, which
+            // may still use it: it is no longer kept in the menu cache
+            // of the window (#776)
+            QObject::connect (old_qwidget, &QObject::destroyed,
+                              [former] () { (void) former; });
+            old_qwidget->deleteLater();
+          }
           extraTools->setWidget (new_qwidget);
       }
       update_visibility();
