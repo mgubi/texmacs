@@ -227,6 +227,9 @@ edit_env_rep::exec (tree t) {
     for (i=1; i<n; i++) r[i]= t[i];
     return r;
   }
+  case CODE_LINES:
+    // lines of code: strings only, nothing to evaluate
+    return t;
   case DATOMS:
     return exec_formatting (t, ATOM_DECORATIONS);
   case DLINES:
@@ -2687,6 +2690,9 @@ edit_env_rep::exec_until (tree t, path p) {
   }
 
   switch (L(t)) {
+  case CODE_LINES:
+    // the lines do not change the environment
+    return;
   case DATOMS:
     exec_until_formatting (t, p, ATOM_DECORATIONS);
     return;
@@ -2846,6 +2852,8 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   //      << " inside " << var << " level " << level << "\n";
   if (is_atomic (t)) return false;
   switch (L(t)) {
+  case CODE_LINES:
+    return false;
   case DATOMS:
     return exec_until_formatting (t, p, var, level, ATOM_DECORATIONS);
   case DLINES:

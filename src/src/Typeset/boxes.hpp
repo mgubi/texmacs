@@ -272,6 +272,7 @@ public:
   friend class  remember_box_rep;
   friend class  group_box_rep;
   friend struct effect_box_rep;
+  friend struct code_box_rep;
   friend void make_eps (url dest, box b, int dpi);
   friend void make_raster_image (url dest, box b, double zoom);
 };

@@ -203,6 +203,11 @@ concater_rep::typeset (tree t, path ip) {
   case DOCUMENT:
     typeset_document (t, ip);
     break;
+  case CODE_LINES:
+    // (inside a line: as a document)
+    if (N(t) == 1) typeset_document (t[0], descend (ip, 0));
+    else typeset_error (t, ip);
+    break;
   case PARA:
     typeset_paragraph (t, ip);
     break;

@@ -370,6 +370,13 @@ tree
 verbatim_document_to_tree (string s, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
   tree t    = verbatim_to_tree (s, wrap, enc);
+  // prototype (#710): the lines as <code-lines|<document|...>>, typeset by
+  // one bridge without a paragraph per line (see bridge_code.cpp)
+  const char* cl= getenv ("TEXMACS_CODE_LINES");
+  if (cl != NULL && string (cl) == "1" && !wrap) {
+    if (!is_func (t, DOCUMENT)) t= tree (DOCUMENT, t);
+    t= tree (DOCUMENT, tree (CODE_LINES, t));
+  }
   tree init = tree (COLLECTION,
                     tree (ASSOCIATE, LANGUAGE, "verbatim"),
                     tree (ASSOCIATE, FONT_FAMILY, "tt"),
