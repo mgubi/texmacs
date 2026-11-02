@@ -497,6 +497,21 @@
 (define (http-root-handler u)
   (load-browse-buffer u))
 
+;; The file which the handlers of @u load, or #f when they do something else
+;; (a web page, an external viewer, several candidates)
+(define (url-load-target u)
+  (with root (or (and (url-rooted? u) (url-root u)) "default")
+    (and (in? root '("default" "file"))
+         (not (url-rooted-protocol? u "mailto"))
+         (not (url-or? (url-expand u)))
+         (let* ((base (car (process-url u)))
+                (b (if (string? base) (system->url base) base)))
+           (and (not (url-none? b))
+                (!= "" (url->system b))
+                (not (url-rooted-web? b))
+                (not (buffer-external? b))
+                b)))))
+
 (define (url-handlers u)
   (with root (or (and (url-rooted? u) (url-root u)) "default")
     (cond ((== root "default") 
@@ -533,9 +548,13 @@
   (:argument opt-from "Optional path for the cursor history")
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
   (if (string? u) (set! u (system->url u)))
-  (with (action post) (url-handlers u) 
-    (action u) (post u))
-  (if (nnull? opt-from) (cursor-history-add (cursor-path))))
+  ;; a link to a large source file asks first; what follows the load (the
+  ;; line and the word of the link, the history) waits for the answer
+  (with (action post) (url-handlers u)
+    (confirm-large-load (url-load-target u)
+      (lambda ()
+        (action u) (post u)
+        (if (nnull? opt-from) (cursor-history-add (cursor-path)))))))
 
 (define (execute-at cmd opt-location)
   (if (null? opt-location) (exec-delayed cmd)

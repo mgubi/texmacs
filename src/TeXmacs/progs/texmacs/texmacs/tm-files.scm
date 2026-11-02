@@ -681,27 +681,65 @@
        (>= size large-source-file-size)
        (in? fm large-source-formats)))
 
+;; Set while the thunk of an answered question runs, so that the loads inside
+;; it do not ask again
+(define large-load-confirmed? #f)
+
+;; Set by the tests, which run without a window, to be asked as if there
+;; was one
+(tm-define large-load-test-interactive? #f)
+
 (define (load-buffer-ask-large? name opts)
   ;; only for the calls which ask for it (:confirm-large, from the menus,
   ;; the dialog of File > Open, the links and the files opened by the
   ;; system), never in a script, with -x, -c, in headless mode or when there
   ;; is no window to ask in
   (and (in? :confirm-large opts)
-       (not (headless?))
-       (> (windows-number) 0)
+       (not large-load-confirmed?)
+       (or large-load-test-interactive?
+           (and (not (headless?)) (> (windows-number) 0)))
        (not (url-rooted-web? name))
        (not (url-rooted-tmfs? name))
        (not (buffer-exists? name))
        (url-test? name "f")
        (large-source-file? (url-size name) (url-format name))))
 
-(define (load-buffer-confirm-large name opts k)
-  (if (load-buffer-ask-large? name opts)
-      (let* ((mb (quotient (+ (url-size name) 524288) 1048576))
+(define (load-buffer-resolve-name name)
+  (if (and (not (url-exists? name))
+           (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
+      (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
+  (if (not (url-rooted? name))
+      (if (current-buffer)
+          (set! name (url-relative (current-buffer) name))
+          (set! name (url-append (url-pwd) name))))
+  name)
+
+(tm-define (confirm-large-load name thunk)
+  (:synopsis "Call @thunk, after the question for a large source file @name")
+  ;; thunk runs at once when no question is needed (@name is not a large
+  ;; source file, or #f, or the call is not interactive), otherwise only in
+  ;; the answer yes: the question may be answered later (a footer prompt),
+  ;; so what has to follow the load belongs in the thunk. The loads in the
+  ;; thunk do not ask again.
+  (if (and name (load-buffer-ask-large? (load-buffer-resolve-name name)
+                                        '(:confirm-large)))
+      (let* ((name (load-buffer-resolve-name name))
+             (mb (quotient (+ (url-size name) 524288) 1048576))
              (msg (replace "The file %1 is large (%2 MB). Opening it may take a long time and a lot of memory. Open it anyway?"
                            (url->system name) (number->string mb))))
         ;; answering no (or escape) leaves everything as it was
-        (user-confirm msg #f (lambda (answ) (when answ (k)))))
+        (user-confirm msg #f
+          (lambda (answ)
+            (when answ
+              (dynamic-wind
+                (lambda () (set! large-load-confirmed? #t))
+                thunk
+                (lambda () (set! large-load-confirmed? #f)))))))
+      (thunk)))
+
+(define (load-buffer-confirm-large name opts k)
+  (if (in? :confirm-large opts)
+      (confirm-large-load name k)
       (k)))
 
 (define (load-buffer-open name opts)
@@ -771,13 +809,7 @@
 
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
-  (if (and (not (url-exists? name))
-           (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
-      (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
-  (if (not (url-rooted? name))
-      (if (current-buffer)
-          (set! name (url-relative (current-buffer) name))
-          (set! name (url-append (url-pwd) name))))
+  (set! name (load-buffer-resolve-name name))
   (load-buffer-confirm-large name opts
     (lambda () (load-buffer-check-autosave name opts))))
 
