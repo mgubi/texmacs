@@ -881,7 +881,8 @@
       ;; yes, after other things happened: loads, one question only
       (go-to-url (string-append (url->system f) "?line=3"))
       (check= large-asked 2)
-      (large-pending #t)
+      ;; the continuation returns nothing that the footer would print
+      (check= (large-pending #t) (noop))
       (check= large-asked 2)
       (check-true (buffer-exists? f))
       (check= (current-buffer) f)

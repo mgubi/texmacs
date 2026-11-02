@@ -687,7 +687,9 @@
 
 ;; Set by the tests, which run without a window, to be asked as if there
 ;; was one: #t, or the procedure (prompt default cont) which asks in place of
-;; user-confirm (a stub cannot replace user-confirm itself under s7)
+;; user-confirm. (A first version stubbed user-confirm itself with with-global
+;; in the editing checks; on the Vue/s7 binary that run hung in the group, the
+;; stub apparently not reached; the hook does not depend on that.)
 (tm-define large-load-test-interactive? #f)
 (tm-define (set-large-load-test-interactive! flag)
   (set! large-load-test-interactive? flag))
@@ -745,7 +747,9 @@
               (dynamic-wind
                 (lambda () (set! large-load-confirmed? #t))
                 thunk
-                (lambda () (set! large-load-confirmed? #f)))))))
+                (lambda () (set! large-load-confirmed? #f))))
+            ;; no value: the footer prints what the continuation returns
+            (noop))))
       (thunk)))
 
 (define (load-buffer-confirm-large name opts k)

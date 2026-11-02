@@ -561,7 +561,7 @@
           (startup-buffer-release)
           (load-buffer-from-system f)
           (check= calls '())
-          (pending #t)
+          (check= (pending #t) (noop))
           (check= asked 2)
           (check= calls (list (list 'current f)))
           ;; another buffer than the startup one: a window of its own
