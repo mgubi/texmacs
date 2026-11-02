@@ -42,6 +42,8 @@ extern int nr_windows;
 
 #ifdef QTTEXMACS
 void del_obj_qt_renderer(void);
+#endif
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 void qt_forget_deferred_deletes ();
 #endif
 
@@ -340,6 +342,8 @@ quit_texmacs_internal (int code) {
   clear_pending_commands ();
 #ifdef QTTEXMACS
   del_obj_qt_renderer ();
+#endif
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
   qt_forget_deferred_deletes ();
 #endif
 
