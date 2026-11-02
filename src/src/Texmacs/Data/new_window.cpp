@@ -312,7 +312,9 @@ void
 kill_buffer (url name) {
   array<url> vs= buffer_to_views (name);
   for (int i=0; i<N(vs); i++)
-    if (!is_none (vs[i])) {
+    // (a view in no window, as the view of an embedded widget, needs no
+    // other view: one made for it would never be shown nor deleted, #775)
+    if (!is_none (vs[i]) && !is_none (view_to_window (vs[i]))) {
       url prev= get_recent_view (name, false, true, false, true);
       if (is_none (prev)) {
         prev= get_recent_view (name, false, true, false, false);
