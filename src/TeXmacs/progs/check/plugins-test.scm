@@ -1228,6 +1228,17 @@
   (for (i (.. 1 6))
     (check-true (cmdline-run "plugins-test-win" "c"))))
 
+;; Windows: the output of a command is read while it runs (#655). Before,
+;; a command with more output than the pipe holds waited for the 30 s limit
+;; of windows_system, and one which filled stderr while stdout was open
+;; (here 1 MB on stderr first) never ended.
+(define (test-windows-output)
+  (check-group "external commands: large output (Windows)")
+  (let* ((t0 (texmacs-time))
+         (r (eval-system "sh -c \"yes e | head -c 1000000 >&2; yes o | head -c 1000000\"")))
+    (check= (string-length r) 1000000)
+    (check-true (< (- (texmacs-time) t0) 20000))))
+
 (define (test-processes)
   (check-group "processes: plugins which exit")
   ;; (the first session opens what is opened once)
@@ -1387,6 +1398,8 @@
       (skip "processes" "no sh or no /dev/fd"))
   (if (os-mingw?)
       (run-group test-windows-cmdline))
+  (if (and (os-mingw?) (url-exists-in-path? "sh"))
+      (run-group test-windows-output))
   (run-group test-scheme-session)
   (run-group test-external)
   (check-end))
