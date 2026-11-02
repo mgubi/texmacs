@@ -672,6 +672,18 @@ gui_start_loop () {
 }
 
 void
+qt_forget_deferred_deletes () {
+  // (called when TeXmacs quits, before _exit: the widgets given to
+  // deleteLater and not yet deleted are forgotten, not deleted. On Windows
+  // _exit runs the shutdown of the DLLs, where Qt delivers the pending
+  // deferred deletes, and ~QWidget crashes (gdb on the Windows CI:
+  // ~QTMWidget under ntdll!LdrShutdownProcess). A script given by -x runs
+  // before the event loop gets to delete them. Harmless to call twice)
+  if (QCoreApplication::instance () != NULL)
+    QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
+}
+
+void
 gui_close () {
     // cleanly close the gui
   ASSERT (the_gui != NULL, "gui not yet open");
