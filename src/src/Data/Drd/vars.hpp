@@ -117,6 +117,7 @@ extern string DEFINED_COLOR;
 extern string MISC_LEXEME_COLOR;
 extern string ALT_KEYWORD_COLOR;
 extern string ALT_CONSTANT_COLOR;
+extern string ADAPT_DARK_COLORS;
 
 extern string PAR_MODE;
 extern string PAR_FLEXIBILITY;

@@ -20,8 +20,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (basic-theme-name theme)
-  (let* ((s1 (string-replace theme "-" " ")))
-    (upcase-first s1)))
+  (if (== theme "programmer")
+      "Programmer mode"
+      (let* ((s1 (string-replace theme "-" " ")))
+        (upcase-first s1))))
 
 (menu-bind basic-theme-menu
   ("Plain" (select-default-basic-theme))

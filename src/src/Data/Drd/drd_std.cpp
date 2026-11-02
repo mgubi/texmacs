@@ -1102,6 +1102,7 @@ init_std_drd () {
   init_var (MISC_LEXEME_COLOR, TYPE_COLOR);
   init_var (ALT_KEYWORD_COLOR, TYPE_COLOR);
   init_var (ALT_CONSTANT_COLOR, TYPE_COLOR);
+  init_var (ADAPT_DARK_COLORS, TYPE_BOOLEAN);
 
   init_var (PAR_MODE, TYPE_STRING);
   init_var (PAR_FLEXIBILITY, TYPE_NUMERIC);
