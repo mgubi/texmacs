@@ -136,7 +136,10 @@ qt_forget_deferred_deletes () {
   // the thread-local objects of Qt are gone before any exit handler is
   // called, and so are the static objects made after this handler was
   // registered, as the list of the active scrollers of QScroller, made by
-  // the first one deleted. The quit of TeXmacs, _exit, deletes nothing)
+  // the first one deleted. The quit of TeXmacs calls this too, before _exit:
+  // on Windows _exit runs the shutdown of the DLLs, where Qt delivers the
+  // pending deferred deletes and ~QWidget crashes; calling it twice, here
+  // and by the exit handler, is harmless)
   if (QCoreApplication::instance () != NULL)
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }

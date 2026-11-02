@@ -37,7 +37,7 @@ from_nsstring (NSString *s) {
 {
   (void) theApplication;
   call ("load-buffer", object (url_system (from_nsstring (filename))),
-                       eval (":new-window"));
+                       eval (":new-window"), eval (":confirm-large"));
   return YES;
 }
 @end

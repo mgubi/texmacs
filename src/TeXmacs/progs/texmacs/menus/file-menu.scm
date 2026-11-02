@@ -105,7 +105,9 @@
     (let* ((short-name `(verbatim ,(short-menu-name name)))
            (long-name `(verbatim ,(long-menu-name name))))
       ((balloon (eval short-name) (eval long-name))
-       (if win? (load-document name) (load-buffer name))))))
+       (if (and win? (window-per-buffer?))
+           (load-buffer-in-new-window name :confirm-large)
+           (load-buffer name :confirm-large))))))
 
 (tm-define (recent-file-list nr)
   (let* ((l1 (map cdar (learned-interactive "recent-buffer")))

@@ -914,7 +914,7 @@ texmacs_entrypoint (int argc, char** argv) {
     c_string _exe (concretize (exe));
 #  if defined(QTTEXMACS)
     string cmd= string ("(load-buffer \"") * open_mode_url
-                * string ("\")");
+                * string ("\" :confirm-large)");
     if (!send_to_single_instance (cmd))
 #  endif
     {
