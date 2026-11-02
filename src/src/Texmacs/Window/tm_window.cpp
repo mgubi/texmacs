@@ -270,11 +270,7 @@ close_embedded_command_rep::close (bool dropped) {
       foc= (N(a) == 0? url_none (): a[0]);
     if (!is_none (foc)) window_focus (foc);
   }
-  // the window stays registered for the buffer when a newer widget took
-  // the buffer over: when that widget is in the same dialog (a refreshable
-  // made it again), it was not registered itself (#776)
-  if (vw != NULL || !contains (name, get_all_buffers ()))
-    window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
+  window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
   if (vw != NULL) {
     ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
     remove_buffer (name);
