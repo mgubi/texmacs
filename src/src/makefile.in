@@ -298,6 +298,22 @@ deps:
 
 .PHONY: deps
 
+# The git commit of the sources (#753), for -v, (texmacs-version-release
+# "revision") and the About page. The header is made at each run of make and
+# rewritten only if the commit changed (misc/scripts/git-revision.sh), so
+# that a new commit rebuilds only System/Boot/build_revision.cpp (and
+# relinks) and no other file: config.h is not involved. Without git, or in
+# a tarball, the header is empty and TEXMACS_REVISION ("Custom ...") stays.
+Objects/git_revision.hpp: FORCE
+	@mkdir -p Objects
+	@$(tmsrc)/../misc/scripts/git-revision.sh --header $@ $(tmsrc)/..
+
+Objects/build_revision.o: Objects/git_revision.hpp
+Objects/build_revision.o: CPPFLAGS += -IObjects
+
+FORCE:
+.PHONY: FORCE
+
 ###############################################################################
 # Object files
 ###############################################################################
