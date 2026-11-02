@@ -772,6 +772,39 @@
       (switch-to-window (buffer->window name))
       (apply load-buffer-main (cons name (cons :new-window opts)))))
 
+;; The startup buffer which a file of the system is being loaded into: the
+;; load may wait for an answer (the autosave question, load-buffer-check-
+;; autosave), and a second file arriving meanwhile must not take the same
+;; buffer: the first would lose its window (#739).
+(define startup-reserved #f)
+
+;; only for the tests, which make many untitled buffers
+(define-public (startup-buffer-release)
+  (set! startup-reserved #f))
+
+(tm-define (startup-buffer? . l)
+  (:synopsis "Is the buffer still the untitled, unmodified one of the startup?")
+  (with b (if (null? l) (current-buffer) (car l))
+    (and b (buffer-exists? b)
+         (not (buffer-has-name? b))
+         (not (buffer-modified? b)))))
+
+(tm-define (load-buffer-from-system name)
+  (:synopsis "Load a file given by the system (the Finder, the Dock, open)")
+  ;; the untitled, unmodified buffer of the startup is replaced by the first
+  ;; file, as the user did not touch it; any other file gets a window of its
+  ;; own, not the one the user is working in (#739). The test is made when
+  ;; the command runs, so several files given at once go one after the other:
+  ;; the first takes the startup buffer, which it reserves for the rest
+  ;; of the session (even if its load fails), the others get new windows.
+  (with b (current-buffer)
+    (if (and (startup-buffer?) (!= b startup-reserved)
+             (not (buffer->window name)))
+        (begin
+          (set! startup-reserved b)
+          (load-buffer name))
+        (load-buffer-in-new-window name))))
+
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
   (cond ((url-rooted-protocol? name "mailto") (load-external name))

@@ -92,7 +92,10 @@ QTMWidget::QTMWidget (QWidget* _parent, qt_widget _tmwid)
     QApplication::postEvent(this, new QFocusEvent(QEvent::FocusIn, Qt::OtherFocusReason));
 }
 
+extern QTMWidget *last_focused_widget;
+
 QTMWidget::~QTMWidget () {
+  if (last_focused_widget == this) last_focused_widget= nullptr;
   if (DEBUG_QT)
     debug_qt << "Destroying " << from_qstring(objectName()) << " of widget "
              << (tm_widget() ? tm_widget()->type_as_string() : "NULL") << LF;

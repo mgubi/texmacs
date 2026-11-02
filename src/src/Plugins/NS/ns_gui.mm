@@ -1651,17 +1651,14 @@ static NSAutoreleasePool *pool = nil;
 {
   (void) app;
   NS_ENTRY_BEGIN
-  // as in Qt: the first one replaces the buffer of the start, the others
-  // open new windows
-  static bool new_window_flag= false;
+  // as in Qt: the untitled, unmodified buffer of the start is replaced by
+  // the first file, the others (and any file opened later) get new windows;
+  // load-buffer-from-system chooses when the command runs (#739)
   for (NSURL* u in urls) {
     string name= [u isFileURL]? from_nsstring_utf8 ([u path]):
                                 from_nsstring_utf8 ([u absoluteString]);
-    const char* win= new_window_flag? ":new-window": ":current-window";
-    exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer"),
-                                           object (url_system (name)),
-                                           eval (win))));
-    new_window_flag= true;
+    exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer-from-system"),
+                                           object (url_system (name)))));
   }
   if (the_gui) the_gui->need_update ();
   NS_ENTRY_END ("application:openURLs:")
