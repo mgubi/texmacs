@@ -787,10 +787,10 @@ tmg_pretty_date (tmscm arg1, tmscm arg2) {
 tmscm
 tmg_texmacs_memory () {
   // TMSCM_DEFER_INTS;
-  int out= mem_used ();
+  long out= mem_used ();
   // TMSCM_ALLOW_INTS;
 
-  return int_to_tmscm (out);
+  return long_to_tmscm (out);
 }
 
 tmscm

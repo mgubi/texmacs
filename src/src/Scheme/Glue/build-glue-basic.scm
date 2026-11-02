@@ -89,7 +89,7 @@
   (pretty-time pretty_time (string int))
   (cpu-idle-time cpu_idle_time (int))
   (pretty-date pretty_date (string int string))
-  (texmacs-memory mem_used (int))
+  (texmacs-memory mem_used (long))
   (bench-print bench_print (void string))
   (bench-print-all bench_print (void))
   (system-wait system_wait (void string string))

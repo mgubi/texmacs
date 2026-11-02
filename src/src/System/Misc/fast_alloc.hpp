@@ -33,7 +33,7 @@ extern char*  alloc_mem_bottom;
 bool break_stub(void* ptr);
 extern size_t alloc_remains;
 extern int    allocated;
-extern int    large_uses;
+extern long   large_uses;
 
 #define alloc_ptr(i) alloc_table[i]
 #define ind(ptr) (*((void **) ptr))
@@ -49,7 +49,7 @@ extern void  fast_free (void* ptr, size_t s);
 extern void* fast_new (size_t s);
 extern void  fast_delete (void* ptr);
 
-extern int   mem_used ();
+extern long  mem_used ();
 extern void  mem_info ();
 void* alloc_check(const char *msg,void *ptr,size_t* sp);
 
