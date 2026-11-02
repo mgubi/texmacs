@@ -19,8 +19,7 @@ have the details, and the problems go to the
   replaced the document of the current window, which stayed loaded without
   a window (Go > Hidden). It now takes the place of the buffer only while
   that is still the untitled, unmodified one of the startup; else it gets a
-  new window (part of #739). The Vue build is not changed (it
-  does not open Finder documents; see #739).
+  new window (part of #739). The Vue build is not changed here.
 
 - **The question dialog on Wayland** (Vue, Linux): with software OpenGL on
   mutter, sway and weston, the first frame of a new window was presented in

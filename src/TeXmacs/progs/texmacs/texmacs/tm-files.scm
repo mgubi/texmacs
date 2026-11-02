@@ -778,8 +778,8 @@
 ;; buffer: the first would lose its window (#739).
 (define startup-reserved #f)
 
-(tm-define (startup-buffer-release)
-  (:synopsis "Forget the reservation of the startup buffer")
+;; only for the tests, which make many untitled buffers
+(define-public (startup-buffer-release)
   (set! startup-reserved #f))
 
 (tm-define (startup-buffer? . l)
@@ -795,8 +795,8 @@
   ;; file, as the user did not touch it; any other file gets a window of its
   ;; own, not the one the user is working in (#739). The test is made when
   ;; the command runs, so several files given at once go one after the other:
-  ;; the first takes the startup buffer, which it reserves until it is
-  ;; replaced, the others get new windows.
+  ;; the first takes the startup buffer, which it reserves for the rest
+  ;; of the session (even if its load fails), the others get new windows.
   (with b (current-buffer)
     (if (and (startup-buffer?) (!= b startup-reserved)
              (not (buffer->window name)))
