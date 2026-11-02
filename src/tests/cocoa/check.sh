@@ -352,16 +352,23 @@ verdict queries "the window queries of the View menu answer false in every windo
 # is printed after each
 errdefs='(define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
 debug_menu=1
-run menus "" "scan;scan;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
+run menus "" "eval:(cocoa-check-errors 'before);scan;scan;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
     "(open-error-messages)" "$errdefs"
 debug_menu=
 menus_ok () {
   fail="no scan"
   grep -aq '^NSTEST scan done' "$out/menus.log" || return 1
-  fail="the scan of the menus put errors in the console: $(grep -a '^CHECK errors' "$out/menus.log" | head -1)"
-  grep -aq '^CHECK errors scanned 0$' "$out/menus.log" || return 1
-  fail="the menu really opened did not show its error: $(grep -a '^CHECK errors' "$out/menus.log" | tail -1)"
-  grep -aqE '^CHECK errors opened [1-9]' "$out/menus.log"
+  count () { grep -a "^CHECK errors $1 " "$out/menus.log" | head -1 | cut -d' ' -f4; }
+  before=$(count before); scanned=$(count scanned); opened=$(count opened)
+  fail="no counts of the messages: '$before' '$scanned' '$opened'"
+  [ -n "$before" ] && [ -n "$scanned" ] && [ -n "$opened" ] || return 1
+  fail="the scan of the menus put errors in the console: $before before, $scanned after"
+  [ "$scanned" = "$before" ] || return 1
+  fail="the menu really opened did not show its error: $scanned after the scan, $opened after"
+  [ "$opened" -gt "$scanned" ] || return 1
+  n=$(grep -ac 'caught while a menu was computed' "$out/menus.log")
+  fail="a scan logs without bound: $n lines"
+  [ "$n" -le 6 ]
 }
 expected='Throwing |caught while a menu was computed|caught in a menu|widget expected'
 verdict menus "the errors of menus computed by macOS are not shown, those of menus opened are (#720)" menus_ok

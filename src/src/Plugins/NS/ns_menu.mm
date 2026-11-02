@@ -83,7 +83,23 @@
 
 extern string the_report; // (basic.cpp)
 
+// whether a menu is being tracked (the menu bar, a pop-up, the keyboard)
+static BOOL ns_menu_tracking= NO;
+
+
 @implementation TMLazyMenu
++ (void)initialize
+{
+  if (self != [TMLazyMenu class]) return;
+  NSNotificationCenter* c= [NSNotificationCenter defaultCenter];
+  [c addObserverForName: NSMenuDidBeginTrackingNotification object: nil
+     queue: nil usingBlock: ^(NSNotification* n) {
+       (void) n; ns_menu_tracking= YES; }];
+  [c addObserverForName: NSMenuDidEndTrackingNotification object: nil
+     queue: nil usingBlock: ^(NSNotification* n) {
+       (void) n; ns_menu_tracking= NO; }];
+}
+
 - (void)setPromise:(promise_rep<widget> *)p
 {
   if (pm) { DEC_COUNT_NULL(pm); }  pm = p;  INC_COUNT_NULL(pm);
@@ -98,7 +114,6 @@ extern string the_report; // (basic.cpp)
 - (void)dealloc
 {
   // NOTE: not setPromise:, which would make a weak reference to self
-  [NSObject cancelPreviousPerformRequestsWithTarget: self];
   [self setDelegate: nil];
   if (pm) { DEC_COUNT_NULL(pm); pm= NULL; }
   [super dealloc];
@@ -110,8 +125,6 @@ extern string the_report; // (basic.cpp)
   // computed again, so that the check marks, the enabled items and the
   // lists (of documents, ...) are up to date
   if (!pm) return;
-  [NSObject cancelPreviousPerformRequestsWithTarget: self
-    selector: @selector(reportFailure) object: nil];
   NSMenu *menu2 = nil;
   // An error while computing the menu (a Scheme error in its definition,
   // such as Debug > Miscellaneous > Provoke menu error, thrown as a C++
@@ -150,8 +163,13 @@ extern string the_report; // (basic.cpp)
     if (N (failure) == 0) failure= "an error";
     // (tm_throw has set these for its error; the report is ours)
     the_exception= ""; the_report= "";
-    cout << "Cocoa: an error was caught while a menu was computed (shown if "
-         << "the menu is opened): " << failure << LF;
+    // (once for the same error in a row: a scan repeats it for each menu)
+    static string last_logged;
+    if (failure != last_logged) {
+      last_logged= failure;
+      cout << "Cocoa: an error was caught while a menu was computed (shown "
+           << "if the menu is opened): " << failure << LF;
+    }
   }
   if (failed || !menu2) {
     [menu removeAllItems];
@@ -177,35 +195,29 @@ extern string the_report; // (basic.cpp)
   // (-[NSMenu _simulateOpening:], with Spotlight or Apple Intelligence),
   // and for these it calls menuNeedsUpdate: and menuWillOpen: one after
   // the other, in the same call, and not menuDidClose: (checked on macOS
-  // 15.7). So menuWillOpen: does not tell a real opening. What does is
-  // the tracking of the menu, which runs the run loop in the mode
-  // NSEventTrackingRunLoopMode: the error is shown when it comes round
-  // there, at once (a few ms) if the user opens the menu, and never for a
-  // scan, which has no such pass (#720)
+  // 15.7). So these two do not tell a real opening. The tracking of the
+  // menus does: NSMenuDidBeginTrackingNotification comes before the menu
+  // is computed, whatever opens it (the menu bar, a key, a pop-up). The
+  // error is shown at once when the menu opens in a tracking, and in any
+  // case when it closes (menuDidClose:), which a real opening always ends
+  // with: it is never lost. A scan neither tracks nor closes, so nothing
+  // is shown (#720). If a scan did one of them, the error would be shown:
+  // a repeated message rather than a hidden one.
   (void) menu;
-  [NSObject cancelPreviousPerformRequestsWithTarget: self
-    selector: @selector(reportFailure) object: nil];
-  if (N (failure) == 0) return;
-  opened_at= (long) texmacs_time ();
-  [self performSelector: @selector(reportFailure) withObject: nil
-        afterDelay: 0 inModes: @[NSEventTrackingRunLoopMode]];
+  if (N (failure) > 0 && ns_menu_tracking) [self reportFailure];
 }
 
 - (void)menuDidClose:(NSMenu *)menu
 {
   (void) menu;
-  [NSObject cancelPreviousPerformRequestsWithTarget: self
-    selector: @selector(reportFailure) object: nil];
+  [self reportFailure];
 }
 
 - (void)reportFailure
 {
-  // (a scan leaves the request for the next tracking, which may come much
-  // later, of another menu: it is dropped then)
   if (N (failure) == 0) return;
   string what= failure, report= failure_report;
   failure= ""; failure_report= "";
-  if ((long) texmacs_time () - opened_at > 1000) return;
   the_exception= what; the_report= report;
   ns_report_exception ("a menu", what);
 }

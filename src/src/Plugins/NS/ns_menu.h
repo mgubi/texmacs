@@ -37,10 +37,10 @@ class ns_simple_widget_rep;
   promise_rep<widget> *pm;
   string failure;         //!< the error of the last computation, if any
   string failure_report;  //!< and its report (see menuWillOpen:)
-  long   opened_at;       //!< when the menu was about to open
 }
 - (void)setPromise:(promise_rep<widget> *)p;
 - (promise_rep<widget> *)promise;
+- (void)reportFailure;
 @end
 
 /*! A menu rendered as a table of icons (tile_menu). */
