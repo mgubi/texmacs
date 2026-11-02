@@ -1,0 +1,65 @@
+# Keeps svn_sync, the git-svn import of the SVN trunk of TeXmacs on Savannah,
+# up to date: every six hours (and by hand, from the Actions tab or with
+#   gh workflow run svn-sync.yml
+# ) the new revisions are fetched anonymously and svn_sync is fast-forwarded.
+# The commits are those a git-svn checkout with developer access makes:
+# --rewrite-root keeps the URL of the git-svn-id lines (svn+ssh), and the
+# authors are git-svn's default (name <name@uuid>), so the hashes match and
+# the branch only ever moves forward. The rev map of git-svn is rebuilt on
+# each run from the git-svn-id lines of the branch (hence the full history).
+# The push is never forced: should the SVN history ever differ, it is
+# rejected and svn_sync stays as it was. The state before this workflow is
+# kept in backup/svn_sync-r15774.
+# A scheduled workflow runs only from the default branch of the repository.
+
+name: Sync svn_sync from Savannah
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: svn-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Fetch the new SVN revisions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      SVN_URL: https://svn.savannah.gnu.org/svn/texmacs/trunk
+      SVN_ROOT: svn+ssh://svn.sv.gnu.org/texmacs/trunk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: svn_sync
+          fetch-depth: 0
+
+      - name: Install git-svn
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends git-svn
+
+      - name: Fetch
+        run: |
+          git svn init --rewrite-root="$SVN_ROOT" "$SVN_URL"
+          git update-ref refs/remotes/git-svn HEAD
+          git svn fetch
+          echo "new revisions:"
+          git log --format='%h %an %s' HEAD..refs/remotes/git-svn
+
+      - name: Push
+        run: |
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/git-svn)" ]; then
+            echo "svn_sync is up to date"
+            exit 0
+          fi
+          # (a fast-forward of what was checked out: nothing else is rewritten)
+          git merge-base --is-ancestor HEAD refs/remotes/git-svn ||
+            { echo "error: the SVN history does not extend svn_sync"; exit 1; }
+          git push origin refs/remotes/git-svn:refs/heads/svn_sync
