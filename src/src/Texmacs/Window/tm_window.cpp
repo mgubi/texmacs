@@ -232,13 +232,27 @@ public:
         main_win= abstract_window (vw->ed->mvw->win);
       if (win_id != 0)
         window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
-  void apply ();
+  void close (bool dropped);
+  void apply () { close (false); }
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
 };
 
+class drop_embedded_command_rep: public command_rep {
+  // the same, when the widget is let go without being destroyed by its
+  // window (side tools made again, #776)
+  command keep;
+  close_embedded_command_rep* cmd;
+public:
+  drop_embedded_command_rep (command c):
+    keep (c), cmd ((close_embedded_command_rep*) c.rep) {}
+  void apply () { cmd->close (true); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<command drop_embedded>"; }
+};
+
 void
-close_embedded_command_rep::apply () {
+close_embedded_command_rep::close (bool dropped) {
   // the view of the buffer which is still shown by this widget, if any
   tm_view vw= NULL;
   array<url> vs= buffer_to_views (name);
@@ -246,11 +260,10 @@ close_embedded_command_rep::apply () {
     tm_view v= concrete_view (vs[i]);
     if (v != NULL && v->win == win) vw= v;
   }
-  // the focus goes back to the master window when it is in this widget;
-  // else it stays where it is (the command also runs when side tools
-  // which are made again let their former widgets go, #776)
+  // the focus goes back to the master window; when the widget was let go
+  // (side tools made again, #776), only if the focus was in it
   tm_view cur= concrete_view (get_current_view_safe ());
-  if (cur == NULL || cur->win == win) {
+  if (!dropped || cur == NULL || cur->win == win) {
     array<url> a= windows_list ();
     url foc= main_win;
     if (is_none (foc) || !contains (foc, a))
@@ -361,7 +374,9 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   // tools made again), a buffer without a name is closed too: nothing else
   // can use it. A named buffer is left to the Scheme code which named it,
   // which may use it further (the buffer of the search toolbar), #776
-  command drop_cmd= (is_none (wname)? close_cmd: command ());
+  command drop_cmd= (is_none (wname)?
+                     command (tm_new<drop_embedded_command_rep> (close_cmd)):
+                     command ());
   return wrapped_widget (win->wid, close_cmd, drop_cmd);
 }
 
