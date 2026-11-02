@@ -8343,7 +8343,10 @@ static void resize_heap_to(s7_scheme *sc, s7_int size)
 	    __func__, func, line, old_free, old_size, size, sc->gc_resize_heap_fraction, (s7_int)(floor(sc->heap_size * sc->gc_resize_heap_fraction)));
 #endif
 
-  if (size == 0)
+  if (size < 0)
+    sc->heap_size += 32 * ((-size + 31) / 32);  /* TeXmacs: grow by that many cells (see try_to_call_gc), rounded up to a multiple
+                                                 *   of 32: the loop below fills 32 cells per iteration (Loop_8 of 4) */
+  else if (size == 0)
     {
       if ((old_free < old_size * sc->gc_resize_heap_by_4_fraction) &&
 	  (sc->max_heap_size > (sc->heap_size * 4)))
@@ -8455,7 +8458,11 @@ static void try_to_call_gc(s7_scheme *sc)
 #if s7_Debugging
       fprintf(stderr, "%s[%d]: forced resize from %s[%d]\n", __func__, __LINE__, func, line);
 #endif
-      resize_heap(sc);
+      /* TeXmacs: the collector is off (tmscm_builder) and the free cells are used up. What the builder still needs
+       *   is not known, but is small, and a heap never shrinks: by 4, a heap of 8M cells (0.9 GB of memory) became
+       *   32M (2.5 GB) when the free list ran out at the wrong moment. Grow by an eighth instead.
+       */
+      resize_heap_to(sc, -((sc->heap_size / 8) > 64000 ? (sc->heap_size / 8) : 64000));
     }
   else
     {
@@ -84090,7 +84097,7 @@ static bool macro_cache_hit_1(s7_scheme *sc) /* sc->code: the macro, sc->args: t
     {
       const bool old_gc_off = sc->gc_off;
       /* room for the copy first (one pair for each pair of the set), above the trigger of new_cell: with the
-       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow, by 4, and a heap never shrinks
+       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow (by an eighth since patch 0008), and a heap never shrinks
        */
       check_free_heap_size(sc, hash_table_entries(cddr(entry)) + Gc_Trigger_Size + 8);
       sc->gc_off = true;                    /* the pieces of the copy are not yet protected */
