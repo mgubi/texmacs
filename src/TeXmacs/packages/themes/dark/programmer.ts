@@ -27,7 +27,7 @@
   <\active*>
     <\src-comment>
       Text font: IBM Plex Mono, shipped in TeXmacs/fonts/truetype/plex
-    </\src-comment>
+    </src-comment>
   </active*>
 
   <assign|font|IBM Plex>

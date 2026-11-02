@@ -165,6 +165,32 @@
       (url-remove f)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+;; the color definitions (setrgbcolor lines) of the PostScript of a code
+;; block on the background #2a2a2e, with the initial value @flag
+;; ("" or an associate of adapt-dark-colors)
+(define (code-block-colors flag)
+  (let* ((f (url-append (url-temp-dir) "dark-colors-check.tm"))
+         (ps (url-append (url-temp-dir) "dark-colors-check.ps"))
+         (doc (string-append
+               "<TeXmacs|2.1.2>\n\n<style|generic>\n\n<\\body>\n"
+               "  <\\python-code>\n    import os # c\n"
+               "    def f(x): return 3\n  </python-code>\n</body>\n\n"
+               "<\\initial>\n  <\\collection>\n"
+               "    <associate|page-medium|paper>\n"
+               "    <associate|bg-color|#2a2a2e>\n" flag
+               "  </collection>\n</initial>\n")))
+    (string-save doc f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (print-to-file ps)
+    (buffer-close f)
+    (let* ((all (string-split (string-load ps) #\newline))
+           (r (list-filter all (lambda (l) (string-search-forwards
+                                            "setrgbcolor" 0 l)))))
+      (url-remove f)
+      (url-remove ps)
+      r)))
+
 (define (in-shared-window group)
   ;; @group with the buffers in one window: with a window per buffer, a page
   ;; such as the one of the font design opens a window which closing its
@@ -2694,6 +2720,14 @@
       (check= (get-style-list) '("generic"))
       (check= (current-basic-theme) "plain")
       (check-true (default-basic-theme?))))
+  ;; the hook: colors of the highlighter on a dark paper are lightened only
+  ;; with adapt-dark-colors
+  (let ((none (code-block-colors ""))
+        (off (code-block-colors "    <associate|adapt-dark-colors|false>\n"))
+        (on (code-block-colors "    <associate|adapt-dark-colors|true>\n")))
+    (check-true (> (length none) 3))
+    (check= off none)
+    (check-false (== on none)))
   ;; what the dark themes set, and that the plain document is not touched
   ;; (documents loaded from files: the environment of a buffer follows its
   ;; style only after loading)

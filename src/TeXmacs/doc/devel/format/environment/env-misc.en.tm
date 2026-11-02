@@ -124,6 +124,11 @@
     until they have a contrast of at least 4.5 with the background color of
     the place where they are used. It is set by the themes <verbatim|dark-mode>
     and <verbatim|programmer>, and has no effect on a bright background.
+    Limits: only the colors of highlighters and flags are adapted. A color
+    set by the user with <markup|with> is kept and may be
+    dark on the dark paper. The comparison is with the <src-var|bg-color> of
+    the page: text in a cell or box with a light background of its own is
+    light on light.
   </explain>
 
   <\explain>
