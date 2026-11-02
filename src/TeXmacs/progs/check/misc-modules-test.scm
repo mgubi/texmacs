@@ -144,6 +144,53 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+;; run @thunk in a buffer loaded from a file with the style packages @styles
+;; ("generic|dark-mode"), then close it
+(define (with-style-file styles thunk)
+  (let* ((old (current-buffer))
+         (f (url-append (url-temp-dir) "dark-theme-check.tm"))
+         (doc (string-append
+               "<TeXmacs|2.1.2>\n\n<style|<tuple|" styles ">>\n\n"
+               "<\\body>\n  <section|S>\n\n  x\n</body>\n\n"
+               "<\\initial>\n  <\\collection>\n    <associate|page-medium|paper>\n  </collection>\n</initial>\n")))
+    (string-save doc f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (go-end)
+    (update-forced)
+    (with r (check-run thunk)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (buffer-close f)
+      (url-remove f)
+      (when (buffer-exists? old) (switch-to-buffer old)))))
+
+;; the color definitions (setrgbcolor lines) of the PostScript of a code
+;; block on the background #2a2a2e, with the initial value @flag
+;; ("" or an associate of adapt-dark-colors)
+(define (code-block-colors flag)
+  (let* ((f (url-append (url-temp-dir) "dark-colors-check.tm"))
+         (ps (url-append (url-temp-dir) "dark-colors-check.ps"))
+         (doc (string-append
+               "<TeXmacs|2.1.2>\n\n<style|generic>\n\n<\\body>\n"
+               "  <\\python-code>\n    import os # c\n"
+               "    def f(x): return 3\n  </python-code>\n</body>\n\n"
+               "<\\initial>\n  <\\collection>\n"
+               "    <associate|page-medium|paper>\n"
+               "    <associate|bg-color|#2a2a2e>\n" flag
+               "  </collection>\n</initial>\n")))
+    (string-save doc f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (print-to-file ps)
+    (buffer-close f)
+    (let* ((all (string-split (string-load ps) #\newline))
+           (r (list-filter all (lambda (l) (string-search-forwards
+                                            "setrgbcolor" 0 l)))))
+      (url-remove f)
+      (url-remove ps)
+      r)))
+
 (define (in-shared-window group)
   ;; @group with the buffers in one window: with a window per buffer, a page
   ;; such as the one of the font design opens a window which closing its
@@ -2587,6 +2634,15 @@
     "ice" "manila-paper" "metal" "pale-blue" "parchment"
     "pine" "reddish" "ridged-paper" "rough-paper" "xperiment"))
 
+;; the themes of the Document > Theme menu: those, and the two for a
+;; dark interface (beamer and poster do not offer them)
+(define dark-themes '("dark-mode" "programmer"))
+(define basic-theme-list
+  '("blackboard" "bluish" "boring-white" "dark-mode" "dark-vador"
+    "granite" "ice" "manila-paper" "metal" "pale-blue" "parchment"
+    "pine" "programmer" "reddish" "ridged-paper" "rough-paper"
+    "xperiment"))
+
 ;; the files of the package of the theme @th, in a subdirectory of themes
 (define (theme-files th)
   (url->list
@@ -2599,12 +2655,19 @@
 (define (test-posters-themes)
   (check-group "posters and themes")
   (check= (poster-themes) themes)
-  (check= (basic-themes) themes)
+  (check= (basic-themes) basic-theme-list)
+  (check= (list-filter (basic-themes) (lambda (th) (not (in? th themes))))
+          dark-themes)
+  (check-false (in? "dark-mode" (beamer-themes)))
+  (check-false (in? "programmer" (poster-themes)))
+  (check= (basic-theme-name "dark-mode") "Dark mode")
+  (check= (basic-theme-name "programmer") "Programmer mode")
+  (check= (basic-theme-name "dark-vador") "Dark vador")
   (check= (poster-title-styles)
           '("plain-poster-title" "framed-poster-title"
             "topless-poster-title"))
   ;; every theme has a package
-  (check= (list-filter themes
+  (check= (list-filter (basic-themes)
                        (lambda (th)
                          (null? (theme-files th))))
           '())
@@ -2636,6 +2699,55 @@
       (edit (select-default-basic-theme))
       (check= (get-style-list) '("generic"))
       (check= (current-basic-theme) "plain")))
+  ;; the dark themes: one at a time, with their check marks
+  (with-buffer-doc '(document "x") '("generic")
+    (lambda ()
+      (edit (add-style-package "dark-mode"))
+      (check= (get-style-list) '("generic" "dark-mode"))
+      (check= (current-basic-theme) "dark-mode")
+      (check-true (has-style-package? "dark-mode"))
+      (check= (style-category "dark-mode") :basic-theme)
+      (check= (style-category "programmer") :basic-theme)
+      (edit (add-style-package "programmer"))
+      (check= (get-style-list) '("generic" "programmer"))
+      (check= (current-basic-theme) "programmer")
+      (check-false (has-style-package? "dark-mode"))
+      (edit (add-style-package "granite"))
+      (check= (get-style-list) '("generic" "granite"))
+      (edit (add-style-package "dark-mode"))
+      (check= (get-style-list) '("generic" "dark-mode"))
+      (edit (select-default-basic-theme))
+      (check= (get-style-list) '("generic"))
+      (check= (current-basic-theme) "plain")
+      (check-true (default-basic-theme?))))
+  ;; the hook: colors of the highlighter on a dark paper are lightened only
+  ;; with adapt-dark-colors
+  (let ((none (code-block-colors ""))
+        (off (code-block-colors "    <associate|adapt-dark-colors|false>\n"))
+        (on (code-block-colors "    <associate|adapt-dark-colors|true>\n")))
+    (check-true (> (length none) 3))
+    (check= off none)
+    (check-false (== on none)))
+  ;; what the dark themes set, and that the plain document is not touched
+  ;; (documents loaded from files: the environment of a buffer follows its
+  ;; style only after loading)
+  (with-style-file "generic"
+    (lambda ()
+      (check= (get-env "bg-color") "white")
+      (check= (get-env "adapt-dark-colors") "false")
+      (check= (get-env "font-family") "rm")
+      (check= (get-env "src-tag-color") "blue")))
+  (with-style-file "generic|dark-mode"
+    (lambda ()
+      (check= (get-env "bg-color") "#2a2a2e")
+      (check= (get-env "color") "#d4d4d8")
+      (check= (get-env "adapt-dark-colors") "true")
+      (check= (get-env "font-family") "rm")))
+  (with-style-file "generic|programmer"
+    (lambda ()
+      (check= (get-env "bg-color") "#2a2a2e")
+      (check= (get-env "adapt-dark-colors") "true")
+      (check= (get-env "font-family") "tt")))
   (with-buffer-doc '(document "x") '("poster")
     (lambda ()
       (check= (current-poster-theme) "boring-white")

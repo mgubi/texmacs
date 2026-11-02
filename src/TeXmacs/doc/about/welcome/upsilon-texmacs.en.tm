@@ -75,6 +75,15 @@
     also have a dark theme, the icon bars at the left, and palettes of
     colours.
 
+    <item>Two document themes for a dark interface, in <menu|Document|Theme>:
+    <menu|Dark mode> (light grey text on a dark grey paper) and
+    <menu|Programmer mode> (the same, in the monospace font <name|IBM Plex
+    Mono>). The colors of the source code, of the sessions and of the source
+    tags are adapted to the dark paper. As with the other themes, the theme
+    belongs to the document, and a <name|PDF> of it is as dark as the page.
+    Only highlighters and flags are adapted: a color you set yourself, or
+    text on a light cell or box background, is not.
+
     <item>The same <TeXmacs> runs in a web browser:
     <hlink|mgubi.github.io/texmacs/texmacs.html|https://mgubi.github.io/texmacs/texmacs.html>, see
     <hlink|<TeXmacs> in the browser|texmacs-vue.en.tm>.

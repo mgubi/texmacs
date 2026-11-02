@@ -137,6 +137,7 @@ initialize_default_env () {
   env (MISC_LEXEME_COLOR) = "";          // ,, color for miscellaneous lexemes
   env (ALT_KEYWORD_COLOR) = "#309090";   // alternative color for keywords
   env (ALT_CONSTANT_COLOR)= "#800080";   // alternative color for constants
+  env (ADAPT_DARK_COLORS)= "false";     // lighten literal colors on dark paper
 
   env (PAR_MODE)         = "justify";   // outline method
   env (PAR_FLEXIBILITY)  = "1000";      // threshold for switching to ragged

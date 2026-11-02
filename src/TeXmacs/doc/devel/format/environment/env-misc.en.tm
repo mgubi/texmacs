@@ -115,6 +115,23 @@
   </explain>
 
   <\explain>
+    <var-val|adapt-dark-colors|false><explain-synopsis|lighten literal
+    colors on dark paper>
+  <|explain>
+    When set to <verbatim|true>, the colors which the highlighters of the
+    programming languages give as fixed values (that is, not through the
+    variables above) and the colors of the flags of the editor are lightened
+    until they have a contrast of at least 4.5 with the background color of
+    the place where they are used. It is set by the themes <verbatim|dark-mode>
+    and <verbatim|programmer>, and has no effect on a bright background.
+    Limits: only the colors of highlighters and flags are adapted. A color
+    set by the user with <markup|with> is kept and may be
+    dark on the dark paper. The comparison is with the <src-var|bg-color> of
+    the page: text in a cell or box with a light background of its own is
+    light on light.
+  </explain>
+
+  <\explain>
     <src-var|canvas-type>, <src-var|canvas-color>,
     <src-var|canvas-hpadding>, <src-var|canvas-vpadding>,
     <src-var|canvas-bar-width>, <src-var|canvas-bar-padding>,

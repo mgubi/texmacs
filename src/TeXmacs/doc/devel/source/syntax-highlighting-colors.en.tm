@@ -145,6 +145,12 @@
     <item>Since these colors are global, a document which is shown with a
     dark background keeps the light-background colors of the preferences.
     Only the environment variable based highlighters adapt automatically.
+    The themes <verbatim|dark-mode> and <verbatim|programmer> set the
+    environment variable <src-var|adapt-dark-colors>: then
+    <cpp|concater_rep::typeset_colored_substring> lightens each literal color
+    of the other highlighters, until its contrast with <src-var|bg-color> is
+    at least 4.5 (WCAG), and keeps hue and the colors which already have that
+    contrast. Other documents, also those with dark themes, are not changed.
   </itemize>
 
   <section|Environment variables and themes>

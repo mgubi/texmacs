@@ -77,7 +77,11 @@ concater_rep::typeset_colored_substring
     if (t == "") c= apply_alpha (env->pen->get_color (), env->alpha);
     else c= named_color (as_string (t), env->alpha);
   }
-  else c= named_color (col, env->alpha);
+  else {
+    c= named_color (col, env->alpha);
+    // (a literal color of a highlighter, which does not know the theme)
+    c= adapt_color (c);
+  }
   box b= text_box (ip, pos, s, env->fn, c);
   a << line_item (STRING_ITEM, OP_TEXT, b, HYPH_INVALID, env->lan);
 }
