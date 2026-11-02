@@ -211,6 +211,21 @@ jobs:
           echo "APP_NAME=$name" >> "$GITHUB_ENV"
           ls -l "$dmg"
 
+      # the commit of the build is in the application (#753): CFBundleVersion
+      # "2.1.5 (hash)" (Finder, Get Info), the signature is still valid, and
+      # TeXmacs -v says it too
+      - name: Revision of the application
+        run: |
+          want=$(git log -1 --abbrev=10 --format=%h)
+          app="../distr/$APP_NAME.app"
+          plutil -p "$app/Contents/Info.plist" | grep -E 'CFBundle(Short)?Version|GetInfoString'
+          v=$(plutil -extract CFBundleVersion raw "$app/Contents/Info.plist")
+          case "$v" in *"($want)") ;; *) echo "error: CFBundleVersion is \"$v\", not the commit $want"; exit 1;; esac
+          codesign --verify --deep --strict "$app"
+          out=$(TEXMACS_HOME_PATH=$(mktemp -d) "$app/Contents/MacOS/TeXmacs" -v)
+          echo "$out"
+          echo "$out" | grep -q "^Revision $want " || { echo "error: -v does not say $want"; exit 1; }
+
       # the application of the disk image, with each architecture: a test
       # home, a document with big red text on the command line, and the
       # windows saved as PNGs (every 3 seconds with Cocoa, at each redraw
@@ -383,6 +398,10 @@ jobs:
           plutil -replace LSMinimumSystemVersion -string 15.0 \
             "../distr/$name.app/Contents/Info.plist"
           codesign --force --deep -s - "../distr/$name.app"
+          # the commit of the build (#753)
+          plutil -p "../distr/$name.app/Contents/Info.plist" | grep -E 'CFBundle(Short)?Version|GetInfoString'
+          codesign --verify --deep --strict "../distr/$name.app"
+          "../distr/$name.app/Contents/MacOS/TeXmacs" -v | grep "^Revision $(git log -1 --abbrev=10 --format=%h) "
           ditto -c -k --keepParent "../distr/$name.app" texmacs-qt-macos-arm64.zip
           # the Ghostscript of the application runs, with no gs of the system
           # (#662)
