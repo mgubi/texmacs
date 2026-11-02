@@ -310,7 +310,9 @@ reused buffer closed #f" \
 # is destroyed by its window. So each new content of a side tool with a
 # texmacs-input without a name left a buffer, a view and an editor behind
 # (#776). The steps run from the event loop, which closes the buffers;
-# after the last one, only the buffer of the present widget is left.
+# after the last one, only the buffer of the present widget is left. A
+# named buffer stays when its tool is closed: the code which named it may
+# use it further (the search toolbar after the search tool).
 cat > "$out/startup-side-tools.scm" <<'EOF'
 (define round 0)
 (tm-tool (startup-side-tool win)
@@ -340,16 +342,41 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
 (define (wait n)
   ;; the former widgets close their buffers from the event queue
   (lambda ()
+    (gc)
     (if (> n 0)
         (later (wait (- n 1)))
         (begin
           (display* "CHECK buffers left " (inputs) "\n")
+          (named-start)))))
+;; a named buffer is left to the code which named it: the search toolbar
+;; goes on with the buffer of the search tool which it replaces
+(define named (string->url "tmfs://aux/startup-side-named"))
+(tm-tool (startup-named-tool win)
+  (:name "startup named tool")
+  (texmacs-input '(document "named") '(style "generic") named))
+(define (named-start)
+  (tool-select :right 'startup-named-tool)
+  (update-menus)
+  (later named-shown))
+(define (named-shown)
+  (update-forced)
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (later (named-wait 20)))
+(define (named-wait n)
+  (lambda ()
+    (gc)
+    (if (> n 0)
+        (later (named-wait (- n 1)))
+        (begin
+          (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
           (set! done #t)))))
 (later step)
 EOF
 
 check "side tools made again close the buffers of their texmacs-input (#776)" \
-      "buffers left 1" \
+      "buffers left 1
+named buffer kept #t" \
       -x '(load "startup-side-tools.scm")'
 
 echo "Total: $total checks, $failed failed"

@@ -357,7 +357,12 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   // that window is being built (between window_handle and window_create);
   // the widgets of the side tools of a main window are in none
   command close_cmd= close_embedded_command (vw, name, pending_window_handle);
-  return wrapped_widget (win->wid, close_cmd);
+  // When the widget is let go without being destroyed by its window (side
+  // tools made again), a buffer without a name is closed too: nothing else
+  // can use it. A named buffer is left to the Scheme code which named it,
+  // which may use it further (the buffer of the search toolbar), #776
+  command drop_cmd= (is_none (wname)? close_cmd: command ());
+  return wrapped_widget (win->wid, close_cmd, drop_cmd);
 }
 
 /******************************************************************************

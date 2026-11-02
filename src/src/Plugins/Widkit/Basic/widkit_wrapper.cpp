@@ -163,6 +163,12 @@ wrapped_widget (widget w, command cmd) {
 }
 
 widget
+wrapped_widget (widget w, command cmd, command drop) {
+  (void) drop;
+  return abstract (wrapped_widget (concrete (w), cmd));
+}
+
+widget
 empty_widget () {
   return abstract (glue_wk_widget (false, false, 0, 0));
 }

@@ -1209,6 +1209,8 @@ widget icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs)  { r
 widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies)  { return widget(); }
 widget responsive_icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs)  { return widget(); }
 widget wrapped_widget (widget w, command cmd) { return widget(); }
+widget wrapped_widget (widget w, command cmd, command drop) {
+  return widget(); }
 //widget tile_menu (array<widget> a, int cols)  { return widget(); }
 //widget minibar_menu (array<widget> arr)  { return widget(); }
 //widget menu_separator (bool vertical)  { return widget(); }
