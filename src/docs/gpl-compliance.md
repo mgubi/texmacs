@@ -76,7 +76,7 @@ as ports, but lacked the upstream copyright lines.
 ## What was found clean
 
 - **Vendored code:**
-  - s7 is upstream commit `6ce8ff0` with patches 0001–0007.
+  - s7 is upstream commit `6ce8ff0` with patches 0001–0008.
   - femtolisp is upstream commit `ec76010` with patches 0001–0036.
 
   Applying the patches to those upstream commits gives files byte-identical to ours. The tree-sitter runtime is identical to 0.27.1, and XZ Embedded is unchanged.

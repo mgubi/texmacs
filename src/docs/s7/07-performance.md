@@ -217,6 +217,13 @@ From `marshal.scm`:
   collections are more frequent: the test suites ran 5–10% slower.
 - Setting `(*s7* 'gc-resize-heap-by-4-fraction)` lower avoids the jumps to
   a 4× larger heap, trading speed for memory.
+- **While C++ builds a Scheme list** (`tmscm_builder`, `01-cpp-binding.md`) the collector
+  is off, and a heap whose free cells run out cannot collect: it grew by 4
+  as well, at a moment decided by chance (a heap of 8 M cells became
+  32 M, 0.9 to 2.5 GB, in half of the runs of the suites `kbd-menu` and
+  `search`, #719). Patch 0008 makes that forced growth an eighth of the
+  heap, rounded up to a multiple of 32 (the loop which enters the new
+  cells works 32 at a time).
 
 **The module system of §2.2 also saves memory.** Copying every export into
 the user module made peak memory on the LaTeX exports about 420 MB.
