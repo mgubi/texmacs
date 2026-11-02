@@ -251,6 +251,65 @@ check "headless: a copy in a buffer which was never typeset (#729)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-untypeset.scm")'
 
+# A buffer which is closed gives back the memory of its editor and of its
+# boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
+# window which showed another view kept the canvas of the former one, so the
+# editor of a closed view, with its boxes, was never deleted, and each open
+# and close of a long document took more memory (#713). The canvas is
+# deleted later, by the event loop of Qt: the steps of the script run from
+# it (exec-delayed), as when the user opens and closes the document. The
+# memory after the closes 3 to 5 may not exceed the one after the closes 1
+# and 2 by half of what an open takes (a canvas may wait one more close
+# before it is deleted). The cost of an open is measured from the first
+# close, as some memory is taken once, at the first open.
+awk 'BEGIN { print "<TeXmacs|2.1.4>\n\n<style|generic>\n\n<\\body>";
+             for (i = 0; i < 3000; i++)
+               print "  Line " i " of a long document of the startup checks.\n";
+             print "</body>" }' > "$out/startup-long.tm"
+cat > "$out/startup-close.scm" <<'EOF'
+(define u (url-append (url-pwd) "startup-long.tm"))
+(define (memory) (gc) (texmacs-memory))
+(define opens '())   ; the memory with the document shown, by cycle
+(define closes '())  ; the memory after it was closed, by cycle
+(define (at l k) (list-ref (reverse l) k))
+(define done #f)
+(define (later f)
+  ;; the next step, from the event loop; an error stops the script (the
+  ;; exit is outside the catch: under Guile, exit throws quit)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (step-open)
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (later step-shown))
+(define (step-shown)
+  (update-forced)
+  (set! opens (cons (memory) opens))
+  (buffer-close u)
+  (later step-closed))
+(define (step-closed)
+  (set! closes (cons (memory) closes))
+  (if (< (length closes) 6)
+      (later step-open)
+      (let ((cost (- (at opens 1) (at closes 0)))
+            (kept (- (max (at closes 3) (at closes 4) (at closes 5))
+                     (max (at closes 1) (at closes 2)))))
+        (display* "memory: opens " (reverse opens) "\n")
+        (display* "memory: closes " (reverse closes) "\n")
+        (display* "CHECK opened " (> cost 0) "\n")
+        (display* "CHECK freed " (< (* 2 kept) cost) "\n")
+        (set! done #t))))
+(later step-open)
+EOF
+
+check "a closed buffer gives back the memory of its editor (#713)" \
+      "opened #t
+freed #t" \
+      -x '(load "startup-close.scm")'
+
 # The command which closes an embedded editor (texmacs-input) when its
 # window is deleted kept the view of its buffer: when the buffer had been
 # closed before, it read the deleted view and crashed (#775). A widget made
