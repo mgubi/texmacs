@@ -783,7 +783,7 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|mem_used> which returns
-    <scm|int>.
+    <scm|double>.
   </explain>
 
   <\explain>
