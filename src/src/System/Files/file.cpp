@@ -919,7 +919,7 @@ search_sub_dirs (url& all, url root) {
     if (!err) {
       for (int i=N(a)-1; i>=0; i--)
         if (N(a[i])>0 && a[i][0] != '.')
-          search_sub_dirs (all, root * a[i]);
+          search_sub_dirs (all, root * url_entry (a[i]));
     }
     all= root | all;
   }
@@ -979,7 +979,7 @@ search_file_in (url u, string name) {
 
   array<string> d= dir_contents [u->t];
   for (int i=0; i<N(d); i++) {
-    url f= search_file_in (u * d[i], name);
+    url f= search_file_in (u * url_entry (d[i]), name);
     if (!is_none (f)) return f;
   }
   return url_none ();

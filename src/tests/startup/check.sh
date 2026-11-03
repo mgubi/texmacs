@@ -489,28 +489,58 @@ survived
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-wild-load.scm")'
 
-# A relative wildcard link in a document of tmfs (a help page) named a file
-# of the system: url-complete threw for the base (#790, after #771). The
-# stubs of system keep any launch of an application away.
-cat > "$out/startup-wild-tmfs.scm" <<'EOF'
+# A wildcard in the other roots (tmfs, web) is not completed: url-exists? and
+# url-complete threw "wildcards only implemented for files" (an abort), for
+# a link, for load-buffer, and for a relative name in a document of tmfs (a
+# help page) (#790, after #771). The message "No file matches" is given and
+# nothing is loaded or fetched. No case reaches default-open: a wildcard
+# stops at the message, and the files of the other cases are .scm and .tm.
+cat > "$out/startup-wild-root.scm" <<'EOF'
 (use-modules (link link-navigate))
-(set! system (lambda l 0))
-(set! system-1 (lambda l 0))
-(define tmfs-buffer (string->url "tmfs://help/foo/bar"))
-(define real-current-buffer current-buffer)
+(define what (getenv "TM_WILD_CASE"))
 (define m (length (buffer-list)))
-(set! current-buffer (lambda () tmfs-buffer))
-(go-to-url "a*.tm")
-(set! current-buffer real-current-buffer)
-(display* "CHECK tmfs-relative " (== m (length (buffer-list))) "\n")
+(define real-current-buffer current-buffer)
+(cond ((== what "go-tmfs") (go-to-url "tmfs://help/x*y"))
+      ((== what "load-tmfs") (load-buffer "tmfs://aux/x*y"))
+      ((== what "load-http") (load-buffer "http://localhost:1/x*y.tm"))
+      ((== what "link-relative")
+       (set! current-buffer (lambda () (string->url "tmfs://help/foo/bar")))
+       (go-to-url "a*.tm")
+       (set! current-buffer real-current-buffer))
+      ((== what "load-relative")
+       (set! current-buffer (lambda () (string->url "tmfs://help/foo/bar")))
+       (load-buffer "a*.tm")
+       (set! current-buffer real-current-buffer)))
+(display* "CHECK " what " " (== m (length (buffer-list))) "\n")
 (display* "CHECK survived\n")
 EOF
 
-check "a relative wildcard link in a tmfs document gives a message (#790)" \
-      "tmfs-relative #t
+for w in go-tmfs load-tmfs load-http link-relative load-relative; do
+  TM_WILD_CASE=$w check "a wildcard of tmfs or the web gives a message: $w (#790)" \
+        "$w #t
 survived
 quit ()" \
-      -headless -x "$atquit" -x '(load "startup-wild-tmfs.scm")'
+        -headless -x "$atquit" -x '(load "startup-wild-root.scm")'
+done
+
+# A buffer named with a wildcard (Save as a*.tm, a name in tmfs://aux): the
+# views of the buffer are found as they were, not as the plain name of a file
+# with a star (#790).
+mkdir -p "$out/startup-save"
+cat > "$out/startup-aux.scm" <<'EOF'
+(open-auxiliary "x*y" '(document "x"))
+(define u (string->url "tmfs://aux/x*y"))
+(open-buffer-in-window u (buffer-get u) "")
+(display* "CHECK aux views " (length (buffer->views u)) " current "
+          (== (current-buffer) u) "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "a buffer of tmfs named with a star has its views (#790)" \
+      "aux views 2 current #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-aux.scm")'
 
 # A file whose name contains a star (not on Windows, which can't have one):
 # url-complete made a wildcard of the name of the entry again, which matched
@@ -549,8 +579,6 @@ quit ()" \
 # again (the name of a view was parsed again into a wildcard).
 cat > "$out/startup-star-link.scm" <<'EOF'
 (use-modules (link link-navigate))
-(set! system (lambda l 0))
-(set! system-1 (lambda l 0))
 (define d1 (url->system (url-append (url-pwd) "startup-star1")))
 (go-to-url (string-append d1 "/a*.scm"))
 (display* "CHECK link " (url->string (url-tail (current-buffer))) "\n")
@@ -566,6 +594,39 @@ load a*b.scm
 survived
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-star-link.scm")'
+
+# Save as with a star in the name: the pattern is the name of the buffer
+cat > "$out/startup-save.scm" <<'EOF'
+(define d (url->system (url-append (url-pwd) "startup-save")))
+(save-buffer-as-main (string->url (string-append d "/sv*.tm")) :overwrite)
+(display* "CHECK saved " (string-ends? (url->system (current-buffer)) "sv*.tm")
+          "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "Save as with a star in the name renames the buffer (#790)" \
+      "saved #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-save.scm")'
+
+# The subdirectories with a star are found as plain names too (url-search-
+# upwards looks into them): the url had a wildcard in place of the name
+mkdir -p "$out/startup-star2/a*b"
+printf 'a\n' > "$out/startup-star2/a*b/target.txt"
+cat > "$out/startup-star-search.scm" <<'EOF'
+(define d (url-append (url-pwd) "startup-star2"))
+(define f (url-search-upwards d "target.txt" '()))
+(display* "CHECK search " (string-ends? (url->system f) "a*b/target.txt") " "
+          (url-exists? f) "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "a subdirectory with a star in its name is searched as a plain name (#790)" \
+      "search #t #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-star-search.scm")'
   ;;
 esac
 

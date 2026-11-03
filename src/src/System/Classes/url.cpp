@@ -880,7 +880,7 @@ reroot (url u, string protocol) {
   return u;
 }
 
-static url
+url
 url_entry (string name) {
   // The url of an entry of a directory. A name with a star is a plain name
   // here, not the wildcard which url (string) makes of it: a file a*b.scm
@@ -1141,8 +1141,8 @@ subdirectories (url u) {
     bool error_flag;
     array<string> dir= read_directory (u, error_flag);
     for (int i=0; i<N(dir); i++)
-      if (!starts (dir[i], ".") && is_directory (u * dir[i]))
-        ret= ret | subdirectories (u * dir[i]);
+      if (!starts (dir[i], ".") && is_directory (u * url_entry (dir[i])))
+        ret= ret | subdirectories (u * url_entry (dir[i]));
     return ret;
   }
   else return url_none ();

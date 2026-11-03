@@ -838,28 +838,28 @@
   ;; autosave files, can't glue to it, #790): the files which it matches are
   ;; the candidates. None, or several, give a message and load nothing (a
   ;; script which calls load-buffer can't answer a page of disambiguation);
-  ;; one is loaded as if it had been named.
+  ;; one is loaded as if it had been named. Nothing is resolved before: the
+  ;; wildcards of the other roots (tmfs, web) are never completed.
   (with l (link-wildcard-candidates name #f)
     (cond ((null? l)
-           (set-message `(concat "No file matches "
-                                 (verbatim ,(url->system name)))
+           (set-message (replace "No file matches %1" (url->system name))
                         "Load file"))
           ((null? (cdr l))
            (apply load-buffer-main (cons (car l) opts)))
           (else
-            (set-message `(concat ,(number->string (length l))
-                                  " files match "
-                                  (verbatim ,(url->system name))
-                                  ", none is loaded")
+            (set-message (replace "%1 files match %2, none is loaded"
+                                  (number->string (length l))
+                                  (url->system name))
                          "Load file")))))
 
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
-  (set! name (load-buffer-resolve-name name))
   (if (url-wildcard? name)
       (load-buffer-wildcard name opts)
-      (load-buffer-confirm-large name opts
-        (lambda () (load-buffer-check-autosave name opts)))))
+      (begin
+        (set! name (load-buffer-resolve-name name))
+        (load-buffer-confirm-large name opts
+          (lambda () (load-buffer-check-autosave name opts))))))
 
 (tm-define (load-buffer name . opts)
   (:argument name smart-file "File name")
