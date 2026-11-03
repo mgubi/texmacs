@@ -28,8 +28,18 @@
 		    0))
 
 (define texmacs-seed (seed->random-state seed-val))
-(define texmacs-serial-pre (random 9340234783837 texmacs-seed))
-(define texmacs-serial-id  (random 8981283236030 texmacs-seed))
+;; Guile 1.8 on 64 bit platforms: (random n) with n >= 2^32 reads
+;; scm_masktab[n >> 24] far beyond the 256 bytes of that table, which crashes
+;; (SIGBUS/SIGSEGV) when the address is not mapped (#551).  So only draw
+;; below 2^31 and combine the draws.
+(define (random-below n state)
+  (let* ((lim 2147483648)
+         (hi (quotient n lim))
+         (x (+ (* lim (random (+ hi 1) state)) (random lim state))))
+    (if (< x n) x (random-below n state))))
+
+(define texmacs-serial-pre (random-below 9340234783837 texmacs-seed))
+(define texmacs-serial-id  (random-below 8981283236030 texmacs-seed))
 
 (define (base62 x)
   (if (== x 0) '()
