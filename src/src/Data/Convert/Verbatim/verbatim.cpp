@@ -559,6 +559,9 @@ source_document_to_tree (string s) {
         body << tree (source_line_to_cork (s (j, i)));
         j= i+1;
       }
+    // (a block of lines, typeset as such: see code_lines_wanted; the lines
+    // of the file are those of the block, code_lines_root)
+    if (code_lines_wanted ()) body= tree (DOCUMENT, tree (CODE_LINES, body));
   }
   tree init = tree (COLLECTION,
                     tree (ASSOCIATE, LANGUAGE, "verbatim"),

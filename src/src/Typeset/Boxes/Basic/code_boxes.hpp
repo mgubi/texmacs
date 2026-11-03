@@ -1,6 +1,6 @@
 
 /******************************************************************************
-* MODULE     : code_lines.hpp
+* MODULE     : code_boxes.hpp
 * DESCRIPTION: the lines of source code (the tag code-lines): boxes, soft
 *              line breaks and colours of the syntax
 * COPYRIGHT  : (C) 2026  the TeXmacs contributors
@@ -10,8 +10,8 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#ifndef CODE_LINES_H
-#define CODE_LINES_H
+#ifndef CODE_BOXES_H
+#define CODE_BOXES_H
 #include "boxes.hpp"
 #include "language.hpp"
 #include "colors.hpp"
@@ -97,7 +97,8 @@ array<int> code_breaks (string s, font fn, SI width, SI cell, int tabw);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines
-// with markup, the boxes tall_box)
+// with markup, the boxes tall_box; tall_fold: 1 the line is hidden by a
+// fold, 2 hidden lines follow it, see System/Language/code_lines.hpp)
 // (cell: the width of a character; tabw: the tabs stop every tabw cells;
 // invis: the spaces, the tabs, the ends of the lines... are shown; 2: not
 // the end of the line, which is the last one)
@@ -105,7 +106,8 @@ box code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
               code_lexer lx, hashmap<string,color> cols, SI pitch,
               SI rpitch, SI cell, int tabw, int invis,
               array<int> tall_k, array<string> tall_txt,
-              array<array<int> > tall_st, array<box> tall_box, SI width);
+              array<array<int> > tall_st, array<box> tall_box,
+              array<int> tall_fold, SI width);
 
 // the row [a, b) of the line with the text text, whose path is lip
 box code_row_box (path lip, tree line, string text, int a, int b, font fn,
@@ -116,4 +118,4 @@ box code_row_box (path lip, tree line, string text, int a, int b, font fn,
 // the clicks, the cursor and the selections in it are scaled too
 box code_fit_box (box b, SI bot, SI top);
 
-#endif // defined CODE_LINES_H
+#endif // defined CODE_BOXES_H

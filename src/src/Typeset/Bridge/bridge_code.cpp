@@ -14,12 +14,65 @@
 #include "Line/lazy_paragraph.hpp"
 #include "analyze.hpp"
 #include "colors.hpp"
-#include "Boxes/Basic/code_lines.hpp"
+#include "Boxes/Basic/code_boxes.hpp"
+#include "code_lines.hpp" // (System/Language: the state of the lines)
 
 static int code_rows_made= 0;
 int get_code_rows_made () { return code_rows_made; }
 static int code_records_made= 0;
 int get_code_records_made () { return code_records_made; }
+
+// The state of a line which the features of programs give (tree-sitter,
+// the language servers: System/Language/code_lines.hpp, and
+// src/docs/code-features.md). A line with layers (the colours of a server,
+// inlay hints) is typeset by the concater (typeset_layered_string), as a
+// line with markup; the folds hide lines, as bridge_rep::fold_line does
+
+extern bool typeset_folds; // (not when printing, see bridge.cpp)
+
+static inline bool
+rich_line (tree t) {
+  // a line typeset by the concater: with markup, or with layers
+  if (!is_atomic (t)) return true;
+  if (is_nil (t->obs)) return false;
+  code_line_layers l;
+  return code_line_layers_of (t, l);
+}
+
+static inline int
+fold_kind (tree doc, int i) {
+  // 1: the line i is hidden; 2: hidden lines follow it (a mark); else 0
+  if (!typeset_folds) return 0;
+  if (code_line_fold_state (doc[i]) > 0) return 1;
+  if (i + 1 < N(doc) && code_line_fold_state (doc[i+1]) > 0) return 2;
+  return 0;
+}
+
+static void
+fold_items (array<page_item>& items, int kind, path lip, edit_env env) {
+  // the page items of a line with a fold kind (as bridge_rep::fold_line)
+  if (kind == 1) {
+    for (int i=0; i<N(items); i++)
+      if (items[i]->type != PAGE_CONTROL_ITEM) {
+        box b= items[i]->b;
+        items[i]->type= PAGE_HIDDEN_ITEM;
+        items[i]->b   = clip_box (lip, b, b->x1, 0, b->x1, 0);
+        items[i]->spc = space (0, 0, 0);
+      }
+  }
+  else if (kind == 2) {
+    for (int i=N(items)-1; i>=0; i--)
+      if (items[i]->type == PAGE_LINE_ITEM) {
+        pencil pen (named_color ("dark grey"), env->pen->get_width ());
+        box gap = empty_box (decorate_right (lip), 0, 0, env->fn->spc->def, 0);
+        box mark= text_box (decorate_right (lip), 0, "...", env->fn, pen);
+        array<box> bs;
+        bs << items[i]->b << gap << mark;
+        items[i]->b= concat_box (items[i]->b->ip, bs);
+        break;
+      }
+  }
+}
 void merge_stack (array<page_item>& l, stack_border& sb,
                   array<page_item> l2, stack_border sb2);
 
@@ -414,7 +467,7 @@ bridge_code_rep::line_rec (tree& t, font fn, SI width, SI cw,
   // a record of the line, made when it is needed (only for lines which may
   // be too wide, or with markup, unless always: a character is at most cw
   // wide, also <...>)
-  bool plain= is_atomic (t);
+  bool plain= !rich_line (t);
   // (a tab, <#9>, is at most tabw cells wide)
   bool tabs= plain && search_forwards ("<#9>", t->label) >= 0;
   if (!always && plain && !tabs && (SI) N(t->label) * cw <= width)
@@ -422,7 +475,7 @@ bridge_code_rep::line_rec (tree& t, font fn, SI width, SI cw,
   code_rec r (true);
   code_records_made++;
   r->line= t;
-  r->text= (plain? t->label: string (""));
+  r->text= (is_atomic (t)? t->label: string (""));
   r->wsig= wsig;
   if (plain && (tabs || (SI) N(t->label) * cw > width))
     r->starts= code_breaks (t->label, fn, width, gcell, tabw);
@@ -479,9 +532,10 @@ bridge_code_rep::my_typeset (int desired_status) {
     if (cell <= 0) cell= cw;
   }
   gcell= cell;
+  // (the stops of the tabs of programs, see concater_rep::typeset_prog_tab)
   tabw= 8;
-  if (env->provides ("code-tab-width")) {
-    string tw= as_string (env->read ("code-tab-width"));
+  if (env->provides (PROG_TAB_WIDTH)) {
+    string tw= as_string (env->read (PROG_TAB_WIDTH));
     if (is_int (tw)) tabw= max (1, min (64, as_int (tw)));
   }
   invis= (env->provides ("code-invisibles") &&
@@ -518,7 +572,7 @@ bridge_code_rep::my_typeset (int desired_status) {
     recs_ok= true;
     if (!is_nil (lexer)) lexer->reset ();
   }
-  // the lexer of the colours, for the language (see code_lines.hpp)
+  // the lexer of the colours, for the language (see code_boxes.hpp)
   if (is_nil (lexer) || lexer->lan.operator-> () != env->lan.operator-> ())
     lexer= code_lexer (env->lan);
   lexer->doc= doc;
@@ -574,7 +628,7 @@ bridge_code_rep::my_typeset (int desired_status) {
   array<array<box> > pars;
   if (ttt->paper)
     for (int i=0; i<n; i++) {
-      if (!is_atomic (doc[i])) {
+      if (rich_line (doc[i])) {
         pars << array<box> ();
         continue;
       }
@@ -596,24 +650,37 @@ bridge_code_rep::my_typeset (int desired_status) {
     array<string> tall_txt;
     array<array<int> > tall_st;
     array<box> tall_box;
-    for (int i=0; i<n; i++)
-      if (!is_atomic (doc[i])) {
+    array<int> tall_fold;
+    for (int i=0; i<n; i++) {
+      int fk= fold_kind (doc, i);
+      if (fk == 1) {
+        // (hidden: its text for the cursor, which may go there)
+        tall_k << i;
+        tall_txt << (is_atomic (doc[i])? doc[i]->label: string (""));
+        tall_st << one_row[0];
+        tall_box << box ();
+        tall_fold << 1;
+      }
+      else if (rich_line (doc[i])) {
         tall_k << i;
         tall_txt << string ("");
         tall_st << one_row[0];
         tall_box << rich_box (doc[i], descend (descend (ip, 0), i), width,
                               cell);
+        tall_fold << fk;
       }
-      else if (!is_nil (recs[i]) && N(recs[i]->starts) > 1) {
+      else if ((!is_nil (recs[i]) && N(recs[i]->starts) > 1) || fk == 2) {
         tall_k << i;
-        tall_txt << recs[i]->text;
-        tall_st << recs[i]->starts;
+        tall_txt << doc[i]->label;
+        tall_st << (is_nil (recs[i])? one_row[0]: recs[i]->starts);
         tall_box << box ();
+        tall_fold << fk;
       }
+    }
     array<box> one;
     one << code_box (ip, doc, 0, n, fn, env->pen, lexer, cols,
                      pitch, rpitch, gcell, tabw, invis,
-                     tall_k, tall_txt, tall_st, tall_box, width);
+                     tall_k, tall_txt, tall_st, tall_box, tall_fold, width);
     pars << one;
   }
   typeset_paragraphs (doc, pars, width, cell);
@@ -631,10 +698,13 @@ bridge_code_rep::typeset_paragraphs (tree doc, array<array<box> > pars,
     stack_border sb;
     array<line_item> before= (i == 0? ttt->a: array<line_item> ());
     array<line_item> after = (i == N1? ttt->b: array<line_item> ());
-    if (N(pars[i]) == 0 && N(doc) > 1 && !is_atomic (doc[i]))
+    if (N(pars[i]) == 0 && N(doc) > 1 && rich_line (doc[i]))
       rich_paragraph (doc[i], descend (descend (ip, 0), i), width, cell,
                       before, after, l, sb);
     else code_paragraph (env, ip, pars[i], before, after, l, sb);
+    // (a line of its own: the folds, in paper mode)
+    if (N(pars) == N(doc))
+      fold_items (l, fold_kind (doc, i), descend (descend (ip, 0), i), env);
     ttt->insert_stack (l, sb);
   }
 }
@@ -800,7 +870,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   auto make_rows= [&] (int i, path lip) -> array<box> {
     // the boxes of the rows of the line i (it has a record: see my_typeset)
     code_rec r= recs[i];
-    if (!is_atomic (doc[i])) return array<box> (); // (see typeset_paragraphs)
+    if (rich_line (doc[i])) return array<box> (); // (see typeset_paragraphs)
     array<int> st= r->starts;
     int len= N(r->text);
     array<box> rows;
@@ -817,6 +887,17 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
     for (int i=0; i<n; i++) pars << make_rows (i, line_path (i));
     typeset_paragraphs (doc, pars, width, cell);
   };
+  // (folds: the lines as paragraphs, whose items are hidden or marked; the
+  // folds are few and short-lived, the rows of the lines are still those
+  // of the records)
+  if (typeset_folds)
+    for (int i=0; i<n; i++)
+      if (code_line_fold_state (doc[i]) > 0) {
+        first.b= box ();
+        last.b= box ();
+        all_paragraphs ();
+        return;
+      }
 
   // Paragraphs of 1 to CODE_TPL rows (of the line 1): the rows are made as
   // these were, and stacked as they are, before a row of the same line,
@@ -915,7 +996,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   auto get= [&] (int i) -> code_rec {
     code_rec r= recs[i];
     path lip= line_path (i);
-    if (!is_atomic (doc[i])) {
+    if (rich_line (doc[i])) {
       // a line with markup: typeset as a paragraph of its rows, at each
       // pass (its items depend on the environment and the macros)
       if (r->rich && r->pass == passes) return r;

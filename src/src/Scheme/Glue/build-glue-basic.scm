@@ -837,6 +837,7 @@
   (code-snapshot-change code_snapshot_change (tree int tree))
   (code-snapshot-changed? code_snapshot_changed (bool int tree))
   (code-snapshot-text code_snapshot_text (string int))
+  (code-lines-root code_lines_root (tree tree))
   (code-line-fold-state code_line_fold_state (int tree))
   (code-set-line-fold-state code_set_line_fold_state (void tree int))
   (code-column code_column (int string int int))

@@ -24,6 +24,10 @@
 
 (define lines '("int a;" "  b = 2;" "c" "" "return a + b;"))
 
+(define (code-lines-env v)
+  ;; TEXMACS_CODE_LINES (#f or "": as not set, the preference "code lines")
+  (system-setenv "TEXMACS_CODE_LINES" (or v "")))
+
 (define (with-body doc thunk)
   ;; run @thunk in a new buffer holding @doc, typeset, then close it
   (let* ((old (current-buffer))
@@ -480,23 +484,23 @@
         (body (lambda ()
                 (with t (tree->stree (cpp-verbatim->texmacs "a\nb" #f "utf-8"))
                   (cadr (assoc 'body (cdr t)))))))
-    (setenv "TEXMACS_CODE_LINES" "1")
+    (code-lines-env "1")
     (check= (body) '(document (code-lines (document "a" "b"))))
-    (setenv "TEXMACS_CODE_LINES" #f)
+    (code-lines-env #f)
     (when (!= (get-preference "code lines") "off")
       (check= (body) '(document (code-lines (document "a" "b")))))
-    (setenv "TEXMACS_CODE_LINES" "0")
+    (code-lines-env "0")
     (check= (body) '(document "a" "b"))
     ;; (#f: as it was, not set)
-    (setenv "TEXMACS_CODE_LINES" old)
-    (check= (getenv "TEXMACS_CODE_LINES") old)))
+    (code-lines-env old)
+    (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tabs and invisible characters
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A tab (<#9>, as the importer keeps it) goes to the next stop, every
-;; code-tab-width characters (8); another control character is a character
+;; prog-tab-width characters (8); another control character is a character
 ;; wide. The cursor goes up and down to the same column, across the tabs
 (define tab-lines
   (list "<#9>abc" "        xyz" "ab<#9>c" "<#1>bcdefghij"))
@@ -510,7 +514,7 @@
                  (step (lambda () #t)))))
     (init-env "page-medium" medium)
     (init-env "code-invisibles" invis)
-    (when width (init-env "code-tab-width" width))
+    (when width (init-env "prog-tab-width" width))
     (step (lambda () #t))
     (goto 1 9) (step kbd-up) (note)      ; after the a of line 0
     (step kbd-down) (note)               ; back under it
@@ -538,7 +542,7 @@
     ;; tabs of 4: the a of line 0 is above the fifth space of line 1
     (with-body doc
       (lambda ()
-        (init-env "code-tab-width" "4")
+        (init-env "prog-tab-width" "4")
         (step (lambda () #t))
         (go-to (at 0 4 0 1 5))
         (step (lambda () #t))
@@ -561,13 +565,129 @@
   (let ((old (getenv "TEXMACS_CODE_LINES"))
         (text (string-append "a" (string #\tab) "b\n"
                              (string (integer->char 1)) "c")))
-    (setenv "TEXMACS_CODE_LINES" "1")
+    (code-lines-env "1")
     (with t (cpp-verbatim->texmacs text #f "utf-8")
       (with body (cadr (assoc 'body (cdr (tree->stree t))))
         (check= body '(document (code-lines (document "a<#9>b" "<#1>c"))))
         (check= (texmacs->code (stree->tree (cadr body)) "utf-8") text)))
-    (setenv "TEXMACS_CODE_LINES" old)
-    (check= (getenv "TEXMACS_CODE_LINES") old)))
+    (code-lines-env old)
+    (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; With the features of programs (src/docs/code-features.md)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The lines of a source file are those of its block (code-lines-root): the
+;; queries of the features (line, offset) are the same with or without it
+(define (test-lines-root)
+  (check-group "the lines of a source file")
+  (let ((block (stree->tree '(document (code-lines (document "a" "b")))))
+        (plain (stree->tree '(document "a" "b"))))
+    (check= (tree->stree (code-lines-root block)) '(document "a" "b"))
+    (check= (tree->stree (code-lines-root (tree-ref block 0)))
+            '(document "a" "b"))
+    (check= (tree->stree (code-lines-root plain)) '(document "a" "b"))
+    (check-true (== (code-lines-root plain) plain)))
+  ;; a source file is loaded as a block, and saved as it was loaded (its
+  ;; tabs, its line ends)
+  (let ((old (getenv "TEXMACS_CODE_LINES"))
+        (text (string-append "int f ()\r\n{\r\n" (string #\tab)
+                             "return 0;\r\n}\r\n")))
+    (code-lines-env "1")
+    (with t (cpp-source->texmacs text)
+      (with body (cadr (assoc 'body (cdr (tree->stree t))))
+        (check= body `(document (code-lines (document "int f ()" "{"
+                                                      "<#9>return 0;" "}"
+                                                      ""))))))
+    ;; (saved as source-files-test does: loaded in a buffer, exported)
+    (let* ((dir (url-append (url-temp-dir) "code-lines-test"))
+           (u (url-append dir "a.cpp"))
+           (v (url-append dir "out-a.cpp")))
+      (system-mkdir dir)
+      (string-save text u)
+      (when (buffer-exists? u) (buffer-close u))
+      (buffer-load u)
+      (check-true (tree-is? (tree-ref (buffer-get-body u) 0) 'code-lines))
+      (buffer-export u v (url-format u))
+      (buffer-close u)
+      (check= (string-load v) text)
+      (system-remove u)
+      (system-remove v))
+    (code-lines-env old)
+    (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
+
+;; Folds (code-fold-lines): the hidden lines take no room, the cursor goes
+;; over them; the lines are all alike, so that their places are the same
+(define (fold-run medium)
+  (let* ((r '())
+         (note (lambda (x) (set! r (cons x r))))
+         (cur (lambda () (list-tail (rel (cursor-path)) 3)))
+         (root (path->tree (at 0 4 0)))
+         (y (lambda (i) (cadr (tree-bounding-rectangle
+                               (path->tree (at 0 4 0 i)))))))
+    (init-env "page-medium" medium)
+    (step (lambda () #t))
+    (with y1 (y 1)
+      (note (code-fold-lines root 0 2))
+      (step (lambda () #t))
+      ;; the line 3 is where the line 1 was
+      (note (== (y 3) y1))
+      ;; down from the line 0: over the fold (papyrus), or into it, which
+      ;; opens it (code-cursor-in-fold, paper: as in a document of lines
+      ;; without the block); never in a hidden line
+      (go-to (at 0 4 0 0 1))
+      (step (lambda () #t))
+      (step kbd-down)
+      (note (or (and (== (cur) '(3 1)) (code-hidden? root 1))
+                (and (== (cur) '(1 1)) (not (code-hidden? root 1)))))
+      (code-unfold-all)
+      (step (lambda () #t))
+      (note (< (y 3) y1)))
+    (reverse r)))
+
+(define (test-folds)
+  (check-group "folds of lines")
+  (let ((doc `(document (with "font-family" "tt" "language" "verbatim"
+                          (code-lines (document "x" "x" "x" "x" "x"))))))
+    (for (medium '("paper" "papyrus"))
+      (with-body doc
+        (lambda ()
+          (check= (cons medium (fold-run medium))
+                  (list medium #t #t #t #t)))))))
+
+;; Layers of a line (code-set-line-layers: the colours and the inlay hints
+;; of a language server): the line is typeset by the concater, the hints
+;; between its characters
+(define (test-layers)
+  (check-group "layers of lines")
+  (let ((doc `(document (with "font-family" "tt" "language" "verbatim"
+                               "mode" "prog" "prog-language" "cpp"
+                          (code-lines (document "abc" "abc" "abc"))))))
+    (for (medium '("paper" "papyrus"))
+      (with-body doc
+        (lambda ()
+          (init-env "page-medium" medium)
+          (step (lambda () #t))
+          ;; (the block is the argument 8 of the with)
+          (let* ((line (path->tree (at 0 8 0 1)))
+                 (x (lambda () (car (tree-bounding-rectangle line))))
+                 (x0 (x)))
+            ;; a hint in a token comes before the token (typeset_layered_
+            ;; string): the text of the line is further
+            (code-set-line-layers line
+                                  (stree->tree '(tuple (tuple "0" "1" "red")))
+                                  (stree->tree '(tuple (tuple "1" "hint:"))))
+            (update-path (tree->path line))
+            (step (lambda () #t))
+            (check-true (> (x) x0))
+            (go-to (at 0 8 0 1 1))
+            (step (lambda () #t))
+            (step kbd-right)
+            (check= (list-tail (rel (cursor-path)) 3) '(1 2))
+            (code-clear-line-layers line)
+            (update-path (tree->path line))
+            (step (lambda () #t))
+            (check= (x) x0)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests
@@ -592,6 +712,9 @@
   (test-export)
   (test-tabs)
   (test-shrink)
+  (test-lines-root)
+  (test-folds)
+  (test-layers)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph
   (check-group "the lines used again are the lines made again")

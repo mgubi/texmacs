@@ -781,11 +781,7 @@
 (define (lines-document t)
   ;; the document of the lines: in a source file or a text, the lines of
   ;; its block of lines (code-lines), also when the cursor is not in it
-  (if (and (tree-is? t 'document) (== (tree-arity t) 1)
-           (tree-is? (tree-ref t 0) 'code-lines)
-           (tree-is? (tree-ref t 0 0) 'document))
-      (tree-ref t 0 0)
-      t))
+  (code-lines-root t))
 
 (tm-define (go-to-line n . opt-from)
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))

@@ -9979,6 +9979,19 @@ tmg_code_clear_line_layers (tmscm arg1) {
 }
 
 tmscm
+tmg_code_lines_root (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-lines-root");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_lines_root (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_code_line_layers (tmscm arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-layers");
 
@@ -13297,6 +13310,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("connection-stop",  tmg_connection_stop, 2, 0, 0);
   tmscm_install_procedure ("code-set-line-layers",  tmg_code_set_line_layers, 3, 0, 0);
   tmscm_install_procedure ("code-clear-line-layers",  tmg_code_clear_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-lines-root",  tmg_code_lines_root, 1, 0, 0);
   tmscm_install_procedure ("code-line-layers",  tmg_code_line_layers, 1, 0, 0);
   tmscm_install_procedure ("code-snapshot-new",  tmg_code_snapshot_new, 1, 0, 0);
   tmscm_install_procedure ("code-snapshot-delete",  tmg_code_snapshot_delete, 1, 0, 0);

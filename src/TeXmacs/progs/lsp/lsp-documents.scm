@@ -486,17 +486,22 @@
   (and (null? opt)
        (with b (lsp-cursor-block) (and b (block-target b)))))
 
+(define (buffer-lines-path)
+  ;; the path of the lines of the current buffer (of its block of lines,
+  ;; code-lines, when it is one)
+  (tree->path (code-lines-root (buffer-get-body (current-buffer)))))
+
 (tm-define (lsp-target-root . opt)
   (:synopsis "The lines of the buffer, or of the code at the cursor")
   ;; (a code block, or its unit)
   (with t (target-block opt)
-    (if t (cadr t) (buffer-get-body (the-buffer opt)))))
+    (if t (cadr t) (code-lines-root (buffer-get-body (the-buffer opt))))))
 
 (tm-define (lsp-target-path l o)
   (:synopsis "The path of the offset @o of the line @l of the code at the cursor")
   ;; (#f for a line beyond the blocks of a unit)
   (with t (target-block '())
-    (cond ((not t) (append (buffer-path) (list l o)))
+    (cond ((not t) (append (buffer-lines-path) (list l o)))
           ((cadddr t) (lsp-unit-path-of (cadddr t) l o))
           (else (with p (tree->path (cadr t)) (and p (append p (list l o))))))))
 
@@ -504,7 +509,7 @@
   (:synopsis "The line and offset in the code at the cursor of the path @p, or #f")
   (with t (target-block '())
     (if (and t (cadddr t)) (lsp-unit-lo-of (cadddr t) p)
-        (let* ((b (if t (tree->path (cadr t)) (buffer-path)))
+        (let* ((b (if t (tree->path (cadr t)) (buffer-lines-path)))
                (r (and b (list-starts? p b) (list-tail p (length b)))))
           (and r (= (length r) 2) r)))))
 

@@ -26,7 +26,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The lines of source code (the tag code-lines): the spaces, the tabs, the
 ;; ends of the lines and the other control characters can be shown, and the
-;; tabs stop every "code-tab-width" characters (settings of the document)
+;; objects taller than a line shrunk to it (settings of the document; the
+;; tabs stop every prog-tab-width characters, the preference "editor:code
+;; tab width")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (code-invisibles?)
@@ -36,14 +38,6 @@
   (:synopsis "Show or hide the spaces, the tabs and the ends of the lines")
   (:check-mark "v" code-invisibles?)
   (init-env "code-invisibles" (if (code-invisibles?) "false" "true")))
-
-(tm-define (code-tab-width? w)
-  (== (get-init "code-tab-width") w))
-
-(tm-define (set-code-tab-width w)
-  (:synopsis "Set the width of the tabs, in characters")
-  (:check-mark "*" code-tab-width?)
-  (init-env "code-tab-width" w))
 
 (tm-define (code-shrink-tall?)
   (== (get-init "code-tall-objects") "shrink"))
@@ -55,11 +49,7 @@
 
 (menu-bind code-lines-menu
   ("Show invisible characters" (toggle-code-invisibles))
-  ("Shrink tall objects to a line" (toggle-code-shrink-tall))
-  (-> "Tab width"
-      ("2" (set-code-tab-width "2"))
-      ("4" (set-code-tab-width "4"))
-      ("8" (set-code-tab-width "8"))))
+  ("Shrink tall objects to a line" (toggle-code-shrink-tall)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main Format menu

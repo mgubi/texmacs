@@ -46,6 +46,14 @@ void code_clear_line_layers (tree line);
 bool code_line_layers_of (tree line, code_line_layers& l);
 tree code_line_layers_tree (tree line);
 
+// The lines of program code of t: a document whose children are its lines
+// (line l, offset o: the place (l o) in it). It is t itself, or, for a
+// source file loaded as a block of lines (the tag code-lines, typeset by
+// Typeset/Bridge/bridge_code.cpp), the document inside the block, when t
+// is the block, or a document of the block alone (the body of the file).
+// Every query of "the lines of a buffer" goes through it
+tree code_lines_root (tree t);
+
 // positions in a line of program code (a Cork string, see src/docs/code-features.md):
 // offsets are those of the string; a character of Cork (a byte, or <...>)
 // is one column, a tab (<#9>, see source_document_to_tree) goes to the next

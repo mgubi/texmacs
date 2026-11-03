@@ -170,7 +170,8 @@
   ;; has moved, after lines inserted or removed above it, and keeps its
   ;; decorations is not); the lines are those of the buffer, or those of
   ;; @opt (a code block, or the lines of a unit)
-  (let* ((lines (line-trees (if (pair? opt) (car opt) (buffer-get-body u))))
+  (let* ((lines (line-trees (if (pair? opt) (car opt)
+                                (code-lines-root (buffer-get-body u)))))
          (n (vector-length lines))
          (places (make-ahash-table))
          (line-index (lambda (t)

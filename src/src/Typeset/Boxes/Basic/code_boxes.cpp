@@ -15,7 +15,7 @@
 #include "Boxes/construct.hpp"
 #include "analyze.hpp"
 #include "colors.hpp"
-#include "code_lines.hpp"
+#include "code_boxes.hpp"
 #include "Boxes/change.hpp"
 
 /******************************************************************************
@@ -35,7 +35,7 @@
 *
 * The geometry of a row (the positions of the cursor in it) is the one of a
 * text box of the row, made when it is needed; the colours of the syntax are
-* asked to the lexer of the block when a line is drawn (see code_lines.hpp):
+* asked to the lexer of the block when a line is drawn (see code_boxes.hpp):
 * from the state of the language at the start of the line, in one pass over
 * it, and kept for the last lines drawn.
 *
@@ -131,7 +131,7 @@ code_breaks (string s, font fn, SI width, SI cell, int tabw) {
 }
 
 /******************************************************************************
-* The colours of the syntax (see code_lines.hpp)
+* The colours of the syntax (see code_boxes.hpp)
 ******************************************************************************/
 
 // the colours kept: the lines, and their runs in all
@@ -203,6 +203,10 @@ code_lexer_rep::removed (int pos, int nr) {
 
 void
 code_lexer_rep::changed (int i) {
+  // (the colours kept for the line go: they may change with the same text,
+  // when they come from elsewhere, as those of tree-sitter)
+  for (size_t k=0; k<kept.size (); k++)
+    if (kept[k].line == i) kept[k].line= -1;
   if (i < 0 || i >= N(states)) { reset (); return; }
   if (i < valid) {
     fix_from= (fix_from < 0? i: min (fix_from, i));
@@ -264,6 +268,18 @@ code_lexer_rep::runs (int i, string text) {
     return plain;
   }
   int st= state_at (i);
+  if (!stateful) {
+    // the colours of a language without states of lines are asked each
+    // time: they may come from elsewhere (tree-sitter: the highlight
+    // observers of the lines, which change after the parse of the region,
+    // treesit-schedule-updates), and are cheap to read
+    static code_runs_entry once;
+    once.line= -1; once.text= text; once.state= 0;
+    once.starts= array<int> (); once.ends= array<int> ();
+    once.cols= array<string> ();
+    (void) lan->colour_line (t, 0, once.starts, once.ends, once.cols);
+    return once;
+  }
   for (size_t k=0; k<kept.size (); k++) {
     code_runs_entry& e= kept[k];
     if (e.line == i && e.state == st &&
@@ -327,6 +343,10 @@ struct code_box_rep: public box_rep {
   array<string>      tall_txt;
   array<array<int> > tall_st;
   array<box>         tall_box;
+  // the folds (System/Language/code_lines.hpp): 1, the line is hidden (it
+  // takes no room and is not drawn: the lines after it are a line higher);
+  // 2, hidden lines follow it (it ends with a mark)
+  array<int>         tall_fold;
   array<SI>          tall_pre, tall_post;
   array<long long>   tall_cum;
   bool     single; // one row [ra, rb) of the line doc (and ip is its path),
@@ -338,7 +358,8 @@ struct code_box_rep: public box_rep {
                 hashmap<string,color> cols, SI pitch, SI rpitch,
                 SI cell, int tabw, int invis,
                 array<int> tall_k, array<string> tall_txt,
-                array<array<int> > tall_st, array<box> tall_box, SI width);
+                array<array<int> > tall_st, array<box> tall_box,
+                array<int> tall_fold, SI width);
   code_box_rep (path lip, tree one, string text, int ra, int rb, font fn,
                 pencil pen, code_lexer lx, hashmap<string,color> cols,
                 SI cell, int tabw, int invis, SI width);
@@ -363,6 +384,10 @@ struct code_box_rep: public box_rep {
   int    tall_index (int k) {
     int j= tall_lower (k);
     return (j < N(tall_k) && tall_k[j] == k)? j: -1; }
+  int    fold (int k) {
+    if (single) return 0;
+    int j= tall_index (k);
+    return j >= 0? tall_fold[j]: 0; }
   bool   rich (int k) {
     if (single) return false;
     int j= tall_index (k);
@@ -414,6 +439,7 @@ struct code_box_rep: public box_rep {
     return invis == 1 && (single || i0 + k < N(doc) - 1); }
   void   draw_invisibles (renderer ren, string s, array<SI>& xp, int a,
                           int b, bool last, SI y);
+  void   draw_fold_mark (renderer ren, int k);
   box    row_box (int k, int i) {
     int a= starts (k) [i], b= row_end (k, i);
     return text_box (line_ip (k), a, line (k) (a, b), fn, pen); }
@@ -451,18 +477,20 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
                             array<int> tall_k2,
                             array<string> tall_txt2,
                             array<array<int> > tall_st2,
-                            array<box> tall_box2, SI width):
+                            array<box> tall_box2, array<int> tall_fold2,
+                            SI width):
   box_rep (ip2), doc (doc2), i0 (i02), n (max (n2, 1)),
   fn (fn2), pen (pen2), lx (lx2), cols (cols2), pitch (pitch2),
   rpitch (rpitch2), cell (cell2), tabw (tabw2), invis (invis2),
   tall_k (tall_k2), tall_txt (tall_txt2),
-  tall_st (tall_st2), tall_box (tall_box2), single (false), ra (0), rb (0)
+  tall_st (tall_st2), tall_box (tall_box2), tall_fold (tall_fold2),
+  single (false), ra (0), rb (0)
 {
   int t= N(tall_k);
   tall_pre = array<SI> (t);
   tall_post= array<SI> (t);
   for (int j=0; j<t; j++) {
-    box b= tall_box[j];
+    box b= (tall_fold[j] == 1? box (): tall_box[j]);
     tall_pre[j] = (is_nil (b)? 0: max ((SI) 0, b->y2 - fn->y2));
     tall_post[j]= (is_nil (b)? 0: max ((SI) 0, fn->y1 - b->y1));
   }
@@ -470,8 +498,10 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
     tall_cum= array<long long> (t + 1);
     tall_cum[0]= 0;
     for (int j=0; j<t; j++)
-      tall_cum[j+1]= tall_cum[j] + tall_pre[j] + tall_post[j] +
-                     (long long) (N(tall_st[j]) - 1) * rpitch;
+      tall_cum[j+1]= tall_cum[j] +
+        (tall_fold[j] == 1? - (long long) pitch:
+         tall_pre[j] + tall_post[j] +
+         (long long) (N(tall_st[j]) - 1) * rpitch);
   }
   // the lines with markup at their places
   for (int j=0; j<t; j++)
@@ -486,7 +516,7 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
           (jl >= 0? tall_post[jl]: 0);
   y2= y4= fn->y2 + (tall_index (0) >= 0? tall_pre[tall_index (0)]: 0);
   for (int j=0; j<t; j++)
-    if (!is_nil (tall_box[j])) {
+    if (!is_nil (tall_box[j]) && tall_fold[j] != 1) {
       box b= tall_box[j];
       x1= min (x1, b->x1); x2= max (x2, b->x2);
       x3= min (x3, b->x0 + b->x3); x4= max (x4, b->x0 + b->x4);
@@ -548,10 +578,12 @@ code_box_rep::subbox (int k) {
   array<string> tt;
   array<array<int> > ts;
   array<box> tb;
-  if (nr_rows (k) > 1) { tk << 0; tt << line (k); ts << starts (k); tb << box (); }
+  array<int> tf;
+  if (nr_rows (k) > 1) {
+    tk << 0; tt << line (k); ts << starts (k); tb << box (); tf << 0; }
   box b= code_new (ip, doc, i0+k, 1, fn, pen, lx, cols,
                                pitch, rpitch, cell, tabw, invis,
-                               tk, tt, ts, tb, x2);
+                               tk, tt, ts, tb, tf, x2);
   b->x0= 0; b->y0= base (k, 0);
   return b;
 }
@@ -569,6 +601,9 @@ code_box_rep::display (renderer ren) {
   row_at (cy1 - (fn->y2 - fn->y1), kb, ib); // those partly visible)
   color fg= pen->get_color ();
   for (int k= ka; k <= kb; k++) {
+    int fk= fold (k);
+    if (fk == 1) continue;
+    if (fk == 2) draw_fold_mark (ren, k);
     if (rich (k)) {
       // a line with markup: its box, which draws its children
       rectangles rs;
@@ -624,7 +659,7 @@ code_box_rep::display (renderer ren) {
           u= v;
         }
       }
-      if (invis)
+      if (invis || search_forwards ("<#9>", a, s) >= 0)
         draw_invisibles (ren, s, xpos, a, b,
                          i == N(st) - 1 && (!single || rb == N(s)) &&
                          has_end (k), y);
@@ -646,7 +681,10 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
     int c= code_control (s, i, j);
     if (c < 0) { j= i; tm_char_forwards (s, j); }
     SI xa= xp[i] - x0, xb= xp[min (j, N(xp) - 1)] - x0;
+    // (the tabs are always shown, as by typeset_prog_tab; the others with
+    // code-invisibles)
     if (c < 0 && s[i] == ' ') {
+      if (!invis) { i= j; continue; }
       SI cx= (xa + xb) / 2;
       ren->fill (cx - d, ym - d, cx + d, ym + d);
     }
@@ -656,7 +694,7 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
       ren->line (r, ym, r - h, ym + h);
       ren->line (r, ym, r - h, ym - h);
     }
-    else if (c >= 0) {
+    else if (c >= 0 && invis) {
       SI l= xa + cell / 6, r= xb - cell / 6, bt= y, tp= y + fn->yx;
       ren->line (l, bt, r, bt); ren->line (r, bt, r, tp);
       ren->line (r, tp, l, tp); ren->line (l, tp, l, bt);
@@ -672,6 +710,23 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
     ren->line (x, md, x + h, md + h);
     ren->line (x, md, x + h, md - h);
   }
+}
+
+void
+code_box_rep::draw_fold_mark (renderer ren, int k) {
+  // after the last row of the line k: a space, then "..." (as the mark of
+  // bridge_rep::fold_line)
+  int i= nr_rows (k) - 1;
+  SI  x;
+  if (rich (k)) { box b= rich_box (k); x= b->x0 + b->x2; }
+  else {
+    array<SI> xp;
+    xpositions (k, row_end (k, i), xp);
+    x= xp[row_end (k, i)] - xp[starts (k) [i]];
+  }
+  x += fn->spc->def;
+  ren->set_pencil (pencil (named_color ("dark grey"), pen->get_width ()));
+  fn->draw (ren, "...", x, base (k, i));
 }
 
 int
@@ -874,10 +929,12 @@ code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
           code_lexer lx, hashmap<string,color> cols, SI pitch, SI rpitch,
           SI cell, int tabw, int invis,
           array<int> tall_k, array<string> tall_txt,
-          array<array<int> > tall_st, array<box> tall_box, SI width) {
+          array<array<int> > tall_st, array<box> tall_box,
+          array<int> tall_fold, SI width) {
   return code_new (ip, doc, i0, n, fn, pen, lx, cols,
                                pitch, rpitch, cell, tabw, invis,
-                               tall_k, tall_txt, tall_st, tall_box, width);
+                               tall_k, tall_txt, tall_st, tall_box,
+                               tall_fold, width);
 }
 
 box
