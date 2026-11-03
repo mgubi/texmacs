@@ -355,6 +355,30 @@
           (step (lambda () (kbd-delete)))
           (step insert-return)
           (check= (tree->string (path->tree (line 0))) "#define TWICE(x) ")
+          (check= (typeset-check-mismatches) mismatches)))))
+  ;; lines removed at the start of the block, and inserted in a comment, at
+  ;; the level of the document (as the edits of a language server): the
+  ;; states of the lines after them are made again (in Scala: a language
+  ;; with states and no tree-sitter, whose colours, as those of C++ where
+  ;; tree-sitter is built, would not come from the lexer of the block)
+  (let* ((s-lines (append (list "/* one" "two" "three */")
+                          (map (lambda (i)
+                                 (string-append "int w" (number->string i)
+                                                ";"))
+                               (.. 0 20))))
+         (doc `(document (with "font-family" "tt" "language" "verbatim"
+                                "mode" "prog" "prog-language" "scala"
+                           (code-lines (document ,@s-lines))))))
+    (with-body doc
+      (lambda ()
+        (let ((d (path->tree (at 0 8 0))))
+          (go-to (at 0 8 0 10 0))
+          (step (lambda () #t))
+          (step (lambda () (tree-remove! d 0 1)))
+          (step (lambda () (tree-insert! d 0 '("/* again"))))
+          (step (lambda () (tree-insert! d 1 '("in" "comment"))))
+          (step (lambda () (tree-remove! d 0 2)))
+          (check= (tree->string (tree-ref d 0)) "comment")
           (check= (typeset-check-mismatches) mismatches))))))
 
 ;; A line with markup is typeset by the concater and put on the grid of the
@@ -616,6 +640,85 @@
     (code-lines-env old)
     (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
 
+;; The cursor stays in the lines of a block: the first and the last place
+;; of a document of a block, and the place where a source file opens, are
+;; in its lines (the tag has an inner border, drd_std.cpp), so that what is
+;; typed there goes into the lines and not before or after the block
+(define (test-cursor-in-block)
+  (check-group "the cursor in the block")
+  (with-body '(document (code-lines (document "ab" "cd" "ef")))
+    (lambda ()
+      (go-to (at 0 0 1 1))
+      (step (lambda () #t))
+      (step go-end)
+      (check= (rel (cursor-path)) '(0 0 2 2))
+      (step (lambda () (insert "x")))
+      (step go-start)
+      (check= (rel (cursor-path)) '(0 0 0 0))
+      (step (lambda () (insert "y")))
+      (check= (tree->stree (path->tree (at 0)))
+              '(code-lines (document "yab" "cd" "efx")))))
+  (let* ((old (getenv "TEXMACS_CODE_LINES"))
+         (prev (current-buffer))
+         (dir (url-append (url-temp-dir) "code-lines-test"))
+         (u (url-append dir "start.c")))
+    (code-lines-env "1")
+    (system-mkdir dir)
+    (string-save "int a;\nint b;\n" u)
+    (when (buffer-exists? u) (buffer-close u))
+    (load-buffer u)
+    (update-forced)
+    (apply-changes)
+    (with r (check-run
+             (lambda ()
+               (insert "x")
+               (update-forced)
+               (apply-changes)
+               (tree->stree (buffer-get-body u))))
+      (check= r '(document (code-lines (document "xint a;" "int b;" "")))))
+    (buffer-close u)
+    (when (buffer-exists? prev) (switch-to-buffer prev))
+    (system-remove u)
+    (code-lines-env old)))
+
+;; A block exports as the document of its lines: a paragraph per line, as
+;; before the block (HTML and LaTeX dropped it, or made an unknown macro)
+(define (test-export-formats)
+  (check-group "export of a block to other formats")
+  (let ((block (stree->tree '(document (code-lines (document "x = 1" "y <less> 2")))))
+        (plain (stree->tree '(document "x = 1" "y <less> 2"))))
+    (for-each
+     (lambda (fm)
+       (check= (convert block "texmacs-tree" fm)
+               (convert plain "texmacs-tree" fm)))
+     '("html-snippet" "latex-snippet" "verbatim-snippet"))
+    (check-true (string-contains? (convert block "texmacs-tree" "html-snippet")
+                                  "x = 1"))))
+
+;; A block of one line with markup, in paper mode, is a paragraph of its
+;; items (it had no rows, and was neither drawn nor reached by the cursor)
+(define (test-one-rich-line)
+  (check-group "a block of one line with markup")
+  (let ((widths '()))
+    (for-each
+     (lambda (medium)
+       (with-body `(document (with "font-family" "tt" "language" "verbatim"
+                               (code-lines
+                                (document (concat "a " (strong "bc"))))))
+         (lambda ()
+           (init-env "page-medium" medium)
+           (step (lambda () #t))
+           ;; (its text is typeset: as wide in paper mode as in papyrus)
+           (with r (tree-bounding-rectangle (path->tree (at 0 4 0 0 1 0)))
+             (set! widths (cons (- (caddr r) (car r)) widths)))
+           (go-to (at 0 4 0 0 1 0 1))
+           (step (lambda () (insert "Q")))
+           (check= (tree->stree (path->tree (at 0 4 0 0)))
+                   '(concat "a " (strong "bQc"))))))
+     '("paper" "papyrus"))
+    (check-true (> (car widths) 1000))
+    (check= (cadr widths) (car widths))))
+
 ;; Folds (code-fold-lines): the hidden lines take no room, the cursor goes
 ;; over them; the lines are all alike, so that their places are the same
 (define (fold-run medium)
@@ -736,6 +839,9 @@
   (test-tabs)
   (test-shrink)
   (test-lines-root)
+  (test-cursor-in-block)
+  (test-export-formats)
+  (test-one-rich-line)
   (test-folds)
   (test-layers)
   (test-tree-sitter)

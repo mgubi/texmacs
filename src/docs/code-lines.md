@@ -19,7 +19,14 @@ core, not a mechanism of its own. Tracking issue: #797.
   (tests). `code_lines_wanted` in `Data/Convert/Verbatim/verbatim.cpp`.
 - **Saving.** `print_verbatim` writes the lines of the block as they are
   (`CODE_LINES`), so `tree_to_source` gives the file back byte for byte (tabs
-  and the other control characters are `<#9>`, `<#x>`).
+  and the other control characters are `<#9>`, `<#x>`). HTML and LaTeX
+  export the lines of a block as the paragraphs of the document around it
+  (`splice-code-lines` in `tmhtml.scm` and `tmtex.scm`), as before the block.
+- **The cursor.** The tag has an inner border (`drd_std.cpp`): the cursor is
+  always in a line, never before or after the block, so that a file opens
+  with the cursor in its first line, and Home and End of the document stay
+  in the lines. The focus skips the block (`focus_search`), as a document:
+  in a source file it is the buffer, as without the block.
 - **The lines of a buffer.** `code_lines_root` (glue `code-lines-root`,
   `System/Language/code_lines.hpp`) is the one definition of "line *l*, offset
   *o*": the document of the lines, which is the one inside the block for a

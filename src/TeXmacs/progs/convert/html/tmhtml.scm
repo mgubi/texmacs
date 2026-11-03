@@ -461,7 +461,17 @@
                         (cdr (cDr bl))
                         (list (add-style-attr (cAr bl) #f s2)))))))
 
-(define (tmhtml-document l)
+;; the lines of a block of lines of code (code-lines: a text or a source
+;; file) are those of the document around it: a paragraph each, as before
+(define (splice-code-lines l)
+  (append-map (lambda (x)
+                (if (and (func? x 'code-lines 1) (func? (cadr x) 'document))
+                    (cdadr x)
+                    (list x)))
+              l))
+
+(define (tmhtml-document l*)
+  (define l (splice-code-lines l*))
   (cond ((null? l) '())
 	((ahash-ref tmhtml-env :preformatted)
 	 (tmhtml-post-simplify-nodes
@@ -1992,6 +2002,7 @@
   (dlines tmhtml-datoms)
   (dpages tmhtml-datoms)
   (dbox tmhtml-datoms)
+  (code-lines tmhtml-datoms)
   
   (with-limits tmhtml-noop)
   (line-break tmhtml-noop)

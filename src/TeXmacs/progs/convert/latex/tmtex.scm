@@ -964,8 +964,20 @@
         ((== (car l) "right") (tmtex-marginal-right-note (cdr l)))
         (else `(marginpar ,(tmtex (cAr l))))))
 
+;; the lines of a block of lines of code (code-lines: a text or a source
+;; file) are those of the document around it: a paragraph each, as before
+(define (splice-code-lines l)
+  (append-map (lambda (x)
+                (if (and (func? x 'code-lines 1) (func? (cadr x) 'document))
+                    (cdadr x)
+                    (list x)))
+              l))
+
 (define (tmtex-document l)
-  (cons '!document (tmtex-list l)))
+  (cons '!document (tmtex-list (splice-code-lines l))))
+
+(define (tmtex-code-lines l)
+  (tmtex (car l)))
 
 (define (tmtex-date l)
   (tmtex-default "tmdate" l))
@@ -3577,6 +3589,7 @@
   (repeat tmtex-noop)
   (float tmtex-float)
   (datoms tmtex-second)
+  (code-lines tmtex-code-lines)
   ((:or dlines dpages dbox) tmtex-noop)
   (line-note tmtex-line-note)
 

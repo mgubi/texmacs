@@ -12,6 +12,20 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 4 November 2026
+
+- **Source files and texts open as a block of lines**: a source or text
+  file is typeset as one block of monospaced rows, not as a paragraph per
+  line, so that large files open and edit quickly (a key in a C file of
+  200000 lines takes some 75 ms instead of seconds, outside paper mode).
+  Tree-sitter colours, the language servers, folds and markup in a line
+  work as before. Tabs and control characters are kept and saved as they
+  were; Format > Source code shows the invisible characters and can shrink
+  formulas or images to the height of a line. The preference `code lines`
+  set to `off` gives back a paragraph per line (#710, #797).
+- **Up and Down in very long documents** (more than about 1300 pages) no
+  longer jump to a wrong line.
+
 ## 3 November 2026
 
 - **Names with a `*`**: opening a file name with a `*` (`dir/*.tm`) opens

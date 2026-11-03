@@ -1009,6 +1009,9 @@ edit_select_rep::focus_search (path p, bool skip_flag, bool up_flag) {
       is_func (st, CELL) ||
       is_compound (st, "shown") ||
       is_func (st, HIDDEN) ||
+      // (a block of lines, code-lines: the focus is the document around it,
+      // as for a source file without the block)
+      is_func (st, CODE_LINES) ||
       is_compound (st, "shared") ||
       is_compound (st, "slide") ||
       is_compound (st, "with-screen-color") ||

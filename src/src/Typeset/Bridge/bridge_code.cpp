@@ -715,7 +715,8 @@ bridge_code_rep::typeset_paragraphs (tree doc, array<array<box> > pars,
     stack_border sb;
     array<line_item> before= (i == 0? ttt->a: array<line_item> ());
     array<line_item> after = (i == N1? ttt->b: array<line_item> ());
-    if (N(pars[i]) == 0 && N(doc) > 1 && rich_line (doc[i]))
+    // (a paragraph per line, also for a block of one line, in paper mode)
+    if (N(pars[i]) == 0 && N(pars) == N(doc) && rich_line (doc[i]))
       rich_paragraph (doc[i], descend (descend (ip, 0), i), width, cell,
                       before, after, l, sb);
     else code_paragraph (env, ip, pars[i], before, after, l, sb);
@@ -1027,9 +1028,13 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
                       array<line_item> (), r->its, r->psb);
       return r;
     }
-    if (r->psig == sig && N(r->rows) > 0 && r->lip == lip) return r;
+    // (the last line has the mark of the end of the file, when the
+    // invisible characters are shown: its rows are not those of another)
+    unsigned long long lsig= (invis && i == n-1? sig_mix (sig, 2): sig);
+    if (lsig == 0) lsig= 1;
+    if (r->psig == lsig && N(r->rows) > 0 && r->lip == lip) return r;
     r->rich= false;
-    r->psig= sig;
+    r->psig= lsig;
     r->lip = lip;
     r->rows= make_rows (i, lip);
     r->bs  = array<box> ();
@@ -1048,7 +1053,10 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   // the first line, with the line items before, and the line 1
   array<page_item> l0;
   stack_border sb0;
-  if (get (0)->rich) {
+  // (a line with markup at either end is typeset once, with the line
+  // items around: not by get, which would typeset its items a second time,
+  // counters and labels included)
+  if (rich_line (doc[0])) {
     first.b= box ();
     rich_paragraph (doc[0], line_path (0), width, cell, ttt->a,
                     array<line_item> (), l0, sb0);
@@ -1069,7 +1077,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
       merge= true;
       continue;
     }
-    bool alone= (i == n-2) || get (i+1)->rich;
+    bool alone= (i == n-2) || rich_line (doc[i+1]);
     array<page_item> its= r->its;
     if (alone) {
       int R= N(its);
@@ -1085,7 +1093,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   // the last line, with the line items after
   array<page_item> ln;
   stack_border sbn;
-  if (get (n-1)->rich) {
+  if (rich_line (doc[n-1])) {
     last.b= box ();
     rich_paragraph (doc[n-1], line_path (n-1), width, cell,
                     array<line_item> (), ttt->b, ln, sbn);

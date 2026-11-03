@@ -18,6 +18,8 @@
 #include "code_boxes.hpp"
 #include "Boxes/change.hpp"
 
+extern int redraw_uninterrupted; // (boxes.cpp)
+
 /******************************************************************************
 * A code box shows the lines i0, i0+1... of a document of strings (the child of
 * <code-lines|<document|line|...>>) as one box, without a box per line or per
@@ -162,7 +164,11 @@ code_lexer_rep::inserted (int pos, int nr) {
   if (pos < 0 || pos > n || nr < 0) { reset (); return; }
   array<int> r (n + nr);
   for (int i=0; i<pos; i++) r[i]= states[i];
-  for (int i=0; i<nr; i++) r[pos+i]= 0;
+  // (the new lines start in the state of the line which was at pos: the
+  // state after the line before, which did not change; the fix below makes
+  // the states after them)
+  int start= (pos < n? states[pos]: 0);
+  for (int i=0; i<nr; i++) r[pos+i]= start;
   for (int i=pos; i<n; i++) r[i+nr]= states[i];
   states= r;
   if (valid > pos) valid += nr;
@@ -191,10 +197,17 @@ code_lexer_rep::removed (int pos, int nr) {
   else if (fix_from >= pos) fix_from= pos;
   if (fix_to >= pos + nr) fix_to -= nr;
   else if (fix_to >= pos) fix_to= pos - 1;
-  // (the line before is made again: the one after it gets its state)
+  // (the line before is made again: the one after it gets its state; when
+  // the first lines go, the new first line starts in the state 0, and the
+  // ones after it are made again from there)
   if (pos > 0 && pos - 1 < valid) {
     fix_from= (fix_from < 0? pos - 1: min (fix_from, pos - 1));
     fix_to  = max (fix_to, pos - 1);
+  }
+  else if (pos == 0 && N(states) > 0 && valid > 0) {
+    states[0]= 0;
+    fix_from= 0;
+    fix_to  = max (fix_to, 0);
   }
   for (size_t k=0; k<kept.size (); k++)
     if (kept[k].line >= pos + nr) kept[k].line -= nr;
@@ -509,12 +522,21 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
       tall_box[j]->x0= 0;
       tall_box[j]->y0= base (tall_k[j], 0);
     }
-  int jl= tall_index (n-1);
+  // (the bottom of the last line which is shown: hidden lines at the end,
+  // a fold of the last lines, take no row)
+  int kl= n-1;
+  while (kl > 0 && tall_index (kl) >= 0 && tall_fold[tall_index (kl)] == 1)
+    kl--;
+  int jl= tall_index (kl);
   x1= x3= 0;
-  x2= x4= width;
-  y1= y3= base (n-1, nr_rows (n-1) - 1) + fn->y1 -
+  x2= width;
+  // (the marks drawn after the texts, the end of a line and the "..." of a
+  // fold, may go beyond the width of a full row)
+  x4= width + 4 * cell;
+  y1= y3= base (kl, nr_rows (kl) - 1) + fn->y1 -
           (jl >= 0? tall_post[jl]: 0);
-  y2= y4= fn->y2 + (tall_index (0) >= 0? tall_pre[tall_index (0)]: 0);
+  // (the top of the first line: depth (0, 0) already counts its height)
+  y2= y4= fn->y2;
   for (int j=0; j<t; j++)
     if (!is_nil (tall_box[j]) && tall_fold[j] != 1) {
       box b= tall_box[j];
@@ -534,7 +556,8 @@ code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
   single (true), ra (ra2), rb (rb2), one_text (text)
 {
   x1= x3= 0;
-  x2= x4= width;
+  x2= width;
+  x4= width + 4 * cell; // (the mark of the end of the line, see above)
   y1= y3= fn->y1;
   y2= y4= fn->y2;
 }
@@ -606,8 +629,11 @@ code_box_rep::display (renderer ren) {
     if (fk == 2) draw_fold_mark (ren, k);
     if (rich (k)) {
       // a line with markup: its box, which draws its children
+      // (drawn whole: this box reports its area as painted)
       rectangles rs;
+      redraw_uninterrupted++;
       rich_box (k)->redraw (ren, path (), rs);
+      redraw_uninterrupted--;
       continue;
     }
     tree t= line_tree (k);
@@ -738,15 +764,20 @@ code_box_rep::pos_at (int k, int i, SI x, SI delta) {
   array<SI> xp;
   xpositions (k, b, xp);
   SI x0= xp[a];
-  int p= a;
+  int p= a, last= a;
   while (p < b) {
     int q= p;
     if (code_control (s, p, j) >= 0) q= j; else tm_char_forwards (s, q);
     if (q > b) q= b;
     SI m= ((xp[p] - x0) + (xp[q] - x0)) >> 1;
     if (x < m || (x == m && delta < 0)) return p;
+    last= p;
     p= q;
   }
+  // (beyond a row which is not the last of its line: before its last
+  // character, since b is the start of the next row, where the cursor of b
+  // is drawn; in paper mode too, where a row is a box of its own)
+  if (b < N(s) && b > a) return last;
   return b;
 }
 
