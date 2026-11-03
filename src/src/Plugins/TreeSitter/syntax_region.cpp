@@ -801,10 +801,14 @@ syntax_region_forget (tree root) {
 
 static bool
 detached_root (tree root) {
-  // is root a part of a document which was closed? (a tree which was in no
-  // document, as a text typeset apart, is not)
-  path ip= obtain_ip (root);
-  return !is_nil (ip) && !ip_attached (ip);
+  // is root a part of a document which was closed? A tree has a path when it
+  // was in a document (the observer of its position); once the document is
+  // closed the path is detached. A tree which was never in a document (a text
+  // typeset apart, a tree made by a script) has no such observer: it is left
+  // to the cache.
+  path ip;
+  if (is_nil (root->obs) || !root->obs->get_ip (ip)) return false;
+  return !ip_attached (obtain_ip (root));
 }
 
 static void
