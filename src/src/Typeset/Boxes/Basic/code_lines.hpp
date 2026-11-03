@@ -112,4 +112,8 @@ box code_row_box (path lip, tree line, string text, int a, int b, font fn,
                   pencil pen, code_lexer lx, hashmap<string,color> cols,
                   SI cell, int tabw, int invis, SI width);
 
+// b, scaled down (and shifted) to be within [bot, top] when it is taller:
+// the clicks, the cursor and the selections in it are scaled too
+box code_fit_box (box b, SI bot, SI top);
+
 #endif // defined CODE_LINES_H

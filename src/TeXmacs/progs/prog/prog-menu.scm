@@ -45,8 +45,17 @@
   (:check-mark "*" code-tab-width?)
   (init-env "code-tab-width" w))
 
+(tm-define (code-shrink-tall?)
+  (== (get-init "code-tall-objects") "shrink"))
+
+(tm-define (toggle-code-shrink-tall)
+  (:synopsis "Scale the formulas, images... down to the height of a line")
+  (:check-mark "v" code-shrink-tall?)
+  (init-env "code-tall-objects" (if (code-shrink-tall?) "natural" "shrink")))
+
 (menu-bind code-lines-menu
   ("Show invisible characters" (toggle-code-invisibles))
+  ("Shrink tall objects to a line" (toggle-code-shrink-tall))
   (-> "Tab width"
       ("2" (set-code-tab-width "2"))
       ("4" (set-code-tab-width "4"))

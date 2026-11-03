@@ -111,6 +111,8 @@ public:
   SI       gcell;          // the width of a cell of the grid,
   int      tabw;           // the tabs stop every tabw cells,
   bool     invis;          // the spaces, tabs... are shown (code-invisibles)
+  bool     shrink;         // the objects taller than a row are scaled down
+  SI       row_lo, row_hi; // to these (code-tall-objects: shrink)
 
   void lines_inserted (int pos, int nr);
   void lines_removed (int pos, int nr);
@@ -150,7 +152,7 @@ public:
 
 bridge_code_rep::bridge_code_rep (typesetter ttt, tree st, path ip):
   bridge_rep (ttt, st, ip), recs_ok (false), passes (0), gcell (0),
-  tabw (8), invis (false) {}
+  tabw (8), invis (false), shrink (false), row_lo (0), row_hi (0) {}
 
 bridge
 bridge_code (typesetter ttt, tree st, path ip) {
@@ -484,6 +486,10 @@ bridge_code_rep::my_typeset (int desired_status) {
   }
   invis= (env->provides ("code-invisibles") &&
           as_string (env->read ("code-invisibles")) == "true");
+  shrink= (env->provides ("code-tall-objects") &&
+           as_string (env->read ("code-tall-objects")) == "shrink");
+  row_lo= fn->y1;
+  row_hi= fn->y2;
   SI height= env->as_length (string ("1fn")) + env->get_length (PAR_SEP);
   SI pitch = height + env->get_vspace (PAR_PAR_SEP)->def;
   SI rpitch= height + env->get_vspace (PAR_LINE_SEP)->def;
@@ -505,7 +511,8 @@ bridge_code_rep::my_typeset (int desired_status) {
                                              (unsigned long long) width),
                                     (unsigned long long)
                                     (void*) fn.operator-> ());
-  wsig= sig_mix (wsig, (unsigned long long) (tabw * 2 + (invis? 1: 0)));
+  wsig= sig_mix (wsig, (unsigned long long)
+                       (tabw * 4 + (invis? 1: 0) + (shrink? 2: 0)));
   if (!recs_ok || N(recs) != n || typeset_caches_mode () == 0) {
     recs= array<code_rec> (n);
     recs_ok= true;
@@ -682,6 +689,9 @@ bridge_code_rep::rich_paragraph (tree& t, path lip, SI width, SI cell,
     line_item it= items[i];
     SI sp= it->spc->def;
     box ib= it->b;
+    // (code-tall-objects: shrink)
+    auto fit= [&] (box b) -> box {
+      return shrink? code_fit_box (b, row_lo, row_hi): b; };
     if (it->type == CONTROL_ITEM || it->type == FLOAT_ITEM ||
         it->type == NOTE_LINE_ITEM || it->type == NOTE_PAGE_ITEM ||
         it->type == MARKER_ITEM) {
@@ -702,7 +712,7 @@ bridge_code_rep::rich_paragraph (tree& t, path lip, SI width, SI cell,
         for (int u=0; u<N(str); k++) {
           int v= u;
           tm_char_forwards (str, v);
-          box cb= text_box (ib->ip, pos + u, str (u, v), f, pn);
+          box cb= fit (text_box (ib->ip, pos + u, str (u, v), f, pn));
           put (line_item (STRING_ITEM, OP_TEXT, cb, HYPH_INVALID, it->lan),
                (SI) (col + k) * cell + (cell - cb->x2) / 2);
           u= v;
@@ -711,6 +721,7 @@ bridge_code_rep::rich_paragraph (tree& t, path lip, SI width, SI cell,
       col += g;
     }
     else {
+      ib= it->b= fit (ib);
       SI w= ib->x2 - min (ib->x1, (SI) 0);
       int cells= (w <= 0? 0: (int) ((w + cell - 1) / cell));
       if (cells > 0 && col > 0 && col + cells > cols) new_row ();

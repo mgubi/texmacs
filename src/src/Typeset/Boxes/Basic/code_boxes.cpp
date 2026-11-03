@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 #include "colors.hpp"
 #include "code_lines.hpp"
+#include "Boxes/change.hpp"
 
 /******************************************************************************
 * A code box shows the lines i0, i0+1... of a document of strings (the child of
@@ -885,4 +886,65 @@ code_row_box (path lip, tree line, string text, int a, int b, font fn,
               SI cell, int tabw, int invis, SI width) {
   return code_new (lip, line, text, a, b, fn, pen, lx, cols,
                                cell, tabw, invis, width);
+}
+
+/******************************************************************************
+* A box scaled down to the height of a row (code-tall-objects: shrink)
+*
+* As transformed_box_rep, but the clicks, the cursor and the selections in
+* the box are scaled too: the box is edited as it is drawn.
+******************************************************************************/
+
+struct code_fit_box_rep: public change_box_rep {
+  double s; // the factor,
+  SI     dy; // then the shift
+  frame  fr;
+  code_fit_box_rep (box b, double s, SI dy);
+  operator tree () { return tree (TUPLE, "fit", (tree) bs[0]); }
+  SI   sc (SI v) { return (SI) (v * s); }
+  void pre_display (renderer &ren) { ren->set_transformation (fr); }
+  void post_display (renderer &ren) { ren->reset_transformation (); }
+  path find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
+    return path (0, bs[0]->find_box_path ((SI) (x / s), (SI) ((y - dy) / s),
+                                         delta, force, found)); }
+  cursor find_cursor (path bp) {
+    if (is_atom (bp)) return box_rep::find_cursor (bp);
+    cursor cu= bs[0]->find_cursor (bp->next);
+    cu->ox= sc (cu->ox); cu->oy= sc (cu->oy) + dy;
+    cu->y1= sc (cu->y1); cu->y2= sc (cu->y2);
+    return cu; }
+  selection find_selection (path lbp, path rbp) {
+    if (is_atom (lbp) || is_atom (rbp))
+      return box_rep::find_selection (lbp, rbp);
+    selection sel= bs[0]->find_selection (lbp->next, rbp->next);
+    rectangles rs;
+    for (rectangles r= sel->rs; !is_nil (r); r= r->next)
+      rs= rectangles (fr (r->item), rs);
+    return selection (rs, sel->start, sel->end); }
+  void get_bracket_extents (SI& lo, SI& hi) { lo= y1; hi= y2; }
+};
+
+code_fit_box_rep::code_fit_box_rep (box b, double s2, SI dy2):
+  change_box_rep (b->ip, true), s (s2), dy (dy2),
+  fr (scaling (s2, point (0.0, (double) dy2)))
+{
+  insert (b, 0, 0);
+  position ();
+  finalize ();
+  rectangle r1= fr (rectangle (x1, y1, x2, y2));
+  rectangle r2= fr (rectangle (x3, y3, x4, y4));
+  x1= r1->x1; y1= r1->y1; x2= r1->x2; y2= r1->y2;
+  x3= r2->x1; y3= r2->y1; x4= r2->x2; y4= r2->y2;
+}
+
+box
+code_fit_box (box b, SI bot, SI top) {
+  SI h= b->y2 - b->y1;
+  if (h <= top - bot || h <= 0) return b;
+  double s= ((double) (top - bot)) / ((double) h);
+  // (then within [bot, top])
+  SI lo= (SI) (b->y1 * s), hi= (SI) (b->y2 * s), dy= 0;
+  if (hi > top) dy= top - hi;
+  else if (lo < bot) dy= bot - lo;
+  return tm_new<code_fit_box_rep> (b, s, dy);
 }

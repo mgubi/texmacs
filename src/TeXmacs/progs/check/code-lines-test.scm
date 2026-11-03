@@ -417,6 +417,57 @@
               (list (car paper) (car papyrus)))
     (check= (cdr papyrus) (cdr paper))))
 
+;; With code-tall-objects "shrink", the fraction is scaled down to the
+;; height of a row: the lines after it are where they are when the line is
+;; plain text, and the cursor and the edits still go into it
+(define (shrink-run medium)
+  (let* ((r '())
+         (note (lambda (x) (set! r (cons x r))))
+         (cur (lambda () (list-tail (rel (cursor-path)) 3)))
+         (y (lambda (i) (cadr (tree-bounding-rectangle
+                               (path->tree (at 0 4 0 i)))))))
+    (init-env "page-medium" medium)
+    (init-env "code-tall-objects" "shrink")
+    (step (lambda () #t))
+    (note (list (- (y 3) (y 1)) (- (y 4) (y 1))))
+    ;; (the plain document: the places only)
+    (when (not (tree-atomic? (path->tree (at 0 4 0 2))))
+      (go-to (at 0 4 0 2 1 0 1 0 0))
+      (step (lambda () #t))
+      (step kbd-right)
+      (note (cur))
+      (step (lambda () (insert "q")))
+      (note (tree->stree (path->tree (at 0 4 0 2 1 0 1 0))))
+      (go-to (at 0 4 0 1 0 2))
+      (step (lambda () #t))
+      (step kbd-down) (step kbd-down)
+      (note (cur)))
+    (reverse r)))
+
+(define (test-shrink)
+  (check-group "tall objects shrunk to a row")
+  (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document ,@markup-lines)))))
+         (plain (map (lambda (l) (if (string? l) l "x= a+b; // note"))
+                     markup-lines))
+         (pdoc `(document (with "font-family" "tt" "language" "verbatim"
+                            (code-lines (document ,@plain)))))
+         (runs '()))
+    (for-each (lambda (medium)
+                (with-body doc
+                  (lambda () (set! runs (cons (shrink-run medium) runs))))
+                (with-body pdoc
+                  (lambda ()
+                    (with places (car (shrink-run medium))
+                      (check= (car (car runs)) places)))))
+              '("paper" "papyrus"))
+    (for-each
+      (lambda (run)
+        (check= (cadr run) '(2 1 0 1 0 1))
+        (check= (caddr run) "bq")
+        (check= (cadddr run) '(3 2)))
+      runs)))
+
 (define (test-export)
   (check-group "export and import")
   (with-body (code-doc)
@@ -540,6 +591,7 @@
   (test-markup)
   (test-export)
   (test-tabs)
+  (test-shrink)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph
   (check-group "the lines used again are the lines made again")
