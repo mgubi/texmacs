@@ -48,6 +48,15 @@ tmg_typeset_code_rows_made () {
 }
 
 tmscm
+tmg_typeset_code_records_made () {
+  // TMSCM_DEFER_INTS;
+  int out= get_code_records_made ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_texmacs_version_release (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "texmacs-version-release");
 
@@ -11675,6 +11684,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("typeset-pass-count",  tmg_typeset_pass_count, 0, 0, 0);
   tmscm_install_procedure ("typeset-redone-count",  tmg_typeset_redone_count, 0, 0, 0);
   tmscm_install_procedure ("typeset-code-rows-made",  tmg_typeset_code_rows_made, 0, 0, 0);
+  tmscm_install_procedure ("typeset-code-records-made",  tmg_typeset_code_records_made, 0, 0, 0);
   tmscm_install_procedure ("texmacs-version-release",  tmg_texmacs_version_release, 1, 0, 0);
   tmscm_install_procedure ("version-before?",  tmg_version_beforeP, 2, 0, 0);
   tmscm_install_procedure ("updater-supported?",  tmg_updater_supportedP, 0, 0, 0);

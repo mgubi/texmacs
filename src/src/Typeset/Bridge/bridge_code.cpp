@@ -14,17 +14,20 @@
 #include "Line/lazy_paragraph.hpp"
 #include "analyze.hpp"
 #include "colors.hpp"
-#include <unordered_map>
 
-box code_box (path ip, tree doc, int i0, int i1, font fn, pencil pen,
+box code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
               language lan, hashmap<string,color> cols, SI pitch, SI rpitch,
-              hashmap<int,array<int> > wraps, SI width);
-box code_row_box (path lip, tree line, int a, int b, font fn, pencil pen,
-                  language lan, hashmap<string,color> cols, SI width);
+              array<int> tall_k, array<string> tall_txt,
+              array<array<int> > tall_st, SI width);
+box code_row_box (path lip, tree line, string text, int a, int b, font fn,
+                  pencil pen, language lan, hashmap<string,color> cols,
+                  SI width);
 array<int> code_breaks (string s, font fn, SI width);
 extern int code_runs_generation;
 static int code_rows_made= 0;
 int get_code_rows_made () { return code_rows_made; }
+static int code_records_made= 0;
+int get_code_records_made () { return code_records_made; }
 void merge_stack (array<page_item>& l, stack_border& sb,
                   array<page_item> l2, stack_border sb2);
 
@@ -46,28 +49,51 @@ static const char* code_color_vars[]= {
 * the paragraphs of a document. The lines do not change the environment,
 * which is the same everywhere inside.
 *
+* The bridge keeps a record of each line which needs one (recs): the soft
+* line breaks of a line which may be too wide, a line with markup, and, in
+* paper mode, every line, with its rows, its boxes and its page items. A
+* record holds while its line is the same tree with the same text (the same
+* string: an edit gives the line another one) and while the font and the
+* width are the same (wsig). The edits come as notifications with the place
+* of the line: the records are inserted, removed or dropped there, without
+* going through the other lines; a short line without markup has none. The
+* tree st is the one of the document: it is changed in place by the edit,
+* after the notification (see apply in observer.cpp), and nothing is made
+* from it here.
+*
 * In paper mode, the rows of a line which did not change are used again from
-* one pass to the next (lines): the same boxes and the same page items, so
-* that the pager keeps the pages which did not change and the change log has
-* only the lines which did. Their boxes have the path which the line keeps,
+* one pass to the next: the same boxes and the same page items, so that the
+* pager keeps the pages which did not change and the change log has only the
+* lines which did. Their boxes have the path which the line keeps,
 * renumbered in place when lines are inserted or removed (see
-* code_boxes.cpp). The rows are made as the paragraphs of one and of two
-* rows of the line 1 were (the making of a paragraph reads the environment,
-* some 30 us a line), and are stacked as they are there. What all the lines
-* share (the font, the widths, these paragraphs) is in a signature: when it
-* changes, nothing is used again. TEXMACS_TYPESET_CACHES=off makes everything
-* again, "check" also stacks all the lines as paragraphs and compares.
+* code_boxes.cpp). The rows are made as the paragraphs of one to five rows
+* of the line 1 were (the making of a paragraph reads the environment, some
+* 30 us a line), and are stacked as they are there. What all the lines share
+* (the font, the widths, these paragraphs) is in a signature (psig): when it
+* changes, the rows are made again. TEXMACS_TYPESET_CACHES=off makes
+* everything again, "check" also makes the records again and stacks all the
+* lines as paragraphs, and compares.
 ******************************************************************************/
 
-struct code_line {
-  tree             line;  // the line (it keeps the tree alive: the key is
-                          // its address)
-  string           text;  // its text, when the boxes were made
-  array<box>       rows;  // the boxes of its rows
-  array<box>       bs;    // the lines of the page which they are in (phrase
-                          // boxes)
-  array<page_item> its;   // as they are stacked before another line
+struct code_rec_rep: concrete_struct {
+  tree               line;   // the line,
+  string             text;   // its text (when it is a string),
+  unsigned long long wsig;   // and the font and the width of the rows
+  array<int>         starts; // the starts of its rows
+  // in paper mode
+  unsigned long long psig;   // what the rows were made as
+  path               lip;    // the path of the line which they have
+  array<box>         rows;   // the boxes of the rows
+  array<box>         bs;     // the lines of the page which they are in
+  array<page_item>   its;    // as they are stacked before another line
+  code_rec_rep (): wsig (0), psig (0) {}
 };
+
+class code_rec {
+  CONCRETE_NULL(code_rec);
+  code_rec (bool make): rep (make? tm_new<code_rec_rep> (): NULL) {}
+};
+CONCRETE_NULL_CODE(code_rec);
 
 // the paragraph of the first or of the last line, used again when the
 // line did not change and there are no line items from around
@@ -77,32 +103,33 @@ struct code_end {
   stack_border     sb;
 };
 
-// the soft line breaks of a line, kept while its text is the same
-struct code_wrap {
-  string     text;
-  array<int> starts;
-};
-
 class bridge_code_rep: public bridge_rep {
 public:
-  std::unordered_map<void*,code_line> lines; // see above
-  unsigned long long lines_sig;              // what they share
-  code_end first, last;                      // their paragraphs
-  std::unordered_map<void*,code_wrap> wraps; // the lines with several rows
-  unsigned long long wraps_sig;              // the font and the width
+  array<code_rec> recs;    // the records of the lines (see above)
+  bool            recs_ok; // they are at the places of the lines
+  code_end first, last;    // the paragraphs of the first and the last line
 
-  array<int> row_starts (tree t, font fn, SI width, SI cw,
-                         std::unordered_map<void*,code_wrap>& next);
+  void lines_inserted (int pos, int nr);
+  void lines_removed (int pos, int nr);
+  void line_changed (int i);
+  void lines_unknown () { recs_ok= false; }
+  code_rec line_rec (tree& t, font fn, SI width, SI cw,
+                     unsigned long long wsig, bool always);
   void end_paragraph (code_end& e, array<box> rows, array<line_item> before,
                       array<line_item> after,
                       array<page_item>& l, stack_border& sb);
   void typeset_paper (tree doc, font fn, pencil pen, language lan,
-                      hashmap<string,color> cols, SI width, SI cw);
+                      hashmap<string,color> cols, SI width, SI cw,
+                      unsigned long long wsig);
   void typeset_paragraphs (array<array<box> > pars);
 
 public:
   bridge_code_rep (typesetter ttt, tree st, path ip);
   void notify_assign (path p, tree u);
+  void notify_insert (path p, tree u);
+  void notify_remove (path p, int nr);
+  void notify_split  (path p);
+  void notify_join   (path p);
   bool notify_macro (int type, string var, int l, path p, tree u);
   void notify_change ();
 
@@ -112,17 +139,98 @@ public:
 };
 
 bridge_code_rep::bridge_code_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), lines_sig (0), wraps_sig (0) {}
+  bridge_rep (ttt, st, ip), recs_ok (false) {}
 
 bridge
 bridge_code (typesetter ttt, tree st, path ip) {
   return tm_new<bridge_code_rep> (ttt, st, ip);
 }
 
+/******************************************************************************
+* Notifications: the records follow the lines
+******************************************************************************/
+
+void
+bridge_code_rep::lines_inserted (int pos, int nr) {
+  int n= N(recs);
+  if (!recs_ok || pos < 0 || pos > n || nr < 0) { lines_unknown (); return; }
+  array<code_rec> r (n + nr);
+  for (int i=0; i<pos; i++) r[i]= recs[i];
+  for (int i=pos; i<n; i++) r[i+nr]= recs[i];
+  recs= r;
+}
+
+void
+bridge_code_rep::lines_removed (int pos, int nr) {
+  int n= N(recs);
+  if (!recs_ok || pos < 0 || nr < 0 || pos + nr > n) {
+    lines_unknown (); return; }
+  array<code_rec> r (n - nr);
+  for (int i=0; i<pos; i++) r[i]= recs[i];
+  for (int i=pos+nr; i<n; i++) r[i-nr]= recs[i];
+  recs= r;
+}
+
+void
+bridge_code_rep::line_changed (int i) {
+  if (!recs_ok || i < 0 || i >= N(recs)) { lines_unknown (); return; }
+  recs[i]= code_rec ();
+}
+
+// The paths are relative to st= <code-lines|<document|line|...>>: (0, i) is
+// the line i, (0, i, ...) is inside it. st is not changed here (see above),
+// except when it is assigned as a whole
 void
 bridge_code_rep::notify_assign (path p, tree u) {
   status= CORRUPTED;
-  st= substitute (st, p, u);
+  if (N(p) >= 2 && p->item == 0) line_changed (p->next->item);
+  else {
+    st= substitute (st, p, u);
+    lines_unknown ();
+  }
+}
+
+void
+bridge_code_rep::notify_insert (path p, tree u) {
+  status= CORRUPTED;
+  if (N(p) == 2 && p->item == 0 && is_compound (u))
+    lines_inserted (p->next->item, N(u));
+  else if (N(p) >= 3 && p->item == 0) line_changed (p->next->item);
+  else lines_unknown ();
+}
+
+void
+bridge_code_rep::notify_remove (path p, int nr) {
+  status= CORRUPTED;
+  if (N(p) == 2 && p->item == 0) lines_removed (p->next->item, nr);
+  else if (N(p) >= 3 && p->item == 0) line_changed (p->next->item);
+  else lines_unknown ();
+}
+
+void
+bridge_code_rep::notify_split (path p) {
+  // p= q * pos * at: the child pos of q split at at
+  status= CORRUPTED;
+  if (N(p) == 3 && p->item == 0) {
+    int i= p->next->item;
+    line_changed (i);
+    lines_inserted (i+1, 1);
+  }
+  else if (N(p) > 3 && p->item == 0) line_changed (p->next->item);
+  else lines_unknown ();
+}
+
+void
+bridge_code_rep::notify_join (path p) {
+  // p= q * pos: the children pos and pos+1 of q joined
+  status= CORRUPTED;
+  if (N(p) == 2 && p->item == 0) {
+    int i= p->next->item;
+    line_changed (i);
+    lines_removed (i+1, 1);
+  }
+  else if (N(p) > 2 && p->item == 0) line_changed (p->next->item);
+  else lines_unknown ();
 }
 
 bool
@@ -140,10 +248,10 @@ bridge_code_rep::notify_change () {
 
 bool
 bridge_code_rep::my_typeset_will_be_complete () {
-  // Typeset again, the block makes again the lines which changed only (in
-  // paper mode), and it has no labels nor entries of the auxiliary tables:
-  // an edit is not a complete pass (which would also make the headers and
-  // the footers of all the pages again), unless it is the first typesetting
+  // Typeset again, the block makes again the lines which changed only, and
+  // it has no labels nor entries of the auxiliary tables: an edit is not a
+  // complete pass (which would also make the headers and the footers of all
+  // the pages again), unless it is the first typesetting
   return (status & VALID_MASK) == CORRUPTED && version == 0;
 }
 
@@ -289,25 +397,32 @@ same_code_stack (array<page_item> l1, array<page_item> l2) {
   return true;
 }
 
-array<int>
-bridge_code_rep::row_starts (tree t, font fn, SI width, SI cw,
-                             std::unordered_map<void*,code_wrap>& next) {
-  // the starts of the rows of a line (only lines which may be too wide are
-  // measured: a character is at most cw wide, also <...>)
-  static array<int> one_row;
-  if (N(one_row) == 0) one_row << 0;
-  if (!is_atomic (t) || (SI) N(t->label) * cw <= width) return one_row;
-  void* key= (void*) t.operator-> ();
-  auto f= wraps.find (key);
-  if (f != wraps.end () && same_text (f->second.text, t->label)) {
-    next[key]= f->second;
-    return f->second.starts;
-  }
-  code_wrap w;
-  w.text  = t->label;
-  w.starts= code_breaks (t->label, fn, width);
-  next[key]= w;
-  return w.starts;
+code_rec
+bridge_code_rep::line_rec (tree& t, font fn, SI width, SI cw,
+                           unsigned long long wsig, bool always) {
+  // a record of the line, made when it is needed (only for lines which may
+  // be too wide, or with markup, unless always: a character is at most cw
+  // wide, also <...>)
+  bool plain= is_atomic (t);
+  if (!always && plain && (SI) N(t->label) * cw <= width) return code_rec ();
+  code_rec r (true);
+  code_records_made++;
+  r->line= t;
+  r->text= (plain? t->label: string (""));
+  r->wsig= wsig;
+  if (plain && (SI) N(t->label) * cw > width)
+    r->starts= code_breaks (t->label, fn, width);
+  else r->starts << 0;
+  return r;
+}
+
+static inline bool
+same_rec (code_rec r, tree& t, unsigned long long wsig) {
+  // (the line is the same tree, with the same string)
+  return !is_nil (r) && r->wsig == wsig &&
+         r->line.operator-> () == t.operator-> () &&
+         (!is_atomic (t) ||
+          r->text.operator-> () == t->label.operator-> ());
 }
 
 /******************************************************************************
@@ -352,32 +467,57 @@ bridge_code_rep::my_typeset (int desired_status) {
     }
   }
 
-  // the soft line breaks are kept for the same font and width
+  // the records of the lines, where the notifications left them: made again
+  // for the lines which changed, or all when their places are not known
   unsigned long long wsig= sig_mix (sig_mix (0x2545F4914F6CDD1DULL,
                                              (unsigned long long) width),
                                     (unsigned long long)
                                     (void*) fn.operator-> ());
-  if (wsig != wraps_sig) wraps.clear ();
-  wraps_sig= wsig;
+  if (!recs_ok || N(recs) != n || typeset_caches_mode () == 0) {
+    recs= array<code_rec> (n);
+    recs_ok= true;
+  }
+  bool paper= ttt->paper && n >= 4 && typeset_caches_mode () != 0;
+  for (int i=0; i<n; i++) {
+    tree& t= doc[i];
+    if (same_rec (recs[i], t, wsig)) continue;
+    recs[i]= line_rec (t, fn, width, cw, wsig, paper);
+  }
+  if (typeset_caches_mode () == 2) {
+    // check: the records as they are made from the lines
+    int made= code_records_made;
+    for (int i=0; i<n; i++) {
+      code_rec r= line_rec (doc[i], fn, width, cw, wsig, paper);
+      bool same= (is_nil (r) == is_nil (recs[i]));
+      if (same && !is_nil (r))
+        same= recs[i]->line.operator-> () == doc[i].operator-> () &&
+              recs[i]->starts == r->starts;
+      if (!same) {
+        typeset_cache_mismatch ("records of the lines of code");
+        recs[i]= r;
+      }
+    }
+    code_records_made= made; // (the count is the one without the check)
+  }
 
-  if (ttt->paper && n >= 4 && typeset_caches_mode () != 0) {
-    typeset_paper (doc, fn, env->pen, env->lan, cols, width, cw);
+  if (paper) {
+    typeset_paper (doc, fn, env->pen, env->lan, cols, width, cw, wsig);
     return;
   }
-  lines.clear ();
   first.b= box ();
   last.b= box ();
-  std::unordered_map<void*,code_wrap> next;
+  array<array<int> > one_row (1);
+  one_row[0] << 0;
   array<array<box> > pars;
   if (ttt->paper)
     for (int i=0; i<n; i++) {
-      array<int> st= row_starts (doc[i], fn, width, cw, next);
+      array<int> st= (is_nil (recs[i])? one_row[0]: recs[i]->starts);
       path lip= descend (descend (ip, 0), i);
-      int len= (is_atomic (doc[i])? N(doc[i]->label): 0);
+      string text= (is_atomic (doc[i])? doc[i]->label: string (""));
       array<box> rows;
       for (int r=0; r<N(st); r++)
-        rows << code_row_box (lip, doc[i], st[r],
-                              r+1 < N(st)? st[r+1]: len,
+        rows << code_row_box (lip, doc[i], text, st[r],
+                              r+1 < N(st)? st[r+1]: N(text),
                               fn, env->pen, env->lan, cols, width);
       pars << rows;
     }
@@ -387,17 +527,20 @@ bridge_code_rep::my_typeset (int desired_status) {
     SI height= env->as_length (string ("1fn")) + env->get_length (PAR_SEP);
     SI pitch = height + env->get_vspace (PAR_PAR_SEP)->def;
     SI rpitch= height + env->get_vspace (PAR_LINE_SEP)->def;
-    hashmap<int,array<int> > ws;
-    for (int i=0; i<n; i++) {
-      array<int> st= row_starts (doc[i], fn, width, cw, next);
-      if (N(st) > 1) ws (i)= st;
-    }
+    array<int> tall_k;
+    array<string> tall_txt;
+    array<array<int> > tall_st;
+    for (int i=0; i<n; i++)
+      if (!is_nil (recs[i]) && N(recs[i]->starts) > 1) {
+        tall_k << i;
+        tall_txt << recs[i]->text;
+        tall_st << recs[i]->starts;
+      }
     array<box> one;
     one << code_box (ip, doc, 0, n, fn, env->pen, env->lan, cols,
-                     pitch, rpitch, ws, width);
+                     pitch, rpitch, tall_k, tall_txt, tall_st, width);
     pars << one;
   }
-  wraps.swap (next);
   typeset_paragraphs (pars);
 }
 
@@ -438,10 +581,10 @@ bridge_code_rep::end_paragraph (code_end& e, array<box> rows,
 
 void
 bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
-                                hashmap<string,color> cols, SI width, SI cw) {
+                                hashmap<string,color> cols, SI width, SI cw,
+                                unsigned long long wsig) {
   int n= N(doc);
   path dip= descend (ip, 0);
-  std::unordered_map<void*,code_wrap> next_wraps;
   auto line_path= [&] (int i) -> path {
     // the path which the line keeps, renumbered in place by the editor
     path lip= obtain_ip (doc[i]);
@@ -450,11 +593,14 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     return lip;
   };
   auto make_rows= [&] (int i, path lip) -> array<box> {
-    array<int> st= row_starts (doc[i], fn, width, cw, next_wraps);
-    int len= (is_atomic (doc[i])? N(doc[i]->label): 0);
+    // the boxes of the rows of the line i (it has a record: see my_typeset)
+    code_rec r= recs[i];
+    array<int> st= r->starts;
+    int len= N(r->text);
     array<box> rows;
-    for (int r=0; r<N(st); r++)
-      rows << code_row_box (lip, doc[i], st[r], r+1 < N(st)? st[r+1]: len,
+    for (int k=0; k<N(st); k++)
+      rows << code_row_box (lip, doc[i], r->text, st[k],
+                            k+1 < N(st)? st[k+1]: len,
                             fn, pen, lan, cols, width);
     code_rows_made += N(rows);
     return rows;
@@ -474,7 +620,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
   // and the others as the middle one
   #define CODE_TPL 5
   path lip1= line_path (1);
-  int  len1= (is_atomic (doc[1])? N(doc[1]->label): 0);
+  string text1= recs[1]->text;
   path eip = decorate_middle (ip);
   array<array<page_item> > T (CODE_TPL + 1);
   array<stack_border> TS (CODE_TPL + 1);
@@ -484,7 +630,8 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     // (a box is placed in one phrase box only: its place is in the box)
     array<box> rs;
     for (int r=0; r<R; r++)
-      rs << code_row_box (lip1, doc[1], 0, len1, fn, pen, lan, cols, width);
+      rs << code_row_box (lip1, doc[1], text1, 0, N(text1), fn, pen, lan,
+                          cols, width);
     code_paragraph (env, ip, rs, array<line_item> (), array<line_item> (),
                     T[R], TS[R]);
     ok= (N(T[R]) == R);
@@ -498,9 +645,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     }
   }
   if (!ok) {
-    lines.clear ();
     all_paragraphs ();
-    wraps.swap (next_wraps);
     return;
   }
   page_item tpl= T[1][0];
@@ -525,7 +670,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
 
   // what the lines share
   unsigned long long sig= 0x84222325CBF29CE4ULL;
-  sig= sig_mix (sig, wraps_sig);
+  sig= sig_mix (sig, wsig);
   sig= sig_mix (sig, (unsigned long long) pen->get_color ());
   sig= sig_mix (sig, (unsigned long long) pen->get_width ());
   sig= sig_mix (sig, (unsigned long long) (void*) lan.operator-> ());
@@ -547,8 +692,6 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
   }
   sig= sig_mix (sig, (unsigned long long) tpl->type);
   sig= sig_mix (sig, (unsigned long long) tpl->nr_cols);
-  sig= sig_mix (sig, (unsigned long long) (long long) tpl->penalty);
-  sig= sig_space (sig, tpl->spc);
   for (int R=1; R<=CODE_TPL; R++) {
     for (int r=0; r<R; r++) {
       sig= sig_space (sig, T[R][r]->spc);
@@ -557,76 +700,54 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     sig= sig_space (sig, mid[R]->spc);
     sig= sig_mix (sig, (unsigned long long) (long long) mid[R]->penalty);
   }
-  if (sig != lines_sig) {
-    lines.clear ();
-    first.b= box ();
-    last.b= box ();
-  }
-  lines_sig= sig;
+  if (sig == 0) sig= 1; // (0: the rows of a record were not made)
 
-  // the lines, made again when they changed
-  std::unordered_map<void*,code_line> next;
-  next.reserve (n);
-  code_line scratch; // (a line with markup, which is not kept)
-  auto get= [&] (int i) -> code_line& {
-    tree& t= doc[i];
-    void* key= (void*) t.operator-> ();
+  // the rows of the line i, made again when the line or what they share
+  // changed (or the path of the line: then it is not the one of the editor)
+  auto get= [&] (int i) -> code_rec {
+    code_rec r= recs[i];
     path lip= line_path (i);
-    if (is_atomic (t)) {
-      auto f= lines.find (key);
-      if (f != lines.end () && same_text (f->second.text, t->label) &&
-          f->second.rows[0]->ip == lip) {
-        code_line& r= next[key];
-        r= f->second;
-        // (the soft line breaks of the line are kept with it)
-        (void) row_starts (t, fn, width, cw, next_wraps);
-        return r;
-      }
+    if (r->psig == sig && N(r->rows) > 0 && r->lip == lip) return r;
+    r->psig= sig;
+    r->lip = lip;
+    r->rows= make_rows (i, lip);
+    r->bs  = array<box> ();
+    r->its = array<page_item> ();
+    int R= N(r->rows);
+    for (int k=0; k<R; k++) {
+      box b= make_phrase (k == 0? ph_first: ph_rest, r->rows[k], eip);
+      r->bs << b;
+      page_item ri= row_item (R, k, false);
+      r->its << page_item (tpl->type, b, ri->spc, ri->penalty,
+                           tpl->fl, tpl->nr_cols, tpl->t);
     }
-    code_line c;
-    c.line= t;
-    c.text= (is_atomic (t)? t->label: string ("<markup>"));
-    c.rows= make_rows (i, lip);
-    int R= N(c.rows);
-    for (int r=0; r<R; r++) {
-      box b= make_phrase (r == 0? ph_first: ph_rest, c.rows[r], eip);
-      c.bs  << b;
-      page_item ri= row_item (R, r, false);
-      c.its << page_item (tpl->type, b, ri->spc, ri->penalty,
-                          tpl->fl, tpl->nr_cols, tpl->t);
-    }
-    if (!is_atomic (t)) { scratch= c; return scratch; }
-    code_line& r= next[key];
-    r= c;
     return r;
   };
 
   // the first line, with the line items before, and the line 1
   array<page_item> l0;
   stack_border sb0;
-  end_paragraph (first, get (0).rows, ttt->a, array<line_item> (), l0, sb0);
+  end_paragraph (first, get (0)->rows, ttt->a, array<line_item> (), l0, sb0);
   ttt->insert_stack (l0, sb0);
-  ttt->insert_stack (get (1).its, sb1);
+  ttt->insert_stack (get (1)->its, sb1);
   // the lines between, already stacked (merge_stack would only shove them
   // as the line 1 was: their borders and their heights are the same)
-  for (int i=2; i<n-2; i++) ttt->l << get (i).its;
+  for (int i=2; i<n-2; i++) ttt->l << get (i)->its;
   // the line before the last: its last row as a line alone, which the last
   // paragraph shoves
   if (n-2 >= 2) {
-    code_line& c= get (n-2);
-    int R= N(c.its);
-    for (int r=0; r+1<R; r++) ttt->l << c.its[r];
+    code_rec r= get (n-2);
+    int R= N(r->its);
+    for (int k=0; k+1<R; k++) ttt->l << r->its[k];
     page_item ri= row_item (R, R-1, true);
-    ttt->l << page_item (tpl->type, c.bs[R-1], ri->spc, ri->penalty,
+    ttt->l << page_item (tpl->type, r->bs[R-1], ri->spc, ri->penalty,
                          tpl->fl, tpl->nr_cols, tpl->t);
   }
   // the last line, with the line items after
   array<page_item> ln;
   stack_border sbn;
-  end_paragraph (last, get (n-1).rows, array<line_item> (), ttt->b, ln, sbn);
+  end_paragraph (last, get (n-1)->rows, array<line_item> (), ttt->b, ln, sbn);
   ttt->insert_stack (ln, sbn);
-  lines.swap (next);
-  wraps.swap (next_wraps);
 
   if (typeset_caches_mode () == 2) {
     // check: every line as a paragraph, stacked one after the other
@@ -634,11 +755,9 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     stack_border     fast_sb= ttt->sb;
     ttt->l = array<page_item> ();
     ttt->sb= stack_border ();
-    std::unordered_map<void*,code_wrap> saved= wraps;
     int made= code_rows_made;
     all_paragraphs ();
     code_rows_made= made; // (the count is the one without the check)
-    wraps= saved;
     if (!same_code_stack (fast_l, ttt->l))
       typeset_cache_mismatch ("lines of code used again");
     ttt->l = fast_l;

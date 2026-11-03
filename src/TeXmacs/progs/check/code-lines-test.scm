@@ -273,6 +273,48 @@
           (step (lambda () (insert "Q")))
           (check-true (<= (- (typeset-code-rows-made) n0) 8)))))))
 
+;; The records of the lines (their soft line breaks) follow the lines when
+;; lines are inserted, removed, split and joined (the notifications of the
+;; editor, see bridge_code.cpp): an edit makes the record of the line which
+;; changed only, also for the wrapped lines after it
+(define (test-records)
+  (check-group "records of the lines")
+  (let* ((many (map (lambda (i)
+                      (if (== (modulo i 10) 3) soft-line
+                          (string-append "  line " (number->string i) ";")))
+                    (.. 0 100)))
+         (doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document ,@many))))))
+    (with-body doc
+      (lambda ()
+        (init-env "page-medium" "papyrus")
+        (step (lambda () #t))
+        (let ((made (lambda (thunk)
+                      (let ((n0 (typeset-code-records-made)))
+                        (step thunk)
+                        (- (typeset-code-records-made) n0)))))
+          (go-to (at 0 4 0 1 3))
+          (step (lambda () #t))
+          ;; a key in a short line, Return, a key in the new line, joining
+          ;; it again, removing a wrapped line: no record made again but
+          ;; for a wrapped line which changed
+          (check= (made (lambda () (insert "Q"))) 0)
+          (check= (made insert-return) 0)
+          (check= (made (lambda () (insert "R"))) 0)
+          (check= (made (lambda () (kbd-backspace) (kbd-backspace))) 0)
+          (check= (tree->string (path->tree (at 0 4 0 1))) "  lQine 1;")
+          (go-to (at 0 4 0 13 4))
+          (step (lambda () #t))
+          (check= (made (lambda () (insert "S"))) 1)
+          (check= (made insert-return) 1)
+          (check= (made kbd-backspace) 1)
+          (check= (tree->string (path->tree (at 0 4 0 13)))
+                  (string-append (substring soft-line 0 4) "S"
+                                 (substring soft-line 4
+                                            (string-length soft-line))))
+          ;; the same document typeset from the start has the same rows
+          (check= (typeset-check-mismatches) mismatches))))))
+
 (define (test-export)
   (check-group "export and import")
   (with-body (code-doc)
@@ -307,6 +349,7 @@
   (test-paper-edits)
   (test-wrapping)
   (test-rows-made)
+  (test-records)
   (test-export)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph

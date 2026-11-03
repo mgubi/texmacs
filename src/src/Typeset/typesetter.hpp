@@ -66,6 +66,8 @@ int get_typeset_redone ();
 // the rows of code-lines made in paper mode since the start (and not used
 // again: see bridge_code.cpp), for the tests
 int get_code_rows_made ();
+// and the records of their lines (without the check mode)
+int get_code_records_made ();
 // (the one place where bridges typeset again are counted: for both counters)
 void typeset_count_redone (int n);
 int get_typeset_check_mismatches ();

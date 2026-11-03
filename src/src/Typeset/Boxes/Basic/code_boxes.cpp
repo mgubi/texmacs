@@ -15,10 +15,9 @@
 #include "Boxes/construct.hpp"
 #include "analyze.hpp"
 #include "colors.hpp"
-#include "iterator.hpp"
 
 /******************************************************************************
-* A code box shows the lines [i0, i1) of a document of strings (the child of
+* A code box shows the lines i0, i0+1... of a document of strings (the child of
 * <code-lines|<document|line|...>>) as one box, without a box per line or per
 * token, and nothing is made for a line until it is drawn or the cursor is
 * in it. Its box paths are (k, pos): the line i0+k of the document, at the
@@ -27,8 +26,8 @@
 * A line which is wider than the box is broken into rows (soft line breaks):
 * after the last space which fits, or where the row is full when a word does
 * not fit (code_breaks). The box has the starts of the rows of these lines
-* only (wraps, by the number of the line), and the number of rows before
-* each line (before). The rows of a line are 'rpitch' from each other (the
+* only (tall_k, tall_st: a sorted list), and the depth which their rows add
+* before each of them (tall_cum). The rows of a line are 'rpitch' from each other (the
 * lines of a paragraph), the lines 'pitch' (the paragraphs of a document);
 * the first baseline is at 0.
 *
@@ -37,6 +36,10 @@
 * asked to the language when a line is drawn, from the start of the line,
 * and kept for the last lines drawn (code_runs: a very long line, as in a
 * minified file, is drawn row after row).
+*
+* An edit changes the tree before the next typesetting: the box keeps the
+* texts of the wrapped lines with their rows, and draws the other lines as
+* they are (a line has one row whatever its text), and none past the end.
 *
 * A box of one row (in paper mode, see bridge_code.cpp: the rows are the
 * lines of the page) holds the line itself, and its path is the one which
@@ -145,49 +148,94 @@ get_code_runs (tree t, language lan, font fn) {
   return c;
 }
 
+static code_runs&
+plain_code_runs (string s, font fn) {
+  static code_runs c;
+  c.key= NULL; c.text= s; c.lan= NULL; c.gen= -1;
+  int n= N(s);
+  c.xpos= array<SI> (n+1);
+  if (n > 0) fn->get_xpositions (s, A(c.xpos));
+  else c.xpos[0]= 0;
+  c.start= array<int> (); c.end= array<int> (); c.col= array<string> ();
+  c.start << 0; c.end << n; c.col << string ("");
+  return c;
+}
+
 /******************************************************************************
 * The boxes
 ******************************************************************************/
 
+static array<int>
+code_one_row () {
+  static array<int> r;
+  if (N(r) == 0) r << 0;
+  return r;
+}
+
 struct code_box_rep: public box_rep {
-  tree     doc;    // the document of lines
-  int      i0, i1; // the lines shown
+  tree     doc;    // the document of the lines (or the line: single)
+  int      i0, n;  // the lines i0, ..., i0+n-1 of doc
   font     fn;
   pencil   pen;
   language lan;
   hashmap<string,color> cols; // the colours given as variables
   SI       pitch;  // the distance between two lines,
   SI       rpitch; // and between two rows of a line
-  hashmap<int,array<int> > wraps; // the starts of the rows of the lines
-                                  // which have several (by i0+k)
-  array<int> before; // the rows before the line k (k <= n), or empty
-  bool     single; // one row of the line 'one', [ra, rb) (and ip its path)
-  tree     one;
-  int      ra, rb;
+  // the lines which have several rows (by their number in the box, in
+  // order), their texts and the starts of their rows when the box was made,
+  // and the depth which the rows add before each of them (and in all:
+  // tall_cum[N(tall_k)])
+  array<int>         tall_k;
+  array<string>      tall_txt;
+  array<array<int> > tall_st;
+  array<long long>   tall_cum;
+  bool     single; // one row [ra, rb) of the line doc (and ip is its path),
+  int      ra, rb; // whose text was one_text
+  string   one_text;
 
-  code_box_rep (path ip, tree doc, int i0, int i1, font fn, pencil pen,
-                language lan, hashmap<string,color> cols, SI pitch,
-                SI rpitch, hashmap<int,array<int> > wraps, SI width);
-  code_box_rep (path lip, tree one, int ra, int rb, font fn, pencil pen,
-                language lan, hashmap<string,color> cols, SI width);
+  code_box_rep (path ip, tree doc, int i0, int n,
+                font fn, pencil pen, language lan,
+                hashmap<string,color> cols, SI pitch, SI rpitch,
+                array<int> tall_k, array<string> tall_txt,
+                array<array<int> > tall_st, SI width);
+  code_box_rep (path lip, tree one, string text, int ra, int rb, font fn,
+                pencil pen, language lan, hashmap<string,color> cols,
+                SI width);
   operator tree () { return "code lines"; }
 
-  // lines and rows
-  int    nr_lines () { return single? 1: i1 - i0; }
-  tree   line_tree (int k) { return single? one: doc[i0+k]; }
+  // lines and rows. The tree changes before the next typesetting: the box
+  // draws the wrapped lines as they were (their rows), and the others as
+  // they are, as long as they are there
+  int    nr_lines () { return n; }
+  tree   line_tree (int k) {
+    if (single) return doc;
+    int i= i0 + k;
+    return (i < N(doc)? doc[i]: tree ("")); }
   string line (int k) {
+    if (single) return one_text;
+    int j= tall_lower (k);
+    if (j < N(tall_k) && tall_k[j] == k) return tall_txt[j];
     tree t= line_tree (k);
     return is_atomic (t)? t->label: string (""); }
   path   line_ip (int k) {
     return single? ip: descend (descend (ip, 0), i0+k); }
+  int    tall_lower (int k) {
+    // the number of the lines with several rows before the line k
+    int lo= 0, hi= N(tall_k);
+    while (lo < hi) {
+      int mid= (lo + hi) / 2;
+      if (tall_k[mid] < k) lo= mid + 1; else hi= mid;
+    }
+    return lo; }
   array<int> starts (int k) {
     if (single) { array<int> r; r << ra; return r; }
-    if (wraps->contains (i0+k)) return wraps[i0+k];
-    array<int> r; r << 0; return r; }
+    int j= tall_lower (k);
+    if (j < N(tall_k) && tall_k[j] == k) return tall_st[j];
+    return code_one_row (); }
   int    nr_rows (int k) {
-    if (single || !wraps->contains (i0+k)) return 1;
-    return N(wraps[i0+k]); }
-  int    rows_before (int k) { return N(before) == 0? k: before[k]; }
+    if (single) return 1;
+    int j= tall_lower (k);
+    return (j < N(tall_k) && tall_k[j] == k)? N(tall_st[j]): 1; }
   int    row_end (int k, int i) {
     if (single) return rb;
     array<int> st= starts (k);
@@ -199,8 +247,8 @@ struct code_box_rep: public box_rep {
     return i; }
   // the depth of the baseline of the row i of the line k below the first
   long long depth (int k, int i) {
-    return (long long) (rows_before (k) - k + i) * rpitch +
-           (long long) k * pitch; }
+    long long extra= (N(tall_cum) == 0? 0: tall_cum[tall_lower (k)]);
+    return (long long) k * pitch + extra + (long long) i * rpitch; }
   SI     base (int k, int i) { return (SI) -depth (k, i); }
   void   row_at (SI y, int& k, int& i);
   box    row_box (int k, int i) {
@@ -225,26 +273,22 @@ struct code_box_rep: public box_rep {
   selection find_selection (path lbp, path rbp);
 };
 
-code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int i12, font fn2,
+code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
                             pencil pen2, language lan2,
                             hashmap<string,color> cols2, SI pitch2,
-                            SI rpitch2, hashmap<int,array<int> > wraps2,
-                            SI width):
-  box_rep (ip2), doc (doc2), i0 (i02), i1 (max (i12, i02+1)),
+                            SI rpitch2, array<int> tall_k2,
+                            array<string> tall_txt2,
+                            array<array<int> > tall_st2, SI width):
+  box_rep (ip2), doc (doc2), i0 (i02), n (max (n2, 1)),
   fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (pitch2),
-  rpitch (rpitch2), wraps (wraps2), single (false), ra (0), rb (0)
+  rpitch (rpitch2), tall_k (tall_k2), tall_txt (tall_txt2),
+  tall_st (tall_st2), single (false), ra (0), rb (0)
 {
-  int n= nr_lines ();
-  bool wrapped= false;
-  iterator<int> it= iterate (wraps);
-  while (it->busy ()) {
-    int i= it->next ();
-    if (i >= i0 && i < i1) { wrapped= true; break; }
-  }
-  if (wrapped) {
-    before= array<int> (n+1);
-    before[0]= 0;
-    for (int k=0; k<n; k++) before[k+1]= before[k] + nr_rows (k);
+  if (N(tall_k) > 0) {
+    tall_cum= array<long long> (N(tall_k) + 1);
+    tall_cum[0]= 0;
+    for (int j=0; j<N(tall_k); j++)
+      tall_cum[j+1]= tall_cum[j] + (long long) (N(tall_st[j]) - 1) * rpitch;
   }
   x1= x3= 0;
   x2= x4= width;
@@ -252,12 +296,12 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int i12, font fn2,
   y2= y4= fn->y2;
 }
 
-code_box_rep::code_box_rep (path lip, tree one2, int ra2, int rb2, font fn2,
-                            pencil pen2, language lan2,
+code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
+                            int rb2, font fn2, pencil pen2, language lan2,
                             hashmap<string,color> cols2, SI width):
-  box_rep (lip), doc (tree (DOCUMENT)), i0 (0), i1 (1),
+  box_rep (lip), doc (one), i0 (0), n (1),
   fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (0), rpitch (0),
-  single (true), one (one2), ra (ra2), rb (rb2)
+  single (true), ra (ra2), rb (rb2), one_text (text)
 {
   x1= x3= 0;
   x2= x4= width;
@@ -298,10 +342,12 @@ code_box_rep::subbox (int k) {
     b->x0= 0; b->y0= 0;
     return b;
   }
-  hashmap<int,array<int> > w;
-  if (wraps->contains (i0+k)) w (i0+k)= wraps[i0+k];
-  box b= tm_new<code_box_rep> (ip, doc, i0+k, i0+k+1, fn, pen, lan, cols,
-                               pitch, rpitch, w, x2);
+  array<int> tk;
+  array<string> tt;
+  array<array<int> > ts;
+  if (nr_rows (k) > 1) { tk << 0; tt << line (k); ts << starts (k); }
+  box b= tm_new<code_box_rep> (ip, doc, i0+k, 1, fn, pen, lan, cols,
+                               pitch, rpitch, tk, tt, ts, x2);
   b->x0= 0; b->y0= base (k, 0);
   return b;
 }
@@ -320,9 +366,12 @@ code_box_rep::display (renderer ren) {
   color fg= pen->get_color ();
   for (int k= ka; k <= kb; k++) {
     tree t= line_tree (k);
-    if (!is_atomic (t) || N(t->label) == 0) continue;
-    code_runs& c= get_code_runs (t, lan, fn);
-    string s= t->label;
+    string s= line (k);
+    if (!is_atomic (t) || N(s) == 0) continue;
+    // (the line changed since the box was made: drawn as it was, without
+    // colours, until it is typeset again)
+    code_runs& c= (same_text (t->label, s)? get_code_runs (t, lan, fn):
+                                            plain_code_runs (s, fn));
     array<int> st= starts (k);
     int lo= (k == ka? ia: 0), hi= (k == kb? ib: N(st) - 1);
     for (int i= lo; i <= hi && i < N(st); i++) {
@@ -395,7 +444,7 @@ code_box_rep::find_box_path (path p, bool& found) {
   }
   if (N(p) == N(me) + 3 && path_up (p, 3) == me && p[N(me)] == 0) {
     int i= p[N(me)+1], pos= last_item (p);
-    if (i >= i0 && i < i1) {
+    if (i >= i0 && i < i0 + nr_lines ()) {
       found= true;
       return path (i - i0, max (0, min (pos, N (line (i - i0)))));
     }
@@ -471,15 +520,19 @@ code_box_rep::find_selection (path lbp, path rbp) {
 ******************************************************************************/
 
 box
-code_box (path ip, tree doc, int i0, int i1, font fn, pencil pen,
+code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
           language lan, hashmap<string,color> cols, SI pitch, SI rpitch,
-          hashmap<int,array<int> > wraps, SI width) {
-  return tm_new<code_box_rep> (ip, doc, i0, i1, fn, pen, lan, cols,
-                               pitch, rpitch, wraps, width);
+          array<int> tall_k, array<string> tall_txt,
+          array<array<int> > tall_st, SI width) {
+  return tm_new<code_box_rep> (ip, doc, i0, n, fn, pen, lan, cols,
+                               pitch, rpitch, tall_k, tall_txt, tall_st,
+                               width);
 }
 
 box
-code_row_box (path lip, tree line, int a, int b, font fn, pencil pen,
-              language lan, hashmap<string,color> cols, SI width) {
-  return tm_new<code_box_rep> (lip, line, a, b, fn, pen, lan, cols, width);
+code_row_box (path lip, tree line, string text, int a, int b, font fn,
+              pencil pen, language lan, hashmap<string,color> cols,
+              SI width) {
+  return tm_new<code_box_rep> (lip, line, text, a, b, fn, pen, lan, cols,
+                               width);
 }
