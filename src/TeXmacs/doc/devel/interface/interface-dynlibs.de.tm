@@ -150,11 +150,11 @@
     </framed-fragment>
   </quotation>
 
-  so dass <verbatim|dynlink.cpp> zu einer dynamisch linkbaren Datei (DLL)
+  so dass <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp> zu einer dynamisch linkbaren Datei (DLL)
   <verbatim|dynlink/lib/libdynlink.so> kompiliert wird. Die <verbatim|tmsrc>
   Variable sollte so gesetzt sein, dass die include-Datei
-  <verbatim|TeXmacs.h> gefunden wird. Die Konfigurations-Datei
-  <verbatim|init-dynlink.scm> enthält die folgenden Zeilen
+  <source-link|TeXmacs.h|TeXmacs/include/TeXmacs.h> gefunden wird. Die Konfigurations-Datei
+  <source-link|init-dynlink.scm|TeXmacs/examples/plugins/dynlink/progs/init-dynlink.scm> enthält die folgenden Zeilen
 
   <\scheme-fragment>
     (plugin-configure dynlink
@@ -168,7 +168,7 @@
     \ \ (:session "Dynlink"))
   </scheme-fragment>
 
-  Die <value|cpp> Datei <verbatim|dynlink.cpp> enthält die Zeichenkette
+  Die <value|cpp> Datei <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp> enthält die Zeichenkette
 
   <\cpp-fragment>
     static char* output= NULL;

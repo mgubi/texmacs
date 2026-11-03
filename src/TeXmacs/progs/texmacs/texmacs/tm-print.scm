@@ -107,6 +107,49 @@
         (buffer-close buf))
       (print-to-file fname)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A PDF with a password (the MuPDF renderer only, see pdf-encryption?)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (pdf-encryption?)
+  ;; whether the PDF will be written by the MuPDF renderer, which encrypts
+  ;; (as use_mupdf_pdf in edit_main.cpp): anything else would ignore the
+  ;; passwords and write a PDF which is not protected
+  (and (supports-native-pdf?)
+       (or (== (getenv "TEXMACS_PDF_MUPDF") "1")
+           (== (get-preference "native pdf renderer") "mupdf"))))
+
+(define pdf-password-target #f)
+
+(tm-define (print-to-pdf-with-password upw opw perm)
+  (:synopsis "Export to a PDF which asks for a password")
+  (:argument upw "password" "Password to open the PDF")
+  (:argument opw "password" "Owner password, which lifts the restrictions (empty: the same)")
+  (:argument perm "string" "Allowed without it (all, or print, copy, modify, annotate...)")
+  (:proposals perm '("all" "print,copy" "print" "none"))
+  ;; The passwords go to the renderer through the environment, for this one
+  ;; export only (mupdf_pdf_renderer.cpp, pdf_encryption): neither the
+  ;; preferences nor the document keep them, which would put them on the
+  ;; disk in clear.
+  (when pdf-password-target
+    (let ((fname pdf-password-target)
+          (clear (lambda ()
+                   (system-setenv "TEXMACS_PDF_USER_PASSWORD" "")
+                   (system-setenv "TEXMACS_PDF_OWNER_PASSWORD" "")
+                   (system-setenv "TEXMACS_PDF_PERMISSIONS" ""))))
+      (set! pdf-password-target #f)
+      (dynamic-wind
+        (lambda ()
+          (system-setenv "TEXMACS_PDF_USER_PASSWORD" upw)
+          (system-setenv "TEXMACS_PDF_OWNER_PASSWORD" opw)
+          (system-setenv "TEXMACS_PDF_PERMISSIONS" perm))
+        (lambda () (wrapped-print-to-file fname))
+        clear))))
+
+(tm-define (choose-pdf-with-password fname)
+  (set! pdf-password-target fname)
+  (interactive print-to-pdf-with-password))
+
 (tm-define (wrapped-print-to-pdf-embeded-with-tm fname)
     (unless (string=? (url-suffix fname) "pdf")
       (texmacs-error "Wrapped-print-to-pdf-embeded-with-tm" "fname is not a pdf"))
@@ -130,16 +173,56 @@
       (unless (attach-doc-to-exported-pdf fname)
           (notify-now "Fail to attach tm to pdf")))))
 
+(define (pdf-embedded-name s)
+  ;; a linked file by its name alone, when it is given by a path
+  (if (or (string-index s #\/) (string-index s #\\))
+      (url->string (url-tail (system->url s)))
+      s))
+
+(define (pdf-embedded-bare-names s)
+  ;; The copy of the document which goes into the PDF names the files it
+  ;; links to by their names alone: they go in next to it, and come out
+  ;; next to it (wrapped-import-pdf-embeded-with-tm), in either build. The
+  ;; paths pdf-replace-linked-path leaves are the author's, absolute ones --
+  ;; they worked, but every PDF told where the author's files are kept.
+  ;; On the stree, and a new one made: a subtree of a tree which is in no
+  ;; buffer cannot be assigned (tree-assign only rebinds it).
+  (cond ((not (pair? s)) s)
+        ((and (in? (car s) '(image include)) (pair? (cdr s)) (string? (cadr s)))
+         (cons* (car s) (pdf-embedded-name (cadr s))
+                (map pdf-embedded-bare-names (cddr s))))
+        ((and (== (car s) 'style) (pair? (cdr s)))
+         (with a (cadr s)
+           (cons* 'style
+                  (cond ((string? a) (pdf-embedded-name a))
+                        ((and (pair? a) (== (car a) 'tuple))
+                         (cons 'tuple
+                               (map (lambda (x)
+                                      (if (string? x) (pdf-embedded-name x) x))
+                                    (cdr a))))
+                        (else a))
+                  (cddr s))))
+        (else (cons (car s) (map pdf-embedded-bare-names (cdr s))))))
+
 (tm-define (attach-doc-to-exported-pdf fname)
+  ;; The document goes in with its linked files (images, included documents,
+  ;; styles of its own), and the copy which goes in names them by their file
+  ;; names alone (pdf-embedded-bare-names), which is where they come out.
+  ;; It is given a copy of the document, since it changes the tree it is
+  ;; given in place -- given the tree of the buffer, it rewrote the paths of
+  ;; the open document, behind the editor's back, and the next save kept
+  ;; them -- and it is that copy which goes in.
   (let* ((tem-url (buffer-new))
          (new-url (url-relative tem-url (string-append (url-basename fname) ".tm")))
          (cur-url (current-buffer-url))
-         (cur-tree (buffer-get cur-url))
+         (cur-tree (tree-copy (buffer-get cur-url)))
          (linked-file (pdf-get-linked-file-paths cur-tree cur-url))
          (linked-file-with-main (array-url-append new-url linked-file))
          (new-tree (pdf-replace-linked-path cur-tree cur-url)))
     (buffer-rename tem-url new-url)
     (buffer-copy cur-url new-url)
+    (buffer-set new-url
+                (stree->tree (pdf-embedded-bare-names (tree->stree new-tree))))
     ;; copy also attachments and auxiliary data
     (with-buffer cur-url
       (let* ((attl (list-attachments)) 
@@ -184,36 +267,67 @@
   (:argument  last "Last page")
   (:proposals last  (list (number->string (get-page-count)) "")))
 
+(tm-define (preview-command-line s)
+  (:synopsis "The shell command which shows the file @s, or #f if none")
+  ;; s comes from url-sys-concretize, which already escapes it for the
+  ;; shell (escape_sh): it is passed as it is
+  (cond ((!= preview-command "default")
+         (string-append preview-command " " s " &"))
+        ((or (os-mingw?) (os-win32?)) s)
+        ((os-macos?) (string-append "open " s))
+        ((url-exists-in-path? "xdg-open")
+         (string-append "xdg-open " s))
+        ((url-exists-in-path? "ggv") (string-append "ggv " s " &"))
+        ((url-exists-in-path? "ghostview") (string-append "ghostview " s " &"))
+        ((url-exists-in-path? "gv") (string-append "gv " s " &"))
+        (else #f)))
+
 (tm-define (preview-file u)
-  (with s (url-sys-concretize u)
-    (cond ((!= preview-command "default")
-           (shell (string-append preview-command " " s " &")))
-          ((or (os-mingw?) (os-win32?))
-           (shell s))
-          ((os-macos?)
-           (shell (string-append "open " s)))
-          ((url-exists-in-path? "xdg-open")
-           (shell (string-append "xdg-open " s)))
-          ((url-exists-in-path? "ggv")
-           (shell (string-append "ggv " s " &")))
-          ((url-exists-in-path? "ghostview")
-           (shell (string-append "ghostview " s " &")))
-          ((url-exists-in-path? "gv")
-           (shell (string-append "gv " s " &")))
+  (let* ((s (url-sys-concretize u))
+         (cmd (and (not (defined? 'web-open-pdf)) (preview-command-line s))))
+    (cond ((defined? 'web-open-pdf)
+           ;; in the browser: a tab of its own (misc/wasm/print.js)
+           (web-open-pdf s (url->string (url-tail u))))
+          (cmd (shell cmd))
           (else (set-message
                  "Error: ghostview does not seem to be installed on your system"
                  "preview")))))
 
+(define (web-print-name)
+  (with name (url->string (url-tail (current-buffer)))
+    (string-append (if (string-ends? name ".tm") (string-drop-right name 3) name)
+                   ".pdf")))
+
 (tm-define (preview-buffer)
-  (with file (cond ((os-mingw?)
+  (with file (cond ((defined? 'web-open-pdf)
+                    ;; in the browser: the PDF, in the files of the page
+                    ;; which are not kept (not in the home directory)
+                    (system->url "/tmp/texmacs-print.pdf"))
+                   ((os-mingw?)
                     (let* ((p (getenv "TEXMACS_HOME_PATH"))
                            (f (string-append p "\\system\\tmp\\preview.pdf")))
                       (system->url f)))
                    ((or (os-macos?) (== (printer-file-format) "pdf"))
                     "$TEXMACS_HOME_PATH/system/tmp/preview.pdf")
                    (else "$TEXMACS_HOME_PATH/system/tmp/preview.ps"))
+    ;; the file of the last preview is removed first: a PDF which could not
+    ;; be made (Ghostscript not found, #546) is then reported, instead of
+    ;; showing the old one, or nothing at all
+    (when (url-exists? file) (system-remove file))
     (print-to-file file)
-    (preview-file file)))
+    (cond ((not (url-exists? file))
+           (with name (url->system (url-tail file))
+             (set-message
+              (if (or (== (printer-file-format) "pdf")
+                      (url-exists-in-path? "gs"))
+                  `(concat "Error: the preview " (verbatim ,name)
+                           " could not be made")
+                  `(concat "Error: the preview " (verbatim ,name)
+                           " could not be made (Ghostscript was not found)"))
+              "preview")))
+          ((defined? 'web-open-pdf)
+           (web-open-pdf (url-sys-concretize file) (web-print-name)))
+          (else (preview-file file)))))
 
 (tm-define (choose-file-and-print-page-selection start end)
   (:argument  start "First page")

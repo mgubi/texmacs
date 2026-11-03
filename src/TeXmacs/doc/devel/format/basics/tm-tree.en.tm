@@ -24,7 +24,7 @@
   of the leafs is an ordinary string. A string symbol is different from a
   usual string only from the efficiency point of view: <TeXmacs> represents
   each symbol by a unique number, so that it is extremely fast to test
-  weather two symbols are equal.
+  whether two symbols are equal.
 
   <paragraph*|Leafs of <TeXmacs> trees>
 
@@ -34,11 +34,14 @@
   Character sequences starting with \P<verbatim|\<less\>>\Q and ending with
   \P<verbatim|\<gtr\>>\Q are interpreted as special extension characters. For
   example, <verbatim|\<less\>alpha\<gtr\>> stands for the letter
-  <math|\<alpha\>>. The semantics of characters in the universal <TeXmacs>
-  encoding does not depend on the context (currently, cyrillic characters are
-  an exception, but this should change soon). In other words, the universal
-  <TeXmacs> encoding may be seen as an analogue of Unicode. In the future, we
-  might actually switch to Unicode.
+  <math|\<alpha\>>. Characters which have no Cork code and no symbolic name
+  are represented by extension characters of the form
+  <verbatim|\<less\>#<em|hex>\<gtr\>>, where <verbatim|<em|hex>> is the
+  hexadecimal Unicode code point; for instance, <verbatim|\<less\>#4E2D\<gtr\>>
+  stands for a Chinese character. The semantics of characters in the
+  universal <TeXmacs> encoding does not depend on the context. In other
+  words, the universal <TeXmacs> encoding may be seen as an analogue of
+  Unicode, into which it can be converted without loss of information.
 
   The string leafs either contain ordinary text or special data. <TeXmacs>
   supports the following atomic data types:
@@ -72,10 +75,11 @@
   surprising to you, consider that a syntax is a way to represent information
   in a form suitable to understanding and modification. The on-screen typeset
   representation of a document, together with its interactive behaviour, is a
-  particularly concrete syntax. Moreover, in the <menu|Document|Source> menu,
-  you may find different ways to customize the way documents are viewed, such
-  as different levels of informative flags and a <hlink|\Psource tree\Q
-  mode|../../style/presentation/src-present.en.tm> for editing style files.
+  particularly concrete syntax. Moreover, in the <menu|Document> menu, you
+  may find different ways to customize the way documents are viewed, such as
+  different levels of <menu|Informative flags> and a <hlink|\Psource tree\Q
+  mode|../../style/presentation/src-present.en.tm> (<menu|Document|Source|Edit
+  source tree>) for editing style files.
 
   <tmdoc-copyright|2004|Joris van der Hoeven>
 

@@ -6,7 +6,7 @@
   <tmdoc-title|Line breaking primitives>
 
   A simple document is a sequence of <def-index|logical paragraphs>, one for
-  each subtree of a <markup|document> or <markup|paragraph> node. Paragraphs
+  each subtree of a <markup|document> or <markup|para> node. Paragraphs
   whose width exceed the available horizontal space are broken into
   <em|physical lines> by the hyphenation algorithm. By default, hyphenated
   lines are justified: horizontal spaces can be shrunk or extended in order
@@ -29,7 +29,7 @@
     <explain-macro|next-line><explain-synopsis|start a new line>
   <|explain>
     This is a tag which will become deprecated as soon as the
-    <markup|paragraph> primitive will be correctly implemented. Its usage is
+    <markup|para> primitive will be correctly implemented. Its usage is
     similar to the <markup|new-line> tag with the difference that we start a
     new logical paragraph unit instead of a new logical paragraph.
 
@@ -60,6 +60,33 @@
     the hyphenation patterns for a language fall short of preventing some
     forbidden patterns like ``arse-nal'' or ``con-genital''. An alternative
     way to prevent breaks is to use the <markup|rigid> tag.
+  </explain>
+
+  <\explain>
+    <explain-macro|hgroup|content><explain-synopsis|forbid line breaks
+    inside some content>
+  <|explain>
+    Typeset <src-arg|content> as usual line content, but forbid line breaks
+    and hyphenation inside it. Contrary to <markup|rigid>, the
+    <src-arg|content> is not turned into a single atomic box, so that the
+    usual spacing rules still apply to its items. The tag accepts an optional
+    second argument, which is currently ignored.
+  </explain>
+
+  <\explain>
+    <explain-macro|hyphenate-as|pattern>
+
+    <explain-macro|hyphenate-as|pattern|content><explain-synopsis|explicit
+    hyphenation>
+  <|explain>
+    Override the hyphenation of a word. The <src-arg|pattern> is a string in
+    which the admissible hyphenation points are marked by dashes, such as
+    <verbatim|hy-phen-ation>. With a single argument, the word is typeset
+    (with its dashes removed) and may only be hyphenated at the indicated
+    points. With two arguments, the <src-arg|content> is typeset as usual,
+    except that each occurrence of the word <src-arg|pattern> (without
+    dashes) is hyphenated as indicated; other words keep the hyphenation of
+    the current language.
   </explain>
 
   <tmdoc-copyright|2004|David Allouche|Joris van der Hoeven>

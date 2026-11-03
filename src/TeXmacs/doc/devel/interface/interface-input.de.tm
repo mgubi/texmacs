@@ -93,7 +93,7 @@
   </verbatim>
 
   Der <value|scheme>-Code zur Konfiguration in der Datei
-  <verbatim|init-input.scm> ist der folgende
+  <source-link|init-input.scm|TeXmacs/examples/plugins/input/progs/init-input.scm> ist der folgende
 
   <\scheme-fragment>
     (plugin-configure input
@@ -118,9 +118,9 @@
     \ \ (lazy-input-converter (input-input) input))
   </scheme-fragment>
 
-  Mit anderen Worten, das Modul <verbatim|input-input.scm> wird nur dann
+  Mit anderen Worten, das Modul <source-link|input-input.scm|TeXmacs/examples/plugins/input/progs/input-input.scm> wird nur dann
   geladen, wenn wir explizit verlangen, dass eine Konversion durchgeführt
-  werden soll. Die Konversionsregeln in <verbatim|input-input.scm> lauten so
+  werden soll. Die Konversionsregeln in <source-link|input-input.scm|TeXmacs/examples/plugins/input/progs/input-input.scm> lauten so
 
   <\scheme-fragment>
     (plugin-input-converters input
@@ -153,7 +153,7 @@
     \ \ (display "))"))
   </scheme-fragment>
 
-  In den zusätzlichen Stil <verbatim|input.ts> definieren wir ein
+  In den zusätzlichen Stil <source-link|input.ts|TeXmacs/examples/plugins/input/packages/session/input.ts> definieren wir ein
   zusätzliches Makro <markup|special>:
 
   <\tm-fragment>
@@ -173,7 +173,7 @@
     \ \ (display "]]]"))
   </scheme-fragment>
 
-  Der folgende <value|cpp> Code in <verbatim|input.cpp>\ 
+  Der folgende <value|cpp> Code in <source-link|input.cpp|src/Data/Convert/Generic/input.cpp>\ 
 
   <\cpp-fragment>
     cout \<less\>\<less\> DATA_BEGIN \<less\>\<less\> "verbatim:";

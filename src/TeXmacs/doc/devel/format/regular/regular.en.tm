@@ -20,6 +20,8 @@
 
     <branch|Linking|prim-link.en.tm>
 
+    <branch|Graphics and animations|prim-graphics.en.tm>
+
     <branch|Miscellaneous tags|prim-physical-misc.en.tm>
   </traverse>
 

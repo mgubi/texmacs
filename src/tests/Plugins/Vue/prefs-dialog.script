@@ -1,0 +1,4 @@
+# needs prefs-dialog.scm: the tabs of the preferences dialog
+wait 9000
+window User preferences
+snapshot pd0

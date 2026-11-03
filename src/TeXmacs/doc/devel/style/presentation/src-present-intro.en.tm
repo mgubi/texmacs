@@ -37,7 +37,7 @@
     <item>Standard editors like <name|Emacs> provide tools for automatic
     highlighting, indentation, <abbr|etc.>
 
-    <item><label|structure-constraints>One is not constraint by any
+    <item><label|structure-constraints>One is not constrained by any
     \Pstructure\Q during the editing phase.
   </enumerate>
 

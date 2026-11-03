@@ -7,8 +7,7 @@
 
   <big-table|<descriptive-table|<tformat|<cwith|1|1|1|1|cell-row-span|1>|<cwith|1|1|1|1|cell-col-span|2>|<cwith|1|1|1|1|cell-halign|c>|<table|<row|<cell|GNU
   <TeXmacs>>|<cell|>>|<row|<cell|Installed
-  version>|<cell|<TeXmacs-version>>>|<row|<cell|SVN
-  revision>|<cell|<TeXmacs-version-release|revision>>>|<row|<cell|Supported
+  version>|<cell|<TeXmacs-version>>>|<row|<cell|Revision>|<cell|<TeXmacs-version-release|revision>>>|<row|<cell|Supported
   systems>|<cell|Most GNU/<name|Linux> systems>>|<row|<cell|Copyright>|<cell|<copyright>
   1998\U2024 by Joris van der Hoeven >>|<row|<cell|License>|<cell|<hlink|GNU
   General Public License|$TEXMACS_PATH/LICENSE>>>|<row|<cell|Web

@@ -32,17 +32,19 @@
 ;;   - version-tmfs.scm finds the version control tool of a file (svn or
 ;;     git, by a .svn or .git directory above it) and dispatches to
 ;;     version-svn.scm or version-git.scm. The git part is checked on a
-;;     throwaway repository in the temporary directory, always through
-;;     "git -c user.name=... -c user.email=..." (or, for git-commit, the
-;;     configuration of the repository), never with a global one, once
-;;     with plain names and once with spaces in the names of the repository
-;;     and of the files; svn is only checked on files which are not under
-;;     version control.
+;;     throwaway repository in the temporary directory, whose identity is
+;;     set in its own configuration, never globally (the Git support itself
+;;     is checked by the suite git, git-test.scm), once with plain names
+;;     and once with spaces (and a letter which is not in ASCII) in the
+;;     names of the repository and of the files; svn is only checked on
+;;     files which are not under version control, and the quoting of the
+;;     arguments of its command lines (version-quote) through git.
 
 (texmacs-module (check version-test)
   (:use (check check-lib)
         (version version-compare)
-        (version version-tmfs)))
+        (version version-tmfs)
+        (version git-drivers)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -789,32 +791,41 @@
 ;; the repository of the current run of test-git-sub
 (define git-dir (tmp-name "repo"))
 
-;; the root of the repository as git-root gives it, with / on Windows too
-(define git-root-dir (string-replace git-dir "\\" "/"))
+;; the root of the repository as git-root gives it, as a path of the system
+;; (with \ on Windows, where git-dir ends with /repo)
+(define git-root-dir (url->system (system->url git-dir)))
 
 (define (set-git-dir! name)
   (set! git-dir (tmp-name name))
-  (set! git-root-dir (string-replace git-dir "\\" "/")))
+  (set! git-root-dir (url->system (system->url git-dir))))
 
 (define (git-sh . l)
-  ;; a git command in the throwaway repository, never configured globally
-  (apply shell "git -C \"" git-dir "\" -c user.name=tester"
-         " -c user.email=tester@example.org " l))
-
-(define (git-available?)
-  (string-starts? (shell "git --version") "git version"))
+  ;; a git command in the throwaway repository, whose identity is set in
+  ;; its own configuration, never globally (one command, no shell syntax)
+  (apply shell "git -C \"" git-dir "\" " l))
 
 (define (test-git)
   (check-group "git")
   (if (not (git-available?))
       (display* "  git is not available, the group is skipped\n")
-      (begin
+      ;; the configuration of the user is ignored (see git-test.scm), and
+      ;; the trusted repositories are put back
+      (let* ((key "git trusted repositories")
+             (old (and (cpp-has-preference? key) (get-preference key))))
+        (check-isolate-git)
         (run-group test-git-arguments)
         (set-git-dir! "repo")
         (run-group (lambda () (test-git-sub "a.tm" "b.tm")))
         (check-group "git, spaces in the names")
         (set-git-dir! "my repo")
-        (run-group (lambda () (test-git-sub "a b.tm" "b c.tm"))))))
+        ;; (a name in utf8, e with an acute accent, which is not in ASCII)
+        (run-group (lambda ()
+                     (test-git-sub "a b.tm"
+                                   (string-append
+                                    "b c" (string (integer->char 195)
+                                                  (integer->char 169))
+                                    ".tm"))))
+        (if old (set-preference key old) (reset-preference key)))))
 
 (define (sq-quote s)
   ;; @s as git rev-parse --sq-quote writes it
@@ -823,17 +834,23 @@
                  "'"))
 
 (define (test-git-arguments)
-  ;; the arguments quoted by version-quote reach git unchanged, through
-  ;; /bin/sh or, on Windows, the splitting of the command line by git
+  ;; the arguments quoted by version-quote (for the command lines of svn)
+  ;; reach the program unchanged, through /bin/sh or, on Windows, the
+  ;; splitting of the command line by the program itself
   (for (s (list "plain" "" "a b" "it's" "$HOME" "`echo x`" "x!y" "%PATH%"
                 "say \"hi\"" "C:\\Users\\John Smith\\" "a\\\"b" "a\\\\b"))
     (check= (shell "git rev-parse --sq-quote " (version-quote s))
             (string-append " " (sq-quote s) "\n"))))
 
+;; The suite "git" (git-test.scm) checks the Git support itself; this group
+;; checks that version-tmfs.scm dispatches the version-* interface to it.
 (define (test-git-sub fa fb)
   ;; @fa and @fb are the names of two files of the repository git-dir
   (system-mkdir (system->url git-dir))
   (git-sh "init -q .")
+  (git-sh "config user.name tester")
+  (git-sh "config user.email tester@example.org")
+  (git-sh "config commit.gpgsign false")
   (git-sh "commit -q --allow-empty -m init")
   (let* ((root (system->url git-dir))
          (f (system->url (string-append git-dir "/" fa)))
@@ -849,60 +866,47 @@
     (check-true (version-supports-git-style? f))
     (check-false (version-supports-svn-style? f))
     (check-true (version-supports-history? f))
-    (check= (git-root f) git-root-dir)
-    (check= (git-root root) git-root-dir)
-    (check= (git-command f)
-            (string-append
-             "git " (version-quote (string-append "--work-tree=" git-root-dir))
-             " " (version-quote (string-append "--git-dir=" git-root-dir
-                                               "/.git"))))
-    ;; an untracked file
-    (check= (buffer-status f) "??")
+    (check= (url->system (git-root f)) git-root-dir)
+    (check= (url->system (git-root root)) git-root-dir)
+    ;; Git is only run in trusted repositories
+    (check-false (git-trusted? f))
+    (check-false (git-status root))
     (check= (version-status f) "unknown")
-    (check-true (buffer-to-add? f))
-    (check-false (buffer-to-unadd? f))
-    (check-false (buffer-histed? f))
-    (check-false (buffer-has-diff? f))
-    (check= (git-status root) (list (list "??" fa)))
+    (git-trust root)
+    (check-true (git-trusted? f))
+    ;; an untracked file
+    (check= (git-file-state f) 'untracked)
+    (check= (version-status f) "unknown")
+    (check= (map git-entry-path (git-status-entries root)) (list fa))
     ;; registered
-    (version-register f)
-    (check= (buffer-status f) "A ")
+    (check= (version-register f) "Added file")
+    (check= (git-file-state f) 'added)
     (check= (version-status f) "modified")
-    (check-true (buffer-to-unadd? f))
-    (check-false (buffer-to-add? f))
-    (check= (git-status root) (list (list "A " fa)))
-    (version-unregister f)
-    (check= (buffer-status f) "??")
-    (version-register f)
+    (check= (version-unregister f) "Stopped tracking file")
+    (check= (git-file-state f) 'untracked)
     ;; committed
-    (git-sh "commit -q -m \"first commit\"")
-    (check= (buffer-status f) "  ")
+    (check= (version-commit f "") "Empty commit message")
+    (version-commit f "first commit")
+    (check= (git-file-state f) 'unmodified)
     (check= (version-status f) "unmodified")
-    (check-true (buffer-histed? f))
-    (check-false (buffer-has-diff? f))
-    (check= (git-status root) '())
+    (check= (git-status-entries root) '())
     (let* ((h1 (git-master f))
            (h0 (string-drop-right (git-sh "rev-parse HEAD~1") 1)))
       (check= (string-length h1) 40)
       (check= h1 (string-drop-right (git-sh "rev-parse HEAD") 1))
       (check= (version-beautify-revision f h1) (string-take h1 7))
       (check= (version-revision f h1) doc1)
-      (check= (git-commit-parents root h1) (list h0))
-      (check= (git-commit-parent root h1) h0)
-      (with m (git-commit-message root h1)
-        (check= (car m) (string-append "commit " h1))
-        (check= (cadr m) "Author: tester <tester@example.org>")
-        (check-true (in? "    first commit" m)))
-      (check= (git-commit-diff root h0 h1)
-              `((7 0 (hlink ,fa ,(version-revision-url f h1))
-                  ,(string-length fa))))
+      (check= (version-revision f "HEAD") doc1)
+      (with c (git-commit-info root h1)
+        (check= (git-commit-parents c) (list h0))
+        (check= (git-commit-author c) "tester")
+        (check= (git-commit-subject c) "first commit"))
+      (check= (git-commit-message root h1) "first commit\n\n")
+      (check= (git-numstat root h1) (list (list 7 0 fa)))
       ;; the log, newest first
-      (with l (git-log root)
-        (check= (length l) 2)
-        (check= (map cadr l) '("tester" "tester"))
-        (check= (map caddr l) '("first commit" "init"))
-        (check= (cadddr (car l))
-                `(hlink ,(string-take h1 7) ,(tmfs-url-commit root h1))))
+      (with l (git-log root 0 10)
+        (check= (map git-commit-subject l) '("first commit" "init"))
+        (check= (map git-commit-hash l) (list h1 h0)))
       (check= (tmfs-url-commit root h1)
               (string-append "tmfs://commit/" h1 "/"
                              (url->tmfs-string root)))
@@ -910,42 +914,35 @@
       (check= (tmfs-load (version-revision-url f h1)) doc1)
       ;; modified in the working tree
       (string-save doc2 (url->system f))
-      (check= (buffer-status f) " M")
+      (git-invalidate root)
+      (check= (git-file-state f) 'modified)
       (check= (version-status f) "modified")
-      (check-true (buffer-has-diff? f))
-      (check-true (buffer-to-add? f))
-      (check= (git-status root)
-              `((" M" (hlink ,fa ,(url->string (url-append root fa))))))
       (check= (version-revision f h1) doc1)
+      (check= (version-revision f "INDEX") doc1)
       ;; a second commit
       (git-sh "commit -q -a -m \"second commit\"")
+      (git-invalidate root)
       (let ((h2 (git-master f)))
         (check-false (== h2 h1))
-        (check= (git-commit-parent root h2) h1)
+        (check= (git-commit-parents (git-commit-info root h2)) (list h1))
         (check= (version-revision f h2) doc2)
         (check= (version-revision f h1) doc1)
-        (check= (git-commit-diff root h1 h2)
-                `((1 1 (hlink ,fa ,(version-revision-url f h2))
-                  ,(string-length fa))))
-        ;; the history of a file, newest first, with the current buffer
-        ;; on the file (the history is relative to its repository)
+        ;; the history of a file, newest first, whatever the current
+        ;; buffer (the history is the one of the repository of the file)
+        (with h (version-history f)
+          (check= (map car h)
+                  (list (string-append h2 ":" (url->tmfs-string f))
+                        (string-append h1 ":" (url->tmfs-string f))))
+          (check= (map cadr h) '("tester" "tester"))
+          (check= (map cadddr h) '("second commit" "first commit")))
+        ;; the revision url of a history entry
+        (check= (version-revision-url f (string-append h1 ":"
+                                                       (url->tmfs-string f)))
+                (version-revision-url f h1))
         (let ((old (current-buffer)))
           (load-buffer f)
           (switch-to-buffer* f)
-          (with h (version-history f)
-            (check= (length h) 2)
-            (check= (map car h)
-                    (list (string-append h2 ":" (url->tmfs-string f))
-                          (string-append h1 ":" (url->tmfs-string f))))
-            (check= (map cadr h) '("tester" "tester"))
-            (check= (map cadddr h) '("second commit" "first commit")))
-          (check= (current-git-root) git-root-dir)
-          (check= (git-commit-master) h2)
-          (check= (git-commit-file-parent fa h2) h1)
-          ;; the revision url of a history entry
-          (check= (version-revision-url f (string-append h1 ":"
-                                                         (url->tmfs-string f)))
-                  (version-revision-url f h1))
+          (check= (url->system (current-git-root)) git-root-dir)
           ;; comparing the buffer with its first revision
           (compare-with-older (string->url (version-revision-url f h1)))
           ;; "One." and "One more." have no word in common
@@ -959,39 +956,26 @@
           (when (buffer-exists? old) (switch-to-buffer old)))
         ;; the history is relative to the repository of the file, also
         ;; when the current buffer is outside it
-        (check-false (== (current-git-root) git-root-dir))
+        (check-false (== (and-with r (current-git-root) (url->system r))
+                         git-root-dir))
         (check= (map car (version-history f))
                 (list (string-append h2 ":" (url->tmfs-string f))
                       (string-append h1 ":" (url->tmfs-string f))))))
     ;; a file which is not in the repository yet
     (string-save doc1 (url->system g))
+    (git-invalidate root)
     (check= (version-status g) "unknown")
-    (check= (git-status root) (list (list "??" fb)))
-    (with c (git-status-content root)
-      (check= (car c) 'document)
-      (check= (tm-ref c 2 0) `(document (tmfs-title "Git Status")
-                                        (description-long
-                                         (document
-                                          (concat (item* "Changes to be committed")
-                                                  "")
-                                          (concat (item* "Changes not staged for commit")
-                                                  "")
-                                          (concat (item* "Untracked files")
-                                                  (concat ,fb (new-line))))))))
-    ;; committed by git-commit, with the current buffer on the file
-    (version-register g)
-    ;; (the identity in the configuration of the throwaway repository only)
-    (git-sh "config user.name tester")
-    (git-sh "config user.email tester@example.org")
-    (git-sh "config commit.gpgsign false")
-    (let ((old (current-buffer))
-          (bufs (buffer-list))
-          ;; (a message in Cork, as typed in TeXmacs, given to git in UTF-8)
-          (msg (string-append "say \"hi\" to $HOME, it's a caf"
-                              (string (integer->char 233)))))
-      (load-buffer g)
-      (switch-to-buffer* g)
-      (git-commit msg)
+    (check= (map git-entry-path (git-status-entries root)) (list fb))
+    (with s (tmfs-load (tmfs-url-git root "status"))
+      (check-true (string-contains? s "Untracked files"))
+      (check-true (string-contains? s (utf8->cork fb))))
+    ;; committed by version-commit, with a message in Cork (as typed in
+    ;; TeXmacs), given to Git in utf8
+    (with msg (string-append "say \"hi\" to $HOME, it's a caf"
+                             (string (integer->char 233)))
+      (check= (version-register g) "Added file")
+      (version-commit g msg)
+      (check= (git-file-state g) 'unmodified)
       ;; the message as git stored it (written to a file by git)...
       (with out (tmp-name "message.txt")
         (git-sh "log -1 --pretty=%s --output=\"" out "\"")
@@ -999,21 +983,74 @@
                 (string-append (cork->utf8 msg) "\n")))
       ;; ... and as eval-system reads it from the output of git (on
       ;; Windows, the output used to be decoded in the OEM code page,
-      ;; which garbled the UTF-8 of git, #641)
+      ;; which garbled the utf8 of git, #641)
       (check= (git-sh "log -1 --pretty=%s")
-              (string-append (cork->utf8 msg) "\n"))
-      (check= (buffer-status g) "  ")
-      (for (b (buffer-list))
-        (when (not (in? b bufs))
-          (buffer-pretend-saved b)
-          (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old)))
-    ;; a renamed file: the status shows the new name ("<old> -> <new>",
-    ;; each name quoted by git when it has a space)
-    (with new (string-append (if (== fb "b.tm") "new-" "new ") fb)
+              (string-append (cork->utf8 msg) "\n")))
+    ;; a renamed file: the status gives the new and the old name
+    (with new (string-append "new " fb)
       (git-sh "mv \"" fb "\" \"" new "\"")
-      (check= (git-status root)
-              `(("R " (hlink ,new ,(url->string (url-append root new)))))))))
+      (git-invalidate root)
+      (check= (map (lambda (e) (list (git-entry-kind e) (git-entry-path e)
+                                     (git-entry-orig e)))
+                   (git-status-entries root))
+              (list (list 'renamed new fb)))
+      (with s (tmfs-load (tmfs-url-git root "status"))
+        (check-true (string-contains? s (utf8->cork new)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The merge driver of Git
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The program which the merge driver runs, in each layout of TeXmacs
+;; (git-test.scm runs the driver itself, on Unix only; this group runs on
+;; Windows too)
+(define (test-merge-driver-program)
+  (check-group "merge driver program")
+  (let ((find (lambda (tp bin appdir appimage windows? . there)
+                (git-driver-program tp bin appdir appimage windows?
+                                    (lambda (s) (in? s there))))))
+    ;; the build tree on Unix
+    (check= (find "/b/TeXmacs" "" "" "" #f "/b/TeXmacs/bin/texmacs.bin")
+            (list "/b/TeXmacs/bin/texmacs.bin" "/b/TeXmacs"))
+    ;; the macOS bundle
+    (with tp "/A/TeXmacs.app/Contents/Resources/share/TeXmacs"
+      (check= (find tp "" "" "" #f
+                    (string-append tp "/../../../MacOS/TeXmacs"))
+              (list (string-append tp "/../../../MacOS/TeXmacs") tp)))
+    ;; make install: the binary under TEXMACS_BIN_PATH, not TEXMACS_PATH
+    (check= (find "/usr/share/TeXmacs" "/usr/lib/texmacs/TeXmacs" "" "" #f
+                  "/usr/lib/texmacs/TeXmacs/bin/texmacs.bin")
+            (list "/usr/lib/texmacs/TeXmacs/bin/texmacs.bin"
+                  "/usr/share/TeXmacs"))
+    ;; the AppImage: its mount point vanishes, the AppImage itself is run
+    (check= (find "/tmp/.mount_x/usr/share/TeXmacs" "/tmp/.mount_x/usr"
+                  "/tmp/.mount_x" "/home/u/a b.AppImage" #f
+                  "/tmp/.mount_x/usr/bin/texmacs.bin")
+            (list "/home/u/a b.AppImage" #f))
+    ;; (APPIMAGE inherited by a TeXmacs which is not the AppImage)
+    (check= (find "/b/TeXmacs" "" "/tmp/.mount_x" "/home/u/a.AppImage" #f
+                  "/b/TeXmacs/bin/texmacs.bin")
+            (list "/b/TeXmacs/bin/texmacs.bin" "/b/TeXmacs"))
+    ;; the Windows bundle and installer: texmacs.exe, with / for Git's sh
+    (check= (find "C:\\Program Files\\TeXmacs Upsilon" "" "" "" #t
+                  "C:\\Program Files\\TeXmacs Upsilon/bin/texmacs.exe")
+            (list "C:/Program Files/TeXmacs Upsilon/bin/texmacs.exe"
+                  "C:/Program Files/TeXmacs Upsilon"))
+    ;; the build tree on Windows (MinGW adds .exe to texmacs.bin)
+    (check= (find "D:\\a\\src\\TeXmacs" "" "" "" #t
+                  "D:\\a\\src\\TeXmacs/bin/texmacs.bin.exe")
+            (list "D:/a/src/TeXmacs/bin/texmacs.bin.exe" "D:/a/src/TeXmacs"))
+    ;; no binary found: the startup script, with its own TEXMACS_PATH
+    (check= (find "/x/TeXmacs" "" "" "" #f) (list "texmacs" #f))
+    (check= (find "C:\\x" "" "" "" #t) (list "texmacs" #f)))
+  ;; this TeXmacs (a build tree or a bundle) finds its own binary
+  (let* ((p (git-merge-driver-program))
+         (cmd (git-merge-driver-command)))
+    (check-true (url-exists? (system->url (car p))))
+    (check-true (string-contains? cmd (git-shell-quote (car p))))
+    (check-true (string-contains? cmd "(git-merge-driver"))
+    (when (or (os-mingw?) (os-win32?))
+      (check-false (string-contains? cmd "\\")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
@@ -1035,6 +1072,7 @@
   (run-group test-compare-files)
   (run-group test-unversioned)
   (run-group test-revision-urls)
+  (run-group test-merge-driver-program)
   (test-git)
   (set-grain "detailed")
   (remove-dir)

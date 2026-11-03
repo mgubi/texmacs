@@ -10,9 +10,14 @@
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(use-modules (ice-9 regex))
+(define (escape-gtr s)
+  ;; replace each > by \<gtr\> (portable between Guile and S7)
+  (apply string-append
+         (map (lambda (c) (if (char=? c #\>) "\\<gtr\\>" (string c)))
+              (string->list s))))
 
-(define glue-defs '("build-glue-basic.scm" "build-glue-server.scm" "build-glue-editor.scm"))
+(define glue-defs '("build-glue-basic.scm" "build-glue-server.scm" "build-glue-editor.scm"
+                    "build-glue-treesit.scm" "build-glue-lsp.scm"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Convenient output routine
@@ -31,7 +36,7 @@
     (output-sub l)))
 
 (define (output-copyright from)
-  noop)
+  #t)
 
 (define (output-arg arg)
       (output " <scm-arg|" arg ">"))
@@ -45,7 +50,7 @@
 	(croutine (cadr l))
 	(ret-type (caaddr l))
 	(args (cdaddr l)))
-(output "  <\\explain>\n    <scm|(" (regexp-substitute/global #f "[>]"  (symbol->string name) 'pre "\\<gtr\\>" 'post))
+(output "  <\\explain>\n    <scm|(" (escape-gtr (symbol->string name)))
 (map output-arg args)
 (output ")>
 <explain-synopsis|no synopsis>\n  <|explain>
@@ -67,8 +72,8 @@
 (define (build-main l)
    (build-routines (cddr l)))
 
-(define-macro build
-  (lambda l (build-main l)))
+(define-macro (build . l)
+  (build-main l))
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Creation of the help document
@@ -84,7 +89,7 @@
 
 
 (begin
-  (output "<TeXmacs|1.99.4>
+  (output "<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -97,7 +102,7 @@ the <c++> code and which, consequently, are neither defined nor documented in th
 elsewhere in the documentation.
 
 This document was generated automatically from the glue code definitions by
-the script <verbatim|src/src/Scheme/Glue/make-apidoc-doc.scm> in <TeXmacs>
+the script <source-link|src/src/Scheme/Glue/make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm> in <TeXmacs>
 source code.
 
 \\;

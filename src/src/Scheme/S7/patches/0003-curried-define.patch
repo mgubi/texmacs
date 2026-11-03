@@ -1,0 +1,27 @@
+Curried define, as in Guile and SRFI 219
+
+(define ((f a) b) . body) is (define (f a) (lambda (b) . body)), to any
+depth and with rest arguments. check_define rewrites the form in place the
+first time it checks it, so what is evaluated and optimized afterwards is
+an ordinary definition: no run-time macro, no cost at each call. define*
+is left alone.
+
+--- a/s7.c
++++ b/s7.c
+@@ -83604,6 +83604,16 @@
+ 	}}
+   else
+     {
++      /* TeXmacs: curried define, as in Guile and SRFI 219: (define ((f a) b) . body) is
++       *   (define (f a) (lambda (b) . body)).  The form is rewritten here, once, when it is
++       *   first checked, so what is evaluated and optimized is an ordinary definition.
++       */
++      while ((!starred) && (is_pair(caar(code))))
++	{
++	  s7_pointer lam = cons(sc, sc->lambda_symbol, cons(sc, cdar(code), cdr(code)));
++	  set_cdr(code, list_1(sc, lam));
++	  set_car(code, caar(code));
++	}
+       func = caar(code);
+       if (!is_symbol(func))                                                      /* (define (3 a) a) */
+ 	syntax_error_with_caller2_nr(sc, "~A: can't define ~S, ~A (should be a symbol or a non-nil list)", 62, caller, func, object_type_name(sc, func));

@@ -79,6 +79,16 @@ in Mogan.
 */
 url get_main_tm (url pdf_path);
 
+#elif defined (MUPDF_RENDERER)
+// MuPDF does it too, when PDFHummus is not built in: the same functions,
+// in Plugins/MuPDF/mupdf_attachments.cpp (the attachments come out into a
+// directory of their own, not next to the PDF, see there)
+bool       extract_attachments_from_pdf (url pdf_path, list<url>& names);
+bool       scm_extract_attachments (url pdf_path);
+array<url> get_linked_file_paths (tree t, url path);
+tree       replace_with_relative_path (tree t, url path);
+url        get_main_tm (url pdf_path);
+
 #else
 /*
  * when the pdf plugin is not enabled, you can still include the pdf headers files.

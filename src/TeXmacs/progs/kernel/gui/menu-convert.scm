@@ -1007,6 +1007,10 @@
             ,(lambda (p style bar?) (list (build-menu-division p style))))
   (class (:%1 :*)
             ,(lambda (p style bar?) (list (build-menu-class p style))))
+  (named (:string? :*)
+         ;; the items as they are: a name is for the scripted tests of the
+         ;; widgets of the ports (make-menu-named in menu-widget.scm)
+         ,(lambda (p style bar?) (build-menu-items-list (cddr p) style bar?)))
   (aligned (:*)
          ,(lambda (p style bar?) (list (build-aligned p style))))
   (aligned-item (:%2)

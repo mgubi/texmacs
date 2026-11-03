@@ -79,7 +79,7 @@ x_drawable_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     color* cols= (color*) gui->color_scale [col_entry];
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
     int i, j, w= gl->width, h= gl->height;
     pm= XCreatePixmap (gui->dpy, gui->root, w, h, gui->depth);
     for (j=0; j<h; j++)
@@ -97,7 +97,7 @@ x_drawable_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   if (bm == NULL) {
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
     int i, j, b, on, w= gl->width, h= gl->height;
     int byte_width= ((w-1)>>3)+1;
     char* data= tm_new_array<char> (byte_width * h);

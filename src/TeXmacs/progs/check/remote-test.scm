@@ -108,7 +108,7 @@
 
 (define (scratch-home?)
   (let ((home (url->system (url-concretize "$TEXMACS_HOME_PATH")))
-        (user (url->system (url-concretize "~/.TeXmacs"))))
+        (user (url->system (url-concretize "~/.TeXmacs_Upsilon"))))
     (!= home user)))
 
 (define (sorted l) (sort l string<=?))

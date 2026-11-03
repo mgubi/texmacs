@@ -65,6 +65,9 @@
           (link tmtex-menu)))
   (-> "References"
       (link ref-menu))
+  (if (defined? 'lsp-start)
+      (-> "Language servers"
+          (link lsp-menu)))
   (if supports-email?
       (-> "Email"
           ("Open mailbox" (email-open-mailbox))
@@ -85,17 +88,25 @@
         ("Albert" (set-preference "ai" "albert")))
       (when (has-chatgpt?)
         ("Chat GPT" (set-preference "ai" "chatgpt")))
+      (when (has-claude?)
+        ("Claude" (set-preference "ai" "claude")))
       (when (has-gemini?)
         ("Gemini" (set-preference "ai" "gemini")))
       (when (has-ollama?)
         ("Ollama" (set-preference "ai" "ollama")))
       (when (has-open-mistral-7b?)
-        ("Mistral 7B" (set-preference "ai" "open-mistral-7b"))))
+        ("Mistral" (set-preference "ai" "open-mistral-7b")))
+      (when (has-openrouter?)
+        ("OpenRouter" (set-preference "ai" "openrouter"))))
   (when (and (cpp-has-preference? "ai")
              (selection-active-any?))
     ("Correct" (ai-correct (get-preference "ai")))
     (-> "Translate"
-        (link ai-translate-menu)))
+        (link ai-translate-menu))
+    ("Ask about the selection" (ai-ask-about-selection (get-preference "ai"))))
+  (when (and (cpp-has-preference? "ai")
+             (not (selection-active-any?)))
+    ("Ask about the document" (ai-ask-about-document (get-preference "ai"))))
   (-> "External AI"
       (when (selection-active-any?)
         ("Copy" (ai-copy))
@@ -108,7 +119,9 @@
   ;;    ("Update web site" (tmweb-interactive-update)))
   (-> "Fonts"
       ("Scan disk for fonts" (scan-disk-for-fonts))
-      ("Clear font cache" (clear-font-cache)))
+      ("Clear font cache" (clear-font-cache))
+      ---
+      ("Font inspector" (open-font-inspector)))
   (-> "Equation editor" (link tools-equation-editor-menu))
   (-> "Miscellaneous"
       ("Clear undo history" (clear-undo-history))
@@ -127,4 +140,16 @@
   ("Presentation tool" (toggle-preference "presentation tool"))
   ("Remote tool" (toggle-preference "remote tool"))
   ("Source macros tool" (toggle-preference "source tool"))
-  ("Versioning tool" (toggle-preference "versioning tool")))
+  (-> "Versioning tool"
+      ("Automatic" (set-versioning-tool "auto"))
+      ("Always" (set-versioning-tool "on"))
+      ("Never" (set-versioning-tool "off"))
+      ---
+      ;; NOTE: also here, since the Version menu is not shown by default
+      ;; for documents outside repositories
+      (when (and (not (url-rooted-web? (current-buffer)))
+                 (not (url-rooted-tmfs? (current-buffer)))
+                 (url-exists? (current-buffer))
+                 (not (versioning-directory (current-buffer))))
+        ("Create Git repository" (git-interactive-init (current-buffer))))
+      ("Clone Git repository" (git-interactive-clone))))

@@ -30,12 +30,21 @@
   chapters. Typically, articles use the short sectional style whereas book
   use the long style.
 
+  All standard sectional tags are defined in <tmpackage|section-base> using
+  the meta-macro <markup|new-section>; <inactive*|<new-section|<em|x>>>
+  defines the tags <markup|<em|x>> and <markup|<em|x>*> together with a
+  counter <src-var|<em|x>-nr> and the customizable macros described below.
   The rendering of a sectional tag <markup|<em|x>> is controlled through the
-  macros <markup|<em|x>-sep>, <markup|<em|x>-title> and
-  <markup|<em|x>-numbered-title>. The <markup|<em|x>-sep> macro prints the
-  separator between the section number and the section title. It defaults to
-  the macro <markup|sectional-sep>, which defaults in its turn to a wide
-  space. For instance, after redefining
+  macros <markup|<em|x>-sep>, <markup|<em|x>-post-sep>, <markup|<em|x>-title>,
+  <markup|<em|x>-unnumbered-title> and <markup|<em|x>-numbered-title>. The
+  <markup|<em|x>-sep> macro prints the separator between the section number
+  and the section title. It defaults to the macro <markup|sectional-sep>,
+  which defaults in its turn to a wide space (<inactive*|<space|2spc>>).
+  Similarly, <markup|<em|x>-post-sep> (which defaults to
+  <markup|sectional-post-sep>) is printed after the title. The predicate
+  <markup|<em|x>-display-numbers> (<verbatim|true> by default) determines
+  whether the tag <markup|<em|x>> is numbered at all. For instance, after
+  redefining
 
   <\tm-fragment>
     <inactive*|<assign|sectional-sep|<macro| -- >>>
@@ -48,10 +57,11 @@
     >|<section-numbered-title|Hairy GNUs>>
   </tm-fragment>
 
-  The <markup|<em|x>-title> and <markup|<em|x>-numbered-title> macros
-  respectively specify how to render unnumbered and numbered section titles.
-  Usually, the user only needs to modify <markup|<em|x>-title>, since
-  <markup|<em|x>-numbered-title> is based on <markup|<em|x>-title>. However,
+  The <markup|<em|x>-unnumbered-title> and <markup|<em|x>-numbered-title>
+  macros respectively specify how to render unnumbered and numbered section
+  titles. Usually, the user only needs to modify <markup|<em|x>-title>, since
+  both <markup|<em|x>-unnumbered-title> and <markup|<em|x>-numbered-title>
+  are based on <markup|<em|x>-title>. However,
   if the numbers have to be rendered in a particular way, then it may be
   necessary to redefine <markup|<em|x>-numbered-title>. For instance,
   consider the redefinition
@@ -94,9 +104,13 @@
     We do not recommend to modify the standard settings (<abbr|i.e.> to
     render paragraphs in a long way or sections in a short way). If you
     really want to do so, then we recommend to redefine the corresponding
-    environment variables <inactive|<value|enrich-x-long>>. This will ensure
-    upward compatibility when sectional tags will take an additional argument
-    (see remark <reference|section-extra-argument-rem>).
+    macros <markup|<em|x>-title> using the helper macros
+    <markup|sectional-short>, <markup|sectional-normal>, <abbr|etc.> (and
+    their <verbatim|-bold> and <verbatim|-italic> variants) from
+    <tmpackage|section-base>, rather than redefining the sectional tags
+    themselves. This will ensure upward compatibility when sectional tags
+    will take an additional argument (see remark
+    <reference|section-extra-argument-rem>).
   </remark>
 
   Besides their rendering, several other aspects of sectional tags can be
@@ -106,7 +120,9 @@
     <item>The call-back macro <markup|<em|x>-clean> can be used for cleaning
     some counters when a new section is started. For instance, in order to
     prefix all standard environments by the section counter, you may use the
-    following lines:
+    following lines (this is what <tmpackage|section-book> does with
+    chapters, and what the <tmpackage|number-long-article> package does with
+    sections):
 
     <\tm-fragment>
       <\inactive*>

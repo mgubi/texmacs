@@ -75,7 +75,7 @@ tile_rep::handle_get_size (get_size_event ev) {
     h= max (h, hh);
   }
   else {
-    int i, ww=0, hh=0;
+    int i; SI ww=0, hh=0;
     for (i=0; i<N(a); i++) {
       SI www= w/cols, hhh= h/rows;
       abs_round (www, hhh);

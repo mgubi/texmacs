@@ -1,4 +1,4 @@
-<TeXmacs|1.99.4>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -11,7 +11,7 @@ the <c++> code and which, consequently, are neither defined nor documented in th
 elsewhere in the documentation.
 
 This document was generated automatically from the glue code definitions by
-the script <verbatim|src/src/Scheme/Glue/make-apidoc-doc.scm> in <TeXmacs>
+the script <source-link|src/src/Scheme/Glue/make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm> in <TeXmacs>
 source code.
 
 \;
@@ -179,6 +179,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(vue-gui?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_is_vue> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(gui-set-next-window-as-popup)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -192,6 +200,134 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|gui_set_next_window_without_focus> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-snapshot <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_snapshot> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-buttons)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_buttons> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-click <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_click> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-menu <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_menu> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-menu-entries <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_menu_entries> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-type <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_type> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-click-later <scm-arg|int> <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_click_later> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-port)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_port> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-raw <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_raw> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-busy?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_busy> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-texts)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_texts> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-windows)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_windows> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-set-pump <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_pump> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-eval-later <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_eval_later> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-file-dialog)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_file_dialog> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-file-dialog-do <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_file_dialog_do> which returns
+    <scm|int>.
   </explain>
 
   <\explain>
@@ -395,6 +531,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(get-user-login)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_user_login> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(get-user-name)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_user_name> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(plugin-list)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -459,6 +611,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(async-evaluate-system <scm-arg|array_string> <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_evaluate_system> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(async-evaluate-cancel <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_evaluate_cancel> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(async-eval-system-full <scm-arg|string> <scm-arg|object>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -472,6 +640,46 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|async_eval_pending> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-\<gtr\>svg-native <scm-arg|url> <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|native_pdf_to_svg> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-archive? <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_is_archive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-unpack <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_unpack> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-pack <scm-arg|array_string> <scm-arg|array_string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_write> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(http-get <scm-arg|string> <scm-arg|array_string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|http_get> which returns
+    <scm|string>.
   </explain>
 
   <\explain>
@@ -1027,6 +1235,70 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(set-hand-tuned-math-fonts <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_hand_tuned_math_fonts> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile-set <scm-arg|string> <scm-arg|scheme_tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile_set> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile-families)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile_families> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile-attr <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile_attr> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(math-family-for-text <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_family_for_text> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(text-family-for-math <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|text_family_for_math> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(hand-tuned-math-fonts?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_hand_tuned_math_fonts> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(tmtm-eqnumber-\<gtr\>nonumber <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1212,6 +1484,22 @@ source code.
 
   <\explain>
     <scm|(font-database-search <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_database_search> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(font-available-features <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ot_font_features> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(font-logical-search <scm-arg|string> <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|font_database_search> which returns
@@ -3371,6 +3659,46 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(emoji-name <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_name> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-names <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_all_names> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-latex-name <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_latex_name> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-from-latex <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_from_latex> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(emoji-to-code-points <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|emoji_to_code_points> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(utf8-\<gtr\>t2a <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -3599,6 +3927,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|tm_char_previous> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(string-grapheme-start <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tm_grapheme_start> which returns
     <scm|int>.
   </explain>
 
@@ -3888,6 +4224,30 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|verbatim_document_to_tree> which returns
     <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-source-\<gtr\>texmacs <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_document_to_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-source-snippet-\<gtr\>texmacs <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_snippet_to_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(source-\<gtr\>cork <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|source_text_to_cork> which returns
+    <scm|string>.
   </explain>
 
   <\explain>
@@ -4307,6 +4667,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cpp-ai-set-prices <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_set_prices> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(cpp-ai-chat <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4343,6 +4711,22 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|tree_to_json> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(json-\<gtr\>typed-tree <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|json_to_typed_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(typed-tree-\<gtr\>json <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typed_tree_to_json> which returns
     <scm|string>.
   </explain>
 
@@ -5491,6 +5875,118 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(code-set-line-layers <scm-arg|tree> <scm-arg|tree> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_set_line_layers> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(code-clear-line-layers <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_clear_line_layers> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(code-line-layers <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_line_layers_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-new <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_new> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-delete <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_delete> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-change <scm-arg|int> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_change> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-changed? <scm-arg|int> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_changed> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(code-snapshot-text <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_snapshot_text> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(code-line-fold-state <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_line_fold_state> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-set-line-fold-state <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_set_line_fold_state> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(code-column <scm-arg|string> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_column> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-utf16-column <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_utf16_column> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-utf16-offset <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_utf16_offset> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(code-indent-end <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|code_indent_end> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(widget-printer <scm-arg|command> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6171,6 +6667,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-forget-history <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|buffer_forget_history> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-embedded? <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -6608,6 +7112,38 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|window_hide> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(alt-window-set-on-top <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_set_on_top> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-info <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_info> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-info-of <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_info_of> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-report)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_report> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>
@@ -8395,6 +8931,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(xy-\<gtr\>path <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|xy_to_path> which returns
+    <scm|path>.
+  </explain>
+
+  <\explain>
     <scm|(set-mouse-pointer <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9635,6 +10179,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(markdown-expand <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|exec_markdown> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(office-expand <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|exec_office> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(animate-checkout <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9760,6 +10320,406 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|edit_test> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-language-new <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_language_new> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-language-load <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_language_load> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-parse-sexp <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_parse_sexp> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-query-new <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_query_new> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-query-capture-names <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_query_capture_names> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-query-captures <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_query_captures> which returns
+    <scm|array_int>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-sexp <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_sexp> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-node-at <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_node_at> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-node-range <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_node_range> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-errors <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_errors> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-last-nodes <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_last_nodes> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-captures <scm-arg|tree> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_captures> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-statistics <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_statistics> which returns
+    <scm|array_int>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-forget <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_forget> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-indent <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_indent> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-errors-with <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_errors_with> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-node-move <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_node_move> which returns
+    <scm|array_int>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-node-info <scm-arg|tree> <scm-arg|int> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_node_info> which returns
+    <scm|array_int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-set-highlighter <scm-arg|string> <scm-arg|int> <scm-arg|array_string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_set_highlighter> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-set-injections <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_set_injections> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-set-injection-name <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_set_injection_name> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-reset-highlights)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_reset_highlights> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-fold-state <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_fold_state> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-set-fold-state <scm-arg|tree> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_set_fold_state> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-pending-updates)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_pending_updates> which returns
+    <scm|array_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-line-colors <scm-arg|string> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_line_colors> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-line-tokens <scm-arg|string> <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_line_tokens> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-set-highlighting <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_set_highlighting> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-wrap-language <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_wrap_language> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-program-language <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_program_language> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-set-scanner <scm-arg|int> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_set_scanner> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-unpack <scm-arg|url> <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_unpack> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-lookahead)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_lookahead> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-advance <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_advance> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-mark-end)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_mark_end> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-set-result <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_set_result> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-column)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_column> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-eof?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_eof> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-advance-while <scm-arg|string> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_advance_while> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-advance-until <scm-arg|string> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_advance_until> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-lexer-skip-spaces <scm-arg|bool> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_lexer_skip_spaces> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-tables-start <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_tables_start> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-tables-finish <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_tables_finish> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-sitter-tables-export <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_sitter_tables_export> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-start <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_start> which returns
+    <scm|object>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-send <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_send> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-listen <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_listen> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-alive? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_alive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-stop <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_stop> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(lsp-document-text <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|lsp_document_text> which returns
+    <scm|string>.
   </explain>
 
 

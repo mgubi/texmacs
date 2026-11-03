@@ -20,6 +20,7 @@ foreach (_test_file ${TEST_SRC_FILES})
   target_link_libraries (${_test_name}
     texmacs_body
     ${TeXmacs_Libraries}
+    ${CMAKE_DL_LIBS}
     Qt${AC_QT_MAJOR_VERSION}::Test
   )
   set_target_properties (${_test_name} PROPERTIES AUTOMOC ON)

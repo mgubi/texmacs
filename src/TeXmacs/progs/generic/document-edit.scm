@@ -116,6 +116,13 @@
         ((== val "Linux Libertine") "libertine-font")
         (else (string-append val "-font"))))
 
+;; A TeX Gyre text font goes with the package of its own mathematics, unless
+;; another math font is asked for: Euler Math and Asana Math are set with
+;; Pagella text, and the package would replace them by Pagella Math
+(define (tex-gyre-font? val opts name)
+  (and (string-starts? val name)
+       (or (null? opts) (string-starts? (car opts) name))))
+
 (tm-define (init-font val . opts)
   (:check-mark "*" test-init-font?)
   (cond ((== val "TeXmacs Computer Modern")
@@ -126,13 +133,13 @@
         ;; profile of its own and its own math font
         ((== val "Stix")
          (init-font "stix" "math-stix"))
-        ((string-starts? val "TeX Gyre Bonum")
+        ((tex-gyre-font? val opts "TeX Gyre Bonum")
          (init-font "bonum" "math-bonum"))
-        ((string-starts? val "TeX Gyre Pagella")
+        ((tex-gyre-font? val opts "TeX Gyre Pagella")
          (init-font "pagella" "math-pagella"))
-        ((string-starts? val "TeX Gyre Schola")
+        ((tex-gyre-font? val opts "TeX Gyre Schola")
          (init-font "schola" "math-schola"))
-        ((string-starts? val "TeX Gyre Termes")
+        ((tex-gyre-font? val opts "TeX Gyre Termes")
          (init-font "termes" "math-termes"))
         (else
           (init-env "font" val)
@@ -140,9 +147,15 @@
             (init-env "math-font" (car opts)))
           (init-env "font-family" "rm")
           (remove-font-packages)
+          ;; the packages of fira-font and libertine-font take the large
+          ;; operators from TeX Gyre Pagella, and are older than the
+          ;; OpenType math fonts of the same design, which cover them
           (with pack (font-package-name val)
             (with dir "$TEXMACS_PATH/packages/customize/fonts"
-              (when (url-exists? (url-append dir (string-append pack ".ts")))
+              (when (and (url-exists? (url-append dir (string-append pack ".ts")))
+                         (or (null? opts)
+                             (== (math-font-profile-attr (car opts) "file")
+                                 "")))
                 (init-default "font")
                 (init-default "font-family")
                 (add-style-package pack)))))))
@@ -585,32 +598,48 @@
   (system-wait "Updating current buffer, " "please wait")
   (update-current-buffer))
 
+(define (zotero-update what)
+  ;; Zotero, when it is used, refreshes the references first (see
+  ;; bibtex/zotero.scm); 'wait when the update waits for zotero.org. An
+  ;; error there is reported, and does not stop the update
+  (if (not (zotero-used?)) 'done
+      (catch #t
+        (lambda () (zotero-before-update what))
+        (lambda err
+          (set-message (string-append "Zotero: " (object->string err))
+                       "Update")
+          'done))))
+
 (define (wait-update-current-buffer-keep)
   (system-wait "Updating current buffer, " "please wait")
   (update-current-buffer-keep))
 
 (tm-define (update-document what)
-  (for (.. 0 doc-update-times)       
-    (delayed    ; allow typesetting/magic to happen before next update
-      (:idle 1)
-      (cursor-after
-       ;; the automatic labels are first numbered in the order of the
-       ;; document: the tables which are made hold their names (a
-       ;; table made alone makes the others too when a name changed)
-       (cond ((== what "all")
-              ;; the layout is made from scratch first (the two gc), the
-              ;; labels are numbered and the tables made from that layout,
-              ;; and the end only types again what the tables changed
-              (inclusions-gc) (picture-gc)
-              (renumber-auto-labels)
-              (generate-all-aux) (wait-update-current-buffer-keep))
-             ((== what "bibliography")
-              (renumber-auto-labels)
-              (generate-all-aux) (wait-update-current-buffer))
-             ((== what "buffer") 
-              (wait-update-current-buffer))
-             ;; a table alone: when the labels were numbered again,
-             ;; the other tables hold names which changed
-             ((renumber-auto-labels)
-              (generate-all-aux) (wait-update-current-buffer))
-             (else (generate-aux what)))))))
+  ;; a bibliography file managed by Zotero is refreshed first; in a web
+  ;; browser, the update may wait for the answers of zotero.org, and is
+  ;; then made again when they come
+  (when (!= (zotero-update what) 'wait)
+    (for (.. 0 doc-update-times)       
+      (delayed    ; allow typesetting/magic to happen before next update
+        (:idle 1)
+        (cursor-after
+         ;; the automatic labels are first numbered in the order of the
+         ;; document: the tables which are made hold their names (a
+         ;; table made alone makes the others too when a name changed)
+         (cond ((== what "all")
+                ;; the layout is made from scratch first (the two gc), the
+                ;; labels are numbered and the tables made from that layout,
+                ;; and the end only types again what the tables changed
+                (inclusions-gc) (picture-gc)
+                (renumber-auto-labels)
+                (generate-all-aux) (wait-update-current-buffer-keep))
+               ((== what "bibliography")
+                (renumber-auto-labels)
+                (generate-all-aux) (wait-update-current-buffer))
+               ((== what "buffer") 
+                (wait-update-current-buffer))
+               ;; a table alone: when the labels were numbered again,
+               ;; the other tables hold names which changed
+               ((renumber-auto-labels)
+                (generate-all-aux) (wait-update-current-buffer))
+               (else (generate-aux what))))))))

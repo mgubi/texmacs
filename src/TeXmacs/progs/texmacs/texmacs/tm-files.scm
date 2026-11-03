@@ -255,8 +255,13 @@
 (define (has-faithful-format? name)
   (in? (url-suffix name) '("tm" "ts" "tp" "stm" "tmml" "scm" "")))
 
+(tm-define (version-notify-saved name)
+  (:synopsis "Hook for versioning tools, called after saving @name")
+  (noop))
+
 (define (save-buffer-post name opts)
   ;;(display* "save-buffer-post " name "\n")
+  (version-notify-saved name)
   (cond ((in? :update opts)
          (update-buffer name))
         ((in? :commit opts)
@@ -438,11 +443,28 @@
              (when answ (save-buffer-as-check-other new-name name opts)))))
         (else (save-buffer-as-check-other new-name name opts))))
 
+(define (save-name-with-suffix new-name name)
+  ;; a document of TeXmacs saved under a name without a suffix is given .tm:
+  ;; it was saved as plain text, the format which a name without a suffix
+  ;; has (#400); a source file keeps the name it is given (a Makefile)
+  (let ((u (if (url? new-name) new-name (system->url new-name))))
+    (if (and (== (url-suffix u) "") (== (url-format name) "texmacs")
+             (not (url-directory? u)))
+        (url-glue u ".tm")
+        new-name)))
+
+(define (save-as-check-suffixed new-name name opts)
+  ;; the file dialog asked about replacing the file it gave (:overwrite),
+  ;; not the one with the suffix added: that one is asked about here
+  (with u (save-name-with-suffix new-name name)
+    (save-buffer-as-check-permissions
+     u name (if (== u new-name) opts (list-difference opts (list :overwrite))))))
+
 (tm-define (save-buffer-as-main new-name . args)
   ;;(display* "save-buffer-as-main " new-name "\n")
   (if (or (null? args) (not (url? (car args))))
-      (save-buffer-as-check-permissions new-name (current-buffer) args)
-      (save-buffer-as-check-permissions new-name (car args) (cdr args))))
+      (save-as-check-suffixed new-name (current-buffer) args)
+      (save-as-check-suffixed new-name (car args) (cdr args))))
 
 (tm-define (save-buffer-as new-name . args)
   (:argument new-name texmacs-file "Save as")
@@ -626,6 +648,13 @@
                               (url-append (string->url "www.doi.org")
                                           (url-unroot u)))
            (load-external u*)))
+        ((defined? 'web-open-external)
+         ;; in the browser (TeXmacs Upsilon): a page of the web or a mail
+         ;; address in the browser, a file of the page in its viewer
+         (if (or (url-rooted-web? u) (url-rooted-protocol? u "mailto"))
+             (web-open-external (url->string u) #f "")
+             (web-open-external (url->system u) #t
+                                (url->string (url-tail u)))))
         ((url-rooted-protocol? u "mailto")
          (system (string-append (default-open) " " (url->string u))))
         ((not (url-rooted-web? u))
@@ -822,11 +851,44 @@
                 (load-buffer-check-permissions name opts)))))
       (load-buffer-check-permissions name opts)))
 
+(define (stree-wildcard? t)
+  (and (pair? t)
+       (or (== (car t) 'wildcard)
+           (list-or (map stree-wildcard? (cdr t))))))
+
+(tm-define (url-wildcard? u)
+  (:synopsis "Does the url @u contain a wildcard, a pattern like in a*.scm?")
+  ;; a name with a star which comes from a directory is a plain name, not
+  ;; a wildcard: a file a*b.scm can be loaded
+  (stree-wildcard? (url->stree (if (string? u) (string->url u) u))))
+
+(define (load-buffer-wildcard name opts)
+  ;; A wildcard is not the name of a buffer (url-glue, for the names of the
+  ;; autosave files, can't glue to it, #790): the files which it matches are
+  ;; the candidates. None, or several, give a message and load nothing (a
+  ;; script which calls load-buffer can't answer a page of disambiguation);
+  ;; one is loaded as if it had been named. Nothing is resolved before: the
+  ;; wildcards of the other roots (tmfs, web) are never completed.
+  (with l (link-wildcard-candidates name #f)
+    (cond ((null? l)
+           (set-message (replace "No file matches %1" (url->system name))
+                        "Load file"))
+          ((null? (cdr l))
+           (apply load-buffer-main (cons (car l) opts)))
+          (else
+            (set-message (replace "%1 files match %2, none is loaded"
+                                  (number->string (length l))
+                                  (url->system name))
+                         "Load file")))))
+
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
-  (set! name (load-buffer-resolve-name name))
-  (load-buffer-confirm-large name opts
-    (lambda () (load-buffer-check-autosave name opts))))
+  (if (url-wildcard? name)
+      (load-buffer-wildcard name opts)
+      (begin
+        (set! name (load-buffer-resolve-name name))
+        (load-buffer-confirm-large name opts
+          (lambda () (load-buffer-check-autosave name opts))))))
 
 (tm-define (load-buffer name . opts)
   (:argument name smart-file "File name")
@@ -1026,9 +1088,12 @@
 (tm-define (print-buffer)
   (:synopsis "Print the current buffer")
   (:interactive (use-print-dialog?))
-  (if (use-print-dialog?)
-      (interactive-print-buffer)
-      (direct-print-buffer)))
+  (cond ((defined? 'web-open-pdf)
+         ;; in the browser: the PDF in a tab, whose viewer prints it
+         (preview-buffer))
+        ((use-print-dialog?)
+         (interactive-print-buffer))
+        (else (direct-print-buffer))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Important files to which the buffer is linked (e.g. bibliographies)

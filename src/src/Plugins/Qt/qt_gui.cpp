@@ -9,6 +9,7 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "gui_test.hpp"
 #include <locale.h>
 
 #include "convert.hpp"
@@ -135,7 +136,10 @@ qt_forget_deferred_deletes () {
   // the thread-local objects of Qt are gone before any exit handler is
   // called, and so are the static objects made after this handler was
   // registered, as the list of the active scrollers of QScroller, made by
-  // the first one deleted. The quit of TeXmacs, _exit, deletes nothing)
+  // the first one deleted. The quit of TeXmacs calls this too, before _exit:
+  // on Windows _exit runs the shutdown of the DLLs, where Qt delivers the
+  // pending deferred deletes and ~QWidget crashes; calling it twice, here
+  // and by the exit handler, is harmless)
   if (QCoreApplication::instance () != NULL)
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
@@ -433,7 +437,6 @@ qt_gui_rep::set_selection (string key, tree t,
 
   cb->setText (QString::fromLatin1 (selection, N_selection), mode);
   QMimeData *md = new QMimeData;
-
   if (format == "verbatim" || format == "default") {
     if (format == "default") {
       md->setData ("application/x-texmacs-clipboard", (char*)selection);
@@ -441,9 +444,11 @@ qt_gui_rep::set_selection (string key, tree t,
       QString pid_str;
       pid_str.setNum (QCoreApplication::applicationPid ());
       md->setData ("application/x-texmacs-pid", pid_str.toLatin1());
-      
+
+      //c_string tmp (sh);
+      //md->setHtml (QString::fromUtf8 (tmp, N(sh)));
       (void) sh;
-      
+
       selection = c_string (sv);
       N_selection = N(sv);
     }
@@ -661,6 +666,7 @@ qt_gui_rep::event_loop () {
     app = QApplication::instance ();
   update();
     //need_update();
+  gui_test_start (); // TEXMACS_TEST_SCRIPT=<file>: a scripted test
   app->exec();
 }
 
@@ -1325,6 +1331,19 @@ command_queue::exec_pending () {
     }
   } else
     wait = false;
+}
+
+bool
+command_queue::has_due (time_t now) {
+  for (int i= 0; i < N(start_times); i++)
+    if (now - start_times[i] >= 0) return true;
+  return false;
+}
+
+bool
+qt_gui_rep::test_busy () {
+  return !waiting_events.is_empty () || needing_update ||
+         delayed_commands.has_due (texmacs_time ());
 }
 
 void

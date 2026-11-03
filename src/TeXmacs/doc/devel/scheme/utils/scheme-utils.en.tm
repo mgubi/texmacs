@@ -1,9 +1,9 @@
-<TeXmacs|1.0.6.10>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
-  <tmdoc-title|<TeXmacs> extensions to <value|scheme> and utilities>
+  <tmdoc-title|<TeXmacs> extensions to <scheme> and utilities>
 
   <\traverse>
     <branch|<TeXmacs> abbreviations|utils-abbrevs.en.tm>

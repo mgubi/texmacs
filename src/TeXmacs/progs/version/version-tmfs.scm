@@ -12,14 +12,19 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (version version-tmfs))
+(texmacs-module (version version-tmfs)
+  (:use (version git-base)))
 
 (define version-tool-table (make-ahash-table))
 (define version-tool-loaded (make-ahash-table))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Arguments of the commands of the external tools
+;; Arguments of the command lines of the external tools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; NOTE: Git is run without a command line (git-run in git-base.scm, with
+;; a list of arguments); the commands of svn are command lines for
+;; eval-system, whose arguments are quoted with version-quote
 
 (define (windows-quote s)
   ;; On Windows, eval-system starts the program without a shell, and the
@@ -38,7 +43,7 @@
                             (string-append r (bs n) (string c)))))))))
 
 (tm-define (version-quote s)
-  ;; @s as one argument on the command line of eval-system
+  (:synopsis "@s as one argument on the command line of eval-system")
   ;; (not escape-shell: on MinGW, escape_sh only puts @s in double quotes)
   (if (or (os-mingw?) (os-win32?))
       (windows-quote s)
@@ -57,19 +62,17 @@
     (list-or (map url-directory? l))))
 
 (tm-define (git-active? name)
-  (let* ((dir (if (url-directory? name) name (url-head name)))
-         (anc (url-append dir (url-ancestor)))
-         (git (url-append anc ".git"))
-         (l   (cDr (url->list (url-expand git)))))
-    (list-or (map url-directory? l))))
+  (nnot (git-root name)))
 
 (tm-define (version-tool name)
   (or (if (ahash-ref version-tool-table name)
           (with tool (ahash-ref version-tool-table name)
             (and (!= tool "") tool))
           (with tool
-              (cond ((svn-active? name) "svn")
-                    ((git-active? name) "git")
+              ;; the tool is needed as well as its directory (a copy of a
+              ;; project with its .git, in the browser, has no git)
+              (cond ((and (svn-active? name) (url-exists-in-path? "svn")) "svn")
+                    ((and (git-active? name) (url-exists-in-path? "git")) "git")
                     (else ""))
             (ahash-set! version-tool-table name tool)
             (when (and tool (not (ahash-ref version-tool-loaded tool)))
@@ -81,6 +84,11 @@
             (and (!= tool "") tool)))
       (and-with base (url-wrap name)
         (and (version-tool base) "wrap"))))
+
+(tm-define (version-tool-reset)
+  (:synopsis "Forget which versioning tools manage which files")
+  (versioning-directory-reset)
+  (set! version-tool-table (make-ahash-table)))
 
 (tm-define (version-tool* name)
   (if (version-revision? name)
@@ -137,9 +145,18 @@
     (string-append (url->system (url-tail u)) " - History")))
 
 (tm-define (version-revision-url u rev)
-  (if (string-contains rev ":")
+  (if (string-contains? rev ":")
     (string-append "tmfs://revision/" (string-replace rev ":" "/"))
     (string-append "tmfs://revision/" rev "/" (url->tmfs-string u))))
+
+(tm-define (version-history-text u s . opt-max)
+  ;; Text @s (author, message) of the history of @u, for display
+  ;; NOTE: the history of git is in utf8, the one of svn is already in cork;
+  ;; the optional argument is a maximal length
+  (if (git-active? u)
+      (utf8->cork (if (null? opt-max) s (git-utf8-shorten s (car opt-max))))
+      (if (or (null? opt-max) (<= (string-length s) (car opt-max))) s
+          (string-append (substring s 0 (- (car opt-max) 3)) "..."))))
 
 (tmfs-load-handler (history name)
   (let* ((u (tmfs-string->url name))
@@ -159,97 +176,8 @@
                ($with dest (version-revision-url u rev)
                  ($describe-item
                      ($inline Version " " ($link dest rev*)
-                              " by " (utf8->cork by) " on " date)
-                   (utf8->cork msg)))))))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Showing a particular commit
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (tmfs-url-commit root rev)
-  (string-append "tmfs://commit/" rev "/" (url->tmfs-string root)))
-
-(tmfs-format-handler (commit name)
-  (url-format (tmfs-string->url (tmfs-cdr name))))
-
-(define (string-repeat str n)
-  (do ((i 1 (1+ i))
-       (ret "" (string-append ret str)))
-      ((> i n) ret)))
-
-(define (get-row-from-x x maxs maxv)
-  (define (get-length nr)
-    (let* ((ret (if (== maxv 0)
-                    0
-                    (/ (* nr (min maxs maxv)) maxv))))
-      (if (and (> ret 0) (< ret 1))
-          1
-          ret)))
-  `(row (cell ,(third x))
-        (cell ,(number->string (+ (first x) (second x))))
-        (cell (concat (with color green
-                        ,(string-repeat "+"
-                                        (get-length (first x))))
-                      (with color red
-                        ,(string-repeat "-"
-                                        (get-length (second x))))))))
-
-(tm-define (git-show-normal root rev)
-  (define (sum2 x)
-    (+ (first x) (second x)))
-  (define (length-of-2col x)
-    (+ (string-length (number->string (sum2 x)))
-       (fourth x)))
-  
-  (let* ((m (git-commit-message root rev))
-         (p (git-commit-parent root rev))
-         (d (git-commit-diff root p rev))
-         (nr (length d))
-         (ins (list-fold + 0 (map first d)))
-         (del (list-fold + 0 (map second d)))
-         (maxv (list-fold max 0 (map sum2 d)))
-         (maxs (- 81 (list-fold max 0 (map length-of-2col d)))))
-    ($generic
-         ($tmfs-title "Commit Message of " (version-beautify-revision root rev))
-         (if (== rev p)
-             "parent 0"
-             `(concat "parent "
-                      ,($link (tmfs-url-commit root p) p)))
-         (list 'new-line)
-         ($for (x m) `(concat ,(utf8->cork x) ,(list 'new-line)))
-         "-----"
-         (list 'new-line)
-         `(verbatim
-           (tabular
-            (tformat
-             (cwith "1" "-1" "1" "-1"
-                    cell-lsep "0pt")
-             ,(cons 'table
-                    (map (lambda (x) (get-row-from-x x maxs maxv)) d)))))
-         (list 'new-line)
-         `(concat ,nr " files changed, "
-                  ,ins
-                  " insertions(" (verbatim (with color green "+")) "), "
-                  ,del
-                  " deletions(" (verbatim (with color red "-")) ")"))))
-
-(tm-define (git-show-merge root rev)
-  (let* ((parents (git-commit-parents root rev))
-         (left (car parents))
-         (right (car (cdr parents))))
-    ($generic ($tmfs-title "Merge")
-            `(concat "parents "
-                     ,($link (tmfs-url-commit root left) left)
-                     ,(list 'new-line)
-                     ,($link (tmfs-url-commit root right) right)))))
-
-(tmfs-load-handler (commit name)
-  (let* ((root (tmfs-string->url (tmfs-cdr name)))
-         (tool (version-tool root)) ;; NOTE: forces lazy loading
-         (rev (tmfs-car name)))
-    (if (== (length (git-commit-parents root rev)) 1)
-        (git-show-normal root rev)
-        (git-show-merge root rev))))
+                              " by " (version-history-text u by) " on " date)
+                   (version-history-text u msg)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Showing a particular revision

@@ -27,6 +27,8 @@ struct poor_rubber_font_rep: font_rep {
   poor_rubber_font_rep (string name, font base);
   font   get_font (int nr);
   int    search_font (string s, string& r);
+  bool   math_big (string s);
+  hashmap<string,int> math_big_cache;
 
   bool   supports (string c);
   void   get_extents (string s, metric& ex);
@@ -52,6 +54,11 @@ struct poor_rubber_font_rep: font_rep {
 
 #define MAGNIFIED_NUMBER 4
 #define HUGE_ADJUST      1
+// slashes cannot be extended by repeating a straight middle part, as the
+// other delimiters are: beyond MAGNIFIED_NUMBER they keep being stretched,
+// mostly vertically, in the fonts from SLASH_BASE on
+#define SLASH_BASE       (2*MAGNIFIED_NUMBER + 6)
+#define SLASH_NUMBER     16
 
 bool
 supports_big_operators (string res_name) {
@@ -67,12 +74,14 @@ supports_big_operators (string res_name) {
 
 poor_rubber_font_rep::poor_rubber_font_rep (string name, font base2):
   font_rep (name, base2), base (base2),
-  big_flag (supports_big_operators (base2->res_name))
+  // a font with a MATH table has its own big operators, whatever its name;
+  // the name tests below are for the fonts that have none
+  big_flag (base2->ot_math || supports_big_operators (base2->res_name))
 {
   this->copy_math_pars (base);
   initialized << true;
   larger << base;
-  for (int i=1; i<=2*MAGNIFIED_NUMBER+5; i++) {
+  for (int i=1; i<SLASH_BASE+SLASH_NUMBER; i++) {
     initialized << false;
     larger << base;
   }
@@ -84,7 +93,13 @@ poor_rubber_font_rep::get_font (int nr) {
   ASSERT (nr < N(larger), "wrong font number");
   if (initialized[nr]) return larger[nr];
   initialized[nr]= true;
-  if (nr <= 2*MAGNIFIED_NUMBER + 1) {
+  if (nr >= SLASH_BASE) {
+    int k= MAGNIFIED_NUMBER + 1 + (nr - SLASH_BASE);
+    double zoomy= pow (2.0, ((double) k) / 4.0);
+    double zoomx= sqrt (sqrt (zoomy));
+    larger[nr]= poor_stretched_font (base, zoomx, zoomy);
+  }
+  else if (nr <= 2*MAGNIFIED_NUMBER + 1) {
     int hnr= nr / 2;
     double zoomy= pow (2.0, ((double) hnr) / 4.0);
     double zoomx= sqrt (zoomy);
@@ -131,6 +146,15 @@ is_thin (string s) {
   return thin_delims->contains (s);
 }
 
+// A big operator which would be built from pieces, a bitmap in a PDF, is
+// left to the base font when that font has it as glyphs of a MATH table
+bool
+poor_rubber_font_rep::math_big (string s) {
+  if (!math_big_cache->contains (s))
+    math_big_cache (s)= smart_font_has_math_big_operator (base, s)? 1: 0;
+  return math_big_cache [s] != 0;
+}
+
 int
 poor_rubber_font_rep::search_font (string s, string& r) {
   if (starts (s, "<big-") && (ends (s, "-1>") || ends (s, "-2>"))) {
@@ -142,11 +166,11 @@ poor_rubber_font_rep::search_font (string s, string& r) {
 	starts (s, "<big-upiiiint") || starts (s, "<big-upoint") ||
         starts (s, "<big-upoiint") || starts (s, "<big-upoiiint") ||
 	starts (s, "<big-amalg") || starts (s, "<big-pluscup"))
-      if (!big_flag) return 2*MAGNIFIED_NUMBER + 5;
+      if (!big_flag) return math_big (s)? 0: 2*MAGNIFIED_NUMBER + 5;
     if (starts (s, "<big-idotsint") || starts (s, "<big-upidotsint") ||
         starts (s, "<big-triangleup") || starts (s, "<big-box") ||
         starts (s, "<big-parallel") || starts (s, "<big-interleave"))
-      return 2*MAGNIFIED_NUMBER + 5;
+      return math_big (s)? 0: 2*MAGNIFIED_NUMBER + 5;
     if (big_flag && ends (s, "-1>") && base->supports (s)) return 0;
     return 2*MAGNIFIED_NUMBER + 4;
   }
@@ -162,6 +186,23 @@ poor_rubber_font_rep::search_font (string s, string& r) {
     int nr= max (num - 5, 0);
     int thin= (is_thin (r)? 1: 0);
     int code;
+    if ((r == "/" || r == "\\") && num > MAGNIFIED_NUMBER) {
+      int k= min (num - MAGNIFIED_NUMBER - 1, SLASH_NUMBER - 1);
+      if (r == "\\" && base->supports ("/")) {
+        metric ex1, ex2;
+        base -> get_extents ("/", ex1);
+        base -> get_extents ("\\", ex2);
+        double h1= ex1->y2 - ex1->y1;
+        double h2= ex2->y2 - ex2->y1;
+        if (fabs ((h2/h1) - 1.0) > 0.05) {
+          // as below: a backslash made from the slash, at the largest
+          // magnified size
+          r= "<emu-backslash>";
+          return 2*MAGNIFIED_NUMBER;
+        }
+      }
+      return SLASH_BASE + k;
+    }
     if (num <= MAGNIFIED_NUMBER ||
         r == "/" || r == "\\" ||
         r == "langle" || r == "rangle" ||
@@ -235,6 +276,18 @@ poor_rubber_font_rep::search_font (string s, string& r) {
   }
   r= s;
   return 0;
+}
+
+// Whether a poor rubber font builds the rubber character s from pieces, as
+// it does for a tall radical, rather than taking a glyph and stretching it;
+// a PDF holds such a construction as a bitmap
+bool
+poor_rubber_constructs (font fn, string s) {
+  poor_rubber_font_rep* p= dynamic_cast<poor_rubber_font_rep*> (fn.rep);
+  if (p == NULL) return false;
+  string r;
+  int nr= p->search_font (s, r);
+  return nr >= 2*MAGNIFIED_NUMBER + 2 && nr < SLASH_BASE;
 }
 
 /******************************************************************************

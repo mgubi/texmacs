@@ -28,17 +28,33 @@
 
   <paragraph*|Built-in <value|scheme> commands>
 
-  On the very basic level, one has the standard <value|scheme> language, with
-  some enhancements by the <name|Guile> implementation (these extensions are
-  used as least as possible, for future portability). The standard
+  On the very basic level, one has the standard <value|scheme> language, as
+  provided by <name|S7> or by <name|Guile> 1.8, depending on the build (the
+  extensions of these implementations are used as least as possible). The
+  differences between the two are hidden by the modules
+  <source-link|boot-s7.scm|TeXmacs/progs/kernel/boot/boot-s7.scm> and
+  <source-link|compat-s7.scm|TeXmacs/progs/kernel/boot/compat-s7.scm> for
+  <name|S7>, <abbr|resp.> <source-link|boot.scm|TeXmacs/progs/kernel/boot/boot.scm>
+  and <source-link|compat.scm|TeXmacs/progs/kernel/boot/compat.scm> for
+  <name|Guile>. At startup, <TeXmacs> loads
+  <source-link|init-s7.scm|TeXmacs/progs/init-s7.scm> <abbr|resp.>
+  <source-link|init-guile.scm|TeXmacs/progs/init-guile.scm>, which set up
+  the interpreter and its module system, and then the files
+  <source-link|init-kernel.scm|TeXmacs/progs/init-kernel.scm> (the kernel
+  modules) and <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>
+  (the rest of the editor), which are common to both. The standard
   <value|scheme> language is enriched by some routines implemented in the C++
   part of <TeXmacs> and exported to <value|scheme> via the glue. If you
   unpacked the source code of <TeXmacs> in <verbatim|<em|source-dir>>, then
   you can find a full list of the routines exported by the glue in the files
 
-  <verbatim| \ \ \ <em|source-dir>/src/Guile/Glue/build-glue-base.scm<new-line>
-  \ \ \ <em|source-dir>/src/Guile/Glue/build-glue-editor.scm<new-line>
-  \ \ \ <em|source-dir>/src/Guile/Glue/build-glue-server.scm>
+  <verbatim| \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-basic.scm<new-line>
+  \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-editor.scm<new-line>
+  \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-server.scm>
+
+  (from which the <c++> files <source-link|glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp>,
+  <source-link|glue_editor.cpp|src/Scheme/Glue/glue_editor.cpp> and <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp> in the same
+  directory are generated).
 
   <paragraph*|Extensions to <value|scheme> and further utilities>
 
@@ -87,8 +103,8 @@
   \ \ \ $TEXMACS_PATH/progs/math<new-line> \ \ \ $TEXMACS_PATH/progs/table>
 
   respectively contain routines for editing source code, mathematics and
-  tables. Exceptions are the internal modules <verbatim|content> and
-  <verbatim|fonts>, which rather correspond to a particular type of
+  tables. Exceptions are internal modules like <verbatim|fonts>,
+  <verbatim|convert> or <verbatim|security>, which rather correspond to a particular type of
   functionality. Each internal module corresponds to a group of files, each
   of which corresponds to an individual <em|<TeXmacs> module>. The internal
   modules are designed to be as independent as possible.

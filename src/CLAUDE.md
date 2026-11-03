@@ -43,7 +43,7 @@ All runners are run from `src/`, after building, and exit non-zero on failure.
 | `tests/scheme/check.sh path/foo-test.scm` | a suite file not yet registered | seconds |
 | `tests/scheme/check.sh integration` | the integration suites (server backup, cache...) | |
 | `tests/startup/check.sh` | the command line (`-x`, files, `-q`, `-headless`) and the exit after a script, one TeXmacs process per case; a crash at the exit fails (#462); offscreen, `TM_TEST_TIMEOUT` per case (60 s) | 20 s, 50 s with a fresh home |
-| `make -C tests` | the C++ unit tests (QtTest), linked against `src/Objects` | minutes |
+| `make -C tests` | the C++ unit tests (tm_test.hpp, any GUI), linked against `src/Objects` | minutes |
 | `tests/documents/check.sh [-u] [-p]` | typesets `tests/documents/samples/*.tm` to PDF and compares their text with `tests/documents/ref` (`-u` updates, `-p` also compares pixels) | about 1 min |
 | `tests/docs/check.sh [-b\|-f] [-l lan] [-u]` | the whole documentation: the Help books to PDF and every `TeXmacs/doc` file; problems are compared with `tests/docs/ref/summary.txt` | about 9 min |
 
@@ -113,3 +113,9 @@ Logs are in `tests/build/<runner>/`. Some references depend on the machine's fon
 - **Dependencies**: Requires Guile Scheme 1.8, FreeType 2, libiconv; optional aspell/hunspell, ImageMagick, mutool (document tests)
 - **Version Control**: Primary SVN repository on Savannah, GitHub mirror for visibility
 - **Plugin Integration**: New plugins follow established patterns in `plugins/` directory
+
+## Browser Port (Vue + WebAssembly)
+
+- The browser build: `misc/wasm/` (Makefile, page scripts, packaging), the Vue interface `src/Plugins/Vue/`, notes in `docs/wasm/README.md`.
+- **Keep the help page of the port up to date**: every new feature or user-visible fix of the browser port gets a line in the "Recent changes" section of `TeXmacs/doc/about/welcome/texmacs-vue.en.tm` (Help > TeXmacs in the browser), in the same commit or right after: a `<paragraph|D Month YYYY>` block per day, newest first, short items written for users. Correct the other sections of the page when a change makes them wrong (e.g. "What does not work").
+- `.tm` files are ASCII (Cork encoding): no raw UTF-8; use `<name>` symbols such as `\<less\>`.

@@ -14,6 +14,12 @@
 
 (texmacs-module (check check-master)
   (:use (convert latex tmtex-pdflatex)
+        (kernel boot abbrevs-test)
+        (kernel logic logic-engine-test)
+        (kernel texmacs tm-define-test)
+        (kernel texmacs tm-dialogue-test)
+        (kernel texmacs tm-convert-test)
+        (kernel texmacs tm-glue-test)
         (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
@@ -38,12 +44,20 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
+        (check source-files-test)
+        (check code-test)
+        (check markdown-test)
+        (check office-test)
         (check editing-test)
         (check read-only-test)
         (check typeset-test)
         (check code-lines-test)
+        (check opentype-typeset-test)
+        (check emoji-test)
         (check pattern-test)
         (check bibtex-test)
+        (check csl-test)
+        (check zotero-test)
         (check database-test)
         (check math-edit-test)
         (check table-test)
@@ -51,10 +65,12 @@
         (check text-structure-test)
         (check graphics-edit-test)
         (check version-test)
+        (check git-test)
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
         (check web-files-test)
+        (check print-test)
         (check kbd-menu-test)
         (check structures-test)
         (check convert-more-test)
@@ -62,7 +78,12 @@
         (check macro-drd-test)
         (check crypto-test)
         (check plugins-test)
+        (check ai-test)
         (kernel texmacs tm-secure-test)))
+
+;; test suites which only make sense with S7
+(if (s7-scheme?)
+    (use-modules (kernel boot compat-s7-test) (kernel boot boot-s7-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -108,6 +129,11 @@
 ;; the first one) or integration (integration-test-group adds them to
 ;; integration-failure-total).
 (define regression-suites
+  (append
+   (if (s7-scheme?)
+       '(("compat-s7" regtest-compat-s7 error)
+         ("boot-s7" regtest-boot-s7 error))
+       '())
   '(("htmltm" regtest-htmltm error)
     ("xmltm" regtest-xmltm error)
     ("tmlength" regtest-tmlength error)
@@ -128,17 +154,26 @@
     ("search" search-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ("source-files" source-files-test-failures count)
+    ("code" code-test-failures count)
+    ("markdown" markdown-test-failures count)
+    ("office" office-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ;; read-only buffers, and the console of the error messages (a window)
     ("read-only" read-only-test-failures count)
     ("typeset" typeset-test-failures count)
     ("code-lines" code-lines-test-failures count)
+    ("opentype-typeset" opentype-typeset-test-failures count)
+    ("emoji" emoji-test-failures count)
     ("pattern" pattern-test-failures count)
     ;; after editing: generating a bibliography or the auxiliary data of a
     ;; document processes the pending GUI events, among which those of the
     ;; views which editing closed (#174)
     ("bibtex" bibtex-test-failures count)
+    ("csl" csl-test-failures count)
+    ;; generates the tables of the JSON grammar of misc/tree-sitter
+    ("treesit" treesit-test-failures count)
     ;; generates the auxiliary data of documents in the temporary directory
     ("links" links-test-failures count)
     ("structures" structures-test-failures count)
@@ -150,11 +185,22 @@
     ("graphics-edit" graphics-edit-test-failures count)
     ;; makes a throwaway git repository in the temporary directory
     ("version" version-test-failures count)
+    ;; makes throwaway git repositories in the temporary directory, and
+    ;; runs this TeXmacs as their merge driver
+    ("git" git-test-failures count)
     ("misc-modules" misc-modules-test-failures count)
+    ;; prints the document for File > Preview (no viewer is started)
+    ("print" print-test-failures count)
     ;; loads the keyword tables of the program languages
     ("parse" parse-test-failures count)
     ("database" database-test-failures count)
+    ;; with a fake Zotero; opens documents (so after links) and loads the
+    ;; modules of the bibliographic database (so after database); writes
+    ;; bibliographies and a database in the temporary directory
+    ("zotero" zotero-test-failures count)
     ("crypto" crypto-test-failures count)
+    ;; the answers of the AI engines, converted without a network
+    ("ai" ai-test-failures count)
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
     ("remote" remote-test-failures count)
@@ -165,10 +211,19 @@
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys
     ("kbd-menu" kbd-menu-test-failures count)
+    ;; starts sh, cat and printf as language servers, and stops them; with
+    ;; clangd, edits a C++ buffer, which loads the keyboard maps of programs:
+    ;; after kbd-menu, whose math checks must come before (see there)
+    ("lsp" lsp-test-failures count)
     ;; loads every style package, and with them the Scheme modules they use
     ("macro-drd" macro-drd-test-failures count)
+    ("tm-define-regression" regtest-tm-define error)
+    ("tm-dialogue" regtest-tm-dialogue error)
+    ("abbrevs" regtest-abbrevs error)
+    ("logic" regtest-logic error)
+    ("tm-glue" regtest-tm-glue error)
     ;; last, since it defines modes and functions in the running TeXmacs
-    ("tm-define" define-test-failures count)))
+    ("tm-define" define-test-failures count))))
 
 (define integration-suites
   '(("deletion-plan" regtest-deletion-plan integration)
@@ -178,7 +233,28 @@
 
 ;; the number of failures of a suite; an error which escapes the suite
 ;; counts as one, and does not stop the suites after it
+;; the suites of the features of program code which a build may leave out
+;; (src/docs/code-features.md): run when the feature is there (its glue); their
+;; modules are loaded then (those of tree-sitter call its glue when they
+;; are loaded)
+(define feature-suites
+  '(("treesit" tree-sitter-program-language (check treesit-test))
+    ("lsp" lsp-start (check lsp-test))))
+
+(define (suite-built? suite)
+  (with f (assoc (car suite) feature-suites)
+    (or (not f) (defined? (cadr f)))))
+
 (define (suite-failures suite)
+  (cond ((not (suite-built? suite))
+         (display* "Suite " (car suite) ": not in this build\n")
+         0)
+        ((assoc (car suite) feature-suites)
+         (module-provide (caddr (assoc (car suite) feature-suites)))
+         (suite-failures* suite))
+        (else (suite-failures* suite))))
+
+(define (suite-failures* suite)
   (let ((f (eval (cadr suite)))
         (kind (caddr suite)))
     (set! integration-failure-total 0)

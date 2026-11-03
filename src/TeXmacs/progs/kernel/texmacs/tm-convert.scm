@@ -20,9 +20,16 @@
 
 (define lazy-format-todo '())
 
+(define-public (lazy-format-add! module)
+  (set! lazy-format-todo (cons module lazy-format-todo)))
+
 (define-public-macro (lazy-format module . ignored)
-  (set! lazy-format-todo (cons module lazy-format-todo))
-  `(delayed (:idle 2000) (import-from ,module)))
+  ;; the module is recorded when the form is evaluated, not when it is
+  ;; expanded: a Scheme may expand a form which is not evaluated (femtolisp
+  ;; expands (when #f (lazy-format ...)) when it compiles it)
+  `(begin
+     (lazy-format-add! ',module)
+     (delayed (:idle 2000) (import-from ,module))))
 
 (define (lazy-format-force)
   (if (nnull? lazy-format-todo)
@@ -151,8 +158,17 @@
          (cmd (if (or (os-win32?) (os-mingw?)) (escape-shell (converter-shell-cmd l from to))
              (converter-shell-cmd l from to))))
     ;;(display* "shell: " cmd "\n")
-    (system cmd)
-    (if (url-exists? to) to #f)))
+    ;; a destination which cannot be made concrete (a relative one) would be
+    ;; left out of the command, and the tool would choose a file of its own
+    ;; (ps2pdf: one named after the source, in the current directory)
+    (if (== (url-concretize to) "")
+        (begin
+          (display* "TeXmacs] cannot convert to " (url->system to)
+                    ": not a full path\n")
+          #f)
+        (begin
+          (system cmd)
+          (if (url-exists? to) to #f)))))
 
 (define-public (converter-save s opts)
   "Helper routine for define-format macro"
@@ -464,7 +480,7 @@
 
 (define-public (format-skip-line s pos)
   (cond ((>= pos (string-length s)) pos)
-        ((in? (string-ref s pos) '(#\newline #\cr)) (+ pos 1))
+        ((in? (string-ref s pos) (list #\newline #\return)) (+ pos 1))
         (else (format-skip-line s (+ pos 1)))))
 
 (define-public (format-test? s pos what)

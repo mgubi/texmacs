@@ -1,0 +1,8 @@
+# needs two-tools.scm: several tools in the side panels
+wait 6000
+window #2
+snapshot tt0
+wait 2500
+snapshot tt1
+wait 2500
+snapshot tt2

@@ -17,8 +17,15 @@
 #include "analyze.hpp"
 #include "hashmap.hpp"
 
+// version of the client/server protocol (also reported without sockets)
+constexpr int TM_PROTOCOL_VERSION = 1;
+
 #ifdef QTTEXMACS
 #include "Qt/QTMSockets.hpp"
+#else
+#include "tm_sockets.hpp"
+#endif
+#if 1 // the sockets exist in every build now
 
 #define CLT_KO(c) (c == NULL || !c->alive)
 
@@ -27,7 +34,6 @@ static hashmap<int,pointer> client_from_fd;
 static bool clients_started= false;
 
 // v1: tree_cache
-constexpr int TM_PROTOCOL_VERSION = 1;
 
 /******************************************************************************
 * Utilities
@@ -108,6 +114,16 @@ legacy_client_start (string host, int port) {
 
 int
 tls_client_start (string host, int port, scheme_tree args) {
+#ifdef __EMSCRIPTEN__
+  // in the browser the sockets are WebSockets, without TLS of their own:
+  // wss encrypts them, which a server over TLS speaks to the other
+  // machines (tm_sockets.cpp)
+  (void) args;
+  web_socket_over_tls (true);
+  int ret= _client_start (host, port, make_socket_client_contact ());
+  web_socket_over_tls (false);
+  return ret;
+#endif
   if (!gnutls_present ())
     return TM_NET_NO_GNUTLS;
   if (!is_tuple_tuple_string (args)) {
@@ -191,61 +207,5 @@ client_listen_connections (int msecs) {
 int client_protocol_version () {
   return TM_PROTOCOL_VERSION;
 }
-#else // Non QT part
-
-int
-client_start (string host) {
-  io_error << "sockets are not implemented";
-  return -1;
-}
-
-int
-tls_client_start (string host, scheme_tree args) {
-  io_error << "sockets are not implemented";
-  return -1;
-}
-void
-client_stop (int fd) {
-  io_error << "sockets are not implemented";
-}
-
-string
-client_read (int fd) {
-  io_error << "sockets are not implemented";
-  return "";
-}
-
-int
-client_write (int fd, string s) {
-  io_error << "sockets are not implemented";
-  return -1;
-}
-
-void
-enter_secure_mode (int fd) {
-  io_error << "sockets are not implemented";
-}
-
-void
-client_listen_connections (int msecs) {
-  io_error << "sockets are not implemented";
-}
-
-int
-legacy_client_start (string host, int port) {
-  (void) host; (void) port;
-  io_error << "sockets are not implemented";
-  return -1;
-}
-
-int
-tls_client_start (string host, int port, scheme_tree args) {
-  (void) host; (void) port; (void) args;
-  io_error << "sockets are not implemented";
-  return -1;
-}
-
-int
-client_protocol_version () { return 0; }
-
 #endif
+

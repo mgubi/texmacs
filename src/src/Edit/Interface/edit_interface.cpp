@@ -26,6 +26,8 @@
 #include "../../Style/Evaluate/evaluate_main.hpp"
 #endif
 #include "gui.hpp" // for gui_interrupted
+#include "iterator.hpp"
+#include <unordered_map>
 
 extern void (*env_next_prog)(void);
 extern void set_snap_mode (tree t);
@@ -67,6 +69,8 @@ edit_interface_rep::edit_interface_rep ():
   magf (zoomf / std_shrinkf),
   pixel ((SI) tm_round ((std_shrinkf * PIXEL) / zoomf)),
   zpixel (max ((SI) tm_round (std_shrinkf * PIXEL), pixel)),
+  zoom_time (0), zoom_waiting (false), zoom_shown (0),
+  zoom_anchor (), zoom_anchor_dx (0), zoom_anchor_dy (0),
   copy_always (),
   last_x (0), last_y (0), last_t (0),
   last_scx (0), last_scy (0),
@@ -80,7 +84,10 @@ edit_interface_rep::edit_interface_rep ():
   gui_root_extents (cur_wx, cur_wy);
 }
 
+static void forget_full_typesets (const void* ed);
+
 edit_interface_rep::~edit_interface_rep () {
+  forget_full_typesets (this);
   if (shadow != NULL) tm_delete (shadow);
   if (stored != NULL) tm_delete (stored);
   shadow = NULL;
@@ -615,6 +622,118 @@ edit_interface_rep::compute_env_rects (path p, rectangles& rs, bool recurse) {
 }
 
 /******************************************************************************
+* Typesetting loops made visible (#621)
+******************************************************************************/
+
+// The whole document typeset again at update after update, without any
+// input, for seconds, is a loop (as #620: the editor of the console was
+// typeset again at each update). A warning, once for each editor, says
+// which document, and what changed in its initial environment.
+struct full_typesets {
+  time_t event= 0;      // the last input when the series began
+  time_t first= 0;      // the first full typesetting of the series
+  time_t last= 0;       // and the last one
+  int    n= 0;          // their number
+  bool   told= false;
+  hashmap<string,tree> env;  // the initial environment at the last one
+  string changed;       // the last change of it in the series
+  array<string> sizes;  // the canvas sizes and zooms seen in the series
+};
+static std::unordered_map<const void*, full_typesets> the_full_typesets;
+
+static void
+forget_full_typesets (const void* ed) {
+  the_full_typesets.erase (ed);
+}
+
+static string
+init_changes (hashmap<string,tree> old_env, hashmap<string,tree> new_env) {
+  string r;
+  int n= 0;
+  iterator<string> it= iterate (new_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    tree old_val= old_env->contains (var)? old_env[var]: tree ("(none)");
+    if (old_val == new_env[var]) continue;
+    if (n++ < 6)
+      r << (N(r) == 0? "": ", ") << var << " " << tree_to_scheme (old_val)
+        << " -> " << tree_to_scheme (new_env[var]);
+  }
+  it= iterate (old_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (new_env->contains (var)) continue;
+    if (n++ < 6) r << (N(r) == 0? "": ", ") << var << " removed";
+  }
+  if (n > 6) r << ", ...";
+  return r;
+}
+
+// whether the initial environment changed in the variables which follow
+// the size of the canvas and the zoom only (or not at all)
+static bool
+only_size_changes (hashmap<string,tree> old_env, hashmap<string,tree> new_env) {
+  iterator<string> it= iterate (new_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (old_env->contains (var) && old_env[var] == new_env[var]) continue;
+    if (!starts (var, "page-screen-") && var != ZOOM_FACTOR) return false;
+  }
+  it= iterate (old_env);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (!new_env->contains (var) &&
+        !starts (var, "page-screen-") && var != ZOOM_FACTOR) return false;
+  }
+  return true;
+}
+
+static void
+watch_full_typesets (const void* ed, url name, time_t last_event,
+                     hashmap<string,tree> init, SI wx, SI wy, double zoom) {
+  full_typesets& f= the_full_typesets[ed];
+  if (f.told) return;
+  time_t now= texmacs_time ();
+  // (a copy: the editor changes its environment in place)
+  hashmap<string,tree> env;
+  iterator<string> it= iterate (init);
+  while (it->busy ()) { string var= it->next (); env (var)= init[var]; }
+  // a canvas size or a zoom not seen yet in the series, with the variables
+  // which follow them only, is a resize or a zoom without input events (a
+  // live resize of the window, a pinch, a zoom by a script): a new series.
+  // A loop comes back to the sizes it had (#620: two sizes in turn)
+  string size= as_string (wx) * "x" * as_string (wy) * "@" * as_string (zoom);
+  bool new_size= f.n > 0 && !contains (size, f.sizes) &&
+                 only_size_changes (f.env, env);
+  if (f.n == 0 || f.event != last_event || now - f.last > 1000) {
+    f.event= last_event; f.first= now; f.n= 0; f.changed= "";
+    f.sizes= array<string> ();
+  }
+  else if (new_size) {
+    // (the sizes seen are kept: a loop between sizes is still counted)
+    f.first= now; f.n= 0; f.changed= "";
+  }
+  else {
+    string c= init_changes (f.env, env);
+    if (N(c) > 0) f.changed= c;
+  }
+  if (!contains (size, f.sizes)) {
+    if (N(f.sizes) >= 64) f.sizes= range (f.sizes, 1, N(f.sizes));
+    f.sizes << size;
+  }
+  f.n++; f.last= now; f.env= env;
+  if (f.n < 20 || now - f.first < 5000) return;
+  f.told= true;
+  std_warning << "the document " << name << " was typeset again from "
+              << "scratch " << f.n << " times in " << (now - f.first)
+              << " ms without any input: a loop? ("
+              << (N(f.changed) == 0? string ("its initial environment did "
+                                             "not change"): f.changed)
+              << "; canvas " << (wx / PIXEL) << "x" << (wy / PIXEL)
+              << ", zoom " << zoom << ")" << LF;
+}
+
+/******************************************************************************
 * handling changes
 ******************************************************************************/
 
@@ -732,6 +851,119 @@ edit_interface_rep::find_alt_selection_index
     return find_alt_selection_index (alt_sel, y, h, e);
 }
 
+/******************************************************************************
+* A zoom typesets the whole document again (its layout has lengths in
+* pixels of the screen: the unit px, the space between the pages, the
+* width of thin lines): the steps of a zoom which follow each other
+* quickly (a key held down, pressed again and again, the wheel) are
+* typeset once, when they stop. Until then the boxes of the previous zoom
+* are drawn at the new one, at once.
+* The first zoom of a document, a document whose page follows the window
+* and another change of the environment do not wait (the canvas, resized
+* to the new zoom, typesets the parts which changed, as after an edit).
+******************************************************************************/
+
+static const int zoom_wait= 250; // ms
+
+bool
+edit_interface_rep::zoom_defers () {
+  if (zoom_time == 0 || is_nil (eb)) return false;
+  if (env_change & THE_ENVIRONMENT) return false;
+  if (get_init_string (PAGE_MEDIUM) == "automatic") return false;
+  if (get_init_value (ZOOM_FACTOR) == "") return false;
+  return texmacs_time () - zoom_time < zoom_wait;
+}
+
+// When the layout of the new zoom comes, the text under the middle of the
+// view stays in place: the spaces in pixels of the screen (between the
+// pages, above the first one) became larger with the previous layout, and
+// the page moved a bit when they became smaller again
+void
+edit_interface_rep::zoom_anchor_take () {
+  zoom_anchor= path ();
+  update_visible ();
+  SI cx= (vx1 + vx2) / 2, cy= (vy1 + vy2) / 2;
+  path sp= find_innermost_scroll (eb, tp);
+  path p= tree_path (sp, cx, cy, 0);
+  if (is_nil (p) || !(rp <= p)) return;
+  cursor cu= eb->find_check_cursor (p);
+  if (!cu->valid) return;
+  zoom_anchor= p;
+  zoom_anchor_dx= cx - cu->ox;
+  zoom_anchor_dy= cy - cu->oy;
+}
+
+void
+edit_interface_rep::zoom_anchor_keep () {
+  if (is_nil (zoom_anchor)) return;
+  path p= zoom_anchor;
+  zoom_anchor= path ();
+  cursor cu= eb->find_check_cursor (p);
+  if (!cu->valid) return;
+  update_visible ();
+  SI cx= cu->ox + zoom_anchor_dx, cy= cu->oy + zoom_anchor_dy;
+  if (cx == (vx1 + vx2) / 2 && cy == (vy1 + vy2) / 2) return;
+  scroll_to (cx, cy);
+  send_invalidate_all (this);
+  update_visible ();
+}
+
+/******************************************************************************
+* The diagnostics of language servers
+******************************************************************************/
+
+static bool
+valid_cursor_path (tree t, path p) {
+  // is @p a cursor position in @t? (the ranges of diagnostics are made by
+  // the programs for a former text, which may have changed since)
+  if (is_nil (p)) return false;
+  while (!is_nil (p->next)) {
+    if (is_atomic (t) || p->item < 0 || p->item >= N(t)) return false;
+    t= t[p->item];
+    p= p->next;
+  }
+  if (is_atomic (t)) return p->item >= 0 && p->item <= N(t->label);
+  return p->item == 0 || p->item == 1;
+}
+
+void
+edit_interface_rep::update_diagnostic_rects (rectangle new_visible) {
+  static const char* names[]= { "code-errors", "code-warnings", "code-infos" };
+  static const char* colors[]= { "#e02020", "#e09000", "#2080e0" };
+  rectangles visible (new_visible);
+  for (int i=0; i<N(diagnostic_rects); i++)
+    invalidate (thicken (diagnostic_rects[i], 0, 3*pixel) & visible);
+  diagnostic_rects = array<rectangles> ();
+  diagnostic_colors= array<color> ();
+  for (int k=0; k<3; k++) {
+    range_set all= get_alt_selection (names[k]);
+    if (is_empty (all)) continue;
+    // the ranges which are still ranges of the text, before the search of
+    // the visible ones (which computes the selections of some of them);
+    // the program gives them in the order of the text
+    range_set sel;
+    for (int i=0; i+1<N(all); i+=2)
+      if (valid_cursor_path (et, all[i]) &&
+          valid_cursor_path (et, all[i+1]) &&
+          !path_less (all[i+1], all[i]))
+        sel << all[i] << all[i+1];
+    color col= named_color (colors[k]);
+    int b= 0, e= N(sel);
+    if (e - b >= 200) {
+      b= max (find_alt_selection_index (sel, vy2, b, e) - 100, b);
+      e= min (find_alt_selection_index (sel, vy1, b, e) + 100, e);
+    }
+    for (int i=b; i+1<e; i+=2) {
+      selection s= compute_selection (simple_range (sel[i], sel[i+1]));
+      if (N(s->rs) == 0) continue;
+      diagnostic_rects  << s->rs;
+      diagnostic_colors << col;
+    }
+  }
+  for (int i=0; i<N(diagnostic_rects); i++)
+    invalidate (thicken (diagnostic_rects[i], 0, 3*pixel) & visible);
+}
+
 // (apply_changes at work: apply_pending_changes does not start it again)
 static int applying_changes= 0;
 
@@ -784,6 +1016,15 @@ edit_interface_rep::apply_changes () {
     //cout << "Tremble- " << tremble_count << LF;
   }
 
+  // a zoom which waited for the keys (or the wheel) to stop: now (none if
+  // the zoom came back to that of the layout). Not a change of the
+  // environment, which would typeset everything again: set_zoom says what
+  // to typeset
+  // (when the zoom came back to that of the layout, the extents and the
+  // picture of the zoom in between are made again below)
+  if (zoom_waiting && texmacs_time () - zoom_time >= zoom_wait)
+    env_change |= THE_EXTENTS;
+
   if (env_change == 0) {
     if (last_change-last_update > 0 &&
         idle_time (INTERRUPTED_EVENT) >= 1000/6)
@@ -797,27 +1038,70 @@ edit_interface_rep::apply_changes () {
   // cout << "Handling automatic resizing\n";
   int sb= 1;
   bool zoomed= false;
+  bool zoom_tree= false; // the tree changed only for the zoom
   if (is_attached (this) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
-    if (new_zoom != old_zoom) {
+    if (new_zoom == old_zoom) {
+      // a zoom which waited came back to that of the layout: the extents
+      // and the picture were made at the zoom in between
+      if (zoom_waiting) {
+        notify_change (THE_EXTENTS);
+        send_invalidate_all (this);
+      }
+      zoom_waiting= false;
+    }
+    else if (zoom_defers ()) {
+      // the boxes typeset at the previous zoom are drawn at the new one
+      if (!zoom_waiting || zoom_shown != zoomf) {
+        zoom_waiting= true;
+        zoom_shown= zoomf;
+        notify_change (THE_EXTENTS);
+        send_invalidate_all (this);
+      }
+    }
+    else {
+      if (zoom_waiting) zoom_anchor_take ();
+      zoom_waiting= false;
+      zoom_tree= (env_change & THE_TREE) == 0;
       set_zoom (new_zoom);
       // (everything on the screen moves, also what was not typeset again)
       zoomed= true;
     }
   
-    if (get_init_string (PAGE_MEDIUM) == "automatic")
+    if (get_init_string (PAGE_MEDIUM) == "automatic" && !zoom_waiting)
     {
       SI wx, wy;
       if (cvw == NULL) ::get_size (get_window (this), wx, wy);
       else ::get_size (widget (cvw), wx, wy);
+      // The size of the widget of a window is that of the whole window,
+      // with its menu bar, tool bars and footer (Qt and Vue): a page which
+      // follows it is taller than what is seen by the height of those,
+      // which differs from one configuration to the next and changes when
+      // a tool bar is shown or hidden. The page follows the canvas, which
+      // is what is seen (the editor is told when its size changes); a
+      // widget without a canvas of its own keeps its size.
+      if (cvw != NULL) {
+        widget cv= ::get_canvas (widget (cvw));
+        SI cw= 0, ch= 0;
+        if (!is_nil (cv)) ::get_size (cv, cw, ch);
+        if (cw > 0 && ch > 0) { wx= cw; wy= ch; }
+      }
       if (get_init_string (SCROLL_BARS) == "false") sb= 0;
       if (get_server () -> in_full_screen_mode ()) sb= 0;
       if (sb) wx -= scrollbar_width();
-      if (wx != cur_wx || wy != cur_wy || new_zoom != old_zoom) {
+      // (also when the document lost the size it was given: its initial
+      // environment is set again when it is loaded again, which the page of
+      // a tmfs document is in the browser after its window got its size;
+      // the page then kept the default size of 10cm for good)
+      tree new_w= as_string ((SI) (wx/magf)) * "tmpt";
+      tree new_h= as_string ((SI) (wy/magf)) * "tmpt";
+      if (wx != cur_wx || wy != cur_wy || new_zoom != old_zoom ||
+          get_init_value (PAGE_SCREEN_WIDTH) != new_w ||
+          get_init_value (PAGE_SCREEN_HEIGHT) != new_h) {
         cur_wx= wx; cur_wy= wy;
-        init_env (PAGE_SCREEN_WIDTH, as_string ((SI) (wx/magf)) * "tmpt");
-        init_env (PAGE_SCREEN_HEIGHT, as_string ((SI) (wy/magf)) * "tmpt");
+        init_env (PAGE_SCREEN_WIDTH, new_w);
+        init_env (PAGE_SCREEN_HEIGHT, new_h);
         notify_change (THE_ENVIRONMENT);
       }
     }
@@ -860,8 +1144,9 @@ edit_interface_rep::apply_changes () {
       rectangles visible (rectangle (vx1, vy1, vx2, vy2));
       for (int i=0; i<N(alt_selection_rects); i++)
         invalidate (alt_selection_rects[i] & visible);
-      range_set alt_sel= append (get_alt_selection ("alternate"),
-                                 get_alt_selection ("brackets"));
+      range_set alt_sel= append (append (get_alt_selection ("alternate"),
+                                         get_alt_selection ("brackets")),
+                                 get_alt_selection ("lsp-highlights"));
       if (is_empty (alt_sel))
         alt_selection_rects= array<rectangles> ();
     }
@@ -876,8 +1161,11 @@ edit_interface_rep::apply_changes () {
   }
 
   // cout << "Handling environment\n";
-  if (env_change & THE_ENVIRONMENT)
+  if (env_change & THE_ENVIRONMENT) {
+    watch_full_typesets (this, buf->buf->name, last_event, get_init (),
+                         cur_wx, cur_wy, zoomf);
     typeset_invalidate_all ();
+  }
 
   // cout << "Handling tree\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT)) {
@@ -948,6 +1236,15 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling extents\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS)) {
+    // the parts between the old and the new box of the document pass from
+    // its background to its surroundings or back (a slide which overflows
+    // its page, for instance): the changes of the text do not cover them
+    rectangle nb (eb->x1, eb->y1, eb->x2, eb->y2);
+    if (nb != last_extents) {
+      rectangles o (last_extents), n (nb);
+      invalidate ((n - o) | (o - n));
+      last_extents= nb;
+    }
     string medium= get_init_string (PAGE_MEDIUM);
     SI ex1= (SI) (((double) eb->x1) * magf);
     SI ey1= (SI) (((double) eb->y1) * magf);
@@ -958,7 +1255,7 @@ edit_interface_rep::apply_changes () {
     SI w, h;
     widget me= ::get_canvas (widget (cvw));
     ::get_size (me, w, h);
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
     w -= 2*PIXEL;
     h -= 2*PIXEL;
 #endif
@@ -968,7 +1265,7 @@ edit_interface_rep::apply_changes () {
       if (medium == "automatic")
         ex2= ex1 + w;
       else {
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
         ex1= (ex1 + ex2 - w) / 2;
         abs_round (ex1);
         ex2= ex1 + w;
@@ -979,7 +1276,7 @@ edit_interface_rep::apply_changes () {
       if (medium == "papyrus" || medium == "automatic")
         ey1= ey2 - h;
       else {
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
         ey1= (ey1 + ey2 - h) / 2;
         abs_round (ey1);
         ey2= ey1 + h;
@@ -989,7 +1286,15 @@ edit_interface_rep::apply_changes () {
     SERVER (set_extents (ex1, ey1, ex2, ey2));
     //set_extents (eb->x1, eb->y1, eb->x2, eb->y2);
   }
-  
+  // the layout of a zoom which waited keeps the place of the text which was
+  // seen (the anchor), and the scrolls made while it waited: the cursor is
+  // not brought into view, unless it or the document changed meanwhile
+  // (set_zoom announces a change of the tree: the parts which depend on
+  // the zoom are typeset again)
+  int edits= THE_CURSOR+THE_SELECTION+THE_FOCUS + (zoom_tree? 0: THE_TREE);
+  bool zoom_layout= !is_nil (zoom_anchor) && (env_change & edits) == 0;
+  zoom_anchor_keep ();
+
   // cout << "Cursor\n";
   temp_invalid_cursor= false;
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS+
@@ -998,7 +1303,8 @@ edit_interface_rep::apply_changes () {
     go_to_here ();
     env_change= (env_change & (~THE_CURSOR)) | THE_CURSOR_BAK;
     if ((env_change & (THE_TREE+THE_ENVIRONMENT+
-                       THE_CURSOR+THE_SELECTION+THE_FOCUS)) != 0)
+                       THE_CURSOR+THE_SELECTION+THE_FOCUS)) != 0 &&
+        !zoom_layout)
       if (!inside_active_graphics ())
         if ((env_change & THE_FREEZE) == 0 ||
             (env_change & THE_SELECTION) != 0)
@@ -1089,7 +1395,7 @@ edit_interface_rep::apply_changes () {
       table_selection= selection_active_table ();
       selection sel; selection_get (sel);
       rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#ifndef QTTEXMACS
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS)||defined(AQUATEXMACS))
       rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
       selection_rects= rs;
@@ -1099,8 +1405,11 @@ edit_interface_rep::apply_changes () {
 
   // cout << "Handling alternative selection\n";
   if ((env_change & THE_SELECTION) || new_visible != last_visible) {
-    range_set alt_sel= append (get_alt_selection ("alternate"),
-                               get_alt_selection ("brackets"));
+    range_set alt_sel= append (append (get_alt_selection ("alternate"),
+                                       get_alt_selection ("brackets")),
+                               // (the uses of the symbol at the cursor,
+                               // from a language server)
+                               get_alt_selection ("lsp-highlights"));
     if (!is_empty (alt_sel)) {
       alt_selection_rects= array<rectangles> (); int b= 0, e= N(alt_sel);
       if (e - b >= 200) {
@@ -1111,7 +1420,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (alt_sel[i], alt_sel[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#ifndef QTTEXMACS
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS)||defined(AQUATEXMACS))
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) alt_selection_rects << rs;
@@ -1128,6 +1437,18 @@ edit_interface_rep::apply_changes () {
       call ("continuous-spell-check");
     else set_alt_selection ("spell-errors", range_set ());
   }
+
+  // the programs which follow the text of the buffer (language servers)
+  if (env_change & THE_TREE)
+    call ("notify-buffer-changed", object (as_string (get_name ())));
+
+  // cout << "Handling diagnostics";
+  // (the cursor does not move them: only the text, its typesetting, the
+  // alt selections which hold them and the visible part do)
+  if ((env_change & (THE_TREE + THE_ENVIRONMENT + THE_EXTENTS +
+                     THE_SELECTION + THE_SPELL_ERRORS)) ||
+      new_visible != last_visible)
+    update_diagnostic_rects (new_visible);
   if (env_change & (THE_CURSOR + THE_FOCUS + THE_TREE +
                     THE_ENVIRONMENT + THE_SELECTION + THE_SPELL_ERRORS)) {
     range_set errs= get_alt_selection ("spell-errors");
@@ -1141,7 +1462,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (errs[i], errs[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS) && !defined (AQUATEXMACS)
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) spell_error_rects << rs;
@@ -1168,7 +1489,16 @@ edit_interface_rep::apply_changes () {
                           THE_LOCUS+THE_TOOLTIP)) ||
            sc_changed) {
     update_focus_loci ();
-    call ("close-tooltips");
+    // the balloons go when the cursor moves, not when it is only said to
+    // have changed: go_to_here says so after each layout, and the balloon
+    // which the mouse had just opened was closed at its next move (#399)
+    static path tooltip_tp;
+    static bool tooltip_focus= false;
+    bool moved= (env_change & (THE_SELECTION+THE_LOCUS+THE_TOOLTIP)) ||
+                sc_changed || tp != tooltip_tp || got_focus != tooltip_focus;
+    tooltip_tp= copy (tp);
+    tooltip_focus= got_focus;
+    if (moved) call ("close-tooltips");
     if (!is_nil (focus_ids) && got_focus)
       call ("link-follow-ids", object (focus_ids), object ("focus"));
   }
@@ -1227,6 +1557,11 @@ void
 edit_interface_rep::apply_pending_changes () {
   if (applying_changes > 0 || headless_mode ||
       !is_attached (this) || !has_current_window ()) return;
+  // at once: a zoom which waits for more steps (zoom_defers) is laid out,
+  // also when nothing else changed (apply_changes would do nothing)
+  zoom_time= 0;
+  if (get_init_value (ZOOM_FACTOR) != as_string (zoomf))
+    notify_change (THE_EXTENTS);
   apply_changes ();
 }
 
@@ -1344,4 +1679,5 @@ edit_interface_rep::handle_notify_resize (SI w, SI h) {
 void
 edit_interface_rep::handle_set_zoom_factor (double zoom) {
   set_zoom_factor (zoom);
+  zoom_time= texmacs_time ();
 }

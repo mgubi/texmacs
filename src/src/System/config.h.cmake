@@ -36,6 +36,11 @@
 /* gs lib */
 #cmakedefine GS_LIB "@GS_LIB@"
 
+/* Scheme interpreter */
+#cmakedefine USE_S7 1
+#cmakedefine USE_FEMTOLISP 1
+#cmakedefine USE_GUILE 1
+
 /* Guile version */
 #cmakedefine GUILE_A 1
 #cmakedefine GUILE_B 1
@@ -158,6 +163,15 @@
 
 /* GUI */
 #cmakedefine QTTEXMACS 1
+
+/* The Vue (Clay, SDL3, MuPDF) and SDL (Widkit on SDL3) ports */
+#cmakedefine VUETEXMACS 1
+#cmakedefine SDLTEXMACS 1
+
+/* MuPDF: its pictures and its PDF */
+#cmakedefine USE_MUPDF 1
+#cmakedefine MUPDF_RENDERER 1
+#cmakedefine USE_THORVG 1
 #cmakedefine QTPIPES 1
 
 /* Type sizes */
@@ -187,6 +201,13 @@
 #cmakedefine USE_RESVG 1
 #cmakedefine USE_SPARKLE 1
 #cmakedefine USE_SQLITE3 1
+
+/* The features of program code which a build may leave out */
+#cmakedefine USE_TREE_SITTER 1
+#cmakedefine USE_LSP 1
+
+/* Make the HTTP requests with libcurl */
+#cmakedefine USE_LIBCURL 1
 #cmakedefine USE_STACK_TRACE 1
 
 /* Word length and masks */

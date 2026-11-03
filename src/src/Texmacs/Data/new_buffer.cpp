@@ -18,7 +18,9 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "scheme.hpp"
 #include "iterator.hpp"
+#include "archiver.hpp"
 #include <time.h>
 
 array<tm_buffer> bufs;
@@ -75,6 +77,8 @@ remove_buffer (tm_buffer buf) {
   int nr, n= N(bufs);
   for (nr=0; nr<n; nr++)
     if (bufs[nr] == buf) {
+      // (the programs which follow the buffer: language servers)
+      call ("notify-buffer-closed", object (as_string (buf->buf->name)));
       array<tm_view> vws= copy (buf->vws);
       for (int i=0; i<N(vws); i++)
         delete_view (abstract_view (vws[i]));
@@ -166,6 +170,7 @@ rename_buffer (url name, url new_name) {
   kill_buffer (new_name);
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return;
+  call ("notify-buffer-closed", object (as_string (name)));
   notify_rename_before (name);
   buf->buf->name= new_name;
   buf->buf->master= new_name;
@@ -389,6 +394,17 @@ get_last_save_buffer (url name) {
   return (int) buf->buf->last_save;
 }
 
+void
+buffer_forget_history (url name) {
+  // A generated page which is made again (an outline at each edit...): its
+  // former contents have no meaning any more, and their copies in the history
+  // of its views would stay for ever (35 MB per edit for an outline of 12800
+  // definitions). NOT in set_buffer_tree: the editors in widgets are made
+  // again with it, and what was typed there can be undone
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) global_forget_document (buf->rp);
+}
+
 bool
 is_aux_buffer (url name) {
   tm_buffer buf= concrete_buffer (name);
@@ -490,6 +506,10 @@ attach_subformat (tree t, url u, string fm) {
   hashmap<string,tree> h (UNINIT, extract (t, "initial"));
   h (MODE)= "prog";
   h (PROG_LANGUAGE)= fm;
+  // the font of source files, a preference (tm-server.scm)
+  h (PROG_FONT)= get_preference ("editor:code font", "Inconsolatazi4");
+  // the columns between the tab stops of source files (a preference)
+  h (PROG_TAB_WIDTH)= get_preference ("editor:code tab width", "8");
   tree t2= change_doc_attr (t, "initial", make_collection (h));
   return change_doc_attr (t2, "style", tree ("code"));
 }
@@ -641,6 +661,10 @@ buffer_export (url name, url dest, string fm) {
     body= vw->ed->exec_verbatim (body);
   if (fm == "html")
     body= vw->ed->exec_html (body);
+  if (fm == "markdown")
+    body= vw->ed->exec_markdown (body);
+  if (fm == "docx" || fm == "odt")
+    body= vw->ed->exec_office (body);
   //if (fm == "latex")
   //body= vw->ed->exec_latex (body);
 

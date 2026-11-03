@@ -1,0 +1,18 @@
+This package is an extension of Bitstream Charter, whose original license is reproduced below, as required under the terms of that license. The extension provides small caps, oldstyle figures and superior figures in all four styles, accompanied by LaTeX font support files. The font files themselves are  in otf and pfb formats. The fonts are licensed as Free fonts under the same terms as the original from Bitstream. All other support files are subject to the LaTeX Project Public License. See 
+http://www.ctan.org/license/lppl1.3
+for the details of that license. 
+
+Original Bitstream Free font license:
+
+  (c) Copyright 1989-1992, Bitstream Inc., Cambridge, MA.
+
+  You are hereby granted permission under all Bitstream propriety rights
+  to use, copy, modify, sublicense, sell, and redistribute the 4
+  Bitstream Charter (r) Type 1 outline fonts for any purpose and without
+  restriction; provided, that this notice is left intact on all copies
+  of such fonts and that Bitstream's trademark is acknowledged as shown
+  below on all unmodified copies of the 4 Charter Type 1 fonts.
+
+    BITSTREAM CHARTER is a registered trademark of Bitstream Inc.
+
+Portions of the font modifications are Copyright (c) 2009--2012, Andrey Panov; Copyright (c) 2013--2024, Michael Sharpe.

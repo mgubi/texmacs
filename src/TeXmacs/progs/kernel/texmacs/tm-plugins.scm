@@ -103,6 +103,38 @@
               ""))
         "")))
 
+;; the first output of a session of a request (which has no program to
+;; write a banner): a procedure of the plug-in, from its name to a tree
+(define request-banners (make-ahash-table))
+(define-public (set-request-banner! name f)
+  (ahash-set! request-banners name f))
+(define-public (request-banner name)
+  (with f (ahash-ref request-banners name)
+    (and f (f name))))
+
+;; the sessions of a group are in a submenu of the menus which list them
+;; (Insert > Session: AI for the chatbots), whose name is the group
+(define session-groups (make-ahash-table))
+(define-public (set-session-group! name group)
+  (ahash-set! session-groups name group))
+(define-public (session-group name)
+  (ahash-ref session-groups name))
+
+;; the names of the sessions l and of their groups, in the order of their
+;; names in the menus; a group as (group name ...)
+(define-public (session-menu-entries l)
+  (let* ((alone (list-filter l (lambda (n) (not (session-group n)))))
+         (groups (list-remove-duplicates
+                  (list-filter (map session-group l) (lambda (g) g))))
+         (entries (append alone
+                          (map (lambda (g)
+                                 (cons g (list-filter
+                                          l (lambda (n)
+                                              (== (session-group n) g)))))
+                               groups)))
+         (label (lambda (x) (if (pair? x) (car x) (session-name x)))))
+    (sort entries (lambda (x y) (string<=? (label x) (label y))))))
+
 (define-public (connection-request? name)
   (with info (connection-info name "default")
     (and (func? info 'tuple 3) (== (cadr info) "request"))))
@@ -404,6 +436,14 @@
 (define check-dir-table (make-ahash-table))
 (define-public plugin-data-table (make-ahash-table))
 
+;; what the cache of the plugins was made for: the path, and in a browser
+;; the build of the page (its packages, misc/wasm/packages.js), since the
+;; path of a page never changes while its plugins do
+(define (plugin-cache-key)
+  (with b (or (getenv "TEXMACS_WEB_BUILD") "")
+    (if (== b "") (get-original-path)
+        (string-append (get-original-path) "|" b))))
+
 (define-public (plugin-load-setup)
   (when (not plugin-loaded-setup?)
     (set! plugin-loaded-setup? #t)
@@ -425,7 +465,7 @@
 (define (plugin-save-setup)
   (when reconfigure-flag?
     (save-object plugin-cache
-                 (list (get-original-path)
+                 (list (plugin-cache-key)
                        (ahash-table->list plugin-data-table)
                        (ahash-table->list check-dir-table)))))
 
@@ -491,7 +531,7 @@
     (add-macos-program-path (url-append rad rel) after?)))
 
 (define (path-up-to-date?)
-  (with ok? (== plugin-check-path (get-original-path))
+  (with ok? (== plugin-check-path (plugin-cache-key))
     (for (p (ahash-table->list check-dir-table))
       (with modified? (!= (url-last-modified (system->url (car p))) (cdr p))
         (if modified? (set! ok? #f))))
@@ -529,18 +569,26 @@
 
 (define-public (alt-launcher name) #f)
 
+;; the result of a :require or :versions: an empty string is no command
+;; ((python-command) is "" where no Python is found: in a browser, the
+;; plugins which run Python were declared, and froze it)
+(define (plugin-detected r)
+  (and r (not (and (string? r) (== r ""))) r))
+
 (define (plugin-configure-cmd name cmd)
   (cond ((func? cmd :require 1)
          (when reconfigure-flag?
            ;;(display* "try to detect " name "\n")
            (if (alt-launcher name)
                (ahash-set! plugin-data-table name #t)
-               (ahash-set! plugin-data-table name ((second cmd))))))
+               (ahash-set! plugin-data-table name
+                           (plugin-detected ((second cmd)))))))
         ((func? cmd :versions 1)
          (when reconfigure-flag?
            (if (alt-launcher name)
                (ahash-set! plugin-data-table name #t)
-               (ahash-set! plugin-data-table name ((second cmd))))))
+               (ahash-set! plugin-data-table name
+                           (plugin-detected ((second cmd)))))))
         ((func? cmd :preferences 1)
          (ahash-set! plugin-prefs-table name ((second cmd))))
         ((func? cmd :setup 1)
@@ -563,6 +611,10 @@
          (connection-setup name `(tuple "pipe" ,(second cmd))))
         ((func? cmd :launch 2)
          (connection-setup name `(tuple "pipe" ,(third cmd)) (cadr cmd)))
+        ((func? cmd :worker 1)
+         ;; a Web Worker, in a browser (worker_link.cpp): its script, from
+         ;; the directory of the page
+         (connection-setup name `(tuple "worker" ,(second cmd))))
         ((func? cmd :socket 2)
          (connection-setup name `(tuple "socket" ,(second cmd) ,(third cmd))))
         ((func? cmd :socket 3)
@@ -603,7 +655,17 @@
                     "for plugin '" name "'\n")))
 
   (ahash-set! plugin-declared-table name #t)
+  (or (in? (car cmd) '(:macpath :winpath))
+      (ahash-ref plugin-data-table name)))
+
+;; plugin-configure expands into calls of these functions rather than into
+;; references to plugin-data-table, which plugin-load-setup replaces: in S7
+;; the other modules would keep seeing the first table.
+(define-public (plugin-data name)
   (ahash-ref plugin-data-table name))
+
+(define-public (plugin-configure-start name)
+  (if reconfigure-flag? (ahash-set! plugin-data-table name #t)))
 
 (define-public (plugin-configure-cmds name cmds)
   "Helper function for plugin-configure"
@@ -628,9 +690,9 @@
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
        (tm-define (,supports-name?)
-         (or (ahash-ref plugin-data-table ,name)
+         (or (plugin-data ,name)
              (remote-connection-defined? ,name)))
-       (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
+       (plugin-configure-start ,name)
        (plugin-configure-cmds ,name
          ,(list 'quasiquote (map plugin-configure-sub options))))))
 
@@ -650,10 +712,10 @@
   (when (ahash-ref plugin-initialize-todo name*)
     (let* ((name (symbol->string name*))
            (file (string-append "plugins/" name "/progs/init-" name ".scm"))
-           ;; (the directories in which plugin-list finds the plugins)
-           (u (url-unix (string-append "$TEXMACS_HOME_PATH:/etc/TeXmacs:"
-                                       "$TEXMACS_PATH:/usr/share/TeXmacs")
-                        file)))
+           ;; (the directories in which plugin-list finds the plugins; in
+           ;; TeXmacs Upsilon not /etc/TeXmacs and /usr/share/TeXmacs, which
+           ;; hold the plugins of an official TeXmacs: see plugin_path)
+           (u (url-unix "$TEXMACS_HOME_PATH:$TEXMACS_PATH" file)))
       (ahash-remove! plugin-initialize-todo name*)
       (if (url-exists? u)
           (with fname (url-materialize u "r")
@@ -662,8 +724,13 @@
             ;;(with start (texmacs-time)
             ;;  (load fname)
             ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
-            (load fname)
-            ))
+            ;; a plugin which fails (an error in its files) is reported,
+            ;; and does not stop the initialization of the others
+            (catch #t
+              (lambda () (load fname))
+              (lambda err
+                (display* "TeXmacs] the plugin " name
+                          " could not be initialized: " err "\n")))))
       (if (plugin-all-initialized?) (plugin-save-setup)))))
 
 (define-public (lazy-plugin-initialize name)

@@ -22,6 +22,7 @@ static hashmap<tree,tree> cache_data ("?");
 static hashset<string> cache_loaded;
 static hashset<string> cache_changed;
 static hashmap<string,bool> cache_valid (false);
+static hashset<tree> cache_dropped; // reset in this session (see cache_save)
 
 void
 cache_set (string buffer, tree key, tree t) {
@@ -30,6 +31,7 @@ cache_set (string buffer, tree key, tree t) {
     cache_data (ckey)= t;
     cache_changed->insert (buffer);
   }
+  if (cache_dropped->contains (ckey)) cache_dropped->remove (ckey);
 }
 
 void
@@ -37,6 +39,7 @@ cache_reset (string buffer, tree key) {
   tree ckey= tuple (buffer, key);
   cache_data->reset (ckey);
   cache_changed->insert (buffer);
+  cache_dropped->insert (ckey);
 }
 
 bool
@@ -159,6 +162,22 @@ void
 cache_save (string buffer) {
   if (cache_changed->contains (buffer)) {
     url cache_file= texmacs_home_path * url ("system/cache/" * buffer);
+    if (buffer == "font_cache.scm") {
+      // NOTE: several instances of TeXmacs share the cache, and each one
+      // wrote what it had, so that the fonts found by another one since it
+      // started were lost, and looked for again (some seconds for the TeX
+      // fonts of a document): the entries of the file which this instance
+      // does not have, and did not reset, are kept
+      string old;
+      if (!load_string (cache_file, old, false)) {
+        tree t= scheme_to_tree (old);
+        for (int i=0; i<N(t)-1; i+=2) {
+          tree ckey= tuple (buffer, t[i]);
+          if (!cache_data->contains (ckey) && !cache_dropped->contains (ckey))
+            cache_data (ckey)= t[i+1];
+        }
+      }
+    }
     string cached;
     iterator<tree> it= iterate (cache_data);
     if (buffer == "file_cache" || buffer == "doc_cache") {
@@ -248,7 +267,7 @@ void
 cache_initialize () {
   texmacs_path= url_system ("$TEXMACS_PATH");
   if (get_env ("TEXMACS_HOME_PATH") == "")
-    texmacs_home_path= url_system ("$HOME/.TeXmacs");
+    texmacs_home_path= url_system ("$HOME/.TeXmacs_Upsilon");
   else texmacs_home_path= url_system ("$TEXMACS_HOME_PATH");
   if (get_env ("TEXMACS_DOC_PATH") == "")
     texmacs_doc_path= url_system ("$TEXMACS_PATH/doc");
@@ -258,6 +277,29 @@ cache_initialize () {
   texmacs_home_path_string = concretize (texmacs_home_path);
   texmacs_doc_path_string = concretize (texmacs_doc_path);
   texmacs_font_path_string = concretize (texmacs_home_path * "fonts/");
+
+#ifdef __EMSCRIPTEN__
+  // In a web browser every build has the version of TeXmacs, which is what
+  // makes the caches be cleared (init_upgrade): the times of the files of
+  // TeXmacs kept in stat_cache.scm made the styles, the files and the
+  // documentation of an old build look up to date. They are cleared when
+  // the build changes (TEXMACS_WEB_BUILD, the hashes of its packages).
+  {
+    string build= get_env ("TEXMACS_WEB_BUILD");
+    url stamp= texmacs_home_path * url ("system/cache/web-build.txt");
+    string old;
+    if (build != "" && (load_string (stamp, old, false) || old != build)) {
+      url cache= texmacs_home_path * url ("system/cache");
+      remove (cache * url_wildcard ("__*"));
+      remove (cache * url ("dir_cache.scm"));
+      remove (cache * url ("doc_cache"));
+      remove (cache * url ("file_cache"));
+      remove (cache * url ("stat_cache.scm"));
+      remove (cache * url ("validate_cache.scm"));
+      save_string (stamp, build, false);
+    }
+  }
+#endif
    
   cache_refresh ();
   if (is_recursively_up_to_date (texmacs_path * "fonts/type1") &&

@@ -13,7 +13,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define glue-defs '("build-glue-basic.scm" "build-glue-server.scm" "build-glue-editor.scm"))
+(define glue-defs '("build-glue-basic.scm" "build-glue-server.scm" "build-glue-editor.scm"
+                    "build-glue-treesit.scm" "build-glue-lsp.scm"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Convenient output routine
@@ -33,7 +34,7 @@
 
 
 (define (output-copyright from)
-  noop)
+  #t)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -60,8 +61,8 @@
 (define (build-main l)
    (build-routines (cddr l)))
 
-(define-macro build
-  (lambda l (build-main l)))
+(define-macro (build . l)
+  (build-main l))
 
 
 (begin

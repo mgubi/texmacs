@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" height="16" id="svg7609" version="1.0" width="16">
+ <defs id="defs7618"/>
+ <g id="g34704" transform="scale(0.0625,0.0625)" style="opacity:0.75">
+  <rect y="48" x="0" width="256" style="fill:#005b99" id="rect7611" height="160"/>
+  <rect y="48" x="80" width="32" style="fill:#fcd116" id="rect7613" height="160"/>
+  <rect y="112" x="0" width="256" style="fill:#fcd116" id="rect7615" height="32"/>
+ </g>
+</svg>

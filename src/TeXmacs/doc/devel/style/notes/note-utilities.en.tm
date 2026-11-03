@@ -11,18 +11,22 @@
 
   <\itemize>
     <item>Writing block environments which span over the entire paragraph
-    width. Notice that the <tmpackage|title-base> package provides some
+    width. Notice that the <tmpackage|section-base> package provides some
     <hyper-link|additional macros|../../../main/styles/section/section-base-helper.en.tm>
     for wide section titles.
 
-    <item>Writing wide block environments which are underlined, overlined or
-    in a frame box.
+    <item>Writing wide or padded block environments which are underlined,
+    overlined, vertically lined, in a frame box or ornamented (<abbr|e.g.>
+    <markup|wide-framed>, <markup|padded-bothlined>, <markup|ornamented>).
 
     <item>Recursive indentation.
 
     <item>Setting page headers and footers.
 
     <item>Localization of text.
+
+    <item>Manipulating tuples (<markup|map>, <markup|comma-separated>,
+    <abbr|etc.>).
   </itemize>
 
   It is good practice to use these standard macros whenever possible when

@@ -920,6 +920,108 @@
       (set-large-load-test-interactive! #f)
       (switch-to-buffer here))))
 
+;; A link by a file: url loads the file, as the link by the name of the file
+;; does, and applies its query (the line, the word) or its anchor; it was
+;; loaded whole, query included, as the name of a new buffer (#772). A large
+;; source file asks the question too, and names the file, not the url.
+(define (file-url f suffix)
+  (let ((s (url->unix f)))
+    (string-append "file://" (if (string-starts? s "/") s (string-append "/" s))
+                   suffix)))
+
+(define (buffer-text b)
+  (object->string (tree->stree (buffer-get-body b))))
+
+(define file-link-prompt "")
+
+(define (test-file-link-query)
+  (check-group "file: links with a query")
+  (let* ((f (tmp "file-query.scm"))
+         (here (current-buffer)))
+    (string-save "line1\nline2\nline3\nline4\n" (url->system f))
+    ;; the file is loaded, at the line of the query
+    (go-to-url (file-url f "?line=3"))
+    (check-true (string-contains? (buffer-text (current-buffer)) "line3"))
+    (check= (url->system (url-tail (current-buffer))) "file-query.scm")
+    (check= (cursor) '(3 0))
+    ;; the buffer is the one of the file opened by its name: the same url (on
+    ;; Windows it was a malformed one, #789), not a second buffer, and a
+    ;; link relative to it names the files beside it
+    (check= (url->stree (current-buffer)) (url->stree f))
+    (check= (url->stree (url-relative (current-buffer) "other.scm"))
+            (url->stree (tmp "other.scm")))
+    (check= (url->stree (system->url (url->system (system->url (file-url f "")))))
+            (url->stree (system->url (file-url f ""))))
+    (buffer-close (current-buffer))
+    (switch-to-buffer here)
+    ;; a file already open is not opened again by a link to it
+    (load-browse-buffer f)
+    (let ((open (length (buffer-list))))
+      (go-to-url (file-url f "?line=2"))
+      (check= (length (buffer-list)) open)
+      (check= (url->stree (current-buffer)) (url->stree f))
+      (check= (cursor) '(2 0))
+      (buffer-close (current-buffer))
+      (switch-to-buffer here))
+    ;; from a buffer of the web, a file: link stays local (the load is
+    ;; stubbed, nothing is fetched)
+    (let ((loaded '()))
+      (set-link-test-hooks! (lambda () (system->url "https://example.com/a/b.tm"))
+                            (lambda (u) (set! loaded (cons u loaded))))
+      (go-to-url (file-url f "?line=3"))
+      (set-link-test-hooks! #f #f)
+      (check= (length loaded) 1)
+      (check-false (url-rooted-web? (car loaded)))
+      (check= (url->system (url-tail (car loaded))) "file-query.scm"))
+    ;; with a column, and a file name with a space
+    (let ((g (tmp "file query.scm")))
+      (string-save "aa\nbb cc\ndd\n" (url->system g))
+      (go-to-url (file-url g "?line=2&column=1"))
+      (check= (url->system (url-tail (current-buffer))) "file query.scm")
+      (check= (cursor) '(2 1))
+      (buffer-close (current-buffer))
+      (switch-to-buffer here)
+      (system-remove g))
+    ;; the anchor of a document
+    (write-doc "file-anchor.tm" '("article") '()
+               '((section (concat "Target" (label "tgt"))) "text"))
+    (go-to-url (file-url (tmp "file-anchor.tm") "#tgt"))
+    (check= (url->system (url-tail (current-buffer))) "file-anchor.tm")
+    (check= (cursor) '(0 0 1 1))
+    (buffer-close (current-buffer))
+    (switch-to-buffer here)
+    ;; a large source file asks the question, which names the file
+    (let* ((line (apply string-append
+                        (make-list 40 "(define (f x) (+ x 1111111111111111111111111111111111111))   ")))
+           (n (+ 1 (quotient large-source-file-size (string-length line))))
+           (big (tmp "file-large.scm")))
+      (string-save (apply string-append
+                          (map (lambda (i) (string-append line "\n")) (iota n)))
+                   (url->system big))
+      (set! large-asked 0)
+      (set! file-link-prompt "")
+      (set-large-load-test-interactive!
+       (lambda (prompt default cont)
+         (set! large-asked (+ large-asked 1))
+         (set! file-link-prompt prompt)
+         (set! large-pending cont)))
+      (go-to-url (file-url big "?line=3"))
+      (check= large-asked 1)
+      (check-true (string-contains? file-link-prompt "file-large.scm"))
+      (check-false (string-contains? file-link-prompt "?line"))
+      (check-false (buffer-exists? (system->url (file-url big "?line=3"))))
+      (check= (current-buffer) here)
+      ;; no: nothing is loaded; yes: the file, at its line
+      (large-pending #f)
+      (check= (current-buffer) here)
+      (go-to-url (file-url big "?line=3"))
+      (large-pending #t)
+      (check= (url->system (url-tail (current-buffer))) "file-large.scm")
+      (check= (cursor) '(3 0))
+      (set-large-load-test-interactive! #f)
+      (buffer-close (current-buffer))
+      (switch-to-buffer here))))
+
 ;; The loci of a typeset document: their identifiers are on their bodies,
 ;; and the links between them are found from either end.
 (define (test-loci)
@@ -3245,6 +3347,7 @@
   (run-group test-hyperlinks)
   (run-group test-hyperlink-files)
   (run-group test-link-large-file)
+  (run-group test-file-link-query)
   (run-group test-loci)
   (run-group test-navigation)
   (run-group test-link-pages)

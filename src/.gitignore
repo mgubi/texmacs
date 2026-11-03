@@ -1,3 +1,8 @@
+
+# written by configure and by the build
+packages/android/AndroidManifest.xml
+packages/android/res/values/
+
 # binary files
 *.so
 *.[oa]
@@ -32,6 +37,45 @@ CMakeLists.txt.user
 misc/benchmark/gbench
 
 TeXmacs/progs/ice-9
+src/Deps
+src/Objects
+TeXmacs/plugins/
+src/System/config.h
+src/System/tm_configure.hpp
+misc/man/texmacs.1
+misc/admin/admin.makefile
+misc/scripts/texmacs
+misc/scripts/fig2ps
+misc/doxygen/Doxyfile
+misc/vscode/c_cpp_properties.json
+misc/autotroll/test.sh
+cmake/CreateBundle.sh
+cmake/CompleteBundle.cmake
+TeXmacs/examples/plugins/dynlink/Makefile
+packages/macos/Info-Xcode.plist
+packages/macos/Base.xcconfig
+packages/macos/Info.plist
+packages/debian/control
+packages/debian/changelog
+packages/mandriva/TeXmacs.spec
+packages/centos/TeXmacs.spec
+packages/fedora/TeXmacs.spec
+packages/windows/resource.rc
+packages/windows/TeXmacs.iss
+packages/redhat/TeXmacs.spec
+Makefile
+src/makefile
+packages/macos/TeXmacs.xcodeproj/project.xcworkspace
+packages/macos/TeXmacs.xcodeproj/xcuserdata
+config.status
+packages/msix/AppxManifest.xml
+packages/msix/AppxManifestStore.xml
+/build-wasm/
+# the makefile of the browser build is a source, not a generated file
+!/misc/wasm/Makefile
 
 # moc output of the autotools build
 src/Plugins/Qt*/moc_*.cpp
+
+# written by misc/wasm/build-info.py at each build of the browser version
+TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1">
+ <g id="layer1" transform="translate(0,4)">
+  <path id="path5198" transform="translate(0,-4)" d="m1.5 1.5h12.5" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5200" transform="translate(0,-4)" d="m1.5 1.5h12.5" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5202" d="m1.5-0.5h14.5" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5204" d="m1.5 1.5h6.5" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5206" d="m6.5 14.5h12.5" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5208" d="m12 12.5h7" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5210" d="m10 10.5h9" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path5212" transform="translate(0,-4)" d="m0 10 3-3v2h14v-2l3 3-3 3v-2h-14v2z" fill="#6060c0"/>
+ </g>
+</svg>

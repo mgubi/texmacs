@@ -53,6 +53,15 @@ encode_url (url u) {
 }
 
 static url
+plain_name (url u) {
+  // The name of a buffer which comes from a file name with a star (a*b.scm)
+  // is a plain name, not the wildcard which url (string) makes of it (#790).
+  if (is_wildcard (u, 1)) return as_url (tree (u->t[1]->label));
+  if (is_concat (u)) return plain_name (u[1]) * plain_name (u[2]);
+  return u;
+}
+
+static url
 decode_url (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
@@ -71,7 +80,14 @@ decode_url (string s) {
   if (s (0, i) == "here") return url (s (i+1, N(s)));
   if (s (0, i) == "default") return url (s (i, N(s)));
 #endif
-  return url_root (s (0, i)) * url_general (s (i+1, N(s)), URL_CLEAN_UNIX);
+  // a URL of the web is made again as its buffer was named: from
+  // "http://host:8080/a.tm" url_general takes the host as it is, while
+  // from "host:8080/a.tm" it took the ":" of the port for the separator of
+  // a list of paths, and the view of the buffer was not found
+  string root= s (0, i);
+  if (root == "http" || root == "https" || root == "ftp")
+    return url_general (root * "://" * s (i+1, N(s)), URL_CLEAN_UNIX);
+  return url_root (root) * url_general (s (i+1, N(s)), URL_CLEAN_UNIX);
 }
 
 url
@@ -94,7 +110,15 @@ concrete_view (url u) {
   int nr= as_int (s (0, i));
   url name= decode_url (s (i+1, N(s)));
   //cout << s (i+1, N(s)) << " -> " << name << "\n";
+  // a buffer named with a wildcard (Save as a*.tm) is found as it is, the
+  // buffer of a file with a star (a*b.scm) as a plain name; both can have the
+  // same view name, the one which holds a view of this number is the buffer
   tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf))
+    for (i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr == nr)
+        return buf->vws[i];
+  buf= concrete_buffer (plain_name (name));
   if (!is_nil (buf))
     for (i=0; i<N(buf->vws); i++)
       if (buf->vws[i]->nr == nr)
@@ -293,6 +317,39 @@ get_passive_view (url name) {
     if (is_none (win)) return vs[i];
   }
   return get_new_view (buf->buf->name);
+}
+
+// The font inspector and the font report ask the editor for its typeset
+// boxes and the box path at the cursor or the mouse, and the boxes for the
+// fonts they were typeset with (font_debug_boxes.cpp)
+static tree
+editor_font_debug_info (editor ed, bool at_mouse) {
+  return box_font_debug_info (ed->get_box_root (),
+                              ed->get_box_path_at (at_mouse), at_mouse);
+}
+
+// The glyph at the cursor (or at the last position of the mouse)
+tree
+font_debug_info (bool at_mouse) {
+  return editor_font_debug_info (get_current_editor (), at_mouse);
+}
+
+// The same in another buffer: the font inspector keeps looking at the
+// document it was opened on while another buffer, such as its font report,
+// has the focus. Only a view shown in a window is asked; none is created.
+tree
+font_debug_info_of (url name, bool at_mouse) {
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++)
+    if (!is_none (view_to_window (vs[i])))
+      return editor_font_debug_info (view_to_editor (vs[i]), at_mouse);
+  return tree (TUPLE);
+}
+
+// Every character of the typeset document, counted by the route its font took
+tree
+font_debug_report () {
+  return box_font_debug_report (get_current_editor ()->get_box_root ());
 }
 
 url

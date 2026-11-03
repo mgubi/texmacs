@@ -17,8 +17,43 @@
 ;; Adaptive hash tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (vector? (make-hash-table 1))
-    (begin ;; old style
+(cond ((s7-scheme?)
+       (begin ;; S7 hash tables
+         (define-public make-ahash-table make-hash-table)
+         (define-public ahash-ref hash-table-ref)
+         (define-public (ahash-get-handle h s)
+           (let ((v  (hash-table-ref h s))) (if v (cons s v) #f)))
+         (define-public ahash-set! hash-table-set!)
+         ;; as Guile's, true when there was an entry to remove
+         (define-public (ahash-remove! h s)
+           (let ((v (hash-table-ref h s)))
+             (hash-table-set! h s #f)
+             (and v (cons s v))))
+         (define-public (ahash-fold folder init h)
+           (let ((acc init))
+             (for-each (lambda (p) (set! acc (folder (car p) (cdr p) acc))) h)
+             acc))
+         (define-public (ahash-table->list h) (map values h))
+         (define-public ahash-size hash-table-entries)))
+      ((femtolisp-scheme?)
+       (begin ;; the tables of femtolisp
+         (define-public (make-ahash-table . size) (table))
+         (define-public ahash-ref %table-ref) ;; in C
+         (define-public (ahash-get-handle h key)
+           (and (has? h key) (cons key (get h key))))
+         (define-public (ahash-set! h key value) (put! h key value) value)
+         ;; as Guile's, the entry which was removed, if any
+         (define-public (ahash-remove! h key)
+           (and (has? h key)
+                (let ((v (get h key)))
+                  (del! h key)
+                  (cons key v))))
+         (define-public (ahash-fold folder init h) (table.foldl folder init h))
+         (define-public (ahash-table->list h) (table.foldl acons '() h))
+         (define-public (ahash-size h)
+           (table.foldl (lambda (k v n) (+ n 1)) 0 h))))
+      ((vector? (make-hash-table 1))
+       (begin ;; old style (Guile)
       (define-public (make-ahash-table)
 	(cons (make-hash-table 1) 0))
 
@@ -59,9 +94,9 @@
 	(hash-fold folder init (car h)))
 
       (define-public (ahash-table->list h)
-	(hash-fold acons '() (car h))))
-
-    (begin ;; new style
+	(hash-fold acons '() (car h)))))
+      (else
+       (begin ;; new style (Guile)
       (define-public make-ahash-table make-hash-table)
       (define-public ahash-ref hash-ref)
       (define-public ahash-get-handle hash-get-handle)
@@ -71,7 +106,7 @@
       (define-public ahash-remove! hash-remove!)
       (define-public ahash-fold hash-fold)
       (define-public (ahash-table->list h)
-	(hash-fold acons '() h))))
+	(hash-fold acons '() h)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra routines on adaptive hash tables

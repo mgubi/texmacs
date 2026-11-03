@@ -5,9 +5,19 @@
 # Shared body of TeXmacs object files
 add_library (texmacs_body OBJECT ${TeXmacs_All_SRCS})
 
+add_dependencies (texmacs_body git_revision)
+
 target_include_directories (texmacs_body PUBLIC
   ${TeXmacs_Include_Dirs}
 )
+
+# the C units of tree-sitter (see CMakeLists.txt)
+set_source_files_properties (
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree_sitter_lib.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_dynamic.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_xz.c"
+  PROPERTIES INCLUDE_DIRECTORIES
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/include;${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/src")
 
 target_compile_options (texmacs_body PRIVATE
   $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
@@ -18,7 +28,21 @@ target_link_libraries (texmacs_body PUBLIC
   ${TeXmacs_Libraries}
 )
 
-set_target_properties (texmacs_body PROPERTIES AUTOMOC ON)
+if (QTTEXMACS)
+  set_target_properties (texmacs_body PROPERTIES AUTOMOC ON)
+endif ()
+
+# the objects of the executables: those of the sources in C++20 (the Vue
+# GUI) are compiled apart
+set (TEXMACS_OBJECTS $<TARGET_OBJECTS:texmacs_body>)
+if (TeXmacs_CXX20_SRCS)
+  add_library (texmacs_cxx20 OBJECT ${TeXmacs_CXX20_SRCS})
+  target_include_directories (texmacs_cxx20 PUBLIC ${TeXmacs_Include_Dirs})
+  target_compile_options (texmacs_cxx20 PRIVATE
+    -include ${CMAKE_BINARY_DIR}/src/System/config.h)
+  set_target_properties (texmacs_cxx20 PROPERTIES CXX_STANDARD 20)
+  list (APPEND TEXMACS_OBJECTS $<TARGET_OBJECTS:texmacs_cxx20>)
+endif ()
 
 if (WIN32)
   set_source_files_properties (
@@ -36,7 +60,7 @@ if (WIN32)
 
   # texmacs.exe
   add_executable (texmacs WIN32
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     ${TEXMACS_ENTRYPOINT_SRC}
     ${TEXMACS_RC_SRC}
   )
@@ -52,7 +76,7 @@ if (WIN32)
 
   # texmacs-open.exe
   add_executable (texmacs-open WIN32
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     "${TEXMACS_SOURCE_DIR}/src/Launcher/texmacs_open_main.cpp"
     ${TEXMACS_RC_SRC}
   )
@@ -121,10 +145,10 @@ if (WIN32)
 
   install (TARGETS texmacs texmacs-open DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 
-elseif (APPLE)
+elseif (APPLE AND QTTEXMACS)
   set (TeXmacs_binary_name "TeXmacs")
   add_executable (${TeXmacs_binary_name} MACOSX_BUNDLE
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     "${TEXMACS_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp"
   )
   target_include_directories (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Include_Dirs})
@@ -140,10 +164,18 @@ elseif (APPLE)
     RELEASE_OUTPUT_NAME ${TeXmacs_binary_name}
     RUNTIME_OUTPUT_DIRECTORY ${TEXMACS_BINARY_DIR}
   )
+  # CFBundleVersion with the git commit, the hash (#753)
+  add_custom_command (TARGET ${TeXmacs_binary_name} POST_BUILD
+    COMMAND sh ${TEXMACS_SOURCE_DIR}/packages/macos/set-bundle-revision.sh
+      "$<TARGET_BUNDLE_CONTENT_DIR:${TeXmacs_binary_name}>/Info.plist"
+      ${TEXMACS_SOURCE_DIR}
+    VERBATIM)
 else ()
+  # also the other GUIs on macOS: TeXmacs/bin/texmacs.bin, run by the
+  # script TeXmacs/bin/texmacs, as on the other Unix systems
   set (TeXmacs_binary_name "texmacs.bin")
   add_executable (${TeXmacs_binary_name}
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     "${TEXMACS_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp"
   )
   target_include_directories (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Include_Dirs})

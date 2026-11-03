@@ -66,7 +66,9 @@
 
   <assign|script-status|<macro|body|<with|color|<value|script-status-color>|<block|<tformat|<cwith|1|1|1|1|cell-background|<value|script-status-background-color>>|<table|<row|<cell|<arg|body>>>>>>>>>
 
-  <assign|script-busy|<macro|msg|<script-status|<if|<equal|<arg|msg>|<uninit>>|<localize|Busy>...|<arg|msg>>>>>
+  <assign|script-busy-dots|<macro|<anim-repeat|<anim-compose|<anim-constant|<phantom|...>|0.3sec>|<anim-constant|.<phantom|..>|0.3sec>|<anim-constant|..<phantom|.>|0.3sec>|<anim-constant|...|0.3sec>>>>>
+
+  <assign|script-busy|<macro|msg|<script-status|<if|<equal|<arg|msg>|<uninit>>|<localize|Busy><script-busy-dots>|<arg|msg>>>>>
 
   <assign|script-interrupted|<macro|<script-status|<math|\<lightning\>>
   <localize|Interrupted>>>>

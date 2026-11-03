@@ -62,7 +62,7 @@ tabs_widget_rep::handle_get_size (get_size_event ev) {
   SI& w= ev->w;
   SI& h= ev->h;
 
-  int i, l=N(a)-1, ww=0, hh=0;
+  int i, l=N(a)-1; SI ww=0, hh=0;
   for (i=0; i<l; i++) {
     SI www= w, hhh= h;
     a[i] << get_size (www, hhh, -1);
@@ -78,7 +78,7 @@ void
 tabs_widget_rep::handle_position (position_event ev) {
   (void) ev;
 
-  int i, l= N(a)-1, tot_w= 0, max_h= 0;
+  int i, l= N(a)-1; SI tot_w= 0, max_h= 0;
   for (i=0; i<l; i++) {
     SI the_w= w, the_h= h;
     a[i] << get_size (the_w, the_h, -1);

@@ -1,0 +1,15 @@
+# needs aligned.scm: drag the dividers of the split widgets
+wait 5000
+window Vue test 3
+snapshot a0
+press 212 150
+move 150 150
+move 100 150
+release 100 150
+wait 300
+press 300 151
+move 300 180
+move 300 200
+release 300 200
+wait 500
+snapshot a1

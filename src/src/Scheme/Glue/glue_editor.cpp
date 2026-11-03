@@ -1879,6 +1879,21 @@ tmg_get_mouse_position () {
 }
 
 tmscm
+tmg_xy_2path (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "xy->path");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "xy->path");
+
+  int in1= tmscm_to_int (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  path out= get_current_editor()->xy_to_path (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return path_to_tmscm (out);
+}
+
+tmscm
 tmg_set_mouse_pointer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-mouse-pointer");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-mouse-pointer");
@@ -3594,6 +3609,32 @@ tmg_html_expand (tmscm arg1) {
 }
 
 tmscm
+tmg_markdown_expand (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "markdown-expand");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->exec_markdown (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_office_expand (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "office-expand");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->exec_office (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_animate_checkout (tmscm arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "animate-checkout");
 
@@ -3898,6 +3939,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("key-press-complete",  tmg_key_press_complete, 1, 0, 0);
   tmscm_install_procedure ("mouse-any",  tmg_mouse_any, 6, 0, 0);
   tmscm_install_procedure ("get-mouse-position",  tmg_get_mouse_position, 0, 0, 0);
+  tmscm_install_procedure ("xy->path",  tmg_xy_2path, 2, 0, 0);
   tmscm_install_procedure ("set-mouse-pointer",  tmg_set_mouse_pointer, 2, 0, 0);
   tmscm_install_procedure ("set-predef-mouse-pointer",  tmg_set_predef_mouse_pointer, 1, 0, 0);
   tmscm_install_procedure ("go-to-path",  tmg_go_to_path, 1, 0, 0);
@@ -4053,6 +4095,8 @@ initialize_glue_editor () {
   tmscm_install_procedure ("verbatim-expand",  tmg_verbatim_expand, 1, 0, 0);
   tmscm_install_procedure ("latex-expand",  tmg_latex_expand, 1, 0, 0);
   tmscm_install_procedure ("html-expand",  tmg_html_expand, 1, 0, 0);
+  tmscm_install_procedure ("markdown-expand",  tmg_markdown_expand, 1, 0, 0);
+  tmscm_install_procedure ("office-expand",  tmg_office_expand, 1, 0, 0);
   tmscm_install_procedure ("animate-checkout",  tmg_animate_checkout, 1, 0, 0);
   tmscm_install_procedure ("animate-commit",  tmg_animate_commit, 1, 0, 0);
   tmscm_install_procedure ("idle-time",  tmg_idle_time, 0, 0, 0);

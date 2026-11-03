@@ -1,0 +1,22 @@
+Write long strings of one character as strings
+
+s7 writes a string of more than 1000 copies of one character as
+(make-string n c), with display and write too. TeXmacs writes its trees as
+data and reads them back (the tree cache, save-object, the server
+protocol), and got a list instead of the string. Keep the abbreviation for
+readable output only, where it evaluates back to the string.
+
+--- a/s7.c
++++ b/s7.c
+@@ -35345,7 +35345,10 @@
+   if (string_length(obj) > 0)
+     {
+       /* since string_length is a scheme length, not C, this write can embed nulls from C's point of view */
+-      if (string_length(obj) > 1000) /* was 10000 28-Feb-18 */
++      /* TeXmacs: only in readable mode, where (make-string ...) reads back as the string;
++       *   write and display must give the characters (TeXmacs reads its trees back as data)
++       */
++      if ((use_write == p_Readable) && (string_length(obj) > 1000)) /* was 10000 28-Feb-18 */
+ 	{
+ 	  size_t size;
+ 	  char buf[Out_Bufsize];

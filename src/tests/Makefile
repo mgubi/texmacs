@@ -24,13 +24,10 @@ TOP   := $(abspath ..)
 SRC   := $(TOP)/src
 BUILD := $(abspath build)
 
+# every test is plain TeXmacs C++ over tests/tm_test.hpp (no QtTest), so
+# that every build runs them all: Qt, Vue, Cocoa
 TEST_SRC := $(shell find . -name '*_test.cpp' | sort)
-# legacy tests that do not link in this setup (xml_test includes a .cpp file
-# that is already part of the main build)
-# mac_images_test calls mac_supports and mac_image_size, which mac_images.h
-# does not declare in a Qt 6 build
-EXCLUDE  := xml_test mac_images_test
-TESTS    := $(filter-out $(EXCLUDE),$(patsubst %.cpp,%,$(notdir $(TEST_SRC))))
+TESTS    := $(patsubst %.cpp,%,$(notdir $(TEST_SRC)))
 vpath %_test.cpp $(sort $(dir $(TEST_SRC)))
 
 # flags of the main build, exported by print-var.mk
@@ -41,8 +38,6 @@ include $(BUILD)/flags.mk
 
 TM_OBJS := $(filter-out %/unix_entrypoint.o %/windows32_entrypoint.o \
                         %/windows64_entrypoint.o, $(wildcard $(SRC)/Objects/*.o))
-
-TEST_LIBS := -framework QtTest
 
 # environment for running the tests
 export TEXMACS_PATH      := $(TOP)/TeXmacs
@@ -66,23 +61,17 @@ run-%: $(BUILD)/%
 	@mkdir -p $(TEXMACS_HOME_PATH)
 	$< $(ARGS)
 
-# only the tests written against QtTest declare a QObject; the others are
-# plain TeXmacs C++ over tests/tm_test.hpp and get an empty stub
-$(BUILD)/%.moc: %.cpp
-	@mkdir -p $(BUILD)
-	@if grep -q Q_OBJECT $<; then 	  $(TM_MOC) $(TM_MOCFLAGS) $(abspath $<) -o $@; 	else : > $@; fi
-
 # test objects depend on every header of the main build: a changed vtable
 # in a stale object is a crash, not a compile error
 TM_HEADERS := $(shell find $(SRC) -name '*.hpp' -not -path '*/Objects/*')
 
-$(BUILD)/%.o: %.cpp $(BUILD)/%.moc $(TM_HEADERS)
+$(BUILD)/%.o: %.cpp $(TM_HEADERS)
+	@mkdir -p $(BUILD)
 	cd $(SRC) && $(TM_CXX) $(TM_INCL) $(TM_CXXFLAGS) -I$(BUILD) -I$(abspath .) \
 	  -c $(abspath $<) -o $@
 
 $(BUILD)/%: $(BUILD)/%.o $(TM_OBJS)
-	$(TM_LD) $(TM_OBJS) $< $(TM_LINK_OPTIONS) $(TM_LDFLAGS) $(TM_LIBS) \
-	  $(TEST_LIBS) -o $@
+	$(TM_LD) $(TM_OBJS) $< $(TM_LINK_OPTIONS) $(TM_LDFLAGS) $(TM_LIBS) -o $@
 
 clean:
 	rm -rf $(BUILD)
@@ -100,4 +89,4 @@ check-stale:
 	else echo "no stale objects"; fi
 
 .PHONY: all build run clean check-stale
-.PRECIOUS: $(BUILD)/%.moc $(BUILD)/%.o
+.PRECIOUS: $(BUILD)/%.o

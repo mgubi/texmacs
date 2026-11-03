@@ -1,0 +1,8 @@
+# needs search-focus.scm: typing after the search toolbar opens goes to it
+wait 9000
+window #2
+focus
+wait 1500
+text abc
+wait 800
+snapshot search

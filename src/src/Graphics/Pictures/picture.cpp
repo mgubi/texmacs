@@ -18,6 +18,7 @@
 #include "iterator.hpp"
 #include "file.hpp"
 #include "effect.hpp"
+#include "boot.hpp" // get_user_preference (the icon set)
 
 /******************************************************************************
 * Unique id for pictures
@@ -232,19 +233,12 @@ cached_load_picture (url file_name, int w, int h, tree eff,
 ******************************************************************************/
 
 picture qt_load_xpm (url file_name);
+picture mupdf_load_xpm (url file_name);
+string  mupdf_get_icon_theme ();
+string  ns_icon_theme ();
 
-picture
-load_xpm (url file_name) {
-  static hashmap<string,picture> cache;
-  string name= as_string (file_name);
-  if (cache->contains (name)) return cache[name];
-
-#ifdef QTTEXMACS
-
-  picture pict= qt_load_xpm (file_name);
-
-#else
-
+picture 
+raw_load_xpm (url file_name) {
   tree t= xpm_load (file_name);
 
   // get main info
@@ -306,7 +300,38 @@ load_xpm (url file_name) {
       pict->set_pixel (x, h-1-y, pmc);
     }
   }
-  pict= as_native_picture (pict);
+  return as_native_picture (pict);
+}
+
+
+picture
+load_xpm (url file_name) {
+  static hashmap<string,picture> cache;
+  // the variant which is loaded depends on the resolution we draw at and,
+  // for the vector icons, on the theme (see mupdf_load_xpm): the key
+  // mentions both, so that a change of either is picked up
+  string name= as_string (file_name) * "#" * as_string (retina_factor);
+#ifdef MUPDF_RENDERER
+  name= name * "#" * mupdf_get_icon_theme ();
+#endif
+#ifdef AQUATEXMACS
+  name= name * "#" * ns_icon_theme ();
+#endif
+  // and the icon set, which may change while TeXmacs runs (apply_icon_set)
+  name= name * "#" * get_user_preference ("icon set", "neo-classical");
+  if (cache->contains (name)) return cache[name];
+
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
+
+  picture pict= qt_load_xpm (file_name);
+
+#elif defined(MUPDF_RENDERER)
+
+  picture pict=  mupdf_load_xpm (resolve ("$TEXMACS_PIXMAP_PATH" * file_name));
+
+#else
+
+  picture pict=  raw_load_xpm (file_name);
 
 #endif
 

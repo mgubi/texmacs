@@ -21,7 +21,7 @@
   </explain>
 
   <\explain>
-    <explain-macro|style|version>
+    <explain-macro|style|style>
 
     <explain-macro|style|<with|font-shape|right|<explain-macro|tuple|style|pack-1|<with|mode|math|\<cdots\>>|pack-n>>><explain-synopsis|style
     and packages>
@@ -31,7 +31,8 @@
 
   <\explain|<explain-macro|body|content><explain-synopsis|body of the
   document>>
-    This mandatory tag specifies the body of your document.
+    This tag specifies the body of your document. It is only omitted when
+    the body is empty.
   </explain>
 
   <\explain|<label|initial-env><explain-macro|initial|table><explain-synopsis|initial
@@ -43,7 +44,24 @@
     <explain-macro|associate|var-i|val-i> and associates the initial value
     <src-arg|val-i> to the environment variable <src-arg|var-i>. The initial
     values of environment variables which do not occur in the table are
-    determined by the style file and packages.
+    determined by the style file and packages. Some purely interactive
+    variables (like the screen dimensions and, in most cases, the zoom
+    factor) are never saved in this table.
+  </explain>
+
+  <\explain|<explain-macro|final|table><explain-synopsis|final environment>>
+    An optional table of the same form as the <markup|initial> table. It is
+    preserved when loading and saving the document, but is currently not
+    used by the typesetter.
+  </explain>
+
+  <\explain|<explain-macro|attachments|table><explain-synopsis|attached
+  documents>>
+    An optional table which associates arbitrary content to keys. Such
+    attachments are saved along with the document, but are not part of its
+    body; they are accessed from <scheme> using <scm|get-attachment>,
+    <scm|set-attachment> and <scm|list-attachments>. For instance, the
+    bibliographic database of a document may be stored in an attachment.
   </explain>
 
   <\explain|<explain-macro|references|table><explain-synopsis|references>>

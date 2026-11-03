@@ -18,6 +18,7 @@
 #include "tree_correct.hpp"
 #include "url.hpp"
 #include "font.hpp"
+#include "converter.hpp" // is_emoji_name
 
 tree upgrade_tex (tree t);
 bool textm_class_flag= false;
@@ -1752,6 +1753,29 @@ translate_keys (array<tree> a, hashmap<tree,tree> dic) {
   return r;
 }
 
+static string
+emoji_arg (tree t) {
+  // the name of an emoji, as written in \emoji{...} (the parser made a
+  // dash of the hyphens of flag-congo---kinshasa)
+  if (is_atomic (t)) return t->label;
+  if (is_concat (t)) {
+    string r;
+    for (int i= 0; i < N(t); i++) r << emoji_arg (t[i]);
+    return r;
+  }
+  if (is_tuple (t, "\\emdash", 0)) return "---";
+  if (is_tuple (t, "\\endash", 0)) return "--";
+  // (white_check_mark, an alias of the package: a subscript for the parser)
+  if (is_tuple (t, "\\<sub>", 1)) return "_" * emoji_arg (t[1]);
+  if (is_tuple (t, "\\<sup>", 1)) return "^" * emoji_arg (t[1]);
+  if (is_tuple (t, "\\begin-math", 0) || is_tuple (t, "\\end-math", 0))
+    return "$";
+  if (is_tuple (t) && N(t) == 1 && is_atomic (t[0]) && N(t[0]->label) == 2 &&
+      t[0]->label[0] == '\\')
+    return t[0]->label (1, 2);                  // \#, \&, \_
+  return "?";
+}
+
 tree
 latex_command_to_tree (tree t) {
   if (is_tuple (t) && N(t)>1) {
@@ -2051,6 +2075,19 @@ latex_command_to_tree (tree t) {
   
   if (is_tuple (t, "\\boxed", 1))
     return compound ("boxed", l2e (t[1]));
+
+  if (is_tuple (t, "\\emoji", 1)) {
+    // the emoji of the LaTeX package emoji (\emoji{grinning-face}): those
+    // of TeXmacs have the same names (<emoji-grinning-face>); its other
+    // names (\emoji{smile}, \emoji{+1}) come from emoji-latex-aliases.scm
+    string raw = emoji_arg (t[1]);
+    string name= emoji_from_latex (locase_all (raw));
+    // (the shortcodes of GitHub have _ where the package has -)
+    if (name == "") name= emoji_from_latex (replace (locase_all (raw), "_", "-"));
+    if (name != "") return name;
+    // a name which is no emoji: kept as it was written
+    if (search_forwards ("?", raw) < 0) return compound ("emoji", raw);
+  }
 
   if (is_tuple (t, "\\marginpar", 1))
     return tree (APPLY, "marginal-note", "normal", "", l2e (t[1]));

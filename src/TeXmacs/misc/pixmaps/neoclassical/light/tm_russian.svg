@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" height="16" id="svg3290" version="1.0" width="16">
+ <defs id="defs3299"/>
+ <g id="g7494" transform="matrix(0.0625,0,0,0.05859363,0,0.51955585)" style="opacity:0.75">
+  <rect y="42.333" x="0" width="256" style="fill:#ffffff" id="rect3292" height="56.888996"/>
+  <rect y="99.222008" x="0" width="256" style="fill:#0000ff" id="rect3294" height="56.888996"/>
+  <rect y="156.11101" x="0" width="256" style="fill:#ff0000" id="rect3296" height="56.888996"/>
+ </g>
+</svg>

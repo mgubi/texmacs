@@ -11,8 +11,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (utils misc doxygen)
-  (:use (ice-9 rdelim)))
+(texmacs-module (utils misc doxygen))
 
 (display "TeXmacs] Loading doxygen C++ support\n")
 
@@ -276,9 +275,7 @@
 	(let ((nst (url-last-modified filename))
 	      (ost (ahash-ref* file->stamp filename '())))
 	  (if (not (equal? nst ost))
-	      (let* ((p (open-input-file filename))
-		     (s (read-delimited "" p)))
-		(close-input-port p)
+	      (let* ((s (string-load (system->url filename))))
 		(ahash-set! file->stamp filename nst)
 		(set! current-dir (url->system (url-head relative_filename)))
 		(parse-main s))))

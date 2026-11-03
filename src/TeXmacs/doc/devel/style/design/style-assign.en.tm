@@ -10,7 +10,7 @@
   value to each string variable. Variables whose values are macros correspond
   to new primitives. The others are ordinary environment variables. The
   primitives for operating on the environment are available from
-  <menu|Source|Define>.
+  <menu|Source|Definition>.
 
   You may permanently change the value of an environment variable using the
   <markup|assign> primitive, as in the example

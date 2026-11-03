@@ -1,0 +1,965 @@
+# TeXmacs of the branch upsilon_texmacs on Linux and Windows, with S7, on the
+# branch upsilon_ci (macOS: upsilon-macos.yml, the Cocoa and Vue ports):
+#   * linux, windows: Qt 6, the jobs of ci.yml (the CI of wip_s7): each
+#     builds TeXmacs, runs the regression suites headless (.github/scripts)
+#     and keeps a runnable bundle as an artifact;
+#   * linux-qt5: that the Qt 5 build of Ubuntu 22.04 (GCC 11) compiles and
+#     starts, as users build it from source;
+#   * linux-vue, windows-vue: the Vue port (SDL3 and Clay, drawn by the
+#     GPU with OpenGL and ThorVG, or by MuPDF without OpenGL 3): the
+#     libraries the distributions lack (misc/vue/build-deps.sh, cached),
+#     TeXmacs, a runnable bundle as an artifact, and a check that it opens
+#     a document given on the command line and shows its colors
+#     (packages/macos/ci-colors.tm, png-has-red.py), under Xvfb on Linux
+#     (OpenGL of Mesa, on the CPU); the snapshots are artifacts too;
+#   * linux-appimage, appimage-check: AppImages of the Qt and the Vue builds,
+#     made on Ubuntu 22.04 (packages/appimage/build-appimage.sh) and run on
+#     Ubuntu 24.04 and Debian 12 without packages of development;
+#   * windows, windows-vue also make an installer each (Inno Setup,
+#     packages/windows/TeXmacs-Upsilon.iss, .github/scripts/windows-installer.sh),
+#     installed, run and uninstalled: beside the stock TeXmacs, it has its
+#     own folder and identity and writes no TEXMACS_PATH.
+# Every package brings Ghostscript (packages/build-gs.sh, the program gs with
+# its fonts and resources built in: macOS in upsilon-macos.yml, the Windows
+# bundles and installers, the AppImages), and the Windows ones also Aspell and
+# dictionaries (packages/windows/build-aspell.sh: linked into TeXmacs, the
+# dictionaries in the folder aspell-0.60), checked with
+# packages/bundled-tools/check.sh, with no gs of the system (#662). The tar.gz
+# files of Linux do not have them: they use the system, as the programs
+# they start do.
+# A state of upsilon_texmacs is built by moving upsilon_ci to it,
+#   git push -f origin upsilon_texmacs:upsilon_ci
+# NOTE: keep the jobs linux and windows as in ci.yml, which comes from wip_s7
+
+name: Linux and Windows (upsilon_texmacs, Qt and Vue)
+
+on:
+  push:
+    branches: [upsilon_ci]
+  workflow_dispatch:
+
+concurrency:
+  group: upsilon-linux-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (Ubuntu 24.04, Qt 6)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            qt6-base-dev qt6-base-dev-tools qt6-svg-dev libgl-dev \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
+            libgnutls28-dev libsqlite3-dev \
+            ghostscript imagemagick fig2dev librsvg2-bin \
+            gnupg
+          # (gnupg: the gpg command, which the encryption of TeXmacs runs
+          # and the crypto suite checks; without it these checks are skipped)
+          # ImageMagick of Ubuntu does not write PostScript, EPS or PDF
+          # (its policy), which TeXmacs asks of it (image_to_eps)
+          sudo sed -i -E 's/rights="none" pattern="(PS|PS2|PS3|EPS|PDF|XPS)"/rights="read|write" pattern="\1"/' \
+            /etc/ImageMagick-6/policy.xml
+
+      # NOTE: GCC, which configure would not take where clang is installed
+      # (as on the runners): the Qt build of Linux is the one users make
+      # with the compiler of their system, and GCC rejects code which clang
+      # accepts (a member named as a type used before it in its class)
+      - name: Configure
+        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake CC=gcc CXX=g++
+
+      - name: Build
+        run: |
+          git config --global --add safe.directory '*'
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
+
+      # the C++ unit tests (tests/Makefile)
+      - name: Unit tests
+        run: make -C tests
+
+      - name: Run the regression suites
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+
+      # the command line and the exit of TeXmacs after a script (#462), one
+      # TeXmacs per case, under s7 (#562); fixes.yml runs them under Guile
+      - name: The startup checks
+        env:
+          TM_TEST_TIMEOUT: 300
+          TM_TEST_HOME: ${{ runner.temp }}/startup-home
+        run: tests/startup/check.sh
+
+      - name: Package
+        run: tar -czf texmacs-linux-x86_64.tar.gz TeXmacs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-linux-x86_64
+          path: src/texmacs-linux-x86_64.tar.gz
+          retention-days: 14
+
+  # Qt 5, as users build it on Ubuntu 22.04 and the distributions of its age
+  # (GCC 11): only that it builds and starts (#389); nothing is published
+  linux-qt5:
+    name: Linux (Ubuntu 22.04, Qt 5, GCC)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            qtbase5-dev qtbase5-dev-tools libqt5svg5-dev libgl-dev \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
+            libgnutls28-dev libsqlite3-dev ghostscript xvfb xauth
+
+      - name: Configure
+        run: ./configure --with-scheme=s7 --with-gnutls QMAKE=/usr/lib/qt5/bin/qmake CC=gcc CXX=g++
+
+      - name: Build
+        run: |
+          git config --global --add safe.directory '*'
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
+
+      - name: TeXmacs starts
+        run: |
+          home=$(mktemp -d)
+          # (TeXmacs asks Qt for xcb, whatever QT_QPA_PLATFORM says)
+          TEXMACS_HOME_PATH="$home" timeout 300 xvfb-run -a \
+            TeXmacs/bin/texmacs.bin \
+            -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -20 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+
+  windows:
+    name: Windows (MSYS2 MinGW-w64, Qt 6)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: src
+    env:
+      # qmake6 is in /mingw64/bin, but moc, uic and rcc of Qt 6 only in here
+      QT6_BIN: /mingw64/share/qt6/bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          # (git: for the git group of the version suite, #625; the native
+          # git, as Git for Windows, not the git of MSYS2, which does not
+          # take Windows paths like D:\a\b.tm as files of the repository)
+          install: >-
+            make perl rsync zip
+            mingw-w64-x86_64-git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-qt6-base
+            mingw-w64-x86_64-qt6-svg
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-gnutls
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-gnupg
+            mingw-w64-x86_64-gettext-runtime
+
+      # Ghostscript and Aspell, built from their sources (cached: the key
+      # follows their scripts), for the bundle and the installer (#662)
+      - name: Place of Ghostscript and Aspell
+        run: |
+          echo "GSD=$(cygpath -u '${{ runner.temp }}')/gs-deps" >> "$GITHUB_ENV"
+          echo "ASP=$(cygpath -u '${{ runner.temp }}')/aspell-deps" >> "$GITHUB_ENV"
+
+      - name: Cache of Ghostscript
+        id: gs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\gs-deps
+          key: gs-windows-${{ hashFiles('src/packages/build-gs.sh') }}
+
+      - name: Ghostscript
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: packages/build-gs.sh "$GSD"
+
+      - uses: actions/cache/save@v4
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\gs-deps
+          key: ${{ steps.gs-cache.outputs.cache-primary-key }}
+
+      - name: Cache of Aspell
+        id: asp-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: aspell-windows-${{ hashFiles('src/packages/windows/build-aspell.sh') }}
+
+      - name: Aspell
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        run: packages/windows/build-aspell.sh "$ASP"
+
+      - uses: actions/cache/save@v4
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: ${{ steps.asp-cache.outputs.cache-primary-key }}
+
+      - name: Configure
+        run: |
+          export PATH="$QT6_BIN:$PATH"
+          # the Windows entry point needs Qt found with pkg-config: with
+          # qmake, Qt defines QT_NEEDS_QMAIN and replaces main
+          # With pkg-config, Qt's flags no longer bring in Winsock (ws2_32),
+          # which the socket code needs; configure should add it for MinGW
+          # (Aspell: its library is linked into TeXmacs, and TeXmacs finds
+          # its dictionaries in the folder aspell-0.60 of the package)
+          ./configure --with-scheme=s7 --with-qt-find-method=pkgconfig \
+            --with-gnutls QMAKE=/mingw64/bin/qmake6 LIBS="-lws2_32 -lstdc++" \
+            CPPFLAGS="-I$ASP/include" LDFLAGS="-L$ASP/lib"
+          grep -i "aspell" config.log | grep -i "USE_ASPELL\|support enabled\|not found" | head -5
+
+      - name: Build
+        run: |
+          git config --global --add safe.directory '*'
+          export PATH="$QT6_BIN:$PATH"
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh --no-run TeXmacs/bin/texmacs.bin
+
+      - name: Run the regression suites
+        run: |
+          BIN=TeXmacs/bin/texmacs.bin
+          test -f "$BIN" || BIN=TeXmacs/bin/texmacs.bin.exe
+          ../.github/scripts/run-tests.sh "$BIN"
+
+      # the command line and the exit after a script, one TeXmacs process per
+      # case (a crash at the exit on Windows only, #783); also when a suite
+      # failed (the packaging steps then do not run)
+      - name: The startup checks
+        if: ${{ !cancelled() }}
+        env:
+          TM_TEST_TIMEOUT: 300
+        run: sh tests/startup/check.sh
+
+      - name: Bundle
+        run: |
+          export PATH="$QT6_BIN:$PATH"
+          # with Qt found by pkg-config, configure does not set the plugin
+          # directory, and the bundle needs at least platforms/qwindows.dll
+          make WINDOWS_BUNDLE QT_PLUGINS_PATH=/mingw64/share/qt6/plugins \
+            GS_BUNDLE="$GSD/bin/gs.exe" GS_LICENSES="$GSD/share/licenses/ghostscript" \
+            ASPELL_DATA="$ASP/lib/aspell-0.60" ASPELL_LICENSES="$ASP/share/licenses/aspell"
+          ls ../distr/TeXmacs-Windows/bin/platforms
+          # what Ghostscript and Aspell add to the bundle
+          ls -l ../distr/TeXmacs-Windows/bin/gs.exe
+          du -sk ../distr/TeXmacs-Windows/aspell-0.60 ../distr/TeXmacs-Windows
+          (cd ../distr && zip -qr "$GITHUB_WORKSPACE/texmacs-windows-x86_64.zip" TeXmacs-Windows)
+          ls -l "$GITHUB_WORKSPACE/texmacs-windows-x86_64.zip"
+
+      # Ghostscript and Aspell of the bundle, with no gs of the system
+      - name: Bundled tools (Ghostscript, Aspell)
+        run: |
+          root=$(cd ../distr/TeXmacs-Windows && pwd)
+          packages/bundled-tools/check.sh -a -e -r "$root" \
+            -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$root/bin/texmacs.exe"
+
+      # the installer (Inno Setup): made, installed, run and uninstalled
+      - name: Installer
+        run: ../.github/scripts/windows-installer.sh qt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-windows-x86_64
+          path: |
+            texmacs-windows-x86_64.zip
+            texmacs-upsilon-qt-x86_64-setup.exe
+          retention-days: 14
+
+  linux-vue:
+    name: Linux (Ubuntu 24.04, Vue, GPU)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config cmake ninja-build meson \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev libsqlite3-dev \
+            libgnutls28-dev \
+            libgl-dev libegl-dev libx11-dev libxext-dev libxrandr-dev \
+            libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
+            libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
+            libwayland-dev wayland-protocols libdecor-0-dev libdbus-1-dev \
+            xvfb xauth libgl1-mesa-dri
+
+      - name: Place of the libraries
+        run: echo "DEPS=$HOME/vue-deps" >> "$GITHUB_ENV"
+
+      # NOTE: saved once built, even when TeXmacs does not build
+      - name: Cache of the libraries
+        id: deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/vue-deps
+          key: vue-deps-linux-${{ hashFiles('src/misc/vue/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+
+      - name: Libraries (SDL3, SDL3_ttf, MuPDF, ThorVG)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: misc/vue/build-deps.sh "$DEPS"
+
+      - uses: actions/cache/save@v4
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/vue-deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      # NOTE: GCC, as the job linux: configure would take clang, which
+      # accepts what GCC refuses (designated initializers out of the order
+      # of their fields, in the calls of Clay)
+      - name: Configure
+        run: |
+          ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
+            --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
+            PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
+
+      # NOTE: -k, so that a run shows all the files which do not compile
+      - name: Build
+        run: |
+          git config --global --add safe.directory '*'
+          make -k -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
+
+      - name: What the libraries export (when the build fails)
+        if: failure()
+        run: |
+          ls -la "$DEPS/lib"
+          nm -D --defined-only "$DEPS/lib/libSDL3_ttf.so" | grep -c " T TTF_" || true
+          nm -D --defined-only "$DEPS/lib/libSDL3_ttf.so" | grep "TTF_OpenFont" || true
+          readelf -d "$DEPS/lib/libSDL3_ttf.so" | head -20
+          # the link again, with where TTF_OpenFont is looked for
+          cd src
+          cmd=$(make -n Objects/texmacs.bin 2> /dev/null | grep -- "-o Objects/texmacs.bin" | tail -1)
+          echo "${cmd:0:200}..."
+          eval "$cmd -Wl,--trace-symbol=TTF_OpenFont -Wl,--trace" 2>&1 | grep -i "sdl\|TTF_OpenFont\|vue-deps" | head -40 || true
+
+      # the C++ unit tests (tests/Makefile), as with Qt
+      - name: Unit tests
+        run: LD_LIBRARY_PATH="$DEPS/lib" make -C tests
+
+      # SDL3 and SDL3_ttf next to TeXmacs (the script TeXmacs/bin/texmacs
+      # puts TeXmacs/lib in LD_LIBRARY_PATH)
+      - name: Package
+        run: |
+          mkdir -p TeXmacs/lib
+          cp -a "$DEPS"/lib/libSDL3*.so* TeXmacs/lib/
+          tar -czf texmacs-vue-linux-x86_64.tar.gz TeXmacs
+
+      - name: Smoke test (TeXmacs shows a document)
+        run: |
+          home=$(mktemp -d)
+          shots="$PWD/../snapshots"
+          mkdir -p "$shots"
+          # NOTE: a first run sets the home up (otherwise the welcome page,
+          # loaded at the first run, replaces the document in its window)
+          HOME="$home" TEXMACS_PATH="$PWD/TeXmacs" timeout 180 \
+            xvfb-run -a -s "-screen 0 1600x1200x24" \
+            TeXmacs/bin/texmacs -x "(quit-TeXmacs)" > "$home/first.txt" 2>&1 || true
+          HOME="$home" TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_VUE_SNAPSHOT="$shots" \
+            xvfb-run -a -s "-screen 0 1600x1200x24" \
+            TeXmacs/bin/texmacs "$PWD/packages/macos/ci-colors.tm" > "$home/log.txt" 2>&1 &
+          pid=$!
+          ok=no
+          for i in $(seq 1 60); do
+            sleep 3
+            kill -0 $pid 2> /dev/null || break
+            ls "$shots"/window-*.png > /dev/null 2>&1 &&
+              packages/macos/png-has-red.py "$shots"/window-*.png && { ok=yes; break; }
+          done
+          pkill -f texmacs.bin || true
+          wait $pid 2> /dev/null || true
+          grep "GPU" "$home/log.txt" || true
+          tail -20 "$home/log.txt"
+          [ $ok = yes ] || { echo "error: the document is not shown"; exit 1; }
+
+      # NOTE: also when the smoke test fails (to try the bundle elsewhere)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: texmacs-vue-linux-x86_64
+          path: src/texmacs-vue-linux-x86_64.tar.gz
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snapshots-vue-linux
+          path: snapshots
+          if-no-files-found: ignore
+
+  # AppImages of the Qt and the Vue builds, made on Ubuntu 22.04 (an
+  # AppImage runs where the glibc is as recent as the one it was built with:
+  # 2.35, Ubuntu 22.04, Debian 12, Fedora 36 and later), with
+  # packages/appimage/build-appimage.sh; appimage-check runs them where
+  # there are no packages of development
+  linux-appimage:
+    name: Linux AppImage (${{ matrix.gui }}, built on Ubuntu 22.04)
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        gui: [qt, vue]
+    defaults:
+      run:
+        working-directory: src
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      DEPS: /opt/vue-deps
+    steps:
+      # (the container has no git: checkout needs it for a clone)
+      - name: Tools of the container
+        working-directory: /
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl file
+
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config python3 python3-venv \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev libsqlite3-dev \
+            libgnutls28-dev libgl-dev
+          if [ "${{ matrix.gui }}" = qt ]; then
+            apt-get install -y --no-install-recommends \
+              qt6-base-dev qt6-base-dev-tools libqt6svg6-dev qt6-wayland
+          else
+            apt-get install -y --no-install-recommends cmake ninja-build \
+              libegl-dev libx11-dev libxext-dev libxrandr-dev \
+              libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
+              libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
+              libwayland-dev wayland-protocols libdecor-0-dev libdbus-1-dev
+          fi
+
+      - name: Cache of the libraries (Vue)
+        if: matrix.gui == 'vue'
+        id: deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/vue-deps
+          key: vue-deps-appimage-2204-${{ hashFiles('src/misc/vue/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+
+      - name: Libraries (SDL3, SDL3_ttf, MuPDF, ThorVG)
+        if: matrix.gui == 'vue' && steps.deps-cache.outputs.cache-hit != 'true'
+        run: misc/vue/build-deps.sh "$DEPS"
+
+      - uses: actions/cache/save@v4
+        if: matrix.gui == 'vue' && steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: /opt/vue-deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      # Ghostscript for the AppImage: built here (glibc of Ubuntu 22.04, as
+      # TeXmacs), cached; a program with everything built in (#662)
+      - name: Cache of Ghostscript
+        id: gs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/gs-deps
+          key: gs-appimage-2204-${{ hashFiles('src/packages/build-gs.sh') }}
+
+      - name: Ghostscript
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: packages/build-gs.sh /opt/gs-deps
+
+      - uses: actions/cache/save@v4
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        with:
+          path: /opt/gs-deps
+          key: ${{ steps.gs-cache.outputs.cache-primary-key }}
+
+      - name: Configure
+        run: |
+          if [ "${{ matrix.gui }}" = qt ]; then
+            ./configure --with-scheme=s7 --with-gnutls \
+              QMAKE=/usr/lib/qt6/bin/qmake CC=gcc CXX=g++
+          else
+            ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
+              --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
+              PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" CC=gcc CXX=g++
+          fi
+
+      - name: Build
+        run: |
+          git config --global --add safe.directory '*'
+          make -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh TeXmacs/bin/texmacs.bin
+
+      - name: AppImage
+        run: |
+          export QMAKE=/usr/lib/qt6/bin/qmake
+          GS_BIN=/opt/gs-deps/bin/gs GS_LICENSES=/opt/gs-deps/share/licenses/ghostscript \
+            packages/appimage/build-appimage.sh ${{ matrix.gui }} \
+            texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage "$DEPS/lib"
+          ls -l /opt/gs-deps/bin/gs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-upsilon-${{ matrix.gui }}-appimage
+          path: src/texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage
+          retention-days: 14
+
+  # the AppImages where a user runs them: the libraries of a desktop, no
+  # packages of development (no libGL.so, which ThorVG needed, #376); TeXmacs
+  # starts, runs a command and, with Vue, draws with OpenGL (Mesa, on the CPU)
+  appimage-check:
+    name: AppImage (${{ matrix.gui }}) on ${{ matrix.image }}
+    needs: linux-appimage
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        gui: [qt, vue]
+        image: ['ubuntu:24.04', 'debian:12']
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # (the scripts of the checks; no git in the container: checkout takes
+      # the archive of the commit)
+      - uses: actions/checkout@v4
+
+      - name: A desktop without packages of development
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            xvfb xauth libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 \
+            libgl1 libopengl0 libharfbuzz0b \
+            libfontconfig1 libdbus-1-3 libx11-6 libx11-xcb1 libxext6 \
+            libxrandr2 libxcursor1 libxi6 libxss1 libxtst6 libxfixes3 \
+            libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxcb-xfixes0 \
+            libwayland-client0 libwayland-egl1 libwayland-cursor0
+          ! ls /usr/lib/x86_64-linux-gnu/libGL.so 2> /dev/null
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: texmacs-upsilon-${{ matrix.gui }}-appimage
+
+      - name: TeXmacs starts and runs a command
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          app="$PWD/texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage"
+          chmod +x "$app"
+          home=$(mktemp -d)
+          # (all the libraries which the system must give, at once)
+          (cd "$home" && "$app" --appimage-extract > /dev/null &&
+           find squashfs-root -type f \( -name '*.so*' -o -path '*/bin/*' \) \
+             -exec ldd {} + 2> /dev/null | grep 'not found' | sort -u) || true
+          HOME="$home" timeout 300 xvfb-run -a -s "-screen 0 1600x1200x24" \
+            "$app" -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -30 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+          if [ "${{ matrix.gui }}" = vue ]; then
+            grep "GPU" "$home/log.txt" || true
+            ! grep -q "no GL canvas\|drawing with MuPDF" "$home/log.txt" ||
+              { echo "error: no OpenGL, TeXmacs draws with MuPDF"; exit 1; }
+            grep -q "GPU: .*Mesa" "$home/log.txt" ||
+              { echo "error: TeXmacs does not draw with OpenGL"; exit 1; }
+          fi
+
+      # Ghostscript of the AppImage (usr/bin/gs, the first of the PATH of
+      # AppRun): it runs alone, and TeXmacs runs it for an EPS image; this
+      # system has no Ghostscript, and a gs which fails comes first in the
+      # PATH after it (#662)
+      - name: Bundled Ghostscript
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          app="$PWD/texmacs-upsilon-${{ matrix.gui }}-x86_64.AppImage"
+          ! command -v gs || { echo "error: this system has a gs"; exit 1; }
+          x=$(mktemp -d)
+          (cd "$x" && "$app" --appimage-extract > /dev/null)
+          ls -l "$x/squashfs-root/usr/bin/gs"
+          ls "$x/squashfs-root/usr/share/TeXmacs/misc/licenses/ghostscript"
+          TM_CHECK_QPA= xvfb-run -a -s "-screen 0 1600x1200x24" \
+            src/packages/bundled-tools/check.sh -g "$x/squashfs-root/usr/bin/gs" \
+              -r "$x/squashfs-root/usr/share/TeXmacs" \
+              -v "$(sed -n 's/^GS_VERSION=//p' src/packages/build-gs.sh)" -- "$app"
+
+  windows-vue:
+    name: Windows (MSYS2 MinGW-w64, Vue, GPU)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make perl rsync zip curl tar git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-sdl3
+            mingw-w64-x86_64-sdl3-ttf
+            mingw-w64-x86_64-gnutls
+            mingw-w64-x86_64-gettext-runtime
+
+      # Ghostscript and Aspell, built from their sources (cached: the key
+      # follows their scripts), for the bundle and the installer (#662)
+      - name: Place of Ghostscript and Aspell
+        run: |
+          echo "GSD=$(cygpath -u '${{ runner.temp }}')/gs-deps" >> "$GITHUB_ENV"
+          echo "ASP=$(cygpath -u '${{ runner.temp }}')/aspell-deps" >> "$GITHUB_ENV"
+
+      - name: Cache of Ghostscript
+        id: gs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\gs-deps
+          key: gs-windows-${{ hashFiles('src/packages/build-gs.sh') }}
+
+      - name: Ghostscript
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        run: packages/build-gs.sh "$GSD"
+
+      - uses: actions/cache/save@v4
+        if: steps.gs-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\gs-deps
+          key: ${{ steps.gs-cache.outputs.cache-primary-key }}
+
+      - name: Cache of Aspell
+        id: asp-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: aspell-windows-${{ hashFiles('src/packages/windows/build-aspell.sh') }}
+
+      - name: Aspell
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        run: packages/windows/build-aspell.sh "$ASP"
+
+      - uses: actions/cache/save@v4
+        if: steps.asp-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\aspell-deps
+          key: ${{ steps.asp-cache.outputs.cache-primary-key }}
+
+      # NOTE: saved once built, even when TeXmacs does not build
+      - name: Cache of the libraries
+        id: deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}\vue-deps
+          key: vue-deps-windows-${{ hashFiles('src/misc/vue/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+
+      - name: Place of the libraries
+        run: echo "DEPS=$(cygpath -u '${{ runner.temp }}')/vue-deps" >> "$GITHUB_ENV"
+
+      # SDL3 and SDL3_ttf of MSYS2
+      - name: Libraries (MuPDF, ThorVG)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: misc/vue/build-deps.sh "$DEPS" mupdf,thorvg
+
+      - uses: actions/cache/save@v4
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\vue-deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      # NOTE: clang (MinGW GCC builds the Vue port too since the calls of
+      # Clay give their fields in order, 6c494fbbaf; not tried here)
+      - name: Configure
+        run: |
+          ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
+            --with-mupdf="$DEPS" --with-thorvg="$DEPS" --with-gnutls \
+            LIBS="-lws2_32 -lstdc++" CC=clang CXX=clang++ \
+            CPPFLAGS="-I$ASP/include" LDFLAGS="-L$ASP/lib"
+
+      - name: Build
+        run: |
+          git config --global --add safe.directory '*'
+          make -k -j"$(nproc)"
+
+      - name: Revision of the build (#753)
+        run: ../.github/scripts/check-revision.sh --no-run TeXmacs/bin/texmacs.bin
+
+      - name: Bundle
+        run: |
+          make WINDOWS_BUNDLE \
+            GS_BUNDLE="$GSD/bin/gs.exe" GS_LICENSES="$GSD/share/licenses/ghostscript" \
+            ASPELL_DATA="$ASP/lib/aspell-0.60" ASPELL_LICENSES="$ASP/share/licenses/aspell"
+          ls ../distr/TeXmacs-Windows/bin
+          # what Ghostscript and Aspell add to the bundle
+          ls -l ../distr/TeXmacs-Windows/bin/gs.exe
+          du -sk ../distr/TeXmacs-Windows/aspell-0.60 ../distr/TeXmacs-Windows
+          (cd ../distr && zip -qr "$(cygpath -u "$GITHUB_WORKSPACE")/texmacs-vue-windows-x86_64.zip" TeXmacs-Windows)
+          ls -l "$(cygpath -u "$GITHUB_WORKSPACE")/texmacs-vue-windows-x86_64.zip"
+
+      # Ghostscript and Aspell of the bundle, with no gs of the system
+      - name: Bundled tools (Ghostscript, Aspell)
+        run: |
+          root=$(cd ../distr/TeXmacs-Windows && pwd)
+          packages/bundled-tools/check.sh -a -r "$root" \
+            -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$root/bin/texmacs.exe"
+
+      # the installer (Inno Setup): made, installed, run and uninstalled
+      - name: Installer
+        run: ../.github/scripts/windows-installer.sh vue
+
+      # the bundle (its DLLs); the runners have no OpenGL 3 (MuPDF draws)
+      - name: Smoke test (TeXmacs shows a document)
+        run: |
+          home=$(mktemp -d)
+          shots="$(cygpath -u "$GITHUB_WORKSPACE")/snapshots"
+          mkdir -p "$shots"
+          exe=../distr/TeXmacs-Windows/bin/texmacs.exe
+          # NOTE: a first run sets the home up (otherwise the welcome page,
+          # loaded at the first run, replaces the document in its window)
+          mkdir -p "$shots/first"
+          HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
+            TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots/first")" \
+            timeout 120 "$exe" -x "(quit-TeXmacs)" > "$home/first.txt" 2>&1 || true
+          # NOTE: timeout does not stop a program of Windows
+          taskkill //F //IM texmacs.exe > /dev/null 2>&1 || true
+          echo "== the first run"
+          tail -20 "$home/first.txt" || true
+          ls -la "$shots/first" || true
+          # NOTE: -d (the steps of the boot) and the profile (a line every 60
+          # turns of the event loop), to see where it stops
+          HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
+            TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" TEXMACS_VUE_PROFILE=60 \
+            TEXMACS_UNBUFFERED=1 \
+            "$exe" -d "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" \
+            -x "(begin (display* \"CI now: \" (buffer-list) \"\\n\") (delayed (:pause 5000) (display* \"CI after 5 s: \" (buffer-list) \"\\n\")) (delayed (:pause 150000) (quit-TeXmacs)))" \
+            > "$home/log.txt" 2>&1 &
+          pid=$!
+          ok=no
+          for i in $(seq 1 60); do
+            sleep 3
+            kill -0 $pid 2> /dev/null || break
+            ls "$shots"/window-*.png > /dev/null 2>&1 &&
+              python3 packages/macos/png-has-red.py "$shots"/window-*.png && { ok=yes; break; }
+          done
+          # what is on the screen (when the windows do not show the document)
+          if [ $ok = no ]; then
+            # NOTE: TeXmacs quits by itself (-x above): its output is then
+            # complete (taskkill /F loses what it has not written yet)
+            for i in $(seq 1 60); do kill -0 $pid 2> /dev/null || break; sleep 2; done
+            cat > "$home/screen.ps1" << 'EOT'
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+          $bmp.Save($args[0])
+          EOT
+            powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$home/screen.ps1")" \
+              "$(cygpath -w "$shots")\screen.png" || true
+            tasklist | grep -i texmacs || true
+          fi
+          kill $pid 2> /dev/null || true
+          taskkill //F //IM texmacs.exe > /dev/null 2>&1 || true
+          grep "GPU" "$home/log.txt" || true
+          grep -v "approximating font\|debug-fonts" "$home/log.txt" | head -150
+          [ $ok = yes ] || { echo "error: the document is not shown"; exit 1; }
+
+      # NOTE: also when the smoke test fails (to try the bundle elsewhere)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: texmacs-vue-windows-x86_64
+          path: |
+            texmacs-vue-windows-x86_64.zip
+            texmacs-upsilon-vue-x86_64-setup.exe
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snapshots-vue-windows
+          path: snapshots
+          if-no-files-found: ignore
+
+  release:
+    # the packages of the jobs which passed, in the pre-release
+    # upsilon-latest (made by upsilon-macos.yml, which writes its notes): each
+    # file replaces the one of the former build, with a label naming the
+    # commit; the files of macOS are not touched
+    needs: [linux, windows, linux-vue, windows-vue, appimage-check]
+    if: always() && github.ref == 'refs/heads/upsilon_ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # (first: a checkout deletes all that the workspace has, so also dist)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/packages
+
+      - uses: actions/download-artifact@v4
+        if: needs.linux.result == 'success'
+        with:
+          name: texmacs-linux-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.windows.result == 'success'
+        with:
+          name: texmacs-windows-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.linux-vue.result == 'success'
+        with:
+          name: texmacs-vue-linux-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.windows-vue.result == 'success'
+        with:
+          name: texmacs-vue-windows-x86_64
+          path: dist
+      # (the AppImages once they ran on all the systems of appimage-check)
+      - uses: actions/download-artifact@v4
+        if: needs.appimage-check.result == 'success'
+        with:
+          pattern: texmacs-upsilon-*-appimage
+          merge-multiple: true
+          path: dist
+
+      # the packages have Ghostscript (AGPL) and Aspell: their source archives
+      # must be in the release upsilon-sources (made by the job sources of
+      # upsilon-macos.yml, which is not in this workflow) before the packages are
+      # published (#662); else run that workflow first
+      - name: The sources of the programs of others are published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          assets=$(gh release view upsilon-sources --json assets -q '.assets[].name') ||
+            { echo "error: no release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; exit 1; }
+          gs_script=src/packages/build-gs.sh
+          asp_script=src/packages/windows/build-aspell.sh
+          gsv=$(sed -n 's/^GS_VERSION=//p' "$gs_script")
+          aspv=$(sed -n 's/^ASPELL_VERSION=//p' "$asp_script")
+          # the archives of the versions which the packages have: Ghostscript,
+          # Aspell and each dictionary (the names of upsilon-macos.yml, job sources)
+          { echo "ghostscript-$gsv.tar.gz"; echo "aspell-$aspv.tar.gz";
+            sed -n '/^DICTIONARIES="/,/^"/p' "$asp_script" | while read -r lang name sha; do
+              case "$lang" in DICTIONARIES=*|'"'|'') continue;; esac
+              echo "$name.tar.bz2"
+            done; } > wanted.txt
+          # (a parse that finds nothing must not pass with the archives of gs
+          # and Aspell alone)
+          [ -n "$gsv" ] && [ -n "$aspv" ] ||
+            { echo "error: no GS_VERSION or ASPELL_VERSION in the scripts"; exit 1; }
+          ndict=$(grep -c '\.tar\.bz2$' wanted.txt || true)
+          [ "$ndict" -gt 0 ] ||
+            { echo "error: no dictionary read from $asp_script (DICTIONARIES)"; exit 1; }
+          missing=0
+          while read -r f; do
+            echo "$assets" | grep -qxF "$f" || { echo "error: $f is not in the release upsilon-sources (run upsilon-macos.yml on upsilon_ci first)"; missing=1; }
+          done < wanted.txt
+          [ $missing = 0 ] || exit 1
+          echo "the $(wc -l < wanted.txt) source archives are in the release upsilon-sources"
+
+      - name: The files of Linux and Windows in upsilon-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOME_PASSED: ${{ contains(needs.*.result, 'success') }}
+        run: |
+          tag=upsilon-latest
+          built="commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)"
+          shopt -s nullglob
+          files=()
+          for f in dist/*; do
+            case "$(basename "$f")" in
+              texmacs-linux-*)       l="Linux, Qt 6, x86_64" ;;
+              texmacs-vue-linux-*)   l="Linux, Vue, x86_64" ;;
+              texmacs-windows-*)     l="Windows, Qt 6, x86_64" ;;
+              texmacs-vue-windows-*) l="Windows, Vue, x86_64" ;;
+              texmacs-upsilon-qt-*.AppImage)  l="Linux AppImage, Qt 6, x86_64" ;;
+              texmacs-upsilon-qt-*-setup.exe)  l="Windows installer, Qt 6, x86_64" ;;
+              texmacs-upsilon-vue-*-setup.exe) l="Windows installer, Vue, x86_64" ;;
+              texmacs-upsilon-vue-*.AppImage) l="Linux AppImage, Vue, x86_64" ;;
+              *) continue ;;
+            esac
+            files+=("$f#$l ($built)")
+          done
+          if [ ${#files[@]} -eq 0 ]; then
+            # (a job passed and its files are not here: not a quiet success)
+            [ "$SOME_PASSED" != true ] ||
+              { echo "error: a job passed, but dist has no package"; exit 1; }
+            echo "no package passed: nothing to publish"; exit 0
+          fi
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            # (the macOS workflow makes it, with its notes; it may not have yet)
+            gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+              --title "TeXmacs Upsilon, latest builds" \
+              --notes "The latest builds of TeXmacs Upsilon: https://mgubi.github.io/texmacs/" ||
+              gh release view "$tag" > /dev/null ||
+              { echo "error: create the release $tag once by hand (gh release create with the scope workflow)"; exit 1; }
+          fi
+          gh release upload "$tag" "${files[@]}" --clobber

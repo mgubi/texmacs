@@ -122,6 +122,7 @@ AC_DEFUN([LC_WITH_QT],[
     AT_WITH_QT([$xtralibs +printsupport +svg +concurrent +network $xtraPlug],[+exceptions],[
       LIBS += $LDFLAGS
       QTPLUGIN = qjpeg qgif qico qsvg
+      qtHaveModule(websockets): QT += websockets
     ],AC_MSG_ERROR([Cannot find a working Qt library]))
     ;;
   pkgconfig.*) 
@@ -206,6 +207,12 @@ AC_DEFUN([LC_WITH_QT],[
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Svg$QT_PKGCONFIG_SUFFIX"
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}PrintSupport$QT_PKGCONFIG_SUFFIX"
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Network$QT_PKGCONFIG_SUFFIX"
+    # optional: the WebSocket clients of the server (QTMSockets.cpp, Qt 6)
+    AS_IF([test $QT_MAJOR -ge 6 && $PKG_CONFIG --exists Qt${QT_MAJOR}WebSockets$QT_PKGCONFIG_SUFFIX],[
+      QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}WebSockets$QT_PKGCONFIG_SUFFIX"
+      # moc has to see the classes which depend on it
+      QT_CPPFLAGS="$QT_CPPFLAGS -DQT_WEBSOCKETS_LIB"
+    ])
     # if CONFIG_OS is GNU_LINUX and QT_VERSION is higher than 6, use wayland
     AS_IF([test "x$CONFIG_OS" = "xGNU_LINUX"],[
       AS_IF([test $QT_MAJOR -ge 6],[

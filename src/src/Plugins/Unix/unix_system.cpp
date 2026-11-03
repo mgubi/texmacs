@@ -13,11 +13,14 @@
 #include "config.h"
 
 #include <chrono>
+#include <string.h> // strerror (with S7 and without Qt, nothing includes it)
 #include <fcntl.h>
 
+#ifdef USE_GUILE
 #include "Guile/guile_tm.hpp"
 #ifdef SCM_HAVE_HOOKS
 #include "libguile/system.h"
+#endif
 #endif
 
 #ifdef QTTEXMACS
@@ -257,7 +260,7 @@ url texmacs_get_application_directory () {
 }
 
 void texmacs_init_guile_hooks() {
-#ifndef SCM_HAVE_HOOKS
+#if defined(USE_GUILE) && !defined(SCM_HAVE_HOOKS)
   cout << "warning: guile hooks are not available" << LF;
 #endif
 }

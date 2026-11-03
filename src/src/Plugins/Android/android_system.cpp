@@ -24,10 +24,12 @@
 #include <QDebug>
 #include <QDateTime>
 
+#ifdef USE_GUILE
 extern "C" {
 #include "libguile/system.h"
 #include "libguile/fports.h"
 }
+#endif
 
 void texmacs_reset_last_error() {
   errno = 0;
@@ -276,6 +278,7 @@ string get_default_theme() {
 #endif
 }
 
+#ifdef USE_GUILE
 int texmacs_guile_printf(const char *format, ...) {
   va_list args;
   va_start(args, format);
@@ -318,6 +321,7 @@ void texmacs_guile_log(const char *cmsg, int len)
     string s = string(cmsg, len);
     std_warning << s << "\n";
 }
+#endif
 
 url texmacs_get_application_directory() {
   QString home = QDir::homePath();
@@ -325,7 +329,9 @@ url texmacs_get_application_directory() {
 }
 
 void texmacs_init_guile_hooks() {
+#ifdef USE_GUILE
   guile_fprintf = texmacs_guile_fprintf;
   guile_printf = texmacs_guile_printf;
   scm_set_log_function(texmacs_guile_log);
+#endif
 }

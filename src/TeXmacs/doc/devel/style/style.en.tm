@@ -26,10 +26,11 @@
   a letter, an article or a book) or a particular layout policy (like
   publishing an article in a given journal).
 
-  Style packages, which are selected from the <menu|Document|Style> menu, are
-  used for further customization of the major style. For instance, the
+  Style packages, which are added using <menu|Document|Style|Add package>,
+  are used for further customization of the major style. For instance, the
   <tmpackage|number-europe> package enables European-style theorem numbering
-  and the <tmpackage|maxima> package contains macros for customizing the
+  and the <tmpackage|maxima> package (shipped with the <name|Maxima> plug-in)
+  contains macros for customizing the
   layout of sessions of the <name|Maxima> computer algebra system. Several
   packages may be used together.
 

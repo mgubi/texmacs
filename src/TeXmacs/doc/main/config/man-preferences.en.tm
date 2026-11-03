@@ -63,12 +63,20 @@
     hyperlinks which give rise to the execution of arbitrary commands (as
     specified by the author). In practice, this feature may involve a
     security risk,. Therefore, the <menu|Security> preference allows the user
-    to specify what should be done with untrusted executable code.
+    to specify what should be done with untrusted executable code. The tab
+    <menu|Security> of the preferences window sets up the wallet of
+    <TeXmacs>, which keeps passphrases and keys (such as the keys of the
+    chatbots) encrypted; on the desktop it is shown with the experimental
+    feature <menu|Encryption> (<menu|Edit|Preferences|Other>), and needs
+    <name|GnuPG>.
 
     <item*|<menu|Converters>>The behaviour of converters between <TeXmacs>
     various other data formats may be configured from this menu. For more
     details, we refer to the <hlink|chapter on compatibility with other
-    formats|../convert/man-convert.en.tm>.
+    formats|../convert/man-convert.en.tm>. The tab <menu|AI> of
+    <menu|Edit|Preferences|Convert> has the network settings of the chatbots
+    and the options of their corrections (see <hlink|Artificial intelligence
+    tools inside <TeXmacs>|../../../plugins/ai/doc/ai.en.tm>).
 
     <item*|<menu|Scripts>>Specify a default scripting language for all
     external scripts.
@@ -86,6 +94,10 @@
       document.
 
       <item>A remote connection tool (which currently does not work anymore).
+
+      <item>A database tool, which keeps bibliographic references (and other
+      data) in databases of <TeXmacs> (see <hlink|The bibliographic
+      database|../links/man-bib-database.en.tm>).
     </itemize>
 
     <item*|<menu|Autosave>>This preference specifies how often documents will
@@ -95,9 +107,17 @@
     power problem.
 
     <item*|<menu|Bibtex command>>The user may specify an alternative to
-    <verbatim|bibtex> for the compilation of bibliographies using <BibTeX>.
-    Notice that recent versions of <TeXmacs> integrate a<nbsp>native
-    alternative tool for the compilation of bibliographies.
+    <verbatim|bibtex> for the compilation of bibliographies using <BibTeX>
+    (<verbatim|biber>, <verbatim|biblatex>, <verbatim|rubibtex> or another
+    command; in the preferences window, <menu|Convert|BibTeX|BibTeX
+    command>). It is only used for the styles of <BibTeX>: the styles whose
+    names start with <verbatim|tm-> are implemented by <TeXmacs> itself (see
+    <hlink|Compiling a bibliography|../links/man-bibliography.en.tm>).
+
+    <item*|<menu|New bibliography dialogue>>Among the experimental features
+    (<menu|Edit|Preferences|Other>): <menu|Insert|Automatic|Bibliography>
+    opens a dialogue which asks for the file and the style of the
+    bibliography, with a preview.
   </description>
 
   <tmdoc-copyright|1998--2010|Joris van der Hoeven>

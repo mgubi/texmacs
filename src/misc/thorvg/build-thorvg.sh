@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# Build ThorVG for the GPU renderer of the Vue port:
+#
+#   sh misc/thorvg/build-thorvg.sh <prefix> [wasm]
+#
+# It fetches ThorVG (THORVG_VERSION, default v1.1.2) into <prefix>/src,
+# builds it as a static library with its GL engine only (no loaders, no
+# threads: TeXmacs gives it paths, and draws the glyphs and the images
+# itself) and installs it in <prefix> (include/thorvg-1/thorvg.h,
+# lib/libthorvg-1.a). With "wasm" it is built with Emscripten (emcc in the
+# PATH, e.g. after ". misc/wasm/emenv.sh build-wasm") with its GL engine
+# (WebGL2) and its WebGPU engine (Dawn's webgpu.h for Emscripten,
+# emdawnwebgpu: the page draws with WebGPU where the browser has it, see
+# gpu_backend_wg.cpp); THORVG_ENGINES=gl for the GL engine alone. meson and
+# ninja come from a Python venv in <prefix>/venv. Then configure with
+# --with-thorvg=<prefix> (or let configure find it through pkg-config:
+# PKG_CONFIG_PATH=<prefix>/lib/pkgconfig).
+
+set -e
+PREFIX=${1:?usage: build-thorvg.sh <prefix> [wasm]}
+TARGET=${2:-native}
+THORVG_VERSION=${THORVG_VERSION:-v1.1.2}
+mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
+
+# NOTE: meson and ninja of the PATH when there are both (MSYS2, where pip
+# has no ninja), otherwise in a venv
+if [ ! -x "$PREFIX/venv/bin/meson" ] &&
+   ! { command -v meson > /dev/null && command -v ninja > /dev/null; }; then
+  PY=python3
+  for p in /opt/homebrew/opt/python@3.13/bin/python3.13 /opt/homebrew/bin/python3; do
+    [ -x "$p" ] && { PY=$p; break; }
+  done
+  "$PY" -m venv "$PREFIX/venv"
+  "$PREFIX/venv/bin/pip" -q install meson ninja
+fi
+[ -d "$PREFIX/src" ] ||
+  git clone -q --depth 1 --branch "$THORVG_VERSION" https://github.com/thorvg/thorvg.git "$PREFIX/src"
+# The GL engine opens libGL.so, .so.4 or .so.3: the name of the library for
+# programs which link with it is libGL.so.1, and libGL.so is only there with
+# the packages of development (libgl-dev). Without them ThorVG had no canvas,
+# and TeXmacs drew with MuPDF: on Linux the main window was never drawn and
+# the dialogs were slow and malformed (#376). libGL.so.1 is tried too.
+GLSRC="$PREFIX/src/src/renderer/gpu_engine/gl/tvgGl.cpp"
+if [ -f "$GLSRC" ] && ! grep -q '"libGL.so.1"' "$GLSRC"; then
+  sed -i.orig 's|^\( *\)if (!_libGL) _libGL = dlopen("libGL.so.3", RTLD_LAZY);|&\
+\1if (!_libGL) _libGL = dlopen("libGL.so.1", RTLD_LAZY);|' "$GLSRC"
+  grep -q '"libGL.so.1"' "$GLSRC" || { echo "build-thorvg.sh: tvgGl.cpp not patched" >&2; exit 1; }
+fi
+
+ENGINES=gl
+[ "$TARGET" = wasm ] && ENGINES=${THORVG_ENGINES:-gl,wg}
+# (webgpu.h for Emscripten: the port emdawnwebgpu, at compile and link time)
+EMWG=
+case "$ENGINES" in *wg*) EMWG=", '--use-port=emdawnwebgpu'";; esac
+OPTS="-Dengines=$ENGINES -Dloaders= -Dthreads=false -Dfile=false -Dextra= -Dstatic=true
+      -Ddefault_library=static -Dbuildtype=release --libdir=lib"
+BUILD="$PREFIX/build-$TARGET"
+if [ ! -f "$BUILD/build.ninja" ]; then
+  if [ "$TARGET" = wasm ]; then
+    # the exceptions of the TeXmacs build (misc/wasm/Makefile, those of MuPDF)
+    cat > "$PREFIX/wasm32.txt" <<EOT
+[binaries]
+c = 'emcc'
+cpp = 'em++'
+ar = 'emar'
+strip = 'emstrip'
+
+[built-in options]
+c_args = ['-O2', '-fwasm-exceptions'$EMWG]
+cpp_args = ['-O2', '-fwasm-exceptions'$EMWG]
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+EOT
+    (cd "$PREFIX/src" && PATH="$PREFIX/venv/bin:$PATH" meson setup "$BUILD" \
+       --cross-file "$PREFIX/wasm32.txt" $OPTS --prefix="$PREFIX/wasm")
+  else
+    (cd "$PREFIX/src" && PATH="$PREFIX/venv/bin:$PATH" meson setup "$BUILD" $OPTS --prefix="$PREFIX")
+  fi
+fi
+PATH="$PREFIX/venv/bin:$PATH" ninja -C "$BUILD" install > /dev/null
+echo "ThorVG ($TARGET) installed in $( [ "$TARGET" = wasm ] && echo "$PREFIX/wasm" || echo "$PREFIX" )"

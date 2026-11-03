@@ -18,7 +18,8 @@
     <src-arg|min> and <src-arg|max> are not specified, then they are
     determined implicitly from the length unit of <src-arg|len>.
 
-    Notice that operands are not evaluated, so they must be literal strings.
+    The operands are evaluated, so that they may be computed using
+    arithmetic primitives such as <markup|plus>.
   </explain>
 
   <\explain>
@@ -48,7 +49,8 @@
     is inserted whose bottom is on the baseline and whose height is the same
     as the lowercase letter <samp|x> in the current font.
 
-    Notice that operands are not evaluated, so they must be literal strings.
+    The operands are evaluated, so that they may be computed using
+    arithmetic primitives such as <markup|plus>.
   </explain>
 
   <\explain>
@@ -64,7 +66,8 @@
     filling. If <src-arg|min> and <src-arg|max> are not specified, then they
     are determined implicitly from the length unit of <src-arg|len>.
 
-    Notice that operands are not evaluated, so they must be literal strings.
+    The operands are evaluated, so that they may be computed using
+    arithmetic primitives such as <markup|plus>.
   </explain>
 
   <\explain>

@@ -1,0 +1,120 @@
+<TeXmacs|2.1.5>
+
+<style|tmdoc>
+
+<\body>
+  <tmdoc-title|Other mathematical fonts>
+
+  <TeXmacs> knows a few more mathematical fonts than it installs. The fonts
+  of the first section below are used as soon as they are installed on your
+  system: they then appear in the font menu like <hlink|the fonts which come
+  with <TeXmacs>|man-math-font-catalogue.en.tm>, with their text
+  companions. They are all free, and part of <TeX> Live, the <TeX>
+  distribution. The second section is about the other <name|OpenType> math
+  fonts, which <TeXmacs> can use without knowing them.
+
+  Each font is shown with a sample which is set in the font itself when it is
+  installed. When it is not, <TeXmacs> sets the sample in the closest font it
+  can find, which is the situation of a document that asks for a font your
+  system does not have.
+
+  <section|Fonts <TeXmacs> knows>
+
+  <paragraph*|XITS>
+
+  A Times design derived from the first STIX fonts, with a bold mathematical font and right to left mathematics; STIX Two, which comes with <TeXmacs>, has superseded it. Text: XITS; mathematics: XITS Math, with 99% of the symbols. Where to find it: <verbatim|xits> in <TeX> Live. Once installed, it appears in the submenu <menu|Other OpenType math fonts> of the font menu.
+
+  <\with|font|XITS Math>
+    Text in <em|italic> and <strong|bold>: the quick brown fox, 0123456789.
+
+    <\equation*>
+      <big|int><rsub|0><rsup|\<infty\>>e<rsup|-x<rsup|2>>*\<mathd\>x=<frac|<sqrt|\<pi\>>|2>,<space|2em><big|sum><rsub|n=1><rsup|\<infty\>><frac|1|n<rsup|2>>=<frac|\<pi\><rsup|2>|6>,<space|2em>\<alpha\>\<beta\>\<gamma\>,<space|1em>\<bbb-R\><rsup|n>,<space|1em>\<cal-F\>
+    </equation*>
+  </with>
+
+  <paragraph*|Asana>
+
+  A Palatino design with a larger set of symbols than Pagella Math; it is set with Pagella text. Text: TeX Gyre Pagella; mathematics: Asana Math, with 94% of the symbols. Where to find it: <verbatim|asana-math> in <TeX> Live. Once installed, it appears in the submenu <menu|Other OpenType math fonts> of the font menu.
+
+  <\with|font|math=Asana Math,TeX Gyre Pagella>
+    Text in <em|italic> and <strong|bold>: the quick brown fox, 0123456789.
+
+    <\equation*>
+      <big|int><rsub|0><rsup|\<infty\>>e<rsup|-x<rsup|2>>*\<mathd\>x=<frac|<sqrt|\<pi\>>|2>,<space|2em><big|sum><rsub|n=1><rsup|\<infty\>><frac|1|n<rsup|2>>=<frac|\<pi\><rsup|2>|6>,<space|2em>\<alpha\>\<beta\>\<gamma\>,<space|1em>\<bbb-R\><rsup|n>,<space|1em>\<cal-F\>
+    </equation*>
+  </with>
+
+  <section|Other <name|OpenType> math fonts>
+
+  Any font with an <name|OpenType> <verbatim|MATH> table can set formulas,
+  even one <TeXmacs> knows nothing about: its formulas are laid out from the
+  table, with no adjustment. Such a font does not appear in the font menu;
+  name it in a rule of the <src-var|font> variable, followed by the text font
+  to use with it, in the markup of the document
+
+  <\tm-fragment>
+    <inactive*|<assign|font|math=Cambria Math,Cambria>>
+  </tm-fragment>
+
+  The best known of these fonts are:
+
+  <\description>
+    <item*|Cambria Math>The mathematical font of <name|Microsoft Office>,
+    installed with <name|Windows> and <name|Office>. It cannot be shipped
+    with <TeXmacs>, but works when it is present.
+
+    <item*|Lucida Bright Math>A commercial font, sold by the <TeX> Users
+    Group, with a wide set of symbols and several weights.
+
+    <item*|Minion Math>A commercial companion of Adobe's Minion, with
+    several weights and optical sizes.
+  </description>
+
+  A font without a <verbatim|MATH> table only provides symbols: it cannot
+  place scripts or build large delimiters, and is not a mathematical font
+  in the above sense. Older versions of Noto Sans Math were of this kind;
+  the one which comes with <TeXmacs> has a <verbatim|MATH> table and is in
+  the font menu as <menu|Noto Sans>.
+
+  <section|Installing fonts>
+
+  <TeXmacs> looks for fonts in the directory <verbatim|fonts/truetype> of its
+  installation and of your <TeXmacs> home directory (<verbatim|~/.TeXmacs>,
+  or the folder <verbatim|TeXmacs> of the application data on <name|Windows>),
+  in the font directories of your system, in the <TeX> Live installations it
+  finds (of any year, on <name|macOS> and <name|Linux>), and
+  in the directories listed in the environment variable
+  <verbatim|TEXMACS_FONT_PATH>, which is the way to point it at another
+  <TeX> Live. To add a font:
+
+  <\enumerate>
+    <item>Install it in the usual way for your system, with the package
+    manager of <TeX> Live (<verbatim|tlmgr install xits>, for instance), or
+    copy its <verbatim|.otf> files into <verbatim|~/.TeXmacs/fonts/truetype>.
+
+    <item>Run <menu|Tools|Fonts|Scan disk for fonts>, so that <TeXmacs>
+    records the new fonts. A mathematical font which <TeXmacs> knows is also
+    recorded by itself the first time it is asked for.
+
+    <item>If a font still does not appear, <menu|Tools|Fonts|Clear font
+    cache> makes <TeXmacs> forget the fonts it used to find instead.
+  </enumerate>
+
+  Remember that a document which uses a font you installed will look
+  different on a system which does not have it.
+
+  <tmdoc-copyright|2026|Massimiliano Gubinelli>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
+</body>
+
+<\initial>
+  <\collection>
+    <associate|language|english>
+  </collection>
+</initial>

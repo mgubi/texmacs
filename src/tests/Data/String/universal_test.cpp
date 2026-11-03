@@ -243,7 +243,11 @@ test_utf8_to_cork_known () {
   CHECK_BYTES (utf8_to_cork ("\xd0\x96"), "<#416>");      // Cyrillic Zhe
   CHECK_BYTES (utf8_to_cork ("\xe4\xb8\xad"), "<#4E2D>"); // CJK
   CHECK_BYTES (utf8_to_cork ("\xe2\x82\xac"), "<#20AC>"); // euro sign
-  CHECK_BYTES (utf8_to_cork ("\xf0\x9f\x98\x80"), "<#1F600>");
+  // an emoji gets its name (#533); another character outside the BMP
+  // its code point
+  CHECK_BYTES (utf8_to_cork ("\xf0\x9f\x98\x80"), "<emoji-grinning-face>");
+  CHECK_BYTES (cork_to_utf8 ("<emoji-grinning-face>"), "\xf0\x9f\x98\x80");
+  CHECK_BYTES (utf8_to_cork ("\xf0\x90\x80\x80"), "<#10000>");
   CHECK_BYTES (utf8_to_cork ("\xf0\x9d\x90\x80"), "<b-up-A>");
   CHECK_BYTES (utf8_to_cork ("x\xce\xb1+\xe4\xb8\xad=\xc3\xa9"),
                "x<alpha>+<#4E2D>=\xe9");
@@ -365,9 +369,10 @@ test_case_cork () {
   }
   // the exceptions, 0x20 apart from 0xBD-0xBF (inverted marks and pound,
   // which have no case): 0x9D is the dotted capital I, whose lower case is
-  // i; 0x9E is the lower case d with stroke (its capital is 0xD0); 0x9F is
-  // the section sign, without case
+  // i; 0x9E is the lower case d with stroke (its capital is that of Eth,
+  // 0xD0); 0x9F is the section sign, without case
   CHECK_BYTES (uni_locase_char (cork_byte (0x9D)), string ("i"));
+  CHECK_BYTES (uni_upcase_char (cork_byte (0x9E)), cork_byte (0xD0));
   for (int c=0x9E; c<0xA0; c++)
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c));
   for (int c=0xBD; c<0xC0; c++)

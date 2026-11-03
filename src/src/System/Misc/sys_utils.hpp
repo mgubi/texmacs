@@ -52,13 +52,18 @@ url get_texmacs_home_path ();
 array<string> evaluate_system (array<string> arg,
 			       array<int> fd_in, array<string> in,
 			       array<int> fd_out);
+void secure_wipe (string s);
 
 class object;
 bool async_eval_system (string cmd, object call_back);
 bool async_eval_system_full (string cmd, object call_back);
 bool async_eval_system (string cmd, int& status, string& outbuf,
 			string& errbuf, bool& kill);
+int  async_evaluate_system (array<string> arg, string in, object call_back);
+void async_evaluate_cancel (int id);
 void async_eval_pending ();
+void async_eval_cancel (string* outbuf);
+
 
 string get_printing_default ();
 bool has_printing_cmd (void);
@@ -82,5 +87,8 @@ struct tm_pollfd {
 };
 
 int tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms);
+
+string get_user_login ();
+string get_user_name ();
 
 #endif // defined SYS_UTILS_H

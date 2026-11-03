@@ -10,6 +10,10 @@
 ******************************************************************************/
 
 #include "tm_test.hpp"
+
+// (a test of the Qt builds only: the others load their pictures otherwise)
+#ifdef QTTEXMACS
+
 #include "picture.hpp"
 #include "colors.hpp"
 #include "file.hpp"
@@ -63,3 +67,18 @@ main () {
   RUN (test_file_change);
   return test_report ();
 }
+
+#else
+
+static void
+test_qt () {
+  SKIP ("the pictures are loaded by Qt in the Qt builds only");
+}
+
+int
+main () {
+  RUN (test_qt);
+  return test_report ();
+}
+
+#endif

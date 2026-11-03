@@ -97,7 +97,10 @@
 	(else
 	 (let* ((s (car c))
 		(r (xmltm-text s)))
-	   (cond ((logic-ref mathml-left->tm% s) => (lambda (x) `((left ,x))))
+	   (cond ((and (== s "/") (not (attribute-is? a 'form "prefix")))
+		  ;; a division, unless it is said to be an opening bracket
+		  (list r))
+		 ((logic-ref mathml-left->tm% s) => (lambda (x) `((left ,x))))
 		 ((logic-ref mathml-right->tm% s) => (lambda (x) `((right ,x))))
 		 ((logic-ref mathml-big->tm% s) => (lambda (x) `((big ,x))))
 		 ((logic-ref mathml-symbol->tm% s) => (lambda (x) `(,x)))

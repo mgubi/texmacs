@@ -14,7 +14,13 @@
 
 
 #include "scheme.hpp" // interface to texmacs
+#if defined(USE_S7)
+#include "../S7/s7_tm.hpp" // interface to S7
+#elif defined(USE_FEMTOLISP)
+#include "../Femtolisp/femtolisp_tm.hpp" // interface to femtolisp
+#else
 #include "../Guile/guile_tm.hpp" // interface to guile
+#endif
 
 
 
@@ -30,11 +36,19 @@ class tmscm_object_rep: public object_rep {
   template<typename C, typename A1> friend C* tm_new (const A1& a1); 
 };
 
+#if defined(USE_FEMTOLISP)
+// the handle is the object itself, a root of the garbage collector
+inline tmscm  object_to_tmscm  (object o) {
+  tmscm_object_rep *oo = static_cast<tmscm_object_rep*>(o.operator->());
+  return oo->handle;
+}
+#else
 inline tmscm  object_to_tmscm  (object o) {
   tmscm_object_rep *oo = static_cast<tmscm_object_rep*>(o.operator->());
   return tmscm_caar (oo->handle);
   //return tmscm_caar ((tmscm )o->lookup ()); 
 }
+#endif
 inline object tmscm_to_object (tmscm  obj) { return tm_new<tmscm_object_rep> (obj); }
 
 

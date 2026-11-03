@@ -14,7 +14,8 @@
 (texmacs-module (kernel texmacs tm-modes)
   (:use
     (kernel logic logic-rules) (kernel logic logic-query) (kernel logic logic-data)
-    (kernel texmacs tm-plugins) (kernel texmacs tm-preferences)))
+    (kernel texmacs tm-plugins) (kernel texmacs tm-preferences)
+    (kernel texmacs tm-program-languages)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining new modes
@@ -32,7 +33,12 @@
            (deps* (map list (map texmacs-mode-pred deps)))
            (l (if (== action #t) deps* (cons action deps*)))
            (test (if (null? l) #t (if (null? (cdr l)) (car l) (cons 'and l))))
-           (defn `(define-public (,pred) ,test))
+           (defn (if (s7-scheme?)
+                     ;; register the name: s7 procedures do not know their name
+                     `(begin
+                        (varlet *texmacs-module* ',pred (lambda () ,test))
+                        (ahash-set! tm-defined-name ,pred ',pred))
+                     `(define-public (,pred) ,test)))
            (rules (map (lambda (dep) (list dep mode)) deps))
            (logic-cmd `(logic-rules ,@rules))
            (arch1 `(set-symbol-procedure! ',mode ,pred))
@@ -43,15 +49,23 @@
           (list 'begin defn arch1 arch2 logic-cmd)))))
 
 (define-public-macro (texmacs-modes . l)
-  `(begin
-     (set! temp-module ,(current-module))
-     (set-current-module texmacs-user)
-     ,@(map texmacs-mode l)
-     (set-current-module temp-module)))
+  (if (s7-scheme?)
+      `(begin
+         ,@(map texmacs-mode l))
+      `(begin
+         (set! temp-module ,(current-module))
+         (set-current-module texmacs-user)
+         ,@(map texmacs-mode l)
+         (set-current-module temp-module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Checking modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;FIXME: in-active-graphics% and developer-mode%
+; seems to be the only two modes which do not have the associated procedure
+; is the code below meaningful? why we need to do the eval?
+; I want maybe to have the catch inside the eval
 
 (define-public (texmacs-in-mode? mode)
   (with proc (symbol-procedure mode)
@@ -61,7 +75,7 @@
 (define-public (texmacs-mode-mode pred)
   "Get drd predicate name associated to scheme predicate or symbol"
   (if (procedure? pred)
-      (with name (procedure-name pred)
+      (with name (procedure-symbol-name pred)
         (if name (texmacs-mode-mode name) 'unknown%))
       (let* ((pred-str (symbol->string pred))
              (pred-root (substring pred-str 0 (- (string-length pred-str) 1)))
@@ -121,10 +135,75 @@
 (define-public (has-llama?) #f)
 (define-public (has-mistral-7b?) #f)
 (define-public (has-albert?) #f)
+(define-public (has-claude?) #f)
+(define-public (has-openrouter?) #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mode related
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Versioning tool
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; With the preference "versioning tool" set to "auto", the versioning tool
+;; is active for documents inside a working tree of Git or Subversion.
+;; NOTE: this is tested very often (e.g. for the keyboard), hence the cache;
+;; no external command is run here. Directories which are not versioned are
+;; tested again after a while, for repositories created outside TeXmacs.
+
+(define versioning-directory-table (make-ahash-table))
+(define versioning-directory-delay 10000)
+
+(define (versioning-directory-sub dir)
+  (cond ((or (url-exists? (url-append dir ".git"))
+             (url-exists? (url-append dir ".svn"))) dir)
+        ((== (url-head dir) dir) #f)
+        (else (versioning-directory-sub (url-head dir)))))
+
+(define-public (versioning-directory u)
+  "Root of the Git or Subversion working tree containing @u, or @#f"
+  (and (url? u) (url-rooted? u) (not (url-rooted-tmfs? u))
+       (not (url-rooted-web? u))
+       (let* ((dir (url-head u))
+              (key (url->system dir))
+              (old (ahash-ref versioning-directory-table key)))
+         (if (and old (or (url? old)
+                          (< (- (texmacs-time) old) versioning-directory-delay)))
+             (and (url? old) old)
+             (with r (versioning-directory-sub dir)
+               ;; NOTE: the time is kept for directories which are not versioned
+               (ahash-set! versioning-directory-table key (or r (texmacs-time)))
+               r)))))
+
+(define-public (git-directory? u)
+  "Is @u inside a Git working tree?"
+  (and-with d (versioning-directory u)
+    (url-exists? (url-append d ".git"))))
+
+(define-public (git-context? u)
+  "Is @u a document inside a Git working tree, or a Git page?"
+  (or (git-directory? u)
+      (and (url? u) (url-rooted-tmfs? u)
+           (list-or (map (cut string-starts? (url->unix u) <>)
+                         '("tmfs://git/" "tmfs://commit/" "tmfs://blame/"))))))
+
+(define-public (versioning-directory-reset)
+  (set! versioning-directory-table (make-ahash-table)))
+
+(define-public (versioning-tool-active?)
+  (with p (get-preference "versioning tool")
+    (or (== p "on")
+        (and (== p "auto")
+             (with u (current-buffer)
+               (or (nnot (versioning-directory u))
+                   (and (url? u) (url-rooted-tmfs? u)
+                        (list-or (map (cut string-starts? (url->unix u) <>)
+                                      versioning-pages)))))))))
+
+(define versioning-pages
+  '("tmfs://git/" "tmfs://commit/" "tmfs://history/" "tmfs://revision/"
+    "tmfs://blame/"))
 
 (texmacs-modes
   (always% #t)
@@ -174,32 +253,14 @@
   (in-comment% (style-has? "comment-dtd"))
   (with-any-selection% (selection-active-any?))
   (with-active-selection% (selection-active-normal?))
-  (in-cpp% (== (get-env "prog-language") "cpp"))
-  (in-prog-cpp% #t in-prog% in-cpp%)
-  (in-dot% (== (get-env "prog-language") "dot"))
-  (in-prog-dot% #t in-prog% in-dot%)
-  (in-octave% (== (get-env "prog-language") "octave"))
-  (in-prog-octave% #t in-prog% in-octave%)
-  (in-java% (== (get-env "prog-language") "java"))
-  (in-prog-java% #t in-prog% in-java%)
-  (in-javascript% (== (get-env "prog-language") "javascript"))
-  (in-prog-javascript% #t in-prog% in-javascript%)
-  (in-json% (== (get-env "prog-language") "json"))
-  (in-prog-json% #t in-prog% in-json%)
-  (in-fortran% (== (get-env "prog-language") "fortran"))
-  (in-prog-fortran% #t in-prog% in-fortran%)
-  (in-scala% (== (get-env "prog-language") "scala"))
-  (in-prog-scala% #t in-prog% in-scala%)
-  (in-scheme% (== (get-env "prog-language") "scheme"))
-  (in-prog-scheme% #t in-prog% in-scheme%)
-  (in-python% (== (get-env "prog-language") "python"))
-  (in-prog-python% #t in-prog% in-python%)
-  (in-julia% (== (get-env "prog-language") "julia"))
-  (in-prog-julia% #t in-prog% in-julia%)
   (in-verbatim% (or (inside? 'verbatim) (inside? 'verbatim-code) 
                     (inside? 'code)) in-text%)
   (in-variants-disabled% 
    (tree-in? (tree-up (cursor-tree)) '(hlink reference pageref label))))
+
+;; in-<name>% and in-prog-<name>% for each program language
+;; (tm-program-languages.scm)
+(eval `(texmacs-modes ,@(program-language-mode-items)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Language related
@@ -294,7 +355,7 @@
   (with-presentation-tool% (== (get-preference "presentation tool") "on"))
   (with-remote-tool% (== (get-preference "remote tool") "on"))
   (with-source-tool% (== (get-preference "source tool") "on"))
-  (with-versioning-tool% (== (get-preference "versioning tool") "on"))
+  (with-versioning-tool% (versioning-tool-active?))
   (with-keyboard-tool% (== (get-preference "keyboard tool") "on"))
   (in-presentation% (or (style-has? "beamer-style")
                         (== (get-preference "presentation tool") "on")

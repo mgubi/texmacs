@@ -35,7 +35,13 @@
 
 (define-public tmfs-handler-table (make-ahash-table))
 
-(define-public (object->tmstring s) (unescape-guile (object->string s)))
+(define-public (object->tmstring s)
+  (if (s7-scheme?)
+      ;; s7 truncates long vectors when printing, unless print-length is raised
+      (let-temporarily (((*s7* 'print-length) 9223372036854775807))
+        (unescape-guile (object->string s)))
+      (unescape-guile (object->string s))))
+ 
 (define (tmstring->object s) (string->object s))
 
 (define-public (tmfs-handler class action handle)
@@ -392,6 +398,8 @@
 (define-public (aux-set-document aux doc)
   (with name (aux-name aux)
     (buffer-set name doc)
+    ;; (a generated page: no copies of its former contents in its history)
+    (buffer-forget-history name)
     (ahash-set! aux-buffers aux (buffer-get name))))
 
 (define-public (aux-set-master aux master)

@@ -136,6 +136,21 @@ renderer_rep::toc_entry (string kind, string title, SI x, SI y) {
 }
 
 void
+renderer_rep::begin_actual_text (string s) {
+  (void) s;
+}
+
+void
+renderer_rep::end_actual_text () {
+}
+
+void
+renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
+                              double hscale) {
+  (void) c; (void) fn; (void) x; (void) y; (void) hscale;
+}
+
+void
 renderer_rep::set_metadata (string kind, string val) {
   (void) kind; (void) val;
 }
@@ -365,6 +380,26 @@ renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
 }
 
 void
+renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                 SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                 bool filled) {
+  // Fallback implementation: draw a plain rectangle without rounded corners
+  (void) r_tl; (void) r_tr; (void) r_br; (void) r_bl;
+  if (filled)
+    fill (x1, y1, x2, y2);
+  else {
+    // Draw the outline using lines
+    array<SI> x (5), y (5);
+    x[0]= x1; y[0]= y1;
+    x[1]= x2; y[1]= y1;
+    x[2]= x2; y[2]= y2;
+    x[3]= x1; y[3]= y2;
+    x[4]= x1; y[4]= y1;
+    lines (x, y);
+  }
+}
+
+void
 renderer_rep::draw_spacial (spacial obj) {
   obj->draw (this);
 }
@@ -565,8 +600,7 @@ delete_renderer (renderer ren) {
   tm_delete (ren);
 }
 
-#ifndef QTTEXMACS
-#ifndef X11TEXMACS
+#if !(defined(QTTEXMACS) || defined(X11TEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS) || defined(AQUATEXMACS))
 
 picture
 native_picture (int w, int h, int ox, int oy) {
@@ -601,5 +635,4 @@ save_picture (url dest, picture p) {
   FAILED ("not yet implemented");
 }
 
-#endif
 #endif

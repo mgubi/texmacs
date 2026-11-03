@@ -41,6 +41,12 @@ struct concat_box_rep: public composite_box_rep {
   SI        lsup_correction ();
   SI        rsub_correction ();
   SI        rsup_correction ();
+  SI        lsub_correction_at (SI h);
+  SI        lsup_correction_at (SI h);
+  SI        rsub_correction_at (SI h);
+  SI        rsup_correction_at (SI h);
+  bool      extended_shape ();
+  bool      top_accent (SI& x);
   SI        sub_lo_base (int level);
   SI        sub_hi_lim  (int level);
   SI        sup_lo_lim  (int level);
@@ -306,6 +312,48 @@ single_box (array<box> bs) {
 // levels would place the script elsewhere.
 // A base glued to markers keeps its own levels (and not the bounds of the
 // concatenation, which for a base like "." would put the script on it)
+
+SI
+concat_box_rep::lsub_correction_at (SI h) {
+  int i= get_first ();
+  if (i<N(bs)) return bs[i]->lsub_correction_at (h);
+  return 0;
+}
+
+SI
+concat_box_rep::lsup_correction_at (SI h) {
+  int i= get_first ();
+  if (i<N(bs)) return bs[i]->lsup_correction_at (h);
+  return 0;
+}
+
+SI
+concat_box_rep::rsub_correction_at (SI h) {
+  int i= get_last ();
+  if (i>=0) return bs[i]->rsub_correction_at (h);
+  return 0;
+}
+
+SI
+concat_box_rep::rsup_correction_at (SI h) {
+  int i= get_last ();
+  if (i>=0) return bs[i]->rsup_correction_at (h);
+  return 0;
+}
+
+bool
+concat_box_rep::extended_shape () {
+  int i= single_box (bs);
+  if (i >= 0) return bs[i]->extended_shape ();
+  return true;
+}
+
+bool
+concat_box_rep::top_accent (SI& x) {
+  int i= single_box (bs);
+  if (i >= 0 && bs[i]->top_accent (x)) { x += sx (i); return true; }
+  return false;
+}
 
 SI
 concat_box_rep::sub_lo_base (int level) {

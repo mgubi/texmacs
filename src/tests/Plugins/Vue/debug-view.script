@@ -1,0 +1,15 @@
+# needs debug-view.scm: toggle the Clay debug view (F1) with a tool open,
+# hover and click while it is shown, then switch it off; must not crash
+wait 9000
+window #2
+key F1
+wait 800
+snapshot dv0
+move 1057 191
+wait 300
+click 1057 191
+wait 800
+snapshot dv1
+key F1
+wait 500
+snapshot dv2

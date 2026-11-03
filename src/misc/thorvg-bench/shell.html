@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThorVG bench</title>
+<style>
+  body { margin: 0; background: #888; }
+  canvas { display: block; width: 1280px; height: 500px; }
+</style>
+</head>
+<body>
+<canvas id="canvas" width="2560" height="1000"></canvas>
+<canvas id="canvas2d"></canvas>
+<script>
+  var Module = { canvas: document.getElementById ('canvas'),
+                 print: function (t) { console.log (t); },
+                 printErr: function (t) { console.error (t); } };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

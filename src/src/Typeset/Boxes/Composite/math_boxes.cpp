@@ -57,7 +57,8 @@ italic_correction (box L, box R) {
 struct frac_box_rep: public composite_box_rep {
   font fn, sfn;
   pencil pen;
-  frac_box_rep (path ip, box b1, box b2, font fn, font sfn, pencil pen);
+  bool disp;
+  frac_box_rep (path ip, box b1, box b2, font fn, font sfn, pencil pen, bool disp);
   operator tree () { return tree (TUPLE, "frac", bs[0], bs[1]); }
   box adjust_kerning (int mode, double factor);
   box expand_glyphs (int mode, double factor);
@@ -65,8 +66,8 @@ struct frac_box_rep: public composite_box_rep {
 };
 
 frac_box_rep::frac_box_rep (
-  path ip, box b1, box b2, font fn2, font sfn2, pencil pen2):
-    composite_box_rep (ip), fn (fn2), sfn (sfn2), pen (pen2)
+  path ip, box b1, box b2, font fn2, font sfn2, pencil pen2, bool disp2):
+    composite_box_rep (ip), fn (fn2), sfn (sfn2), pen (pen2), disp (disp2)
 {
   // Italic correction does not lead to nicer results,
   // because right correction is not equilibrated w.r.t. left correction
@@ -80,9 +81,38 @@ frac_box_rep::frac_box_rep (
   SI d     = sep >> 1;
 
   pencil bar_pen= pen->set_width (bar_w);
-  insert (b1, (w>>1) - (b1->x2>>1), bar_y+ sep+ (bar_w>>1)- b1_y);
-  insert (b2, (w>>1) - (b2->x2>>1), bar_y- sep- (bar_w>>1)- b2_y);
-  insert (line_box (decorate_middle (ip), d, 0, w-d, 0, bar_pen), 0, bar_y);
+
+  bool use_opentype= fn->math_type == MATH_TYPE_OPENTYPE && fn->ot_math &&
+                     (fn->frac_num_gap_min > 0);
+
+  if (use_opentype) {
+    if (fn->frac_rule_thickness > 0) {
+      bar_w  = fn->frac_rule_thickness;
+      bar_pen= pen->set_width (bar_w);
+    }
+    SI num_gap_min   = fn->frac_num_gap_min;
+    SI den_gap_min   = fn->frac_denom_gap_min;
+    SI num_shift_up  = fn->frac_num_shift_up;
+    SI den_shift_down= fn->frac_denom_shift_down;
+
+    if (disp) {
+      num_gap_min   = fn->frac_num_disp_gap_min;
+      den_gap_min   = fn->frac_denom_disp_gap_min;
+      num_shift_up  = fn->frac_num_disp_shift_up;
+      den_shift_down= fn->frac_denom_disp_shift_down;
+    }
+
+    insert (b1, (w >> 1) - (b1->x2 >> 1),
+            max (num_shift_up, bar_y + num_gap_min + (bar_w >> 1) - b1->y1));
+    insert (b2, (w >> 1) - (b2->x2 >> 1),
+            min (-den_shift_down, bar_y - den_gap_min - (bar_w >> 1) - b2->y2));
+    insert (line_box (decorate_middle (ip), d, 0, w - d, 0, bar_pen), 0, bar_y);
+  }
+  else {
+    insert (b1, (w >> 1) - (b1->x2 >> 1), bar_y + sep + (bar_w >> 1) - b1_y);
+    insert (b2, (w >> 1) - (b2->x2 >> 1), bar_y - sep - (bar_w >> 1) - b2_y);
+    insert (line_box (decorate_middle (ip), d, 0, w - d, 0, bar_pen), 0, bar_y);
+  }
 
   SI b1_lc, b1_rc, b2_lc, b2_rc;
   italic_correct (b1, b1_lc, b1_rc);
@@ -101,7 +131,7 @@ frac_box_rep::adjust_kerning (int mode, double factor) {
   (void) mode;
   box num= bs[0]->adjust_kerning (0, factor);
   box den= bs[1]->adjust_kerning (0, factor);
-  return frac_box (ip, num, den, fn, sfn, pen);
+  return frac_box (ip, num, den, fn, sfn, pen, disp);
 }
 
 box
@@ -109,7 +139,7 @@ frac_box_rep::expand_glyphs (int mode, double factor) {
   (void) mode;
   box num= bs[0]->expand_glyphs (0, factor);
   box den= bs[1]->expand_glyphs (0, factor);
-  return frac_box (ip, num, den, fn, sfn, pen);
+  return frac_box (ip, num, den, fn, sfn, pen, disp);
 }
 
 int
@@ -145,12 +175,21 @@ sqrt_box_rep::sqrt_box_rep (
   right_italic_correct (b1, b1_rc);
 
   SI sep  = fn->sep;
+  SI rsep = fn->sep;
   SI wline= fn->wline;
   SI dx   = -fn->wfn/36, dy= -fn->wfn/36; // correction
+  bool use_open_type= fn->math_type == MATH_TYPE_OPENTYPE && fn->ot_math &&
+                      (fn->sqrt_degree_rise_percent > 0);
+  // the radical sign is drawn so that its top edge is the rule: the rule
+  // sits half a thickness below the top of the sign instead of at a
+  // guessed offset, which closes the gap that some fonts showed
+  if (use_open_type && fn->sqrt_rule_thickness > 0)
+    dy= -(fn->sqrt_rule_thickness >> 1);
   SI by   = sqrtb->y2+ dy;
   if (sqrtb->x2 - sqrtb->x4 > wline) dx -= (sqrtb->x2 - sqrtb->x4);
-  
-  pencil rpen= pen->set_width (wline);
+
+  pencil rpen= use_open_type ? pen->set_width (fn->sqrt_rule_thickness)
+                             : pen->set_width (wline);
   insert (b1, 0, 0);
   if (!is_nil (b2)) {
     SI X = - sqrtb->w();
@@ -164,20 +203,34 @@ sqrt_box_rep::sqrt_box_rep (
       else if (occurs ("agella", fn->res_name)) Y += (16*bw) >> 3;
       else Y += (15*bw) >> 3;
     }
+    else if (use_open_type) {
+      Y+= fn->sqrt_degree_rise_percent * sqrtb->h () / 100;
+      sep= 0;
+    }
     else {
       if (bh < 3*bw) Y += bh >> 1;
       else Y += (bw*3) >> 1;
     }
-    insert (b2, min (X, M- b2->x2), Y- b2->y1+ sep);
+    // the degree is tucked into the radical: radicalKernAfterDegree, a
+    // negative value, separates its right edge from the left edge of the
+    // sign, which sits at X
+    SI degx= min (X, M - b2->x2);
+    if (use_open_type) degx= X - fn->sqrt_kern_after_degree - b2->x2;
+    insert (b2, degx, Y- b2->y1+ sep);
   }
   insert (sqrtb, -sqrtb->x2, 0);
   insert (line_box (decorate_middle (ip), dx, by, b1->x2, by, rpen), 0, 0);
   
   position ();
+  // radicalKernBeforeDegree keeps the degree clear of what precedes the
+  // radical: the box starts that far on the left of the degree, unless
+  // the sign starts further left
+  if (use_open_type && !is_nil (b2))
+    x1= min (x1, sx1 (1) - fn->sqrt_kern_before_degree);
   left_justify ();
   y1 -= wline;
-  y2 += wline;
-  x2 += sep >> 1;
+  y2+= use_open_type ? fn->sqrt_extra_ascender : wline;
+  x2 += rsep >> 1;
 
   right_italic_restore (b1, b1_rc);
   finalize ();
@@ -374,6 +427,50 @@ tree_box_rep::find_child (SI x, SI y, SI delta, bool force) {
 * Computation of wide accent
 ******************************************************************************/
 
+// Whether an over- or underline is a rule drawn from the constants of the
+// MATH table of an untuned OpenType math font
+static bool
+is_math_rule (font fn, string s, bool wide, bool above) {
+  bool stix= (fn->math_type == MATH_TYPE_STIX);
+  bool tex_gyre= (fn->math_type == MATH_TYPE_TEX_GYRE);
+  return fn->ot_math && !tex_gyre && !stix && s == "<bar>" &&
+         (wide || !above) &&
+         (above? fn->overbar_rule_thickness: fn->underbar_rule_thickness) > 0;
+}
+
+// The glyph of an OpenType math font for the name of an accent: the
+// smallest of the horizontal variants of its combining accent, when the
+// font has them. The accent base height, the attachment points and the
+// flattened forms are those of these glyphs, not of the spacing accents,
+// which come from a text font and which a math font may lack. Without
+// variants the spacing accent is taken, or else the combining one.
+static string
+math_accent (font fn, string s) {
+  static hashmap<string,string> h ("");
+  if (N(h) == 0) {
+    h ("<hat>")= "<#302>";        h ("<tilde>")= "<#303>";
+    h ("<bar>")= "<#304>";        h ("<check>")= "<#30C>";
+    h ("<breve>")= "<#306>";      h ("<invbreve>")= "<#311>";
+    h ("<acute>")= "<#301>";      h ("<grave>")= "<#300>";
+    h ("<dot>")= "<#307>";        h ("<ddot>")= "<#308>";
+    h ("<dddot>")= "<#20DB>";     h ("<ddddot>")= "<#20DC>";
+    h ("<abovering>")= "<#30A>";  h ("<vect>")= "<#20D7>";
+  }
+  if (s == "^") s= "<hat>";
+  if (s == "~") s= "<tilde>";
+  string r;
+  // the variants of a bar are those of the overline: over a single letter
+  // the accent is the macron
+  if (s == "<bar>") {
+    if (fn->get_wide_variant ("<wide-macron>", 0, r)) return r;
+  }
+  else if (N(s) > 2 && fn->get_wide_variant ("<wide-" * s (1, N(s)), 0, r))
+    return r;
+  if (!fn->supports (s) && h->contains (s) && fn->supports (h[s]))
+    return h[s];
+  return s;
+}
+
 bool
 compute_wide_accent (path ip, box b, string s,
                      font fn, pencil pen, bool request_wide, bool above,
@@ -439,6 +536,74 @@ compute_wide_accent (path ip, box b, string s,
         return wide;
       }
     }
+  }
+  // Over- and underlines of untuned OpenType math fonts are rules whose
+  // thickness, gap to the base and extra ascender come from the MATH
+  // table; the gap is measured from the ink of the base
+  if (is_math_rule (fn, s, wide, above)) {
+    SI thick= above? fn->overbar_rule_thickness: fn->underbar_rule_thickness;
+    SI gap  = above? fn->overbar_vertical_gap: fn->underbar_vertical_gap;
+    SI extra= above? fn->overbar_extra_ascender: fn->underbar_extra_descender;
+    pencil bpen= pen->set_width (thick);
+    // the rule is centered on its base line, on which it is positioned
+    wideb= line_box (decorate_middle (ip), 0, 0, b->x2 - b->x1, 0, bpen);
+    if (above) {
+      sep  = max (b->y4 - b->y2, 0) + gap + (thick >> 1);
+      wideb= vresize_box (wideb->ip, wideb, wideb->y1,
+                          wideb->y2 + (thick >> 1) + extra);
+    }
+    else {
+      sep  = max (b->y1 - b->y3, 0) + gap + (thick >> 1);
+      wideb= vresize_box (wideb->ip, wideb,
+                          wideb->y1 - (thick >> 1) - extra, wideb->y2);
+    }
+    return wide;
+  }
+
+  string ot_name;
+  bool   ot_wide= false;
+  // fonts with hand-tuned wide accents (TeX Gyre, STIX) keep them
+  if (wide && fn->ot_math && !tex_gyre && !stix) {
+    string ss= s (1, N(s)-1);
+    if (s == "^") ss= "hat";
+    if (s == "~") ss= "tilde";
+    string dummy;
+    SI width= b->x2 - b->x1;
+    ot_wide= fn->get_wide_variant ("<wide-" * ss * ">", width, dummy);
+    if (ot_wide) ot_name= "<wide-" * ss * ">";
+  }
+  bool ot_narrow= !wide && fn->ot_math && !tex_gyre && !stix &&
+                  fn->math_type == MATH_TYPE_OPENTYPE && above &&
+                  fn->accent_base_height > 0;
+  if (ot_wide || ot_narrow) {
+    if (ot_wide) {
+      // the font stretches the accent itself; keep its ink box only, the
+      // combining marks have no advance
+      SI width= b->x2 - b->x1;
+      wideb= wide_box (decorate_middle (ip), ot_name, fn, pen, width);
+    }
+    else {
+      // flattened accents over tall bases (GSUB feature flac)
+      string acc= math_accent (fn, s), r;
+      if (fn->flattened_accent_base_height > 0 &&
+          b->y2 > fn->flattened_accent_base_height &&
+          fn->get_feature_variant (acc, "flac", 0, r)) acc= r;
+      wideb= text_box (decorate_middle (ip), 0, acc, fn, pen);
+    }
+    SI wl= min (wideb->x1, wideb->x3), wr= max (wideb->x2, wideb->x4);
+    // the box of a combining accent, which has no advance, is its ink
+    if (ot_narrow && wideb->x1 == wideb->x2 && wideb->x3 < wideb->x4) {
+      wl= wideb->x3;
+      wr= wideb->x4;
+    }
+    wideb= resize_box (decorate_middle (ip), wideb, wl, wideb->y1,
+                       wr, wideb->y2);
+    // accents are designed for bases of height accentBaseHeight and are
+    // raised by the excess height of the base
+    SI abh= fn->accent_base_height;
+    if (above) sep= (abh > 0)? -min (b->y2, abh): -fn->yx;
+    else sep= fn->sep;
+    return wide;
   }
   if (very_wide) {
     SI w= fn->wline;
@@ -586,6 +751,19 @@ struct wide_box_rep: public composite_box_rep {
       return rc; }
     */
     return ref->rsup_correction (); }
+  SI lsub_correction_at (SI h) {
+    return ref->lsub_correction_at (h); }
+  SI lsup_correction_at (SI h) {
+    return ref->lsup_correction_at (h); }
+  SI rsub_correction_at (SI h) {
+    return ref->rsub_correction_at (h); }
+  SI rsup_correction_at (SI h) {
+    return ref->rsup_correction_at (h); }
+  bool extended_shape () {
+    return ref->extended_shape (); }
+  bool top_accent (SI& x) {
+    if (ref->top_accent (x)) { x += sx (0); return true; }
+    return false; }
   SI sub_lo_base (int level) {
     return ref->sub_lo_base (level); }
   SI sub_hi_lim  (int level) {
@@ -620,15 +798,27 @@ wide_box_rep::wide_box_rep (
   if (above) {
     Y= ref->y2;
     X= m;
-    if (ref->right_slope () != 0)
-      X += ref->rsup_correction() + ((SI) (ref->right_slope() * fn->yx * 0.5));
-    X += ref->wide_correction (1);
-    //X= ((SI) (ref->right_slope () * (Y - fn->yx))) + m;
-    insert (hi, X- ((hi->x1 + hi->x2)>>1), Y+ sep);
+    SI ax, hx;
+    if (fn->math_type == MATH_TYPE_OPENTYPE && fn->ot_math &&
+        ref->top_accent (ax)) {
+      // attach the accent at the attachment points of both glyphs
+      if (!hi->top_accent (hx)) hx= (hi->x1 + hi->x2) >> 1;
+      insert (hi, ax - hx, Y+ sep);
+    }
+    else {
+      if (ref->right_slope () != 0)
+        X += ref->rsup_correction() + ((SI) (ref->right_slope() * fn->yx * 0.5));
+      X += ref->wide_correction (1);
+      //X= ((SI) (ref->right_slope () * (Y - fn->yx))) + m;
+      insert (hi, X- ((hi->x1 + hi->x2)>>1), Y+ sep);
+    }
   }
   else {
     Y= ref->y1 - hi->y2;
-    X= m - ((SI) (ref->right_slope () * sep));
+    X= m;
+    // an accent follows the slope of its base, a rule spans it
+    if (!is_math_rule (fn, s, wide, above))
+      X -= ((SI) (ref->right_slope () * sep));
     X += ref->wide_correction (-1);
     //X= ((SI) (ref->right_slope () * (Y - sep))) + m;
     insert (hi, X- ((hi->x1 + hi->x2)>>1), Y- sep);
@@ -644,7 +834,7 @@ wide_box_rep::wide_box_rep (
   x2= m+ hw- dx;
   x1= min (x1, ref->x1);
   x2= max (x2, ref->x2);
-  if (!above) y1 += fn->sep - sep;
+  if (!above && !is_math_rule (fn, s, wide, above)) y1 += fn->sep - sep;
   finalize ();
 }
 
@@ -701,8 +891,9 @@ wide_box_rep::get_bracket_extents (SI& lo, SI& hi) {
 ******************************************************************************/
 
 box
-frac_box (path ip, box b1, box b2, font fn, font sfn, pencil pen) {
-  return tm_new<frac_box_rep> (ip, b1, b2, fn, sfn, pen);
+frac_box (path ip, box b1, box b2, font fn, font sfn, pencil pen,
+          bool disp) {
+  return tm_new<frac_box_rep> (ip, b1, b2, fn, sfn, pen, disp);
 }
 
 box

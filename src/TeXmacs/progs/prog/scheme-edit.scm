@@ -128,7 +128,13 @@
     (tm-count (string->list (substring s 0 (cdr a))) 1)))
 
 (tm-define (program-compute-indentation doc row col)
-  (:require in-prog-scheme?)
+  (:mode in-prog-scheme?)
+  ;; by the syntax tree when there is one (the same rules, from
+  ;; misc/tree-sitter/scheme/indents.scm), else by the characters
+  (or (syntax-compute-indentation doc row (get-tabstop))
+      (scheme-indentation-by-characters doc row col)))
+
+(tm-define (scheme-indentation-by-characters doc row col)
   (let* ((l (previous-arguments doc row col 10))
          (t (reference-type doc l))
          (i (indent-get-arity t))
@@ -168,6 +174,8 @@
 (tm-define (notify-cursor-moved status)
   (:require prog-highlight-brackets?)
   (:mode in-prog-scheme?)
+  ;; (the other hooks run too: language servers)
+  (former status)
   (select-brackets-after-movement "([{" ")]}" "\\"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

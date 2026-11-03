@@ -24,6 +24,7 @@
 #include "resource.hpp"
 #include "Generic/input.hpp"
 #include "gui.hpp"
+#include "analyze.hpp"
 
 static tree connection_retrieve (string name, string session);
 
@@ -44,6 +45,7 @@ struct connection_rep: rep<connection> {
   bool    request_eval;  // request style evaluation
   texmacs_input tm_out;  // texmacs input handler for output from child
   texmacs_input tm_err;  // texmacs input handler for errors from child
+  tree   shown_partial;  // the partial answer last shown (request links)
 
 public:
   connection_rep (string name, string session, tm_link ln);
@@ -76,7 +78,7 @@ connection_rep::connection_rep (string name2, string session2, tm_link ln2):
   name (name2), session (session2), ln (ln2),
   status (CONNECTION_DEAD), prev_status (CONNECTION_DEAD),
   forced_eval (false), cmdline_eval (false), request_eval (false),
-  tm_out ("output"), tm_err ("error") {}
+  tm_out ("output"), tm_err ("error"), shown_partial ("") {}
 
 string
 connection_rep::start (bool again) {
@@ -89,7 +91,9 @@ connection_rep::start (bool again) {
     message= ln->start ();
     tm_out = texmacs_input ("output");
     tm_err = texmacs_input ("error");
-    status = WAITING_FOR_OUTPUT;
+    // a program which could not be started (a page has no processes) is
+    // dead, not awaited: plugin-start reports its error
+    status = starts (message, "Error:") ? CONNECTION_DEAD : WAITING_FOR_OUTPUT;
     if (again && (message == "ok")) {
       beep ();
       (void) connection_retrieve (name, session);
@@ -135,6 +139,7 @@ connection_rep::start (bool again) {
 
 void
 connection_rep::write (string s) {
+  shown_partial= "";
   tm_out->bof ();
   tm_err->bof ();
   status= WAITING_FOR_OUTPUT;
@@ -219,6 +224,14 @@ connection_rep::listen () {
     if (cmdline_eval || request_eval) ln->listen (1);
     read (LINK_ERR);
     connection_notify (this, "error", tm_err->get ("error"));
+    if (request_eval && status == WAITING_FOR_OUTPUT) {
+      // a request whose answer comes in pieces: the text so far
+      tree p= ln->partial ();
+      if (p != shown_partial) {
+        shown_partial= p;
+        if (p != "") connection_notify (this, "progress", p);
+      }
+    }
     read (LINK_OUT);
     connection_notify (this, "output", tm_out->get ("output"));
     connection_notify (this, "prompt", tm_out->get ("prompt"));
@@ -284,6 +297,11 @@ connection_start (string name, string session, bool again) {
     }
     if (is_tuple (t, "pipe", 1)) {
       tm_link ln= make_pipe_link (t[1]->label);
+      con= tm_new<connection_rep> (name, session, ln);
+    }
+    else if (is_tuple (t, "worker", 1)) {
+      // a plugin of the browser: a Web Worker (worker_link.cpp)
+      tm_link ln= make_worker_link (t[1]->label);
       con= tm_new<connection_rep> (name, session, ln);
     }
     else if (is_tuple (t, "dynlink", 3)) {

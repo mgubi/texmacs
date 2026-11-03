@@ -18,6 +18,7 @@
 #include "url.hpp"
 
 bool has_gs ();
+string gs_executable ();
 string gs_prefix ();
 string eps_device ();
 bool gs_supports (url image);

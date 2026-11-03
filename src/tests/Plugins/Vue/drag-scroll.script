@@ -1,0 +1,42 @@
+# needs drag-scroll.scm (a long document): a drag selection which goes
+# past the bottom of the view, then out of the window, scrolls the view
+# (the canvas keeps the pointer while the button is held, and the editor
+# centres the view on the point it asks for). F12 prints the scroll
+# position and the selection: the second line must show a smaller scroll
+# (the view went down) and a selection ending further in the document,
+# the third one (after the release outside the window) the same selection
+wait 9000
+window #2
+focus
+wait 500
+key F12
+press 300 300
+move 300 400
+wait 200
+move 300 700
+wait 200
+move 300 790
+wait 300
+move 300 800
+wait 300
+move 300 805
+wait 300
+move 300 900
+wait 300
+move 300 950
+wait 300
+move 300 1000
+wait 300
+move 300 1010
+wait 300
+move 300 1020
+wait 300
+key F12
+snapshot drag
+release 300 1020
+wait 500
+key F12
+move 300 400
+wait 500
+key F12
+snapshot released

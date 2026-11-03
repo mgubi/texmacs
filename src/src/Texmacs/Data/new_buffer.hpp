@@ -90,6 +90,7 @@ url new_buffer_in_new_window (url name, tree t, tree geom= "");
 int  get_last_save_buffer (url name);
 void set_last_save_buffer (url name, int t);
 bool is_aux_buffer (url name);
+void buffer_forget_history (url name);
 double last_visited (url name);
 bool buffer_modified (url name);
 void set_buffer_read_only (url name, bool flag);

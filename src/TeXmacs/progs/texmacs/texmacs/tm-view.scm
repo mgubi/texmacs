@@ -81,6 +81,18 @@
 ;; Changing the view properties
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The Vue interface in a single window (TEXMACS_VUE_SINGLE_WINDOW, always
+;; so in the browser) shows the windows of TeXmacs as its tabs: the bars and
+;; the tools are then changed for all of them, as for a single window, and
+;; not for the tab in view only (whose tools would not follow the
+;; preference, and would open elsewhere)
+(define (single-window-gui?)
+  (with v (getenv "TEXMACS_VUE_SINGLE_WINDOW")
+    (and (string? v) (!= v "") (!= v "0"))))
+
+(define (view-of-all-windows?)
+  (or (== (windows-number) 1) (single-window-gui?)))
+
 (tm-define (toggle-visible-header)
   (:synopsis "Toggle the visibility of the window's header")
   (:check-mark "v" visible-header?)
@@ -93,7 +105,7 @@
   (:synopsis "Toggle the visibility of the window's footer")
   (:check-mark "v" visible-footer?)
   (with val (not (visible-footer?))
-    (if (== (windows-number) 1)
+    (if (view-of-all-windows?)
         (set-boolean-preference "status bar" val)
         (show-footer val))))
 
@@ -102,7 +114,7 @@
   (:check-mark "v" has-side-tools?)
   (with val (not (has-side-tools? n))
     (with var (if (== n 0) "side tools" "left tools")
-      (if (and (== (windows-number) 1) (in? n (list 0 1)))
+      (if (and (view-of-all-windows?) (in? n (list 0 1)))
           (set-boolean-preference var val)
           (show-side-tools n val)))))
 
@@ -111,7 +123,7 @@
   (:check-mark "v" visible-bottom-tools?)
   (with val (not (visible-bottom-tools? n))
     (with var (if (== n 0) "bottom tools" "extra tools")
-      (if (and (== (windows-number) 1) (in? n (list 0 1)))
+      (if (and (view-of-all-windows?) (in? n (list 0 1)))
           (set-boolean-preference var val)
           (show-bottom-tools n val)))))
 
@@ -123,7 +135,7 @@
                     ((== n 1) "mode dependent icons")
                     ((== n 2) "focus dependent icons")
                     ((== n 3) "user provided icons"))))
-    (if (== (windows-number) 1)
+    (if (view-of-all-windows?)
         (set-boolean-preference var val)
         (show-icon-bar n val))
     (when (and (os-macos?) (== n 0)

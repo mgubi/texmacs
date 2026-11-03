@@ -18,7 +18,7 @@
   <scm|dynamic>: it allows you to embed one widget into another.
 
   Let's see how you create a dialog. To get started here is one little
-  example taken from <hlink|<verbatim|menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>:
+  example taken from <hlink|<source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>:
 
   <\session|scheme|default>
     <\unfolded-io|Scheme] >
@@ -91,14 +91,15 @@
   <scm|resize> is another of the several available container or
   <hlink|content management widgets|scheme-gui-advanced.en.tm>. It accepts
   two sorts of arguments. Either one sets a fixed size for the widget with
-  two strings, as in the example above, or one passes two lists, the first
-  for widths, the second for heights, with the minimum, default and maximum
-  values in that order, like this:\ 
+  two strings, as in the example above, or one passes two (quoted) lists,
+  the first for widths, the second for heights, with the minimum, default
+  and maximum values in that order, like this:\ 
 
-  <scm|(resize ("100px" "200px" "400px") ("100px" "200px" "400px")
-  (some-widget-here))>
+  <scm|(resize '("100px" "200px" "400px") '("100px" "200px" "400px")
+  (dynamic (some-widget-here)))>
 
-  This sets <scm|some-widget-here> to have a default square size of 200x200
+  This sets the <scm|tm-widget> <scm|some-widget-here>, included with
+  <scm|dynamic>, to have a default square size of 200x200
   pixels.
 
   If you want to add the usual buttons you use <scm|bottom-buttons> like in
@@ -128,8 +129,14 @@
   </session>
 
   Since the widget now needs an argument, we must use another function to
-  display it, namely <scm|dialogue-window>, which will also close the window
-  after the button has been clicked.
+  display it, namely <scm|(dialogue-window <scm-arg|widget> <scm-arg|cmd>
+  <scm-arg|title>)>. It passes to the widget a function which first calls
+  <scm-arg|cmd> with the same arguments and then closes the window. Both
+  <scm|top-window> and <scm|dialogue-window> accept optional arguments
+  after the title: first urls of buffers which belong to the window (a new
+  window for the same buffers closes the former one), then a command
+  which is executed when the window is closed. They are defined in
+  <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>.
 
   <\session|scheme|default>
     <\input|Scheme] >

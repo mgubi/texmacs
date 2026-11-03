@@ -73,8 +73,8 @@ x_drawable_rep::get_extents (SI& w2, SI& h2) {
   if (x_win != NULL) {
     int ww, hh;
     x_win->get_extents (ww, hh);
-    w2= ww;
-    h2= hh;
+    w2= ww; h2= hh;
+    return;
   }
   else {
     w2= w;
@@ -162,11 +162,6 @@ x_drawable_rep::lines (array<SI> x, array<SI> y) {
   }
   XDrawLines (dpy, win, gc, pnt, n, CoordModeOrigin);
   STACK_DELETE_ARRAY (pnt);
-}
-
-void
-x_drawable_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
-  clear (x1, y1, x2, y2);
 }
 
 void

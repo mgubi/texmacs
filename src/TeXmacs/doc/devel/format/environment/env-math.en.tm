@@ -12,7 +12,9 @@
     such as indices and fractions. When the index level is high, formulas are
     rendered in a smaller font. Nevertheless, index levels higher than
     <verbatim|2> are all rendered in the same way as index level
-    <verbatim|2>; this ensures that formulas like
+    <verbatim|2> (more precisely, all index levels beyond the number of
+    script sizes specified by <src-var|math-font-sizes> are rendered using
+    the smallest size); this ensures that formulas like
 
     <\equation*>
       \<mathe\><rsup|\<mathe\><rsup|\<mathe\><rsup|\<mathe\><rsup|x>>>>=<frac|1+<frac|1|x+\<mathe\><rsup|x>>|1+<frac|1|\<mathe\><rsup|x>+<frac|1|\<mathe\><rsup|\<mathe\><rsup|x>>>>>
@@ -31,9 +33,28 @@
   </explain>
 
   <\explain>
+    <var-val|math-font-sizes|default><explain-synopsis|script sizes>
+  <|explain>
+    This variable determines the font sizes which are used for the different
+    index levels. For the value <verbatim|default>, <TeXmacs> uses two
+    standard script sizes (for index levels <verbatim|1> and <verbatim|2>).
+    Alternatively, the value may be a tuple of tuples of the form
+    <explain-macro|tuple|size|s-1|<with|mode|math|\<cdots\>>|s-n>, where
+    <src-arg|size> is either a base font size (in points) or
+    <verbatim|all>, and where the script sizes <src-arg|s-1> until
+    <src-arg|s-n> are either integers (font sizes) or relative sizes like
+    <verbatim|*0.8> or <verbatim|*4/5>. For instance, the
+    <tmpackage|four-script-sizes> package uses the value
+
+    <\tm-fragment>
+      <inactive*|<tuple|<tuple|all|*0.8|*0.6|*0.5>>>
+    </tm-fragment>
+  </explain>
+
+  <\explain>
     <var-val|math-display|false><explain-synopsis|display style>
   <|explain>
-    This environement variable controls whether we are in <em|display style>
+    This environment variable controls whether we are in <em|display style>
     or not. Formulas which occur on separate lines like
 
     <\equation*>
@@ -91,6 +112,59 @@
     vertical positions take effect on each
     <with|mode|math|a<rsub|i><rsup|2>>. Indeed, the vertical position is
     uniform for each horizontal concatenation.
+  </explain>
+
+  <\explain>
+    <var-val|math-nesting-mode|off>
+
+    <src-var|math-nesting-level><explain-synopsis|coloring of nested
+    brackets>
+  <|explain>
+    When <src-var|math-nesting-mode> is not <verbatim|off> (the
+    <tmpackage|math-brackets> and <tmpackage|math-check> packages set it to
+    <verbatim|colored>), matching large brackets are rendered in colors which
+    depend on their nesting depth. The current depth is maintained by the
+    typesetter in the variable <src-var|math-nesting-level>.
+  </explain>
+
+  <\explain>
+    <var-val|math-frac-limit|100par>
+
+    <var-val|math-table-limit|100par>
+
+    <var-val|math-flatten-color|#448><explain-synopsis|flattening of wide
+    formulas>
+  <|explain>
+    Fractions whose numerator or denominator are wider than
+    <src-var|math-frac-limit> are typeset in a linear form <math|a/b>
+    instead of the usual two-dimensional form; similarly, simple tables
+    (without an explicit <src-var|table-width>) which are wider than
+    <src-var|math-table-limit> are flattened.
+    The brackets and slashes which are introduced for such flattened
+    expressions are rendered using the color <src-var|math-flatten-color>.
+    The default limits are so large that flattening essentially never
+    happens; smaller limits are used for instance in the output of
+    interactive sessions.
+  </explain>
+
+  <\explain>
+    <var-val|math-top-swell-start|1.7ex>
+
+    <var-val|math-top-swell-end|3.5ex>
+
+    <var-val|math-bot-swell-start|-0.7ex>
+
+    <var-val|math-bot-swell-end|-2.5ex><explain-synopsis|extra spacing
+    around large formulas>
+  <|explain>
+    When the paragraph variable <src-var|par-swell> (<abbr|resp.> the cell
+    variable <src-var|cell-swell>) is positive, some extra vertical padding
+    is added above lines (<abbr|resp.> table cells) whose content rises
+    above <src-var|math-top-swell-start>. The padding increases linearly
+    with the height and reaches the full value of <src-var|par-swell> at
+    <src-var|math-top-swell-end>. The variables
+    <src-var|math-bot-swell-start> and <src-var|math-bot-swell-end> play a
+    similar role below the baseline.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

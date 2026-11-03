@@ -236,6 +236,9 @@ inline bool tmscm_is_double (tmscm obj) { return scm_is_double (obj); }
 inline bool tmscm_is_string (tmscm obj) { return scm_is_string (obj); }
 inline bool tmscm_is_symbol (tmscm obj) { return scm_is_symbol (obj); }
 
+// nothing to do while C++ code builds a list: the collector of Guile
+// looks at the stack (see the class of this name for S7)
+struct tmscm_builder { inline tmscm_builder () {} inline ~tmscm_builder () {} };
 inline tmscm tmscm_cons (tmscm obj1, tmscm obj2) { return scm_cons (obj1, obj2); }
 inline tmscm tmscm_car (tmscm obj) { return SCM_CAR (obj); }
 inline tmscm tmscm_cdr (tmscm obj) { return SCM_CDR (obj); }

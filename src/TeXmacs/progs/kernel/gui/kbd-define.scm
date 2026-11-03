@@ -26,11 +26,15 @@
     (set! lazy-keyboard-waiting (acons mode module lazy-keyboard-waiting))))
 
 (tm-define-macro (lazy-keyboard module . modes)
-  (for-each (lambda (mode) (lazy-keyboard-do module mode)) modes)
-  `(delayed
-     (:idle 250)
-     (ahash-set! lazy-keyboard-done ',module #t)
-     (module-provide ',module)))
+  ;; the modes are recorded when the form is evaluated, not when it is
+  ;; expanded (femtolisp expands (when #f (lazy-keyboard ...)) when it
+  ;; compiles it)
+  `(begin
+     (for-each (lambda (mode) (lazy-keyboard-do ',module mode)) ',modes)
+     (delayed
+       (:idle 250)
+       (ahash-set! lazy-keyboard-done ',module #t)
+       (module-provide ',module))))
 
 (define lazy-force-all? #f)
 (define lazy-force-busy? #f)
@@ -214,11 +218,17 @@
 
 (define kbd-require-table (make-ahash-table))
 
+(define (kbd-current-module-name)
+  ;; (S7 has no module-name: a module is a let which binds *module-name*)
+  (if (s7-scheme?)
+      ((current-module) '*module-name*)
+      (module-name (current-module))))
+
 (tm-define (kbd-require-condition expr pred)
   (:synopsis "Helper routine for the option :require of kbd-map and kbd-unmap")
   ;; The same condition in the same module gives the same predicate @pred,
   ;; so that the bindings made under it can be found again.
-  (with key (list (module-name (current-module)) expr)
+  (with key (list (kbd-current-module-name) expr)
     (or (ahash-ref kbd-require-table key)
 	(begin
 	  (ahash-set! kbd-require-table key pred)
@@ -303,10 +313,10 @@
 
 (tm-define-macro (kbd-symbols . l)
   (:synopsis "Add symbols in @l to keyboard mapping")
-  (define (fun s)
-    (list s (string-append "insert#<" s ">")
-	  (list 'kbd-insert (string-append "<" s ">"))))
-  `(kbd-commands ,@(map fun l)))
+  (let ((fun (lambda (s)
+               (list s (string-append "insert#<" s ">")
+                     (list 'kbd-insert (string-append "<" s ">"))))))
+    `(kbd-commands ,@(map fun l))))
 
 (tm-define (emulate-keyboard k)
   (delayed (raw-emulate-keyboard k)))

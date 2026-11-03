@@ -45,6 +45,10 @@ struct xml_html_parser {
   array<tree> a;
   int i, n;
   tree stack;
+  int depth;     // depth of the element which is being built
+  int expanded;  // number of characters which declared entities produced
+  bool too_deep;  // whether the depth limit was told about
+  bool too_long;  // whether the entity limit was told about
 
   xml_html_parser ();
   inline void skip_space () {
@@ -56,11 +60,12 @@ struct xml_html_parser {
 
   string transcode (string s);
 
-  string parse_until (string what);
+  string parse_until (string what, bool expand= true);
   string parse_name ();
   string parse_quoted ();
   string expand_entity (string s);
   string expand_entities (string s);
+  string expand_entities (string s, bool declared);
   string parse_entity ();
   tree parse_attribute ();
   tree parse_opening ();
@@ -121,7 +126,13 @@ void load_entities (hashmap<string, string> table, string fname) {
       }
 }
 
-xml_html_parser::xml_html_parser (): entities ("") {
+// Deeper elements are attached to their ancestor of this depth
+#define XML_MAX_DEPTH 1000
+// Declared entities expand to at most this number of characters in all
+#define XML_MAX_EXPANSION 4000000
+
+xml_html_parser::xml_html_parser ():
+  entities (""), depth (0), expanded (0), too_deep (false), too_long (false) {
   if (N(html_empty_tag_table) == 0) {
     html_empty_tag_table->insert ("basefont");
     html_empty_tag_table->insert ("br");
@@ -269,11 +280,11 @@ xml_html_parser::transcode (string s2) {
 ******************************************************************************/
 
 string
-xml_html_parser::parse_until (string what) {
+xml_html_parser::parse_until (string what, bool expand) {
   string r;
   while (s && !test (s, what)) r << s->read (1);
   if (test (s, what)) s += N(what);
-  return expand_entities (r);
+  return expand? expand_entities (r): r;
 }
 
 string
@@ -286,7 +297,18 @@ xml_html_parser::parse_name () {
 
 string
 xml_html_parser::expand_entity (string s) {
-  if (entities->contains (s)) return entities[s];
+  if (entities->contains (s)) {
+    // entities which are defined by other entities grow fast
+    if (expanded > XML_MAX_EXPANSION) {
+      if (!too_long)
+        convert_error << "xml: the entities expand to too much text, "
+                      << "the rest of it is left out\n";
+      too_long= true;
+      return "";
+    }
+    expanded += N(entities[s]);
+    return entities[s];
+  }
   else if (s[0] == '&') {
     if (N(s)>1 && s[1] == '#') {
       int i= 2;
@@ -310,7 +332,7 @@ xml_html_parser::expand_entity (string s) {
 }
 
 string
-xml_html_parser::expand_entities (string s) {
+xml_html_parser::expand_entities (string s, bool declared) {
   string r;
   int i, n= N(s);
   for (i=0; i<n; ) {
@@ -326,12 +348,30 @@ xml_html_parser::expand_entities (string s) {
       }
       else while (i<n && is_name_char (s[i])) i++;
       if (i<n && s[i] == ';') i++;
-      r << expand_entity (s (start, i));
+      string e= s (start, i);
+      if (!declared) r << expand_entity (e);
+      else if (entities->contains (e)) r << expand_entity (e);
+      else r << e;
     }
     else r << s[i++];
   }
-  if (r == s) return r;
-  return expand_entities (r);
+  return r;
+}
+
+string
+xml_html_parser::expand_entities (string s) {
+  // declared entities are expanded until nothing changes; the characters
+  // and predefined entities are expanded once, so that "&amp;lt;" is "&lt;"
+  while (true) {
+    int before= expanded;
+    string r= expand_entities (s, true);
+    if (r == s) break;
+    // a pass which used declared entities counts for its length, so that
+    // an entity which contains itself ends after a bounded amount of work
+    if (expanded != before) expanded += N(r);
+    s= r;
+  }
+  return expand_entities (s, false);
 }
 
 string
@@ -425,13 +465,13 @@ xml_html_parser::parse_pi () {
 tree
 xml_html_parser::parse_comment () {
   s += 4;
-  return tuple ("comment", parse_until ("-->"));
+  return tuple ("comment", parse_until ("-->", false));
 }
 
 tree
 xml_html_parser::parse_cdata () {
   s += 9;
-  return tuple ("cdata", parse_until ("]]>"));
+  return tuple ("cdata", parse_until ("]]>", false));
 }
 
 tree
@@ -658,9 +698,19 @@ xml_html_parser::build (tree& r) {
       i++;
       if (html && html_empty_tag_table->contains (name))
         r << sub;
+      else if (depth >= XML_MAX_DEPTH) {
+        // too deep: the element stays empty and its children follow it
+        if (!too_deep)
+          convert_error << "xml: the elements are nested too deep, "
+                        << "the deepest ones follow their parents\n";
+        too_deep= true;
+        r << sub;
+      }
       else {
         stack= tuple (name, stack);
+        depth++;
         build (sub);
+        depth--;
         r << sub;
         stack= stack[1];
       }

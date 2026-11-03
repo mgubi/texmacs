@@ -30,6 +30,15 @@
   ("cmd tab" (program-indent #f))
   ("cmd S-tab" (program-indent #t)) ; TODO
   ("cmd A-tab" (program-indent-all #f))
+  ("std (" (program-fold))
+  ("std )" (program-unfold))
+  ;; (from the server which follows the file, else from the syntax tree)
+  ("F12" (code-go-to-definition))
+  ("std O" (code-outline))
+  ("F8" (code-next-diagnostic #t))
+  ("S-F8" (code-next-diagnostic #f))
+  ("structured:cmd delete" (program-remove-structure))
+  ("structured:cmd backspace" (program-remove-structure))
 
   ;; override some text mode shortcuts
   ("space var" (insert-tabstop))
@@ -38,7 +47,13 @@
   ("$ var" (make 'math))
   ("\\" "\\")
   ("\\ var" (make 'hybrid))
-  ("\"" "\"")
+  ("(" (program-bracket-open "(" ")"))
+  (")" (program-bracket-close "(" ")"))
+  ("[" (program-bracket-open "[" "]"))
+  ("]" (program-bracket-close "[" "]"))
+  ("{" (program-bracket-open "{" "}"))
+  ("}" (program-bracket-close "{" "}"))
+  ("\"" (program-bracket-open "\"" "\""))
   ("`" "`")
   ("` var" "<#2018>")
   ("'" "'")
@@ -98,6 +113,10 @@
   ("]" (python-bracket-close "[" "]" ))
   ("\"" (python-bracket-open "\"" "\"" ))
   ("'" (python-bracket-open "'" "'" )))
+
+(kbd-map
+  (:mode in-prog-html?)
+  (">" (program-greater)))
 
 (kbd-map
   (:mode in-prog-fortran?)

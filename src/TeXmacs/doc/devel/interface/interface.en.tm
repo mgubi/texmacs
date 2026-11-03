@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.11>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Interfacing <TeXmacs> with other programs>
@@ -32,7 +32,13 @@
     <branch|Plans for the future|interface-plans.en.tm>
   </traverse>
 
+  A systematic description of the protocol and of its implementation can
+  be found in the section on the <hlink|internals of the plug-in
+  system|../plugin/plugin-internals.en.tm>.
+
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
@@ -42,8 +48,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

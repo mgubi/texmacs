@@ -102,7 +102,7 @@
     write macros which define sets of other macros. For instance, the macro
 
     <\tm-fragment>
-      <inactive*|<assign|new-theorem|<macro|name|text|<quasi|<assign|<unquote|name>|<macro|body|<surround|<no-indent><strong|<unquote|<arg|text>>.
+      <inactive*|<assign|new-theorem|<macro|name|text|<quasi|<assign|<unquote|<arg|name>>|<macro|body|<surround|<no-indent><strong|<unquote|<arg|text>>.
       >|<right-flush>|<arg|body>>>>>>>>
     </tm-fragment>
 
@@ -129,6 +129,54 @@
     it may be useful to access the real, non-typeset value. This can be done
     with <explain-macro|quote-arg|var|index-1|<math|\<cdots\>>|index-n>.
   </explain>
+
+  <\explain>
+    <explain-macro|copy|expr><explain-synopsis|evaluate and copy>
+  <|explain>
+    Evaluates <src-arg|expr> and returns a copy of the result, which is
+    disconnected from the source document.
+  </explain>
+
+  <\explain>
+    <explain-macro|mark|arg|body>
+
+    <explain-macro|mark*|arg|body><explain-synopsis|link rendering to a
+    macro argument>
+  <|explain>
+    Evaluates and typesets <src-arg|body>, but tells the editor that the
+    result corresponds to the macro argument <src-arg|arg> (which is
+    typically of the form <explain-macro|arg|name>): cursor positions at the
+    borders of the rendering are identified with the borders of the
+    argument. This primitive is used when a macro displays a transformed
+    version of one of its arguments, and in particular for the rendering of
+    inactive markup. The <src-arg|arg> is not evaluated.
+  </explain>
+
+  <\explain>
+    <explain-macro|expand-as|expr|body><explain-synopsis|expand as another
+    expression>
+  <|explain>
+    Evaluates and typesets <src-arg|body>, but, for the routines which look
+    for the accessible source of a rendering (such as loci,
+    <markup|hard-id> and <markup|find-accessible>), the result stands for
+    <src-arg|expr>.
+  </explain>
+
+  <\explain>
+    <explain-macro|find-accessible|expr><explain-synopsis|find the source
+    of an expression>
+  <|explain>
+    Expands <src-arg|expr> (typically a macro argument) until a subtree of
+    the source document is found, and returns this subtree, without
+    evaluating it. It is used by the <markup|action> macro in order to pass
+    document fragments to <scheme> scripts.
+  </explain>
+
+  The implementation of these primitives is described in more detail in the
+  chapter on <hlink|macro expansion|../../source/macro-expansion.en.tm>,
+  and in particular in the sections on <hlink|the
+  evaluator|../../source/macro-expansion-exec.en.tm> and on <hlink|macro
+  expansion during typesetting|../../source/macro-expansion-typeset.en.tm>.
 
   <tmdoc-copyright|2004|Joris van der Hoeven>
 

@@ -79,11 +79,11 @@
     </src-comment>
   </active*>
 
-  <assign|cite-author|<macro|key|<cite-add|<arg|key>><natbib-author|<cite-data|<arg|key>>>>>
+  <assign|cite-author|<macro|key|<cite-csl|a|<merge|<arg|key>|,>|<tuple|<arg|key>>|<cite-add|<arg|key>>|<cite-add|<arg|key>><natbib-author|<cite-data|<arg|key>>>>>>
 
-  <assign|cite-year|<macro|key|<cite-add|<arg|key>><natbib-year|<cite-data|<arg|key>>>>>
+  <assign|cite-year|<macro|key|<cite-csl|y|<merge|<arg|key>|,>|<tuple|<arg|key>>|<cite-add|<arg|key>>|<cite-add|<arg|key>><natbib-year|<cite-data|<arg|key>>>>>>
 
-  <assign|cite-author*|<macro|key|<cite-add|<arg|key>><natbib-author*|<cite-data|<arg|key>>>>>
+  <assign|cite-author*|<macro|key|<cite-csl|a|<merge|<arg|key>|,>|<tuple|<arg|key>>|<cite-add|<arg|key>>|<cite-add|<arg|key>><natbib-author*|<cite-data|<arg|key>>>>>>
 
   <assign|cite-author-year|<macro|key|<cite-author|<arg|key>><if|<equal|<natbib-year|<cite-data|<arg|key>>>|?>||,
   <cite-year|<arg|key>>>>>
@@ -125,21 +125,21 @@
 
   <assign|cite-textual+|<macro|key|<cite-sep><cite-textual-1|<arg|key>>>>
 
-  <assign|cite-textual|<xmacro|x|<cite-textual-1|<arg|x|0>><map-args|cite-textual+|concat|x|1>>>
+  <assign|cite-textual|<xmacro|x|<cite-csl|t|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<cite-textual-1|<arg|x|0>><map-args|cite-textual+|concat|x|1>>>>
 
   <assign|cite-textual*-1|<macro|key|<cite-link|<arg|key>|<cite-author*-year*|<arg|key>>>>>
 
   <assign|cite-textual*+|<macro|key|<cite-sep><cite-textual*-1|<arg|key>>>>
 
-  <assign|cite-textual*|<xmacro|x|<cite-textual*-1|<arg|x|0>><map-args|cite-textual*+|concat|x|1>>>
+  <assign|cite-textual*|<xmacro|x|<cite-csl|t|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<cite-textual*-1|<arg|x|0>><map-args|cite-textual*+|concat|x|1>>>>
 
   \;
 
-  <assign|cite|<xmacro|x|<render-cite|<cite-raw-1|<arg|x|0>><map-args|cite-raw+|concat|x|1>>>>
+  <assign|cite|<xmacro|x|<cite-csl|p|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<render-cite|<cite-raw-1|<arg|x|0>><map-args|cite-raw+|concat|x|1>>>>>
 
-  <assign|cite*|<xmacro|x|<render-cite|<cite-raw*-1|<arg|x|0>><map-args|cite-raw*+|concat|x|1>>>>
+  <assign|cite*|<xmacro|x|<cite-csl|p|<map-args|cite-csl-key|merge|x>|<map-args|cite-csl-id|tuple|x>|<map-args|cite-add|concat|x>|<render-cite|<cite-raw*-1|<arg|x|0>><map-args|cite-raw*+|concat|x|1>>>>>
 
-  <assign|cite-detail|<macro|key|details|<render-cite-detail|<cite-raw-1|<arg|key>>|<arg|details>>>>
+  <assign|cite-detail|<macro|key|details|<cite-csl|p|<merge|<arg|key>|@|<arg|details>|,>|<tuple|<tuple|<arg|key>|<arg|details>>>|<cite-add|<arg|key>>|<render-cite-detail|<cite-raw-1|<arg|key>>|<arg|details>>>>>
 
   <assign|cite-parenthesized|<value|cite>>
 

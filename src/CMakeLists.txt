@@ -42,6 +42,10 @@ project (TEXMACS CXX C)
 if (WIN32)
   enable_language (RC)
 endif ()
+if (APPLE)
+  # the Objective-C of the macOS plugin (src/Plugins/MacOS)
+  enable_language (OBJC OBJCXX)
+endif ()
 
 set (PACKAGE TeXmacs)
 set (PACKAGE_NAME "TeXmacs")
@@ -228,13 +232,28 @@ set (STDC_HEADERS 1)
 set (DEBUG_ASSERT 1)
 
 ### --------------------------------------------------------------------
-### Guile integration (embedded tm-guile188)
+### Scheme interpreter: S7 (vendored in src/Scheme/S7), the embedded Guile
+### (tm-guile188), or a system Guile found with pkg-config
 ### --------------------------------------------------------------------
 
-set (SCHEME_IMPL "embedded18" CACHE STRING "Implementation of Scheme to compile for.")
+set (SCHEME_IMPL "s7" CACHE STRING
+  "Implementation of Scheme to compile for: s7, femtolisp, embedded18 (tm-guile188) or guile")
+set_property (CACHE SCHEME_IMPL PROPERTY STRINGS s7 femtolisp embedded18 guile)
 
-if (SCHEME_IMPL STREQUAL "embedded18" OR SCHEME_IMPL STREQUAL "tm-guile188")
+if (SCHEME_IMPL STREQUAL "femtolisp")
+  message (STATUS "Using the femtolisp interpreter")
+  set (SCHEME_DIR "Femtolisp")
+  set (USE_FEMTOLISP 1)
+  set (guile_str_size_t "size_t")
+elseif (SCHEME_IMPL STREQUAL "s7")
+  message (STATUS "Using the S7 Scheme interpreter")
+  set (SCHEME_DIR "S7")
+  set (USE_S7 1)
+  set (guile_str_size_t "size_t")
+elseif (SCHEME_IMPL STREQUAL "embedded18" OR SCHEME_IMPL STREQUAL "tm-guile188")
   message (STATUS "Using embedded Guile from tm-guile188")
+  set (SCHEME_DIR "Guile")
+  set (USE_GUILE 1)
   add_subdirectory (tm-guile188)
   set (GUILE_C 1)
   set (GUILE_NUM 1)
@@ -251,6 +270,9 @@ if (SCHEME_IMPL STREQUAL "embedded18" OR SCHEME_IMPL STREQUAL "tm-guile188")
     ${GUILE_BUILD_DIR}/include/libguile
   )
 else ()
+  message (STATUS "Using a system Guile")
+  set (SCHEME_DIR "Guile")
+  set (USE_GUILE 1)
   pkg_search_module (Guile REQUIRED guile-1.8 guile-3.0 guile-2.2 guile-2.0)
   if (Guile_VERSION VERSION_LESS 2.0)
     set (GUILE_C 1)
@@ -266,13 +288,17 @@ endif ()
 ### GUI & Qt Selection
 ### --------------------------------------------------------------------
 
-set (TEXMACS_GUI "Qt" CACHE STRING "TeXmacs Gui (Qt, Qt6, Qt5, Qt4)")
-set_property (CACHE TEXMACS_GUI PROPERTY STRINGS Qt Qt6 Qt5 Qt4)
+# as configure --with-gui: Qt (Qt6, else Qt5), Qt6, Qt5, Qt4; Vue (Clay,
+# SDL3 and MuPDF); SDL (Widkit on SDL3 and MuPDF); X11 (Widkit on X11)
+set (TEXMACS_GUI "Qt" CACHE STRING "TeXmacs Gui (Qt, Qt6, Qt5, Qt4, Vue, SDL, X11)")
+set_property (CACHE TEXMACS_GUI PROPERTY STRINGS Qt Qt6 Qt5 Qt4 Vue SDL X11)
 option (QTPIPES "use Qt pipes" ON)
 
-# (the other interfaces of configure --with-gui are not built by CMake)
-if (NOT TEXMACS_GUI MATCHES "^Qt[456]?$")
-  message (FATAL_ERROR "Unknown TEXMACS_GUI ${TEXMACS_GUI}: Qt, Qt6, Qt5 or Qt4")
+if (NOT TEXMACS_GUI MATCHES "^(Qt.*|Vue|SDL|X11)$")
+  message (FATAL_ERROR "Unknown TEXMACS_GUI ${TEXMACS_GUI}: Qt, Qt6, Qt5, Qt4, Vue, SDL or X11")
+endif ()
+if (NOT TEXMACS_GUI MATCHES "Qt.*")
+  set (QTPIPES OFF)
 endif ()
 
 if (TEXMACS_GUI MATCHES "Qt.*")
@@ -300,10 +326,97 @@ if (TEXMACS_GUI MATCHES "Qt.*")
     endif ()
   endif ()
 
+  # optional: the WebSocket clients of the server (QTMSockets.cpp, Qt 6)
+  if (AC_QT_MAJOR_VERSION GREATER 5)
+    find_package (Qt${AC_QT_MAJOR_VERSION} COMPONENTS WebSockets QUIET)
+    if (Qt${AC_QT_MAJOR_VERSION}WebSockets_FOUND)
+      list (APPEND QT_LIBRARIES Qt${AC_QT_MAJOR_VERSION}::WebSockets)
+    endif ()
+  endif ()
+
   set (QTTEXMACS 1)
   set (CONFIG_GUI "QT")
   set (CONFIG_QT "Qt")
   set (QT_PLUGIN_DIR "Qt")
+elseif (TEXMACS_GUI STREQUAL "Vue" OR TEXMACS_GUI STREQUAL "SDL")
+  pkg_check_modules (SDL3 REQUIRED sdl3 sdl3-ttf)
+  if (TEXMACS_GUI STREQUAL "Vue")
+    set (VUETEXMACS 1)
+    set (CONFIG_GUI "VUE")
+  else ()
+    set (SDLTEXMACS 1)
+    set (CONFIG_GUI "SDL")
+  endif ()
+elseif (TEXMACS_GUI STREQUAL "X11")
+  find_package (X11 REQUIRED)
+  set (X11TEXMACS 1)
+  set (CONFIG_GUI "X11")
+endif ()
+
+### --------------------------------------------------------------------
+### MuPDF: the pictures and the PDF of the Vue and SDL ports; the Qt and
+### X11 ports have pictures of their own, which clash with it
+### --------------------------------------------------------------------
+
+set (MUPDF_DIR "" CACHE PATH "Prefix of the MuPDF installation (optional)")
+if (TEXMACS_GUI STREQUAL "Vue" OR TEXMACS_GUI STREQUAL "SDL")
+  set (_mupdf_default ON)
+else ()
+  set (_mupdf_default OFF)
+endif ()
+option (USE_MUPDF "Use MuPDF (required by the Vue and SDL GUIs)" ${_mupdf_default})
+# never with X11 nor Qt, also on demand: the Qt renderer took the pictures
+# of MuPDF for its own, and crashed at the first image drawn
+if (TEXMACS_GUI STREQUAL "X11" OR TEXMACS_GUI MATCHES "^Qt")
+  set (USE_MUPDF OFF)
+endif ()
+if (USE_MUPDF)
+  find_path (MUPDF_INCLUDE_DIR mupdf/fitz.h HINTS "${MUPDF_DIR}/include")
+  find_library (MUPDF_LIBRARY mupdf HINTS "${MUPDF_DIR}/lib")
+  find_library (MUPDF_THIRD_LIBRARY mupdf-third HINTS "${MUPDF_DIR}/lib")
+  if (MUPDF_INCLUDE_DIR AND MUPDF_LIBRARY)
+    set (USE_MUPDF 1)
+    set (MUPDF_RENDERER 1)
+    set (MUPDF_LIBRARIES ${MUPDF_LIBRARY})
+    if (MUPDF_THIRD_LIBRARY)
+      list (APPEND MUPDF_LIBRARIES ${MUPDF_THIRD_LIBRARY})
+    endif ()
+    message (STATUS "Found MuPDF: ${MUPDF_LIBRARY}")
+  else ()
+    set (USE_MUPDF 0)
+  endif ()
+endif ()
+if (NOT USE_MUPDF AND (TEXMACS_GUI STREQUAL "Vue" OR TEXMACS_GUI STREQUAL "SDL"))
+  message (FATAL_ERROR "TEXMACS_GUI=${TEXMACS_GUI} needs MuPDF: set MUPDF_DIR")
+endif ()
+
+### --------------------------------------------------------------------
+### ThorVG: the GPU renderer of the Vue port (as configure --with-thorvg;
+### misc/thorvg/build-thorvg.sh builds it); without it, the Vue port draws
+### with MuPDF only
+### --------------------------------------------------------------------
+
+set (THORVG_DIR "" CACHE PATH
+  "Prefix of ThorVG, for the GPU renderer of the Vue GUI (optional)")
+if (VUETEXMACS AND THORVG_DIR)
+  if (EXISTS "${THORVG_DIR}/include/thorvg-1/thorvg.h" AND
+      EXISTS "${THORVG_DIR}/lib/libthorvg-1.a")
+    set (USE_THORVG 1)
+    set (THORVG_INCLUDE_DIR "${THORVG_DIR}/include/thorvg-1")
+    set (THORVG_LIBRARIES "${THORVG_DIR}/lib/libthorvg-1.a")
+    if (APPLE)
+      list (APPEND THORVG_LIBRARIES "-framework OpenGL")
+    elseif (WIN32)
+      list (APPEND THORVG_LIBRARIES opengl32)
+    else ()
+      list (APPEND THORVG_LIBRARIES GL)
+    endif ()
+    add_compile_definitions (GL_SILENCE_DEPRECATION TVG_STATIC)
+    message (STATUS "Found ThorVG: ${THORVG_DIR} (GPU renderer of Vue)")
+  else ()
+    message (FATAL_ERROR "No ThorVG in ${THORVG_DIR} "
+      "(see misc/thorvg/build-thorvg.sh)")
+  endif ()
 endif ()
 
 ### --------------------------------------------------------------------
@@ -385,7 +498,13 @@ find_package (PNG REQUIRED)
 find_package (ZLIB REQUIRED)
 
 find_package (Iconv)
-if (Iconv_FOUND OR ICONV_FOUND)
+# cmake/FindIconv.cmake names its results ICONV_..., CMake's Iconv_...
+if (ICONV_FOUND AND NOT Iconv_FOUND)
+  set (Iconv_FOUND 1)
+  set (Iconv_LIBRARIES ${ICONV_LIBRARIES})
+  set (Iconv_INCLUDE_DIRS ${ICONV_INCLUDE_DIR})
+endif ()
+if (Iconv_FOUND)
   set (USE_ICONV 1)
 endif ()
 
@@ -395,6 +514,10 @@ if (USE_GNUTLS)
   pkg_check_modules (GNUTLS QUIET gnutls hogweed nettle)
   if (NOT GNUTLS_FOUND)
     find_package (GnuTLS REQUIRED)
+  elseif (GNUTLS_LINK_LIBRARIES)
+    # the full paths: the names alone are not found outside the default
+    # directories of the linker (Homebrew)
+    set (GNUTLS_LIBRARIES ${GNUTLS_LINK_LIBRARIES})
   endif ()
   set (USE_GNUTLS 1)
   set (LINKED_GNUTLS 1)
@@ -403,6 +526,11 @@ if (USE_GNUTLS)
     set (GNUTLS_EXTRA_LIBS dbghelp Secur32 shell32 ole32 advapi32 secur32 pthread)
   endif ()
 endif ()
+
+# the features of program code which a build may leave out (see
+# src/docs/code-features.md and misc/m4/tm_code.m4)
+option (USE_TREE_SITTER "Use the syntax trees of tree-sitter" ON)
+option (USE_LSP "Use language servers" ON)
 
 # SQLite3
 option (USE_SQLITE3 "Use SQLite3" ON)
@@ -418,6 +546,18 @@ if (USE_SQLITE3)
   endif ()
 endif ()
 
+# libcurl: the HTTP requests of the builds without Qt (else the curl program)
+option (USE_LIBCURL "make the HTTP requests with libcurl" ON)
+if (USE_LIBCURL)
+  find_package (CURL)
+  if (CURL_FOUND)
+    set (USE_LIBCURL 1)
+  else ()
+    set (USE_LIBCURL 0)
+    message (STATUS "libcurl not found, the curl program makes the HTTP requests")
+  endif ()
+endif ()
+
 # Ghostscript
 set (USE_GS 1)
 if (WIN32)
@@ -430,10 +570,13 @@ else ()
   set (GS_LIB "share/ghostscript/lib")
 endif ()
 
-# PDF Hummus native renderer
-set (PDF_RENDERER 1)
-set (PDFHUMMUS_NO_TIFF 1)
-set (PDFHUMMUS_NO_DCT 1)
+# PDF Hummus native renderer (with Qt only, as in configure); MuPDF writes
+# the PDF when it is there (the two define the same attachment functions)
+if (QTTEXMACS AND NOT USE_MUPDF)
+  set (PDF_RENDERER 1)
+  set (PDFHUMMUS_NO_TIFF 1)
+  set (PDFHUMMUS_NO_DCT 1)
+endif ()
 
 ### --------------------------------------------------------------------
 ### Generate configure headers
@@ -471,6 +614,17 @@ configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/System/config.h.cmake
 configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/System/tm_configure.hpp.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/src/System/tm_configure.hpp)
 
+# the git commit of the sources (#753): the header is made now and again at
+# each build (the target git_revision), rewritten only when the commit
+# changes, so that only src/System/Boot/build_revision.cpp is rebuilt
+set (TM_GIT_REVISION_CMD
+  ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+  -DOUT=${CMAKE_CURRENT_BINARY_DIR}/src/System/git_revision.hpp
+  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GitRevision.cmake)
+execute_process (COMMAND ${TM_GIT_REVISION_CMD})
+add_custom_target (git_revision ALL COMMAND ${TM_GIT_REVISION_CMD}
+  COMMENT "Reading the git revision" VERBATIM)
+
 ### --------------------------------------------------------------------
 ### Source Files
 ### --------------------------------------------------------------------
@@ -481,8 +635,18 @@ file (GLOB_RECURSE TeXmacs_Graphics_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Graphi
 file (GLOB_RECURSE TeXmacs_Kernel_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Kernel/*.cpp")
 file (GLOB_RECURSE TeXmacs_Scheme_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Scheme/*.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Guile/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}/*.c"
 )
+if (USE_FEMTOLISP)
+  # the vendored femtolisp finds the headers of its library llt by their
+  # names alone (only for its own sources: llt has headers like utils.h)
+  set_source_files_properties (
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Femtolisp/fl_core.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Femtolisp/fl_llt.c"
+    PROPERTIES COMPILE_OPTIONS
+    "-I${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Femtolisp/femtolisp/llt;-w")
+endif ()
 option (ENABLE_EXPERIMENTAL "Enable experimental style rewriting code" OFF)
 if (ENABLE_EXPERIMENTAL)
   file (GLOB_RECURSE TeXmacs_Style_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Style/*.cpp")
@@ -503,10 +667,11 @@ file (GLOB_RECURSE TeXmacs_Texmacs_SRCS
 # Standard plugins
 file (GLOB_RECURSE TeXmacs_Std_Plugins_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Bibtex/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Cairo/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Imlib2/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Database/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Freetype/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Gnutls/*.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Ghostscript/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Ispell/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Metafont/*.cpp"
@@ -514,18 +679,66 @@ file (GLOB_RECURSE TeXmacs_Std_Plugins_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Openssl/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Updater/*.cpp"
 )
-file (GLOB TeXmacs_Pdf_C_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/LibAesgm/*.c")
+if (PDF_RENDERER)
+  file (GLOB_RECURSE TeXmacs_Pdf_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/*.cpp")
+  list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Pdf_SRCS})
+  file (GLOB TeXmacs_Pdf_C_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/LibAesgm/*.c")
+endif ()
+if (USE_MUPDF)
+  file (GLOB TeXmacs_MuPDF_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MuPDF/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MuPDF/*.c")
+  list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_MuPDF_SRCS})
+endif ()
 
 if (USE_RESVG)
   list (APPEND TeXmacs_Std_Plugins_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Resvg/resvg.cpp")
 endif ()
 file (GLOB_RECURSE TeXmacs_Sqlite_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Sqlite3/*.cpp")
 list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Sqlite_SRCS})
+# tree-sitter: the vendored runtime (one unit, tree_sitter_lib.c) and the
+# languages made from the tables of progs/treesit (as in src/makefile.in)
+set (TeXmacs_TreeSitter_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/TreeSitter")
+if (USE_TREE_SITTER)
+  list (APPEND TeXmacs_Std_Plugins_SRCS
+    "${TeXmacs_TreeSitter_DIR}/tree_sitter_glue.cpp"
+    "${TeXmacs_TreeSitter_DIR}/syntax_region.cpp"
+    "${TeXmacs_TreeSitter_DIR}/ts_highlight.cpp"
+    "${TeXmacs_TreeSitter_DIR}/ts_tables.cpp"
+    "${TeXmacs_TreeSitter_DIR}/tree_sitter_lib.c"
+    "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c"
+    "${TeXmacs_TreeSitter_DIR}/ts_xz.c")
+endif ()
+# (their include directories are set in src/CMakeLists.txt, where the
+# target is)
 
 # GUI Sources
-file (GLOB TeXmacs_Qt_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.cpp")
-list (FILTER TeXmacs_Qt_SRCS EXCLUDE REGEX "moc_.*\\.cpp$")
-file (GLOB TeXmacs_Qt_HDRS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.hpp")
+if (QTTEXMACS)
+  file (GLOB TeXmacs_GUI_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.hpp")
+  # the moc files of a build with configure, when there was one: AUTOMOC
+  # makes its own
+  list (FILTER TeXmacs_GUI_SRCS EXCLUDE REGEX "/moc_[^/]*\\.cpp$")
+  set (TeXmacs_GUI_DIRS Qt)
+elseif (VUETEXMACS)
+  # the Vue sources are C++20 (as in src/makefile.in), in a library of
+  # their own (src/CMakeLists.txt); of the C sources, Clay only
+  # (clay_renderer_SDL3.c is an example of the library)
+  file (GLOB TeXmacs_CXX20_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Vue/*.cpp")
+  set (TeXmacs_GUI_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Vue/clay.c")
+  set (TeXmacs_GUI_DIRS Vue)
+elseif (SDLTEXMACS)
+  file (GLOB_RECURSE TeXmacs_GUI_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/SDL/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Widkit/*.cpp")
+  set (TeXmacs_GUI_DIRS SDL Widkit)
+elseif (X11TEXMACS)
+  file (GLOB_RECURSE TeXmacs_GUI_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/X11/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Widkit/*.cpp")
+  set (TeXmacs_GUI_DIRS X11 Widkit)
+endif ()
 
 # System OS Sources
 if (WIN32)
@@ -537,7 +750,8 @@ if (WIN32)
     list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Windows/windows32_entrypoint.cpp")
   endif ()
 elseif (APPLE)
-  # Unix system layer plus the Objective-C(++) helpers of Plugins/MacOS
+  # the Unix sources, and the Objective-C of the macOS plugin (as
+  # configure)
   enable_language (OBJC OBJCXX)
   set (CMAKE_OBJCXX_STANDARD 17)
   set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
@@ -546,6 +760,10 @@ elseif (APPLE)
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.mm")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
+  # the title bar of the Vue windows (proxy icon, edited dot), macOS only
+  if (VUETEXMACS)
+    list (APPEND TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Vue/vue_mac.mm")
+  endif ()
 else ()
   file (GLOB TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
@@ -564,8 +782,7 @@ set (TeXmacs_All_SRCS
   ${TeXmacs_Texmacs_SRCS}
   ${TeXmacs_Std_Plugins_SRCS}
   ${TeXmacs_Pdf_C_SRCS}
-  ${TeXmacs_Qt_SRCS}
-  ${TeXmacs_Qt_HDRS}
+  ${TeXmacs_GUI_SRCS}
   ${TeXmacs_OS_SRCS}
 )
 
@@ -574,6 +791,8 @@ set (TeXmacs_All_SRCS
 ### --------------------------------------------------------------------
 
 set (TeXmacs_Include_Dirs
+  # first the headers generated here (config.h, tm_configure.hpp): the
+  # source tree may have those of a build with configure
   ${CMAKE_CURRENT_BINARY_DIR}/src/System
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Data/Convert
@@ -607,9 +826,8 @@ set (TeXmacs_Include_Dirs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Pdf/LibAesgm
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Gnutls
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Resvg
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Guile
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Scheme
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Glue
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Style
@@ -633,6 +851,7 @@ set (TeXmacs_Include_Dirs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Typeset/Page
   ${CMAKE_CURRENT_SOURCE_DIR}/TeXmacs/include
   ${Guile_INCLUDE_DIRS}
+  ${CURL_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${PNG_INCLUDE_DIRS}
   ${GNUTLS_INCLUDE_DIRS}
@@ -645,6 +864,29 @@ if (WIN32)
     list (APPEND TeXmacs_Include_Dirs ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Windows ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Windows/nowide)
   endif ()
   list (APPEND TeXmacs_Include_Dirs ${CMAKE_CURRENT_SOURCE_DIR}/packages/windows)
+endif ()
+
+foreach (_dir ${TeXmacs_GUI_DIRS})
+  list (APPEND TeXmacs_Include_Dirs ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/${_dir})
+endforeach ()
+if (USE_MUPDF)
+  list (APPEND TeXmacs_Include_Dirs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MuPDF ${MUPDF_INCLUDE_DIR})
+endif ()
+if (SDL3_FOUND)
+  list (APPEND TeXmacs_Include_Dirs ${SDL3_INCLUDE_DIRS})
+endif ()
+if (USE_THORVG)
+  list (APPEND TeXmacs_Include_Dirs ${THORVG_INCLUDE_DIR})
+endif ()
+if (X11TEXMACS)
+  list (APPEND TeXmacs_Include_Dirs ${X11_INCLUDE_DIR})
+endif ()
+if (NOT WIN32)
+  list (APPEND TeXmacs_Include_Dirs ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix)
+endif ()
+if (APPLE)
+  list (APPEND TeXmacs_Include_Dirs ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS)
 endif ()
 
 if (RESVG_INCLUDE_DIR)
@@ -694,6 +936,13 @@ if (USE_ICONV)
     list (APPEND TeXmacs_Libraries ${ICONV_LIBRARIES})
   endif ()
 endif ()
+if (USE_LIBCURL)
+  list (APPEND TeXmacs_Libraries ${CURL_LIBRARIES})
+  if (APPLE)
+    # (the proxies of the settings of macOS)
+    list (APPEND TeXmacs_Libraries "-framework CFNetwork" "-framework CoreFoundation")
+  endif ()
+endif ()
 if (USE_SQLITE3)
   if (SQLITE3_LIBRARIES)
     list (APPEND TeXmacs_Libraries ${SQLITE3_LIBRARIES})
@@ -704,6 +953,21 @@ if (USE_SQLITE3)
   elseif (SQLite3_LIBRARY)
     list (APPEND TeXmacs_Libraries ${SQLite3_LIBRARY})
   endif ()
+endif ()
+if (NOT WIN32)
+  list (APPEND TeXmacs_Libraries ${CMAKE_DL_LIBS})
+endif ()
+if (USE_MUPDF)
+  list (APPEND TeXmacs_Libraries ${MUPDF_LIBRARIES})
+endif ()
+if (SDL3_FOUND)
+  list (APPEND TeXmacs_Libraries ${SDL3_LINK_LIBRARIES})
+endif ()
+if (USE_THORVG)
+  list (APPEND TeXmacs_Libraries ${THORVG_LIBRARIES})
+endif ()
+if (X11TEXMACS)
+  list (APPEND TeXmacs_Libraries ${X11_LIBRARIES})
 endif ()
 if (APPLE)
   list (APPEND TeXmacs_Libraries "-framework Cocoa" "-framework IOKit")

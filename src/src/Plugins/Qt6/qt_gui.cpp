@@ -9,6 +9,7 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "gui_test.hpp"
 #include <locale.h>
 
 #include "convert.hpp"
@@ -640,6 +641,7 @@ qt_gui_rep::event_loop () {
     app = QApplication::instance ();
   update();
     //need_update();
+  gui_test_start (); // TEXMACS_TEST_SCRIPT=<file>: a scripted test
   app->exec();
 }
 
@@ -669,6 +671,18 @@ void
 gui_start_loop () {
   // start the main loop
   the_gui->event_loop ();
+}
+
+void
+qt_forget_deferred_deletes () {
+  // (called when TeXmacs quits, before _exit: the widgets given to
+  // deleteLater and not yet deleted are forgotten, not deleted. On Windows
+  // _exit runs the shutdown of the DLLs, where Qt delivers the pending
+  // deferred deletes, and ~QWidget crashes (gdb on the Windows CI:
+  // ~QTMWidget under ntdll!LdrShutdownProcess). A script given by -x runs
+  // before the event loop gets to delete them. Harmless to call twice)
+  if (QCoreApplication::instance () != NULL)
+    QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
 
 void
@@ -1313,6 +1327,19 @@ command_queue::exec_pending () {
     }
   } else
     wait = false;
+}
+
+bool
+command_queue::has_due (time_t now) {
+  for (int i= 0; i < N(start_times); i++)
+    if (now - start_times[i] >= 0) return true;
+  return false;
+}
+
+bool
+qt_gui_rep::test_busy () {
+  return !waiting_events.is_empty () || needing_update ||
+         delayed_commands.has_due (texmacs_time ());
 }
 
 void

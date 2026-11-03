@@ -24,6 +24,7 @@ struct superpose_box_rep: public concrete_composite_box_rep {
   box adjust_kerning (int mode, double factor);
   box expand_glyphs (int mode, double factor);
   gr_selections graphical_select (SI x, SI y, SI dist);
+  int find_child (SI x, SI y, SI delta, bool force);
 };
 
 superpose_box_rep::operator tree () {
@@ -65,6 +66,24 @@ superpose_box_rep::graphical_select (SI x, SI y, SI dist) {
   for (i=n-1; i>=0; i--)
     res << bs[i]->graphical_select (x- sx(i), y- sy(i), dist);
   return res;
+}
+
+// the child a click goes to: the closest one, and among those as close the
+// one drawn last, on top of the others (a text over an image gets the click,
+// not the image under it: the labels of a TikZ picture, plugins/tikz)
+int
+superpose_box_rep::find_child (SI x, SI y, SI delta, bool force) {
+  if (border_flag && outside (x, delta, x1, x2) &&
+      (is_accessible (ip) || force)) return -1;
+  int i, n= subnr(), m= -1;
+  SI d= MAX_SI;
+  for (i=n-1; i>=0; i--)
+    if (distance (i, x, y, delta) < d)
+      if (bs[i]->accessible () || force) {
+        d= distance (i, x, y, delta);
+        m= i;
+      }
+  return m;
 }
 
 /******************************************************************************

@@ -36,7 +36,7 @@
   einbringen. Ihre Anwendung kann sogar das Schriftsatz-Programm modifizieren
   oder erweitern.
 
-  Im Verzeichnis <verbatim|examples/plugins>, können Sie Beispiele für
+  Im Verzeichnis <source-link|examples/plugins|TeXmacs/examples/plugins>, können Sie Beispiele für
   einfache Plugins finden.\ 
 
   Im nächsten Kapitel werden wir eine etwas eingehendere Beschreibung der

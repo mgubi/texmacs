@@ -1,7 +1,9 @@
 
 /******************************************************************************
 * MODULE     : async_eval_test.cpp
-* DESCRIPTION: tests of the asynchronous commands (async_eval_system)
+* DESCRIPTION: tests of the asynchronous commands (async_eval_system); the
+*              commands of a request link (the curl program) which are
+*              no longer wanted write nothing into the next answer
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -13,6 +15,7 @@
 #include "sys_utils.hpp"
 #include "tm_timer.hpp"
 #include "file.hpp"
+#include "analyze.hpp"
 #ifndef OS_MINGW
 #include <unistd.h>
 #endif
@@ -107,10 +110,66 @@ test_kill () {
 #endif
 }
 
+// A request link without libcurl and without Qt 6 asks the curl program,
+// whose output async_eval_system reads in a thread into the buffers of the
+// link. An interrupted answer (request_link_rep::interrupt) is cancelled,
+// then the next question uses the same buffers (request_link_rep::write):
+// the slow command below stands for the interrupted curl, which goes on
+// writing for a while; nothing of it may reach the next answer.
+
+#ifndef OS_MINGW
+static bool
+pump_until (bool (*ok) (int&, string&), int& status, string& out, int msecs) {
+  time_t t0= texmacs_time ();
+  while ((texmacs_time () - t0) < msecs) {
+    async_eval_pending ();
+    if (ok (status, out)) return true;
+    usleep (20000);
+  }
+  return false;
+}
+
+static bool
+started (int& status, string& out) {
+  (void) status; return occurs ("OLD1", out); }
+
+static bool
+ended (int& status, string& out) {
+  (void) out; return status == 0; }
+#endif
+
+static void
+test_interrupted_answer () {
+#ifdef OS_MINGW
+  SKIP ("no sh on Windows");
+#else
+  int status= 1;
+  string outbuf, errbuf;
+  bool kill= false;
+  CHECK (!async_eval_system ("sh -c 'printf OLD1; sleep 1; printf OLD2'",
+                               status, outbuf, errbuf, kill));
+  CHECK (pump_until (started, status, outbuf, 3000));
+  // interrupted, as request_link_rep::interrupt does it
+  kill= true;
+  async_eval_cancel (&outbuf);
+  // the next question, in the same buffers, as request_link_rep::write
+  status= 1; outbuf= ""; errbuf= ""; kill= false;
+  CHECK (!async_eval_system ("printf NEW", status, outbuf, errbuf, kill));
+  CHECK (pump_until (ended, status, outbuf, 3000));
+  CHECK_MSG (outbuf == "NEW", outbuf);
+  // the interrupted command ends meanwhile: its output is dropped
+  time_t t0= texmacs_time ();
+  while ((texmacs_time () - t0) < 1500) { async_eval_pending (); usleep (20000); }
+  CHECK_MSG (outbuf == "NEW", outbuf);
+  CHECK_EQ (status, 0);
+#endif
+}
+
 int
 main () {
   RUN (test_status_and_errors);
   RUN (test_long_output);
   RUN (test_kill);
+  RUN (test_interrupted_answer);
   return test_report ();
 }

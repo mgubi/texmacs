@@ -1,0 +1,219 @@
+<TeXmacs|2.1.4>
+
+<style|<tuple|tmdoc|english>>
+
+<\body>
+  <tmdoc-title|Building with the autotools>
+
+  <section|Quick start>
+
+  The traditional build, described for users in the file
+  <verbatim|COMPILE>, is
+
+  <\verbatim-code>
+    ./configure
+
+    make
+
+    make install
+  </verbatim-code>
+
+  run from <source-link|src/|src>. When <source-link|configure.in|configure.in> or one of the
+  macros in <source-link|misc/m4/|misc/m4> has changed, <verbatim|configure> must be
+  regenerated first with <verbatim|autoreconf -fi> (as in the
+  <verbatim|Dockerfile>). The build is done in the source tree: objects go
+  to <verbatim|src/Objects/>, dependency files to <verbatim|src/Deps/>,
+  and the binary to <verbatim|TeXmacs/bin/texmacs.bin>.
+
+  <section|Configuration>
+
+  <source-link|configure.in|configure.in> checks the compilers (preferring
+  <verbatim|clang> and <verbatim|clang++>, with <name|Objective-C> for
+  <name|macOS>), the sizes of the basic types and a few headers, and then
+  calls one macro per subject. The options which matter most are:
+
+  <\description>
+    <item*|<name|Guile>>(<source-link|guile.m4|misc/m4/guile.m4>) <verbatim|--with-guile=<em|path>>
+    gives the <verbatim|guile-config> program to use;
+    <verbatim|--with-guile=embedded18> uses the embedded <name|Guile> 1.8
+    in <verbatim|tm-guile188/>, which is also chosen automatically when
+    that directory exists. Without either, <verbatim|configure> looks for
+    <verbatim|guile18-config>, <verbatim|guile1.8-config>, <verbatim|guile16-config>,
+    ..., <verbatim|guile-config> and then <verbatim|guile20-config> and
+    similar names. <name|Guile> 2 and later are refused unless
+    <verbatim|--enable-guile2> is given. The version determines the
+    dialect macro <verbatim|GUILE_A> to <verbatim|GUILE_D>; when cross
+    compiling, it must be given in the variable <verbatim|GUILE_VERSION>.
+
+    <item*|Graphical port>(<source-link|tm_gui.m4|misc/m4/tm_gui.m4>, <source-link|qt.m4|misc/m4/qt.m4>)
+    <verbatim|--with-gui=<em|port>> chooses the port, which defines one
+    macro:
+
+    <\description>
+      <item*|<verbatim|qt>>(the default) native <name|Qt> 5 or 6 widgets,
+      <verbatim|QTTEXMACS>. <verbatim|--enable-qt-new> (the default on
+      <name|Android>) compiles <source-link|Plugins/Qt6|src/Plugins/Qt6> instead of
+      <source-link|Plugins/Qt|src/Plugins/Qt>, and requires <name|Qt> 6.10 or later.
+
+      <item*|<verbatim|qtwk>><name|Qt> as a platform layer with the
+      <name|Widkit> widgets, <verbatim|QTWKTEXMACS> together with
+      <verbatim|QTTEXMACS>.
+
+      <item*|<verbatim|x11>>The historical <name|X11> port with
+      <name|Widkit>, <verbatim|X11TEXMACS>.
+
+      <item*|<verbatim|sdl>><name|Widkit> on <name|SDL> 3
+      (<verbatim|--with-sdl3>), drawn with <name|MuPDF>,
+      <verbatim|SDLTEXMACS>.
+
+      <item*|<verbatim|vue>><name|SDL> 3 windows and widgets drawn by
+      <name|Clay>, <verbatim|VUETEXMACS>; with <verbatim|--with-thorvg=<em|dir>>
+      the GPU renderer (<name|OpenGL> and <name|ThorVG>).
+
+      <item*|<verbatim|cocoa>, <verbatim|aqua>>The native <name|macOS>
+      port of <source-link|Plugins/NS|src/Plugins/NS>, <verbatim|AQUATEXMACS>; it needs the
+      <name|macOS> extensions.
+    </description>
+
+    <name|SDL> and <name|Vue> require <name|MuPDF>
+    (<verbatim|--with-mupdf=<em|dir>>, <source-link|mupdf.m4|misc/m4/mupdf.m4>);
+    <name|Qt> uses it when it is found, <name|X11> and <name|Cocoa> refuse
+    it. <verbatim|--enable-qtpipes> (on by default with <name|Qt> and
+    <name|Qtwk>, refused with the other ports) replaces <name|Unix> pipes by
+    <name|Qt> pipes. The <name|Qt> installation is found through
+    <verbatim|qmake> (variables <verbatim|QMAKE>, <verbatim|QT_PATH>,
+    <verbatim|MOC>, ...). On <name|macOS>, the <name|Objective-C> code of
+    <source-link|src/Plugins/MacOS|src/Plugins/MacOS> is added unless
+    <verbatim|--disable-macosx-extensions> is given.
+
+    <item*|Libraries><verbatim|--with-freetype>, <verbatim|--with-iconv>,
+    <verbatim|--with-gnutls>, <verbatim|--with-aspell>,
+    <verbatim|--with-cairo>, <verbatim|--with-imlib2>,
+    <verbatim|--with-resvg>, <verbatim|--with-sparkle> (automatic updates
+    on <name|macOS> and <name|Windows>, with <verbatim|--with-appcast>),
+    <verbatim|--with-axel>, <verbatim|--disable-gs>,
+    <verbatim|--disable-pdf-renderer>, and the <name|SQLite> check of
+    <source-link|sql.m4|misc/m4/sql.m4>.
+
+    <item*|Debugging and optimization>(<source-link|tm_debug.m4|misc/m4/tm_debug.m4>,
+    <source-link|tm_optimize.m4|misc/m4/tm_optimize.m4>) <verbatim|--enable-debug>,
+    <verbatim|--enable-assert>, <verbatim|--enable-warnings>,
+    <verbatim|--enable-checks>, <verbatim|--enable-profile>,
+    <verbatim|--enable-sanitizers>, <verbatim|--enable-optimize>,
+    <verbatim|--disable-fastalloc> (use the system allocator instead of
+    the fast allocator for small objects, useful with memory checkers) and
+    <verbatim|--enable-experimental> (the style rewriting code in
+    <source-link|src/Style/|src/Style>).
+
+    <item*|Developer kit><verbatim|--with-tmrepo=<em|dir>> (<source-link|tm_repo.m4|misc/m4/tm_repo.m4>)
+    uses a <TeXmacs> <abbr|SDK> directory: its <verbatim|bin>,
+    <verbatim|include>, <verbatim|lib> and <verbatim|pkgconfig>
+    directories are put first in the search paths. It is also required for
+    some packaging targets (see <hlink|packages|build-packaging.en.tm>).
+  </description>
+
+  The platform macro (<source-link|tm_platform.m4|misc/m4/tm_platform.m4>) chooses the operating
+  system layer, the static or dynamic link mode (<source-link|tm_static.m4|misc/m4/tm_static.m4>)
+  and the default packaging targets.
+
+  <section|Generated files>
+
+  <verbatim|configure> writes
+  <verbatim|src/System/config.h> (from <source-link|src/System/config.in|src/System/config.in>, as
+  declared by <verbatim|AC_CONFIG_HEADERS>) and the files listed in
+  <verbatim|AC_CONFIG_FILES>, among which:
+
+  <\itemize>
+    <item><verbatim|Makefile>, <verbatim|src/makefile> and
+    <verbatim|misc/admin/admin.makefile>;
+
+    <item><verbatim|src/System/tm_configure.hpp> (from
+    <source-link|tm_configure.in|src/System/tm_configure.in>), with the version and the build
+    description;
+
+    <item>the scripts <verbatim|misc/scripts/texmacs> and
+    <verbatim|misc/scripts/fig2ps>, the manual page
+    <verbatim|misc/man/texmacs.1> and the <name|Doxygen> configuration;
+
+    <item>the package descriptions: <verbatim|packages/redhat/TeXmacs.spec>,
+    the <name|Debian> control files, the <name|macOS>
+    <verbatim|Info.plist> and <name|Xcode> configuration, the
+    <name|Windows> resource file and <name|Inno Setup> script, the
+    <name|MSIX> manifests and the <name|Android> manifest;
+
+    <item>the makefile of the example dynamic link plug-in
+    <source-link|TeXmacs/examples/plugins/dynlink/|TeXmacs/examples/plugins/dynlink>.
+  </itemize>
+
+  None of these generated files is under version control; only their
+  templates (<verbatim|*.in>) are.
+
+  <section|Makefile targets>
+
+  The top level <verbatim|Makefile> (from <source-link|Makefile.in|Makefile.in>) has the
+  following main targets:
+
+  <\description>
+    <item*|<verbatim|TEXMACS>>(the default) Builds the embedded
+    <name|Guile> if needed and then the binary through
+    <verbatim|src/makefile>.
+
+    <item*|<verbatim|STATIC_TEXMACS>>A statically linked binary.
+
+    <item*|<verbatim|deps>>Regenerates the dependency files.
+
+    <item*|<verbatim|GLUE>>Regenerates the <scheme> glue
+    (<verbatim|src/Scheme/Glue/glue_*.cpp>), see <hlink|the <scheme>
+    glue|scheme-bridge-glue.en.tm>. In <verbatim|src/makefile>, a glue
+    file also depends on its <verbatim|build-glue-*.scm> declaration file,
+    so the glue is regenerated automatically when the dependency files are
+    up to date.
+
+    <item*|<verbatim|PLUGINS>, <verbatim|EX_PLUGINS>>The binaries of the
+    plug-ins in <source-link|plugins/|plugins> and of the example plug-ins.
+
+    <item*|<verbatim|install>, <verbatim|uninstall>>Installation into the
+    prefix: executables, data, plug-ins, icons, desktop files, include
+    files and manual pages.
+
+    <item*|<verbatim|PACKAGE>, <verbatim|BUNDLE>>The default package and
+    application bundle of the platform; see <hlink|packages for the various
+    platforms|build-packaging.en.tm>.
+
+    <item*|<verbatim|clean>, <verbatim|distclean>>Remove the objects; <verbatim|distclean> also removes the embedded
+    <name|Guile> build, the makefiles, the configuration headers, the
+    scripts and the manual page (but not the generated package
+    descriptions in <source-link|packages/|packages>).
+  </description>
+
+  <section|Pitfalls>
+
+  <\itemize>
+    <item>The two build systems do not accept the same <name|Guile>
+    versions: the autotools build refuses <name|Guile> 2 and later without
+    <verbatim|--enable-guile2>, whereas <name|CMake> with
+    <verbatim|SCHEME_IMPL=system> accepts <name|Guile> 3.0 silently.
+
+    <item>An autotools build leaves <verbatim|src/System/config.h> and
+    <verbatim|tm_configure.hpp> in the source tree, where they can shadow
+    the headers of a later <name|CMake> build (see <hlink|building with
+    <name|CMake>|build-cmake.en.tm>).
+
+    <item>The configuration is cached in <verbatim|config.status>; after
+    switching branches with different <source-link|configure.in|configure.in> files, run
+    <verbatim|autoreconf -fi> and <verbatim|./configure> again rather than
+    relying on <verbatim|config.status --recheck>.
+  </itemize>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
+</body>
+
+<initial|<\collection>
+</collection>>

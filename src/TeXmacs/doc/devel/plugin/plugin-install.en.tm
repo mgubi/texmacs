@@ -1,6 +1,6 @@
-<TeXmacs|1.99.20>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Installing and using a plug-in>
@@ -23,16 +23,24 @@
   This will create a <verbatim|<em|myplugin>> subdirectory in
   <verbatim|$TEXMACS_PATH/plugins>. As soon as you restart <TeXmacs>, the
   plug-in should be automatically recognized. If not, then click on
-  <menu|Tools|Update|Plugins> and relaunch <TeXmacs>. Please read the
-  documentation which comes with your plug-in in order to learn using it.
+  <menu|Tools|Update|Plugins> (or <menu|Insert|Session|Redetect>) and
+  relaunch <TeXmacs>: the results of the detection of plug-ins are cached,
+  and these menu entries force a new detection. Please read the
+  documentation which comes with your plug-in in order to learn using it;
+  if the plug-in provides documentation, then it is available in the
+  <menu|Help|Plug-ins> menu.
 
   <\remark>
     If you did not install <TeXmacs> yourself, or if you do not have write
     access to <verbatim|$TEXMACS_PATH>, then you may also unpack the tarball
     in <verbatim|$TEXMACS_HOME_PATH/plugins>. Here we recall that
-    <verbatim|$TEXMACS_HOME_PATH> defaults to <verbatim|$HOME/.TeXmacs>. When
+    <verbatim|$TEXMACS_HOME_PATH> defaults to <verbatim|$HOME/.TeXmacs>
+    (and to <verbatim|%APPDATA%\\TeXmacs> under <name|Windows>). When
     starting <TeXmacs>, your plug-in should again be automatically
-    recognized.
+    recognized. If a plug-in with the same name is installed both in
+    <verbatim|$TEXMACS_HOME_PATH/plugins> and in
+    <verbatim|$TEXMACS_PATH/plugins>, then the initialization file of the
+    version in <verbatim|$TEXMACS_HOME_PATH> is used.
   </remark>
 
   <\remark>
@@ -65,6 +73,8 @@
   </remark>
 
   <tmdoc-copyright|1998\U2021|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

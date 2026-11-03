@@ -10,8 +10,10 @@
     extern typesetting macro>
   <|explain>
     This primitive allows the user to implement macros in <scheme>. The
-    primitive applies the <scheme> function or macro <src-arg|scheme-foo> to
-    the arguments <src-arg|arg-1> until <src-arg|arg-n>. For instance, the
+    primitive applies the <scheme> function or macro <src-arg|scheme-foo> (a
+    string, which is evaluated) to the arguments <src-arg|arg-1> until
+    <src-arg|arg-n>. The result of the <scheme> function is converted back
+    into a <TeXmacs> tree, which is evaluated and typeset. For instance, the
     code <inactive*|<extern|(lambda (name) `(concat "hi " ,name))|dude>>
     yields ``<extern|(lambda (name) `(concat "hi " ,name))|dude>''.
 
@@ -38,6 +40,41 @@
     <verbatim|:secure> option. Alternatively, the user may define all
     <scheme> routines to be secure in <menu|Edit|Preferences|Security|Accept
     all scripts>.
+  </explain>
+
+  <\explain>
+    <explain-macro|use-package|package-1|<math|\<cdots\>>|package-n><explain-synopsis|load
+    style packages>
+  <|explain>
+    Load the style packages <src-arg|package-1> until <src-arg|package-n>
+    and execute their definitions in the current environment. The package
+    names are literal strings; they are looked up (with the suffix
+    <verbatim|.ts>) in the style path and in the directory of the current
+    document. This primitive is mainly used in style files, in order to
+    build upon other packages.
+  </explain>
+
+  <\explain>
+    <explain-macro|use-module|module-1|<math|\<cdots\>>|module-n><explain-synopsis|load
+    <scheme> modules>
+  <|explain>
+    Load <scheme> modules on which a style file depends. Each argument is
+    evaluated and is either a module name like <verbatim|(dynamic
+    fold-edit)>, which is loaded with <scm|use-modules>, or the name of a
+    plug-in, which is initialized. The loaded modules are recorded in the
+    <src-var|the-modules> environment variable.
+  </explain>
+
+  <\explain>
+    <explain-macro|with-package|package|body><explain-synopsis|local
+    package>
+  <|explain>
+    Typeset <src-arg|body> in an environment in which the definitions of
+    the style <src-arg|package> have been loaded. Contrary to
+    <markup|use-package>, the definitions are local to <src-arg|body>: the
+    tag is rewritten into a <markup|with> which sets all variables assigned
+    at the top level of the package (only plain <markup|assign> statements
+    are taken into account).
   </explain>
 
   <\explain>

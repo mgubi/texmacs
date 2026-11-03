@@ -14,12 +14,16 @@
 #include "typesetter.hpp"
 #include "tree_select.hpp"
 #ifdef AQUATEXMACS
-#  include "Cocoa/aqua_simple_widget.h"
+#  include "NS/ns_simple_widget.h"
 #else
-#  ifdef QTTEXMACS
+#  if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 #    include "Qt/qt_simple_widget.hpp"
 #  else
-#    include "Widkit/simple_wk_widget.hpp"
+#    if defined(VUETEXMACS)
+#      include "Vue/vue_widget.hpp"
+#    else
+#      include "Widkit/simple_wk_widget.hpp"
+#    endif
 #  endif
 #endif
 #include "server.hpp"
@@ -205,6 +209,7 @@ public:
                           array<double> d) = 0;
   virtual bool mouse_message (string message, SI x, SI y) = 0;
   virtual color mouse_clickable_color () = 0;
+  virtual path xy_to_path (SI x, SI y) = 0;
   virtual void mouse_click (SI x, SI y) = 0;
   virtual bool mouse_extra_click (SI x, SI y) = 0;
   virtual void mouse_drag (SI x, SI y) = 0;
@@ -324,6 +329,10 @@ public:
   virtual tree     exec_verbatim (tree t) = 0;
   virtual tree     exec_html (tree t, path p) = 0;
   virtual tree     exec_html (tree t) = 0;
+  virtual tree     exec_markdown (tree t, path p) = 0;
+  virtual tree     exec_markdown (tree t) = 0;
+  virtual tree     exec_office (tree t, path p) = 0;
+  virtual tree     exec_office (tree t) = 0;
   virtual tree     exec_latex (tree t, path p) = 0;
   virtual tree     exec_latex (tree t) = 0;
   virtual tree     texmacs_exec (tree t) = 0;
@@ -639,6 +648,8 @@ public:
   virtual path the_buffer_path () = 0;
   virtual void show_tree () = 0;
   virtual void show_box () = 0;
+  virtual box  get_box_root () = 0;
+  virtual path get_box_path_at (bool at_mouse) = 0;
   virtual void show_env () = 0;
   virtual void show_path () = 0;
   virtual void show_cursor () = 0;

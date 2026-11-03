@@ -8,6 +8,8 @@
   <\traverse>
     <branch|Short description|r-abstract.en.tm>
 
+    <branch|<name|R> in a web browser|r-browser.en.tm>
+
     <branch|Example session|r-demo.en.tm>
   </traverse>
 

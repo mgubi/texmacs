@@ -12,7 +12,7 @@
   macros. For instance:
 
   <\tm-fragment>
-    <inactive*|<assign|new-theorem|<macro|name|text|<quasi|<assign|<unquote|name>|<macro|body|<surround|<no-indent><strong|<unquote|<arg|text>>.
+    <inactive*|<assign|new-theorem|<macro|name|text|<quasi|<assign|<unquote|<arg|name>>|<macro|body|<surround|<no-indent><strong|<unquote|<arg|text>>.
     >|<right-flush>|<arg|body>>>>>>>>
   </tm-fragment>
 
@@ -29,7 +29,7 @@
   <markup|theorem>.
 
   It should be noticed that the <TeXmacs> conventions for evaluation are
-  slightly different then those from conventional functional languages like
+  slightly different than those from conventional functional languages like
   <name|Scheme>. The subtle differences are motivated by our objective to
   make it as easy as possible for the user to write macros for typesetting
   purposes.

@@ -224,6 +224,15 @@ tmg_qt_guiP () {
 }
 
 tmscm
+tmg_vue_guiP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gui_is_vue ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_gui_set_next_window_as_popup () {
   // TMSCM_DEFER_INTS;
   gui_set_next_window_as_popup ();
@@ -239,6 +248,194 @@ tmg_gui_set_next_window_without_focus () {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_snapshot (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-snapshot");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_snapshot (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_buttons () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_buttons ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_click (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-click");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_click (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_menu (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-menu");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_menu (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_menu_entries (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-menu-entries");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_menu_entries (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_type (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-type");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_type (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_click_later (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "gui-test-click-later");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "gui-test-click-later");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "gui-test-click-later");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_click_later (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_port () {
+  // TMSCM_DEFER_INTS;
+  string out= gui_test_port ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_raw (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-raw");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_raw (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_busyP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_busy ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_texts () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_texts ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_windows () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_windows ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_set_pump (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "gui-test-set-pump");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_pump (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_eval_later (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-eval-later");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_eval_later (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_file_dialog () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_file_dialog ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_file_dialog_do (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-file-dialog-do");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_file_dialog_do (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -467,6 +664,15 @@ tmg_supports_ghostscriptP () {
 }
 
 tmscm
+tmg_gs_executable () {
+  // TMSCM_DEFER_INTS;
+  string out= get_gs_executable ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_rescue_modeP () {
   // TMSCM_DEFER_INTS;
   bool out= in_rescue_mode ();
@@ -500,6 +706,24 @@ tmg_get_texmacs_home_path () {
   // TMSCM_ALLOW_INTS;
 
   return url_to_tmscm (out);
+}
+
+tmscm
+tmg_get_user_login () {
+  // TMSCM_DEFER_INTS;
+  string out= get_user_login ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_get_user_name () {
+  // TMSCM_DEFER_INTS;
+  string out= get_user_name ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
 }
 
 tmscm
@@ -617,6 +841,36 @@ tmg_async_eval_system (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_async_evaluate_system (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "async-evaluate-system");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "async-evaluate-system");
+  TMSCM_ASSERT_OBJECT (arg3, TMSCM_ARG3, "async-evaluate-system");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  string in2= tmscm_to_string (arg2);
+  object in3= tmscm_to_object (arg3);
+
+  // TMSCM_DEFER_INTS;
+  int out= async_evaluate_system (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_async_evaluate_cancel (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "async-evaluate-cancel");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  async_evaluate_cancel (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_async_eval_system_full (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "async-eval-system-full");
   TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "async-eval-system-full");
@@ -638,6 +892,77 @@ tmg_async_eval_pending () {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_pdf_2svg_native (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf->svg-native");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf->svg-native");
+
+  url in1= tmscm_to_url (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= native_pdf_to_svg (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_archiveP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-archive?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= zip_is_archive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_unpack (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-unpack");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= zip_unpack (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_pack (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "zip-pack");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "zip-pack");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= zip_write (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_http_get (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-get");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-get");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= http_get (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
 }
 
 tmscm
@@ -1510,6 +1835,106 @@ tmg_new_fontsP () {
 }
 
 tmscm
+tmg_set_hand_tuned_math_fonts (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "set-hand-tuned-math-fonts");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  set_hand_tuned_math_fonts (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_math_font_profile_set (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-font-profile-set");
+  TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "math-font-profile-set");
+
+  string in1= tmscm_to_string (arg1);
+  scheme_tree in2= tmscm_to_scheme_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  math_font_profile_set (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_math_font_profile (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-font-profile");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= math_font_profile (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_math_font_profile_families () {
+  // TMSCM_DEFER_INTS;
+  array_string out= math_font_profile_families ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_math_font_profile_attr (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-font-profile-attr");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "math-font-profile-attr");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= math_font_profile_attr (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_math_family_for_text (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-family-for-text");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= math_family_for_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_text_family_for_math (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "text-family-for-math");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= text_family_for_math (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_hand_tuned_math_fontsP () {
+  // TMSCM_DEFER_INTS;
+  bool out= get_hand_tuned_math_fonts ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_tmtm_eqnumber_2nonumber (tmscm arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tmtm-eqnumber->nonumber");
 
@@ -1790,6 +2215,38 @@ tmg_font_database_search (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   array_string out= font_database_search (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_available_features (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-available-features");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= ot_font_features (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_logical_search (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-logical-search");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-logical-search");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "font-logical-search");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "font-logical-search");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_search (in1, in2, in3, in4);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
@@ -5645,6 +6102,71 @@ tmg_cork_2utf8 (tmscm arg1) {
 }
 
 tmscm
+tmg_emoji_name (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "emoji-name");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= emoji_name (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_emoji_names (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "emoji-names");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= emoji_all_names (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_emoji_latex_name (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "emoji-latex-name");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= emoji_latex_name (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_emoji_from_latex (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "emoji-from-latex");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= emoji_from_latex (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_emoji_to_code_points (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "emoji-to-code-points");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= emoji_to_code_points (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_utf8_2t2a (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->t2a");
 
@@ -6046,6 +6568,21 @@ tmg_string_previous (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   int out= tm_char_previous (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_string_grapheme_start (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-grapheme-start");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-grapheme-start");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= tm_grapheme_start (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
@@ -6563,6 +7100,45 @@ tmg_cpp_verbatim_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_source_2texmacs (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-source->texmacs");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= source_document_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_source_snippet_2texmacs (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-source-snippet->texmacs");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= source_snippet_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_source_2cork (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "source->cork");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= source_text_to_cork (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
 }
 
 tmscm
@@ -7304,6 +7880,19 @@ tmg_cpp_ai_latex_output (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_cpp_ai_set_prices (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-set-prices");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  ai_set_prices (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_cpp_ai_chat (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat");
@@ -7377,6 +7966,32 @@ tmg_tree_2json (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   string out= tree_to_json (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_json_2typed_tree (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "json->typed-tree");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= json_to_typed_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_typed_tree_2json (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "typed-tree->json");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= typed_tree_to_json (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -9334,6 +9949,206 @@ tmg_connection_stop (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_code_set_line_layers (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-set-line-layers");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-set-line-layers");
+  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "code-set-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+  tree in2= tmscm_to_tree (arg2);
+  tree in3= tmscm_to_tree (arg3);
+
+  // TMSCM_DEFER_INTS;
+  code_set_line_layers (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_clear_line_layers (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-clear-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  code_clear_line_layers (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_line_layers (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-layers");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_line_layers_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_new (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-snapshot-new");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_snapshot_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_delete (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-delete");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  code_snapshot_delete (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_snapshot_change (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-change");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-snapshot-change");
+
+  int in1= tmscm_to_int (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= code_snapshot_change (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_changedP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-changed?");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "code-snapshot-changed?");
+
+  int in1= tmscm_to_int (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= code_snapshot_changed (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_code_snapshot_text (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "code-snapshot-text");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= code_snapshot_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_code_line_fold_state (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-line-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_line_fold_state (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_set_line_fold_state (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "code-set-line-fold-state");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-set-line-fold-state");
+
+  tree in1= tmscm_to_tree (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  code_set_line_fold_state (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_code_column (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-column");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-column");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "code-column");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  int in3= tmscm_to_int (arg3);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_column (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_utf16_column (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-utf16-column");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-utf16-column");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_utf16_column (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_utf16_offset (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-utf16-offset");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "code-utf16-offset");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_utf16_offset (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_code_indent_end (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "code-indent-end");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= code_indent_end (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_widget_printer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-printer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "widget-printer");
@@ -10587,6 +11402,19 @@ tmg_buffer_auxP (tmscm arg1) {
 }
 
 tmscm
+tmg_buffer_forget_history (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-forget-history");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  buffer_forget_history (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_buffer_embeddedP (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-embedded?");
 
@@ -11298,6 +12126,58 @@ tmg_alt_window_hide (tmscm arg1) {
 }
 
 tmscm
+tmg_alt_window_set_on_top (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-set-on-top");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "alt-window-set-on-top");
+
+  int in1= tmscm_to_int (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  window_set_on_top (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_debug_info (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "font-debug-info");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_info (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_info_of (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-debug-info-of");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "font-debug-info-of");
+
+  url in1= tmscm_to_url (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_info_of (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_report () {
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_report ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_alt_window_get_size (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-get-size");
 
@@ -11702,8 +12582,25 @@ initialize_glue_basic () {
   tmscm_install_procedure ("has-printing-cmd?",  tmg_has_printing_cmdP, 0, 0, 0);
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
+  tmscm_install_procedure ("vue-gui?",  tmg_vue_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-without-focus",  tmg_gui_set_next_window_without_focus, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-snapshot",  tmg_gui_test_snapshot, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-buttons",  tmg_gui_test_buttons, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-click",  tmg_gui_test_click, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-menu",  tmg_gui_test_menu, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-menu-entries",  tmg_gui_test_menu_entries, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-type",  tmg_gui_test_type, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-click-later",  tmg_gui_test_click_later, 3, 0, 0);
+  tmscm_install_procedure ("gui-test-port",  tmg_gui_test_port, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-raw",  tmg_gui_test_raw, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-busy?",  tmg_gui_test_busyP, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-texts",  tmg_gui_test_texts, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-windows",  tmg_gui_test_windows, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-set-pump",  tmg_gui_test_set_pump, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-eval-later",  tmg_gui_test_eval_later, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-file-dialog",  tmg_gui_test_file_dialog, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-file-dialog-do",  tmg_gui_test_file_dialog_do, 1, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
@@ -11725,10 +12622,13 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-error",  tmg_cpp_error, 0, 0, 0);
   tmscm_install_procedure ("supports-native-pdf?",  tmg_supports_native_pdfP, 0, 0, 0);
   tmscm_install_procedure ("supports-ghostscript?",  tmg_supports_ghostscriptP, 0, 0, 0);
+  tmscm_install_procedure ("gs-executable",  tmg_gs_executable, 0, 0, 0);
   tmscm_install_procedure ("rescue-mode?",  tmg_rescue_modeP, 0, 0, 0);
   tmscm_install_procedure ("scheme-dialect",  tmg_scheme_dialect, 0, 0, 0);
   tmscm_install_procedure ("get-texmacs-path",  tmg_get_texmacs_path, 0, 0, 0);
   tmscm_install_procedure ("get-texmacs-home-path",  tmg_get_texmacs_home_path, 0, 0, 0);
+  tmscm_install_procedure ("get-user-login",  tmg_get_user_login, 0, 0, 0);
+  tmscm_install_procedure ("get-user-name",  tmg_get_user_name, 0, 0, 0);
   tmscm_install_procedure ("plugin-list",  tmg_plugin_list, 0, 0, 0);
   tmscm_install_procedure ("set-fast-environments",  tmg_set_fast_environments, 1, 0, 0);
   tmscm_install_procedure ("font-exists-in-tt?",  tmg_font_exists_in_ttP, 1, 0, 0);
@@ -11737,8 +12637,15 @@ initialize_glue_basic () {
   tmscm_install_procedure ("var-eval-system",  tmg_var_eval_system, 1, 0, 0);
   tmscm_install_procedure ("evaluate-system",  tmg_evaluate_system, 4, 0, 0);
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
+  tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
+  tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
   tmscm_install_procedure ("async-eval-system-full",  tmg_async_eval_system_full, 2, 0, 0);
   tmscm_install_procedure ("async-eval-pending",  tmg_async_eval_pending, 0, 0, 0);
+  tmscm_install_procedure ("pdf->svg-native",  tmg_pdf_2svg_native, 2, 0, 0);
+  tmscm_install_procedure ("zip-archive?",  tmg_zip_archiveP, 1, 0, 0);
+  tmscm_install_procedure ("zip-unpack",  tmg_zip_unpack, 1, 0, 0);
+  tmscm_install_procedure ("zip-pack",  tmg_zip_pack, 2, 0, 0);
+  tmscm_install_procedure ("http-get",  tmg_http_get, 2, 0, 0);
   tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
   tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);
   tmscm_install_procedure ("async-http-post",  tmg_async_http_post, 4, 0, 0);
@@ -11808,6 +12715,14 @@ initialize_glue_basic () {
   tmscm_install_procedure ("glyph-recognize",  tmg_glyph_recognize, 1, 0, 0);
   tmscm_install_procedure ("set-new-fonts",  tmg_set_new_fonts, 1, 0, 0);
   tmscm_install_procedure ("new-fonts?",  tmg_new_fontsP, 0, 0, 0);
+  tmscm_install_procedure ("set-hand-tuned-math-fonts",  tmg_set_hand_tuned_math_fonts, 1, 0, 0);
+  tmscm_install_procedure ("math-font-profile-set",  tmg_math_font_profile_set, 2, 0, 0);
+  tmscm_install_procedure ("math-font-profile",  tmg_math_font_profile, 1, 0, 0);
+  tmscm_install_procedure ("math-font-profile-families",  tmg_math_font_profile_families, 0, 0, 0);
+  tmscm_install_procedure ("math-font-profile-attr",  tmg_math_font_profile_attr, 2, 0, 0);
+  tmscm_install_procedure ("math-family-for-text",  tmg_math_family_for_text, 1, 0, 0);
+  tmscm_install_procedure ("text-family-for-math",  tmg_text_family_for_math, 1, 0, 0);
+  tmscm_install_procedure ("hand-tuned-math-fonts?",  tmg_hand_tuned_math_fontsP, 0, 0, 0);
   tmscm_install_procedure ("tmtm-eqnumber->nonumber",  tmg_tmtm_eqnumber_2nonumber, 1, 0, 0);
   tmscm_install_procedure ("busy-versioning?",  tmg_busy_versioningP, 0, 0, 0);
   tmscm_install_procedure ("players-set-elapsed",  tmg_players_set_elapsed, 2, 0, 0);
@@ -11832,6 +12747,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("font-database-delta-families",  tmg_font_database_delta_families, 0, 0, 0);
   tmscm_install_procedure ("font-database-styles",  tmg_font_database_styles, 1, 0, 0);
   tmscm_install_procedure ("font-database-search",  tmg_font_database_search, 2, 0, 0);
+  tmscm_install_procedure ("font-available-features",  tmg_font_available_features, 1, 0, 0);
+  tmscm_install_procedure ("font-logical-search",  tmg_font_logical_search, 4, 0, 0);
   tmscm_install_procedure ("font-database-characteristics",  tmg_font_database_characteristics, 2, 0, 0);
   tmscm_install_procedure ("font-database-substitutions",  tmg_font_database_substitutions, 1, 0, 0);
   tmscm_install_procedure ("font-family->master",  tmg_font_family_2master, 1, 0, 0);
@@ -12101,6 +13018,11 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cork->sourcecode",  tmg_cork_2sourcecode, 1, 0, 0);
   tmscm_install_procedure ("utf8->cork",  tmg_utf8_2cork, 1, 0, 0);
   tmscm_install_procedure ("cork->utf8",  tmg_cork_2utf8, 1, 0, 0);
+  tmscm_install_procedure ("emoji-name",  tmg_emoji_name, 1, 0, 0);
+  tmscm_install_procedure ("emoji-names",  tmg_emoji_names, 1, 0, 0);
+  tmscm_install_procedure ("emoji-latex-name",  tmg_emoji_latex_name, 1, 0, 0);
+  tmscm_install_procedure ("emoji-from-latex",  tmg_emoji_from_latex, 1, 0, 0);
+  tmscm_install_procedure ("emoji-to-code-points",  tmg_emoji_to_code_points, 1, 0, 0);
   tmscm_install_procedure ("utf8->t2a",  tmg_utf8_2t2a, 1, 0, 0);
   tmscm_install_procedure ("t2a->utf8",  tmg_t2a_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->html",  tmg_utf8_2html, 1, 0, 0);
@@ -12130,6 +13052,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("list->tmstring",  tmg_list_2tmstring, 1, 0, 0);
   tmscm_install_procedure ("string-next",  tmg_string_next, 2, 0, 0);
   tmscm_install_procedure ("string-previous",  tmg_string_previous, 2, 0, 0);
+  tmscm_install_procedure ("string-grapheme-start",  tmg_string_grapheme_start, 2, 0, 0);
   tmscm_install_procedure ("tmstring-split",  tmg_tmstring_split, 1, 0, 0);
   tmscm_install_procedure ("tmstring-translit",  tmg_tmstring_translit, 1, 0, 0);
   tmscm_install_procedure ("tmstring-locase-first",  tmg_tmstring_locase_first, 1, 0, 0);
@@ -12166,6 +13089,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-texmacs->verbatim",  tmg_cpp_texmacs_2verbatim, 3, 0, 0);
   tmscm_install_procedure ("cpp-verbatim-snippet->texmacs",  tmg_cpp_verbatim_snippet_2texmacs, 3, 0, 0);
   tmscm_install_procedure ("cpp-verbatim->texmacs",  tmg_cpp_verbatim_2texmacs, 3, 0, 0);
+  tmscm_install_procedure ("cpp-source->texmacs",  tmg_cpp_source_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("cpp-source-snippet->texmacs",  tmg_cpp_source_snippet_2texmacs, 1, 0, 0);
+  tmscm_install_procedure ("source->cork",  tmg_source_2cork, 1, 0, 0);
   tmscm_install_procedure ("parse-latex",  tmg_parse_latex, 1, 0, 0);
   tmscm_install_procedure ("parse-latex-document",  tmg_parse_latex_document, 1, 0, 0);
   tmscm_install_procedure ("latex->texmacs",  tmg_latex_2texmacs, 1, 0, 0);
@@ -12218,11 +13144,14 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-ai-latex-command",  tmg_cpp_ai_latex_command, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-latex-request",  tmg_cpp_ai_latex_request, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-latex-output",  tmg_cpp_ai_latex_output, 3, 0, 0);
+  tmscm_install_procedure ("cpp-ai-set-prices",  tmg_cpp_ai_set_prices, 1, 0, 0);
   tmscm_install_procedure ("cpp-ai-chat",  tmg_cpp_ai_chat, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-correct",  tmg_cpp_ai_correct, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
   tmscm_install_procedure ("json->tree",  tmg_json_2tree, 1, 0, 0);
   tmscm_install_procedure ("tree->json",  tmg_tree_2json, 1, 0, 0);
+  tmscm_install_procedure ("json->typed-tree",  tmg_json_2typed_tree, 1, 0, 0);
+  tmscm_install_procedure ("typed-tree->json",  tmg_typed_tree_2json, 1, 0, 0);
   tmscm_install_procedure ("lantool-correct",  tmg_lantool_correct, 2, 0, 0);
   tmscm_install_procedure ("url->url",  tmg_url_2url, 1, 0, 0);
   tmscm_install_procedure ("root->url",  tmg_root_2url, 1, 0, 0);
@@ -12366,6 +13295,20 @@ initialize_glue_basic () {
   tmscm_install_procedure ("connection-eval",  tmg_connection_eval, 3, 0, 0);
   tmscm_install_procedure ("connection-interrupt",  tmg_connection_interrupt, 2, 0, 0);
   tmscm_install_procedure ("connection-stop",  tmg_connection_stop, 2, 0, 0);
+  tmscm_install_procedure ("code-set-line-layers",  tmg_code_set_line_layers, 3, 0, 0);
+  tmscm_install_procedure ("code-clear-line-layers",  tmg_code_clear_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-line-layers",  tmg_code_line_layers, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-new",  tmg_code_snapshot_new, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-delete",  tmg_code_snapshot_delete, 1, 0, 0);
+  tmscm_install_procedure ("code-snapshot-change",  tmg_code_snapshot_change, 2, 0, 0);
+  tmscm_install_procedure ("code-snapshot-changed?",  tmg_code_snapshot_changedP, 2, 0, 0);
+  tmscm_install_procedure ("code-snapshot-text",  tmg_code_snapshot_text, 1, 0, 0);
+  tmscm_install_procedure ("code-line-fold-state",  tmg_code_line_fold_state, 1, 0, 0);
+  tmscm_install_procedure ("code-set-line-fold-state",  tmg_code_set_line_fold_state, 2, 0, 0);
+  tmscm_install_procedure ("code-column",  tmg_code_column, 3, 0, 0);
+  tmscm_install_procedure ("code-utf16-column",  tmg_code_utf16_column, 2, 0, 0);
+  tmscm_install_procedure ("code-utf16-offset",  tmg_code_utf16_offset, 2, 0, 0);
+  tmscm_install_procedure ("code-indent-end",  tmg_code_indent_end, 1, 0, 0);
   tmscm_install_procedure ("widget-printer",  tmg_widget_printer, 2, 0, 0);
   tmscm_install_procedure ("widget-color-picker",  tmg_widget_color_picker, 3, 0, 0);
   tmscm_install_procedure ("widget-extend",  tmg_widget_extend, 2, 0, 0);
@@ -12451,6 +13394,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-attach-notifier",  tmg_buffer_attach_notifier, 1, 0, 0);
   tmscm_install_procedure ("buffer-has-name?",  tmg_buffer_has_nameP, 1, 0, 0);
   tmscm_install_procedure ("buffer-aux?",  tmg_buffer_auxP, 1, 0, 0);
+  tmscm_install_procedure ("buffer-forget-history",  tmg_buffer_forget_history, 1, 0, 0);
   tmscm_install_procedure ("buffer-embedded?",  tmg_buffer_embeddedP, 1, 0, 0);
   tmscm_install_procedure ("buffer-import",  tmg_buffer_import, 3, 0, 0);
   tmscm_install_procedure ("buffer-load",  tmg_buffer_load, 1, 0, 0);
@@ -12506,6 +13450,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("alt-window-delete",  tmg_alt_window_delete, 1, 0, 0);
   tmscm_install_procedure ("alt-window-show",  tmg_alt_window_show, 1, 0, 0);
   tmscm_install_procedure ("alt-window-hide",  tmg_alt_window_hide, 1, 0, 0);
+  tmscm_install_procedure ("alt-window-set-on-top",  tmg_alt_window_set_on_top, 2, 0, 0);
+  tmscm_install_procedure ("font-debug-info",  tmg_font_debug_info, 1, 0, 0);
+  tmscm_install_procedure ("font-debug-info-of",  tmg_font_debug_info_of, 2, 0, 0);
+  tmscm_install_procedure ("font-debug-report",  tmg_font_debug_report, 0, 0, 0);
   tmscm_install_procedure ("alt-window-get-size",  tmg_alt_window_get_size, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-size",  tmg_alt_window_set_size, 3, 0, 0);
   tmscm_install_procedure ("alt-window-get-position",  tmg_alt_window_get_position, 1, 0, 0);

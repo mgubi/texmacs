@@ -682,6 +682,13 @@
   (check= (parse-xml "<?pi?><a/>") '(*TOP* (*PI* pi "") (a)))
   (check= (parse-xml "<a x=\"&lt;&amp;&quot;\" y='a\"b'/>")
           '(*TOP* (a (@ (x "<&\"") (y "a\"b")))))
+  ;; the entities of XML are replaced once, in attributes and CDATA too
+  (check= (parse-xml "<a x=\"q=1&amp;lt=2&amp;amp;&amp;#65;\"/>")
+          '(*TOP* (a (@ (x "q=1&lt=2&amp;&#65;")))))
+  (check= (parse-xml "<a><![CDATA[a&amp;b]]></a>") '(*TOP* (a "a&amp;b")))
+  (check= (parse-xml (string-append "<!DOCTYPE a [<!ENTITY e \"E&#38;#66;\">"
+                                    "<!ENTITY f \"&e;F\">]><a x=\"&f;\">&f;</a>"))
+          '(*TOP* (*DOCTYPE* "a") (a (@ (x "EBF")) "EBF")))
   (check= (parse-xml "<a  b = 'single' c=\"d\" >  x  </a>")
           '(*TOP* (a (@ (b "single") (c "d")) "  x  ")))
   (check= (parse-xml "<n:a xmlns:n=\"urn:x\"><n:b n:c=\"d\"/></n:a>")
@@ -731,7 +738,10 @@
   (check= (tm->xml-cdata "x<foo>y") '(!concat "x" (tm-sym "foo") "y"))
   ;; <#3B1> is written as a symbol, since alpha comes back as <alpha>
   (check= (tm->xml-cdata "<#3B1>") '(tm-sym "#3B1"))
-  (check= (tm->xml-cdata "<#1F600>") (u8 #x1F600))
+  ;; and so is <#1F600>, which comes back by its name: the name is written
+  ;; as the character
+  (check= (tm->xml-cdata "<#1F600>") '(tm-sym "#1F600"))
+  (check= (tm->xml-cdata "<emoji-grinning-face>") (u8 #x1F600))
   (check= (xml-unspace "  a   b  " #t #t) "a b")
   (check= (xml-unspace "  a   b  " #f #f) " a b ")
   (check= (xml-unspace "  a \n\t b  " #t #f) "a b ")
@@ -745,14 +755,15 @@
   (check= (export '(with "my_var" "1" "y") "tmml-snippet")
           "<with my_95_var=\"1\">y</with>")
   (check= (export "<#3B1><#1F600><foo>" "tmml-snippet")
-          (string-append "<tm-sym>#3B1</tm-sym>" (u8 #x1F600) "<tm-sym>foo</tm-sym>"))
+          "<tm-sym>#3B1</tm-sym><tm-sym>#1F600</tm-sym><tm-sym>foo</tm-sym>")
+  (check= (export "<emoji-grinning-face>" "tmml-snippet") (u8 #x1F600))
   (check= (export (cork #x10 #x11 #x15 #x16 #x1c) "tmml-snippet")
           (u8 #x201C #x201D #x2013 #x2014 #xFB01))
-  (let ((doc (tmfile '(document (foo-bar "x") (my_tag "y") (a.b "z")
+  (let ((doc (tmfile `(document (foo-bar "x") (my_tag "y") (a.b "z")
                                 (equation* (document "w"))
                                 "<#3B1><#1F600><foo>\x10\x11\x15\x16\x1c"
                                 "a & b <less> c <gtr> d \"q\" 'r'"
-                                "a\x09b\x0d\x7f\xff"))))
+                                ,(string-append "a\x09" "b\x0d\x7f\xff")))))
     (check= (import (export doc "tmml-document") "tmml-document") doc)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -805,6 +816,34 @@
              identity)
             `(("<sterling>" ,(cork #xbf)) ("<guillemotleft>" ,(cork #x13))
               ("<guillemotright>" ,(cork #x14))))))
+
+;; The symbols of tmuniversaltounicode-extra: all give their code point
+;; and come back, since none takes a code point which another table reads
+;; back as something else; <mathhyphen> exports to the Cork hyphen, one way.
+(define (test-extra-symbols)
+  (check-group "extra symbols")
+  (let* ((t (read-table "tmuniversaltounicode-extra"))
+         (l (list-filter t (lambda (e) (and (list? e) (= (length e) 2)
+                                            (string? (car e))
+                                            (string-starts? (car e) "<")
+                                            (hex-code (cadr e)))))))
+    (check-true (>= (length l) 150))
+    (check= (list-filter
+             (map (lambda (e)
+                    (and (!= (cork->utf8 (car e)) (u8 (hex-code (cadr e)))) e))
+                  l)
+             identity)
+            '())
+    (check= (list-filter
+             (map (lambda (e)
+                    (and (!= (utf8->cork (u8 (hex-code (cadr e)))) (car e))
+                         (not (member (cadr e) '("#200B")))
+                         (list (car e) (utf8->cork (u8 (hex-code (cadr e)))))))
+                  l)
+             identity)
+            '()))
+  (check= (cork->utf8 "<mathhyphen>") (u8 #x2010))
+  (check= (utf8->cork (u8 #x2010)) (cork #x7f)))
 
 (define greek
   '(("alpha" #x3B1) ("beta" #x3B2) ("gamma" #x3B3) ("delta" #x3B4)
@@ -888,7 +927,8 @@
   (check= (utf8->cork (u8 #x416 #x44F #x430)) "<#416><#44F><#430>")
   (check= (cork->utf8 "<#416><#44F><#430>") (u8 #x416 #x44F #x430))
   (check= (utf8->cork (u8 #x10D3)) "<#10D3>")
-  (check= (utf8->cork (u8 #x1F600)) "<#1F600>")
+  ;; an emoji comes by its name, as alpha does (emoji-test.scm)
+  (check= (utf8->cork (u8 #x1F600)) "<emoji-grinning-face>")
   (check= (utf8->cork (u8 #x4E2D #x6587)) "<#4E2D><#6587>")
   (check= (cork->utf8 "<#3B1><#10D3><#1F600>") (u8 #x3B1 #x10D3 #x1F600))
   (check= (cork->utf8 "<#3b1>") (u8 #x3B1))
@@ -955,9 +995,11 @@
   (check= (string-convert (string-append (u8 #x3B1) (u8 #x416)) "UTF-8" "KOI8-R")
           (string-append "?" (cork #xf6)))
   (check= (string-convert "ab\xc3" "UTF-8" "ISO-8859-1") "ab?")
-  (check= (string-convert "a\xe9b\xe9" "ASCII" "UTF-8")
+  ;; (no hexadecimal digit after \xe9: S7 would read it in the escape)
+  (check= (string-convert (string-append "a\xe9" "b\xe9") "ASCII" "UTF-8")
           (string-append "a" (u8 #xFFFD) "b" (u8 #xFFFD)))
-  (check= (string-convert "a\xe9b" "ASCII" "Cork") "a<#FFFD>b")
+  (check= (string-convert (string-append "a\xe9" "b") "ASCII" "Cork")
+          "a<#FFFD>b")
   ;; the guess of the encoding of a text
   (check= (guess-wencoding "abc") "ASCII")
   (check= (guess-wencoding (string-append "caf" (u8 #xE9))) "UTF-8")
@@ -1176,7 +1218,8 @@
 
 ;; Each source code format is verbatim with the encoding SourceCode: one
 ;; paragraph per line, the symbols in UTF-8, the ASCII kept as it is (no
-;; quotes of TeX), and back.
+;; quotes of TeX), and back. A document is a source file, which keeps its
+;; tabs, line ends and encoding (see source-files-test.scm).
 (define (test-code-formats)
   (check-group "code formats")
   (for-each
@@ -1204,13 +1247,18 @@
                           (initial (collection
                                     (associate "language" "verbatim")
                                     (associate "font-family" "tt")
-                                    (associate "par-first" "0cm")))))
+                                    (associate "par-first" "0cm")
+                                    ;; (to save the file as it was)
+                                    (associate "source-encoding" "utf-8")
+                                    (associate "source-line-ends" "unix")
+                                    (associate "source-indent" "spaces")))))
        (with code '(document "def f(x):" "    return x <less> 1" "" "# \xe9")
          (check= (import (export code snip) snip) code))))
    code-formats)
-  ;; the markup is lost, the tabs are expanded
+  ;; the markup is lost; the tabs are kept, as the character <#9>
   (check= (export '(concat "x" (em "y")) "cpp-snippet") "xy")
-  (check= (import "a\tb" "python-snippet") "a       b")
+  (check= (import "a\tb" "python-snippet") "a<#9>b")
+  (check= (export "a<#9>b" "python-snippet") "a\tb")
   ;; a Cork byte 0x09 is a macron, not a tab
   (check= (export "a\tb" "python-snippet") (string-append "a" (u8 #xAF) "b"))
   ;; the verbatim export, unlike the source code, makes quotes of ``
@@ -1295,9 +1343,11 @@
              (concat (math "<nu><ni>x") ", " (math (concat "a" (no-number)))
                      (no-indent) "b "))
     (check= (st (cpp-ai-latex-output ai-answer-doc "chatgpt" "check")) r)
-    (check= (st (cpp-ai-latex-output (gemini-answer ai-answer-doc)
+    ;; (Upsilon adds the answer as it came, folded, after the answer of an
+    ;; engine which gives it in JSON)
+    (with g (st (cpp-ai-latex-output (gemini-answer ai-answer-doc)
                                      "gemini" "check"))
-            r)))
+      (check= (if (func? g 'document) (cadr g) g) r))))
 
 (define (test-json)
   (check-group "json")
@@ -2432,7 +2482,7 @@
                   test-html-mathjax-formulas
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
-                  test-tmml-special test-cork-table test-cork-symbols
+                  test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers

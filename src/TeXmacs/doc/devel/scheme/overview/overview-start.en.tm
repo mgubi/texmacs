@@ -22,12 +22,18 @@
   </verbatim>
 
   The file <verbatim|my-init-texmacs.scm> is loaded when booting <TeXmacs>
-  and <verbatim|my-init-buffer.scm> is booted each time you open a file.
+  and <verbatim|my-init-buffer.scm> is executed each time a view of a
+  document is created, after the system file
+  <verbatim|$TEXMACS_PATH/progs/init-buffer.scm>. Both files can be opened
+  with <menu|Developer|Open my-init-texmacs.scm> <abbr|resp.>
+  <menu|Developer|Open my-init-buffer.scm> (the <menu|Developer> menu is
+  shown when the developer tool is enabled in <menu|Tools>).
 
   Usually, the file <verbatim|my-init-texmacs.scm> contains personal keyboard
   bindings and menus. For instance, when putting the following piece of code
-  in this file, the keyboard shortcuts <key|T h .> and <key|P r o p .> for
-  starting a new theorem <abbr|resp.> proposition:
+  in this file, you define the keyboard shortcuts <key|T h .> and <key|P r o
+  p .> for starting a new theorem <abbr|resp.> proposition (and similar
+  shortcuts for definitions and lemmas):
 
   <\scm-code>
     (kbd-map
@@ -41,10 +47,12 @@
     \ \ ("T h ." (make 'theorem)))
   </scm-code>
 
-  Similarly, the following command extends the standard <menu|Insert> menu
+  Similarly, the following commands extend the standard <menu|Insert> menu
   with a special section for the insertion of greetings:
 
   <\scm-code>
+    (import-from (generic insert-menu))
+
     (menu-bind insert-menu
 
     \ \ (former)
@@ -63,6 +71,13 @@
 
     \ \ \ \ \ \ ("Greetings" (insert "Greetings,"))))
   </scm-code>
+
+  The <scm|import-from> line is needed because the standard menu is defined
+  lazily: at boot time, <scm|insert-menu> is only a stub, and the module
+  <verbatim|(generic insert-menu)>, loaded later when the editor is idle,
+  would define it again and replace your version. Loading the module first
+  makes <scm|(former)> refer to the standard menu, and your definition comes
+  after it.
 
   The customization of the <hlink|keyboard|../utils/utils-keyboard.en.tm> and
   <hlink|menus|../utils/utils-menus.en.tm> is described in more detail in the
@@ -85,7 +100,7 @@
     \ \ \ \ \ \ (buffer-pretend-saved (current-buffer))))
   </scm-code>
 
-  Notice that the ``no name'' check is important: when omitted, the styles of
+  Notice that the \Pno name\Q check is important: when omitted, the styles of
   existing documents would also be changed to <tmstyle|article>. The function
   <scm|buffer-pretend-saved> is used in order to avoid <TeXmacs> to complain
   about unsaved documents when leaving <TeXmacs> without changing the
@@ -155,7 +170,7 @@
   load the appropriate modules only when needed.
 
   For more information about how to write plug-ins, we refer to the
-  <hlink|corresponding chapter|../../interface/interface.en.tm>.
+  <hlink|corresponding chapter|../../plugin/plugins.en.tm>.
 
   <paragraph*|Interactive invocation of <scheme> commands>
 
@@ -178,21 +193,21 @@
   session and execute them):
 
   <\session|scheme|default>
-    <\folded-io|scheme] >
+    <\input|Scheme] >
       (define (square x) (* x x))
-    </folded-io|>
+    </input>
 
-    <\folded-io|scheme] >
+    <\input|Scheme] >
       (square 1111111)
-    </folded-io|>
+    </input>
 
-    <\folded-io|scheme] >
+    <\input|Scheme] >
       (kbd-map ("h i ." (insert "Hi there!")))
-    </folded-io|>
+    </input>
 
-    <\folded-io|scheme] >
-      ;; try typing ``hi.''
-    </folded-io|>
+    <\input|Scheme] >
+      ;; now try typing "hi."
+    </input>
   </session>
 
   <paragraph*|Command-line options for executing <scheme> commands>
@@ -210,7 +225,7 @@
       texmacs -x "(display \\"Hi there\\\\n\\")"
     </shell-code>
 
-    causes <TeXmacs> to print ``Hi there!'' when starting up. Notice that the
+    causes <TeXmacs> to print \PHi there\Q when starting up. Notice that the
     <verbatim|-x> option may be used several times.
 
     <item*|<with|font-series|medium|<verbatim|-q>>>This option causes
@@ -227,10 +242,31 @@
     <item*|<with|font-series|medium|<verbatim|-c <em|in> <em|out>>>>This
     options may be used to convert the input file <verbatim|<em|in>> into the
     output file <verbatim|<em|out>>. The suffixes of <verbatim|<em|in>> and
-    <verbatim|<em|out>> determine their file formats.
+    <verbatim|<em|out>> determine their file formats. It runs the commands
+    <scm|load-buffer> and <scm|export-buffer>, and is usually followed by
+    <verbatim|-q>.
+
+    <item*|<with|font-series|medium|<verbatim|-headless>>>Runs <TeXmacs>
+    without opening a window (also <verbatim|-H>), for instance for
+    conversions with <verbatim|-c> or commands with <verbatim|-x>.
+
+    <item*|<with|font-series|medium|<verbatim|-i <em|file>>>>Uses
+    <verbatim|<em|file>> instead of the standard initialization file of
+    <scheme> (also <verbatim|-initialize>).
+
+    <item*|<with|font-series|medium|<verbatim|-b <em|file>>>>Uses
+    <verbatim|<em|file>> instead of the system file
+    <verbatim|$TEXMACS_PATH/progs/init-buffer.scm>, which is executed for
+    each new view (also <verbatim|-initialize-buffer>).
+
+    <item*|<with|font-series|medium|<verbatim|-test-suite
+    <em|dir>>>>Typesets the documents of the directory
+    <verbatim|<em|dir>> into <verbatim|<em|dir>-check>, compares them with
+    the reference results in <verbatim|<em|dir>-ref> (made with
+    <verbatim|-reference-suite <em|dir>>) and quits.
   </description-long>
 
-  <paragraph*|Invoking <scheme> scrips from <TeXmacs> markup>
+  <paragraph*|Invoking <scheme> scripts from <TeXmacs> markup>
 
   <label|markup-scripts><TeXmacs> provides two major tags for invoking
   <scheme> scripts from within the markup:
@@ -254,8 +290,8 @@
       <inactive*|<extern|(lambda (x) `(concat "Hallo " ,x))|Piet>>
     </tm-fragment>
 
-    produces the output ``<extern|(lambda (x) `(concat "Hallo " ,x))|Piet>''.
-    Notice that the argument ``Piet'' remains editable.
+    produces the output \P<extern|(lambda (x) `(concat "Hallo " ,x))|Piet>\Q.
+    Notice that the argument \PPiet\Q remains editable.
   </description-long>
 
   It should be noticed that the direct invocation of <scheme> scripts from
@@ -265,8 +301,9 @@
   considered secure or not. For instance, when clicking <action|here|(lambda
   () (system "xterm"))> (so as to launch an <verbatim|xterm>), the editor
   will prompt you by default in order to confirm whether you wish to execute
-  this script. The desired level of security can be specified in
-  <menu|Edit|Preferences|Security>. When writing your own <scheme> extensions
+  this script. The desired level of security can be specified with the
+  <menu|Security> field in the <menu|Other> tab of the preferences dialog
+  (<menu|Edit|Preferences>). When writing your own <scheme> extensions
   to <TeXmacs>, it is also possible to define routines as being secure.
 
   <tmdoc-copyright|2005|Joris van der Hoeven>

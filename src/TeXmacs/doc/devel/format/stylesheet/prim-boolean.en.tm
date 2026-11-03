@@ -14,6 +14,13 @@
     <src-arg|expr-1> until <src-arg|expr-n>. For instance,
     <inactive*|<or|false|<equal|1|1>|false>> yields
     <or|false|<equal|1|1>|false>.
+
+    The evaluation is lazy, from left to right: <markup|or> returns the value
+    of the first argument which does not evaluate to <verbatim|false> (or
+    <verbatim|false> if there is none), and <markup|and> returns
+    <verbatim|false> as soon as an argument evaluates to <verbatim|false>,
+    and the value of the last argument otherwise. At least two arguments
+    are required.
   </explain>
 
   <\explain>
@@ -27,7 +34,9 @@
   <\explain>
     <explain-macro|not|expr>
   <|explain>
-    Returns the negation of <src-arg|expr>.
+    Returns the negation of <src-arg|expr>: <verbatim|true> if
+    <src-arg|expr> evaluates to <verbatim|false>, and <verbatim|false>
+    otherwise.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

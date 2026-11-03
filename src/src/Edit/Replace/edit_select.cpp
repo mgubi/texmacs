@@ -633,6 +633,12 @@ edit_select_rep::selection_set (string key, tree t, bool persistant) {
         else 
             t= exec_html (t, tp);
     }
+    if (selection_export == "markdown") {
+        if (mode == "math")
+            t= exec_markdown (compound ("math", t));
+        else
+            t= exec_markdown (t, tp);
+    }
     if (selection_export == "latex") t= exec_latex (t, tp);
     if ((selection_export == "latex") && (mode == "math"))
       t= compound ("math", t);
@@ -646,6 +652,8 @@ edit_select_rep::selection_set (string key, tree t, bool persistant) {
     }
     else {
       s= tree_to_generic (t, "texmacs-snippet");
+      // the verbatim variant is what another application receives: without
+      // it the clipboard carries the TeXmacs serialization
       tree tmp;
       tmp= exec_verbatim (t, tp);
       sv= tree_to_generic (tmp, "verbatim-snippet");
@@ -703,7 +711,8 @@ edit_select_rep::selection_paste (string key) {
     string lan = get_env_string (MODE_LANGUAGE (mode));
     string s   = selection_decode (lan, as_string (t[1]));
     if (mode == "prog")
-      if (selection_import == "latex" || selection_import == "html")
+      if (selection_import == "latex" || selection_import == "html" ||
+          selection_import == "markdown")
         selection_import= "verbatim";
     if (mode == "math")
       if (selection_import == "latex") {

@@ -128,7 +128,7 @@ get_texmacs_home_path () {
   // a path of the system, as for get_texmacs_path: with the standard syntax
   // the ':' of a Windows drive (C:\...) separates two paths
   string home= get_env ("TEXMACS_HOME_PATH");
-  if (home == "") return url_system ("$HOME/.TeXmacs");
+  if (home == "") return url_system ("$HOME/.TeXmacs_Upsilon");
   return url_system (home);
 }
 
@@ -147,7 +147,20 @@ evaluate_system (array<string> arg,
 #else
   int ret= unix_system (arg, fd_in, in, fd_out, ptr);
 #endif
+  // the inputs sent to the command (passphrases of GnuPG, of the keychain)
+  // are overwritten once sent, before they are released: they are the
+  // copies made for this call by the glue (evaluate-system), which nobody
+  // reads after it (the C++ callers give no inputs)
+  for (int i= 0; i < N(in); i++) secure_wipe (in[i]);
   return append (as_string (ret), out);
+}
+
+void
+secure_wipe (string s) {
+  // (through a volatile pointer, so that the writes are not left out as
+  // writes to memory which is released afterwards)
+  volatile char* p= (volatile char*) &(s[0]);
+  for (int i= 0; i < N(s); i++) p[i]= 0;
 }
 
 
@@ -270,7 +283,10 @@ tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms) {
 // On Unix, the command is the leader of its own process group, so that a
 // kill reaches the commands which the shell runs (curl...); on Windows, it
 // is run by popen: its errors are not read, and a kill does not stop it
-// (its result is only dropped).
+// (its result is only dropped). The output is read as it comes: a request
+// link shows the output so far (a streamed answer, see async_eval_pending).
+// A command of a request link which is no longer wanted (async_eval_cancel)
+// is stopped like a killed one, and writes nothing more into the link.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -282,7 +298,10 @@ tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms) {
 #if defined (OS_MINGW) || defined (OS_WIN) || defined (OS_ANDROID) || \
     defined (__EMSCRIPTEN__)
 #define ASYNC_POPEN
-#if !defined (OS_MINGW) && !defined (OS_WIN)
+#if defined (OS_MINGW) || defined (OS_WIN)
+#include <io.h>
+#else
+#include <unistd.h>
 #include <sys/wait.h>
 #endif
 #else
@@ -328,6 +347,8 @@ struct async_handle {
   int          fd_err;
 #endif
   bool         killed;    // *kill was seen: the process was stopped
+  bool         cancelled; // no longer wanted (async_eval_cancel): the
+                          // pointers below are NULL, and it writes nothing
   int          mode;
   // either
   object*      call_back; // (a pointer: the variant of a request link makes
@@ -338,12 +359,14 @@ struct async_handle {
   string*      errbuf;
   bool*        kill;
   async_handle (int mode2, object call_back2):
-    done (false), exit_code (-1), killed (false), mode (mode2),
+    done (false), exit_code (-1), killed (false), cancelled (false),
+    mode (mode2),
     call_back (tm_new<object> (call_back2)),
     status (NULL), outbuf (NULL), errbuf (NULL), kill (NULL) {
       pthread_mutex_init (&lock, NULL); }
   async_handle (int* st, string* out, string* err, bool* k):
-    done (false), exit_code (-1), killed (false), mode (ASYNC_POINTER),
+    done (false), exit_code (-1), killed (false), cancelled (false),
+    mode (ASYNC_POINTER),
     call_back (NULL), status (st), outbuf (out), errbuf (err), kill (k) {
       pthread_mutex_init (&lock, NULL); }
   ~async_handle () {
@@ -375,11 +398,17 @@ async_finish (async_handle* handle, int code) {
 
 void*
 async_read_output (void* arg) {
+  // (read, not fread, which waits for a whole buffer; a command which is
+  // no longer wanted is no longer read)
   async_handle* handle= (async_handle*) arg;
   while (true) {
     char buffer[4096];
-    int bytes_read= fread (buffer, 1, sizeof (buffer), handle->fp);
+    int bytes_read= read (fileno (handle->fp), buffer, sizeof (buffer));
     if (bytes_read <= 0) break;
+    pthread_mutex_lock (&handle->lock);
+    bool unwanted= handle->killed || handle->cancelled;
+    pthread_mutex_unlock (&handle->lock);
+    if (unwanted) break;
     async_append (handle, false, buffer, bytes_read);
   }
   int ret= pclose (handle->fp);
@@ -553,8 +582,103 @@ async_eval_system (string cmd, int& status, string& outbuf,
                                                   &errbuf, &kill));
 }
 
+/******************************************************************************
+* Asynchronous execution of commands without shell
+******************************************************************************/
+
+struct async_process {
+  int    id;
+  object call_back;
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  array<string> result;
+#else
+  unix_process_rep* rep;
+#endif
+};
+
+static array<async_process*> async_processes;
+static int async_process_counter= 0;
+
+int
+async_evaluate_system (array<string> arg, string in, object call_back) {
+  // Run arg[0] with arguments arg[i], i >= 1, without shell, sending in
+  // to its standard input.  When the command terminates, call_back is
+  // called with the list (exit-code stdout stderr).
+  // Returns an identifier for async_evaluate_cancel, or 0 on failure.
+  async_process* p= tm_new<async_process> ();
+  p->id= ++async_process_counter;
+  p->call_back= call_back;
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  array<int> fd_in;
+  array<string> str_in;
+  if (N(in) > 0) { fd_in << 0; str_in << in; }
+  array<int> fd_out;
+  fd_out << 1 << 2;
+  p->result= evaluate_system (arg, fd_in, str_in, fd_out);
+#else
+  p->rep= unix_system_start (arg, in);
+  if (p->rep == NULL) {
+    tm_delete<async_process> (p);
+    return 0;
+  }
+#endif
+  async_processes << p;
+  return p->id;
+}
+
+void
+async_evaluate_cancel (int id) {
+  // Terminate the command with identifier id; its call back will be
+  // called as usual, when it has terminated
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  (void) id;
+#else
+  for (int i=0; i<N(async_processes); i++)
+    if (async_processes[i]->id == id)
+      unix_system_kill (async_processes[i]->rep);
+#endif
+}
+
+static void
+async_evaluate_pending () {
+  array<async_process*> done;
+  array<async_process*> busy;
+  array<object> results;
+  for (int i=0; i<N(async_processes); i++) {
+    async_process* p= async_processes[i];
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+    int ret= as_int (p->result[0]);
+    string out= p->result[1], err= p->result[2];
+    done << p;
+    results << list_object (object (ret), object (out), object (err));
+#else
+    int ret;
+    string out, err;
+    if (unix_system_finished (p->rep, ret, out, err)) {
+      done << p;
+      results << list_object (object (ret), object (out), object (err));
+    }
+    else busy << p;
+#endif
+  }
+  // NOTE: the call backs might start new processes
+  async_processes= busy;
+  for (int i=0; i<N(done); i++) {
+    call (done[i]->call_back, results[i]);
+    tm_delete<async_process> (done[i]);
+  }
+}
+
+#ifdef __EMSCRIPTEN__
+void web_async_pending (); // the requests of the browser (web_files.cpp)
+#endif
+
 void
 async_eval_pending () {
+#ifdef __EMSCRIPTEN__
+  web_async_pending ();
+#endif
+  if (N(async_processes) > 0) async_evaluate_pending ();
   for (int i=0; i<N(async_busy); ) {
     async_handle* handle= async_busy[i];
     pthread_mutex_lock (&handle->lock);
@@ -563,6 +687,11 @@ async_eval_pending () {
       handle->killed= true;
       async_stop (handle);
     }
+    // the output so far, for a request link (its partial answer)
+    if (!done && handle->mode == ASYNC_POINTER &&
+        !handle->killed && !handle->cancelled &&
+        handle->out.n > N(*(handle->outbuf)))
+      *(handle->outbuf)= string (handle->out.a, handle->out.n);
     pthread_mutex_unlock (&handle->lock);
     if (!done) { i++; continue; }
     // the thread is done with the handle; it is removed before the call
@@ -576,12 +705,59 @@ async_eval_pending () {
       call (*(handle->call_back), out);
     else if (handle->mode == ASYNC_FULL)
       call (*(handle->call_back), object (code), object (out), object (err));
-    else if (handle->killed);  // (the link no longer waits for it)
+    else if (handle->killed || handle->cancelled);
+      // (the link no longer waits for it)
     else {
       *(handle->status)= (code == 0? 0: (code > 0? -code: -1));
       *(handle->outbuf)= out;
       *(handle->errbuf)= err;
     }
     tm_delete<async_handle> (handle);
+  }
+}
+
+/******************************************************************************
+* User information
+******************************************************************************/
+
+string get_user_login () {
+#ifdef OS_MINGW
+  return get_env ("USERNAME");
+#else
+  return unix_get_login ();
+#endif
+}
+
+string get_user_name () {
+#ifdef OS_MINGW
+  // the Windows entry point stores the display name (GetUserNameExW) in
+  // TEXMACS_DISPLAYNAME (see Plugins/Windows64/windows64_entrypoint.cpp)
+  string name= get_env ("TEXMACS_DISPLAYNAME");
+  return name == ""? get_env ("USERNAME"): name;
+#else // Linux and macOS
+  return unix_get_username ();
+#endif
+}
+
+// The commands of a request link (the curl program, see web_files.cpp)
+// which write into outbuf are no longer wanted: an interrupted answer, or
+// a link which asks again or is destroyed. They are stopped (on Unix), they
+// write nothing more into the link (its status, its output, its errors),
+// and their output is dropped: nothing of an interrupted answer reaches the
+// next one.
+void
+async_eval_cancel (string* outbuf) {
+  for (int i=0; i<N(async_busy); i++) {
+    async_handle* handle= async_busy[i];
+    if (handle->mode != ASYNC_POINTER || handle->outbuf != outbuf) continue;
+    pthread_mutex_lock (&handle->lock);
+    if (!handle->done && !handle->killed && !handle->cancelled)
+      async_stop (handle);
+    handle->cancelled= true;
+    handle->status= NULL;
+    handle->outbuf= NULL;
+    handle->errbuf= NULL;
+    handle->kill= NULL;
+    pthread_mutex_unlock (&handle->lock);
   }
 }

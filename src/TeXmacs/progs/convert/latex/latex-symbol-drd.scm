@@ -74,7 +74,10 @@
   ;; Big delimiters
   rmoustache lmoustache rgroup lgroup
   lbrack rbrack lbrace rbrace
-  arrowvert Arrowvert bracevert)
+  arrowvert Arrowvert bracevert
+
+  ;; The euro sign of the eurosym package
+  euro)
 
 (logic-group latex-big-symbol%
   sum prod coprod
@@ -126,10 +129,10 @@
   nshortmid nshortparallel nsim nsubseteq nsubseteqq nsucc nsucceq
   nsupseteq nsupseteqq ntriangleleft ntrianglelefteq ntriangleright
   ntrianglerighteq nvDash nvdash pitchfork precapprox preccurlyeq
-  precnapprox precneqq precnsim precsim propto rhd rightarrowtail
+  precnapprox precneqq precnsim precsim propto rightarrowtail
   rightleftarrows rightleftharpoons rightrightarrows rightsquigarrow
-  rightthreetimes risingdotseq rtimes rvert rVert shortleftarrow shortmid
-  shortparallel shortrightarrow smalldash smallfrown smallsetminus
+  rightthreetimes risingdotseq rtimes rvert rVert shortmid
+  shortparallel smalldash smallfrown smallsetminus
   smallsmile smile sphericalangle subseteqq
   subsetneq subsetneqq succapprox succcurlyeq succnapprox succneqq
   succnsim succsim supseteqq supsetneq supsetneqq therefore
@@ -233,6 +236,49 @@
   Uptau Upupsilon Upphi Upchi Uppsi Upomega)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Symbols of the unicode-math package
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The names TeXmacs took from unicode-math when its symbol tables were
+;; extended; see langs/encoding/tmuniversaltounicode-extra.scm. A document
+;; that uses one of them exports with \usepackage{unicode-math}, which
+;; needs LuaLaTeX or XeLaTeX; a document that uses none is unaffected.
+;; The names which LaTeX or a macro of latex-define.scm already provides
+;; (lgroup, rgroup, dotminus, dottimes, btimes, mapsup, mapsdown) and euro,
+;; which is a command of eurosym, are not in the list.
+
+(logic-group latex-unicodemath-symbol%
+  Angstrom approxident arceq assert awint backcong backdprime backtrprime
+  barV barvee Bbbgamma BbbGamma BbbPi Bbbsum bigblacktriangledown
+  bigblacktriangleup bigbot bigcupdot bigtimes bigtop blanksymbol blockfull
+  blockhalfshaded blockqtrshaded blockthreeqtrshaded carriagereturn
+  circledequal Colon Coloneq concavediamond concavediamondtickleft
+  concavediamondtickright cupdot cupleftarrow dashcolon dashV Dashv DashV
+  DashVDash dashVdash diamondcdot divslash dotsminusdots dottedsquare
+  downuparrows downwhitearrow dprime dualmap eqcolon eqdef eqgtr eqless
+  equalparallel Equiv Eulerconst fint fracslash geqqslant hermitmatrix
+  horizbar hrectangle hrectangleblack imageof increment intbottom
+  intclockwise intextender inttop invlazys kernelcontraction lbracelend
+  lbracemid lbraceuend lbrackextender lbracklend lbrackuend Ldsh
+  leftdasharrow leftthreearrows leftwhitearrow leqqslant lgblkcircle
+  linefeed longleftsquigarrow Longmapsfrom Longmapsto longrightsquigarrow
+  lozengeminus lparenextender lparenlend lparenuend Mapsfrom Mapsto
+  mathhyphen mathratio mathvisiblespace mdblkcircle mdblkdiamond mdblksquare
+  mdlgblkdiamond mdsmblkcircle mdsmwhtcircle mdwhtcircle mdwhtdiamond
+  mdwhtlozenge mdwhtsquare measeq measuredrightangle mitBbbD mitBbbd mitBbbe
+  mitBbbi mitBbbj multimapinv Nearrow ngtrless ngtrsim nlessgtr nlesssim
+  Nwarrow obrbrak ointctrclockwise origof Planckconst preceqq precneq QED
+  qprime questeq rbracelend rbracemid rbraceuend rbrackextender rbracklend
+  rbrackuend Rdsh rightangle rightarrowonoplus rightdasharrow
+  rightthreearrows rightwhitearrow rparenextender rparenlend rparenuend
+  Searrow simneqq sinewave smallin smallni smblksquare smwhtcircle
+  smwhtsquare sqint sqrtbottom sqsubsetneq sqsupsetneq stareq succeqq
+  succneq sumbottom sumtop Swarrow tieconcat trprime turnednot
+  twoheaddownarrow twoheaduparrow twolowline ubrbrak upand updownarrows
+  upwhitearrow varclubsuit varlrtriangle varointclockwise varspadesuit Vbar
+  vbraceextender VDash vectimes veeeq vlongdash vysmblkcircle wedgeq)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rules
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -254,4 +300,6 @@
   ((latex-symbol% 'x) (latex-textcomp-symbol% 'x))
   ((latex-needs% 'x "textcomp") (latex-textcomp-symbol% 'x))
   ((latex-symbol% 'x) (latex-upgreek-symbol% 'x))
-  ((latex-needs% 'x "upgreek") (latex-upgreek-symbol% 'x)))
+  ((latex-needs% 'x "upgreek") (latex-upgreek-symbol% 'x))
+  ((latex-symbol% 'x) (latex-unicodemath-symbol% 'x))
+  ((latex-needs% 'x "unicode-math") (latex-unicodemath-symbol% 'x)))

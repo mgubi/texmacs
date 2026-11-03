@@ -209,11 +209,27 @@
        (string->symbol (string-append "begin-" (tex-env-name (cadr x)))))
       (logic-ref latex-texmacs-arity% x)))
 
-(define (latex-needs? x)
+;; latex-needs? is asked for every node of the document, often twice, and
+;; each call is a query of the logic engine; its answers only depend on the
+;; logic rules, so they are cached until new rules are added
+(define latex-needs-cache (make-ahash-table))
+(define latex-needs-cache-version -1)
+
+(define (latex-needs-uncached x)
   (if (env-begin? x)
       (latex-needs?
        (string->symbol (string-append "begin-" (tex-env-name (cadr x)))))
       (logic-ref latex-needs% x)))
+
+(define (latex-needs? x)
+  (when (!= latex-needs-cache-version (logic-rules-version))
+    (set! latex-needs-cache (make-ahash-table))
+    (set! latex-needs-cache-version (logic-rules-version)))
+  (with cached (ahash-ref latex-needs-cache x)
+    (if cached (car cached)
+        (with r (latex-needs-uncached x)
+          (ahash-set! latex-needs-cache x (list r))
+          r))))
 
 (define (latex-texmacs-option? x)
   (if (env-begin? x)
@@ -498,6 +514,10 @@
   (:synopsis "Return the usepackage command for @doc")
   (set! latex-uses-table (make-ahash-table))
   (latex-use-which-package doc)
+  ;; both define \citeauthor, \citeyear, \citep...: with a CSL style, the
+  ;; citations are those of citation-style-language
+  (when (ahash-ref latex-uses-table "citation-style-language")
+    (ahash-remove! latex-uses-table "natbib"))
   (for (p (ahash-table->list latex-packages-option))
     (ahash-set! latex-uses-table (car p) #t))
   (let* ((l1 latex-all-packages)

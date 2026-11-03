@@ -12,7 +12,8 @@
 #include "basic.hpp"
 
 // NOTE: with Qt pipes, the command line links are those of
-// Plugins/Qt/qt_cmdline_link.cpp (QProcess), as the pipe links
+// Plugins/Qt/qt_cmdline_link.cpp (QProcess), as the pipe links; on
+// Windows, this file is for the builds without Qt (windows_process)
 #if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
 
 #include "tm_link.hpp"
@@ -33,10 +34,7 @@
 #include <errno.h>
 #define TM_FD_SET(fd, set) FD_SET(fd, set)
 #else
-namespace wsoc {
-#include <winsock2.h>
-}
-#define TM_FD_SET(fd, set) FD_SET((u_int) fd, set)
+#include "windows_process.hpp"
 #endif // OS_MINGW
 
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
@@ -71,6 +69,9 @@ struct cmdline_link_rep: tm_link_rep {
   int    in;            // file descriptor for data going to the child
   int    out;           // file descriptor for data coming from the child
   int    err;           // file descriptor for errors coming from the child
+#ifdef OS_MINGW
+  windows_process proc; // the child, with its pipes (instead of the above)
+#endif
 
   string outbuf;        // pending output from plugin
   string errbuf;        // pending errors from plugin
@@ -158,10 +159,15 @@ cmdline_link_rep::close_fds () {
 
 void
 close_all_cmdlines () {
-#ifndef OS_MINGW
   iterator<pointer> it= iterate (cmdline_link_set);
   while (it->busy()) {
     cmdline_link_rep* con= (cmdline_link_rep*) it->next();
+#ifdef OS_MINGW
+    if (con->alive) {
+      con->proc.terminate (0);
+      con->alive= false;
+    }
+#else
     if (con->alive) {
       terminate_child (con->pid);
       con->alive= false;
@@ -170,8 +176,8 @@ close_all_cmdlines () {
       con->close_fds ();
       //cout << "Alive = false, close all\n";
     }
-  }
 #endif
+  }
 }
 
 void
@@ -188,7 +194,7 @@ process_all_cmdlines () {
 /******************************************************************************
 * Routines for cmdline_links
 ******************************************************************************/
-
+// NOTE: the copy in pipe_link.cpp is local to it
 #ifndef OS_MINGW
 void
 execute_shell (string s) {
@@ -200,7 +206,7 @@ execute_shell (string s) {
   argv[3] = NULL;
   execve ("/bin/sh", argv, environ);
 }
-#endif
+#endif 
 
 string
 cmdline_link_rep::start () {
@@ -209,7 +215,6 @@ cmdline_link_rep::start () {
   return "cmdline";
 }
 
-#ifndef OS_MINGW
 static string
 debug_io_string (string s) {
   int i, n= N(s);
@@ -225,18 +230,29 @@ debug_io_string (string s) {
   }
   return r;
 }
-#endif
 
 void
 cmdline_link_rep::write (string s, int channel) {
   while (ends (s, "\n")) s= s (0, N(s)-1);
   //cout << "Write[" << name << "] " << s << "\n";
-#ifdef OS_MINGW
-  (void) channel;
-#else
   if (alive || (channel != LINK_IN)) return;
   string cmd= as_string (call ("connection-cmdline", name, session, s));
   if (cmd == "") return;
+#ifdef OS_MINGW
+  // The command is a line of the command interpreter (%ComSpec% /d /s /c,
+  // as the shell runs it on Unix, and as _wsystem does), its errors going
+  // to NUL (as 2> /dev/null, for all the commands of the line). Nothing is
+  // written to its input, which is closed at once: a program which reads
+  // it ends instead of waiting (the input is in the command).
+  if (DEBUG_IO) debug_io << "Launching '" << cmd << "'\n";
+  if (!proc.start (std::string (&cmd[0], N(cmd)), true, false)) {
+    errbuf << "Error: cannot start '" << cmd << "'\n";
+    if (DEBUG_IO) debug_io << string (proc.error ().c_str ()) << "\n";
+    return;
+  }
+  proc.close_input ();
+  alive= true;
+#else
   cmd= cmd * " 2> /dev/null";
   //cout << "Command[" << name << "," << s << "] = " << cmd << "\n";
   if (DEBUG_IO) debug_io << "Launching '" << cmd << "'\n";
@@ -244,7 +260,7 @@ cmdline_link_rep::write (string s, int channel) {
   int e2= pipe (pp_out); (void) e2;
   int e3= pipe (pp_err); (void) e3;
   pid= fork ();
-  if (pid < 0) { // no process: not a live program
+  if (pid < 0) { // no process (a page has none): not a live program
     int* fds[3]= { pp_in, pp_out, pp_err };
     for (int i= 0; i < 3; i++)
       for (int j= 0; j < 2; j++)
@@ -296,7 +312,23 @@ void
 cmdline_link_rep::feed (int channel) {
   //cout << "Feed " << channel << "\n";
 #ifdef OS_MINGW
+  // what the threads of proc have read, from both pipes; the end is that
+  // of the output, as on Unix (the process then ends: it is given 2 s, as
+  // after SIGTERM in terminate_child, and what is left of it is ended)
   (void) channel;
+  if (!alive) return;
+  std::string o, e;
+  bool end= proc.take (o, e);
+  if (o.size () > 0) {
+    string s (o.data (), (int) o.size ());
+    if (DEBUG_IO) debug_io << debug_io_string (s);
+    outbuf << s;
+  }
+  if (e.size () > 0) errbuf << string (e.data (), (int) e.size ());
+  if (end) {
+    proc.terminate (2000);
+    alive= false;
+  }
 #else
   if ((!alive) || ((channel != LINK_OUT) && (channel != LINK_ERR))) return;
   int r;
@@ -338,17 +370,30 @@ string
 cmdline_link_rep::read (int channel) {
   //cout << "Read " << channel << "\n";
   if (channel == LINK_OUT) {
+#ifdef OS_MINGW
+    // NOTE: no notifiers here (on Unix, perform_select feeds the link):
+    // what waits for the answer by reading it (connection_eval) takes the
+    // news itself, waiting for them at most 1 ms
+    if (alive && proc.wait (1)) feed (LINK_OUT);
+#endif
     if (alive) {
       //cout << "\n--- partial output ---\n" << outbuf << "\n";
       return "";
     }
     string r= outbuf;
     outbuf= "";
+#ifdef OS_MINGW
+    // the ends of lines of the programs of Windows (as QIODevice::Text)
+    r= replace (r, "\r\n", "\n");
+#endif
     return r;
   }
   else if (channel == LINK_ERR) {
     string r= errbuf;
     errbuf= "";
+#ifdef OS_MINGW
+    r= replace (r, "\r\n", "\n");
+#endif
     return r;
   }
   else return string("");
@@ -357,11 +402,18 @@ cmdline_link_rep::read (int channel) {
 void
 cmdline_link_rep::listen (int msecs) {
   //cout << "Listen " << msecs << "\n";
-#ifdef OS_MINGW
-  using namespace wsoc;
-#endif
   if (!alive) return;
   time_t wait_until= texmacs_time () + msecs;
+#ifdef OS_MINGW
+  // as below, the pipes being read by the threads of proc: wait for news
+  // of them, take what they read, until nothing more comes within msecs
+  while (alive) {
+    int nout= N(outbuf), nerr= N(errbuf);
+    if (proc.wait (msecs)) feed (LINK_OUT);
+    if (texmacs_time () - wait_until > 0) break;
+    if (N(outbuf) == nout && N(errbuf) == nerr) break;
+  }
+#else
   // NOTE: the end of the output closes the descriptors (feed): they are
   // only used while the link is alive
   while (alive) {
@@ -379,13 +431,19 @@ cmdline_link_rep::listen (int msecs) {
     if (texmacs_time () - wait_until > 0) break;
     if (N(outbuf) == nout && N(errbuf) == nerr) break;
   }
+#endif
 }
 
 void
 cmdline_link_rep::interrupt () {
   //cout << "Interrupt\n";
-#ifndef OS_MINGW
   if (!alive) return;
+#ifdef OS_MINGW
+  // no SIGINT for the processes without console: the process and all it
+  // started are ended, as by Ctrl+C (STATUS_CONTROL_C_EXIT); the end of
+  // their output then ends the link, as on Unix
+  proc.kill (0xC000013A);
+#else
   killpg (pid, SIGINT);
 #endif
 }
@@ -393,8 +451,14 @@ cmdline_link_rep::interrupt () {
 void
 cmdline_link_rep::stop () {
   //cout << "Stop\n";
-#ifndef OS_MINGW
   if (!alive) return;
+#ifdef OS_MINGW
+  // Windows cannot ask a program of the console to end (QProcess::terminate
+  // posts WM_CLOSE, which they ignore): the process and all it started
+  // are ended at once
+  proc.terminate (0);
+  alive= false;
+#else
   terminate_child (pid);
   alive= false;    
   //cout << "Alive = false, stop\n";

@@ -55,6 +55,7 @@ extern string FONT_SHAPE;
 extern string FONT_SIZE;
 extern string FONT_BASE_SIZE;
 extern string FONT_EFFECTS;
+extern string FONT_FEATURES;
 extern string MAGNIFICATION;
 extern string COLOR;
 extern string OPACITY;
@@ -96,6 +97,7 @@ extern string PROG_FONT;
 extern string PROG_FONT_FAMILY;
 extern string PROG_FONT_SERIES;
 extern string PROG_FONT_SHAPE;
+extern string PROG_TAB_WIDTH;
 extern string PROG_SESSION;
 
 extern string KEYWORD_COLOR;

@@ -1,0 +1,4 @@
+# needs icons.scm: the icons of the toolbars under the current theme
+wait 6000
+window Icons
+snapshot icons

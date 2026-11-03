@@ -193,6 +193,30 @@
 
   <assign|json-lang|<macro|body|<with|mode|prog|prog-language|json|font-family|rm|<arg|body>>>>
 
+  <assign|go-lang|<macro|body|<with|mode|prog|prog-language|go|font-family|rm|<arg|body>>>>
+
+  <assign|lean|<macro|body|<with|mode|prog|prog-language|lean|font-family|rm|<arg|body>>>>
+
+  <assign|lua|<macro|body|<with|mode|prog|prog-language|lua|font-family|rm|<arg|body>>>>
+
+  <assign|rust|<macro|body|<with|mode|prog|prog-language|rust|font-family|rm|<arg|body>>>>
+
+  <assign|typescript-lang|<macro|body|<with|mode|prog|prog-language|typescript|font-family|rm|<arg|body>>>>
+
+  <assign|html-lang|<macro|body|<with|mode|prog|prog-language|html|font-family|rm|<arg|body>>>>
+
+  <assign|css-lang|<macro|body|<with|mode|prog|prog-language|css|font-family|rm|<arg|body>>>>
+
+  <assign|toml-lang|<macro|body|<with|mode|prog|prog-language|toml|font-family|rm|<arg|body>>>>
+
+  <assign|yaml-lang|<macro|body|<with|mode|prog|prog-language|yaml|font-family|rm|<arg|body>>>>
+
+  <assign|haskell-lang|<macro|body|<with|mode|prog|prog-language|haskell|font-family|rm|<arg|body>>>>
+
+  <assign|ocaml-lang|<macro|body|<with|mode|prog|prog-language|ocaml|font-family|rm|<arg|body>>>>
+
+  <assign|latex-lang|<macro|body|<with|mode|prog|prog-language|latex|font-family|rm|<arg|body>>>>
+
   <assign|octave-lang|<macro|body|<with|mode|prog|prog-language|octave|font-family|rm|<arg|body>>>>
 
   <\active*>
@@ -252,6 +276,78 @@
   <assign|json-code|<\macro|body>
     <\pseudo-code>
       <json-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|go-code|<\macro|body>
+    <\pseudo-code>
+      <go-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|lean-code|<\macro|body>
+    <\pseudo-code>
+      <lean|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|lua-code|<\macro|body>
+    <\pseudo-code>
+      <lua|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|rust-code|<\macro|body>
+    <\pseudo-code>
+      <rust|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|typescript-code|<\macro|body>
+    <\pseudo-code>
+      <typescript-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|html-code|<\macro|body>
+    <\pseudo-code>
+      <html-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|css-code|<\macro|body>
+    <\pseudo-code>
+      <css-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|toml-code|<\macro|body>
+    <\pseudo-code>
+      <toml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|yaml-code|<\macro|body>
+    <\pseudo-code>
+      <yaml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|haskell-code|<\macro|body>
+    <\pseudo-code>
+      <haskell-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|ocaml-code|<\macro|body>
+    <\pseudo-code>
+      <ocaml-lang|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|latex-code|<\macro|body>
+    <\pseudo-code>
+      <latex-lang|<arg|body>>
     </pseudo-code>
   </macro>>
 

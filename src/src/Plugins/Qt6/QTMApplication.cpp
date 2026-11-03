@@ -126,6 +126,12 @@ void QTMApplication::toggleOnScreenKeyboardVisibility() {
 * Single instance and messages
 ******************************************************************************/
 
+// The name of the server of a running TeXmacs, to which another one started
+// passes its files: Upsilon has its own, so that it runs beside a stock
+// TeXmacs, which used the same name (each removed the server of the other,
+// and the files went to the TeXmacs already running, whichever it was)
+static const char* local_server_name= "org.texmacs.upsilon.local";
+
 QTMLocalServer::QTMLocalServer (): QObject (NULL) {
   server= NULL;
   alive= false;
@@ -148,11 +154,11 @@ QTMLocalServer::QTMLocalServer (): QObject (NULL) {
   server= new QLocalServer (this);
   connect (server, &QLocalServer::newConnection, this,
 	   &QTMLocalServer::onNewConnection);
-  if (!QLocalServer::removeServer ("org.texmacs.local")) {
-    //qCritical () << "QTMLocalServer failed to grab org.texmacs.local";
+  if (!QLocalServer::removeServer (local_server_name)) {
+    //qCritical () << "QTMLocalServer failed to grab the local server";
     return;
   }      
-  if (!server->listen ("org.texmacs.local")) {
+  if (!server->listen (local_server_name)) {
     //qCritical () << "QTMLocalServer failed to start: "
     //             << server->errorString ();
     return;
@@ -244,7 +250,7 @@ QTMLocalServer::onClientDisconnected () {
 bool
 send_to_single_instance (string s) {
   QLocalSocket socket;
-  socket.connectToServer ("org.texmacs.local");
+  socket.connectToServer (local_server_name);
   if (!socket.waitForConnected (1000)) // 1s
     return false;
   string msg= (as_string (N (s)) * "\n") * s; // same as tm_link

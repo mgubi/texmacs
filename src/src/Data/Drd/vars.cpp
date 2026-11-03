@@ -57,6 +57,7 @@ string FONT_SHAPE ("font-shape");
 string FONT_SIZE ("font-size");
 string FONT_BASE_SIZE ("font-base-size");
 string FONT_EFFECTS ("font-effects");
+string FONT_FEATURES ("font-features");
 string MAGNIFICATION ("magnification");
 string COLOR ("color");
 string OPACITY ("opacity");
@@ -97,6 +98,7 @@ string PROG_SCRIPTS ("prog-scripts");
 string PROG_FONT ("prog-font");
 string PROG_FONT_FAMILY ("prog-font-family");
 string PROG_FONT_SERIES ("prog-font-series");
+string PROG_TAB_WIDTH ("prog-tab-width");
 string PROG_FONT_SHAPE ("prog-font-shape");
 string PROG_SESSION ("prog-session");
 

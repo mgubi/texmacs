@@ -82,6 +82,20 @@
     </verbatim>
   </tm-fragment>
 
+  Arguments which follow the last multi-paragraph argument are written
+  inside the closing tag. For instance, if only <verbatim|x<rsub|1>> is
+  multi-paragraph in a tree with three arguments, then it is serialized as
+
+  <\tm-fragment>
+    <\verbatim>
+      \<less\>\\f\<gtr\>
+
+      \ \ x<rsub|1>
+
+      \<less\>/f\|x<rsub|2>\|x<rsub|3>\<gtr\>
+    </verbatim>
+  </tm-fragment>
+
   The escape sequences <verbatim|\\\<less\>less\\\<gtr\>>, <verbatim|\\\|>,
   <verbatim|\\\<less\>gtr\\\<gtr\>> and <verbatim|\\\\> may be used to
   represent the characters <verbatim|\<less\>>, <verbatim|\|>,

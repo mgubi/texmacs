@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (fonts font-old-menu)
-  (:use (generic format-edit)))
+  (:use (generic format-edit) (fonts font-weight)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Font submenu in text mode
@@ -292,10 +292,7 @@
       ("Roman" (make-with "font-family" "rm"))
       ("Typewriter" (make-with "font-family" "tt"))
       ("Sans serif" (make-with "font-family" "ss")))
-  (-> "Series"
-      ("Light" (make-with "font-series" "light"))
-      ("Medium" (make-with "font-series" "medium"))
-      ("Bold" (make-with "font-series" "bold")))
+  (-> "Weight" (link text-font-weight-menu))
   (-> "Shape"
       ("Upright" (make-with "font-shape" "right"))
       ("Slanted" (make-with "font-shape" "slanted"))

@@ -55,7 +55,15 @@
   ;; versions of Guile.  These erroneous versions incorrectly recognize
   ;; characters such as A0 (hexadecimal), which breaks certain routines
   ;; involving unicode or cork.
-  (in? c '(#\space #\ht #\newline #\return)))
+  (in? c (list #\space (integer->char 9) #\newline #\return)))
+
+(define-public (string-wipe! s)
+  "Overwrite the characters of the string @s (a passphrase once used)."
+  ;; NOTE: only this string is overwritten: the copies which were made of it
+  ;; (by the garbage collector, by string-append, by the GUI) are not
+  (when (and (string? s) (> (string-length s) 0))
+    (catch #t (lambda () (string-fill! s #\space)) (lambda args #f)))
+  "")
 
 (define-public (string-tail s n)
   "Return all but the first @n chars of @s."
@@ -201,9 +209,12 @@
 (define-public (string-recompose l sep)
   "Turn list @l of strings into one string using @sep as separator."
   (if (char? sep) (set! sep (list->string (list sep))))
-  (cond ((null? l) "")
-	((null? (cdr l)) (car l))
-	(else (string-append (car l) sep (string-recompose (cdr l) sep)))))
+  ;; one string-append for the whole list: appending piece by piece would
+  ;; take a time quadratic in the length (a source file of 100000 lines)
+  (if (null? l) ""
+      (let loop ((r (cdr l)) (acc (list (car l))))
+        (if (null? r) (apply string-append (reverse acc))
+            (loop (cdr r) (cons (car r) (cons sep acc)))))))
 
 (define-public (string-tokenize-comma s)
   "Cut string @s into pieces using comma as a separator and remove whitespace."

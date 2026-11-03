@@ -52,8 +52,9 @@
     ;;(display* "curly= " curly ", round= " round ", square= " square "\n")
     (cond ((== row 0) i)
 	  (curly (+ i 2))
-	  (round (+ round 1))
-	  (square (+ square 2))
+	  ;; (columns after the bracket: a tab before it goes to its stop)
+	  (round (string-column s (+ round 1)))
+	  (square (+ (string-column s square) 2))
 	  ((standard-indent? s) (+ i 2))
 	  (else
 	    ;;(display* "row= " prev "\n")
@@ -63,7 +64,8 @@
 
 (define (compute-indentation row)
   (let* ((s (program-row row))
-	 (i (string-get-indent s)))
+	 (i (string-indent-end s)))
+    ;; (i: the offset of the first character, not its column)
     (if (and (< i (string-length s)) (== (string-ref s i) #\}))
 	(max 0 (- (compute-indentation-bis row) 2))
 	(compute-indentation-bis row))))

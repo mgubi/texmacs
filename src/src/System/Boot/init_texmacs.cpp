@@ -57,9 +57,40 @@ get_env_path (string which, url def) {
   return val;
 }
 
+// the path of the icons without the set of the preferences (empty when
+// TEXMACS_PIXMAP_PATH was given, which is left alone)
+static string base_pixmap_path;
+
+// the icon set of the preferences, in front of the path of the icons: at
+// the start, and again when the preference changes (the Vue interface
+// follows it at once, see vue_follow_icon_set)
+void
+apply_icon_set () {
+  if (N(base_pixmap_path) == 0) return;
+  string icon_set= get_user_preference ("icon set", "neo-classical");
+  url pixmaps ("$TEXMACS_PATH/misc/pixmaps");
+  string icon_dir= "";
+  if (icon_set == "monochrome") icon_dir= "monochrome";
+  if (icon_set == "neo-classical") icon_dir= "neoclassical";
+  // the Lucide set has only the icons with a counterpart in Lucide: the
+  // others (symbols, tags) come from the neo-classical set, whose colours
+  // suit its pastel insides
+  if (icon_set == "lucide")
+    set_env_path ("TEXMACS_PIXMAP_PATH",
+                  pixmaps * url ("lucide") | pixmaps * url ("neoclassical") |
+                  url_system (base_pixmap_path));
+  else if (icon_dir != "")
+    set_env_path ("TEXMACS_PIXMAP_PATH",
+                  pixmaps * url (icon_dir) |
+                  url_system (base_pixmap_path));
+  else set_env ("TEXMACS_PIXMAP_PATH", base_pixmap_path);
+}
+
 static url
 plugin_path (string which) {
-  url base= "$TEXMACS_HOME_PATH:/etc/TeXmacs:$TEXMACS_PATH:/usr/share/TeXmacs";
+  // TeXmacs Upsilon: not /etc/TeXmacs and /usr/share/TeXmacs, which hold the
+  // plugins of an official TeXmacs installed on the system
+  url base= "$TEXMACS_HOME_PATH:$TEXMACS_PATH";
   url search= base * "plugins" * url_wildcard ("*") * which;
   return expand (complete (search, "r"));
 }
@@ -68,9 +99,7 @@ scheme_tree
 plugin_list () {
   bool flag;
   array<string> a= read_directory ("$TEXMACS_PATH/plugins", flag);
-  a << read_directory ("/etc/TeXmacs/plugins", flag);
   a << read_directory ("$TEXMACS_HOME_PATH/plugins", flag);
-  a << read_directory ("/usr/share/TeXmacs/plugins", flag);
   merge_sort (a);
   int i, n= N(a);
   tree t (TUPLE);
@@ -92,13 +121,13 @@ plugin_list () {
 static void
 init_main_paths () {
 #ifdef OS_MINGW
-  if (is_none (get_env_path ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "/TeXmacs"))) {
+  if (is_none (get_env_path ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "/TeXmacs_Upsilon"))) {
 #else
-  if (is_none (get_env_path ("TEXMACS_HOME_PATH", "~/.TeXmacs"))) {
+  if (is_none (get_env_path ("TEXMACS_HOME_PATH", "~/.TeXmacs_Upsilon"))) {
 #endif
     boot_error << "\n";
     boot_error << "Installation problem: please send a bug report.\n";
-    boot_error << "'TEXMACS_HOME_PATH' could not be set to '~/.TeXmacs'.\n";
+    boot_error << "'TEXMACS_HOME_PATH' could not be set to '~/.TeXmacs_Upsilon'.\n";
     boot_error << "You may try to set this environment variable manually\n";
     boot_error << "\n";
     FAILED ("installation problem");
@@ -331,6 +360,39 @@ init_env_vars () {
     bin_path= url_system (get_user_preference ("manual path")) | bin_path;
 
   set_env_path ("PATH", bin_path);
+#ifdef OS_MINGW
+  // The gs.exe of the package (Ghostscript, built as a program of Unix on
+  // Windows) makes its temporary files in $TMPDIR, else in /tmp, which Windows
+  // has not: the folder of the other programs (TEMP) then. It reads that
+  // folder and opens its files with the ANSI functions of Windows, which
+  // cannot name a folder with letters outside the code page of the system (a
+  // user name in Cyrillic or Chinese on a Western system): its short name
+  // (8.3, ASCII) then, or else the folder Temp of Windows (C:\Windows\Temp,
+  // where users may create files but, by default, not read those of others;
+  // not the folder Public, which the other users of the machine can read).
+  // TMPDIR is read by the programs which TeXmacs starts as well, before TEMP
+  // (Python...): they get the same folder.
+  if (get_env ("TMPDIR") == "" && exists (url ("$TEXMACS_PATH/bin/gs.exe"))) {
+    string tmp= get_env ("TEMP");
+    if (tmp == "") tmp= get_env ("TMP");
+    bool ascii= true;
+    for (int i=0; i<N(tmp); i++) if ((unsigned char) tmp[i] >= 128) ascii= false;
+#ifdef OS_MINGW64
+    if (!ascii && tmp != "") {
+      string sh= texmacs_short_path (tmp);
+      ascii= true;
+      for (int i=0; i<N(sh); i++) if ((unsigned char) sh[i] >= 128) ascii= false;
+      if (ascii) tmp= sh;
+    }
+#endif
+    if (!ascii) {
+      tmp= get_env ("SystemRoot");
+      for (int i=0; i<N(tmp); i++) if ((unsigned char) tmp[i] >= 128) tmp= "";
+      if (tmp != "") tmp= tmp * "\\Temp";
+    }
+    if (tmp != "") set_env ("TMPDIR", tmp);
+  }
+#endif
   url lib_path= get_env_path ("LD_LIBRARY_PATH") | plugin_path ("lib");
   set_env_path ("LD_LIBRARY_PATH", lib_path);
 
@@ -369,6 +431,7 @@ init_env_vars () {
                        url ("$TEXMACS_PATH/misc/patterns") |
                        url ("$TEXMACS_PATH/misc/pictures") |
                        plugin_path ("misc/patterns"));
+  bool pixmap_path_given= (get_env ("TEXMACS_PIXMAP_PATH") != "");
   (void) get_env_path ("TEXMACS_PIXMAP_PATH",
 		       url ("$TEXMACS_PATH/misc/pixmaps") |
                        url ("$TEXMACS_HOME_PATH/misc/pixmaps") |
@@ -379,6 +442,13 @@ init_env_vars () {
                        url ("$TEXMACS_PATH/misc/pixmaps/modern/16x16/focus") |
                        url ("$TEXMACS_PATH/misc/pixmaps/traditional/--x17") |
                        plugin_path ("misc/pixmaps"));
+  // The icon set: the original icons ("classical") are those of the path
+  // above; another set, chosen in the preferences (by default the
+  // neo-classical one), is looked up first (see apply_icon_set)
+  if (!pixmap_path_given) {
+    base_pixmap_path= get_env ("TEXMACS_PIXMAP_PATH");
+    apply_icon_set ();
+  }
   (void) get_env_path ("TEXMACS_DIC_PATH",
                        "$TEXMACS_HOME_PATH/langs/natural/dic" |
                        url ("$TEXMACS_PATH/langs/natural/dic") |

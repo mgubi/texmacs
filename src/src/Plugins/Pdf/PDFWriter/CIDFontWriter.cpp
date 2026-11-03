@@ -189,37 +189,38 @@ void CIDFontWriter::WriteToUnicodeMap(ObjectIDType inToUnicodeMap)
 	PDFStream* pdfStream = mObjectsContext->StartPDFStream();
 	IByteWriter* cmapWriteContext = pdfStream->GetWriteStream();
 	PrimitiveObjectsWriter primitiveWriter(cmapWriteContext);
-	unsigned long i = 1;
-	UIntAndGlyphEncodingInfoVector::iterator it = mCharactersVector.begin() + 1; // skip 0 glyph
-	unsigned long vectorSize = (unsigned long)mCharactersVector.size() - 1; // cause 0 is not there
+
+	// TeXmacs: a glyph which stands for no character (a layer of an emoji,
+	// a piece of a bracket) has no entry, rather than an entry for U+0000,
+	// which readers copy as a character (Preview, as spaces); and the 0
+	// glyph is skipped
+	UIntAndGlyphEncodingInfoVector entries;
+	UIntAndGlyphEncodingInfoVector::iterator it = mCharactersVector.begin();
+	if (it != mCharactersVector.end()) ++it;
+	for(; it != mCharactersVector.end(); ++it)
+		if (it->second.mUnicodeCharacters.size() > 0)
+			entries.push_back(*it);
+	unsigned long vectorSize = (unsigned long)entries.size();
 
 	cmapWriteContext->Write((const Byte*)scCmapHeader,strlen(scCmapHeader));
 	primitiveWriter.WriteEncodedHexString(scFourByteRangeStart);
 	primitiveWriter.WriteEncodedHexString(scFourByteRangeEnd,eTokenSeparatorEndLine);
 	cmapWriteContext->Write((const Byte*)scEndCodeSpaceRange,strlen(scEndCodeSpaceRange));
 
-	if(vectorSize < 100)
-		primitiveWriter.WriteInteger(vectorSize);
-	else
-		primitiveWriter.WriteInteger(100);
-	primitiveWriter.WriteKeyword(scBeginBFChar);
-	
-	WriteGlyphEntry(cmapWriteContext,it->second.mEncodedCharacter,it->second.mUnicodeCharacters);
-	++it;
-	for(; it != mCharactersVector.end(); ++it,++i)
+	for(unsigned long i = 0; i < vectorSize; ++i)
 	{
 		if(i % 100 == 0)
 		{
-			primitiveWriter.WriteKeyword(scEndBFChar);
+			if (i > 0) primitiveWriter.WriteKeyword(scEndBFChar);
 			if(vectorSize - i < 100)
 				primitiveWriter.WriteInteger(vectorSize - i);
 			else
 				primitiveWriter.WriteInteger(100);
 			primitiveWriter.WriteKeyword(scBeginBFChar);
 		}
-		WriteGlyphEntry(cmapWriteContext,it->second.mEncodedCharacter,it->second.mUnicodeCharacters);
+		WriteGlyphEntry(cmapWriteContext,entries[i].second.mEncodedCharacter,entries[i].second.mUnicodeCharacters);
 	}
-	primitiveWriter.WriteKeyword(scEndBFChar);
+	if (vectorSize > 0) primitiveWriter.WriteKeyword(scEndBFChar);
 	cmapWriteContext->Write((const Byte*)scCmapFooter,strlen(scCmapFooter));
 	mObjectsContext->EndPDFStream(pdfStream);
 	delete pdfStream;

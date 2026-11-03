@@ -48,10 +48,35 @@
 (define-public scheme-completions-built? #f)
 
 (tm-define (all-used-modules)
-  (cons (current-module) (module-uses (current-module))))
+  (cond ((s7-scheme?) *modules*)
+        ((femtolisp-scheme?) (table.values *modules*))
+        (else (cons (current-module) (module-uses (current-module))))))
 
 (tm-define (all-used-symbols)
-  (list-fold obarray-fold-sub '() (all-used-modules)))
+  (cond ((femtolisp-scheme?)
+         ;; the global (public) names which are bound, without the private
+         ;; names of the modules (name@module) and of femtolisp (%fl:name)
+         (filter (lambda (s)
+                   (and (not (string-index s #\@))
+                        (not (string-prefix? "%" s))))
+                 (map symbol->string
+                      (filter (lambda (s) (and (symbol? s) (bound? s)))
+                              (environment)))))
+        (else (all-used-symbols-guile-s7))))
+
+(define (all-used-symbols-guile-s7)
+  (if (s7-scheme?)
+      (map symbol->string
+           (append
+            ;; tm-defined symbols
+            (map car tm-defined-table)
+            ;; all other exported symbols
+            (apply append
+                   (map (lambda (m)
+                          (let ((e ((cdr m) '*exports*)))
+                            (if (undefined? e) (values) e)))
+                        *modules*))))
+      (list-fold obarray-fold-sub '() (all-used-modules))))
 
 (tm-define (scheme-completions-add str)
   (set! completions (pt-add completions str)))

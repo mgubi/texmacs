@@ -27,6 +27,14 @@
 * The object representation class
 ******************************************************************************/
 
+#if defined(USE_FEMTOLISP)
+
+// a tmscm is a root of the garbage collector of femtolisp by itself
+tmscm_object_rep::tmscm_object_rep (tmscm obj): handle (obj) {}
+tmscm_object_rep::~tmscm_object_rep () {}
+
+#else
+
 static list<tmscm > destroy_list;
 extern tmscm object_stack;
 
@@ -48,6 +56,8 @@ tmscm_object_rep::~tmscm_object_rep () {
     // because the destructor can be called during garbage collection.
   destroy_list= list<tmscm > ( handle, destroy_list);
 }
+
+#endif
 
 
 /******************************************************************************
@@ -402,7 +412,7 @@ object eval (const char* expr) {
 object eval (string expr) {
   return tmscm_to_object (eval_scheme (expr)); }
 object eval (object expr) {
-  return call ("eval", expr); }
+  return call ("tm-eval", expr); }
 object eval_secure (string expr) {
   return call ("secure-eval", string_to_object (expr)); }
 
@@ -548,7 +558,7 @@ get_preference (string var, string def) {
 * Delayed evaluation
 ******************************************************************************/
 
-#ifndef QTTEXMACS
+#if !defined(QTTEXMACS) && !defined(AQUATEXMACS)
 static array<object> delayed_queue;
 static array<time_t> start_queue;
 
@@ -593,7 +603,7 @@ clear_pending_commands () {
   delayed_queue= array<object> (0);
   start_queue  = array<time_t> (0);
 }
-#endif // QTTEXMACS
+#endif // !defined(QTTEXMACS) && !defined(AQUATEXMACS)
 
 /******************************************************************************
 * Protected evaluation

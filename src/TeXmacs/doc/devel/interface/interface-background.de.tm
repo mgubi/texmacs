@@ -36,7 +36,7 @@
     \ \ \ \ <example-plugin-link|substitute/src/substitute.cpp>
   </verbatim>
 
-  Die Hauptschleife von <verbatim|substitute.cpp> besteht aus den folgenden
+  Die Hauptschleife von <source-link|substitute.cpp|TeXmacs/examples/plugins/substitute/src/substitute.cpp> besteht aus den folgenden
   Zeilen
 
   <\cpp-fragment>
@@ -54,7 +54,7 @@
     fflush (stdout);
   </cpp-fragment>
 
-  Die Konfigurationsdatei des Plugins, <verbatim|init-substitute.scm>, hat
+  Die Konfigurationsdatei des Plugins, <source-link|init-substitute.scm|TeXmacs/examples/plugins/substitute/progs/init-substitute.scm>, hat
   den folgenden Code, der den ausgewählten Bereich durch das Ergebnis der
   Evaluierung ersetzt.
 
@@ -104,9 +104,9 @@
 
   enthält.
 
-  Wie <verbatim|substitute.cpp> oben formt das Hauptprogramm
-  <verbatim|secure.cpp> <LaTeX>-Ausdrücke in <TeXmacs>-Ausdrücke um. Das
-  Modul <verbatim|secure-secure.scm> enthält die <em|sichere>
+  Wie <source-link|substitute.cpp|TeXmacs/examples/plugins/substitute/src/substitute.cpp> oben formt das Hauptprogramm
+  <source-link|secure.cpp|TeXmacs/examples/plugins/secure/src/secure.cpp> <LaTeX>-Ausdrücke in <TeXmacs>-Ausdrücke um. Das
+  Modul <source-link|secure-secure.scm|TeXmacs/examples/plugins/secure/progs/secure-secure.scm> enthält die <em|sichere>
   <value|scheme>-Routine <verbatim|latexer>:
 
   <\scheme-fragment>
@@ -124,7 +124,7 @@
   Man muss <verbatim|latexer> unbedingt als \Rsicher`` einstufen, damit sie
   mit dem <markup|extern> Konstrukt zur Definition von weiteren Konstrukten
   herangezogen werden kann. Dazu wird die Stil-Definition
-  \ <verbatim|secure.ts> benutzt mit dem Code:
+  \ <source-link|secure.ts|TeXmacs/examples/plugins/secure/packages/secure.ts> benutzt mit dem Code:
 
   <\tm-fragment>
     <\inactive*>

@@ -37,6 +37,7 @@ scheme_tree plugin_list ();
 
 bool   has_user_preference (string var);
 string get_user_preference (string var, string def= "");
+void apply_icon_set (); // the icon set of the preferences, on the path of the icons
 void   set_user_preference (string var, string val);
 void   reset_user_preference (string var);
 void   load_user_preferences ();

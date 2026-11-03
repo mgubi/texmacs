@@ -1,0 +1,52 @@
+# How safe the files kept in the browser are (misc/wasm/files.js: wrote,
+# safetyLine, remind; #406), run in a page with a new profile (an empty
+# home):
+#   node misc/wasm/browser-run.mjs --profile <new dir> --script misc/wasm/test/storage.script
+# (Firefox asks the user for persistent storage: the answer stays pending
+# headless, unless --pref dom.storageManager.prompt.testing=true --pref
+# dom.storageManager.prompt.testing.allow=true; Chrome answers false
+# without a bookmark or an installed app.) Expected, in this order:
+#   1. no question and no reminder before anything is saved
+#      ("asked":false, "reminderOnEmptyHome":false);
+#   2. the panel line says the files may be deleted, "Last backup: never";
+#   3. a document saved by TeXmacs calls persist () once ("persistCalls":1,
+#      not again at the second save); the line follows the answer
+#      ("Kept until you clear the data of this site" when granted);
+#   4. its Back up button changes the date to "today";
+#   5. the reminder with a backup 10 days old, not twice the same day, not
+#      with a backup 2 days old, and with no backup;
+#   6. after a reload, the reminder comes by itself;
+#   7. its button makes a backup.
+wait 15000
+eval (async()=>{for(let i=0;i<120&&!(typeof _malloc=='function'&&typeof _vue_web_scheme_eval=='function');i++)await new Promise(r=>setTimeout(r,1000));await new Promise(r=>setTimeout(r,3000));return 'ready'})()
+eval window.tmS=(c)=>{const n=lengthBytesUTF8(c)+1,p=_malloc(n);stringToUTF8(c,p,n);const r=UTF8ToString(_vue_web_scheme_eval(p));_free(p);return r}; window.pause=(ms)=>new Promise(r=>setTimeout(r,ms)); window.calls=[]; if(navigator.storage&&navigator.storage.persist){const o=navigator.storage.persist.bind(navigator.storage);navigator.storage.persist=()=>{calls.push(Date.now());return o()}} window.line=()=>{const s=document.getElementById('tm-files-safety');return s?s.innerText:null}; 'ok'
+eval JSON.stringify({storage:tmFiles.storage(),hasApi:!!(navigator.storage&&navigator.storage.persist),home:FS.readdir('/home/web'),docs:FS.analyzePath('/home/web/Documents').exists?FS.readdir('/home/web/Documents'):null,toast:!!document.getElementById('tm-backup-reminder')})
+# 1. the empty home: no reminder
+eval (async()=>{localStorage.removeItem('tm-backup-reminded');tmFiles.remind();await pause(200);return JSON.stringify({reminderOnEmptyHome:!!document.getElementById('tm-backup-reminder')})})()
+# 2. the panel before any save
+eval (async()=>{tmFiles.browse();await pause(500);return JSON.stringify({line:line(),persistCalls:calls.length})})()
+shot panel-before
+key Escape
+# 3. a save of a document by TeXmacs: persist() asked
+eval (async()=>{const r=tmS('(begin (insert "hello 406") (save-buffer-as (string->url "/home/web/Documents/saved406.tm") (current-buffer) (list)) "saved")');await pause(4000);return JSON.stringify({r:r,exists:FS.analyzePath('/home/web/Documents/saved406.tm').exists,persistCalls:calls.length,storage:tmFiles.storage(),persisted:await navigator.storage.persisted()})})()
+eval (async()=>{tmS('(begin (insert " more") (save-buffer (current-buffer)) "again")');await pause(3000);return JSON.stringify({persistCallsAfterSecondSave:calls.length})})()
+eval (async()=>{tmFiles.browse();await pause(800);return JSON.stringify({line:line(),state:document.getElementById('tm-files-safety-state').dataset.persisted})})()
+shot panel-after-save
+# 4. Back up
+eval (async()=>{localStorage.removeItem('tm-last-backup');tmFiles.browse();await pause(300);const before=line();document.getElementById('tm-files-backup-now').click();await pause(3000);return JSON.stringify({before:before,after:line(),lastBackup:tmFiles.storage().lastBackup})})()
+shot panel-after-backup
+key Escape
+# 5. the reminder: documents, the last backup 10 days ago
+eval (async()=>{document.querySelectorAll('#tm-backup-reminder').forEach(e=>e.remove());localStorage.setItem('tm-last-backup',String(Date.now()-10*86400000));localStorage.removeItem('tm-backup-reminded');tmFiles.remind();await pause(300);const t=document.getElementById('tm-backup-reminder');return JSON.stringify({reminder:t?t.innerText:null})})()
+shot reminder-old
+eval (async()=>{document.querySelectorAll('#tm-backup-reminder').forEach(e=>e.remove());tmFiles.remind();await pause(300);return JSON.stringify({reminderAgainSameDay:!!document.getElementById('tm-backup-reminder')})})()
+eval (async()=>{localStorage.removeItem('tm-backup-reminded');localStorage.setItem('tm-last-backup',String(Date.now()-2*86400000));tmFiles.remind();await pause(300);return JSON.stringify({reminderRecentBackup:!!document.getElementById('tm-backup-reminder')})})()
+eval (async()=>{localStorage.removeItem('tm-backup-reminded');localStorage.removeItem('tm-last-backup');tmFiles.remind();await pause(300);const t=document.getElementById('tm-backup-reminder');return JSON.stringify({reminderNever:t?t.innerText:null})})()
+shot reminder-never
+# 6. on its own after a reload: documents, no backup, not reminded today
+eval (async()=>{localStorage.removeItem('tm-backup-reminded');localStorage.removeItem('tm-last-backup');setTimeout(()=>location.reload(),100);return 'reload'})()
+wait 3000
+eval (async()=>{const t0=Date.now();for(let i=0;i<90&&!document.getElementById('tm-backup-reminder');i++)await new Promise(r=>setTimeout(r,1000));const t=document.getElementById('tm-backup-reminder');return JSON.stringify({afterReload:t?t.innerText:null,waited:Date.now()-t0,storage:tmFiles.storage()})})()
+shot reminder-after-reload
+# 7. the reminder button backs up
+eval (async()=>{const t=document.getElementById('tm-backup-reminder');if(!t)return 'no toast';t.querySelector('button').click();await new Promise(r=>setTimeout(r,3000));return JSON.stringify({lastBackupAfterToastButton:tmFiles.storage().lastBackup,toastGone:!document.getElementById('tm-backup-reminder')})})()

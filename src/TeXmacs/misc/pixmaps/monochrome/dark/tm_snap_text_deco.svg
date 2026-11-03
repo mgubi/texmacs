@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><rect fill="none" stroke="#D8D8D8" stroke-width="1.45" x="2.5" y="5.5" width="13" height="15" rx="1"/><path fill="#D8D8D8" stroke="#D8D8D8" stroke-width="1.1" d="M12.89 11.64 12.67 8.94H5.33L5.11 11.64H5.41C5.57 9.71 5.75 9.31 7.57 9.31C7.78 9.31 8.09 9.31 8.21 9.33C8.47 9.38 8.47 9.51 8.47 9.79V16.11C8.47 16.52 8.47 16.69 7.21 16.69H6.73V17.06C7.22 17.03 8.44 17.03 8.99 17.03C9.55 17.03 10.78 17.03 11.27 17.06V16.69H10.79C9.53 16.69 9.53 16.52 9.53 16.11V9.79C9.53 9.55 9.53 9.38 9.75 9.33C9.88 9.31 10.21 9.31 10.43 9.31C12.25 9.31 12.43 9.71 12.59 11.64Z"/><path fill="none" stroke="#FF453A" stroke-width="2.4" d="M13.5 18h7M17 14.5v7"/></g>
+</svg>

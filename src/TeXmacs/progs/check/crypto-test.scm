@@ -38,7 +38,7 @@
 ;; that a passphrase which gpg would ask for makes the command fail instead
 ;; of hanging. The functions of gpg-edit.scm use the GnuPG directory of the
 ;; TeXmacs home (TEXMACS_HOME_PATH/users/<user>/gnupg), which the checks
-;; use only when the TeXmacs home is not ~/.TeXmacs (tests/scheme/check.sh
+;; use only when the TeXmacs home is not ~/.TeXmacs_Upsilon (tests/scheme/check.sh
 ;; gives a scratch home), with the same gpg-agent.conf.
 ;;
 ;; Left out because they need a dialog: the decryption of key encrypted
@@ -745,7 +745,12 @@
     (check= (gpg-string-load-decrypt f "" dir) secret-text)
     (check-false (gpg-string-load-decrypt f "" other))
     (gpg-encrypt-save-object g o fpr dir)
-    (check= (gpg-load-decrypt-object g "" dir) o))
+    (check= (gpg-load-decrypt-object g "" dir) o)
+    ;; a long object comes back whole (with S7, write prints only the first
+    ;; 40 elements of a list: the GnuPG wallet saves its table this way)
+    (with long (map (lambda (i) (list i (number->string i))) (iota 100))
+      (gpg-encrypt-save-object g long fpr dir)
+      (check= (gpg-load-decrypt-object g "" dir) long)))
   ;; FIXME (#66, item 4): gpg-delete-public-key runs
   ;; --delete-secret-and-public-key (security/gpg/gpg-base.scm:429), so
   ;; that deleting a public key also deletes the secret key.
@@ -852,7 +857,7 @@
   ;; the GnuPG home of TeXmacs may be used: TeXmacs does not run with the
   ;; home of the user
   (let ((home (url->system (url-concretize "$TEXMACS_HOME_PATH")))
-        (user (url->system (url-concretize "~/.TeXmacs"))))
+        (user (url->system (url-concretize "~/.TeXmacs_Upsilon"))))
     (!= home user)))
 
 ;; The passphrase of a secret key, as the wallet checks it

@@ -193,6 +193,10 @@
 (menu-bind load-menu
   ("Load" (open-document))
   ("Revert" (revert-buffer))
+  ;; the browser build: the files kept in the page (web-files is defined
+  ;; by the Vue plugin there)
+  (if (defined? 'web-files)
+      ("Files in this browser..." (web-files)))
   (if (not (window-per-buffer?))
       ("Load in new window" (open-document*)))
   ---
@@ -233,6 +237,10 @@
 
 (menu-bind print-menu
   ("Preview" (preview-buffer))
+  (if (defined? 'web-open-pdf)
+      ;; in the browser: the PDF in a tab, whose viewer prints it (as
+      ;; Preview, but named for what it is for; print-buffer is interactive)
+      ("Print" (preview-buffer)))
   (if (use-print-dialog?)
       (if (has-printing-cmd?) ("Print" (print-buffer)))
       ("Print to file"
@@ -247,6 +255,10 @@
 
 (menu-bind print-menu-inline
   ("Preview" (preview-buffer))
+  (if (defined? 'web-open-pdf)
+      ;; in the browser: the PDF in a tab, whose viewer prints it (as
+      ;; Preview, but named for what it is for; print-buffer is interactive)
+      ("Print" (preview-buffer)))
   (if (use-print-dialog?)
       (if (has-printing-cmd?) ("Print" (print-buffer)))
       ("Print to file"
@@ -274,19 +286,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (wrapped-import-pdf-embeded-with-tm tem-pdf)
+  ;; the linked files (images, included documents...) come out of the PDF
+  ;; next to its document, which is therefore what their paths are made
+  ;; relative to: with PDFHummus that is <pdf-name>-attachments next to the
+  ;; PDF, with MuPDF a directory of their own (see mupdf_attachments.cpp)
   (let* ((tem-dir (url-temp-dir))
+         (tem-tm (url-append tem-dir "tem.tm"))
          (tem-tm2 (url-append tem-dir "extracted.tm"))
          (main-tm (and (extract-attachments tem-pdf)
-                       (pdf-get-attached-main-tm tem-pdf))))
+                       (url-relative tem-tm
+                                     (pdf-get-attached-main-tm tem-pdf)))))
     (if (and main-tm (not (url-none? main-tm)))
         (begin
-          ;; the attachments were extracted into <pdf-name>-attachments
-          ;; next to the pdf; make the links of the main document point there
           (string-save
             (serialize-texmacs
-              (pdf-replace-linked-path
-                (tree-import main-tm "texmacs")
-                main-tm))
+              (pdf-replace-linked-path (tree-import main-tm "texmacs") main-tm))
             tem-tm2)
           (load-buffer tem-tm2))
         (begin
@@ -319,6 +333,8 @@
       ---
       ("Pdf" (choose-file wrapped-print-to-file "Save pdf file" "pdf"))
       ("Pdf with embedded document" (choose-file wrapped-print-to-pdf-embeded-with-tm "Save pdf file" "pdf"))
+      (when (pdf-encryption?)
+        ("Pdf with password" (choose-file choose-pdf-with-password "Save pdf file" "pdf")))
       ("Postscript"
        (choose-file wrapped-print-to-file "Save postscript file" "postscript"))
       (when (selection-active-any?)

@@ -1,0 +1,1217 @@
+// This file is compiled in every build, but the Qt port keeps its own
+// implementation (Plugins/Qt/QTMSockets.cpp, on QSocketNotifier).
+#ifndef QTTEXMACS
+
+/******************************************************************************
+* MODULE     : tm_sockets.cpp
+* DESCRIPTION: TeXmacs sockets manager, GUI independent (from QTMSockets)
+* COPYRIGHT  : (C) 2015 Denis RAUX
+*                  2022 Gregoire LECERF
+*                  2025 Robin WILS
+*******************************************************************************
+* This software falls under the GNU general public license version 3 or later.
+* It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+* in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+******************************************************************************/
+
+#include "tm_sockets.hpp"
+#include "socket_notifier.hpp"
+#include "sys_utils.hpp"
+#include "list.hpp"
+#include "scheme.hpp"
+#include "iterator.hpp"
+#include "analyze.hpp"
+#include "boot.hpp"
+#include "server_log.hpp"
+#include "gnutls.hpp"
+#include "websocket_contact.hpp"
+#include "tm_timer.hpp"
+#include "hashset.hpp"
+#include <cctype>
+#include <string.h> // memset, memcpy (without Qt, which included it)
+
+#if defined(OS_MACOS)
+  #include "MacOS/mac_utilities.h"
+#endif
+
+#ifndef OS_MINGW
+
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
+
+#define CONNECT ::connect
+#define CLOSE(a) close(a)
+#define WRITE(a, b, c) ::write(a, b, c)
+#define ERRNO errno
+#define ERRSOC(a) a 
+#define GETADDRINFO getaddrinfo
+#define FREEADDRINFO freeaddrinfo
+#define ADDRINFO addrinfo
+#define SOCKET socket
+#define GAI_STRERROR gai_strerror
+#define BIND bind
+#define LISTEN listen
+#define ACCEPT accept
+#define INET_NTOP inet_ntop
+#define TM_FD_SET(fd, set) FD_SET(fd, set)
+#define GETSOCKOPT getsockopt
+#define SETSOCKOPT setsockopt
+
+#else
+
+#define CONNECT wsoc::connect
+#define CLOSE(a) wsoc::closesocket(a)
+#define WRITE(a, b, c) wsoc::send(a, b, c, 0) 
+#define ERRNO wsoc::WSAGetLastError()
+#define ERRSOC(a) WSA##a 
+#define GETADDRINFO wsoc::getaddrinfo 
+#define FREEADDRINFO wsoc::freeaddrinfo
+#define ADDRINFO wsoc::addrinfo
+#define SOCKET wsoc::socket
+#define GAI_STRERROR wsoc::gai_strerrorA
+#define BIND wsoc::bind
+#define LISTEN wsoc::listen
+#define ACCEPT wsoc::accept
+#define INET_NTOP wsoc::inet_ntop
+#undef FD_ISSET
+#define FD_ISSET __WSAFDIsSet
+#define TM_FD_SET(fd, set) FD_SET((u_int) fd, set)
+#define GETSOCKOPT wsoc::getsockopt
+#define SETSOCKOPT wsoc::setsockopt
+
+#endif
+
+/******************************************************************************
+* Utilities
+******************************************************************************/
+
+static string
+string_from_socket_address (SOCKADDR_STORAGE* sock) {
+  static char tmp[128];
+  if (sock->ss_family == AF_INET) {
+#ifdef OS_MINGW
+    return wsoc::inet_ntoa (((SOCKADDR_IN*) sock)->sin_addr);
+#else
+    if (inet_ntop (AF_INET, &(((sockaddr_in*) sock)->sin_addr),
+        tmp, sizeof(tmp)) == NULL)
+      return "";
+    return tmp;
+#endif
+  }
+  if (sock->ss_family == AF_INET6) {
+#if !defined (OS_MINGW) || (_WIN32_WINNT >= 0x0600)
+    if (INET_NTOP (AF_INET6, &(((SOCKADDR_IN6*) sock)->sin6_addr),
+        tmp, sizeof(tmp)) == NULL)
+      return "";
+#else
+    return "";
+#endif
+    return string ("[") * tmp * string ("]");
+  }
+  return "";
+}
+
+string
+socket_debug_io_string (string s, int max) {
+  int i, n= N(s);
+  string r;
+  for (i=0; i<n && i<max; i++) {
+    unsigned char c= (unsigned char) s[i];
+    if (c == DATA_BEGIN) r << "[BEGIN]";
+    else if (c == DATA_END) r << "[END]";
+    else if (c == DATA_COMMAND) r << "[COMMAND]";
+    else if (c == DATA_ESCAPE) r << "[ESCAPE]";
+    else if (isprint ((int) c) || isspace ((int) c)) r << s[i];
+    else r << "\\x" << as_hexadecimal(c);
+  }
+  if (n > max) {
+    r << "... (" << as_string (n) << " bytes truncated to "
+      << as_string (max) << ")";
+  }
+  return r;
+}
+
+unsigned long long int tmsocket_debug_counter= 0;
+
+static int
+safe_server_close (int fd) {
+  int ret= CLOSE (fd);
+  if (ret != 0) {
+    SERRNO_LOGE ("server socket close");
+    SLOGE ("cannot close server socket. Please exit TeXmacs in order to stop "
+        "the server completely");
+  }
+  return ret;
+}
+
+static int
+set_socket_noblock (int socket) {
+#ifndef OS_MINGW
+    if (fcntl (socket, F_SETFL, O_NONBLOCK) == -1)
+      return -1;
+#else
+    {
+      using namespace wsoc;
+      u_long flags = -1;
+      if (ioctlsocket (socket, FIONBIO, &flags) == SOCKET_ERROR)
+        return -1;
+    }
+#endif
+    return 0;
+}
+
+/******************************************************************************
+* Socket initialization
+******************************************************************************/
+
+#ifndef OS_MINGW
+
+bool
+socket_present () {
+  return true;
+}
+
+#else
+
+static bool __socket_present= false;
+static wsoc::WSADATA wsadata;
+
+struct __WSA_initializer {
+  __WSA_initializer () {
+	using namespace wsoc;
+    if (__socket_present) return;
+    int e= WSAStartup (MAKEWORD (2,0), &wsadata);
+    if (e == 0)
+      __socket_present= true;
+    else {
+      SERRNO_LOGE ("WSAStartup failed, disabling sockets");
+    }
+  }
+  ~__WSA_initializer () {
+    wsoc::WSACleanup ();
+    __socket_present= false;
+  }
+};
+
+bool
+socket_present () {
+  static __WSA_initializer __dummy;
+  (void) __dummy;
+  return __socket_present;
+}
+
+#endif
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+// In the browser a socket is a WebSocket (Emscripten). A TeXmacs server
+// serves the WebSockets at a port of their own, by default the one which
+// follows its port, so that a connection to host:port opens
+// ws://host:port+1/ or wss://host:port+1/. ?websocket-port=N in the address
+// of the page gives another port (the preference "server websocket port"
+// of the server, or the port of a bridge).
+//
+// The server speaks wss when it is open to other machines and asks its
+// clients for TLS, ws otherwise (a server for this machine only, or one
+// without TLS). So: ws to this machine, and wss to another host when the
+// login is one over TLS; a page served over https may open wss only to
+// another host anyway (a ws from it is blocked as mixed content).
+// ?websocket=wss (or ws) in the address of the page says which, whatever
+// the page and the server (the tests use it).
+static bool web_socket_tls= false;
+
+void
+web_socket_over_tls (bool tls) {
+  web_socket_tls= tls;
+}
+
+EM_JS (int, web_socket_scheme, (const char* host, int tls), {
+  var h = UTF8ToString (host);
+  var page = typeof location !== 'undefined' ? location : null;
+  var q = page ? new URLSearchParams (page.search).get ('websocket') : null;
+  var local = /^(localhost|127\.[0-9.]+|::1|\[::1\])$/i.test (h);
+  var https = page && page.protocol === 'https:';
+  var scheme = (q === 'wss' || q === 'ws') ? q :
+               (!local && (https || tls) ? 'wss' : 'ws');
+  if (typeof SOCKFS !== 'undefined') SOCKFS.websocketArgs['url'] = scheme + '://';
+  return scheme === 'wss' ? 1 : 0;
+});
+
+EM_JS (int, web_socket_port, (int port), {
+  var page = typeof location !== 'undefined' ? location : null;
+  var q = page ? new URLSearchParams (page.search).get ('websocket-port') : null;
+  var n = q ? parseInt (q, 10) : NaN;
+  return (n > 0 && n < 65536) ? n : port + 1;
+});
+
+// The browser does not tell a page why a WebSocket failed (security): a
+// connection which fails before any data says where it went, and what may
+// be wrong
+static hashmap<int,string> web_socket_url ("");
+static hashset<int> web_socket_got;
+
+static string
+web_socket_failure (int s) {
+  if (web_socket_got->contains (s) || web_socket_url[s] == "") return "";
+  return " (" * web_socket_url[s] * " could not be opened: no TeXmacs "
+    "server there, one which does not serve WebSocket clients at that "
+    "port (its preferences \"server websocket\" and \"server websocket "
+    "port\"), one which speaks " * (starts (web_socket_url[s], "wss") ?
+      string ("ws") : string ("wss")) * " there (?websocket=... in the "
+    "address of the page) or, for wss, a certificate which the browser "
+    "does not trust)";
+}
+#else
+static string web_socket_failure (int s) { (void) s; return ""; }
+#endif
+
+int try_connect (const char* host, const char* port, int timeout,
+                 char* errbuf, size_t errlen) {
+#define MAX_SOCKS 16
+  struct ADDRINFO hints;
+  struct ADDRINFO *result, *rp;
+  memset (&hints, 0, sizeof (hints));
+  hints.ai_family= AF_UNSPEC;
+  hints.ai_socktype= SOCK_STREAM;
+  hints.ai_protocol= 0;
+  hints.ai_canonname= NULL;
+  hints.ai_addr= NULL;
+  hints.ai_next= NULL;
+
+  if (errbuf && errlen > 0) errbuf[0]= '\0';
+#ifdef __EMSCRIPTEN__
+  bool wss= web_socket_scheme (host, web_socket_tls ? 1 : 0) != 0;
+  // the port of the WebSockets of the server
+  c_string _wport (as_string (web_socket_port (atoi (port))));
+  port= (const char*) _wport;
+#endif
+
+  int x= GETADDRINFO (host, port, &hints, &result);
+  if (x != 0) {
+    if (errbuf)
+      snprintf (errbuf, errlen, "getaddrinfo: %s", GAI_STRERROR (x));
+    return -1;
+  }
+
+  int socks[MAX_SOCKS];
+  struct tm_pollfd pfds[MAX_SOCKS];
+  int n= 0;
+
+  for (rp= result; rp != NULL && n < MAX_SOCKS; rp= rp->ai_next) {
+    int s= SOCKET (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (s < 0) continue;
+    if (set_socket_noblock (s) == -1) {
+      CLOSE (s);
+      continue;
+    }
+
+#ifdef __EMSCRIPTEN__
+    web_socket_url (s)= string (wss ? "wss://" : "ws://") * string (host) *
+                        ":" * string (port) * "/";
+    web_socket_got->remove (s);
+#endif
+    int ret= CONNECT (s, rp->ai_addr, rp->ai_addrlen);
+    if (ret == 0) {
+      // immediate success
+      for (int j= 0; j < n; j++) CLOSE (socks[j]);
+      FREEADDRINFO (result);
+      return s;
+    }
+
+#if defined(OS_MINGW)
+    int err= ERRNO;
+    if (err != WSAEWOULDBLOCK) {
+      CLOSE (s);
+      continue;
+    }
+#else
+    if (errno != EINPROGRESS) {
+      CLOSE (s);
+      continue;
+    }
+#endif
+#ifdef __EMSCRIPTEN__
+    // in the browser a socket is a WebSocket, which opens once the page
+    // has the hand again: no waiting here (it would never open). What is
+    // written before is queued, and the link waits for the socket to be
+    // writable, which it is once open
+    FREEADDRINFO (result);
+    return s;
+#endif
+    socks[n]= s;
+    pfds[n].fd= s;
+    pfds[n].events= TM_POLL_WRITE;
+    pfds[n].revents= 0;
+    n++;
+  }
+  FREEADDRINFO (result);
+
+  if (n == 0) return -1;
+
+  int ret= tm_poll (pfds, n, timeout);
+  if (ret <= 0) {
+    for (int i= 0; i < n; i++) CLOSE (socks[i]);
+    return -1;
+  }
+
+  int winner= -1;
+  for (int i= 0; i < n; i++) {
+    if (pfds[i].revents & TM_POLL_WRITE) {
+      int err= 0;
+      socklen_t elen= sizeof (err);
+      GETSOCKOPT (socks[i], SOL_SOCKET, SO_ERROR, (char*) &err, &elen);
+      if (err == 0) {
+        winner= socks[i];
+        break;
+      }
+    }
+  }
+
+  for (int i= 0; i < n; i++)
+    if (socks[i] != winner) CLOSE (socks[i]);
+
+  return winner;
+}
+
+/******************************************************************************
+* Socket link
+******************************************************************************/
+
+static hashset<pointer> all_connections;
+
+static inline bool
+exists (socket_link_rep* s) {
+  return all_connections->contains ((pointer) s);
+}
+
+static inline void
+checkin (socket_link_rep* s) {
+  all_connections->insert ((pointer) s);
+}
+
+static inline void
+checkout (socket_link_rep* s) {
+  all_connections->remove ((pointer) s);
+}
+
+// the links stopped from their own callbacks, freed at the next poll
+static list<socket_link_rep*> stopped_links;
+
+void
+collect_stopped_links () {
+  while (!is_nil (stopped_links)) {
+    socket_link_rep* l= stopped_links->item;
+    stopped_links= stopped_links->next;
+    tm_delete (l);
+  }
+}
+
+// to be created by the server
+socket_link_rep::socket_link_rep (int fd, SOCKADDR_STORAGE* addr,
+    tm_contact contact2, socket_server_rep* server2):
+  host (""), port (0), socket_id (fd), contact (contact2), server (server2),
+  handshake (false), read_enabled (false), write_enabled (false) {
+  alive= false;
+  since= texmacs_time ();
+  memcpy (&address, addr, sizeof(address));
+  host= string_from_socket_address (&address);
+}
+
+// to be created by clients
+socket_link_rep::socket_link_rep (string host2, unsigned short port2,
+    tm_contact contact2):
+  host (host2), port (port2), socket_id (-1), contact (contact2), server (NULL),
+  handshake (false), read_enabled (false), write_enabled (false) {
+  alive= false;
+  since= texmacs_time ();
+}
+
+// the notifiers: readable and writable sockets call back here; which
+// routine handles them depends on the phase (handshake or data)
+void
+socket_link_rep::read_callback (void* obj, void* info) {
+  (void) info;
+  socket_link_rep* l= (socket_link_rep*) obj;
+  if (!exists (l)) return;
+  if (l->handshake) l->resume_start (l->socket_id);
+  else l->data_set_ready (l->socket_id);
+}
+
+void
+socket_link_rep::write_callback (void* obj, void* info) {
+  (void) info;
+  socket_link_rep* l= (socket_link_rep*) obj;
+  DEBUG_SOCKET ("'socket_link_rep::write_callback', socket " << l->socket_id
+                << " exists " << (int) exists (l) << " handshake " << (int) l->handshake);
+  if (!exists (l)) return;
+  if (l->handshake) l->resume_start (l->socket_id);
+  else l->ready_to_send (l->socket_id);
+}
+
+void
+socket_link_rep::enable_read (bool on) {
+  if (on == read_enabled) return;
+  read_enabled= on;
+  if (is_nil (read_notifier)) return;
+  if (on) add_notifier (read_notifier);
+  else remove_notifier (read_notifier);
+}
+
+void
+socket_link_rep::enable_write (bool on) {
+  if (on == write_enabled) return;
+  write_enabled= on;
+  if (is_nil (write_notifier)) return;
+  if (on) add_notifier (write_notifier);
+  else remove_notifier (write_notifier);
+}
+
+socket_link_rep::~socket_link_rep () {
+  DEBUG_SOCKET("'~socket_link_rep' is closing socket " << socket_id);
+  if (socket_id >= 0)
+    CLOSE(socket_id);
+  input_buffer= "";
+  output_buffer= "";
+}
+
+string
+socket_link_rep::start () {
+  if (!socket_present ())
+    return "cannot use sockets";
+  if (socket_id >= 0) { // used by the server
+    if (!is_alive (contact)) {
+      string msg= string ("unexpected closed contact for socket ") *
+        as_string (socket_id);
+      checkin (this);
+      SLOGE (msg);
+      return msg;
+    }
+  }
+  else { // used for clients
+    if (used_by_server ())
+      return "internal error, inconsistent 'socket_link_rep'";
+
+    c_string _host (host);
+    c_string _port (as_string (port));
+    char errbuf[256];
+
+    socket_id= try_connect (_host, _port, 5000, errbuf, sizeof (errbuf));
+    if (socket_id < 0) {
+      if (errbuf[0] != '\0')
+        return string ("'getaddrinfo' error: ") * string (errbuf);
+      return "cannot connect to hostname '" * host
+        * "' at port " * as_string (port);
+    }
+
+    DEBUG_SOCKET("'socket_link_rep::start' created socket with id "
+      << socket_id);
+    ::start (contact, socket_id);
+    if (!is_alive (contact)) {
+      CLOSE(socket_id);
+      socket_id= -1;
+      return "contact has not started";
+    }
+
+    SLOG ("contact started for socket " * as_string (socket_id));
+    call ("client-add", object (socket_id));
+  }
+  checkin (this);
+  read_notifier=  socket_notifier (socket_id, &read_callback, this, NULL, false);
+  write_notifier= socket_notifier (socket_id, &write_callback, this, NULL, true);
+
+  if (is_active (contact)) {
+    connect_data_notifiers ();
+  } else {
+    connect_handshake_notifiers ();
+  }
+  enable_read (true);
+  // the write notifier is kept only while there is something to send (or
+  // during the handshake): a writable socket is always ready
+  enable_write (handshake || N(output_buffer) > 0);
+  alive= true;
+  return "";
+}
+
+void socket_link_rep::connect_data_notifiers () {
+  ASSERT (is_active(contact), "inactive contact");
+  SLOG ("connecting data notifiers for socket " * as_string (socket_id));
+  handshake= false;
+}
+
+void socket_link_rep::connect_handshake_notifiers () {
+  SLOG ("connecting handshake resume notifier for socket "
+	* as_string (socket_id));
+  handshake= true;
+}
+
+void
+socket_link_rep::stop () {
+  DEBUG_SOCKET("'socket_link_rep::stop' is closing socket " << socket_id);
+  if (!alive) {
+    // a connection of a client which ends before it was made (the first
+    // write failed while it was started): the client is told as well, or
+    // whoever waits for its answer would wait until a timeout
+    if (!used_by_server () && socket_id >= 0)
+      call ("client-remove", object (socket_id));
+    checkout (this);
+    return;
+  }
+  enable_read (false);
+  enable_write (false);
+  read_notifier= socket_notifier ();
+  write_notifier= socket_notifier ();
+  if (used_by_server ()) { // socket created by the server
+    call ("server-logout-client", object (socket_id));
+    call ("server-remove", object (socket_id));
+  }
+  else { // socket created by a client
+    call ("client-remove", object (socket_id));
+  }
+  alive= false;
+  ::stop (contact);
+  if (socket_id >= 0) {
+    if (CLOSE(socket_id) && used_by_server ())
+      SLOGE ("cannot close socket " * as_string (socket_id));
+  }
+  checkout (this);
+  if (used_by_server ()) { // socket created by the server
+    if (server != NULL) server->disconnection (this);
+  }
+  else
+    socket_id= -1;
+}
+
+string&
+socket_link_rep::watch (int channel) {
+  static string empty_string= "";
+  if (channel == LINK_OUT)
+    return input_buffer;
+  return empty_string;
+}
+
+string
+socket_link_rep::read (int channel) {
+  DEBUG_SOCKET("'socket_link_rep::read' received size " << N(input_buffer));
+  if (channel == LINK_OUT && N(input_buffer)) {
+    string r= input_buffer;
+    input_buffer= "";
+    return r;
+  }
+  else return "";
+}
+
+void
+socket_link_rep::write (string s, int channel) {
+  DEBUG_SOCKET("'socket_link_rep::write' received size " << N(s));
+  if ((!alive) || (channel != LINK_IN) || !N(s))
+    return;
+  output_buffer << s;
+  enable_write (true);
+}
+
+inline bool
+socket_link_rep::retry (int err) {
+#ifdef USE_GNUTLS
+  return err < 0 && err != EAGAIN && err != GNUTLS_E_AGAIN &&
+    err != GNUTLS_E_INTERRUPTED;
+#else
+  return err < 0 && err != EAGAIN;
+#endif
+}
+
+void
+socket_link_rep::resume_start (int s) {
+  if (!exists (this)) return;
+  DEBUG_SOCKET ("'socket_link_rep::resume_start', socket " << s
+                << " alive " << (int) is_alive (contact) << " active " << (int) is_active (contact));
+  if (!is_alive (contact)) {
+    DEBUG_SOCKET ("contact is dead for socket " * as_string (s));
+    stop ();
+    // on cert error an interactive trust-certificate widget is spawned
+    if (!is_headless ()
+        && contact->last_error() != ""
+        && contact->last_error() != "certificate verify interactive")
+      call ("client-open-error", contact->last_error());
+    return;
+  }
+  if (!is_active (contact)) {
+    ::start (contact, s);
+    if (!is_alive (contact)) {
+      stop ();
+      if (!is_headless ()
+          && contact->last_error() != ""
+          && contact->last_error() != "certificate verify interactive")
+        call ("client-open-error", contact->last_error());
+      return;
+    }
+  }
+  if (is_active (contact)) {
+    connect_data_notifiers();
+    enable_write (N(output_buffer) > 0);
+    // what the contact read while it started (the first request of a
+    // client over TLS, read to know what it is) does not make the socket
+    // readable again
+    data_set_ready (s);
+  }
+}
+
+void
+socket_link_rep::data_set_ready (int s) {
+  if (!exists (this)) return;
+  if (!alive)
+    return;
+  if (!is_active (contact)) {
+    stop ();
+    return;
+  }
+  DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
+    << socket_id << ", s= " << s);
+  // a contact may hold data of its own (decoded from WebSocket frames, or
+  // TLS records) beyond what one call gives: read until it has no more,
+  // since the socket will not say it is readable for those
+  bool got= false;
+  for (int round= 0; round < 256; round++) {
+  char data[16384];
+  int n= receive (contact, (void*) data, 16384);
+  DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
+    << socket_id << " 'receive' returned " << n);
+  if (n == 0) {
+    DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
+      << socket_id << " hung up");
+    if (!used_by_server ())
+      io_error << "connection to server '" << host << "' hung up"
+               << web_socket_failure (socket_id) << LF;
+    stop ();
+  }
+  else if (n < 0) {
+    if (is_alive (contact)); // nothing to read yet (EAGAIN), keep listening
+    else {
+      DEBUG_SOCKET("'socket_link_rep::data_set_ready', 'receive' failed: "
+        << last_error (contact));
+      if (used_by_server ())
+	io_error << "connection to client " << s << " aborted" << LF;
+      else
+        io_error << "connection to server '" << host << "' aborted"
+                 << web_socket_failure (socket_id) << LF;
+      stop ();
+    }
+  }
+  else {
+    input_buffer << string (data, n);
+#ifdef __EMSCRIPTEN__
+    web_socket_got->insert (socket_id);
+#endif
+    if (DEBUG_IO) {
+      string s (data, n);
+      bool ok= true;
+      for (int i= 0; i < N(s); i++)
+        if (((int) (unsigned char) s[i]) >= 128 ||
+            (((int) (unsigned char) s[i]) < 32 &&
+             s[i] != '\n' && s[i] != '\t'))
+          ok= false;
+      if (ok) {
+        DEBUG_SOCKET_DATA(
+            "'socket_link_rep::data_set_ready', received data: ", s);
+      }
+      else {
+        DEBUG_SOCKET("'socket_link_rep::data_set_ready', received size "
+          << N(s));
+      }
+    }
+    got= true;
+    continue;
+  }
+  break; // nothing more (or the end, or an error)
+  }
+  if (got && !is_nil (feed_cmd))
+    feed_cmd->apply ();
+}
+
+void
+socket_link_rep::ready_to_send (int s) {
+  if (!exists (this)) return;
+#ifdef OS_MINGW
+  using namespace wsoc;
+#endif
+  enable_write (false);
+  if (!alive)
+    return;
+  if (!is_active (contact)) {
+    stop ();
+    return;
+  }
+  int n= N(output_buffer);
+  if (n > 0) {
+    c_string buf (output_buffer);
+    int ret= send (contact, buf, n);
+    DEBUG_SOCKET("'socket_link_rep::ready_to_send', 'send' returned "
+      << ret);
+    if (ret > 0) {
+      if (ret == n)
+        output_buffer= "";
+      else
+        output_buffer= output_buffer (ret, n);
+      n -= ret;
+      if (n > 0) enable_write (true);
+    }
+    else if (retry (ret)) {
+      DEBUG_SOCKET("'socket_link_rep::ready_to_send', error: "
+        << last_error (contact));
+      if (is_active (contact)) {
+        if (used_by_server ())
+          io_warning << "retrying connection to client "
+            << as_string (s) << ": " << last_error (contact);
+        else
+          io_warning << "retrying connection to server '"
+            << host << "': " << last_error (contact);
+        enable_write (true);
+      }
+      else {
+        if (used_by_server ())
+          io_error << "connection to client "
+            << as_string (s) << " aborted: " << last_error (contact);
+        else
+          io_error << "connection to server '"
+            << host << "' aborted: " << last_error (contact)
+            << web_socket_failure (socket_id);
+        stop ();
+      }
+    }
+    else enable_write (true);
+  }
+}
+
+void
+socket_link_rep::listen (int msecs) {
+  if (!alive) return;
+  time_t start = texmacs_time();
+  int initial_len = N(input_buffer);
+  // wait for input: poll the sockets and run the pending (delayed) Scheme
+  // commands meanwhile, as the Qt port did with processEvents — a server
+  // in the same process answers through them
+  // (the input is checked right after the poll: the pending commands
+  // include the polling loops of client-base.scm, which would otherwise
+  // take the packet this call is waiting for)
+  while (alive && N(input_buffer) == initial_len) {
+    perform_select ();
+    collect_stopped_links ();
+    if (!alive || N(input_buffer) != initial_len) break;
+    if (msecs <= 0 || (texmacs_time() - start >= msecs)) break;
+    exec_pending_commands ();
+    tm_poll (NULL, 0, 5); // a short sleep between the polls
+  }
+}
+
+/******************************************************************************
+* Server
+******************************************************************************/
+
+static hashset<pointer> all_servers;
+
+static inline bool
+exists (socket_server_rep* s) {
+  return all_servers->contains ((pointer) s);
+}
+
+static inline void
+checkin (socket_server_rep* s) {
+  all_servers->insert ((pointer) s);
+}
+
+static inline void
+checkout (socket_server_rep* s) {
+  all_servers->remove ((pointer) s);
+}
+
+socket_server_rep::socket_server_rep (string host2, unsigned short port2):
+  host (host2), port (port2), socket_id (-1), listening (false),
+  socket_ptr_from_id ((pointer) NULL), websocket_id (-1),
+  websocket_secure (false), websocket_listening (false) {}
+
+void
+socket_server_rep::accept_callback (void* obj, void* info) {
+  (void) info;
+  socket_server_rep* srv= (socket_server_rep*) obj;
+  if (exists (srv)) srv->connection (srv->socket_id);
+}
+
+void
+socket_server_rep::websocket_accept_callback (void* obj, void* info) {
+  (void) info;
+  socket_server_rep* srv= (socket_server_rep*) obj;
+  if (exists (srv)) srv->connection (srv->websocket_id);
+}
+
+socket_server_rep::~socket_server_rep () {}
+
+/******************************************************************************
+* The port of the WebSocket clients
+*
+* The clients in a browser come to a port of their own (by default the one
+* which follows the port of the server), as in the versions with Qt (see
+* QTMSockets.cpp): the port of the server and its clients are left as they
+* are. Here the handshake and the frames of the WebSockets are those of
+* websocket_contact.cpp.
+*
+* The preference "server websocket" says who may come: "local" (the
+* default) only this machine, "on" everybody, "off" nobody. The port speaks
+* wss (WebSockets over TLS) when it is open to other machines and the
+* server asks its clients for TLS (preference "tls-server"), so that no
+* password travels in clear; otherwise it speaks ws.
+******************************************************************************/
+
+void
+socket_server_rep::close_slow_clients () {
+  // A client which does not finish the opening of its connection (the
+  // handshake of TLS or of a WebSocket) is not kept. There is no timer
+  // here: they are looked at when another client comes.
+  int timeout= as_int (get_preference ("server contact timeout", "10000"));
+  if (timeout <= 0) timeout= 10000;
+  array<socket_link_rep*> slow;
+  iterator<pointer> it= iterate (connections);
+  while (it->busy ()) {
+    socket_link_rep* c= (socket_link_rep*) it->next ();
+    if (c->opening () && texmacs_time () - c->since > timeout) slow << c;
+  }
+  for (int i= 0; i < N(slow); i++) {
+    SLOGE ("connection of " * slow[i]->get_host_name () * " at socket "
+        * as_string (slow[i]->get_socket_id ()) * " closed: not opened in time");
+    slow[i]->stop ();
+  }
+}
+
+void
+socket_server_rep::start_websockets () {
+  string mode= get_preference ("server websocket", "local");
+  if (mode == "default") mode= "local";
+  if (mode == "off") return;
+  string pref= get_preference ("server websocket port", "default");
+  int wport= is_int (pref) ? as_int (pref) : port + 1;
+  bool everyone= (mode == "on");
+  websocket_secure= everyone && get_preference ("tls-server") == string ("on");
+  string where= (everyone ? string ("") : string ("localhost")) * ":"
+    * as_string (wport);
+  if (websocket_secure && !gnutls_present ()) {
+    SLOGE ("no WebSocket clients at " * where * ": GnuTLS is missing");
+    return;
+  }
+
+  c_string _port (as_string (wport));
+  struct ADDRINFO hints;
+  struct ADDRINFO *result, *rp;
+  memset (&hints, 0, sizeof(struct ADDRINFO));
+  hints.ai_family = everyone ? AF_UNSPEC : AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+  int x = GETADDRINFO(everyone ? (char*) NULL : (char*) "127.0.0.1",
+    (char*) _port, &hints, &result);
+  if (x != 0)  {
+    SLOGE ("cannot serve WebSocket clients at " * where * ": "
+        * as_string (GAI_STRERROR(x)));
+    return;
+  }
+  int fd= -1;
+  for (rp = result; rp != NULL; rp = rp->ai_next) {
+    fd= SOCKET(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (fd < 0) continue;
+    // the port is free again as soon as the server stops
+    int yes= 1;
+    (void) SETSOCKOPT (fd, SOL_SOCKET, SO_REUSEADDR,
+                       (const char*) &yes, sizeof (yes));
+    if (set_socket_noblock (fd) != -1 &&
+        BIND(fd, rp->ai_addr, rp->ai_addrlen) == 0 &&
+        LISTEN(fd, 1024) == 0) break;
+    SERRNO_LOGE ("port of the WebSocket clients");
+    safe_server_close (fd);
+    fd= -1;
+  }
+  FREEADDRINFO(result);
+  if (fd < 0) {
+    SLOGE ("cannot serve WebSocket clients at " * where);
+    return;
+  }
+  websocket_id= fd;
+  websocket_notifier= socket_notifier (websocket_id,
+    &websocket_accept_callback, this, NULL, false);
+  add_notifier (websocket_notifier);
+  websocket_listening= true;
+  SLOGI ("waiting for WebSocket clients ("
+      * string (websocket_secure ? "wss" : "ws") * ") at " * where);
+}
+
+string
+socket_server_rep::start () {
+#if defined(OS_MACOS)
+  mac_begin_server ();
+#endif
+  socket_id = -1;
+  if (!socket_present ()) {
+    SLOGE ("cannot use sockets");
+    return "cannot use sockets";
+  }
+  c_string _port (as_string (port));
+  c_string _host (host);
+  struct ADDRINFO hints;
+  struct ADDRINFO *result, *rp;
+  memset (&hints, 0, sizeof(struct ADDRINFO));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+  hints.ai_protocol = 0;
+  hints.ai_canonname = NULL;
+  hints.ai_addr = NULL;
+  hints.ai_next = NULL;
+  int x = GETADDRINFO(host == "" ? (char*) NULL : (char*) _host,
+    (char*) _port, &hints, &result);
+  if (x != 0)  {
+    SLOGE ("'getaddrinfo' failed for " * host * " via port " * as_string (port)
+        * ": "  * as_string (GAI_STRERROR(x)));
+    return "'getaddrinfo' failed";
+  }
+  for (rp = result; rp != NULL; rp = rp->ai_next) {
+    hostname= string_from_socket_address ((SOCKADDR_STORAGE*) rp->ai_addr);
+    SLOGI ("trying to serve at " * hostname * ":" * as_string (port));
+    socket_id= SOCKET(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (socket_id < 0) {
+      SERRNO_LOGE ("server socket creation");
+      socket_id = -1;
+      continue;
+    }
+
+    if (set_socket_noblock (socket_id) == -1) {
+      SERRNO_LOGE ("cannot set socket as non blocking");
+      safe_server_close (socket_id);
+      socket_id = -1;
+      continue;
+    }
+
+    if (BIND(socket_id, rp->ai_addr, rp->ai_addrlen) == 0)
+      break;
+    else if (errno == EADDRINUSE) {
+      SERRNO_LOGE ("bind");
+      safe_server_close (socket_id);
+      socket_id = -1;
+      break;
+    }
+    SERRNO_LOGE ("bind");
+    safe_server_close (socket_id);
+    socket_id = -1;
+  }
+  FREEADDRINFO(result); 
+  if (socket_id < 0) {
+    SLOGE ("cannot start server at " * host * " via " * as_string (port));
+    return "cannot create server socket";
+  }
+  if (LISTEN(socket_id, 1024) != 0) {
+    SERRNO_LOGE ("listen on " * host * ":" * as_string (port));
+    return "'listen' failed";
+  }
+  checkin (this);
+  notifier= socket_notifier (socket_id, &accept_callback, this, NULL, false);
+  add_notifier (notifier);
+  listening= true;
+  SLOGI ("waiting for connections at " * host * ":" * as_string (port));
+  start_websockets ();
+  call ("server-create-default-admin-account");
+  return "";
+}
+
+void
+socket_server_rep::stop () {
+  SLOGI ("stopping server at " * host * ":" * as_string (port));
+  iterator<pointer> it= iterate (connections);
+  while (it->busy ()) {
+    socket_link_rep* c= (socket_link_rep*) it->next ();
+    c->stop ();
+    disconnection (c);
+  }
+  if (listening) {
+    remove_notifier (notifier);
+    listening= false;
+  }
+  notifier= socket_notifier ();
+  if (websocket_listening) {
+    remove_notifier (websocket_notifier);
+    websocket_listening= false;
+  }
+  websocket_notifier= socket_notifier ();
+  collect_stopped_links ();
+  safe_server_close (socket_id);
+  socket_id= -1;
+  if (websocket_id >= 0) safe_server_close (websocket_id);
+  websocket_id= -1;
+#if defined(OS_MACOS)
+  mac_end_server ();
+#endif
+  checkout (this);
+  SLOGI ("server stopped at " * host * ":" * as_string (port));
+  server_log_stop ();
+}
+
+void
+socket_server_rep::connection (int s) {
+  if (!exists (this)) return;
+  SLOGI ("new connection received from " * as_string (s));
+  int client; socket_link_rep* clt;
+  SOCKADDR_STORAGE cltadd;
+  socklen_t sz= sizeof (cltadd);
+  close_slow_clients ();
+  // from the port of the server, or from the port of the WebSockets
+  bool websocket= (s == websocket_id);
+  if (websocket ? !websocket_listening : !listening) return;
+  client= ACCEPT(s, (SOCKADDR*) &cltadd, &sz);
+  if (client <= 0) {
+    switch (ERRNO) {
+    case ERRSOC(EWOULDBLOCK):
+    case ERRSOC(ECONNABORTED): break;
+    default: {
+      SLOGE ("server socket aborted");
+      stop (); }
+    }
+    SLOGE ("connection failed from " * string_from_socket_address (&cltadd));
+    return;
+  }
+  string address= string_from_socket_address (&cltadd);
+  address_from_id (client)= address;
+  SLOGI ("connection accepted from " * address
+      * " at socket " * as_string (client));
+
+#ifndef OS_MINGW
+  if (fcntl (client, F_SETFL, O_NONBLOCK) == -1) {
+    SERRNO_LOGE ("cannot set socket as non blocking");
+    return;
+  }
+#else
+  {
+    using namespace wsoc;
+    u_long flags = 1;
+    if (ioctlsocket (client, FIONBIO, &flags) == SOCKET_ERROR) {
+      SERRNO_LOGE ("cannot set socket as non blocking");
+      return;
+    }
+  }
+#endif
+
+  array<array<string> > authentications;
+  array<string> _anonymous; _anonymous << string ("anonymous");
+  if (get_preference ("tls-server") == string ("on")) {
+    if (get_preference ("tls-server authentication anonymous")
+      == string ("on"))
+      authentications << _anonymous;
+  }
+  else
+    authentications << _anonymous;
+
+  bool is_tls_server = get_preference ("tls-server") == string ("on");
+  tm_contact contact;
+  if (!websocket)
+    contact= is_tls_server ?
+      make_tls_server_contact (authentications) :
+      make_socket_server_contact (authentications);
+  else if (!websocket_secure)
+    contact= make_websocket_server_contact (tm_contact ());
+  else {
+    // a WebSocket inside a TLS session (websocket_contact.cpp)
+    tm_contact tls= make_tls_server_contact (authentications);
+    if (!is_nil (tls)) contact= make_websocket_server_contact (tls);
+  }
+
+  if (!contact.rep) {
+    SLOGE ("contact creation failed from " * string_from_socket_address (&cltadd)
+        * " at socket " * as_string (client));
+    CLOSE(client);
+    if (!gnutls_present() && is_tls_server) {
+    SLOGW ("tls-server preference is on but GnuTLS is missing, either disable"
+        " tls-server preference or use a TeXmacs version with GnuTLS");
+    }
+    return;
+  }
+
+  ::start (contact, client);
+
+  if (!is_alive (contact)) {
+    SLOGE ("contact failed from " * string_from_socket_address (&cltadd)
+      * " at socket " * as_string (client));
+    ::stop (contact);
+    CLOSE(client);
+    return;
+  } 
+
+  SLOGI ("contact started from " * string_from_socket_address (&cltadd)
+    * " at socket " * as_string (client));
+
+  clt= tm_new<socket_link_rep> (client, &cltadd, contact, this);
+  string st= clt->start ();
+  if (st != "") {
+    SLOGE ("'socket_link_rep' failed from "
+      * string_from_socket_address (&cltadd)
+      * " at socket " * as_string (client) * ": " * st);
+    clt->stop ();
+    stopped_links= list<socket_link_rep*> (clt, stopped_links);
+    return;
+  }
+  socket_ptr_from_id (clt->get_socket_id ())= (pointer) clt;
+  connections->insert ((pointer) clt);
+  call ("server-add", object (clt->get_socket_id ()));
+  SLOGI ("'socket_link_rep' started from "
+    * string_from_socket_address (&cltadd)
+    * " at socket " * as_string (client));
+}
+
+void
+socket_server_rep::disconnection (class socket_link_rep* clt) {
+  if (!exists (this)) return;
+  int io= clt->get_socket_id ();
+  SLOGI ("disconnection of " * clt->get_host_name ()
+      * " from socket " * as_string (io));
+  if (!connections->contains ((pointer) clt)) return; // already handled
+  connections->remove ((pointer) clt);
+  socket_ptr_from_id->reset (io);
+  address_from_id->reset (io);
+  clt->stop (); // no-op when called from clt->stop itself (alive is false)
+  stopped_links= list<socket_link_rep*> (clt, stopped_links);
+}
+
+string
+socket_server_rep::read (int id) {
+  socket_link_rep* clt= find_connection_ptr (id);
+  if (!clt)
+    return "";
+  if (!clt->complete_packet (LINK_OUT)) return "";
+  bool success;
+  string ret= clt->read_packet (LINK_OUT, 0, success);
+  return ret;
+}
+
+void
+socket_server_rep::write (int id, string s) {
+  socket_link_rep* clt= find_connection_ptr (id);
+  if (clt)
+    clt->write_packet (s, LINK_IN);
+}
+
+socket_link_rep*
+socket_server_rep::find_connection_ptr (int id) {
+  pointer ptr= socket_ptr_from_id[id];
+  if (ptr)
+    return (socket_link_rep*) ptr;
+  SLOGE ("'socket_server_rep::find_connection_ptr', cannot find socket "
+      * as_string (id));
+  return NULL;
+}
+
+void
+socket_server_rep::listen_connections (int msecs) {
+  (void) msecs;
+  perform_select ();
+  collect_stopped_links ();
+}
+
+#endif // not QTTEXMACS

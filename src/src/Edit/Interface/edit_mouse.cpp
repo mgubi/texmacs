@@ -42,6 +42,16 @@ edit_interface_rep::mouse_message (string message, SI x, SI y) {
   return r != "";
 }
 
+path
+edit_interface_rep::xy_to_path (SI x, SI y) {
+  // the cursor position at the point (x, y) of the document, as a click
+  // there would find it (the hovers of language servers); none before the
+  // document is typeset
+  if (is_nil (eb)) return path ();
+  path sp= find_innermost_scroll (eb, tp);
+  return tree_path (sp, x, y, 0);
+}
+
 color
 edit_interface_rep::mouse_clickable_color () {
   path sp= find_innermost_scroll (eb, tp);
@@ -196,7 +206,7 @@ edit_interface_rep::mouse_adjust (SI x, SI y, int mods) {
     SERVER (menu_widget ("(vertical (link " * menu * "))", wid));
     widget popup_wid= ::popup_widget (wid);
     popup_win= ::popup_window_widget (popup_wid, "Popup menu");
-#if defined (QTTEXMACS) || defined(AQUATEXMACS)
+#if defined (QTTEXMACS) || defined(AQUATEXMACS) || defined(VUETEXMACS)
     SI ox, oy, sx, sy;
     get_position (this, ox, oy);
     get_scroll_position(this, sx, sy);
@@ -640,7 +650,7 @@ relativize (tree t, url base) {
 
 static void
 call_drop_event (string kind, SI x, SI y, SI ticket, time_t t, url base) {
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (VUETEXMACS) || defined (AQUATEXMACS)
   (void) kind; (void) x; (void) y; (void) t;
   extern hashmap<int, tree> payloads;
   tree doc = payloads [ticket];

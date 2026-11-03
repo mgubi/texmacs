@@ -165,6 +165,10 @@
   (:synopsis "Widget with CSS style name")
   `(cons* 'division (lambda () ,name) ($list ,@l)))
 
+(tm-define-macro ($named name . l)
+  (:synopsis "Widgets which the scripted tests can name by @name")
+  `(cons* 'named ,name ($list ,@l)))
+
 (tm-define-macro ($class name . l)
   (:synopsis "Widget with CSS style name")
   `(cons* 'class (lambda () ,name) ($list ,@l)))

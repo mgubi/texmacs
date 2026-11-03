@@ -109,4 +109,5 @@
   ("parser" (debug-toggle "parser"))
   ("correct" (debug-toggle "correct"))
   ("convert" (debug-toggle "convert"))
-  ("remote" (debug-toggle "remote")))
+  ("remote" (debug-toggle "remote"))
+  ("fonts" (debug-toggle "fonts")))

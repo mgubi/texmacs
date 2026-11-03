@@ -22,6 +22,7 @@
 #include "sys_utils.hpp"
 #include "convert.hpp"
 #include "converter.hpp"
+#include "font.hpp"
 #include "ntuple.hpp"
 #include "link.hpp"
 #include "frame.hpp"
@@ -169,6 +170,9 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   void compile_glyph (scheme_tree t);
   void begin_text ();
   void end_text ();
+  void begin_actual_text (string s);
+  void end_actual_text ();
+  void draw_invisible (int c, font_glyphs fn, SI x, SI y, double hscale);
   
   void begin_page();
   void end_page();
@@ -532,6 +536,34 @@ pdf_hummus_renderer_rep::end_text () {
   }
 }
 
+// The span is in the text object, as the glyphs it covers (a drawing of
+// glyphs does not end the text object)
+void
+pdf_hummus_renderer_rep::begin_actual_text (string s) {
+  // (marked content is of PDF 1.2, its ActualText of 1.5, which the
+  // readers take whatever the version of the file)
+  begin_text ();
+  c_string hex (utf8_to_pdf_hex_string (s));
+  contentContext->WriteFreeCode ("/Span << /ActualText " +
+                                 std::string ((char*) hex) + " >> BDC ");
+}
+
+void
+pdf_hummus_renderer_rep::end_actual_text () {
+  contentContext->WriteFreeCode (" EMC\r\n");
+}
+
+void
+pdf_hummus_renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
+                                         double hscale) {
+  begin_text ();
+  contentContext->Tr (3);
+  if (hscale != 1.0) contentContext->Tz ((int) (100.0 * hscale + 0.5));
+  draw (c, fn, x, y);
+  if (hscale != 1.0) contentContext->Tz (100);
+  contentContext->Tr (0);
+}
+
 /******************************************************************************
  * Transformed rendering
  ******************************************************************************/
@@ -706,6 +738,8 @@ pdf_hummus_renderer_rep::register_pattern_image (brush br, SI pixel) {
     image_pdf= pattern_image_pool[key];
   else {
     // debug_convert << "Insert pattern image\n";
+    url temp= url_temp (".png");
+#ifdef QTTEXMACS
     QImage* pim = get_image (u, w, h, eff, pixel);
     if (pim == NULL) {
       convert_error << "Cannot read image file '" << u << "'"
@@ -717,8 +751,17 @@ pdf_hummus_renderer_rep::register_pattern_image (brush br, SI pixel) {
 		    << " after get_image" << LF;
       return;
     }
-    url temp= url_temp (".png");
     pim->save (utf8_to_qstring (concretize (temp)), "PNG");
+#else
+    // the tile through the pictures of the interface (Cocoa)
+    picture pic= load_picture (u, w, h, eff, pixel);
+    if (is_nil (pic) || pic->get_width () != w || pic->get_height () != h) {
+      convert_error << "Cannot read image file '" << u << "'"
+		    << " with load_picture" << LF;
+      return;
+    }
+    save_picture (temp, pic);
+#endif
     temp_images << temp;
     ObjectIDType image_id= pdfWriter.GetObjectsContext()
       .GetInDirectObjectsRegistry().AllocateNewObjectID();
@@ -1729,6 +1772,11 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     gl_index= t3font_get_local_glyph
       (ch, t3font_list(cfn)->font_chunk,
        t3font_list(cfn)->fn->res_name);
+  // a glyph drawn by its number stands for the character the font
+  // recorded for it, or for none (the further pieces of an assembly)
+  bool by_number= (ch >= 0xc000000);
+  int  code= by_number?
+    native_glyph_get_unicode (fn->res_name, ch - 0xc000000): ch;
   static const std::string ligature_ff= "/Span << /ActualText (ff) >> BDC ";
   static const std::string ligature_fi= "/Span << /ActualText (fi) >> BDC ";
   static const std::string ligature_fl= "/Span << /ActualText (fl) >> BDC ";
@@ -1752,16 +1800,20 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   else {
     if (cfid != NULL) {
-      int uc= ch;
-      if (EuropeanComputerModern_fonts->contains (cfn))
-        uc= tex_glyph_unicode (ch, false);
-      else if (T2A_fonts->contains (cfn))
-        uc= tex_glyph_unicode (ch, true);
+      if (by_number && code <= 0)
+        glyphs.push_back (GlyphUnicodeMapping (gl_index, ULongVector ()));
       else {
-        array<int> table= tex_math_unicode (cfn);
-        if (ch >= 0 && ch < N(table) && table[ch] >= 0) uc= table[ch];
+        int uc= code;
+        if (EuropeanComputerModern_fonts->contains (cfn))
+          uc= tex_glyph_unicode (ch, false);
+        else if (T2A_fonts->contains (cfn))
+          uc= tex_glyph_unicode (ch, true);
+        else if (!by_number) {
+          array<int> table= tex_math_unicode (cfn);
+          if (ch >= 0 && ch < N(table) && table[ch] >= 0) uc= table[ch];
+        }
+        glyphs.push_back (GlyphUnicodeMapping (gl_index, uc));
       }
-      glyphs.push_back (GlyphUnicodeMapping (gl_index, uc));
       contentContext->Tj(glyphs);
     }
     else {
@@ -2112,6 +2164,37 @@ pdf_image_info (url image, int& w, int& h, PDFRectangle& cropBox, double (&tMat)
     << "dx,dy={"<<tMat[4]<< ", "<<tMat[5] <<"}"<< LF;
 }
 
+#ifndef QTTEXMACS
+// the pixels of an image (RGB, and the alpha as a mask), from the top row,
+// through the pictures of the interface (Cocoa), as qt_image_data below
+static void
+picture_image_data (url image, int& w, int&h, string& data, string& mask) {
+  picture pic= load_picture (image, 0, 0, tree (""), PIXEL);
+  if (is_nil (pic) || pic->get_width () <= 0 || pic->get_height () <= 0) {
+    convert_error << "Cannot read image file '" << image << "'"
+    << " in picture_image_data" << LF;
+    return;
+  }
+  w= pic->get_width ();
+  h= pic->get_height ();
+  data= string ((w*h)*3);
+  mask= string (w*h);
+  int k= 0, l= 0;
+  for (int j= 0; j < h; j++)
+    for (int i= 0; i < w; i++) {
+      // the rows of a picture go up from its bottom
+      int r, g, b, a;
+      get_rgb_color (pic->get_pixel (i - pic->get_origin_x (),
+                                     h - 1 - j - pic->get_origin_y ()),
+                     r, g, b, a);
+      data[l++]= (char) r;
+      data[l++]= (char) g;
+      data[l++]= (char) b;
+      mask[k++]= (char) a;
+    }
+}
+#endif
+
 #ifdef QTTEXMACS
 void
 qt_image_data (url image, int& w, int&h, string& data, string& mask) {
@@ -2146,8 +2229,7 @@ pdf_image_rep::flush_for_pattern (PDFWriter& pdfw) {
 #ifdef QTTEXMACS
   qt_image_data (u, iw, ih, data, smask);
 #else
-  convert_error << "pdf_image_rep::flush_for_pattern: cannot export pattern "
-		<< u << "  to PDF" << LF;
+  picture_image_data (u, iw, ih, data, smask);
 #endif
   if ((iw==0)||(ih==0)) return false;
   
@@ -2358,8 +2440,10 @@ pdf_hummus_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
     pict->pict.save (utf8_to_qstring (concretize (temp)), "PNG");
     temp_images << temp;	
 #else
-    convert_error << "pdf renderer, draw_picture: "
-      << "cannot export picture " << p->get_name() << LF;
+    // through the pictures of the interface (Cocoa)
+    temp= url_temp (".png");
+    save_picture (temp, p);
+    temp_images << temp;
 #endif
     picture_cache (key)= temp;
   }

@@ -16,13 +16,6 @@
 #include "command.hpp"
 #include <QProcess>
 
-// the program and all it starts form a process group of their own, which is
-// stopped and interrupted as a whole (not on Windows, where QProcess has no
-// process groups, nor on Android)
-#if !defined (OS_MINGW) && !defined (OS_ANDROID)
-#define QTM_PIPE_GROUPS
-#endif
-
 class QTMPipeLink : public QProcess {
   Q_OBJECT
 
@@ -34,7 +27,6 @@ public:
   string outbuf;
   string errbuf;
   command* feed_cmd;
-  qint64 group;  // the process group of the program and all it starts (Unix)
 
   QTMPipeLink (string);
   ~QTMPipeLink ();
@@ -49,20 +41,11 @@ public:
   void feedBuf (ProcessChannel);
   bool listenChannel (ProcessChannel, int msecs);
   void killProcess (int msecs);
-#ifndef OS_MINGW
-  void interruptGroup ();
-#endif
-#ifdef QTM_PIPE_GROUPS
-  static bool groupAlive (qint64 pg);
-  bool askToEnd ();
-  bool hasEnded ();
-  void killGroup ();
-  void forgetEndedGroup ();
 
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+#if !defined (OS_MINGW) && !defined (OS_ANDROID) && QT_VERSION < 0x060000
 protected:
+  // the program gets a process group of its own (Qt 6: a child modifier)
   void setupChildProcess () override;
-#endif
 #endif
 };
 

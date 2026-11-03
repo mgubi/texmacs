@@ -1,0 +1,25 @@
+
+;; the TeXmacs server and a client in the same instance (GUI independent
+;; sockets, System/Link/tm_sockets.cpp): start the server, connect an
+;; anonymous client to it and evaluate a service remotely. This build has no
+;; GnuTLS: the legacy protocol is used (the preference is restored at the end)
+(use-modules (server server-base) (client client-base) (client client-authentication))
+(define sockets-old-tls (get-preference "tls-server"))
+(set-preference "tls-server" "off")
+(delayed (:pause 3000)
+  (server-start)
+  (display* "SOCKETS server started: " (server-started?) "\n")
+  (delayed (:pause 1500)
+    (with fd (anonymous-client-start "localhost" "6561" 'legacy)
+      (display* "SOCKETS client fd: " fd "\n")
+      (when (> fd 0)
+        (client-remote-eval fd '(remote-public-preferences)
+          (lambda (r) (display* "SOCKETS roundtrip: " r "\n"))
+          (lambda (e) (display* "SOCKETS roundtrip error: " e "\n"))))
+      (delayed (:pause 4000)
+        (when (> fd 0) (client-stop fd))
+        (server-stop)
+        (display* "SOCKETS stopped, server running: " (server-started?) "\n")
+        (if (== sockets-old-tls "default")
+            (reset-preference "tls-server")
+            (set-preference "tls-server" sockets-old-tls))))))

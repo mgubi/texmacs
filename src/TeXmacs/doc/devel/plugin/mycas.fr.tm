@@ -8,7 +8,7 @@
   La meilleure façon d'implémenter votre première interface avec
   <apply|TeXmacs> est d'examiner soigneusement l'exemple <verbatim|mycas>,
   que vous trouverez dans le répertoire <verbatim|$TEXMACS_PATH/misc/mycas>.
-  Le fichier <verbatim|mycas.cpp>, dont le contenu est inclus à la fin de
+  Le fichier <source-link|mycas.cpp|plugins/mycas/src/mycas.cpp>, dont le contenu est inclus à la fin de
   cette section, contient un programme très simple que l'on peut interfacer
   avec <apply|TeXmacs>. Pour tester ce programme, compilez-le avec :
 
@@ -22,7 +22,7 @@
   menu <apply|menu|Insert|Session>.
 
   NdT: Si vous utilisez le port Fink de <TeXmacs>, le plus simple est de
-  copier le fichier <verbatim|mycas.cpp>, situé dans le répertoire
+  copier le fichier <source-link|mycas.cpp|plugins/mycas/src/mycas.cpp>, situé dans le répertoire
   /sw/share/TeXmacs.../plugins/mycas/examples, dans ~/bin (créez le
   répertoire auparavant s'il n'existe pas déjà), puis compilez-le comment
   indiqué ci-dessus.

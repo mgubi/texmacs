@@ -31,7 +31,7 @@
     \ \ \ \ <example-plugin-link|menus/src/menus.cpp>
   </verbatim>
 
-  Der Rumpf der Hauptschleife von <verbatim|menus.cpp> besteht aus
+  Der Rumpf der Hauptschleife von <source-link|menus.cpp|TeXmacs/examples/plugins/menus/src/menus.cpp> besteht aus
 
   <\cpp-fragment>
     char buffer[100];
@@ -55,7 +55,7 @@
   </cpp-fragment>
 
   Das <value|scheme>-Makro <scheme-code|menus-add> wird in
-  <verbatim|init-menus.scm> definiert:
+  <source-link|init-menus.scm|TeXmacs/examples/plugins/menus/progs/init-menus.scm> definiert:
 
   <\scheme-fragment>
     (menu-bind menus-menu

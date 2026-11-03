@@ -1,6 +1,6 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Dynamic libraries>
@@ -9,6 +9,15 @@
   possible to connect it as a dynamically linked library. Although
   communication through pipes is usually easier to implement, more robust and
   compatible with gradual output, the second option is faster.
+
+  <\warning>
+    Dynamic linking is only available if <TeXmacs> was compiled with the
+    macro <cpp|TM_DYNAMIC_LINKING> defined (the <name|autotools>
+    configuration script defines it as <cpp|dlopen> when this function is
+    available, see <source-link|misc/m4/dlopen.m4|misc/m4/dlopen.m4>). It is not supported under
+    <name|Windows>. Otherwise, starting a session fails with the message
+    <verbatim|Dynamic linking not implemented>.
+  </warning>
 
   In order to dynamically link your application to <TeXmacs>, you should
   follow the <TeXmacs> communication protocol, which is specified in the
@@ -84,7 +93,7 @@
   <\scm-code>
     (plugin-configure <em|myplugin>
 
-    \ \ (:require (url-exists? (url "$LD_LIBRARY_PATH"
+    \ \ (:require (url-exists? (url-unix "$LD_LIBRARY_PATH"
     "lib<em|myplugin>.so")))
 
     \ \ (:link "lib<em|myplugin>.so" "<em|myplugin>_exports" "")
@@ -92,8 +101,17 @@
     \ \ <em|further-configuration>)
   </scm-code>
 
-  Here <verbatim|<em|myplugin>_exports> is a pointer to a structure of the
-  type <cpp|package_exports_1>.
+  Here <verbatim|<em|myplugin>_exports> is the name of a global variable of
+  type <cpp|package_exports_1> in your library: when a session is started,
+  <TeXmacs> opens the library (which is searched in
+  <verbatim|$LD_LIBRARY_PATH>; the <verbatim|lib> subdirectory of your
+  plug-in is automatically added to this path), looks up this symbol using
+  <cpp|dlsym> and calls its <verbatim|install> routine with the third
+  argument of <scm|:link> as options. If the <verbatim|install> routine
+  sets <verbatim|*errors>, then the installation is considered to have
+  failed. The strings returned by <verbatim|evaluate> are interpreted in
+  the same way as the output of an application which communicates through
+  pipes.
 
   <\remark>
     It is possible that the communication protocol changes in the future. In
@@ -119,13 +137,15 @@
     \ \ \ \ <example-plugin-link|dynlink/src/dynlink.cpp>
   </verbatim>
 
-  The <verbatim|Makefile> contains
+  The <verbatim|Makefile> is generated from <source-link|Makefile.in|Makefile.in> by the
+  <name|autotools> configuration script, which substitutes the path of the
+  <TeXmacs> sources for <verbatim|@tmsrc@>. It contains
 
   <\quotation>
     <\framed-fragment>
       <\with|par-par-sep|0fn>
         <\verbatim>
-          tmsrc = /home/vdhoeven/texmacs/src/TeXmacs
+          tmsrc = @tmsrc@
 
           CXX = g++
 
@@ -145,24 +165,25 @@
   </quotation>
 
   so that running it will create a dynamic library
-  <verbatim|dynlink/lib/libdynlink.so> from <verbatim|dynlink.cpp>. The
-  <verbatim|tmsrc> variable should contain <verbatim|$TEXMACS_PATH>, so as to
-  find the include file <verbatim|TeXmacs.h>. The configuration file
-  <verbatim|init-dynlink.scm> simply contains
+  <verbatim|dynlink/lib/libtmdynlink.so> from <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp> (the
+  <verbatim|lib> directory must exist). The <verbatim|tmsrc> variable
+  should contain <verbatim|$TEXMACS_PATH>, so as to find the include file
+  <source-link|TeXmacs.h|TeXmacs/include/TeXmacs.h>. The configuration file
+  <source-link|init-dynlink.scm|TeXmacs/examples/plugins/dynlink/progs/init-dynlink.scm> simply contains
 
   <\scm-code>
     (plugin-configure dynlink
 
-    \ \ (:require (url-exists? (url "$LD_LIBRARY_PATH"
+    \ \ (:require (url-exists? (url-unix "$LD_LIBRARY_PATH"
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ "libtmdynlink.so")))
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ "libtmdynlink.so")))
 
     \ \ (:link "libtmdynlink.so" "dynlink_exports" "")
 
     \ \ (:session "Dynlink"))
   </scm-code>
 
-  As to the <c++> file <verbatim|dynlink.cpp>, it contains a string
+  As to the <c++> file <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp>, it contains a string
 
   <\cpp-code>
     static char* output= NULL;
@@ -226,6 +247,8 @@
   deallocation of <cpp|output>.
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

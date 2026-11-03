@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" height="16" id="svg4547" version="1.0" width="16">
+ <defs id="defs4554"/>
+ <g id="g11351" transform="matrix(0.0625,0,0,0.05859375,1.25e-6,0.51953264)" style="opacity:0.75">
+  <rect y="42.333328" x="0" width="256" style="fill:#ffffff" id="rect4549" height="170.66667"/>
+  <circle transform="matrix(0.2844444,0,0,0.2844444,0,42.333315)" style="fill:#bc002d" r="180" id="circle4551" cy="300" cx="450" d="m 630,300 c 0,99.41125 -80.58875,180 -180,180 -99.41125,0 -180,-80.58875 -180,-180 0,-99.41125 80.58875,-180 180,-180 99.41125,0 180,80.58875 180,180 z"/>
+ </g>
+</svg>

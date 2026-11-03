@@ -5,15 +5,20 @@
 <\body>
   <tmdoc-title|Global presentation>
 
-  In the <menu|Source tags> group of the <menu|Document|Source> menu, you find
-  several ways to customize the rendering of source trees in your document.
-  We recommend you to play around with the different possibilities in a
-  document of your own (after enabling <menu|Document|Source|Source tree>) or a
-  standard style package in <verbatim|$TEXMACS_PATH/packages>.
+  In the <menu|Preferences> group of the <menu|Document|Source> menu, you
+  find several ways to customize the rendering of source trees in your
+  document (in the compressed menu layout, these settings are found in a
+  dialog opened by <menu|Document|Source|Preferences>). They correspond to
+  the environment variables <src-var|src-style>, <src-var|src-special>,
+  <src-var|src-compact> and <src-var|src-close>. We recommend you to play
+  around with the different possibilities in a document of your own (after
+  enabling <menu|Document|Source|Edit source tree>) or a standard style
+  package in <verbatim|$TEXMACS_PATH/packages>.
 
   First of all, you may choose between the different major styles
   ``angular'', ``scheme'', ``functional'' and ``<LaTeX>'' \ for rendering
-  source trees, as illustrated in the figure below:
+  source trees (in the <menu|Document|Source|Style> menu), as illustrated in
+  the figure below:
 
   <\big-figure>
     <\quote-env>
@@ -185,7 +190,8 @@
   </big-figure>
 
   Finally, the user may specify the way closing tags should be rendered when
-  the tag is stretched out across several lines. The rendering may either be
+  the tag is stretched out across several lines (in the
+  <menu|Document|Source|Closing style> menu). The rendering may either be
   minimalistic, compact, long, or recall the matching opening tag. The
   different options are illustrated below:
 

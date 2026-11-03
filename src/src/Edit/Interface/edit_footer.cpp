@@ -11,6 +11,7 @@
 
 #include "edit_interface.hpp"
 #include "convert.hpp"
+#include "converter.hpp"
 #include "connect.hpp"
 #include "dictionary.hpp"
 
@@ -78,7 +79,12 @@ edit_interface_rep::set_left_footer () {
     string session= get_env_string (PROG_SESSION);
     switch (connection_status (lan, session)) {
     case CONNECTION_DEAD:
-      s= s << " [dead]";
+      // a plug-in of requests (an HTTP API) or of a command line has its
+      // link only while it answers: between two, it is waiting
+      if (as_bool (call ("connection-request?", lan)) ||
+          as_bool (call ("connection-cmdline?", lan)))
+        s= s << " [idle]";
+      else s= s << " [dead]";
       break;
     case CONNECTION_DYING:
     case WAITING_FOR_OUTPUT:
@@ -107,11 +113,16 @@ edit_interface_rep::compute_text_footer (tree st) {
   string r;
   language lan= get_env_language ();
   int end  = last_item (tp);
-  int start= end;
-  tm_char_backwards (st->label, start);
+  // the character before the cursor, an emoji sequence whole (a family, a
+  // flag, a skin tone, a keycap), not its last code point alone
+  int start= tm_grapheme_start (st->label, end);
   r= st->label (start, end);
+  // an emoji with its name (also an emoji written as its code points)
+  string e= emoji_name (r);
+  if (e != "") return verbatim (r * " (" * e (1, N(e)-1) * ")");
   if (r == "") r= "start";
   if (r == " ") r= "space";
+  if (r == "<#9>") r= "tab";   // (a tab of a source file)
   if (r == "space" && get_env_string (MODE) == "math") r= "apply";
   if (starts (r, "<") && !starts (r, "<#"))
     if (cork_to_utf8 (r) != r)
@@ -394,7 +405,12 @@ edit_interface_rep::set_right_footer () {
   tree lf;
   if (is_atomic (st)) lf= compute_text_footer (st);
   else lf= compute_operation_footer (st);
-  if (N(focus_get (false))+1 >= N(tp)) cf= concat (cf, lf);
+  // (the character at the cursor, where the focus is around it; in program
+  // code also when the focus is the whole document, as in a source file:
+  // a tab or a space is then told apart)
+  if (N(focus_get (false))+1 >= N(tp) ||
+      (is_atomic (st) && get_env_string (MODE) == "prog"))
+    cf= concat (cf, lf);
   set_right_footer (cf);
 }
 
@@ -494,11 +510,16 @@ edit_interface_rep::set_footer () {
     cout << "instance  " << instance_count << "\n";
   )
 
+  // tell whether the footer shows the environment at the cursor (and
+  // not a message): an interactive footer replaces only that, see
+  // (texmacs menus footer-menu)
+  call ("footer-environment-notify", object (false));
   if ((message_l == "") && (message_r == "")) {
     last_l= ""; last_r= "";
     tree st= subtree (et, path_up (tp));
     if (set_latex_footer (st)) return;
     if (set_hybrid_footer (st)) return;
+    call ("footer-environment-notify", object (true));
     set_left_footer();
     set_right_footer();
   }

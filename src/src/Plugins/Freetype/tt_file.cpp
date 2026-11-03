@@ -21,6 +21,7 @@
 #include "scheme.hpp"
 
 static hashmap<string,string> tt_fonts ("no");
+static bool tt_indexed= false; // see tt_index_find
 
 url
 add_to_path (url u, url d) {
@@ -32,7 +33,13 @@ add_to_path (url u, url d) {
 }
 
 void
+tt_font_index_reset () {
+  tt_indexed= false; // (made again at the next look up, see tt_index_find)
+}
+
+void
 tt_extend_font_path (url u) {
+  tt_indexed= false; // (the index of the files of the path is made again)
   if (!is_directory (u)) u= head (u);
   string old= get_preference ("imported fonts", "");
   if (old == "") set_preference ("imported fonts", as_unix_string (u));
@@ -41,6 +48,41 @@ tt_extend_font_path (url u) {
     set_preference ("imported fonts", as_unix_string (dirs));
   }
 }
+
+#ifndef OS_MINGW
+// OpenType and TrueType font directories of the TeX Live installations
+// found under the usual roots, whatever their year; a newer year comes
+// before an older one. A distribution may also install TeX Live without a
+// directory for the year. The trees are large and do not change while
+// TeXmacs runs, so they are walked once.
+static url
+texlive_font_dirs () {
+  static bool done= false;
+  static url  r   = url_none ();
+  if (done) return r;
+  done= true;
+  const char* roots[]= { "/usr/local/texlive", "/usr/share/texlive",
+                         "/opt/texlive", "$HOME/texlive" };
+  for (int i= 0; i < 4; i++) {
+    url root= url_system (roots[i]);
+    if (!is_directory (root)) continue;
+    bool err= false;
+    array<string> a= read_directory (root, err);
+    if (err) continue;
+    a << string ("");
+    for (int j= N(a) - 1; j >= 0; j--) {
+      if (starts (a[j], ".")) continue;
+      url fonts= root * url ("texmf-dist") * url ("fonts");
+      if (a[j] != "")
+        fonts= root * url (a[j]) * url ("texmf-dist") * url ("fonts");
+      if (!is_directory (fonts)) continue;
+      r= r | search_sub_dirs (fonts * url ("opentype"))
+           | search_sub_dirs (fonts * url ("truetype"));
+    }
+  }
+  return r;
+}
+#endif
 
 url
 tt_font_path () {
@@ -66,25 +108,62 @@ tt_font_path () {
     search_sub_dirs ("/opt/local/share/texmf-texlive/fonts/truetype") |
     search_sub_dirs ("/opt/local/share/texmf-texlive-dist/fonts/opentype") |
     search_sub_dirs ("/opt/local/share/texmf-texlive-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/truetype");
+    texlive_font_dirs ();
 #else
     search_sub_dirs ("$HOME/.fonts") |
     search_sub_dirs ("/usr/share/fonts/opentype") |
     search_sub_dirs ("/usr/share/fonts/truetype") |
     search_sub_dirs ("/usr/local/share/fonts/opentype") |
     search_sub_dirs ("/usr/local/share/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/truetype");
+    texlive_font_dirs ();
 #endif
+}
+
+// The files of the directories of the font path, by name: the place of
+// the file in the first directory of the path which has it. The path and
+// its directories are walked once (the system directories and the trees of
+// TeX Live are large, and a font which is not there, as the many sizes of
+// the TeX fonts, which have no sfnt form, was looked for in each of them);
+// a directory imported meanwhile (tt_extend_font_path) makes it again
+static hashmap<string,string> tt_index ("");
+
+static void
+tt_index_add (url dirs) {
+  if (is_none (dirs)) return;
+  if (is_or (dirs)) {
+    tt_index_add (dirs[1]);
+    tt_index_add (dirs[2]);
+    return;
+  }
+  bool err= false;
+  array<string> a= read_directory (dirs, err);
+  if (err) return;
+  for (int i= 0; i < N(a); i++)
+    if (N(a[i]) > 0 && a[i][0] != '.' && !tt_index->contains (a[i]))
+      tt_index (a[i])= as_string (dirs * url (a[i]));
+}
+
+static url
+tt_index_find (string name) {
+  if (!tt_indexed) {
+    tt_indexed= true;
+    tt_index= hashmap<string,string> ("");
+    bench_start ("tt font index");
+    tt_index_add (tt_font_path ());
+    bench_cumul ("tt font index");
+  }
+  if (!tt_index->contains (name)) {
+    // the file systems of macOS store the names in decomposed Unicode, and
+    // find a file by any form of its name, unlike the index: the names
+    // which are not ASCII (as the Hiragino fonts asked by font.cpp) are
+    // looked for in the directories
+    for (int i= 0; i < N(name); i++)
+      if (((unsigned char) name[i]) >= 128)
+        return resolve (tt_font_path () * name);
+    return url_none ();
+  }
+  url u= url_system (tt_index[name]);
+  return exists (u)? u: url_none ();
 }
 
 static url
@@ -132,9 +211,7 @@ tt_locate (string name) {
 	}
     }
 
-  url tt_path= tt_font_path ();
-  //cout << "Resolve " << name << " in " << tt_path << "\n";
-  return resolve (tt_path * name);
+  return tt_index_find (name);
 }
 
 url
@@ -142,16 +219,31 @@ tt_font_find_sub (string name) {
   //cout << "tt_font_find " << name << "\n";
   url u= tt_unpack (name);
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".pfb");
-  //if (!is_none (u)) cout << name << " -> " << u << "\n";
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttf");
-  //if (!is_none (u)) cout << name << " -> " << u << "\n";
-  //else cout << name << " -> ???\n";
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttc");
-  if (!is_none (u)) return u;
+  // The sfnt formats come first, and Type 1 last. A TeX distribution ships
+  // many families in both forms, and the Type 1 file carries the encoding
+  // of the TeX world: in XCharter-Roman.pfb the code of 'a' is the pound
+  // sign and the code of 'A' is 'a'. TeXmacs asks for characters by Unicode
+  // and needs the cmap of the sfnt file. The same choice gives the PDF
+  // writer real glyph indices instead of character codes.
+  // (the font path is indexed once, see tt_index_find)
   u= tt_locate (name * ".otf");
+  if (is_none (u)) u= tt_locate (name * ".ttf");
+  if (is_none (u)) u= tt_locate (name * ".ttc");
+  if (!is_none (u)) {
+    // Except for a font of TeX, which has a TFM of its name (cmsy10,
+    // msam10...): TeXmacs asks for its glyphs by their codes in the TFM,
+    // which its Type 1 file has. An sfnt file of the same name elsewhere,
+    // as the BaKoMa fonts of LyX in /usr/share/fonts on Linux (fonts-lyx,
+    // which matplotlib needs), puts them at other codes, and the symbols
+    // came out as boxes (#407). The families of the paragraph above have
+    // no TFM of their name.
+    if (exists_in_tex (name * ".tfm")) {
+      url p= tt_locate (name * ".pfb");
+      if (!is_none (p)) return p;
+    }
+    return u;
+  }
+  u= tt_locate (name * ".pfb");
   if (!is_none (u)) return u;
   u= tt_locate (name * ".dfont");
   return u;
@@ -159,7 +251,14 @@ tt_font_find_sub (string name) {
 
 url
 tt_font_find (string name) {
-  string s= "ttf:" * name;
+  // The prefix of the key records which files this routine prefers. The
+  // answers are cached in the home directory, which outlives an upgrade
+  // and is shared by every installation, so a cache written when Type 1
+  // came first still named the .pfb file of a family whose .otf TeXmacs
+  // now wants; the font then had no OpenType feature and no MATH table.
+  // Change the prefix whenever tt_font_find_sub changes its order ("sfnt:"
+  // gave the fonts of TeX their TrueType files of LyX, #407).
+  string s= "sfnt-tfm:" * name;
   if (is_cached ("font_cache.scm", s)) {
     string r= cache_get ("font_cache.scm", s) -> label;
     if (r == "") return url_none ();

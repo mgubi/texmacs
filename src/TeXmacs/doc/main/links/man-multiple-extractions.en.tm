@@ -24,7 +24,7 @@
     <markup|with-bib> tag into your document, with the cursor inside.
 
     <item>Inside this <markup|with-bib> tag, enter your citation, using
-    <menu|Insert|Link|Citation>.
+    <menu|Insert|Link|Citation|Visible> (or another kind of citation).
   </itemize>
 
   If needed, the <markup|with-bib> tag can be made to span over a large

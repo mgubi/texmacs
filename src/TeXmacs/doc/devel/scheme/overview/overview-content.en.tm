@@ -123,7 +123,9 @@
     \ \ \ \ (insert t)))
   </scm-code>
 
-  The <scm|with-cursor> macro temporarily changes the cursor position, while
+  The <scm|with-cursor> macro, from the module <scm|(utils library cursor)>
+  which should be imported with <scm|:use>, temporarily changes the cursor
+  position, while
   storing the old cursor position in such a way that it will be updated
   during changes of the document. The user may also use the more explicit
   routines <scm|position-new>, <scm|position-delete>, <scm|position-set> and

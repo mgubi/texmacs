@@ -22,14 +22,19 @@
   (if (or (like-gnome?) (like-macos?) (like-windows?)) "popup" "footer"))
 
 (define (get-default-buffer-management)
-  (if (or (like-macos?) (like-windows?)) "separate" "shared"))
+  ;; in the browser (where the Vue plugin defines web-files) the windows are
+  ;; the tabs of the page: a document per tab
+  (if (or (like-macos?) (like-windows?) (defined? 'web-files))
+      "separate" "shared"))
 
 (define (notify-buffer-management var val)
   (when (== val (get-default-buffer-management))
     (reset-preference "buffer management")))
 
 (define (get-default-show-table-cells)
-  (if (qt-gui?) "on" "off"))
+  ;; (the lines between the cells of the table at the cursor: the Vue and
+  ;; Cocoa ports, the browser included, show them as Qt does)
+  (if (or (qt-gui?) (vue-gui?) (ns-gui?)) "on" "off"))
 
 (define (get-default-gui-density)
   (if (os-android?) "large" "normal"))
@@ -42,8 +47,27 @@
                "configure look and feel"))
 
 (define (notify-gui-theme var val)
-  (set-message "Restart in order to let the new theme take effect"
-               "graphical interface theme"))
+  ;; the Cocoa interface follows the theme at once (ns_follow_theme)
+  (when (not (ns-gui?))
+    (set-message "Restart in order to let the new theme take effect"
+                 "graphical interface theme")))
+
+(define (notify-icon-set var val)
+  ;; the Vue and Cocoa interfaces follow the icon set at once
+  ;; (vue_follow_icon_set, ns_follow_icon_set); the others at their next start
+  (when (not (or (vue-gui?) (ns-gui?))) (notify-restart var val)))
+
+(define (notify-gui-scaling var val)
+  ;; the Vue interface follows the scaling at once
+  ;; (vue_follow_interface_scale); Qt reads it at its start
+  (when (not (vue-gui?)) (notify-restart var val)))
+
+(define (notify-window-tabs var val)
+  ;; the tabs of the windows of the browser (misc/wasm/frame.js): in a
+  ;; column at the left of the page, or above it
+  (when (defined? 'web-javascript)
+    (web-javascript (string-append "tmFrame.setTabsPosition ('"
+                                   (if (== val "top") "top" "left") "')"))))
 
 (define (notify-language var val)
   (set-output-language val)
@@ -77,6 +101,9 @@
 (define (notify-new-fonts var val)
   (set-new-fonts (== val "on")))
 
+(define (notify-hand-tuned-math-fonts var val)
+  (set-hand-tuned-math-fonts (== val "on")))
+
 (define (notify-fast-environments var val)
   (set-fast-environments (== val "on")))
 
@@ -96,8 +123,41 @@
   (set-message "Restart in order to let the new setting take effect"
                "configure graphical interface"))
 
+;; the font of source files (programs open as code, not documents with
+;; code in them): the master of a monospaced text font (font-short-menu),
+;; or roman, the typewriter font of TeXmacs; new_buffer.cpp sets it in
+;; the initial environment of a source file which is opened, and a change
+;; reaches the open ones (which stay unmodified: their text is the same)
+(define (notify-code-font var val)
+  (with font (if (in? val '("" "default")) "Inconsolatazi4" val)
+    (for (u (buffer-list))
+      (with-buffer u
+        (when (and (== (get-style-list) '("code"))
+                   (!= (get-init "prog-font") font))
+          (with modified? (buffer-modified? u)
+            (init-env "prog-font" font)
+            (when (not modified?) (buffer-pretend-saved u))))))))
+
+(define (notify-code-tab-width var val)
+  ;; (the open source files take the new width, as the font)
+  (with w (if (string->number val) val "8")
+    (for (u (buffer-list))
+      (with-buffer u
+        (when (and (== (get-style-list) '("code"))
+                   (!= (get-init "prog-tab-width") w))
+          (with modified? (buffer-modified? u)
+            (init-env "prog-tab-width" w)
+            (when (not modified?) (buffer-pretend-saved u))))))))
+
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
+  ("editor:code font" "Inconsolatazi4" notify-code-font)
+  ;; the columns between the tab stops of source files (prog-tab-width,
+  ;; also those which are open), and the indentation of the new lines of the
+  ;; files which have none yet (a file indented by tabs or by spaces keeps
+  ;; its own, source-indent: prog-edit.scm)
+  ("editor:code tab width" "8" notify-code-tab-width)
+  ("editor:code indent" "spaces" noop)
   ("look and feel" "default" notify-look-and-feel)
   ("case sensitive shortcuts" "default" noop)
   ("detailed menus" "detailed" noop)
@@ -109,9 +169,23 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
+  ("icon set" "neo-classical" notify-icon-set)
+  ;; the Vue interface reads it at each layout; at the left by default in
+  ;; a web browser
+  ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
+  ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
-  ("gui scaling" "default" notify-restart)
+  ("gui scaling" "default" notify-gui-scaling)
+  ;; the glyphs drawn by the GPU renderer of the Vue interface, which
+  ;; follows them at once (vue_gpu_follow_glyph_settings)
+  ("gpu glyphs" "freetype" noop)
+  ("gpu glyph boldness" "0.22" noop)
+  ("gpu glyph hinting" "light" noop)
+  ;; the emoji: the shipped Twemoji, or those of the system (smart_font.cpp)
+  ("emoji font" "default" noop)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
+  ("interactive footer" "off" noop)
+  ("typographic palette set" "Classical" noop)
   ("page medium" "paper" (lambda args (noop)))
   ("fast environments" "on" notify-fast-environments)
   ("continuous spell checking" "off" notify-continuous-spell-checking)
@@ -143,9 +217,10 @@
   ("presentation tool" "off" notify-tool)
   ("remote tool" "off" notify-tool)
   ("source tool" "off" notify-tool)
-  ("versioning tool" "off" notify-tool)
+  ("versioning tool" "auto" notify-tool)
   ("experimental alpha" "on" notify-tool)
   ("new style fonts" "on" notify-new-fonts)
+  ("hand tuned math fonts" "on" notify-hand-tuned-math-fonts)
   ("bitmap effects" "on" notify-tool)
   ("new style page breaking" "on" notify-new-page-breaking)
   ("open console on errors" "on" noop)
@@ -191,6 +266,9 @@
 (validate-enum-preference "document update times" '("1" "2" "3"))
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
+(validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "lucide"))
+(validate-enum-preference "icon bars" '("top" "left" "right"))
+(validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
 
@@ -332,3 +410,15 @@
 
 (tm-define (close-document*)
   (if (window-per-buffer?) (safely-kill-buffer) (safely-kill-window)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; When to show the versioning tool
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (versioning-tool-is? what)
+  (== (get-preference "versioning tool") what))
+
+(tm-define (set-versioning-tool what)
+  (:synopsis "When to show the versioning tool")
+  (:check-mark "*" versioning-tool-is?)
+  (set-preference "versioning tool" what))

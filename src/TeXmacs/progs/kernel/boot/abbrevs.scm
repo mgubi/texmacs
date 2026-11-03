@@ -69,10 +69,13 @@
 (define-public (number->keyword x)
   (symbol->keyword (string->symbol (string-append "%" (number->string x)))))
 
-(if (guile-c?)
+(if (s7-scheme?)
+    ;; s7 truncates long vectors when printing, unless print-length is raised
     (define-public (save-object file value)
       (call-with-output-file (url-materialize file "")
-        (lambda (port) (pretty-print value port))))
+        (lambda (port)
+          (let-temporarily (((*s7* 'print-length) 9223372036854775807))
+            (write value port)))))
     (define-public (save-object file value)
       (call-with-output-file (url-materialize file "")
         (lambda (port) (write value port)))))
@@ -102,11 +105,12 @@
 ;; Common programming constructs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public-macro (when cond? . body)
-  `(if ,cond? (begin ,@body)))
-
-(define-public-macro (unless cond? . body)
-  `(if (not ,cond?) (begin ,@body)))
+(if (not (s7-scheme?)) ;; built into s7
+    (begin
+      (define-public-macro (when cond? . body)
+        `(if ,cond? (begin ,@body)))
+      (define-public-macro (unless cond? . body)
+        `(if (not ,cond?) (begin ,@body)))))
 
 (define-public-macro (with var val . body)
   (if (or (pair? var) (null? var))
@@ -117,19 +121,24 @@
   `(let ((,(car fun) (lambda ,(cdr fun) ,fun-body)))
      ,@body))
 
+
+;; handle multiple values in a way compatible with s7 (and backcompatible with guile)
 (define-public-macro (with-global var val . body)
   ;; the variable is restored after an error too; lazy-catch rethrows from
   ;; where the error happened, so that backtraces still point there
-  (let ((old (gensym)) (new (gensym)) (args (gensym)))
+  (let ((old (gensym)) (args (gensym)))
     `(let ((,old ,var))
        (set! ,var ,val)
-       (let ((,new (lazy-catch #t
-                          (lambda () ,@body)
-                          (lambda ,args
-                            (set! ,var ,old)
-                            (apply throw ,args)))))
-         (set! ,var ,old)
-         ,new))))
+       (call-with-values
+          (lambda ()
+            (lazy-catch #t
+                        (lambda () ,@body)
+                        (lambda ,args
+                          (set! ,var ,old)
+                          (apply throw ,args))))
+          (lambda vals
+            (set! ,var ,old)
+            (apply values vals))))))
 
 (define-public-macro (and-with var val . body)
   `(with ,var ,val
@@ -242,3 +251,4 @@
 (define-public (qt5-or-later-gui?) (in? (gui-version) (list "qt5" "qt6")))
 (define-public (qt6-gui?) (== (gui-version) "qt6"))
 (define-public (qt6-or-later-gui?) (in? (gui-version) (list "qt6")))
+(define-public (ns-gui?) (== (gui-version) "ns")) ; the native Cocoa interface

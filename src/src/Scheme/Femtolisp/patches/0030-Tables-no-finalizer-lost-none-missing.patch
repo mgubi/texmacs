@@ -1,0 +1,123 @@
+From 9d51c37f44c3649343581b6ffc86949c51ecf277 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Sun, 18 Oct 2026 19:05:28 +0100
+Subject: [PATCH] Tables: no finalizer lost, none missing
+
+fl_table turned the finalizer of the type of the tables off around the
+allocation of a small table: the tables freed by a collection there
+were not finalized, their storage leaked (at each make-hash-table in
+TeXmacs). cvalue_no_finalizer allocates without registering the new
+table, and fl_table registers it when collisions made it outgrow its
+inline space, as in Julia's femtolisp (5fc4ba9193, e50ca99ae7).
+---
+ cvalues.c | 19 +++++++++++++++++--
+ flisp.h   |  1 +
+ table.c   | 15 ++++++++++-----
+ 3 files changed, 28 insertions(+), 7 deletions(-)
+
+diff --git a/cvalues.c b/cvalues.c
+index 573ebf8..b52408a 100644
+--- a/cvalues.c
++++ b/cvalues.c
+@@ -131,7 +131,11 @@ static value_t cprim(fltype_t *type, size_t sz)
+     return tagptr(pcp, TAG_CPRIM);
+ }
+ 
+-value_t cvalue(fltype_t *type, size_t sz)
++// TeXmacs, from Julia's femtolisp: with may_finalize 0, a cvalue whose
++// type has a finalizer is not added to the list of finalizers (fl_table
++// turned the finalizer of its type off around the allocation, and the
++// tables freed by a collection there were never finalized)
++static value_t _cvalue(fltype_t *type, size_t sz, int may_finalize)
+ {
+     cvalue_t *pcv;
+     int str=0;
+@@ -150,7 +154,8 @@ value_t cvalue(fltype_t *type, size_t sz)
+         pcv = (cvalue_t*)alloc_words(nw);
+         pcv->type = type;
+         pcv->data = &pcv->_space[0];
+-        if (type->vtable != NULL && type->vtable->finalize != NULL)
++        if (may_finalize && type->vtable != NULL &&
++            type->vtable->finalize != NULL)
+             add_finalizer(pcv);
+     }
+     else {
+@@ -170,6 +175,16 @@ value_t cvalue(fltype_t *type, size_t sz)
+     return tagptr(pcv, TAG_CVALUE);
+ }
+ 
++value_t cvalue(fltype_t *type, size_t sz)
++{
++    return _cvalue(type, sz, 1);
++}
++
++value_t cvalue_no_finalizer(fltype_t *type, size_t sz)
++{
++    return _cvalue(type, sz, 0);
++}
++
+ value_t cvalue_from_data(fltype_t *type, void *data, size_t sz)
+ {
+     value_t cv;
+diff --git a/flisp.h b/flisp.h
+index e17df8f..a6037ed 100644
+--- a/flisp.h
++++ b/flisp.h
+@@ -354,6 +354,7 @@ extern fltype_t *stringtype, *wcstringtype;
+ extern fltype_t *builtintype;
+ 
+ value_t cvalue(fltype_t *type, size_t sz);
++value_t cvalue_no_finalizer(fltype_t *type, size_t sz);
+ void add_finalizer(cvalue_t *cv);
+ void cv_autorelease(cvalue_t *cv);
+ void cv_pin(cvalue_t *cv);
+diff --git a/table.c b/table.c
+index a3638c1..63241cd 100644
+--- a/table.c
++++ b/table.c
+@@ -1,4 +1,5 @@
+ #include <stdlib.h>
++#include <stddef.h>
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <string.h>
+@@ -90,12 +91,10 @@ value_t fl_table(value_t *args, uint32_t nargs)
+     value_t nt;
+     // prevent small tables from being added to finalizer list
+     if (cnt <= HT_N_INLINE) {
+-        tabletype->vtable->finalize = NULL;
+-        nt = cvalue(tabletype, sizeof(htable_t));
+-        tabletype->vtable->finalize = free_htable;
++        nt = cvalue_no_finalizer(tabletype, sizeof(htable_t));
+     }
+     else {
+-        nt = cvalue(tabletype, 2*sizeof(void*));
++        nt = cvalue(tabletype, offsetof(htable_t, _space));
+     }
+     htable_t *h = (htable_t*)cv_data((cvalue_t*)ptr(nt));
+     htable_new(h, cnt/2);
+@@ -107,6 +106,12 @@ value_t fl_table(value_t *args, uint32_t nargs)
+         else
+             k = arg;
+     }
++    // TeXmacs, from Julia's femtolisp: a small table which outgrew its
++    // inline space (collisions) needs the finalizer too
++    if (cnt <= HT_N_INLINE && h->table != &h->_space[0]) {
++        add_finalizer((cvalue_t*)ptr(nt));
++        ((cvalue_t*)ptr(nt))->len = offsetof(htable_t, _space);
++    }
+     return nt;
+ }
+ 
+@@ -121,7 +126,7 @@ value_t fl_table_put(value_t *args, uint32_t nargs)
+     if (table0 == &h->_space[0] && h->table != &h->_space[0]) {
+         cvalue_t *cv = (cvalue_t*)ptr(args[0]);
+         add_finalizer(cv);
+-        cv->len = 2*sizeof(void*);
++        cv->len = offsetof(htable_t, _space);
+     }
+     return args[0];
+ }
+-- 
+2.50.1 (Apple Git-155)
+

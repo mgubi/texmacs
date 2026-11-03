@@ -87,6 +87,18 @@ SI modifier_box_rep::rsub_correction () {
   return b->rsub_correction (); }
 SI modifier_box_rep::rsup_correction () {
   return b->rsup_correction (); }
+SI modifier_box_rep::lsub_correction_at (SI h) {
+  return b->lsub_correction_at (h); }
+SI modifier_box_rep::lsup_correction_at (SI h) {
+  return b->lsup_correction_at (h); }
+SI modifier_box_rep::rsub_correction_at (SI h) {
+  return b->rsub_correction_at (h); }
+SI modifier_box_rep::rsup_correction_at (SI h) {
+  return b->rsup_correction_at (h); }
+bool modifier_box_rep::extended_shape () {
+  return b->extended_shape (); }
+bool modifier_box_rep::top_accent (SI& x) {
+  return b->top_accent (x); }
 SI modifier_box_rep::sub_lo_base (int level) {
   return b->sub_lo_base (level); }
 SI modifier_box_rep::sub_hi_lim  (int level) {
@@ -187,6 +199,14 @@ public:
   box    adjust_kerning (int mode, double factor);
   box    expand_glyphs (int mode, double factor);
   path   find_box_path (SI x, SI y, SI delta, bool force, bool& found);
+  path   find_rip ();
+  path   find_right_box_path ();
+  path   find_box_path (path p, bool& found);
+  cursor find_cursor (path bp);
+  selection find_selection (path lbp, path rbp);
+private:
+  path   outer (path p);
+  path   inner (path bp);
 };
 
 symbol_box_rep::symbol_box_rep (path ip, box b2, int n2):
@@ -217,6 +237,58 @@ symbol_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
     else return path_up (p) * n;
   }
   else return p;
+}
+
+// The string of the leaf differs from the string in the tree, which has
+// length n: the box paths of a symbol box end with 0 or with n, for the left
+// and the right side of the symbol, and correspond to the positions in the
+// tree. 'outer' converts a box path of the contents, 'inner' gives the box
+// path which the contents understand.
+
+path
+symbol_box_rep::outer (path p) {
+  box leaf= ::subbox (box (this), path_up (p));
+  if (leaf->get_type () != TEXT_BOX || !is_accessible (leaf->ip)) return p;
+  if (last_item (p) == 0) return p;
+  return path_up (p) * n;
+}
+
+path
+symbol_box_rep::inner (path bp) {
+  box leaf= ::subbox (box (this), path_up (bp));
+  if (leaf->get_type () != TEXT_BOX || !is_accessible (leaf->ip))
+    return bp->next;
+  if (last_item (bp) == 0) return bp->next;
+  return path_up (bp->next) * last_item (leaf->find_right_box_path ());
+}
+
+path
+symbol_box_rep::find_rip () {
+  path p= b->find_rip ();
+  if (is_nil (p) || !is_accessible (p)) return p;
+  return path (n, p->next);
+}
+
+path
+symbol_box_rep::find_right_box_path () {
+  return outer (modifier_box_rep::find_right_box_path ());
+}
+
+path
+symbol_box_rep::find_box_path (path p, bool& found) {
+  return outer (modifier_box_rep::find_box_path (p, found));
+}
+
+cursor
+symbol_box_rep::find_cursor (path bp) {
+  return b->find_cursor (inner (bp));
+}
+
+selection
+symbol_box_rep::find_selection (path lbp, path rbp) {
+  selection sel= b->find_selection (inner (lbp), inner (rbp));
+  return selection (sel->rs, find_tree_path (lbp), find_tree_path (rbp),
+                    sel->valid);
 }
 
 /******************************************************************************
@@ -384,6 +456,14 @@ struct macro_box_rep: public composite_box_rep {
   SI lsup_correction () { return bs[0]->lsup_correction(); }
   SI rsub_correction () { return bs[0]->rsub_correction(); }
   SI rsup_correction () { return bs[0]->rsup_correction(); }
+  SI lsub_correction_at (SI h) { return bs[0]->lsub_correction_at (h); }
+  SI lsup_correction_at (SI h) { return bs[0]->lsup_correction_at (h); }
+  SI rsub_correction_at (SI h) { return bs[0]->rsub_correction_at (h); }
+  SI rsup_correction_at (SI h) { return bs[0]->rsup_correction_at (h); }
+  bool extended_shape () { return bs[0]->extended_shape (); }
+  bool top_accent (SI& x) {
+    if (bs[0]->top_accent (x)) { x += sx (0); return true; }
+    return false; }
   SI sub_lo_base (int l) {
     // second test separates small and large big operators
     return (!is_nil (big_fn)) && ((y2-y1) <= 3*big_fn->yx)?

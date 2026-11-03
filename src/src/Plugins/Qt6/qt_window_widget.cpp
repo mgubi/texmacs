@@ -254,6 +254,21 @@ qt_window_widget_rep::send (slot s, blackbox val) {
       }
     }
       break;
+    case SLOT_ON_TOP:
+    {
+      // a tool window floats above the other windows of the application
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);
+      if (qwid) {
+        Qt::WindowFlags f= qwid->windowFlags () & ~Qt::WindowType_Mask;
+        if (flag) f= (f | Qt::Tool | Qt::WindowStaysOnTopHint);
+        else f= ((f & ~Qt::WindowStaysOnTopHint) | Qt::Window);
+        bool vis= qwid->isVisible ();
+        qwid->setWindowFlags (f);
+        if (vis) qwid->show ();
+      }
+    }
+      break;
     case SLOT_MOUSE_GRAB:
     {   
       check_type<bool> (val, s);
@@ -403,7 +418,10 @@ qt_popup_widget_rep::tooltip_window_widget (string s) {
     qwid->setWindowTitle (to_qstring (s));
   }
   qwid->setWindowModality (Qt::NonModal);
-  qwid->setWindowFlags (Qt::ToolTip);
+  // the pointer goes through to the window under the balloon: else the
+  // editor did not see it go, and the balloon stayed, over the words which
+  // the pointer was then on (#399)
+  qwid->setWindowFlags (Qt::ToolTip | Qt::WindowTransparentForInput);
   return this;
 }
 

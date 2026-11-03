@@ -1,0 +1,7 @@
+wait 15000
+eval withStackSave(()=>_vue_web_scheme(stringToUTF8OnStack('(begin (use-modules (client client-widgets) (client client-tmfs)) (client-login-home "localhost" "6561" "admin" (quote (tls-password "secret123")) (lambda args (display* "logged in: " (client-active-servers) "\\n") (remote-create-file (car (client-active-servers)) "tmfs://remote-file/localhost/~admin/hello.tm" (quote (document (TeXmacs "2.1.5") (style (tuple "generic")) (body (document "Hello from TeXmacs in the browser, saved on the TeXmacs server."))))))))'))); 'sent'
+wait 6000
+shot remote-file
+eval withStackSave(()=>_vue_web_scheme(stringToUTF8OnStack('(load-document (remote-home-directory (car (client-active-servers))))'))); 'sent'
+wait 4000
+shot remote-home2

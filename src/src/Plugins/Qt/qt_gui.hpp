@@ -108,6 +108,7 @@ public:
   void exec_pending ();
   void clear_pending ();
   bool must_wait (time_t now) const;
+  bool has_due (time_t now); // a command is to run now
   
   friend class qt_gui_rep;
 };
@@ -195,7 +196,10 @@ public:
   void process_resize (qt_simple_widget_rep *wid, SI x, SI y);
   void process_command (command _cmd);
   void process_command (command _cmd, object _args);
-  void process_delayed_commands (); 
+  void process_delayed_commands ();
+  // events, delayed commands which are due or an update are waiting (for
+  // the scripted tests, gui_test_busy)
+  bool test_busy (); 
   void process_queued_events (int max = -1);
   
   /* befriended interface functions */

@@ -1,0 +1,16 @@
+# needs balloon.scm: the help balloon of a menu item. It must appear near
+# the pointer and float over everything, not under the item it belongs to:
+# there it covered the next item of the menu and was clipped to the menu's
+# width, so walking down a menu replaced one item after another with an
+# opaque box and the menu seemed to flicker.
+wait 9000
+window #2
+click 409 12
+wait 900
+move 430 40
+wait 1400
+snapshot b0
+move 430 72
+wait 1400
+snapshot b1
+wait 400

@@ -96,6 +96,13 @@ string tm_correct (string s);
 void   tm_char_forwards (string s, int& pos);
 void   tm_char_backwards (string s, int& pos);
 int    tm_char_next (string s, int pos);
+// the end of the character at pos, an emoji sequence taken whole (a family,
+// a flag, a skin tone, a keycap: what the emoji fonts draw as one picture)
+int    tm_grapheme_end (string s, int pos);
+// the start of the character (an emoji sequence taken whole) before pos
+int    tm_grapheme_start (string s, int pos);
+// whether pos is inside an emoji sequence, from start to end
+bool   tm_grapheme_inside (string s, int pos, int& start, int& end);
 int    tm_char_previous (string s, int pos);
 string tm_forward_access (string s, int i);
 string tm_backward_access (string s, int i);
@@ -105,6 +112,14 @@ array<string> tm_string_split (string s);
 string tm_recompose (array<string> a);
 int    tm_search_forwards (string s, int pos, string in);
 int    tm_search_backwards (string s, int pos, string in);
+
+// a tab of a source file: the character <#9> of Cork (byte 9 is a macron),
+// at @pos of @s
+inline bool
+is_source_tab (string s, int pos) {
+  return pos + 3 < N(s) && s[pos] == '<' && s[pos+1] == '#' &&
+         s[pos+2] == '9' && s[pos+3] == '>';
+}
 
 string scm_quote (string s);
 string scm_unquote (string s);

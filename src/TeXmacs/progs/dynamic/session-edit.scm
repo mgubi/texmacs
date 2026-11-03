@@ -16,7 +16,8 @@
 	(utils library cursor)
 	(utils plugins plugin-cmd)
 	(dynamic session-drd)
-	(dynamic fold-edit)))
+	(dynamic fold-edit)
+	(code code-syntax)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where to find plug-in binaries
@@ -34,12 +35,12 @@
       (when (cpp-has-preference? "manual path")
         (with cur (getenv "PATH")
           (when (string-starts? cur (string-append old ":"))
-            (setenv "PATH" (string-drop cur (+ (string-length old) 1))))))
+            (system-setenv "PATH" (string-drop cur (+ (string-length old) 1))))))
       (if (== p "")
           (reset-preference "manual path")
           (begin
             (set-preference "manual path" p)
-            (setenv "PATH" (string-append p ":" (getenv "PATH")))))
+            (system-setenv "PATH" (string-append p ":" (getenv "PATH")))))
       (reinit-plugin-cache))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -49,7 +50,7 @@
 (tm-define (set-manual-key k v)
   (:synopsis "Set API key to remote plug-in")
   (:argument k "Key name")
-  (:argument v "Key value")
+  (:argument v "password" "Key value")
   (set-preference (string-append k " api key") v)
   (reinit-plugin-cache))
 
@@ -289,14 +290,40 @@
 	  (tree-insert! t i '((errput (document)))))
       (session-output (tree-ref t i 0) u))))
 
+;; The channel "progress" (a request whose answer comes in pieces: see
+;; connection_rep::listen) gives the text of the answer so far: it is shown,
+;; in grey, before the busy sign, in place of the text given before, until
+;; the output or an error comes.
+(define (session-remove-progress t)
+  (when (tm-func? t 'document)
+    (for (i (reverse (.. 0 (tree-arity t))))
+      (with x (tree-ref t i)
+        (when (and (tm-func? x 'with 3)
+                   (tm-equal? (tree-ref x 0) "session-progress"))
+          (tree-remove! t i 1))))))
+
+(define (session-show-progress t u)
+  (when (tm-func? t 'document)
+    (session-remove-progress t)
+    (with i (tree-arity t)
+      (if (and (> i 0) (tm-func? (tree-ref t (- i 1)) 'script-busy))
+	  (set! i (- i 1)))
+      (tree-insert! t i
+                    (list `(with "session-progress" "true"
+                             (with "color" "dark grey" ,(tm->stree u))))))))
+
 (define (session-notify lan ses ch t)
   ;;(display* "Session notify " lan ", " ses ", " ch ", " t "\n")
   (with l (pending-ref lan ses)
     (with (in out next opts) (session-decode (car l))
       (when (session-coherent? out next)
-	(cond ((== ch "output")
+	(cond ((== ch "progress")
+	       (session-show-progress out t))
+	      ((== ch "output")
+	       (session-remove-progress out)
 	       (session-output out t))
 	      ((== ch "error")
+	       (session-remove-progress out)
 	       (session-errput out t))
 	      ((== ch "prompt")
 	       (if (and (== (length l) 1) (tree-empty? (tree-ref next 1)))
@@ -598,6 +625,9 @@
 (tm-define (kbd-enter t shift?)
   (:require (field-input-context? t))
   (cond ((xor (session-multiline-input?) shift?)
+         (insert-return))
+        ((syntax-input-incomplete? (tree-ref t 1))
+         ;; an open bracket or block (by the syntax tree, see ts-edit.scm)
          (insert-return))
         ((session-supports-input-done?)
          (let* ((lan (get-env "prog-language"))

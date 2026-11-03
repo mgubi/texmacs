@@ -76,6 +76,7 @@ initialize_default_env () {
   env (FONT_SIZE)        = "1";         // the font size multiplier
   env (FONT_BASE_SIZE)   = "10";        // the font base size
   env (FONT_EFFECTS)     = "";          // additional effects applied to font
+  env (FONT_FEATURES)    = "";          // OpenType features, e.g. onum,smcp
   env (MAGNIFICATION)    = "1";         // magnification (slides for instance)
   env (COLOR)            = "black";     // the color
   env (OPACITY)          = "100%";      // the opacity
@@ -120,6 +121,7 @@ initialize_default_env () {
   env (PROG_FONT_FAMILY) = "tt";        // the font family in prog mode
   env (PROG_FONT_SERIES) = "medium";    // the font series in prog mode
   env (PROG_FONT_SHAPE)  = "right";     // the font shape in prog mode
+  env (PROG_TAB_WIDTH)   = "8";         // the columns between tab stops
   env (PROG_SESSION)     = "default";   // computer algebra session name
 
   env (KEYWORD_COLOR)     = "#8020c0";   // syntax highlight color for keywords

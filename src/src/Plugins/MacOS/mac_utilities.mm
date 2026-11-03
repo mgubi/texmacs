@@ -19,7 +19,7 @@
 
 #undef FAILED // redefined by CARBON
 #define extend CARBON_extends // avoid name collision
-#include "Cocoa/mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include <Carbon/Carbon.h>
 #include <crt_externs.h>
 #include "HIDRemote.h"
@@ -66,10 +66,6 @@ mac_alternate_startup () {
            & NSDeviceIndependentModifierFlagsMask) == kCGEventFlagMaskAlternate);
 #endif
 }
-
-
-
-
 
 
 #ifdef QTTEXMACS
@@ -556,3 +552,8 @@ void applyMacOSUnifiedBar(QWidget* widget) {
   //[nativeWindow setMovableByWindowBackground:YES];
 }
 #endif
+
+void
+mac_beep () {
+  NSBeep ();
+}

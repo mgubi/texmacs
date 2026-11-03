@@ -34,7 +34,29 @@
 #include "analyze.hpp"
 #include "hashmap.hpp"
 #include "scheme.hpp"
+#include "picture.hpp"
+#include "effect.hpp"
+#include "renderer.hpp" // PIXEL
 #include "Imlib2/imlib2.hpp"
+#ifdef MUPDF_RENDERER
+// in Plugins/MuPDF/mupdf_picture.cpp (declared here: this file is compiled
+// without the headers of MuPDF)
+bool mupdf_image_size (url u, int& w, int& h);
+// in Plugins/MuPDF/mupdf_pdf_renderer.cpp
+bool mupdf_pdf_to_svg (url pdf, url svg);
+#endif
+
+// The first page of a PDF as an SVG, without another program: true if it
+// was written. Only the builds with MuPDF can do it.
+bool
+native_pdf_to_svg (url pdf, url svg) {
+#ifdef MUPDF_RENDERER
+  return mupdf_pdf_to_svg (pdf, svg);
+#else
+  (void) pdf; (void) svg;
+  return false;
+#endif
+}
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_images.h"
@@ -397,6 +419,16 @@ image_size_sub (url image, int& w, int& h) { // returns w,h in units of pt (1/72
     return;
   }
 #endif
+#ifdef MUPDF_RENDERER
+  // bitmaps and svg (the browser has neither the system loaders nor the
+  // external programs)
+  if (mupdf_image_size (image, w, h)) {
+    if (DEBUG_CONVERT)
+      debug_convert << "image_size_sub, size found by mupdf_image_size: "
+		    << w << " x " << h << "\n";
+    return;
+  }
+#endif
   if(imagemagick_image_size(image, w, h)) {
     if (DEBUG_CONVERT)
       debug_convert<< "image_size_sub, size found by imagemagick_image_size: "
@@ -421,6 +453,9 @@ pdf_image_size (url image, int& w, int& h) {
 #ifdef PDF_RENDERER
   hummus_pdf_image_size (image, w, h);
   return;
+#endif
+#ifdef MUPDF_RENDERER
+  if (mupdf_image_size (image, w, h)) return;
 #endif
 #ifdef USE_GS
   gs_PDFimage_size (image, w, h);
@@ -491,7 +526,9 @@ image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
   // Note: since inkscape would most likely be the prog called to
   // translate svg we could at no additional cost allow other
   // vector formats supported by inkscape : ai, svgz, cdr, wmf ...
-  if ((s == "svg") && !wrap_qt_supports (image) &&
+  if ((s == "svg") &&
+      (!wrap_qt_supports (image) ||
+       get_preference ("image->texmacs:svg-prefer-inkscape") == "on") &&
       (call_scm_converter (image, eps))) return;
   
 #ifdef USE_GS
@@ -547,7 +584,9 @@ image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi,
 		  << " into " << pdf << LF;
   string s= suffix (image);
   // First try to preserve "vectorialness"
-  if ((s == "svg") && !wrap_qt_supports (image) &&
+  if ((s == "svg") &&
+      (!wrap_qt_supports (image) ||
+       get_preference ("image->texmacs:svg-prefer-inkscape") == "on") &&
       call_scm_converter (image, pdf)) return;
 #ifdef USE_GS
   if (gs_supports (image)) {
@@ -783,5 +822,15 @@ void
 apply_effect (tree eff, array<url> src, url dest, int w, int h) {
 #ifdef QTTEXMACS
   qt_apply_effect (eff, src, dest, w, h);
+#else
+  // the effects (blurs, shadows, degradations...) are computed on pictures
+  // by Graphics/Effects, which needs no GUI: load the sources, apply, save.
+  // Without this the whole feature silently did nothing outside Qt.
+  array<picture> a;
+  for (int i= 0; i < N(src); i++)
+    a << load_picture (src[i], w, h, "", PIXEL);
+  effect e= build_effect (eff);
+  if (is_nil (e)) return;
+  save_picture (dest, e->apply (a, PIXEL));
 #endif
 }

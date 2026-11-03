@@ -47,7 +47,7 @@
   <section|Das <TeXmacs> Kommunikations-Protokoll.>
 
   Das <TeXmacs> Kommunikations-Protokoll dient dazu, DLLs dynamisch in
-  <TeXmacs> einzubinden. Die Datei <verbatim|include/TeXmacs.h> enthält die
+  <TeXmacs> einzubinden. Die Datei <source-link|include/TeXmacs.h|TeXmacs/include/TeXmacs.h> enthält die
   Definition aller Daten-Strukturen und Funktionen, die von dem Protokoll
   benutzt werden. In Zukunft erwarten wir eine Folge von unterschiedlichen
   Protokollen, die alle die abstrakten Daten-Strukturen

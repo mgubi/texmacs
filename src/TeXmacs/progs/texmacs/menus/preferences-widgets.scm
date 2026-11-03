@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (texmacs menus preferences-widgets)
-  (:use (texmacs menus preferences-menu)))
+  (:use (texmacs menus preferences-menu)
+        (fonts font-short-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Validation Macro
@@ -61,7 +62,11 @@
             (else #f))))
 
 (tm-define (set-retina-boolean-preference which on?)
-  (set-retina-preference which (if on? "on" "off")))
+  (set-retina-preference which (if on? "on" "off"))
+  ;; the Cocoa interface reads them when it starts (ns_gui_rep)
+  (when (ns-gui?)
+    (set-message "Restart in order to let the new setting take effect"
+                 "retina setting")))
 
 (tm-define (reset-retina-preferences)
   (reset-preference "retina-factor")
@@ -107,6 +112,35 @@
       ("default" "Default")
       ("light" "Bright")
       ("dark" "Dark"))
+
+(define-preference-names-and-validate "icon set"
+  ("classical" "Classical")
+  ("monochrome" "Monochrome")
+  ("neo-classical" "Neo-classical")
+  ("lucide" "Lucide"))
+
+(define-preference-names-and-validate "icon bars"
+  ("top" "Above the document")
+  ("left" "At the left of the document")
+  ("right" "At the right of the document"))
+
+(define-preference-names-and-validate "window tabs"
+  ("left" "In a column at the left")
+  ("top" "Above the page"))
+
+(define-preference-names-and-validate "gpu glyphs"
+  ("freetype" "FreeType, as dark as Qt")
+  ("texmacs" "Bitmaps of TeXmacs, as Qt")
+  ("mupdf" "MuPDF, lighter"))
+
+(define-preference-names-and-validate "emoji font"
+  ("default" "Twemoji, the same everywhere")
+  ("system" "Those of the system"))
+
+(define-preference-names-and-validate "gpu glyph hinting"
+  ("light" "Light")
+  ("none" "None")
+  ("full" "Full"))
 
 (define-preference-names-and-validate "gui density"
   ("compact" "Compact")
@@ -156,13 +190,34 @@
             (get-pretty-preference "buffer management")
             "18em"))
     (item (text "User interface theme:")
-      (enum (set-pretty-preference* "gui theme" answer)
+      ;; the Cocoa interface follows the theme at once, without a restart
+      (enum (if (ns-gui?)
+                (set-pretty-preference "gui theme" answer)
+                (set-pretty-preference* "gui theme" answer))
             (if qt6-or-later-gui?
                 '("Default" "Bright" "Dark" "")
                 '("Default" "Bright" "Dark" "Native" "Legacy" "")
             )
             (get-pretty-preference "gui theme")
             "18em"))
+    (item (text "Icon set:")
+      (enum (set-pretty-preference "icon set" answer)
+            '("Classical" "Monochrome" "Neo-classical" "Lucide")
+            (get-pretty-preference "icon set")
+            "18em"))
+    (assuming (or (vue-gui?) (ns-gui?))
+      (item (text "Main and mode icon bars:")
+        (enum (set-pretty-preference "icon bars" answer)
+              '("Above the document" "At the left of the document"
+                "At the right of the document")
+              (get-pretty-preference "icon bars")
+              "18em")))
+    (assuming (defined? 'web-javascript)
+      (item (text "Tabs of the windows:")
+        (enum (set-pretty-preference "window tabs" answer)
+              '("In a column at the left" "Above the page")
+              (get-pretty-preference "window tabs")
+              "18em")))
     (assuming (support-functionality? "density")
       (item (text "Interface density:")
         (enum (set-pretty-preference "gui density" answer)
@@ -174,16 +229,43 @@
             '("Top tabs" "Side tabs" "Mobile list")
             (get-pretty-preference "gui:responsive tab mode")
             "18em"))
-    (item (text "Interface scaling:")
-      (enum (set-pretty-preference "gui scaling" answer)
-            '("default" "0.25" "0.5" "1" "2" "3")
-            (get-pretty-preference "gui scaling")
-            "18em"))
-    (assuming (qt5-gui?)
+    (assuming (not (ns-gui?))
+      ;; macOS scales the native interface of Cocoa itself
+      (item (text "Interface scaling:")
+        (enum (set-pretty-preference "gui scaling" answer)
+              '("default" "0.25" "0.5" "1" "2" "3")
+              (get-pretty-preference "gui scaling")
+              "18em")))
+    (assuming (or (vue-gui?) (ns-gui?))
+      (item (text "Glyphs on the screen:")
+        (enum (set-pretty-preference "gpu glyphs" answer)
+              '("FreeType, as dark as Qt" "Bitmaps of TeXmacs, as Qt"
+                "MuPDF, lighter")
+              (get-pretty-preference "gpu glyphs")
+              "18em"))
+      (item (text "Boldness of FreeType glyphs:")
+        (enum (set-preference "gpu glyph boldness" answer)
+              '("0" "0.1" "0.22" "0.3" "0.4" "0.5" "")
+              (get-preference "gpu glyph boldness")
+              "18em"))
+      (item (text "Hinting of FreeType glyphs:")
+        (enum (set-pretty-preference "gpu glyph hinting" answer)
+              '("Light" "None" "Full")
+              (get-pretty-preference "gpu glyph hinting")
+              "18em")))
+    ;; the emoji font of smart_font.cpp (emoji_font_name), read when the
+    ;; fonts are made: the browser has no fonts of a system
+    (assuming (not (defined? 'web-javascript))
+      (item (text "Emoji (from the next start):")
+        (enum (set-pretty-preference "emoji font" answer)
+              '("Twemoji, the same everywhere" "Those of the system")
+              (get-pretty-preference "emoji font")
+              "18em")))
+    (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina fonts"))
         (toggle (set-retina-boolean-preference "retina-factor" answer)
                 (get-retina-boolean-preference "retina-factor"))))
-    (assuming (qt5-gui?)
+    (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina icons"))
         (toggle (set-retina-boolean-preference "retina-icons" answer)
                 (get-retina-boolean-preference "retina-icons"))))))
@@ -606,6 +688,10 @@
   ("iso-8859-2" "Iso-8859-2")
   ("utf-8" "Utf-8"))
 
+(define-preference-names "editor:code indent"
+  ("spaces" "Spaces")
+  ("tabs" "Tabs"))
+
 (tm-widget (verbatim-preferences-widget)
   ======
   (bold (text "TeXmacs -> Verbatim"))
@@ -634,6 +720,20 @@
       (enum (set-pretty-preference "verbatim->texmacs:encoding" answer)
             '("Automatic" "Cork" "Iso-8859-1" "Iso-8859-2" "Utf-8")
             (get-pretty-preference "verbatim->texmacs:encoding")
+            "12em")))
+  ====== ======
+  (bold (text "Source code"))
+  ===
+  (aligned
+    (item (text "Columns between tab stops:")
+      (enum (set-preference "editor:code tab width" answer)
+            '("2" "4" "8" "")
+            (get-preference "editor:code tab width")
+            "12em"))
+    (item (text "Indent new files with:")
+      (enum (set-pretty-preference "editor:code indent" answer)
+            '("Spaces" "Tabs")
+            (get-pretty-preference "editor:code indent")
             "12em"))))
 
 ;; Pdf ----------
@@ -694,7 +794,35 @@
    (eval `(define-preference-names "texmacs->image:format" ,@valid-image-format-list))
    (cadr (apply map list valid-image-format-list))))
 
-(define (supports-inkscape?) (url-exists-in-path? "inkscape"))
+(when (and (os-macos?)
+	   (url-exists? "/Applications/Inkscape.app/Contents/MacOS/inkscape"))
+  (system-setenv "PATH" (string-append "/Applications/Inkscape.app/Contents/MacOS/:"
+				(getenv "PATH"))))
+
+(when (os-mingw64?)
+  (with r (eval-system "reg.exe query \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\inkscape.exe\"")
+    (with l (filter (lambda (x) (string-contains? x "Path "))
+		    (string-tokenize-by-char r #\newline))
+      (with s (if (null? l) "" (string-trim-spaces-left (car l)))
+	(with pos (string-search-forwards ":" 0 s)
+	  (if (>= pos 1) (set! s (string-drop s (- pos 1))))
+	  (when (string-ends? s "\x0d") (set! s (string-drop-right s 1))))
+	(when (!= s "")
+	  (system-setenv "PATH" (string-append s ";" (getenv "PATH"))))))))
+
+(define (inkscape-version)
+  (with l (string-tokenize-by-char (eval-system "inkscape --version") #\space)
+    (and (>= (length l) 2) (cadr l))))
+
+(define (inkscape-version-ge-1.4?)
+  (and-with v (inkscape-version)
+    (and-with l (map string->number (string-tokenize-by-char v #\.))
+      (or (and (>= (length l) 1) (> (car l) 2))
+	  (and (>= (length l) 2) (>= (car l) 1) (>= (cadr l) 4))))))
+
+(define (supports-inkscape?)
+  (and (url-exists-in-path? "inkscape")
+       (inkscape-version-ge-1.4?)))
 
 (tm-widget (image-preferences-widget)
   ======
@@ -724,6 +852,10 @@
                 (get-boolean-preference
                  "image->texmacs:svg-prefer-inkscape"))))))
 
+(define (http-proxy-shown)
+  (with p (get-preference "http proxy")
+    (if (in? p '("" "default")) "default" p)))
+
 (tm-widget (ai-preferences-widget)
   ======
   (bold (text "AI connexions"))
@@ -732,7 +864,15 @@
     (item (hlist // (text "Network timeout in seconds:"))
       (enum (set-preference "http request timeout" answer)
                 '("60" "30" "10" "5" "2" "1" "")
-                (get-preference "http request timeout") "6em")))
+                (get-preference "http request timeout") "6em"))
+    ;; (default: the proxy of the system; host:port, socks5://host:port,
+    ;; or direct; a browser has its own)
+    (assuming (not (defined? 'web-javascript))
+      (item (hlist // (text "Proxy:"))
+        (enum (set-preference "http proxy"
+                              (if (== answer "") "default" answer))
+              (list (http-proxy-shown) "default" "direct" "")
+              (http-proxy-shown) "14em"))))
   ======
   (bold (text "AI corrections"))
   ===
@@ -747,6 +887,38 @@
 	       "ai-correct explain" answer)
 	      (get-boolean-preference
 	       "ai-correct explain")))))
+
+;; Markdown ----------
+
+(tm-widget (markdown-preferences-widget)
+  ======
+  (bold (text "Markdown -> TeXmacs"))
+  ===
+  (aligned
+    (meti (hlist // (text "Read a file as a document of the style markdown, which is written back as it was"))
+      (toggle (set-boolean-preference "markdown->texmacs:faithful" answer)
+              (get-boolean-preference "markdown->texmacs:faithful"))))
+  ======
+  (bold (text "TeXmacs -> Markdown"))
+  ===
+  (aligned
+    (meti (hlist // (text "Use Html for what Markdown cannot express"))
+      (toggle (set-boolean-preference "texmacs->markdown:html" answer)
+              (get-boolean-preference "texmacs->markdown:html")))
+    (meti (hlist // (text "Export the title, the authors and the date as a YAML header"))
+      (toggle (set-boolean-preference "texmacs->markdown:front-matter" answer)
+              (get-boolean-preference "texmacs->markdown:front-matter")))))
+
+;; Word and OpenDocument ----------
+
+(tm-widget (office-preferences-widget)
+  ======
+  (bold (text "Word, OpenDocument -> TeXmacs"))
+  ===
+  (aligned
+    (meti (hlist // (text "Read a file as a document of the style office, which is written back as it was"))
+      (toggle (set-boolean-preference "office->texmacs:faithful" answer)
+              (get-boolean-preference "office->texmacs:faithful")))))
 
 ;; All converters ----------
 
@@ -763,6 +935,12 @@
       (tab (text "BibTeX")
         (centered
           (dynamic (bibtex-preferences-widget))))
+      (tab (text "Markdown")
+        (centered
+          (dynamic (markdown-preferences-widget))))
+      (tab (text "Office")
+        (centered
+          (dynamic (office-preferences-widget))))
       (tab (text "Verbatim")
         (centered
           (dynamic (verbatim-preferences-widget))))
@@ -849,10 +1027,12 @@
       (bold (text "Wallet"))
       ===
       (dynamic (wallet-preferences-widget))
-      ====== ======
-      (bold (text "Encryption"))
-      ===
-      (dynamic (gpg-preferences-widget))
+      ;; GnuPG is a program, which a web browser cannot run
+      (assuming (not (defined? 'web-javascript))
+        ====== ======
+        (bold (text "Encryption"))
+        ===
+        (dynamic (gpg-preferences-widget)))
       ;;====== ======
       ;;(bold (text "Scripts")) 
       ;;===
@@ -896,8 +1076,28 @@
       (text "Console") >>
       ("Open debug console" (open-debug-console)))))
 
+;; the fonts of source files: the TeXmacs typewriter font and the
+;; installed monospaced fonts, as (label master)
+(define (code-font-choices)
+  (cons (list "TeXmacs typewriter" "roman")
+        (map (lambda (p) (list (car p) (cadr p))) (text-font-list 'mono))))
+
+(define (code-font-label)
+  (with f (get-preference "editor:code font")
+    (with p (list-find (code-font-choices) (lambda (p) (== (cadr p) f)))
+      (if p (car p) f))))
+
+(define (set-code-font label)
+  (with p (assoc label (code-font-choices))
+    (when p (set-preference "editor:code font" (cadr p)))))
+
 (tm-widget (misc-preferences-widget)
   (aligned
+    (item (text "Font of source code:")
+      (enum (set-code-font answer)
+            (map car (code-font-choices))
+            (code-font-label)
+            "12em"))
     (item (text "Automatically save:")
       (enum (set-pretty-preference "autosave" answer)
             '("5 sec" "30 sec" "120 sec" "300 sec" "Disable")
@@ -948,6 +1148,9 @@
       (meti (hlist // (text "New style fonts"))
         (toggle (set-boolean-preference "new style fonts" answer)
                 (get-boolean-preference "new style fonts")))
+      (meti (hlist // (text "Hand tuned math fonts"))
+        (toggle (set-boolean-preference "hand tuned math fonts" answer)
+                (get-boolean-preference "hand tuned math fonts")))
       (meti (hlist // (text "Advanced font customization"))
         (toggle (set-boolean-preference "advanced font customization" answer)
                 (get-boolean-preference "advanced font customization")))
@@ -971,13 +1174,19 @@
         (meti (hlist // (text "Automatic program brackets"))
           (toggle (set-boolean-preference "prog:automatic brackets" answer)
                   (get-boolean-preference "prog:automatic brackets")))
+        (meti (hlist // (text "Balanced brackets in code with a syntax tree"))
+          (toggle (set-boolean-preference "prog:balanced brackets" answer)
+                  (get-boolean-preference "prog:balanced brackets")))
+        (meti (hlist // (text "Program coloring by syntax trees"))
+          (toggle (set-boolean-preference "tree-sitter highlighting" answer)
+                  (get-boolean-preference "tree-sitter highlighting")))
         (meti (hlist // (text "Program bracket selections"))
           (toggle (set-boolean-preference "prog:select brackets" answer)
                   (get-boolean-preference "prog:select brackets")))
         (meti (hlist // (text "Case-insensitive search"))
           (toggle (set-boolean-preference "case-insensitive-match" answer)
                   (get-boolean-preference "case-insensitive-match")))
-        (assuming (qt-gui?)  ; TODO: recode the dialogue in scheme
+        (assuming (or (qt-gui?) (vue-gui?))  ; TODO: recode the dialogue in scheme
           (meti (hlist // (text "Use print dialogue"))
             (toggle (set-boolean-preference "gui:print dialogue" answer)
                     (get-boolean-preference "gui:print dialogue"))))
@@ -1034,13 +1243,19 @@
     (meti (hlist // (text "Automatic program brackets"))
       (toggle (set-boolean-preference "prog:automatic brackets" answer)
               (get-boolean-preference "prog:automatic brackets")))
+    (meti (hlist // (text "Balanced brackets in code with a syntax tree"))
+      (toggle (set-boolean-preference "prog:balanced brackets" answer)
+              (get-boolean-preference "prog:balanced brackets")))
+    (meti (hlist // (text "Program coloring by syntax trees"))
+      (toggle (set-boolean-preference "tree-sitter highlighting" answer)
+              (get-boolean-preference "tree-sitter highlighting")))
     (meti (hlist // (text "Program bracket selections"))
       (toggle (set-boolean-preference "prog:select brackets" answer)
               (get-boolean-preference "prog:select brackets")))
     ;;(meti (hlist // (text "Case-insensitive search"))
     ;;  (toggle (set-boolean-preference "case-insensitive-match" answer)
     ;;          (get-boolean-preference "case-insensitive-match")))
-    (assuming (qt-gui?)  ; TODO: recode the dialogue in scheme
+    (assuming (or (qt-gui?) (vue-gui?))  ; TODO: recode the dialogue in scheme
       (meti (hlist // (text "Use print dialogue"))
         (toggle (set-boolean-preference "gui:print dialogue" answer)
                 (get-boolean-preference "gui:print dialogue"))))
@@ -1155,7 +1370,9 @@
           (dynamic (math-preferences-widget))))
       (icon-tab "tm_prefs_convert.xpm" (text "Convert")
         (dynamic (conversion-preferences-widget)))
-      (assuming (== (get-preference "experimental encryption") "on")
+      ;; in a web browser the wallet (web-wallet.scm) is there anyway
+      (assuming (or (== (get-preference "experimental encryption") "on")
+                    (defined? 'web-javascript))
         (icon-tab "tm_prefs_security.xpm" (text "Security")
           (centered
             (dynamic (security-preferences-widget)))))

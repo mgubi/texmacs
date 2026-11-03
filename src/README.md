@@ -1,3 +1,19 @@
+> **TeXmacs Upsilon.** This directory is the source tree of GNU TeXmacs (the
+> SVN trunk) with the additions of TeXmacs Upsilon, an enhanced and
+> bleeding-edge version with experimental features. What it adds, its
+> builds and the branches it is made of are in the
+> [README at the root of the repository](../README.md); the builds are on
+> the [main page of the site](https://mgubi.github.io/texmacs/).
+> Problems with these builds go to the
+> [issues of this repository](https://github.com/mgubi/texmacs/issues), not
+> to the TeXmacs project.
+>
+> For developers: the notes on the additions (design, status, audits) are
+> in [`docs/`](docs/README.md), the tests in [`tests/`](tests/README.md),
+> and the developer documentation inside TeXmacs (Help ▸ Developer
+> documentation) in [`TeXmacs/doc/devel/`](TeXmacs/doc/devel/). The
+> section below is the README of GNU TeXmacs.
+
 # GNU TeXmacs
 [![Join the chat at https://gitter.im/texmacs/Lobby](https://badges.gitter.im/texmacs/Lobby.svg)](https://gitter.im/texmacs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 

@@ -982,9 +982,29 @@
     ("int x = 1; // c"
      `(("int" ,black) ("x" ,black) ("=" ,black) ("1;" ,black) ("//" ,black)
        ("c" ,black))))
+  (check-lines "latex"
+    ("x = 1 % c"
+     `(("x" ,black) ("=" ,black) ("1" ,black) ("%" ,black) ("c" ,black))))
+  ;; (shell has a format and shell-lang.scm since #734, without tables: the
+  ;; tokenizer would take $# for a comment; tree-sitter colors it)
   (check-lines "shell"
     ("echo $HOME # c"
-     `(("echo" ,black) ("$HOME" ,black) ("#" ,black) ("c" ,black)))))
+     `(("echo" ,black) ("$HOME" ,black) ("#" ,black) ("c" ,black)))
+    ("echo $# args"
+     `(("echo" ,black) ("$#" ,black) ("args" ,black))))
+  ;; without tree-sitter, // and /* */ of paths are no comments (they are
+  ;; those of default-lang.scm, which shell-lang.scm removes)
+  ;; (tree-sitter is off in these groups, see below)
+  (let* ((lines '("curl https://example.com/x -o f" "ls /tmp/*.txt" "echo after"
+                    "rm */foo" "echo end"))
+           (r (highlight "shell" lines)))
+      (check-true (and (list? r) (== (length r) (length lines))))
+      (when (and (list? r) (== (length r) (length lines)))
+        (for-each (lambda (line runs)
+                    (check-equal (string-append "shell: " line)
+                                 (lambda () (list-remove-duplicates (map cadr runs)))
+                                 (list black)))
+                  lines r))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tables of the languages
@@ -1000,9 +1020,10 @@
 (define (test-tables)
   ;; every table module loads, and its features are lists headed by the key
   (for (m '((python-lang) (java-lang) (scala-lang) (julia-lang) (json-lang)
-            (csv-lang) (cpp-lang) (dot-lang) (javascript-lang) (octave-lang)))
+            (csv-lang) (c-lang) (cpp-lang) (dot-lang) (javascript-lang)
+            (octave-lang)))
     (check= (begin (module-provide m) (module-available? m)) #t))
-  (for (lan '("python" "java" "scala" "julia" "json" "csv" "cpp" "dot"
+  (for (lan '("python" "java" "scala" "julia" "json" "csv" "c" "cpp" "dot"
               "javascript" "octave"))
     (for (key '("keyword" "operator" "number" "string" "comment"))
       (check= (car (feature lan key)) (string->symbol key))))
@@ -1141,6 +1162,9 @@
   (run-group "incorrect formulas" test-math-incorrect)
   (run-group "precedence" test-math-precedence)
   (run-group "symbols" test-symbols)
+  ;; the highlighters of TeXmacs, not those of tree-sitter (treesit suite)
+  (when (defined? 'tree-sitter-set-highlighting)
+    (tree-sitter-set-highlighting #f))
   (run-group "highlight cpp" test-cpp)
   (run-group "highlight scheme" test-scheme)
   (run-group "highlight mathemagix" test-mathemagix)
@@ -1157,5 +1181,7 @@
   (run-group "no highlighting" test-no-highlighting)
   (run-group "language tables" test-tables)
   (run-group "classes" test-classes)
+  (when (defined? 'tree-sitter-set-highlighting)
+    (tree-sitter-set-highlighting #t))
   (when (url-exists? parse-dir) (system-rmdir-recursive parse-dir))
   (check-end))

@@ -1,0 +1,116 @@
+AC_DEFUN([LC_MUPDF], [
+  AC_ARG_WITH([mupdf],
+    [AS_HELP_STRING([--with-mupdf=DIR],
+      [Path to MuPDF installation prefix (optional)])],
+    [MUPDF_DIR=$withval],
+    [MUPDF_DIR=""]
+  )
+
+
+  # MuPDF's own build and Homebrew have the third-party libraries in
+  # libmupdf-third; the distributions (Arch, MSYS2, ...) link libmupdf
+  # against their own and give its flags with pkg-config instead
+  if test "x$MUPDF_DIR" != "x"; then
+    MUPDF_CFLAGS="-I$MUPDF_DIR/include"
+    MUPDF_LIBS="-L$MUPDF_DIR/lib -lmupdf"
+    if ls "$MUPDF_DIR"/lib/libmupdf-third.* > /dev/null 2>&1; then
+      MUPDF_LIBS="$MUPDF_LIBS -lmupdf-third"
+    fi
+    # a static MuPDF only (misc/vue/build-deps.sh): with the libraries of
+    # the system it was built with (FreeType, zlib)
+    if test -f "$MUPDF_DIR/lib/libmupdf.a" &&
+       ! ls "$MUPDF_DIR"/lib/libmupdf.so* "$MUPDF_DIR"/lib/libmupdf*.dylib \
+            "$MUPDF_DIR"/lib/libmupdf*.dll* > /dev/null 2>&1; then
+      MUPDF_SYS_LIBS=`pkg-config --static --libs freetype2 2> /dev/null`
+      test -z "$MUPDF_SYS_LIBS" && MUPDF_SYS_LIBS="-lfreetype"
+      MUPDF_LIBS="$MUPDF_LIBS $MUPDF_SYS_LIBS -lz -lm"
+    fi
+  elif pkg-config --exists mupdf 2> /dev/null; then
+    MUPDF_CFLAGS=`pkg-config --cflags mupdf`
+    MUPDF_LIBS=`pkg-config --libs mupdf`
+  else
+    MUPDF_CFLAGS=""
+    MUPDF_LIBS="-lmupdf -lmupdf-third"
+  fi
+
+  CPPFLAGS_SAVED="$CPPFLAGS"
+  LDFLAGS_SAVED="$LDFLAGS"
+  LIBS_SAVED="$LIBS"
+
+  CPPFLAGS="$CPPFLAGS $MUPDF_CFLAGS"
+  LDFLAGS="$LDFLAGS $MUPDF_LIBS"
+  LIBS="$LIBS $MUPDF_LIBS"
+  
+  AC_CHECK_HEADER(mupdf/pdf.h)
+  AC_MSG_CHECKING([for usable MuPDF])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([
+      #include <mupdf/fitz.h>
+    ], [
+      fz_context *ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
+      fz_drop_context(ctx);
+    ])
+  ], [
+    AC_MSG_RESULT(yes)
+    mupdf_usable=yes
+    MUPDF_CPPFLAGS="$CPPFLAGS"
+    MUPDF_LDFLAGS="$LDFLAGS"
+    if test "$with_mupdf" = "linked" ; then
+      MUPDF_LIBS="$LIBS"
+    fi
+  ], [
+    AC_MSG_RESULT(no)
+    mupdf_usable=no])
+
+  CPPFLAGS="$CPPFLAGS_SAVED"
+  LDFLAGS="$LDFLAGS_SAVED"
+  LIBS="$LIBS_SAVED"
+
+  LC_SUBST(MUPDF)
+])
+
+# Whether MuPDF is used depends on the GUI (TM_GUI must have run): the SDL
+# and Vue ports draw their pictures with it (MUPDF_RENDERER), while the X11,
+# Cocoa and Qt ports (Qtwk too) have pictures of their own: with those of
+# MuPDF, the Qt renderer was given pictures which it took for its own (a
+# crash at the first image drawn), and X11 and Cocoa clash with them at
+# link time. MuPDF is therefore not used with them, also when it is found.
+AC_DEFUN([TM_MUPDF_FOR_GUI], [
+  CONFIG_MUPDF=""
+  case "$CONFIG_GUI" in
+    X11 | COCOA | QT | QTWK)
+      if test "$mupdf_usable" = yes; then
+        if test "x$with_mupdf" != x -a "x$with_mupdf" != xno; then
+          AC_MSG_ERROR([--with-gui=$gui_selector cannot draw with MuPDF: configure it without --with-mupdf])
+        fi
+        AC_MSG_RESULT([not using MuPDF with --with-gui=$gui_selector])
+      fi
+      MUPDF_CFLAGS=""
+      MUPDF_LIBS=""
+      MUPDF_CPPFLAGS=""
+      MUPDF_LDFLAGS=""
+      ;;
+    *)
+      if test "$mupdf_usable" = yes; then
+        AC_DEFINE(USE_MUPDF, 1, [Use MuPDF library])
+        if test "$with_mupdf" = "linked" ; then
+          AC_DEFINE(LINKED_MUPDF, 1, [Link MuPDF library with TeXmacs])
+        fi
+        AC_DEFINE(MUPDF_RENDERER, 1, [Enabling native MuPDF backend])
+        CONFIG_MUPDF="MuPDF" # the directory Plugins/MuPDF (filesystems with case)
+      else
+        case "$CONFIG_GUI" in
+          SDL | VUE)
+            AC_MSG_ERROR([--with-gui=$gui_selector needs MuPDF: use --with-mupdf=DIR]) ;;
+        esac
+        # NOTE: not the libraries which were tried (-lmupdf -lmupdf-third
+        # when there is no MuPDF at all), which the link would ask for
+        MUPDF_CFLAGS=""
+        MUPDF_LIBS=""
+        MUPDF_CPPFLAGS=""
+        MUPDF_LDFLAGS=""
+      fi
+      ;;
+  esac
+  AC_SUBST(CONFIG_MUPDF)
+])

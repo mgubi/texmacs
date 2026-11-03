@@ -14,6 +14,7 @@
 #include "drd_std.hpp"
 #include "drd_mode.hpp"
 #include "analyze.hpp"
+#include "converter.hpp" // emoji_match
 
 /******************************************************************************
 * Constructor and destructor
@@ -214,6 +215,15 @@ edit_replace_rep::test_sub (path p, tree t) {
       if (is_compound (st)) return p;
       int l= last_item (p);
       // cout << "Test with " << st->label << " at " << l << "\n";
+      if (has_emoji (t->label)) {
+        // an emoji by its name or by its code points, see search_string
+        // (a whole emoji: not one inside a sequence)
+        int end= emoji_match (st->label, l, t->label), a, b;
+        if (end <= l) return p;
+        if (tm_grapheme_inside (st->label, l, a, b) ||
+            tm_grapheme_inside (st->label, end, a, b)) return p;
+        return path_add (p, end - l);
+      }
       if (N(st->label) < (N(t->label) + l)) return p;
       if (st->label (l, l + N(t->label)) != t->label) return p;
       return path_add (p, N (t->label));

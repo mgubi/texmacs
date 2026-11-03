@@ -55,7 +55,7 @@ horizontal_array_rep::handle_get_size (get_size_event ev) {
   SI& h= ev->h;
 
   if (ev->mode==-1) {
-    int i, hh=0;
+    int i; SI hh=0;
     for (i=0; i<N(a); i++) {
       SI www= w/N(a), hhh= h;
       a[i] << get_size (www, hhh, -1);
@@ -64,7 +64,7 @@ horizontal_array_rep::handle_get_size (get_size_event ev) {
     w= 0; h= hh;
   }
   else {
-    int i, ww=0, hh=0;
+    int i; SI ww=0, hh=0;
     for (i=0; i<N(a); i++) {
       SI www= w/N(a), hhh= h;
       a[i] << get_size (www, hhh,  1);

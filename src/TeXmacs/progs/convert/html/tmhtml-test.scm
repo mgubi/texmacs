@@ -428,7 +428,7 @@
 	      (regtest-tmhtml-verbatim)
 	      ;; (regtest-tmhtml-table)
 	      ;; (regtest-tmhtml-table-post)
-	      (regtest-tmhtml-picture))))
+	       (regtest-tmhtml-picture))))
 	      ;; (regtest-tmhtml-document-post))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of tmhtml: ok\n")))

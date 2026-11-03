@@ -1,0 +1,1504 @@
+<TeXmacs|2.1.5>
+
+<style|<tuple|tmdoc|old-dots|old-lengths>>
+
+<\body>
+  <tmdoc-title|<TeXmacs> in the browser>
+
+  <TeXmacs> Upsilon, an enhanced and bleeding-edge version of <TeXmacs> with
+  experimental features, also runs in a page of a web browser. It is the
+  same <TeXmacs>, compiled to WebAssembly, with a new interface,
+  <name|Vue>, which draws the menus, the tool bars and the dialogs itself. Nothing is installed on your computer, and nothing you write is
+  sent anywhere: the documents stay in the browser, on your computer, until
+  you save a copy of them.
+
+  This page describes what is different from the desktop program, and what
+  does not work yet.
+
+  <section|Windows, tabs and dialogs>
+
+  A web page has a single window. The windows of <TeXmacs> are therefore the
+  <em|tabs> in the column at the left of the page: one per document, with
+  its name, a dot when it has unsaved changes, a cross to close it, and
+  <with|font-series|bold|New window> after the last one, for a new
+  document. A tab is moved to another place by dragging it; when the tabs
+  do not fit, chevrons above and below them scroll them. Its right edge
+  changes its width (a double click gives the usual width back); dragged
+  far enough to the left, it folds the column, and dragged back, it opens
+  it again. The chevron at the
+  bottom of the column folds it, to leave more room to the document: the
+  column then keeps the logo and small tabs with the initials of the
+  windows; under the mouse, a small tab grows into a whole one, with the
+  name of its window and a cross to close it; the browser
+  remembers it. The dialogs of <TeXmacs> float over the page, and can be
+  moved by their title bar and resized by their edges.
+
+  Closing or reloading the page while documents have unsaved changes: the
+  browser asks first (in its own words). Safari on the iPhone and the iPad
+  never asks.
+
+  The <with|font-series|bold|Upsilon> button at the top left of the
+  page opens a menu of the page itself: the version of <TeXmacs>, the state
+  of its files and the storage they use, <menu|Files in this browser...>,
+  <menu|Save a backup> and <menu|Restore a backup...> (see below),
+  <menu|Reload>, <menu|Reset...> (which deletes your files and preferences),
+  and <menu|Remove from this browser...>. Its panel also has more
+  information and the options of the address of the page (see below).
+
+  <section|What works in the page>
+
+  Editing and typesetting work as in the desktop program, with the menus,
+  the dialogs and the side tools, and also:
+
+  <\itemize>
+    <item>Drawing: by the <name|GPU> with <name|WebGPU> in the browsers of
+    <name|Chromium>, with <name|WebGL2> elsewhere, or by <name|MuPDF>.
+    <verbatim|?gpu=webgpu>, <verbatim|?gpu=webgl> or <verbatim|?gpu=0> at
+    the end of the address of the page chooses, and <verbatim|?scale=>
+    changes the size of the interface.
+
+    <item>Spell checking (<name|Hunspell>), with the dictionaries fetched
+    from the network the first time a language needs them.
+
+    <item>The converters of <name|Markdown>, <name|Word> and
+    <name|OpenDocument> (<menu|File|Import>, <menu|File|Export>), the font
+    design page (the last entry of the font menu of <menu|Document>), and
+    citations from <name|Zotero> through <verbatim|zotero.org>, with an API
+    key kept in the wallet.
+
+    <item>Program code colored by its syntax tree (22 languages), with
+    folds, an outline and the moves by structure.
+
+    <item>The sessions of the plug-ins whose program runs in the page, and
+    of the chatbots, with files attached to the questions (the others are in
+    <with|font-series|bold|What does not work> below).
+  </itemize>
+
+  <menu|Help|Upsilon features> describes what this version of
+  <TeXmacs> adds to the official one, in the browser and on the desktop.
+
+  <section|Your files>
+
+  Your documents are kept in the storage of the browser, for this site
+  only. <menu|File|Files in this browser...> shows them:
+
+  <\itemize>
+    <item><with|font-series|bold|Add files...>, <with|font-series|bold|Add a
+    folder...> and <with|font-series|bold|Add a zip...> bring files from
+    your computer, with whole projects (a folder or a zip archive, with the
+    images of its documents). Files and folders can also be dropped on the
+    page: the documents open, and the images dropped on a document are
+    inserted where they fall.
+
+    <item><with|font-series|bold|save copy> saves a copy of a file on your
+    computer (a folder as a zip archive).
+
+    <item><with|font-series|bold|open> opens a document in <TeXmacs>. A PDF
+    or an image, which <TeXmacs> does not open as a document, is shown in a
+    new tab of the browser.
+
+    <item>The dialogs <menu|File|Load> and <menu|File|Save as> are this same
+    panel.
+
+    <item><with|font-series|bold|Your <TeXmacs> folder> shows your
+    <verbatim|.TeXmacs> folder: the preferences, and the styles, packages,
+    fonts and <name|Scheme> code you added. Its files are opened, renamed,
+    deleted and saved as copies as your other files, and
+    <with|font-series|bold|New folder> makes a folder in either place.
+
+    <item><with|font-series|bold|Files of <TeXmacs>> shows the files of
+    <TeXmacs> itself (its styles, packages and documentation). They cannot be
+    changed, but <with|font-series|bold|customize> copies one into your own
+    <verbatim|.TeXmacs> folder, where <TeXmacs> looks first.
+  </itemize>
+
+  <paragraph|Backups>
+
+  What the browser keeps is lost when its data for this site are cleared,
+  and it is not seen by another browser or another computer. In the menu of
+  <with|font-series|bold|Upsilon>, <menu|Save a backup> saves
+  on your computer a zip archive of all of it: your documents and your
+  <verbatim|.TeXmacs> folder, with your preferences, your own styles and
+  the wallet (which stays encrypted: its passphrase opens it). A document
+  which is not saved is not in it: save your documents first.
+
+  <with|font-series|bold|Save a backup> and <with|font-series|bold|Restore a
+  backup...> are buttons of <menu|File|Files in this browser...> too.
+
+  <menu|Restore a backup...>, in the same menu, takes such an archive, in
+  this browser or in another one: after a confirmation, its files replace
+  the files of the same name, the others stay (use <menu|Reset...> first for
+  an exact copy), and <TeXmacs> starts again with them. The passphrase of
+  the wallet opens it everywhere; a passkey added to it may not be there in
+  another browser.
+
+  <paragraph|How long the browser keeps them>
+
+  At the first save of a file, <TeXmacs> asks the browser to keep the files
+  of the site (<em|persistent storage>). <name|Firefox> asks you,
+  <name|Chrome> decides by itself (from how you use the site: a bookmark, an
+  installed application...), and <name|Safari> grants it mostly to a web
+  application added to the Home Screen. When the browser agrees, it keeps
+  the files until you clear the data of the site; otherwise it may delete
+  them when it needs space.
+
+  The line at the top of <menu|File|Files in this browser...> says which:
+  <with|font-series|bold|Kept until you clear the data of this site>, or
+  <with|font-series|bold|The browser may delete these files>. It gives the
+  date of your last backup (or <with|font-series|bold|never>), with a
+  <with|font-series|bold|Back up> button. When your files have had no
+  backup for seven days (or none at all), a short reminder at the bottom of
+  the page says so, at most once a day, with the same button; there is none
+  while you have no documents.
+
+  <\warning*>
+    Clearing the data of the site deletes your files, and so does clearing
+    the history of <name|Safari> by hand, which removes the data of the
+    sites too. <name|Safari> also deletes the data of a site after seven
+    days of its use without a visit to the site (a web application added to
+    the Home Screen counts only the days it is used). Save a copy of the documents you want to keep, or save a backup
+    now and then: the date of the last one is in the Files panel.
+  </warning*>
+
+  <paragraph|Several tabs>
+
+  <TeXmacs> Upsilon may be open in several tabs of the browser: each of
+  them keeps the documents it saves, and the others see the new version.
+  Your preferences (the <verbatim|.TeXmacs> folder) are kept by one tab at a
+  time: when <TeXmacs> Upsilon is already open in another tab, a new tab
+  says so; <with|font-series|bold|Use TeXmacs here> moves the preferences to
+  it (the other tab keeps its last changes first). When the tab which has
+  them is closed, the others offer to reload. Two tabs which save the same
+  document overwrite each other: the last one saved stays.
+
+  <section|Passwords and keys: the wallet>
+
+  The wallet of <TeXmacs> keeps passwords and keys (the keys of the
+  services of artificial intelligence, the passwords of <TeXmacs> servers)
+  encrypted. In the browser it is encrypted by the browser itself, and
+  opened with a passphrase or with a passkey: <menu|Edit|Preferences>, tab
+  <with|font-series|bold|Security>.
+
+  <\itemize>
+    <item><with|font-series|bold|Initialize> makes the wallet, with its
+    passphrase. Nothing of it is kept in the clear: only what is encrypted
+    goes to the storage of the browser.
+
+    <item>While the wallet is on, <with|font-series|bold|Add a passkey> lets
+    the passkey of your computer or phone (Touch ID, Windows Hello, a
+    security key...) open it too, where the browser allows it.
+
+    <item><with|font-series|bold|Turn on> opens the wallet, with the
+    passphrase or the passkey, once per session; <with|font-series|bold|Turn
+    off> forgets what it holds until it is opened again.
+  </itemize>
+
+  While the wallet is on, the code which runs in the page (a
+  <name|JavaScript> session for instance) could read what it holds: only
+  run code which you trust.
+
+  <section|Keyboard, clipboard and printing>
+
+  <TeXmacs> keeps its usual keyboard shortcuts, but the browser keeps some
+  for itself (a new window, a new tab, closing a tab, reloading the page):
+  use the menus of <TeXmacs>, or the <verbatim|+> of the tabs, for those. On
+  a Mac, they use the command key, as those of the browser: <key|M-c>,
+  <key|M-x> and <key|M-v> copy, cut and paste. The keys which compose (dead
+  keys, the accents of a Mac, the input methods of Chinese or Japanese) work
+  as in the other programs.
+
+  Copy, cut and paste go through the clipboard of the system, so that text
+  can be exchanged with the other programs; a copy made in <TeXmacs> keeps
+  its structure when it is pasted back into <TeXmacs>. The browser lets a
+  page read its clipboard only when a key pastes, so that
+  <menu|Edit|Paste> pastes the last copy or paste of <TeXmacs>; use
+  <menu|Edit|Paste from browser...> for what was copied in another page or
+  program since: it opens a small dialog, in which <key|M-v> (or its button)
+  pastes.
+
+  In the same way, some browsers (Safari) let a page write its clipboard
+  only during a key or a click: <key|M-c> and <key|M-x> always copy for the
+  other programs, but a copy from a menu (<menu|Edit|Copy>, the formats of
+  <menu|Edit|Copy to>) opens a small dialog, <with|font-series|bold|Copy for
+  other programs>, whose button gives it to them.
+
+  <menu|File|Print> makes a PDF of the document and opens it in a new tab
+  of the browser, from which it can be printed or saved.
+
+  <section|Loading and fonts>
+
+  The first visit loads about 11<nbsp>MB before <TeXmacs> starts, and about
+  9<nbsp>MB more in the background while you work (the section
+  <with|font-series|bold|This build> below gives the size of each part). The fonts of the
+  first screen come with the files needed to start; the other fonts which
+  come with <TeXmacs> are loaded one by one, the first time a document uses
+  them, and a font which failed to load is tried again in the background.
+  All of it is kept by the browser: the next visits load nothing.
+
+  Only the fonts which come with <TeXmacs> are available: a web page cannot
+  see the fonts installed on your computer.
+
+  <section|Opening a document from the web>
+
+  A link to the page can open a document published on the web, which makes
+  the page a viewer of <TeXmacs> documents:
+
+  <\verbatim-code>
+    https://mgubi.github.io/texmacs/texmacs.html?open=https://example.org/paper.tm
+  </verbatim-code>
+
+  Any format <TeXmacs> opens will do (<verbatim|.tm>, <verbatim|.tex>,
+  <verbatim|.html>, <verbatim|.md>...). The site of the document has to
+  allow other pages to read it, and the images the document refers to are
+  not fetched with it. Other options of the address run Scheme commands (the
+  page asks before running them) or show debugging messages: see the
+  options of the address in the <with|font-series|bold|Upsilon> menu.
+
+  <section|What does not work>
+
+  <\itemize>
+    <item>A web page cannot run other programs. There are therefore no
+    sessions of other programs (Maxima...), and the tools which need an
+    external program are missing: the compilation with <LaTeX>,
+    Ghostscript, ImageMagick, Git. The sessions which
+    exist in the browser are those whose program runs in the page itself:
+    <name|Python> (<name|Pyodide>) and <name|R> (<name|webR>), loaded
+    from the network,
+    <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
+    their plug-ins, in <menu|Help|Plug-ins>), and those of the chatbots
+    which the page asks through the web: <name|ChatGPT>, <name|Claude>,
+    <name|Gemini>, <name|Mistral> and <name|OpenRouter> with a key, and
+    <name|Ollama> on your computer if it allows the page. <name|Albert> does not answer web pages.
+
+    <item>The <menu|Remote> menu connects to a <TeXmacs> server over
+    WebSocket, which a page has only: a server of this version of
+    <TeXmacs> (<name|Vue> or <name|Qt>), which serves browsers at the port
+    after its usual one (the preference <verbatim|server websocket>: those
+    of the same computer by default), in clear text on the same computer
+    and encrypted with another one. The servers of other versions, such as
+    <verbatim|cloud.texmacs.org>, are reached through a bridge (see 9
+    October 2026 below). The language servers of program code, which are
+    programs, do not work either.
+
+    <item><TeXmacs> Upsilon types, scrolls and typesets as fast as the
+    desktop program, but its <name|Scheme> runs two to three times slower,
+    which shows in the commands which are mostly <name|Scheme> (the
+    conversions, some menus) and at the start.
+  </itemize>
+
+  <section|Reporting problems>
+
+  <TeXmacs> Upsilon is experimental. A problem which does not happen with the
+  <TeXmacs> you install on your computer is a problem of this port: please
+  report it on the <hlink|issue page of the
+  port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
+  project. The sources and the notes of the port are on
+  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/upsilon_texmacs>.
+
+  <include|texmacs-vue-build.en.tm>
+
+  <section|Recent changes>
+
+  The additions to <TeXmacs> Upsilon, the newest first.
+
+  <paragraph|31 October 2026>
+
+  <\itemize>
+    <item>In a source file (<verbatim|.cpp>, <verbatim|.py>, <verbatim|.json>,
+    and so on), the menu <menu|Focus> has the entries for program code, as in
+    a code block: <menu|Definitions>, <menu|Outline>, <menu|Go to definition>,
+    <menu|Folds>. The definitions of a large file are found much faster, and
+    <menu|Definitions> shows the first 500 of them.
+  </itemize>
+
+  <paragraph|28 October 2026>
+
+  <\itemize>
+    <item>A window closed by a key or a click in its own editor (<key|C-return>
+    in the editor of a comment) or by a key of another window no longer
+    crashes the page.
+  </itemize>
+
+  <paragraph|27 October 2026>
+
+  <\itemize>
+    <item>The emoji have names, those of the LaTeX package <verbatim|emoji>
+    (<verbatim|grinning-face>, <verbatim|flag-italy>): the footer shows the
+    emoji before the cursor in color, a family or a flag whole, with its
+    name, where it showed a square.
+  </itemize>
+
+  <paragraph|26 October 2026>
+
+  <\itemize>
+    <item><menu|View|Clone window> (also in <menu|File>) opens a second tab
+    on the document, to see two parts of it side by side: it starts at the
+    cursor, and what is typed in one tab shows in the other. The tabs of the
+    document are numbered, (1) and (2), and <menu|Go|Windows> has an entry
+    for each of them.
+
+    <item>The licenses of the components are served with the page
+    (<verbatim|licenses/>), the section on this build names the license of
+    each, and TikZJax and Asymptote-web come with their licenses and the
+    places of their sources.
+  </itemize>
+
+  <paragraph|23 October 2026>
+
+  <\itemize>
+    <item>A family, a flag or another emoji sequence is one character for
+    the cursor keys and for deleting.
+
+    <item>The emoji copy out of an exported PDF as their characters, and so
+    do the mathematical letters of the OpenType fonts.
+
+    <item>Emoji in color (\<#1F600\> \<#1F680\> \<#1F1EE\>\<#1F1F9\>), with a font
+    which comes with <TeXmacs>, Twemoji Mozilla, also in formulas and in
+    the PDF. A family, a flag, a skin tone or a keycap is one picture; it
+    was written out as its code.
+
+    <item>The error messages (their window opens by itself after a warning)
+    can be selected and copied as in a document, but not changed; new
+    messages are added at the end without losing the selection.
+  </itemize>
+
+  <paragraph|22 October 2026>
+
+  <\itemize>
+    <item>The window of the error messages behaves as an editor window: it
+    opens at the same size whatever the messages are, and they fill it,
+    follow its size and scroll.
+  </itemize>
+
+  <paragraph|21 October 2026>
+
+  <\itemize>
+    <item>Hyphenation uses the patterns which end with the end of a word
+    (<verbatim|along-side>, which had no break), so the lines of some
+    documents break a little differently.
+
+    <item><menu|Tools|Update|Help> reads the documentation again, and Save
+    in a part view (<menu|Document|Part>) writes the included files changed
+    in it, which were dropped.
+
+    <item>Removing a keyboard shortcut works whatever the way its keys are
+    written, and keeps the other keys of its command in the menus.
+
+    <item>The export to HTML includes the files of <markup|include> with
+    their formulas and numbers; a pasted comment is a comment of its own; an
+    index entry in a section title no longer turns the page numbers of the
+    table of contents into question marks; tall cells which span several
+    rows stay inside their table; and typing in a long document without
+    pages (a source file) is faster.
+  </itemize>
+
+  <paragraph|20 October 2026>
+
+  <\itemize>
+    <item>Your files are safer: at the first save, <TeXmacs> asks the
+    browser to keep them (persistent storage); the top of
+    <menu|File|Files in this browser...> says whether it agreed, with the
+    date of your last backup and a <with|font-series|bold|Back up> button;
+    and a short reminder comes when your documents had no backup for seven
+    days.
+
+    <item>The main and mode icon bars can be at the right of the document:
+    <menu|Edit|Preferences|General|Main and mode icon bars|At the right of
+    the document>, or <verbatim|?bars=right> in the address.
+
+    <item>The input fields of the dialogs take the keys of the fields of
+    the other applications: control (command on a <name|Mac>) with c, x, v,
+    a, z and shift-z copy, cut, paste, select all, undo and redo. Elsewhere
+    than on a <name|Mac>, control-v did nothing and control-c cancelled the
+    field. The menu of the right button has Undo and Redo too.
+
+    <item>The input fields copy and paste the accented letters and the
+    symbols as they are: an alpha copied was lost, and an accented letter
+    pasted from another application became garbage.
+
+    <item>Undo and redo keep the numbers of the sections and of the other
+    automatic labels; <menu|Tools|Miscellaneous|Clear undo history> clears
+    the history of the current document only, which stays saved if it was.
+
+    <item>The export to <LaTeX> of struck-through and highlighted text, of
+    columns and of the colors given by value compiles (it stopped
+    <name|pdflatex>), and many fixes of the bibliographies made with
+    <name|BibTeX>.
+
+    <item>A document can no longer run its own code through
+    <markup|use-module>, which now only takes the names of modules and of
+    plugins.
+  </itemize>
+
+  <paragraph|19 October 2026>
+
+  <\itemize>
+    <item>On a touch screen, a finger put down on the handle of a scroll
+    bar drags it (it moved the view the other way).
+
+    <item>On a tablet (an <name|iPad>), a keyboard button at the bottom
+    right of the page opens the keyboard of the system, and closes it: no
+    keyboard came without an external one. <verbatim|?keyboard> in the
+    address shows the button anywhere, <verbatim|?keyboard=0> hides it.
+
+    <item>After a turn of the wheel of a mouse the page no longer goes on
+    moving for two seconds (the wheel was taken for a trackpad, after which
+    the page glided): the page glides only after a finger, since the
+    browsers and the systems glide after a trackpad themselves.
+
+    <item>Touch screens (an <name|iPad>, a phone): a tap on an item of a
+    menu chooses it (nothing happened: the items of the menus only worked
+    with a mouse or a trackpad), a finger dragged over a document scrolls
+    it, and goes on gliding when it is lifted while it moves (it selected
+    text, and a document could not be scrolled without a mouse or a
+    trackpad), and a finger which rests a moment before it moves selects,
+    as a mouse does.
+
+    <item>Escape closes a dialog, as its close box does.
+  </itemize>
+
+  <paragraph|18 October 2026>
+
+  <\itemize>
+    <item>The table at the cursor shows the lines between its rows and its
+    columns, as in the <name|Qt> version (<with|font-series|bold|Show table
+    cells> in the preferences, now on by default with <name|Vue> and
+    <name|Cocoa> too).
+
+    <item>A large zoom in a long document (a full manual, far from its
+    start) no longer breaks the view: the page went off the screen, and
+    scrolling left smeared copies of the text. The coordinates of the
+    window, those of the document times the zoom, overflowed; the zoom now
+    stops before (in the full manuals, at about 800% far down; a short
+    document still goes to 2500%).
+
+    <item>A page of the site,
+    <hlink|the main page of the site|https://mgubi.github.io/texmacs/>,
+    lists the builds of <TeXmacs> Upsilon for <name|macOS>, <name|Linux> and
+    <name|Windows>, which anyone can download; the menu of
+    <with|font-series|bold|Upsilon> links to it.
+
+    <item>This version of <TeXmacs> is now called <TeXmacs> Upsilon (it was
+    Max's <TeXmacs>, and <TeXmacs> <name|Vue> in the browser), and its
+    branch <verbatim|upsilon_texmacs>: the menu of the page is
+    <with|font-series|bold|Upsilon>, and its title and its messages say
+    <TeXmacs> Upsilon. <name|Vue> remains the name of the
+    interface.
+
+    <item><menu|Help|Upsilon features>, a new page, says what this
+    version of <TeXmacs> adds to the official one; this page has a section
+    <with|font-series|bold|What works in the page>.
+
+    <item>Program code is colored by its syntax tree, in 22 languages (C,
+    C++, Python, Scheme, Java, <name|JavaScript>, <name|TypeScript>, R,
+    Julia, Shell, Go, Rust, Lua, Lean, Haskell, <name|OCaml>, HTML, CSS,
+    TOML, YAML, JSON and <LaTeX>), also inside the scripts and styles of
+    HTML; a bracket without its partner is shown in red.
+
+    <item>In program code, brackets and quotes stay balanced as they are
+    typed and deleted, Return closes a block with its keyword (<verbatim|end>,
+    <verbatim|fi>...) or an environment of <LaTeX>, and the end tag of HTML
+    comes with its start tag.
+
+    <item>The menu <menu|Focus> of program code goes from definition to
+    definition, selects, deletes, swaps and comments whole parts of the
+    code, removes or adds brackets, and folds blocks
+    (<shortcut|(program-fold)> and <shortcut|(program-unfold)>); the lines
+    are indented by the structure of the code.
+
+    <item>Folds nest, and change only the view: the hidden lines are
+    printed; the code inside the scripts of
+    HTML is colored again only where it changes; the <menu|Definitions> of
+    <LaTeX> (sections, labels, macros), CSS, TOML, YAML, JSON and HTML;
+    indentation of <LaTeX> and Haskell; <menu|Toggle comment> in HTML, CSS
+    and <name|OCaml>. The help on program code is the section Editing program code
+    of <menu|Help|Manual|Editing tools>.
+
+    <item>In program code, the syntax errors are underlined after a pause
+    in the typing, and <key|F8> goes from one to the next;
+    <shortcut|(code-go-to-definition)> goes to the definition of the name
+    at the cursor and <shortcut|(code-outline)> shows the outline of the
+    code on a page; <key|tab> completes a name with the names defined in
+    the code (in a session, the program completes as before).
+
+    <item>The lines of program code are cut into the tokens of their
+    syntax tree, and typing in a long source file costs much less (a file
+    of 100000 lines of C: three times less); a line keeps the right colors
+    when a line above it is removed (an unclosed comment closed). The
+    mark ... of a new fold shows at once, and <menu|Unfold all> shows the
+    lines of a fold whose first line was deleted.
+
+    <item>In a source file which is indented by tabs, <key|tab> in the
+    search looks for a tab, and the columns between the tab stops
+    (<menu|Edit|Preferences>) change in the files which are open.
+
+    <item>The windows are drawn with <name|WebGPU>, the newer graphics
+    interface of the browsers, in <name|Chrome> and the other browsers of
+    <name|Chromium> (<name|Edge>...): as fast as with <name|WebGL2>, and
+    faster when zooming. The other browsers draw with <name|WebGL2> as
+    before, and so do those which give no <name|WebGPU>.
+    <verbatim|?gpu=webgpu> in the address of the page asks for
+    <name|WebGPU> in any browser, <verbatim|?gpu=webgl> for <name|WebGL2>.
+    The menu <with|font-series|bold|Upsilon> says which one
+    draws.
+
+    <item><verbatim|?gpu=0> in the address of the page draws with
+    <name|MuPDF> again, as it says (it drew with <name|WebGL2>); so does a
+    browser without <name|WebGL2>.
+
+    <item>Files can be attached to the questions of the chatbots:
+    <with|font-series|bold|Attach> in the focus bar of a session or of an
+    executable fold takes a file of the panel of the files, and a file
+    dropped on the page while the cursor is in a question is attached to
+    it. Text files go after the question, images and <name|PDF> files as
+    such (to <name|ChatGPT>, <name|Claude>, <name|Gemini> and
+    <name|OpenRouter>; <name|Mistral> and <name|Ollama> take the images
+    only).
+  </itemize>
+
+  <paragraph|17 October 2026>
+
+  <\itemize>
+    <item>At a large zoom the letters no longer disappear.
+
+    <item>A page made as wide as the window (<menu|View|Fit to screen width>) is
+    in its middle, not against its left side.
+  </itemize>
+
+  <paragraph|15 October 2026>
+
+  <\itemize>
+    <item>The text on the screen is darker, as heavy as in <TeXmacs> on the
+    desktop, and drawn as fast as before.
+
+    <item><menu|Edit|Preferences>, tab <menu|General>, chooses how the
+    letters are drawn on the screen (<menu|Glyphs on the screen>), how bold
+    they are and how they are fitted to the pixels; a change shows at
+    once.
+
+    <item>Word and <name|OpenDocument> files keep their formatting by
+    hand in both directions: the size, font, color and highlighting of the
+    text, capitals, lower case and words beginning with capitals, the
+    kinds of underlines and of lines through, the spacing of the letters,
+    and the indentations, spaces, line spacing, background and border of
+    the paragraphs. A font which <TeXmacs> does not have is shown in the
+    closest family and written back with its name, and the titles of the
+    sections take the look of the headings of the file.
+
+    <item>A picture with the text around it in a Word or
+    <name|OpenDocument> file is shown on its side, in a paragraph of its
+    own, and floats again in the file which is written. Cropped pictures
+    of <name|OpenDocument> files stay cropped, and the line between the
+    columns of a section is kept.
+
+    <item>A label in the text of a Word or <name|OpenDocument> file comes
+    back at its place after a save, the captions of the figures of
+    <name|LibreOffice> are recognized, the underline of links no longer
+    changes when Word saves the file, and a formula alone in a cell stays
+    in the cell.
+
+    <item>Boxes of text and shapes (rectangles, ellipses...) of Word and
+    <name|OpenDocument> files are shown as framed boxes with their fill,
+    on their side, their text can be edited, and they are written back as
+    boxes and shapes.
+
+    <item>After a review of the Word and <name|OpenDocument> converters,
+    text is no longer lost in formulas with tracked changes, after a field
+    which does not end, in ruby text or in repeated table rows; the
+    numbering of lists, the references to pages and the formatting
+    switched off inside a paragraph come out right; and the files which
+    are written have no section breaks in cells or notes, keep the dashes
+    and quotes of <TeXmacs> and define the styles they use. Addresses of
+    links and descriptions of pictures written with <verbatim|&amp;lt;>
+    or <verbatim|&amp;amp;> are read correctly. A file saved in the other
+    format keeps the look of its named styles, the bibliography of
+    <name|Zotero> in a Word file stays a field, pictures linked to the web
+    stay links, a comment in a note stays in the note, and a formula on
+    its own line inside a paragraph is shown on its own line.
+
+    <item>A footnote in a formula is no longer lost in Word and
+    <name|OpenDocument> files: its mark follows the formula, and the point
+    after the mark stays with the formula when the file is read. A
+    paragraph in a style <verbatim|Caption> which is not under a figure
+    keeps its look, plain paragraphs no longer take the look of another
+    style, and a style of the document on the text of a link is kept in
+    Word.
+
+    <item>A <name|Markdown> file keeps the tabs at the start of its lines
+    (in code, formulas, tables and the <name|YAML> header), a formula of a
+    single symbol is read back as a formula, and files with many formulas
+    open faster. After a review, typographic quotes stay as they are, a
+    file which begins with a byte order mark or holds an entity such as
+    <verbatim|&#1e3;> is read, <verbatim|\<less\>pre\<gtr\>> and
+    <verbatim|\<less\>script\<gtr\>> blocks run to their closing tag, and the
+    <name|Markdown> which is written reads back the same in more cases
+    (nested lists, emphasis next to code, links). All the named entities
+    of <name|HTML5> are read.
+
+    <item>A Word or <name|OpenDocument> file which was changed in
+    <TeXmacs> is saved back with the changed headers, footers and styles,
+    and with fields inside fields; the title of a file keeps the look of
+    its style; a document of the style <verbatim|office> exports to
+    <LaTeX>.
+  </itemize>
+
+  <paragraph|14 October 2026>
+
+  <\itemize>
+    <item>A <name|Markdown> file keeps more of itself when it is saved:
+    its tabs, the definitions of links to which nothing refers (and the
+    comments <verbatim|[//]: # (text)>), footnotes defined in quotations
+    or lists, marked several times or not defined, and a <name|YAML>
+    header with any keys. Its export to <LaTeX> compiles.
+
+    <item>Word and <name|OpenDocument> files of any length are read and
+    written (ten thousand paragraphs stopped the converters), and a
+    damaged or forged file gives a message instead of ending <TeXmacs>.
+
+    <item>A table of a <name|Markdown> file keeps the links and footnotes
+    whose definitions only it uses, a heading between two rules is no
+    longer taken for a <name|YAML> header, and a header edited in
+    <TeXmacs> is read back as a header. Many footnotes are written much
+    faster.
+
+    <item>A small forged Word or <name|OpenDocument> file can no longer
+    keep <TeXmacs> busy for hours.
+
+    <item>Word and <name|OpenDocument> files keep their page (size,
+    orientation, margins) and the look of their usual paragraphs (size of
+    the font, a font without serifs, alignment, indentation, spacing) in
+    both directions, the ways of numbering of their lists, and their
+    headings without numbers. The text of boxes and shapes is imported,
+    hidden text is left out, and the chapters of a book are exported with
+    their numbers.
+
+    <item>A Word or <name|OpenDocument> file opens in the new style
+    <tmstyle|office>, which keeps its named styles, headers and footers,
+    fields, comments, tracked changes and columns, and writes the file back
+    with its own styles, pages and settings. Cropped pictures, pictures of
+    <name|Windows> (through <name|LibreOffice>), arrays of equations and
+    all the screens of a presentation are converted too.
+  </itemize>
+
+  <paragraph|13 October 2026>
+
+  <\itemize>
+    <item>A <name|Markdown> file is opened as a document of the new style
+    <tmstyle|markdown>, with text without serifs and headings without
+    numbers, and is saved as it was read: its <name|YAML> header, its
+    formulas, tables and <name|Html> keep their text, and so do the levels
+    of its headings, its lists, its code, images and footnotes, as long
+    as you do not edit them. See <menu|Help|Reference guide|Compatibility with
+    other formats>.
+
+    <item>A <TeXmacs> server now answers the browsers at a port of its
+    own, the one after its usual port (6562 for 6561), and leaves its usual
+    port to the other versions of <TeXmacs>. Nothing changes in the login:
+    the port to give is still the one of the server, and the page goes to
+    the next one. A server started by an older <TeXmacs> Upsilon has to
+    be updated together with the page.
+
+    <item>To a server on another computer, a login over TLS goes through
+    secure WebSockets (<verbatim|wss>), whatever the page; to a server on
+    the same computer it stays in clear, without any certificate. Such a
+    server serves the browsers of other computers when its preference
+    <verbatim|server websocket> is <verbatim|on>.
+
+    <item>Editing a long document is faster. A new section, a numbered
+    equation or the join of two paragraphs used to typeset everything
+    after it again, since the numbers changed: now only what shows one of
+    these numbers is. The page breaks are searched faster, and not at all
+    when no line changed its height; the pages which did not change, with
+    their headers and footers, are no longer put together again at every
+    key. In the user manual opened as a book, some 380 pages, a letter
+    takes about 50<nbsp>ms in this page instead of 730, the join of two
+    paragraphs 50 instead of 2100 and a new section 200 instead
+    of 3200 (the typesetting alone, on a recent laptop; the pages are
+    the same as before).
+
+    <item>The entries of a table of contents and of an index keep pointing
+    to their places when sections or index entries are added before them:
+    they no longer wait for <menu|Document|Update|All> to be right again.
+
+    <item>A long document sometimes lost what comes at its end when it was
+    made by a program: the user manual, opened as a book from the
+    <menu|Help> menu, was now and then shown as one endless page instead of
+    its pages. The memory of such a document could be reused while it was
+    still being built.
+  </itemize>
+
+  <paragraph|9 October 2026>
+
+  <\itemize>
+    <item><menu|Font design>, in the menu of the fonts (the font button of
+    the focus bar), opens a page to choose the fonts of the document by
+    looking at them. Its top lists the parts of a document with the font
+    of each: the text, the mathematics, the sans serif and the
+    typewriter text, and the
+    blackboard bold, calligraphic and fraktur letters of the formulas. The
+    name of a part is a button which shows the fonts for it, each with a
+    few words, a sample of that part and a button to choose it. The
+    choice is listed at the top of the page with a sample, and <menu|Use
+    for the document> gives it to the document. The samples are pictures:
+    the page fetches no font but those of the choice. Such fonts show as <menu|Custom> on the font
+    button; <menu|Save as> on the page, or <menu|Save these fonts> in the
+    menu, keeps them under a name, which the menu then offers for every
+    document (<menu|Saved fonts>).
+
+    <item>A slow network no longer leaves signs out of the first screen.
+    The fonts of the first screen which are not among the files of the
+    start (those of the welcome page and, on a Mac, the one of the command
+    sign and of the other keys of the shortcuts in the menus) are fetched
+    with those files, under the progress bar: <TeXmacs> used to fetch each
+    when it first drew with it, holding the page meanwhile, and a request
+    which failed left that font out until the next visit (a question mark
+    for the command sign). A request which fails is now made again. A
+    font which still does not come is asked for in the background, the
+    page going on without it, until it comes: the documents and the menus
+    are then drawn again with it.
+
+    <item>A login from the browser to a server of another version of
+    <TeXmacs>, such as <verbatim|cloud.texmacs.org>, fails: a page has only
+    WebSockets, which those servers do not answer. The message now says
+    so. Until they do, a bridge on your own machine passes the connection
+    on: run <verbatim|node misc/wasm/remote/ws-bridge.mjs> (from the
+    sources of <TeXmacs> Upsilon; <verbatim|cloud.texmacs.org> is its
+    default), and log in with the server <verbatim|localhost> and the port
+    6562 (the bridge listens at the next one, as a server does).
+
+    <item>The menus drop in without stopping halfway. On a display of 120
+    Hz the page drew a frame every 8 ms, more than the graphics card
+    follows with a large window: the browser then held the frames back for
+    a tenth of a second at a time, in the middle of the movement at an
+    interface scaling of 2. The page now draws 60 frames a second at most.
+
+    <item>The interface follows the zoom of the browser. Its size was
+    that of a whole number of pixels of the screen per point: on a
+    display of density 2, a zoom of 115% or 120% made it smaller, and one
+    of 125% larger than asked.
+  </itemize>
+
+  <paragraph|8 October 2026>
+
+  <\itemize>
+    <item>More fonts come with <TeXmacs>, those of the <name|ConTeXt>
+    distribution which were missing: <name|DejaVu> (serif, sans serif,
+    typewriter and condensed, with its mathematical font), <name|Gentium
+    Plus>, the
+    Polish families <name|Antykwa Torunska>, <name|Antykwa Poltawskiego>,
+    <name|Iwona> and <name|Kurier>, the light, semi bold and condensed
+    faces of <name|IBM Plex>, and the typewriter of variable width of
+    <name|Latin Modern>. As the other fonts, each is fetched when a
+    document first uses it.
+
+    <item>The menu of the fonts (the font button of the focus bar, and
+    the font in the footer) sorts them by design: <menu|Serif>, <menu|Sans
+    serif>, <menu|Typewriter> and <menu|Decorative>. A submenu lists first
+    the fonts which come with their mathematics, such as <menu|Palatino>,
+    <menu|DejaVu> or <menu|Fira>, then those which change the text only,
+    such as <menu|Gentium Plus> or <menu|Iwona>. Text with mathematics was
+    a long list in the menu itself, and the text fonts were apart.
+
+    <item>The documents of <name|Word> (<verbatim|.docx>) and of
+    <name|LibreOffice> (<verbatim|.odt>) are opened and written by
+    <TeXmacs> itself, in the browser too: add such a file to the files of
+    the browser and open it, or use <menu|File|Export|Word> and
+    <menu|File|Export|OpenDocument> and save the result on the computer.
+    Formulas, tables, images, footnotes, the numbers and the references
+    are kept in both directions; see <menu|Help|Reference guide|Compatibility with
+    other formats>. <name|Markdown> files (<verbatim|.md>) are read and
+    written in the same way.
+
+    <item>The shadows of the chat rooms and of the remote directories are
+    grey again: in the browser they were stripes of green and of noise. The
+    browser uses the small copies of the pictures of the shadows which come
+    with <TeXmacs>, in grey with transparency, a format which was read as
+    if it were in colours. And the pieces of a shadow for which a box has
+    no room are left out: they were drawn whole, across the box and the
+    page.
+
+    <item>The remote tools say what happens with the server. The footer
+    says <verbatim|connecting to...>, then <verbatim|connected to ... as
+    ...>; the top of the <menu|Remote> menu and the cloud icon say
+    <verbatim|Connected to host as user (40 ms)>, the time being that of
+    the last answer of the server, which is asked for a sign of life every
+    ten seconds. A server which does not answer for 25 seconds is said so,
+    and when it answers again; meanwhile its cloud has an amber badge, in
+    place of the green one of a connection which works. The cloud is struck
+    through after a connection was lost. A connection which ends otherwise than by
+    <menu|Remote|Logout> is said to be lost, in a dialog and in the menu
+    (<verbatim|Connection lost: user@host>), until you log in again; a
+    login to a server which is not there, or which never answers, fails
+    with a message after ten seconds. It all went unsaid before: the menus
+    stayed as they were and the requests waited for ever.
+
+    <item>In a live document you see where the others are: the cursor of
+    each other user is a bar of a colour of its own, with the name of the
+    user above it, which follows what that user does;
+    <menu|Remote|Live document> lists who else is in the document.
+
+    <item>The input fields whose width is left to the interface (the
+    passphrases of GnuPG and of the wallet, the names of the remote files)
+    have the usual width of a field, and take the room of their dialog:
+    they were 30 points wide, three or four letters. The widths in
+    <verbatim|em> of the dialogs follow the font of the interface.
+
+    <item>The thumbs of the scroll bars are never shorter than 30 points:
+    in a long document they shrank to a few pixels, which the mouse could
+    hardly pick.
+
+    <item>The tabs of the windows have a cross to close them and nothing
+    else: their menu, with <menu|Move to a new browser tab>, is gone.
+
+    <item><menu|Save a backup> (it was called <menu|Download a backup>) and
+    <menu|Restore a backup...> are buttons of <menu|File|Files in this
+    browser...> too, next to <with|font-series|bold|Close>.
+
+    <item><menu|File|Files in this browser...> has a third place,
+    <with|font-series|bold|Your TeXmacs folder>, between
+    <with|font-series|bold|Your files> and <with|font-series|bold|Files of
+    TeXmacs>: it shows <verbatim|.TeXmacs>, with the preferences and the
+    styles, packages, fonts and Scheme code you added, which can be
+    opened, renamed, deleted, saved as copies and added to as your other
+    files. It is there in the dialogs to open and to save too.
+
+    <item>The remote tools (<menu|Tools|Remote tool>, then the
+    <menu|Remote> menu) were checked against a <TeXmacs> server, from the
+    browser and from the desktop version, alone and together in a chat room
+    and in a live document. The corrections: the name asked by
+    <menu|Remote|Rename> has the width of its dialog (it showed a few
+    letters), and its button <menu|Ok> takes the name as typed (it renamed
+    nothing unless Return was pressed in the field); the preferences of
+    the server say whether the server has <verbatim|rsync> (they showed an
+    error); the history of a remote file keeps a version saved again
+    within five seconds; the tabs of remote directories and of the lists
+    of chat rooms, shared resources and live documents have a title, not
+    their address; and the browser, which cannot be a server, no longer
+    offers <menu|Remote|Start server>.
+
+    <item><menu|Save a backup> and <menu|Restore a backup...>, in the
+    menu <with|font-series|bold|Upsilon>: all your files and your preferences in one
+    zip archive, to keep them safe or to move them to another browser (see
+    <with|font-series|bold|Your files>).
+
+    <item><menu|Edit|Preferences|General|Interface scaling> is obeyed, as
+    in the Qt version, and at once, without a new start of <TeXmacs>: the
+    whole interface, with the documents and the windows themselves, is
+    larger or smaller by that factor. It had no effect. In the browser it scales what <TeXmacs>
+    draws, not the tabs and the menu of the page, which follow the zoom of
+    the browser; the address <verbatim|?scale=1.5> sets it for one visit.
+  </itemize>
+
+  <paragraph|7 October 2026>
+
+  <\itemize>
+    <item>A new look, in the colours of before: rounder menus whose items
+    follow their corners, rounded tabs in the column of tabs, and short
+    animations when the menus, lists and dialogs appear.
+
+    <item>A new icon set, <name|Lucide>, with thin lines and pastel colours
+    inside which tell the kind of an action (documents in blue, editing in
+    amber, searching in violet, inserting in green, the look of the text in
+    rose): choose it in <menu|Edit|Preferences|General|Icon set> (the
+    default is still the neo-classical set). The buttons of the icons are
+    square, and the two columns of icons at the left match.
+
+    <item>The browser asks before closing or reloading the page while
+    documents have unsaved changes.
+
+    <item>Each tab of the column has a menu (its <verbatim|...>, or a right
+    click): <menu|Move to a new browser tab> moves its document to a new tab
+    of the browser.
+
+    <item>The other tabs of the browser in which <TeXmacs> Upsilon is open
+    keep the documents they save (only the preferences are kept by one tab),
+    and each tab sees the documents the others saved.
+
+    <item>The page is built from the branch <verbatim|upsilon_texmacs>, which
+    gathers the other lines of work of the repository: it has their newest
+    state (the <name|OpenType> mathematics, the citations from
+    <name|Zotero>, the icon sets) and the whole developer documentation
+    (<menu|Help|Developer documentation>). Its sources are on
+    <hlink|GitHub|https://github.com/mgubi/texmacs/tree/upsilon_texmacs>.
+
+    <item>More fonts for text and mathematics come with the page: Garamond,
+    Old Standard, <name|IBM> Plex, Noto Sans, Lete Sans, <name|GFS>
+    Neohellenic and Computer Modern Sans (in the font menus of the footer and
+    of <menu|Document|Font>), with Inconsolata as the typewriter font of
+    Palatino, Times, Bookman, Schoolbook and Euler. As the other fonts, each
+    file is fetched the first time a document uses it, and kept by the
+    browser for the next visits.
+
+    <item>The typewriter font of sessions (and of the prompt of <name|AI>
+    sessions) is the one of the font of the document, as in the rest of the
+    text, and the spaces of a monospaced font take one cell.
+  </itemize>
+
+  <paragraph|6 October 2026>
+
+  <\itemize>
+    <item>The tabs of the windows, the menu <with|font-series|bold|Upsilon> and its
+    dialogs follow the dark theme, as the rest of the interface (the theme of the
+    preferences, or the appearance of the system).
+
+    <item>This page tells which commit made the build, the components of
+    the program with their versions and the checksums of their sources, the
+    sizes of the program and of the files, and the plug-ins with the programs
+    they run, where they come from and how large they are (<em|This build>,
+    above).
+
+    <item>The plots of the examples of <name|R> and <name|Python> and the
+    figure of the page layout (<menu|Help|Developer documentation>) are shown: they
+    were
+    <name|PostScript>, which the browser cannot draw, and are now <name|PDF>.
+
+    <item>The help of the <name|Python> and <name|R> plug-ins is there
+    (<menu|Help|Plug-ins>), with how they run in the browser: it was left out
+    of the files of the page.
+
+    <item>PDF pictures are shown again (they were a question mark since the
+    windows are drawn by the GPU).
+
+    <item>The menu <with|font-series|bold|Upsilon> says how the
+    page draws: with the GPU (<name|WebGL2> and <name|ThorVG>, whose version
+    is given with the other libraries) or with <name|MuPDF>, and why.
+
+    <item>The tabs of the windows are in a column at the left of the page,
+    which leaves the whole height to the document; the column folds to
+    small tabs with the initials of the windows, which grow into whole
+    tabs (the name and a cross to close the window) under the mouse.
+
+    <item>The tabs of the windows can be dragged to another place; when
+    they do not fit in the column, chevrons above and below them scroll
+    them; <with|font-series|bold|New window> comes after the last tab. Its right edge changes its width, and folds the
+    column when it is dragged far enough to the left.
+
+    <item>The document no longer flickers or jumps while the page or the
+    column is resized.
+  </itemize>
+
+  <paragraph|5 October 2026>
+
+  <\itemize>
+    <item>Your files are kept as soon as they change (within a second),
+    and no longer every five seconds; a large folder of files no longer
+    slows this down.
+
+    <item>Two tabs no longer overwrite each other's files: a second tab of
+    <TeXmacs> Upsilon is read-only, says so, and can take <TeXmacs> over
+    with <with|font-series|bold|Use TeXmacs here>.
+
+    <item>A reference of <name|Zotero> cited from the search window is
+    copied at once into the database (or into the <BibTeX> file of the
+    bibliography), and the document remembers its item: the bibliography
+    no longer depends on finding the citation key on <verbatim|zotero.org>,
+    which does not search the keys.
+
+    <item>The panel <with|font-shape|italic|Updating current buffer, please
+    wait> of <menu|Document|Update|All> goes away once the update is done
+    (it stayed until a key or a click), and its rounded corners no longer
+    show a square frame. A bibliography inserted without
+    file takes the references of <name|Zotero> which the document cites,
+    in a file exported from <name|Zotero>, at <menu|Document|Update|All>.
+
+    <item>While <name|Zotero> answers come from <verbatim|zotero.org>,
+    the footer says what is asked (a search, the references of a
+    bibliography...) and for how long, then how long it took or why it
+    failed; the search window of a citation shows
+    <with|font-shape|italic|Searching zotero.org...> under its results.
+
+    <item>The window which turns on the wallet takes the passphrase at
+    <shortcut|(kbd-return)> as well as with <with|font-series|bold|Ok>, and
+    says so when the passphrase is wrong (before, <shortcut|(kbd-return)>
+    did nothing and a wrong passphrase was not reported).
+
+    <item>Citations from <name|Zotero>, read from your library on
+    <verbatim|zotero.org> with an API key (made on
+    <verbatim|zotero.org/settings/keys>, given in
+    <menu|Document|Bibliography|Zotero settings...>, and kept in the wallet
+    when it is on): the search window of a citation (<menu|Focus|Search
+    references>) lists the references of <name|Zotero>, the keys are
+    completed from it, and the bibliography takes its references. The
+    Zotero application itself cannot be reached from a web page. The
+    answers of <verbatim|zotero.org> come in the background, without
+    stopping the page. Without a key, <TeXmacs> asks for it when it is needed,
+    after opening the wallet if it is closed (as for the keys of the
+    chatbots). See the
+    page <with|font-shape|italic|Citations from Zotero> of the manual, in
+    the chapter on links and bibliographies.
+
+    <item>The wallet works in the browser, encrypted by the browser and
+    opened with a passphrase or a passkey (Touch ID...): the tab
+    <with|font-series|bold|Security> of the preferences. The key of the
+    <name|Albert> service of artificial intelligence goes there when it is
+    on.
+
+    <item>Sessions of chatbots: <name|ChatGPT>, <name|Claude> (new),
+    <name|Gemini>, <name|Mistral> and <name|Ollama>, asked by the browser.
+    Their keys are given in <menu|Insert|Session|Preferences>, and kept in
+    the wallet when it is on; <with|font-series|bold|Update the list of
+    models> asks each one which models the key gives. A session begins with
+    the name of its model, and the answers are shown as they come, set as
+    far as their <LaTeX> is complete (an environment or a formula which is
+    not closed yet waits for its end); executable folds of chatbots work
+    too. A question is sent with the conversation above it in the session
+    as its context. The <name|TikZ> pictures of an answer become folds of
+    the <name|TikZ> plug-in, its <name|SVG> pictures images, and the answer
+    as it came is kept in a fold after it. See the help of the AI plug-in in <menu|Help|Plug-ins>.
+
+    <item>The <name|SVG> pictures (those of <name|TikZ> among them) are in
+    the PDF which is printed, as drawings: they were the sign of an unknown
+    image.
+
+    <item>The pictures of an answer of a chatbot are made as soon as they
+    are complete, while the rest of the answer comes.
+
+    <item>The chatbots are told how to write <LaTeX> which <TeXmacs> takes
+    well; these instructions can be changed for each one (Instructions,
+    Edit, in its preferences). The lists with options of
+    <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
+    are no longer lost.
+
+    <item>Desktop version without <name|Qt> (Vue): the requests to the web
+    (the chatbots) are made with the library libcurl rather than the program
+    curl, when it is there (as on macOS and Linux): an interrupted answer
+    really stops (the chatbot stops writing it), and the keys are no longer
+    on a command line.
+
+    <item><menu|Tools|AI engine>, <with|font-series|bold|Correct> and
+    <with|font-series|bold|Translate>: without a key, the key is asked for;
+    an error of the chatbot is said on the status bar, and the selection is
+    replaced only by an answer (it was cut first, and an error took its
+    place).
+
+    <item>Desktop version of the chatbots: their answers are shown as they
+    come, as in the browser, and a question which is interrupted stops its
+    request; their <name|TikZ> pictures are drawn by the <name|TikZ>
+    plug-in of the desktop (they made a whole page). A question interrupted
+    before the chatbot began to answer no longer gives an error.
+
+    <item>The menu of the font in the footer (when it is interactive) is
+    the one of the focus bar: the fonts of text and mathematics, those of
+    text only by kind, and the selector for the others; it sets the font at
+    the cursor (in a formula, its font). It was the old menu of the fonts.
+
+    <item>Answers of the chatbots: an error of <name|OpenRouter> says what
+    the provider of the model answered (a free model which is
+    <with|font-shape|italic|temporarily rate-limited upstream>, for
+    instance), where it said <with|font-shape|italic|Provider returned
+    error>; an answer in plain text (the words with an image) is in the font
+    of the text; the <name|TikZ> pictures may compute coordinates
+    (<verbatim|$(a)!0.5!(b)$>, library <verbatim|calc>) without loading it.
+
+    <item>Each session of a chatbot has its own model, kept in the
+    document: two sessions of <name|Gemini> may ask two models. The menu of
+    the focus bar changes the model of its session, and each answer says
+    which model gave it (in the fold of the answer as it came).
+
+    <item>When the wallet is asked to be turned on twice at once (a key
+    asked for, a key given), there is one dialogue, whose answer goes to
+    both: a second one stayed open.
+
+    <item><LaTeX> import: no multiplication is put before a text in a
+    formula (<verbatim|$a\\text{ if }b$> gave <math|a*<text| if >b>), and
+    <verbatim|\\parbox[t][3cm][c]{2cm}{...}> is read with all its options.
+
+    <item>Code copied out of <TeXmacs> (a code block, the answer of a
+    chatbot as it came) keeps its <verbatim|...>, which became an ellipsis
+    (<verbatim|\\foreach \\x in {0,...,5}> of <name|TikZ> then failed).
+
+    <item>An error of <TeXmacs> (a menu of a plug-in which cannot be
+    built...) is shown in the window of the error messages and in the status
+    bar, as on the desktop: it stopped the page, which had to be reloaded.
+
+    <item><LaTeX> import (and answers of the chatbots): a space which
+    begins the argument of <verbatim|\\text>, <verbatim|\\textbf>,
+    <verbatim|\\emph>... is kept (<verbatim|f\\text{ continuous}> showed
+    <with|font-shape|italic|fcontinuous>), and the lists with options
+    (<verbatim|\\begin{itemize}[nosep]>, a <verbatim|description> with
+    options) keep their items.
+
+    <item>The text of a <verbatim|\\parbox> imported from <LaTeX> is
+    text, also in a formula (it was read as mathematics). In an answer of a
+    chatbot, a <verbatim|\\parbox> alone in a displayed formula is shown as
+    a paragraph.
+
+    <item>The chatbots are together in <menu|Insert|Session|AI>, each a
+    submenu of its models: the session starts with the one chosen (and the
+    executable folds of <menu|Insert|Fold|Executable> are grouped the same).
+
+    <item>The model of a session of a chatbot is shown in its focus bar, in
+    a menu which changes it for the next questions (by provider for
+    <name|OpenRouter>), with <with|font-series|bold|Other model>,
+    <with|font-series|bold|Update the list of models> and its preferences.
+    (It was there twice after a key was given or the wallet opened.)
+
+    <item>The answers of <name|OpenRouter> which come after its messages of
+    waiting (<verbatim|: OPENROUTER PROCESSING>) are read; they were an
+    unexpected answer.
+
+    <item><name|OpenRouter> sessions: the models of many providers with a
+    single key (<verbatim|anthropic/claude-sonnet-4.5>,
+    <verbatim|deepseek/deepseek-chat>..., or <verbatim|openrouter/auto>
+    which chooses), its image models among them.
+    <with|font-series|bold|Update the list of models> lists them all (a
+    list of models was cut at the first backquote of the descriptions of
+    the models).
+
+    <item>The <name|TikZ> pictures of an answer whose code has
+    <verbatim|...> (as <verbatim|\\foreach \\x in {0,1,...,5}>) are drawn:
+    the dots became an ellipsis, which <name|TikZ> refuses. The conversation
+    sent again keeps them too.
+
+    <item>The chatbots are in <menu|Insert|Session|AI> before they have a
+    key. A session without a key asks for it: it opens the preferences of the
+    chatbot, or first the wallet if it is closed (it may hold the key). A key
+    given while the wallet is closed opens it, to be kept there.
+
+    <item>Images in <name|PNG> or <name|JPEG> in the answers of the
+    chatbots: the models which draw (<verbatim|gemini-2.5-flash-image> of
+    <name|Gemini>, <verbatim|gpt-image-1> of <name|ChatGPT>...) make a
+    painting or an artistic rendition of what is asked, shown as an image
+    of the answer; their instructions say so.
+
+    <item>The answer of a chatbot can be stopped (the stop
+    button of the session, <with|font-series|bold|Interrupt execution>, or
+    <menu|Focus|Interrupt execution>): its service is told to stop writing
+    it, and the question can be changed and asked again.
+
+    <item>The name of a file can be typed again in the panel of
+    <menu|File|Save as> (the characters did not come in).
+
+    <item><name|TikZ>: the surfaces of <verbatim|pgfplots>
+    (<verbatim|\\addplot3[surf]>) are drawn; their drawing went too deep
+    for <name|MuPDF>.
+
+    <item><name|TikZ>: the diagrams of <verbatim|tikz-cd> whose drawing
+    was lost (its <name|SVG> was not well formed) are drawn. In an answer of
+    a chatbot, a diagram alone in a displayed formula is a picture, and a
+    picture which was cut by the limit of the length of the answer is shown
+    as its code, with the rest of the answer; <name|Claude> may write longer
+    answers.
+
+    <item><name|TikZ>: the libraries of <verbatim|pgfplots> which
+    <name|TikZJax> lacked (<verbatim|fill between>, group plots, polar
+    axes...). The pictures of the answers of the chatbots keep the settings
+    of their preamble, and their minipages are set as their contents; an
+    answer which comes no longer gives errors for a command whose arguments
+    have not come yet.
+
+    <item>The <with|font-series|bold|Busy> sign of a session or a fold
+    which waits for its answer is animated.
+
+    <item>After an update of the page, the caches of <TeXmacs> in your
+    browser are cleared: the styles, files and documentation of the previous
+    version were sometimes still used.
+
+    <item>The input fields of the dialogs whose width is given as a
+    multiple of the default one are no longer as wide as the window (the
+    buttons of the dialogs of the wallet were out of sight).
+
+    <item>Faster Scheme: the macros of a piece of code are expanded once,
+    not each time the code runs (the export to <LaTeX> is about 15% faster).
+
+    <item>The windows are drawn by the graphics card (WebGL2): scrolling,
+    zooming and every frame cost the processor two to four times less, with
+    the same text as before. Add <verbatim|?gpu=0> to the address of the page
+    to draw as before, in a browser where something looks wrong.
+
+    <item>Dates: <markup|date> gives the date (it gave nothing), its formats
+    such as <verbatim|MMMM d, yyyy> or <verbatim|dd/MM/yy> work, and numbers
+    keep their zeros (<verbatim|2026-10-05>). The names of the months and
+    days are in English.
+
+    <item>Long HTML documents are imported (about two thousand paragraphs
+    stopped the import without a message), and the equation arrays of LaTeX
+    (<verbatim|eqnarray>, <verbatim|align>...) are imported as in a desktop
+    version which has run before (the first time, their content did not
+    become a block).
+
+    <item>Questions about the document: <menu|Tools|Ask about the selection>
+    puts a session of the chatbot of <menu|Tools|AI engine> after the
+    paragraph of the selection, with the selection in its input, for the
+    question which is typed after it; <menu|Tools|Ask about the document>
+    puts one at the cursor which sends the document with each question. The
+    menu of the model in the focus bar of a session turns this on or off
+    (<with|font-series|bold|Send the document as context>): the document is
+    sent as <LaTeX>, without the sessions of chatbots, and <name|Claude>
+    keeps it in its cache, so that the next questions about it cost less.
+
+    <item>Chatbots which reason: their reasoning is shown while it comes and
+    kept folded before the answer; <with|font-series|bold|Reasoning> in the
+    focus bar of the session (or in its preferences) asks for more or less
+    of it.
+
+    <item>Each answer of a chatbot is followed by its tokens (and its cost
+    with <name|OpenRouter>); the menu of the model gives the sum for the
+    session. <with|font-series|bold|Insert answer> in the focus bar puts an
+    answer after the session, as paragraphs of the document.
+
+    <item>A question which an engine refuses for a while (too many requests,
+    an engine overloaded) is asked again after a few seconds, three times
+    at most.
+
+    <item>The long lists of models (<name|OpenRouter>) are in alphabetical
+    ranges: a few entries at the top, then the providers, then their models.
+    <menu|Insert|Session|AI> lists the chatbots alone: a session starts with
+    the model of the preferences, and another one is chosen in its focus
+    bar.
+
+    <item>Executable folds of chatbots (<menu|Insert|Fold|Executable|AI>):
+    each asks its question alone (with the document, if it is chosen in its
+    focus bar), with its own model, and keeps its answer, which is the answer
+    alone; unfolding it again does not ask again (<key|Return> in its
+    question, or <with|font-series|bold|Ask again>, does). Its focus bar
+    says <with|font-series|bold|Question changed> when its question was
+    changed since its answer.
+
+    <item>The cost of an answer of <name|ChatGPT>, <name|Claude>,
+    <name|Gemini> or <name|Mistral> is estimated from the prices of its
+    model (<with|font-series|bold|about $...>); the menu of the model also
+    gives the tokens and the cost of all the answers of the document (those
+    of the folds among them).
+
+    <item><name|Python> sessions and executable folds
+    (<menu|Insert|Session|Python>): <name|Python> 3.14 runs in the page
+    (<name|Pyodide>, loaded from the network by the first input), with the
+    packages which an input imports (<verbatim|numpy>, <verbatim|sympy>,
+    <verbatim|matplotlib>, <verbatim|pandas>, <verbatim|scipy>...). The
+    results of <name|SymPy> are formulas, the figures of <name|matplotlib>
+    pictures. <menu|Stop> ends <name|Python> while it computes; it starts
+    again with the next input. See <menu|Help|Plug-ins|Python>.
+
+    <item>Spell checking (<menu|Edit|Spell>, and the words underlined while
+    typing with <with|font-series|bold|Continuous spell checking> in the
+    preferences): <name|Hunspell> is in the page, and the dictionary of a
+    language is fetched the first time it is needed (from the dictionaries
+    of <hlink|github.com/wooorm/dictionaries|https://github.com/wooorm/dictionaries>,
+    for about thirty languages), then kept in the browser with the words
+    which you insert. The misspelled words are highlighted, not hidden by a
+    box.
+
+    <item><name|R> sessions and executable folds (<menu|Insert|Session|R>):
+    <name|R> runs in the page (<name|webR>, loaded from the network by the
+    first input), its plots are shown after the inputs which make them, and
+    <verbatim|install.packages> installs the packages built for
+    <name|webR>. <menu|Stop> ends <name|R> while it computes; it starts
+    again with the next input. See <menu|Help|Plug-ins|R>.
+
+    <item>A third faster start on the next visits (about 1<nbsp>s instead of
+    1.5<nbsp>s once the page is loaded): the files of <TeXmacs> had the time
+    of each visit, so that it merged its font database again at every start
+    and lost the caches of its fonts and of its directories.
+  </itemize>
+
+  <paragraph|4 October 2026>
+
+  <\itemize>
+    <item>Fixes in the Scheme interpreter: a crash which could happen the
+    second time some functions ran (for instance when editing graphics), an
+    error in a document no longer escapes from the typesetting, long runs of
+    one character in a document are saved and cached correctly, and plug-ins
+    keep all their settings when <TeXmacs> starts from its plug-in cache.
+
+    <item>In a JavaScript session, <verbatim|TeXmacs.show> shows <TeXmacs>
+    content at once, while asynchronous code runs; executable folds show
+    their output as it comes, as sessions do, with every plug-in.
+
+    <item>More examples in the help of the Asymptote, TikZ and JavaScript
+    plug-ins, and a link to it at the start of their sessions.
+
+    <item>A simpler panel while the page loads: a bar and one line which
+    says what happens. It fades out once <TeXmacs> is ready.
+
+    <item>A click puts the help balloon of a button away, and no balloon
+    comes while a menu is open, where it would hide the menu.
+
+    <item>The arrows of the submenus, and of the other menus and lists, are
+    solid triangles.
+
+    <item>The keys which compose: the dead keys of many keyboards (the
+    <verbatim|^> or the diaeresis of a Swiss or a French keyboard), the accents of a Mac, and the input methods of Chinese,
+    Japanese or Korean; the text being composed is shown in the document,
+    and the panel of the system (the accents of a held key, the candidates of
+    an input method) appears at the cursor.
+
+    <item>A copy keeps its structure when it is pasted into another tab of
+    <TeXmacs>, or into the page reloaded (it was pasted as text).
+
+    <item>The shortcuts with Option, Control or Command work in browsers
+    which hide these keys from the page, as LibreWolf (Option+arrows moved
+    by characters instead of words).
+
+    <item>The <name|Asymptote> plug-in in the browser: sessions and
+    executable folds (<menu|Insert|Session|Asymptote>) make <name|Asymptote>
+    pictures with <name|Asymptote> itself, compiled to <name|WebAssembly>;
+    their labels are set by <TeXmacs> from their <LaTeX> and can be edited,
+    and in a fold the code follows. See <menu|Help|Plug-ins|Asymptote>.
+
+    <item><name|JavaScript> sessions and executable folds
+    (<menu|Insert|Session|JavaScript>): the <name|JavaScript> of the page
+    itself, with <TeXmacs> at hand (<verbatim|TeXmacs.scheme>), and a file
+    <verbatim|my-init-javascript.js> run at each start
+    (<menu|Developer|Open my-init-javascript.js>). See
+    <menu|Help|Plug-ins|JavaScript>.
+
+    <item>Copy in Safari: <key|M-c> and <key|M-x> copy for the other
+    programs too (the system kept its old clipboard), with the HTML of the
+    copy; a copy from a menu offers the dialog <with|font-series|bold|Copy
+    for other programs>.
+
+    <item>Executable folds evaluate again in every case (depending on the
+    order <TeXmacs> started in, <key|return> could turn a fold into an
+    empty output).
+
+    <item>A crash of the page on some keys (in the editing of a formula)
+    fixed in the interpreter of <name|Scheme>.
+
+    <item>The help pages keep the backslashes of their examples of code.
+  </itemize>
+
+  <paragraph|3 October 2026>
+
+  <\itemize>
+    <item>The <name|TikZ> plug-in in the browser: sessions and executable
+    folds (<menu|Insert|Session|TikZ>) make <name|TikZ> pictures with
+    <name|TikZJax>, a <name|TeX> which runs in the page; the text of a
+    picture is set by <TeXmacs> and can be edited, and in a fold the source
+    follows. See <menu|Help|Plug-ins|TikZ>.
+
+    <item>Plug-ins in the browser, which run beside the page (as <name|Web
+    Workers>); the list of the plug-ins is made again after an update of the
+    page, and a plug-in which fails no longer hides the others.
+  </itemize>
+
+  <paragraph|2 October 2026>
+
+  <\itemize>
+    <item>Tighter tool bars.
+
+    <item>The full manuals (<menu|Help|Full manuals>) no longer crash the
+    page.
+  </itemize>
+
+  <paragraph|1 October 2026>
+
+  <\itemize>
+    <item><menu|Edit|Paste from browser...>: a dialog which gets what was
+    copied in another page or program, in the formats of
+    <menu|Edit|Paste from>.
+
+    <item>Fast typing no longer lags behind the keys.
+
+    <item>The <menu|Remote> menu connects with secure WebSockets
+    (<verbatim|wss>) when the page is served over <verbatim|https>.
+
+    <item>The loading panel shows <TeXmacs>, its version, and what it loads.
+
+    <item>The keys of the shortcuts are shown with the symbols of a Mac, in
+    the font of the menus.
+  </itemize>
+
+  <paragraph|30 September 2026>
+
+  <\itemize>
+    <item>This page, <menu|Help|TeXmacs in the browser>.
+
+    <item>The fonts are loaded one by one, the first time a document uses
+    them, instead of all of them in the background (28<nbsp>MB less).
+
+    <item>An interactive status bar: the character before the cursor, a
+    swatch of the colour, and a right click on a tag opens its
+    <menu|Focus> menu.
+
+    <item>The panel of the files: a PDF or an image opens in a tab of the
+    browser; its buttons say that the files stay in this browser.
+
+    <item>On a Mac, Control+click is a right click.
+  </itemize>
+
+  <paragraph|29 September 2026>
+
+  <\itemize>
+    <item>Downloads and requests to the web are made by the browser:
+    documents can be opened from the web.
+
+    <item>The links to other sites open in the browser.
+
+    <item>The logo of <TeXmacs> Upsilon, which is also the icon of the
+    page.
+
+    <item>A document at an address with a port opens instead of crashing.
+  </itemize>
+
+  <paragraph|28 September 2026>
+
+  <\itemize>
+    <item>The address of the page opens a document
+    (<verbatim|?open=...>) and passes options to <TeXmacs>.
+
+    <item>Presentation mode, in full screen.
+
+    <item>The shortcuts with Shift and the command key on a Mac.
+
+    <item>The page uses no processor while nothing happens.
+
+    <item>The bars and the side tools of the <menu|View> menu apply to all
+    the tabs.
+  </itemize>
+
+  <paragraph|27 September 2026>
+
+  <\itemize>
+    <item><TeXmacs> Upsilon is published on <name|GitHub Pages>, built
+    by the continuous integration of the repository.
+
+    <item>The clipboard of the system, with the shortcuts of the platform of
+    the browser.
+
+    <item>Printing: the PDF of the document in a tab of the browser.
+
+    <item>Scrolling with a trackpad follows the fingers.
+
+    <item>The <menu|Remote> menu, through a <TeXmacs> server which accepts
+    WebSocket clients.
+
+    <item>The storage of the page: its size, its removal, and the files of
+    <TeXmacs> itself.
+
+    <item>The <with|font-series|bold|Upsilon> menu: the progress
+    of the loading, the software of the page, more information and the
+    limits.
+
+    <item>The fonts of the PDF files are embedded correctly (a fix to
+    <name|MuPDF>).
+
+    <item>A plug-in which cannot start its program no longer freezes the
+    page.
+  </itemize>
+
+  <paragraph|26 September 2026>
+
+  <\itemize>
+    <item>The first version of <TeXmacs> in the browser: <TeXmacs> compiled
+    to <name|WebAssembly> with the <name|Vue> interface, a tab per
+    document, the frame of the page, the files of the page (with the files
+    and folders dropped on it), and the files of <TeXmacs> loaded in the
+    background.
+  </itemize>
+
+  <tmdoc-copyright|2026|Massimiliano Gubinelli>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
+</body>
+
+<\initial>
+  <\collection>
+    <associate|preamble|false>
+  </collection>
+</initial>

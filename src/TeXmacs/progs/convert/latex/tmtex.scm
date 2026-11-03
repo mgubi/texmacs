@@ -43,6 +43,18 @@
 (define tmtex-auto-consume 0)
 (define tmtex-image-root-url (unix->url "image"))
 (define tmtex-image-root-string "image")
+;; whether converted images have a place: next to the .tex file which is
+;; saved (without one, a conversion to a string, they would go into the
+;; current directory of TeXmacs, which the LaTeX does not know)
+(define tmtex-image-dir? #f)
+;; the first bibliography of the document in a CSL style, (NAME FILE KEYS):
+;; its citations and its bibliography are then those of the LaTeX package
+;; citation-style-language (see "Citations in a CSL style" below); global,
+;; as tmtex-packages, for the predicate of the mode csl-package% (Guile)
+(tm-define tmtex-csl #f)
+(define tmtex-csl-resource "")
+(define tmtex-csl-file? #f)
+(define tmtex-csl-names* 'unknown)
 (define tmtex-image-loose? #t)
 (define tmtex-appendices? #f)
 (define tmtex-indirect-bib? #f)
@@ -105,7 +117,8 @@
 
   ;; Other styles
   (beamer-style%        (in? tmtex-style '("beamer" "old-beamer")))
-  (natbib-package%      (in? "cite-author-year" tmtex-packages)))
+  (natbib-package%      (in? "cite-author-year" tmtex-packages))
+  (csl-package%         tmtex-csl))
 
 (tm-define (tmtex-style-init body)
   (noop))
@@ -145,7 +158,8 @@
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
   (set! tmtex-image-loose? (not (tmtex-image-target? opts)))
-  (if (not tmtex-image-loose?)
+  (set! tmtex-image-dir? (tmtex-image-target? opts))
+  (if tmtex-image-dir?
       (begin
         (set! tmtex-image-root-url
               (url-drop-suffix (url-drop-suffix current-save-target)))
@@ -454,6 +468,7 @@
 
 (logic-table latex-text-symbols%
   ("#20AC"         euro)
+  ("euro"          euro)
   ("cent"          textcent)
   ("circledR"      textregistered)
   ("copyright"     textcopyright)
@@ -488,6 +503,10 @@
         ((string-starts? s "b-") (tmtex-modified-token 'tmmathbf s 2))
         ((and (not (tmtex-math-mode?)) (logic-ref latex-text-symbols% s))
          (list '!group (list (logic-ref latex-text-symbols% s))))
+        ((and (string-starts? s "emoji-")
+              (!= (string-convert (string-append "<" s ">") "Cork" "UTF-8")
+                  (string-append "<" s ">")))
+         (tmtex-emoji (string-append "<" s ">")))
         ((and (string-starts? s "#") (not tmtex-use-catcodes?))
          (let* ((qs (string-append "<" s ">"))
                 (cv (string-convert qs "Cork" "UTF-8")))
@@ -514,6 +533,91 @@
            (q (if (null? p2) '() (cdr p2)))
            (r (routine q)))
       (cons (tmtex-token-sub s group?) r))))
+
+;; The emoji. One which the LaTeX package emoji has is \emoji{name}, by its
+;; name there; one which it has not (a newer one) its characters, in
+;; \tmemojichar, which shows them with LuaLaTeX and XeLaTeX and their code
+;; points with pdfLaTeX (which stops on them). The preamble defines both
+;; for each engine (latex-texmacs-preamble, latex-define.scm). In a
+;; formula, in a \text.
+
+(define (tmtex-emoji-wrap e)
+  (if (tmtex-math-mode?) (list 'text e) (list '!group e)))
+
+(define (tmtex-emoji-chars name)
+  ;; \tmemojichar{characters}{U+... of its code points}{its first code
+  ;; point, in decimal, for \iffontchar}
+  (let* ((us (string-convert name "Cork" "UTF-8"))
+         (cv (if tmtex-use-catcodes? (string-convert us "UTF-8" "LaTeX") us))
+         (cps (string-decompose
+               (string-replace (string-replace (emoji-to-code-points name)
+                                               "<#" "") ">" " ") " "))
+         (cps* (list-filter cps (lambda (x) (!= x ""))))
+         (u (apply string-append
+                   (list-intersperse (map (lambda (x) (string-append "U+" x))
+                                          cps*) " "))))
+    (tmtex-emoji-wrap (list 'tmemojichar (list '!widechar (string->symbol cv))
+                            u (number->string
+                               (or (and (pair? cps*)
+                                        (string->number (car cps*) 16))
+                                   0))))))
+
+(define (tmtex-emoji name)
+  ;; name: <emoji-...>, an emoji of ours
+  (with ln (emoji-latex-name name)
+    (if (!= ln "")
+        (tmtex-emoji-wrap (list 'emoji ln))
+        (tmtex-emoji-chars name))))
+
+(define (tmtex-emoji-text t)
+  ;; the text of the argument of an (emoji ...) tag (an older import made
+  ;; (concat "white" (rsub "c") ...) of white_check_mark)
+  (cond ((string? t) t)
+        ((func? t 'concat) (apply string-append (map tmtex-emoji-text (cdr t))))
+        ((func? t 'rsub 1) (string-append "_" (tmtex-emoji-text (cadr t))))
+        ((func? t 'rsup 1) (string-append "^" (tmtex-emoji-text (cadr t))))
+        ((and (pair? t) (pair? (cdr t)))
+         (apply string-append (map tmtex-emoji-text (cdr t))))
+        (else "")))
+
+(define (tmtex-emoji-tag s l)
+  ;; (emoji "name"), a \emoji{name} of an import which had not that emoji:
+  ;; the emoji if the name is one of the package, else the name as a
+  ;; shortcode, as text (not \emoji, which the package would stop on)
+  (let* ((x (if (pair? l) (tmtex-emoji-text (car l)) ""))
+         (e0 (emoji-from-latex (locase-all x)))
+         ;; (the shortcodes of GitHub have _ where the package has -)
+         (e (if (!= e0 "") e0
+                (emoji-from-latex (string-replace (locase-all x) "_" "-")))))
+    (if (!= e "") (tmtex-emoji e)
+        (tmtex-emoji-wrap
+         (list 'texttt (string-append ":" (tmtex-emoji-escape x) ":"))))))
+
+(define (tmtex-emoji-escape x)
+  ;; the characters of x which are special for TeX, written as characters
+  (apply string-append
+         (map (lambda (c)
+                (cond ((string-index "#$%&_{}" c) (string #\\ c))
+                      ((== c #\~) "\\textasciitilde{}")
+                      ((== c #\^) "\\textasciicircum{}")
+                      ((== c #\\) "\\textbackslash{}")
+                      ((< (char->integer c) 32) "")
+                      (else (string c))))
+              (string->list x))))
+
+(define (tmtex-emoji-clean s)
+  ;; the selectors and the joiners after an emoji by its name (what is
+  ;; left of a sequence which is not one emoji of the table) are left out:
+  ;; the emoji has them, and pdfLaTeX would stop on them
+  (let loop ((l (tmstring->list s)) (prev #f) (acc '()))
+    (if (null? l) (apply string-append (reverse acc))
+        (let* ((c (car l))
+               (named? (lambda (x) (and x (string-starts? x "<emoji-")))))
+          (cond ((and (in? c '("<#FE0F>" "<#FE0E>")) (named? prev))
+                 (loop (cdr l) prev acc))
+                ((and (== c "<#200D>") (named? prev))
+                 (loop (cdr l) prev acc))
+                (else (loop (cdr l) c (cons c acc))))))))
 
 (define (tmtex-text-sub head l)
   (if (string? head)
@@ -554,28 +658,28 @@
               ((== c #\^)  (tmtex-text-sub "\\^{}" l))
               ((== c #\\)  (tmtex-text-sub '(textbackslash) l))
               ((== c #\`)  (tmtex-text-sub "`" l))
-              ((== c #\00) (tmtex-text-sub "\\`{}" l))
-              ((== c #\01) (tmtex-text-sub "\\'{}" l))
-              ((== c #\04) (tmtex-text-sub "\\\"{}" l))
-              ((== c #\05) (tmtex-text-sub "\\H{}" l))
-              ((== c #\06) (tmtex-text-sub "\\r{}" l))
-              ((== c #\07) (tmtex-text-sub "\\v{}" l))
-              ((== c #\10) (tmtex-text-sub "\\u{}" l))
-              ((== c #\11) (tmtex-text-sub "\\={}" l))
-              ((== c #\12) (tmtex-text-sub "\\.{}" l))
-              ((== c #\14) (tmtex-text-sub "\\k{}" l))
-              ((== c #\20) (tmtex-text-sub "``" l))
-              ((== c #\21) (tmtex-text-sub "''" l))
-              ((== c #\22) (tmtex-text-sub ",," l))
-              ((== c #\25) (tmtex-text-sub "--" l))
-              ((== c #\26) (tmtex-text-sub "---" l))
-              ((== c #\27) (tmtex-text-sub "{}" l))
-              ((== c #\33) (tmtex-text-sub "ff" l))
-              ((== c #\34) (tmtex-text-sub '(textbackslash) l))
-              ((== c #\35) (tmtex-text-sub "fl" l))
-              ((== c #\36) (tmtex-text-sub "ffi" l))
-              ((== c #\37) (tmtex-text-sub "ffl" l))
-              ((== c #\174) (tmtex-text-sub '(textbar) l))
+              ((== c (integer->char 0)) (tmtex-text-sub "\\`{}" l))
+              ((== c (integer->char 1)) (tmtex-text-sub "\\'{}" l))
+              ((== c (integer->char 4)) (tmtex-text-sub "\\\"{}" l))
+              ((== c (integer->char 5)) (tmtex-text-sub "\\H{}" l))
+              ((== c (integer->char 6)) (tmtex-text-sub "\\r{}" l))
+              ((== c (integer->char 7)) (tmtex-text-sub "\\v{}" l))
+              ((== c (integer->char 8)) (tmtex-text-sub "\\u{}" l))
+              ((== c (integer->char 9)) (tmtex-text-sub "\\={}" l))
+              ((== c (integer->char 10)) (tmtex-text-sub "\\.{}" l))
+              ((== c (integer->char 12)) (tmtex-text-sub "\\k{}" l))
+              ((== c (integer->char 16)) (tmtex-text-sub "``" l))
+              ((== c (integer->char 17)) (tmtex-text-sub "''" l))
+              ((== c (integer->char 18)) (tmtex-text-sub ",," l))
+              ((== c (integer->char 21)) (tmtex-text-sub "--" l))
+              ((== c (integer->char 22)) (tmtex-text-sub "---" l))
+              ((== c (integer->char 23)) (tmtex-text-sub "{}" l))
+              ((== c (integer->char 27)) (tmtex-text-sub "ff" l))
+              ((== c (integer->char 28)) (tmtex-text-sub '(textbackslash) l))
+              ((== c (integer->char 29)) (tmtex-text-sub "fl" l))
+              ((== c (integer->char 30)) (tmtex-text-sub "ffi" l))
+              ((== c (integer->char 31)) (tmtex-text-sub "ffl" l))
+              ((== c #\|) (tmtex-text-sub '(textbar) l))
               (else
                 (append
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
@@ -645,6 +749,11 @@
                     (tmtex-string-produce (cdr l)))))))
 
 (define (tmtex-string s)
+  ;; the emoji in code points of the documents written before their names
+  ;; (<#1F600>, <#1F468><#200D>...) are exported by their names
+  (when (string-index s #\<)
+    (set! s (emoji-names s))
+    (when (string-contains? s "<emoji-") (set! s (tmtex-emoji-clean s))))
   (if (> (string-length s) 1000)
     `(!concat ,@(map tmtex (tmstring-split s)))
     (let* ((l (string->list s))
@@ -1843,7 +1952,10 @@
   (let* ((u (url-relative (save-target-url) (unix->url name)))
          (suffix (url-suffix u))
          (fm (string-append (format-from-suffix suffix) "-file")))
-    (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg")))
+    ;; used as it is when LaTeX reads it, or when there is no .tex file
+    ;; next to which a converted image could be written
+    (if (or (not tmtex-image-dir?)
+            (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg"))))
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
@@ -2208,6 +2320,59 @@
 
 (define (tmtex-footnotemark s l)
   `(footnotemark (!option ,(tmtex (car l)))))
+
+;; The macros of the style markdown (styles/markdown.ts): what they display,
+;; without the text of the file which they keep
+(define (tmtex-md-body s l) (if (null? l) "" (tmtex (car l))))
+(define (tmtex-md-fence s l) (if (< (length l) 2) "" (tmtex (cadr l))))
+(define (tmtex-md-footnote s l)
+  (if (< (length l) 2) "" (tmtex-footnote s (cdr l))))
+(define (tmtex-md-h6 s l) (if (null? l) "" (tmtex `(subparagraph ,(car l)))))
+(define (tmtex-md-meta s l)
+  (cond ((< (length l) 2) "")
+        ((== (car l) "") (tmtex `(verbatim ,(cadr l))))
+        (else (with key (if (string? (car l)) (string-append (car l) ":")
+                            `(concat ,(car l) ":"))
+                (tmtex `(concat (strong ,key) " " ,(cadr l)))))))
+(define (tmtex-md-nothing s l) "")
+
+;; The macros of the style office (styles/office.ts): what they display,
+;; without what they keep of the Word or OpenDocument file
+(define (tmtex-office-last s l) (if (null? l) "" (tmtex (cAr l))))
+(define (tmtex-office-font s l)
+  (if (< (length l) 3) (tmtex-office-last s l)
+      (tmtex `(with "font-family" ,(cadr l) ,(caddr l)))))
+(define (tmtex-office-underline s l)
+  (cond ((< (length l) 2) (tmtex-office-last s l))
+        ((== (car l) "double") (tmtex `(underline (underline ,(cadr l)))))
+        (else (tmtex `(underline ,(cadr l))))))
+(define (tmtex-office-strike s l)
+  (if (null? l) "" (tmtex `(strike-through ,(cAr l)))))
+(define (tmtex-office-columns s l)
+  (if (< (length l) 2) (tmtex-office-last s l)
+      (tmtex `(with "par-columns" ,(car l) ,(cAr l)))))
+(define (tmtex-office-inline t)
+  ;; the paragraphs of a comment or a change, in one line
+  (if (tm-func? t 'document)
+      `(concat ,@(list-intersperse (tm-children t) " "))
+      t))
+(define (tmtex-office-comment s l)
+  (if (< (length l) 3) ""
+      (tmtex `(with "color" "dark magenta"
+                (concat (rsup (math "<ast>"))
+                        (with "font-size" "0.71"
+                          (concat "[" (strong ,(car l)) ": "
+                                  ,(tmtex-office-inline (caddr l)) "]")))))))
+(define (tmtex-office-commented s l)
+  (if (< (length l) 4) (tmtex-office-last s l)
+      (tmtex `(concat ,(car l) (office-comment ,@(cdr l))))))
+(define (tmtex-office-change s l)
+  (cond ((< (length l) 3) "")
+        ((== s "office-ins")
+         (tmtex `(with "color" "dark green" (underline ,(tmtex-office-inline (caddr l))))))
+        (else
+         (tmtex `(with "color" "dark red" (strike-through ,(tmtex-office-inline (caddr l))))))))
+;; (strike-through and marked: tmtex-strike-through and tmtex-marked below)
 
 (define (filter-enunciation-due-to l)
   (cond ((func? l 'dueto) (list l))
@@ -3101,32 +3266,212 @@
 (define (tmtex-cite-raw* s l)
   (tex-apply 'citealp* (tmtex-cite-list l)))
 
-(define (tmtex-cite-textual s l)
+(tm-define (tmtex-cite-textual s l)
   (tex-apply 'citet (tmtex-cite-list l)))
 
-(define (tmtex-cite-textual* s l)
+(tm-define (tmtex-cite-textual* s l)
   (tex-apply 'citet* (tmtex-cite-list l)))
 
-(define (tmtex-cite-parenthesized s l)
+(tm-define (tmtex-cite-parenthesized s l)
   (tex-apply 'citep (tmtex-cite-list l)))
 
-(define (tmtex-cite-parenthesized* s l)
+(tm-define (tmtex-cite-parenthesized* s l)
   (tex-apply 'citep* (tmtex-cite-list l)))
 
 (define (tmtex-render-cite s l)
   (tex-apply 'citetext (tmtex (car l))))
 
-(define (tmtex-cite-author s l)
+(tm-define (tmtex-cite-author s l)
   (tex-apply 'citeauthor (tmtex (car l))))
 
-(define (tmtex-cite-author* s l)
+(tm-define (tmtex-cite-author* s l)
   (tex-apply 'citeauthor* (tmtex (car l))))
 
-(define (tmtex-cite-year s l)
+(tm-define (tmtex-cite-year s l)
   (tex-apply 'citeyear (tmtex (car l))))
 
 (define (tmtex-natbib-triple s l)
   `(protect (citeauthoryear ,@(map tmtex l))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Citations in a CSL style
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A document whose bibliography has a style csl-NAME is exported for the
+;; package citation-style-language (citeproc-lua, run by LuaLaTeX): the
+;; citations stay commands, \printbibliography replaces the rendered
+;; bibliography, and next to the .tex file go the cited entries as BibTeX
+;; (BASE-refs.bib) and the style NAME.csl, so that LaTeX formats them as
+;; TeXmacs does.
+
+(define tmtex-csl-cite-tags
+  '(cite nocite cite-textual cite-textual* cite-parenthesized
+    cite-parenthesized* cite-author cite-author* cite-year))
+
+(define (tmtex-csl-keys t)
+  ;; the keys of the entries of @t: the labels bib-KEY of a rendered
+  ;; bibliography, and the keys of the citations
+  (cond ((npair? t) '())
+        ((and (func? t 'label 1) (string? (cadr t))
+              (string-starts? (cadr t) "bib-"))
+         (list (string-drop (cadr t) 4)))
+        ((in? (car t) tmtex-csl-cite-tags) (list-filter (cdr t) string?))
+        ((and (func? t 'cite-detail 2) (string? (cadr t))) (list (cadr t)))
+        (else (append-map tmtex-csl-keys (cdr t)))))
+
+(define (tmtex-csl-bibliography t)
+  ;; the first bibliography of @t in a CSL style
+  (cond ((npair? t) #f)
+        ((and (func? t 'bibliography 4) (string? (caddr t))
+              (string-starts? (caddr t) "csl-")
+              (> (string-length (caddr t)) 4))
+         t)
+        (else (let loop ((l (cdr t)))
+                (and (pair? l)
+                     (or (tmtex-csl-bibliography (car l)) (loop (cdr l))))))))
+
+(define (tmtex-find-csl body)
+  (and-with b (tmtex-csl-bibliography body)
+    (list (string-drop (caddr b) 4)
+          (if (string? (cadddr b)) (cadddr b) "")
+          (list-remove-duplicates (tmtex-csl-keys body)))))
+
+(define (tmtex-csl-default-resource file)
+  ;; without a .tex file, the .bib file of the bibliography
+  (cond ((== file "") "references.bib")
+        ((string-ends? file ".bib") file)
+        (else (string-append file ".bib"))))
+
+(define (tmtex-csl-style-source name)
+  ;; as csl-bib-process finds it: next to the document first
+  (let* ((dir (and (url-rooted? (current-buffer)) (url-head (current-buffer))))
+         (u (and dir (url-append dir (string-append name ".csl")))))
+    (if (and u (url-exists? u)) u (csl-style-file name))))
+
+(define (tmtex-csl-write-files)
+  ;; next to the .tex file: the cited entries, and the style unless a file
+  ;; of its name is there already
+  (when tmtex-image-dir?
+    (let* ((name (car tmtex-csl))
+           (bib (url-glue tmtex-image-root-url "-refs.bib"))
+           (csl (url-append (url-head tmtex-image-root-url)
+                            (string-append name ".csl")))
+           (src (tmtex-csl-style-source name)))
+      (string-save (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl)) bib)
+      (set! tmtex-csl-resource (url->string (url-tail bib)))
+      (when (and src (not (url-exists? csl)))
+        (string-save (string-load src) csl)))))
+
+(tm-define (tmtex-biblio s l titled?)
+  (:mode csl-package?)
+  (tmtex-csl-write-files)
+  (list 'printbibliography))
+
+(tm-define (latex-extra-preamble)
+  (:mode csl-package?)
+  (let* ((lan (if (pair? tmtex-languages) (car tmtex-languages) "english"))
+         (loc (if (== lan "english") ""
+                  (string-append ", locale = " (csl-language->locale lan)))))
+    (string-append
+     (former)
+     "% the citations and the bibliography are made by the package\n"
+     "% citation-style-language: compile with LuaLaTeX\n"
+     "\\cslsetup{style = " (car tmtex-csl) loc "}\n"
+     ;; TeXmacs does not abbreviate the names of the journals
+     "\\addbibresource[journal-abbreviation=false]{" tmtex-csl-resource "}\n")))
+
+(tm-define (tmtex-cite s l)
+  (:mode csl-package?)
+  (tex-apply 'cite (tmtex-cite-list l)))
+
+(define (tmtex-csl-option key val)
+  ;; key={val}, in one piece (the serializer puts spaces between pieces)
+  (if (string? val) (string-append key "={" (string-trim-both val) "}")
+      `(!concat ,(string-append key "={") ,val "}")))
+
+(tm-define (tmtex-cite-detail s l)
+  (:mode csl-package?)
+  ;; a locator when the details read as one ("pp. 12-14"), else a suffix
+  (let* ((c (tmtex-cite-list (list (car l))))
+         (d (cadr l))
+         (p (and (string? d) (csl-cite-details d)))
+         (opt (cond ((null? p) #f)
+                    ((and p (assoc-ref p 'locator))
+                     (tmtex-csl-option (assoc-ref p 'label)
+                                       (tmtex (assoc-ref p 'locator))))
+                    ((and p (string? (assoc-ref p 'suffix)))
+                     (tmtex-csl-option "suffix" (tmtex (assoc-ref p 'suffix))))
+                    (else (tmtex-csl-option "suffix"
+                                            `(!concat ", " ,(tmtex d)))))))
+    (if opt (tex-apply 'cite `(!option ,opt) c) (tex-apply 'cite c))))
+
+(define (tmtex-csl-names)
+  ;; for a style whose citations show no names ([1], [Knu84]), ((KEY .
+  ;; NAMES) ...) with the names of the entries as TeXmacs shows them in a
+  ;; textual citation:
+  ;; \textcite and \citeauthor of citation-style-language only know the
+  ;; styles whose citations show the names
+  (when (== tmtex-csl-names* 'unknown)
+    (set! tmtex-csl-names*
+          (csl-textual-authors
+           (string-append "csl-" (car tmtex-csl))
+           (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl))
+           (caddr tmtex-csl))))
+  tmtex-csl-names*)
+
+(define (tmtex-csl-numeric-textual names keys)
+  ;; Knuth [1, 2], Lamport [3]: the consecutive works of the same names
+  ;; share their citation
+  (let loop ((l keys) (groups '()))
+    (cond ((pair? l)
+           (with n (or (assoc-ref names (car l)) (car l))
+             (if (and (pair? groups) (== (caar groups) n))
+                 (loop (cdr l) (cons (append (car groups) (list (car l)))
+                                     (cdr groups)))
+                 (loop (cdr l) (cons (list n (car l)) groups)))))
+          (else
+           (tex-concat
+            (list-intersperse
+             (map (lambda (g)
+                    `(!concat ,(tmtex (car g)) " "
+                              ,(tex-apply 'cite (tmtex-cite-list (cdr g)))))
+                  (reverse groups))
+             ", "))))))
+
+(tm-define (tmtex-cite-textual s l)
+  (:mode csl-package?)
+  (with names (tmtex-csl-names)
+    (if names (tmtex-csl-numeric-textual names (list-filter l string?))
+        (tex-apply 'textcite (tmtex-cite-list l)))))
+
+(tm-define (tmtex-cite-textual* s l)
+  (:mode csl-package?)
+  (tmtex-cite-textual s l))
+
+(tm-define (tmtex-cite-author s l)
+  (:mode csl-package?)
+  (with names (and (string? (car l)) (tmtex-csl-names))
+    (if names (tmtex (or (assoc-ref names (car l)) (car l)))
+        (tex-apply 'citeauthor (tmtex (car l))))))
+
+(tm-define (tmtex-cite-year s l)
+  (:mode csl-package?)
+  ;; when the citations show no names, the citation itself, [2], as TeXmacs
+  (if (tmtex-csl-names)
+      (tex-apply 'citeyearpar (tmtex (car l)))
+      (tex-apply 'citeyear (tmtex (car l)))))
+
+(tm-define (tmtex-cite-parenthesized s l)
+  (:mode csl-package?)
+  (tex-apply 'parencite (tmtex-cite-list l)))
+
+(tm-define (tmtex-cite-parenthesized* s l)
+  (:mode csl-package?)
+  (tex-apply 'parencite (tmtex-cite-list l)))
+
+(tm-define (tmtex-cite-author* s l)
+  (:mode csl-package?)
+  (tmtex-cite-author s l))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Glossaries
@@ -3382,6 +3727,7 @@
   (show-part (,tmtex-show-part -1))
   ((:or doc-title-options author-data) (,tmtex-default -1))
   (appendix (,tmtex-appendix 1))
+  (emoji (,tmtex-emoji-tag 1))
   (appendix* (,tmtex-appendix* 1))
   ((:or theorem proposition lemma corollary proof axiom definition
         notation conjecture remark note example convention warning
@@ -3407,6 +3753,23 @@
   (jump-in (,tmtex-jump-in 1))
   (algorithm-indent (,tmtex-indent 1))
   ((:or footnote wide-footnote) (,tmtex-footnote 1))
+  ((:or md-source md-block-source md-image md-loose md-metadata)
+   (,tmtex-md-body -1))
+  (md-fence (,tmtex-md-fence -1))
+  (md-footnote (,tmtex-md-footnote -1))
+  (md-footnote-text (,tmtex-md-nothing -1))
+  (md-meta (,tmtex-md-meta -1))
+  (md-h6 (,tmtex-md-h6 -1))
+  ((:or office-par office-span office-plain office-letters office-capitalize
+        office-float office-box office-shape office-field)
+   (,tmtex-office-last -1))
+  (office-font (,tmtex-office-font -1))
+  (office-underline (,tmtex-office-underline -1))
+  (office-strike (,tmtex-office-strike -1))
+  ((:or office-columns office-columns*) (,tmtex-office-columns -1))
+  (office-comment (,tmtex-office-comment -1))
+  (office-commented (,tmtex-office-commented -1))
+  ((:or office-ins office-del) (,tmtex-office-change -1))
   (footnotemark (,tmtex-default 0))
   (footnotemark* (,tmtex-footnotemark 1))
   ((:or description description-compact description-aligned
@@ -3818,17 +4181,25 @@
         (set! tmtex-style (car style))
         (set! tmtex-packages (cdr style))
         (set! tmtex-languages (list lan))
+        (set! tmtex-csl (tmtex-find-csl body))
+        (set! tmtex-csl-names* 'unknown)
+        (set! tmtex-csl-resource
+              (if tmtex-csl (tmtex-csl-default-resource (cadr tmtex-csl)) ""))
         (set! tmtex-colors '())
         (set! tmtex-colormaps '())
         (import-tmtex-styles)
         (tmtex-style-init body)
         (set! doc (tmtex-style-preprocess doc))
-        (with result (tmtex-postprocess (texmacs->latex doc opts))
+        (with result (with-global tmtex-csl-file? #t
+                       (tmtex-postprocess (texmacs->latex doc opts)))
+          ;; tmtex-csl stays for the preamble, made after the conversion
           (set! tmtex-style "generic")
           (set! tmtex-packages '())
           result))
       (let* ((x2 (tree->stree (tmtm-eqnumber->nonumber (stree->tree x))))
              (x3 (tmtm-match-brackets x2)))
+        ;; a snippet has no bibliography of its own
+        (when (not tmtex-csl-file?) (set! tmtex-csl #f))
         (tmtex-initialize opts)
         (with r (tmtex (tmpre-produce x3))
           (if tmtex-mathjax?

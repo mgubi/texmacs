@@ -10,6 +10,9 @@
 ******************************************************************************/
 
 #include "config.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #include "boot.hpp"
 #include "tm_server.hpp"
 #include "drd_std.hpp"
@@ -23,6 +26,7 @@
 #include "socket_notifier.hpp"
 #include "new_style.hpp"
 #include "Database/database.hpp"
+#include "web_files.hpp"
 
 server* the_server= NULL;
 bool texmacs_started= false;
@@ -42,6 +46,9 @@ extern int nr_windows;
 
 #ifdef QTTEXMACS
 void del_obj_qt_renderer(void);
+#endif
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
+void qt_forget_deferred_deletes ();
 #endif
 
 /******************************************************************************
@@ -136,13 +143,31 @@ tm_server_rep::tm_server_rep ()
   gui_interpose (texmacs_interpose_handler);
   set_wait_handler (texmacs_wait_handler);
   if (is_none (tm_init_file))
-    tm_init_file= "$TEXMACS_PATH/progs/init-texmacs.scm";
+    tm_init_file= scheme_init_file ();
   if (is_none (my_init_file))
     my_init_file= "$TEXMACS_HOME_PATH/progs/my-init-texmacs.scm";
   bench_start ("initialize scheme");
   if (exists (tm_init_file)) exec_file (tm_init_file);
   if (exists (my_init_file)) exec_file (my_init_file);
   bench_cumul ("initialize scheme");
+#ifdef __EMSCRIPTEN__
+  // in a page, the JavaScript of the user too (plugins/javascript): run once
+  // TeXmacs has started, out of it, so that it may use TeXmacs.scheme
+  {
+    url js= "$TEXMACS_HOME_PATH/progs/my-init-javascript.js";
+    string code;
+    if (!is_headless () && exists (js) && !load_string (js, code, false)) {
+      c_string c (code);
+      EM_ASM ({
+        var code = UTF8ToString ($0);
+        setTimeout (function () {
+          try { (0, eval) (code); }
+          catch (e) { console.error ('TeXmacs: my-init-javascript.js: ' + e); }
+        }, 0);
+      }, (char*) c);
+    }
+  }
+#endif
   if (my_init_cmds != "") {
     my_init_cmds= "(begin" * my_init_cmds * ")";
     exec_delayed (scheme_cmd (my_init_cmds));
@@ -205,9 +230,9 @@ tm_server_rep::cpu_idle_time () {
 
 void
 tm_server_rep::interpose_handler () {
-#ifdef QTTEXMACS
-  // TeXmacs/Qt handles delayed messages and socket notification
-  // in its own runloop
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
+  // TeXmacs/Qt (and the NS port) handle delayed messages and socket
+  // notification in their own runloop
   //server_listen_connections (0);
   //client_listen_connections (0);
 #ifndef QTPIPES
@@ -219,7 +244,17 @@ tm_server_rep::interpose_handler () {
   reap_pipe_children ();
   exec_pending_commands ();
 #endif
+  process_all_workers (); // the plugins which are Web Workers (browser)
   async_eval_pending ();
+  // (the messages of the language servers, when they are part of the build
+  // and one was started: see lsp_link.cpp)
+  process_all_link_processors ();
+  http_async_pending (); // the requests made with libcurl
+#if !defined (QTTEXMACS) && !defined (AQUATEXMACS)
+  // the plug-ins which make HTTP requests (request_link.cpp, the AI
+  // engines): Qt and Cocoa process them with their pipes (process_all_pipes)
+  process_all_requests ();
+#endif
 
   if (!headless_mode) {
     int i, j;
@@ -340,7 +375,25 @@ quit_texmacs_internal (int code) {
 #ifdef QTTEXMACS
   del_obj_qt_renderer ();
 #endif
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
+  qt_forget_deferred_deletes ();
+#endif
 
+#ifdef __EMSCRIPTEN__
+  // in a page there is nothing to go back to: TeXmacs starts again, once
+  // the home directory (the preferences just saved) is written to the
+  // storage of the browser (see misc/wasm/web-pre.js); headless (node), it
+  // ends as elsewhere. TeXmacs has asked about the unsaved documents: the
+  // page does not ask again (tmFrame.leave, misc/wasm/frame.js)
+  if (!is_headless ()) {
+    emscripten_cancel_main_loop ();
+    EM_ASM ({
+      if (typeof tmFrame !== 'undefined') tmFrame.leave ();
+      FS.syncfs (false, function () { location.reload (); });
+    });
+    return;
+  }
+#endif
 #ifdef ADVANCED_DEVELOPER_MODE
   // Crashes sometimes occur when destructing Qt objects at exit.
   // Developers are invited to investigate this issue.

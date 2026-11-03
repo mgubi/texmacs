@@ -10,6 +10,12 @@
 ******************************************************************************/
 
 #include "glue.hpp"
+#include "build_revision.hpp"
+#include "gui_test.hpp"
+
+// the glue type uint (see build-glue): the C library of macOS declares it,
+// that of the browser build does not (a typedef may be repeated in C++)
+typedef unsigned int uint;
 
 #include "promise.hpp"
 #include "tree.hpp"
@@ -24,11 +30,19 @@
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"
+#ifdef USE_GS
+#include "Ghostscript/gs_utilities.hpp"
+#endif
 #include "locale.hpp"
 #include "iterator.hpp"
 #include "Freetype/tt_tools.hpp"
 #include "Database/database.hpp"
 #include "Sqlite3/sqlite3.hpp"
+#ifdef USE_TREE_SITTER
+#include "TreeSitter/tree_sitter_glue.hpp"
+#include "TreeSitter/syntax_region.hpp"
+#include "TreeSitter/ts_highlight.hpp"
+#endif
 #include "Updater/tm_updater.hpp"
 
 tmscm 
@@ -72,7 +86,7 @@ texmacs_version (string which) {
   if (which == "stable") return TM_STABLE;
   if (which == "devel-release") return TM_DEVEL_RELEASE;
   if (which == "stable-release") return TM_STABLE_RELEASE;
-  if (which == "revision") return TEXMACS_REVISION;
+  if (which == "revision") return get_build_revision ();
   return TEXMACS_VERSION;
 }
 
@@ -124,12 +138,22 @@ get_bounding_rectangle (tree t) {
   return ret;
 }
 
+bool use_mupdf_pdf (); // edit_main.cpp
+
 bool
 supports_native_pdf () {
 #ifdef PDF_RENDERER
   return true;
 #else
+#ifdef MUPDF_RENDERER
+  // The writer on MuPDF is a native PDF renderer too, when it is the one
+  // chosen. Saying so keeps the Scheme side and the C++ side of the same
+  // mind: printer-file-suffix would otherwise ask for PostScript while
+  // use_pdf () was writing a PDF (see docs/pdf-output-with-mupdf.md).
+  return use_mupdf_pdf ();
+#else
   return false;
+#endif
 #endif
 }
 
@@ -139,6 +163,15 @@ supports_ghostscript () {
   return true;
 #else
   return false;
+#endif
+}
+
+string
+get_gs_executable () {
+#ifdef USE_GS
+  return gs_executable ();
+#else
+  return "";
 #endif
 }
 
@@ -441,6 +474,7 @@ tree_remove_node (tree r, int pos) {
 
 tmscm 
 scheme_tree_to_tmscm (scheme_tree t) {
+  tmscm_builder building;
   if (is_atomic (t)) {
     string s= t->label;
     if (s == "#t") return tmscm_true ();
@@ -543,6 +577,7 @@ TMSCM_ASSERT (tmscm_is_path (p), p, arg, rout)
 
 tmscm 
 path_to_tmscm (path p) {
+  tmscm_builder building;
   if (is_nil (p)) return tmscm_null ();
   else return tmscm_cons (int_to_tmscm (p->item), path_to_tmscm (p->next));
 }
@@ -813,6 +848,7 @@ TMSCM_ASSERT (tmscm_is_table_string_string (p), p, arg, rout)
 
 tmscm 
 table_string_string_to_tmscm (hashmap<string,string> t) {
+  tmscm_builder building;
   tmscm p= tmscm_null ();
   iterator<string> it= iterate (t);
   while (it->busy ()) {
@@ -869,6 +905,7 @@ TMSCM_ASSERT (tmscm_is_array_int (p), p, arg, rout)
 
 /* static */ tmscm 
 array_int_to_tmscm (array<int> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (int_to_tmscm (a[i]), p);
@@ -905,6 +942,7 @@ TMSCM_ASSERT (tmscm_is_array_SI (p), p, arg, rout)
 
 /* static */ tmscm 
 array_SI_to_tmscm (array<SI> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (SI_to_tmscm (a[i]), p);
@@ -943,6 +981,7 @@ TMSCM_ASSERT (tmscm_is_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_double_to_tmscm (array<double> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null();
   for (i=n-1; i>=0; i--) p= tmscm_cons (double_to_tmscm (a[i]), p);
@@ -972,6 +1011,7 @@ TMSCM_ASSERT (tmscm_is_array_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_array_double_to_tmscm (array<array_double> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (array_double_to_tmscm (a[i]), p);
@@ -1001,6 +1041,7 @@ TMSCM_ASSERT (tmscm_is_array_array_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_array_array_double_to_tmscm (array<array_array_double> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (array_array_double_to_tmscm (a[i]), p);
@@ -1027,6 +1068,7 @@ TMSCM_ASSERT (tmscm_is_array_string (p), p, arg, rout)
 
 /* static */ tmscm 
 array_string_to_tmscm (array<string> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (string_to_tmscm (a[i]), p);
@@ -1056,6 +1098,7 @@ TMSCM_ASSERT (tmscm_is_array_tree (p), p, arg, rout)
 
 /* static */ tmscm 
 array_tree_to_tmscm (array<tree> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (tree_to_tmscm (a[i]), p);
@@ -1085,6 +1128,7 @@ TMSCM_ASSERT (tmscm_is_array_widget (p), p, arg, rout)
 
 /* static */ tmscm 
 array_widget_to_tmscm (array<widget> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (widget_to_tmscm (a[i]), p);
@@ -1115,6 +1159,7 @@ TMSCM_ASSERT (tmscm_is_array_url (p), p, arg, rout)
 
 /* static */ tmscm 
 array_url_to_tmscm (array<url> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (url_to_tmscm (a[i]), p);
@@ -1145,6 +1190,7 @@ TMSCM_ASSERT (tmscm_is_array_patch (p), p, arg, rout)
 
 /* static */ tmscm 
 array_patch_to_tmscm (array<patch> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (patch_to_tmscm (a[i]), p);
@@ -1174,6 +1220,7 @@ TMSCM_ASSERT (tmscm_is_array_path (p), p, arg, rout)
 
 /* static */ tmscm 
 array_path_to_tmscm (array<path> a) {
+  tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (path_to_tmscm (a[i]), p);
@@ -1209,6 +1256,7 @@ TMSCM_ASSERT (tmscm_is_list_string (p), p, arg, rout)
 
 tmscm 
 list_string_to_tmscm (list_string l) {
+  tmscm_builder building;
   if (is_nil (l)) return tmscm_null ();
   return tmscm_cons (string_to_tmscm (l->item),
            list_string_to_tmscm (l->next));
@@ -1236,6 +1284,7 @@ TMSCM_ASSERT (tmscm_is_list_tree (p), p, arg, rout)
 
 tmscm 
 list_tree_to_tmscm (list_tree l) {
+  tmscm_builder building;
   if (is_nil (l)) return tmscm_null ();
   return tmscm_cons (tree_to_tmscm (l->item),
            list_tree_to_tmscm (l->next));
@@ -1256,10 +1305,16 @@ tmscm_to_list_tree (tmscm p) {
 #include "tm_window.hpp"
 #include "boot.hpp"
 #include "connect.hpp"
+#ifdef USE_LSP
+#include "lsp_link.hpp"
+#endif
+#include "code_lines.hpp"
+#include "code_regions.hpp"
 #include "convert.hpp"
 #include "file.hpp"
 #include "image_files.hpp"
 #include "web_files.hpp"
+#include "zip_files.hpp"
 #include "data_cache.hpp"
 #include "sys_utils.hpp"
 #include "client_server.hpp"
@@ -1294,6 +1349,14 @@ tmscm_to_list_tree (tmscm p) {
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"
 #include "../Glue/glue_server.cpp"
+// (the features of program code which a build may leave out, see
+// src/docs/code-features.md and misc/m4/tm_code.m4)
+#ifdef USE_TREE_SITTER
+#include "../Glue/glue_treesit.cpp"
+#endif
+#ifdef USE_LSP
+#include "../Glue/glue_lsp.cpp"
+#endif
 
 void
 initialize_glue () {
@@ -1308,4 +1371,10 @@ initialize_glue () {
   initialize_glue_basic ();
   initialize_glue_editor ();
   initialize_glue_server ();
+#ifdef USE_TREE_SITTER
+  initialize_glue_treesit ();
+#endif
+#ifdef USE_LSP
+  initialize_glue_lsp ();
+#endif
 }

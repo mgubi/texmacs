@@ -32,6 +32,8 @@ public:
   virtual void set_visibility (bool flag) = 0;
     // Map or unmap the window
   virtual void set_full_screen (bool flag) = 0;
+  // a window above the other windows of TeXmacs (a tool window)
+  inline virtual void set_on_top (bool flag) { (void) flag; }
     // Set or reset full screen mode
   virtual void set_size (SI w, SI h) = 0;
     // Resize the window

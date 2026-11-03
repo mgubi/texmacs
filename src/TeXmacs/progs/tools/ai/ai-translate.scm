@@ -34,12 +34,19 @@
         ((and (tm? out) (tree-pointer->tree tp))
          (let* ((t (tree-pointer->tree tp))
                 (st* (tm->stree t))
-                (out* (cpp-ai-output out model))
-                (out** (cpp-ai-get-body out*))
-                (new-t (decompress-html (car out**) 1)))
-           ;; (a document when the engine put <p>: not nested, #526)
-           (when (== st st*)
-             (tree-replace-paragraph! t new-t)))))
+                (out* (cpp-ai-output out model)))
+           ;; (an error of the engine, a refused key, a quota: said on the
+           ;; status bar, and the translation stops, rather than every
+           ;; paragraph being replaced by the error)
+           (if (and (string? out*) (string-starts? out* "Error:"))
+               (begin
+                 (set-message out* "Translate")
+                 (process-deactivate 'translate))
+               (let* ((out** (cpp-ai-get-body out*))
+                      (new-t (decompress-html (car out**) 1)))
+                 ;; (a document when the engine put <p>: not nested, #526)
+                 (when (== st st*)
+                   (tree-replace-paragraph! t new-t)))))))
   (tree-pointer-detach tp)
   (next))
 
@@ -92,7 +99,12 @@
   (make-process (translate-process-one lan) 'translate))
 
 (tm-define (ai-translate* lan)
-  ((make-translate-process lan)))
+  ;; (without a key, the key is asked, as by ai-translate)
+  (with missing (and (defined? 'ai-key-missing)
+                     (ai-key-missing (get-preference "ai")))
+    (if missing
+        (set-message missing "Translate")
+        ((make-translate-process lan)))))
 
 (tm-define (ai-abort-translate)
   (process-deactivate 'translate))

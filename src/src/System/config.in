@@ -36,6 +36,15 @@
 /* gs lib path relative to TEXMACS_PATH */
 #undef GS_LIB
 
+/* Use the Guile Scheme interpreter */
+#undef USE_GUILE
+
+/* Use the femtolisp interpreter */
+#undef USE_FEMTOLISP
+
+/* Use the S7 Scheme interpreter */
+#undef USE_S7
+
 /* Guile version */
 #undef GUILE_A
 
@@ -126,6 +135,9 @@
 /* Link imlib2 library with TeXmacs */
 #undef LINKED_IMLIB2
 
+/* Link MuPDF library with TeXmacs */
+#undef LINKED_MUPDF
+
 /* Link sqlite3 library with TeXmacs */
 #undef LINKED_SQLITE3
 
@@ -140,6 +152,9 @@
 
 /* Max fast alloc // WORD_LENGTH more than power of 2 */
 #undef MAX_FAST
+
+/* Enabling native MuPDF backend */
+#undef MUPDF_RENDERER
 
 /* Disable fast memory allocator */
 #undef NO_FAST_ALLOC
@@ -216,14 +231,20 @@
 /* Enabling Qt pipes */
 #undef QTPIPES
 
-/* Enable experimental Qt port */
+/* Enable Qt port */
 #undef QTTEXMACS
+
+/* Enable experimental Qt port with Widkit */
+#undef QTWKTEXMACS
 
 /* sanitizers linked */
 #undef SANITIZERS_ON
 
 /* Enable checks style rewriting code */
 #undef SANITY_CHECKS
+
+/* Enable experimental SDL port */
+#undef SDLTEXMACS
 
 /* signtool location */
 #undef SIGNTOOL
@@ -266,6 +287,12 @@
 /* Use axel library */
 #undef USE_AXEL
 
+/* Use language servers */
+#undef USE_LSP
+
+/* Use the syntax trees of tree-sitter */
+#undef USE_TREE_SITTER
+
 /* Use cairo library */
 #undef USE_CAIRO
 
@@ -278,6 +305,9 @@
 /* Use ghostscript */
 #undef USE_GS
 
+/* Use the Guile Scheme interpreter */
+#undef USE_GUILE
+
 /* Use iconv library */
 #undef USE_ICONV
 
@@ -287,8 +317,23 @@
 /* Use intl library */
 #undef USE_INTL
 
+/* Use Metal for the GPU renderer of the Vue port */
+#undef USE_METAL
+
+/* Use MuPDF library */
+#undef USE_MUPDF
+
+/* Make the HTTP requests with libcurl */
+#undef USE_LIBCURL
+
 /* Use resvg library for SVG rendering */
 #undef USE_RESVG
+
+/* Use the S7 Scheme interpreter */
+#undef USE_S7
+
+/* Use SDL3 library */
+#undef USE_SDL3
 
 /* Use Sparkle framework */
 #undef USE_SPARKLE
@@ -298,6 +343,12 @@
 
 /* Use C++ stack backtraces */
 #undef USE_STACK_TRACE
+
+/* Use ThorVG and OpenGL for the Vue renderer */
+#undef USE_THORVG
+
+/* Enable experimental Vue port */
+#undef VUETEXMACS
 
 /* Pointer size */
 #undef WORD_LENGTH

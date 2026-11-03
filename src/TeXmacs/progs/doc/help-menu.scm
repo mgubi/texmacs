@@ -33,6 +33,13 @@
   (when (url-exists-in-help? "about/welcome/new-welcome.en.tm")
 	("Welcome" (load-help-article "about/welcome/new-welcome"))
 	("Getting started" (load-help-article "about/welcome/start"))
+	(when (url-exists-in-help? "about/welcome/upsilon-texmacs.en.tm")
+	  ("Upsilon features"
+	   (load-help-article "about/welcome/upsilon-texmacs")))
+	;; the browser build (web-files is defined by the Vue plugin there)
+	(if (defined? 'web-files)
+	    ("TeXmacs in the browser"
+	     (load-help-article "about/welcome/texmacs-vue")))
 	---)
   (if (detailed-menus?)
       (when (url-exists-in-help? "main/config/man-configuration.en.tm")
@@ -57,6 +64,20 @@
 	     (load-help-article "main/text/man-text"))
 	    ("Mathematical formulas"
 	     (load-help-article "main/math/man-math"))
+	    (-> "Fonts"
+		("Choosing fonts"
+		 (load-help-article "main/text/man-fonts"))
+		("Mathematical fonts"
+		 (load-help-article "main/math/fonts/man-math-fonts"))
+		("How mathematical fonts work"
+		 (load-help-article "main/math/fonts/man-math-fonts-intro"))
+		("The fonts which come with TeXmacs"
+		 (load-help-article "main/math/fonts/man-math-font-catalogue"))
+		("Other mathematical fonts"
+		 (load-help-article "main/math/fonts/man-math-font-others"))
+		---
+		("Fonts, from selection to glyph"
+		 (load-help-buffer "devel/fonts/font-guide")))
 	    ("Tabular material"
 	     (load-help-article "main/table/man-table"))
 	    ("Automatic content generation"
@@ -97,6 +118,22 @@
 	     (load-help-article "main/styles/styles"))
 	    ("Compatibility with other formats"
 	     (load-help-article "main/convert/man-convert"))))
+  (when (url-exists-in-help? "devel/devel.en.tm")
+	(-> "Developer documentation"
+	    ("Browse" (load-help-buffer "devel/devel"))
+	    ---
+	    ("The TeXmacs document format"
+	     (load-help-buffer "devel/format/format"))
+	    ("Writing TeXmacs style files"
+	     (load-help-article "devel/style/style"))
+	    ("The TeXmacs Scheme developer guide"
+	     (load-help-buffer "devel/scheme/scheme"))
+	    ("The TeXmacs plug-in system"
+	     (load-help-article "devel/plugin/plugins"))
+	    ("Interfacing TeXmacs with other programs"
+	     (load-help-buffer "devel/interface/interface"))
+	    ("About the source code of TeXmacs"
+	     (load-help-buffer "devel/source/source"))))
   (-> "Plug-ins"
       (link help-plugins-menu))
   (when (url-exists-in-help? "about/about.en.tm")
@@ -251,6 +288,8 @@
             ("User manual" (load-help-book "main/man-user-manual")))
           ;; (when (url-exists-in-help? "tutorial/tut-tutorial.en.tm")
           ;;   ("Tutorial" (load-help-book "tutorial/tut-tutorial")))
+          (when (url-exists-in-help? "devel/devel.en.tm")
+            ("Developer documentation" (load-help-book "devel/devel")))
           (when (url-exists-in-help? "devel/source/source.en.tm")
             ("Developers guide" (load-help-book "devel/source/source")))
           (when (url-exists-in-help? "devel/scheme/scheme.en.tm")

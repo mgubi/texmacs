@@ -118,6 +118,19 @@
         ((boolean? args) #t)
         (else #f)))
 
+;; S7 expands a quasiquote when it reads it: `(concat "a" ,x ,@l) is read as
+;; (#_list-values (#_quote concat) "a" x (#_apply-values l)), whose heads
+;; are the builtins themselves, not symbols (and `(a . ,b) gives the list*
+;; of S7). These builders only make lists of their arguments: the call is
+;; secure when its arguments are.
+(define s7-quasiquote-builders
+  (if (s7-scheme?)
+      (list (car '`(a ,b)) (car (caddr '`(a ,@b))) (car '`(a . ,b)))
+      '()))
+
+(define s7-quasiquote-quote
+  (and (s7-scheme?) (car (cadr '`(a ,b)))))
+
 (define (secure-expr? expr env)
   (cond ((pair? expr)
          (let* ((f (car expr))
@@ -135,6 +148,9 @@
                   (and (== (car f) 'lambda)
                        (secure-lambda? (cdr f) env)
                        (secure-args? (cdr expr) env)))
+                 ((and s7-quasiquote-quote (eq? f s7-quasiquote-quote)) #t)
+                 ((and (procedure? f) (memq f s7-quasiquote-builders))
+                  (secure-args? (cdr expr) env))
                  (else #f))))
         ((symbol? expr)
          (or (assoc-ref env expr) (property expr :secure)))

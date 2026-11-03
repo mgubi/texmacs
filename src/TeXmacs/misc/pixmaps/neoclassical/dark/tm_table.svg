@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
+ <g id="layer1" transform="translate(0,4)">
+  <path id="path5469" d="m0-2v17h19v-17z" fill="url(#cg0)" fill-opacity=".87923"/>
+  <path id="path5457" d="m0.5-1.5v16h18v-16z" fill="none" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="square"/>
+  <path id="path5459" d="m1.5 2.5h17" fill="none" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="square" stroke-linejoin="round"/>
+  <path id="path5461" d="m1.5 6.5h17" fill="none" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="square" stroke-linejoin="round"/>
+  <path id="path5463" d="m1.5 10.5h17" fill="none" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="square" stroke-linejoin="round"/>
+  <path id="path5465" d="m6.5-1.5v16" fill="none" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="square"/>
+  <path id="path5467" d="m12.5-1.5v16" fill="none" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="square"/>
+ </g>
+</svg>

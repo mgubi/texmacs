@@ -15,7 +15,7 @@
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS)
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>

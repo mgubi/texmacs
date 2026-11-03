@@ -11,123 +11,29 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond ((os-mingw?)
-       (debug-set! stack 0))
-      ((os-macos?)
-       (debug-set! stack 2000000))
-      (else
-       (debug-set! stack 1000000)))
+;; Loaded by init-s7.scm or init-guile.scm, after init-kernel.scm; common
+;; to both interpreters. The initialization file that TeXmacs loads first
+;; is the one of the Scheme backend (scheme_init_file in C++).
 
-(define boot-start (texmacs-time))
-(define remote-client-list (list))
-
-(define developer-mode?
-  (equal? (cpp-get-preference "developer tool" "off") "on"))
-
-(if developer-mode?
-    (debug-enable 'backtrace 'debug))
-
-(define (%new-read-hook sym) (noop)) ; for autocompletion
-
-(define-public macro-keywords '(define-macro define-public-macro 
-                                tm-define-macro))
-(define-public def-keywords
-  `(define-public provide-public
-    tm-define tm-menu menu-bind tm-widget ,@macro-keywords))
-
-(define tm-interactive-hook tm-interactive)
-
-(define old-read read)
-(define (new-read port)
-  "A redefined reader which stores line number and file name in symbols."
-  ;; FIXME: handle overloaded definitions
-  (let ((form (old-read port)))
-    (if (and (pair? form) (member (car form) def-keywords))
-        (let* ((l (source-property form 'line))
-               (c (source-property form 'column))
-               (f (source-property form 'filename))
-               (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
-          (if (symbol? sym) ; Just in case
-              (let ((old (or (symbol-property sym 'defs) '()))
-                    (new `(,f ,l ,c)))
-                (%new-read-hook sym)
-                (if (and (member (car form) macro-keywords)
-                         (not (member sym def-keywords)))
-                    (set! def-keywords (cons sym def-keywords)))
-                (if (not (member new old))
-                    (set-symbol-property! sym 'defs (cons new old)))))))
-    form))
-
-(define old-primitive-load primitive-load)
-(define (new-primitive-load filename)
-  (if (member (scheme-dialect) (list "guile-a" "guile-b"))
-      (old-primitive-load filename)
-      ;; We explicitly circumvent guile's decision to set the current-reader
-      ;; to #f inside ice-9/boot-9.scm, try-module-autoload
-      (with-fluids ((current-reader read))
-                   (old-primitive-load filename))))
-
-(if developer-mode?
-    (begin
-      (module-export! (current-module)
-                      '(%new-read-hook old-read new-read def-keywords))
-      (set! read new-read)
-      (module-export! (current-module)
-                      '(old-primitive-load new-primitive-load))
-      (set! primitive-load new-primitive-load)))
-
-;; TODO: scheme file caching using (set! primitive-load ...) and
-;; (set! %search-load-path)
-
-;;(debug-enable 'backtrace 'debug)
-;; (define load-indent 0)
-;; (define old-primitive-load primitive-load)
-;; (define (new-primitive-load . x)
-;;   (for-each display (make-list load-indent "  "))
-;;   (display "Load ") (apply display x) (display "\n")
-;;   (set! load-indent (+ load-indent 1))
-;;   (apply old-primitive-load x)
-;;   (set! load-indent (- load-indent 1))
-;;   (for-each display (make-list load-indent "  "))
-;;   (display "Done\n"))
-;; (set! primitive-load new-primitive-load)
-
-;(display "Booting TeXmacs kernel functionality\n")
-(if (and (os-mingw?) (string= (gui-version) "qt4"))
-    (load "kernel/boot/boot.scm")
-    (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
-(inherit-modules (kernel boot compat) (kernel boot abbrevs)
-                 (kernel boot debug) (kernel boot srfi)
-                 (kernel boot ahash-table) (kernel boot prologue))
-(inherit-modules (kernel library base) (kernel library list)
-                 (kernel library tree) (kernel library content)
-                 (kernel library patch))
-(inherit-modules (kernel regexp regexp-match) (kernel regexp regexp-select))
-(inherit-modules (kernel logic logic-rules) (kernel logic logic-query)
-                 (kernel logic logic-data))
-(inherit-modules (kernel texmacs tm-define)
-                 (kernel texmacs tm-preferences) (kernel texmacs tm-modes)
-                 (kernel texmacs tm-plugins) (kernel texmacs tm-secure)
-                 (kernel texmacs tm-convert) (kernel texmacs tm-dialogue)
-                 (kernel texmacs tm-language) (kernel texmacs tm-file-system)
-                 (kernel texmacs tm-states))
-(inherit-modules (kernel gui gui-markup)
-                 (kernel gui menu-define) (kernel gui menu-widget)
-                 (kernel gui kbd-define)
-                 (kernel gui speech-define)
-                 (kernel gui kbd-handlers)
-                 (kernel gui menu-test)
-                 (kernel old-gui old-gui-widget)
-                 (kernel old-gui old-gui-factory)
-                 (kernel old-gui old-gui-form)
-                 (kernel old-gui old-gui-test))
-(lazy-define (kernel gui menu-convert) make-menu-widget**)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting utilities\n")
 (use-modules (utils library cpp-wrap))
 (lazy-define (utils library cursor) notify-cursor-moved notify-undo-redo)
+(lazy-define (treesit ts-highlight)
+             treesit-highlighter-request treesit-schedule-updates)
+(lazy-define (utils library cursor) notify-buffer-changed)
+;; the features of program code (src/docs/code-features.md): the folds
+(lazy-define (code code-fold) code-cursor-in-fold code-fold code-unfold
+             code-fold-all code-unfold-all code-folds code-fold-lines
+             code-unfold-lines code-hidden? code-can-fold? code-cursor-lines)
+(lazy-define (code code-navigate) code-go-to-definition code-outline
+             code-outline-entries code-go-to)
+(lazy-menu (code code-navigate) code-definitions-menu)
+(lazy-define (code code-diagnostics) code-next-diagnostic code-set-diagnostics
+             code-clear-diagnostics code-diagnostics code-check-syntax)
+(lazy-define (utils library cursor) notify-buffer-closed)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
@@ -142,6 +48,7 @@
 (lazy-tmfs-handler (utils automate auto-tmfs) automate)
 (lazy-define (utils automate auto-tmfs) auto-load-help)
 (lazy-define (utils misc gui-keyboard) get-keyboard)
+(lazy-define (utils misc file-chooser) open-file-chooser)
 (lazy-keyboard (utils automate auto-kbd) in-auto?)
 (define supports-email? (url-exists-in-path? "mmail"))
 (if supports-email? (use-modules (utils email email-tmfs)))
@@ -152,6 +59,28 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
+(lazy-define (csl csl-bib) csl-style-name? csl-available-styles
+             csl-bib-process csl-cite-details csl-textual-authors)
+(lazy-define (csl csl-style) csl-style-file csl-language->locale)
+(lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
+             zotero-before-update zotero-managed-file?
+             zotero-completion-suffixes zotero-citation-entry
+             zotero-show-item zotero-update-citations
+             zotero-with-retry zotero-pending? zotero-asking?
+             zotero-waiting?
+             zotero-search-opened)
+(lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
+             zotero-import-items zotero-in-database? zotero-search-entries
+             zotero-database-renames
+             zotero-rename-database-entries zotero-database-entry-info
+             zotero-adopt-entries zotero-in-database-search?
+             zotero-mark-results zotero-file-search-results
+             zotero-open-search-tool zotero-search-sources-text
+             zotero-import-citations zotero-import-entry zotero-can-import?
+             zotero-imported? zotero-searching-results zotero-cited
+             zotero-conflict-fields zotero-merge-entries)
+(lazy-menu (bibtex zotero-widgets) zotero-synchronize
+           open-zotero-check open-zotero-settings zotero-key-dialog)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -169,6 +98,8 @@
            print-menu print-menu-inline close-menu)
 (lazy-menu (texmacs menus edit-menu) edit-menu)
 (lazy-menu (texmacs menus view-menu) view-menu texmacs-bottom-toolbars)
+(lazy-menu (texmacs menus footer-menu)
+           texmacs-footer-environment texmacs-footer-path)
 (lazy-menu (texmacs menus tools-menu) tools-menu)
 (lazy-menu (texmacs menus preferences-menu) preferences-menu page-setup-menu)
 (lazy-menu (texmacs menus preferences-widgets)
@@ -268,18 +199,29 @@
            context-preferences-menu insert-math-menu)
 (lazy-initialize (math math-menu) (in-math?))
 (lazy-define (math math-edit) brackets-refresh)
+(lazy-define (math math-symbol-tools)
+             open-math-symbols open-math-symbols-tool)
+(lazy-tool (math math-symbol-tools) math-symbols-tool)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
-(lazy-format (code-format) cpp julia scala java javascript dot json csv)
+(lazy-format (code-format) c cpp julia scala java javascript dot json csv
+             go lean lua rust typescript css toml yaml ocaml haskell shell)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
 (lazy-format (python-format) python)
 (lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
+;; the language servers follow the source files (preference "lsp"), when
+;; they are part of the build (their glue)
+(when (defined? 'lsp-start)
+  (lazy-keyboard (lsp lsp-kbd) in-prog?)
+  (lazy-menu (lsp lsp-kbd) lsp-menu)
+  (when (!= (get-preference "lsp") "off")
+    (delayed (:idle 1000) (module-provide '(lsp lsp-kbd)))))
 (lazy-menu (prog prog-menu) prog-format-menu prog-format-icons prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
@@ -392,11 +334,13 @@
              tmweb-interactive-build tmweb-interactive-update
              open-website-builder)
 (lazy-define (doc apidoc) apidoc-all-modules apidoc-all-symbols)
+(lazy-define (doc source-links) open-source-link)
+(lazy-menu (doc source-links) source-links-menu)
 (lazy-menu (doc apidoc-menu) apidoc-menu)
 (lazy-tmfs-handler (doc docgrep) grep)
 (lazy-tmfs-handler (doc tmdoc) help)
 (lazy-tmfs-handler (doc apidoc) apidoc)
-(define-secure-symbols tmdoc-include youtube-select)
+(define-secure-symbols tmdoc-include youtube-select open-source-link)
 (tm-property (open-website-builder) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
@@ -406,6 +350,8 @@
 (lazy-format (convert tmml init-tmml) tmml)
 (lazy-format (convert latex init-latex) latex)
 (lazy-format (convert html init-html) html)
+(lazy-format (convert markdown init-markdown) markdown)
+(lazy-format (convert office init-office) docx odt)
 (lazy-format (convert bibtex init-bibtex) bibtex)
 (lazy-format (convert images init-images)
              postscript pdf xfig xmgrace svg xpm jpeg ppm gif png pnm)
@@ -415,6 +361,8 @@
 (lazy-define (convert html tmhtml) ext-tmhtml-eqnarray*)
 (define-secure-symbols ext-tmhtml-eqnarray*)
 (lazy-define (convert html tmhtml-expand) tmhtml-env-patch)
+(lazy-define (convert markdown tmmarkdown-expand) tmmarkdown-env-patch)
+(lazy-define (convert office tmoffice-expand) tmoffice-env-patch)
 (lazy-define (convert latex latex-drd) latex-arity latex-type)
 (lazy-define (convert latex tmtex) tmtex-env-patch)
 (lazy-define (convert latex latex-tools) latex-set-virtual-packages
@@ -432,12 +380,13 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting database facilities\n")
-(lazy-define (database db-widget) open-db-chooser)
+(lazy-define (database db-widgets) open-db-chooser)
 (lazy-define (database db-menu) db-show-toolbar)
 (lazy-define (database db-convert) db-url?)
 (lazy-define (database bib-db) zealous-bib-import zealous-bib-export)
 (lazy-define (database bib-manage)
-             bib-import-bibtex bib-compile bib-attach open-bib-chooser)
+             bib-import-bibtex bib-compile bib-attach open-bib-chooser
+             bib-entries-as-bibtex)
 (lazy-define (database bib-local) open-biblio)
 (lazy-define (database ai-agents-db) ai-agents-get-corrector
 	     ai-agents-get-interlocutor ai-agents-get-translator
@@ -457,7 +406,8 @@
 (tm-define-macro (with-wallet . body) (expand-with-wallet body))
 (lazy-define (security wallet wallet-base)
 	     supports-wallet? wallet-initialized?
-	     wallet-on? wallet-off? wallet-get)
+	     wallet-on? wallet-off? wallet-get wallet-set wallet-delete
+	     wallet-add-on-hook)
 (lazy-menu (security wallet wallet-menu) wallet-preferences-widget)
 (lazy-define (security gpg gpg-edit) tree-export-encrypted
 	     tm-gpg-dialogue-passphrase-decrypt-buffer)
@@ -490,7 +440,7 @@
 (lazy-keyboard (link link-kbd) with-linking-tool?)
 (lazy-define (link link-edit) create-unique-id)
 (lazy-define (link link-navigate) link-active-upwards link-active-ids
-             link-follow-ids link-mouse-ids)
+             link-follow-ids link-mouse-ids link-wildcard-candidates)
 (lazy-define (link link-extern) get-constellation
              get-link-locations register-link-locations)
 (lazy-menu (link ref-menu) ref-menu)
@@ -504,6 +454,24 @@
 (lazy-keyboard (version version-kbd) with-versioning-tool?)
 (lazy-keyboard (tools spell spell-kbd) always?)
 (lazy-define (version version-tmfs) update-buffer commit-buffer)
+(lazy-tmfs-handler (version version-tmfs) history revision)
+(lazy-tmfs-handler (version version-git) git commit)
+(lazy-tmfs-handler (version git-blame) blame)
+(lazy-define (version git-drivers) git-merge-driver)
+(lazy-tool (version git-widgets) git-tool version-review-tool)
+(lazy-define (version git-widgets) git-interactive-init git-interactive-clone)
+(lazy-define (version git-base) git-footer)
+(with previous footer-hook
+  ;; NOTE: the Git modules are only loaded for documents inside a working tree
+  (set! footer-hook
+        (lambda (t)
+          (with t* (previous t)
+            (if (and (versioning-tool-active?)
+                     (versioning-directory (current-buffer))
+                     (url-exists? (url-append (versioning-directory
+                                               (current-buffer)) ".git")))
+                (git-footer t*)
+                t*)))))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -525,6 +493,7 @@
 (lazy-define (tools spell spell-lantool) lantool-server supports-lantool?
 	     lantool-check)
 (lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
+(define-secure-symbols update-correct-widget)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
 (lazy-define (tools ai ai-compress) with-compress-table compress-table-callback)
@@ -539,12 +508,26 @@
 ;(display "Booting fonts\n")
 (use-modules (fonts fonts-ec) (fonts fonts-adobe) (fonts fonts-x)
              (fonts fonts-math) (fonts fonts-foreign) (fonts fonts-misc)
-             (fonts fonts-composite) (fonts fonts-truetype))
+             (fonts fonts-composite) (fonts fonts-truetype)
+             (fonts fonts-opentype))
 (lazy-define (fonts font-old-menu)
 	     text-font-menu math-font-menu prog-font-menu)
+(lazy-menu (fonts font-short-menu) document-short-design-font-menu)
+(lazy-define (fonts font-design) open-font-design font-design-apply
+             font-design-parse)
+(lazy-define (fonts font-custom) font-design-label font-design-menu-label)
+(lazy-menu (fonts font-custom) document-custom-font-menu)
+(lazy-tmfs-handler (fonts font-design) font-design)
+(lazy-menu (fonts font-features)
+           text-font-features-menu document-font-features-menu)
+(lazy-define (fonts font-features)
+             font-features-here font-feature-on? font-features-toggle)
 (lazy-define (fonts font-new-widgets)
              open-font-selector open-document-font-selector
              open-document-other-font-selector)
+(lazy-define (fonts font-debug)
+             open-font-inspector toggle-font-colours-by-origin
+             open-font-report)
 (tm-property (open-font-selector) (:interactive #t))
 (tm-property (open-document-font-selector) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -568,3 +551,40 @@
 (delayed (:idle 10000) (autosave-delayed))
 (texmacs-banner)
 ;(display "Initialization done\n")
+
+;; Benchmarks for developers (not run at boot):
+;;   (benchmark-menu-expand), or texmacs.bin -x "(benchmark-manual)"
+
+(tm-define (benchmark-menu-expand)
+  (display "------------------------------------------------------\n")
+  (display "Benchmark menu-expand\n")
+  (let ((start (texmacs-time)))
+  (display (menu-expand '(horizontal (link texmacs-main-icons))))
+  (newline)
+  (display "Time: ") (display (- (texmacs-time) start)) (newline))
+  (display "------------------------------------------------------\n")
+)
+
+
+(tm-define (benchmark-manual)
+(exec-delayed (lambda ()
+(let ((root (url-resolve (url-unix "$TEXMACS_DOC_PATH" "main/man-manual.en.tm") "r"))
+      (start-time (texmacs-time))
+      (update (lambda (cont)
+                (generate-all-aux)
+                (update-current-buffer)
+                (exec-delayed cont))))
+  (tmdoc-expand-help root "book")
+  (exec-delayed
+    (lambda ()
+      (update
+        (lambda ()
+          (update
+            (lambda ()
+              (update
+                (lambda ()
+                  (buffer-pretend-saved (current-buffer))
+                  (display "Timing:") (display (- (texmacs-time) start-time)) (newline)
+                  ;(quit-TeXmacs)
+                  ))))))))))))
+

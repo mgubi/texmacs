@@ -1,0 +1,12 @@
+# The title of the window names the document and marks unsaved changes.
+# Needs -debug-qt-widgets: the checks are the "window title" lines of the
+# log, which must read
+#   window title: No name [<n>]        (the name TeXmacs gives a new buffer)
+#   window title: No name [<n>] *      (after the first change)
+# and never "TeXmacs" (the name the window was created with, kept because
+# SLOT_NAME was not forwarded) nor " *" (the marker without the name).
+wait 6000
+window #2
+wait 500
+text Hello
+wait 1500
