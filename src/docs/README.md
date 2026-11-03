@@ -77,6 +77,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 | File | Contents |
 |---|---|
 | [code-features.md](code-features.md) | Tree-sitter and language servers together: the common mechanism, and how a build degrades without either |
+| [code-lines.md](code-lines.md) | Blocks of lines of code (`code-lines`): large source files, the bridge and the box, and how tree-sitter and the servers work in them |
 | [tree-sitter.md](tree-sitter.md) | Tree-sitter in TeXmacs: survey and design |
 
 ## Plans
