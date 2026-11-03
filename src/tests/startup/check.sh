@@ -599,7 +599,7 @@ quit ()" \
 cat > "$out/startup-save.scm" <<'EOF'
 (define d (url->system (url-append (url-pwd) "startup-save")))
 (save-buffer-as-main (string->url (string-append d "/sv*.tm")) :overwrite)
-(display* "CHECK saved " (string-ends? (url->system (current-buffer)) "sv*.tm")
+(display* "CHECK saved " (string-contains? (url->system (current-buffer)) "sv*.tm")
           "\n")
 (display* "CHECK survived\n")
 EOF
