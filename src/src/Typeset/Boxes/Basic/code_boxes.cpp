@@ -269,13 +269,18 @@ struct code_box_rep: public box_rep {
   hashmap<string,color> cols; // the colours given as variables
   SI       pitch;  // the distance between two lines,
   SI       rpitch; // and between two rows of a line
-  // the lines which have several rows (by their number in the box, in
-  // order), their texts and the starts of their rows when the box was made,
-  // and the depth which the rows add before each of them (and in all:
-  // tall_cum[N(tall_k)])
+  // The special lines (by their number in the box, in order): the lines
+  // which have several rows (their texts and the starts of their rows when
+  // the box was made), and the lines with markup (a box of the line, made
+  // from its line items: tall_box, placed at the line). The depth which they
+  // add (rows, and what a line with markup has above and below a row:
+  // tall_pre, tall_post) is in tall_cum before each of them, and in all at
+  // tall_cum[N(tall_k)]
   array<int>         tall_k;
   array<string>      tall_txt;
   array<array<int> > tall_st;
+  array<box>         tall_box;
+  array<SI>          tall_pre, tall_post;
   array<long long>   tall_cum;
   bool     single; // one row [ra, rb) of the line doc (and ip is its path),
   int      ra, rb; // whose text was one_text
@@ -285,45 +290,50 @@ struct code_box_rep: public box_rep {
                 font fn, pencil pen, code_lexer lx,
                 hashmap<string,color> cols, SI pitch, SI rpitch,
                 array<int> tall_k, array<string> tall_txt,
-                array<array<int> > tall_st, SI width);
+                array<array<int> > tall_st, array<box> tall_box, SI width);
   code_box_rep (path lip, tree one, string text, int ra, int rb, font fn,
                 pencil pen, code_lexer lx, hashmap<string,color> cols,
                 SI width);
   operator tree () { return "code lines"; }
 
   // lines and rows. The tree changes before the next typesetting: the box
-  // draws the wrapped lines as they were (their rows), and the others as
-  // they are, as long as they are there
+  // draws the special lines as they were, and the others as they are, as
+  // long as they are there
   int    nr_lines () { return n; }
   tree   line_tree (int k) {
     if (single) return doc;
     int i= i0 + k;
     return (i < N(doc)? doc[i]: tree ("")); }
-  string line (int k) {
-    if (single) return one_text;
-    int j= tall_lower (k);
-    if (j < N(tall_k) && tall_k[j] == k) return tall_txt[j];
-    tree t= line_tree (k);
-    return is_atomic (t)? t->label: string (""); }
-  path   line_ip (int k) {
-    return single? ip: descend (descend (ip, 0), i0+k); }
   int    tall_lower (int k) {
-    // the number of the lines with several rows before the line k
+    // the number of the special lines before the line k
     int lo= 0, hi= N(tall_k);
     while (lo < hi) {
       int mid= (lo + hi) / 2;
       if (tall_k[mid] < k) lo= mid + 1; else hi= mid;
     }
     return lo; }
+  int    tall_index (int k) {
+    int j= tall_lower (k);
+    return (j < N(tall_k) && tall_k[j] == k)? j: -1; }
+  bool   rich (int k) {
+    if (single) return false;
+    int j= tall_index (k);
+    return j >= 0 && !is_nil (tall_box[j]); }
+  box    rich_box (int k) { return tall_box[tall_index (k)]; }
+  string line (int k) {
+    if (single) return one_text;
+    int j= tall_index (k);
+    if (j >= 0) return tall_txt[j];
+    tree t= line_tree (k);
+    return is_atomic (t)? t->label: string (""); }
+  path   line_ip (int k) {
+    return single? ip: descend (descend (ip, 0), i0+k); }
   array<int> starts (int k) {
     if (single) { array<int> r; r << ra; return r; }
-    int j= tall_lower (k);
-    if (j < N(tall_k) && tall_k[j] == k) return tall_st[j];
+    int j= tall_index (k);
+    if (j >= 0 && is_nil (tall_box[j])) return tall_st[j];
     return code_one_row (); }
-  int    nr_rows (int k) {
-    if (single) return 1;
-    int j= tall_lower (k);
-    return (j < N(tall_k) && tall_k[j] == k)? N(tall_st[j]): 1; }
+  int    nr_rows (int k) { return N(starts (k)); }
   int    row_end (int k, int i) {
     if (single) return rb;
     array<int> st= starts (k);
@@ -333,10 +343,16 @@ struct code_box_rep: public box_rep {
     int i= N(st) - 1;
     while (i > 0 && st[i] > pos) i--;
     return i; }
-  // the depth of the baseline of the row i of the line k below the first
+  // the depth of the baseline of the row i of the line k below the first,
+  // and the top of the line
   long long depth (int k, int i) {
-    long long extra= (N(tall_cum) == 0? 0: tall_cum[tall_lower (k)]);
+    int j= tall_lower (k);
+    long long extra= (N(tall_cum) == 0? 0: tall_cum[j]);
+    if (j < N(tall_k) && tall_k[j] == k) extra += tall_pre[j];
     return (long long) k * pitch + extra + (long long) i * rpitch; }
+  long long top (int k) {
+    int j= tall_index (k);
+    return depth (k, 0) - fn->y2 - (j >= 0? tall_pre[j]: 0); }
   SI     base (int k, int i) { return (SI) -depth (k, i); }
   void   row_at (SI y, int& k, int& i);
   box    row_box (int k, int i) {
@@ -344,17 +360,17 @@ struct code_box_rep: public box_rep {
     return text_box (line_ip (k), a, line (k) (a, b), fn, pen); }
 
   // The lines are not children for what goes through all the children
-  // (subnr is 0: drawing, positioning), but a box path (k, pos) leads to a
-  // box of the line k, made when it is asked for, at its place
+  // (subnr is 0: drawing, positioning), but a box path (k, ...) leads to a
+  // box of the line k: made when it is asked for (its rows), or the box of
+  // a line with markup, at its place
   box    subbox (int k);
 
   void      display (renderer ren);
   path      find_box_path (SI x, SI y, SI delta, bool force, bool& found);
   path      find_lip ();
   path      find_rip ();
-  path      find_left_box_path () { return path (0, single? ra: 0); }
-  path      find_right_box_path () {
-    return path (nr_lines () - 1, single? rb: N (line (nr_lines () - 1))); }
+  path      find_left_box_path ();
+  path      find_right_box_path ();
   path      find_box_path (path p, bool& found);
   path      find_tree_path (path bp);
   cursor    find_cursor (path bp);
@@ -366,22 +382,47 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
                             hashmap<string,color> cols2, SI pitch2,
                             SI rpitch2, array<int> tall_k2,
                             array<string> tall_txt2,
-                            array<array<int> > tall_st2, SI width):
+                            array<array<int> > tall_st2,
+                            array<box> tall_box2, SI width):
   box_rep (ip2), doc (doc2), i0 (i02), n (max (n2, 1)),
   fn (fn2), pen (pen2), lx (lx2), cols (cols2), pitch (pitch2),
   rpitch (rpitch2), tall_k (tall_k2), tall_txt (tall_txt2),
-  tall_st (tall_st2), single (false), ra (0), rb (0)
+  tall_st (tall_st2), tall_box (tall_box2), single (false), ra (0), rb (0)
 {
-  if (N(tall_k) > 0) {
-    tall_cum= array<long long> (N(tall_k) + 1);
-    tall_cum[0]= 0;
-    for (int j=0; j<N(tall_k); j++)
-      tall_cum[j+1]= tall_cum[j] + (long long) (N(tall_st[j]) - 1) * rpitch;
+  int t= N(tall_k);
+  tall_pre = array<SI> (t);
+  tall_post= array<SI> (t);
+  for (int j=0; j<t; j++) {
+    box b= tall_box[j];
+    tall_pre[j] = (is_nil (b)? 0: max ((SI) 0, b->y2 - fn->y2));
+    tall_post[j]= (is_nil (b)? 0: max ((SI) 0, fn->y1 - b->y1));
   }
+  if (t > 0) {
+    tall_cum= array<long long> (t + 1);
+    tall_cum[0]= 0;
+    for (int j=0; j<t; j++)
+      tall_cum[j+1]= tall_cum[j] + tall_pre[j] + tall_post[j] +
+                     (long long) (N(tall_st[j]) - 1) * rpitch;
+  }
+  // the lines with markup at their places
+  for (int j=0; j<t; j++)
+    if (!is_nil (tall_box[j])) {
+      tall_box[j]->x0= 0;
+      tall_box[j]->y0= base (tall_k[j], 0);
+    }
+  int jl= tall_index (n-1);
   x1= x3= 0;
   x2= x4= width;
-  y1= y3= base (n-1, nr_rows (n-1) - 1) + fn->y1;
-  y2= y4= fn->y2;
+  y1= y3= base (n-1, nr_rows (n-1) - 1) + fn->y1 -
+          (jl >= 0? tall_post[jl]: 0);
+  y2= y4= fn->y2 + (tall_index (0) >= 0? tall_pre[tall_index (0)]: 0);
+  for (int j=0; j<t; j++)
+    if (!is_nil (tall_box[j])) {
+      box b= tall_box[j];
+      x1= min (x1, b->x1); x2= max (x2, b->x2);
+      x3= min (x3, b->x0 + b->x3); x4= max (x4, b->x0 + b->x4);
+      y3= min (y3, b->y0 + b->y3); y4= max (y4, b->y0 + b->y4);
+    }
 }
 
 code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
@@ -399,27 +440,28 @@ code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
 
 void
 code_box_rep::row_at (SI y, int& k, int& i) {
-  // the row whose middle is the nearest to y
-  int n= nr_lines ();
+  // the row whose band (from half way to the row above to half way to the
+  // row below) has y
   if (single) { k= 0; i= 0; return; }
-  long long q= (long long) (fn->y1 + fn->y2) / 2 - (long long) y;
-  // the last line which starts above q (a binary search on the depths)
+  long long q= - (long long) y;
+  long long gap= (long long) pitch - (fn->y2 - fn->y1);
+  if (gap < 0) gap= 0;
+  // the last line whose top (half the gap above it) is above q
   int lo= 0, hi= n-1;
   while (lo < hi) {
     int mid= (lo + hi + 1) / 2;
-    if (depth (mid, 0) <= q) lo= mid; else hi= mid - 1;
+    if (top (mid) - gap / 2 <= q) lo= mid; else hi= mid - 1;
   }
   k= lo;
+  if (rich (k)) { i= 0; return; }
+  long long rgap= (long long) rpitch - (fn->y2 - fn->y1);
+  if (rgap < 0) rgap= 0;
+  long long d= q - (depth (k, 0) - fn->y2 - rgap / 2);
+  long long ri= d / (rpitch > 0? rpitch: 1);
   int r= nr_rows (k);
-  long long d= q - depth (k, 0);
-  long long ri= (d + rpitch/2) / (rpitch > 0? rpitch: 1);
   if (ri < 0) ri= 0;
   if (ri > r-1) ri= r-1;
   i= (int) ri;
-  if (k+1 < n) {
-    long long d1= q - depth (k, i), d2= depth (k+1, 0) - q;
-    if (d1 > 0 && d2 < d1) { k= k+1; i= 0; }
-  }
 }
 
 box
@@ -430,12 +472,14 @@ code_box_rep::subbox (int k) {
     b->x0= 0; b->y0= 0;
     return b;
   }
+  if (rich (k)) return rich_box (k);
   array<int> tk;
   array<string> tt;
   array<array<int> > ts;
-  if (nr_rows (k) > 1) { tk << 0; tt << line (k); ts << starts (k); }
+  array<box> tb;
+  if (nr_rows (k) > 1) { tk << 0; tt << line (k); ts << starts (k); tb << box (); }
   box b= tm_new<code_box_rep> (ip, doc, i0+k, 1, fn, pen, lx, cols,
-                               pitch, rpitch, tk, tt, ts, x2);
+                               pitch, rpitch, tk, tt, ts, tb, x2);
   b->x0= 0; b->y0= base (k, 0);
   return b;
 }
@@ -453,6 +497,12 @@ code_box_rep::display (renderer ren) {
   row_at (cy1 - (fn->y2 - fn->y1), kb, ib); // those partly visible)
   color fg= pen->get_color ();
   for (int k= ka; k <= kb; k++) {
+    if (rich (k)) {
+      // a line with markup: its box, which draws its children
+      rectangles rs;
+      rich_box (k)->redraw (ren, path (), rs);
+      continue;
+    }
     tree t= line_tree (k);
     string s= line (k);
     if (!is_atomic (t) || N(s) == 0) continue;
@@ -495,13 +545,19 @@ code_box_rep::display (renderer ren) {
 }
 
 /******************************************************************************
-* Cursor and selection, by the row and then by a text box of the row
+* Cursor and selection, by the row and then by a text box of the row (or by
+* the box of a line with markup)
 ******************************************************************************/
 
 path
 code_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
   int k, i;
   row_at (y, k, i);
+  if (rich (k)) {
+    box b= rich_box (k);
+    return path (k, b->find_box_path (x - b->x0, y - b->y0, delta, force,
+                                      found));
+  }
   int a= starts (k) [i];
   box rb= row_box (k, i);
   path bp= rb->find_box_path (x, y - base (k, i), delta, force, found);
@@ -511,18 +567,33 @@ code_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
 
 path
 code_box_rep::find_lip () {
+  if (rich (0)) return rich_box (0)->find_lip ();
   return descend (line_ip (0), single? ra: 0);
 }
 
 path
 code_box_rep::find_rip () {
   int k= nr_lines () - 1;
+  if (rich (k)) return rich_box (k)->find_rip ();
   return descend (line_ip (k), single? rb: N (line (k)));
 }
 
 path
+code_box_rep::find_left_box_path () {
+  if (rich (0)) return path (0, rich_box (0)->find_left_box_path ());
+  return path (0, single? ra: 0);
+}
+
+path
+code_box_rep::find_right_box_path () {
+  int k= nr_lines () - 1;
+  if (rich (k)) return path (k, rich_box (k)->find_right_box_path ());
+  return path (k, single? rb: N (line (k)));
+}
+
+path
 code_box_rep::find_box_path (path p, bool& found) {
-  // p: a path in the edit tree; the lines are at reverse (ip) * (0, i, pos)
+  // p: a path in the edit tree; the lines are at reverse (ip) * (0, i, ...)
   found= false;
   path me= reverse (ip);
   if (!is_accessible (ip)) return path (0, 0);
@@ -538,11 +609,15 @@ code_box_rep::find_box_path (path p, bool& found) {
     }
     return path (0, ra);
   }
-  if (N(p) == N(me) + 3 && path_up (p, 3) == me && p[N(me)] == 0) {
-    int i= p[N(me)+1], pos= last_item (p);
+  if (N(p) >= N(me) + 2 && head (p, N(me)) == me && p[N(me)] == 0) {
+    int i= p[N(me)+1];
     if (i >= i0 && i < i0 + nr_lines ()) {
-      found= true;
-      return path (i - i0, max (0, min (pos, N (line (i - i0)))));
+      int k= i - i0;
+      if (rich (k)) return path (k, rich_box (k)->find_box_path (p, found));
+      if (N(p) == N(me) + 3) {
+        found= true;
+        return path (k, max (0, min (last_item (p), N (line (k)))));
+      }
     }
   }
   if (N(p) == N(me) + 1 && path_up (p) == me) {
@@ -560,6 +635,9 @@ code_box_rep::find_tree_path (path bp) {
     return reverse (find_rip ());
   }
   int k= max (0, min (bp->item, nr_lines () - 1));
+  if (rich (k))
+    return rich_box (k)->find_tree_path (is_nil (bp->next)? path (0):
+                                                             bp->next);
   int pos= is_nil (bp->next)? 0: bp->next->item;
   int lo= (single? ra: 0), hi= (single? rb: N (line (k)));
   return reverse (descend (line_ip (k), max (lo, min (pos, hi))));
@@ -570,6 +648,13 @@ code_box_rep::find_cursor (path bp) {
   if (is_atom (bp))
     bp= (bp->item == 0? find_left_box_path (): find_right_box_path ());
   int k= max (0, min (bp->item, nr_lines () - 1));
+  if (rich (k)) {
+    box b= rich_box (k);
+    cursor cu= b->find_cursor (is_nil (bp->next)? path (0): bp->next);
+    cu->ox += b->x0;
+    cu->oy += b->y0;
+    return cu;
+  }
   int pos= is_nil (bp->next)? 0: bp->next->item;
   int i= row_of (k, pos);
   int a= starts (k) [i];
@@ -583,31 +668,31 @@ code_box_rep::find_selection (path lbp, path rbp) {
   if (is_atom (lbp)) lbp= find_left_box_path ();
   if (is_atom (rbp)) rbp= find_right_box_path ();
   int k1= lbp->item, k2= rbp->item;
-  int p1= is_nil (lbp->next)? 0: lbp->next->item;
-  int p2= is_nil (rbp->next)? 0: rbp->next->item;
-  if (k1 > k2 || (k1 == k2 && p1 > p2)) return find_selection (rbp, lbp);
-  int r1= row_of (k1, p1), r2= row_of (k2, p2);
-  if (k1 == k2 && r1 == r2) {
-    int a= starts (k1) [r1];
-    selection sel= row_box (k1, r1)->find_selection (path (p1 - a),
-                                                      path (p2 - a));
-    return selection (translate (sel->rs, 0, base (k1, r1)),
+  if (k1 == k2 && rich (k1)) {
+    box b= rich_box (k1);
+    selection sel= b->find_selection (lbp->next, rbp->next);
+    return selection (translate (sel->rs, b->x0, b->y0),
                       find_tree_path (lbp), find_tree_path (rbp));
   }
+  int p1= is_nil (lbp->next)? 0: lbp->next->item;
+  int p2= is_nil (rbp->next)? 0: rbp->next->item;
+  if (k1 > k2 || (k1 == k2 && !rich (k1) && p1 > p2))
+    return find_selection (rbp, lbp);
+  if (k1 == k2 && row_of (k1, p1) == row_of (k2, p2)) {
+    int r= row_of (k1, p1), a= starts (k1) [r];
+    selection sel= row_box (k1, r)->find_selection (path (p1 - a),
+                                                     path (p2 - a));
+    return selection (translate (sel->rs, 0, base (k1, r)),
+                      find_tree_path (lbp), find_tree_path (rbp));
+  }
+  // from the first cursor to the right, the rows between, from the left to
+  // the second cursor
   cursor c1= find_cursor (lbp), c2= find_cursor (rbp);
-  SI top = fn->y2, bot= fn->y1;
-  // the rest of the first row, the rows between, the start of the last
-  int k1n= k1, r1n= r1 + 1;
-  if (r1n >= nr_rows (k1)) { k1n= k1 + 1; r1n= 0; }
-  int k2p= k2, r2p= r2 - 1;
-  if (r2p < 0) { k2p= k2 - 1; r2p= nr_rows (k2p) - 1; }
-  rectangles rs (rectangle (x1, base (k2, r2) + bot, c2->ox,
-                            base (k2, r2) + top));
-  if (k1n < k2 || (k1n == k2 && r1n < r2))
-    rs= rectangles (rectangle (x1, base (k2p, r2p) + bot, x2,
-                               base (k1n, r1n) + top), rs);
-  rs= rectangles (rectangle (c1->ox, base (k1, r1) + bot, x2,
-                             base (k1, r1) + top), rs);
+  SI top= fn->y2, bot= fn->y1;
+  rectangles rs (rectangle (x1, c2->oy + bot, c2->ox, c2->oy + top));
+  if (c2->oy + top < c1->oy + bot)
+    rs= rectangles (rectangle (x1, c2->oy + top, x2, c1->oy + bot), rs);
+  rs= rectangles (rectangle (c1->ox, c1->oy + bot, x2, c1->oy + top), rs);
   return selection (rs, find_tree_path (lbp), find_tree_path (rbp));
 }
 
@@ -619,10 +704,10 @@ box
 code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
           code_lexer lx, hashmap<string,color> cols, SI pitch, SI rpitch,
           array<int> tall_k, array<string> tall_txt,
-          array<array<int> > tall_st, SI width) {
+          array<array<int> > tall_st, array<box> tall_box, SI width) {
   return tm_new<code_box_rep> (ip, doc, i0, n, fn, pen, lx, cols,
                                pitch, rpitch, tall_k, tall_txt, tall_st,
-                               width);
+                               tall_box, width);
 }
 
 box

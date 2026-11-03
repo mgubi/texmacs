@@ -81,12 +81,13 @@ CONCRETE_NULL_CODE(code_lexer);
 // the starts of the rows of the text s, at most width wide
 array<int> code_breaks (string s, font fn, SI width);
 
-// the lines i0, ..., i0+n-1 of doc (the lines tall_k of the box have the
-// texts tall_txt, broken into rows at tall_st)
+// the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
+// have the texts tall_txt, broken into rows at tall_st, or, for the lines
+// with markup, the boxes tall_box)
 box code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
               code_lexer lx, hashmap<string,color> cols, SI pitch,
               SI rpitch, array<int> tall_k, array<string> tall_txt,
-              array<array<int> > tall_st, SI width);
+              array<array<int> > tall_st, array<box> tall_box, SI width);
 
 // the row [a, b) of the line with the text text, whose path is lip
 box code_row_box (path lip, tree line, string text, int a, int b, font fn,

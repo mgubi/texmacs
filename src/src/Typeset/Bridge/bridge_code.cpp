@@ -38,8 +38,9 @@ static const char* code_color_vars[]= {
 * one box per row (the pager breaks the pages between them). A line wider
 * than the paragraph is broken into rows (soft line breaks: code_breaks):
 * the rows of a line are the lines of a paragraph, the lines of the block
-* the paragraphs of a document. The lines do not change the environment,
-* which is the same everywhere inside.
+* the paragraphs of a document. A line with markup is typeset by the
+* concater, and its items are put on the grid (see rich_paragraph). The
+* lines do not change the environment, which is the same everywhere inside.
 *
 * The bridge keeps a record of each line which needs one (recs): the soft
 * line breaks of a line which may be too wide, a line with markup, and, in
@@ -78,7 +79,12 @@ struct code_rec_rep: concrete_struct {
   array<box>         rows;   // the boxes of the rows
   array<box>         bs;     // the lines of the page which they are in
   array<page_item>   its;    // as they are stacked before another line
-  code_rec_rep (): wsig (0), psig (0) {}
+  // (a line with markup: its rows are typeset as a paragraph, with this
+  // border, and its items are as they are in the paragraph)
+  bool               rich;
+  stack_border       psb;
+  int                pass;   // (the pass in which it was typeset)
+  code_rec_rep (): wsig (0), psig (0), rich (false), pass (-1) {}
 };
 
 class code_rec {
@@ -101,6 +107,7 @@ public:
   code_lexer      lexer;   // the colours of the syntax
   bool            recs_ok; // they are at the places of the lines
   code_end first, last;    // the paragraphs of the first and the last line
+  int      passes;         // the passes of typeset_paper
 
   void lines_inserted (int pos, int nr);
   void lines_removed (int pos, int nr);
@@ -115,8 +122,13 @@ public:
                       array<page_item>& l, stack_border& sb);
   void typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
                       hashmap<string,color> cols, SI width, SI cw,
-                      unsigned long long wsig);
-  void typeset_paragraphs (array<array<box> > pars);
+                      unsigned long long wsig, SI cell, SI rpitch);
+  void typeset_paragraphs (tree doc, array<array<box> > pars, SI width,
+                           SI cell);
+  void rich_paragraph (tree& t, path lip, SI width, SI cell,
+                       array<line_item> before, array<line_item> after,
+                       array<page_item>& l, stack_border& sb);
+  box  rich_box (tree& t, path lip, SI width, SI cell);
 
 public:
   bridge_code_rep (typesetter ttt, tree st, path ip);
@@ -134,7 +146,7 @@ public:
 };
 
 bridge_code_rep::bridge_code_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), recs_ok (false) {}
+  bridge_rep (ttt, st, ip), recs_ok (false), passes (0) {}
 
 bridge
 bridge_code (typesetter ttt, tree st, path ip) {
@@ -452,6 +464,19 @@ bridge_code_rep::my_typeset (int desired_status) {
     if (cw <= 0) cw= fn->wfn;
   }
   width= max (width, 8 * cw);
+  // the width of a cell of the grid (a character of the font) and the
+  // distances between the lines and between the rows of a line (the lines
+  // and the paragraphs of a document)
+  SI cell= 0;
+  {
+    SI xp[5];
+    fn->get_xpositions ("mmmm", xp);
+    cell= xp[4] / 4;
+    if (cell <= 0) cell= cw;
+  }
+  SI height= env->as_length (string ("1fn")) + env->get_length (PAR_SEP);
+  SI pitch = height + env->get_vspace (PAR_PAR_SEP)->def;
+  SI rpitch= height + env->get_vspace (PAR_LINE_SEP)->def;
 
   // the colours of the syntax, which are drawn when the lines are
   hashmap<string,color> cols;
@@ -520,7 +545,8 @@ bridge_code_rep::my_typeset (int desired_status) {
   }
 
   if (paper) {
-    typeset_paper (doc, fn, env->pen, lexer, cols, width, cw, wsig);
+    typeset_paper (doc, fn, env->pen, lexer, cols, width, cw, wsig,
+                   cell, rpitch);
     return;
   }
   first.b= box ();
@@ -530,6 +556,10 @@ bridge_code_rep::my_typeset (int desired_status) {
   array<array<box> > pars;
   if (ttt->paper)
     for (int i=0; i<n; i++) {
+      if (!is_atomic (doc[i])) {
+        pars << array<box> ();
+        continue;
+      }
       array<int> st= (is_nil (recs[i])? one_row[0]: recs[i]->starts);
       path lip= descend (descend (ip, 0), i);
       string text= (is_atomic (doc[i])? doc[i]->label: string (""));
@@ -542,38 +572,50 @@ bridge_code_rep::my_typeset (int desired_status) {
     }
   else {
     // the rows of a line as the lines of a paragraph, the lines as the
-    // paragraphs of a document
-    SI height= env->as_length (string ("1fn")) + env->get_length (PAR_SEP);
-    SI pitch = height + env->get_vspace (PAR_PAR_SEP)->def;
-    SI rpitch= height + env->get_vspace (PAR_LINE_SEP)->def;
+    // paragraphs of a document; a line with markup is a box of its items
     array<int> tall_k;
     array<string> tall_txt;
     array<array<int> > tall_st;
+    array<box> tall_box;
     for (int i=0; i<n; i++)
-      if (!is_nil (recs[i]) && N(recs[i]->starts) > 1) {
+      if (!is_atomic (doc[i])) {
+        tall_k << i;
+        tall_txt << string ("");
+        tall_st << one_row[0];
+        tall_box << rich_box (doc[i], descend (descend (ip, 0), i), width,
+                              cell);
+      }
+      else if (!is_nil (recs[i]) && N(recs[i]->starts) > 1) {
         tall_k << i;
         tall_txt << recs[i]->text;
         tall_st << recs[i]->starts;
+        tall_box << box ();
       }
     array<box> one;
     one << code_box (ip, doc, 0, n, fn, env->pen, lexer, cols,
-                     pitch, rpitch, tall_k, tall_txt, tall_st, width);
+                     pitch, rpitch, tall_k, tall_txt, tall_st, tall_box,
+                     width);
     pars << one;
   }
-  typeset_paragraphs (pars);
+  typeset_paragraphs (doc, pars, width, cell);
 }
 
 void
-bridge_code_rep::typeset_paragraphs (array<array<box> > pars) {
-  // each line as a paragraph of its rows, with the line items of the bridges
-  // around before the first and after the last
+bridge_code_rep::typeset_paragraphs (tree doc, array<array<box> > pars,
+                                     SI width, SI cell) {
+  // each line as a paragraph of its rows (no rows: a line with markup, as
+  // the paragraph of its items), with the line items of the bridges around
+  // before the first and after the last
   int N1= N(pars) - 1;
   for (int i=0; i<N(pars); i++) {
     array<page_item> l;
     stack_border sb;
-    code_paragraph (env, ip, pars[i],
-                    i == 0? ttt->a: array<line_item> (),
-                    i == N1? ttt->b: array<line_item> (), l, sb);
+    array<line_item> before= (i == 0? ttt->a: array<line_item> ());
+    array<line_item> after = (i == N1? ttt->b: array<line_item> ());
+    if (N(pars[i]) == 0 && N(doc) > 1 && !is_atomic (doc[i]))
+      rich_paragraph (doc[i], descend (descend (ip, 0), i), width, cell,
+                      before, after, l, sb);
+    else code_paragraph (env, ip, pars[i], before, after, l, sb);
     ttt->insert_stack (l, sb);
   }
 }
@@ -581,6 +623,126 @@ bridge_code_rep::typeset_paragraphs (array<array<box> > pars) {
 /******************************************************************************
 * Paper mode: the lines which did not change are used again
 ******************************************************************************/
+
+/******************************************************************************
+* Lines with markup: the line items on the grid
+*
+* A line which is not a string is typeset by the concater (typeset_concat),
+* and its line items are put on the grid of the cells, in order, and made a
+* paragraph (lazy_paragraph: the decorations of the items, as an underline,
+* are those of a paragraph). A string whose characters are a cell wide
+* (strong, em, a colour, a macro which only changes them...) takes a cell for
+* each character; a string in another font (a bold font which is wider) is
+* split into its characters, each in its cell; any other box (math, an
+* image...) takes the cells which it needs; the spaces after an item take
+* theirs. An item is put at its cell by the space after the item before it
+* (which cannot stretch), and the line is broken (next-line) before an item
+* which does not fit. The items are the boxes of the concater, with their
+* paths: the cursor and the edits go into them. The paragraph is the one of
+* the line in paper mode, and its lines are the box of the line otherwise.
+******************************************************************************/
+
+void
+bridge_code_rep::rich_paragraph (tree& t, path lip, SI width, SI cell,
+                                 array<line_item> before,
+                                 array<line_item> after,
+                                 array<page_item>& l, stack_border& sb) {
+  array<line_item> items= typeset_concat (env, t, lip);
+  path eip= decorate_middle (lip);
+  int cols= max (1, (int) (width / cell));
+  array<line_item> a;
+  SI x= 0;  // where the paragraph puts the next item
+  int col= 0;
+  auto put= [&] (line_item it, SI want) {
+    if (N(a) > 0) a[N(a)-1]->spc= space (want - x);
+    it->spc= space (0);
+    if (it->type != CONTROL_ITEM) it->penalty= HYPH_INVALID;
+    a << it;
+    x= want + it->b->x2;
+  };
+  auto new_row= [&] () {
+    put (line_item (CONTROL_ITEM, OP_SKIP, empty_box (eip), HYPH_INVALID,
+                    tree (NEXT_LINE)), x);
+    x= 0;
+    col= 0;
+  };
+  for (int i=0; i<N(items); i++) {
+    line_item it= items[i];
+    SI sp= it->spc->def;
+    box ib= it->b;
+    if (it->type == CONTROL_ITEM || it->type == FLOAT_ITEM ||
+        it->type == NOTE_LINE_ITEM || it->type == NOTE_PAGE_ITEM ||
+        it->type == MARKER_ITEM) {
+      put (it, x);
+    }
+    else if (ib->get_type () == TEXT_BOX &&
+             N(ib->get_leaf_string ()) > 0) {
+      string str= ib->get_leaf_string ();
+      int g= tm_string_length (str);
+      SI d= ib->x2 - (SI) g * cell;
+      if (col > 0 && col + g > cols) new_row ();
+      if (d <= cell / 8 && d >= -cell / 8) put (it, (SI) col * cell);
+      else {
+        // its characters, each in its cell
+        int pos= ib->get_leaf_left_pos (), k= 0;
+        font f= ib->get_leaf_font ();
+        pencil pn= ib->get_leaf_pencil ();
+        for (int u=0; u<N(str); k++) {
+          int v= u;
+          tm_char_forwards (str, v);
+          box cb= text_box (ib->ip, pos + u, str (u, v), f, pn);
+          put (line_item (STRING_ITEM, OP_TEXT, cb, HYPH_INVALID, it->lan),
+               (SI) (col + k) * cell + (cell - cb->x2) / 2);
+          u= v;
+        }
+      }
+      col += g;
+    }
+    else {
+      SI w= ib->x2 - min (ib->x1, (SI) 0);
+      int cells= (w <= 0? 0: (int) ((w + cell - 1) / cell));
+      if (cells > 0 && col > 0 && col + cells > cols) new_row ();
+      put (it, (SI) col * cell - min (ib->x1, (SI) 0));
+      col += cells;
+    }
+    if (sp > 0) col += max (1, (int) ((sp + cell / 2) / cell));
+  }
+  lazy_paragraph par (env, ip);
+  par->a= copy (before); // (<< below would append to 'before')
+  par->a << a;
+  par->a << after;
+  par->format_paragraph ();
+  l= par->sss->l;
+  sb= par->sss->sb;
+  code_rows_made += N(l);
+}
+
+box
+bridge_code_rep::rich_box (tree& t, path lip, SI width, SI cell) {
+  // the lines of the paragraph of the line, the first baseline at 0
+  array<page_item> l;
+  stack_border sb;
+  rich_paragraph (t, lip, width, cell, array<line_item> (),
+                  array<line_item> (), l, sb);
+  array<box> bs;
+  array<SI> xs, ys;
+  SI y= 0;
+  box prev;
+  space prev_spc;
+  for (int i=0; i<N(l); i++) {
+    if (l[i]->type != PAGE_LINE_ITEM) continue;
+    box b= l[i]->b;
+    if (!is_nil (prev)) y -= -prev->y1 + prev_spc->def + b->y2;
+    bs << b; xs << (SI) 0; ys << y;
+    prev= b;
+    prev_spc= l[i]->spc;
+  }
+  if (N(bs) == 0) {
+    bs << empty_box (decorate_middle (lip), 0, env->fn->y1, 0, env->fn->y2);
+    xs << (SI) 0; ys << (SI) 0;
+  }
+  return composite_box (decorate_middle (lip), bs, xs, ys);
+}
 
 void
 bridge_code_rep::end_paragraph (code_end& e, array<box> rows,
@@ -601,7 +763,8 @@ bridge_code_rep::end_paragraph (code_end& e, array<box> rows,
 void
 bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
                                 hashmap<string,color> cols, SI width, SI cw,
-                                unsigned long long wsig) {
+                                unsigned long long wsig, SI cell,
+                                SI rpitch) {
   int n= N(doc);
   path dip= descend (ip, 0);
   auto line_path= [&] (int i) -> path {
@@ -614,6 +777,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   auto make_rows= [&] (int i, path lip) -> array<box> {
     // the boxes of the rows of the line i (it has a record: see my_typeset)
     code_rec r= recs[i];
+    if (!is_atomic (doc[i])) return array<box> (); // (see typeset_paragraphs)
     array<int> st= r->starts;
     int len= N(r->text);
     array<box> rows;
@@ -627,7 +791,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   auto all_paragraphs= [&] () {
     array<array<box> > pars;
     for (int i=0; i<n; i++) pars << make_rows (i, line_path (i));
-    typeset_paragraphs (pars);
+    typeset_paragraphs (doc, pars, width, cell);
   };
 
   // Paragraphs of 1 to CODE_TPL rows (of the line 1): the rows are made as
@@ -721,12 +885,28 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   }
   if (sig == 0) sig= 1; // (0: the rows of a record were not made)
 
+  passes++;
   // the rows of the line i, made again when the line or what they share
   // changed (or the path of the line: then it is not the one of the editor)
   auto get= [&] (int i) -> code_rec {
     code_rec r= recs[i];
     path lip= line_path (i);
+    if (!is_atomic (doc[i])) {
+      // a line with markup: typeset as a paragraph of its rows, at each
+      // pass (its items depend on the environment and the macros)
+      if (r->rich && r->pass == passes) return r;
+      r->pass= passes;
+      r->rich= true;
+      r->psig= 0;
+      r->lip = lip;
+      r->rows= array<box> ();
+      r->bs  = array<box> ();
+      rich_paragraph (doc[i], lip, width, cell, array<line_item> (),
+                      array<line_item> (), r->its, r->psb);
+      return r;
+    }
     if (r->psig == sig && N(r->rows) > 0 && r->lip == lip) return r;
+    r->rich= false;
     r->psig= sig;
     r->lip = lip;
     r->rows= make_rows (i, lip);
@@ -746,26 +926,50 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   // the first line, with the line items before, and the line 1
   array<page_item> l0;
   stack_border sb0;
-  end_paragraph (first, get (0)->rows, ttt->a, array<line_item> (), l0, sb0);
+  if (get (0)->rich) {
+    first.b= box ();
+    rich_paragraph (doc[0], line_path (0), width, cell, ttt->a,
+                    array<line_item> (), l0, sb0);
+  }
+  else end_paragraph (first, get (0)->rows, ttt->a, array<line_item> (),
+                      l0, sb0);
   ttt->insert_stack (l0, sb0);
-  ttt->insert_stack (get (1)->its, sb1);
-  // the lines between, already stacked (merge_stack would only shove them
-  // as the line 1 was: their borders and their heights are the same)
-  for (int i=2; i<n-2; i++) ttt->l << get (i)->its;
-  // the line before the last: its last row as a line alone, which the last
-  // paragraph shoves
-  if (n-2 >= 2) {
-    code_rec r= get (n-2);
-    int R= N(r->its);
-    for (int k=0; k+1<R; k++) ttt->l << r->its[k];
-    page_item ri= row_item (R, R-1, true);
-    ttt->l << page_item (tpl->type, r->bs[R-1], ri->spc, ri->penalty,
-                         tpl->fl, tpl->nr_cols, tpl->t);
+  // The lines between: already stacked (merge_stack would only shove them
+  // as the line 1 was: their borders and their heights are the same), but
+  // for a line with markup and the line after it, which are stacked by
+  // merge_stack, and the line before it and before the last, whose last
+  // row is a line alone (merge_stack shoves it)
+  bool merge= true; // (the line 1 is stacked after the paragraph of the first)
+  for (int i=1; i<=n-2; i++) {
+    code_rec r= get (i);
+    if (r->rich) {
+      ttt->insert_stack (r->its, r->psb);
+      merge= true;
+      continue;
+    }
+    bool alone= (i == n-2) || get (i+1)->rich;
+    array<page_item> its= r->its;
+    if (alone) {
+      int R= N(its);
+      its= copy (its);
+      page_item ri= row_item (R, R-1, true);
+      its[R-1]= page_item (tpl->type, r->bs[R-1], ri->spc, ri->penalty,
+                           tpl->fl, tpl->nr_cols, tpl->t);
+    }
+    if (merge) ttt->insert_stack (its, sb1);
+    else ttt->l << its;
+    merge= false;
   }
   // the last line, with the line items after
   array<page_item> ln;
   stack_border sbn;
-  end_paragraph (last, get (n-1)->rows, array<line_item> (), ttt->b, ln, sbn);
+  if (get (n-1)->rich) {
+    last.b= box ();
+    rich_paragraph (doc[n-1], line_path (n-1), width, cell,
+                    array<line_item> (), ttt->b, ln, sbn);
+  }
+  else end_paragraph (last, get (n-1)->rows, array<line_item> (), ttt->b,
+                      ln, sbn);
   ttt->insert_stack (ln, sbn);
 
   if (typeset_caches_mode () == 2) {

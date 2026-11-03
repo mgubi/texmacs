@@ -353,6 +353,70 @@
           (check= (tree->string (path->tree (line 0))) "#define TWICE(x) ")
           (check= (typeset-check-mismatches) mismatches))))))
 
+;; A line with markup is typeset by the concater and put on the grid of the
+;; cells (bridge_code.cpp): a string in strong, em, a colour... takes a cell
+;; for each character (a wider bold font too: each character in its cell),
+;; math and other boxes the cells which they need. The cursor goes from a
+;; plain line to the same column of a line with markup, and into its markup;
+;; edits go into the markup; a higher line (a fraction) pushes the lines
+;; after it, at the same places in paper mode and in papyrus mode
+(define markup-lines
+  `("int abcdef = 1;"
+    (concat "int " (strong "abcdef") " = 2;")
+    (concat "x= " (math (concat "a+" (frac "b" "c"))) "; // " (em "note"))
+    "int after = 3;"
+    "int more = 4;"))
+
+(define (markup-run medium)
+  (let* ((r '())
+         (note (lambda (x) (set! r (cons x r))))
+         (cur (lambda () (list-tail (rel (cursor-path)) 3)))
+         (goto (lambda (l)
+                 (go-to (apply at (append '(0 4 0) l)))
+                 (step (lambda () #t)))))
+    (init-env "page-medium" medium)
+    (step (lambda () #t))
+    ;; the places of the plain lines after the line with a fraction
+    (let* ((y (lambda (i) (cadr (tree-bounding-rectangle
+                                 (path->tree (at 0 4 0 i))))))
+           (y0 (y 0)))
+      (note (list (- (y 3) y0) (- (y 4) y0))))
+    ;; down from the column 6 of a plain line: the column 6 of the next,
+    ;; in strong (its third character)
+    (goto '(0 6))
+    (step kbd-down)
+    (note (cur))
+    ;; an edit in strong
+    (step (lambda () (insert "Z")))
+    (note (tree->stree (path->tree (at 0 4 0 1))))
+    ;; into the math, and an edit there
+    (goto '(2 1 0 0 1))
+    (step (lambda () (insert "q")))
+    (note (tree->stree (path->tree (at 0 4 0 2 1 0 0))))
+    (note (cur))
+    (reverse r)))
+
+(define (test-markup)
+  (check-group "lines with markup")
+  (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document ,@markup-lines)))))
+         (paper #f) (papyrus #f))
+    (with-body doc (lambda () (set! paper (markup-run "paper"))))
+    (with-body doc (lambda () (set! papyrus (markup-run "papyrus"))))
+    (check= (list-ref paper 1) '(1 1 0 2))
+    (check= (list-ref paper 2) '(concat "int " (strong "abZcdef") " = 2;"))
+    (check= (list-ref paper 3) "aq+")
+    (check= (list-ref paper 4) '(2 1 0 0 2))
+    ;; the line with the fraction is higher than a line, in both modes
+    ;; (paper mode shoves it between the lines around it, as the stacker
+    ;; does: the places are not the same)
+    (for-each (lambda (places)
+                (check-true (> (- (car places) (cadr places)) 0))
+                (check-true (< (car places) (* 3 (- (cadr places)
+                                                    (car places))))))
+              (list (car paper) (car papyrus)))
+    (check= (cdr papyrus) (cdr paper))))
+
 (define (test-export)
   (check-group "export and import")
   (with-body (code-doc)
@@ -389,6 +453,7 @@
   (test-rows-made)
   (test-records)
   (test-colour-states)
+  (test-markup)
   (test-export)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph

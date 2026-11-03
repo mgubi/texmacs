@@ -28,6 +28,16 @@
 
       \;
 
+      int <strong|bold_name>= 2; // <em|emphasis> in a comment
+
+      int <with|color|red|red_value>= 3;
+
+      double area= <math|\<pi\> r<rsup|2>>; /* math */
+
+      int <underline|underlined>= 4;
+
+      double ratio= <math|<frac|<frac|a|b>|c+d>>; // a tall line
+
       int total= alpha_one + alpha_two + alpha_three + alpha_four + alpha_five + alpha_six + alpha_seven + alpha_eight + alpha_nine + alpha_ten;
     </code-lines>
   </with>
