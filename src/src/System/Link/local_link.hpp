@@ -31,6 +31,8 @@ int    local_connect (int port);       // the link, or -1
 bool   local_send (int id, string s);  // false if the link is dead
 string local_receive (int id);         // the next packet, or "" (none yet)
 bool   local_alive (int id);
+void   local_set_limit (int id, int bytes); // the longest packet of the link
+bool   local_send_raw (int id, string s);   // bytes as they are (tests)
 void   local_close (int id);
 
 // Helpers of the shared files: the process, the per-user folder, paths

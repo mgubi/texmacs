@@ -19,6 +19,10 @@
 #   takeover-window  the same with a window (offscreen) for B
 #   off         the preference off (the default): nothing is shared
 #   stale       an entry of a dead process; a wrong token; garbage
+#   conflict    edits at once: merged, or the person's text saved when lost
+#   save        Save and close in a participant; a buffer removed by C++
+#   slow        a host that is alive but stalled is not replaced
+#   attack      oversize, bad and endless packets before the token
 #
 # TM_SHARED_PREF=off runs them with the preference off (they must then fail,
 # except "off"). Every process is stopped above TM_TEST_RSS_KB (default 2 GB) of memory and
@@ -39,7 +43,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent refuse handover death takeover takeover-window off stale
+[ $# -eq 0 ] && set -- basic concurrent conflict refuse save handover death takeover takeover-window off stale slow attack
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or
@@ -113,6 +117,11 @@ for name in "$@"; do
     echo "FAIL $name (logs in $w)"; status=1
   fi
 done
+
+# With the preference off nothing is made: no folder of entries
+if [ -d "$run/off/tmp" ] && ls "$run"/off/tmp/texmacs-* >/dev/null 2>&1; then
+  echo "FAIL off: a folder of entries was made"; status=1
+fi
 
 # The per-user folder of the entries is private (mode 0700)
 for d in "$run"/*/tmp/texmacs-*/shared; do

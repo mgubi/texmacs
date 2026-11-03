@@ -4,7 +4,8 @@
 (define (A-steps)
   (list
    (act "load" (load-buffer FILE))
-   (act "check" (check "A does not share" (not (shared-file? (the-name)))))
+   (act "check" (check "A does not share" (not (shared-file? (the-name))))
+        (check "no sharing machinery was started" (not (shared-files-in-use?))))
    (act "go" (sync-set! "a-loaded"))
    (wait-sync "b-loaded")
    (act "edit" (insert-text! 1 5 "AA") (sync-set! "a-edited"))
@@ -21,7 +22,6 @@
    (step "settle" (begin (if (not off-t) (set! off-t (texmacs-time)))
                          (> (- (texmacs-time) off-t) 600)))
    (act "check" (check "A's edit did not reach B" (== (text-of 1) "Hello world."))
-        (check "no entry" (not (shared-entry (the-name))))
         (sync-set! "b-done"))))
 
 (define off-t #f)

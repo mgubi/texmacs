@@ -2080,6 +2080,36 @@ tmg_local_aliveP (tmscm arg1) {
 }
 
 tmscm
+tmg_local_set_limit (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-set-limit");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "local-set-limit");
+
+  int in1= tmscm_to_int (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  local_set_limit (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_local_send_raw (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-send-raw");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "local-send-raw");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= local_send_raw (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_local_close (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-close");
 
@@ -12934,6 +12964,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("local-send",  tmg_local_send, 2, 0, 0);
   tmscm_install_procedure ("local-receive",  tmg_local_receive, 1, 0, 0);
   tmscm_install_procedure ("local-alive?",  tmg_local_aliveP, 1, 0, 0);
+  tmscm_install_procedure ("local-set-limit",  tmg_local_set_limit, 2, 0, 0);
+  tmscm_install_procedure ("local-send-raw",  tmg_local_send_raw, 2, 0, 0);
   tmscm_install_procedure ("local-close",  tmg_local_close, 1, 0, 0);
   tmscm_install_procedure ("shared-process-id",  tmg_shared_process_id, 0, 0, 0);
   tmscm_install_procedure ("shared-process-alive?",  tmg_shared_process_aliveP, 1, 0, 0);

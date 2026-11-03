@@ -201,6 +201,8 @@
 "local-send"
 "local-receive"
 "local-alive?"
+"local-set-limit"
+"local-send-raw"
 "local-close"
 "shared-process-id"
 "shared-process-alive?"

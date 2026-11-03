@@ -21,6 +21,7 @@
 
 (texmacs-module (utils relate shared-files)
   (:use (utils relate live-document)
+        (utils relate live-connection)
         (texmacs texmacs tm-files)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -154,8 +155,11 @@
                                 interactive host-id)))))
 
 (define (list-dir-names dir)
+  ;; (a tuple of strings comes as the list of the strings)
   (with l (shared-list-dir dir)
-    (if (and (pair? l) (== (car l) 'tuple)) (cdr l) '())))
+    (if (list? l)
+        (map (lambda (n) (if (symbol? n) (symbol->string n) n)) l)
+        '())))
 
 (define (clean-stale-entries)
   ;; entries of processes which are gone
@@ -378,10 +382,15 @@
                              interactive base))
            c))))
 
-(define (join-failed key entry)
-  ;; the host did not answer: its entry is stale if its process is gone
-  (when (not (shared-process-alive? (list-ref entry 4)))
-    (remove-entry-if key (cadddr entry))))
+(define sf-join-wait 500)   ; ms: the most a join makes the interface wait
+(define sf-unshared (make-ahash-table))  ; names opened without sharing
+
+(define (note-unshared! name)
+  ;; the host of the file is alive but did not answer in time: the file is
+  ;; read as usual, not shared (never a second host: both would write it)
+  (ahash-set! sf-unshared (url->string name) #t)
+  (set-message "Shared file: the process which has this file open did not answer; it is opened from the file, without sharing"
+               "Shared file"))
 
 (tm-define (shared-file-try-join name)
   (:synopsis "Join the process which has the file @name open, if there is one")
@@ -394,13 +403,18 @@
          (and key
               (not (ahash-ref sf-table key))
               (with entry (read-entry key)
-                (and entry (join-host name key entry)))))))
+                (and entry
+                     (with r (join-host name key entry)
+                       (when (== r 'alive) (note-unshared! name))
+                       (== r #t))))))))
 
 ;; (join-host with a buffer which exists, read from the file, replaces it)
 (define (join-host name key entry)
   (let* ((id (sf-new-id)) (inter (shared-interactive?))
          (c (do-hello key entry id inter #f))
-         (m (and c (msg-wait c 3000))))
+         (m (and c (msg-wait c sf-join-wait))))
+    ;; gives #t (joined), 'alive (the host is alive but did not answer: do
+    ;; not take its place) or #f (its entry is stale, and was removed)
     (cond ((and m (func? m 'welcome) (== (length m) 6))
            (with (tag state doc modified roster host-id) m
              (buffer-set name (stree->tree doc))
@@ -418,8 +432,8 @@
                #t)))
           (else
             (when c (local-close c))
-            (when (not c) (join-failed key entry))
-            #f))))
+            (cond ((shared-process-alive? (list-ref entry 4)) 'alive)
+                  (else (remove-entry-if key (cadddr entry)) #f))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hosting
@@ -429,10 +443,12 @@
   (:synopsis "Called when the buffer @name has been loaded from its file")
   ;; The process hosts the file, unless a host appeared meanwhile (then the
   ;; process joins it, replacing what it has read).
-  (when (and (shared-files-on?) (not (sf-by-name name)))
-    (and-with key (shareable-key name)
-      (when (not (ahash-ref sf-table key))
-        (host-start name key)))))
+  (cond ((ahash-ref sf-unshared (url->string name))
+         (ahash-remove! sf-unshared (url->string name)))
+        ((and (shared-files-on?) (not (sf-by-name name)))
+         (and-with key (shareable-key name)
+           (when (not (ahash-ref sf-table key))
+             (host-start name key))))))
 
 (define (host-start name key)
   (let ((port (local-listen)))
@@ -450,10 +466,11 @@
             (let ((e (read-entry key)))
               (sf-destroy! sf)
               (when e
-                (if (join-host name key e)
-                    #t
-                    (begin (remove-entry-if key (cadddr e))
-                           (host-start name key))))))))))
+                (with r (join-host name key e)
+                  (cond ((== r #t) #t)
+                        ((== r 'alive) (note-unshared! name))
+                        ;; (join-host removed the stale entry)
+                        (else (host-start name key)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Peers, roster, broadcasting (host)
@@ -577,6 +594,11 @@
 
 (define (host-accept-hello sf link id pid interactive base)
   (host-flush! sf)
+  (if (not (local-alive? link))
+      (local-close link)
+      (host-accept-hello* sf link id pid interactive base)))
+
+(define (host-accept-hello* sf link id pid interactive base)
   (let ((seq (+ (sf-get sf 'seq-counter) 1)))
     (sf-put! sf 'seq-counter seq)
     (sf-put! sf 'peers
@@ -646,7 +668,10 @@
     (and (== (sf-get sf 'role) 'participant)
          (sf-get sf 'conn)
          (begin
-           (msg-send (sf-get sf 'conn) (list 'save))
+           (sf-put! sf 'save-wanted #t)
+           (participant-flush! sf)
+           (participant-submit! sf)
+           (participant-send-save-when-clean! sf)
            (set-message "Save asked to the host of the file" "Save file")
            #t))))
 
@@ -687,6 +712,69 @@
   (and-with sf (sf-by-name name)
     (sf-put! sf 'bad-base flag)))
 
+;; Changes of the person which are not kept (refused, dropped when the host's
+;; patch could not be combined with them, not sent when the buffer is closed)
+;; are not lost silently. What can be recovered is what the person typed: the
+;; contents which the lost patches insert or put in place. It is saved in a
+;; document in $TEXMACS_HOME_PATH/system/recovered (as the document of a
+;; failed typesetting is), the footer says so, and an interactive TeXmacs asks
+;; whether to open it (a question stays until it is answered). The deletions
+;; and the moves among the lost changes are not recoverable this way (the
+;; text they removed is still in the document): the notice says that
+;; changes were not kept.
+
+(define (lost-contents patches)
+  (append-map
+   (lambda (p)
+     (append-map
+      (lambda (m)
+        (let ((kind (car m)) (t (caddr m)))
+          (cond ((not (in? kind '(insert assign))) '())
+                ((and (string? t) (== t "")) '())
+                ((func? t 'document) (cdr t))
+                (else (list t)))))
+      (patch->modlist p)))
+   patches))
+
+(define (report-lost! sf patches)
+  (when (nnull? patches)
+    (stat! 'lost)
+    (let* ((items (lost-contents patches))
+           (name (url->system (sf-buffer sf)))
+           (msg (string-append "Shared file: changes of yours to " name
+                               " could not be combined with those of another process")))
+      (cond ((null? items)
+             (set-message `(concat ,msg ".") "Shared file"))
+            (else
+              (set! sf-serial (+ sf-serial 1))
+              (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+                     (file (url-append dir (string-append
+                                            "shared-lost-"
+                                            (number->string (shared-process-id)) "-"
+                                            (number->string sf-serial) ".tm")))
+                     (doc `(document (TeXmacs "2.1.5") (style (tuple "generic"))
+                             (body (document
+                                     ,(string-append "Changes of yours to " name
+                                                     " which could not be kept:")
+                                     ,@items))))
+                     (ok (catch #t
+                           (lambda ()
+                             (system-mkdir dir)
+                             (not (not (tree-export (stree->tree doc) file "texmacs"))))
+                           (lambda args #f))))
+                (stat! 'lost-saved)
+                (set-message `(concat ,msg ". "
+                                      ,(if ok
+                                           `(concat "What you typed is saved in "
+                                                    (verbatim ,(url->system file)))
+                                           "It could not be saved."))
+                             "Shared file")
+                (when (and ok (not (headless?)))
+                  (user-confirm "Changes of yours to a shared file could not be kept. Open the document with what you typed?" #t
+                    (lambda (answ)
+                      (when answ (load-buffer file))
+                      (noop))))))))))
+
 (define (rollback-pending! sf)
   ;; undo the pending changes in the buffer: it becomes the confirmed document
   (let* ((key (sf-key sf)) (pend (sf-get sf 'pending)))
@@ -702,9 +790,7 @@
 (define (participant-reset! sf state doc modified)
   ;; the document of the host replaces everything, pending changes included
   (let* ((key (sf-key sf)) (name (sf-buffer sf)))
-    (when (nnull? (sf-get sf 'pending))
-      (set-message "Shared file: some of your recent changes could not be kept"
-                   "Shared file"))
+    (report-lost! sf (sf-get sf 'pending))
     (sf-put! sf 'pending '())
     (sf-put! sf 'inflight #f)
     (sf-put! sf 'collect '())
@@ -729,7 +815,8 @@
             ;; the host will rebase them (and one with a tie: its own
             ;; patch is placed first): take them back, apply the patch,
             ;; put them back as far as they can be
-            (let* ((kept (transform-pending pend (patch-invert r d0))))
+            (let* ((kept (transform-pending pend (patch-invert r d0)))
+                   (inflight (sf-get sf 'inflight)))
               (rollback-pending! sf)
               (cond ((apply-in-place! sf r (author-of sf (sf-get sf 'host-id)))
                      (live-apply-patch key r to)
@@ -741,11 +828,11 @@
                                        (else (reverse done))))))
                        (when (< (length ok) (length pend))
                          (stat! 'dropped)
-                         (set-message "Shared file: a change of yours conflicted with a change of another and was undone"
-                                      "Shared file"))
+                         (report-lost! sf (list-tail pend (length ok))))
                        (sf-put! sf 'pending ok)
-                       ;; the one which was sent is still on its way if kept
-                       (when (null? ok) (sf-put! sf 'inflight #f))
+                       ;; (the patch which was sent is still on its way if it
+                       ;; is kept: its confirmation is recognised by the id)
+                       (sf-put! sf 'inflight (and (nnull? ok) inflight))
                        (sf-trim! key)))
                     (else (participant-request-resync! sf))))))))
 
@@ -776,15 +863,18 @@
              (when (== id (sf-get sf 'inflight))
                (stat! 'rolled-back)
                (sf-debug "my patch was refused\n")
+               (report-lost! sf (sf-get sf 'pending))
                (rollback-pending! sf)
-               (set-message "Shared file: a change of yours conflicted with another and was undone"
-                            "Shared file")
                (when (!= cur (live-current-state key))
                  (participant-request-resync! sf)))))
           ((func? msg 'roster)
            (sf-put! sf 'roster (cadr msg)))
           ((func? msg 'saved)
+           ;; (the time of the last save is the time of the file; the buffer
+           ;; stays modified if there are changes the host has not got)
            (buffer-pretend-saved (sf-buffer sf))
+           (when (or (sf-get sf 'inflight) (nnull? (sf-get sf 'pending)))
+             (buffer-pretend-modified (sf-buffer sf)))
            (sf-put! sf 'dirty #f))
           ((func? msg 'welcome-reset)
            (with (tag state doc modified roster host-id) msg
@@ -811,8 +901,17 @@
                  (loop))))
            (cond ((not (sf-get sf 'conn)) (noop))
                  ((not (local-alive? c)) (participant-host-gone! sf))
-                 (else (participant-submit! sf))))
+                 (else
+                   (participant-submit! sf)
+                   (participant-send-save-when-clean! sf))))
           ((sf-get sf 'reconnecting) (reconnect-step sf)))))
+
+(define (participant-send-save-when-clean! sf)
+  ;; a Save waits until the host has all the changes of this process
+  (when (and (sf-get sf 'save-wanted) (sf-get sf 'conn)
+             (null? (sf-get sf 'pending)) (not (sf-get sf 'inflight)))
+    (sf-put! sf 'save-wanted #f)
+    (msg-send (sf-get sf 'conn) (list 'save))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Changing the host: handover, rehosting, a host which is gone
@@ -992,6 +1091,16 @@
 (define (leave-as-participant sf)
   (let ((c (sf-get sf 'conn)))
     (participant-flush! sf)
+    ;; the changes the host has not got are sent first (for a moment at
+    ;; most); those which still could not be are kept in a document
+    (let ((end (+ (texmacs-time) 1000)))
+      (let loop ()
+        (when (and c (local-alive? c)
+                   (or (nnull? (sf-get sf 'pending)) (sf-get sf 'inflight))
+                   (< (texmacs-time) end))
+          (participant-tick sf)
+          (loop))))
+    (report-lost! sf (sf-get sf 'pending))
     (when c
       (msg-send c (list 'leave))
       (local-close c))
@@ -1033,7 +1142,10 @@
   (let loop ()
     (let ((c (local-accept)))
       (when (>= c 0)
-        (set! sf-incoming (cons (cons c (texmacs-time)) sf-incoming))
+        ;; (not too many links which have not said who they are)
+        (if (< (length sf-incoming) 16)
+            (set! sf-incoming (cons (cons c (texmacs-time)) sf-incoming))
+            (local-close c))
         (loop))))
   (set! sf-incoming
         (list-filter
@@ -1048,12 +1160,22 @@
                    ((> (- (texmacs-time) (cdr e)) 5000) (local-close c) #f)
                    (else #t)))))))
 
+(define (token=? a b)
+  ;; without stopping at the first difference
+  (and (string? a) (string? b) (== (string-length a) (string-length b))
+       (let loop ((i 0) (acc 0))
+         (if (>= i (string-length a))
+             (== acc 0)
+             (loop (+ i 1)
+                   (+ acc (if (== (string-ref a i) (string-ref b i)) 0 1)))))))
+
 (define (identify-link c m)
   ;; the first packet of a link: it must have the token of the file, else
   ;; the link is closed
   (with (tag token key id pid interactive base) m
     (let ((sf (ahash-ref sf-table key)))
-      (cond ((and sf (sf-host? sf) (== token (sf-get sf 'token)))
+      (cond ((and sf (sf-host? sf) (token=? token (sf-get sf 'token)))
+             (local-set-limit c 67108864)
              (host-accept-hello sf c id pid interactive base))
             (else (local-close c))))))
 
@@ -1085,3 +1207,11 @@
 (tm-define (shared-poll)
   (:synopsis "For the tests: do what the polling does, now")
   (shared-tick))
+
+;; A buffer which is removed without buffer-close (the window and the buffer
+;; killed together, a buffer renamed): the hook of the C++ code leaves the
+;; sharing, the buffer still exists
+(tm-define (notify-buffer-closed name)
+  (former name)
+  (when (shared-files-in-use?)
+    (shared-file-leave (string->url name))))

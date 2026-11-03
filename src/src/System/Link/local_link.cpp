@@ -108,8 +108,9 @@ struct local_link_rep: tm_link_rep {
   int    fd;
   string in;      // bytes received, not yet a whole packet
   string out;     // bytes not yet taken by the peer
+  int    limit;   // the longest packet (and the buffer before a whole one)
 public:
-  local_link_rep (int fd2): fd (fd2) { alive= (fd >= 0); }
+  local_link_rep (int fd2): fd (fd2), limit (65536) { alive= (fd >= 0); }
   ~local_link_rep () { stop (); }
 
   string  start () { return alive? "ok": "dead"; }
@@ -121,9 +122,29 @@ public:
   void    stop ();
   bool    pending_write () { return N(out) > 0; }
 
+  bool    valid ();   // is in the beginning of a packet within the limit?
   void    fill ();    // what has come, into in
   void    flush ();   // what can be written of out
 };
+
+// What a peer may send before it is trusted: packets are <length>\n<payload>
+// with the length in decimal digits (not the "!" of the encrypted links of
+// tm_link, nor a sign), at most 11 of them, and at most `limit' bytes. A link
+// which does not follow this is closed: the memory is bounded.
+bool
+local_link_rep::valid () {
+  int n= N(in);
+  if (n == 0) return true;
+  if ((long long) n > 2LL * limit + 16) return false;
+  int i= 0;
+  while (i < n && i < 12 && in[i] >= '0' && in[i] <= '9') i++;
+  if (i == 0 || i > 11) return false;
+  if (i == n) return true;                    // the digits are not ended yet
+  if (in[i] != '\n') return false;
+  long long len= 0;
+  for (int j=0; j<i; j++) len= 10 * len + (in[j] - '0');
+  return len <= (long long) limit;
+}
 
 void
 local_link_rep::fill () {
@@ -134,11 +155,13 @@ local_link_rep::fill () {
     if (r > 0) in << string (buf, r);
     else if (r == 0) { stop (); return; }
     else {
-      if (L_WOULDBLOCK (L_ERRNO)) return;
+      if (L_WOULDBLOCK (L_ERRNO)) break;
       stop (); return;
     }
-    if (r < (int) sizeof (buf)) return;
+    if (!valid ()) break;
+    if (r < (int) sizeof (buf)) break;
   }
+  if (!valid ()) { in= ""; stop (); }
 }
 
 void
@@ -191,6 +214,26 @@ make_local_link (int fd) {
 
 static array<tm_link> local_links;
 static int local_server_fd= -1;
+// links closed by their owner which still have output to write
+static array<tm_link> local_closing;
+static array<int>     local_closing_polls;  // polls left before it is dropped
+
+static void
+local_flush_closing () {
+  for (int i= N(local_closing) - 1; i >= 0; i--) {
+    local_link_rep* ln= (local_link_rep*) local_closing[i].rep;
+    ln->flush ();
+    if (!ln->alive || N(ln->out) == 0 || --local_closing_polls[i] <= 0) {
+      ln->stop ();
+      for (int j=i; j<N(local_closing)-1; j++) {
+        local_closing[j]= local_closing[j+1];
+        local_closing_polls[j]= local_closing_polls[j+1];
+      }
+      local_closing->resize (N(local_closing)-1);
+      local_closing_polls->resize (N(local_closing_polls)-1);
+    }
+  }
+}
 
 static int
 local_register (tm_link ln) {
@@ -244,6 +287,7 @@ local_unlisten () {
 
 int
 local_accept () {
+  local_flush_closing ();
   if (local_server_fd < 0) return -1;
   struct sockaddr_in addr;
 #ifndef OS_MINGW
@@ -272,7 +316,9 @@ local_connect (int port) {
     L_CLOSE ((L_SOCK_T) fd);
     return -1;
   }
-  return local_register (make_local_link (fd));
+  tm_link ln= make_local_link (fd);
+  ((local_link_rep*) ln.rep)->limit= 64 * 1024 * 1024;
+  return local_register (ln);
 }
 
 bool
@@ -309,8 +355,27 @@ local_close (int id) {
   local_link_rep* ln= local_get (id);
   if (ln == NULL) return;
   ln->flush ();
-  ln->stop ();
+  if (ln->alive && N(ln->out) > 0) {
+    // (the rest is written by the next polls: local_accept)
+    local_closing << local_links[id];
+    local_closing_polls << 250;
+  }
+  else ln->stop ();
   local_links[id]= tm_link ();
+}
+
+void
+local_set_limit (int id, int bytes) {
+  local_link_rep* ln= local_get (id);
+  if (ln != NULL && bytes > 0) ln->limit= bytes;
+}
+
+bool
+local_send_raw (int id, string s) {
+  local_link_rep* ln= local_get (id);
+  if (ln == NULL) return false;
+  ln->write (s, LINK_IN);
+  return ln->alive;
 }
 
 /******************************************************************************
@@ -400,15 +465,10 @@ shared_user_dir () {
   }
   return dir;
 #else
-  string base= shared_env ("TEMP");
-  if (base == "") base= shared_env ("TMP");
-  if (base == "") return "";
-  string top= base * "\\texmacs-" * shared_env ("USERNAME");
-  string dir= top * "\\shared";
-  c_string p1 (top), p2 (dir);
-  _mkdir ((char*) p1);
-  _mkdir ((char*) p2);
-  return dir;
+  // Not on Windows (yet): it needs a system source of random numbers
+  // (BCryptGenRandom) and an exclusive create of the entries, which were not
+  // written; the preference has no effect there.
+  return "";
 #endif
 }
 

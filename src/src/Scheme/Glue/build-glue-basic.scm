@@ -200,6 +200,8 @@
   (local-send local_send (bool int string))
   (local-receive local_receive (string int))
   (local-alive? local_alive (bool int))
+  (local-set-limit local_set_limit (void int int))
+  (local-send-raw local_send_raw (bool int string))
   (local-close local_close (void int))
   (shared-process-id shared_process_id (int))
   (shared-process-alive? shared_process_alive (bool int))

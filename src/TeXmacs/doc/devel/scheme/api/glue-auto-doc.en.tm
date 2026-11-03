@@ -1411,6 +1411,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(local-set-limit <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_set_limit> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(local-send-raw <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_send_raw> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(local-close <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>

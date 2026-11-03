@@ -88,3 +88,30 @@
           (lambda ()
             (if (not t0) (set! t0 (texmacs-time)))
             (> (- (texmacs-time) t0) ms)))))
+
+(define (rname n s) (string-append "r" (number->string n) "-" s))
+
+;; One round of concurrent edits: A (the host) and B edit while neither hears
+;; of the other; B's patch reaches the host first, then the host works.
+(define (round-steps n a-edit! b-edit!)
+  (if (== ROLE "A")
+      (list (act (rname n "A edits") (shared-pause! #t) (a-edit!) (sync-set! (rname n "a-ready")))
+            (wait-sync (rname n "b-submitted"))
+            (act (rname n "A resumes") (shared-pause! #f))
+            (timed-wait 800)
+            (act (rname n "A done") (sync-set! (rname n "a-done")))
+            (wait-sync (rname n "b-done")))
+      (list (wait-sync (rname n "a-ready"))
+            (act (rname n "B edits") (shared-pause! #t) (b-edit!))
+            (act (rname n "B resumes") (shared-pause! #f))
+            (step (rname n "B submitted") (>= (shared-stat 'submitted) n))
+            (act (rname n "B signals") (sync-set! (rname n "b-submitted")))
+            (wait-sync (rname n "a-done"))
+            (timed-wait 300)
+            (act (rname n "B done") (sync-set! (rname n "b-done"))))))
+
+(define (recovered-files)
+  (let* ((dir (string-append (getenv "TEXMACS_HOME_PATH") "/system/recovered"))
+         (l (shared-list-dir dir)))
+    (map (lambda (n) (string-append dir "/" (if (symbol? n) (symbol->string n) n)))
+         (if (list? l) l '()))))
