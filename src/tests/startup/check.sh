@@ -433,10 +433,10 @@ cat > "$out/startup-glue.scm" <<'EOF'
 (define (ends? u s) (string-ends? (url->system u) s))
 (define (found u) (url->system (url-tail (url-complete u "fr"))))
 (define g (url-glue w "~"))
-(display* "CHECK glue " (ends? g "/one*.scm~") " " (found g) "\n")
+(display* "CHECK glue " (ends? g "one*.scm~") " " (found g) "\n")
 (define u (url-unglue g 1))
-(display* "CHECK unglue " (ends? u "/one*.scm") " " (found u) "\n")
-(display* "CHECK unglue-3 " (ends? (url-unglue w 3) "/one*.") "\n")
+(display* "CHECK unglue " (ends? u "one*.scm") " " (found u) "\n")
+(display* "CHECK unglue-3 " (ends? (url-unglue w 3) "one*.") "\n")
 (display* "CHECK survived\n")
 EOF
 
