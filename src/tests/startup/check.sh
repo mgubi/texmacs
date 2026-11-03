@@ -419,5 +419,155 @@ survived
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-wild.scm")'
 
+# A wildcard url reached url-glue and url-unglue, which threw a C++
+# exception for it (nothing catches it under -x: TeXmacs aborted), and
+# load-buffer, which glues the names of the autosave files (#790). Each case
+# is a run of its own, since a crash ends the run: the statuses 134 and 139
+# show as "exit status" lines.
+mkdir -p "$out/startup-glue"
+printf 'a\n' > "$out/startup-glue/one1.scm"
+printf 'a\n' > "$out/startup-glue/one1.scm~"
+cat > "$out/startup-glue.scm" <<'EOF'
+(define d (url->system (url-append (url-pwd) "startup-glue")))
+(define w (system->url (string-append d "/one*.scm")))
+(define (ends? u s) (string-ends? (url->system u) s))
+(define (found u) (url->system (url-tail (url-complete u "fr"))))
+(define g (url-glue w "~"))
+(display* "CHECK glue " (ends? g "/one*.scm~") " " (found g) "\n")
+(define u (url-unglue g 1))
+(display* "CHECK unglue " (ends? u "/one*.scm") " " (found u) "\n")
+(display* "CHECK unglue-3 " (ends? (url-unglue w 3) "/one*.") "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "url-glue and url-unglue of a wildcard apply to the pattern (#790)" \
+      "glue #t one1.scm~
+unglue #t one1.scm
+unglue-3 #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-glue.scm")'
+
+# load-buffer of a wildcard: the files which it matches are the candidates;
+# none gives a message, several give a message and load nothing (a script
+# can't answer a page of disambiguation), one is loaded, with the question
+# for a large file (a stub answers it, since no window can ask it).
+yes 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' \
+  | head -c 5400000 > "$out/startup-wild/huge1.scm"
+cat > "$out/startup-wild-load.scm" <<'EOF'
+(define d (url->system (url-append (url-pwd) "startup-wild")))
+(define n (length (buffer-list)))
+(define (same?) (== n (length (buffer-list))))
+(define (names)
+  (string-recompose (list-filter (map (lambda (u) (url->string (url-tail u)))
+                                      (buffer-list))
+                                 (lambda (s) (string-starts? s "wild")))
+                    " "))
+(load-buffer (string-append d "/nothing*.scm"))
+(display* "CHECK none " (same?) "\n")
+(load-buffer (string-append d "/wild*.scm"))
+(display* "CHECK several " (same?) " [" (names) "]\n")
+(load-buffer (string-append d "/solo*.scm"))
+(display* "CHECK one " (url->string (url-tail (current-buffer))) " "
+          (== (+ n 1) (length (buffer-list))) "\n")
+(buffer-close (current-buffer))
+(define asked 0)
+(set-large-load-test-interactive!
+ (lambda (prompt default cont) (set! asked (+ asked 1)) (cont #f)))
+(load-buffer (string-append d "/huge*.scm") :confirm-large)
+(display* "CHECK large asked " asked " loaded " (not (same?)) "\n")
+(set-large-load-test-interactive! #f)
+(display* "CHECK survived\n")
+EOF
+
+check "load-buffer of a wildcard: none, several and one match (#790)" \
+      "none #t
+several #t []
+one solo1.scm #t
+large asked 1 loaded #f
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-wild-load.scm")'
+
+# A relative wildcard link in a document of tmfs (a help page) named a file
+# of the system: url-complete threw for the base (#790, after #771). The
+# stubs of system keep any launch of an application away.
+cat > "$out/startup-wild-tmfs.scm" <<'EOF'
+(use-modules (link link-navigate))
+(set! system (lambda l 0))
+(set! system-1 (lambda l 0))
+(define tmfs-buffer (string->url "tmfs://help/foo/bar"))
+(define real-current-buffer current-buffer)
+(define m (length (buffer-list)))
+(set! current-buffer (lambda () tmfs-buffer))
+(go-to-url "a*.tm")
+(set! current-buffer real-current-buffer)
+(display* "CHECK tmfs-relative " (== m (length (buffer-list))) "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "a relative wildcard link in a tmfs document gives a message (#790)" \
+      "tmfs-relative #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-wild-tmfs.scm")'
+
+# A file whose name contains a star (not on Windows, which can't have one):
+# url-complete made a wildcard of the name of the entry again, which matched
+# itself, until the stack overflowed (#790, status 139).
+case $(uname -s) in
+  MINGW*|MSYS*|CYGWIN*) ;;
+  *)
+mkdir -p "$out/startup-star" "$out/startup-star1"
+printf 'a\n' > "$out/startup-star/a*b.scm"
+printf 'a\n' > "$out/startup-star/axc.scm"
+printf 'a\n' > "$out/startup-star/zzz.scm"
+printf 'a\n' > "$out/startup-star1/a*b.scm"
+cat > "$out/startup-star.scm" <<'EOF'
+(define d (url->system (url-append (url-pwd) "startup-star")))
+(define (found pattern)
+  (string-recompose
+   (sort (map (lambda (u) (url->system (url-tail u)))
+              (url->list (url-expand (url-complete (system->url pattern) "fr"))))
+         string<?)
+   " "))
+(display* "CHECK complete [" (found (string-append d "/a*.scm")) "]\n")
+(display* "CHECK complete-name [" (found (string-append d "/a*b.scm")) "]\n")
+(display* "CHECK complete-any [" (found (string-append d "/*")) "]\n")
+(display* "CHECK survived\n")
+EOF
+
+check "url-complete in a directory with a file with a star in its name (#790)" \
+      "complete [a*b.scm axc.scm]
+complete-name [a*b.scm]
+complete-any [a*b.scm axc.scm zzz.scm]
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-star.scm")'
+
+# The file is reached by a link and by load-buffer, and its buffer is found
+# again (the name of a view was parsed again into a wildcard).
+cat > "$out/startup-star-link.scm" <<'EOF'
+(use-modules (link link-navigate))
+(set! system (lambda l 0))
+(set! system-1 (lambda l 0))
+(define d1 (url->system (url-append (url-pwd) "startup-star1")))
+(go-to-url (string-append d1 "/a*.scm"))
+(display* "CHECK link " (url->string (url-tail (current-buffer))) "\n")
+(buffer-close (current-buffer))
+(load-buffer (string-append d1 "/a*.scm"))
+(display* "CHECK load " (url->string (url-tail (current-buffer))) "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "a file with a star in its name is reached by a link and load-buffer (#790)" \
+      "link a*b.scm
+load a*b.scm
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-star-link.scm")'
+  ;;
+esac
+
 echo "Total: $total checks, $failed failed"
 exit $status

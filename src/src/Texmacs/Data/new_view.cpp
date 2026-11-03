@@ -53,7 +53,24 @@ encode_url (url u) {
 }
 
 static url
+plain_name (url u) {
+  // The name of a buffer is never a pattern: a star in a file name (a*b.scm)
+  // is a character of the name, not the wildcard which url (string) makes of
+  // it, which would never be found among the buffers (#790).
+  if (is_wildcard (u, 1)) return as_url (tree (u->t[1]->label));
+  if (is_concat (u)) return plain_name (u[1]) * plain_name (u[2]);
+  return u;
+}
+
+static url decode_url_sub (string s);
+
+static url
 decode_url (string s) {
+  return plain_name (decode_url_sub (s));
+}
+
+static url
+decode_url_sub (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
 #ifdef WINPATHS

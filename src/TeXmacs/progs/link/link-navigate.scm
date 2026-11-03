@@ -578,18 +578,21 @@
 (define (urls->or l)
   (if (null? (cdr l)) (car l) (url-or (car l) (urls->or (cdr l)))))
 
-(define (link-wildcard-candidates u)
-  "The urls which the wildcard of @u matches, with the query when only one"
+(tm-define (link-wildcard-candidates u . opt-keep-query)
+  (:synopsis "The urls which the wildcard of @u matches")
+  ;; also used by load-buffer-main (tm-files.scm), through lazy-define
   (let* ((suffix (url-query-suffix (url->system u)))
+         (keep? (or (null? opt-keep-query) (car opt-keep-query)))
          (base (load-buffer-resolve-name (car (process-url u))))
-         ;; a relative link in a document of the web names a page of the
-         ;; web, and url-complete only knows wildcards of files (it throws
-         ;; "wildcards only implemented for files", the same abort)
-         (all (if (url-rooted-web? base)
-                  '()
-                  (url->list (url-expand (url-complete base "fr")))))
+         (root (or (and (url-rooted? base) (url-root base)) "default"))
+         ;; a relative link in a document of the web or of tmfs names a page
+         ;; there, and url-complete only knows wildcards of files (it throws
+         ;; "wildcards only implemented for files", an abort)
+         (all (if (in? root '("default" "file"))
+                  (url->list (url-expand (url-complete base "fr")))
+                  '()))
          (l (list-filter all (lambda (x) (not (url-none? x))))))
-    (if (and (pair? l) (null? (cdr l)) (!= suffix ""))
+    (if (and keep? (pair? l) (null? (cdr l)) (!= suffix ""))
         (list (system->url (string-append (url->system (car l)) suffix)))
         l)))
 
