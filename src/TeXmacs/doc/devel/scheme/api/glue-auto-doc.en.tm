@@ -6715,6 +6715,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-meta-hash <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_buffer_meta_hash> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-set-init <scm-arg|url> <scm-arg|string> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>

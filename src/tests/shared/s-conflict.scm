@@ -10,6 +10,9 @@
        (list (act "load" (load-buffer FILE)) (act "go" (sync-set! "a-loaded"))
              (wait-sync "b-joined"))
        (list (wait-sync "a-loaded") (act "load" (load-buffer FILE))
+             (act "old file" (let ((d (string-append (getenv "TEXMACS_HOME_PATH") "/system/recovered")))
+                               (system-mkdir (string->url d))
+                               (string-save "x" (string->url (string-append d "/shared-lost-100-1-1.tm")))))
              (act "go" (sync-set! "b-joined"))))
    ;; round 1: the same paragraph, different places
    (round-steps 1 (lambda () (insert-text! 1 2 "XX")) (lambda () (insert-text! 1 8 "YY")))
@@ -34,6 +37,16 @@
        (list (act "check 3" (check "deletion and insertion merged" (== (text-of 2) "ThiZZrd one."))
                   (check "no more loss" (== (shared-stat 'lost) 1))))
        (list (act "check 3" (check "host has both" (== (text-of 2) "ThiZZrd one.")))))
+   ;; round 4: both delete the same text; what B deleted is in its document
+   (round-steps 4 (lambda () (tree-remove (para 1) 4 3)) (lambda () (tree-remove (para 1) 4 2)))
+   (if (== ROLE "B")
+       (list (act "check 4"
+                  (check "the deleted text is recovered, and the old file pruned"
+                         (and (== (shared-stat 'lost-saved) 2)
+                              (list-or (map (lambda (f) (string-contains? (string-load (string->url f)) "Deleted"))
+                                            (recovered-files)))
+                              (not (list-or (map (lambda (f) (string-contains? f "shared-lost-100-")) (recovered-files))))))))
+       '())
    (list (act "out" (publish-body!) (sync-set! (string-append (string-downcase ROLE) "-fin")))
          (wait-sync (if (== ROLE "A") "b-fin" "a-fin")))))
 

@@ -11431,6 +11431,19 @@ tmg_buffer_get_meta (tmscm arg1) {
 }
 
 tmscm
+tmg_buffer_meta_hash (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-meta-hash");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_buffer_meta_hash (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_buffer_set_init (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-init");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "buffer-set-init");
@@ -13672,6 +13685,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-get-style",  tmg_buffer_get_style, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-style",  tmg_buffer_set_style, 2, 0, 0);
   tmscm_install_procedure ("buffer-get-meta",  tmg_buffer_get_meta, 1, 0, 0);
+  tmscm_install_procedure ("buffer-meta-hash",  tmg_buffer_meta_hash, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-init",  tmg_buffer_set_init, 3, 0, 0);
   tmscm_install_procedure ("buffer-reset-init",  tmg_buffer_reset_init, 2, 0, 0);
   tmscm_install_procedure ("buffer-set-master",  tmg_buffer_set_master, 2, 0, 0);

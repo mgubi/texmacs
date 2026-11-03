@@ -942,6 +942,7 @@
   (buffer-get-style get_buffer_style (tree url))
   (buffer-set-style set_buffer_style (void url content))
   (buffer-get-meta get_buffer_meta (tree url))
+  (buffer-meta-hash get_buffer_meta_hash (int url))
   (buffer-set-init set_buffer_init (void url string content))
   (buffer-reset-init reset_buffer_init (void url string))
   (buffer-set-master set_master_buffer (void url url))

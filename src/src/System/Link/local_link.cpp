@@ -412,6 +412,20 @@ shared_real_path (string path) {
   if (r == NULL) return "";
   string s (r);
   free (r);
+#ifdef F_GETPATH
+  // macOS: on a volume that is not case sensitive realpath keeps the case
+  // it was given; the system knows the stored one (so that one file has one
+  // key whatever the case of its name)
+  {
+    c_string q (s);
+    int fd= open ((char*) q, O_RDONLY | O_NONBLOCK);
+    if (fd >= 0) {
+      char buf[1024];
+      if (fcntl (fd, F_GETPATH, buf) != -1) s= string (buf);
+      ::close (fd);
+    }
+  }
+#endif
   return s;
 #else
   char* r= _fullpath (NULL, (char*) p, 0);

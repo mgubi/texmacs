@@ -170,14 +170,25 @@ refused, dropped as above, replaced by the host's document (`welcome-reset`),
 or not yet sent when the buffer is closed (the close waits 1 s at the most
 for the host to take them), what the person **typed** (the contents which the
 lost patches insert or put in place) is saved in a document in
-`$TEXMACS_HOME_PATH/system/recovered/shared-lost-<pid>-<n>.tm`, the footer
+`$TEXMACS_HOME_PATH/system/recovered/shared-lost-<time>-<pid>-<n>.tm`, the footer
 says so, and an interactive TeXmacs asks whether to open it (a question
-stays until answered). Text is what can be recovered this way; the deletions
-and moves among the lost changes are not (the text they removed is still in
-the document), and the notice says that changes were not kept. Why a document
-and not the inverse patches: an inverse can only be applied to the document
-it was made for, and the host's document has moved; the text can be pasted
-anywhere.
+stays until answered). The document has the text typed, the content that was
+deleted (from the inverse modification of the deletion, after "Deleted:"),
+the settings changed or removed ("Setting name: value"), and a description of
+the changes of structure (a paragraph split or joined, a tag changed). Why a
+document and not the inverse patches: an inverse can only be applied to the
+document it was made for, and the host's document has moved; the text can be
+pasted anywhere. The files are kept 30 days and the last 50.
+
+## Cost of the polling
+
+At each tick the editor is asked for a number (`buffer-meta-hash`: a sum over
+its style and initial environment, which does not depend on the order of the
+variables); the trees are made and compared only when it changed, and then
+the comparison does not depend on the order within a collection. A tick
+without a change costs a pass over the variables in C++ (microseconds for
+1500 variables), not a conversion to Scheme. At most 4 new links are accepted
+per tick.
 
 ## Saving
 
@@ -205,11 +216,13 @@ number for each).
   gets `(welcome state document modified roster host)` (waiting 500 ms at the
   most, in a loop on the main thread) and makes the buffer from it
   (`buffer-set`, `buffer-pretend-saved`). **A host whose process is alive is
-  never replaced**: if it does not answer in time (it is busy or stopped) or
-  refuses the connection, the file is opened from the file, not shared, with
-  a message in the footer; an entry is removed only when its process is dead.
-  So two hosts never write the same file. A pid reused by another program
-  keeps a file from being shared until that program ends.
+  never replaced**: if its port accepts the connection but it does not answer
+  in time (it is busy or stopped), the file is opened from the file, not
+  shared, with a message in the footer. An entry is removed when its port
+  refuses the connection (the process is gone, or is another program with the
+  same pid: nothing serves the file there), or when it is empty or damaged and
+  more than 5 s old (a create that did not end). So two hosts never write the
+  same file.
 - **An interactive process joins a file hosted by an interactive one**: it is
   a participant (the first interactive process hosts). **An interactive
   process joins a file hosted by a non-interactive one**:
@@ -222,12 +235,19 @@ number for each).
   it kept the states); a participant whose state it does not have gets the whole
   document (its pending changes are dropped, and it is told).
 - **The host closes the file** (`buffer-close`): the same handover to the
-  first participant by priority, waiting for the answer (4 s), then it
+  first participant by priority, waiting for the answer (1.5 s at most), then it
   leaves; without a participant it removes its entry. Changes of the host which
   were not yet sent are sent before.
 - **A buffer removed by the C++ code without `buffer-close`** (the window and
   buffer killed together): `notify-buffer-closed`, which `remove_buffer`
   calls, makes the process leave the sharing as above.
+- **Never take over a host that is alive.** The same rule holds when a
+  participant elects itself (the host died, or a reconnection to a new host
+  timed out): `become-host!` does nothing while the entry belongs to another
+  process that is alive and whose port accepts connections; the participant
+  goes on trying to reach it, once a second, without blocking, and keeps its
+  changes (a new host which stalls for longer than a participant waits is not
+  replaced).
 - **The host dies**: the participants see the link close. Each computes the
   candidates from the last roster (without the dead host); the first becomes
   host from its own copy (its pending changes become new states); the others
@@ -268,6 +288,10 @@ checks that the two documents end equal. Running them with
 - Undo after a remote patch: a crash in `edit_modify_rep::undo` was seen
   headless; it happens with the feature off too (pre-existing), and is not
   studied here.
+- A case-insensitive volume: on macOS the key is made from the name the system
+  stores (`F_GETPATH`), so that `F.TM` and `f.tm` are one file; on Windows the
+  feature is off, and on Linux a volume that ignores case (rare) is not
+  handled.
 - Heavy use of undo: not studied (design 3.5).
 - Windows: the feature is off there (the preference has no effect): it needs a
   system source of random numbers (`BCryptGenRandom`) and an exclusive create

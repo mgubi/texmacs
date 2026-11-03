@@ -864,6 +864,7 @@
 "buffer-get-style"
 "buffer-set-style"
 "buffer-get-meta"
+"buffer-meta-hash"
 "buffer-set-init"
 "buffer-reset-init"
 "buffer-set-master"

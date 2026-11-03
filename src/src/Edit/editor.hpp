@@ -346,6 +346,7 @@ public:
   virtual void     change_style (tree style) = 0;
   virtual void     change_style_local (tree style) = 0;
   virtual tree     get_init_all () = 0;
+  virtual int      get_meta_hash () = 0;  // style and initial environment: see get_buffer_meta_hash
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
   virtual void     init_env_local (string var, tree by) = 0;

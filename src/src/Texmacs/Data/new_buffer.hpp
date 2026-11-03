@@ -86,6 +86,7 @@ void set_buffer_body (url name, tree body);
 tree get_buffer_style (url name);
 void set_buffer_style (url name, tree style);
 tree get_buffer_meta (url name);
+int get_buffer_meta_hash (url name);
 void set_buffer_init (url name, string var, tree val);
 void reset_buffer_init (url name, string var);
 tree get_buffer_body (url name);

@@ -134,7 +134,14 @@
            (with e (catch #t
                      (lambda () (string->object (string-load u)))
                      (lambda args #f))
-             (and (func? e 'entry) (== (length e) 7) (== (cadr e) key) e))))))
+             (cond ((and (func? e 'entry) (== (length e) 7))
+                    (and (== (cadr e) key) e))
+                   (else
+                     ;; empty or damaged (a create that did not end): when
+                     ;; it is not new any more it is stale
+                     (when (> (- (current-time) (url-last-modified u)) 5)
+                       (system-remove u))
+                     #f)))))))
 
 (define (remove-entry-if key token)
   ;; (only the entry which has the token: not one made meanwhile)
@@ -306,7 +313,8 @@
         (for (a want-init)
           (let ((c (assoc (car a) cur-init)))
             (when (or (not c) (!= (cdr c) (cdr a)))
-              (buffer-set-init name (car a) (stree->tree (cdr a))))))))))
+              (buffer-set-init name (car a) (stree->tree (cdr a)))))))
+      (sf-put! sf 'meta-hash (buffer-meta-hash name)))))
 
 (define (meta-diff! shadow new)
   ;; Change the tree @shadow into the stree @new, by modifications; gives
@@ -344,18 +352,36 @@
       (do! (modification-assign (list 0) (stree->tree (cadr new)))))
     (for (b (.. 0 sf-buckets))
       (let ((want (cdr (list-ref (cdr (caddr new)) b))))
-        (when (!= want (cdr (tm->stree (tree-ref shadow 1 b))))
+        (when (!= (sort-assoc want)
+                  (sort-assoc (cdr (tm->stree (tree-ref shadow 1 b)))))
           (diff-bucket! b want))))
     (reverse out)))
 
+(define (sort-assoc l)
+  (sort l (lambda (a b) (string<? (cadr a) (cadr b)))))
+
+(define (meta-same? a b)
+  ;; two bucketed metas (strees), the order within a collection not mattering
+  (and (== (cadr a) (cadr b))
+       (let loop ((x (cdr (caddr a))) (y (cdr (caddr b))))
+         (cond ((null? x) (null? y))
+               ((null? y) #f)
+               (else (and (== (sort-assoc (cdr (car x))) (sort-assoc (cdr (car y))))
+                          (loop (cdr x) (cdr y))))))))
+
 (define (meta-poll! sf)
   ;; the changes of the style and of the initial environment in the editor,
-  ;; since the last time, become local changes
+  ;; since the last time, become local changes. A number from the editor
+  ;; (buffer-meta-hash) is compared first: the trees are made and compared
+  ;; only when it changed.
   (when (and (not sf-applying?) (buffer-exists? (sf-buffer sf)))
-    (let ((new (bucketize (tm->stree (buffer-get-meta (sf-buffer sf))))))
-      (when (!= new (tm->stree (sf-meta sf)))
-        (for (pp (meta-diff! (sf-meta sf) new))
-          (sf-put! sf 'collect (cons pp (sf-get sf 'collect))))))))
+    (let ((h (buffer-meta-hash (sf-buffer sf))))
+      (when (!= h (sf-get sf 'meta-hash))
+        (sf-put! sf 'meta-hash h)
+        (let ((new (bucketize (tm->stree (buffer-get-meta (sf-buffer sf))))))
+          (when (not (meta-same? new (tm->stree (sf-meta sf))))
+            (for (pp (meta-diff! (sf-meta sf) new))
+              (sf-put! sf 'collect (cons pp (sf-get sf 'collect))))))))))
 
 (define (author-of sf peer-id)
   (with t (sf-get sf 'authors)
@@ -474,6 +500,7 @@
     (sf-put! sf 'election #f)
     (sf-put! sf 'msg-id 0)
     (sf-put! sf 'meta (read-editor-meta name))
+    (sf-put! sf 'meta-hash (buffer-meta-hash name))
     (ahash-set! sf-table key sf)
     (ahash-set! sf-by-buffer (url->string name) key)
     (sf-put! sf 'observer (tree-observe (buffer-get-body name) "shared-notify"))
@@ -536,7 +563,7 @@
 (define (note-unshared! name)
   ;; the host of the file is alive but did not answer in time: the file is
   ;; read as usual, not shared (never a second host: both would write it)
-  (ahash-set! sf-unshared (url->string name) #t)
+  (ahash-set! sf-unshared (url->string name) (texmacs-time))
   (set-message "Shared file: the process which has this file open did not answer; it is opened from the file, without sharing"
                "Shared file"))
 
@@ -581,8 +608,10 @@
                (sf-debug "joined " key " state " state "\n")
                #t)))
           (else
-            (when c (local-close c))
-            (cond ((shared-process-alive? (list-ref entry 4)) 'alive)
+            ;; (a connection that is refused: nobody serves the file there, the
+            ;; process is gone or is another program with the same pid; one
+            ;; that is made but not answered: the host is busy or stopped)
+            (cond (c (local-close c) 'alive)
                   (else (remove-entry-if key (cadddr entry)) #f))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -593,8 +622,10 @@
   (:synopsis "Called when the buffer @name has been loaded from its file")
   ;; The process hosts the file, unless a host appeared meanwhile (then the
   ;; process joins it, replacing what it has read).
-  (cond ((ahash-ref sf-unshared (url->string name))
-         (ahash-remove! sf-unshared (url->string name)))
+  (cond ((let ((t (ahash-ref sf-unshared (url->string name))))
+           (ahash-remove! sf-unshared (url->string name))
+           (and t (< (- (texmacs-time) t) 10000)))
+         (noop))
         ((and (shared-files-on?) (not (sf-by-name name)))
          (and-with key (shareable-key name)
            (when (not (ahash-ref sf-table key))
@@ -615,8 +646,11 @@
             ;; an entry exists: of a live host (join it), or a stale one
             (let ((e (read-entry key)))
               (sf-destroy! sf)
-              (when e
-                (with r (join-host name key e)
+              (if (not e)
+                  ;; (an unreadable entry that was old has just been removed)
+                  (when (not (and-with p (entry-path key) (url-exists? (string->url p))))
+                    (host-start name key))
+                  (with r (join-host name key e)
                   (cond ((== r #t) #t)
                         ((== r 'alive) (note-unshared! name))
                         ;; (join-host removed the stale entry)
@@ -709,13 +743,16 @@
                      (when r (stat! 'rebased))
                      r))
                   (else #f))))
-    (cond ((and p (patch-applicable? p (live-current-document key)))
+    (cond ((and p (patch-applicable? p (live-current-document key))
+                (apply-in-place! sf p (author-of sf (peer-id peer))))
+           ;; (applied to the buffer first: if that fails nothing moves)
            (let ((to (live-apply-patch key p)))
-             (apply-in-place! sf p (author-of sf (peer-id peer)))
              (sf-notify-modified! sf)
-             (send-peers sf (list 'applied cur to (peer-id peer) id
-                                  (patch->scheme p)))
-             (sf-trim! key)))
+             (cond (to
+                     (send-peers sf (list 'applied cur to (peer-id peer) id
+                                          (patch->scheme p)))
+                     (sf-trim! key))
+                   (else (host-reset-live! sf)))))
           (else
             (stat! 'refused)
             (sf-debug "refused a patch of " (peer-id peer) " from " base "\n")
@@ -883,20 +920,64 @@
         ((string? t) (list (string-append "Setting changed to: " t)))
         (else '())))
 
+(define (patch-leaves p)
+  (cond ((patch-pair? p) (list p))
+        ((patch-compound? p) (append-map patch-leaves (patch-children p)))
+        (else '())))
+
+(define (content-items c)
+  (cond ((and (string? c) (== c "")) '())
+        ((func? c 'document) (cdr c))
+        (else (list c))))
+
+(define (lost-items pp)
+  ;; what the person did in the change @pp (a pair of modifications), in a
+  ;; readable form: the text typed, the content deleted (it is in the inverse
+  ;; modification), a description of a change of structure, the settings
+  (let* ((m (modification->scheme (patch-direct pp)))
+         (im (modification->scheme (patch-inverse pp)))
+         (kind (car m)) (path (cadr m)) (t (caddr m))
+         (where (object->string (if (pair? path) (cdr path) path))))
+    (cond ((not (pair? path)) '())
+          ((== (car path) 0)                    ; the style, the settings
+           (cond ((== kind 'remove)
+                  (map (lambda (x) (string-append "Removed: " x))
+                       (lost-setting-texts 'insert (caddr im))))
+                 (else (lost-setting-texts kind t))))
+          ((in? kind '(insert assign)) (content-items t))
+          ((== kind 'remove)
+           (cons "Deleted:" (content-items (caddr im))))
+          ((== kind 'split)
+           (list (string-append "A paragraph was split at " where)))
+          ((== kind 'join)
+           (list (string-append "Two paragraphs were joined at " where)))
+          ((in? kind '(assign-node insert-node remove-node))
+           (list (string-append "Change of structure (" (symbol->string kind)
+                                ") at " where
+                                (if (string? t) "" (string-append ": " (object->string t))))))
+          (else '()))))
+
 (define (lost-contents patches)
-  (append-map
-   (lambda (p)
-     (append-map
-      (lambda (m)
-        (let ((kind (car m)) (t (caddr m)))
-          (cond ((not (in? kind '(insert assign))) '())
-                ((!= (car (cadr m)) 1)           ; (the meta part: as text)
-                 (lost-setting-texts kind t))
-                ((and (string? t) (== t "")) '())
-                ((func? t 'document) (cdr t))
-                (else (list t)))))
-      (patch->modlist p)))
-   patches))
+  (append-map (lambda (p) (append-map lost-items (patch-leaves p))) patches))
+
+(define lost-keep-days 30)
+(define lost-keep-files 50)
+
+(define (prune-lost-files! dir)
+  ;; the documents of lost changes are kept 30 days, and the last 50
+  (let* ((now (current-time))
+         (names (list-filter (list-dir-names dir)
+                             (lambda (n) (and (string-starts? n "shared-lost-")
+                                              (string-ends? n ".tm")))))
+         (stamp (lambda (n)
+                  (or (string->number (list-ref (string-split n #\-) 2)) 0)))
+         (sorted (sort names (lambda (a b) (< (stamp a) (stamp b))))))
+    (let loop ((l sorted) (n (length sorted)))
+      (when (nnull? l)
+        (when (or (> n lost-keep-files)
+                  (> (- now (stamp (car l))) (* lost-keep-days 86400)))
+          (system-remove (url-append (url->url dir) (car l))))
+        (loop (cdr l) (- n 1))))))
 
 (define (report-lost! sf patches)
   (when (nnull? patches)
@@ -912,6 +993,7 @@
               (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
                      (file (url-append dir (string-append
                                             "shared-lost-"
+                                            (number->string (current-time)) "-"
                                             (number->string (shared-process-id)) "-"
                                             (number->string sf-serial) ".tm")))
                      (doc `(document (TeXmacs "2.1.5") (style (tuple "generic"))
@@ -922,6 +1004,8 @@
                      (ok (catch #t
                            (lambda ()
                              (system-mkdir dir)
+                             (catch #t (lambda () (prune-lost-files! (url->system dir)))
+                               (lambda args #f))
                              (not (not (tree-export (stree->tree doc) file "texmacs"))))
                            (lambda args #f))))
                 (stat! 'lost-saved)
@@ -938,16 +1022,21 @@
                       (noop))))))))))
 
 (define (rollback-pending! sf)
-  ;; undo the pending changes in the buffer: it becomes the confirmed document
-  (let* ((key (sf-key sf)) (pend (sf-get sf 'pending)))
+  ;; undo the pending changes in the buffer: it becomes the confirmed
+  ;; document. Gives #f if one of the inverse patches could not be applied
+  ;; (then the document must be asked from the host).
+  (let* ((key (sf-key sf)) (pend (sf-get sf 'pending)) (ok #t))
     (when (nnull? pend)
       (let loop ((l pend) (t (live-current-document key)) (invs '()))
         (if (null? l)
-            (for (inv invs) (apply-in-place! sf inv (author-of sf (sf-get sf 'id))))
+            (for (inv invs)
+              (when (not (apply-in-place! sf inv (author-of sf (sf-get sf 'id))))
+                (set! ok #f)))
             (loop (cdr l) (patch-apply t (car l))
                   (cons (patch-invert (car l) t) invs))))
       (sf-put! sf 'pending '())
-      (sf-put! sf 'inflight #f))))
+      (sf-put! sf 'inflight #f))
+    ok))
 
 (define (participant-reset! sf state doc modified)
   ;; the document of the host replaces everything, pending changes included
@@ -979,27 +1068,33 @@
             ;; The pending changes go on top of the patch of the host, as
             ;; the host will rebase them (and one with a tie: its own
             ;; patch is placed first): take them back, apply the patch,
-            ;; put them back as far as they can be
+            ;; put them back as far as they can be. If a step fails the
+            ;; changes are reported and the document asked from the host.
             (let* ((kept (transform-pending pend (patch-invert r d0)))
                    (inflight (sf-get sf 'inflight)))
-              (rollback-pending! sf)
-              (cond ((apply-in-place! sf r (author-of sf (sf-get sf 'host-id)))
-                     (live-apply-patch key r to)
-                     (sf-notify-modified! sf)
-                     (let ((ok (let loop ((l kept) (done '()))
-                                 (cond ((null? l) (reverse done))
-                                       ((apply-in-place! sf (car l) (author-of sf (sf-get sf 'id)))
-                                        (loop (cdr l) (cons (car l) done)))
-                                       (else (reverse done))))))
-                       (when (< (length ok) (length pend))
-                         (stat! 'dropped)
-                         (report-lost! sf (list-tail pend (length ok))))
-                       (sf-put! sf 'pending ok)
-                       ;; (the patch which was sent is still on its way if it
-                       ;; is kept: its confirmation is recognised by the id)
-                       (sf-put! sf 'inflight (and (nnull? ok) inflight))
-                       (sf-trim! key)))
-                    (else (participant-request-resync! sf))))))))
+              (cond
+                ((not (rollback-pending! sf))
+                 (report-lost! sf pend)
+                 (participant-request-resync! sf))
+                ((not (apply-in-place! sf r (author-of sf (sf-get sf 'host-id))))
+                 (report-lost! sf pend)
+                 (participant-request-resync! sf))
+                (else
+                  (live-apply-patch key r to)
+                  (sf-notify-modified! sf)
+                  (let ((ok (let loop ((l kept) (done '()))
+                              (cond ((null? l) (reverse done))
+                                    ((apply-in-place! sf (car l) (author-of sf (sf-get sf 'id)))
+                                     (loop (cdr l) (cons (car l) done)))
+                                    (else (reverse done))))))
+                    (when (< (length ok) (length pend))
+                      (stat! 'dropped)
+                      (report-lost! sf (list-tail pend (length ok))))
+                    (sf-put! sf 'pending ok)
+                    ;; (the patch which was sent is still on its way if it
+                    ;; is kept: its confirmation is recognised by the id)
+                    (sf-put! sf 'inflight (and (nnull? ok) inflight))
+                    (sf-trim! key)))))))))
 
 (define (participant-request-resync! sf)
   (stat! 'resync)
@@ -1029,7 +1124,8 @@
                (stat! 'rolled-back)
                (sf-debug "my patch was refused\n")
                (report-lost! sf (sf-get sf 'pending))
-               (rollback-pending! sf)
+               (when (not (rollback-pending! sf))
+                 (participant-request-resync! sf))
                (when (!= cur (live-current-state key))
                  (participant-request-resync! sf)))))
           ((func? msg 'roster)
@@ -1096,7 +1192,7 @@
 (define (host-start-handover sf target-id leaving?)
   (host-flush! sf)
   (and-with peer (find-peer sf target-id)
-    (sf-put! sf 'handover (list target-id (+ (texmacs-time) 4000) leaving?))
+    (sf-put! sf 'handover (list target-id (+ (texmacs-time) (if leaving? 1500 4000)) leaving?))
     (msg-send (peer-link peer)
               (list 'become-host (live-current-state (sf-key sf))))))
 
@@ -1128,15 +1224,34 @@
   (let ((old (sf-get sf 'conn)))
     (cond ((and (== state (live-current-state (sf-key sf)))
                 (> (local-listen) 0))
-           (let ((token (become-host! sf)))
+           (let ((token (become-host! sf #t)))
              (when old
                (msg-send old (list 'host-ready (local-listen) token))
                (local-close old))))
           (else (when old (msg-send old (list 'host-failed)))))))
 
-(define (become-host! sf)
+;; The entry of another process that serves the file: its process is alive
+;; and its port accepts connections (one that is refused is not served: the
+;; process is gone, or is another program with the same pid, and the entry is
+;; removed). Such an entry is never taken over.
+(define (serving-entry key)
+  (let ((e (read-entry key)))
+    (and e (!= (list-ref e 4) (shared-process-id))
+         (shared-process-alive? (list-ref e 4))
+         (let ((c (local-connect (caddr e))))
+           (cond ((>= c 0) (local-close c) e)
+                 (else (remove-entry-if key (cadddr e)) #f))))))
+
+(define (become-host! sf . handover?)
   ;; this process hosts the file from now on: its document is the confirmed
-  ;; one, to which its pending changes are added as new states
+  ;; one, to which its pending changes are added as new states. Unless the
+  ;; host hands over to it, it does not when another process serves the file
+  ;; (then #f): two hosts would write the same file.
+  (if (and (null? handover?) (serving-entry (sf-key sf)))
+      #f
+      (become-host!* sf)))
+
+(define (become-host!* sf)
   (let* ((key (sf-key sf)) (port (local-listen))
          (token (shared-random-token)))
     (participant-flush! sf)
@@ -1159,7 +1274,12 @@
               (live-create key (sf-composite sf)))))
       (when (nnull? pend) (sf-put! sf 'dirty #t))
       (write-entry key port token (sf-get sf 'interactive) (sf-get sf 'id))
+      (sf-put! sf 'tried-reconnect #f)
       (sf-debug "now hosting " key " on " port "\n")
+      ;; a Save asked in the meantime is done here now
+      (when (sf-get sf 'save-wanted)
+        (sf-put! sf 'save-wanted #f)
+        (host-save sf))
       token)))
 
 (define (participant-reconnect! sf port token host-id)
@@ -1172,6 +1292,7 @@
              (sf-put! sf 'host-id host-id)
              (sf-put! sf 'inflight #f)
              (sf-put! sf 'reconnecting (list c (+ (texmacs-time) 4000)))
+             (sf-put! sf 'tried-reconnect #t)
              (msg-send c (list 'hello token (sf-key sf) (sf-get sf 'id)
                                (shared-process-id) (sf-get sf 'interactive)
                                (live-current-state (sf-key sf)))))
@@ -1184,15 +1305,18 @@
       (with m (msg-receive c)
         (cond (m
                 (cond ((func? m 'welcome-same)
+                       (sf-put! sf 'tried-reconnect #f)
                        (sf-put! sf 'roster (caddr m))
                        (sf-put! sf 'reconnecting #f))
                       ((func? m 'welcome-catchup)
+                       (sf-put! sf 'tried-reconnect #f)
                        (with (tag from to psexp roster host-id) m
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
                          (participant-apply-remote! sf (scheme->patch psexp)
                                                     from to)))
                       ((func? m 'welcome-reset)
+                       (sf-put! sf 'tried-reconnect #f)
                        (with (tag state doc modified roster host-id) m
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
@@ -1216,32 +1340,37 @@
       (when c (local-close c))
       (sf-put! sf 'conn #f)
       (sf-put! sf 'inflight #f)
+      ;; (deadline for a candidate, those left out, the host that was, the
+      ;; time of the next try: after a failed reconnection, a second later)
       (sf-put! sf 'election
                (list (+ (texmacs-time) 3000) (list (sf-get sf 'host-id))
-                     (sf-get sf 'host-id)))
+                     (sf-get sf 'host-id)
+                     (+ (texmacs-time) (if (sf-get sf 'tried-reconnect) 1000 0))))
       (sf-debug "host gone: " (sf-get sf 'host-id) "\n")
       (election-step sf))))
 
 (define (election-step sf)
   (let* ((e (sf-get sf 'election))
          (deadline (car e)) (excluded (cadr e)) (old-host (caddr e))
-         (cands (by-priority
-                 (list-filter (sf-get sf 'roster)
-                              (lambda (r) (not (in? (car r) excluded)))))))
-    (cond ((or (null? cands) (== (car (car cands)) (sf-get sf 'id)))
-           (become-host! sf))
-          (else
-            (let ((entry (read-entry (sf-key sf))))
-              (cond ((and entry (!= (list-ref entry 6) old-host)
-                          (shared-process-alive? (list-ref entry 4)))
-                     (sf-put! sf 'election #f)
-                     (participant-reconnect! sf (caddr entry) (cadddr entry)
-                                             (list-ref entry 6)))
-                    ((> (texmacs-time) deadline)
-                     (sf-put! sf 'election
-                              (list (+ (texmacs-time) 3000)
-                                    (cons (car (car cands)) excluded)
-                                    old-host)))))))))
+         (next-try (cadddr e)))
+    (when (>= (texmacs-time) next-try)
+      (let ((foreign (serving-entry (sf-key sf)))
+            (cands (by-priority
+                    (list-filter (sf-get sf 'roster)
+                                 (lambda (r) (not (in? (car r) excluded)))))))
+        (cond (foreign
+               ;; a host is alive (the old one, which did not answer, or a
+               ;; new one): go on trying to reach it; never take its place
+               (sf-put! sf 'election #f)
+               (participant-reconnect! sf (caddr foreign) (cadddr foreign)
+                                       (list-ref foreign 6)))
+              ((or (null? cands) (== (car (car cands)) (sf-get sf 'id)))
+               (become-host! sf))
+              ((> (texmacs-time) deadline)
+               (sf-put! sf 'election
+                        (list (+ (texmacs-time) 3000)
+                              (cons (car (car cands)) excluded)
+                              old-host next-try))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Leaving a file
@@ -1287,7 +1416,7 @@
               (host-start-handover sf (car (car cands)) #t)
               ;; wait for the end of the handover (the other process answers
               ;; at its next tick)
-              (let ((end (+ (texmacs-time) 4000)))
+              (let ((end (+ (texmacs-time) 1500)))
                 (let loop ()
                   (host-tick sf)
                   (when (and (sf-get sf 'handover) (< (texmacs-time) end))
@@ -1304,14 +1433,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (accept-new-links)
-  (let loop ()
-    (let ((c (local-accept)))
+  ;; (a few links a tick at most)
+  (let loop ((n 0))
+    (let ((c (if (< n 4) (local-accept) -1)))
       (when (>= c 0)
         ;; (not too many links which have not said who they are)
         (if (< (length sf-incoming) 16)
             (set! sf-incoming (cons (cons c (texmacs-time)) sf-incoming))
             (local-close c))
-        (loop))))
+        (loop (+ n 1)))))
   (set! sf-incoming
         (list-filter
          sf-incoming
@@ -1378,5 +1508,6 @@
 ;; sharing, the buffer still exists
 (tm-define (notify-buffer-closed name)
   (former name)
+  (ahash-remove! sf-unshared name)
   (when (shared-files-in-use?)
     (shared-file-leave (string->url name))))
