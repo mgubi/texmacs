@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 3 November 2026
+
+- **Links with a wildcard or a `file:` address**: a link whose target has a
+  `*` (`dir/*.scm`) no longer stops TeXmacs: it opens the file when one
+  matches, offers the choice when several do, and says when none does
+  (#771). A `file://` link with a line, such as `file:///a/b.scm?line=3`,
+  opens the file at that line instead of an empty document (#772).
+
 ## 2 November 2026
 
 - **A question before a very large source file** (desktop applications):
