@@ -112,6 +112,15 @@
 ;; (entry key port token pid interactive host-id): created whole and replaced
 ;; atomically, so that a reader never sees half of it.
 
+(define (token=? a b)
+  ;; without stopping at the first difference
+  (and (string? a) (string? b) (== (string-length a) (string-length b))
+       (let loop ((i 0) (acc 0))
+         (if (>= i (string-length a))
+             (== acc 0)
+             (loop (+ i 1)
+                   (+ acc (if (== (string-ref a i) (string-ref b i)) 0 1)))))))
+
 (define (entry-path key)
   (with dir (shared-user-dir)
     (and (!= dir "")
@@ -143,17 +152,39 @@
                        (system-remove u))
                      #f)))))))
 
+;; The changes of an entry (replace, remove if the token is such) are made
+;; holding a lock, a file made with O_EXCL (one older than 3 s is a dead
+;; process's and is removed), so that an entry is never removed that another
+;; process has just written. (The creation is atomic as it is.)
+(define (with-entry-lock key thunk)
+  (let* ((lp (string-append (entry-path key) ".lock")) (u (string->url lp))
+         (end (+ (texmacs-time) 300)))
+    (let loop ()
+      (cond ((shared-create-file lp "")
+             (let ((r (catch #t thunk (lambda args #f))))
+               (system-remove u)
+               r))
+            ((and (url-exists? u) (> (- (current-time) (url-last-modified u)) 3))
+             (system-remove u)
+             (loop))
+            ((< (texmacs-time) end) (loop))
+            (else (catch #t thunk (lambda args #f)))))))
+
 (define (remove-entry-if key token)
   ;; (only the entry which has the token: not one made meanwhile)
-  (and-with e (read-entry key)
-    (when (== (cadddr e) token)
-      (system-remove (string->url (entry-path key))))))
+  (with-entry-lock key
+    (lambda ()
+      (and-with e (read-entry key)
+        (when (token=? (cadddr e) token)
+          (system-remove (string->url (entry-path key))))))))
 
 (define (write-entry key port token interactive host-id)
   (and-with path (entry-path key)
-    (shared-replace-file
-     path (object->string (list 'entry key port token (shared-process-id)
-                                interactive host-id)))))
+    (with-entry-lock key
+      (lambda ()
+        (shared-replace-file
+         path (object->string (list 'entry key port token (shared-process-id)
+                                    interactive host-id)))))))
 
 (define (create-entry key port token interactive host-id)
   (and-with path (entry-path key)
@@ -173,6 +204,11 @@
   (with dir (shared-user-dir)
     (when (!= dir "")
       (for (name (list-dir-names dir))
+        (when (and (string? name) (string-starts? name "f-")
+                   (string-ends? name ".lock"))
+          (let ((u (string->url (string-append dir "/" name))))
+            (when (> (- (current-time) (url-last-modified u)) 10)
+              (system-remove u))))
         (when (and (string? name) (string-starts? name "f-")
                    (string-ends? name ".entry"))
           (let* ((u (string->url (string-append dir "/" name)))
@@ -550,12 +586,12 @@
 ;; (the hello: token of the entry, file, my id, my process, am I interactive,
 ;; the state I have, or #f if I have none)
 (define (do-hello key entry id interactive base)
+  ;; the link, or a negative number: -2 refused, -1 another error
   (let ((c (local-connect (caddr entry))))
-    (and (>= c 0)
-         (begin
-           (msg-send c (list 'hello (cadddr entry) key id (shared-process-id)
-                             interactive base))
-           c))))
+    (when (>= c 0)
+      (msg-send c (list 'hello (cadddr entry) key id (shared-process-id)
+                        interactive base)))
+    c))
 
 (define sf-join-wait 500)   ; ms: the most a join makes the interface wait
 (define sf-unshared (make-ahash-table))  ; names opened without sharing
@@ -587,7 +623,7 @@
 (define (join-host name key entry)
   (let* ((id (sf-new-id)) (inter (shared-interactive?))
          (c (do-hello key entry id inter #f))
-         (m (and c (msg-wait c sf-join-wait))))
+         (m (and (>= c 0) (msg-wait c sf-join-wait))))
     ;; gives #t (joined), 'alive (the host is alive but did not answer: do
     ;; not take its place) or #f (its entry is stale, and was removed)
     (cond ((and m (func? m 'welcome) (== (length m) 7))
@@ -611,8 +647,11 @@
             ;; (a connection that is refused: nobody serves the file there, the
             ;; process is gone or is another program with the same pid; one
             ;; that is made but not answered: the host is busy or stopped)
-            (cond (c (local-close c) 'alive)
-                  (else (remove-entry-if key (cadddr entry)) #f))))))
+            ;; (any other error is not known to mean that: unshared, and the
+            ;; entry stays)
+            (cond ((>= c 0) (local-close c) 'alive)
+                  ((== c -2) (remove-entry-if key (cadddr entry)) #f)
+                  (else 'alive))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hosting
@@ -743,16 +782,22 @@
                      (when r (stat! 'rebased))
                      r))
                   (else #f))))
-    (cond ((and p (patch-applicable? p (live-current-document key))
-                (apply-in-place! sf p (author-of sf (peer-id peer))))
-           ;; (applied to the buffer first: if that fails nothing moves)
-           (let ((to (live-apply-patch key p)))
-             (sf-notify-modified! sf)
-             (cond (to
-                     (send-peers sf (list 'applied cur to (peer-id peer) id
-                                          (patch->scheme p)))
-                     (sf-trim! key))
-                   (else (host-reset-live! sf)))))
+    (cond ((and p (patch-applicable? p (live-current-document key)))
+           ;; (applied to the buffer first: if that fails nothing moves, but
+           ;; the buffer and the live document differ: start again from the
+           ;; buffer, so that the host heals)
+           (if (apply-in-place! sf p (author-of sf (peer-id peer)))
+               (let ((to (live-apply-patch key p)))
+                 (sf-notify-modified! sf)
+                 (cond (to
+                         (send-peers sf (list 'applied cur to (peer-id peer) id
+                                              (patch->scheme p)))
+                         (sf-trim! key))
+                       (else (host-reset-live! sf))))
+               (begin
+                 (stat! 'refused)
+                 (host-reset-live! sf)
+                 (msg-send (peer-link peer) (list 'refused id cur)))))
           (else
             (stat! 'refused)
             (sf-debug "refused a patch of " (peer-id peer) " from " base "\n")
@@ -816,6 +861,8 @@
                          (sf-composite-stree sf)
                          (or (sf-get sf 'dirty) (buffer-modified? (sf-buffer sf)))
                          (roster-of sf) (sf-get sf 'id))))
+        ((func? msg 'host-accept)
+         (host-handle-accept sf peer (cadr msg)))
         ((func? msg 'host-ready)
          (host-finish-handover sf peer (cadr msg) (caddr msg)))
         ((func? msg 'host-failed)
@@ -837,7 +884,54 @@
   (and-with h (sf-get sf 'handover)
     (when (> (texmacs-time) (cadr h))
       (sf-debug "handover timed out\n")
-      (sf-put! sf 'handover #f))))
+      (sf-put! sf 'handover #f)))
+  (host-check-entry! sf))
+
+(define (host-check-entry! sf)
+  ;; the entry of the file must be this host's (its token); else another
+  ;; process has taken the file, and this one stops hosting
+  (let ((now (texmacs-time)) (key (sf-key sf)))
+    (when (and (not (sf-get sf 'handover)) (> now (or (sf-get sf 'entry-check) 0)))
+      (sf-put! sf 'entry-check (+ now 3000))
+      (let ((e (read-entry key)))
+        (cond ((not e)
+               (create-entry key (local-listen) (sf-get sf 'token)
+                             (sf-get sf 'interactive) (sf-get sf 'id)))
+              ((token=? (cadddr e) (sf-get sf 'token)) (noop))
+              (else (host-demote! sf e)))))))
+
+(define (save-recovered-copy! sf)
+  ;; the whole document, in the recovered folder
+  (set! sf-serial (+ sf-serial 1))
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (file (url-append dir (string-append
+                                "shared-lost-" (number->string (current-time)) "-"
+                                (number->string (shared-process-id)) "-"
+                                (number->string sf-serial) ".tm"))))
+    (and (catch #t
+           (lambda () (system-mkdir dir)
+             (not (buffer-export (sf-buffer sf) file "texmacs")))
+           (lambda args #f))
+         file)))
+
+(define (host-demote! sf e)
+  ;; another process is the host of the file: this one joins it. The document
+  ;; here is saved first, since it may have changes the other has not.
+  (stat! 'demoted)
+  (let ((file (save-recovered-copy! sf)))
+    (set-message `(concat "Shared file: another process hosts this file; this one joins it."
+                          ,(if file
+                               `(concat " A copy of your document is in " (verbatim ,(url->system file)))
+                               ""))
+                 "Shared file"))
+  (for (p (sf-get sf 'peers))
+    (msg-send (peer-link p) (list 'rehost (caddr e) (cadddr e) (list-ref e 6)))
+    (local-close (peer-link p)))
+  (sf-put! sf 'roster (roster-of sf))
+  (sf-put! sf 'peers '())
+  (sf-put! sf 'role 'participant)
+  (sf-put! sf 'handover #f)
+  (participant-reconnect! sf (caddr e) (cadddr e) (list-ref e 6)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving
@@ -1143,7 +1237,11 @@
              (sf-put! sf 'host-id host-id)
              (participant-reset! sf state doc modified)))
           ((func? msg 'become-host)
-           (participant-become-host-on-request sf (cadr msg)))
+           (participant-become-host-on-request sf (cadr msg) (caddr msg)))
+          ((func? msg 'host-go)
+           (participant-handle-go sf (cadr msg) (caddr msg)))
+          ((func? msg 'host-no)
+           (sf-put! sf 'pending-go #f))
           ((func? msg 'rehost)
            (with (tag port token host-id) msg
              (participant-reconnect! sf port token host-id)))
@@ -1189,12 +1287,33 @@
 ;;    connect to the new host and send their pending patches again; the
 ;;    host itself does so too, unless it is closing.
 
+;; The target does not become host when it is asked: it answers (host-accept
+;; rid) and becomes host only on (host-go rid state), which the host sends
+;; only while its handover is on (not given up: the host then answers
+;; (host-no rid)). So a target that was busy for longer than the host waited
+;; never becomes host after the host has gone on. Once it has sent host-go the
+;; host waits for host-ready for another 4 s; whatever happens after that, a
+;; host checks every 3 s that the entry is its own.
 (define (host-start-handover sf target-id leaving?)
   (host-flush! sf)
   (and-with peer (find-peer sf target-id)
-    (sf-put! sf 'handover (list target-id (+ (texmacs-time) (if leaving? 1500 4000)) leaving?))
-    (msg-send (peer-link peer)
-              (list 'become-host (live-current-state (sf-key sf))))))
+    (let ((rid (sf-new-id)))
+      (sf-put! sf 'handover (list target-id
+                                  (+ (texmacs-time) (if leaving? 1500 4000))
+                                  leaving? rid #f))
+      (msg-send (peer-link peer)
+                (list 'become-host (live-current-state (sf-key sf)) rid)))))
+
+(define (host-handle-accept sf peer rid)
+  (let ((h (sf-get sf 'handover)))
+    (cond ((and h (== (peer-id peer) (car h)) (== rid (cadddr h))
+                (not (list-ref h 4)) (< (texmacs-time) (cadr h)))
+           (host-flush! sf)
+           (sf-put! sf 'handover
+                    (list (car h) (+ (texmacs-time) 4000) (caddr h) rid #t))
+           (msg-send (peer-link peer)
+                     (list 'host-go rid (live-current-state (sf-key sf)))))
+          (else (msg-send (peer-link peer) (list 'host-no rid))))))
 
 (define (host-finish-handover sf peer port token)
   (and-with h (sf-get sf 'handover)
@@ -1220,14 +1339,23 @@
                                   (shared-process-id) (sf-get sf 'interactive)
                                   (live-current-state (sf-key sf)))))))))))
 
-(define (participant-become-host-on-request sf state)
+(define (participant-become-host-on-request sf state rid)
+  ;; asked to host: say so, and wait for (host-go rid state)
   (let ((old (sf-get sf 'conn)))
-    (cond ((and (== state (live-current-state (sf-key sf)))
+    (cond ((and old (== state (live-current-state (sf-key sf)))
                 (> (local-listen) 0))
+           (sf-put! sf 'pending-go (list rid (+ (texmacs-time) 6000)))
+           (msg-send old (list 'host-accept rid)))
+          (else (when old (msg-send old (list 'host-failed)))))))
+
+(define (participant-handle-go sf rid state)
+  (let ((old (sf-get sf 'conn)) (g (sf-get sf 'pending-go)))
+    (sf-put! sf 'pending-go #f)
+    (cond ((and old g (== (car g) rid) (< (texmacs-time) (cadr g))
+                (== state (live-current-state (sf-key sf))))
            (let ((token (become-host! sf #t)))
-             (when old
-               (msg-send old (list 'host-ready (local-listen) token))
-               (local-close old))))
+             (msg-send old (list 'host-ready (local-listen) token))
+             (local-close old)))
           (else (when old (msg-send old (list 'host-failed)))))))
 
 ;; The entry of another process that serves the file: its process is alive
@@ -1240,20 +1368,33 @@
          (shared-process-alive? (list-ref e 4))
          (let ((c (local-connect (caddr e))))
            (cond ((>= c 0) (local-close c) e)
-                 (else (remove-entry-if key (cadddr e)) #f))))))
+                 ((== c -2) (remove-entry-if key (cadddr e)) #f)
+                 (else e))))))             ; (an error that tells nothing)
 
 (define (become-host! sf . handover?)
   ;; this process hosts the file from now on: its document is the confirmed
-  ;; one, to which its pending changes are added as new states. Unless the
-  ;; host hands over to it, it does not when another process serves the file
-  ;; (then #f): two hosts would write the same file.
-  (if (and (null? handover?) (serving-entry (sf-key sf)))
-      #f
-      (become-host!* sf)))
+  ;; one, to which its pending changes are added as new states. When the host
+  ;; hands over to it (@handover?) it takes the entry of the host. Else it
+  ;; does not when another process serves the file (then #f): two hosts would
+  ;; write the same file; the entry of a host that is gone is removed and the
+  ;; new one made with O_EXCL, which fails if someone else was first.
+  (let ((key (sf-key sf)))
+    (cond ((pair? handover?) (become-host!* sf))
+          ((serving-entry key) #f)
+          (else
+            (let ((port (local-listen)) (token (shared-random-token)))
+              (and (> port 0)
+                   (begin
+                     (and-with e (read-entry key)
+                       (remove-entry-if key (cadddr e)))
+                     (create-entry key port token (sf-get sf 'interactive)
+                                   (sf-get sf 'id))
+                     (become-host!* sf port token))))))))
 
-(define (become-host!* sf)
-  (let* ((key (sf-key sf)) (port (local-listen))
-         (token (shared-random-token)))
+(define (become-host!* sf . given)
+  (let* ((key (sf-key sf))
+         (port (if (pair? given) (car given) (local-listen)))
+         (token (if (pair? given) (cadr given) (shared-random-token))))
     (participant-flush! sf)
     (let ((pend (sf-get sf 'pending)))
       (sf-put! sf 'pending '())
@@ -1273,8 +1414,9 @@
               (loop (cdr l))
               (live-create key (sf-composite sf)))))
       (when (nnull? pend) (sf-put! sf 'dirty #t))
-      (write-entry key port token (sf-get sf 'interactive) (sf-get sf 'id))
-      (sf-put! sf 'tried-reconnect #f)
+      (when (null? given)
+        (write-entry key port token (sf-get sf 'interactive) (sf-get sf 'id)))
+      (reconnect-ok! sf)
       (sf-debug "now hosting " key " on " port "\n")
       ;; a Save asked in the meantime is done here now
       (when (sf-get sf 'save-wanted)
@@ -1305,18 +1447,18 @@
       (with m (msg-receive c)
         (cond (m
                 (cond ((func? m 'welcome-same)
-                       (sf-put! sf 'tried-reconnect #f)
+                       (reconnect-ok! sf)
                        (sf-put! sf 'roster (caddr m))
                        (sf-put! sf 'reconnecting #f))
                       ((func? m 'welcome-catchup)
-                       (sf-put! sf 'tried-reconnect #f)
+                       (reconnect-ok! sf)
                        (with (tag from to psexp roster host-id) m
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
                          (participant-apply-remote! sf (scheme->patch psexp)
                                                     from to)))
                       ((func? m 'welcome-reset)
-                       (sf-put! sf 'tried-reconnect #f)
+                       (reconnect-ok! sf)
                        (with (tag state doc modified roster host-id) m
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
@@ -1334,12 +1476,23 @@
 ;; the others look for the new entry and connect to it. A candidate which
 ;; does not appear within a while is left out and the next one is awaited.
 
+(define (reconnect-ok! sf)
+  (sf-put! sf 'tried-reconnect #f)
+  (sf-put! sf 'reconnect-fails 0))
+
 (define (participant-host-gone! sf)
   (when (not (sf-get sf 'election))
     (let ((c (sf-get sf 'conn)))
       (when c (local-close c))
       (sf-put! sf 'conn #f)
       (sf-put! sf 'inflight #f)
+      (when (sf-get sf 'tried-reconnect)
+        (let ((n (+ 1 (or (sf-get sf 'reconnect-fails) 0))))
+          (sf-put! sf 'reconnect-fails n)
+          (when (== n 2)
+            (stat! 'host-silent)
+            (set-message "Shared file: the host of this file is not answering; your changes are kept, and sent when it does"
+                         "Shared file"))))
       ;; (deadline for a candidate, those left out, the host that was, the
       ;; time of the next try: after a failed reconnection, a second later)
       (sf-put! sf 'election
@@ -1454,15 +1607,6 @@
                    ((not (local-alive? c)) (local-close c) #f)
                    ((> (- (texmacs-time) (cdr e)) 5000) (local-close c) #f)
                    (else #t)))))))
-
-(define (token=? a b)
-  ;; without stopping at the first difference
-  (and (string? a) (string? b) (== (string-length a) (string-length b))
-       (let loop ((i 0) (acc 0))
-         (if (>= i (string-length a))
-             (== acc 0)
-             (loop (+ i 1)
-                   (+ acc (if (== (string-ref a i) (string-ref b i)) 0 1)))))))
 
 (define (identify-link c m)
   ;; the first packet of a link: it must have the token of the file, else

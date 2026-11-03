@@ -24,6 +24,7 @@
 #   save        Save and close in a participant; a buffer removed by C++
 #   hostage     a stalled new host is not replaced by the old one
 #   corrupt     empty, old or unserved entries are stale; case of names
+#   late        a target busy for too long does not become host after the host went on
 #   slow        a host that is alive but stalled is not replaced
 #   attack      oversize, bad and endless packets before the token
 #
@@ -46,7 +47,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or

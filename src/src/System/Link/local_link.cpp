@@ -301,6 +301,9 @@ local_accept () {
   return local_register (make_local_link (fd));
 }
 
+// The link, -2 when the connection is refused (nothing listens there), -1 for
+// any other error (too many files, not allowed...: nothing is known about the
+// process that may be there)
 int
 local_connect (int port) {
   if (!local_sockets_ready ()) return -1;
@@ -312,9 +315,24 @@ local_connect (int port) {
   addr.sin_addr.s_addr= htonl (INADDR_LOOPBACK);
   addr.sin_port       = htons ((unsigned short) port);
   // (a connection to the loopback is made or refused at once)
-  if (L_CONNECT ((L_SOCK_T) fd, (struct sockaddr*) &addr, sizeof (addr)) != 0) {
+  int r= -1, err= 0;
+  for (int tries= 0; tries < 3; tries++) {
+    r= L_CONNECT ((L_SOCK_T) fd, (struct sockaddr*) &addr, sizeof (addr));
+    if (r == 0) break;
+    err= L_ERRNO;
+#ifndef OS_MINGW
+    if (err != EINTR) break;
+#else
+    break;
+#endif
+  }
+  if (r != 0) {
     L_CLOSE ((L_SOCK_T) fd);
-    return -1;
+#ifndef OS_MINGW
+    return err == ECONNREFUSED? -2: -1;
+#else
+    return err == WSAECONNREFUSED? -2: -1;
+#endif
   }
   tm_link ln= make_local_link (fd);
   ((local_link_rep*) ln.rep)->limit= 64 * 1024 * 1024;

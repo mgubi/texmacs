@@ -226,10 +226,15 @@ number for each).
 - **An interactive process joins a file hosted by an interactive one**: it is
   a participant (the first interactive process hosts). **An interactive
   process joins a file hosted by a non-interactive one**:
-  the host flushes its changes and sends `(become-host state)` to it; it
-  accepts if its state is the host's (otherwise `host-failed` and the host goes
-  on), listens, writes the entry (new token) and answers `(host-ready port
-  token)`; the old host sends `(rehost port token id)` to the others, and
+  the host flushes its changes and sends `(become-host state rid)` to it. In
+  three steps, so that a target that is busy for longer than the host waits
+  (4 s here, 1.5 s when the host leaves) cannot become a second host: the
+  target, if its state is the host's (else `host-failed`), answers
+  `(host-accept rid)` and does nothing else; the host, only while its
+  handover is on and not given up, answers `(host-go rid state)` (after that
+  it waits 4 s more for the end), else `(host-no rid)`; on host-go the
+  target listens, replaces the entry (new token) and answers `(host-ready port
+  token)`. The old host then sends `(rehost port token id)` to the others and
   connects itself to the new host, as a participant. Pending changes are
   sent again to the new host with their state (the new host has the history, as
   it kept the states); a participant whose state it does not have gets the whole
@@ -247,7 +252,20 @@ number for each).
   process that is alive and whose port accepts connections; the participant
   goes on trying to reach it, once a second, without blocking, and keeps its
   changes (a new host which stalls for longer than a participant waits is not
-  replaced).
+  replaced). After the second failed attempt a message says that the host is
+  not answering and that the changes are kept. An election that finds the
+  entry of a host that is gone removes it and makes its own with `O_EXCL`; if
+  that fails, someone else was first and this process joins it.
+- **The entry is checked** by its host every 3 s: if it is not the host's own
+  any more (its token), another process has taken the file; this process
+  saves a copy of its document in the recovered folder and joins that host
+  (if the entry is missing it is made again). Changes of an entry (replace,
+  remove if the token is such) are made holding a lock file (`O_EXCL`; one
+  older than 3 s is removed), so that a newer entry is never removed.
+- **Connection errors:** `local-connect` gives -2 when the connection is
+  refused, -1 for any other error. Only a refusal means that nothing serves the
+  file there; any other error (too many files, not allowed) leaves the entry
+  and the file unshared.
 - **The host dies**: the participants see the link close. Each computes the
   candidates from the last roster (without the dead host); the first becomes
   host from its own copy (its pending changes become new states); the others
