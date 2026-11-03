@@ -15,6 +15,7 @@
 #include "Boxes/construct.hpp"
 #include "analyze.hpp"
 #include "colors.hpp"
+#include "code_lines.hpp"
 
 /******************************************************************************
 * A code box shows the lines i0, i0+1... of a document of strings (the child of
@@ -33,9 +34,9 @@
 *
 * The geometry of a row (the positions of the cursor in it) is the one of a
 * text box of the row, made when it is needed; the colours of the syntax are
-* asked to the language when a line is drawn, from the start of the line,
-* and kept for the last lines drawn (code_runs: a very long line, as in a
-* minified file, is drawn row after row).
+* asked to the lexer of the block when a line is drawn (see code_lines.hpp):
+* from the state of the language at the start of the line, in one pass over
+* it, and kept for the last lines drawn.
 *
 * An edit changes the tree before the next typesetting: the box keeps the
 * texts of the wrapped lines with their rows, and draws the other lines as
@@ -82,16 +83,14 @@ code_breaks (string s, font fn, SI width) {
 }
 
 /******************************************************************************
-* The colours of the lines which were drawn last
+* The colours of the syntax (see code_lines.hpp)
 ******************************************************************************/
 
-int code_runs_generation= 0; // made larger when code-lines are typeset
-
-// The colours of a line are not asked beyond this length: the languages
-// look at the line from its start for every token (in_comment: quadratic,
-// days for a minified file of a line of 1.5 MB), and editors do not colour
-// such lines either
-#define CODE_COLOR_MAX 20000
+// the colours kept: the lines, and their runs in all
+#define CODE_RUNS_LINES 512
+#define CODE_RUNS_BUDGET 1000000
+// how far the states are made again beyond the line asked, after an edit
+#define CODE_STATES_AHEAD 1000
 
 static inline bool
 same_text (string a, string b) {
@@ -99,66 +98,155 @@ same_text (string a, string b) {
   return a.operator-> () == b.operator-> () || a == b;
 }
 
-struct code_runs {
-  void*        key;   // the line
-  string       text;  // its text
-  void*        lan;
-  int          gen;
-  array<int>   start, end;
-  array<string> col;  // the colours, as the language names them
-  array<SI>    xpos;  // the positions of the characters
-};
+code_lexer_rep::code_lexer_rep (language lan2):
+  lan (lan2), stateful (lan2->has_line_states ()), valid (0),
+  fix_from (-1), fix_to (-1), kept_next (0), kept_size (0) {}
 
-#define CODE_RUNS_KEPT 16
-static code_runs code_runs_kept[CODE_RUNS_KEPT];
-static int code_runs_next= 0;
+code_lexer::code_lexer (language lan): rep (tm_new<code_lexer_rep> (lan)) {}
 
-static code_runs&
-get_code_runs (tree t, language lan, font fn) {
-  void* key= (void*) t.operator-> ();
-  for (int i=0; i<CODE_RUNS_KEPT; i++) {
-    code_runs& c= code_runs_kept[i];
-    if (c.key == key && c.lan == (void*) lan.operator-> () &&
-        c.gen == code_runs_generation && same_text (c.text, t->label))
-      return c;
-  }
-  code_runs& c= code_runs_kept[code_runs_next];
-  code_runs_next= (code_runs_next + 1) % CODE_RUNS_KEPT;
-  c.key= key; c.text= t->label; c.lan= (void*) lan.operator-> ();
-  c.gen= code_runs_generation;
-  c.start= array<int> (); c.end= array<int> (); c.col= array<string> ();
-  string s= t->label;
-  int n= N(s);
-  c.xpos= array<SI> (n+1);
-  if (n > 0) fn->get_xpositions (s, A(c.xpos));
-  else c.xpos[0]= 0;
-  if (n > CODE_COLOR_MAX) {
-    c.start << 0; c.end << n; c.col << string ("");
-    return c;
-  }
-  int pos= 0;
-  while (pos < n) {
-    int start= pos;
-    (void) lan->advance (t, pos);
-    if (pos > n) pos= n;
-    if (pos <= start) pos= start + 1;
-    if (pos - start == 1 && s[start] == ' ') continue;
-    c.start << start; c.end << pos; c.col << lan->get_color (t, start, pos);
-  }
-  return c;
+void
+code_lexer_rep::reset () {
+  states= array<int> ();
+  valid= 0;
+  fix_from= fix_to= -1;
+  kept.clear ();
+  kept_next= kept_size= 0;
 }
 
-static code_runs&
-plain_code_runs (string s, font fn) {
-  static code_runs c;
-  c.key= NULL; c.text= s; c.lan= NULL; c.gen= -1;
-  int n= N(s);
-  c.xpos= array<SI> (n+1);
-  if (n > 0) fn->get_xpositions (s, A(c.xpos));
-  else c.xpos[0]= 0;
-  c.start= array<int> (); c.end= array<int> (); c.col= array<string> ();
-  c.start << 0; c.end << n; c.col << string ("");
-  return c;
+void
+code_lexer_rep::inserted (int pos, int nr) {
+  int n= N(states);
+  if (pos < 0 || pos > n || nr < 0) { reset (); return; }
+  array<int> r (n + nr);
+  for (int i=0; i<pos; i++) r[i]= states[i];
+  for (int i=0; i<nr; i++) r[pos+i]= 0;
+  for (int i=pos; i<n; i++) r[i+nr]= states[i];
+  states= r;
+  if (valid > pos) valid += nr;
+  if (fix_from >= pos) fix_from += nr;
+  if (fix_to >= pos) fix_to += nr;
+  // (the new lines are made, and the one after them is compared)
+  if (pos < valid) {
+    fix_from= (fix_from < 0? pos: min (fix_from, pos));
+    fix_to  = max (fix_to, pos + nr - 1);
+  }
+  for (size_t k=0; k<kept.size (); k++)
+    if (kept[k].line >= pos) kept[k].line += nr;
+}
+
+void
+code_lexer_rep::removed (int pos, int nr) {
+  int n= N(states);
+  if (pos < 0 || nr < 0 || pos + nr > n) { reset (); return; }
+  array<int> r (n - nr);
+  for (int i=0; i<pos; i++) r[i]= states[i];
+  for (int i=pos+nr; i<n; i++) r[i-nr]= states[i];
+  states= r;
+  if (valid >= pos + nr) valid -= nr;
+  else if (valid > pos) valid= pos;
+  if (fix_from >= pos + nr) fix_from -= nr;
+  else if (fix_from >= pos) fix_from= pos;
+  if (fix_to >= pos + nr) fix_to -= nr;
+  else if (fix_to >= pos) fix_to= pos - 1;
+  // (the line before is made again: the one after it gets its state)
+  if (pos > 0 && pos - 1 < valid) {
+    fix_from= (fix_from < 0? pos - 1: min (fix_from, pos - 1));
+    fix_to  = max (fix_to, pos - 1);
+  }
+  for (size_t k=0; k<kept.size (); k++)
+    if (kept[k].line >= pos + nr) kept[k].line -= nr;
+    else if (kept[k].line >= pos) kept[k].line= -1;
+}
+
+void
+code_lexer_rep::changed (int i) {
+  if (i < 0 || i >= N(states)) { reset (); return; }
+  if (i < valid) {
+    fix_from= (fix_from < 0? i: min (fix_from, i));
+    fix_to  = max (fix_to, i);
+  }
+}
+
+int
+code_lexer_rep::line_out (int j) {
+  // the state after the line j
+  array<int> a, b;
+  array<string> c;
+  tree t= doc[j];
+  if (is_atomic (t) && N(t->label) > CODE_COLOR_MAX) return states[j];
+  return lan->colour_line (t, states[j], a, b, c);
+}
+
+int
+code_lexer_rep::state_at (int i) {
+  if (!stateful || i <= 0) return 0;
+  int n= N(doc);
+  if (N(states) != n) {
+    states= array<int> (n);
+    valid= 0;
+    fix_from= fix_to= -1;
+  }
+  if (i >= n) return 0;
+  if (fix_from >= 0) {
+    // the states after the lines which changed, up to the first which is
+    // the same as before (or a while after the line asked)
+    int j= fix_from;
+    while (j + 1 < valid) {
+      int out= line_out (j);
+      if (j >= fix_to && out == states[j+1]) break;
+      states[j+1]= out;
+      j++;
+      if (j > fix_to && j > i + CODE_STATES_AHEAD) { valid= j + 1; break; }
+    }
+    fix_from= fix_to= -1;
+  }
+  if (valid == 0) { states[0]= 0; valid= 1; }
+  while (valid <= i) {
+    states[valid]= line_out (valid - 1);
+    valid++;
+  }
+  return states[i];
+}
+
+code_runs_entry&
+code_lexer_rep::runs (int i, string text) {
+  static code_runs_entry plain;
+  tree t= (i >= 0 && i < N(doc)? doc[i]: tree (""));
+  if (!is_atomic (t) || !same_text (t->label, text) ||
+      N(text) > CODE_COLOR_MAX) {
+    plain.line= -1; plain.text= text; plain.state= 0;
+    plain.starts= array<int> (); plain.ends= array<int> ();
+    plain.cols= array<string> ();
+    plain.starts << 0; plain.ends << N(text); plain.cols << string ("");
+    return plain;
+  }
+  int st= state_at (i);
+  for (size_t k=0; k<kept.size (); k++) {
+    code_runs_entry& e= kept[k];
+    if (e.line == i && e.state == st &&
+        e.text.operator-> () == text.operator-> ())
+      return e;
+  }
+  code_runs_entry e;
+  e.line= i; e.text= text; e.state= st;
+  (void) lan->colour_line (t, st, e.starts, e.ends, e.cols);
+  // (kept within the budget: the oldest go first)
+  if ((int) kept.size () < CODE_RUNS_LINES) {
+    kept.push_back (code_runs_entry ());
+    kept_next= (int) kept.size () - 1;
+  }
+  else kept_next= (kept_next + 1) % CODE_RUNS_LINES;
+  kept_size -= N(kept[kept_next].starts);
+  kept[kept_next]= e;
+  kept_size += N(e.starts);
+  for (int k= (kept_next + 1) % (int) kept.size ();
+       kept_size > CODE_RUNS_BUDGET && k != kept_next;
+       k= (k + 1) % (int) kept.size ()) {
+    kept_size -= N(kept[k].starts);
+    kept[k]= code_runs_entry ();
+    kept[k].line= -1;
+  }
+  return kept[kept_next];
 }
 
 /******************************************************************************
@@ -177,7 +265,7 @@ struct code_box_rep: public box_rep {
   int      i0, n;  // the lines i0, ..., i0+n-1 of doc
   font     fn;
   pencil   pen;
-  language lan;
+  code_lexer lx;   // the colours of the syntax
   hashmap<string,color> cols; // the colours given as variables
   SI       pitch;  // the distance between two lines,
   SI       rpitch; // and between two rows of a line
@@ -194,12 +282,12 @@ struct code_box_rep: public box_rep {
   string   one_text;
 
   code_box_rep (path ip, tree doc, int i0, int n,
-                font fn, pencil pen, language lan,
+                font fn, pencil pen, code_lexer lx,
                 hashmap<string,color> cols, SI pitch, SI rpitch,
                 array<int> tall_k, array<string> tall_txt,
                 array<array<int> > tall_st, SI width);
   code_box_rep (path lip, tree one, string text, int ra, int rb, font fn,
-                pencil pen, language lan, hashmap<string,color> cols,
+                pencil pen, code_lexer lx, hashmap<string,color> cols,
                 SI width);
   operator tree () { return "code lines"; }
 
@@ -274,13 +362,13 @@ struct code_box_rep: public box_rep {
 };
 
 code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
-                            pencil pen2, language lan2,
+                            pencil pen2, code_lexer lx2,
                             hashmap<string,color> cols2, SI pitch2,
                             SI rpitch2, array<int> tall_k2,
                             array<string> tall_txt2,
                             array<array<int> > tall_st2, SI width):
   box_rep (ip2), doc (doc2), i0 (i02), n (max (n2, 1)),
-  fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (pitch2),
+  fn (fn2), pen (pen2), lx (lx2), cols (cols2), pitch (pitch2),
   rpitch (rpitch2), tall_k (tall_k2), tall_txt (tall_txt2),
   tall_st (tall_st2), single (false), ra (0), rb (0)
 {
@@ -297,10 +385,10 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
 }
 
 code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
-                            int rb2, font fn2, pencil pen2, language lan2,
+                            int rb2, font fn2, pencil pen2, code_lexer lx2,
                             hashmap<string,color> cols2, SI width):
   box_rep (lip), doc (one), i0 (0), n (1),
-  fn (fn2), pen (pen2), lan (lan2), cols (cols2), pitch (0), rpitch (0),
+  fn (fn2), pen (pen2), lx (lx2), cols (cols2), pitch (0), rpitch (0),
   single (true), ra (ra2), rb (rb2), one_text (text)
 {
   x1= x3= 0;
@@ -346,7 +434,7 @@ code_box_rep::subbox (int k) {
   array<string> tt;
   array<array<int> > ts;
   if (nr_rows (k) > 1) { tk << 0; tt << line (k); ts << starts (k); }
-  box b= tm_new<code_box_rep> (ip, doc, i0+k, 1, fn, pen, lan, cols,
+  box b= tm_new<code_box_rep> (ip, doc, i0+k, 1, fn, pen, lx, cols,
                                pitch, rpitch, tk, tt, ts, x2);
   b->x0= 0; b->y0= base (k, 0);
   return b;
@@ -368,19 +456,27 @@ code_box_rep::display (renderer ren) {
     tree t= line_tree (k);
     string s= line (k);
     if (!is_atomic (t) || N(s) == 0) continue;
-    // (the line changed since the box was made: drawn as it was, without
-    // colours, until it is typeset again)
-    code_runs& c= (same_text (t->label, s)? get_code_runs (t, lan, fn):
-                                            plain_code_runs (s, fn));
+    // (the number of the line in the document: for one row, the path of
+    // the line has it)
+    int li= (single? (is_nil (ip)? 0: ip->item): i0 + k);
+    code_runs_entry& c= lx->runs (li, s);
+    array<SI> xpos (N(s) + 1);
+    fn->get_xpositions (s, A(xpos));
     array<int> st= starts (k);
     int lo= (k == ka? ia: 0), hi= (k == kb? ib: N(st) - 1);
     for (int i= lo; i <= hi && i < N(st); i++) {
       int a= st[i], b= row_end (k, i);
       SI y= base (k, i);
-      for (int r=0; r<N(c.start); r++) {
-        int s1= max (c.start[r], a), s2= min (c.end[r], b);
+      // (the runs are in order: the first which ends after a)
+      int r0= 0, r1= N(c.ends);
+      while (r0 < r1) {
+        int mid= (r0 + r1) / 2;
+        if (c.ends[mid] <= a) r0= mid + 1; else r1= mid;
+      }
+      for (int r=r0; r<N(c.starts) && c.starts[r] < b; r++) {
+        int s1= max (c.starts[r], a), s2= min (c.ends[r], b);
         if (s1 >= s2) continue;
-        string col= c.col[r];
+        string col= c.cols[r];
         color cl= (col == ""? fg:
                    cols->contains (col)? cols[col]: named_color (col));
         ren->set_pencil (pencil (cl));
@@ -390,7 +486,7 @@ code_box_rep::display (renderer ren) {
           while (u < s2 && s[u] == ' ') u++;
           int v= u;
           while (v < s2 && s[v] != ' ') v++;
-          if (v > u) fn->draw (ren, s (u, v), c.xpos[u] - c.xpos[a], y);
+          if (v > u) fn->draw (ren, s (u, v), xpos[u] - xpos[a], y);
           u= v;
         }
       }
@@ -521,18 +617,18 @@ code_box_rep::find_selection (path lbp, path rbp) {
 
 box
 code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
-          language lan, hashmap<string,color> cols, SI pitch, SI rpitch,
+          code_lexer lx, hashmap<string,color> cols, SI pitch, SI rpitch,
           array<int> tall_k, array<string> tall_txt,
           array<array<int> > tall_st, SI width) {
-  return tm_new<code_box_rep> (ip, doc, i0, n, fn, pen, lan, cols,
+  return tm_new<code_box_rep> (ip, doc, i0, n, fn, pen, lx, cols,
                                pitch, rpitch, tall_k, tall_txt, tall_st,
                                width);
 }
 
 box
 code_row_box (path lip, tree line, string text, int a, int b, font fn,
-              pencil pen, language lan, hashmap<string,color> cols,
+              pencil pen, code_lexer lx, hashmap<string,color> cols,
               SI width) {
-  return tm_new<code_box_rep> (lip, line, text, a, b, fn, pen, lan, cols,
+  return tm_new<code_box_rep> (lip, line, text, a, b, fn, pen, lx, cols,
                                width);
 }

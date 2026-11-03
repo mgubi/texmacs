@@ -604,3 +604,106 @@ cpp_language_rep::get_color (tree t, int start, int end) {
   //return decode_color ("cpp", encode_color (type));
   return type;
 }
+
+/******************************************************************************
+* The colours of a line, with the state of the lines before it: whether the
+* line starts inside a comment of several lines (as in C), and whether it
+* continues a line of
+* the preprocessor (ending with a backslash). In one pass over the line, with the
+* tokens of get_color (which looks at the lines before, and parses the line
+* again from its start, for each token)
+******************************************************************************/
+
+#define CPP_IN_COMMENT 1
+#define CPP_IN_PREPROC 2
+
+bool
+cpp_language_rep::has_line_states () {
+  return true;
+}
+
+// The next token of get_color from pos (a comment of several lines and the
+// rest of a line of the preprocessor are tokens too): its type, and the
+// state after it
+static string
+cpp_parse_token (hashmap<string,string>& colored, string s, int& pos,
+                 int& state, bool pre) {
+  static string none= "";
+  int n= N(s), opos= pos;
+  if ((state & CPP_IN_COMMENT) != 0) {
+    int e= search_forwards ("*/", pos, s);
+    pos= (e < 0? n: e + 2);
+    if (e >= 0) state &= ~CPP_IN_COMMENT;
+    return "comment-color";
+  }
+  if (pos + 1 < n && s[pos] == '/' && s[pos+1] == '*') {
+    state |= CPP_IN_COMMENT;
+    pos += 2;
+    return cpp_parse_token (colored, s, pos, state, pre);
+  }
+  if (pre) {
+    int e= search_forwards ("/*", pos, s);
+    pos= (e < 0? n: e);
+    if (pos == opos) pos++;
+    return "preprocessor-color";
+  }
+  parse_blanks (s, pos);
+  if (opos < pos) return none;
+  parse_string (s, pos);
+  if (opos < pos) return "string-color";
+  parse_comment_single_line (s, pos);
+  if (opos < pos) return "comment-color";
+  parse_cpp_keyword (colored, s, pos);
+  if (opos < pos) return colored [s (opos, pos)];
+  parse_cpp_type (colored, s, pos);
+  if (opos < pos) return "defined-color";
+  parse_other_lexeme (colored, s, pos);  //not left parenthesis
+  if (opos < pos) return "operator-color";
+  parse_cpp_constant (colored, s, pos);
+  if (opos < pos) return "constant-color";
+  parse_number (s, pos);
+  if (opos < pos) return "number-color";
+  parse_identifier (colored, s, pos);
+  if (opos < pos) return none;
+  pos= opos + 1;
+  return none;
+}
+
+int
+cpp_language_rep::colour_line (tree t, int state, array<int>& starts,
+                               array<int>& ends, array<string>& cols) {
+  static bool setup_done= false;
+  if (!setup_done) {
+    cpp_color_setup_constants (colored);
+    cpp_color_setup_keywords (colored);
+    cpp_color_setup_types (colored);
+    cpp_color_setup_otherlexeme (colored);
+    setup_done= true;
+  }
+  if (!is_atomic (t)) return state & CPP_IN_COMMENT;
+  string s= t->label;
+  int n= N(s);
+  bool pre= begin_preprocessing (s) || (state & CPP_IN_PREPROC) != 0;
+  state &= CPP_IN_COMMENT;
+  // The tokens of advance, each with the colour of the token of get_color
+  // in which it starts (as get_color, which parses the line from its start
+  // up to the token): the two in one pass
+  int pos= 0;            // the tokens of advance
+  int ppos= 0;           // the tokens of get_color, [pstart, ppos)
+  string ptype;
+  while (pos < n) {
+    int start= pos;
+    (void) advance (t, pos);
+    if (pos > n) pos= n;
+    if (pos <= start) pos= start + 1;
+    while (ppos <= start) ptype= cpp_parse_token (colored, s, ppos, state, pre);
+    if (pos - start == 1 && s[start] == ' ') continue;
+    int k= N(starts) - 1;
+    if (k >= 0 && ends[k] == start && cols[k] == ptype) ends[k]= pos;
+    else { starts << start; ends << pos; cols << ptype; }
+  }
+  while (ppos < n) (void) cpp_parse_token (colored, s, ppos, state, pre);
+  int out= state & CPP_IN_COMMENT;
+  if (pre && end_preprocessing (s)) out |= CPP_IN_PREPROC;
+  return out;
+}

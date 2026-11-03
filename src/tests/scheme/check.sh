@@ -29,7 +29,7 @@ export TEXMACS_HOME_PATH="${TM_TEST_HOME:-$out/home}"
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 timeout=${TM_TEST_TIMEOUT:-600}
 
-[ $# -eq 0 ] && set -- all typeset-check
+[ $# -eq 0 ] && set -- all typeset-check code-lines-check
 status=0
 for suite in "$@"; do
   checks=
@@ -40,6 +40,11 @@ for suite in "$@"; do
       checks="TEXMACS_TYPESET_READS=check TEXMACS_TYPESET_CACHES=check
               TEXMACS_PAGE_REUSE=check TEXMACS_PAGE_BREAK_FAST=check
               TEXMACS_PAGE_BREAK_CACHE=check" ;;
+    code-lines-check)
+      # the records, the rows and the colours of code-lines kept from one
+      # pass to the next, against what is made again
+      expr="(run-regression-suite \"code-lines\")"; name=code-lines-check
+      checks="TEXMACS_TYPESET_CACHES=check" ;;
     integration) expr="(run-integration-tests)"; name=integration ;;
     *.scm)
       file=$(cd "$(dirname "$suite")" && pwd)/$(basename "$suite")

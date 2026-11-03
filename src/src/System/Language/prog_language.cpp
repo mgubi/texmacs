@@ -280,7 +280,15 @@ prog_language_rep::get_color (tree t, int start, int end) {
   // Coloring as multi-line comment
   if (multi_line_comments && in_comment (start, t))
     return decode_color (lan_name, encode_color ("comment"));
+  return token_color (t, start, end);
+}
 
+// the colour of the token [start, end) which advance gave last, outside a
+// comment of several lines
+string
+prog_language_rep::token_color (tree t, int start, int end) {
+  static string none= "";
+  if (start >= end) return none;
   string type= none;
   string s= t->label;
 
@@ -308,6 +316,78 @@ prog_language_rep::get_color (tree t, int start, int end) {
 
   if (type == none) return none;
   return decode_color (lan_name, encode_color (type));
+}
+
+/******************************************************************************
+* The colours of a line, with the state of the lines before it: whether the
+* line starts inside a comment of several lines (as in C). The comments are
+* found first, from the start of the line: outside a comment, the strings
+* (with the escapes) are skipped and an inline comment ends the search; a
+* comment begins with slash and star and ends at the first star and slash.
+* The tokens of advance in a comment have its colour, the others the colour
+* of get_color. (get_color asks in_comment, which looks for the comment in
+* the lines before, for each token, also in inline comments and strings)
+******************************************************************************/
+
+#define PROG_IN_COMMENT 1
+
+bool
+prog_language_rep::has_line_states () {
+  return multi_line_comments;
+}
+
+int
+prog_language_rep::colour_line (tree t, int state, array<int>& starts,
+                                array<int>& ends, array<string>& cols) {
+  if (!multi_line_comments)
+    return language_rep::colour_line (t, state, starts, ends, cols);
+  if (!is_atomic (t)) return state;
+  string s= t->label;
+  int n= N(s);
+  // the comments on the line
+  array<int> cb, ce;
+  int p= 0;
+  if ((state & PROG_IN_COMMENT) != 0) {
+    int e= search_forwards ("*/", 0, s);
+    cb << 0; ce << (e < 0? n: e + 2);
+    if (e < 0) p= n;
+    else { state &= ~PROG_IN_COMMENT; p= e + 2; }
+  }
+  while (p < n) {
+    char c= s[p];
+    if (c == '\"' || c == '\'') {
+      p++;
+      while (p < n && s[p] != c) p += (s[p] == '\\'? 2: 1);
+      if (p < n) p++;
+      continue;
+    }
+    if (inline_comment_parser.can_parse (s, p)) break;
+    if (c == '/' && p + 1 < n && s[p+1] == '*') {
+      int e= search_forwards ("*/", p + 2, s);
+      cb << p; ce << (e < 0? n: e + 2);
+      if (e < 0) { state |= PROG_IN_COMMENT; break; }
+      p= e + 2;
+      continue;
+    }
+    p++;
+  }
+  // the tokens, with their colours
+  string comment= decode_color (lan_name, encode_color ("comment"));
+  int pos= 0, k= 0;
+  while (pos < n) {
+    int start= pos;
+    (void) advance (t, pos);
+    if (pos > n) pos= n;
+    if (pos <= start) pos= start + 1;
+    if (pos - start == 1 && s[start] == ' ') continue;
+    while (k < N(cb) && ce[k] <= start) k++;
+    string col= (k < N(cb) && cb[k] <= start? comment:
+                 token_color (t, start, pos));
+    int r= N(starts) - 1;
+    if (r >= 0 && ends[r] == start && cols[r] == col) ends[r]= pos;
+    else { starts << start; ends << pos; cols << col; }
+  }
+  return state;
 }
 
 bool prog_lang_exists (string s) {

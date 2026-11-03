@@ -14,16 +14,8 @@
 #include "Line/lazy_paragraph.hpp"
 #include "analyze.hpp"
 #include "colors.hpp"
+#include "Boxes/Basic/code_lines.hpp"
 
-box code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
-              language lan, hashmap<string,color> cols, SI pitch, SI rpitch,
-              array<int> tall_k, array<string> tall_txt,
-              array<array<int> > tall_st, SI width);
-box code_row_box (path lip, tree line, string text, int a, int b, font fn,
-                  pencil pen, language lan, hashmap<string,color> cols,
-                  SI width);
-array<int> code_breaks (string s, font fn, SI width);
-extern int code_runs_generation;
 static int code_rows_made= 0;
 int get_code_rows_made () { return code_rows_made; }
 static int code_records_made= 0;
@@ -106,19 +98,22 @@ struct code_end {
 class bridge_code_rep: public bridge_rep {
 public:
   array<code_rec> recs;    // the records of the lines (see above)
+  code_lexer      lexer;   // the colours of the syntax
   bool            recs_ok; // they are at the places of the lines
   code_end first, last;    // the paragraphs of the first and the last line
 
   void lines_inserted (int pos, int nr);
   void lines_removed (int pos, int nr);
   void line_changed (int i);
-  void lines_unknown () { recs_ok= false; }
+  void lines_unknown () {
+    recs_ok= false;
+    if (!is_nil (lexer)) lexer->reset (); }
   code_rec line_rec (tree& t, font fn, SI width, SI cw,
                      unsigned long long wsig, bool always);
   void end_paragraph (code_end& e, array<box> rows, array<line_item> before,
                       array<line_item> after,
                       array<page_item>& l, stack_border& sb);
-  void typeset_paper (tree doc, font fn, pencil pen, language lan,
+  void typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
                       hashmap<string,color> cols, SI width, SI cw,
                       unsigned long long wsig);
   void typeset_paragraphs (array<array<box> > pars);
@@ -152,6 +147,7 @@ bridge_code (typesetter ttt, tree st, path ip) {
 
 void
 bridge_code_rep::lines_inserted (int pos, int nr) {
+  if (!is_nil (lexer)) lexer->inserted (pos, nr);
   int n= N(recs);
   if (!recs_ok || pos < 0 || pos > n || nr < 0) { lines_unknown (); return; }
   array<code_rec> r (n + nr);
@@ -162,6 +158,7 @@ bridge_code_rep::lines_inserted (int pos, int nr) {
 
 void
 bridge_code_rep::lines_removed (int pos, int nr) {
+  if (!is_nil (lexer)) lexer->removed (pos, nr);
   int n= N(recs);
   if (!recs_ok || pos < 0 || nr < 0 || pos + nr > n) {
     lines_unknown (); return; }
@@ -173,6 +170,7 @@ bridge_code_rep::lines_removed (int pos, int nr) {
 
 void
 bridge_code_rep::line_changed (int i) {
+  if (!is_nil (lexer)) lexer->changed (i);
   if (!recs_ok || i < 0 || i >= N(recs)) { lines_unknown (); return; }
   recs[i]= code_rec ();
 }
@@ -432,7 +430,6 @@ same_rec (code_rec r, tree& t, unsigned long long wsig) {
 void
 bridge_code_rep::my_typeset (int desired_status) {
   (void) desired_status;
-  code_runs_generation++; // (the colours of a line may depend on others)
   tree doc= (N(st) == 1? st[0]: tree (DOCUMENT, ""));
   if (!is_func (doc, DOCUMENT)) doc= tree (DOCUMENT, doc);
   if (N(doc) == 0) doc= tree (DOCUMENT, "");
@@ -476,6 +473,28 @@ bridge_code_rep::my_typeset (int desired_status) {
   if (!recs_ok || N(recs) != n || typeset_caches_mode () == 0) {
     recs= array<code_rec> (n);
     recs_ok= true;
+    if (!is_nil (lexer)) lexer->reset ();
+  }
+  // the lexer of the colours, for the language (see code_lines.hpp)
+  if (is_nil (lexer) || lexer->lan.operator-> () != env->lan.operator-> ())
+    lexer= code_lexer (env->lan);
+  lexer->doc= doc;
+  if (typeset_caches_mode () == 0) lexer->reset ();
+  if (typeset_caches_mode () == 2 && lexer->stateful) {
+    // check: the states of the lines kept by the lexer, as they are made
+    // from the first line
+    int state= 0;
+    for (int i=0; i<n; i++) {
+      if (lexer->state_at (i) != state) {
+        typeset_cache_mismatch ("states of the lines of code");
+        lexer->reset ();
+        break;
+      }
+      if (is_atomic (doc[i]) && N(doc[i]->label) > CODE_COLOR_MAX) continue;
+      array<int> a, b;
+      array<string> c;
+      state= env->lan->colour_line (doc[i], state, a, b, c);
+    }
   }
   bool paper= ttt->paper && n >= 4 && typeset_caches_mode () != 0;
   for (int i=0; i<n; i++) {
@@ -501,7 +520,7 @@ bridge_code_rep::my_typeset (int desired_status) {
   }
 
   if (paper) {
-    typeset_paper (doc, fn, env->pen, env->lan, cols, width, cw, wsig);
+    typeset_paper (doc, fn, env->pen, lexer, cols, width, cw, wsig);
     return;
   }
   first.b= box ();
@@ -518,7 +537,7 @@ bridge_code_rep::my_typeset (int desired_status) {
       for (int r=0; r<N(st); r++)
         rows << code_row_box (lip, doc[i], text, st[r],
                               r+1 < N(st)? st[r+1]: N(text),
-                              fn, env->pen, env->lan, cols, width);
+                              fn, env->pen, lexer, cols, width);
       pars << rows;
     }
   else {
@@ -537,7 +556,7 @@ bridge_code_rep::my_typeset (int desired_status) {
         tall_st << recs[i]->starts;
       }
     array<box> one;
-    one << code_box (ip, doc, 0, n, fn, env->pen, env->lan, cols,
+    one << code_box (ip, doc, 0, n, fn, env->pen, lexer, cols,
                      pitch, rpitch, tall_k, tall_txt, tall_st, width);
     pars << one;
   }
@@ -580,7 +599,7 @@ bridge_code_rep::end_paragraph (code_end& e, array<box> rows,
 }
 
 void
-bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
+bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
                                 hashmap<string,color> cols, SI width, SI cw,
                                 unsigned long long wsig) {
   int n= N(doc);
@@ -601,7 +620,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     for (int k=0; k<N(st); k++)
       rows << code_row_box (lip, doc[i], r->text, st[k],
                             k+1 < N(st)? st[k+1]: len,
-                            fn, pen, lan, cols, width);
+                            fn, pen, lx, cols, width);
     code_rows_made += N(rows);
     return rows;
   };
@@ -630,7 +649,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
     // (a box is placed in one phrase box only: its place is in the box)
     array<box> rs;
     for (int r=0; r<R; r++)
-      rs << code_row_box (lip1, doc[1], text1, 0, N(text1), fn, pen, lan,
+      rs << code_row_box (lip1, doc[1], text1, 0, N(text1), fn, pen, lx,
                           cols, width);
     code_paragraph (env, ip, rs, array<line_item> (), array<line_item> (),
                     T[R], TS[R]);
@@ -673,7 +692,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, language lan,
   sig= sig_mix (sig, wsig);
   sig= sig_mix (sig, (unsigned long long) pen->get_color ());
   sig= sig_mix (sig, (unsigned long long) pen->get_width ());
-  sig= sig_mix (sig, (unsigned long long) (void*) lan.operator-> ());
+  sig= sig_mix (sig, (unsigned long long) (void*) lx.operator-> ());
   for (int i=0; code_color_vars[i] != NULL; i++) {
     string var= code_color_vars[i];
     sig= sig_mix (sig, cols->contains (var)? 1 + (unsigned long long) cols[var]: 0);

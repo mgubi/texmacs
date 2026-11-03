@@ -315,6 +315,44 @@
           ;; the same document typeset from the start has the same rows
           (check= (typeset-check-mismatches) mismatches))))))
 
+;; The colours of a line depend on the lines before it (a comment of several
+;; lines, a line of the preprocessor continued with a backslash): the lexer
+;; of a block keeps the state at the start of each line, and an edit changes
+;; them from the line which changed (bridge_code.cpp, code_boxes.cpp). With
+;; TEXMACS_TYPESET_CACHES=check (tests/scheme/check.sh code-lines-check),
+;; the states are compared at each pass with the states made from the first
+;; line
+(define (test-colour-states)
+  (check-group "states of the colours")
+  (let* ((c-lines (append (list "#define TWICE(x) \\" "  ((x) + (x))"
+                                "int a; /* one" "two */ int b;")
+                          (map (lambda (i)
+                                 (string-append "int v" (number->string i)
+                                                " = " (number->string i) ";"))
+                               (.. 0 40))))
+         (doc `(document (with "font-family" "tt" "language" "verbatim"
+                                "mode" "prog" "prog-language" "cpp"
+                           (code-lines (document ,@c-lines))))))
+    (with-body doc
+      (lambda ()
+        (let ((line (lambda (i) (at 0 8 0 i))))
+          ;; open a comment, which goes to the next star and slash
+          (go-to (append (line 10) '(0)))
+          (step (lambda () (insert "/* ")))
+          (go-to (append (line 20) '(0)))
+          (step (lambda () (insert "*/ ")))
+          ;; remove the opening again, and join lines
+          (go-to (append (line 10) '(3)))
+          (step (lambda () (kbd-backspace) (kbd-backspace) (kbd-backspace)))
+          (go-to (append (line 30) '(0)))
+          (step kbd-backspace)
+          ;; a line of the preprocessor continued, then not
+          (go-to (append (line 0) (list (string-length "#define TWICE(x) "))))
+          (step (lambda () (kbd-delete)))
+          (step insert-return)
+          (check= (tree->string (path->tree (line 0))) "#define TWICE(x) ")
+          (check= (typeset-check-mismatches) mismatches))))))
+
 (define (test-export)
   (check-group "export and import")
   (with-body (code-doc)
@@ -350,6 +388,7 @@
   (test-wrapping)
   (test-rows-made)
   (test-records)
+  (test-colour-states)
   (test-export)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph
