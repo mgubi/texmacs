@@ -33,6 +33,7 @@ template<class T> class list {
 
   friend bool is_atom LESSGTR (list<T> l);
   friend bool strong_equal LESSGTR (list<T> l1, list<T> l2);
+  friend class list_rep<T>;
 };
 
 extern int list_count;
@@ -43,7 +44,21 @@ public:
 
   inline list_rep (T item2, list<T> next2): item(item2), next(next2) {
     TM_DEBUG(list_count++); }
-  inline ~list_rep () { TM_DEBUG(list_count--); }
+  inline ~list_rep () {
+    TM_DEBUG(list_count--);
+    // the cells of the tail which only this list holds are freed in a loop:
+    // freeing them one in another overflowed the stack for long lists (the
+    // rectangles of a document of 200000 lines)
+    list_rep<T>* r= next.rep;
+    while (r != NULL && r->ref_count == 1) {
+      // this cell takes the tail of r, which is then freed alone
+      next.rep= r->next.rep;
+      r->next.rep= NULL;
+      r->ref_count= 0;
+      tm_delete (r);
+      r= next.rep;
+    }
+  }
   friend class list<T>;
 };
 

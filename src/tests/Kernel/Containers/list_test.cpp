@@ -39,6 +39,7 @@ private slots:
   void test_reverse ();
   void test_remove ();
   void test_contains ();
+  void test_long_list ();
 };
 
 void
@@ -166,6 +167,27 @@ TestList::test_contains () {
 
   QCOMPARE (contains (normal, 2L), true);
   QCOMPARE (contains (normal, 3L), true);
+}
+
+// A list of a million cells is freed without a recursion as deep as it is
+// long (it overflowed the stack: the rectangles of a document of 200000
+// lines), also when its tail is shared, which stays intact
+void
+TestList::test_long_list () {
+  list<long> shared;
+  for (long i=0; i<1000; i++) shared= list<long> (i, shared);
+  {
+    list<long> l= shared;
+    for (long i=0; i<1000000; i++) l= list<long> (i, l);
+    QCOMPARE (N(l), 1001000);
+  }
+  QCOMPARE (N(shared), 1000);
+  QCOMPARE (shared->item, 999L);
+  QCOMPARE (last_item (shared), 0L);
+  {
+    list<long> l;
+    for (long i=0; i<1000000; i++) l= list<long> (i, l);
+  }
 }
 
 QTEST_MAIN(TestList)
