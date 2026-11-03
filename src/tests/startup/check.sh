@@ -531,13 +531,16 @@ cat > "$out/startup-aux.scm" <<'EOF'
 (open-auxiliary "x*y" '(document "x"))
 (define u (string->url "tmfs://aux/x*y"))
 (open-buffer-in-window u (buffer-get u) "")
-(display* "CHECK aux views " (length (buffer->views u)) " current "
-          (== (current-buffer) u) "\n")
+(define vs (buffer->views u))
+(display* "CHECK aux views "
+          (and (pair? vs) (list-and (map (lambda (v) (== (view->buffer v) u))
+                                         vs)))
+          " current " (== (current-buffer) u) "\n")
 (display* "CHECK survived\n")
 EOF
 
 check "a buffer of tmfs named with a star has its views (#790)" \
-      "aux views 2 current #t
+      "aux views #t current #t
 survived
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-aux.scm")'
@@ -627,6 +630,36 @@ check "a subdirectory with a star in its name is searched as a plain name (#790)
 survived
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-star-search.scm")'
+
+# A file a*b.scm loaded as a plain name, and a buffer saved as a*b.scm, which
+# is named with the wildcard: their views have the same name, each is found
+# in its own buffer
+mkdir -p "$out/startup-star3"
+printf 'a\n' > "$out/startup-star3/a*b.scm"
+cat > "$out/startup-star-both.scm" <<'EOF'
+(define d (url->system (url-append (url-pwd) "startup-star3")))
+(load-buffer (string-append d "/a*b.scm"))
+(define P (current-buffer))
+(define pv (car (buffer->views P)))
+;; the views are numbered by name: the second view of new.tm has number 2,
+;; the first view of a*b.scm number 1 (the same number, with the same name
+;; of view, can't be told apart: both buffers are named a*b.scm)
+(load-buffer (string-append d "/new.tm"))
+(buffer-close (current-buffer))
+(load-buffer (string-append d "/new.tm"))
+(save-buffer-as-main (string->url (string-append d "/a*b.scm")) :overwrite)
+(define W (current-buffer))
+(define wv (car (buffer->views W)))
+(display* "CHECK both P " (== (view->buffer pv) P) " W "
+          (== (view->buffer wv) W) "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "views of a plain a*b.scm and of a buffer saved as a*b.scm (#790)" \
+      "both P #t W #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-star-both.scm")'
   ;;
 esac
 

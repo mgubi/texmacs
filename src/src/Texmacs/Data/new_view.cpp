@@ -103,10 +103,15 @@ concrete_view (url u) {
   int nr= as_int (s (0, i));
   url name= decode_url (s (i+1, N(s)));
   //cout << s (i+1, N(s)) << " -> " << name << "\n";
-  tm_buffer buf= concrete_buffer (name);
   // a buffer named with a wildcard (Save as a*.tm) is found as it is, the
-  // name of a file with a star (a*b.scm) only as a plain name
-  if (is_nil (buf)) buf= concrete_buffer (plain_name (name));
+  // buffer of a file with a star (a*b.scm) as a plain name; both can have the
+  // same view name, the one which holds a view of this number is the buffer
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf))
+    for (i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr == nr)
+        return buf->vws[i];
+  buf= concrete_buffer (plain_name (name));
   if (!is_nil (buf))
     for (i=0; i<N(buf->vws); i++)
       if (buf->vws[i]->nr == nr)

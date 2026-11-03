@@ -156,7 +156,6 @@ bool has_permission (url u, string filter); // check file permissions
 url  descendance (url u);                   // utility for style&package menus
 url  subdirectories (url u);                // similarly for patters
 url  url_entry (string name);               // entry of a directory (star: plain)
-url  url_entry (string name);               // an entry of a directory, as a plain name (also with a star)
 url  concretize_url (url u);                // variant of concretize below
 string concretize (url u, bool quiet= false); // system name for resolved url
 string materialize (url u, string f= "fr", bool quiet= false); // resolve + concretize
