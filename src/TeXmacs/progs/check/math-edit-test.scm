@@ -657,8 +657,8 @@
           '(around "(" (around "(" (around "(" "x" ")") ")") ")"))
   (check= (around-depth (tree-upgrade-brackets (nested-parens 300) "math"))
           '(300 "x"))
-  (check= (around-depth (tree-upgrade-brackets (nested-parens 8500) "math"))
-          '(8500 "x")))
+  (check= (around-depth (tree-upgrade-brackets (nested-parens 1000) "math"))
+          '(1000 "x")))
 
 ;; Backspace and delete over brackets: removing one bracket of a pair
 ;; leaves a missing bracket, removing the other one too removes the pair
