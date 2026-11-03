@@ -560,11 +560,55 @@
         (and (resolve-id id)
              (delayed (:idle 25) (apply go-to-id (cons id opt-from)))))))
 
+;; A wildcard in the target of a link (reproW*.scm) is not a file name: the
+;; files which it matches are the candidates of the link, treated as the
+;; candidates of an or'ed url: none gives the message "Not found", one is
+;; followed as if the link named it (with its query, and the question for a
+;; large file), several give the page of disambiguation (without the query,
+;; which an or'ed url cannot carry). It used to be loaded as the name of a
+;; buffer, which threw from url-glue (the autosave names), an exception
+;; which aborts TeXmacs (#771).
+(define (link-wildcard? u)
+  (let ((root (or (and (url-rooted? u) (url-root u)) "default")))
+    (and (in? root '("default" "file"))
+         (not (url-or? u))
+         (string-index (url->system (car (process-url u))) #\*)
+         #t)))
+
+(define (urls->or l)
+  (if (null? (cdr l)) (car l) (url-or (car l) (urls->or (cdr l)))))
+
+(define (link-wildcard-candidates u)
+  "The urls which the wildcard of @u matches, with the query when only one"
+  (let* ((suffix (url-query-suffix (url->system u)))
+         (base (load-buffer-resolve-name (car (process-url u))))
+         ;; a relative link in a document of the web names a page of the
+         ;; web, and url-complete only knows wildcards of files (it throws
+         ;; "wildcards only implemented for files", the same abort)
+         (all (if (url-rooted-web? base)
+                  '()
+                  (url->list (url-expand (url-complete base "fr")))))
+         (l (list-filter all (lambda (x) (not (url-none? x))))))
+    (if (and (pair? l) (null? (cdr l)) (!= suffix ""))
+        (list (system->url (string-append (url->system (car l)) suffix)))
+        l)))
+
 (tm-define (go-to-url u . opt-from)
   (:synopsis "Jump to the url @u")
   (:argument opt-from "Optional path for the cursor history")
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
   (if (string? u) (set! u (system->url u)))
+  (if (not (link-wildcard? u))
+      (go-to-url* u opt-from)
+      (with l (link-wildcard-candidates u)
+        (cond ((null? l)
+               (set-message `(concat "No file matches "
+                                     (verbatim ,(url->system u)))
+                            "Not found"))
+              ((null? (cdr l)) (go-to-url* (car l) opt-from))
+              (else (default-root-disambiguator (urls->or l)))))))
+
+(define (go-to-url* u opt-from)
   ;; a link to a large source file asks first; what follows the load (the
   ;; line and the word of the link, the history) waits for the answer
   (with (action post) (url-handlers u)
