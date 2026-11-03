@@ -217,12 +217,19 @@ texmacs_window_widget (widget wid, tree geom) {
 ******************************************************************************/
 
 class close_embedded_command_rep: public command_rep {
-  tm_view vw;
+  // The command keeps the name of the buffer and the window of the widget,
+  // not the view: the buffer may have been closed before the widget (its
+  // view is deleted then), or be shown by an embedded widget made later
+  // with the same name, which takes over its view (#775)
+  tm_window win;
   url name;
   int win_id;
+  url main_win;  // the window of the view which was current at creation
 public:
-  close_embedded_command_rep (tm_view vw2, url n2, int win2):
-    vw (vw2), name (n2), win_id (win2) {
+  close_embedded_command_rep (tm_view vw, url n2, int win2):
+    win (vw->win), name (n2), win_id (win2), main_win (url_none ()) {
+      if (vw->ed->mvw != NULL && vw->ed->mvw->win != NULL)
+        main_win= abstract_window (vw->ed->mvw->win);
       if (win_id != 0)
         window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
   void apply ();
@@ -232,24 +239,24 @@ public:
 
 void
 close_embedded_command_rep::apply () {
-  //cout << "Destroy " << vw->buf->buf->name << "\n";
-  ASSERT (!is_nil(vw->ed), "embedded command acting on deleted editor");
-  url foc= abstract_window (vw->ed->mvw->win);
-  if (is_none (foc)) {
-    array<url> a= windows_list ();
-    ASSERT (N(a) != 0, "no remaining windows");
-    foc= a[0];
+  // the view of the buffer which is still shown by this widget, if any
+  tm_view vw= NULL;
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++) {
+    tm_view v= concrete_view (vs[i]);
+    if (v != NULL && v->win == win) vw= v;
   }
-  window_focus (foc);
-  //cout << "Changed focus\n";
-  tm_window win= vw->win;
-  ASSERT (N (buffer_to_views (vw->buf->buf->name)) == 1,
-          "invalid cloned embedded TeXmacs widget");
+  array<url> a= windows_list ();
+  url foc= main_win;
+  if (is_none (foc) || !contains (foc, a))
+    foc= (N(a) == 0? url_none (): a[0]);
+  if (!is_none (foc)) window_focus (foc);
   window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
-  remove_buffer (vw->buf->buf->name);
-  //cout << "Deleted buffer\n";
+  if (vw != NULL) {
+    ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
+    remove_buffer (name);
+  }
   tm_delete (win);
-  //cout << "Deleted window\n";
 }
 
 command

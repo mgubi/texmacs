@@ -336,5 +336,173 @@ check "headless: a copy in a buffer which was never typeset (#729)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-untypeset.scm")'
 
+# A buffer which is closed gives back the memory of its editor and of its
+# boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
+# window which showed another view kept the canvas of the former one, so the
+# editor of a closed view, with its boxes, was never deleted, and each open
+# and close of a long document took more memory (#713). The canvas is
+# deleted later, by the event loop of Qt: the steps of the script run from
+# it (exec-delayed), as when the user opens and closes the document. The
+# memory after the closes 3 to 5 may not exceed the one after the closes 1
+# and 2 by half of what an open takes (a canvas may wait one more close
+# before it is deleted). The cost of an open is measured from the first
+# close, as some memory is taken once, at the first open.
+awk 'BEGIN { print "<TeXmacs|2.1.4>\n\n<style|generic>\n\n<\\body>";
+             for (i = 0; i < 3000; i++)
+               print "  Line " i " of a long document of the startup checks.\n";
+             print "</body>" }' > "$out/startup-long.tm"
+cat > "$out/startup-close.scm" <<'EOF'
+(define u (url-append (url-pwd) "startup-long.tm"))
+(define (memory) (gc) (texmacs-memory))
+(define opens '())   ; the memory with the document shown, by cycle
+(define closes '())  ; the memory after it was closed, by cycle
+(define (at l k) (list-ref (reverse l) k))
+(define done #f)
+(define (later f)
+  ;; the next step, from the event loop; an error stops the script (the
+  ;; exit is outside the catch: under Guile, exit throws quit)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (step-open)
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (later step-shown))
+(define (step-shown)
+  (update-forced)
+  (set! opens (cons (memory) opens))
+  (buffer-close u)
+  (later step-closed))
+(define (step-closed)
+  (set! closes (cons (memory) closes))
+  (if (< (length closes) 6)
+      (later step-open)
+      (let ((cost (- (at opens 1) (at closes 0)))
+            (kept (- (max (at closes 3) (at closes 4) (at closes 5))
+                     (max (at closes 1) (at closes 2)))))
+        (display* "memory: opens " (reverse opens) "\n")
+        (display* "memory: closes " (reverse closes) "\n")
+        (display* "CHECK opened " (> cost 0) "\n")
+        (display* "CHECK freed " (< (* 2 kept) cost) "\n")
+        (set! done #t))))
+(later step-open)
+EOF
+
+check "a closed buffer gives back the memory of its editor (#713)" \
+      "opened #t
+freed #t" \
+      -x '(load "startup-close.scm")'
+
+# The command which closes an embedded editor (texmacs-input) when its
+# window is deleted kept the view of its buffer: when the buffer had been
+# closed before, it read the deleted view and crashed (#775). A widget made
+# again with the same name takes over the buffer and its view: deleting the
+# window of the former widget must not close the buffer which the new one
+# shows. The steps run from the event loop, which deletes the windows.
+cat > "$out/startup-embedded.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (embedded name doc)
+  ;; a window with a texmacs-input on the buffer name
+  (let ((win (alt-window-handle))
+        (in (widget-texmacs-input doc '(style "generic") name)))
+    (alt-window-create-plain win in "startup-embedded")
+    (alt-window-show win)
+    win))
+(define u1 (string->url "tmfs://aux/startup-embedded-1"))
+(define u2 (string->url "tmfs://aux/startup-embedded-2"))
+(define w1 #f)
+(define w2 #f)
+(define w3 #f)
+(define (step1)
+  (set! w1 (embedded u1 '(document "one")))
+  (later step2))
+(define (step2)
+  (buffer-close u1)
+  (display* "CHECK buffer closed " (buffer-exists? u1) "\n")
+  (alt-window-delete w1)
+  (set! w2 (embedded u2 '(document "two")))
+  (later step3))
+(define (step3)
+  (set! w3 (embedded u2 '(document "three")))
+  (later step4))
+(define (step4)
+  (alt-window-delete w2)
+  (display* "CHECK reused buffer kept " (buffer-exists? u2) "\n")
+  (alt-window-delete w3)
+  (display* "CHECK reused buffer closed " (buffer-exists? u2) "\n")
+  (set! done #t))
+(later step1)
+EOF
+
+check "an embedded buffer closed before its window, and one made again (#775)" \
+      "buffer closed #f
+reused buffer kept #t
+reused buffer closed #f" \
+      -x '(load "startup-embedded.scm")'
+
+# A link whose target has a wildcard: the pattern was loaded as the name of
+# a buffer, and url-glue (the autosave names) threw a C++ exception which
+# nothing catches under -x, so that TeXmacs aborted (#771). The check is
+# here, not in the suites, since a crash would take a whole suite run down;
+# here it is the status 134 of this one case. The files which match are the
+# candidates of the link: several give the page of disambiguation, one is
+# loaded (also with a query and as a file: url), none gives a message; a
+# wildcard in a relative link of a document of the web gives a message too.
+mkdir -p "$out/startup-wild"
+printf 'a\nb\nc\nd\n' > "$out/startup-wild/wild1.scm"
+printf 'x\n' > "$out/startup-wild/wild2.scm"
+printf 'y\n' > "$out/startup-wild/solo1.scm"
+cat > "$out/startup-wild.scm" <<'EOF'
+(use-modules (link link-navigate))
+(define d (url->system (url-append (url-pwd) "startup-wild")))
+(define (page-text)
+  (with l (list-filter (buffer-list)
+                       (lambda (b) (== (url->string (url-tail b))
+                                       "Disambiguation page")))
+    (if (null? l) "" (object->string (tree->stree (buffer-get-body (car l)))))))
+(define (listed? s) (string-contains? (page-text) s))
+(go-to-url (string-append d "/wild*.scm"))
+(display* "CHECK several " (listed? "wild1.scm") " " (listed? "wild2.scm")
+          " " (listed? "solo1.scm") "\n")
+(define n (length (buffer-list)))
+(go-to-url (string-append d "/nothing*.scm"))
+(display* "CHECK none " (== n (length (buffer-list))) "\n")
+(go-to-url (string-append d "/solo*.scm"))
+(display* "CHECK one " (url->string (url-tail (current-buffer))) "\n")
+(buffer-close (current-buffer))
+(go-to-url (string-append d "/wild*.scm?line=3"))
+(display* "CHECK several-query " (listed? "wild1.scm") "\n")
+(go-to-url (string-append "file://" d "/wild*.scm"))
+(display* "CHECK file-root " (listed? "wild2.scm") "\n")
+;; a relative link in a document of the web: url-complete knows only files
+(define web-buffer (string->url "http://localhost:1/x/y.tm"))
+(define real-current-buffer current-buffer)
+(define m (length (buffer-list)))
+(set! current-buffer (lambda () web-buffer))
+(go-to-url "docs/a*.html")
+(set! current-buffer real-current-buffer)
+(display* "CHECK web-relative " (== m (length (buffer-list))) "\n")
+(display* "CHECK survived\n")
+EOF
+
+check "a link with a wildcard in its target does not abort TeXmacs (#771)" \
+      "several #t #t #f
+none #t
+one solo1.scm
+several-query #t
+file-root #t
+web-relative #t
+survived
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-wild.scm")'
+
 echo "Total: $total checks, $failed failed"
 exit $status
