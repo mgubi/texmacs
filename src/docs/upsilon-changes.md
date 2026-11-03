@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 3 November 2026
 
+- **Closing a program file** gives back the memory of its colours and its
+  syntax tree: they stayed in the cache of tree-sitter until newer files
+  pushed them out, about 5 MB for each close and reopen of a one-line 438 KB
+  JavaScript file, 11 MB for a file of 12000 lines (#765).
+
 - **Names with a `*`**: opening a file name with a `*` (`dir/*.tm`) opens
   the one file that matches, or says how many match, instead of stopping
   TeXmacs, and files whose names contain a `*` can be opened and linked to
