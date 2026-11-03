@@ -162,8 +162,14 @@ verdict () {
 
 # (title) the title is printed in UTF-8 by the window test; the warnings of
 # the conversions are on debug-aqua
-run title french "windows;windows;windows" "(open-preferences)"
+# The window may come late on a slow runner (the first start of the job
+# also loads the fonts and opens the Welcome first: run 41616292441 had no
+# preferences window yet at the third step, one second later than usual), so
+# the window test waits for it (at most 20 s, then the check fails as before)
+# instead of looking at a fixed time; the quit is delayed accordingly.
 title=$(printf "Pr\303\251f\303\251rences de l'utilisateur")
+quit_after=30000
+run title french "windows;wait:$title;windows;windows" "(open-preferences)"
 title_ok () {
   fail="no window '$title'"
   grep -aq "NSTEST window '$title'" "$out/title.log" || return 1
