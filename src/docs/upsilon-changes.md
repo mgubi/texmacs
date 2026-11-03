@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 3 November 2026
 
+- **Names with a `*`**: opening a file name with a `*` (`dir/*.tm`) opens
+  the one file that matches, or says how many match, instead of stopping
+  TeXmacs, and files whose names contain a `*` can be opened and linked to
+  (#790). A web link with a literal `*` must write it `%2A`.
+- **`file:` links on Windows** open the same document as the plain path,
+  not a second copy with a wrong name (#794).
 - **Links with a wildcard or a `file:` address**: a link whose target has a
   `*` (`dir/*.scm`) no longer stops TeXmacs: it opens the file when one
   matches, offers the choice when several do, and says when none does
