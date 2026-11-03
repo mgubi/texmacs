@@ -818,7 +818,7 @@ immediate_options (int argc, char** argv) {
 #endif
     }
 
-#if defined (QTTEXMACS) || defined (VUETEXMACS)
+#if defined (QTTEXMACS) || defined (VUETEXMACS) || defined (AQUATEXMACS)
     else if (s == "-headless" || s == "-H" || s == "-C" ||
 	     s == "-build-website" || s == "-W" ||
 	     s == "-update-website" || s == "-U")
