@@ -192,6 +192,87 @@
                 (check= (list-ref code k) (list-ref plain k)))
               (.. 0 7))))
 
+;; A line wider than the paragraph is broken into rows: after the last space
+;; which fits, or where the row is full (a word which does not fit). The
+;; cursor goes from row to row in the line, and the rows are at the same
+;; places in paper mode (a page item per row) and in papyrus mode (one box)
+(define soft-line
+  (string-append "  x = " (apply string-append (make-list 40 "alpha + ")) "1;"))
+(define hard-line
+  (string-append "  s= \"" (make-string 300 #\x) "\";"))
+(define wrap-lines (list "int a;" soft-line "c" hard-line "d" "e"))
+
+(define (wrap-run medium)
+  (let* ((r '())
+         (cur (lambda () (list-tail (rel (cursor-path)) 3)))
+         (goto (lambda (i pos)
+                 (go-to (at 0 4 0 i pos))
+                 (step (lambda () #t)))))
+    (init-env "page-medium" medium)
+    (step (lambda () #t))
+    (goto 0 0)
+    (set! r (cons (all-rects #t) r))
+    (goto 1 3)
+    (for-each (lambda (k)
+                (step kbd-down)
+                (set! r (cons (cur) r)))
+              (.. 0 6))
+    (goto 3 2) (step kbd-down) (set! r (cons (cur) r))
+    (step kbd-up) (set! r (cons (cur) r))
+    (reverse r)))
+
+(define (test-wrapping)
+  (check-group "soft line breaks")
+  (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document ,@wrap-lines)))))
+         (paper #f) (papyrus #f))
+    (with-body doc (lambda () (set! paper (wrap-run "paper"))))
+    (with-body doc (lambda () (set! papyrus (wrap-run "papyrus"))))
+    (check= (length paper) 9)
+    ;; the soft line: four more rows, then the next lines
+    (check= (map car (list-head (cdr paper) 6)) '(1 1 1 1 2 3))
+    (check-true (> (cadr (list-ref paper 1)) (string-length "  x = ")))
+    ;; the hard line: its second row is in the same line, further (the
+    ;; first row ends after the space)
+    (check= (list-ref paper 7) '(3 7))
+    (check= (list-ref paper 8) '(3 2))
+    ;; papyrus as paper: the cursor, and the lines after the wrapped ones
+    ;; (the outline of a selection of several rows is not the same)
+    (check= (cdr papyrus) (cdr paper))
+    (check= (map (lambda (i) (list-ref (car papyrus) i)) '(0 2 4 5))
+            (map (lambda (i) (list-ref (car paper) i)) '(0 2 4 5)))))
+
+;; In paper mode an edit makes again the rows of the lines which changed
+;; only (and of the first and the last line: a paragraph with what is
+;; around), also in a block of many lines and with lines which are wrapped
+(define (test-rows-made)
+  (check-group "rows made again in paper mode")
+  (let* ((many (map (lambda (i)
+                      (if (== (modulo i 50) 7) soft-line
+                          (string-append "  line " (number->string i) ";")))
+                    (.. 0 300)))
+         (doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document ,@many))))))
+    (with-body doc
+      (lambda ()
+        (init-env "page-medium" "paper")
+        (step (lambda () #t))
+        (go-to (at 0 4 0 150 3))
+        (step (lambda () #t))
+        (let ((n0 (typeset-code-rows-made)))
+          (step (lambda () (insert "Q")))
+          (check-true (<= (- (typeset-code-rows-made) n0) 4))
+          (check= (tree->string (path->tree (at 0 4 0 150))) "  lQine 150;"))
+        (let ((n0 (typeset-code-rows-made)))
+          (step insert-return)
+          (check-true (<= (- (typeset-code-rows-made) n0) 6)))
+        (go-to (at 0 4 0 157 3))
+        (step (lambda () #t))
+        (let ((n0 (typeset-code-rows-made)))
+          ;; (the line 157 was the line 156: a wrapped line)
+          (step (lambda () (insert "Q")))
+          (check-true (<= (- (typeset-code-rows-made) n0) 8)))))))
+
 (define (test-export)
   (check-group "export and import")
   (with-body (code-doc)
@@ -213,13 +294,22 @@
 ;; All tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define mismatches 0)
+
 (tm-define (code-lines-test-failures)
   (:synopsis "Run the tests of the tag code-lines, return the number of failures")
   (check-suite "code-lines")
+  (set! mismatches (typeset-check-mismatches))
   (test-places)
   (test-cursor)
   (test-editing)
   (test-odd-contents)
   (test-paper-edits)
+  (test-wrapping)
+  (test-rows-made)
   (test-export)
+  ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
+  ;; are compared with every line typeset as a paragraph
+  (check-group "the lines used again are the lines made again")
+  (check= (typeset-check-mismatches) mismatches)
   (check-end))
