@@ -593,11 +593,20 @@
         (list (system->url (string-append (url->system (car l)) suffix)))
         l)))
 
+;; A file: url names a file as the plain name of the file does, and the buffer
+;; of a link to it must be the same buffer, with the same url (default-rooted):
+;; the file-rooted url of the link was the name of a second buffer for the
+;; same file, and on Windows a malformed one (the handlers go through the
+;; string of the url, #789).
+(define (link-canonical-url u)
+  (if (url-rooted-protocol? u "file") (url-concretize* u) u))
+
 (tm-define (go-to-url u . opt-from)
   (:synopsis "Jump to the url @u")
   (:argument opt-from "Optional path for the cursor history")
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
   (if (string? u) (set! u (system->url u)))
+  (set! u (link-canonical-url u))
   (if (not (link-wildcard? u))
       (go-to-url* u opt-from)
       (with l (link-wildcard-candidates u)
