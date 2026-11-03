@@ -67,7 +67,8 @@ box_rep::distance (int i, SI x, SI y, SI delta) {
   box b= subbox (i);
   x -= sx(i);
   y -= sy(i);
-  int dx, dy;
+  // (in SI: a box 2^31 units away, some 1300 pages, is not near)
+  SI dx, dy;
   if (x <=  b->x1) dx = b->x1- x- (delta<0? 1:0);
   else if (x >=  b->x2) dx = x- b->x2+ (delta<0? 0:1);
   else dx = 0;

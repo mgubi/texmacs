@@ -252,11 +252,16 @@ edit_cursor_rep::go_right_physical () {
   select_from_cursor_if_active ();
 }
 
+// Beyond the start and the end of any document: 2^30 is some 650 pages of
+// paper, 2^40 (with 64 bit SI) some 650000; the distances to the boxes stay
+// far from the largest SI
+#define FAR_AWAY (((SI) 1) << (sizeof (SI) > 4? 40: 30))
+
 void
 edit_cursor_rep::go_up () {
   if (has_changed (THE_TREE+THE_ENVIRONMENT)) return;
   path scroll_p= find_innermost_scroll (eb, tp);
-  path start_p= tree_path (scroll_p, -(1 << 30), 1 << 30, 0);
+  path start_p= tree_path (scroll_p, -FAR_AWAY, FAR_AWAY, 0);
   if (tp == start_p) return;
   path old_p= tp;
   adjust_ghost_cursor (HORIZONTAL);
@@ -270,7 +275,7 @@ void
 edit_cursor_rep::go_down () {
   if (has_changed (THE_TREE+THE_ENVIRONMENT)) return;
   path scroll_p= find_innermost_scroll (eb, tp);
-  path end_p= tree_path (scroll_p, 1 << 30, -(1 << 30), 0);
+  path end_p= tree_path (scroll_p, FAR_AWAY, -FAR_AWAY, 0);
   if (tp == end_p) return;
   path old_p= tp;
   adjust_ghost_cursor (HORIZONTAL);

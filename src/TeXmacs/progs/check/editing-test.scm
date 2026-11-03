@@ -694,6 +694,41 @@
       (edit (go-right))
       (check= (cursor) '(0 3)))))
 
+;; The cursor goes up and down in a document taller than 2^31 units (some
+;; 350m, 1300 pages of A4): the distances to the boxes are not cut to 32 bits
+;; (box_rep::distance), and the start and the end of the document are not
+;; taken in its middle (go_up, go_down)
+(define (test-far-cursor)
+  (check-group "cursor in a very tall document")
+  ;; (400 lines 100cm apart: a gap is not larger than the steps of the
+  ;; search of cursor_move_sub, DELTA)
+  (with-buffer-body
+    (cons 'document
+          (map (lambda (i) `(concat ,(number->string i) (vspace "100cm")))
+               (.. 0 400)))
+    (lambda ()
+      (let ((step (lambda (thunk)
+                    (thunk) (update-forced) (apply-changes)))
+            (from (lambda (i move)
+                    (go-to (at i 0)) (update-forced) (apply-changes)
+                    (move) (update-forced) (apply-changes)
+                    (car (cursor)))))
+        ;; (pages of 20m: the pages are chosen by their distances)
+        (init-env "page-medium" "paper")
+        (init-env "page-type" "user")
+        (init-env "page-width" "21cm")
+        (init-env "page-height" "2000cm")
+        (step (lambda () #t))
+        (check-true (> (get-page-count) 15))
+        (check= (from 0 kbd-down) 1)
+        (check= (from 10 kbd-down) 11)
+        (check= (from 250 kbd-down) 251)
+        (check= (from 250 kbd-up) 249)
+        ;; at the end, down does not move; at the start, up does not
+        (check= (from 399 kbd-down) 399)
+        (check= (from 399 kbd-up) 398)
+        (check= (from 0 kbd-up) 0)))))
+
 ;; Clicks and a drag (mouse-any, as the events of the window) at the left
 ;; or at the right of the lines. Outside paper mode, the lines of a
 ;; document are merged by chunks (chunk_lines in Typeset/Bridge/bridge.cpp)
@@ -2162,5 +2197,6 @@
   (test-views-style)
   (test-export)
   (test-copy-as-text)
+  (test-far-cursor)
   (remove-tmp-files)
   (check-end))
