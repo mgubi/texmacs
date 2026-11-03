@@ -42,6 +42,7 @@ All runners are run from `src/`, after building, and exit non-zero on failure.
 | `tests/scheme/check.sh <name>` | one suite of check-master (e.g. `latex`, `table`) | seconds |
 | `tests/scheme/check.sh path/foo-test.scm` | a suite file not yet registered | seconds |
 | `tests/scheme/check.sh integration` | the integration suites (server backup, cache...) | |
+| `tests/shared/check.sh [scenario]` | the shared files (docs/shared-files.md): each scenario runs two headless TeXmacs processes at once on a shared file (join, patches, rebase, save, handover, death), offscreen, each capped at 2 GB and 120 s | 1 min |
 | `tests/startup/check.sh` | the command line (`-x`, files, `-q`, `-headless`) and the exit after a script, one TeXmacs process per case; a crash at the exit fails (#462); offscreen, `TM_TEST_TIMEOUT` per case (60 s) | 20 s, 50 s with a fresh home |
 | `make -C tests` | the C++ unit tests (tm_test.hpp, any GUI), linked against `src/Objects` | minutes |
 | `tests/documents/check.sh [-u] [-p]` | typesets `tests/documents/samples/*.tm` to PDF and compares their text with `tests/documents/ref` (`-u` updates, `-p` also compares pixels) | about 1 min |

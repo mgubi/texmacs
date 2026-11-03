@@ -1999,6 +1999,209 @@ tmg_headlessP () {
 }
 
 tmscm
+tmg_local_listen () {
+  // TMSCM_DEFER_INTS;
+  int out= local_listen ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_local_unlisten () {
+  // TMSCM_DEFER_INTS;
+  local_unlisten ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_local_accept () {
+  // TMSCM_DEFER_INTS;
+  int out= local_accept ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_local_connect (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-connect");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= local_connect (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_local_send (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-send");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "local-send");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= local_send (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_local_receive (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-receive");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= local_receive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_local_aliveP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-alive?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= local_alive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_local_close (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "local-close");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  local_close (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_shared_process_id () {
+  // TMSCM_DEFER_INTS;
+  int out= shared_process_id ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_process_aliveP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-process-alive?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_process_alive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_real_path (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-real-path");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= shared_real_path (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_user_dir () {
+  // TMSCM_DEFER_INTS;
+  string out= shared_user_dir ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_list_dir (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-list-dir");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= shared_list_dir (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_set_private (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-set-private");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_set_private (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_create_file (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-create-file");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "shared-create-file");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_create_file (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_replace_file (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-replace-file");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "shared-replace-file");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_replace_file (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_random_token () {
+  // TMSCM_DEFER_INTS;
+  string out= shared_random_token ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_tt_existsP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
@@ -5454,6 +5657,21 @@ tmg_tree_2tree_pointer (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   observer out= tree_pointer_new (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return observer_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_observe (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-observe");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-observe");
+
+  tree in1= tmscm_to_tree (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  observer out= tree_pointer_cb_new (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return observer_to_tmscm (out);
@@ -12709,6 +12927,23 @@ initialize_glue_basic () {
   tmscm_install_procedure ("players-set-speed",  tmg_players_set_speed, 2, 0, 0);
   tmscm_install_procedure ("apply-effect",  tmg_apply_effect, 5, 0, 0);
   tmscm_install_procedure ("headless?",  tmg_headlessP, 0, 0, 0);
+  tmscm_install_procedure ("local-listen",  tmg_local_listen, 0, 0, 0);
+  tmscm_install_procedure ("local-unlisten",  tmg_local_unlisten, 0, 0, 0);
+  tmscm_install_procedure ("local-accept",  tmg_local_accept, 0, 0, 0);
+  tmscm_install_procedure ("local-connect",  tmg_local_connect, 1, 0, 0);
+  tmscm_install_procedure ("local-send",  tmg_local_send, 2, 0, 0);
+  tmscm_install_procedure ("local-receive",  tmg_local_receive, 1, 0, 0);
+  tmscm_install_procedure ("local-alive?",  tmg_local_aliveP, 1, 0, 0);
+  tmscm_install_procedure ("local-close",  tmg_local_close, 1, 0, 0);
+  tmscm_install_procedure ("shared-process-id",  tmg_shared_process_id, 0, 0, 0);
+  tmscm_install_procedure ("shared-process-alive?",  tmg_shared_process_aliveP, 1, 0, 0);
+  tmscm_install_procedure ("shared-real-path",  tmg_shared_real_path, 1, 0, 0);
+  tmscm_install_procedure ("shared-user-dir",  tmg_shared_user_dir, 0, 0, 0);
+  tmscm_install_procedure ("shared-list-dir",  tmg_shared_list_dir, 1, 0, 0);
+  tmscm_install_procedure ("shared-set-private",  tmg_shared_set_private, 1, 0, 0);
+  tmscm_install_procedure ("shared-create-file",  tmg_shared_create_file, 2, 0, 0);
+  tmscm_install_procedure ("shared-replace-file",  tmg_shared_replace_file, 2, 0, 0);
+  tmscm_install_procedure ("shared-random-token",  tmg_shared_random_token, 0, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);
@@ -12952,6 +13187,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("id->trees",  tmg_id_2trees, 1, 0, 0);
   tmscm_install_procedure ("vertex->links",  tmg_vertex_2links, 1, 0, 0);
   tmscm_install_procedure ("tree->tree-pointer",  tmg_tree_2tree_pointer, 1, 0, 0);
+  tmscm_install_procedure ("tree-observe",  tmg_tree_observe, 2, 0, 0);
   tmscm_install_procedure ("tree-pointer-detach",  tmg_tree_pointer_detach, 1, 0, 0);
   tmscm_install_procedure ("tree-pointer->tree",  tmg_tree_pointer_2tree, 1, 0, 0);
   tmscm_install_procedure ("current-link-types",  tmg_current_link_types, 0, 0, 0);

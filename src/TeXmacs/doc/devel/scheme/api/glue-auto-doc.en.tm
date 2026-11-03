@@ -499,6 +499,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gs-executable)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_gs_executable> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(rescue-mode?)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1344,6 +1352,142 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|is_headless> which returns
     <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(local-listen)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_listen> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(local-unlisten)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_unlisten> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(local-accept)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_accept> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(local-connect <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_connect> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(local-send <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_send> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(local-receive <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_receive> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(local-alive? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_alive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(local-close <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|local_close> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-process-id)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_process_id> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-process-alive? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_process_alive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-real-path <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_real_path> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-user-dir)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_user_dir> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-list-dir <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_list_dir> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-set-private <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_set_private> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-create-file <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_create_file> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-replace-file <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_replace_file> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-random-token)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_random_token> which returns
+    <scm|string>.
   </explain>
 
   <\explain>
@@ -3287,6 +3431,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|tree_pointer_new> which returns
+    <scm|observer>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-observe <scm-arg|tree> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_pointer_cb_new> which returns
     <scm|observer>.
   </explain>
 

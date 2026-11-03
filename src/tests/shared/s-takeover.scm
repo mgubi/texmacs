@@ -1,0 +1,40 @@
+;; An interactive process joins a file which a headless one hosts: hosting
+;; moves to it, and the headless one goes on as a participant.
+(load (string-append (getenv "SH_DIR") "/lib.scm"))
+
+(define (A-steps)
+  (list
+   (act "headless" (shared-set-interactive! #f))
+   (act "load" (load-buffer FILE))
+   (act "edit" (check "A hosts" (== (role-of) 'host)) (insert-text! 1 5 "AA"))
+   (act "go" (sync-set! "a-loaded"))
+   (step "hosting moved" (== (role-of) 'participant))
+   (act "check" (check "A is a participant of B" (== (role-of) 'participant))
+        (check "A kept its change" (== (text-of 1) "HelloAA world.")))
+   (act "edit" (insert-text! 2 3 "A2") (sync-set! "a-edited"))
+   (wait-sync "b-edited")
+   (step "converged" (and (== (text-of 3) "ThirdB3 one.") (== (pending-count) 0)))
+   (wait-sync "b-saved")
+   (act "out" (publish-body!) (sync-set! "a-done"))
+   (wait-sync "b-done")))
+
+(define (B-steps)
+  (list
+   (act "interactive" (if (getenv "SH_WINDOW") (check "B counts as interactive with a window" (shared-interactive?)) (shared-set-interactive! #t)))
+   (wait-sync "a-loaded")
+   (act "load" (load-buffer FILE))
+   (step "B hosts" (and (== (role-of) 'host) (= (peers-count) 1)))
+   (act "check" (check "B got the document of A" (== (text-of 1) "HelloAA world."))
+        (check "B is the host" (== (role-of) 'host)))
+   (wait-sync "a-edited")
+   (step "A's edit" (== (text-of 2) "SecA2ond paragraph."))
+   (act "edit" (insert-text! 3 5 "B3") (sync-set! "b-edited"))
+   (act "save" (save-buffer-main (the-name)))
+   (act "saved" (check "file has all" (and (string-contains? (string-load (the-name)) "HelloAA")
+                                            (string-contains? (string-load (the-name)) "SecA2ond")
+                                            (string-contains? (string-load (the-name)) "ThirdB3")))
+        (sync-set! "b-saved"))
+   (wait-sync "a-done")
+   (act "out" (publish-body!) (sync-set! "b-done"))))
+
+(run-steps (if (== ROLE "A") (A-steps) (B-steps)))

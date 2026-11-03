@@ -14,6 +14,19 @@ have the details, and the problems go to the
 
 ## 3 November 2026
 
+- **Shared files** (desktop applications, off by default): with the
+  preference `share-open-files` set to `on`, several TeXmacs processes of the
+  same user which open the same `.tm` file stay in sync, with no server. The
+  process which opens the file first hosts it and writes it; the others join it
+  and get its document instead of reading the file, send their changes to the
+  host, and ask it to save. An interactive TeXmacs always hosts a file it has
+  open (hosting moves to it from a headless one); when the host closes the
+  file, or dies, the next participant takes over. See
+  [shared-files.md](shared-files.md). First part of the shared files of the
+  [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design);
+  there is no menu for the preference yet, nor cursors of the other
+  participants.
+
 - **Closing a program file** gives back the memory of its colours and its
   syntax tree: they stayed in the cache of tree-sitter until newer files
   pushed them out, about 5 MB for each close and reopen of a one-line 438 KB
