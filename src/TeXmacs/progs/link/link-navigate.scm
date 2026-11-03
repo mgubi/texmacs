@@ -481,15 +481,29 @@
   ; TODO: jump to anchors in HTML
   (noop))
 
+;; The checks of the links suite stub the current buffer and the load, to
+;; follow a link from a buffer of the web without fetching anything.
+(define link-test-buffer #f)
+(define link-test-loader #f)
+(tm-define (set-link-test-hooks! buffer loader)
+  (set! link-test-buffer buffer)
+  (set! link-test-loader loader))
+
+(define (link-current-buffer)
+  (if link-test-buffer (link-test-buffer) (current-buffer)))
+
+(define (link-load-browse-buffer u)
+  (if link-test-loader (link-test-loader u) (load-browse-buffer u)))
+
 (define (default-root-handler u)
   (cond ((and (url-rooted-protocol? u "default")
-              (url-rooted-web? (current-buffer)))
-         (default-root-handler (url-relative (current-buffer) u)))
+              (url-rooted-web? (link-current-buffer)))
+         (default-root-handler (url-relative (link-current-buffer) u)))
         ((url-or? (url-expand u))
          (default-root-disambiguator (url-expand u)))
         (else (with (base qry) (process-url u)
                 (if (!= "" (url->system base))
-                    (load-browse-buffer base))))))
+                    (link-load-browse-buffer base))))))
 
 (define (tmfs-root-handler u)
   (load-browse-buffer u))
@@ -597,9 +611,13 @@
 ;; of a link to it must be the same buffer, with the same url (default-rooted):
 ;; the file-rooted url of the link was the name of a second buffer for the
 ;; same file, and on Windows a malformed one (the handlers go through the
-;; string of the url, #789).
+;; string of the url, #789). From a buffer of the web it stays a file: url,
+;; local: a default-rooted url would be relative to the web page.
 (define (link-canonical-url u)
-  (if (url-rooted-protocol? u "file") (url-concretize* u) u))
+  (if (and (url-rooted-protocol? u "file")
+           (not (url-rooted-web? (link-current-buffer))))
+      (url-concretize* u)
+      u))
 
 (tm-define (go-to-url u . opt-from)
   (:synopsis "Jump to the url @u")

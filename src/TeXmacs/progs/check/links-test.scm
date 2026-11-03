@@ -962,6 +962,16 @@
       (check= (cursor) '(2 0))
       (buffer-close (current-buffer))
       (switch-to-buffer here))
+    ;; from a buffer of the web, a file: link stays local (the load is
+    ;; stubbed, nothing is fetched)
+    (let ((loaded '()))
+      (set-link-test-hooks! (lambda () (system->url "https://example.com/a/b.tm"))
+                            (lambda (u) (set! loaded (cons u loaded))))
+      (go-to-url (file-url f "?line=3"))
+      (set-link-test-hooks! #f #f)
+      (check= (length loaded) 1)
+      (check-false (url-rooted-web? (car loaded)))
+      (check= (url->system (url-tail (car loaded))) "file-query.scm"))
     ;; with a column, and a file name with a space
     (let ((g (tmp "file query.scm")))
       (string-save "aa\nbb cc\ndd\n" (url->system g))
