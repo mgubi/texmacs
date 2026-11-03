@@ -441,6 +441,84 @@
     (check= (getenv "TEXMACS_CODE_LINES") old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tabs and invisible characters
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A tab (<#9>, as the importer keeps it) goes to the next stop, every
+;; code-tab-width characters (8); another control character is a character
+;; wide. The cursor goes up and down to the same column, across the tabs
+(define tab-lines
+  (list "<#9>abc" "        xyz" "ab<#9>c" "<#1>bcdefghij"))
+
+(define (tab-run medium invis width)
+  (let* ((r '())
+         (cur (lambda () (list-tail (rel (cursor-path)) 3)))
+         (note (lambda () (set! r (cons (cur) r))))
+         (goto (lambda (i pos)
+                 (go-to (at 0 4 0 i pos))
+                 (step (lambda () #t)))))
+    (init-env "page-medium" medium)
+    (init-env "code-invisibles" invis)
+    (when width (init-env "code-tab-width" width))
+    (step (lambda () #t))
+    (goto 1 9) (step kbd-up) (note)      ; after the a of line 0
+    (step kbd-down) (note)               ; back under it
+    (goto 1 8) (step kbd-down) (note)    ; after the tab of line 2
+    (step kbd-down) (note)               ; (<#1> is one character wide)
+    (goto 0 0) (step kbd-right) (note)   ; over the tab, not into <#9>
+    (reverse r)))
+
+(define (test-tabs)
+  (check-group "tabs and invisible characters")
+  (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document ,@tab-lines)))))
+         (expected '((0 5) (1 9) (2 6) (3 11) (0 4)))
+         (runs '()))
+    (for-each
+      (lambda (medium)
+        (for-each
+          (lambda (invis)
+            (with-body doc
+              (lambda ()
+                (set! runs (cons (tab-run medium invis #f) runs)))))
+          '("false" "true")))
+      '("paper" "papyrus"))
+    (for-each (lambda (run) (check= run expected)) runs)
+    ;; tabs of 4: the a of line 0 is above the fifth space of line 1
+    (with-body doc
+      (lambda ()
+        (init-env "code-tab-width" "4")
+        (step (lambda () #t))
+        (go-to (at 0 4 0 1 5))
+        (step (lambda () #t))
+        (step kbd-up)
+        (check= (list-tail (rel (cursor-path)) 3) '(0 5)))))
+  ;; a line of tabs is broken into rows as wide as the page
+  (let* ((tabs (apply string-append (make-list 40 "<#9>x")))
+         (doc `(document (with "font-family" "tt" "language" "verbatim"
+                           (code-lines (document "a" ,tabs "b"))))))
+    (with-body doc
+      (lambda ()
+        (init-env "page-medium" "papyrus")
+        (step (lambda () #t))
+        (go-to (at 0 4 0 1 0))
+        (step (lambda () #t))
+        (step kbd-down)
+        (check= (car (list-tail (rel (cursor-path)) 3)) 1))))
+  ;; the importer keeps the tabs and the control characters, the exporter
+  ;; gives them back
+  (let ((old (getenv "TEXMACS_CODE_LINES"))
+        (text (string-append "a" (string #\tab) "b\n"
+                             (string (integer->char 1)) "c")))
+    (setenv "TEXMACS_CODE_LINES" "1")
+    (with t (cpp-verbatim->texmacs text #f "utf-8")
+      (with body (cadr (assoc 'body (cdr (tree->stree t))))
+        (check= body '(document (code-lines (document "a<#9>b" "<#1>c"))))
+        (check= (texmacs->code (stree->tree (cadr body)) "utf-8") text)))
+    (setenv "TEXMACS_CODE_LINES" old)
+    (check= (getenv "TEXMACS_CODE_LINES") old)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -461,6 +539,7 @@
   (test-colour-states)
   (test-markup)
   (test-export)
+  (test-tabs)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph
   (check-group "the lines used again are the lines made again")

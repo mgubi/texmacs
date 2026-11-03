@@ -140,6 +140,10 @@ print_verbatim (string& buf, tree t, bool wrap) {
     case SYNTAX:
       print_verbatim_arg (buf, t[0], wrap);
       break;
+    case CODE_LINES:
+      // a block of lines (as they are: not wrapped)
+      if (N(t) == 1) print_verbatim (buf, t[0], false);
+      break;
     case TABLE:
       print_verbatim_table (buf, t, wrap);
       break;
@@ -367,6 +371,34 @@ verbatim_to_tree (string s, bool wrap, string enc) {
   return verbatim_to_tree (s, enc);
 }
 
+// The text encoded as encode does, but for the control characters (other
+// than the newlines), which are <#..>: a tab is <#9>, and not the character
+// 9 of Cork (an accent), and is a tab again when the text is exported. The
+// encoding is guessed from the whole text (as "auto" does), and the text
+// between the control characters is encoded with it
+static string
+encode_keeping_controls (string s, string enc) {
+  string iso;
+  if (enc == "auto") {
+    string g= guess_wencoding (s);
+    if (g == "UTF-8-BOM") { s= s (3, N(s)); enc= "utf-8"; }
+    else if (g == "UTF-8") enc= "utf-8";
+    else if (g == "ISO-8859")
+      iso= language_to_local_ISO_charset (get_locale_language ());
+  }
+  string r;
+  int j= 0, n= N(s);
+  for (int i=0; i<=n; i++)
+    if (i == n || (((unsigned char) s[i]) < 32 && s[i] != '\n') ||
+        ((unsigned char) s[i]) == 127) {
+      string seg= s (j, i);
+      r << (iso != ""? convert (seg, iso, "Cork"): encode (seg, enc));
+      if (i < n) r << "<#" << as_hexadecimal ((unsigned char) s[i]) << ">";
+      j= i + 1;
+    }
+  return r;
+}
+
 // Is a verbatim document (a text, a source file) made of a code-lines block?
 // The preference "code lines" ("on" unless "off"), unless TEXMACS_CODE_LINES
 // is 0 or 1
@@ -381,13 +413,21 @@ code_lines_wanted () {
 tree
 verbatim_document_to_tree (string s, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
-  tree t    = verbatim_to_tree (s, wrap, enc);
-  // the lines as <code-lines|<document|...>>, typeset by one bridge without
-  // a paragraph per line (see bridge_code.cpp, #710)
+  tree t;
   if (code_lines_wanted () && !wrap) {
-    if (!is_func (t, DOCUMENT)) t= tree (DOCUMENT, t);
-    t= tree (DOCUMENT, tree (CODE_LINES, t));
+    // the lines as <code-lines|<document|...>>, typeset by one bridge
+    // without a paragraph per line (see bridge_code.cpp, #710); the tabs
+    // are kept (a block of lines shows them at their stops), and the
+    // backspaces are characters as the others
+    string r= encode_keeping_controls (mac_to_unix (dos_to_unix (s)), enc);
+    tree d (DOCUMENT);
+    int j= 0;
+    for (int i=0; i<N(r); i++)
+      if (r[i] == '\n') { d << r (j, i); j= i+1; }
+    d << r (j, N(r));
+    t= tree (DOCUMENT, tree (CODE_LINES, d));
   }
+  else t= verbatim_to_tree (s, wrap, enc);
   tree init = tree (COLLECTION,
                     tree (ASSOCIATE, LANGUAGE, "verbatim"),
                     tree (ASSOCIATE, FONT_FAMILY, "tt"),

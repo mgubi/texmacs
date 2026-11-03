@@ -108,6 +108,9 @@ public:
   bool            recs_ok; // they are at the places of the lines
   code_end first, last;    // the paragraphs of the first and the last line
   int      passes;         // the passes of typeset_paper
+  SI       gcell;          // the width of a cell of the grid,
+  int      tabw;           // the tabs stop every tabw cells,
+  bool     invis;          // the spaces, tabs... are shown (code-invisibles)
 
   void lines_inserted (int pos, int nr);
   void lines_removed (int pos, int nr);
@@ -146,7 +149,8 @@ public:
 };
 
 bridge_code_rep::bridge_code_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), recs_ok (false), passes (0) {}
+  bridge_rep (ttt, st, ip), recs_ok (false), passes (0), gcell (0),
+  tabw (8), invis (false) {}
 
 bridge
 bridge_code (typesetter ttt, tree st, path ip) {
@@ -409,14 +413,17 @@ bridge_code_rep::line_rec (tree& t, font fn, SI width, SI cw,
   // be too wide, or with markup, unless always: a character is at most cw
   // wide, also <...>)
   bool plain= is_atomic (t);
-  if (!always && plain && (SI) N(t->label) * cw <= width) return code_rec ();
+  // (a tab, <#9>, is at most tabw cells wide)
+  bool tabs= plain && search_forwards ("<#9>", t->label) >= 0;
+  if (!always && plain && !tabs && (SI) N(t->label) * cw <= width)
+    return code_rec ();
   code_rec r (true);
   code_records_made++;
   r->line= t;
   r->text= (plain? t->label: string (""));
   r->wsig= wsig;
-  if (plain && (SI) N(t->label) * cw > width)
-    r->starts= code_breaks (t->label, fn, width);
+  if (plain && (tabs || (SI) N(t->label) * cw > width))
+    r->starts= code_breaks (t->label, fn, width, gcell, tabw);
   else r->starts << 0;
   return r;
 }
@@ -469,6 +476,14 @@ bridge_code_rep::my_typeset (int desired_status) {
     cell= xp[4] / 4;
     if (cell <= 0) cell= cw;
   }
+  gcell= cell;
+  tabw= 8;
+  if (env->provides ("code-tab-width")) {
+    string tw= as_string (env->read ("code-tab-width"));
+    if (is_int (tw)) tabw= max (1, min (64, as_int (tw)));
+  }
+  invis= (env->provides ("code-invisibles") &&
+          as_string (env->read ("code-invisibles")) == "true");
   SI height= env->as_length (string ("1fn")) + env->get_length (PAR_SEP);
   SI pitch = height + env->get_vspace (PAR_PAR_SEP)->def;
   SI rpitch= height + env->get_vspace (PAR_LINE_SEP)->def;
@@ -490,6 +505,7 @@ bridge_code_rep::my_typeset (int desired_status) {
                                              (unsigned long long) width),
                                     (unsigned long long)
                                     (void*) fn.operator-> ());
+  wsig= sig_mix (wsig, (unsigned long long) (tabw * 2 + (invis? 1: 0)));
   if (!recs_ok || N(recs) != n || typeset_caches_mode () == 0) {
     recs= array<code_rec> (n);
     recs_ok= true;
@@ -562,7 +578,8 @@ bridge_code_rep::my_typeset (int desired_status) {
       for (int r=0; r<N(st); r++)
         rows << code_row_box (lip, doc[i], text, st[r],
                               r+1 < N(st)? st[r+1]: N(text),
-                              fn, env->pen, lexer, cols, width);
+                              fn, env->pen, lexer, cols, gcell, tabw,
+                              invis? (i == n-1? 2: 1): 0, width);
       pars << rows;
     }
   else {
@@ -588,8 +605,8 @@ bridge_code_rep::my_typeset (int desired_status) {
       }
     array<box> one;
     one << code_box (ip, doc, 0, n, fn, env->pen, lexer, cols,
-                     pitch, rpitch, tall_k, tall_txt, tall_st, tall_box,
-                     width);
+                     pitch, rpitch, gcell, tabw, invis,
+                     tall_k, tall_txt, tall_st, tall_box, width);
     pars << one;
   }
   typeset_paragraphs (doc, pars, width, cell);
@@ -779,7 +796,8 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
     for (int k=0; k<N(st); k++)
       rows << code_row_box (lip, doc[i], r->text, st[k],
                             k+1 < N(st)? st[k+1]: len,
-                            fn, pen, lx, cols, width);
+                            fn, pen, lx, cols, gcell, tabw,
+                            invis? (i == n-1? 2: 1): 0, width);
     code_rows_made += N(rows);
     return rows;
   };
@@ -809,7 +827,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
     array<box> rs;
     for (int r=0; r<R; r++)
       rs << code_row_box (lip1, doc[1], text1, 0, N(text1), fn, pen, lx,
-                          cols, width);
+                          cols, gcell, tabw, invis, width);
     code_paragraph (env, ip, rs, array<line_item> (), array<line_item> (),
                     T[R], TS[R]);
     ok= (N(T[R]) == R);

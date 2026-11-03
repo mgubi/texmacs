@@ -53,20 +53,68 @@
 * Soft line breaks
 ******************************************************************************/
 
+int
+code_control (string s, int i, int& j) {
+  int n= N(s);
+  if (i + 3 >= n || s[i] != '<' || s[i+1] != '#') return -1;
+  int k= i + 2;
+  while (k < n && s[k] != '>') k++;
+  if (k >= n || k == i + 2) return -1;
+  int c= from_hexadecimal (s (i+2, k));
+  if (c >= 32 && c != 127) return -1;
+  j= k + 1;
+  return c;
+}
+
+void
+code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos) {
+  int n= max (0, min (N(s), upto));
+  string t= s (0, n);
+  array<SI> raw (n + 1);
+  raw[0]= 0;
+  if (n > 0) fn->get_xpositions (t, A(raw));
+  xpos= array<SI> (n + 1);
+  xpos[0]= raw[0];
+  SI shift= 0;
+  int i= 0;
+  while (i < n) {
+    int j= i;
+    int c= code_control (t, i, j);
+    if (c < 0) {
+      j= i;
+      tm_char_forwards (t, j);
+      if (j > n) j= n;
+      for (int k=i+1; k<=j; k++) xpos[k]= raw[k] + shift;
+      i= j;
+      continue;
+    }
+    // a tab, to the next stop; another control character, a cell
+    SI x= xpos[i], end= x + cell;
+    if (c == 9 && tabw > 0 && cell > 0) {
+      SI stop= (SI) tabw * cell;
+      end= (x / stop + 1) * stop;
+    }
+    for (int k=i+1; k<j; k++) xpos[k]= x;
+    xpos[j]= end;
+    shift= end - raw[j];
+    i= j;
+  }
+}
+
 array<int>
-code_breaks (string s, font fn, SI width) {
+code_breaks (string s, font fn, SI width, SI cell, int tabw) {
   // the starts of the rows of s, at most width wide
   array<int> r;
   r << 0;
   int n= N(s);
   if (n == 0 || width <= 0) return r;
-  SI* xpos= tm_new_array<SI> (n+1);
-  fn->get_xpositions (s, xpos);
-  if (xpos[n] <= width) { tm_delete_array (xpos); return r; }
+  array<SI> xpos;
+  code_xpos (s, n, fn, cell, tabw, xpos);
+  if (xpos[n] <= width) return r;
   int a= 0, i= 0, after_space= -1;
   while (i < n) {
     int j= i;
-    tm_char_forwards (s, j);
+    if (code_control (s, i, j) < 0) { j= i; tm_char_forwards (s, j); }
     if (j > n) j= n;
     if (xpos[j] - xpos[a] > width && i > a) {
       int b= (after_space > a? after_space: i);
@@ -78,7 +126,6 @@ code_breaks (string s, font fn, SI width) {
     if (s[i] == ' ') after_space= j;
     i= j;
   }
-  tm_delete_array (xpos);
   return r;
 }
 
@@ -264,6 +311,10 @@ struct code_box_rep: public box_rep {
   hashmap<string,color> cols; // the colours given as variables
   SI       pitch;  // the distance between two lines,
   SI       rpitch; // and between two rows of a line
+  SI       cell;   // the width of a cell (a character)
+  int      tabw;   // the tabs stop every tabw cells
+  int      invis;  // the spaces, tabs, ends of lines... are shown (2: not
+                  // the end of the line: the last line of the block)
   // The special lines (by their number in the box, in order): the lines
   // which have several rows (their texts and the starts of their rows when
   // the box was made), and the lines with markup (a box of the line, made
@@ -284,11 +335,12 @@ struct code_box_rep: public box_rep {
   code_box_rep (path ip, tree doc, int i0, int n,
                 font fn, pencil pen, code_lexer lx,
                 hashmap<string,color> cols, SI pitch, SI rpitch,
+                SI cell, int tabw, int invis,
                 array<int> tall_k, array<string> tall_txt,
                 array<array<int> > tall_st, array<box> tall_box, SI width);
   code_box_rep (path lip, tree one, string text, int ra, int rb, font fn,
                 pencil pen, code_lexer lx, hashmap<string,color> cols,
-                SI width);
+                SI cell, int tabw, int invis, SI width);
   operator tree () { return "code lines"; }
 
   // lines and rows. The tree changes before the next typesetting: the box
@@ -350,6 +402,17 @@ struct code_box_rep: public box_rep {
     return depth (k, 0) - fn->y2 - (j >= 0? tall_pre[j]: 0); }
   SI     base (int k, int i) { return (SI) -depth (k, i); }
   void   row_at (SI y, int& k, int& i);
+  // the positions of the characters of the line k up to upto (see
+  // code_xpos), the position in the row i of the line k nearest to x, and
+  // the extents of the text between two positions (as a text box)
+  void   xpositions (int k, int upto, array<SI>& xp) {
+    code_xpos (line (k), upto, fn, cell, tabw, xp); }
+  int    pos_at (int k, int i, SI x, SI delta);
+  // (the last line of the block does not end with a newline)
+  bool   has_end (int k) {
+    return invis == 1 && (single || i0 + k < N(doc) - 1); }
+  void   draw_invisibles (renderer ren, string s, array<SI>& xp, int a,
+                          int b, bool last, SI y);
   box    row_box (int k, int i) {
     int a= starts (k) [i], b= row_end (k, i);
     return text_box (line_ip (k), a, line (k) (a, b), fn, pen); }
@@ -372,16 +435,26 @@ struct code_box_rep: public box_rep {
   selection find_selection (path lbp, path rbp);
 };
 
+// (tm_new takes at most 15 arguments)
+template<typename... A> static inline code_box_rep*
+code_new (const A&... a) {
+  void* ptr= fast_new (sizeof (code_box_rep));
+  (void) new (ptr) code_box_rep (a...);
+  return (code_box_rep*) ptr;
+}
+
 code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
                             pencil pen2, code_lexer lx2,
                             hashmap<string,color> cols2, SI pitch2,
-                            SI rpitch2, array<int> tall_k2,
+                            SI rpitch2, SI cell2, int tabw2, int invis2,
+                            array<int> tall_k2,
                             array<string> tall_txt2,
                             array<array<int> > tall_st2,
                             array<box> tall_box2, SI width):
   box_rep (ip2), doc (doc2), i0 (i02), n (max (n2, 1)),
   fn (fn2), pen (pen2), lx (lx2), cols (cols2), pitch (pitch2),
-  rpitch (rpitch2), tall_k (tall_k2), tall_txt (tall_txt2),
+  rpitch (rpitch2), cell (cell2), tabw (tabw2), invis (invis2),
+  tall_k (tall_k2), tall_txt (tall_txt2),
   tall_st (tall_st2), tall_box (tall_box2), single (false), ra (0), rb (0)
 {
   int t= N(tall_k);
@@ -422,9 +495,11 @@ code_box_rep::code_box_rep (path ip2, tree doc2, int i02, int n2, font fn2,
 
 code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
                             int rb2, font fn2, pencil pen2, code_lexer lx2,
-                            hashmap<string,color> cols2, SI width):
+                            hashmap<string,color> cols2, SI cell2, int tabw2,
+                            int invis2, SI width):
   box_rep (lip), doc (one), i0 (0), n (1),
   fn (fn2), pen (pen2), lx (lx2), cols (cols2), pitch (0), rpitch (0),
+  cell (cell2), tabw (tabw2), invis (invis2),
   single (true), ra (ra2), rb (rb2), one_text (text)
 {
   x1= x3= 0;
@@ -473,8 +548,9 @@ code_box_rep::subbox (int k) {
   array<array<int> > ts;
   array<box> tb;
   if (nr_rows (k) > 1) { tk << 0; tt << line (k); ts << starts (k); tb << box (); }
-  box b= tm_new<code_box_rep> (ip, doc, i0+k, 1, fn, pen, lx, cols,
-                               pitch, rpitch, tk, tt, ts, tb, x2);
+  box b= code_new (ip, doc, i0+k, 1, fn, pen, lx, cols,
+                               pitch, rpitch, cell, tabw, invis,
+                               tk, tt, ts, tb, x2);
   b->x0= 0; b->y0= base (k, 0);
   return b;
 }
@@ -500,13 +576,21 @@ code_box_rep::display (renderer ren) {
     }
     tree t= line_tree (k);
     string s= line (k);
-    if (!is_atomic (t) || N(s) == 0) continue;
+    if (!is_atomic (t)) continue;
+    if (N(s) == 0) {
+      if (invis && (!single || rb == 0)) {
+        array<SI> xp (1);
+        xp[0]= 0;
+        draw_invisibles (ren, s, xp, 0, 0, has_end (k), base (k, 0));
+      }
+      continue;
+    }
     // (the number of the line in the document: for one row, the path of
     // the line has it)
     int li= (single? (is_nil (ip)? 0: ip->item): i0 + k);
     code_runs_entry& c= lx->runs (li, s);
-    array<SI> xpos (N(s) + 1);
-    fn->get_xpositions (s, A(xpos));
+    array<SI> xpos;
+    xpositions (k, N(s), xpos);
     array<int> st= starts (k);
     int lo= (k == ka? ia: 0), hi= (k == kb? ib: N(st) - 1);
     for (int i= lo; i <= hi && i < N(st); i++) {
@@ -525,18 +609,89 @@ code_box_rep::display (renderer ren) {
         color cl= (col == ""? fg:
                    cols->contains (col)? cols[col]: named_color (col));
         ren->set_pencil (pencil (cl));
-        // (a space is not drawn: the font has a visible space there)
-        int u= s1;
+        // (a space is not drawn: the font has a visible space there; nor a
+        // tab or another control character: see draw_invisibles)
+        int u= s1, j;
         while (u < s2) {
-          while (u < s2 && s[u] == ' ') u++;
+          if (s[u] == ' ') { u++; continue; }
+          if (code_control (s, u, j) >= 0) { u= j; continue; }
           int v= u;
-          while (v < s2 && s[v] != ' ') v++;
-          if (v > u) fn->draw (ren, s (u, v), xpos[u] - xpos[a], y);
+          while (v < s2 && s[v] != ' ' && code_control (s, v, j) < 0)
+            tm_char_forwards (s, v);
+          if (v > s2) v= s2;
+          fn->draw (ren, s (u, v), xpos[u] - xpos[a], y);
           u= v;
         }
       }
+      if (invis)
+        draw_invisibles (ren, s, xpos, a, b,
+                         i == N(st) - 1 && (!single || rb == N(s)) &&
+                         has_end (k), y);
     }
   }
+}
+
+// The spaces (a dot), the tabs (an arrow to their stop), the other control
+// characters (a box) of the row [a, b) of the line s at the baseline y, and
+// its end (an arrow back) when it is the last row of the line
+void
+code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
+                               int a, int b, bool last, SI y) {
+  ren->set_pencil (pencil (named_color ("#a0a0a0"), max (fn->wline, PIXEL)));
+  SI x0= xp[a], ym= y + fn->yx / 2, d= max (cell / 12, PIXEL), h= cell / 4;
+  int i= a;
+  while (i < b) {
+    int j= i;
+    int c= code_control (s, i, j);
+    if (c < 0) { j= i; tm_char_forwards (s, j); }
+    SI xa= xp[i] - x0, xb= xp[min (j, N(xp) - 1)] - x0;
+    if (c < 0 && s[i] == ' ') {
+      SI cx= (xa + xb) / 2;
+      ren->fill (cx - d, ym - d, cx + d, ym + d);
+    }
+    else if (c == 9) {
+      SI l= xa + cell / 6, r= max (xb - cell / 6, l + h);
+      ren->line (l, ym, r, ym);
+      ren->line (r, ym, r - h, ym + h);
+      ren->line (r, ym, r - h, ym - h);
+    }
+    else if (c >= 0) {
+      SI l= xa + cell / 6, r= xb - cell / 6, bt= y, tp= y + fn->yx;
+      ren->line (l, bt, r, bt); ren->line (r, bt, r, tp);
+      ren->line (r, tp, l, tp); ren->line (l, tp, l, bt);
+    }
+    i= j;
+  }
+  if (last) {
+    // the end of the line
+    SI x= xp[min (b, N(xp) - 1)] - x0 + cell / 6;
+    SI r= x + (cell * 2) / 3, tp= y + fn->yx, md= y + fn->yx / 3;
+    ren->line (r, tp, r, md);
+    ren->line (r, md, x, md);
+    ren->line (x, md, x + h, md + h);
+    ren->line (x, md, x + h, md - h);
+  }
+}
+
+int
+code_box_rep::pos_at (int k, int i, SI x, SI delta) {
+  // as text_box_rep::find_box_path: the position before the character
+  // whose middle is after x
+  string s= line (k);
+  int a= starts (k) [i], b= row_end (k, i), j;
+  array<SI> xp;
+  xpositions (k, b, xp);
+  SI x0= xp[a];
+  int p= a;
+  while (p < b) {
+    int q= p;
+    if (code_control (s, p, j) >= 0) q= j; else tm_char_forwards (s, q);
+    if (q > b) q= b;
+    SI m= ((xp[p] - x0) + (xp[q] - x0)) >> 1;
+    if (x < m || (x == m && delta < 0)) return p;
+    p= q;
+  }
+  return b;
 }
 
 /******************************************************************************
@@ -553,11 +708,9 @@ code_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
     return path (k, b->find_box_path (x - b->x0, y - b->y0, delta, force,
                                       found));
   }
-  int a= starts (k) [i];
-  box rb= row_box (k, i);
-  path bp= rb->find_box_path (x, y - base (k, i), delta, force, found);
+  (void) force;
   found= true;
-  return path (k, a + (is_nil (bp)? 0: bp->item));
+  return path (k, pos_at (k, i, x, delta));
 }
 
 path
@@ -650,11 +803,25 @@ code_box_rep::find_cursor (path bp) {
     cu->oy += b->y0;
     return cu;
   }
+  // as text_box_rep::find_cursor, with the positions of code_xpos
   int pos= is_nil (bp->next)? 0: bp->next->item;
   int i= row_of (k, pos);
   int a= starts (k) [i];
-  cursor cu= row_box (k, i)->find_cursor (path (max (0, pos - a)));
-  cu->oy += base (k, i);
+  string s= line (k);
+  pos= max (a, min (pos, row_end (k, i)));
+  array<SI> xp;
+  xpositions (k, pos, xp);
+  metric ex;
+  ex->y1= ex->y2= 0;
+  if (pos > a) {
+    int q= pos;
+    tm_char_backwards (s, q);
+    fn->get_extents (s (q, pos), ex);
+  }
+  cursor cu (xp[pos] - xp[a], base (k, i));
+  cu->y1= min (ex->y1, (SI) 0);
+  cu->y2= max (ex->y2, fn->yx);
+  cu->slope= fn->get_right_slope (s (a, row_end (k, i)));
   return cu;
 }
 
@@ -674,11 +841,17 @@ code_box_rep::find_selection (path lbp, path rbp) {
   if (k1 > k2 || (k1 == k2 && !rich (k1) && p1 > p2))
     return find_selection (rbp, lbp);
   if (k1 == k2 && row_of (k1, p1) == row_of (k2, p2)) {
-    int r= row_of (k1, p1), a= starts (k1) [r];
-    selection sel= row_box (k1, r)->find_selection (path (p1 - a),
-                                                     path (p2 - a));
-    return selection (translate (sel->rs, 0, base (k1, r)),
-                      find_tree_path (lbp), find_tree_path (rbp));
+    // as text_box_rep::find_selection, with the positions of code_xpos
+    int r= row_of (k1, p1), a= starts (k1) [r], e= row_end (k1, r);
+    p1= max (a, min (p1, e)); p2= max (a, min (p2, e));
+    string s= line (k1);
+    array<SI> xp;
+    xpositions (k1, p2, xp);
+    metric ex;
+    fn->get_extents (s (p1, p2), ex);
+    rectangles rs (rectangle (xp[p1] - xp[a], ex->y1 + base (k1, r),
+                              xp[p2] - xp[a], ex->y2 + base (k1, r)));
+    return selection (rs, find_tree_path (lbp), find_tree_path (rbp));
   }
   // from the first cursor to the right, the rows between, from the left to
   // the second cursor
@@ -698,17 +871,18 @@ code_box_rep::find_selection (path lbp, path rbp) {
 box
 code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
           code_lexer lx, hashmap<string,color> cols, SI pitch, SI rpitch,
+          SI cell, int tabw, int invis,
           array<int> tall_k, array<string> tall_txt,
           array<array<int> > tall_st, array<box> tall_box, SI width) {
-  return tm_new<code_box_rep> (ip, doc, i0, n, fn, pen, lx, cols,
-                               pitch, rpitch, tall_k, tall_txt, tall_st,
-                               tall_box, width);
+  return code_new (ip, doc, i0, n, fn, pen, lx, cols,
+                               pitch, rpitch, cell, tabw, invis,
+                               tall_k, tall_txt, tall_st, tall_box, width);
 }
 
 box
 code_row_box (path lip, tree line, string text, int a, int b, font fn,
               pencil pen, code_lexer lx, hashmap<string,color> cols,
-              SI width) {
-  return tm_new<code_box_rep> (lip, line, text, a, b, fn, pen, lx, cols,
-                               width);
+              SI cell, int tabw, int invis, SI width) {
+  return code_new (lip, line, text, a, b, fn, pen, lx, cols,
+                               cell, tabw, invis, width);
 }

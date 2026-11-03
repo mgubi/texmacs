@@ -24,6 +24,35 @@
   (dynamic (focus-code-icons t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The lines of source code (the tag code-lines): the spaces, the tabs, the
+;; ends of the lines and the other control characters can be shown, and the
+;; tabs stop every "code-tab-width" characters (settings of the document)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (code-invisibles?)
+  (== (get-init "code-invisibles") "true"))
+
+(tm-define (toggle-code-invisibles)
+  (:synopsis "Show or hide the spaces, the tabs and the ends of the lines")
+  (:check-mark "v" code-invisibles?)
+  (init-env "code-invisibles" (if (code-invisibles?) "false" "true")))
+
+(tm-define (code-tab-width? w)
+  (== (get-init "code-tab-width") w))
+
+(tm-define (set-code-tab-width w)
+  (:synopsis "Set the width of the tabs, in characters")
+  (:check-mark "*" code-tab-width?)
+  (init-env "code-tab-width" w))
+
+(menu-bind code-lines-menu
+  ("Show invisible characters" (toggle-code-invisibles))
+  (-> "Tab width"
+      ("2" (set-code-tab-width "2"))
+      ("4" (set-code-tab-width "4"))
+      ("8" (set-code-tab-width "8"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main Format menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -40,6 +69,9 @@
       ---
       (group "Text")
       (link textual-properties-menu))
+  ---
+  (group "Source code")
+  (link code-lines-menu)
   ---
   (group "Paragraph")
   (link paragraph-menu)
@@ -59,6 +91,7 @@
   (when (inside? 'table)
     ("Cell" (open-cell-properties))
     ("Table" (open-table-properties)))
+  (-> "Source code" (link code-lines-menu))
   ---
   (-> "Whitespace" (link space-menu))
   (-> "Indentation" (link indentation-menu))

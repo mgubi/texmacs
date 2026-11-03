@@ -85,20 +85,31 @@ CONCRETE_NULL_CODE(code_lexer);
 * Boxes and soft line breaks (code_boxes.cpp)
 ******************************************************************************/
 
+// The control character at i of s, <#..> (9: a tab), or -1 (j: after it)
+int code_control (string s, int i, int& j);
+// the positions of the characters of s up to upto, from the start of the
+// line: as the font gives them, but a tab goes to the next stop (every tabw
+// cells of width cell) and another control character is a cell wide
+void code_xpos (string s, int upto, font fn, SI cell, int tabw,
+                array<SI>& xpos);
 // the starts of the rows of the text s, at most width wide
-array<int> code_breaks (string s, font fn, SI width);
+array<int> code_breaks (string s, font fn, SI width, SI cell, int tabw);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines
 // with markup, the boxes tall_box)
+// (cell: the width of a character; tabw: the tabs stop every tabw cells;
+// invis: the spaces, the tabs, the ends of the lines... are shown; 2: not
+// the end of the line, which is the last one)
 box code_box (path ip, tree doc, int i0, int n, font fn, pencil pen,
               code_lexer lx, hashmap<string,color> cols, SI pitch,
-              SI rpitch, array<int> tall_k, array<string> tall_txt,
+              SI rpitch, SI cell, int tabw, int invis,
+              array<int> tall_k, array<string> tall_txt,
               array<array<int> > tall_st, array<box> tall_box, SI width);
 
 // the row [a, b) of the line with the text text, whose path is lip
 box code_row_box (path lip, tree line, string text, int a, int b, font fn,
                   pencil pen, code_lexer lx, hashmap<string,color> cols,
-                  SI width);
+                  SI cell, int tabw, int invis, SI width);
 
 #endif // defined CODE_LINES_H
