@@ -851,11 +851,44 @@
                 (load-buffer-check-permissions name opts)))))
       (load-buffer-check-permissions name opts)))
 
+(define (stree-wildcard? t)
+  (and (pair? t)
+       (or (== (car t) 'wildcard)
+           (list-or (map stree-wildcard? (cdr t))))))
+
+(tm-define (url-wildcard? u)
+  (:synopsis "Does the url @u contain a wildcard, a pattern like in a*.scm?")
+  ;; a name with a star which comes from a directory is a plain name, not
+  ;; a wildcard: a file a*b.scm can be loaded
+  (stree-wildcard? (url->stree (if (string? u) (string->url u) u))))
+
+(define (load-buffer-wildcard name opts)
+  ;; A wildcard is not the name of a buffer (url-glue, for the names of the
+  ;; autosave files, can't glue to it, #790): the files which it matches are
+  ;; the candidates. None, or several, give a message and load nothing (a
+  ;; script which calls load-buffer can't answer a page of disambiguation);
+  ;; one is loaded as if it had been named. Nothing is resolved before: the
+  ;; wildcards of the other roots (tmfs, web) are never completed.
+  (with l (link-wildcard-candidates name #f)
+    (cond ((null? l)
+           (set-message (replace "No file matches %1" (url->system name))
+                        "Load file"))
+          ((null? (cdr l))
+           (apply load-buffer-main (cons (car l) opts)))
+          (else
+            (set-message (replace "%1 files match %2, none is loaded"
+                                  (number->string (length l))
+                                  (url->system name))
+                         "Load file")))))
+
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
-  (set! name (load-buffer-resolve-name name))
-  (load-buffer-confirm-large name opts
-    (lambda () (load-buffer-check-autosave name opts))))
+  (if (url-wildcard? name)
+      (load-buffer-wildcard name opts)
+      (begin
+        (set! name (load-buffer-resolve-name name))
+        (load-buffer-confirm-large name opts
+          (lambda () (load-buffer-check-autosave name opts))))))
 
 (tm-define (load-buffer name . opts)
   (:argument name smart-file "File name")
