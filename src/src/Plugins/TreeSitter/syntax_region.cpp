@@ -801,14 +801,18 @@ syntax_region_forget (tree root) {
 
 static bool
 detached_root (tree root) {
-  // is root a part of a document which was closed? A tree has a path when it
-  // was in a document (the observer of its position); once the document is
-  // closed the path is detached. A tree which was never in a document (a text
-  // typeset apart, a tree made by a script) has no such observer: it is left
-  // to the cache.
-  path ip;
-  if (is_nil (root->obs) || !root->obs->get_ip (ip)) return false;
-  return !ip_attached (obtain_ip (root));
+  // is root detached from the documents? obtain_ip gives the detached path
+  // for a tree whose document was closed, and also for a tree which has no
+  // observer of its position, so a tree which was never in a document (made
+  // by a script, typeset apart) is released too: it is parsed again if it is
+  // highlighted again. Keeping those trees to the cache instead was worse:
+  // highlighting big files fills the 256 slots with roots which have an
+  // observer but no position (about 1650 evictions in one run of the audit,
+  // 11 of them of roots with a position; they are, we guess, the copies of
+  // the code blocks which the typesetter makes), and they pushed out the
+  // regions of the open documents.
+  path ip= obtain_ip (root);
+  return !is_nil (ip) && !ip_attached (ip);
 }
 
 static void
