@@ -53,6 +53,15 @@ encode_url (url u) {
 }
 
 static url
+plain_name (url u) {
+  // The name of a buffer which comes from a file name with a star (a*b.scm)
+  // is a plain name, not the wildcard which url (string) makes of it (#790).
+  if (is_wildcard (u, 1)) return as_url (tree (u->t[1]->label));
+  if (is_concat (u)) return plain_name (u[1]) * plain_name (u[2]);
+  return u;
+}
+
+static url
 decode_url (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
@@ -94,7 +103,15 @@ concrete_view (url u) {
   int nr= as_int (s (0, i));
   url name= decode_url (s (i+1, N(s)));
   //cout << s (i+1, N(s)) << " -> " << name << "\n";
+  // a buffer named with a wildcard (Save as a*.tm) is found as it is, the
+  // buffer of a file with a star (a*b.scm) as a plain name; both can have the
+  // same view name, the one which holds a view of this number is the buffer
   tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf))
+    for (i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr == nr)
+        return buf->vws[i];
+  buf= concrete_buffer (plain_name (name));
   if (!is_nil (buf))
     for (i=0; i<N(buf->vws); i++)
       if (buf->vws[i]->nr == nr)

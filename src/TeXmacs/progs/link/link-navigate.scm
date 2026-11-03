@@ -583,29 +583,38 @@
 ;; buffer, which threw from url-glue (the autosave names), an exception
 ;; which aborts TeXmacs (#771).
 (define (link-wildcard? u)
-  (let ((root (or (and (url-rooted? u) (url-root u)) "default")))
-    (and (in? root '("default" "file"))
-         (not (url-or? u))
-         (string-index (url->system (car (process-url u))) #\*)
-         #t)))
+  ;; a pattern (not the plain name of a file with a star in it), in any root:
+  ;; url-complete knows only the wildcards of files, and the others gave
+  ;; "wildcards only implemented for files" (#790)
+  (and (not (url-or? u))
+       (url-wildcard? u)))
 
 (define (urls->or l)
   (if (null? (cdr l)) (car l) (url-or (car l) (urls->or (cdr l)))))
 
-(define (link-wildcard-candidates u)
-  "The urls which the wildcard of @u matches, with the query when only one"
+(define (file-root? u)
+  (in? (or (and (url-rooted? u) (url-root u)) "default") '("default" "file")))
+
+(tm-define (link-wildcard-candidates u . opt-keep-query)
+  (:synopsis "The urls which the wildcard of @u matches")
+  ;; also used by load-buffer-main (tm-files.scm), through lazy-define. The
+  ;; root is tested before anything is resolved: url-exists? and url-complete
+  ;; throw for a wildcard which is not one of files (an abort), also when the
+  ;; name is relative to a buffer of tmfs or of the web.
   (let* ((suffix (url-query-suffix (url->system u)))
-         (base (load-buffer-resolve-name (car (process-url u))))
-         ;; a relative link in a document of the web names a page of the
-         ;; web, and url-complete only knows wildcards of files (it throws
-         ;; "wildcards only implemented for files", the same abort)
-         (all (if (url-rooted-web? base)
-                  '()
-                  (url->list (url-expand (url-complete base "fr")))))
-         (l (list-filter all (lambda (x) (not (url-none? x))))))
-    (if (and (pair? l) (null? (cdr l)) (!= suffix ""))
-        (list (system->url (string-append (url->system (car l)) suffix)))
-        l)))
+         (keep? (or (null? opt-keep-query) (car opt-keep-query)))
+         (here (and (not (url-rooted? u)) (current-buffer)))
+         (file? (and (file-root? u) (or (not here) (file-root? here)))))
+    (if (not file?)
+        '()
+        (let* ((base (load-buffer-resolve-name (car (process-url u))))
+               (all (if (file-root? base)
+                        (url->list (url-expand (url-complete base "fr")))
+                        '()))
+               (l (list-filter all (lambda (x) (not (url-none? x))))))
+          (if (and keep? (pair? l) (null? (cdr l)) (!= suffix ""))
+              (list (system->url (string-append (url->system (car l)) suffix)))
+              l)))))
 
 ;; A file: url names a file as the plain name of the file does, and the buffer
 ;; of a link to it must be the same buffer, with the same url (default-rooted):
@@ -629,8 +638,7 @@
       (go-to-url* u opt-from)
       (with l (link-wildcard-candidates u)
         (cond ((null? l)
-               (set-message `(concat "No file matches "
-                                     (verbatim ,(url->system u)))
+               (set-message (replace "No file matches %1" (url->system u))
                             "Not found"))
               ((null? (cdr l)) (go-to-url* (car l) opt-from))
               (else (default-root-disambiguator (urls->or l)))))))

@@ -674,6 +674,7 @@ basename (url u) {
 url
 glue (url u, string s) {
   if (is_atomic (u)) return as_url (tree (u->t->label * s));
+  if (is_wildcard (u, 1)) return url_wildcard (u->t[1]->label * s);
   if (is_concat (u)) return u[1] * glue (u[2], s);
   if (is_or (u)) return glue (u[1], s) | glue (u[2], s);
   if (is_none (u)) return u;
@@ -687,6 +688,8 @@ url
 unglue (url u, int nr) {
   if (is_atomic (u))
     return as_url (tree (u->t->label (0, max (N(u->t->label) - nr, 0))));
+  if (is_wildcard (u, 1))
+    return url_wildcard (u->t[1]->label (0, max (N(u->t[1]->label) - nr, 0)));
   if (is_concat (u)) return u[1] * unglue (u[2], nr);
   if (is_or (u)) return unglue (u[1], nr) | unglue (u[2], nr);
   if (is_none (u)) return u;
@@ -877,6 +880,16 @@ reroot (url u, string protocol) {
   return u;
 }
 
+url
+url_entry (string name) {
+  // The url of an entry of a directory. A name with a star is a plain name
+  // here, not the wildcard which url (string) makes of it: a file a*b.scm
+  // would match the pattern a*.scm, and complete again and again with
+  // itself as pattern, until the stack overflows (#790).
+  if (occurs ("*", name)) return as_url (tree (name));
+  return url (name);
+}
+
 static url
 complete (url base, url sub, url u, string filter, bool flag) {
 #ifdef OS_ANDROID
@@ -961,10 +974,11 @@ complete (url base, url u, string filter, bool flag) {
       if (starts (dir[i], "http://") ||
           starts (dir[i], "https://") ||
           starts (dir[i], "ftp://"))
-        if (is_directory (base * dir[i])) continue;
-      ret= ret | (dir[i] * complete (base * dir[i], u, filter, flag));
+        if (is_directory (base * url_entry (dir[i]))) continue;
+      ret= ret | (url_entry (dir[i]) *
+                  complete (base * url_entry (dir[i]), u, filter, flag));
       if (match_wildcard (dir[i], u[2][1]->t->label))
-        ret= ret | complete (base, dir[i], filter, flag);
+        ret= ret | complete (base, url_entry (dir[i]), filter, flag);
     }
     return ret;
   }
@@ -997,11 +1011,12 @@ complete (url base, url u, string filter, bool flag) {
       if (starts (dir[i], "http://") ||
           starts (dir[i], "https://") ||
           starts (dir[i], "ftp://"))
-        if (is_directory (base * dir[i])) continue;
+        if (is_directory (base * url_entry (dir[i]))) continue;
       if (is_wildcard (u, 0))
-        ret= ret | (dir[i] * complete (base * dir[i], u, filter, flag));
+        ret= ret | (url_entry (dir[i]) *
+                    complete (base * url_entry (dir[i]), u, filter, flag));
       else if (match_wildcard (dir[i], u[1]->t->label))
-        ret= ret | complete (base, dir[i], filter, flag);
+        ret= ret | complete (base, url_entry (dir[i]), filter, flag);
     }
     return ret;
   }
@@ -1126,8 +1141,8 @@ subdirectories (url u) {
     bool error_flag;
     array<string> dir= read_directory (u, error_flag);
     for (int i=0; i<N(dir); i++)
-      if (!starts (dir[i], ".") && is_directory (u * dir[i]))
-        ret= ret | subdirectories (u * dir[i]);
+      if (!starts (dir[i], ".") && is_directory (u * url_entry (dir[i])))
+        ret= ret | subdirectories (u * url_entry (dir[i]));
     return ret;
   }
   else return url_none ();
