@@ -34,7 +34,8 @@
 ;;   - the C++ parsers of Coq vernacular and JSON, the compressed trees and
 ;;     their tables (freed after each request of AI or LanguageTool);
 ;;   - the serializations (tm, stm, tmml, stree) of the control characters
-;;     and of a document of 2000 paragraphs, each in less than 2 s.
+;;     and of a document of 2000 paragraphs, each in at most 20 times the
+;;     time of 250 paragraphs (a conversion which does not scale).
 ;;
 ;; Strings of TeXmacs trees are Cork-encoded: "\xe9" is e acute in Cork,
 ;; "\xc3\xa9" the same in UTF-8. Expected UTF-8 strings are built by u8
@@ -1940,52 +1941,107 @@
          (r (thunk)))
     (cons r (- (texmacs-time) t0))))
 
-(define (fastest-run thunk tries)
-  ;; @thunk timed up to @tries times, until once in less than 2 s: the
-  ;; shared runners of CI are sometimes slower for a moment (the tmml
-  ;; check took 2003 and 2101 ms there), while a slow conversion stays slow
+;; The time of a conversion depends on the machine: on the shared runners
+;; of CI the tmml check (the only one of about 1 s: the others take some
+;; 10 ms) took 2003, 2101 and 2161 ms against a limit of 2 s. What these
+;; checks are meant to catch is a conversion which does not scale (a loop
+;; over the document in a loop over its paragraphs, 8 times as long for a
+;; document 4 times as long...), so each conversion is also timed on 250
+;; paragraphs, in the same process (a slow machine is slow for both), and the
+;; big one may take at most scaling-factor times the small one (linear is 8,
+;; 7 to 9 measured for tmml, quadratic 64), but at least 4 s (the small
+;; times are too short, and noisy, to be a reference) and at most 10 s.
+(define scaling-small 250)
+(define scaling-big 2000)
+(define scaling-factor 20)
+
+(define (scaling-limit small-ms)
+  ;; the limit in ms of the big run, from the time of the small one
+  (min 10000 (max 4000 (* scaling-factor small-ms))))
+
+(define (fastest-run thunk tries ok?)
+  ;; @thunk timed up to @tries times, until once with a time in ms which
+  ;; satisfies @ok?: a run may be slow for a moment (the garbage collector,
+  ;; a neighbour on a shared runner), while a slow conversion stays slow
   (with r (timed thunk)
-    (if (or (<= tries 1) (< (cdr r) 2000)) r
-        (with r2 (fastest-run thunk (- tries 1))
+    (if (or (<= tries 1) (ok? (cdr r))) r
+        (with r2 (fastest-run thunk (- tries 1) ok?)
           (if (< (cdr r2) (cdr r)) r2 r)))))
 
-(define (check-fast what thunk expected)
-  ;; @thunk gives @expected in less than 2 s (the fastest of up to 3 runs)
-  (with r (check-run (lambda () (fastest-run thunk 3)))
-    (if (and (pair? r) (== (car r) 'error))
-        (check-report #f what (object->string r))
-        (begin
-          (check-report (equal? (car r) expected) what "wrong result")
-          (check-report (< (cdr r) 2000) (string-append what " in < 2 s")
-                        (string-append (number->string (cdr r)) " ms"))))))
+(define (check-fast what make expect)
+  ;; the thunk (make n) of a conversion of a document of @n paragraphs gives
+  ;; (expect n), and the big run takes at most (scaling-limit small-time) ms
+  (let* ((rs (check-run (lambda ()
+                          (fastest-run (make scaling-small) 3
+                                       (lambda (ms) #f)))))
+         (limit (if (and (pair? rs) (integer? (cdr rs)))
+                    (scaling-limit (cdr rs))
+                    4000))
+         (rb (check-run (lambda ()
+                          (fastest-run (make scaling-big) 3
+                                       (lambda (ms) (< ms limit)))))))
+    (cond ((and (pair? rs) (== (car rs) 'error))
+           (check-report #f what (object->string rs)))
+          ((and (pair? rb) (== (car rb) 'error))
+           (check-report #f what (object->string rb)))
+          (else
+           (check-report (equal? (car rs) (expect scaling-small))
+                         what "wrong result")
+           (check-report (equal? (car rb) (expect scaling-big))
+                         what "wrong result")
+           (check-report (< (cdr rb) limit)
+                         (string-append what " scales")
+                         (string-append (number->string (cdr rb)) " ms for "
+                                        (number->string scaling-big)
+                                        " paragraphs, "
+                                        (number->string (cdr rs)) " ms for "
+                                        (number->string scaling-small)
+                                        ", limit "
+                                        (number->string limit)))))))
 
-;; A document of 2000 paragraphs goes through each serialization and back
-;; in less than 2 s.
+(define (big-file n)
+  (tmfile (big-document n)))
+
+;; A document of 2000 paragraphs goes through each serialization and back,
+;; in at most 20 times the time of one of 250 paragraphs (4 s at least).
 (define (test-big-document)
   (check-group "big document")
-  (let* ((body (big-document 2000))
-         (doc (tmfile body))
-         (t (stree->tree doc)))
-    (check-fast "stree->tree" (lambda () (st (stree->tree doc))) doc)
-    (check-fast "tree->stree" (lambda () (tree->stree t)) doc)
-    (with s (serialize-texmacs t)
-      (check-true (> (string-length s) 100000))
-      (check-fast "tm" (lambda () (st (parse-texmacs (serialize-texmacs t)))) doc))
-    (check-fast "stm" (lambda () (import (export doc "stm-document") "stm-document"))
-                doc)
-    (check-fast "tmml" (lambda () (import (export doc "tmml-document") "tmml-document"))
-                doc)
-    (check-fast "verbatim"
-                (lambda () (length (cdr (import (export body "verbatim-snippet")
-                                                "verbatim-snippet"))))
-                2000)
-    (check-fast "texmacs-file"
-                (lambda ()
-                  (let* ((u (export doc "texmacs-file"))
-                         (r (st (convert u "texmacs-file" "texmacs-tree"))))
-                    (system-remove u)
-                    r))
-                doc))
+  (with s (serialize-texmacs (stree->tree (big-file 2000)))
+    (check-true (> (string-length s) 100000)))
+  (check-fast "stree->tree"
+              (lambda (n) (with doc (big-file n) (lambda () (st (stree->tree doc)))))
+              big-file)
+  (check-fast "tree->stree"
+              (lambda (n) (with t (stree->tree (big-file n))
+                            (lambda () (tree->stree t))))
+              big-file)
+  (check-fast "tm"
+              (lambda (n) (with t (stree->tree (big-file n))
+                            (lambda () (st (parse-texmacs (serialize-texmacs t))))))
+              big-file)
+  (check-fast "stm"
+              (lambda (n) (with doc (big-file n)
+                            (lambda () (import (export doc "stm-document")
+                                               "stm-document"))))
+              big-file)
+  (check-fast "tmml"
+              (lambda (n) (with doc (big-file n)
+                            (lambda () (import (export doc "tmml-document")
+                                               "tmml-document"))))
+              big-file)
+  (check-fast "verbatim"
+              (lambda (n) (with body (big-document n)
+                            (lambda () (length (cdr (import (export body "verbatim-snippet")
+                                                            "verbatim-snippet"))))))
+              identity)
+  (check-fast "texmacs-file"
+              (lambda (n) (with doc (big-file n)
+                            (lambda ()
+                              (let* ((u (export doc "texmacs-file"))
+                                     (r (st (convert u "texmacs-file" "texmacs-tree"))))
+                                (system-remove u)
+                                r))))
+              big-file)
   (with body (cons 'document (make-list 2000 "x"))
     (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 2000))
   ;; 4000 elements at the top, a paragraph and a table for the fraction
