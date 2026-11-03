@@ -943,8 +943,35 @@
     (check-true (string-contains? (buffer-text (current-buffer)) "line3"))
     (check= (url->system (url-tail (current-buffer))) "file-query.scm")
     (check= (cursor) '(3 0))
+    ;; the buffer is the one of the file opened by its name: the same url (on
+    ;; Windows it was a malformed one, #789), not a second buffer, and a
+    ;; link relative to it names the files beside it
+    (check= (url->stree (current-buffer)) (url->stree f))
+    (check= (url->stree (url-relative (current-buffer) "other.scm"))
+            (url->stree (tmp "other.scm")))
+    (check= (url->stree (system->url (url->system (system->url (file-url f "")))))
+            (url->stree (system->url (file-url f ""))))
     (buffer-close (current-buffer))
     (switch-to-buffer here)
+    ;; a file already open is not opened again by a link to it
+    (load-browse-buffer f)
+    (let ((open (length (buffer-list))))
+      (go-to-url (file-url f "?line=2"))
+      (check= (length (buffer-list)) open)
+      (check= (url->stree (current-buffer)) (url->stree f))
+      (check= (cursor) '(2 0))
+      (buffer-close (current-buffer))
+      (switch-to-buffer here))
+    ;; from a buffer of the web, a file: link stays local (the load is
+    ;; stubbed, nothing is fetched)
+    (let ((loaded '()))
+      (set-link-test-hooks! (lambda () (system->url "https://example.com/a/b.tm"))
+                            (lambda (u) (set! loaded (cons u loaded))))
+      (go-to-url (file-url f "?line=3"))
+      (set-link-test-hooks! #f #f)
+      (check= (length loaded) 1)
+      (check-false (url-rooted-web? (car loaded)))
+      (check= (url->system (url-tail (car loaded))) "file-query.scm"))
     ;; with a column, and a file name with a space
     (let ((g (tmp "file query.scm")))
       (string-save "aa\nbb cc\ndd\n" (url->system g))

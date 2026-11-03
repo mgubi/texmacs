@@ -562,7 +562,7 @@ as_string (url u, int type) {
       if (is_concat (u[2])) {           
         root = as_string (u[2][1], type);
         // root might be unit letter or hostname. It depends on the length
-        remain = as_string (u[2][2], type);
+        remain = as_string (u[2][2], stype);
       }
       else {
         root = s2;
