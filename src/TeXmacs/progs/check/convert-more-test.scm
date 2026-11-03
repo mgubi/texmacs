@@ -1985,7 +1985,6 @@
           ((and (pair? rb) (== (car rb) 'error))
            (check-report #f what (object->string rb)))
           (else
-           (display* "TIMING " what " small " (cdr rs) " big " (cdr rb) " limit " limit "\n")
            (check-report (equal? (car rs) (expect scaling-small))
                          what "wrong result")
            (check-report (equal? (car rb) (expect scaling-big))
