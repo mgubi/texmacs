@@ -582,7 +582,12 @@
   "The urls which the wildcard of @u matches, with the query when only one"
   (let* ((suffix (url-query-suffix (url->system u)))
          (base (load-buffer-resolve-name (car (process-url u))))
-         (all (url->list (url-expand (url-complete base "fr"))))
+         ;; a relative link in a document of the web names a page of the
+         ;; web, and url-complete only knows wildcards of files (it throws
+         ;; "wildcards only implemented for files", the same abort)
+         (all (if (url-rooted-web? base)
+                  '()
+                  (url->list (url-expand (url-complete base "fr")))))
          (l (list-filter all (lambda (x) (not (url-none? x))))))
     (if (and (pair? l) (null? (cdr l)) (!= suffix ""))
         (list (system->url (string-append (url->system (car l)) suffix)))

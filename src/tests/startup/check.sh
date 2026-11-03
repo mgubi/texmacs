@@ -369,7 +369,8 @@ reused buffer closed #f" \
 # here, not in the suites, since a crash would take a whole suite run down;
 # here it is the status 134 of this one case. The files which match are the
 # candidates of the link: several give the page of disambiguation, one is
-# loaded (also with a query and as a file: url), none gives a message.
+# loaded (also with a query and as a file: url), none gives a message; a
+# wildcard in a relative link of a document of the web gives a message too.
 mkdir -p "$out/startup-wild"
 printf 'a\nb\nc\nd\n' > "$out/startup-wild/wild1.scm"
 printf 'x\n' > "$out/startup-wild/wild2.scm"
@@ -396,6 +397,14 @@ cat > "$out/startup-wild.scm" <<'EOF'
 (display* "CHECK several-query " (listed? "wild1.scm") "\n")
 (go-to-url (string-append "file://" d "/wild*.scm"))
 (display* "CHECK file-root " (listed? "wild2.scm") "\n")
+;; a relative link in a document of the web: url-complete knows only files
+(define web-buffer (string->url "http://localhost:1/x/y.tm"))
+(define real-current-buffer current-buffer)
+(define m (length (buffer-list)))
+(set! current-buffer (lambda () web-buffer))
+(go-to-url "docs/a*.html")
+(set! current-buffer real-current-buffer)
+(display* "CHECK web-relative " (== m (length (buffer-list))) "\n")
 (display* "CHECK survived\n")
 EOF
 
@@ -405,6 +414,7 @@ none #t
 one solo1.scm
 several-query #t
 file-root #t
+web-relative #t
 survived
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-wild.scm")'
