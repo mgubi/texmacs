@@ -155,6 +155,11 @@ struct code_end {
 class bridge_code_rep: public bridge_rep {
 public:
   array<code_rec> recs;    // the records of the lines (see above)
+  // the lines without a record which were looked at: the wsig with which
+  // they were found short and plain (0: not known); a line is looked at
+  // again when it changes, not at each key (an observer and a search for
+  // tabs for each of the lines of a long file)
+  array<unsigned long long> plain;
   code_lexer      lexer;   // the colours of the syntax
   bool            recs_ok; // they are at the places of the lines
   code_end first, last;    // the paragraphs of the first and the last line
@@ -220,9 +225,12 @@ bridge_code_rep::lines_inserted (int pos, int nr) {
   int n= N(recs);
   if (!recs_ok || pos < 0 || pos > n || nr < 0) { lines_unknown (); return; }
   array<code_rec> r (n + nr);
-  for (int i=0; i<pos; i++) r[i]= recs[i];
-  for (int i=pos; i<n; i++) r[i+nr]= recs[i];
+  array<unsigned long long> p (n + nr);
+  for (int i=0; i<pos; i++) { r[i]= recs[i]; p[i]= plain[i]; }
+  for (int i=pos; i<pos+nr; i++) p[i]= 0;
+  for (int i=pos; i<n; i++) { r[i+nr]= recs[i]; p[i+nr]= plain[i]; }
   recs= r;
+  plain= p;
 }
 
 void
@@ -232,9 +240,11 @@ bridge_code_rep::lines_removed (int pos, int nr) {
   if (!recs_ok || pos < 0 || nr < 0 || pos + nr > n) {
     lines_unknown (); return; }
   array<code_rec> r (n - nr);
-  for (int i=0; i<pos; i++) r[i]= recs[i];
-  for (int i=pos+nr; i<n; i++) r[i-nr]= recs[i];
+  array<unsigned long long> p (n - nr);
+  for (int i=0; i<pos; i++) { r[i]= recs[i]; p[i]= plain[i]; }
+  for (int i=pos+nr; i<n; i++) { r[i-nr]= recs[i]; p[i-nr]= plain[i]; }
   recs= r;
+  plain= p;
 }
 
 void
@@ -242,6 +252,7 @@ bridge_code_rep::line_changed (int i) {
   if (!is_nil (lexer)) lexer->changed (i);
   if (!recs_ok || i < 0 || i >= N(recs)) { lines_unknown (); return; }
   recs[i]= code_rec ();
+  plain[i]= 0;
 }
 
 // The paths are relative to st= <code-lines|<document|line|...>>: (0, i) is
@@ -565,8 +576,11 @@ bridge_code_rep::my_typeset (int desired_status) {
                                     (void*) fn.operator-> ());
   wsig= sig_mix (wsig, (unsigned long long)
                        (tabw * 4 + (invis? 1: 0) + (shrink? 2: 0)));
+  if (wsig == 0) wsig= 1; // (0: not known, see plain)
   if (!recs_ok || N(recs) != n || typeset_caches_mode () == 0) {
     recs= array<code_rec> (n);
+    plain= array<unsigned long long> (n);
+    for (int i=0; i<n; i++) plain[i]= 0;
     recs_ok= true;
     if (!is_nil (lexer)) lexer->reset ();
   }
@@ -594,8 +608,12 @@ bridge_code_rep::my_typeset (int desired_status) {
   bool paper= ttt->paper && n >= 4 && typeset_caches_mode () != 0;
   for (int i=0; i<n; i++) {
     tree& t= doc[i];
-    if (same_rec (recs[i], t, wsig)) continue;
+    // (in paper mode every line has a record: see typeset_paper)
+    if (is_nil (recs[i]) && !paper? plain[i] == wsig:
+        same_rec (recs[i], t, wsig))
+      continue;
     recs[i]= line_rec (t, fn, width, cw, wsig, paper);
+    plain[i]= (is_nil (recs[i]) && !paper? wsig: 0);
   }
   if (typeset_caches_mode () == 2) {
     // check: the records as they are made from the lines
@@ -609,6 +627,7 @@ bridge_code_rep::my_typeset (int desired_status) {
       if (!same) {
         typeset_cache_mismatch ("records of the lines of code");
         recs[i]= r;
+        plain[i]= (is_nil (r) && !paper? wsig: 0);
       }
     }
     code_records_made= made; // (the count is the one without the check)
