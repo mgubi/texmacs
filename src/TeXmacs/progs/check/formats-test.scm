@@ -688,8 +688,9 @@
   (check= (import "a\nb\n\nc" "verbatim-snippet"
                   (cons "verbatim->texmacs:wrap" "on"))
           '(document "a b" "c"))
+  ;; (a text is a block of lines: code-lines)
   (check= (import "a\nb" "verbatim-document")
-          '(document (body (document "a" "b"))
+          '(document (body (document (code-lines (document "a" "b"))))
                      (initial (collection (associate "language" "verbatim")
                                           (associate "font-family" "tt")
                                           (associate "par-first" "0cm"))))))

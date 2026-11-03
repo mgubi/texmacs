@@ -1197,8 +1197,10 @@
                    "``x'' -- y"))
        (check= (import (string-append "x = 1\n  y " (u8 #xE9 #x3B1) " <\n") snip)
                '(document "x = 1" "  y \xe9<alpha> <less>" ""))
+       ;; (a source file is a block of lines of code: code-lines)
        (check= (import "x = 1\n  y\n" doc)
-               '(document (body (document "x = 1" "  y" ""))
+               '(document (body (document (code-lines
+                                           (document "x = 1" "  y" ""))))
                           (initial (collection
                                     (associate "language" "verbatim")
                                     (associate "font-family" "tt")

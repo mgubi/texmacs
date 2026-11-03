@@ -886,7 +886,8 @@
       (check= large-asked 2)
       (check-true (buffer-exists? f))
       (check= (current-buffer) f)
-      (check= (cursor) '(3 0))
+      ;; (the line 3 of the block of lines of the file: code-lines)
+      (check= (cursor) '(0 0 3 0))
       (buffer-close f)
       (switch-to-buffer here)
       ;; a relative link: it names the file of the directory of the buffer
@@ -911,7 +912,7 @@
         (check-true (buffer-exists? f))
         (check-false (buffer-exists? decoy))
         (check= (current-buffer) f)
-        (check= (cursor) '(3 0))
+        (check= (cursor) '(0 0 3 0))
         (buffer-close f)
         (buffer-close other)
         (system-remove decoy)

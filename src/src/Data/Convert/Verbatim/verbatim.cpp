@@ -16,6 +16,7 @@
 #include "vars.hpp"
 #include "drd_std.hpp"
 #include "analyze.hpp"
+#include "scheme.hpp"
 
 /******************************************************************************
 * TeXmacs to verbatim
@@ -366,14 +367,24 @@ verbatim_to_tree (string s, bool wrap, string enc) {
   return verbatim_to_tree (s, enc);
 }
 
+// Is a verbatim document (a text, a source file) made of a code-lines block?
+// The preference "code lines" ("on" unless "off"), unless TEXMACS_CODE_LINES
+// is 0 or 1
+static bool
+code_lines_wanted () {
+  const char* cl= getenv ("TEXMACS_CODE_LINES");
+  if (cl != NULL && string (cl) == "0") return false;
+  if (cl != NULL && string (cl) == "1") return true;
+  return get_preference ("code lines", "on") != "off";
+}
+
 tree
 verbatim_document_to_tree (string s, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
   tree t    = verbatim_to_tree (s, wrap, enc);
-  // prototype (#710): the lines as <code-lines|<document|...>>, typeset by
-  // one bridge without a paragraph per line (see bridge_code.cpp)
-  const char* cl= getenv ("TEXMACS_CODE_LINES");
-  if (cl != NULL && string (cl) == "1" && !wrap) {
+  // the lines as <code-lines|<document|...>>, typeset by one bridge without
+  // a paragraph per line (see bridge_code.cpp, #710)
+  if (code_lines_wanted () && !wrap) {
     if (!is_func (t, DOCUMENT)) t= tree (DOCUMENT, t);
     t= tree (DOCUMENT, tree (CODE_LINES, t));
   }
