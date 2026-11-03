@@ -47,6 +47,19 @@ on:
     branches: [upsilon_ci]
   workflow_dispatch:
 
+# A newer run on the same ref cancels the older one, as in
+# upsilon-linux-windows.yml: else the older could finish last, and its job
+# release would replace the newer files of upsilon-latest. The group has the
+# ref, so that a dispatch on another branch never cancels a run on
+# upsilon_ci (a second dispatch on the same branch does cancel the first).
+# A cancelled run publishes nothing: release needs !cancelled() and the
+# success of dmg. The job sources can be cancelled in the middle of an
+# upload: it only trusts the assets in the state "uploaded", and replaces
+# the others.
+concurrency:
+  group: upsilon-macos-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   MIN_MACOS: "13.0"
 
@@ -466,13 +479,13 @@ jobs:
               --title "TeXmacs Upsilon, sources of the programs of others" \
               --notes "The exact source archives of the programs of others which the packages of TeXmacs Upsilon bring: Ghostscript (GNU Affero General Public License 3), Aspell (GNU Lesser General Public License 2.1) and its dictionaries (their own free licenses), as the build scripts download them (packages/build-gs.sh, packages/windows/build-aspell.sh), not modified but for one line of mkromfs.c, which packages/build-gs.sh changes when it builds the gs.exe of the Windows packages (see the script). The sources of TeXmacs Upsilon itself are at https://github.com/${GH_REPO}. Written offer: the same archives, on request to the maintainer of the repository, for three years from the release of a package which has the program."
           fi
-          have=$(gh release view "$tag" --json assets -q '.assets[].name')
+          have=$(gh release view "$tag" --json assets -q '.assets[]|select(.state=="uploaded")|.name')
           while read -r file url sha; do
             echo "$have" | grep -qx "$file" && { echo "$file: already there"; continue; }
             curl -sSfL --retry 3 -o "$file" "$url"
             [ "$(sha256sum "$file" | cut -d' ' -f1)" = "$sha" ] ||
               { echo "error: wrong SHA-256 for $file"; exit 1; }
-            gh release upload "$tag" "$file"
+            gh release upload --clobber "$tag" "$file"
           done < list.txt
 
   release:
@@ -482,7 +495,7 @@ jobs:
     # (the sources of the programs of others first: a package is not published
     # before them, #662)
     needs: [dmg, qt, sources]
-    if: always() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success' && needs.sources.result == 'success'
+    if: ${{ !cancelled() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success' && needs.sources.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
