@@ -14,10 +14,38 @@ a file already shared stays so.
 ## What is shared
 
 A file is shared when it is a plain local file in TeXmacs format (`.tm`) which
-exists, and the per-user folder can be made. What is shared is the **body** of
-the buffer; the style, the initial environment and the references travel at
-joining only (a change of the style by one participant is not propagated:
-open point). Loading goes through `load-buffer-main` as before (the question
+exists, and the per-user folder can be made. What is shared is the body of the
+buffer and its **style and initial environment** (the style list, the
+packages, the document style, the page setup, the language, the font and
+paragraph settings...), which the editor keeps in its own copies, not in the
+body tree. The references and the auxiliary data (labels, table of contents,
+bibliography) are not shared: each process typesets them. The variables of
+the window (size, zoom, full screen) stay those of the process.
+
+One tree holds both for the states and the patches: `(shared META BODY)`,
+with `META` = `(meta STYLE (initial C0 ... C15))`: `STYLE` is the tuple of the
+style, and the `Ci` are collections of `(associate variable value)`, a
+variable being in the collection given by a hash of its name (two settings
+added at once would else be two inserts at the same place of one collection,
+which the rebase refuses, as for two texts typed at the same place). Paths of
+patches start with 0 for the meta tree and 1 for the body: one stream of states,
+one ordering, one rule of rebase (`patch-can-pull?`, else refused), one
+history, handover and recovery for both. In a process, the body is observed
+by a tree observer; for the meta tree there is a shadow tree that mirrors the
+editor (`buffer-get-meta`): at each tick the editor's style and initial
+environment are compared with it, which takes in every way they change
+(Document > Style, style packages, `init-style`, `init-env`,
+`init-default`, page setup, language, the `buffer-set` of a whole document),
+and the differences are applied to the shadow by modifications, which are
+the patches. A patch of the meta tree from another process is applied to the
+shadow and installed in the editor (`buffer-set-style`, `buffer-set-init`,
+`buffer-reset-init`, the same calls the menus end in), so that both
+typeset the same, and the next comparison finds nothing to send back (no
+echo). The meta tree comes with the welcome, with the document. A change of
+the style while the participants are in a handover is a state like another.
+A patch which mixes both parts is split for applying (`split-patch`).
+
+Loading goes through `load-buffer-main` as before (the question
 for a large source file, wildcards, the startup buffer `startup-reserved` are
 upstream of the join); the join is made in `load-buffer-check-autosave`, so
 that a joining process neither reads the file nor asks about an autosave file,

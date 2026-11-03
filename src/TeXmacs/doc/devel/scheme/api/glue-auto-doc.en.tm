@@ -6707,6 +6707,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-get-meta <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_buffer_meta> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-set-init <scm-arg|url> <scm-arg|string> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_buffer_init> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-reset-init <scm-arg|url> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|reset_buffer_init> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-set-master <scm-arg|url> <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>

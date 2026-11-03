@@ -19,6 +19,7 @@
 #   takeover-window  the same with a window (offscreen) for B
 #   off         the preference off (the default): nothing is shared
 #   stale       an entry of a dead process; a wrong token; garbage
+#   meta        style and initial environment shared as the body is
 #   conflict    edits at once: merged, or the person's text saved when lost
 #   save        Save and close in a participant; a buffer removed by C++
 #   slow        a host that is alive but stalled is not replaced
@@ -43,7 +44,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict refuse save handover death takeover takeover-window off stale slow attack
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or

@@ -24,8 +24,9 @@ have the details, and the problems go to the
   file, or dies, the next participant takes over. Not on Windows. See
   [shared-files.md](shared-files.md). First part of the shared files of the
   [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design);
-  there is no menu for the preference yet, nor cursors of the other
-  participants.
+  the style and the initial environment (packages, page setup, language,
+  fonts) are shared with the text; there is no menu for the preference yet,
+  nor cursors of the other participants.
 
 - **Closing a program file** gives back the memory of its colours and its
   syntax tree: they stayed in the cache of tree-sitter until newer files

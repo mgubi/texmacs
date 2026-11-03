@@ -75,7 +75,17 @@
 (define (para-count) (tree-arity (body)))
 
 
-(define (publish-body!) (sync-write! (string-append ROLE "-body") (object->string (body-stree))))
+(define (meta-now) (tm->stree (buffer-get-meta (the-name))))
+(define (meta-var v)
+  (let ((a (list-filter (cdr (caddr (meta-now))) (lambda (a) (== (cadr a) v)))))
+    (and (nnull? a) (caddr (car a)))))
+(define (publish-body!)
+  ;; the document and its style and initial environment (sorted: the order of
+  ;; the variables is not that of the file)
+  (let* ((m (meta-now))
+         (init (sort (cdr (caddr m)) (lambda (a b) (string<? (cadr a) (cadr b))))))
+    (sync-write! (string-append ROLE "-body")
+                 (object->string (list (body-stree) (cadr m) init)))))
 (define (text-of i) (para-text i))
 (define (pending-count) (and-with i (shared-file-info (the-name)) (list-ref i 5)))
 (define (peers-count) (and-with i (shared-file-info (the-name)) (list-ref i 2)))
@@ -89,6 +99,7 @@
             (if (not t0) (set! t0 (texmacs-time)))
             (> (- (texmacs-time) t0) ms)))))
 
+(define round-sub0 0)
 (define (rname n s) (string-append "r" (number->string n) "-" s))
 
 ;; One round of concurrent edits: A (the host) and B edit while neither hears
@@ -102,9 +113,9 @@
             (act (rname n "A done") (sync-set! (rname n "a-done")))
             (wait-sync (rname n "b-done")))
       (list (wait-sync (rname n "a-ready"))
-            (act (rname n "B edits") (shared-pause! #t) (b-edit!))
+            (act (rname n "B edits") (shared-pause! #t) (set! round-sub0 (shared-stat 'submitted)) (b-edit!))
             (act (rname n "B resumes") (shared-pause! #f))
-            (step (rname n "B submitted") (>= (shared-stat 'submitted) n))
+            (step (rname n "B submitted") (> (shared-stat 'submitted) round-sub0))
             (act (rname n "B signals") (sync-set! (rname n "b-submitted")))
             (wait-sync (rname n "a-done"))
             (timed-wait 300)

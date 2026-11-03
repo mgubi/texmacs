@@ -206,16 +206,156 @@
 ;; The document of a shared file and its modifications
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; What is shared is the body of the buffer; its states are kept as for the
-;; live documents (live-create, live-apply-patch: the document of the last
-;; state, the list of states, and the inverse of each change). A participant
-;; keeps them too, from the patches it is sent, so that it can take over.
+;; What is shared is the body of the buffer and its style and initial
+;; environment, which the editor keeps in its own copies, not in the body.
+;; One tree holds them for the states and the patches: (shared META BODY),
+;; where META is (meta STYLE INITIAL) as in the file: STYLE is the tuple of
+;; the style and INITIAL a collection of (associate var value). Patches are
+;; on this tree, with the paths of the body starting with 1 and those of the
+;; meta tree with 0; there is one stream of states, one ordering, one rule
+;; of rebase for both. In a process the parts are: the body of the buffer (a
+;; tree observer makes the patches), and a shadow tree of the meta, which
+;; mirrors the editor: each tick the editor's style and initial environment
+;; are compared with the shadow (this takes in every path by which they change,
+;; Document > Style, the page setup, the language, set-style-list, init-env,
+;; the buffer-set of a whole document) and the differences become patches of
+;; the shadow; a patch of the meta that comes from another process is applied
+;; to the shadow and then installed in the editor (buffer-set-style,
+;; buffer-set-init, buffer-reset-init), so that the next comparison finds
+;; nothing to send back. The references and the auxiliary data are not
+;; shared: each process typesets them.
+;; The states are kept as for the live documents (live-create,
+;; live-apply-patch: the document of the last state, the list of states, and
+;; the inverse of each change). A participant keeps them too, from the
+;; patches it is sent, so that it can take over.
 
 (define (sf-body sf) (buffer-get-body (sf-buffer sf)))
+(define (sf-meta sf) (sf-get sf 'meta))
 
-(define (copy-doc t)
+(define (sf-composite-stree sf)
+  `(shared ,(tm->stree (sf-meta sf)) ,(tm->stree (sf-body sf))))
+
+(define (sf-composite sf)
   ;; (the live documents must not be the trees of the buffers)
-  (stree->tree (tm->stree t)))
+  (stree->tree (sf-composite-stree sf)))
+
+;; The initial environment is split in 16 collections, by a hash of the name
+;; of the variable: (initial (collection ...) ...). Two settings added at the
+;; same time would otherwise both be inserted at the end of one collection,
+;; which is two inserts at the same place, and the second is refused (as for
+;; two texts typed at the same place); in different collections they merge.
+(define sf-buckets 16)
+
+(define (var-bucket var)
+  (modulo (apply + (map char->integer (string->list var))) sf-buckets))
+
+(define (bucketize m)
+  ;; (meta STYLE (collection (associate ...) ...)) as the editor gives it
+  ;; into the form of the shared tree
+  `(meta ,(cadr m)
+         (initial ,@(map (lambda (b)
+                           `(collection
+                             ,@(list-filter (cdr (caddr m))
+                                            (lambda (a) (== (var-bucket (cadr a)) b)))))
+                         (.. 0 sf-buckets)))))
+
+(define (flatten-meta m)
+  `(meta ,(cadr m) (collection ,@(append-map cdr (cdr (caddr m))))))
+
+(define (read-editor-meta name)
+  (stree->tree (bucketize (tm->stree (buffer-get-meta name)))))
+
+(define (prefix-mod i m)
+  (let ((l (modification->scheme m)))
+    (scheme->modification (list (car l) (cons i (cadr l)) (caddr l)))))
+
+(define (strip-mod m)
+  (let ((l (modification->scheme m)))
+    (scheme->modification (list (car l) (cdr (cadr l)) (caddr l)))))
+
+(define (split-patch p part)
+  ;; the modifications of @p which are under child @part of the shared tree,
+  ;; with their paths relative to it; #f for a kind of patch which a patch
+  ;; made here never is
+  (cond ((patch-pair? p)
+         (let ((path (modification-path (patch-direct p))))
+           (cond ((not (pair? path)) #f)
+                 ((== (car path) part)
+                  (patch-pair (strip-mod (patch-direct p))
+                              (strip-mod (patch-inverse p))))
+                 (else (patch-compound '())))))
+        ((patch-compound? p)
+         (let ((l (map (lambda (c) (split-patch c part)) (patch-children p))))
+           (and (list-and (map (lambda (x) (and x #t)) l))
+                (patch-compound l))))
+        (else #f)))
+
+(define (meta-install! sf)
+  ;; make the editor have the style and initial environment of the shadow
+  (let* ((name (sf-buffer sf))
+         (cur (tm->stree (buffer-get-meta name)))
+         (want (flatten-meta (tm->stree (sf-meta sf)))))
+    (when (!= cur want)
+      (when (!= (cadr cur) (cadr want))
+        (buffer-set-style name (stree->tree (cadr want))))
+      (let ((cur-init (map (lambda (a) (cons (cadr a) (caddr a))) (cdr (caddr cur))))
+            (want-init (map (lambda (a) (cons (cadr a) (caddr a))) (cdr (caddr want)))))
+        (for (a cur-init)
+          (when (not (assoc (car a) want-init))
+            (buffer-reset-init name (car a))))
+        (for (a want-init)
+          (let ((c (assoc (car a) cur-init)))
+            (when (or (not c) (!= (cdr c) (cdr a)))
+              (buffer-set-init name (car a) (stree->tree (cdr a))))))))))
+
+(define (meta-diff! shadow new)
+  ;; Change the tree @shadow into the stree @new, by modifications; gives
+  ;; their patches (paths with the 0 of the meta part), the first first.
+  (let ((out '()))
+    (define (do! m)
+      (let ((inv (modification-invert m shadow)))
+        (modification-inplace-apply shadow m)
+        (set! out (cons (patch-pair (prefix-mod 0 m) (prefix-mod 0 inv)) out))))
+    (define (index-of var l)
+      (let loop ((l l) (i 0))
+        (cond ((null? l) #f)
+              ((== (cadr (car l)) var) i)
+              (else (loop (cdr l) (+ i 1))))))
+    (define (diff-bucket! b want)
+      (define (cur-list) (cdr (tm->stree (tree-ref shadow 1 b))))
+      ;; variables which are no longer there
+      (let loop ()
+        (let find ((l (cur-list)) (i 0))
+          (when (nnull? l)
+            (if (index-of (cadr (car l)) want)
+                (find (cdr l) (+ i 1))
+                (begin (do! (modification-remove (list 1 b) i 1))
+                       (loop))))))
+      ;; new values, new variables
+      (for (a want)
+        (let ((i (index-of (cadr a) (cur-list))))
+          (cond ((not i)
+                 ;; (the content inserted is a node whose children are inserted)
+                 (do! (modification-insert (list 1 b) (length (cur-list))
+                                           (stree->tree `(collection ,a)))))
+                ((!= (caddr (list-ref (cur-list) i)) (caddr a))
+                 (do! (modification-assign (list 1 b i 1) (stree->tree (caddr a)))))))))
+    (when (!= (cadr new) (tm->stree (tree-ref shadow 0)))
+      (do! (modification-assign (list 0) (stree->tree (cadr new)))))
+    (for (b (.. 0 sf-buckets))
+      (let ((want (cdr (list-ref (cdr (caddr new)) b))))
+        (when (!= want (cdr (tm->stree (tree-ref shadow 1 b))))
+          (diff-bucket! b want))))
+    (reverse out)))
+
+(define (meta-poll! sf)
+  ;; the changes of the style and of the initial environment in the editor,
+  ;; since the last time, become local changes
+  (when (and (not sf-applying?) (buffer-exists? (sf-buffer sf)))
+    (let ((new (bucketize (tm->stree (buffer-get-meta (sf-buffer sf))))))
+      (when (!= new (tm->stree (sf-meta sf)))
+        (for (pp (meta-diff! (sf-meta sf) new))
+          (sf-put! sf 'collect (cons pp (sf-get sf 'collect))))))))
 
 (define (author-of sf peer-id)
   (with t (sf-get sf 'authors)
@@ -225,12 +365,17 @@
           a))))
 
 (define (apply-in-place! sf p author)
-  ;; apply the patch @p to the body of the buffer, as a change of @author
-  (let ((body (sf-body sf)))
-    (and (patch-applicable? p body)
+  ;; apply the patch @p to the body of the buffer and to the meta tree (then
+  ;; to the editor), as a change of @author
+  (let ((body (sf-body sf)) (meta (sf-meta sf))
+        (mp (split-patch p 0)) (bp (split-patch p 1)))
+    (and mp bp (patch-applicable? bp body) (patch-applicable? mp meta)
          (with-author author
            (with-global sf-applying? #t
-             (patch-inplace-apply body p)))
+             (patch-inplace-apply body bp)
+             (when (patch-modifies? mp)
+               (patch-inplace-apply meta mp)
+               (meta-install! sf))))
          #t)))
 
 (define (sf-notify-modified! sf)
@@ -245,11 +390,13 @@
         (and-with sf (ahash-ref sf-table key)
           (let ((m (modification-copy mod)))
             (sf-put! sf 'collect
-                     (cons (patch-pair m (modification-invert m t))
+                     (cons (patch-pair (prefix-mod 1 m)
+                                       (prefix-mod 1 (modification-invert m t)))
                            (sf-get sf 'collect)))))))))
 
 (define (take-local-patch sf)
   ;; the local changes since the last time: a patch, or #f
+  (meta-poll! sf)
   (let ((l (sf-get sf 'collect)))
     (sf-put! sf 'collect '())
     (and (nnull? l)
@@ -326,6 +473,7 @@
     (sf-put! sf 'handover #f)
     (sf-put! sf 'election #f)
     (sf-put! sf 'msg-id 0)
+    (sf-put! sf 'meta (read-editor-meta name))
     (ahash-set! sf-table key sf)
     (ahash-set! sf-by-buffer (url->string name) key)
     (sf-put! sf 'observer (tree-observe (buffer-get-body name) "shared-notify"))
@@ -415,16 +563,18 @@
          (m (and c (msg-wait c sf-join-wait))))
     ;; gives #t (joined), 'alive (the host is alive but did not answer: do
     ;; not take its place) or #f (its entry is stale, and was removed)
-    (cond ((and m (func? m 'welcome) (== (length m) 6))
-           (with (tag state doc modified roster host-id) m
+    (cond ((and m (func? m 'welcome) (== (length m) 7))
+           (with (tag state doc modified roster host-id meta) m
              (buffer-set name (stree->tree doc))
              (let ((sf (sf-make name key 'participant)))
+               (sf-put! sf 'meta (stree->tree meta))
+               (meta-install! sf)
                (sf-put! sf 'id id)
                (sf-put! sf 'interactive inter)
                (sf-put! sf 'conn c)
                (sf-put! sf 'host-id host-id)
                (sf-put! sf 'roster roster)
-               (live-create key (copy-doc (sf-body sf)) state)
+               (live-create key (sf-composite sf) state)
                (if modified
                    (buffer-pretend-modified name)
                    (buffer-pretend-saved name))
@@ -458,7 +608,7 @@
              (sf (sf-make name key 'host)))
         (sf-put! sf 'token token)
         (sf-put! sf 'host-id (sf-get sf 'id))
-        (live-create key (copy-doc (sf-body sf)))
+        (live-create key (sf-composite sf))
         (if (create-entry key port token (sf-get sf 'interactive)
                           (sf-get sf 'id))
             (sf-debug "hosting " key " on " port "\n")
@@ -538,8 +688,8 @@
 
 (define (host-reset-live! sf)
   (let* ((key (sf-key sf))
-         (state (live-create key (copy-doc (sf-body sf)))))
-    (send-peers sf (list 'welcome-reset state (tm->stree (sf-body sf))
+         (state (live-create key (sf-composite sf))))
+    (send-peers sf (list 'welcome-reset state (sf-composite-stree sf)
                          (or (sf-get sf 'dirty) (buffer-modified? (sf-buffer sf)))
                          (roster-of sf) (sf-get sf 'id)))))
 
@@ -579,7 +729,8 @@
     (cond ((not base)
            (msg-send link (list 'welcome cur (tm->stree (buffer-get name))
                                 (or (sf-get sf 'dirty) (buffer-modified? name))
-                                (roster-of sf) (sf-get sf 'id))))
+                                (roster-of sf) (sf-get sf 'id)
+                                (tm->stree (sf-meta sf)))))
           ((== base cur)
            (msg-send link (list 'welcome-same cur (roster-of sf)
                                 (sf-get sf 'id))))
@@ -588,7 +739,7 @@
              (msg-send link (list 'welcome-catchup base cur (patch->scheme p)
                                   (roster-of sf) (sf-get sf 'id)))))
           (else
-            (msg-send link (list 'welcome-reset cur (tm->stree (sf-body sf))
+            (msg-send link (list 'welcome-reset cur (sf-composite-stree sf)
                                  (or (sf-get sf 'dirty) (buffer-modified? name))
                                  (roster-of sf) (sf-get sf 'id)))))))
 
@@ -625,7 +776,7 @@
          (host-flush! sf)
          (msg-send (peer-link peer)
                    (list 'welcome-reset (live-current-state (sf-key sf))
-                         (tm->stree (sf-body sf))
+                         (sf-composite-stree sf)
                          (or (sf-get sf 'dirty) (buffer-modified? (sf-buffer sf)))
                          (roster-of sf) (sf-get sf 'id))))
         ((func? msg 'host-ready)
@@ -723,6 +874,15 @@
 ;; text they removed is still in the document): the notice says that
 ;; changes were not kept.
 
+(define (lost-setting-texts kind t)
+  ;; a setting or the style which was not kept, as a paragraph
+  (cond ((func? t 'collection)
+         (map (lambda (a) (string-append "Setting " (cadr a) ": " (object->string (caddr a))))
+              (list-filter (cdr t) (lambda (a) (func? a 'associate)))))
+        ((func? t 'tuple) (list (string-append "Style: " (object->string (cdr t)))))
+        ((string? t) (list (string-append "Setting changed to: " t)))
+        (else '())))
+
 (define (lost-contents patches)
   (append-map
    (lambda (p)
@@ -730,6 +890,8 @@
       (lambda (m)
         (let ((kind (car m)) (t (caddr m)))
           (cond ((not (in? kind '(insert assign))) '())
+                ((!= (car (cadr m)) 1)           ; (the meta part: as text)
+                 (lost-setting-texts kind t))
                 ((and (string? t) (== t "")) '())
                 ((func? t 'document) (cdr t))
                 (else (list t)))))
@@ -794,9 +956,12 @@
     (sf-put! sf 'pending '())
     (sf-put! sf 'inflight #f)
     (sf-put! sf 'collect '())
+    ;; (doc is the shared tree: (shared META BODY))
     (with-global sf-applying? #t
-      (buffer-set-body name (stree->tree doc)))
-    (live-create key (copy-doc (sf-body sf)) state)
+      (buffer-set-body name (stree->tree (caddr doc)))
+      (sf-put! sf 'meta (stree->tree (cadr doc)))
+      (meta-install! sf))
+    (live-create key (sf-composite sf) state)
     (if modified (buffer-pretend-modified name) (buffer-pretend-saved name))))
 
 (define (participant-apply-remote! sf r from to)
@@ -991,7 +1156,7 @@
         (when (nnull? l)
           (if (live-apply-patch key (car l))
               (loop (cdr l))
-              (live-create key (copy-doc (sf-body sf))))))
+              (live-create key (sf-composite sf)))))
       (when (nnull? pend) (sf-put! sf 'dirty #t))
       (write-entry key port token (sf-get sf 'interactive) (sf-get sf 'id))
       (sf-debug "now hosting " key " on " port "\n")

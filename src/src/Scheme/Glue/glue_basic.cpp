@@ -11418,6 +11418,51 @@ tmg_buffer_set_style (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_buffer_get_meta (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get-meta");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_buffer_meta (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_buffer_set_init (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-init");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "buffer-set-init");
+  TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "buffer-set-init");
+
+  url in1= tmscm_to_url (arg1);
+  string in2= tmscm_to_string (arg2);
+  content in3= tmscm_to_content (arg3);
+
+  // TMSCM_DEFER_INTS;
+  set_buffer_init (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_buffer_reset_init (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-reset-init");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "buffer-reset-init");
+
+  url in1= tmscm_to_url (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  reset_buffer_init (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_buffer_set_master (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-master");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "buffer-set-master");
@@ -13626,6 +13671,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-get-body",  tmg_buffer_get_body, 1, 0, 0);
   tmscm_install_procedure ("buffer-get-style",  tmg_buffer_get_style, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-style",  tmg_buffer_set_style, 2, 0, 0);
+  tmscm_install_procedure ("buffer-get-meta",  tmg_buffer_get_meta, 1, 0, 0);
+  tmscm_install_procedure ("buffer-set-init",  tmg_buffer_set_init, 3, 0, 0);
+  tmscm_install_procedure ("buffer-reset-init",  tmg_buffer_reset_init, 2, 0, 0);
   tmscm_install_procedure ("buffer-set-master",  tmg_buffer_set_master, 2, 0, 0);
   tmscm_install_procedure ("buffer-get-master",  tmg_buffer_get_master, 1, 0, 0);
   tmscm_install_procedure ("buffer-set-title",  tmg_buffer_set_title, 2, 0, 0);
