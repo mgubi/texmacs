@@ -25,6 +25,8 @@
 #   colors   without a window (-headless): an unknown color name gives an
 #            opaque black, also in a PDF (black, white... of colors.cpp are
 #            set, #656)
+#   headless -headless is parsed by the Cocoa build: (headless?) is true and
+#            TeXmacs quits by itself after the command line
 #   sizes    two dialogs with a glue and a resize of negative sizes: the
 #            sizes given to AppKit are replaced, with one warning on
 #            debug-aqua for each place in all, and the dialogs are shown
@@ -234,6 +236,25 @@ colors_ok () {
   ! grep -aqE '/ca 0([^.0-9]|$)' "$home/colors.pdf"
 }
 verdict colors "an unknown color name is an opaque black, on the screen and in a PDF (#656)" colors_ok
+
+# (headless) -headless is a headless run: TeXmacs quits by itself after the
+# command line, without (quit-TeXmacs) (the Cocoa build ignored the option,
+# showed its windows and stayed until it was killed)
+home="$homes/headless-home"
+rm -rf "${homes:?}/headless-home"
+mkdir -p "$home"
+HOME="$home" CFFIXED_USER_HOME="$home" TEXMACS_HOME_PATH="$home" \
+  perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -headless -x \
+  "(begin (display* \"CHECK headless \" (headless?) \"\\n\") (display \"CHECK alive\\n\"))" \
+  > "$out/headless.log" 2>&1
+echo "exit status $?" >> "$out/headless.log"
+headless_ok () {
+  fail="(headless?) is not true: $(grep -a 'CHECK headless' "$out/headless.log")"
+  grep -aq '^CHECK headless #t' "$out/headless.log" || return 1
+  fail="TeXmacs did not quit by itself: $(grep -a 'exit status' "$out/headless.log")"
+  grep -aq '^exit status 0$' "$out/headless.log"
+}
+verdict headless "-headless: TeXmacs runs without a window and quits after the command line" headless_ok
 
 # (sizes) the glue and the resize of two dialogs have negative sizes: the
 # lengths are replaced by 0 for AppKit, with one warning for each place

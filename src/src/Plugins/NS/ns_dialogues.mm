@@ -31,6 +31,7 @@
 #include "MacOS/mac_images.h"
 #include "editor.hpp"
 #include "convert.hpp"
+#include "boot.hpp" // is_headless: no modal dialog without a window
 
 
 /******************************************************************************
@@ -256,7 +257,8 @@ ns_chooser_widget_rep::perform_dialog () {
   }
 
   file= "#f";
-  NSInteger answer= [panel runModal];
+  // headless: nobody can answer a dialog, which would wait for ever
+  NSInteger answer= is_headless ()? NSModalResponseCancel: [panel runModal];
   [panel setDelegate: nil];
   if (answer == NSModalResponseOK) {
     string name= from_nsstring_utf8 ([[panel URL] path]); // not cork
@@ -416,7 +418,8 @@ ns_inputs_list_widget_rep::perform_dialog () {
     for (int i=0; i<N(f->proposals); i++)
       [alert addButtonWithTitle: to_label (upcase_first (f->proposals[i]))];
     [alert addButtonWithTitle: to_label (translate ("Cancel"))];
-    NSModalResponse r= [alert runModal];
+    // headless: cancelled (no dialog which nobody could answer)
+    NSModalResponse r= is_headless ()? NSModalResponseCancel: [alert runModal];
     int i= (int) (r - NSAlertFirstButtonReturn);
     if (i >= 0 && i < N(f->proposals)) f->input= scm_quote (f->proposals[i]);
     else f->input= "#f";
@@ -451,7 +454,7 @@ ns_inputs_list_widget_rep::perform_dialog () {
     [alert addButtonWithTitle: to_label (translate ("Cancel"))];
     if (N(children) > 0)
       [[alert window] setInitialFirstResponder: [boxes objectAtIndex: 0]];
-    bool ok= [alert runModal] == NSAlertFirstButtonReturn;
+    bool ok= !is_headless () && [alert runModal] == NSAlertFirstButtonReturn;
     for (int i=0; i<N(children); i++)
       field(i)->input= ok? scm_quote (from_label ([[boxes objectAtIndex: i]
                                                     stringValue]))
@@ -950,7 +953,7 @@ ns_color_picker_widget_rep::showDialog () {
   [alert setAccessoryView: well];
   [alert addButtonWithTitle: to_label (translate ("Ok"))];
   [alert addButtonWithTitle: to_label (translate ("Cancel"))];
-  bool ok= [alert runModal] == NSAlertFirstButtonReturn;
+  bool ok= !is_headless () && [alert runModal] == NSAlertFirstButtonReturn;
   [[NSColorPanel sharedColorPanel] orderOut: nil];
   if (!ok || is_nil (_commandAfterExecution)) return;
   NSColor* c= [[well color] colorUsingColorSpace: [NSColorSpace sRGBColorSpace]];
