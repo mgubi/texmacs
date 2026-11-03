@@ -689,6 +689,29 @@
             (step (lambda () #t))
             (check= (x) x0)))))))
 
+
+;; Tree-sitter: the region of a block is the document of its lines
+;; (treesit_language_rep::highlight, code_lines_root), which follows an edit
+;; by an incremental parse; it was the body of the buffer, whose one line
+;; was the block, flattened at each key (#797)
+(define (test-tree-sitter)
+  (check-group "tree-sitter in a block")
+  (when (defined? 'tree-sitter-program-language)
+    (with-body `(document (with "mode" "prog" "prog-language" "c"
+                                "font-family" "tt"
+                            (code-lines (document "/* a" "b */" "int x;"))))
+      (lambda ()
+        (let* ((inner (path->tree (at 0 6 0)))
+               (colors (tree-sitter-line-colors "c" (tree-ref inner 1)))
+               (lan (tree-sitter-program-language "c")))
+          ;; (the second line of the comment: the region has the lines)
+          (check= colors '((0 4 "comment")))
+          (tree-insert! (tree-ref inner 2) 0 " ")
+          (step (lambda () #t))
+          (with st (syntax-region-statistics inner lan)
+            (check-true (and (pair? st) (pair? (cdr st))
+                             (>= (cadr st) 1)))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -715,6 +738,7 @@
   (test-lines-root)
   (test-folds)
   (test-layers)
+  (test-tree-sitter)
   ;; with TEXMACS_TYPESET_CACHES=check, the lines used again in paper mode
   ;; are compared with every line typeset as a paragraph
   (check-group "the lines used again are the lines made again")

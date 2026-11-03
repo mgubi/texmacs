@@ -34,15 +34,13 @@ static inline bool
 rich_line (tree t) {
   // a line typeset by the concater: with markup, or with layers
   if (!is_atomic (t)) return true;
-  if (is_nil (t->obs)) return false;
-  code_line_layers l;
-  return code_line_layers_of (t, l);
+  return code_line_has_layers (t);
 }
 
 static inline int
 fold_kind (tree doc, int i) {
   // 1: the line i is hidden; 2: hidden lines follow it (a mark); else 0
-  if (!typeset_folds) return 0;
+  if (!typeset_folds || !code_folds_possible ()) return 0;
   if (code_line_fold_state (doc[i]) > 0) return 1;
   if (i + 1 < N(doc) && code_line_fold_state (doc[i+1]) > 0) return 2;
   return 0;
@@ -890,7 +888,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
   // (folds: the lines as paragraphs, whose items are hidden or marked; the
   // folds are few and short-lived, the rows of the lines are still those
   // of the records)
-  if (typeset_folds)
+  if (typeset_folds && code_folds_possible ())
     for (int i=0; i<n; i++)
       if (code_line_fold_state (doc[i]) > 0) {
         first.b= box ();

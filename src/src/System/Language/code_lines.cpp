@@ -46,9 +46,19 @@ code_line_fold_state (tree t) {
   return 0;
 }
 
+static int folded_lines= 0;
+
+bool
+code_folds_possible () {
+  return folded_lines > 0;
+}
+
 void
 code_set_line_fold_state (tree t, int state) {
   if (!is_atomic (t)) return;
+  int before= code_line_fold_state (t);
+  if (before == 0 && state > 0) folded_lines++;
+  if (before > 0 && state <= 0) folded_lines= max (folded_lines - 1, 0);
   if (!is_nil (t->obs)) {
     for (int d= 1; d <= CODE_FOLD_MAX; d++)
       remove_highlight (t->obs, CODE_FOLD_CODES + d);
@@ -147,6 +157,13 @@ code_line_layers_of (tree t, code_line_layers& l) {
       l.hint_text << layer_names[hs[p] - 1];
     }
   return true;
+}
+
+bool
+code_line_has_layers (tree t) {
+  if (!is_atomic (t) || is_nil (t->obs)) return false;
+  return has_highlight (t, CODE_LAYER_COLORS) ||
+         has_highlight (t, CODE_LAYER_HINTS);
 }
 
 tree

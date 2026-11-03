@@ -25,6 +25,10 @@
 // The lines are then to be typeset again (update-path)
 int  code_line_fold_state (tree line);
 void code_set_line_fold_state (tree line, int state);
+// false when no line can be folded (the lines whose state was set, and not
+// set back to 0; a line which is edited forgets its state, and may be
+// counted still): the typesetter of a long file then looks for none
+bool code_folds_possible ();
 
 // layers of a line which a feature draws over the colours of its language:
 // colours of pieces of the line (the semantic tokens of a language server,
@@ -44,6 +48,9 @@ void code_set_line_layers (tree line, tree colors, tree hints);
 void code_clear_line_layers (tree line);
 // the layers of @line (false: none), and as a tree (tuple colors hints)
 bool code_line_layers_of (tree line, code_line_layers& l);
+// whether @line has layers (as code_line_layers_of, without making them: a
+// test for each line of a long file at each typesetting)
+bool code_line_has_layers (tree line);
 tree code_line_layers_tree (tree line);
 
 // The lines of program code of t: a document whose children are its lines

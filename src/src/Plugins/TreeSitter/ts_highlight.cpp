@@ -197,6 +197,13 @@ set_line_colors (tree line, int hl, array<int> cols, bool notify) {
 
 void
 treesit_language_rep::highlight (tree t) {
+  // (a block of lines, code-lines, or a document of the block alone: the
+  // region is the document of its lines, code_lines_root; else the block
+  // would be one line of the region, flattened at each change)
+  if (is_document (t) || is_func (t, CODE_LINES)) {
+    tree r= code_lines_root (t);
+    if (r.operator-> () != t.operator-> ()) { highlight (r); return; }
+  }
   ts_highlighter* h= get_highlighter ();
   if (h == NULL) { base->highlight (t); return; }
   if (epoch != highlight_epoch) {
