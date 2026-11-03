@@ -432,7 +432,9 @@
     (setenv "TEXMACS_CODE_LINES" "")
     (let ((t (tree->stree (cpp-verbatim->texmacs "a\nb" #f "utf-8"))))
       (check= (cadr (assoc 'body (cdr t))) '(document "a" "b")))
-    (setenv "TEXMACS_CODE_LINES" (or old ""))))
+    ;; (#f: as it was, not set)
+    (setenv "TEXMACS_CODE_LINES" old)
+    (check= (getenv "TEXMACS_CODE_LINES") old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests

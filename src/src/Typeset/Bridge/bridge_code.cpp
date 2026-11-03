@@ -275,11 +275,6 @@ bridge_code_rep::my_exec_until (path p) {
 * Subroutines
 ******************************************************************************/
 
-static inline bool
-same_text (string a, string b) {
-  // (the string of a line which did not change is the same string)
-  return a.operator-> () == b.operator-> () || a == b;
-}
 
 static inline unsigned long long
 sig_mix (unsigned long long h, unsigned long long x) {

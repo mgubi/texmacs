@@ -92,11 +92,6 @@ code_breaks (string s, font fn, SI width) {
 // how far the states are made again beyond the line asked, after an edit
 #define CODE_STATES_AHEAD 1000
 
-static inline bool
-same_text (string a, string b) {
-  // (the string of a line which did not change is the same string)
-  return a.operator-> () == b.operator-> () || a == b;
-}
 
 code_lexer_rep::code_lexer_rep (language lan2):
   lan (lan2), stateful (lan2->has_line_states ()), valid (0),

@@ -30,6 +30,13 @@
 * removed or changed; its document is the one of the editor.
 ******************************************************************************/
 
+// the same text (the string of a line which did not change is the same
+// string: then it is not compared)
+inline bool
+same_text (string a, string b) {
+  return a.operator-> () == b.operator-> () || a == b;
+}
+
 // The colours of a line are not asked beyond this length (a minified file:
 // a line is tokenized at each change of its text), as in other editors; the
 // state after such a line is the one before it
