@@ -1189,6 +1189,35 @@
 
 (define web-file-tags '(image postscript pattern))
 
+;; Macros of the standard styles which run commands, read files or act on
+;; click through their arguments (the bodies in TeXmacs/styles and packages
+;; use action, find-file, include*, script, observer, hybrid, authorize, or
+;; extern with a function that reads files or runs programs). They are refused
+;; although the style defines them. Found by scanning every <assign|...|<macro|
+;; of the .ts files (the script is described in docs/mcp-server.md).
+(define refused-style-macros
+  '(
+    block-comment button button-ornament calc-check carbon-comment chunk-link
+    db-pretty db-result dir-entry-icon dir-header-cell doc-module-synopsis
+    doxygen-get doxygen-load doxygen-ref edit-macro fold fold-bpr fold-button
+    fold-button* fold-detailed folded-comment icon inline-comment
+    link-to-module-doc link-to-module-source live-io live-io* mc-popup mirror
+    mirror-comment passive-tab radio-box radio-button remote-big-icon
+    remote-email remote-menu remote-name remote-picture render-button
+    render-circled-button screenshot shared source-link spell-error
+    spell-propositions summarized-algorithm summarized-tiny tmdoc-file
+    tmdoc-image tmdoc-translation tmdoc-web tmweb tmweb-link toggle-box
+    toggle-button unfold-button unfold-button* unfold-summarized widget-cmd
+    widget-value youtube-thumbnail ))
+
+;; The tags whose string arguments are names: they are written as they are
+;; (labels, keys, addresses, files, environment variables) in the exports to
+;; LaTeX and HTML, so that a `}' or a `\\' in them is not text.
+(define name-tags
+  '(label reference pageref eqref cite nocite cite-detail bibitem smart-ref ref
+    include include* image postscript postscript* pattern video sound
+    tmdoc-include include-section attachment ocr bibliography with))
+
 (define (filter-lists)
   ;; for the tests: the names of all the lists (symbols)
   (append (map car code-reasons) (map car file-primitives) (map car link-primitives)
@@ -1201,21 +1230,29 @@
 
 (define (known-primitive? tag) (and (memq tag drd-primitives) #t))
 
-(define (check-arity st)
+(define (check-arity st d)
   ;; refuse a tree in which a tag known to the DRD has a number of arguments
-  ;; it cannot have (a `with' with none crashes the typesetter). Only the
-  ;; primitives are checked: the macros (of the styles, loaded or not) are
-  ;; accepted, and the arguments of all are walked.
+  ;; it cannot have: a primitive (a `with' with none crashes the typesetter),
+  ;; or a macro of the style, when the DRD knows its arity (a macro the
+  ;; document assigns itself is not known before it is typeset)
   (cond ((string? st) #t)
         ((pair? st)
-         (let ((n (length (cdr st))))
-           (when (and (not (== (car st) 'document)) (known-primitive? (car st))
-                      (not (tag-possible-arity? (car st) n)))
-             (tool-error (string-append "the tag `" (symbol->string (car st))
+         (let ((n (length (cdr st))) (tag (car st)))
+           (when (and (not (== tag 'document))
+                      (or (known-primitive? tag) (known-macro-arity? tag))
+                      (not (tag-possible-arity? tag n)))
+             (tool-error (string-append "the tag `" (symbol->string tag)
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
-           (for (c (cdr st)) (check-arity c))))
+           (for (c (cdr st)) (check-arity c d))))
         (else #t)))
+
+(define (known-macro-arity? tag)
+  ;; does the DRD give a macro an arity (it is not the default of the tags
+  ;; it does not know, which have only the arity 0)? Then it is the macro's.
+  (let loop ((n 1))
+    (and (<= n 16)
+         (or (tag-possible-arity? tag n) (loop (+ n 1))))))
 
 (define (document-folder base)
   (let ((r (shared-real-path base)))
@@ -1298,6 +1335,40 @@
            #f)
           (else #t))))
 
+(define (name-chars-ok? s kind)
+  ;; may the string @s be written in an export as a name? No `\\', `{', `}', no
+  ;; control character, no `^^'; for a label or a key also no % # $ & ^ ~; for
+  ;; a file also no %, #; for an address a `%' only before two hexadecimal
+  ;; digits and a `#' (a fragment); `&', `$', `~' and a single `^' are fine in
+  ;; an address (queries, paths of users), but not `^^' 
+  (let ((n (string-length s)))
+    (and (< (string-length s) 4096)
+         (let loop ((i 0))
+           (or (>= i n)
+               (let ((c (string-ref s i)))
+                 (and (>= (char->integer c) 32) (not (== (char->integer c) 127))
+                      (not (memv c '(#\\ #\{ #\})))
+                      (cond ((== kind 'label) (not (memv c '(#\% #\# #\$ #\& #\^ #\~))))
+                            ((== kind 'file) (not (memv c '(#\% #\# #\$ #\& #\^ #\~))))
+                            (else
+                              (and (or (not (char=? c #\^))
+                                       (not (and (< (+ i 1) n) (char=? (string-ref s (+ i 1)) #\^))))
+                                   (or (not (char=? c #\%))
+                                       (and (<= (+ i 3) n)
+                                            (char-hexdigit? (string-ref s (+ i 1)))
+                                            (char-hexdigit? (string-ref s (+ i 2))))))))
+                      (loop (+ i 1)))))))))
+
+(define (char-hexdigit? c)
+  (or (char-numeric? c) (and (char-alphabetic? c) (memv (char-downcase c) '(#\a #\b #\c #\d #\e #\f)))))
+
+(define (name-kind tag)
+  (cond ((memq tag '(href slink hlink url link)) 'address)
+        ((memq tag '(include include* image postscript postscript* pattern video sound
+                     tmdoc-include include-section attachment ocr bibliography))
+         'file)
+        (else 'label)))
+
 (define (refuse-tag tag why)
   (tool-error (string-append "the tag `" (symbol->string tag) "' " why
                              ": the content is refused (nothing was changed)")))
@@ -1320,6 +1391,8 @@
           (tool-error (string-append "the tag `" (symbol->string tag)
                                      "' has a file that is not written as a plain name: refused (nothing was changed)")))))
 
+(define safety-defined? #f)
+
 (define (check-safety st base)
   ;; refuse content with markup that can run code, loop, or read what it
   ;; should not
@@ -1329,6 +1402,24 @@
      (let ((tag (car st)))
        ;; (the arguments first: what is inside is named in the reason)
        (for (c (cdr st)) (check-safety c base))
+       ;; the tags that are not primitives: only those the style of the
+       ;; document (or the document itself, by assign) defines, and not the
+       ;; ones that run commands: the rest would be written as raw macros
+       ;; in an export to LaTeX (\\verbatiminput, \\write18...)
+       (when (and (not (known-primitive? tag)) (not (assq tag code-reasons))
+                  (not (assq tag code-macro-reasons)) (not (suffix-reason tag)))
+         (cond ((memq tag refused-style-macros)
+                (refuse-tag tag "is a macro of the styles that runs commands, reads files or acts on a click"))
+               ((not (and safety-defined? (safety-defined? tag)))
+                (tool-error (string-append "unknown tag `" (symbol->string tag)
+                                           "' (not defined by the style of the document): the content is refused (nothing was changed)")))))
+       (when (memq tag name-tags)
+         (for (a (if (eq? tag 'with)
+                     (if (pair? (cdr st)) (list-head (cdr st) (- (length (cdr st)) 1)) '())
+                     (cdr st)))
+           (when (and (string? a) (not (name-chars-ok? a (name-kind tag))))
+             (tool-error (string-append "a string in a `" (symbol->string tag) "' has a character that cannot be in a name (a backslash, a brace, a control character, % # $ & ^ ~ ...): `"
+                                        (utf8-prefix (u8 a) 40) "' (nothing was changed)")))))
        (cond
          ((assq tag code-reasons) => (lambda (e) (refuse-tag tag (cdr e))))
          ((assq tag code-macro-reasons) => (lambda (e) (refuse-tag tag (cdr e))))
@@ -1350,6 +1441,10 @@
                (cond ((not (string? a))
                       (tool-error (string-append "a `" (symbol->string tag)
                                                  "' whose destination is not written as plain text is refused (nothing was changed)")))
+                     ((not (name-chars-ok? a 'address))
+                      (tool-error (string-append "a `" (symbol->string tag)
+                                                 "' with the target `" (utf8-prefix (u8 a) 60)
+                                                 "' is refused: a backslash, a brace, a control character or a bare % cannot be in an address (nothing was changed)")))
                      ((not (link-target-ok? a))
                       (tool-error (string-append "a `" (symbol->string tag)
                                                  "' with the target `" (utf8-prefix (u8 a) 60)
@@ -1365,7 +1460,13 @@
                                          "' (text for another program) is refused: only texmacs, screen and printer (nothing was changed)")))))
          ((== tag 'latex)
           (for (a (cdr st))
-            (when (string? a) (check-latex-source a)))))))
+            (when (string? a)
+              (when (>= (string-search-forwards "^^" 0 a) 0)
+                (tool-error "a `latex' with ^^ (a way to write any character) is refused (nothing was changed)"))
+              (check-latex-source a)
+              (for (c (latex-commands a))
+                (when (member c latex-tag-forbidden)
+                  (tool-error (string-append "the LaTeX command \\" c " in a `latex' tag is refused (it takes a file or an address; the text is written as it is in an export) (nothing was changed)"))))))))))
     (else #t)))
 
 (define latex-forbidden
@@ -1374,7 +1475,18 @@
     "csname" "directlua" "luaexec" "pdfshellescape" "newwrite" "externaldocument"
     ;; (ways to build a command name, or a definition that may hide one)
     "string" "expandafter" "noexpand" "def" "edef" "gdef" "xdef" "futurelet"
-    "makeatletter" "makeatother"))
+    "makeatletter" "makeatother"
+    ;; (they become tags of the export, or load files or programs)
+    "inputminted" "import" "subimport" "includepdf" "usepackage" "documentclass"
+    "addbibresource" "bibliographystyle" "ShellEscape" "write18" "pgfplotstableread"
+    "CatchFileDef" "DTLloaddb" "addplot" "loadglsentries" "lstset" "input@path"))
+
+(define latex-tag-forbidden
+  ;; more, for the text of a <latex|> tag, which is written as it is in an
+  ;; export: the commands that take a file or an address
+  '("includegraphics" "bibliography" "IfFileExists" "ExecuteMetaData" "graphicspath"
+    "epsfbox" "epsffile" "psfig" "href" "url" "hyperref" "includestandalone"
+    "pgfplotstableread" "lstinputlisting" "inputencoding" "openin"))
 
 (define (latex-commands s)
   ;; the names of the commands (\name) in @s
@@ -1395,7 +1507,25 @@
     (when (member c latex-forbidden)
       (tool-error (string-append "the LaTeX command \\" c " is refused (it reads files, runs code or hides a command name): the content is refused (nothing was changed)")))))
 
-(define (parse-content content fmt base)
+(define (assigned-names t)
+  ;; the names that the document itself defines (assign): macros of its
+  ;; preamble or of its text
+  (cond ((tree-atomic? t) '())
+        ((and (tm-is? t 'assign) (> (tree-arity t) 0) (tree-atomic? (tree-ref t 0)))
+         (cons (tree->string (tree-ref t 0))
+               (append-map assigned-names (tree-children t))))
+        (else (append-map assigned-names (tree-children t)))))
+
+(define (defined-predicate d)
+  ;; is the tag defined for the document: by its style (and packages) as this
+  ;; process has loaded them, or by an assign of the document
+  (let ((locals (assigned-names (doc-body d))))
+    (lambda (tag)
+      (let ((name (symbol->string tag)))
+        (or (and (member name locals) #t)
+            (with-buffer (doc-url d) (style-has? name)))))))
+
+(define (parse-content content fmt base d)
   ;; the stree of @content, written in the format @fmt; an error when it
   ;; does not parse, has a tag with a wrong number of arguments, or has
   ;; markup which is refused (@base is the folder of the document)
@@ -1425,8 +1555,12 @@
     (when (or (not st) (not (valid-stree? st 0)))
       (tool-error (string-append "the content does not parse as " fmt
                                  " (nothing was changed)")))
-    (check-safety st base)
-    (check-arity st)
+    (set! safety-defined? (and d (defined-predicate d)))
+    (let ((r (catch #t
+               (lambda () (check-safety st base) (check-arity st d) 'ok)
+               (lambda args 'failed))))
+      (set! safety-defined? #f)
+      (when (!= r 'ok) (throw 'mcp-tool-error)))
     st))
 
 (define (content-items st)
@@ -1694,7 +1828,7 @@
          (fmt (opt-string args "format" "texmacs"))
          (hn (target d args "node")) (h (car hn)) (t (cdr hn))
          (expect (opt-string args "expect" #f))
-         (st (parse-content (opt-string args "content" #f) fmt (doc-base d)))
+         (st (parse-content (opt-string args "content" #f) fmt (doc-base d) d))
          (items (content-items st)))
     (cond
       ((body-root? d t)
@@ -1759,7 +1893,7 @@
          (ah (opt-string args "anchor" #f))
          (anchor (if ah (handle-node d ah) (doc-body d)))
          (expect (opt-string args "expect" #f))
-         (st (parse-content (opt-string args "content" #f) fmt (doc-base d)))
+         (st (parse-content (opt-string args "content" #f) fmt (doc-base d) d))
          (items (content-items st)))
     (when (not (member where '("before" "after" "first" "last")))
       (param-error "the argument `where' must be before, after, first or last"))
@@ -2042,29 +2176,44 @@
                                      " is outside the folders of this server")))
         (when (shared-lexists? target)
           (tool-error "the file exists already (or is a link): open it instead"))
-        (let ((items (and content (content-items (parse-content content fmt rdir)))))
-          ;; (made with O_EXCL: no existing path is followed or overwritten)
-          (when (not (shared-create-document
-                      target
-                      (string-append "<TeXmacs|" (texmacs-version) ">\n\n<style|<tuple|"
-                                     style ">>\n\n<\\body>\n  \n</body>\n")))
-            (tool-error "the file could not be created"))
-          (let ((d (catch #t
-                     (lambda ()
-                       (let ((d (open-doc! target)))
-                         (when items
-                           (run-edit! d
-                             (lambda ()
-                               (tree-assign (doc-body d) (tree-of-stree (cons 'document items)))))
-                           (forget-steps! d))
-                         d))
-                     (lambda args
-                       ;; (what was made is removed)
-                       (catch #t (lambda () (system-remove (system->url target)))
-                         (lambda args #f))
-                       (tool-error "the document could not be made: the file was removed")))))
+        ;; (made with O_EXCL: no existing path is followed or overwritten)
+        (when (not (shared-create-document
+                    target
+                    (string-append "<TeXmacs|" (texmacs-version) ">\n\n<style|<tuple|"
+                                   style ">>\n\n<\\body>\n  \n</body>\n")))
+          (tool-error "the file could not be created"))
+        (set! mcp-tool-error-message "")
+        (let* ((failed #f)
+               (d (catch #t
+                    (lambda ()
+                      ;; (the content is read for the style of the new document)
+                      (let* ((d (open-doc! target))
+                             (items (and content
+                                         (content-items
+                                          (parse-content content fmt rdir d)))))
+                        (when items
+                          (run-edit! d
+                            (lambda ()
+                              (tree-assign (doc-body d)
+                                           (tree-of-stree (cons 'document items)))))
+                          (forget-steps! d))
+                        d))
+                    (lambda args
+                      (set! failed #t)
+                      #f))))
+          (when failed
+            ;; (what was made is removed, with the reason that was given)
+            (let ((why mcp-tool-error-message))
+              (for (x mcp-docs)
+                (when (== (doc-path x) (canonical-path target))
+                  (catch #t (lambda () (buffer-close (doc-url x))) (lambda args #f))
+                  (set! mcp-docs (list-filter mcp-docs (lambda (y) (!= (doc-id y) (doc-id x)))))))
+              (catch #t (lambda () (system-remove (system->url target))) (lambda args #f))
+              (tool-error (if (and (string? why) (!= why ""))
+                              why
+                              "the document could not be made: the file was removed"))))
             (snapshot! d)
-            (doc-info d)))))))
+            (doc-info d))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The table of tools

@@ -248,14 +248,45 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   `string`, `error`, `document`, `para`, `surround`, `concat`, `rigid`, `hgroup`, `hidden`, `freeze`, `unfreeze`, `hspace`, `vspace*`, `vspace`, `space`, `htab`, `move`, `shift`, `resize`, `clipped`, `repeat`, `repeat*`, `float`, `datoms`, `dlines`, `dpages`, `dbox`, `line-note`, `page-note`, `if-page-break`, `with-limits`, `line-break`, `new-line`, `next-line`, `no-break`, `no-indent`, `yes-indent`, `no-indent*`, `yes-indent*`, `page-break*`, `page-break`, `no-page-break*`, `no-page-break`, `no-break-here*`, `no-break-here`, `no-break-start`, `no-break-end`, `new-page*`, `new-page`, `new-dpage*`, `new-dpage`, `around`, `around*`, `big-around`, `left`, `mid`, `right`, `big`, `long-arrow`, `lprime`, `rprime`, `below`, `above`, `lsub`, `lsup`, `rsub`, `rsup`, `frac`, `sqrt`, `wide`, `wide*`, `neg`, `tree`, `syntax`, `tformat`, `twith`, `cwith`, `tmarker`, `table`, `row`, `cell`, `subtable`, `with`, `provides`, `value`, `quote-value`, `or-value`, `quote-arg`, `arg`, `get-label`, `get-arity`, `mark`, `mark*`, `expand-as`, `quote`, `copy`, `if`, `if*`, `case`, `dynamic-case`, `or`, `xor`, `and`, `not`, `plus`, `minus`, `times`, `over`, `div`, `mod`, `minimum`, `maximum`, `math-sqrt`, `exp`, `log`, `pow`, `cos`, `sin`, `tan`, `merge`, `length`, `number`, `date`, `translate`, `change-case`, `is-tuple`, `look-up`, `occurs-inside`, `equal`, `unequal`, `less`, `lesseq`, `greater`, `greatereq`, `blend`, `rgb-color`, `rgb-access`, `cm-length`, `mm-length`, `in-length`, `pt-length`, `bp-length`, `dd-length`, `pc-length`, `cc-length`, `fs-length`, `fbs-length`, `em-length`, `ln-length`, `sep-length`, `yfrac-length`, `ex-length`, `fn-length`, `fns-length`, `bls-length`, `fnbot-length`, `fntop-length`, `spc-length`, `xspc-length`, `par-length`, `paw-length`, `pag-length`, `gw-length`, `gh-length`, `gu-length`, `tmpt-length`, `px-length`, `guipx-length`, `lcorner-length`, `bcorner-length`, `rcorner-length`, `tcorner-length`, `ms-length`, `s-length`, `msec-length`, `sec-length`, `min-length`, `hr-length`, `active`, `active*`, `inactive`, `inactive*`, `rewrite-inactive`, `inline-tag`, `open-tag`, `middle-tag`, `close-tag`, `symbol`, `locus`, `id`, `hard-id`, `find-accessible`, `relay`, `set-binding`, `get-binding`, `has-binding`, `hidden-binding`, `label`, `reference`, `pageref`, `get-attachment`, `write`, `toc-notify`, `auto-id`, `cache-ref`, `tuple`, `attr`, `tmlen`, `collection`, `associate`, `backup`, `gradient`, `flag`, `hyphenate-as`, `anim-static`, `anim-dynamic`, `morph`, `anim-time`, `anim-portion`, `anim-compose`, `anim-repeat`, `anim-constant`, `anim-accelerate`, `anim-translate`, `anim-progressive`, `graphics`, `superpose`, `gr-group`, `gr-transform`, `gr-effect`, `text-at`, `math-at`, `document-at`, `point`, `line`, `cline`, `arc`, `carc`, `spline`, `spline*`, `cspline`, `bezier`, `cbezier`, `smooth`, `csmooth`, `penscript`, `calligraphy`, `fill`, `box-info`, `frame-direct`, `frame-inverse`, `is-equal`, `is-intersection`, `on-curve`, `on-text-border`, `on-grid`, `transform-3d`, `object-3d`, `triangle-3d`, `light-3d`, `light-diffuse`, `light-specular`, `eff-move`, `eff-magnify`, `eff-bubble`, `eff-crop`, `eff-turbulence`, `eff-fractal-noise`, `eff-hatch`, `eff-dots`, `eff-gaussian`, `eff-oval`, `eff-rectangular`, `eff-motion`, `eff-blur`, `eff-outline`, `eff-thicken`, `eff-erode`, `eff-degrade`, `eff-distort`, `eff-gnaw`, `eff-superpose`, `eff-add`, `eff-sub`, `eff-mul`, `eff-min`, `eff-max`, `eff-mix`, `eff-normalize`, `eff-monochrome`, `eff-color-matrix`, `eff-gradient`, `eff-make-transparent`, `eff-make-opaque`, `eff-recolor`, `eff-skin`, `canvas`, `ornament`, `art-box`, `format`, `line-sep`, `split`, `delay`, `hold`, `release`, `old-matrix`, `old-table`, `old-mosaic`, `old-mosaic-item`, `env`.
 
   Other rules:
+  - *Which tags are accepted at all*: a primitive (classified safe above), or a macro that
+    the document defines: its style and packages as this process has loaded them
+    (`style-has?` in the buffer of the document), or an `assign` in the document
+    itself (its preamble). Every other tag is refused with "unknown tag X (not
+    defined by the style of the document)": an unknown tag would be written as a
+    raw macro in an export to LaTeX (`\verbatiminput`, `\write18`...), and the
+    LaTeX importer makes such tags from `\includepdf`, `\inputminted`, `\import`,
+    `\usepackage{../x}`... Even a macro of the style is refused if its body runs
+    commands, reads files or acts on a click. The list was made by scanning every
+    `<assign|name|<macro|...>` of `TeXmacs/styles` and `TeXmacs/packages` for `action`,
+    `find-file`, `include*`, `script`, `observer`, `hybrid`, `authorize`, and
+    `extern` with a function that reads files or runs programs (doxygen, tmdoc,
+    module documentation, remote, spell, listing, popups...), plus the macros named by
+    the audit: `refused-style-macros` in `mcp-server.scm`:
+    `block-comment`, `button`, `button-ornament`, `calc-check`, `carbon-comment`, `chunk-link`, `db-pretty`, `db-result`, `dir-entry-icon`, `dir-header-cell`, `doc-module-synopsis`, `doxygen-get`, `doxygen-load`, `doxygen-ref`, `edit-macro`, `fold`, `fold-bpr`, `fold-button`, `fold-button*`, `fold-detailed`, `folded-comment`, `icon`, `inline-comment`, `link-to-module-doc`, `link-to-module-source`, `live-io`, `live-io*`, `mc-popup`, `mirror`, `mirror-comment`, `passive-tab`, `radio-box`, `radio-button`, `remote-big-icon`, `remote-email`, `remote-menu`, `remote-name`, `remote-picture`, `render-button`, `render-circled-button`, `screenshot`, `shared`, `source-link`, `spell-error`, `spell-propositions`, `summarized-algorithm`, `summarized-tiny`, `tmdoc-file`, `tmdoc-image`, `tmdoc-translation`, `tmdoc-web`, `tmweb`, `tmweb-link`, `toggle-box`, `toggle-button`, `unfold-button`, `unfold-button*`, `unfold-summarized`, `widget-cmd`, `widget-value`, `youtube-thumbnail`.
+    The folding tags (`fold`, `summarized-*`, `toggle-box`, ...) use `action` and are
+    in it. The macros of the style are also checked for their number of arguments
+    when the DRD knows it (`(theorem)` is refused); the macros that the document
+    assigns itself are not, before they are typeset.
+  - *Names that go to an export*: the string arguments of `label`, `reference`, `pageref`,
+    `eqref`, `cite`, `nocite`, `cite-detail`, `bibitem`, `smart-ref`, `ref`, of the file
+    tags, and the values of a `with` (not its text), and the destination of a link, are
+    written as they are in an export to LaTeX or HTML. A backslash, a brace or a
+    control character is refused in all of them (`<label|a}\input{/etc/passwd}\x{>`
+    would hijack the `.tex`); in labels and files also `%`, `#`, `$`, `&`, `^`, `~`; in
+    addresses `^^` and a `%` that is not followed by two hexadecimal
+    digits (a `#` fragment, `%20`, `&` and `~` are fine). The text of a `<latex|>` tag is
+    also scanned for the commands that take a file or an address (`\includegraphics`,
+    `\bibliography`, `\IfFileExists`, `\href`, `\url`...). A `<latex|>` with `^^` is refused.
+    *This is a bug of the LaTeX exporter for any document* (`tmtex-label`,
+    `tmtex-reference`, `tmtex-cite`, `tmtex-href` in `progs/convert/latex/tmtex.scm`
+    write the strings as they are): a label with a brace breaks or hijacks the `.tex`.
+    Not fixed on this branch.
   - *Macros* (tags that are not primitives): `session`, `input`, `output`, `script-input`,
     `script-output`, `script-eval` and every tag ending in `-input` or `-output`
     (`scheme-input`, `shell-input`...) are refused as code; `tmdoc-include`,
     `include-section`, `attachment`, `ocr` (first argument) and `bibliography` (all
     its string arguments) are file arguments; `href` and `slink` (first argument)
-    are link destinations. Any other tag unknown to the DRD, such as a macro of the
-    person's style which this process has not loaded, is accepted, and its
-    arguments are walked.
+    are link destinations. A tag defined by nothing (see above) is refused.
   - *File arguments*: a plain string that is a relative name, with no `..` component, no
     colon or scheme, not starting with `/`, `\` or `~`, no `%2e`, `%2f` or `%5c`,
     that stays (symbolic links resolved, also for a file that does not exist yet) inside the
@@ -276,14 +307,18 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     command name (`\string`, `\expandafter`, `\noexpand`, `\def`, `\edef`, `\gdef`, `\xdef`,
     `\futurelet`, `\makeatletter`, `\makeatother`) are refused before the conversion: the
     importer would read the files itself. This also refuses them inside `verbatim`
-    (a false positive that stays). `\bibliography{refs}` is accepted (the
-    `bibliography` tag is checked as above), `\includegraphics` becomes an `image`.
+    (a false positive that stays). Also refused: `\inputminted`, `\import`,
+    `\subimport`, `\includepdf`, `\usepackage`, `\documentclass`, `\addbibresource`,
+    `\bibliographystyle`, `\ShellEscape`, `\write18`, `\pgfplotstableread`,
+    `\CatchFileDef`, `\DTLloaddb`, `\addplot`, `\loadglsentries`, `\lstset`. `\bibliography{refs}`
+    becomes a `bibliography` with one argument, which is refused (the style defines it with
+    more, or does not define it); `\includegraphics` becomes an `image`.
   - *Trees that cannot be*: a primitive with a number of arguments it cannot have
-    (`(with)`, `(frac "a")`, an empty `(table)`...) is refused. A `with` with no
+    (`(with)`, `(frac "a")`, an empty `(table)`...) is refused, and so is a macro of the
+    style with a number of arguments its definition does not have. A `with` with no
     argument crashed the typesetter; the typesetter now shows a `with` with a wrong
     number of arguments as an inactive tree (`make_bridge`), so a patch of another
     process with such a tree no longer crashes the person's TeXmacs either.
-    Macros are not checked.
   This is a filter on what the agent writes, not a sandbox: a document that the
   person opened already is not scanned, and the importers run in this process.
 - **A node** is a block of the document (then `replace` takes one or several

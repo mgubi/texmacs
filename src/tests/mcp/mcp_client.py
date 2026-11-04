@@ -1307,8 +1307,8 @@ def s_content(w):
     refused("find-file", "stree", '(image (find-file "/etc/passwd") "1par" "" "" "")', "`find-file'")
     refused("a plugin input", "texmacs", "<scheme-input|default|1|(+ 1 2)>", "-input")
     refused("shell-input", "texmacs", "<shell-input|a|b|c>", "-input")
-    refused("a macro", "texmacs", "<with|f|<macro|<f>>|<f>>", "`macro'")
-    refused("a macro that calls itself", "texmacs", "<with|f|<macro|x|<f|x>>|<f|a>>", "`macro'")
+    refused("a macro", "texmacs", "<with|f|<macro|<f>>|<f>>", "tag `")
+    refused("a macro that calls itself", "texmacs", "<with|f|<macro|x|<f|x>>|<f|a>>", "tag `")
     refused("apply", "stree", '(apply "f" "x")', "`apply'")
     refused("expand", "stree", '(expand "f" "x")', "`expand'")
     refused("set", "stree", '(set "x" "y")', "`set'")
@@ -1331,7 +1331,7 @@ def s_content(w):
     refused("a latex tag with \\input", "stree", '(latex "\\\\input{/etc/passwd}")', "\\input")
     refused("latex: building a command name", "latex", "\\in\\string put{secret}", "\\string")
     refused("latex: a definition that hides \\input", "latex", "\\newcommand{\\foo}{\\input{x}}", "\\input")
-    refused("latex: \\bibliography of an absolute file", "latex", "\\bibliography{/etc/passwd}", "refers to the file")
+    refused("latex: \\bibliography of an absolute file", "latex", "\\bibliography{/etc/passwd}", "bibliography")
     refused("latex: \\href to a file", "latex", "\\href{file:///etc/passwd}{x}", "file:")
     refused("latex: \\url to javascript", "latex", "\\url{javascript:alert(1)}", "javascript:")
     refused("markdown: ![x](../../etc/passwd)", "markdown", "![x](../../etc/passwd)", "refers to the file")
@@ -1341,19 +1341,56 @@ def s_content(w):
     accepted("a link to a section of another file", "texmacs", "<hlink|a|other.tm#sec:x>")
     accepted("a link with an uppercase scheme", "texmacs", "<hlink|a|HTTP://x.y>")
     accepted("a link to the web with a query", "texmacs", "<hlink|a|https://x.org/a?b=c:d>")
-    accepted("a smart-ref", "texmacs", "<smart-ref|sec:x>")
     accepted("a reference", "texmacs", "<reference|sec:x>")
-    accepted("a macro of a style which is not loaded", "texmacs", "<unknowntag|a|b>")
-    accepted("a macro of a style with one argument", "texmacs", "<foo|a>")
+    refused("an unknown tag", "texmacs", "<unknowntag|a|b>", "unknown tag")
+    refused("an unknown tag with one argument", "texmacs", "<foo|a>", "unknown tag")
     accepted("a theorem with a colon", "texmacs", "<theorem|Let x: then y.>")
     accepted("a footnote with a colon", "texmacs", "<footnote|note: with colon>")
     accepted("a pattern in the folder", "texmacs", "<with|color|<pattern|pic.png|1cm|1cm>|x>")
     accepted("a specific for printer", "texmacs", "<specific|printer|x>")
     accepted("a graphics with a point", "texmacs", "<graphics|<point|0|0>>")
     accepted("a latex tag with plain text", "stree", '(latex "x^2")')
-    accepted("latex: \\bibliography of a relative name", "latex", "\\bibliography{refs}")
+    refused("latex: \\bibliography (wrong number of arguments, or not in the style)", "latex", "\\bibliography{refs}", "bibliography")
     accepted("latex: href to the web", "latex", "\\href{https://example.org}{site}")
     accepted("a get-attachment", "texmacs", "<get-attachment|a>")
+    # names written as they are in an export to LaTeX
+    for tag in ("label", "reference", "pageref", "eqref", "cite", "nocite"):
+        refused("%s with a brace and \\input" % tag, "stree", '(%s "a}\\\\input{/etc/passwd}\\\\x{")' % tag, "character that cannot be in a name")
+    refused("label with a percent", "stree", '(label "a%b")', "character that cannot be")
+    refused("label with a control character", "stree", '(label "a\\nb")', "character that cannot be")
+    refused("label with a hash", "stree", '(label "a#b")', "character that cannot be")
+    refused("a link to an address with a brace", "stree", '(hlink "x" "http://a/b}\\\\input{x}")', "cannot be in an address")
+    refused("a link to an address with a bare percent", "stree", '(hlink "x" "http://a/b%zz")', "cannot be in an address")
+    refused("an include with a brace", "stree", '(include "a}b.tm")', "character that cannot be")
+    refused("a with whose value has a brace", "stree", '(with "font-family" "}\\\\input{x}" "text")', "character that cannot be")
+    accepted("a label with a colon and a dash", "stree", '(label "sec:intro-1_a")')
+    accepted("a link with a fragment", "texmacs", "<hlink|a|https://x.org/p#frag>")
+    accepted("a link with a percent escape", "texmacs", "<hlink|a|https://x.org/a%20b>")
+    accepted("a link with a query and a user path", "stree", '(hlink "a" "http://a.b/~u/c?d=1&e=2#f")')
+    accepted("markdown: a link with a query", "markdown", "[a](https://example.com/a?b=c&d=e#f)")
+    refused("a link with ^^", "stree", '(hlink "a" "http://a.b/^^5c")', "cannot be in an address")
+    refused("a latex tag with includegraphics", "stree", '(latex "\\\\includegraphics{/etc/passwd}")', "includegraphics")
+    refused("a latex tag with bibliography", "stree", '(latex "\\\\bibliography{/etc/passwd}")', "bibliography")
+    refused("a latex tag with IfFileExists", "stree", '(latex "\\\\IfFileExists{/etc/passwd}{a}{b}")', "IfFileExists")
+    accepted("a with with a plain value", "stree", '(with "color" "red" "x")')
+    accepted("text with braces and a backslash (escaped by the export)", "stree", '(concat "a { b } \\\\ c")')
+    # tags are accepted only if the style (or the document) defines them
+    for tag, args in (("verbatiminput", '"/etc/passwd"'), ("lstinputlisting", '"x"'), ("inputminted", '"c" "x"'),
+                      ("import", '"x" "y"'), ("subimport", '"x" "y"'), ("includepdf", '"x"'),
+                      ("ShellEscape", '"x"'), ("directlua", '"x"'), ("immediate", '"x"'),
+                      ("write18", '"x"'), ("doxygen-load", '"x"'), ("button", '"x" "y"'),
+                      ("tmdoc-file", '"x"'), ("widget-cmd", '"x"')):
+        refused("an unknown tag: %s" % tag, "stree", "(%s %s)" % (tag, args), tag)
+    for src in ("\\includepdf{x}", "\\inputminted{c}{x}", "\\import{a}{b}", "\\subimport{a}{b}",
+                "\\usepackage{../x}", "\\documentclass{../../x}", "\\addbibresource{x}",
+                "\\bibliographystyle{x}", "\\ShellEscape{x}", "\\directlua{x}", "\\immediate\\write18{x}",
+                "\\addplot table {/etc/passwd};", "\\pgfplotstableread{x}", "\\CatchFileDef{a}{b}{c}",
+                "\\DTLloaddb{a}{b}"):
+        refused("latex: %s" % src, "latex", src, "LaTeX command")
+    refused("^^ in a latex tag", "stree", '(latex "a^^5cinput{x}")', "^^")
+    refused("a macro with the wrong number of arguments", "stree", '(theorem)', "cannot have")
+    refused("a macro with too many arguments", "stree", '(theorem "a" "b")', "cannot have")
+    refused("a bibliography with the wrong number of arguments", "texmacs", "<bibliography|bib|plain|refs.bib>", "bibliography")
     # trees with the wrong number of arguments (the typesetter crashed on `with')
     for bad in ('(with)', '(frac "a")', '(table)', '(row)', '(cell)', '(concat)', '(tformat)',
                 '(sqrt)', '(document "a" (frac "b"))', '(rsub "a" "b")', '(tuple "a" (with))'):
@@ -1397,11 +1434,49 @@ def s_filter(w):
           len(line) == 1 and line[0].strip() == "UNKNOWN-NAMES ()")
 
 
+def s_styles(w):
+    """the tags of the style of the document, and those the document assigns, are
+    accepted; the other ones are not"""
+    env, home = make_env(w, "A")
+    os.makedirs(os.path.join(home, "styles"), exist_ok=True)
+    with open(os.path.join(home, "styles", "mystyle.ts"), "w") as fh:
+        fh.write("<TeXmacs|2.1.5>\n\n<style|source>\n\n<\\body>\n  <\\active*>\n    <\\src-package|mystyle|1.0>\n    </src-package>\n  </active*>\n\n"
+                 "  <assign|mymacro|<macro|x|<strong|<arg|x>>>>\n</body>\n")
+    f = os.path.join(w, "s.tm")
+    with open(f, "w") as fh:
+        fh.write("<TeXmacs|2.1.5>\n\n<style|<tuple|generic|mystyle>>\n\n<\\body>\n"
+                 "  <assign|localmac|<macro|x|<em|<arg|x>>>>\n\n  Text.\n</body>\n")
+    g = os.path.join(w, "g.tm")
+    write_small(g)
+    f = os.path.realpath(f)
+    g = os.path.realpath(g)
+    m = Mcp(env)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    e, v2 = m.tool("open_document", path=g)
+    def ins(d, content, fmt="texmacs"):
+        r = m.tool("insert", document=d, where="last", content=content, format=fmt)
+        if not r[0]:
+            m.tool("undo_agent", document=d)
+        return r
+    e, r = ins("d1", "<mymacro|hi>")
+    check("a macro of the style of the document is accepted", not e)
+    e, r = ins("d1", "<localmac|hi>")
+    check("a macro that the document assigns is accepted", not e)
+    e, r = ins("d2", "<mymacro|hi>")
+    check("the same macro in a document without that style: unknown", e and "unknown tag" in str(r))
+    e, r = ins("d2", "<localmac|hi>")
+    check("a macro assigned in another document: unknown", e and "unknown tag" in str(r))
+    e, r = ins("d1", "<strong|x> <em|y>")
+    check("the macros of the standard style are accepted", not e)
+    check("exit 0", m.close() == 0)
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "undo": s_undo, "filter": s_filter, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]
