@@ -12,6 +12,10 @@
 #              it and reads the host's live edit and deletion
 #   mcp-host   the MCP server hosts the file; another TeXmacs joins and edits
 #   unshared   share-open-files off (the default): nothing is shared
+#   launcher   the script TeXmacs/bin/texmacs keeps stdin for --mcp
+#   robust     utf8 and newlines in every format, odd paths, TEXMACS_MCP_ROOTS,
+#              sections in concatenations, bad arguments and messages, limits
+#   outputs    outline and references cut and continued; a vanished client
 #
 # Every process is stopped above TM_TEST_RSS_KB (default 2 GB) and after
 # TM_TEST_TIMEOUT seconds (default 120); the work folder is TM_TEST_HOME (not
@@ -24,7 +28,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol tools shared mcp-host unshared
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs shared mcp-host unshared
 status=0
 for name in "$@"; do
   w="$run/$name"

@@ -9,9 +9,18 @@ documents through it:
 
 This step only reads. Editing (`replace`, `insert`, `delete`, `edit_text`),
 agent modes and proposals, `check`, `render`, `export`, notifications and
-`get_changes` are the steps 3 to 6 of the design. Nothing is evaluated, no
-plugin session is started, and nothing but the documents is reachable (design
-5.6): the tools below are the whole interface.
+`get_changes` are the steps 3 to 6 of the design. The interface has no tool
+that evaluates code, starts a plugin session, or touches preferences or the
+network (design 5.6). The real guarantee about files is weaker than "nothing
+but documents": `open_document` (and any tool given a path) opens **any file the
+user can read**, as TeXmacs would, through its importers (a `.tex`, `.md`,
+or a plain text file such as `/etc/passwd` opens as a document). To limit it,
+start the server with **`TEXMACS_MCP_ROOTS=dir1:dir2`**: only files whose
+canonical path (symbolic links and `..` resolved) is inside one of the folders
+can be opened, and `list_documents` shows no other open file; the default is no
+limit. `TEXMACS_MCP_READONLY` is reserved for the editing steps (every tool
+reads today). Paths containing a colon cannot be opened (a colon separates
+the alternatives of a TeXmacs url) and give a clean error.
 
 ## The process
 
@@ -28,9 +37,16 @@ standard input and output, and ends when the input ends.
   including the Scheme `display`. A program started by TeXmacs inherits
   neither the protocol input nor its output. (Before the home is known the
   descriptors go to `/dev/null`: the first lines of start-up are lost.)
-  `TEXMACS_MCP_DEBUG=1` also logs every message.
-- **Reading is polled on the main thread**, by a delayed command every 10 ms,
-  like the shared files (`mcp_stdin_read` is a non-blocking `poll` + `read`).
+  `TEXMACS_MCP_DEBUG=1` also logs every message. A log over 4 MB is renamed to
+  `mcp.log.1` when the server starts.
+- **The launcher** `TeXmacs/bin/texmacs` (from `misc/scripts/texmacs.in`) runs
+  the binary with standard input from `/dev/null`; for `--mcp` it keeps the input.
+  `claude mcp add texmacs -- texmacs --mcp` thus works with the launcher.
+- **Reading is polled on the main thread**, by a delayed command every 10 ms
+  while messages come, every 50 ms after 2 s of silence (idle cost under 1% of
+  a CPU), like the shared files (`mcp_stdin_read` is a non-blocking `poll` +
+  `read`). The pieces of a line are kept in a list and only the new piece is
+  searched for the newline.
   The output is written by `mcp_stdout_write` (blocking, until the client
   has taken it). A tool call runs to its end before the next line is read.
 - **The C++ part is the four functions of `mcp_stdio.cpp`** (glued as
@@ -41,6 +57,8 @@ standard input and output, and ends when the input ends.
   `typed-tree->json`, which the LSP client uses too); the reader is lenient, so a
   line whose brackets or quotes do not match is refused beforehand as a parse
   error.
+- **A client that is gone**: when a write to the output fails the server ends
+  (SIGPIPE is ignored in this mode).
 - **End of input** (or of the pipe) is a clean exit: the documents are closed
   (a shared one is left) and TeXmacs quits, status 0.
 - No Windows yet: `mcp_stdio.cpp` does nothing there (the shared files do not
@@ -49,7 +67,11 @@ standard input and output, and ends when the input ends.
 ## The protocol
 
 JSON-RPC 2.0, one message per line (a CR before the newline is accepted; a blank
-line is skipped; a line over 32 MB is dropped with an error).
+line is skipped; a line over 32 MB is dropped up to its newline, with one error
+-32600). A line must be one object or array with matching brackets and quotes,
+nested at most 512 deep (the C++ reader crashes on hundreds of thousands of levels
+and accepts garbage), with nothing after it: else -32700. An id that is neither
+a string nor a number, or a missing or non-string method, is -32600.
 
 - `initialize`: answers the client's `protocolVersion` if it is one of
   2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05, else 2025-06-18; capabilities
@@ -92,12 +114,12 @@ line is skipped; a line over 32 MB is dropped with an error).
 
 | Tool | Arguments | Result |
 |---|---|---|
-| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`) |
+| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its port accepts a connection (the lock is not taken, so that a process starting to host is not disturbed) |
 | `open_document` | `path` (absolute) | the same facts for the document (the same id when it is open already) |
-| `get_outline` | `document` | `title`, `hash`, `blocks`, `sections`: `handle`, `tag`, `level` (part 0, chapter 1, section 2... subparagraph 6), `title`, `labels`, `index` (position among the top-level blocks), `chars` (size to the next section), `hash` |
+| `get_outline` | `document`, `limit?` (300), `start?` | `title`, `hash`, `blocks`, `sections`: `handle`, `tag`, `level` (part 0, chapter 1, section 2... subparagraph 6), `title`, `labels`, `index` (position among the top-level blocks), `chars` (size to the next section), `hash`; also `total`, `next_start` (continue with `start`). Sections are found also in a concatenation (`<section|A><label|x>` and the LaTeX importer make `(concat (section ..) (label ..))`) |
 | `read` | `document`, `node?` (a handle), `format?` (`text` default, `texmacs`, `stree`, `latex`, `markdown`), `max_size?` (characters, default 12000, 200 to 400000), `start?` | `content`, `hash`, `tag`, `truncated`, and for a document or a `document` node `start`, `end`, `blocks`, `next_start` (continue with `start`) and `children` (handle, index, tag, hash, preview, at most 200); for another node the first 50 children |
 | `find` | `document`, `query`, `limit?` (50) | `count`, `truncated`, `matches`: handle, tag, hash, `section` (the title of the section it is in), `context` |
-| `get_references` | `document` | `labels` (name, handle of the block that holds it, section), `references` (name, tag, handle, `defined`), `citations` (key, handle), `broken_references`, `duplicate_labels` |
+| `get_references` | `document`, `limit?` (200), `start?` | `labels` (name, handle of the block that holds it, section), `references` (name, tag, handle, `defined`), `citations` (key, handle), `broken_references`, `duplicate_labels`; `labels_total`, `references_total`, `citations_total`, `truncated` (`limit` and `start` apply to the three lists) |
 
 Notes:
 
@@ -107,6 +129,12 @@ Notes:
   limit is cut as text, at a character of UTF-8. A `texmacs` or `stree` read of
   the whole document in pieces, one after another with `start`, concatenates
   to the whole.
+- **Arguments** of the wrong type (a node that is not a string, `max_size` that
+  is not an integer, `arguments` that is not an object) are JSON-RPC errors
+  -32602; an empty `tag:`, `label:` or `section:` is a tool error.
+- **Texts.** Inside, strings are Cork; the client gets UTF-8 with the newlines and
+  tabs as they are (`cork->utf8` would map them to other characters). The
+  converters to Markdown and verbatim text already give UTF-8, LaTeX gives ASCII.
 - **Formats.** `texmacs` is the syntax of a `.tm` snippet (exact) in ASCII: a
   Cork character above 127 is written `\<#e9\>`. `stree` is the Scheme form with
   the strings in UTF-8. `latex` and `markdown` use the converters of the build
@@ -141,6 +169,9 @@ the work folder).
 | `shared` | a second headless TeXmacs hosts the file (`host-live.scm`, using `tests/shared/lib.scm`); the MCP server lists it as open elsewhere, joins it, reads the host's live edit through the handle it had, then a deletion; the handle of the deleted block is an error |
 | `mcp-host` | the MCP server hosts the file; another TeXmacs joins (`host-join.scm`) and edits; the MCP server reads the edit |
 | `unshared` | the preference off (the default): not shared, nothing listed |
+| `launcher` | the same through `TeXmacs/bin/texmacs` |
+| `robust` | non-ASCII and newlines in every format and in the file name, a star in a name, colons refused, `TEXMACS_MCP_ROOTS` (outside file, `/etc/passwd`, `..`, a symbolic link), sections in concatenations, bad arguments and messages, 200000 nested arrays, a 34 MB line |
+| `outputs` | the outline and the references cut and continued; the server ends when the client is gone |
 
 ## Decisions and open points
 

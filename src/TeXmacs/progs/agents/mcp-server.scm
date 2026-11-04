@@ -64,24 +64,36 @@
         ((func? t 'json-boolean 1) (== (cadr t) "true"))
         (else default)))
 
+(define json-max-depth 512)
+
 (define (json-balanced? s)
-  ;; do the brackets and quotes of @s match? (the reader of C++ is lenient:
-  ;; it reads some text which is not JSON, so that a message which is cut
-  ;; or garbled is found here)
+  ;; is @s one object or array, with its brackets and quotes matching, nested
+  ;; at most json-max-depth deep, and nothing after it? (The reader of C++ is
+  ;; lenient: it reads some text which is not JSON, and it crashes on a
+  ;; nesting of hundreds of thousands of levels; this is checked first.)
   (let ((n (string-length s)))
-    (let loop ((i 0) (depth 0) (in-string? #f))
+    (let loop ((i 0) (depth 0) (in-string? #f) (state 'start))
+      ;; state: start (nothing yet), open (inside the value), done (closed)
       (if (>= i n)
-          (and (== depth 0) (not in-string?))
+          (and (== state 'done) (not in-string?))
           (let ((c (string-ref s i)))
             (cond (in-string?
-                   (cond ((char=? c #\\) (loop (+ i 2) depth #t))
-                         ((char=? c #\") (loop (+ i 1) depth #f))
-                         (else (loop (+ i 1) depth #t))))
-                  ((char=? c #\") (loop (+ i 1) depth #t))
-                  ((or (char=? c #\{) (char=? c #\[)) (loop (+ i 1) (+ depth 1) #f))
-                  ((or (char=? c #\}) (char=? c #\]))
-                   (and (> depth 0) (loop (+ i 1) (- depth 1) #f)))
-                  (else (loop (+ i 1) depth #f))))))))
+                   (cond ((char=? c #\\) (loop (+ i 2) depth #t state))
+                         ((char=? c #\") (loop (+ i 1) depth #f state))
+                         (else (loop (+ i 1) depth #t state))))
+                  ((memv c '(#\space #\tab #\newline #\return))
+                   (loop (+ i 1) depth #f state))
+                  ((== state 'done) #f)
+                  ((and (== state 'start) (not (memv c '(#\{ #\[)))) #f)
+                  ((char=? c #\") (loop (+ i 1) depth #t state))
+                  ((memv c '(#\{ #\[))
+                   (and (< depth json-max-depth)
+                        (loop (+ i 1) (+ depth 1) #f 'open)))
+                  ((memv c '(#\} #\]))
+                   (and (> depth 0)
+                        (loop (+ i 1) (- depth 1) #f
+                              (if (== depth 1) 'done 'open))))
+                  (else (loop (+ i 1) depth #f state))))))))
 
 (define (json-parse s)
   (and (string? s) (!= s "") (json-balanced? s)
@@ -112,7 +124,24 @@
 ;; Texts: Cork inside, utf8 outside
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (u8 s) (cork->utf8 s))
+(define (u8 s)
+  ;; the Cork string @s in utf8; the newlines and tabs stay as they are
+  ;; (cork->utf8 maps the bytes 10 and 9 to other characters)
+  (define (has-ctl?)
+    (let loop ((i 0))
+      (and (< i (string-length s))
+           (or (memv (string-ref s i) '(#\newline #\tab))
+               (loop (+ i 1))))))
+  (if (not (has-ctl?))
+      (cork->utf8 s)
+      (let loop ((i 0) (from 0) (acc '()))
+        (define (seg) (cork->utf8 (substring s from i)))
+        (cond ((>= i (string-length s))
+               (apply string-append (reverse (cons (seg) acc))))
+              ((memv (string-ref s i) '(#\newline #\tab))
+               (loop (+ i 1) (+ i 1)
+                     (cons (string (string-ref s i)) (cons (seg) acc))))
+              (else (loop (+ i 1) from acc))))))
 
 (define (continuation-byte? c)
   (let ((b (char->integer c))) (and (>= b 128) (< b 192))))
@@ -219,6 +248,12 @@
       (utf8->cork (squeeze (convert (tm->stree t) "texmacs-stree" "verbatim-snippet"))))
     (lambda args "")))
 
+(define (first-text t)
+  (if (> (tree-arity t) 0) (node-text (tree-ref t 0)) ""))
+
+(define (last-text t)
+  (if (> (tree-arity t) 0) (node-text (tree-ref t (- (tree-arity t) 1))) ""))
+
 (define (ntext t)
   ;; the same in utf8 (what the client gets)
   (u8 (node-text t)))
@@ -238,22 +273,21 @@
          (join-texts (map node-text (tree-children t)) "\n"))
         ((in? (tree-label t) math-tags) (math-text t))
         ((in? (tree-label t) invisible-tags) "")
-        ((tm-is? t 'with) (node-text (tree-ref t (- (tree-arity t) 1))))
+        ((tm-is? t 'with) (last-text t))
         ((tm-is? t 'table)
          (join-texts (map node-text (tree-children t)) "\n"))
         ((tm-is? t 'row)
          (join-texts (map node-text (tree-children t)) " | "))
         ((in? (tree-label t) '(reference eqref pageref))
-         (string-append "(ref " (node-text (tree-ref t 0)) ")"))
+         (string-append "(ref " (first-text t) ")"))
         ((in? (tree-label t) '(cite nocite cite-detail))
          (string-append "[" (join-texts (map node-text (tree-children t)) ", ")
                         "]"))
         ((in? (tree-label t) '(hlink href))
-         (node-text (tree-ref t 0)))
+         (first-text t))
         ((in? (tree-label t) '(image postscript postscript*))
          "[image]")
-        ((tm-is? t 'tformat)
-         (node-text (tree-ref t (- (tree-arity t) 1))))
+        ((tm-is? t 'tformat) (last-text t))
         ((in? (tree-label t) '(doc-data))
          (join-texts (map node-text (tree-children t)) "\n"))
         (else
@@ -298,20 +332,67 @@
            (with p (canonical-path ref)
              (list-find mcp-docs (lambda (d) (== (doc-path d) p)))))))
 
+(define (mcp-roots)
+  ;; the folders the agent may open files in (TEXMACS_MCP_ROOTS, separated
+  ;; by colons, canonical), or #f for no limit
+  (let ((e (getenv "TEXMACS_MCP_ROOTS")))
+    (and e (!= e "")
+         (map (lambda (r)
+                (let ((c (canonical-path r)))
+                  (if (and (> (string-length c) 1)
+                           (string-ends? c "/"))
+                      (substring c 0 (- (string-length c) 1))
+                      c)))
+              (list-filter (string-tokenize-by-char e #\:)
+                           (lambda (r) (!= r "")))))))
+
+(define (path-allowed? p)
+  ;; may the file with the canonical path @p be opened?
+  (let ((roots (mcp-roots)))
+    (or (not roots)
+        (list-find roots
+                   (lambda (r)
+                     (or (== r "/") (== p r)
+                         (string-starts? p (string-append r "/"))))))))
+
+(define (path-url path)
+  ;; the url of the file @path. (A colon separates the alternatives of a
+  ;; path in a url of TeXmacs: a name that has one cannot be written as a
+  ;; url, so that open-doc! refuses it. Wildcards in a name are plain.)
+  (system->url path))
+
+(define (colon-in-path? path)
+  ;; (after the letter of a drive, as in C:\dir)
+  (let ((rest (if (and (> (string-length path) 1) (== (string-ref path 1) #\:))
+                  (substring path 2 (string-length path))
+                  path)))
+    (>= (string-search-forwards ":" 0 rest) 0)))
+
+(define (find-buffer u)
+  ;; the buffer with the url @u. (buffer-exists? takes a name with a
+  ;; wildcard, as a*b.tm, for a pattern.)
+  (let ((name (url->string u)))
+    (list-find (buffer-list) (lambda (b) (== (url->string b) name)))))
+
 (define (open-doc! path)
   (let* ((p (canonical-path path)) (old (find-doc path)))
     (cond (old old)
-          ((not (url-exists? (string->url path)))
+          ((colon-in-path? path)
+           (tool-error "a path with a colon (:) cannot be opened: TeXmacs urls use it as a separator"))
+          ((not (path-allowed? p))
+           (tool-error (string-append "not allowed: " path
+                                      " is outside the folders of this server")))
+          ((not (url-exists? (path-url path)))
            (tool-error (string-append "no such file: " path)))
           (else
-            (let ((u (string->url path)))
-              (when (not (buffer-exists? u))
-                (load-buffer u))
-              (when (not (buffer-exists? u))
+            (let* ((u0 (path-url path))
+                   (bu (or (find-buffer u0)
+                           (begin (load-buffer u0) (find-buffer u0)))))
+              (when (not bu)
                 (tool-error (string-append "could not open " path)))
               (set! mcp-doc-count (+ mcp-doc-count 1))
               (let ((d (list (string-append "d" (number->string mcp-doc-count))
-                             u p)))
+                             bu p)))
                 (set! mcp-docs (append mcp-docs (list d)))
                 d))))))
 
@@ -345,7 +426,7 @@
   (let ((u (doc-url d)))
     (obj "document" (doc-id d)
          "path" (doc-path d)
-         "file" (u8 (buffer-get-title u))
+         "file" (buffer-get-title u)
          "title" (let ((t (title-of-document d))) (if t t jnull))
          "style" (let ((s (tm->stree (buffer-get-style u))))
                    (arr (map u8 (cond ((string? s) (list s))
@@ -478,13 +559,27 @@
                    (else (find (cdr c))))))
           (else (loop (cdr l))))))
 
+(define (find-section t)
+  ;; the section in the block @t: the block itself, or the first one in a
+  ;; concatenation or nested document (a section followed by its label is
+  ;; a concatenation)
+  (cond ((tree-atomic? t) #f)
+        ((section-level t) t)
+        ((or (tm-is? t 'concat) (tm-is? t 'document))
+         (let loop ((l (tree-children t)))
+           (cond ((null? l) #f)
+                 ((find-section (car l)))
+                 (else (loop (cdr l))))))
+        (else #f)))
+
 (define (outline-entries d)
-  ;; ((index level node) ...) of the sections in the body
+  ;; ((index level node block) ...) of the sections in the body
   (let loop ((i 0) (l (tree-children (doc-body d))) (acc '()))
     (cond ((null? l) (reverse acc))
-          ((section-level (car l))
-           (loop (+ i 1) (cdr l)
-                 (cons (list i (section-level (car l)) (car l)) acc)))
+          ((find-section (car l))
+           => (lambda (sec)
+                (loop (+ i 1) (cdr l)
+                      (cons (list i (section-level sec) sec (car l)) acc))))
           (else (loop (+ i 1) (cdr l) acc)))))
 
 (define (section-of d t)
@@ -512,7 +607,7 @@
           ((== fmt "latex")
            (u8 (convert st "texmacs-stree" "latex-snippet")))
           ((== fmt "markdown")
-           (u8 (convert st "texmacs-stree" "markdown-snippet")))
+           (convert st "texmacs-stree" "markdown-snippet"))
           (else (tool-error (string-append "unknown format " fmt))))))
 
 (define (convert-checked t fmt)
@@ -570,10 +665,11 @@
                           "pid" (num (caddr e))))
                    (list-filter (shared-files-in-use)
                                 (lambda (e)
-                                  (not (find-doc (car e))))))))))
+                                  (and (path-allowed? (car e))
+                                       (not (find-doc (car e)))))))))))
 
 (define (tool-open-document args)
-  (let ((path (jstring (jref args "path"))))
+  (let ((path (opt-string args "path" #f)))
     (when (not path) (tool-error "the argument `path' is needed"))
     (when (not (absolute-path? path))
       (tool-error "the path must be absolute"))
@@ -581,17 +677,42 @@
       (doc-refresh! d)
       (doc-info d))))
 
+(define default-list-limit 300)
+
+(define (opt-int args key default lo hi)
+  ;; an integer argument, between lo and hi, or the default
+  (let ((v (jref args key)))
+    (cond ((or (not v) (jnull? v)) default)
+          ((jint v) (min hi (max lo (jint v))))
+          (else (param-error (string-append "the argument `" key
+                                            "' must be an integer"))))))
+
+(define (opt-string args key default)
+  (let ((v (jref args key)))
+    (cond ((or (not v) (jnull? v)) default)
+          ((string? v) v)
+          (else (param-error (string-append "the argument `" key
+                                            "' must be a string"))))))
+
 (define (tool-get-outline args)
-  (let* ((d (require-doc (jstring (jref args "document")))))
+  (let* ((d (require-doc (opt-string args "document" #f)))
+         (limit (opt-int args "limit" default-list-limit 1 2000))
+         (start (opt-int args "start" 0 0 1000000000)))
     (doc-refresh! d)
-    (let ((entries (outline-entries d)) (body (doc-body d)))
+    (let* ((entries (outline-entries d)) (body (doc-body d))
+           (total (length entries))
+           (start (min start total))
+           (end (min total (+ start limit))))
       (obj "document" (doc-id d)
            "title" (let ((t (title-of-document d))) (if t t jnull))
            "hash" (hash-short body)
            "blocks" (num (tree-arity body))
+           "total" (num total)
+           "start" (num start)
+           "next_start" (if (< end total) (num end) jnull)
            "sections"
-           (arr (let loop ((l entries) (acc '()))
-                  (if (null? l)
+           (arr (let loop ((l (list-tail entries start)) (k start) (acc '()))
+                  (if (or (null? l) (>= k end))
                       (reverse acc)
                       (let* ((e (car l)) (t (caddr e))
                              (next (if (null? (cdr l))
@@ -601,12 +722,12 @@
                                       (map estimate-size
                                            (sublist (tree-children body)
                                                     (car e) next)))))
-                        (loop (cdr l)
+                        (loop (cdr l) (+ k 1)
                               (cons (obj "handle" (make-handle! d t)
                                          "tag" (node-tag t)
                                          "level" (num (cadr e))
                                          "title" (ntext t)
-                                         "labels" (arr (tree-labels t))
+                                         "labels" (arr (tree-labels (cadddr e)))
                                          "index" (num (car e))
                                          "chars" (num chars)
                                          "hash" (hash-short t))
@@ -622,12 +743,11 @@
 (define default-max-size 12000)
 
 (define (tool-read args)
-  (let* ((d (require-doc (jstring (jref args "document"))))
-         (fmt (or (jstring (jref args "format")) "text"))
-         (max-size (min 400000 (max 200 (or (jint (jref args "max_size"))
-                                              default-max-size))))
-         (start (max 0 (or (jint (jref args "start")) 0)))
-         (h (jstring (jref args "node"))))
+  (let* ((d (require-doc (opt-string args "document" #f)))
+         (fmt (opt-string args "format" "text"))
+         (max-size (opt-int args "max_size" default-max-size 200 400000))
+         (start (opt-int args "start" 0 0 1000000000))
+         (h (opt-string args "node" #f)))
     (when (not (member fmt read-formats))
       (tool-error (string-append "unknown format " fmt ", use one of: "
                                  (string-recompose read-formats ", "))))
@@ -752,11 +872,13 @@
        "context" (squeeze (u8 context))))
 
 (define (tool-find args)
-  (let* ((d (require-doc (jstring (jref args "document"))))
-         (query (jstring (jref args "query")))
-         (limit (min 500 (max 1 (or (jint (jref args "limit")) find-limit)))))
+  (let* ((d (require-doc (opt-string args "document" #f)))
+         (query (opt-string args "query" #f))
+         (limit (opt-int args "limit" find-limit 1 500)))
     (when (or (not query) (== query ""))
       (tool-error "the argument `query' is needed"))
+    (when (member query '("tag:" "label:" "section:"))
+      (tool-error (string-append "nothing after `" query "'")))
     (doc-refresh! d)
     (let* ((body (doc-body d))
            (cq (utf8->cork query))
@@ -804,7 +926,9 @@
 (define citation-tags '(cite nocite cite-detail))
 
 (define (tool-get-references args)
-  (let* ((d (require-doc (jstring (jref args "document")))))
+  (let* ((d (require-doc (opt-string args "document" #f)))
+         (limit (opt-int args "limit" 200 1 2000))
+         (start (opt-int args "start" 0 0 1000000000)))
     (doc-refresh! d)
     (let* ((body (doc-body d))
            (labels (append-map (lambda (l) (if (and (== (tree-arity l) 1)
@@ -831,39 +955,56 @@
                               (lambda (k) (!= k "")))))
                       (find-tags body tag)))
                    citation-tags))
-           (names (map car labels))
-           (dups (list-filter (list-remove-duplicates names)
-                              (lambda (n) (> (length (list-filter names (lambda (m) (== m n)))) 1)))))
+           (counts (make-ahash-table))
+           (known (for (e labels)
+                    (ahash-set! counts (car e)
+                                (+ 1 (or (ahash-ref counts (car e)) 0)))))
+           (defined? (lambda (n) (and (ahash-ref counts n) #t)))
+           (dups (list-remove-duplicates
+                  (map car (list-filter labels
+                                        (lambda (e) (> (ahash-ref counts (car e)) 1))))))
+           (broken (list-remove-duplicates
+                    (map car (list-filter refs (lambda (e) (not (defined? (car e))))))))
+           (page (lambda (l)
+                   (if (>= start (length l)) '()
+                       (sublist l start (min (length l) (+ start limit))))))
+           (more? (lambda (l) (> (length l) (+ start limit)))))
       (obj "document" (doc-id d)
+           "start" (num start)
+           "limit" (num limit)
+           "truncated" (bool (or (more? labels) (more? refs) (more? cites)
+                                 (> (length broken) limit) (> (length dups) limit)))
+           "labels_total" (num (length labels))
+           "references_total" (num (length refs))
+           "citations_total" (num (length cites))
            "labels"
            (arr (map (lambda (e)
                        (obj "name" (u8 (car e))
                             "handle" (make-handle! d (block-of (cdr e)))
                             "section" (let ((s (section-of d (cdr e)))) (if s s jnull))))
-                     labels))
+                     (page labels)))
            "references"
            (arr (map (lambda (e)
                        (obj "name" (u8 (car e))
                             "tag" (node-tag (cdr e))
                             "handle" (make-handle! d (block-of (cdr e)))
-                            "defined" (bool (member (car e) names))))
-                     refs))
+                            "defined" (bool (defined? (car e)))))
+                     (page refs)))
            "citations"
            (arr (map (lambda (e)
                        (obj "key" (u8 (car e))
                             "handle" (make-handle! d (block-of (cdr e)))))
-                     cites))
-           "broken_references"
-           (arr (list-remove-duplicates
-                 (map (lambda (e) (u8 (car e)))
-                      (list-filter refs (lambda (e) (not (member (car e) names)))))))
-           "duplicate_labels" (arr (map u8 dups))))))
+                     (page cites)))
+           "broken_references" (arr (map u8 (sublist broken 0 (min limit (length broken)))))
+           "duplicate_labels" (arr (map u8 (sublist dups 0 (min limit (length dups)))))))))
 
 (define (list-remove-duplicates l)
-  (let loop ((l l) (acc '()))
-    (cond ((null? l) (reverse acc))
-          ((member (car l) acc) (loop (cdr l) acc))
-          (else (loop (cdr l) (cons (car l) acc))))))
+  (let ((seen (make-ahash-table)))
+    (let loop ((l l) (acc '()))
+      (cond ((null? l) (reverse acc))
+            ((ahash-ref seen (car l)) (loop (cdr l) acc))
+            (else (ahash-set! seen (car l) #t)
+                  (loop (cdr l) (cons (car l) acc)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The table of tools
@@ -891,7 +1032,10 @@
          tool-open-document)
    (list "get_outline" "Outline of a document"
          "The sections of a document with their level, title, labels, a handle, the index of the block and an estimate of the size in characters: a cheap map of a long document, to decide what to read."
-         (schema (list (cons "document" document-prop)) '("document"))
+         (schema (list (cons "document" document-prop)
+                       (cons "limit" (prop "integer" "Most sections to return (default 300)."))
+                       (cons "start" (prop "integer" "Index of the first section, to continue (next_start).")))
+                 '("document"))
          tool-get-outline)
    (list "read" "Read a document or a node"
          "Reads the whole document (no `node'), or the node of a handle, in a format: text (the visible text, cheapest), texmacs (the .tm syntax of a snippet, exact), stree (the Scheme form, exact), latex or markdown (converted, lossy for general documents). Long documents are cut at `max_size' characters between blocks: `next_start' tells where to continue (argument `start'). The result has handles for the blocks it shows, with a hash of their content and a preview."
@@ -911,7 +1055,10 @@
          tool-find)
    (list "get_references" "Labels, references and citations"
          "The labels (with the block that holds each), the references and the citations of a document, the references to labels which do not exist, and the labels defined twice."
-         (schema (list (cons "document" document-prop)) '("document"))
+         (schema (list (cons "document" document-prop)
+                       (cons "limit" (prop "integer" "Most items per list (default 200)."))
+                       (cons "start" (prop "integer" "Index of the first item of each list, to continue.")))
+                 '("document"))
          tool-get-references)))
 
 (define (tool-name t) (car t))
@@ -949,25 +1096,40 @@
 (define (send! msg)
   (let ((s (json-write msg)))
     (log-debug "-> " (utf8-prefix s 300))
-    (mcp-stdout-write (string-append s "\n"))))
+    (when (not (mcp-stdout-write (string-append s "\n")))
+      ;; the client is gone
+      (mcp-log "cannot write to the client")
+      (mcp-finish!))))
 
 (define (text-result text error?)
   (obj "content" (arr (list (obj "type" "text" "text" text)))
        "isError" (bool error?)))
 
+(define mcp-param-error-message #f)
+
+(define (param-error msg)
+  ;; an argument of the wrong type: a JSON-RPC error (-32602)
+  (set! mcp-param-error-message msg)
+  (throw 'mcp-param-error))
+
 (define (call-tool name args)
+  ;; the result of the tool @name, 'unknown, or (invalid . message)
   (let ((tool (list-find mcp-tools (lambda (t) (== (car t) name)))))
     (if (not tool)
         'unknown
         (catch #t
           (lambda ()
+            (set! mcp-param-error-message #f)
             (text-result (json-write ((list-ref tool 4) args)) #f))
           (lambda args*
-            (if (and (pair? args*) (eq? (car args*) 'mcp-tool-error))
-                (text-result mcp-tool-error-message #t)
-                (begin
-                  (mcp-log "error in tool " name ": " args*)
-                  (text-result (string-append "internal error in " name) #t))))))))
+            (cond ((and (pair? args*) (eq? (car args*) 'mcp-tool-error))
+                   (text-result mcp-tool-error-message #t))
+                  ((and (pair? args*) (eq? (car args*) 'mcp-param-error))
+                   (cons 'invalid mcp-param-error-message))
+                  (else
+                    (mcp-log "error in tool " name ": " args*)
+                    (text-result (string-append "internal error in " name)
+                                 #t))))))))
 
 (define (handle-request id method params)
   ;; the response to the request @method, an stree
@@ -987,17 +1149,27 @@
     ((== method "tools/list") (result-message id (tools-list-result)))
     ((== method "tools/call")
      (let* ((name (jstring (jref params "name")))
-            (args (let ((a (jref params "arguments"))) (if (func? a 'attr) a (obj))))
-            (r (and name (call-tool name args))))
+            (a (jref params "arguments"))
+            (args (if (func? a 'attr) a (obj))))
        (cond ((not name) (error-message id -32602 "missing tool name"))
-             ((eq? r 'unknown)
-              (error-message id -32602 (string-append "unknown tool: " name)))
-             (else (result-message id r)))))
-    ((or (== method "resources/list"))
+             ((and a (not (jnull? a)) (not (func? a 'attr)))
+              (error-message id -32602 "the arguments must be an object"))
+             (else
+               (let ((r (call-tool name args)))
+                 (cond ((eq? r 'unknown)
+                        (error-message id -32602
+                                       (string-append "unknown tool: " name)))
+                       ((and (pair? r) (eq? (car r) 'invalid))
+                        (error-message id -32602 (cdr r)))
+                       (else (result-message id r))))))))
+    ((== method "resources/list")
      (result-message id (obj "resources" (arr '()))))
     ((== method "prompts/list")
      (result-message id (obj "prompts" (arr '()))))
     (else (error-message id -32601 (string-append "method not found: " method)))))
+
+(define (valid-id? id)
+  (or (string? id) (func? id 'json-number 1)))
 
 (tm-define (mcp-handle-line line)
   (:synopsis "Handle a message (a line of JSON) of the client, give the response")
@@ -1007,10 +1179,16 @@
           ((not (func? msg 'attr))
            (error-message #f -32600 "invalid request"))
           (else
-            (let ((id (jref msg "id")) (method (jstring (jref msg "method"))))
-              (cond ((not method)
+            (let ((id (jref msg "id")) (method (jref msg "method")))
+              (cond ((and id (not (jnull? id)) (not (valid-id? id)))
+                     (error-message #f -32600 "invalid request: bad id"))
+                    ((and (not method)
+                          (or (jref msg "result") (jref msg "error")))
                      ;; a response to a request of ours (we make none)
                      #f)
+                    ((not (string? method))
+                     (error-message (and (valid-id? id) id) -32600
+                                    "invalid request: no method"))
                     ((or (not id) (jnull? id))
                      (log-debug "notification " method)
                      #f)
@@ -1029,66 +1207,96 @@
 ;; The loop
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define mcp-input "")
+;; The pieces of the line being read are kept in a list and only the new piece
+;; is searched for a newline, so that a long line costs no more than its length.
+
+(define mcp-chunks '())                     ; the pieces of the line (reversed)
+(define mcp-chunks-length 0)
+(define mcp-skipping? #f)                   ; after a line which was too long
 (define mcp-running? #f)
 (define mcp-max-line 33554432)
+(define mcp-last-activity 0)
+
+(define (strip-cr line)
+  (if (and (> (string-length line) 0)
+           (== (string-ref line (- (string-length line) 1)) #\return))
+      (substring line 0 (- (string-length line) 1))
+      line))
 
 (define (process-line! line)
-  (let ((line (if (and (> (string-length line) 0)
-                       (== (string-ref line (- (string-length line) 1)) #\return))
-                  (substring line 0 (- (string-length line) 1))
-                  line)))
+  (let ((line (strip-cr line)))
     (when (!= line "")
       (let ((r (mcp-handle-line line)))
         (when r (send! r))))))
 
-(define (process-input!)
-  ;; the complete lines of the input are handled
-  (let loop ()
-    (let ((i (string-search-forwards "\n" 0 mcp-input)))
-      (cond ((>= i 0)
-             (let ((line (substring mcp-input 0 i)))
-               (set! mcp-input (substring mcp-input (+ i 1)
-                                          (string-length mcp-input)))
-               (process-line! line)
-               (loop)))
-            ((> (string-length mcp-input) mcp-max-line)
-             (mcp-log "a line is too long, dropped")
-             (set! mcp-input "")
-             (send! (error-message #f -32600 "message too long")))))))
+(define (take-line! piece)
+  ;; the line that ends with the beginning of @piece
+  (let ((line (apply string-append (reverse (cons piece mcp-chunks)))))
+    (set! mcp-chunks '())
+    (set! mcp-chunks-length 0)
+    line))
+
+(define (feed! s)
+  ;; @s was read from the input
+  (let loop ((s s))
+    (when (!= s "")
+      (let ((i (string-search-forwards "\n" 0 s)))
+        (cond (mcp-skipping?
+               ;; (the end of a line which was dropped)
+               (when (>= i 0)
+                 (set! mcp-skipping? #f)
+                 (loop (substring s (+ i 1) (string-length s)))))
+              ((>= i 0)
+               (let ((line (take-line! (substring s 0 i))))
+                 (process-line! line)
+                 (loop (substring s (+ i 1) (string-length s)))))
+              (else
+                (set! mcp-chunks (cons s mcp-chunks))
+                (set! mcp-chunks-length (+ mcp-chunks-length (string-length s)))
+                (when (> mcp-chunks-length mcp-max-line)
+                  (mcp-log "a line is too long, dropped")
+                  (set! mcp-chunks '())
+                  (set! mcp-chunks-length 0)
+                  (set! mcp-skipping? #t)
+                  (send! (error-message #f -32600 "message too long")))))))))
 
 (define (mcp-finish!)
-  (mcp-log "end of input, exit")
-  (for (d mcp-docs)
-    (catch #t
-      (lambda () (buffer-close (doc-url d)))
-      (lambda args (noop))))
-  (set! mcp-docs '())
-  (set! mcp-running? #f)
-  (quit-TeXmacs))
+  (when mcp-running?
+    (mcp-log "exit")
+    (set! mcp-running? #f)
+    (for (d mcp-docs)
+      (catch #t
+        (lambda () (buffer-close (doc-url d)))
+        (lambda args (noop))))
+    (set! mcp-docs '())
+    (quit-TeXmacs)))
 
 (define (mcp-tick)
-  (catch #t
-    (lambda ()
-      (let ((s (mcp-stdin-read)))
-        (when (!= s "")
-          (set! mcp-input (string-append mcp-input s)))
-        (process-input!)
-        (cond ((and (mcp-stdin-eof?) (< (string-search-forwards "\n" 0 mcp-input) 0))
-               (when (!= mcp-input "")
-                 (let ((rest mcp-input))
-                   (set! mcp-input "")
-                   (process-line! rest)))
-               (mcp-finish!)
-               #t)
-              (else 10))))
-    (lambda args
-      (mcp-log "error in the loop: " args)
-      10)))
+  (if (not mcp-running?)
+      #t
+      (catch #t
+        (lambda ()
+          (let ((s (mcp-stdin-read)))
+            (when (!= s "")
+              (set! mcp-last-activity (texmacs-time))
+              (feed! s))
+            (cond ((not mcp-running?) #t)
+                  ((mcp-stdin-eof?)
+                   (when (and (not mcp-skipping?) (> mcp-chunks-length 0))
+                     (process-line! (take-line! "")))
+                   (mcp-finish!)
+                   #t)
+                  ;; (polling is cheaper when nothing has come for a while)
+                  ((< (- (texmacs-time) mcp-last-activity) 2000) 10)
+                  (else 50))))
+        (lambda args
+          (mcp-log "error in the loop: " args)
+          10))))
 
 (tm-define (mcp-server-start)
   (:synopsis "Serve MCP on the standard input and output, until the input ends")
   (when (not mcp-running?)
     (set! mcp-running? #t)
+    (set! mcp-last-activity (texmacs-time))
     (mcp-log "started, " (texmacs-version))
     (exec-delayed-pause mcp-tick)))

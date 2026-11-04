@@ -23,7 +23,8 @@ have the details, and the problems go to the
   `texmacs`, `stree`, `latex` or `markdown`, cut at a size, with handles and
   hashes of the blocks), `find` and `get_references`. With shared files on, a
   file the person has open is joined and the agent reads their latest edits.
-  See [mcp-server.md](mcp-server.md); tests in `tests/mcp`.
+  `TEXMACS_MCP_ROOTS` limits the folders it opens. See
+  [mcp-server.md](mcp-server.md); tests in `tests/mcp`.
 
 ## 3 November 2026
 

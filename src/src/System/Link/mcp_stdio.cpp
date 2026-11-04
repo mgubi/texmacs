@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
+#include <sys/stat.h>
 #endif
 
 static int  mcp_in = -1;        // the protocol input (the original stdin)
@@ -42,6 +43,13 @@ mcp_stdio_setup (string log_file) {
   int log= -1;
   if (N(log_file) != 0) {
     char* tmp= as_charp (log_file);
+    // (a log of more than 4 MB is kept as mcp.log.1, replacing the older one)
+    struct stat st;
+    if (stat (tmp, &st) == 0 && st.st_size > 4 * 1024 * 1024) {
+      char* old= as_charp (log_file * ".1");
+      rename (tmp, old);
+      tm_delete_array (old);
+    }
     log= open (tmp, O_WRONLY | O_CREAT | O_APPEND, 0600);
     tm_delete_array (tmp);
   }

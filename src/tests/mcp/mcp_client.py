@@ -14,6 +14,7 @@ import json, os, select, subprocess, sys, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.abspath(os.path.join(HERE, "..", ".."))
 BIN = os.path.join(TOP, "TeXmacs", "bin", "texmacs.bin")
+LAUNCHER = os.path.join(TOP, "TeXmacs", "bin", "texmacs")
 RSS_CAP = int(os.environ.get("TM_TEST_RSS_KB", "2000000"))
 TIMEOUT = int(os.environ.get("TM_TEST_TIMEOUT", "120"))
 
@@ -56,8 +57,8 @@ def watchdog():
 class Mcp:
     """A `texmacs --mcp' process and its protocol."""
 
-    def __init__(self, env, args=()):
-        self.p = subprocess.Popen([BIN, "--mcp"] + list(args), stdin=subprocess.PIPE,
+    def __init__(self, env, args=(), launcher=False):
+        self.p = subprocess.Popen([LAUNCHER if launcher else BIN, "--mcp"] + list(args), stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   env=env)
         procs.append(self.p)
@@ -528,8 +529,184 @@ def s_unshared(w):
     check("exit 0", m.close() == 0)
 
 
+
+def write_tm(path, body):
+    with open(path, "w") as f:
+        f.write("<TeXmacs|2.1.5>\n\n<style|<tuple|generic>>\n\n<\\body>\n" + body +
+                "</body>\n")
+
+
+def s_launcher(w):
+    """the launcher script TeXmacs/bin/texmacs keeps the standard input for --mcp"""
+    env, home = make_env(w, "A")
+    m = Mcp(env, launcher=True)
+    r = m.initialize()
+    check("through the launcher: initialize", r is not None and "result" in r)
+    r = m.request("ping")
+    check("through the launcher: ping", r is not None and r.get("result") == {})
+    check("through the launcher: exit 0", m.close() == 0)
+    check("through the launcher: only protocol lines", not m.bad_lines)
+
+
+def s_robust(w):
+    """text encodings, unusual paths, odd shapes, bad messages, limits"""
+    roots = os.path.join(w, "root")
+    os.makedirs(roots, exist_ok=True)
+    env, home = make_env(w, "A")
+    env["TEXMACS_MCP_ROOTS"] = roots
+    uni = os.path.join(roots, "sp é.tm")
+    write_tm(uni, "First line T\\<#E9\\>st \\<alpha\\>.\n\nSecond paragraph.\n\n"
+                  "<section|Caf\\<#E9\\>>\n\nBody after.\n")
+    weird = os.path.join(roots, "ok.tm:weird.tm")
+    write_tm(weird, "Weird name.\n")
+    star = os.path.join(roots, "a*b.tm")
+    write_tm(star, "Star name.\n")
+    os.makedirs(os.path.join(roots, "sp é:x"), exist_ok=True)
+    indir = os.path.join(roots, "sp é:x", "inner.tm")
+    write_tm(indir, "Inside.\n")
+    nested = os.path.join(roots, "nested.tm")
+    write_tm(nested, "<section|Intro><label|s1>\n\nText.\n\n<subsection|Sub><label|s2>\n\n"
+                     "More <reference|s1>.\n\n<reference>\n")
+    outside = os.path.join(w, "outside.tm")
+    write_tm(outside, "Outside the roots.\n")
+    m = Mcp(env)
+    m.initialize()
+    # encodings and newlines
+    e, v = m.tool("open_document", path=os.path.realpath(uni))
+    check("a name with a space and a non-ascii letter", not e and v["file"] == "sp é.tm")
+    for fmt in ("text", "latex", "markdown", "texmacs", "stree"):
+        e, t = m.tool("read", document="d1", format=fmt, max_size=100000)
+        c = t["content"] if not e else ""
+        check("read %s: no garbled characters" % fmt,
+              not e and "˙" not in c and "Ã" not in c and "¯" not in c)
+    e, t = m.tool("read", document="d1", format="text")
+    check("text: real newlines and utf8", not e and "\n" in t["content"] and "Tést α." in t["content"])
+    e, t = m.tool("read", document="d1", format="markdown")
+    check("markdown: real newlines and utf8", not e and "\n" in t["content"] and "Tést" in t["content"] and "# Café" in t["content"])
+    e, t = m.tool("read", document="d1", format="latex")
+    check("latex: real newlines", not e and "\n" in t["content"] and "\\section" in t["content"])
+    e, t = m.tool("read", document="d1", format="texmacs")
+    check("texmacs: real newlines, ascii", not e and "\n" in t["content"] and all(ord(ch) < 128 for ch in t["content"]))
+    e, t = m.tool("read", document="d1", format="text", max_size=300)
+    check("preview has no garbled newline", not e and all("˙" not in c["preview"] for c in t["children"]))
+    e, f = m.tool("find", document="d1", query="second")
+    check("find context has no garbled newline", not e and f["count"] == 1 and "˙" not in f["matches"][0]["context"])
+    e, o = m.tool("get_outline", document="d1")
+    check("outline title in utf8", not e and o["sections"][0]["title"] == "Café")
+    # paths
+    e, v = m.tool("open_document", path=os.path.realpath(star))
+    if not e:
+        e, t = m.tool("read", document=v["document"], format="text")
+    check("a star in the name is a plain character", not e and "Star name." in t["content"])
+    for name, path in (("a colon in the name", weird), ("a colon in a folder", indir)):
+        e, v = m.tool("open_document", path=os.path.realpath(path))
+        check(name + " is refused cleanly", e and "colon" in str(v))
+    # the roots
+    e, v = m.tool("open_document", path=os.path.realpath(outside))
+    check("a file outside the roots is refused", e and "not allowed" in str(v))
+    e, v = m.tool("open_document", path="/etc/passwd")
+    check("/etc/passwd is refused", e and "not allowed" in str(v))
+    e, v = m.tool("open_document", path=roots + "/../outside.tm")
+    check("a .. path out of the roots is refused", e and "not allowed" in str(v))
+    link = os.path.join(roots, "link.tm")
+    try:
+        os.symlink(os.path.realpath(outside), link)
+        e, v = m.tool("open_document", path=link)
+        check("a symbolic link out of the roots is refused", e and "not allowed" in str(v))
+    except OSError:
+        pass
+    e, v = m.tool("read", document=os.path.realpath(outside))
+    check("read by an outside path is refused", e and "not allowed" in str(v))
+    # sections in concatenations
+    e, v = m.tool("open_document", path=os.path.realpath(nested))
+    did = v["document"]
+    e, o = m.tool("get_outline", document=did)
+    secs = o["sections"] if not e else []
+    check("sections followed by labels are found", [x["title"] for x in secs] == ["Intro", "Sub"])
+    check("their labels and levels", secs and secs[0]["labels"] == ["s1"] and [x["level"] for x in secs] == [2, 3])
+    e, f = m.tool("find", document=did, query="section:sub")
+    check("find section: in that shape", not e and f["count"] == 1)
+    e, f = m.tool("find", document=did, query="More")
+    check("find: the section of a hit", not e and f["matches"][0]["section"] == "Sub")
+    e, t = m.tool("read", document=did, node=secs[0]["handle"], format="text")
+    check("a section handle reads", not e and "Intro" in t["content"])
+    e, r = m.tool("get_references", document=did)
+    check("a reference with no argument is harmless", not e and r["labels_total"] == 2)
+    # arguments
+    e, f = m.tool("find", document=did, query="tag:")
+    check("tag: with nothing is a clean error", e and "nothing after" in str(f))
+    r = m.request("tools/call", {"name": "read", "arguments": {"document": did, "node": 5}})
+    check("a node that is not a string: invalid params", r is not None and r.get("error", {}).get("code") == -32602)
+    r = m.request("tools/call", {"name": "read", "arguments": {"document": did, "max_size": "big"}})
+    check("max_size that is not an integer: invalid params", r is not None and r.get("error", {}).get("code") == -32602)
+    r = m.request("tools/call", {"name": "read", "arguments": [1]})
+    check("arguments that are not an object: invalid params", r is not None and r.get("error", {}).get("code") == -32602)
+    # bad messages
+    m.send_raw('{"jsonrpc":"2.0","id":{"a":1},"method":"ping"}\n')
+    r = m.read_msg()
+    check("an id that is an object: -32600", r is not None and r.get("error", {}).get("code") == -32600)
+    m.send_raw('{"jsonrpc":"2.0","id":7}\n')
+    r = m.read_msg()
+    check("no method: -32600", r is not None and r.get("error", {}).get("code") == -32600 and r.get("id") == 7)
+    m.send_raw('{"jsonrpc":"2.0","id":8,"method":5}\n')
+    r = m.read_msg()
+    check("a method that is not a string: -32600", r is not None and r.get("error", {}).get("code") == -32600)
+    m.send_raw('{"jsonrpc":"2.0","id":9,"method":"ping"} garbage\n')
+    r = m.read_msg()
+    check("garbage after the object: -32700", r is not None and r.get("error", {}).get("code") == -32700)
+    m.send_raw('{"jsonrpc":"2.0","id":9,"method":"ping"}{"x":1}\n')
+    r = m.read_msg()
+    check("a second object on the line: -32700", r is not None and r.get("error", {}).get("code") == -32700)
+    m.send_raw("[" * 200000 + "\n")
+    r = m.read_msg()
+    check("200000 nested arrays: an error, no crash", r is not None and "error" in r)
+    r = m.request("ping")
+    check("still alive after the nesting", r is not None and "result" in r)
+    # a line which is too long is dropped to its end
+    big = b'{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":"' + b"a" * (34 * 1024 * 1024) + b'"}}\n'
+    m.send_raw(big)
+    r = m.read_msg(60)
+    check("a line over 32 MB: error", r is not None and r.get("error", {}).get("code") == -32600)
+    r = m.request("ping", None, 30)
+    check("and nothing else is answered for it", r is not None and r.get("id") == m.n and "result" in r)
+    check("exit 0", m.close() == 0)
+    check("stdout carries only protocol lines", not m.bad_lines)
+
+
+def s_outputs(w):
+    """long lists are cut and can be continued; a client that is gone ends the server"""
+    env, home = make_env(w, "A")
+    f = os.path.join(w, "many.tm")
+    body = "".join("<section|S%d<label|l%d>>\n\nSee <reference|l%d> and <cite|k%d>.\n\n" % (i, i, i, i)
+                   for i in range(1, 61))
+    write_tm(f, body)
+    m = Mcp(env)
+    m.initialize()
+    m.tool("open_document", path=os.path.realpath(f))
+    e, o = m.tool("get_outline", document="d1", limit=25)
+    check("outline: limit", not e and len(o["sections"]) == 25 and o["total"] == 60 and o["next_start"] == 25)
+    e, o2 = m.tool("get_outline", document="d1", limit=25, start=o["next_start"])
+    check("outline: continues", not e and o2["sections"][0]["title"] == "S26")
+    e, r = m.tool("get_references", document="d1", limit=10)
+    check("references: limit", not e and len(r["labels"]) == 10 and r["labels_total"] == 60 and r["truncated"])
+    e, r = m.tool("get_references", document="d1", limit=10, start=55)
+    check("references: continues", not e and len(r["labels"]) == 5)
+    # the client goes away: the server notices that it cannot write and ends
+    m.p.stdout.close()
+    m.send_raw(json.dumps({"jsonrpc": "2.0", "id": 99, "method": "ping"}) + "\n")
+    try:
+        code = m.p.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        code = None
+    check("the server ends when it cannot write", code is not None)
+    if code is None:
+        m.p.kill()
+    big = os.path.join(home, "system", "mcp.log")
+    check("the log is small", os.path.getsize(big) < 4 * 1024 * 1024)
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
-             "mcp-host": s_mcp_host, "unshared": s_unshared}
+             "mcp-host": s_mcp_host, "unshared": s_unshared,
+             "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]
