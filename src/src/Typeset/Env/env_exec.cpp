@@ -2438,6 +2438,14 @@ edit_env_rep::exec_pattern (tree t) {
   url image= pattern_file (base_file_name, label);
   if (is_none (image)) {
     (void) picture_lookup ('q', label, image, 0, 0);
+    // the HTML export keeps a pattern whose image is not found here (the
+    // image may be where the page is served): the page shows it or not
+    if (env.contains ("html-keep-patterns") && N(t) >= 3) {
+      tree r (_PATTERN, label, exec_string (t[1]), exec_string (t[2]));
+      if (N(t) >= 4) r << exec (t[3]);
+      if (N(t) == 5) r << arg5;
+      return r;
+    }
     return pattern_fallback (base, env [BG_COLOR]);
   }
   int imw_pt, imh_pt;
