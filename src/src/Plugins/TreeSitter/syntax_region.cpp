@@ -1303,21 +1303,21 @@ highlight_region (syntax_region_rep* r, int query, array<int> colors,
   return r->hl_cols;
 }
 
-array<array<int> >
+array<array<array<int> > >
 syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          int injections, ts_injection_resolver resolve,
                          int epoch, array<int>* recoloured, bool* all) {
   // (see highlight_region; in a long region, the colours of its parts one
-  // after the other: each part colours the lines of its edits)
+  // after the other: each part colours the lines of its edits. They are
+  // given part by part: appending them into one array of the lines copied
+  // the lines before each part again, at each key, quadratic in the number
+  // of parts; and the caller only needs the lines which were coloured)
   array<syntax_region_rep*> rs= regions_of (root, language);
-  if (N(rs) == 1)
-    return highlight_region (rs[0], query, colors, injections, resolve,
-                             epoch, recoloured, all);
-  array<array<int> > cols;
+  array<array<array<int> > > parts (N(rs));
   for (int k= 0; k < N(rs); k++)
-    cols << highlight_region (rs[k], query, colors, injections, resolve,
-                              epoch, recoloured, all);
-  return cols;
+    parts[k]= highlight_region (rs[k], query, colors, injections, resolve,
+                                epoch, recoloured, all);
+  return parts;
 }
 
 /******************************************************************************

@@ -41,12 +41,15 @@ typedef bool (*ts_injection_resolver) (string name, int& language, int& query,
 // (a leaf) starts: the typesetting cuts the lines there (ts_highlight.cpp)
 #define TS_TOKEN_START (1 << 24)
 #define TS_COLOR_MASK (TS_TOKEN_START - 1)
-array<array<int> > syntax_region_highlight (tree region, int language,
-                                            int query, array<int> colors,
-                                            int injections= -1,
-                                            ts_injection_resolver resolve= NULL,
-                                            int epoch= 0,
-                                            array<int>* recoloured= NULL,
-                                            bool* all= NULL);
+// (the colours of the lines part by part, in the order of the lines: one
+// part, or the parts of a long region; the caller takes the lines which it
+// needs, without an array of all the lines made at each key)
+array<array<array<int> > > syntax_region_highlight (tree region, int language,
+                                                    int query, array<int> colors,
+                                                    int injections= -1,
+                                                    ts_injection_resolver resolve= NULL,
+                                                    int epoch= 0,
+                                                    array<int>* recoloured= NULL,
+                                                    bool* all= NULL);
 
 #endif // SYNTAX_REGION_H

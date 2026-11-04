@@ -19,6 +19,9 @@ have the details, and the problems go to the
   starts a line) no longer parses the whole file again at each key, and
   opening it parses it once instead of twice: a key in such a file of
   200000 lines took about 1 s, now 0.4 s.
+- **A key in a long program file** no longer copies the colours of all its
+  lines: about 11 ms less per key in a C file of 200000 lines (55 to 44 ms
+  as paragraphs, 17 to 10 ms as a block of lines, #798).
 
 ## 3 November 2026
 
