@@ -159,8 +159,9 @@
   (<source-link|ns_widget.mm|src/Plugins/NS/ns_widget.mm>), and the wait window is not shown.
   The option is read in <cpp|immediate_options> of
   <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>, as for the Qt
-  and Vue interfaces, and <TeXmacs> quits after the command line. The modal
-  dialogs (file choosers, questions, lists of fields, the color picker) are
+  and Vue interfaces, and <TeXmacs> quits after the commands given with
+  <verbatim|-x> or <verbatim|-c>. The modal dialogs (file choosers,
+  questions, lists of fields, the color picker, the print panel) are
   answered as cancelled, since nobody could answer them.
 
   <section|The renderer>

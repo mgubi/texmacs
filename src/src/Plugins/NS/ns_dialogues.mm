@@ -1021,7 +1021,8 @@ ns_printer_widget_rep::showDialog () {
   NSURL* u= [NSURL fileURLWithPath: to_nsstring_utf8 (concretize (pdf))];
   PDFDocument* d= [[[PDFDocument alloc] initWithURL: u] autorelease];
   bool done= false;
-  if (d) {
+  // headless: cancelled, as the other dialogs (nobody could answer the panel)
+  if (d && !is_headless ()) {
     NSPrintOperation* op=
       [d printOperationForPrintInfo: [NSPrintInfo sharedPrintInfo]
                         scalingMode: kPDFPrintPageScaleToFit autoRotate: YES];
@@ -1029,8 +1030,9 @@ ns_printer_widget_rep::showDialog () {
     [op setShowsProgressPanel: YES];
     done= [op runOperation];
   }
-  else call ("set-message", object ("Could not read the file for printing"),
-             object ("Print"));
+  else if (!d)
+    call ("set-message", object ("Could not read the file for printing"),
+          object ("Print"));
   if (pdf != file) remove (pdf);
   if (done && !is_nil (commandAfterExecution)) commandAfterExecution ();
 }
