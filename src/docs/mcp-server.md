@@ -278,18 +278,30 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     | `screens-bar` | bar of screens: numbers and the fixed command screens-switch-to |
     | `math-check` | packrat check of a math cell |
     | `math-check-table` | same for the cells of a table |
-    | `ext-tiled-items` | table of tiles |
-    | `ext-vertical-items` | table of items |
+    | `ext-vertical-items` | table of items, one row for each child |
     | `tmdoc-key` | the keys of a shortcut, rewritten |
     | `tmdoc-key*` | same |
     | `tmdoc-shortcut` | the shortcut bound to a command, rewritten |
     | `tmdoc-render-keys` | render-key trees |
     | `tmdoc-menu-font` | the font of the menus |
-    | `gui-tiled` | table of tiles in a tag named by argument 0 (name at argument 0) |
     | `gui-hlist-table` | table of a horizontal list, in a tag named by argument 0 (name at argument 0) |
     | `gui-vlist-table` | table of a vertical list, in a tag named by argument 0 (name at argument 0) |
-    | `tm-register-new-list-tag` | registers a symbol as a list tag |
+    | `ext-apply-on-paragraphs` | applies the macro named by argument 0 to the paragraphs of the tree (name at argument 0) |
+    | `ext-smart-ref` | smart references: picks the macro <type>-ref from the beginning or the end of each label (checked at the call: see smart-ref-ok?) |
 
+    A function that loops or allocates by a number taken from its arguments is not on the list
+    (`gui-tiled`, `ext-tiled-items`: zero columns loop for ever), nor is one with a global side
+    effect (`tm-register-new-list-tag`). The numbers and lengths that the content gives to a variable of
+    the environment (`with`) have at most 4 digits before the point and 6 after it.
+    *Definers.* A macro that assigns a name made of an argument (`new-theorem`, `new-remark`,
+    `new-exercise`, `new-figure`, `new-env`, `new-list`, `new-section`, `new-counter`...) has a place of the
+    kind `define` and is dangerous: the content may not define anything (`<new-remark|strong|...>`
+    would redefine `strong`). *smart-ref* (`ext-smart-ref`) picks the macro `<type>-ref` from the letters at the
+    beginning or the end of each label: it is accepted when the labels are written and the macros of those
+    names that exist are not dangerous. A `specific` for the formats `even` and `odd` (what the margin
+    notes of the journal styles make) is accepted after the expansion; an image of `local:$TEXMACS_PATH/misc/images/`
+    (the logo of the manuals) too. Links to absolute paths or with `..` are accepted as links (they
+    act only when clicked); the files read by `image`, `include` and the like are checked.
     The test `static` scans the macros of the standard styles and packages: every function of
     `extern` that they use is on this list, or its macro is dangerous or in `refused-style-macros`.
     A call by a computed name with a fixed beginning counts as dangerous when a macro that the

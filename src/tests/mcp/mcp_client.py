@@ -1885,7 +1885,7 @@ def s_static(w):
     def refused(label, d, tool, **args):
         h = hashof(d)
         e, r = m.tool(tool, document=d, **args)
-        ok = e and ("refused" in str(r) or "only relative" in str(r)) and hashof(d) == h
+        ok = e and ("refused" in str(r) or "only relative" in str(r) or "nothing was changed" in str(r)) and hashof(d) == h
         check("refused: %s" % label, ok)
         if not ok:
             print("    ", str(r)[:300])
@@ -2098,6 +2098,43 @@ def s_static(w):
     refused("tmfs help http", d, "insert", where="last", content="<hlink|x|tmfs://help/http/example.org/a>")
     refused("tmfs git", d, "insert", where="last", content="<hlink|x|tmfs://git/a>")
     accepted("tmfs help article", d, "insert", where="last", content="<hlink|x|tmfs://help/article/tm/doc/main/man-intro.en.tm>")
+    # 7c. (audit) work driven by data, definers, smart-ref, the notes in the margin
+    d = opendoc("  Text.\n", "generic|gui-button")
+    t0 = time.monotonic()
+    refused("tiled with 0 columns (a loop)", d, "insert", where="last", content='(tiled "0" "a" "b")', format="stree")
+    check("and it is refused at once (%.1f s)" % (time.monotonic() - t0), time.monotonic() - t0 < 10)
+    d = opendoc("  Text.\n", "generic|exam")
+    refused("a huge number of columns in a with", d, "insert", where="last",
+            content='(with "mc-monospaced-cols" "300000" "x")', format="stree")
+    refused("a number with 199 digits", d, "insert", where="last", content='(with "par-sep" "%s" "x")' % ("9" * 199), format="stree")
+    refused("a length with a long fraction", d, "insert", where="last", content='(with "par-sep" "1.12345678cm" "x")', format="stree")
+    accepted("a number of columns", d, "insert", where="last", content='(with "mc-monospaced-cols" "50" "x")', format="stree")
+    accepted("a length", d, "insert", where="last", content='(with "par-sep" "0.5fn" "x")', format="stree")
+    accepted("a date as text", d, "insert", where="last", content='(with "my-date" "2026-11-04" "x")', format="stree")
+    d = opendoc("  Text.\n")
+    for tg, nargs in (("new-remark", 2), ("new-theorem", 2), ("new-exercise", 2), ("new-figure", 2),
+                      ("new-section", 1), ("new-counter", 1)):
+        refused("definer %s redefining strong" % tg, d, "insert", where="last",
+                content='(%s %s)' % (tg, " ".join(['"strong"', '"REDEFINED"'][:nargs])), format="stree")
+    refused("new-env", d, "insert", where="last", content='(new-env "strong" "S" "x" "y")', format="stree")
+    refused("new-list", d, "insert", where="last", content='(new-list "strong" "x" "y")', format="stree")
+    # smart-ref: harmless unless the macro <type>-ref of a label is dangerous
+    d = opendoc("  <assign|zz-ref|<macro|x|<hlink|t|<arg|x>>>>\n\n  Text.\n", "generic|smart-ref")
+    accepted("smart-ref with a label of a known type", d, "insert", where="last", content='(smart-ref "eq:foo")', format="stree")
+    refused("smart-ref with a label whose type is a dangerous macro of the person", d, "insert", where="last",
+            content='(smart-ref "zz:javascript")', format="stree")
+    refused("smart-ref with a label that is not written", d, "insert", where="last",
+            content='(smart-ref (merge "z" "z"))', format="stree")
+    d = opendoc("  Text.\n", "generic|smart-ref")
+    accepted("smart-ref in a plain document", d, "insert", where="last", content='(smart-ref "eq:foo" "fig:bar")', format="stree")
+    # the notes in the margin of the styles of journals; the title of the manuals
+    for st in ("elsart", "amsart", "jsc", "ifac", "svjour", "article", "book", "beamer"):
+        d = opendoc("  Text.\n", st)
+        accepted("%s: marginal-note" % st, d, "insert", where="last", content='(marginal-note "normal" "c" "A note")', format="stree")
+    d = opendoc("  Text.\n", "tmdoc")
+    accepted("tmdoc: tmdoc-title", d, "insert", where="last", content='(tmdoc-title "A title")', format="stree")
+    d = opendoc("  Text.\n", "generic|exam")
+    accepted("exam: gap-dots-long", d, "insert", where="last", content='(gap-dots-long "x")', format="stree")
     # 8. edit_text does not reach text inside definitions or code
     for what, body, old, new in (
         ("set", "  <set|dst|https://ok.org>\n\n  <assign|u|<macro|<hlink|t|<value|dst>>>>\n\n  Text.\n", "https://ok.org", "javascript:alert(1)"),

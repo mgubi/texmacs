@@ -1514,6 +1514,25 @@
                        ((and (char=? c #\.) (not dot?)) (loop (+ i 1) #t))
                        (else #f))))))))
 
+(define (number-bounded? v)
+  ;; a value that is a number or a length (a sign, digits, a point, a unit) has at most
+  ;; 4 digits before the point and 6 after it: numbers drive loops and sizes
+  (let* ((n (string-length v))
+         (k (if (and (> n 0) (memv (string-ref v 0) '(#\+ #\-))) 1 0))
+         (digits (lambda (from) (let loop ((i from)) (if (and (< i n) (char-numeric? (string-ref v i))) (loop (+ i 1)) i)))))
+    (if (and (< k n) (or (char-numeric? (string-ref v k)) (and (char=? (string-ref v k) #\.) (< (+ k 1) n))))
+        (let* ((e (digits k))
+               (rest-start (if (and (< e n) (char=? (string-ref v e) #\.)) (digits (+ e 1)) e))
+               (frac (if (> rest-start e) (- rest-start e 1) 0))
+               (tail (substring v rest-start n)))
+          ;; (only when the rest is a unit: letters or %, so that 2026-11-04 or 3 pages stay text)
+          (if (or (string=? tail "") (list-find (string->list tail) (lambda (c) #f))
+                  (let loop ((l (string->list tail)))
+                    (or (null? l) (and (or (char-alphabetic? (car l)) (char=? (car l) #\%)) (loop (cdr l))))))
+              (and (<= (- e k) 4) (<= frac 6))
+              #t))
+        #t)))
+
 (define (env-value-ok? var v)
   ;; may the variable @var of the environment be given the string @v? What is
   ;; written in an export (a colour in an HTML attribute, a size) is typed
@@ -1526,8 +1545,8 @@
                             (memv (string-ref v i) '(#\space #\-)))
                         (loop (+ i 1)))))))
         ((member var '("font-size" "font-base-size" "magnification" "dpi"))
-         (number-string? v))
-        (else #t)))
+         (and (number-string? v) (number-bounded? v)))
+        (else (number-bounded? v))))
 
 (define (check-env-pairs tag vars-and-values)
   ;; (var value var value ...) of a with, cwith or twith
@@ -1670,7 +1689,11 @@
 (define (check-expanded-file tag a base)
   ;; a file after the evaluation: the evaluator gives the full name of a file
   ;; that exists, which must be inside the roots (or the folder of the document)
-  (cond ((and (string? a) (string-starts? a "/") (not (dotdot-in-path? a)))
+  (cond ((and (string? a) (string-starts? a "local:$TEXMACS_PATH/misc/images/")
+              (not (dotdot-in-path? a)))
+         ;; (an image of the installation of TeXmacs, such as the logo of the titles of the manuals)
+         #t)
+        ((and (string? a) (string-starts? a "/") (not (dotdot-in-path? a)))
          (let ((p (resolve-existing a)))
            (when (not (if (mcp-roots)
                           (path-allowed? p)
@@ -1743,7 +1766,7 @@
          ((memq tag '(extern hybrid authorize observer eval-args))
           (refuse-tag tag "is left after the expansion of the content"))
          ((eq? tag 'specific)
-          (when (not (and (pair? args) (member (car args) '("texmacs" "screen" "printer" "screen*" "printer*"))))
+          (when (not (and (pair? args) (member (car args) '("texmacs" "screen" "printer" "screen*" "printer*" "even" "odd"))))
             (violate! (string-append "the content expands to a text for another program (specific): "
                                      (if (and (pair? args) (string? (car args))) (utf8-prefix (u8 (car args)) 80) "?")
                                      (if (and (pair? args) (pair? (cdr args)) (string? (cadr args))) (string-append " " (utf8-prefix (u8 (cadr args)) 80)) "")
@@ -2218,12 +2241,25 @@
         acc
         (loop (cdr l) (+ k 1) (append acc (assign-nodes (car l)))))))
 
-(define (block-violations d blk i)
-  ;; the violations of the top-level block @blk (a tree) of index @i
+(define (block-literal-violations d blk i)
+  ;; the violations of the top-level block @blk as written (nothing is evaluated)
   (let ((st (tm->stree blk)) (base (doc-base d)))
     (reset-danger!)
-    (append (literal-violations st base d)
-            (expansion-violations st base d (assigns-before d i) block-budget))))
+    (literal-violations st base d)))
+
+(define (block-violations d blk i . opt)
+  ;; the violations of the top-level block @blk (a tree) of index @i; with the
+  ;; violations as written, when they are known
+  (let* ((st (tm->stree blk)) (base (doc-base d))
+         (lit (if (pair? opt) (car opt) (block-literal-violations d blk i))))
+    (append lit (expansion-violations st base d (assigns-before d i) block-budget))))
+
+(define (document-literal-violations d)
+  ;; the violations of the blocks as written (nothing is evaluated)
+  (reset-danger!)
+  (let ((base (doc-base d)))
+    (append-map (lambda (blk) (literal-violations (tm->stree blk) base d))
+                (tree-children (doc-body d)))))
 
 (define (document-violations d . opt)
   ;; the violations of the blocks of the document, evaluated by batches whose
@@ -2320,6 +2356,8 @@
     (include* file 0) (pattern file 0) (video file 0) (sound file 0)
     (attachment file 0) (ocr file 0) (bibliography file all)
     ;; (action: the script is the second argument; extern: see extern-functions)
+    ;; (the content may not define anything: a name that is made of an argument)
+    (assign define 0) (set define 0) (reset define 0) (provide define 0) (drd-props define 0)
     (script code all) (action code (1)) (hybrid code all)
     (authorize code all) (observer code all) (eval code all) (eval-args code all)
     (specific code all) (latex code all)
@@ -2466,14 +2504,14 @@
     ("screens-index" "index of the screen") ("screens-arity" "number of screens")
     ("screens-bar" "bar of screens: numbers and the fixed command screens-switch-to")
     ("math-check" "packrat check of a math cell") ("math-check-table" "same for the cells of a table")
-    ("ext-tiled-items" "table of tiles") ("ext-vertical-items" "table of items")
+    ("ext-vertical-items" "table of items, one row for each child")
     ("tmdoc-key" "the keys of a shortcut, rewritten") ("tmdoc-key*" "same")
     ("tmdoc-shortcut" "the shortcut bound to a command, rewritten")
     ("tmdoc-render-keys" "render-key trees") ("tmdoc-menu-font" "the font of the menus")
-    ("gui-tiled" "table of tiles in a tag named by argument 0" 0)
     ("gui-hlist-table" "table of a horizontal list, in a tag named by argument 0" 0)
     ("gui-vlist-table" "table of a vertical list, in a tag named by argument 0" 0)
-    ("tm-register-new-list-tag" "registers a symbol as a list tag")))
+    ("ext-apply-on-paragraphs" "applies the macro named by argument 0 to the paragraphs of the tree" 0)
+    ("ext-smart-ref" "smart references: picks the macro <type>-ref from the beginning or the end of each label (checked at the call: see smart-ref-ok?)")))
 
 (define (bad-names-with-prefix? prefix)
   ;; does a macro that the content may not call begin with @prefix?
@@ -2547,10 +2585,12 @@
              ;; the function named is run with the other arguments as data: only the
              ;; functions of the reviewed list take data, the other ones take code
              (let ((f (and (pair? args) (string? (car args)) (assoc (car args) extern-functions))))
-               (if f
-                   (for (i (cddr f))
-                     (when (< i (length (cdr args))) (sink! (list-ref (cdr args) i) 'name)))
-                   (for (a args) (sink! a 'code)))))
+               (cond ((and f (equal? (car f) "ext-smart-ref"))
+                      (for (a (cdr args)) (sink! a 'ref)))
+                     (f
+                      (for (i (cddr f))
+                        (when (< i (length (cdr args))) (sink! (list-ref (cdr args) i) 'name))))
+                     (else (for (a args) (sink! a 'code))))))
             ((eq? tag 'map-args)
              (when (and (pair? args) (string? (car args)))
                (let ((en (lookup (car args))))
@@ -2681,6 +2721,32 @@
     (and (member name safe-macros)
          (not (closure-has-local? d name)))))
 
+;; smart-ref picks the macro `<type>-ref' of each label from the letters at its
+;; beginning or its end: it is harmless when every label is written, and the macros
+;; of those names that exist (the style's or the document's) are not dangerous.
+(define (smart-ref-ok? d en args)
+  (let ((as (if (eq? (car en) 'all) args
+                (if (and (number? (car en)) (< (car en) (length args))) (list (list-ref args (car en))) '()))))
+    (and (list-find as (lambda (a) #t)) #t
+         (not (list-find as (lambda (a) (not (string? a)))))
+         (not (list-find
+               as
+               (lambda (a)
+                 (list-find (label-types a)
+                            (lambda (tp)
+                              (let ((m (string-append tp "-ref")))
+                                (or (dangerous-name? m)
+                                    (and (macro-definition d m)
+                                         (pair? (dangerous-positions d m)))))))))))))
+
+(define (label-types s)
+  ;; the letters at the beginning and at the end of the label (the types that smart-ref tries)
+  (let* ((n (string-length s))
+         (alpha? (lambda (c) (char-alphabetic? c)))
+         (i (let loop ((k 0)) (if (and (< k n) (alpha? (string-ref s k))) (loop (+ k 1)) k)))
+         (j (let loop ((k n)) (if (and (> k 0) (alpha? (string-ref s (- k 1)))) (loop (- k 1)) k))))
+    (list-filter (list (substring s 0 i) (substring s j n)) (lambda (x) (> (string-length x) 0)))))
+
 (define (dangerous-call? d st)
   ;; does the node @st call a macro that is dangerous? A place that is only the name of
   ;; a macro (`map') is harmless when the name is written and is that of a macro that
@@ -2690,13 +2756,15 @@
     (and (not (safe-macro? d tag))
          (list-find (dangerous-positions d name)
                     (lambda (en)
-                      (not (and (number? (car en)) (equal? (cdr en) '(name))
-                                (< (car en) (length args))
-                                (let ((a (list-ref args (car en))))
-                                  (and (string? a)
-                                       (not (dangerous-name? a))
-                                       (not (member a safe-macros))
-                                       (null? (dangerous-positions d a))))))))
+                      (not (or (and (number? (car en)) (equal? (cdr en) '(name))
+                                    (< (car en) (length args))
+                                    (let ((a (list-ref args (car en))))
+                                      (and (string? a)
+                                           (not (dangerous-name? a))
+                                           (not (member a safe-macros))
+                                           (null? (dangerous-positions d a)))))
+                               (and (equal? (cdr en) '(ref))
+                                    (smart-ref-ok? d en args))))))
          #t)))
 
 (define (check-safe-macro-arguments st base)
@@ -2748,12 +2816,13 @@
       (tool-error "the definitions of the document (assign, set, macro...) belong to the person: the content filter refuses edits inside them, and edits that replace or delete a node that has one inside: the edit is refused (nothing was changed)"))
     (when (and t (inside-opaque? d t (not delete?)))
       (tool-error "this node is code or text for another program, or inside one (extern, script, hybrid, action, specific, latex...): the content filter refuses edits in it (nothing was changed)"))
-    (let ((viol (and blk i (block-violations d blk i))))
+    (let* ((lit (and blk i (block-literal-violations d blk i)))
+           (viol (and blk i (block-violations d blk i lit))))
       (when (and viol (over-budget? viol))
         (tool-error "the block does not evaluate within the budget: the content filter refuses edits in it (nothing was changed)"))
       ;; (the definitions cannot be changed by the content, so the rest of the
       ;; document is not compared: only the block of the edit and the new blocks)
-      (list (and blk (ptr blk)) viol (assigns-signature d)))))
+      (list (and blk (ptr blk)) viol (assigns-signature d) lit))))
 
 (define (filter-map f l)
   (let loop ((l l) (acc '()))
@@ -2787,8 +2856,14 @@
                          (else (loop (cdr l) (cons (car l) acc)))))))
     (for (b blocks)
       (let* ((i (index-in-body d b))
-             (after (block-violations d b i))
-             (before (if (and blk (tree? blk) (tree-eq? b (top-level-ancestor d blk))) (or old-viol '()) '()))
+             (same? (and blk (tree? blk) (tree-eq? b (top-level-ancestor d blk))))
+             ;; (what is wrong as written is told before anything is evaluated: the
+             ;; evaluation of content that is refused could run what it should not)
+             (lit-after (block-literal-violations d b i))
+             (lit-new (new-violations (if same? (or (cadddr pre) '()) '()) lit-after))
+             (_ (when (pair? lit-new) (guard-fail! lit-new)))
+             (after (block-violations d b i lit-after))
+             (before (if same? (or old-viol '()) '()))
              (new (new-violations before after)))
         (when (over-budget? after) (guard-fail! (list over-budget-reason)))
         (when (pair? new) (guard-fail! new))))
@@ -3377,7 +3452,8 @@
                                            (tree-of-stree (cons 'document items)))))
                           (forget-steps! d)
                           ;; (a new document has nothing but the content)
-                          (let ((v (document-violations d)))
+                          (let ((v (let ((lv (document-literal-violations d)))
+                                     (if (pair? lv) lv (document-violations d)))))
                             (when (pair? v)
                               (tool-error (string-append "the content is refused: "
                                                          (utf8-prefix (u8 (reason-text (car v))) 200))))))
