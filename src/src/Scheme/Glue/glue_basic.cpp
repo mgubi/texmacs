@@ -2369,6 +2369,28 @@ tmg_mcp_json_validP (tmscm arg1) {
 }
 
 tmscm
+tmg_exec_budget_start (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "exec-budget-start");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  exec_budget_start (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_exec_budget_end () {
+  // TMSCM_DEFER_INTS;
+  int out= exec_budget_end ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_shared_pid_aliveP (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-pid-alive?");
 
@@ -13208,6 +13230,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("mcp-stdin-eof?",  tmg_mcp_stdin_eofP, 0, 0, 0);
   tmscm_install_procedure ("mcp-stdout-write",  tmg_mcp_stdout_write, 1, 0, 0);
   tmscm_install_procedure ("mcp-json-valid?",  tmg_mcp_json_validP, 1, 0, 0);
+  tmscm_install_procedure ("exec-budget-start",  tmg_exec_budget_start, 1, 0, 0);
+  tmscm_install_procedure ("exec-budget-end",  tmg_exec_budget_end, 0, 0, 0);
   tmscm_install_procedure ("shared-pid-alive?",  tmg_shared_pid_aliveP, 1, 0, 0);
   tmscm_install_procedure ("shared-port-probe",  tmg_shared_port_probe, 1, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);

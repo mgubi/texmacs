@@ -212,10 +212,40 @@ texmacs_exec (edit_env env, tree cmd) {
 * Evaluation of trees
 ******************************************************************************/
 
+// A limit on the work of the evaluator, for the programs that evaluate text
+// which does not come from the person (texmacs --mcp checks what an agent
+// writes): exec_budget_start (n) makes the evaluator give an error tree after
+// n steps (a macro that calls its argument twice, ten times nested, would
+// take a thousand years), exec_budget_end () gives what is left (negative if
+// the limit was reached). The nesting of the macros is limited always: a
+// macro that calls itself would else overflow the stack of the process.
+static bool exec_budget_on= false;
+static long exec_budget_left= 0;
+static int  exec_macro_depth= 0;
+static const int EXEC_MACRO_DEPTH_LIMIT= 1200;
+
+void
+exec_budget_start (int n) {
+  exec_budget_on  = true;
+  exec_budget_left= n;
+}
+
+int
+exec_budget_end () {
+  long left= exec_budget_left;
+  exec_budget_on= false;
+  exec_budget_left= 0;
+  if (left > 2000000000L) left= 2000000000L;
+  if (left < -2000000000L) left= -2000000000L;
+  return (int) left;
+}
+
 tree
 edit_env_rep::exec (tree t) {
   // cout << "Execute: " << t << "\n";
   if (is_atomic (t)) return t;
+  if (exec_budget_on && --exec_budget_left < 0)
+    return tree (_ERROR, "evaluation budget");
   switch (L(t)) {
   case MOVE:
   case SHIFT:
@@ -733,6 +763,8 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
+    if (exec_macro_depth >= EXEC_MACRO_DEPTH_LIMIT)
+      return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);
@@ -748,7 +780,9 @@ edit_env_rep::exec_compound (tree t) {
 	macro_arg->item (f[i]->label)= st;
 	macro_src->item (f[i]->label)= obtain_ip (st);
       }
+    exec_macro_depth++;
     tree r= exec (f[n]);
+    exec_macro_depth--;
     macro_arg= macro_arg->next;
     macro_src= macro_src->next;
     return r;

@@ -1541,11 +1541,150 @@ def s_styles(w):
     check("exit 0", m.close() == 0)
 
 
+def s_guard(w):
+    """an edit may not introduce what the filter refuses, in the context of the
+    document: leaves of existing nodes, definitions, the environment around, the
+    budget of the evaluation, a macro that calls itself"""
+    env, home = make_env(w, "A")
+    root = os.path.join(w, "root")
+    os.makedirs(root, exist_ok=True)
+    env["TEXMACS_MCP_ROOTS"] = root
+    with open(os.path.join(root, "pic.png"), "wb") as fh:
+        fh.write(b"x")
+    f = os.path.join(root, "g.tm")
+    body = (
+        "  <assign|foo|<macro|x|<hlink|harmless|https://a.org>>>\n\n"
+        "  <assign|bar|<macro|x|<hlink|passes|<arg|x>>>>\n\n"
+        "  <assign|ctxm|<macro|x|<if|<equal|<value|color>|red>|<hlink|t|<arg|x>>|<arg|x>>>>\n\n"
+        "  <assign|dbl|<macro|x|<concat|<arg|x>|<arg|x>>>>\n\n"
+        "  <assign|loopm|<macro|x|<loopm|<arg|x>>>>\n\n"
+        "  A paragraph with <hlink|a link|https://ok.org> in it.\n\n"
+        "  A label here<label|lab1> and an image <image|pic.png|1par|||>.\n\n"
+        "  <with|color|red|Red paragraph.>\n\n"
+        "  Plain paragraph.\n")
+    write_tm(f, body)
+    f = os.path.realpath(f)
+    m = Mcp(env)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    def state():
+        return m.tool("read", document="d1", format="texmacs", max_size=100000)[1]
+    def block(prefix):
+        t = m.tool("read", document="d1", format="text", max_size=100000)[1]
+        for c in t["children"]:
+            if c["preview"].startswith(prefix):
+                return c
+        return None
+    base = state()["hash"]
+    def check_refused(label, tool, **args):
+        e, r = m.tool(tool, document="d1", **args)
+        h = state()["hash"]
+        check("refused: %s" % label, e and ("content filter" in str(r) or "refused" in str(r)) and h == base)
+    def check_applied(label, tool, **args):
+        e, r = m.tool(tool, document="d1", **args)
+        ok = not e and r["status"] == "applied"
+        check("accepted: %s" % label, ok)
+        if ok:
+            m.tool("undo_agent", document="d1")
+        return ok
+    # leaves of existing nodes (reached through their handles)
+    def node_in(prefix, tag):
+        b = block(prefix)
+        t = m.tool("read", document="d1", node=b["handle"], format="text")[1]
+        for c in t["children"]:
+            if c["tag"] == tag:
+                return c
+        return None
+    def child(h, i):
+        t = m.tool("read", document="d1", node=h, format="text")[1]
+        return t["children"][i]
+    # (a refused edit is cancelled: the nodes are restored as new trees, so the handles are taken again)
+    def dest_handle():
+        return child(node_in("A paragraph with", "hlink")["handle"], 1)["handle"]
+    def label_handle():
+        return child(node_in("A label here", "label")["handle"], 0)["handle"]
+    def image_handle():
+        return child(node_in("A label here", "image")["handle"], 0)["handle"]
+    check("the address leaf of the link was found",
+          child(node_in("A paragraph with", "hlink")["handle"], 1)["preview"] == "https://ok.org")
+    for what, content in (("javascript:", "javascript:alert(1)"), ("script:", 'script:(system "id")'),
+                          ("a file address", "file:///etc/passwd")):
+        check_refused("replace of the address leaf by %s" % what, "replace", node=dest_handle(), content=content)
+    check_applied("replace of the address leaf by a web address", "replace", node=dest_handle(), content="https://elsewhere.org")
+    check_refused("replace of a label by a brace and \\input", "replace", node=label_handle(), content="a}\\input{x}")
+    check_applied("replace of a label by another name", "replace", node=label_handle(), content="lab2")
+    check_refused("replace of an image file by an absolute path", "replace", node=image_handle(), content="/etc/passwd")
+    check_refused("replace of an image file by ..", "replace", node=image_handle(), content="../x.png")
+    check_applied("replace of an image file by another name in the folder", "replace", node=image_handle(), content="other.png")
+    b = block("A paragraph with")
+    check_applied("edit_text of the words around the link", "edit_text", node=b["handle"], old="A paragraph", new="One paragraph")
+    # the environment around the edit
+    rb = block("Red paragraph")
+    rbody = child(rb["handle"], 2)
+    check("the body of the with was found", rbody["preview"] == "Red paragraph.")
+    check_refused("a pass-through macro inside a with that makes a link", "replace", node=rbody["handle"], content="<ctxm|javascript:alert(1)>")
+    check_applied("the same macro outside it (plain text)", "insert", where="last", content="<ctxm|javascript:alert(1)>")
+    rb = block("Red paragraph")
+    check_refused("a value of with replaced by a compound", "replace", node=rb["handle"], content='(with "color" (concat "red" "\\"") "x")', format="stree")
+    # definitions
+    check_applied("a use of a harmless macro with a dangerous argument (it ignores it)", "insert", where="last", content="<foo|javascript:alert(1)>")
+    e, r = m.tool("insert", document="d1", where="last", content="<foo|javascript:alert(1)>")
+    use = r["changed"][0]["handle"] if not e else None
+    base2 = state()["hash"]
+    # the two-step: change the macro so that it uses its argument
+    foo = block("harmless") or None
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    fooblk = [c for c in t["children"] if c["tag"] == "assign"][:1]
+    if fooblk:
+        mac = child(fooblk[0]["handle"], 1)
+        hl = child(mac["handle"], 1)
+        url = child(hl["handle"], 1)
+        e, r = m.tool("replace", document="d1", node=url["handle"], content="javascript:alert(2)")
+        check("a macro whose address is changed to javascript: is refused", e and "content filter" in str(r) and state()["hash"] == base2)
+        mac = child(fooblk[0]["handle"], 1)
+        hl = child(mac["handle"], 1)
+        e, r = m.tool("replace", document="d1", node=hl["handle"], content='<hlink|harmless|<arg|x>>')
+        check("a macro changed to pass its argument to a link is refused",
+              e and "refused" in str(r) and state()["hash"] == base2)
+        mac = child(fooblk[0]["handle"], 1)
+        hl = child(mac["handle"], 1)
+        e, r = m.tool("replace", document="d1", node=hl["handle"], content='<bar|<arg|x>>')
+        check("the two-step: the macro now calls a macro of the person which makes a link of the argument, "
+              "and a use with javascript: exists: refused by the check of the document",
+              e and "content filter" in str(r) and state()["hash"] == base2)
+    else:
+        check("the macro foo was found", False)
+    m.tool("undo_agent", document="d1")
+    # the budget: a macro that doubles, nested
+    nest = "x"
+    for _ in range(26):
+        nest = "<dbl|%s>" % nest
+    t0 = time.monotonic()
+    e, r = m.tool("insert", document="d1", where="last", content=nest)
+    dt = time.monotonic() - t0
+    check("a nested doubling macro is refused within the budget (%.1f s)" % dt, e and ("budget" in str(r) or "content filter" in str(r)) and dt < 60)
+    r = m.request("ping")
+    check("and the server is alive", r is not None and "result" in r)
+    # a macro that calls itself
+    e, r = m.tool("insert", document="d1", where="last", content="<loopm|a>")
+    r2 = m.request("ping")
+    check("a macro that calls itself does not crash the server", r2 is not None and "result" in r2)
+    check("and the content is refused", e)
+    # the preamble of the person does not make every insertion refused
+    e, r = m.tool("insert", document="d1", where="last", content="Hello <em|you>")
+    check("a plain insertion in a document with such a preamble is accepted", not e and r["status"] == "applied")
+    # the commands of a latex tag
+    for cmd in ("pdfximage", "special", "VerbatimInput", "includesvg", "attachfile", "markdownInput", "latelua", "pdfobj"):
+        e, r = m.tool("insert", document="d1", where="last", content='(latex "\\\\\\%s{x}")' % cmd, format="stree")
+        check("a latex tag with \\\\%s is refused" % cmd, e)
+    check("exit 0", m.close() == 0)
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "undo": s_undo, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]

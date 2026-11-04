@@ -224,6 +224,8 @@
 "mcp-stdin-eof?"
 "mcp-stdout-write"
 "mcp-json-valid?"
+"exec-budget-start"
+"exec-budget-end"
 "shared-pid-alive?"
 "shared-port-probe"
 "tt-exists?"

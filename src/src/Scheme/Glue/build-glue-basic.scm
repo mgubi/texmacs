@@ -225,6 +225,8 @@
   (mcp-stdin-eof? mcp_stdin_eof (bool))
   (mcp-stdout-write mcp_stdout_write (bool string))
   (mcp-json-valid? mcp_json_valid (bool string))
+  (exec-budget-start exec_budget_start (void int))
+  (exec-budget-end exec_budget_end (int))
   (shared-pid-alive? shared_pid_alive (bool int))
   (shared-port-probe shared_port_probe (int int))
   

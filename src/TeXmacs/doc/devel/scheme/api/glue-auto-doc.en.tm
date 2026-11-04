@@ -1595,6 +1595,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(exec-budget-start <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|exec_budget_start> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(exec-budget-end)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|exec_budget_end> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(shared-pid-alive? <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>

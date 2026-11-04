@@ -1068,6 +1068,29 @@
              (and (> depth 0) (loop (+ i 1) (- depth 1))))
             (else (loop (+ i 1) depth))))))
 
+;;; Collecting violations: the rules of the filter call violate!, which refuses
+;;; (as tool-error) or, when collecting, keeps the reason: the filter of a
+;;; document compares the violations before and after an edit.
+
+(define collecting? #f)
+(define collected '())
+
+(define (violate! msg)
+  (if collecting?
+      (set! collected (cons msg collected))
+      (tool-error msg)))
+
+(define (collect-violations thunk)
+  ;; the reasons (strings) of the violations of the rules run by @thunk
+  (let ((old-c collecting?) (old-l collected))
+    (set! collecting? #t)
+    (set! collected '())
+    (catch #t thunk (lambda args (set! collected (cons "the check failed" collected))))
+    (let ((r (reverse collected)))
+      (set! collecting? old-c)
+      (set! collected old-l)
+      r)))
+
 ;;; What content is refused (design 5.6: no evaluation of code, nothing but the
 ;;; documents is reached). Every primitive of the DRD (src/Data/Drd/drd_std.cpp)
 ;;; is classified by its real name: refused as code or as a definition of the
@@ -1237,7 +1260,7 @@
            (when (and (not (== tag 'document))
                       (or (known-primitive? tag) (known-macro-arity? tag))
                       (not (tag-possible-arity? tag n)))
-             (tool-error (string-append "the tag `" (symbol->string tag)
+             (violate! (string-append "the tag `" (symbol->string tag)
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
            (for (c (cdr st)) (check-arity c d))))
@@ -1386,7 +1409,7 @@
         (else 'label)))
 
 (define (refuse-tag tag why)
-  (tool-error (string-append "the tag `" (symbol->string tag) "' " why
+  (violate! (string-append "the tag `" (symbol->string tag) "' " why
                              ": the content is refused (nothing was changed)")))
 
 (define (argument st k)
@@ -1401,11 +1424,11 @@
   (cond ((string? a)
          (when (not (and (file-name-ok? a base web?)
                          (name-chars-ok? a (if (url-scheme a) 'address 'file))))
-           (tool-error (string-append "the tag `" (symbol->string tag) "' refers to the file `"
+           (violate! (string-append "the tag `" (symbol->string tag) "' refers to the file `"
                                       (utf8-prefix (u8 a) 60)
                                       "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)"))))
         (else
-          (tool-error (string-append "the tag `" (symbol->string tag)
+          (violate! (string-append "the tag `" (symbol->string tag)
                                      "' has a file that is not written as a plain name: refused (nothing was changed)")))))
 
 (define safety-defined? #f)
@@ -1484,11 +1507,17 @@
     (when (and (pair? l) (pair? (cdr l)))
       (let ((var (car l)) (val (cadr l)))
         (when (string? var)
+          (when (and (not (string? val)) (pair? val)
+                     (or (member var '("font-size" "font-base-size" "magnification" "dpi"))
+                         (and (or (== var "color") (string-ends? var "-color"))
+                              (not (memq (car val) '(pattern gradient rgb-color blend tuple quote))))))
+            (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
+                                     "' to something that is not plain text: refused (nothing was changed)")))
           (when (tag-name? var)
-            (tool-error (string-append "a `" (symbol->string tag) "' that sets `" (utf8-prefix (u8 var) 40)
+            (violate! (string-append "a `" (symbol->string tag) "' that sets `" (utf8-prefix (u8 var) 40)
                                        "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))
           (when (and (string? val) (not (env-value-ok? var val)))
-            (tool-error (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
+            (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
                                        "' to a value that is not accepted: `" (utf8-prefix (u8 val) 40)
                                        "' (letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)")))))
       (loop (cddr l)))))
@@ -1511,7 +1540,7 @@
          (cond ((memq tag refused-style-macros)
                 (refuse-tag tag "is a macro of the styles that runs commands, reads files or acts on a click"))
                ((not (and safety-defined? (safety-defined? tag)))
-                (tool-error (string-append "unknown tag `" (symbol->string tag)
+                (violate! (string-append "unknown tag `" (symbol->string tag)
                                            "' (not defined by the style of the document): the content is refused (nothing was changed)")))))
        ;; (aliases, and what is written into the exports as attributes)
        (cond ((eq? tag 'with)
@@ -1524,18 +1553,18 @@
               (check-env-pairs tag (cdr st)))
              ((memq tag '(value quote-value or-value))
               (when (and (pair? (cdr st)) (string? (cadr st)) (tag-name? (cadr st)))
-                (tool-error (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)
+                (violate! (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)
                                            "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))))
        ;; macros which call the macro named by an argument
        (when (memq tag macro-by-name-tags)
          (for (a (cdr st))
            (when (and (string? a) (dangerous-name? a))
-             (tool-error (string-append "a `" (symbol->string tag) "' that calls `" (utf8-prefix (u8 a) 40)
+             (violate! (string-append "a `" (symbol->string tag) "' that calls `" (utf8-prefix (u8 a) 40)
                                         "' is refused: that macro is not accepted in the content (nothing was changed)")))))
        (when (memq tag name-tags)
          (for (a (cdr st))
            (when (and (string? a) (not (name-chars-ok? a (name-kind tag))))
-             (tool-error (string-append "a string in a `" (symbol->string tag) "' has a character that cannot be in a name (a backslash, a brace, a control character, % # $ & ^ ~ ...): `"
+             (violate! (string-append "a string in a `" (symbol->string tag) "' has a character that cannot be in a name (a backslash, a brace, a control character, % # $ & ^ ~ ...): `"
                                         (utf8-prefix (u8 a) 40) "' (nothing was changed)")))))
        (cond
          ((assq tag code-reasons) => (lambda (e) (refuse-tag tag (cdr e))))
@@ -1558,14 +1587,14 @@
            (let ((a (argument st (cdr l))))
              (when a
                (cond ((not (string? a))
-                      (tool-error (string-append "a `" (symbol->string tag)
+                      (violate! (string-append "a `" (symbol->string tag)
                                                  "' whose destination is not written as plain text is refused (nothing was changed)")))
                      ((not (name-chars-ok? a 'address))
-                      (tool-error (string-append "a `" (symbol->string tag)
+                      (violate! (string-append "a `" (symbol->string tag)
                                                  "' with the target `" (utf8-prefix (u8 a) 60)
                                                  "' is refused: a backslash, a brace, a control character or a bare % cannot be in an address (nothing was changed)")))
                      ((not (link-target-ok? a))
-                      (tool-error (string-append "a `" (symbol->string tag)
+                      (violate! (string-append "a `" (symbol->string tag)
                                                  "' with the target `" (utf8-prefix (u8 a) 60)
                                                  "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)"))))))))
        (cond
@@ -1574,18 +1603,18 @@
           ;; one of TeXmacs: then it is TeXmacs markup, checked as the rest)
           (let ((fmt (argument st 0)))
             (when (not (and (string? fmt) (member fmt '("texmacs" "screen" "printer"))))
-              (tool-error (string-append "a `specific' for the format `"
+              (violate! (string-append "a `specific' for the format `"
                                          (if (string? fmt) (utf8-prefix (u8 fmt) 20) "?")
                                          "' (text for another program) is refused: only texmacs, screen and printer (nothing was changed)")))))
          ((== tag 'latex)
           (for (a (cdr st))
             (when (string? a)
               (when (>= (string-search-forwards "^^" 0 a) 0)
-                (tool-error "a `latex' with ^^ (a way to write any character) is refused (nothing was changed)"))
+                (violate! "a `latex' with ^^ (a way to write any character) is refused (nothing was changed)"))
               (check-latex-source a)
               (for (c (latex-commands a))
                 (when (member c latex-tag-forbidden)
-                  (tool-error (string-append "the LaTeX command \\" c " in a `latex' tag is refused (it takes a file or an address; the text is written as it is in an export) (nothing was changed)"))))))))))
+                  (violate! (string-append "the LaTeX command \\" c " in a `latex' tag is refused (it takes a file or an address; the text is written as it is in an export) (nothing was changed)"))))))))))
     (else #t)))
 
 (define allowed-scripts '("mouse-fold" "mouse-unfold"))
@@ -1604,7 +1633,7 @@
            (when (not (if (mcp-roots)
                           (path-allowed? p)
                           (inside-folder? p (document-folder base))))
-             (tool-error (string-append "the content expands to a `" (symbol->string tag)
+             (violate! (string-append "the content expands to a `" (symbol->string tag)
                                         "' of the file `" (utf8-prefix (u8 a) 60)
                                         "', outside the folders of the server (or of the document): refused (nothing was changed)")))))
         (else (check-file-argument tag a base (and (memq tag web-file-tags) #t)))))
@@ -1624,38 +1653,42 @@
           (let* ((dest (car (reverse args))) (u (url-destination dest)))
             (cond ((func? dest 'script)
                    (when (not (and (pair? (cdr dest)) (member (cadr dest) allowed-scripts)))
-                     (tool-error "the content expands to a link that runs a script: refused (nothing was changed)")))
+                     (violate! "the content expands to a link that runs a script: refused (nothing was changed)")))
                   ((not u)
                    (when (and (pair? dest) (not (memq (car dest) '(id tuple))))
-                     (tool-error "the content expands to a link whose destination is not plain text: refused (nothing was changed)")))
+                     (violate! "the content expands to a link whose destination is not plain text: refused (nothing was changed)")))
                   ((or (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
-                   (tool-error (string-append "the content expands to a link to `" (utf8-prefix (u8 u) 60)
+                   (violate! (string-append "the content expands to a link to `" (utf8-prefix (u8 u) 60)
                                               "': only http, https, mailto and relative targets are accepted (nothing was changed)"))))))
          ((and (eq? tag 'hlink) (= (length args) 2))
           (let ((u (url-destination (cadr args))))
             (when (or (not u) (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
-              (tool-error "the content expands to a link whose destination is not accepted: refused (nothing was changed)"))))
+              (violate! "the content expands to a link whose destination is not accepted: refused (nothing was changed)"))))
          ((memq tag '(image postscript postscript* include include* pattern video sound))
           (when (pair? args)
             (check-expanded-file tag (car args) base)))
          ((eq? tag 'script)
           (when (not (and (pair? args) (member (car args) allowed-scripts)))
-            (tool-error "the content expands to a script: refused (nothing was changed)")))
+            (violate! "the content expands to a script: refused (nothing was changed)")))
          ((eq? tag 'action)
           (when (not (and (>= (length args) 2) (member (cadr args) allowed-scripts)))
-            (tool-error "the content expands to an action: refused (nothing was changed)")))
+            (violate! "the content expands to an action: refused (nothing was changed)")))
+         ((eq? tag 'error)
+          (violate! (string-append "the content expands to an error: "
+                                   (if (and (pair? args) (string? (car args))) (utf8-prefix (u8 (car args)) 60) "?")
+                                   " (nothing was changed)")))
          ((memq tag '(extern hybrid authorize observer eval-args))
           (refuse-tag tag "is left after the expansion of the content"))
          ((eq? tag 'specific)
           (when (not (and (pair? args) (member (car args) '("texmacs" "screen" "printer" "screen*" "printer*"))))
-            (tool-error "the content expands to a text for another program (specific): refused (nothing was changed)")))
+            (violate! "the content expands to a text for another program (specific): refused (nothing was changed)")))
          ((eq? tag 'latex)
           (for (a args)
             (when (string? a)
               (check-latex-source a)
               (for (c (latex-commands a))
                 (when (member c latex-tag-forbidden)
-                  (tool-error "the content expands to LaTeX that takes a file or an address: refused (nothing was changed)")))))))))
+                  (violate! "the content expands to LaTeX that takes a file or an address: refused (nothing was changed)")))))))))
     (else #t)))
 
 (define (assign-nodes t)
@@ -1690,7 +1723,10 @@
   ;; export: the commands that take a file or an address
   '("includegraphics" "bibliography" "IfFileExists" "ExecuteMetaData" "graphicspath"
     "epsfbox" "epsffile" "psfig" "href" "url" "hyperref" "includestandalone"
-    "pgfplotstableread" "lstinputlisting" "inputencoding" "openin"))
+    "pgfplotstableread" "lstinputlisting" "inputencoding" "openin"
+    "pdfximage" "pdfobj" "pdfliteral" "pdfannot" "special" "VerbatimInput" "BVerbatimInput"
+    "includesvg" "attachfile" "markdownInput" "latelua" "minted" "inputminted" "usemintedstyle"
+    "write" "newwrite" "openout" "immediate"))
 
 (define (latex-commands s)
   ;; the names of the commands (\name) in @s
@@ -1766,13 +1802,13 @@
                 (string-contains? (locase-all t) "shell")
                 (string-starts? (locase-all (tm-string-trim-both t)) "convert")
                 (string-contains? (locase-all t) "write18"))
-        (tool-error (string-append "the LaTeX command \\" name " asks for `" (utf8-prefix t 40)
+        (violate! (string-append "the LaTeX command \\" name " asks for `" (utf8-prefix t 40)
                                    "', which runs programs or reads files: refused (nothing was changed)")))
       (when (not (plain-name-token? (tm-string-trim-both t)))
-        (tool-error (string-append "the LaTeX command \\" name " has an argument that is not a plain name (a package, a class, a style or a file name of letters, digits, - _ . only; no path): `"
+        (violate! (string-append "the LaTeX command \\" name " has an argument that is not a plain name (a package, a class, a style or a file name of letters, digits, - _ . only; no path): `"
                                    (utf8-prefix t 40) "' (nothing was changed)"))))
     (when (and (not arg) (!= "" (tm-string-trim-both (substring s end (string-length s)))))
-      (tool-error (string-append "the LaTeX command \\" name " is not followed by a {name}: refused (nothing was changed)")))))
+      (violate! (string-append "the LaTeX command \\" name " is not followed by a {name}: refused (nothing was changed)")))))
 
 (define (latex-occurrences s)
   ;; ((name . position after the name) ...) of the commands in @s
@@ -1789,11 +1825,11 @@
 
 (define (check-latex-source s)
   (when (string-contains? (locase-all s) "filecontents")
-    (tool-error "the LaTeX environment filecontents writes files: refused (nothing was changed)"))
+    (violate! "the LaTeX environment filecontents writes files: refused (nothing was changed)"))
   ;; the importer of LaTeX reads the files of \input and the like: not accepted
   (for (o (latex-occurrences s))
     (when (member (car o) latex-forbidden)
-      (tool-error (string-append "the LaTeX command \\" (car o) " is refused (it reads files, runs code or hides a command name): the content is refused (nothing was changed)")))
+      (violate! (string-append "the LaTeX command \\" (car o) " is refused (it reads files, runs code or hides a command name): the content is refused (nothing was changed)")))
     (when (member (car o) plain-arg-commands)
       (check-plain-arguments s (car o) (cdr o)))))
 
@@ -1946,10 +1982,6 @@
                (lambda args 'failed))))
       (set! safety-defined? #f)
       (when (!= r 'ok) (throw 'mcp-tool-error)))
-    ;; the second layer: the content as it expands
-    (when d
-      (let ((x (expand-in-document st d)))
-        (when x (check-expanded x base))))
     st))
 
 (define (content-items st)
@@ -2043,12 +2075,140 @@
                     ((> (- (texmacs-time) t0) 10000) 'timeout)
                     (else (loop (+ n 1))))))))))
 
+;;; The filter of the document: an edit may not introduce a violation
+;;; The content is checked as it is written, but what it does depends on the
+;;; document (the macros of the style, the assigns of the preamble, the `with'
+;;; around it), and an edit of a leaf or of a definition changes what existing
+;;; text expands to. So the document is checked after the edit, tentatively
+;;; made inside the transaction of the editor (mark-start, mark-cancel), and a
+;;; violation that was not there before the edit cancels it. The violations that
+;;; were already there (the preamble of the person, their own links) stay.
+;;; The unit is the top-level block that holds the edit (and the blocks the edit
+;;; adds), with the assigns of the blocks before it; when an assign is changed
+;;; the whole document is compared. Evaluation has a budget: what does not
+;;; evaluate within it is a violation.
+
+(define block-budget 1500000)
+(define document-budget 40000000)
+
+(define (expansion-violations st base d assigns budget)
+  ;; the violations of the rules for the expansion of @st (a stree), in the
+  ;; environment of the document after @assigns
+  (let* ((u (doc-url d))
+         (r (catch #t
+              (lambda ()
+                (exec-budget-start budget)
+                ;; (the assigns come first, to define; what is checked is the last
+                ;; part, the expansion of the content)
+                (let ((x (with-buffer u
+                           (tm->stree (texmacs-exec (stree->tree (cons 'concat (append assigns (list (list 'document st))))))))))
+                  (if (and (pair? x) (eq? (car x) 'concat) (pair? (cdr x)))
+                      (car (reverse (cdr x)))
+                      x)))
+              (lambda args #f)))
+         (left (exec-budget-end)))
+    (cond ((< left 0) (list "the content does not evaluate within the budget (it expands too much)"))
+          ((not r) (list "the content cannot be evaluated"))
+          (else (collect-violations (lambda () (check-expanded r base)))))))
+
+(define (literal-violations st base d)
+  (set! safety-defined? (and d (defined-predicate d)))
+  (let ((r (collect-violations (lambda () (check-safety st base) (check-arity st d)))))
+    (set! safety-defined? #f)
+    r))
+
+(define (assigns-before d i)
+  ;; the assigns of the blocks before the block number @i (and of the other
+  ;; place where the document defines something: the blocks are in order)
+  (let loop ((l (tree-children (doc-body d))) (k 0) (acc '()))
+    (if (or (null? l) (>= k i))
+        acc
+        (loop (cdr l) (+ k 1) (append acc (assign-nodes (car l)))))))
+
+(define (block-violations d blk i)
+  ;; the violations of the top-level block @blk (a tree) of index @i
+  (let ((st (tm->stree blk)) (base (doc-base d)))
+    (append (literal-violations st base d)
+            (expansion-violations st base d (assigns-before d i) block-budget))))
+
+(define (document-violations d)
+  ;; the violations of the whole document
+  (let* ((body (doc-body d)) (st (tm->stree body)) (base (doc-base d)))
+    (append (literal-violations st base d)
+            (expansion-violations st base d '() document-budget))))
+
+(define (assigns-signature d)
+  (tree-hash (stree->tree (cons 'tuple (assign-nodes (doc-body d))))))
+
+(define (new-violations before after)
+  ;; the reasons of @after that are not in @before (with their number)
+  (let loop ((l after) (pool before) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((member (car l) pool)
+           (loop (cdr l) (let rm ((p pool)) (cond ((null? p) '()) ((equal? (car p) (car l)) (cdr p)) (else (cons (car p) (rm (cdr p)))))) acc))
+          (else (loop (cdr l) pool (cons (car l) acc))))))
+
+(define (guard-pre d t)
+  ;; before an edit of the node @t (or of the document: #f): what is needed to
+  ;; compare after it
+  (let* ((body (doc-body d))
+         (blk (and t (not (body-root? d t)) (top-level-ancestor d t)))
+         (i (and blk (index-in-body d blk)))
+         (defs? (and blk (pair? (assign-nodes blk)))))
+    (list (and blk (ptr blk))
+          (and blk i (block-violations d blk i))
+          (assigns-signature d)
+          (and defs? (document-violations d)))))
+
+(define (guard-fail! reasons)
+  (set! edit-reason
+        (string-append "the edit is refused: it would introduce what the content filter refuses ("
+                       (utf8-prefix (u8 (car reasons)) 200)
+                       (if (pair? (cdr reasons)) (string-append ", and " (number->string (length (cdr reasons))) " more") "")
+                       "); nothing was changed"))
+  (throw 'mcp-guard-refused))
+
+(define (guard-post d pre new-nodes skip-block?)
+  ;; after the edit, inside its transaction: refuse it if it introduced a violation
+  (let* ((old-ptr (car pre)) (old-viol (cadr pre))
+         (blk (and old-ptr (not skip-block?) (deref old-ptr)))
+         (blocks (let loop ((l (append (if (and blk (tree? blk) (inside-body? d blk)
+                                                (not (body-root? d blk)))
+                                           (list (top-level-ancestor d blk)) '())
+                                       (map (lambda (n) (and (tree? n) (inside-body? d n)
+                                                             (not (body-root? d n))
+                                                             (top-level-ancestor d n)))
+                                            new-nodes)))
+                           (acc '()))
+                   (cond ((null? l) (reverse acc))
+                         ((not (car l)) (loop (cdr l) acc))
+                         ((list-find acc (lambda (x) (tree-eq? x (car l)))) (loop (cdr l) acc))
+                         (else (loop (cdr l) (cons (car l) acc)))))))
+    (for (b blocks)
+      (let* ((i (index-in-body d b))
+             (after (block-violations d b i))
+             (before (if (and blk (tree? blk) (tree-eq? b (top-level-ancestor d blk))) (or old-viol '()) '()))
+             (new (new-violations before after)))
+        (when (pair? new) (guard-fail! new))))
+    (when (!= (assigns-signature d) (caddr pre))
+      (let ((full-before (cadddr pre)))
+        (when (not full-before)
+          (guard-fail! (list "it changes the definitions of the document")))
+        (let ((new (new-violations full-before (document-violations d))))
+          (when (pair? new) (guard-fail! new)))))))
+
 (define edit-reason #f)
+(define current-guard #f)
+
+(define (set-guard! d t get-nodes skip-block?)
+  ;; the next run-edit! checks the document before and after (see guard-post)
+  (set! current-guard (list d (guard-pre d t) get-nodes skip-block?)))
 
 (define (run-edit! d thunk)
   ;; do @thunk (it changes the tree) as one step of the editor of the buffer,
   ;; all or nothing; gives its value
-  (let ((u (doc-url d)) (failed #f) (value #f))
+  (let ((u (doc-url d)) (failed #f) (value #f) (g current-guard))
+    (set! current-guard #f)
     (with-buffer u
       (start-editing)
       (let ((a (get-author)))
@@ -2058,6 +2218,16 @@
                         (mark-cancel a)
                         (set! failed #t)
                         #f)))
+        ;; (the document is checked as it is after the edit; a violation that was
+        ;; not there before cancels the edit)
+        (when (and g (not failed))
+          (catch #t
+            (lambda () (guard-post (car g) (cadr g) ((caddr g)) (cadddr g)))
+            (lambda args
+              (when (not edit-reason)
+                (set! edit-reason "the check of the document after the edit failed or ran out of budget: nothing was changed"))
+              (mark-cancel a)
+              (set! failed #t))))
         (when (not failed) (mark-end a))
         (end-editing)))
     (when failed
@@ -2234,6 +2404,7 @@
             (tool-error "the node is part of a paragraph: the content must be one item, not several blocks"))
           (cond
             (block?
+             (set-guard! d t (lambda () nodes) #f)
              (run-edit! d
                (lambda ()
                  (tree-assign t (tree-of-stree (car items)))
@@ -2249,12 +2420,14 @@
                     (kids (cdr pold))
                     (new (inline-stree (append (sublist kids 0 i) items
                                                (list-tail kids (+ i 1))))))
+               (set-guard! d t (lambda () nodes) #f)
                (run-edit! d
                  (lambda ()
                    (tree-assign parent (tree-of-stree new))
                    (set! nodes (list parent))))
                (finish-edit! d dist nodes (undo-replace d nodes (list pold)))))
             (else
+              (set-guard! d t (lambda () nodes) #f)
               (run-edit! d
                 (lambda ()
                   (tree-assign t (tree-of-stree (car items)))
@@ -2305,6 +2478,7 @@
                (nodes '()))
           (cond
             ((tm-is? parent 'document)
+             (set-guard! d (if ah anchor #f) (lambda () nodes) #f)
              (run-edit! d
                (lambda ()
                  (tree-var-insert parent pos (tree-of-stree (cons 'document items)))
@@ -2316,6 +2490,7 @@
              (let* ((old (tm->stree parent)) (kids (cdr old))
                     (new (inline-stree (append (sublist kids 0 pos) items
                                                (list-tail kids pos)))))
+               (set-guard! d (if ah anchor #f) (lambda () nodes) #f)
                (run-edit! d
                  (lambda ()
                    (tree-assign parent (tree-of-stree new))
@@ -2367,11 +2542,13 @@
                (if (and (not prev) (not next))
                    ;; (a document is never empty: its only block becomes an empty text)
                    (let ((nodes '()))
+                     (set-guard! d t (lambda () (quote ())) (body-root? d parent))
                      (run-edit! d (lambda ()
                                     (tree-assign t (tree-of-stree ""))
                                     (set! nodes (list (tree-ref parent 0)))))
                      (finish-edit! d dist '() (undo-replace d nodes (list old))))
                    (begin
+                     (set-guard! d t (lambda () (quote ())) (body-root? d parent))
                      (run-edit! d (lambda () (tree-remove parent i 1)))
                      (finish-edit! d dist '()
                                    (undo-delete d parent prev next old))))))
@@ -2380,6 +2557,7 @@
                     (kids (cdr pold))
                     (new (inline-stree (append (sublist kids 0 i) (list-tail kids (+ i 1)))))
                     (nodes '()))
+               (set-guard! d t (lambda () (quote ())) (body-root? d parent))
                (run-edit! d (lambda ()
                               (tree-assign parent (tree-of-stree new))
                               (set! nodes (list parent))))
@@ -2460,6 +2638,7 @@
             (else
               (let* ((leaf (car (car hits))) (pos (cdr (car hits)))
                      (dist (disturbances d)))
+                (set-guard! d t (lambda () (list t)) #f)
                 (run-edit! d
                   (lambda ()
                     (tree-remove leaf pos (string-length old*))
@@ -2585,7 +2764,12 @@
                             (lambda ()
                               (tree-assign (doc-body d)
                                            (tree-of-stree (cons 'document items)))))
-                          (forget-steps! d))
+                          (forget-steps! d)
+                          ;; (a new document has nothing but the content)
+                          (let ((v (document-violations d)))
+                            (when (pair? v)
+                              (tool-error (string-append "the content is refused: "
+                                                         (utf8-prefix (u8 (car v)) 200))))))
                         d))
                     (lambda args
                       (set! failed #t)

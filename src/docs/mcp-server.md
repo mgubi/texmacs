@@ -177,25 +177,48 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   and walked completely, also what the LaTeX and Markdown importers make of it.
   The filter has **two layers**, because a list of names of macros keeps leaking (a
   wrapper macro, an alias made with `with` and `value`, a macro that calls the macro
-  named by its argument...):
-  1. *The tree as written* is checked by name: the classification below, the
-     allowlist of tags (defined by the style or the document), the characters of the
-     strings that become names in an export, the values of `with`, `cwith` and
-     `twith`, aliases (`<value|href>`, `<with|em|...>` where `em` is a tag), the macros
-     that call a macro named by an argument (`map` and the like, with a dangerous
-     name), the arity. This is the cheap first pass.
-  2. *The tree as it expands*: the content is evaluated in the environment of the
-     document (`texmacs-exec` in its buffer, after the `assign`s of the document), down
-     to the primitives, and the rules of the primitives are applied to the result,
-     whatever macro made it: the destination of every `link` and `hlink` (the scheme
-     rule), the file of every `image`, `include`, `include*`, `pattern`, `postscript`,
-     `video`, `sound` (the files rule, also for the full names that the evaluator
-     gives), `script` and `action` (only the commands `mouse-fold` and `mouse-unfold`
-     of the folding tags), `specific`, `latex`, and what the evaluator leaves of
-     `extern`, `hybrid`, `authorize`, `observer`. `hlink*`, `tmdoc-link`, `item-pic`,
-     `cite`, `reference`, the folding tags... are thus checked by what they become.
-  The document itself is not changed by the second layer: the content written is
-  inserted, not the expansion.
+  named by its argument, a leaf of an existing node, a definition changed under its
+  uses, the `with` around the place of an insertion...):
+  1. *The content as written* is checked by name, cheaply, before anything is
+     done: the classification below, the allowlist of tags (defined by the style or
+     the document), the characters of the strings that become names in an export, the
+     values of `with`, `cwith` and `twith` (typed: a size or a colour is not a
+     compound), aliases (`<value|href>`, `<with|em|...>` where `em` is a tag), the
+     macros that call a macro named by an argument (`map` and the like, with a
+     dangerous name), the arity.
+  2. *The document after the edit, compared with the document before it.* The edit
+     is made tentatively inside the transaction of the editor (`mark-start`) and, if
+     it introduced something the filter refuses that was not there before,
+     cancelled (`mark-cancel`) with the reason ("the edit is refused: it would
+     introduce what the content filter refuses (...)"). The unit is the top-level
+     block that holds the edit (and the blocks the edit adds), checked in two forms:
+     as written (the rules of layer 1 on the block) and as it expands (the block is
+     evaluated by `texmacs-exec` in the environment of the document, after the
+     `assign`s of the blocks before it, down to the primitives, and the rules of the
+     primitives are applied: the destination of every `link` and `hlink`, the file of
+     every `image`, `include`, `include*`, `pattern`, `postscript`, `video`, `sound`
+     (also the full names that the evaluator gives), `script` and `action` (only
+     `mouse-fold` and `mouse-unfold`, what the folding tags make), `specific`, `latex`,
+     what the evaluator leaves of `extern`, `hybrid`, `authorize`, `observer`, and
+     any `error`). Only the *new* violations count (by their text, with their
+     number): what the person already has, in their preamble or their text, stays and
+     does not make the edits refused. So a leaf of an existing node (the address of a
+     link, a label, the file of an image, the value of a `with`), the macros whose
+     definition is changed (when an `assign` of the document changes, the whole
+     document is compared before and after), and the environment around the
+     insertion (a `with` of the person, a macro of theirs that depends on it) are
+     covered by construction.
+  *Budgets.* The evaluation of the content has a budget of 1.5 million steps for a
+  block (40 million for the whole document, when a definition changed): an
+  expansion that exceeds it (a macro that calls its argument twice, nested) is a
+  violation, the edit is refused, and the server stays alive. The budget is a counter
+  in the evaluator (`exec_budget_start`, `exec_budget_end` in `env_exec.cpp`, off
+  unless asked). The nesting of macros is also limited, always, to 1200 levels (a
+  macro that calls itself returned a stack overflow; it now gives an error tree),
+  which protects the person's TeXmacs as well. Any failure of the check (an
+  error, a budget) refuses the edit. The document itself is not changed by the check:
+  the content written is inserted, not the expansion. 20000 paragraphs: an edit takes
+  20 to 50 ms.
 
   Every one of the 370 primitives of the DRD (`src/Data/Drd/drd_std.cpp`) is
   classified below by its real name; the lists in `mcp-server.scm` are this table,
