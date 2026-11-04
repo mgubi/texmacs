@@ -268,6 +268,21 @@
       (check-true (nopwn `(new-remark "rem" ,p)))
       (check-true (nopwn `(float "figure" ,(string-append "h]" p) (document "x"))))
       (check-true (nopwn `(wide-float "figure" ,(string-append "h]" p) "x"))))
+    (let ((nopwn (lambda (t) (not (string-occurs? "\\input{pwn}" (tls t)))))
+          (p "x}\\input{pwn}\\y{"))
+      (for (pre '("cal-" "bbb-" "frak-" "b-" "b-up-" "up-" "b-cal-"))
+        (check-true (nopwn `(with "mode" "math" ,(string-append "<" pre p ">")))))
+      (check-true (nopwn `(with "mode" "math" (around* "(" "x" ,p)))))
+    (check-true (string-occurs? "\\left\\{"
+                                (tls '(with "mode" "math" (around* "{" (frac "a" "b") "}")))))
+    (check-true (string-occurs? "\\right\\}"
+                                (tls '(with "mode" "math" (around* "{" (frac "a" "b") "}")))))
+    (check-true (string-occurs? "\\left("
+                                (tls '(with "mode" "math" (around* "(" (frac "a" "b") ")")))))
+    (check-false (string-occurs? "input{pwn}" (tls "<#x}\\input{pwn}\\y{>")))
+    (check-false (string-occurs? "input{pwn}" (tls '(concat "a" "<#x}\\input{pwn}\\y{>"))))
+    (check-false (string-occurs? "input{pwn}" (tls '(|a}\\input{pwn}\\y{| "z"))))
+    (check= (tls '(with "mode" "math" "<mathcal-A>")) (tls '(with "mode" "math" "<mathcal-A>")))
     (check= (tls '(wide-tabular (tformat (table (row (cell "a"))))))
             "{\\noindent}\\begin{tabularx}{1.0\\textwidth}{@{}X@{}} a \\end{tabularx}")
     (check= (tls '(new-theorem "thm" "Theorem")) "\\newtheorem{thm}{Theorem}")

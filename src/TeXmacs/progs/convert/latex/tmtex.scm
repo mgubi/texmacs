@@ -438,11 +438,18 @@
   (and (>= (string-length s) (string-length r))
        (== (substring s 0 (string-length r)) r)))
 
+;; <#4E2D>: the token is # and hexadecimal digits, nothing else reaches \char
+(define (tmtex-hex-token? s)
+  (and (> (string-length s) 1)
+       (null? (filter (lambda (c) (not (string-index "0123456789abcdefABCDEF" c)))
+                      (string->list (substring s 1 (string-length s)))))))
+
 (define (tmtex-modified-token op s i)
   (tex-math-apply op
     (if (= (string-length s) (+ i 1))
         (substring s i (string-length s))
-        (tex-apply (string->symbol (substring s i (string-length s)))))))
+        (tex-apply (string->symbol
+                    (tmtex-keep-chars (substring s i (string-length s)) '()))))))
 
 (logic-table latex-special-symbols%
   ("less"          #\<)
@@ -488,11 +495,11 @@
         ((string-starts? s "b-") (tmtex-modified-token 'tmmathbf s 2))
         ((and (not (tmtex-math-mode?)) (logic-ref latex-text-symbols% s))
          (list '!group (list (logic-ref latex-text-symbols% s))))
-        ((and (string-starts? s "#") (not tmtex-use-catcodes?))
+        ((and (string-starts? s "#") (tmtex-hex-token? s) (not tmtex-use-catcodes?))
          (let* ((qs (string-append "<" s ">"))
                 (cv (string-convert qs "Cork" "UTF-8")))
            (list '!widechar (string->symbol cv))))
-        ((and (string-starts? s "#") tmtex-use-catcodes?)
+        ((and (string-starts? s "#") (tmtex-hex-token? s) tmtex-use-catcodes?)
          (let* ((qs (string-append "<" s ">"))
                 (us (string-convert qs "Cork" "UTF-8"))
                 (cv (string-convert us "UTF-8" "LaTeX")))
@@ -1164,7 +1171,9 @@
 
 (define (tmtex-large-name s)
   ;; the name of a delimiter, in \left<name>: letters only, else a dot
-  (with r (tmtex-keep-chars s '())
+  (with r (list->string (filter (lambda (c) (and (char-alphabetic? c)
+                                                 (< (char->integer c) 128)))
+                                (string->list s)))
     (if (== r "") "." (string-append "\\" r))))
 
 (define (tmtex-large-decode s)
@@ -1172,6 +1181,7 @@
         ((in? s '("(" ")" "[" "]" "|" "/" ".")) s)
         ((in? s '("||" "<||>")) "\\|")
         ((== s "\\") "\\backslash")
+        ((in? s '("{" "}")) (string-append "\\" s))
         ((and (string-starts? s "<") (string-ends? s ">"))
          (tmtex-large-name (substring s 1 (- (string-length s) 1))))
         (else (tmtex-large-name s))))
