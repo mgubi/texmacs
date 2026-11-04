@@ -53,6 +53,25 @@
   (set! sf-paused? flag))
 
 (define (sf-get sf name) (ahash-ref sf name))
+
+;; Patches are numbered by their author: the id is <author>/<n>. Every process
+;; keeps the highest n it knows to have been applied, for each author (from
+;; the patches the host sends, so that a participant that becomes host has it),
+;; and a patch whose n is not above is not applied again.
+(define (id-split id)
+  (let loop ((i (- (string-length id) 1)))
+    (cond ((< i 0) (cons id 0))
+          ((char=? (string-ref id i) #\/)
+           (cons (substring id 0 i)
+                 (or (string->number (substring id (+ i 1) (string-length id))) 0)))
+          (else (loop (- i 1))))))
+(define (id-author id) (car (id-split id)))
+(define (id-seq id) (cdr (id-split id)))
+(define (seen-seq sf author) (or (ahash-ref (sf-get sf 'seen) author) 0))
+(define (seen! sf id)
+  (when (string? id)
+    (ahash-set! (sf-get sf 'seen) (id-author id)
+                (max (id-seq id) (seen-seq sf (id-author id))))))
 (define (sf-put! sf name val) (ahash-set! sf name val))
 
 (define sf-debugging? (and (getenv "TEXMACS_SHARED_DEBUG") #t))
@@ -161,14 +180,21 @@
            (with e (catch #t
                      (lambda () (string->object (string-load u)))
                      (lambda args #f))
-             (and (func? e 'entry) (== (length e) 7) (== (cadr e) key) e))))))
+             (and (func? e 'entry) (== (length e) 8) (== (cadr e) key) e))))))
 
-(define (write-entry key port token interactive host-id)
-  ;; (only by the holder of the lock)
+(define (write-entry key port token interactive host-id npeers)
+  ;; (only by the holder of the lock) @npeers is the number of participants:
+  ;; a process that finds the entry of a host which is gone knows by it how
+  ;; long the participants take to seek the lock
   (and-with path (entry-path key)
     (shared-replace-file
      path (object->string (list 'entry key port token (shared-process-id)
-                                interactive host-id)))))
+                                interactive host-id npeers)))))
+
+(define (host-write-entry! sf)
+  (write-entry (sf-key sf) (local-listen) (sf-get sf 'token)
+               (sf-get sf 'interactive) (sf-get sf 'id)
+               (length (sf-get sf 'peers))))
 
 (define (remove-entry key)
   ;; (only by the holder of the lock)
@@ -498,6 +524,7 @@
     (sf-put! sf 'id (sf-new-id))
     (sf-put! sf 'interactive (shared-interactive?))
     (sf-put! sf 'authors (make-ahash-table))
+    (sf-put! sf 'seen (make-ahash-table))
     (sf-put! sf 'collect '())
     (sf-put! sf 'pending '())     ; local patches not yet in the host's states
     (sf-put! sf 'inflight #f)     ; id of the first of them, sent
@@ -568,19 +595,79 @@
   (let ((c (local-connect (caddr entry))))
     (when (>= c 0)
       (msg-send c (list 'hello (cadddr entry) key id (shared-process-id)
-                        interactive base)))
+                        interactive base #f)))
     c))
 
 (define sf-join-wait 500)   ; ms: the most a join makes the interface wait
 (define sf-unshared (make-ahash-table))  ; names opened without sharing
+
+;; A host that is gone but whose participants may be seeking the lock (its
+;; entry says how many): a process which opens the file then must not host it
+;; from the disk, which has less than the participants have. It opens the file
+;; read-only (the footer says that it is connecting) and polls, on the timer,
+;; for the new host, for as long as the participants take (300 ms for each, and
+;; one second); it hosts from the disk only after that, if the lock is still
+;; free. Nothing blocks.
+(define sf-pending (make-ahash-table))   ; (url->string name) -> record
+
+(define (pending-join! name key wait old-token)
+  (ahash-set! sf-pending (url->string name)
+              (list name key (+ (texmacs-time) wait) old-token 0))
+  (shared-ensure-tick!))
+
+(define (pending-start! name)
+  ;; the buffer of a file whose host is awaited
+  (buffer-set-read-only name #t)
+  (set-message "Shared file: connecting to the process which had this file open (read-only for a moment)"
+               "Shared file"))
+
+(define (pending-done! name)
+  (ahash-remove! sf-pending (url->string name))
+  (when (buffer-exists? name) (buffer-set-read-only name #f)))
+
+(define (pending-poll!)
+  (let ((now (texmacs-time)))
+    (for (rec (map cdr (ahash-table->list sf-pending)))
+      (with (name key deadline old-token next) rec
+        (when (>= now next)
+          (ahash-set! sf-pending (url->string name)
+                      (list name key deadline old-token (+ now 100)))
+          (cond
+            ((not (buffer-exists? name))
+             (ahash-remove! sf-pending (url->string name)))
+            ((not (lock-free? key))
+             ;; someone hosts: join it when its entry is new
+             (let ((e (read-entry key)))
+               (cond ((and e (not (and old-token (token=? (cadddr e) old-token))))
+                      (pending-done! name)
+                      (with r (join-host name key e)
+                        (cond ((== r #t) #t)
+                              ((== r 'busy) (tell-unshared name))
+                              (else (host-start name key 0)))))
+                     ((> now deadline)
+                      (pending-done! name)
+                      (tell-unshared name)))))
+            ((> now deadline)
+             ;; nobody took the file: from the disk
+             (pending-done! name)
+             (host-start name key 0))))))))
+
+(define (tell-unshared name)
+  (set-message "Shared file: the process which has this file open does not answer; it is opened from the file, without sharing"
+               "Shared file"))
 
 (define (note-unshared! name)
   ;; another process holds the lock of the file (it hosts it) but does not
   ;; answer: the file is read as usual, not shared. It is never hosted
   ;; meanwhile: the lock is what makes a host, and a stalled host keeps it.
   (ahash-set! sf-unshared (url->string name) (texmacs-time))
-  (set-message "Shared file: the process which has this file open does not answer; it is opened from the file, without sharing"
-               "Shared file"))
+  (tell-unshared name))
+
+(define (abandoned! name key entry)
+  ;; the lock of the file is free but its entry is there: the host is gone
+  (when (> (list-ref entry 7) 0)
+    (pending-join! name key (+ 1000 (* 300 (list-ref entry 7))) (cadddr entry)))
+  #f)
 
 (tm-define (shared-file-try-join name)
   (:synopsis "Join the process which has the file @name open, if there is one")
@@ -594,9 +681,12 @@
               (not (ahash-ref sf-table key))
               (with entry (read-entry key)
                 (and entry
-                     (with r (join-host name key entry)
-                       (when (== r 'busy) (note-unshared! name))
-                       (== r #t))))))))
+                     (if (lock-free? key)
+                         (abandoned! name key entry)
+                         (with r (join-host name key entry)
+                           (cond ((== r #t) #t)
+                                 ((== r 'busy) (note-unshared! name) #f)
+                                 (else (abandoned! name key entry)))))))))))
 
 ;; (join-host with a buffer which exists, read from the file, replaces it)
 (define (join-host name key entry)
@@ -636,7 +726,9 @@
   (:synopsis "Called when the buffer @name has been loaded from its file")
   ;; The process hosts the file if it can get the lock; else a host appeared
   ;; meanwhile and the process joins it, replacing what it has read.
-  (cond ((let ((t (ahash-ref sf-unshared (url->string name))))
+  (cond ((ahash-ref sf-pending (url->string name))
+         (pending-start! name))
+        ((let ((t (ahash-ref sf-unshared (url->string name))))
            (ahash-remove! sf-unshared (url->string name))
            (and t (< (- (texmacs-time) t) 10000)))
          (noop))
@@ -655,14 +747,16 @@
               (sf-put! sf 'token token)
               (sf-put! sf 'host-id (sf-get sf 'id))
               (live-create key (sf-composite sf))
-              (write-entry key port token (sf-get sf 'interactive)
-                           (sf-get sf 'id))
+              (host-write-entry! sf)
+              (sf-put! sf 'touch-at (+ (texmacs-time) 3600000))
               (sf-debug "hosting " key " on " port "\n")))
           (else
             ;; someone holds the lock: it hosts the file
             (let ((e (read-entry key)))
               (if (not e)
-                  (note-unshared! name)          ; (it is starting)
+                  (begin                         ; (it is starting: wait)
+                    (pending-join! name key 2000 #f)
+                    (pending-start! name))
                   (with r (join-host name key e)
                     (cond ((== r #t) #t)
                           ((== r 'busy) (note-unshared! name))
@@ -697,6 +791,7 @@
 (define (send-roster sf)
   (with r (roster-of sf)
     (sf-put! sf 'roster r)
+    (host-write-entry! sf)
     (send-peers sf (list 'roster r))))
 
 (define (drop-peer! sf p)
@@ -747,6 +842,14 @@
 (define (host-handle-patch sf peer id base psexp)
   (sf-debug "host got patch " id " base " base "\n")
   (host-flush! sf)
+  (if (<= (id-seq id) (seen-seq sf (peer-id peer)))
+      ;; (sent again: it was applied, its author did not hear of it)
+      (begin (stat! 'duplicate)
+             (msg-send (peer-link peer)
+                       (list 'ack id (live-current-state (sf-key sf)))))
+      (host-handle-patch* sf peer id base psexp)))
+
+(define (host-handle-patch* sf peer id base psexp)
   (let* ((key (sf-key sf))
          (cur (live-current-state key))
          (p0 (patch-remove-set-cursor (scheme->patch psexp)))
@@ -763,6 +866,7 @@
            (if (apply-in-place! sf p (author-of sf (peer-id peer)))
                (let ((to (live-apply-patch key p)))
                  (sf-notify-modified! sf)
+                 (seen! sf id)
                  (cond (to
                          (send-peers sf (list 'applied cur to (peer-id peer) id
                                               (patch->scheme p)))
@@ -777,7 +881,7 @@
             (sf-debug "refused a patch of " (peer-id peer) " from " base "\n")
             (msg-send (peer-link peer) (list 'refused id cur))))))
 
-(define (host-send-welcome sf link base id interactive pid)
+(define (host-send-welcome sf link base id interactive pid inflight)
   ;; the answer to a hello: the document, or what the other lacks
   (let* ((key (sf-key sf))
          (cur (live-current-state key))
@@ -787,6 +891,11 @@
                                 (or (sf-get sf 'dirty) (buffer-modified? name))
                                 (roster-of sf) (sf-get sf 'id)
                                 (tm->stree (sf-meta sf)))))
+          ((and inflight (<= (id-seq inflight) (seen-seq sf id)))
+           ;; the patch it had on its way was applied: its author did not hear
+           (msg-send link (list 'welcome-reset cur (sf-composite-stree sf)
+                                (or (sf-get sf 'dirty) (buffer-modified? name))
+                                (roster-of sf) (sf-get sf 'id))))
           ((== base cur)
            (msg-send link (list 'welcome-same cur (roster-of sf)
                                 (sf-get sf 'id))))
@@ -799,20 +908,20 @@
                                  (or (sf-get sf 'dirty) (buffer-modified? name))
                                  (roster-of sf) (sf-get sf 'id)))))))
 
-(define (host-accept-hello sf link id pid interactive base)
+(define (host-accept-hello sf link id pid interactive base inflight)
   (host-flush! sf)
   (if (not (local-alive? link))
       (local-close link)
-      (host-accept-hello* sf link id pid interactive base)))
+      (host-accept-hello* sf link id pid interactive base inflight)))
 
-(define (host-accept-hello* sf link id pid interactive base)
+(define (host-accept-hello* sf link id pid interactive base inflight)
   (let ((seq (+ (sf-get sf 'seq-counter) 1)))
     (sf-put! sf 'seq-counter seq)
     (sf-put! sf 'peers
              (append (list-filter (sf-get sf 'peers)
                                   (lambda (p) (!= (peer-id p) id)))
                      (list (list id link interactive seq pid))))
-    (host-send-welcome sf link base id interactive pid)
+    (host-send-welcome sf link base id interactive pid inflight)
     (send-roster sf)
     ;; an interactive process hosts rather than a headless one: it is
     ;; offered the file
@@ -846,11 +955,53 @@
     (when (and (find-peer sf (peer-id p)) (not (local-alive? (peer-link p))))
       (sf-debug "peer " (peer-id p) " is gone\n")
       (drop-peer! sf p)))
+  (host-check-lock! sf)
   ;; a headless host retries to give the file to an interactive participant
   (let ((now (texmacs-time)))
     (when (> now (or (sf-get sf 'offer-at) 0))
       (sf-put! sf 'offer-at (+ now 5000))
       (host-offer-handover! sf))))
+
+(define (host-check-lock! sf)
+  ;; The lock is a file: if it has been removed (or replaced) another process
+  ;; could make and lock a new one. Once a second the host checks that the file
+  ;; it holds is the file at the path; if not it makes it again and locks it:
+  ;; if that works nobody else hosts and it goes on; if not another process
+  ;; hosts, and this one stops at once (its document is saved) and joins it.
+  ;; The files are touched once an hour, for the cleaners of /tmp.
+  (let ((now (texmacs-time)) (key (sf-key sf)))
+    (when (> now (or (sf-get sf 'lock-check) 0))
+      (sf-put! sf 'lock-check (+ now 1000))
+      (let ((path (lock-path key)) (h (sf-get sf 'lock)))
+        (cond ((not (shared-lock-valid? h path))
+               (if (shared-lock-renew h path)
+                   (begin (stat! 'lock-renewed) (host-write-entry! sf))
+                   (host-lost-lock! sf)))
+              ((not (url-exists? (string->url (entry-path key))))
+               (host-write-entry! sf)))
+        (when (and (sf-host? sf) (> now (or (sf-get sf 'touch-at) 0)))
+          (sf-put! sf 'touch-at (+ now 3600000))
+          (shared-touch path)
+          (shared-touch (entry-path key)))))))
+
+(define (host-lost-lock! sf)
+  (stat! 'lock-lost)
+  (let ((file (save-recovered-copy! sf)))
+    (set-message
+     `(concat "Shared file: another process hosts this file now (the lock was removed)."
+              ,(if file
+                   `(concat " A copy of your document is in " (verbatim ,(url->system file)))
+                   ""))
+     "Shared file"))
+  (send-peers sf (list 'released (sf-get sf 'token) #f (roster-of sf)))
+  (for (p (sf-get sf 'peers)) (local-close (peer-link p)))
+  (sf-put! sf 'peers '())
+  (shared-lock-release (sf-get sf 'lock))
+  (sf-put! sf 'lock #f)
+  (sf-put! sf 'role 'participant)
+  (sf-put! sf 'roster (roster-of sf))
+  (sf-put! sf 'host-id (sf-get sf 'id))
+  (participant-seek! sf (sf-get sf 'token) #f))
 
 (define (host-save sf)
   ;; (asked by a participant, or the host's own Save which comes here)
@@ -863,13 +1014,18 @@
   (:synopsis "A Save of the buffer @name: handled here when another process hosts it")
   (and-with sf (sf-by-name name)
     (and (== (sf-get sf 'role) 'participant)
-         (sf-get sf 'conn)
          (begin
+           ;; (always queued: with no connection to the host (it is being
+           ;; sought, or does not answer) this process does not write the file)
            (sf-put! sf 'save-wanted #t)
+           (when (not (sf-get sf 'conn)) (stat! 'save-queued))
            (participant-flush! sf)
            (participant-submit! sf)
            (participant-send-save-when-clean! sf)
-           (set-message "Save asked to the host of the file" "Save file")
+           (set-message (if (sf-get sf 'conn)
+                            "Save asked to the host of the file"
+                            "Save queued: the host of the file is not reachable now; it is saved when it answers")
+                        "Save file")
            #t))))
 
 (tm-define (shared-file-saved name)
@@ -898,11 +1054,18 @@
       (sf-put! sf 'msg-id n)
       (stat! 'submitted)
       (sf-put! sf 'inflight id)
-      (msg-send (sf-get sf 'conn)
-                (list 'patch id
-                      (if (sf-get sf 'bad-base) "no such state"
-                          (live-current-state (sf-key sf)))
-                      (patch->scheme (car (sf-get sf 'pending))))))))
+      (let ((msg (list 'patch id
+                       (if (sf-get sf 'bad-base) "no such state"
+                           (live-current-state (sf-key sf)))
+                       (patch->scheme (car (sf-get sf 'pending))))))
+        (sf-put! sf 'last-msg msg)
+        (msg-send (sf-get sf 'conn) msg)))))
+
+(tm-define (shared-test-resend-last! name)
+  (:synopsis "For the tests: send the last patch again")
+  (and-with sf (sf-by-name name)
+    (when (and (sf-get sf 'conn) (sf-get sf 'last-msg))
+      (msg-send (sf-get sf 'conn) (sf-get sf 'last-msg)))))
 
 (tm-define (shared-test-bad-base! name flag)
   (:synopsis "For the tests: submit the patches against a state which does not exist")
@@ -988,6 +1151,26 @@
           (system-remove (url-append (url->url dir) (car l))))
         (loop (cdr l) (- n 1))))))
 
+;; (the whole document of the buffer, as it is, in the recovered folder)
+(define (save-recovered-copy! sf)
+  (set! sf-serial (+ sf-serial 1))
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (file (url-append dir (string-append
+                                "shared-lost-" (number->string (current-time)) "-"
+                                (number->string (shared-process-id)) "-"
+                                (number->string sf-serial) "-document.tm"))))
+    (and (catch #t
+           (lambda () (system-mkdir dir)
+             (not (buffer-export (sf-buffer sf) file "texmacs")))
+           (lambda args #f))
+         file)))
+
+(tm-define (shared-test-reset! name body)
+  (:synopsis "For the tests: a document of the host (this body) replaces this one")
+  (and-with sf (sf-by-name name)
+    (participant-reset! sf (live-current-state (sf-key sf))
+                        `(shared ,(tm->stree (sf-meta sf)) ,body) #f)))
+
 (define (report-lost! sf patches)
   (when (nnull? patches)
     (stat! 'lost)
@@ -1050,6 +1233,18 @@
 (define (participant-reset! sf state doc modified)
   ;; the document of the host replaces everything, pending changes included
   (let* ((key (sf-key sf)) (name (sf-buffer sf)))
+    ;; The document of this process is replaced as a whole, never combined
+    ;; with the new one (that could revert newer changes of the host). When
+    ;; it is not the same, it is first saved in the recovered folder.
+    (when (!= (sf-composite-stree sf) doc)
+      (let ((file (save-recovered-copy! sf)))
+        (stat! 'replaced)
+        (set-message
+         `(concat "Shared file: the document of the host replaces yours."
+                  ,(if file
+                       `(concat " Yours is saved in " (verbatim ,(url->system file)))
+                       ""))
+         "Shared file")))
     (report-lost! sf (sf-get sf 'pending))
     (sf-put! sf 'pending '())
     (sf-put! sf 'inflight #f)
@@ -1115,6 +1310,7 @@
   (let ((key (sf-key sf)))
     (cond ((func? msg 'applied)
            (with (tag from to author id psexp) msg
+             (seen! sf id)
              (cond ((!= from (live-current-state key))
                     (participant-request-resync! sf))
                    ((and id (== id (sf-get sf 'inflight))
@@ -1137,6 +1333,10 @@
                  (participant-request-resync! sf))
                (when (!= cur (live-current-state key))
                  (participant-request-resync! sf)))))
+          ((func? msg 'ack)
+           ;; the host had the patch already: the document is asked
+           (when (== (cadr msg) (sf-get sf 'inflight))
+             (participant-request-resync! sf)))
           ((func? msg 'roster)
            (sf-put! sf 'roster (cadr msg)))
           ((func? msg 'saved)
@@ -1234,6 +1434,7 @@
     (when c (local-close c)))
   (sf-put! sf 'conn #f)
   (sf-put! sf 'reconnecting #f)
+  (when (sf-get sf 'inflight) (sf-put! sf 'last-inflight (sf-get sf 'inflight)))
   (sf-put! sf 'inflight #f)
   (let* ((old-id (sf-get sf 'host-id))
          (ids (map car (by-priority
@@ -1298,7 +1499,8 @@
               (loop (cdr l))
               (live-create key (sf-composite sf)))))
       (when (nnull? pend) (sf-put! sf 'dirty #t))
-      (write-entry key port token (sf-get sf 'interactive) (sf-get sf 'id))
+      (host-write-entry! sf)
+      (sf-put! sf 'touch-at (+ (texmacs-time) 3600000))
       (reconnect-ok! sf)
       (sf-debug "now hosting " key " on " port "\n")
       ;; a Save asked in the meantime is done here now
@@ -1317,9 +1519,14 @@
              (sf-put! sf 'host-token token)
              (sf-put! sf 'inflight #f)
              (sf-put! sf 'reconnecting (list c (+ (texmacs-time) 2500)))
+             ;; (the last argument: the patch that was on its way to the old
+             ;; host: if that host applied it, this is not told to its author,
+             ;; and the new host sends the whole document, not a patch which
+             ;; would put the change in twice)
              (msg-send c (list 'hello token (sf-key sf) (sf-get sf 'id)
                                (shared-process-id) (sf-get sf 'interactive)
-                               (live-current-state (sf-key sf)))))
+                               (live-current-state (sf-key sf))
+                               (sf-get sf 'last-inflight))))
             (else (participant-reconnect-failed! sf))))))
 
 (define (participant-reconnect-failed! sf)
@@ -1335,10 +1542,12 @@
     (when c (local-close c)))
   (sf-put! sf 'conn #f)
   (sf-put! sf 'reconnecting #f)
+  (when (sf-get sf 'inflight) (sf-put! sf 'last-inflight (sf-get sf 'inflight)))
   (sf-put! sf 'inflight #f)
   (sf-put! sf 'seeking (list #f (+ (texmacs-time) 1000))))
 
 (define (reconnect-ok! sf)
+  (sf-put! sf 'last-inflight #f)
   (sf-put! sf 'reconnect-fails 0))
 
 (define (reconnect-step sf)
@@ -1423,7 +1632,7 @@
          sf-incoming
          (lambda (e)
            (let* ((c (car e)) (m (msg-receive c)))
-             (cond ((and m (func? m 'hello) (== (length m) 7))
+             (cond ((and m (func? m 'hello) (== (length m) 8))
                     (identify-link c m)
                     #f)
                    (m (local-close c) #f)
@@ -1434,11 +1643,11 @@
 (define (identify-link c m)
   ;; the first packet of a link: it must have the token of the file, else
   ;; the link is closed
-  (with (tag token key id pid interactive base) m
+  (with (tag token key id pid interactive base inflight) m
     (let ((sf (ahash-ref sf-table key)))
       (cond ((and sf (sf-host? sf) (token=? token (sf-get sf 'token)))
              (local-set-limit c 67108864)
-             (host-accept-hello sf c id pid interactive base))
+             (host-accept-hello sf c id pid interactive base inflight))
             (else (local-close c))))))
 
 (define (sf-tick sf)
@@ -1454,10 +1663,13 @@
     (catch #t
       (lambda () (accept-new-links))
       (lambda args (display* "shared file error: " args "\n")))
+    (catch #t
+      (lambda () (pending-poll!))
+      (lambda args (display* "shared file error: " args "\n")))
     (for (sf (map cdr (ahash-table->list sf-table)))
       (when (ahash-ref sf-table (sf-key sf))
         (sf-tick sf))))
-  (if (== (ahash-size sf-table) 0)
+  (if (and (== (ahash-size sf-table) 0) (== (ahash-size sf-pending) 0))
       (begin (set! sf-tick-running? #f) #t)
       20))
 

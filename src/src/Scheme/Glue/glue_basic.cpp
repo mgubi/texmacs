@@ -2258,6 +2258,49 @@ tmg_shared_lock_release (tmscm arg1) {
 }
 
 tmscm
+tmg_shared_lock_validP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-lock-valid?");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "shared-lock-valid?");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_lock_valid (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_lock_renew (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-lock-renew");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "shared-lock-renew");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_lock_renew (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_touch (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-touch");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  shared_touch (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_tt_existsP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
@@ -13062,6 +13105,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("shared-random-token",  tmg_shared_random_token, 0, 0, 0);
   tmscm_install_procedure ("shared-lock-acquire",  tmg_shared_lock_acquire, 1, 0, 0);
   tmscm_install_procedure ("shared-lock-release",  tmg_shared_lock_release, 1, 0, 0);
+  tmscm_install_procedure ("shared-lock-valid?",  tmg_shared_lock_validP, 2, 0, 0);
+  tmscm_install_procedure ("shared-lock-renew",  tmg_shared_lock_renew, 2, 0, 0);
+  tmscm_install_procedure ("shared-touch",  tmg_shared_touch, 1, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);

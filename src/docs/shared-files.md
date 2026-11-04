@@ -74,10 +74,14 @@ per-user folder is not made: the feature is off there.
 
 ## Discovery
 
-The folder is `$XDG_RUNTIME_DIR` (Linux) or `$TMPDIR` or `/tmp`, then
-`texmacs-<uid>/shared`; on macOS `$TMPDIR` is a folder of the user. On Windows there is none. It is made with mode 0700, and if it exists it
-must be a directory owned by the user (else no sharing). It does not depend on
-`TEXMACS_HOME_PATH`.
+The folder is one for the user, the same for every process whatever its
+environment (`TMPDIR`, `XDG_RUNTIME_DIR` do not count): `/tmp/texmacs-<uid>/shared`,
+with `/tmp` as the system resolves it (on macOS `/private/tmp`). It is made with
+mode 0700 and must be a directory owned by the user (checked with `lstat`),
+else there is no sharing. It does not depend on `TEXMACS_HOME_PATH`. (The
+variable `TEXMACS_SHARED_DIR` replaces `/tmp`; the tests use it, to have a folder
+of their own.) On Windows there is none. As cleaners of `/tmp` go by age, a host
+touches its lock and its entry once an hour.
 
 **Who hosts a file is decided by the system.** For each file the folder has
 `f-<hash of the canonical path>.lock`, and a process is the host of the file
@@ -97,9 +101,16 @@ a random token of 128 bits from `/dev/urandom`, the pid, whether the host is
 interactive, and its id. It is written (whole, replaced atomically by
 temporary file and rename) by the holder of the lock after it has got it, and
 never trusted for authority: a leftover entry, empty, damaged or of a process
-that is gone, makes no difference, since the lock is free then. An entry is
+that is gone, makes no difference, since the lock is free then. It has the
+number of participants (rewritten at each join and leave): when a host gives the
+file up or dies, it tells how many are going to seek the lock. An entry is
 removed when a host leaves with nobody; leftovers stay (one small file per
-shared file).
+shared file). A host checks once a second that the lock file is still the file
+at its path (`fstat` against `stat`), and that its entry exists: if the file was
+removed it makes it again and locks it; if that works nobody else hosts and it
+goes on; if it fails another process hosts (it made and locked a new one), and
+this one stops at once, saves its document in the recovered folder with a
+notice, and joins that host as a participant. Lock files are never removed.
 
 ## Transport
 
@@ -201,10 +212,26 @@ without a change costs a pass over the variables in C++ (microseconds for
 1500 variables), not a conversion to Scheme. At most 4 new links are accepted
 per tick.
 
+## Patch ids
+
+A patch is sent with an id `<author>/<n>`. Every process keeps, for each author,
+the highest `n` it knows to have been applied (from the `applied` messages of
+the host, so that a participant that becomes host has it). A host does not apply
+a patch whose `n` is not above, and answers `(ack id state)`. A participant that
+reconnects to a new host sends the id of the patch that was on its way to the
+old one: if the new host knows it applied (the old host died after applying it
+and before the author heard), it sends the whole document instead of a patch
+which would put the change in twice (the pending changes of the author are then
+dropped and saved, as for any reset). A reset also saves the author's whole
+document in the recovered folder whenever it is not the same as the one that
+arrives, with a notice, and replaces it as a whole, never as a difference.
+
 ## Saving
 
-Only the host writes the file. A Save in a participant (`save-buffer-main`)
-sends its local changes to the host and, when the host has confirmed all of
+Only the host writes the file. A Save in a participant (`save-buffer-main`) is queued whatever the state
+of its connection (the footer says so when there is none: seeking a host, or a
+host that does not answer) and is done when the host has all the changes, or when
+this process becomes the host; it sends its local changes to the host and, when the host has confirmed all of
 them, sends `(save)`; it does nothing else; the host runs its usual `save-buffer-main`
 (with its checks and dialogs; if the host has applied patches since the last
 save it first calls `buffer-pretend-modified`, since the modified flag is
@@ -233,15 +260,30 @@ number for each).
   from the file, not shared, with a message in the footer. **A stalled host is
   never replaced: it holds the lock.** (Any error of `local-connect` other than
   a refusal gives the same: the lock decides.)
+- **A host that is gone, with participants** (the entry is there, the lock is
+  free, the entry says that it had participants): they are seeking the lock, and
+  have confirmed work that is not on the disk. A process that opens the file then
+  does not host from the disk. It opens the file **read-only** (the footer says
+  that it is connecting), and on the timer, without blocking, waits for as long
+  as the participants take (300 ms for each, and one second) for one of them to
+  take the lock: then it joins that host (replacing the buffer, which has not
+  changed). Only if the lock is still free after that does it host from the disk.
+  With no participant in the entry, it hosts at once.
 - **Host at load**: after a normal load the process tries the lock; if it gets
   it, it hosts (listens, writes the entry). If not, a host appeared meanwhile:
-  it joins it, replacing what it read, or opens unshared with the message.
+  it joins it, replacing what it read; if the host has no entry yet (it is
+  starting) it waits for it in the same way (two seconds), read-only; if the host
+  does not answer, it opens unshared with the message.
 - **Giving up the file** (the file is closed, or a non-interactive host has an
   interactive participant, offered at the hello of the interactive process
   and again every 5 s): the host sends all its changes, then
   `(released token preferred roster)` to all, closes its links, frees the lock
   and, unless it is leaving, goes on as a participant. There is no waiting and
-  no state in between.
+  no state in between. (The entry stays, with its number of participants,
+  until the new host writes its own; joiners do not connect to it: the lock is
+  free or taken by the new host, and they wait as above. A participant that closes
+  the file still waits up to 1 s for its changes to reach the host, see
+  "Changes that are not kept".)
 - **Seeking** (after `released`, or when the link of a host is dead, which is
   how its death is seen): each participant tries the lock, the preferred one
   (first by priority, interactive first) at once, the next ones 300 ms later
@@ -284,7 +326,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`. The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with

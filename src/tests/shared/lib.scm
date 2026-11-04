@@ -126,3 +126,7 @@
          (l (shared-list-dir dir)))
     (map (lambda (n) (string-append dir "/" (if (symbol? n) (symbol->string n) n)))
          (if (list? l) l '()))))
+
+(define (file-has? file str)
+  ;; (string-load may serve a cached copy of a file written in place)
+  (== 0 (system (string-append "grep -q '" str "' '" (url->system file) "'"))))

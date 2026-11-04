@@ -214,6 +214,9 @@
   (shared-random-token shared_random_token (string))
   (shared-lock-acquire shared_lock_acquire (int string))
   (shared-lock-release shared_lock_release (void int))
+  (shared-lock-valid? shared_lock_valid (bool int string))
+  (shared-lock-renew shared_lock_renew (bool int string))
+  (shared-touch shared_touch (void string))
   
   ;; routines for the font database
   (tt-exists? tt_font_exists (bool string))

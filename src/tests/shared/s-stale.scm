@@ -7,7 +7,7 @@
    (act "stale entry"
         (let* ((key (shared-real-path FILE))
                (path (shared-entry-path (the-name))))
-          (shared-create-file path (object->string (list 'entry key 1 "oldtoken" 2147000 #f "x")))
+          (shared-create-file path (object->string (list 'entry key 1 "oldtoken" 2147000 #f "x" 0)))
           (check "stale entry made" (and (shared-entry (the-name)) #t))))
    (act "load" (load-buffer FILE))
    (act "host" (check "A hosts in spite of the stale entry" (== (role-of) 'host))

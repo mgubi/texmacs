@@ -1523,6 +1523,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(shared-lock-valid? <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_lock_valid> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-lock-renew <scm-arg|int> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_lock_renew> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-touch <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_touch> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(tt-exists? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

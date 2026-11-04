@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -95,6 +96,10 @@ local_nonblocking (int fd) {
 #ifndef OS_MINGW
   int fl= fcntl (fd, F_GETFL, 0);
   if (fl >= 0) fcntl (fd, F_SETFL, fl | O_NONBLOCK);
+  // not given to the programs that are started: they would keep the
+  // connection open after this process has died
+  int fd_fl= fcntl (fd, F_GETFD, 0);
+  if (fd_fl >= 0) fcntl (fd, F_SETFD, fd_fl | FD_CLOEXEC);
 #ifdef SO_NOSIGPIPE
   int one= 1;
   setsockopt (fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof (one));
@@ -477,16 +482,16 @@ shared_env (const char* name) {
 
 string
 shared_user_dir () {
-  // The folder is the same for all the processes of the user, whatever their
-  // TEXMACS_HOME_PATH: [XDG_RUNTIME_DIR | TMPDIR | /tmp]/texmacs-<uid>/shared
-  // on Unix (on macOS TMPDIR is a folder of the user), the temporary folder
-  // of the user on Windows. It must be a folder of the user, which nobody
-  // else can enter (mode 0700), else there is none.
+  // The same folder for every process of the user, whatever its environment:
+  // /tmp/texmacs-<uid>/shared, with /tmp as the system resolves it (on macOS
+  // /private/tmp). (TEXMACS_SHARED_DIR replaces /tmp: for the tests.) It must
+  // be a folder of the user which nobody else can enter (mode 0700), else
+  // there is none. Files in /tmp may be cleaned by age: the hosts touch theirs.
 #ifndef OS_MINGW
-  string base= shared_env ("XDG_RUNTIME_DIR");
-  if (base == "" || access (c_string (base), W_OK) != 0)
-    base= shared_env ("TMPDIR");
-  if (base == "" || access (c_string (base), W_OK) != 0) base= "/tmp";
+  string base= shared_env ("TEXMACS_SHARED_DIR");
+  if (base == "") base= "/tmp";
+  base= shared_real_path (base);
+  if (base == "") return "";
   while (N(base) > 1 && base[N(base)-1] == '/') base= base (0, N(base)-1);
   string top = base * "/texmacs-" * as_string ((int) getuid ());
   string dir = top * "/shared";
@@ -502,8 +507,8 @@ shared_user_dir () {
   return dir;
 #else
   // Not on Windows (yet): it needs a system source of random numbers
-  // (BCryptGenRandom) and an exclusive create of the entries, which were not
-  // written; the preference has no effect there.
+  // (BCryptGenRandom) and a file lock (LockFileEx), which were not written;
+  // the preference has no effect there.
   return "";
 #endif
 }
@@ -638,5 +643,55 @@ shared_lock_release (int id) {
   shared_lock_fds[id]= -1;
 #else
   (void) id;
+#endif
+}
+
+// Is the file which the lock @id holds still the file at @path? (If the file
+// was removed, or replaced, another process could make and lock a new one.)
+bool
+shared_lock_valid (int id, string path) {
+#ifndef OS_MINGW
+  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return false;
+  struct stat a, b;
+  c_string p (path);
+  if (fstat (shared_lock_fds[id], &a) != 0) return false;
+  if (stat ((char*) p, &b) != 0) return false;
+  return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+#else
+  (void) id; (void) path;
+  return false;
+#endif
+}
+
+// Make the file again and lock it, in place of the lock @id: true if it
+// worked (nobody had it), false if another process holds a lock there (then
+// that one is the host, and the lock @id is still the old one).
+bool
+shared_lock_renew (int id, string path) {
+#ifndef OS_MINGW
+  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return false;
+  c_string p (path);
+  int fd= open ((char*) p, O_RDWR | O_CREAT, 0600);
+  if (fd < 0) return false;
+  int fl= fcntl (fd, F_GETFD, 0);
+  if (fl >= 0) fcntl (fd, F_SETFD, fl | FD_CLOEXEC);
+  if (flock (fd, LOCK_EX | LOCK_NB) != 0) { ::close (fd); return false; }
+  ::close (shared_lock_fds[id]);
+  shared_lock_fds[id]= fd;
+  return true;
+#else
+  (void) id; (void) path;
+  return false;
+#endif
+}
+
+// (so that the cleaners of /tmp which go by age leave the files alone)
+void
+shared_touch (string path) {
+#ifndef OS_MINGW
+  c_string p (path);
+  utimes ((char*) p, NULL);
+#else
+  (void) path;
 #endif
 }

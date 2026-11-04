@@ -26,6 +26,11 @@
 #   corrupt     an entry is not trusted (empty, unserved); case of names
 #   late        a target that stalls gets the lock later: one host at a time
 #   lockheld    a lock held by a process that is not TeXmacs: nobody hosts
+#   lockdel     the lock file removed under a host
+#   race        a joiner waits for the seeking participants of a gone host
+#   seeksave    Save with no host is queued
+#   diffdir     one folder whatever TMPDIR and XDG_RUNTIME_DIR
+#   dupe        a patch sent twice; a replaced document is saved whole
 #   slow        a host that is alive but stalled is not replaced
 #   attack      oversize, bad and endless packets before the token
 #
@@ -46,9 +51,9 @@ mkdir -p "$run" || exit 1
 export TEXMACS_PATH="$top/TeXmacs"
 export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-unset XDG_RUNTIME_DIR
+unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or
@@ -79,7 +84,7 @@ for name in "$@"; do
   case $name in
     takeover-window) scen=takeover; bflags="" ;;
     off)             pref=off ;;
-    death)           dead=A ;;
+    death|seeksave)  dead=A ;;
   esac
   pref=${TM_SHARED_PREF:-$pref}
   w="$run/$name"
@@ -94,7 +99,14 @@ for name in "$@"; do
     [ $role = B ] && flags="$bflags"
     extra=""
     [ $name = takeover-window ] && [ $role = B ] && extra="SH_WINDOW=1"
-    env TMPDIR="$w/tmp" TEXMACS_HOME_PATH="$w/home$role" SH_ROLE=$role \
+    # (the folder of the entries and locks is /tmp/texmacs-<uid>/shared for every
+    # process; TEXMACS_SHARED_DIR gives the tests a folder of their own, except
+    # in diffdir, where the processes differ by TMPDIR and XDG_RUNTIME_DIR)
+    shdir="TEXMACS_SHARED_DIR=$w/tmp"; tmpd="$w/tmp"
+    if [ $name = diffdir ]; then
+      mkdir -p "$w/xdg$role" "$w/tmp$role"; shdir="XDG_RUNTIME_DIR=$w/xdg$role"; tmpd="$w/tmp$role"
+    fi
+    env $shdir TMPDIR="$tmpd" TEXMACS_HOME_PATH="$w/home$role" SH_ROLE=$role \
         SH_SYNC="$w/sync" SH_FILE="$w/f.tm" SH_OUT="$w/out-$role" \
         SH_DIR="$here" $extra \
         "$bin" $flags -x "(load \"$here/s-$scen.scm\")" \

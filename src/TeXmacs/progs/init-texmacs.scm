@@ -376,7 +376,7 @@
 (lazy-define (utils relate shared-files) shared-file-try-join shared-file-opened
              shared-file-leave shared-file-participant? shared-file-save-request
              shared-file-saved shared-file? shared-file-info shared-files-list
-             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base!)
+             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path)
 ;(display "Booting partial document facilities\n")
 (lazy-define (part part-shared) buffer-initialize buffer-notify)
 (lazy-menu (part part-menu) document-master-menu)

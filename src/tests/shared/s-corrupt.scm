@@ -11,7 +11,7 @@
         (buffer-close (the-name)))
    (act "pid of a program that is alive, nothing serves"
         (shared-replace-file (shared-entry-path (the-name))
-                             (object->string (list 'entry (shared-real-path FILE) 1 "tok" 1 #f "x"))))
+                             (object->string (list 'entry (shared-real-path FILE) 1 "tok" 1 #f "x" 0))))
    (act "load" (load-buffer FILE))
    (act "check" (check "an entry of a pid alive but not serving is replaced"
                        (and (== (role-of) 'host) (== (list-ref (shared-entry (the-name)) 4) (shared-process-id))))

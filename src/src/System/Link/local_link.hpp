@@ -46,6 +46,9 @@ bool   shared_create_file (string path, string s); // fails if it exists
 bool   shared_replace_file (string path, string s);// atomically (tmp + rename)
 string shared_random_token ();
 int    shared_lock_acquire (string path); // a handle; -1 if held, -2 on error
-void   shared_lock_release (int id);          // 32 hex digits from the system
+void   shared_lock_release (int id);
+bool   shared_lock_valid (int id, string path);  // still the file at path?
+bool   shared_lock_renew (int id, string path);  // make it again and lock it
+void   shared_touch (string path);          // 32 hex digits from the system
 
 #endif // LOCAL_LINK_H
