@@ -836,11 +836,10 @@
 ;; (but data:image/png, jpeg, gif and webp for an image) are not followed.
 ;; The scheme is read as a browser reads it, without spaces and controls,
 ;; with the entities for the colon and the other ones removed.
+;; only ASCII matters for the scheme of an address (integer->char fails above
+;; 255 on Guile 1.8): any other code point is a placeholder, removed later
 (define (tmhtml-entity-char n)
-  ;; the character of a code point of a numeric reference, or ""
-  (if (and (> n 0) (< n 1114112) (not (and (>= n 55296) (< n 57344))))
-      (integer->char n)
-      #\space))
+  (if (and (> n 32) (< n 127)) (integer->char n) #\space))
 
 (define (tmhtml-url-normalize u)
   ;; &#106; &#x6A; (leading zeros, the ; is optional) and the names colon, Tab
@@ -1384,7 +1383,7 @@
 (define (tmhtml-table l)
   (list (tmhtml-make-table (cons 'table l) '() '() '() '())))
 
-(define (tmhtml-tformat l)
+(tm-define (tmhtml-tformat l)
   (with t (tmtable-normalize (cons 'tformat l))
     (receive (tablef colf rowf cellf) (tmtable-properties* t)
       (list (tmhtml-make-table (cAr t) tablef colf rowf cellf)))))

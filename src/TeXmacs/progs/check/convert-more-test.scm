@@ -1917,19 +1917,33 @@
     (check-false (string-occurs? "onmouseover" (cell hostile)))
     (check-true (string-occurs? "inherit" (cell hostile)))
     (check-true (string-occurs? "background-color: #ff0000" (cell "#ff0000")))
-    (check-false (string-occurs? "position"
-                                 (cell '(pattern "x.png" "1cm;position:fixed" "100%"
-                                                 "red;position:fixed"))))
-    (check-false (string-occurs? "javascript"
-                                 (cell '(pattern "javascript:alert(1)" "100%" "100%" "red"))))
-    (check-false (string-occurs? "evil"
-                                 (cell '(pattern "x&#39;);b:url(http://evil/x" "100%" "100%"))))
-)
-  ;; the address of a pattern, in url('...') (the pattern itself is not
-  ;; reached by the export of a cell in this configuration)
-  (check= (tmhtml-css-url "data:image/png;base64,AA") "data:image/png;base64,AA")
-  (check= (tmhtml-css-url "x.png') ;b:url(a") "x.png%27%29 %3bb:url%28a")
-  (check= (tmhtml-css-url "javascript:alert(1)") "#")
+    )
+  ;; The patterns: the export of a document turns a pattern into a white
+  ;; background (an issue of its own), so the cell is converted here by
+  ;; tmhtml-tformat on a tree which was not expanded.
+  (let ((pat (lambda (u)
+               (apply string-append
+                      (map serialize-html
+                           (tmhtml-tformat
+                            `((cwith "1" "1" "1" "1" "cell-background"
+                                     (pattern ,u "100%" "100%" "red"))
+                              (table (row (cell "a"))))))))))
+    (check-false (string-occurs? "javascript" (pat "javascript:alert(1)")))
+    (check-true (string-occurs? "url('x%27%29%3bb:url%28http://evil/x')"
+                                (pat "x');b:url(http://evil/x")))
+    (check-false (string-occurs? "');position" (pat "x.png');position:fixed;b:url('")))
+    (check-true (string-occurs? "background: url('x.png'); background-size: 100% 100%"
+                                (pat "x.png")))
+    (check-true (string-occurs? "data:image/png;base64,AA"
+                                (pat "data:image/png;base64,AA"))))
+  ;; the addresses with characters beyond Latin 1 (Guile 1.8: integer->char
+  ;; stops at 255)
+  (for (u '("http://a/<#43B>.html" "http://a/<#20AC>x" "<#4E2D>.html"))
+    (check-true (string? (html-of-buffer `(document (hlink "t" ,u)))))
+    (check-true (string? (html-of-buffer `(document (image ,u "1cm" "1cm" "" "")))))
+    (check-true (string? (html-of-buffer `(document (html-video ,u "1" "2"))))))
+  (check= (tmhtml-safe-url "http://a/&#1083;&#8217;x") "http://a/&#1083;&#8217;x")
+  (check= (tmhtml-safe-url "&#1083;javascript:1") "&#1083;javascript:1")
   (check-false (string-occurs? "javascript"
                (html-of-buffer
                 '(document (image "&#x6A;avascript&colon;alert(1).png" "1cm" "1cm" "" "")))))
