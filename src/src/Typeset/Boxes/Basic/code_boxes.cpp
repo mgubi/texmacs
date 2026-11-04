@@ -69,6 +69,27 @@ code_control (string s, int i, int& j) {
   return c;
 }
 
+// the characters of s from a to b for the heights of the selections and of
+// the cursor, without the spaces and the control characters (a tab, <#x>):
+// the heights are then those of the same text in a paragraph in prog mode,
+// where a space is a box of its own, and a tab a box (typeset_prog_tab)
+// which does not count in them; the space of a monospaced font, and the
+// box of a control character, may be glyphs which go below the baseline or
+// above the line
+static string
+code_ink (string s, int a, int b) {
+  string m;
+  int i= a;
+  while (i < b) {
+    int j;
+    int c= code_control (s, i, j);
+    if (c >= 0) { i= j; continue; }
+    if (s[i] != ' ') m << s[i];
+    i++;
+  }
+  return m;
+}
+
 void
 code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos) {
   int n= max (0, min (N(s), upto));
@@ -707,14 +728,23 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
     int c= code_control (s, i, j);
     if (c < 0) { j= i; tm_char_forwards (s, j); }
     SI xa= xp[i] - x0, xb= xp[min (j, N(xp) - 1)] - x0;
-    // (the tabs are always shown, as by typeset_prog_tab; the others with
-    // code-invisibles)
+    // (the tabs are always shown, as by typeset_prog_tab; the others, and
+    // the tabs as arrows to their stops, with code-invisibles)
     if (c < 0 && s[i] == ' ') {
       if (!invis) { i= j; continue; }
       SI cx= (xa + xb) / 2;
       ren->fill (cx - d, ym - d, cx + d, ym + d);
     }
+    else if (c == 9 && !invis) {
+      // (a small arrow at its start, as typeset_prog_tab draws it in a
+      // paragraph, also on paper)
+      ren->set_pencil (pencil (named_color ("#c8c8c8"), pen->get_width ()));
+      fn->draw (ren, "<rightarrow>", xa, y);
+      ren->set_pencil (pencil (named_color ("#a0a0a0"),
+                               max (fn->wline, PIXEL)));
+    }
     else if (c == 9) {
+      // (with the invisible characters: an arrow up to its stop)
       SI l= xa + cell / 6, r= max (xb - cell / 6, l + h);
       ren->line (l, ym, r, ym);
       ren->line (r, ym, r - h, ym + h);
@@ -903,7 +933,9 @@ code_box_rep::find_cursor (path bp) {
   if (pos > a) {
     int q= pos;
     tm_char_backwards (s, q);
-    fn->get_extents (s (q, pos), ex);
+    // (the character before the cursor, unless it is a space or a tab)
+    string m= code_ink (s, q, pos);
+    if (N(m) > 0) fn->get_extents (m, ex);
   }
   cursor cu (xp[pos] - xp[a], base (k, i));
   cu->y1= min (ex->y1, (SI) 0);
@@ -934,11 +966,9 @@ code_box_rep::find_selection (path lbp, path rbp) {
     string s= line (k1);
     array<SI> xp;
     xpositions (k1, p2, xp);
-    // (the height of the characters without the spaces, which are boxes
-    // of their own in a paragraph: the space of a monospaced font may be a
-    // glyph which goes below the baseline)
-    string m;
-    for (int i= p1; i < p2; i++) if (s[i] != ' ') m << s[i];
+    // (the height of the characters without the spaces and the tabs: see
+    // code_ink)
+    string m= code_ink (s, p1, p2);
     SI ey1= 0, ey2= fn->yx;
     if (N(m) > 0) {
       metric ex;

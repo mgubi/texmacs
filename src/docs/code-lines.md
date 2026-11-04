@@ -138,7 +138,20 @@ cut at the nodes of the top level which start a line
 is one part, which an edit parses again incrementally (about 0.4 s for
 200000 lines), and which `group_update` tried to cut again at each key,
 parsing it whole (1 s more): a fix of tree-sitter of its own, outside this
-work, the same with and without the block.
+work, the same with and without the block: #811.
+
+## Known differences
+
+- **The paragraph after a block** (in a document, papyrus mode) is 262 units
+  (about a pixel at 10pt) higher than after the same lines as paragraphs.
+  The stacker places a line at the pitch below the one before only when
+  the two are short (`shove_delta`, "enough place"); the block is one tall
+  line, whose baseline is the one of its first line, so the next paragraph
+  is put below its bottom at the separation instead. It would take a stack
+  box around the block, a level more in all its box paths; a source file
+  has nothing after its lines.
+- **A line does not change the environment** of the lines after it (an
+  `assign` in a line, `exec_until` of the block does nothing).
 
 ## Tests
 

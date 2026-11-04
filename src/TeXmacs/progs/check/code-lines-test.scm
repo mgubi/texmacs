@@ -769,18 +769,21 @@
 ;; setting of the whole document, not offered in a code block of a document
 (define (test-audit-5)
   (check-group "spaces, empty blocks, short blocks, code blocks")
-  (let* ((ls '("c" "zz zz" "int " " " "x"))
+  (let* ((ls '("c" "zz zz" "int " " " "x" "<#9>int x;" "<#9>" "<#9>a"
+               " <#9> "))
+         ;; (in prog mode, where a tab is an arrow in a paragraph too)
          (doc (lambda (cl)
                 `(document (with "font-family" "tt" "language" "verbatim"
+                             "mode" "prog" "prog-language" "c"
                              "code-lines" ,cl (document ,@ls)))))
          (rel (lambda ()
-                (let ((r0 (tree-bounding-rectangle (path->tree (at 0 6 0)))))
+                (let ((r0 (tree-bounding-rectangle (path->tree (at 0 10 0)))))
                   (map (lambda (i)
                          (with r (tree-bounding-rectangle
-                                  (path->tree (at 0 6 i)))
+                                  (path->tree (at 0 10 i)))
                            (list (- (cadr r) (cadr r0))
                                  (- (cadddr r) (cadr r0)))))
-                       '(1 2 4)))))
+                       '(1 2 4 5 6 7 8)))))
          (plain #f) (code #f))
     (with-body (doc "false") (lambda () (set! plain (rel))))
     (with-body (doc "true") (lambda () (set! code (rel))))
