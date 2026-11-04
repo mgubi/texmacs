@@ -16,7 +16,7 @@
 #include <ctype.h>
 #include <errno.h>
 
-#ifndef OS_MINGW
+#if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -33,7 +33,7 @@ static off_t MCP_LOG_CAP= 4 * 1024 * 1024;   // (TEXMACS_MCP_LOG_CAP: the tests)
 
 void
 mcp_stdio_setup (string log_file) {
-#ifndef OS_MINGW
+#if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
   if (mcp_out < 0) {
     mcp_in = dup (0);
     mcp_out= dup (1);
@@ -82,7 +82,7 @@ mcp_stdio_active () {
   return mcp_out >= 0;
 }
 
-#ifndef OS_MINGW
+#if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
 // A log which grew over the cap during the run is kept as mcp.log.1 (the
 // older one is replaced) and a new one is started.
 static bool mcp_rotate_failed= false;
@@ -114,7 +114,7 @@ mcp_rotate_log () {
 
 string
 mcp_stdin_read () {
-#ifndef OS_MINGW
+#if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
   if (++mcp_ticks % 64 == 0) mcp_rotate_log ();
   if (mcp_in < 0 || mcp_eof) return "";
   struct pollfd p;
@@ -142,7 +142,7 @@ mcp_stdin_eof () {
 
 bool
 mcp_stdout_write (string s) {
-#ifndef OS_MINGW
+#if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
   if (mcp_out < 0) return false;
   int i= 0, n= N(s);
   while (i < n) {

@@ -1190,11 +1190,33 @@ def s_edit_shared(w):
     check("the other TeXmacs passed its checks", out == "ok")
 
 
+def s_undo(w):
+    """the editor's undo in a headless process (single process, no sharing)"""
+    f = os.path.join(w, "u.tm")
+    write_small(f)
+    env, home = make_env(w, "A")
+    env["UNDO_FILE"] = os.path.realpath(f)
+    p = subprocess.Popen([BIN, "-headless", "-x", '(load "%s")' % os.path.join(HERE, "undo-probe.scm")],
+                         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    procs.append(p)
+    try:
+        out = p.communicate(timeout=60)[0].decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out = ""
+    checks = [l for l in out.splitlines() if l.startswith("CHECK ")]
+    check("the probe ran to its end", "UNDO-DONE" in out)
+    check("no crash (exit status 0)", p.returncode == 0)
+    for l in checks:
+        check(l[6:-5], l.endswith("PASS"))
+    check("three undo checks", len(checks) == 3)
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]

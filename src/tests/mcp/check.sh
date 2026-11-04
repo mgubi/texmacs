@@ -17,6 +17,7 @@
 #   readonly   TEXMACS_MCP_READONLY and TEXMACS_MCP_ROOTS for the editing tools
 #   edit-shared the agent edits a file a second TeXmacs hosts and edits too: merge,
 #              refusal, conflict, undo, the person's undo skips the agent
+#   undo       the undo of the editor in a headless process (it crashed)
 #   launcher   the script TeXmacs/bin/texmacs keeps stdin for --mcp
 #   robust     utf8 and newlines in every format, odd paths, TEXMACS_MCP_ROOTS,
 #              sections in concatenations, bad arguments and messages, limits
@@ -37,7 +38,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared hostdeath nonascii stalled
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared undo hostdeath nonascii stalled
 status=0
 for name in "$@"; do
   w="$run/$name"
@@ -54,4 +55,8 @@ for name in "$@"; do
     status=1
   fi
 done
+# (the work folder is removed when everything passed)
+if [ $status -eq 0 ]; then
+  case "$run" in "$base"/run-*) rm -r -- "$run" ;; esac
+fi
 exit $status

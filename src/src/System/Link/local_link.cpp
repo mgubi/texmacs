@@ -14,6 +14,37 @@
 #include "array.hpp"
 #include "config.h"
 #include "tm_timer.hpp"
+
+#ifdef __EMSCRIPTEN__
+// The browser has no processes of the user to share files with: the
+// functions do nothing (as on Windows, where the feature is off).
+tm_link make_local_link (int) { return tm_link (); }
+int    local_listen () { return 0; }
+void   local_unlisten () {}
+int    local_accept () { return -1; }
+int    local_connect (int) { return -1; }
+bool   local_send (int, string) { return false; }
+string local_receive (int) { return ""; }
+bool   local_alive (int) { return false; }
+void   local_set_limit (int, int) {}
+bool   local_send_raw (int, string) { return false; }
+void   local_close (int) {}
+int    shared_process_id () { return 0; }
+bool   shared_pid_alive (int) { return false; }
+int    shared_port_probe (int) { return -1; }
+string shared_real_path (string) { return ""; }
+string shared_user_dir () { return ""; }
+tree   shared_list_dir (string) { return tuple (); }
+bool   shared_set_private (string) { return false; }
+bool   shared_create_file (string, string) { return false; }
+bool   shared_replace_file (string, string) { return false; }
+string shared_random_token () { return ""; }
+int    shared_lock_acquire (string) { return -2; }
+void   shared_lock_release (int) {}
+bool   shared_lock_valid (int, string) { return false; }
+int    shared_lock_renew (int, string) { return -1; }
+void   shared_touch (string) {}
+#else
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -745,3 +776,5 @@ shared_touch (string path) {
   (void) path;
 #endif
 }
+
+#endif // __EMSCRIPTEN__

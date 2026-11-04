@@ -93,6 +93,7 @@ standard input and output, and ends when the input ends.
   (SIGPIPE is ignored in this mode).
 - **End of input** (or of the pipe) is a clean exit: the documents are closed
   (a shared one is left) and TeXmacs quits, status 0.
+- The browser build (`__EMSCRIPTEN__`) compiles `local_link.cpp` and `mcp_stdio.cpp` as stubs that do nothing (as on Windows).
 - No Windows yet: `mcp_stdio.cpp` does nothing there (the shared files do not
   work there either).
 
@@ -274,6 +275,8 @@ the work folder).
 | `mcp-host` | the MCP server hosts the file; another TeXmacs joins (`host-join.scm`) and edits; the MCP server reads the edit |
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
+| `undo` | the undo of the editor in a headless process, single process (`undo-probe.scm`): the own steps, the step of another author skipped when it commutes, the undo back to the saved state (it crashed: `QApplication::beep` without an application) |
+| `edit`, `readonly`, `edit-shared` | the editing tools: each tool, conflicts, undo_agent, all-or-nothing, save/close/create, read-only and roots; with a second headless TeXmacs hosting and editing (merge in one paragraph, a refusal reported, the person's undo skipping the agent's changes) |
 | `robust` | non-ASCII and newlines in every format and in the file name, a star in a name, colons refused, `TEXMACS_MCP_ROOTS` (outside file, `/etc/passwd`, `..`, a symbolic link), sections in concatenations, bad arguments and messages, 200000 nested arrays, a 34 MB line |
 | `hostdeath` | a server which has not opened the file lists it, the host is killed with `kill -9`, the file leaves the list; then the entry is given the pid of a live foreign process and a closed port: still not listed |
 | `nonascii` | a file with a non-ASCII name, hosted elsewhere, is listed as it is, opens, joins and reads |
@@ -306,5 +309,6 @@ the work folder).
   re-applies its own pending changes with the author of its own editor (they were
   made foreign by the transformation). With two parties only the first was
   already right; a third party shows the difference.
+- On the report that the person's second Cmd-Z removed the agent's last insertion: the archiver (`archiver_rep::undo`) undoes the steps of the editor's author, and it undoes the steps of other authors that do not commute with them (it first undoes the foreign step above); the steps that commute are swapped out of the way when they are added. Two cases are tested and keep the agent's change (the agent inserts a block; the agent changes the start of the paragraph the person types in, the person undoes twice). A change that does not commute with the person's typing (the same place, or a deleted node) is undone with it by the editor's undo: that is the behaviour of the archiver, not of the patches' authors. Patches are received with the author of their sender since this work. The rollback of a refused change and the re-application of pending changes use the author of the process's own editor (they are its own steps).
 - `beep` in a headless Qt build crashed (an undo that restores the saved
   state called `QApplication::beep` without an application): it is skipped when headless.
