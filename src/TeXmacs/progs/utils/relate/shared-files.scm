@@ -60,6 +60,19 @@
   (:synopsis "For the tests: how many times @name (a symbol) happened")
   (or (ahash-ref sf-stats name) 0))
 
+(tm-define (shared-collect-mark name)
+  (:synopsis "The changes of the shared buffer @name that were not sent yet, to go back to them")
+  ;; (for the edits that are made tentatively and cancelled: nothing of them
+  ;; must reach the host)
+  (with sf (sf-by-name name)
+    (if sf (list (sf-get sf 'collect)) #f)))
+
+(tm-define (shared-collect-restore! name mark)
+  (:synopsis "Forget the changes of @name made since @mark (see shared-collect-mark)")
+  (with sf (sf-by-name name)
+    (when (and sf mark)
+      (sf-put! sf 'collect (car mark)))))
+
 (tm-define (shared-pause! flag)
   (:synopsis "For the tests: stop (or resume) serving the links of the shared files")
   (set! sf-paused? flag))
@@ -982,6 +995,7 @@
                  (sf-notify-modified! sf)
                  (seen! sf id)
                  (cond (to
+                         (stat! 'peer-patches)
                          (send-peers sf (list 'applied cur to (peer-id peer) id
                                               (patch->scheme p)))
                          (sf-trim! key))

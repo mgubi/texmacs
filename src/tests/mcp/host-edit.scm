@@ -29,6 +29,8 @@
           ((== name "pause") (shared-pause! #t))
           ((== name "resume") (shared-pause! #f))
           ((== name "undo") (with-buffer (the-name) (undo 0)))
+          ((== name "peers")
+           (sync-write! "peers" (number->string (shared-stat 'peer-patches))))
           ((== name "stats")
            (sync-write! "stats" (object->string (list (shared-stat 'refused)))))
           (else (display* "unknown command " c "\n")))))

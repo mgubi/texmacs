@@ -1075,10 +1075,23 @@
 (define collecting? #f)
 (define collected '())
 
+(define cur-node #f)           ; the node whose rule is being applied
+
+(define (node-key)
+  ;; the whole content of the node, hashed: two violations of the same rule in
+  ;; the same place are the same only if the node is the same
+  (if cur-node (tree-hash (stree->tree cur-node)) "-"))
+
 (define (violate! msg)
   (if collecting?
-      (set! collected (cons msg collected))
+      (set! collected (cons (string-append msg " #" (node-key)) collected))
       (tool-error msg)))
+
+(define (reason-text r)
+  ;; a reason without the key of its node
+  (let ((i (let loop ((k (- (string-length r) 1)))
+             (cond ((< k 0) #f) ((char=? (string-ref r k) #\#) k) (else (loop (- k 1)))))))
+    (if (and i (> i 0)) (substring r 0 (- i 1)) r)))
 
 (define (collect-violations thunk)
   ;; the reasons (strings) of the violations of the rules run by @thunk
@@ -1257,6 +1270,7 @@
   (cond ((string? st) #t)
         ((pair? st)
          (let ((n (length (cdr st))) (tag (car st)))
+           (set! cur-node st)
            (when (and (not (== tag 'document))
                       (or (known-primitive? tag) (known-macro-arity? tag))
                       (not (tag-possible-arity? tag n)))
@@ -1408,7 +1422,15 @@
          'file)
         (else 'label)))
 
+(define definitional-tags
+  '(assign set reset provide macro xmacro func drd-props with-package use-package
+    use-module new-theme copy-theme apply-theme select-theme style-with style-with*
+    style-only style-only* filter-style))
+
 (define (refuse-tag tag why)
+  ;; (a definition of the document is a violation that stays when the person
+  ;; changes it: its reason is not tied to the content of the node)
+  (when (memq tag definitional-tags) (set! cur-node #f))
   (violate! (string-append "the tag `" (symbol->string tag) "' " why
                              ": the content is refused (nothing was changed)")))
 
@@ -1531,6 +1553,7 @@
      (let ((tag (car st)))
        ;; (the arguments first: what is inside is named in the reason)
        (for (c (cdr st)) (check-safety c base))
+       (set! cur-node st)
        ;; the tags that are not primitives: only those the style of the
        ;; document (or the document itself, by assign) defines, and not the
        ;; ones that run commands: the rest would be written as raw macros
@@ -1648,6 +1671,7 @@
     ((pair? t)
      (let ((tag (car t)) (args (cdr t)))
        (for (c args) (check-expanded c base))
+       (set! cur-node t)
        (cond
          ((and (eq? tag 'link) (>= (length args) 3))
           (let* ((dest (car (reverse args))) (u (url-destination dest)))
@@ -1692,9 +1716,11 @@
     (else #t)))
 
 (define (assign-nodes t)
+  ;; the definitions of the document: its assigns, and its sets and resets
+  ;; of the environment (the context of the blocks after them)
   ;; the assigns of the document (its preamble), as strees
   (cond ((tree-atomic? t) '())
-        ((tm-is? t 'assign) (list (tm->stree t)))
+        ((or (tm-is? t 'assign) (tm-is? t 'set) (tm-is? t 'reset)) (list (tm->stree t)))
         (else (append-map assign-nodes (tree-children t)))))
 
 (define (expand-in-document st d)
@@ -2088,28 +2114,62 @@
 ;;; the whole document is compared. Evaluation has a budget: what does not
 ;;; evaluate within it is a violation.
 
-(define block-budget 1500000)
-(define document-budget 40000000)
+(define block-budget 1500000)        ; steps of the evaluator for one block
+(define document-budget 12000000)    ; steps for the blocks of a whole comparison
+(define document-size-limit 3000000) ; nodes of the results of a whole comparison
+(define batch-size 20000)            ; nodes of the blocks evaluated together
 
-(define (expansion-violations st base d assigns budget)
-  ;; the violations of the rules for the expansion of @st (a stree), in the
-  ;; environment of the document after @assigns
+(define (stree-size x)
+  (if (pair? x) (+ 1 (apply + (map stree-size (cdr x)))) 1))
+
+(define over-budget-reason "the content does not evaluate within the budget (it expands too much)")
+(define cannot-evaluate-reason "the content cannot be evaluated")
+
+(define (over-budget? reasons)
+  (list-find reasons (lambda (r) (or (string-starts? r over-budget-reason)
+                                     (string-starts? r cannot-evaluate-reason)))))
+
+(define (context-definitions defs)
+  ;; the definitions of the document as the evaluator takes them: a `set' of the
+  ;; person (the evaluator does not do it, the typesetter does) is an assign of
+  ;; the variable, a `reset' is left out
+  (filter-map (lambda (a)
+                (cond ((eq? (car a) 'set) (cons 'assign (cdr a)))
+                      ((eq? (car a) 'reset) #f)
+                      (else a)))
+              defs))
+
+(define (expand-blocks d blocks-st assigns budget)
+  ;; the expansions (strees, in the order) of the strees @blocks-st in the
+  ;; environment of the document after @assigns; (steps-used . results), or
+  ;; #f if the budget was exceeded or the evaluation failed
   (let* ((u (doc-url d))
          (r (catch #t
               (lambda ()
                 (exec-budget-start budget)
-                ;; (the assigns come first, to define; what is checked is the last
-                ;; part, the expansion of the content)
-                (let ((x (with-buffer u
-                           (tm->stree (texmacs-exec (stree->tree (cons 'concat (append assigns (list (list 'document st))))))))))
-                  (if (and (pair? x) (eq? (car x) 'concat) (pair? (cdr x)))
-                      (car (reverse (cdr x)))
-                      x)))
+                ;; (the assigns come first, to define; the blocks follow, each in a
+                ;; document of its own, which the results keep apart)
+                (with-buffer u
+                  (tm->stree (texmacs-exec (stree->tree
+                                            (cons 'concat
+                                                  (append (context-definitions assigns)
+                                                          (map (lambda (b) (list 'document b))
+                                                               blocks-st))))))))
               (lambda args #f)))
          (left (exec-budget-end)))
-    (cond ((< left 0) (list "the content does not evaluate within the budget (it expands too much)"))
-          ((not r) (list "the content cannot be evaluated"))
-          (else (collect-violations (lambda () (check-expanded r base)))))))
+    (cond ((< left 0) #f)
+          ((not r) #f)
+          (else
+            (cons (- budget left)
+                  (let ((items (if (and (pair? r) (eq? (car r) 'concat)) (cdr r) (list r))))
+                    (list-filter items (lambda (x) (func? x 'document)))))))))
+
+(define (expansion-violations st base d assigns budget)
+  ;; the violations of the rules for the expansion of the stree @st
+  (let ((r (expand-blocks d (list st) assigns budget)))
+    (cond ((not r) (list over-budget-reason))
+          (else (collect-violations
+                 (lambda () (for (x (cdr r)) (check-expanded x base))))))))
 
 (define (literal-violations st base d)
   (set! safety-defined? (and d (defined-predicate d)))
@@ -2118,8 +2178,7 @@
     r))
 
 (define (assigns-before d i)
-  ;; the assigns of the blocks before the block number @i (and of the other
-  ;; place where the document defines something: the blocks are in order)
+  ;; the definitions of the blocks before the block number @i
   (let loop ((l (tree-children (doc-body d))) (k 0) (acc '()))
     (if (or (null? l) (>= k i))
         acc
@@ -2131,11 +2190,45 @@
     (append (literal-violations st base d)
             (expansion-violations st base d (assigns-before d i) block-budget))))
 
-(define (document-violations d)
-  ;; the violations of the whole document
-  (let* ((body (doc-body d)) (st (tm->stree body)) (base (doc-base d)))
-    (append (literal-violations st base d)
-            (expansion-violations st base d '() document-budget))))
+(define (document-violations d . opt)
+  ;; the violations of the blocks of the document, evaluated by batches whose
+  ;; results are discarded at once (the memory stays low); with a predicate,
+  ;; only the blocks it accepts. Beyond the budgets: a violation.
+  (let* ((select (if (pair? opt) (car opt) #f))
+         (base (doc-base d))
+         (viol '()) (used 0) (total 0) (failed #f)
+         (pre '()) (batch '()) (batch-assigns '()) (size 0))
+    (define (flush!)
+      (when (and (pair? batch) (not failed))
+        (let ((r (expand-blocks d (reverse batch) pre block-budget-for-batch)))
+          (if (not r)
+              (set! failed #t)
+              (begin
+                (set! used (+ used (car r)))
+                (set! total (+ total (apply + (map stree-size (cdr r)))))
+                (set! viol (append viol (collect-violations
+                                         (lambda () (for (x (cdr r)) (check-expanded x base))))))
+                (when (or (> used document-budget) (> total document-size-limit))
+                  (set! failed #t))))))
+      (set! pre (append pre batch-assigns))
+      (set! batch '()) (set! batch-assigns '()) (set! size 0))
+    (for (blk (tree-children (doc-body d)))
+      (when (not failed)
+        (if (or (not select) (select blk))
+            (let ((st (tm->stree blk)))
+              (set! viol (append viol (literal-violations st base d)))
+              (when (and (pair? batch) (> (+ size (stree-size st)) batch-size))
+                (flush!))
+              (set! batch (cons st batch))
+              (set! batch-assigns (append batch-assigns (assign-nodes blk)))
+              (set! size (+ size (stree-size st))))
+            (begin
+              (flush!)
+              (set! pre (append pre (assign-nodes blk)))))))
+    (flush!)
+    (if failed (cons over-budget-reason viol) viol)))
+
+(define block-budget-for-batch 6000000)
 
 (define (assigns-signature d)
   (tree-hash (stree->tree (cons 'tuple (assign-nodes (doc-body d))))))
@@ -2148,22 +2241,87 @@
            (loop (cdr l) (let rm ((p pool)) (cond ((null? p) '()) ((equal? (car p) (car l)) (cdr p)) (else (cons (car p) (rm (cdr p)))))) acc))
           (else (loop (cdr l) pool (cons (car l) acc))))))
 
-(define (guard-pre d t)
+;; The tags whose content is code or text for another program: an edit inside
+;; them, or of them, is refused, whatever the violations before and after
+;; (a violation that was there is hidden by a change inside the same node).
+(define opaque-tags
+  '(extern script eval eval-args quasi quasiquote unquote unquote* hybrid authorize
+    observer action compound apply expand expand* hide-expand begin end map-args
+    find-file find-file-upwards latex session input output raw-data))
+
+(define (opaque-node? t)
+  (and (tree-compound? t)
+       (let ((tag (tree-label t)))
+         (or (memq tag opaque-tags)
+             (suffix-reason tag)
+             (and (eq? tag 'specific)
+                  (not (and (> (tree-arity t) 0) (tree-atomic? (tree-ref t 0))
+                            (member (tree->string (tree-ref t 0)) '("texmacs" "screen" "printer")))))))))
+
+(define (inside-opaque? d t self?)
+  ;; is @t (if @self?) or one of its ancestors up to the block an opaque node?
+  (let loop ((x (if self? t (tree-up t))) (n 0))
+    (and x (< n 200) (tree? x) (inside-body? d x) (not (body-root? d x))
+         (or (opaque-node? x) (loop (tree-up x) (+ n 1))))))
+
+(define (mentions? t names)
+  ;; does the tree use one of the names (as a tag, or as a string: a value)?
+  (cond ((tree-atomic? t) (and (ahash-ref names (tree->string t)) #t))
+        (else (or (and (ahash-ref names (symbol->string (tree-label t))) #t)
+                  (list-find (tree-children t) (lambda (c) (mentions? c names)))))))
+
+(define (assign-name-of st)
+  (and (pair? st) (memq (car st) '(assign set reset)) (pair? (cdr st)) (string? (cadr st)) (cadr st)))
+
+(define (definition-closure d names)
+  ;; the names, and the names of the definitions of the document that use them
+  ;; (again and again); #f if one is defined by the style (then everything may
+  ;; change)
+  (let ((defs (assign-nodes (doc-body d))) (set (make-ahash-table)))
+    (for (n names) (ahash-set! set n #t))
+    (let loop ()
+      (let ((grown #f))
+        (for (a defs)
+          (let ((n (assign-name-of a)))
+            (when (and n (not (ahash-ref set n))
+                       (mentions? (stree->tree a) set))
+              (ahash-set! set n #t)
+              (set! grown #t))))
+        (when grown (loop))))
+    (if (list-find (map car (ahash-table->list set))
+                   (lambda (n) (with-buffer (doc-url d) (style-has? n))))
+        #f
+        set)))
+
+(define (guard-pre d t delete?)
   ;; before an edit of the node @t (or of the document: #f): what is needed to
-  ;; compare after it
-  (let* ((body (doc-body d))
-         (blk (and t (not (body-root? d t)) (top-level-ancestor d t)))
+  ;; compare after it. Refuses an edit inside or of code, and in a block that
+  ;; cannot be evaluated.
+  (let* ((blk (and t (not (body-root? d t)) (top-level-ancestor d t)))
          (i (and blk (index-in-body d blk)))
-         (defs? (and blk (pair? (assign-nodes blk)))))
-    (list (and blk (ptr blk))
-          (and blk i (block-violations d blk i))
-          (assigns-signature d)
-          (and defs? (document-violations d)))))
+         (defs (and blk (assign-nodes blk))))
+    (when (and t (inside-opaque? d t (not delete?)))
+      (tool-error "this node is code or text for another program, or inside one (extern, script, hybrid, action, specific, latex...): the content filter refuses edits in it (nothing was changed)"))
+    (let ((viol (and blk i (block-violations d blk i))))
+      (when (and viol (over-budget? viol))
+        (tool-error "the block does not evaluate within the budget: the content filter refuses edits in it (nothing was changed)"))
+      (let* ((names (and (pair? defs) (filter-map assign-name-of defs)))
+             (closure (and names (definition-closure d names)))
+             (sel (and names (if closure (lambda (b) (mentions? b closure)) #f))))
+        (list (and blk (ptr blk)) viol (assigns-signature d)
+              (and (pair? defs) (document-violations d sel))
+              sel (and closure names))))))
+
+(define (filter-map f l)
+  (let loop ((l l) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((f (car l)) => (lambda (x) (loop (cdr l) (cons x acc))))
+          (else (loop (cdr l) acc)))))
 
 (define (guard-fail! reasons)
   (set! edit-reason
         (string-append "the edit is refused: it would introduce what the content filter refuses ("
-                       (utf8-prefix (u8 (car reasons)) 200)
+                       (utf8-prefix (u8 (reason-text (car reasons))) 200)
                        (if (pair? (cdr reasons)) (string-append ", and " (number->string (length (cdr reasons))) " more") "")
                        "); nothing was changed"))
   (throw 'mcp-guard-refused))
@@ -2189,25 +2347,38 @@
              (after (block-violations d b i))
              (before (if (and blk (tree? blk) (tree-eq? b (top-level-ancestor d blk))) (or old-viol '()) '()))
              (new (new-violations before after)))
+        (when (over-budget? after) (guard-fail! (list over-budget-reason)))
         (when (pair? new) (guard-fail! new))))
     (when (!= (assigns-signature d) (caddr pre))
-      (let ((full-before (cadddr pre)))
+      (let ((full-before (cadddr pre)) (sel (list-ref pre 4)) (names (list-ref pre 5)))
         (when (not full-before)
           (guard-fail! (list "it changes the definitions of the document")))
-        (let ((new (new-violations full-before (document-violations d))))
-          (when (pair? new) (guard-fail! new)))))))
+        ;; (the names that the edited definitions have now, and what uses them)
+        (let* ((now (if (and blk (tree? blk) (inside-body? d blk) (not (body-root? d blk)))
+                        (filter-map assign-name-of (assign-nodes (top-level-ancestor d blk)))
+                        '()))
+               (names2 (append (or names '()) now))
+               (closure2 (and sel (definition-closure d names2))))
+          (when (and sel (not closure2))
+            (guard-fail! (list "it changes a definition of the style")))
+          (let ((after (document-violations d (if sel (lambda (b) (mentions? b closure2)) #f))))
+            (when (over-budget? after) (guard-fail! (list over-budget-reason)))
+            (let ((new (new-violations full-before after)))
+              (when (pair? new) (guard-fail! new)))))))))
 
 (define edit-reason #f)
 (define current-guard #f)
 
-(define (set-guard! d t get-nodes skip-block?)
-  ;; the next run-edit! checks the document before and after (see guard-post)
-  (set! current-guard (list d (guard-pre d t) get-nodes skip-block?)))
+(define (set-guard! d t get-nodes skip-block? . opt)
+  ;; the next run-edit! checks the document before and after (see guard-post);
+  ;; the last argument says that the edit deletes the node
+  (set! current-guard (list d (guard-pre d t (and (pair? opt) (car opt))) get-nodes skip-block?)))
 
 (define (run-edit! d thunk)
   ;; do @thunk (it changes the tree) as one step of the editor of the buffer,
   ;; all or nothing; gives its value
-  (let ((u (doc-url d)) (failed #f) (value #f) (g current-guard))
+  (let ((u (doc-url d)) (failed #f) (value #f) (g current-guard)
+        (mark (shared-collect-mark (doc-url d))))
     (set! current-guard #f)
     (with-buffer u
       (start-editing)
@@ -2230,6 +2401,9 @@
               (set! failed #t))))
         (when (not failed) (mark-end a))
         (end-editing)))
+    ;; (an edit that was cancelled never reaches the host: not even with its
+    ;; inverse)
+    (when failed (shared-collect-restore! u mark))
     (when failed
       (let ((why edit-reason))
         (set! edit-reason #f)
@@ -2542,13 +2716,13 @@
                (if (and (not prev) (not next))
                    ;; (a document is never empty: its only block becomes an empty text)
                    (let ((nodes '()))
-                     (set-guard! d t (lambda () (quote ())) (body-root? d parent))
+                     (set-guard! d t (lambda () (quote ())) (body-root? d parent) #t)
                      (run-edit! d (lambda ()
                                     (tree-assign t (tree-of-stree ""))
                                     (set! nodes (list (tree-ref parent 0)))))
                      (finish-edit! d dist '() (undo-replace d nodes (list old))))
                    (begin
-                     (set-guard! d t (lambda () (quote ())) (body-root? d parent))
+                     (set-guard! d t (lambda () (quote ())) (body-root? d parent) #t)
                      (run-edit! d (lambda () (tree-remove parent i 1)))
                      (finish-edit! d dist '()
                                    (undo-delete d parent prev next old))))))
@@ -2557,7 +2731,7 @@
                     (kids (cdr pold))
                     (new (inline-stree (append (sublist kids 0 i) (list-tail kids (+ i 1)))))
                     (nodes '()))
-               (set-guard! d t (lambda () (quote ())) (body-root? d parent))
+               (set-guard! d t (lambda () (quote ())) (body-root? d parent) #t)
                (run-edit! d (lambda ()
                               (tree-assign parent (tree-of-stree new))
                               (set! nodes (list parent))))
@@ -2769,7 +2943,7 @@
                           (let ((v (document-violations d)))
                             (when (pair? v)
                               (tool-error (string-append "the content is refused: "
-                                                         (utf8-prefix (u8 (car v)) 200))))))
+                                                         (utf8-prefix (u8 (reason-text (car v))) 200))))))
                         d))
                     (lambda args
                       (set! failed #t)

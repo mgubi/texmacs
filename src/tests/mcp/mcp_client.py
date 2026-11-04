@@ -1188,6 +1188,30 @@ def s_edit_shared(w):
           "CC" not in str(hb) and "DD" not in str(hb) and "Start paragraph." in str(hb))
     e, t = m.tool("read", document="d1", format="stree", max_size=100000)
     check("shared: the agent has the same document", "Start paragraph." in t["content"] and "CC" not in t["content"])
+    # 9. an edit that the content filter cancels never reaches the host; an accepted one is sent once
+    def peers():
+        try:
+            os.remove(os.path.join(w, "sync", "peers"))
+        except OSError:
+            pass
+        hostcmd(w, st, "peers")
+        wait_file(os.path.join(w, "sync", "peers"), 10)
+        time.sleep(0.1)
+        return int(open(os.path.join(w, "sync", "peers")).read().strip())
+    e, r = m.tool("insert", document="d1", where="last", content="<hlink|site|https://ok.org>")
+    check("shared: a block with a link is accepted", not e and r["status"] == "applied")
+    def dest():
+        t = m.tool("read", document="d1", format="text", max_size=100000)[1]
+        link = t["children"][-1]
+        return m.tool("read", document="d1", node=link["handle"], format="text")[1]["children"][1]["handle"]
+    n1 = peers()
+    e, r = m.tool("replace", document="d1", node=dest(), content="javascript:alert(1)")
+    n2 = peers()
+    check("shared: an edit cancelled by the content filter is refused", e and "content filter" in str(r))
+    check("shared: and the host took no patch for it (%d, %d)" % (n1, n2), n2 == n1)
+    e, r = m.tool("replace", document="d1", node=dest(), content="https://other.org")
+    n3 = peers()
+    check("shared: an accepted edit is sent once (%d, %d)" % (n2, n3), not e and n3 == n2 + 1)
     sync_set(w, "c-done")
     check("exit 0", m.close() == 0)
     try:
@@ -1558,6 +1582,10 @@ def s_guard(w):
         "  <assign|ctxm|<macro|x|<if|<equal|<value|color>|red>|<hlink|t|<arg|x>>|<arg|x>>>>\n\n"
         "  <assign|dbl|<macro|x|<concat|<arg|x>|<arg|x>>>>\n\n"
         "  <assign|loopm|<macro|x|<loopm|<arg|x>>>>\n\n"
+        "  <assign|usev|<macro|x|<if|<equal|<value|ctxvar>|red>|<hlink|t|<arg|x>>|<arg|x>>>>\n\n"
+        "  <set|ctxvar|red>\n\n"
+        "  <specific|html|hello>\n\n  <specific|latex|relax>\n\n  <extern|(display \"aaa\")>\n\n"
+        "  Long link <hlink|t|javascript:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX> here.\n\n"
         "  A paragraph with <hlink|a link|https://ok.org> in it.\n\n"
         "  A label here<label|lab1> and an image <image|pic.png|1par|||>.\n\n"
         "  <with|color|red|Red paragraph.>\n\n"
@@ -1626,6 +1654,72 @@ def s_guard(w):
     check_applied("the same macro outside it (plain text)", "insert", where="last", content="<ctxm|javascript:alert(1)>")
     rb = block("Red paragraph")
     check_refused("a value of with replaced by a compound", "replace", node=rb["handle"], content='(with "color" (concat "red" "\\"") "x")', format="stree")
+    # a node that is code or raw text for another program: no edit inside it, whatever it was
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    for pref, tag in (("hello", "specific"), ("relax", "specific"), ("aaa", "extern")):
+        pass
+    sp = [c for c in t["children"] if c["tag"] == "specific"]
+    ex = [c for c in t["children"] if c["tag"] == "extern"]
+    if len(sp) >= 2 and ex:
+        h_html = child(sp[0]["handle"], 1)
+        check_refused("an edit of the text of a specific for html (to a script)", "replace", node=h_html["handle"], content="<script>alert(1)</script>")
+        sp = [c for c in m.tool("read", document="d1", format="text", max_size=100000)[1]["children"] if c["tag"] == "specific"]
+        h_tex = child(sp[1]["handle"], 1)
+        check_refused("an edit of the text of a specific for latex", "replace", node=h_tex["handle"], content="immediate\\write18{id}")
+        ex = [c for c in m.tool("read", document="d1", format="text", max_size=100000)[1]["children"] if c["tag"] == "extern"]
+        h_ext = child(ex[0]["handle"], 0)
+        check_refused("an edit of the command of an extern", "replace", node=h_ext["handle"], content='(system "id")')
+        e, r = m.tool("delete", document="d1", node=ex[0]["handle"])
+        check("the extern itself can be deleted (and put back)", not e and r["status"] == "applied")
+        m.tool("undo_agent", document="d1")
+    else:
+        check("the specific and extern nodes were found", False)
+    # equal reasons for different contents: the key has the whole node
+    t = m.tool("read", document="d1", format="text", max_size=100000)[1]
+    jl = [c for c in t["children"] if c["preview"].startswith("Long link")]
+    if jl:
+        link = [c for c in m.tool("read", document="d1", node=jl[0]["handle"], format="text")[1]["children"] if c["tag"] == "hlink"][0]
+        dest = child(link["handle"], 1)
+        check_refused("a change at the end of a long javascript address that the person has", "replace",
+                      node=dest["handle"], content="javascript:" + "a" * 90 + "Y")
+    else:
+        check("the block with the long link was found", False)
+    # a block that does not evaluate within the budget: edits in it are refused
+    hf = os.path.join(root, "h.tm")
+    write_tm(hf, "  <assign|dbl|<macro|x|<concat|<arg|x>|<arg|x>>>>\n\n  Light block.\n\n  Heavy " + "<dbl|" * 24 + "x" + ">" * 24 + ".\n")
+    e, v2 = m.tool("open_document", path=os.path.realpath(hf))
+    t = m.tool("read", document=v2["document"], format="text", max_size=100000)[1]
+    hv = [c for c in t["children"] if c["preview"].startswith("Heavy")]
+    if hv:
+        e, r = m.tool("edit_text", document=v2["document"], node=hv[0]["handle"], old="Heavy", new="Light")
+        check("an edit in a block that does not evaluate within the budget is refused", e and "budget" in str(r))
+    else:
+        check("the heavy block was found", False)
+    lt = [c for c in t["children"] if c["preview"].startswith("Light block")]
+    e, r = m.tool("edit_text", document=v2["document"], node=lt[0]["handle"], old="Light", new="Easy")
+    check("an edit in another block of that document is accepted", not e and r["status"] == "applied")
+    # a whole-document comparison (a definition is edited) with heavy blocks: the memory stays low
+    mf = os.path.join(root, "mem.tm")
+    write_tm(mf, "  <assign|dbl|<macro|x|<concat|<arg|x>|<arg|x>>>>\n\n" +
+             "".join("  Block %d " % i + "<dbl|" * 17 + "x" + ">" * 17 + ".\n\n" for i in range(25)))
+    e, v3 = m.tool("open_document", path=os.path.realpath(mf))
+    t0 = time.monotonic()
+    t = m.tool("read", document=v3["document"], format="text", max_size=5000)[1]
+    asg = [c for c in t["children"] if c["tag"] == "assign"][0]
+    def child3(h, i):
+        return m.tool("read", document=v3["document"], node=h, format="text")[1]["children"][i]
+    mac = child3(asg["handle"], 1)
+    body = child3(mac["handle"], 1)
+    e, r = m.tool("replace", document=v3["document"], node=body["handle"], content="<concat|<arg|x>|<arg|x>|<arg|x>>")
+    dt = time.monotonic() - t0
+    check("an edit of a definition under heavy uses is refused within the budgets (%.1f s)" % dt, e and dt < 100)
+    r2 = m.request("ping")
+    check("and the server is alive (the watchdog stops a process above 2 GB)", r2 is not None and "result" in r2)
+    # set of the person: the context of the blocks after it
+    t = m.tool("read", document="d1", format="text", max_size=100000)[1]
+    st = [c for c in t["children"] if c["tag"] == "set"]
+    check("the set block was found", len(st) == 1)
+    check_refused("a macro that depends on a variable set by the person, after the set", "insert", where="last", content="<usev|javascript:alert(1)>")
     # definitions
     check_applied("a use of a harmless macro with a dangerous argument (it ignores it)", "insert", where="last", content="<foo|javascript:alert(1)>")
     e, r = m.tool("insert", document="d1", where="last", content="<foo|javascript:alert(1)>")
@@ -1680,11 +1774,32 @@ def s_guard(w):
     check("exit 0", m.close() == 0)
 
 
+def s_recursion(w):
+    """a macro that calls itself, in a block and inline: typesetting and export of the
+    document do not crash the process (the person's TeXmacs would have crashed too)"""
+    env, home = make_env(w, "A")
+    f = os.path.join(w, "loop.tm")
+    write_tm(f, "  <assign|loopm|<macro|x|<loopm|<arg|x>>>>\n\n  Before\n\n  <loopm|a>\n\n  After <loopm|b> inline.\n")
+    env["RECURSION_FILE"] = os.path.realpath(f)
+    env["RECURSION_PDF"] = os.path.join(os.path.realpath(w), "loop.pdf")
+    p = subprocess.Popen([BIN, "-headless", "-x", '(load "%s")' % os.path.join(HERE, "recursion-probe.scm")],
+                         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    procs.append(p)
+    try:
+        out = p.communicate(timeout=100)[0].decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out = ""
+    check("typesetting does not crash", "TYPESET-OK" in out)
+    check("export to PDF does not crash", "EXPORT-OK" in out and os.path.exists(env["RECURSION_PDF"]))
+    check("exit status 0", p.returncode == 0)
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "undo": s_undo, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]

@@ -19,6 +19,7 @@
 #              refusal, conflict, undo, the person's undo skips the agent
 #   filter     every name of the lists of refused content is a tag of the DRD
 #   styles     tags of the style of the document and of its assigns are accepted
+#   recursion  a macro that calls itself: typesetting and PDF export do not crash
 #   guard      an edit may not introduce what the filter refuses: leaves, definitions,
 #              the environment, the budget, a macro that calls itself
 #   content    what content is refused (code, files, links, wrong arities), create_document
@@ -43,7 +44,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared undo filter content styles guard hostdeath nonascii stalled
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared undo recursion filter content styles guard hostdeath nonascii stalled
 status=0
 for name in "$@"; do
   w="$run/$name"

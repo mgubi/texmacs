@@ -208,17 +208,36 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
      document is compared before and after), and the environment around the
      insertion (a `with` of the person, a macro of theirs that depends on it) are
      covered by construction.
-  *Budgets.* The evaluation of the content has a budget of 1.5 million steps for a
-  block (40 million for the whole document, when a definition changed): an
-  expansion that exceeds it (a macro that calls its argument twice, nested) is a
-  violation, the edit is refused, and the server stays alive. The budget is a counter
-  in the evaluator (`exec_budget_start`, `exec_budget_end` in `env_exec.cpp`, off
-  unless asked). The nesting of macros is also limited, always, to 1200 levels (a
-  macro that calls itself returned a stack overflow; it now gives an error tree),
-  which protects the person's TeXmacs as well. Any failure of the check (an
-  error, a budget) refuses the edit. The document itself is not changed by the check:
-  the content written is inserted, not the expansion. 20000 paragraphs: an edit takes
-  20 to 50 ms.
+  *Keys of the violations.* A violation is compared by its reason and the whole
+  content of the node that has it (hashed, no truncation), so a change inside a
+  node that already had a violation (a person's `<specific|html|...>`, their
+  `<extern|...>`, a long `javascript:` address) is a new violation; the definitions of
+  the document (`assign`, `macro`, `set`...) are the exception, being tied to no
+  content. An edit inside, or of, code or raw text for another program (`extern`,
+  `script`, `hybrid`, `action`, `compound`, `latex`, a `specific` for another program,
+  the inputs and outputs of sessions...) is refused whatever the violations, and an
+  edit in a block that does not evaluate within the budget is refused.
+  *Budgets.* The evaluation has a budget of 1.5 million steps for a block; a
+  comparison of the whole document (when a definition changed) evaluates the blocks
+  in batches of about 20000 nodes whose results are dropped at once, within 12 million
+  steps and 3 million nodes of results in all, and only the blocks that use the changed
+  definitions (the names of the `assign`s of the edited block, and of the
+  definitions that use them again and again, found as tags or as strings; all the blocks
+  if the style defines one of the names). An expansion that exceeds a budget is a
+  violation, the edit is refused, and the server stays alive. The budget is a counter in
+  the evaluator (`exec_budget_start`, `exec_budget_end` in `env_exec.cpp`, off unless
+  asked). The nesting of macros is limited always, which protects the person's
+  TeXmacs: the evaluator stops at 1200 levels (`exec_compound`), the typesetter at 150
+  levels for the macros of a block (`bridge_compound.cpp`) and 300 for those inside a
+  paragraph (`concat_macro.cpp`), where it shows an error box (a macro that calls itself
+  overflowed the stack: typesetting and the export to PDF crashed). A `set` of the
+  person is taken as an `assign` of the variable when the context is built (the evaluator
+  does not do it). Any failure of the check (an error, a budget) refuses the edit.
+  An edit that is refused is cancelled before anything is sent to the host: the changes
+  collected for the host are dropped with it (`shared-collect-mark`,
+  `shared-collect-restore!`). The document itself is not changed by the check: the content
+  written is inserted, not the expansion. With 20000 paragraphs an edit takes 30 to 60 ms,
+  and the edit of a definition used by 100 blocks 0.2 to 0.4 s.
 
   Every one of the 370 primitives of the DRD (`src/Data/Drd/drd_std.cpp`) is
   classified below by its real name; the lists in `mcp-server.scm` are this table,

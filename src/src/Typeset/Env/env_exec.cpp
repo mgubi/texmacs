@@ -215,10 +215,11 @@ texmacs_exec (edit_env env, tree cmd) {
 // A limit on the work of the evaluator, for the programs that evaluate text
 // which does not come from the person (texmacs --mcp checks what an agent
 // writes): exec_budget_start (n) makes the evaluator give an error tree after
-// n steps (a macro that calls its argument twice, ten times nested, would
-// take a thousand years), exec_budget_end () gives what is left (negative if
-// the limit was reached). The nesting of the macros is limited always: a
-// macro that calls itself would else overflow the stack of the process.
+// n steps (a macro that calls its argument twice, ten times nested, would take
+// a thousand years), exec_budget_end () gives what is left (negative if the
+// limit was reached). The nesting of the macros is limited always, here and in
+// the typesetter (concat_macro.cpp, bridge_compound.cpp): a macro that calls
+// itself would else overflow the stack of the process, which then crashes.
 static bool exec_budget_on= false;
 static long exec_budget_left= 0;
 static int  exec_macro_depth= 0;

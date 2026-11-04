@@ -194,6 +194,12 @@ bridge_compound_rep::my_typeset (int desired_status) {
     d= 0;
   }
 
+  // A macro that calls itself would nest the bridges until the stack of the
+  // process overflows: past a depth, an error box is shown instead.
+  static int bridge_macro_depth= 0;
+  if (bridge_macro_depth >= 150 && is_applicable (f))
+    f= tree (_ERROR, "macro nesting too deep");
+
   if (is_applicable (f)) {
     int i, n=N(f)-1, m=N(st)-d;
     env->macro_arg= list<hashmap<string,tree> > (
@@ -221,7 +227,9 @@ bridge_compound_rep::my_typeset (int desired_status) {
       ttt->insert_marker (st, ip);
     // (the body of an included file is a document of its own)
     bridge_macro_scope scope (L(st) != INCLUDE);
+    bridge_macro_depth++;
     body->typeset (desired_status);
+    bridge_macro_depth--;
     env->macro_arg= env->macro_arg->next;
     env->macro_src= env->macro_src->next;
   }
