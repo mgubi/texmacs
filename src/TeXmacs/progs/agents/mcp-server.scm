@@ -1197,18 +1197,14 @@
 ;; of the .ts files (the script is described in docs/mcp-server.md).
 (define refused-style-macros
   '(
-    block-comment button button-ornament calc-check carbon-comment chunk-link
-    db-pretty db-result dir-entry-icon dir-header-cell doc-module-synopsis
-    doxygen-get doxygen-load doxygen-ref edit-macro fold fold-bpr fold-button
-    fold-button* fold-detailed folded-comment icon inline-comment
-    link-to-module-doc link-to-module-source live-io live-io* mc-popup mirror
-    mirror-comment passive-tab radio-box radio-button remote-big-icon
-    remote-email remote-menu remote-name remote-picture render-button
-    render-circled-button screenshot shared source-link spell-error
-    spell-propositions summarized-algorithm summarized-tiny tmdoc-file
-    tmdoc-image tmdoc-translation tmdoc-web tmweb tmweb-link toggle-box
-    toggle-button unfold-button unfold-button* unfold-summarized widget-cmd
-    widget-value youtube-thumbnail ))
+    block-comment button calc-check carbon-comment chunk-link dir-entry-icon
+    dir-header-cell doc-module-synopsis doxygen-get doxygen-load doxygen-ref
+    edit-macro folded-comment icon inline-comment link-to-module-doc
+    link-to-module-source live-io live-io* mc-popup mirror mirror-comment
+    radio-box radio-button remote-big-icon remote-email remote-menu
+    remote-name remote-picture screenshot shared spell-error
+    spell-propositions tmdoc-file tmdoc-image tmdoc-translation tmdoc-web
+    tmweb tmweb-link toggle-box toggle-button widget-cmd widget-value ))
 
 ;; The tags whose string arguments are names: they are written as they are
 ;; (labels, keys, addresses, files, environment variables) in the exports to
@@ -1477,8 +1473,7 @@
     "string" "expandafter" "noexpand" "def" "edef" "gdef" "xdef" "futurelet"
     "makeatletter" "makeatother"
     ;; (they become tags of the export, or load files or programs)
-    "inputminted" "import" "subimport" "includepdf" "usepackage" "documentclass"
-    "addbibresource" "bibliographystyle" "ShellEscape" "write18" "pgfplotstableread"
+    "inputminted" "import" "subimport" "includepdf" "ShellEscape" "write18" "pgfplotstableread"
     "CatchFileDef" "DTLloaddb" "addplot" "loadglsentries" "lstset" "input@path"))
 
 (define latex-tag-forbidden
@@ -1501,11 +1496,125 @@
                          (if (> j (+ i 1)) (cons (substring s (+ i 1) j) acc) acc)))))
             (else (loop (+ i 1) acc))))))
 
+(define plain-arg-commands
+  ;; commands whose arguments must be plain names (packages, classes, styles,
+  ;; bibliography files), not paths
+  '("usepackage" "RequirePackage" "documentclass" "bibliographystyle" "bibliography"
+    "addbibresource"))
+
+(define (plain-name-token? t)
+  ;; letters, digits, - _ . = and blanks; not starting with a dot; no ..
+  (let ((n (string-length t)))
+    (and (> n 0) (< n 200)
+         (not (char=? (string-ref t 0) #\.))
+         (< (string-search-forwards ".." 0 t) 0)
+         (let loop ((i 0))
+           (or (>= i n)
+               (let ((c (string-ref t i)))
+                 (and (or (char-alphabetic? c) (char-numeric? c)
+                          (memv c '(#\- #\_ #\. #\= #\space)))
+                      (< (char->integer c) 128)
+                      (loop (+ i 1)))))))))
+
+(define (split-commas t)
+  (let loop ((i 0) (from 0) (acc '()))
+    (cond ((>= i (string-length t))
+           (reverse (cons (substring t from i) acc)))
+          ((char=? (string-ref t i) #\,)
+           (loop (+ i 1) (+ i 1) (cons (substring t from i) acc)))
+          (else (loop (+ i 1) from acc)))))
+
+(define (latex-group s i open close)
+  ;; the text of the group opened at i (open ... close, without nesting) and
+  ;; the position after it, or #f
+  (and (< i (string-length s)) (char=? (string-ref s i) open)
+       (let loop ((j (+ i 1)))
+         (cond ((>= j (string-length s)) #f)
+               ((char=? (string-ref s j) close) (cons (substring s (+ i 1) j) (+ j 1)))
+               ((memv (string-ref s j) '(#\{ #\} #\\ #\[ #\])) #f)
+               (else (loop (+ j 1)))))))
+
+(define (skip-blanks s i)
+  (let loop ((i i))
+    (if (and (< i (string-length s)) (memv (string-ref s i) '(#\space #\newline #\tab)))
+        (loop (+ i 1)) i)))
+
+(define (check-plain-arguments s name end)
+  ;; the optional [options] and the {names} after the command: plain names
+  (let* ((i (skip-blanks s end))
+         (opt (latex-group s i #\[ #\]))
+         (j (if opt (skip-blanks s (cdr opt)) i))
+         (arg (latex-group s j #\{ #\})))
+    (for (t (append (if opt (split-commas (car opt)) '())
+                    (if arg (split-commas (car arg)) '())))
+      (when (not (plain-name-token? (tm-string-trim-both t)))
+        (tool-error (string-append "the LaTeX command \\" name " has an argument that is not a plain name (a package, a class, a style or a file name of letters, digits, - _ . only; no path): `"
+                                   (utf8-prefix t 40) "' (nothing was changed)"))))
+    (when (and (not arg) (!= "" (tm-string-trim-both (substring s end (string-length s)))))
+      (tool-error (string-append "the LaTeX command \\" name " is not followed by a {name}: refused (nothing was changed)")))))
+
+(define (latex-occurrences s)
+  ;; ((name . position after the name) ...) of the commands in @s
+  (let ((n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (cond ((>= i n) (reverse acc))
+            ((char=? (string-ref s i) #\\)
+             (let scan ((j (+ i 1)))
+               (if (and (< j n) (char-alphabetic? (string-ref s j)))
+                   (scan (+ j 1))
+                   (loop (max (+ i 2) j)
+                         (if (> j (+ i 1)) (cons (cons (substring s (+ i 1) j) j) acc) acc)))))
+            (else (loop (+ i 1) acc))))))
+
 (define (check-latex-source s)
   ;; the importer of LaTeX reads the files of \input and the like: not accepted
-  (for (c (latex-commands s))
-    (when (member c latex-forbidden)
-      (tool-error (string-append "the LaTeX command \\" c " is refused (it reads files, runs code or hides a command name): the content is refused (nothing was changed)")))))
+  (for (o (latex-occurrences s))
+    (when (member (car o) latex-forbidden)
+      (tool-error (string-append "the LaTeX command \\" (car o) " is refused (it reads files, runs code or hides a command name): the content is refused (nothing was changed)")))
+    (when (member (car o) plain-arg-commands)
+      (check-plain-arguments s (car o) (cdr o)))))
+
+(define (latex-normalize st)
+  ;; what the importer gives for the preamble commands: the class and the
+  ;; packages (the style of the document says them) and the resources are
+  ;; dropped, a bibliography style and a bibliography make the bibliography
+  ;; of the standard style, <bibliography|bib|style|files|body>
+  (let ((style #f))
+    (define (find-style t)
+      (cond ((func? t 'bibliographystyle 1)
+             (when (and (not style) (string? (cadr t))) (set! style (cadr t))))
+            ((pair? t) (for (c (cdr t)) (find-style c)))))
+    (define (drop? t)
+      (or (func? t 'documentclass) (func? t 'usepackage) (func? t 'addbibresource)
+          (func? t 'bibliographystyle) (func? t 'RequirePackage)
+          (func? t 'documentclass*) (func? t 'usepackage*) (func? t 'RequirePackage*)))
+    (define (rewrite t)
+      (cond ((not (pair? t)) t)
+            ((and (func? t 'bibliography 1) (string? (cadr t)))
+             `(bibliography "bib" ,(string-append "tm-" (or style "plain")) ,(cadr t)
+                            (document "")))
+            (else
+              (cons (car t)
+                    (let loop ((l (cdr t)) (acc '()))
+                      (cond ((null? l) (reverse acc))
+                            ((drop? (car l)) (loop (cdr l) acc))
+                            (else (loop (cdr l) (cons (rewrite (car l)) acc)))))))))
+    (define (clean t)
+      ;; (a concatenation or a document that became empty or single)
+      (cond ((not (pair? t)) t)
+            (else
+              (let* ((kids (map clean (cdr t)))
+                     (kids (if (memq (car t) '(document concat))
+                               (list-filter kids (lambda (k) (not (or (equal? k '(concat)) (equal? k "")))))
+                               kids)))
+                (cond ((and (eq? (car t) 'concat) (null? kids)) "")
+                      ((and (eq? (car t) 'concat) (null? (cdr kids))) (car kids))
+                      (else (cons (car t) kids)))))))
+    (find-style st)
+    (let ((r (clean (rewrite st))))
+      (when (or (equal? r '(document)) (equal? r "") (equal? r '(document "")))
+        (tool-error "the content has only commands of the preamble (class, packages, styles): there is nothing to insert (nothing was changed)"))
+      r)))
 
 (define (assigned-names t)
   ;; the names that the document itself defines (assign): macros of its
@@ -1555,6 +1664,7 @@
     (when (or (not st) (not (valid-stree? st 0)))
       (tool-error (string-append "the content does not parse as " fmt
                                  " (nothing was changed)")))
+    (when (== fmt "latex") (set! st (latex-normalize st)))
     (set! safety-defined? (and d (defined-predicate d)))
     (let ((r (catch #t
                (lambda () (check-safety st base) (check-arity st d) 'ok)

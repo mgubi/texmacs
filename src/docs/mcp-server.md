@@ -262,9 +262,11 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     `extern` with a function that reads files or runs programs (doxygen, tmdoc,
     module documentation, remote, spell, listing, popups...), plus the macros named by
     the audit: `refused-style-macros` in `mcp-server.scm`:
-    `block-comment`, `button`, `button-ornament`, `calc-check`, `carbon-comment`, `chunk-link`, `db-pretty`, `db-result`, `dir-entry-icon`, `dir-header-cell`, `doc-module-synopsis`, `doxygen-get`, `doxygen-load`, `doxygen-ref`, `edit-macro`, `fold`, `fold-bpr`, `fold-button`, `fold-button*`, `fold-detailed`, `folded-comment`, `icon`, `inline-comment`, `link-to-module-doc`, `link-to-module-source`, `live-io`, `live-io*`, `mc-popup`, `mirror`, `mirror-comment`, `passive-tab`, `radio-box`, `radio-button`, `remote-big-icon`, `remote-email`, `remote-menu`, `remote-name`, `remote-picture`, `render-button`, `render-circled-button`, `screenshot`, `shared`, `source-link`, `spell-error`, `spell-propositions`, `summarized-algorithm`, `summarized-tiny`, `tmdoc-file`, `tmdoc-image`, `tmdoc-translation`, `tmdoc-web`, `tmweb`, `tmweb-link`, `toggle-box`, `toggle-button`, `unfold-button`, `unfold-button*`, `unfold-summarized`, `widget-cmd`, `widget-value`, `youtube-thumbnail`.
-    The folding tags (`fold`, `summarized-*`, `toggle-box`, ...) use `action` and are
-    in it. The macros of the style are also checked for their number of arguments
+    `block-comment`, `button`, `calc-check`, `carbon-comment`, `chunk-link`, `dir-entry-icon`, `dir-header-cell`, `doc-module-synopsis`, `doxygen-get`, `doxygen-load`, `doxygen-ref`, `edit-macro`, `folded-comment`, `icon`, `inline-comment`, `link-to-module-doc`, `link-to-module-source`, `live-io`, `live-io*`, `mc-popup`, `mirror`, `mirror-comment`, `radio-box`, `radio-button`, `remote-big-icon`, `remote-email`, `remote-menu`, `remote-name`, `remote-picture`, `screenshot`, `shared`, `spell-error`, `spell-propositions`, `tmdoc-file`, `tmdoc-image`, `tmdoc-translation`, `tmdoc-web`, `tmweb`, `tmweb-link`, `toggle-box`, `toggle-button`, `widget-cmd`, `widget-value`.
+    A macro whose `action` runs a fixed command (the folding tags `fold`, `unfold`,
+    `folded`, `summarized`, `detailed`, `fold-button`, ... call `mouse-fold` or `mouse-unfold`
+    with their argument as data) is not in the list; one whose action is an argument or a
+    computed command (`button`, `toggle-box`, ...) is. The macros of the style are also checked for their number of arguments
     when the DRD knows it (`(theorem)` is refused); the macros that the document
     assigns itself are not, before they are typeset.
   - *Names that go to an export*: the string arguments of `label`, `reference`, `pageref`,
@@ -307,12 +309,18 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     command name (`\string`, `\expandafter`, `\noexpand`, `\def`, `\edef`, `\gdef`, `\xdef`,
     `\futurelet`, `\makeatletter`, `\makeatother`) are refused before the conversion: the
     importer would read the files itself. This also refuses them inside `verbatim`
-    (a false positive that stays). Also refused: `\inputminted`, `\import`,
-    `\subimport`, `\includepdf`, `\usepackage`, `\documentclass`, `\addbibresource`,
-    `\bibliographystyle`, `\ShellEscape`, `\write18`, `\pgfplotstableread`,
-    `\CatchFileDef`, `\DTLloaddb`, `\addplot`, `\loadglsentries`, `\lstset`. `\bibliography{refs}`
-    becomes a `bibliography` with one argument, which is refused (the style defines it with
-    more, or does not define it); `\includegraphics` becomes an `image`.
+    (a false positive that stays). Also refused: `\inputminted`, `\import`, `\subimport`, `\includepdf`, `\ShellEscape`,
+    `\write18`, `\pgfplotstableread`, `\CatchFileDef`, `\DTLloaddb`, `\addplot`,
+    `\loadglsentries`, `\lstset`. `\documentclass`, `\usepackage`, `\RequirePackage`,
+    `\bibliographystyle`, `\bibliography` and `\addbibresource` are accepted when their
+    options and names are plain (letters, digits, `- _ .` and `=`, not starting with a
+    dot, no `..`, no `/`, no `\`, no braces): `\usepackage{amsmath,amssymb}`,
+    `\documentclass[12pt]{article}`, `\bibliography{refs}`; a path is refused. After the
+    conversion the class, the packages and the resources are dropped (the style of the
+    document says them), and `\bibliographystyle{S}` with `\bibliography{F}` become
+    `<bibliography|bib|tm-S|F|<document|>>`, the form of the standard style (4 arguments;
+    the importer gives only 1), whose string arguments are then checked as names and
+    files; a text that has only such commands is refused as having nothing to insert. `\includegraphics` becomes an `image`.
   - *Trees that cannot be*: a primitive with a number of arguments it cannot have
     (`(with)`, `(frac "a")`, an empty `(table)`...) is refused, and so is a macro of the
     style with a number of arguments its definition does not have. A `with` with no

@@ -1350,7 +1350,27 @@ def s_content(w):
     accepted("a specific for printer", "texmacs", "<specific|printer|x>")
     accepted("a graphics with a point", "texmacs", "<graphics|<point|0|0>>")
     accepted("a latex tag with plain text", "stree", '(latex "x^2")')
-    refused("latex: \\bibliography (wrong number of arguments, or not in the style)", "latex", "\\bibliography{refs}", "bibliography")
+    for src in ("\\usepackage{../x}", "\\usepackage{/etc/x}", "\\documentclass{../../x}", "\\documentclass[../x]{article}",
+                "\\bibliographystyle{/etc/x}", "\\bibliography{/etc/passwd}", "\\bibliography{../refs}",
+                "\\addbibresource{../x.bib}", "\\usepackage{a\\input}", "\\usepackage{.hidden}"):
+        refused("latex: %s (a path, not a name)" % src, "latex", src, "LaTeX command")
+    accepted("latex: \\bibliography{refs} with its style", "latex", "\\bibliographystyle{plain}\\bibliography{refs}")
+    accepted("latex: \\addbibresource with a name and a section", "latex", "\\section{A}\\addbibresource{refs.bib}")
+    e, r = m.tool("insert", document="d1", where="last", format="latex", content=
+             "\\documentclass[12pt,a4paper]{article}\n\\usepackage{amsmath,amssymb}\n\\usepackage[utf8]{inputenc}\n"
+             "\\begin{document}\n\\section{Intro}\\label{sec:i}\nWe know that $x^2\\geq 0$ \\cite{knuth}.\n"
+             "\\bibliographystyle{plain}\n\\bibliography{refs}\n\\end{document}")
+    check("a full small LaTeX article is accepted", not e and r["status"] == "applied")
+    e, t = m.tool("read", document="d1", format="texmacs", max_size=100000)
+    check("the article has no preamble command and has a bibliography with its style",
+          not e and "documentclass" not in t["content"] and "usepackage" not in t["content"] and "tm-plain" in t["content"])
+    m.tool("undo_agent", document="d1", steps=3)
+    refused("latex: only the preamble", "latex", "\\documentclass{article}\\usepackage{amsmath}", "only commands of the preamble")
+    accepted("a folded block", "stree", '(folded "summary" "body")')
+    accepted("a summarized block", "stree", '(summarized "summary" "body")')
+    accepted("a detailed block", "stree", '(detailed "summary" "body")')
+    refused("a button (its script is an argument)", "stree", '(button "x" "y")', "button")
+    refused("a toggle-box (its action is a computed command)", "stree", '(toggle-box "a" "b")', "toggle-box")
     accepted("latex: href to the web", "latex", "\\href{https://example.org}{site}")
     accepted("a get-attachment", "texmacs", "<get-attachment|a>")
     # names written as they are in an export to LaTeX
@@ -1382,8 +1402,7 @@ def s_content(w):
                       ("tmdoc-file", '"x"'), ("widget-cmd", '"x"')):
         refused("an unknown tag: %s" % tag, "stree", "(%s %s)" % (tag, args), tag)
     for src in ("\\includepdf{x}", "\\inputminted{c}{x}", "\\import{a}{b}", "\\subimport{a}{b}",
-                "\\usepackage{../x}", "\\documentclass{../../x}", "\\addbibresource{x}",
-                "\\bibliographystyle{x}", "\\ShellEscape{x}", "\\directlua{x}", "\\immediate\\write18{x}",
+                "\\ShellEscape{x}", "\\directlua{x}", "\\immediate\\write18{x}",
                 "\\addplot table {/etc/passwd};", "\\pgfplotstableread{x}", "\\CatchFileDef{a}{b}{c}",
                 "\\DTLloaddb{a}{b}"):
         refused("latex: %s" % src, "latex", src, "LaTeX command")
