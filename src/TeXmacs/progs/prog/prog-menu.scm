@@ -40,9 +40,10 @@
       ---
       (group "Text")
       (link textual-properties-menu))
-  ---
-  (group "Source code")
-  (link code-lines-menu)
+  (if (code-lines-document?)
+      ---
+      (group "Source code")
+      (link code-lines-menu))
   ---
   (group "Paragraph")
   (link paragraph-menu)
@@ -62,7 +63,8 @@
   (when (inside? 'table)
     ("Cell" (open-cell-properties))
     ("Table" (open-table-properties)))
-  (-> "Source code" (link code-lines-menu))
+  (if (code-lines-document?)
+      (-> "Source code" (link code-lines-menu)))
   ---
   (-> "Whitespace" (link space-menu))
   (-> "Indentation" (link indentation-menu))

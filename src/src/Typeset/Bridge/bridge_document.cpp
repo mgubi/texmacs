@@ -500,7 +500,10 @@ void
 bridge_document_rep::my_typeset (int desired_status) {
   //cout << INDENT;
   // (lines of code, or paragraphs: see above)
-  set_mode (env->read ("code-lines") == "true"? DOC_CODE: DOC_PARAGRAPHS);
+  // (a document without lines is typeset as paragraphs: the code bridge
+  // would have a line which is not in the tree)
+  set_mode (env->read ("code-lines") == "true" && N(st) > 0?
+            DOC_CODE: DOC_PARAGRAPHS);
   if (mode == DOC_CODE) {
     code->typeset (desired_status);
     st= code->st;

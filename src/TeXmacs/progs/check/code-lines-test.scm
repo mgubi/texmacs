@@ -760,6 +760,72 @@
     (when (buffer-exists? prev) (switch-to-buffer prev))
     (code-lines-env old)))
 
+;; Fixes of the audit of 14707e2593: the rectangles of lines with spaces
+;; (as in a document, measured from a line without spaces), a block whose
+;; lines are all removed by the tree (an edit of a language server: the
+;; editor looped on a line which the box had and the tree had not), a block
+;; in paper mode which goes below 4 lines (the records of paper mode were
+;; kept: code-lines-check), and the switch of the lines of code, which is a
+;; setting of the whole document, not offered in a code block of a document
+(define (test-audit-5)
+  (check-group "spaces, empty blocks, short blocks, code blocks")
+  (let* ((ls '("c" "zz zz" "int " " " "x"))
+         (doc (lambda (cl)
+                `(document (with "font-family" "tt" "language" "verbatim"
+                             "code-lines" ,cl (document ,@ls)))))
+         (rel (lambda ()
+                (let ((r0 (tree-bounding-rectangle (path->tree (at 0 6 0)))))
+                  (map (lambda (i)
+                         (with r (tree-bounding-rectangle
+                                  (path->tree (at 0 6 i)))
+                           (list (- (cadr r) (cadr r0))
+                                 (- (cadddr r) (cadr r0)))))
+                       '(1 2 4)))))
+         (plain #f) (code #f))
+    (with-body (doc "false") (lambda () (set! plain (rel))))
+    (with-body (doc "true") (lambda () (set! code (rel))))
+    (check= code plain))
+  ;; all the lines removed (as an edit of the editor, which corrects the
+  ;; cursor), the arrows, then one line inserted
+  (let ((edit (lambda (thunk)
+                (start-editing) (thunk) (end-editing)
+                (update-forced) (apply-changes))))
+    (with-body '(document "before"
+                          (with "font-family" "tt" "code-lines" "true"
+                            (document "a" "b" "c" "d" "e"))
+                          "after")
+      (lambda ()
+        (init-env "page-medium" "papyrus")
+        (edit (lambda () #t))
+        (go-to (at 1 4 2 1))
+        (let ((d (path->tree (at 1 4))))
+          (edit (lambda () (tree-remove! d 0 5)))
+          (check= (tree-arity d) 0)
+          (edit kbd-down)
+          (edit kbd-up)
+          (check-true (list? (cursor-path)))
+          (edit (lambda () (tree-insert! d 0 '("again"))))
+          (check= (tree->stree d) '(document "again"))))))
+  ;; paper mode, from 4 lines to 3 (code-lines-check compares the records)
+  (with-body '(document (with "font-family" "tt" "code-lines" "true"
+                          (document "a" "b" "c" "d")))
+    (lambda ()
+      (init-env "page-medium" "paper")
+      (step (lambda () #t))
+      (go-to (at 0 4 3 0))
+      (step (lambda () #t))
+      (step kbd-backspace)
+      (check= (tree->stree (path->tree (at 0 4))) '(document "a" "b" "cd"))
+      (check= (typeset-check-mismatches) mismatches)))
+  ;; a code block of a document: not offered there
+  (with-body '(document "Some text."
+                        (cpp-code (document "int x;" "return 0;")))
+    (lambda ()
+      (go-to (at 1 0 0 2))
+      (step (lambda () #t))
+      (check-true (in-prog?))
+      (check-false (code-lines-document?)))))
+
 ;; A block of one line with markup, in paper mode, is a paragraph of its
 ;; items (it had no rows, and was neither drawn nor reached by the cursor)
 (define (test-one-rich-line)
@@ -906,6 +972,7 @@
   (test-lines-root)
   (test-cursor-in-block)
   (test-text-files)
+  (test-audit-5)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)

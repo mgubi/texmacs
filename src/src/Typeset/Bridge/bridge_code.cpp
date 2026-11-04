@@ -165,6 +165,7 @@ public:
   array<unsigned long long> plain;
   code_lexer      lexer;   // the colours of the syntax
   bool            recs_ok; // they are at the places of the lines
+  bool         recs_paper; // they were made for paper mode (all the lines)
   code_end first, last;    // the paragraphs of the first and the last line
   int      passes;         // the passes of typeset_paper
   SI       gcell;          // the width of a cell of the grid,
@@ -210,7 +211,8 @@ public:
 };
 
 bridge_code_rep::bridge_code_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), recs_ok (false), passes (0), gcell (0),
+  bridge_rep (ttt, st, ip), recs_ok (false), recs_paper (false),
+  passes (0), gcell (0),
   tabw (8), invis (false), shrink (false), row_lo (0), row_hi (0) {}
 
 bridge
@@ -609,6 +611,12 @@ bridge_code_rep::my_typeset (int desired_status) {
     }
   }
   bool paper= ttt->paper && n >= 4 && typeset_caches_mode () != 0;
+  if (paper != recs_paper) {
+    // (the records of paper mode, one for each line, are not those of
+    // papyrus mode or of a block of less than 4 lines, and conversely)
+    for (int i=0; i<n; i++) { recs[i]= code_rec (); plain[i]= 0; }
+    recs_paper= paper;
+  }
   for (int i=0; i<n; i++) {
     tree& t= doc[i];
     // (in paper mode every line has a record: see typeset_paper)

@@ -934,10 +934,19 @@ code_box_rep::find_selection (path lbp, path rbp) {
     string s= line (k1);
     array<SI> xp;
     xpositions (k1, p2, xp);
-    metric ex;
-    fn->get_extents (s (p1, p2), ex);
-    rectangles rs (rectangle (xp[p1] - xp[a], ex->y1 + base (k1, r),
-                              xp[p2] - xp[a], ex->y2 + base (k1, r)));
+    // (the height of the characters without the spaces, which are boxes
+    // of their own in a paragraph: the space of a monospaced font may be a
+    // glyph which goes below the baseline)
+    string m;
+    for (int i= p1; i < p2; i++) if (s[i] != ' ') m << s[i];
+    SI ey1= 0, ey2= fn->yx;
+    if (N(m) > 0) {
+      metric ex;
+      fn->get_extents (m, ex);
+      ey1= ex->y1; ey2= ex->y2;
+    }
+    rectangles rs (rectangle (xp[p1] - xp[a], ey1 + base (k1, r),
+                              xp[p2] - xp[a], ey2 + base (k1, r)));
     return selection (rs, find_tree_path (lbp), find_tree_path (rbp));
   }
   // from the first cursor to the right, the rows between, from the left to

@@ -414,11 +414,19 @@
 ;; The main Format menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (code-lines-document?)
+  ;; a document which may be typeset as lines of code (code-lines, which is
+  ;; a setting of the whole document): a source file, a text, or a document
+  ;; which is typeset so; not a code block of another document, where
+  ;; the program code also is (in-prog?)
+  (or (code-lines?)
+      (== (get-style-list) '("code"))
+      (== (get-init "language") "verbatim")))
+
 (tm-define (code-lines-text?)
-  ;; a text (a file of verbatim text, not a program), which may be typeset
-  ;; as lines of code (the program code has the menu in prog-format-menu)
-  (and (not (in-prog?))
-       (or (code-lines?) (== (get-init "language") "verbatim"))))
+  ;; a text (not a program), which may be typeset as lines of code (the
+  ;; program code has the menu in prog-format-menu)
+  (and (not (in-prog?)) (code-lines-document?)))
 
 (menu-bind format-menu
   (if (or (in-text?) (in-source?)) (link text-format-menu))

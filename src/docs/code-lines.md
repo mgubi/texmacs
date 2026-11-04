@@ -113,20 +113,32 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
 
 ## Measurements
 
-A C file of 200000 lines, the cursor at the line 150000, s7 build (#797):
+A C file of 200000 lines (40000 functions of 5 lines, with tabs and
+comments), the cursor at the line 150000, s7 build, macOS (M4), headless,
+4 November 2026; a key is `update-forced` and `apply-changes` after it:
 
-| | paper | papyrus |
+| | with the block | without |
 |---|---|---|
-| a key, with the block | 0.8–0.9 s | 71–78 ms |
-| Return, with the block | 1.8–2.0 s | 78 ms |
-| a key, without the block | 1.3–5 s | |
-| Return, without the block | 4.4–4.8 s | |
+| load and typeset (papyrus) | 2.4 s | 9.5 s |
+| a key, papyrus | 14 ms | 50 ms |
+| Return, papyrus | 16 ms | 152 ms |
+| to paper mode | 1.1 s | 5.6 s |
+| a key, paper | 270 ms | 360 ms |
+| Return, paper | 530 ms | 900 ms |
 
 In paper mode, most of what is left is the page breaker: it reuses its
 search for a key, but its passes over all the items (signature, matching
 with the previous search, tables) run again when the number of lines
-changes. In papyrus mode, most of what is left is tree-sitter's region
-brought up to date at each key (`get_region` → `update_lines`).
+changes.
+
+Tree-sitter's parts: a long region is parsed by parts of about 2000 lines,
+cut at the nodes of the top level which start a line
+(`Plugins/TreeSitter/syntax_region.cpp`). A file without such nodes (e.g.
+200000 statements indented at the top level of a C file, which are errors)
+is one part, which an edit parses again incrementally (about 0.4 s for
+200000 lines), and which `group_update` tried to cut again at each key,
+parsing it whole (1 s more): a fix of tree-sitter of its own, outside this
+work, the same with and without the block.
 
 ## Tests
 
