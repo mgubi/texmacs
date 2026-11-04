@@ -339,8 +339,14 @@ bridge_code_rep::my_typeset_will_be_complete () {
 
 void
 bridge_code_rep::my_exec_until (path p) {
-  // the lines do not change the environment
-  (void) p;
+  // the lines do not change the environment of the lines after them; the
+  // environment at a place inside a line is the one of the markup on the
+  // way to it (a with, a math...), as when the line is typeset by the
+  // concater, with code-lines false (see rich_paragraph)
+  if (N(p) < 2 || p->item < 0 || p->item >= N(st)) return;
+  if (env->read ("code-lines") == "true")
+    env->write_update ("code-lines", "false");
+  env->exec_until (st[p->item], p->next);
 }
 
 /******************************************************************************

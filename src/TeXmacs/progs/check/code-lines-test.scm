@@ -889,7 +889,7 @@
 ;; as paragraphs, and exec_until goes through it as such; it took code-lines
 ;; from the environment of exec_until and dropped its paragraphs)
 (define (test-audit-9)
-  (check-group "environments in a block typeset as paragraphs")
+  (check-group "environments in blocks, without the fast environments")
   (define fast? (== (get-preference "fast environments") "on"))
   (set-fast-environments #f)
   (with-body '(document (with "code-lines" "true"
@@ -903,6 +903,23 @@
       (check= (get-env "zz") "7")
       (step (lambda () (insert "Q")))
       (check= (get-env "zz") "7")))
+  ;; inside the markup of a line of a block (the line is walked as the
+  ;; concater typesets it: bridge_code_rep::my_exec_until)
+  (for (medium '("papyrus" "paper"))
+    (with-body '(document (with "code-lines" "true"
+                            (document "a"
+                                      (concat "x " (with "color" "red" "abc")
+                                              " " (math "a+b"))
+                                      "b")))
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (go-to (at 0 2 1 1 2 1))
+        (step (lambda () #t))
+        (check= (get-env "color") "red")
+        (go-to (at 0 2 1 3 0 1))
+        (step (lambda () #t))
+        (check= (get-env "mode") "math"))))
   (set-fast-environments fast?))
 
 ;; A block of one line with markup, in paper mode, is a paragraph of its
