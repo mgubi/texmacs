@@ -1382,7 +1382,7 @@ def s_content(w):
     refused("a link to an address with a brace", "stree", '(hlink "x" "http://a/b}\\\\input{x}")', "cannot be in an address")
     refused("a link to an address with a bare percent", "stree", '(hlink "x" "http://a/b%zz")', "cannot be in an address")
     refused("an include with a brace", "stree", '(include "a}b.tm")', "character that cannot be")
-    refused("a with whose value has a brace", "stree", '(with "font-family" "}\\\\input{x}" "text")', "character that cannot be")
+    refused("a with whose value has a brace", "stree", '(with "font-family" "}\\\\input{x}" "text")', "value that is not accepted")
     accepted("a label with a colon and a dash", "stree", '(label "sec:intro-1_a")')
     accepted("a link with a fragment", "texmacs", "<hlink|a|https://x.org/p#frag>")
     accepted("a link with a percent escape", "texmacs", "<hlink|a|https://x.org/a%20b>")
@@ -1410,6 +1410,56 @@ def s_content(w):
     refused("a macro with the wrong number of arguments", "stree", '(theorem)', "cannot have")
     refused("a macro with too many arguments", "stree", '(theorem "a" "b")', "cannot have")
     refused("a bibliography with the wrong number of arguments", "texmacs", "<bibliography|bib|plain|refs.bib>", "bibliography")
+    # aliases and wrappers: the second layer checks the content as it expands
+    refused("an alias of href through with and value", "texmacs", "<with|em|<value|href>|<em|javascript:alert(1)>>", "alias")
+    refused("an alias of label", "texmacs", "<with|strong|<value|label>|<strong|a>>", "alias")
+    refused("an alias of a macro through quote-value", "texmacs", "<with|em|<quote-value|hlink>|<em|x|file:///etc/passwd>>", "alias")
+    refused("a with that sets a tag", "texmacs", "<with|em|x|<em|y>>", "alias")
+    refused("a wrapper macro with a javascript address", "texmacs", "<hlink*|x|javascript:alert(1)|t>", "expands to a link")
+    refused("a wrapper macro with a file address", "texmacs", "<hlink*|x|file:///etc/passwd|t>", "expands to a link")
+    accepted("a wrapper macro with a web address", "texmacs", "<hlink*|x|https://example.org|t>")
+    accepted("a reference and a cite (they expand to links)", "texmacs", "<reference|sec:x> <cite|knuth>")
+    # the values of the environment
+    for bad in ('(with "font-size" "2\\" onmouseover=\\"x" "t")', '(with "color" "red\\" onmouseover=\\"x" "t")',
+                '(with "bg-color" "red<b>" "t")', '(with "font-size" "big" "t")', '(with "color" "#12" "t")',
+                '(tformat (cwith "1" "1" "1" "1" "cell-background" "red\\" onmouseover=\\"x") (table (row (cell "a"))))'):
+        refused("a value that is not accepted: %s" % bad[:40], "stree", bad, "not accepted")
+    accepted("a hex colour", "texmacs", "<with|color|#ff0000|x>")
+    accepted("a hex background", "texmacs", "<with|bg-color|#ffeecc|x>")
+    accepted("a length in percent", "texmacs", "<with|par-left|10%|x>")
+    accepted("a font size", "texmacs", "<with|font-size|1.2|x>")
+    accepted("a colour name", "texmacs", "<with|color|dark red|x>")
+    accepted("a cwith with a colour", "stree", '(tformat (cwith "1" "1" "1" "1" "cell-background" "#ffeecc") (table (row (cell "a"))))')
+    refused("a bibliography with a path in a list of files", "texmacs", "<bibliography|bib|tm-plain|refs,../secret|<document|>>", "refers to the file")
+    accepted("a bibliography with a list of files", "texmacs", "<bibliography|bib|tm-plain|refs,more|<document|>>")
+    e, r = m.tool("insert", document="d1", where="last", format="latex", content=
+             "\\documentclass{article}\\title{On the Theory}\\author{A. Author\\thanks{Grant}}\\date{2026}\n"
+             "\\begin{document}\n\\maketitle\n\\section{A}\\small small \\large large\\normalsize\n"
+             "See \\autoref{sec:a} and \\ref{x}. \\caption{bare}\n\\hline\n\\bibliographystyle{plain}\\bibliography{refs}\n\\end{document}")
+    check("a LaTeX article with title, author, maketitle, thanks, caption, autoref, hline", not e and r["status"] == "applied")
+    e, t = m.tool("read", document="d1", format="texmacs", max_size=100000)
+    check("and it is imported with its title and bibliography", not e and "doc-title|On the Theory" in t["content"]
+          and "tm-plain" in t["content"] and "<reference|sec:a>" in t["content"] and "autoref" not in t["content"])
+    m.tool("undo_agent", document="d1")
+    accepted("a snippet with a title and a maketitle", "latex", "\\title{T}\\author{A}\\maketitle Hello")
+    # what goes into the exports as attributes, entities, files written by LaTeX
+    refused("a label with a tag", "stree", '(label "a\\"><script>alert(1)</script>")', "character that cannot be")
+    refused("a reference with a quote", "stree", '(reference "a\\"><script>alert(5)</script>")', "character that cannot be")
+    refused("a cite with a quote", "stree", '(cite "a\\"><script>alert(11)</script>")', "character that cannot be")
+    refused("a link with a quote and an event", "stree", '(hlink "x" "http://a.b/\\"onmouseover=\\"alert(1)")', "cannot be in an address")
+    refused("a link with a tag", "stree", '(hlink "x" "http://a.b/\'><script>alert(2)</script>")', "cannot be in an address")
+    refused("a link with a numeric entity", "stree", '(hlink "x" "&#106;avascript:alert(3)")', "cannot be in an address")
+    refused("a link with a hexadecimal entity", "stree", '(hlink "x" "jav&#x61;script:alert(3)")', "cannot be in an address")
+    refused("an href with a named entity", "stree", '(href "javascript&colon;alert(1)")', "href")
+    refused("a link with a blank", "stree", '(hlink "x" "http://a.b/c d")', "cannot be in an address")
+    refused("an image address with a quote", "stree", '(image "http://a.b/x.png\\" onerror=\\"alert(9)" "1par" "" "" "")', "character that cannot be")
+    refused("an image size with a quote", "stree", '(image "x.png" "1par\\" onload=\\"alert(10)" "" "" "")', "character that cannot be")
+    refused("a map that calls include*", "texmacs", "<map|include*|<tuple|/etc/passwd>>", "that calls")
+    refused("a map that calls hlink", "texmacs", "<map|hlink|<tuple|x>>", "that calls")
+    accepted("a map that calls strong", "texmacs", "<map|strong|<tuple|x|y>>")
+    refused("LaTeX filecontents", "latex", "\\begin{filecontents*}{../x.tex}hi\\end{filecontents*}", "filecontents")
+    refused("LaTeX minted with shell-escape", "latex", "\\usepackage[shell-escape]{minted}\\begin{document}x\\end{document}", "runs programs")
+    refused("LaTeX standalone with convert", "latex", "\\documentclass[convert=true]{standalone}\\begin{document}x\\end{document}", "runs programs")
     # trees with the wrong number of arguments (the typesetter crashed on `with')
     for bad in ('(with)', '(frac "a")', '(table)', '(row)', '(cell)', '(concat)', '(tformat)',
                 '(sqrt)', '(document "a" (frac "b"))', '(rsub "a" "b")', '(tuple "a" (with))'):

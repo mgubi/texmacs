@@ -1212,7 +1212,7 @@
 (define name-tags
   '(label reference pageref eqref cite nocite cite-detail bibitem smart-ref ref
     include include* image postscript postscript* pattern video sound
-    tmdoc-include include-section attachment ocr bibliography with))
+    tmdoc-include include-section attachment ocr bibliography))
 
 (define (filter-lists)
   ;; for the tests: the names of all the lists (symbols)
@@ -1332,6 +1332,10 @@
           (else #t))))
 
 (define (name-chars-ok? s kind)
+  (and (name-chars-ok-1? s kind)
+       (or (not (== kind 'address)) (not (entity-in? s)))))
+
+(define (name-chars-ok-1? s kind)
   ;; may the string @s be written in an export as a name? No `\\', `{', `}', no
   ;; control character, no `^^'; for a label or a key also no % # $ & ^ ~; for
   ;; a file also no %, #; for an address a `%' only before two hexadecimal
@@ -1343,7 +1347,8 @@
            (or (>= i n)
                (let ((c (string-ref s i)))
                  (and (>= (char->integer c) 32) (not (== (char->integer c) 127))
-                      (not (memv c '(#\\ #\{ #\})))
+                      (not (memv c '(#\\ #\{ #\} #\" #\' #\< #\>)))
+                      (or (not (== kind 'address)) (not (char=? c #\space)))
                       (cond ((== kind 'label) (not (memv c '(#\% #\# #\$ #\& #\^ #\~))))
                             ((== kind 'file) (not (memv c '(#\% #\# #\$ #\& #\^ #\~))))
                             (else
@@ -1357,6 +1362,21 @@
 
 (define (char-hexdigit? c)
   (or (char-numeric? c) (and (char-alphabetic? c) (memv (char-downcase c) '(#\a #\b #\c #\d #\e #\f)))))
+
+(define (entity-in? s)
+  ;; an HTML entity (&#106; &colon;): a browser reads it in an address
+  (let ((n (string-length s)))
+    (let loop ((i 0))
+      (and (< i n)
+           (or (and (char=? (string-ref s i) #\&)
+                    (let scan ((j (+ i 1)))
+                      (cond ((>= j n) #f)
+                            ((char=? (string-ref s j) #\;) (> j (+ i 1)))
+                            ((or (char-alphabetic? (string-ref s j)) (char-numeric? (string-ref s j))
+                                 (char=? (string-ref s j) #\#))
+                             (scan (+ j 1)))
+                            (else #f))))
+               (loop (+ i 1)))))))
 
 (define (name-kind tag)
   (cond ((memq tag '(href slink hlink url link)) 'address)
@@ -1379,7 +1399,8 @@
 
 (define (check-file-argument tag a base web?)
   (cond ((string? a)
-         (when (not (file-name-ok? a base web?))
+         (when (not (and (file-name-ok? a base web?)
+                         (name-chars-ok? a (if (url-scheme a) 'address 'file))))
            (tool-error (string-append "the tag `" (symbol->string tag) "' refers to the file `"
                                       (utf8-prefix (u8 a) 60)
                                       "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)"))))
@@ -1388,6 +1409,89 @@
                                      "' has a file that is not written as a plain name: refused (nothing was changed)")))))
 
 (define safety-defined? #f)
+
+(define macro-by-name-tags
+  '(map enum-tag group-individual-counters inc-counter item-tag marginal-note
+    next-counter ornament-render-shadow render-box render-button render-marker
+    reset-counter rsection* value-counter gpg-passphrase-decrypted-block))
+
+(define (dangerous-name? name)
+  ;; the name of a tag that the content may not use
+  (let ((tag (string->symbol name)))
+    (or (assq tag code-reasons) (assq tag code-macro-reasons) (suffix-reason tag)
+        (assq tag file-primitives) (assq tag file-macros)
+        (assq tag link-primitives) (assq tag link-macros)
+        (memq tag refused-style-macros) (memq tag name-tags)
+        (memq tag '(specific latex)))))
+
+(define (tag-name? name)
+  ;; does the string name a tag or a macro (not a plain variable of the
+  ;; environment)? `<value|href>' or `<with|em|...>' would make an alias of it
+  (let ((tag (string->symbol name)))
+    (or (known-primitive? tag) (memq tag refused-style-macros)
+        (memq tag name-tags) (assq tag link-macros) (assq tag file-macros)
+        (assq tag code-macro-reasons) (known-macro-arity? tag)
+        )))
+
+(define value-chars-extra '(#\space #\. #\_ #\- #\+ #\* #\/ #\% #\# #\, #\: #\= #\@))
+
+(define (value-chars-ok? v)
+  ;; a value of the environment: letters, digits, blanks and . _ - + * / % # , : =
+  ;; (no quote, bracket, backslash, brace or control character)
+  (let ((n (string-length v)))
+    (and (< n 200)
+         (let loop ((i 0))
+           (or (>= i n)
+               (let ((c (string-ref v i)))
+                 (and (or (char-alphabetic? c) (char-numeric? c) (>= (char->integer c) 128)
+                          (memv c value-chars-extra))
+                      (loop (+ i 1)))))))))
+
+(define (hex-color? v)
+  (and (>= (string-length v) 4) (<= (string-length v) 9) (char=? (string-ref v 0) #\#)
+       (let loop ((i 1))
+         (or (>= i (string-length v))
+             (and (char-hexdigit? (string-ref v i)) (loop (+ i 1)))))))
+
+(define (number-string? v)
+  (let ((n (string-length v)))
+    (and (> n 0)
+         (let loop ((i 0) (dot? #f))
+           (or (>= i n)
+               (let ((c (string-ref v i)))
+                 (cond ((char-numeric? c) (loop (+ i 1) dot?))
+                       ((and (char=? c #\.) (not dot?)) (loop (+ i 1) #t))
+                       (else #f))))))))
+
+(define (env-value-ok? var v)
+  ;; may the variable @var of the environment be given the string @v? What is
+  ;; written in an export (a colour in an HTML attribute, a size) is typed
+  (cond ((not (value-chars-ok? v)) #f)
+        ((or (== var "color") (string-ends? var "-color"))
+         (or (hex-color? v)
+             (let loop ((i 0))
+               (or (>= i (string-length v))
+                   (and (or (char-alphabetic? (string-ref v i)) (char-numeric? (string-ref v i))
+                            (memv (string-ref v i) '(#\space #\-)))
+                        (loop (+ i 1)))))))
+        ((member var '("font-size" "font-base-size" "magnification" "dpi"))
+         (number-string? v))
+        (else #t)))
+
+(define (check-env-pairs tag vars-and-values)
+  ;; (var value var value ...) of a with, cwith or twith
+  (let loop ((l vars-and-values))
+    (when (and (pair? l) (pair? (cdr l)))
+      (let ((var (car l)) (val (cadr l)))
+        (when (string? var)
+          (when (tag-name? var)
+            (tool-error (string-append "a `" (symbol->string tag) "' that sets `" (utf8-prefix (u8 var) 40)
+                                       "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))
+          (when (and (string? val) (not (env-value-ok? var val)))
+            (tool-error (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
+                                       "' to a value that is not accepted: `" (utf8-prefix (u8 val) 40)
+                                       "' (letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)")))))
+      (loop (cddr l)))))
 
 (define (check-safety st base)
   ;; refuse content with markup that can run code, loop, or read what it
@@ -1409,10 +1513,27 @@
                ((not (and safety-defined? (safety-defined? tag)))
                 (tool-error (string-append "unknown tag `" (symbol->string tag)
                                            "' (not defined by the style of the document): the content is refused (nothing was changed)")))))
+       ;; (aliases, and what is written into the exports as attributes)
+       (cond ((eq? tag 'with)
+              (when (pair? (cdr st))
+                (check-env-pairs tag (list-head (cdr st) (- (length (cdr st)) 1)))))
+             ((eq? tag 'cwith)
+              (when (>= (length (cdr st)) 6)
+                (check-env-pairs tag (list-tail (cdr st) 4))))
+             ((eq? tag 'twith)
+              (check-env-pairs tag (cdr st)))
+             ((memq tag '(value quote-value or-value))
+              (when (and (pair? (cdr st)) (string? (cadr st)) (tag-name? (cadr st)))
+                (tool-error (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)
+                                           "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))))
+       ;; macros which call the macro named by an argument
+       (when (memq tag macro-by-name-tags)
+         (for (a (cdr st))
+           (when (and (string? a) (dangerous-name? a))
+             (tool-error (string-append "a `" (symbol->string tag) "' that calls `" (utf8-prefix (u8 a) 40)
+                                        "' is refused: that macro is not accepted in the content (nothing was changed)")))))
        (when (memq tag name-tags)
-         (for (a (if (eq? tag 'with)
-                     (if (pair? (cdr st)) (list-head (cdr st) (- (length (cdr st)) 1)) '())
-                     (cdr st)))
+         (for (a (cdr st))
            (when (and (string? a) (not (name-chars-ok? a (name-kind tag))))
              (tool-error (string-append "a string in a `" (symbol->string tag) "' has a character that cannot be in a name (a backslash, a brace, a control character, % # $ & ^ ~ ...): `"
                                         (utf8-prefix (u8 a) 40) "' (nothing was changed)")))))
@@ -1427,8 +1548,10 @@
                (cond (first?
                       (check-file-argument tag (car l) base (and (memq tag web-file-tags) #t)))
                      ((and (memq tag '(bibliography)) (string? (car l)))
-                      ;; (the files of a bibliography, the style: names)
-                      (check-file-argument tag (car l) base #f)))
+                      ;; (the files of a bibliography, the style: names; a list
+                      ;; of files separated by commas)
+                      (for (name (split-commas (car l)))
+                        (check-file-argument tag (tm-string-trim-both name) base #f))))
                (loop (cdr l) #f)))))
        (let ((l (or (assq tag link-primitives) (assq tag link-macros))))
          (when l
@@ -1464,6 +1587,92 @@
                 (when (member c latex-tag-forbidden)
                   (tool-error (string-append "the LaTeX command \\" c " in a `latex' tag is refused (it takes a file or an address; the text is written as it is in an export) (nothing was changed)"))))))))))
     (else #t)))
+
+(define allowed-scripts '("mouse-fold" "mouse-unfold"))
+
+(define (url-destination x)
+  ;; the destination of a link: a string, or (url string); else #f
+  (cond ((string? x) x)
+        ((and (func? x 'url 1) (string? (cadr x))) (cadr x))
+        (else #f)))
+
+(define (check-expanded-file tag a base)
+  ;; a file after the evaluation: the evaluator gives the full name of a file
+  ;; that exists, which must be inside the roots (or the folder of the document)
+  (cond ((and (string? a) (string-starts? a "/") (not (dotdot-in-path? a)))
+         (let ((p (resolve-existing a)))
+           (when (not (if (mcp-roots)
+                          (path-allowed? p)
+                          (inside-folder? p (document-folder base))))
+             (tool-error (string-append "the content expands to a `" (symbol->string tag)
+                                        "' of the file `" (utf8-prefix (u8 a) 60)
+                                        "', outside the folders of the server (or of the document): refused (nothing was changed)")))))
+        (else (check-file-argument tag a base (and (memq tag web-file-tags) #t)))))
+
+(define (check-expanded t base)
+  ;; The expanded content (the macros of the style evaluated down to the
+  ;; primitives, in the environment of the document): the links, the files,
+  ;; the commands of the scripts and the raw texts, whatever macro or alias
+  ;; made them, are checked with the rules of the primitives.
+  (cond
+    ((string? t) #t)
+    ((pair? t)
+     (let ((tag (car t)) (args (cdr t)))
+       (for (c args) (check-expanded c base))
+       (cond
+         ((and (eq? tag 'link) (>= (length args) 3))
+          (let* ((dest (car (reverse args))) (u (url-destination dest)))
+            (cond ((func? dest 'script)
+                   (when (not (and (pair? (cdr dest)) (member (cadr dest) allowed-scripts)))
+                     (tool-error "the content expands to a link that runs a script: refused (nothing was changed)")))
+                  ((not u)
+                   (when (and (pair? dest) (not (memq (car dest) '(id tuple))))
+                     (tool-error "the content expands to a link whose destination is not plain text: refused (nothing was changed)")))
+                  ((or (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
+                   (tool-error (string-append "the content expands to a link to `" (utf8-prefix (u8 u) 60)
+                                              "': only http, https, mailto and relative targets are accepted (nothing was changed)"))))))
+         ((and (eq? tag 'hlink) (= (length args) 2))
+          (let ((u (url-destination (cadr args))))
+            (when (or (not u) (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
+              (tool-error "the content expands to a link whose destination is not accepted: refused (nothing was changed)"))))
+         ((memq tag '(image postscript postscript* include include* pattern video sound))
+          (when (pair? args)
+            (check-expanded-file tag (car args) base)))
+         ((eq? tag 'script)
+          (when (not (and (pair? args) (member (car args) allowed-scripts)))
+            (tool-error "the content expands to a script: refused (nothing was changed)")))
+         ((eq? tag 'action)
+          (when (not (and (>= (length args) 2) (member (cadr args) allowed-scripts)))
+            (tool-error "the content expands to an action: refused (nothing was changed)")))
+         ((memq tag '(extern hybrid authorize observer eval-args))
+          (refuse-tag tag "is left after the expansion of the content"))
+         ((eq? tag 'specific)
+          (when (not (and (pair? args) (member (car args) '("texmacs" "screen" "printer" "screen*" "printer*"))))
+            (tool-error "the content expands to a text for another program (specific): refused (nothing was changed)")))
+         ((eq? tag 'latex)
+          (for (a args)
+            (when (string? a)
+              (check-latex-source a)
+              (for (c (latex-commands a))
+                (when (member c latex-tag-forbidden)
+                  (tool-error "the content expands to LaTeX that takes a file or an address: refused (nothing was changed)")))))))))
+    (else #t)))
+
+(define (assign-nodes t)
+  ;; the assigns of the document (its preamble), as strees
+  (cond ((tree-atomic? t) '())
+        ((tm-is? t 'assign) (list (tm->stree t)))
+        (else (append-map assign-nodes (tree-children t)))))
+
+(define (expand-in-document st d)
+  ;; the content evaluated in the environment of the document (after its
+  ;; own assigns), or #f if it cannot be
+  (catch #t
+    (lambda ()
+      (let ((pre (assign-nodes (doc-body d))))
+        (with-buffer (doc-url d)
+          (tm->stree (texmacs-exec (stree->tree (cons 'concat (append pre (list st)))))))))
+    (lambda args #f)))
 
 (define latex-forbidden
   '("input" "include" "includeonly" "InputIfFileExists" "verbatiminput" "lstinputlisting"
@@ -1539,6 +1748,12 @@
     (if (and (< i (string-length s)) (memv (string-ref s i) '(#\space #\newline #\tab)))
         (loop (+ i 1)) i)))
 
+(define latex-forbidden-packages
+  '("minted" "catchfile" "shellesc" "pythontex" "sagetex" "gnuplottex" "bashful" "runcode"
+    "verbatimcopy" "filecontents" "markdown" "write18" "epstopdf" "pgfplotstable" "datatool"
+    "attachfile" "embedfile" "standalone" "luacode" "luatex85" "currfile" "import"
+    "subfiles" "docmute" "combine" "includepdf" "pdfpages" "svg"))
+
 (define (check-plain-arguments s name end)
   ;; the optional [options] and the {names} after the command: plain names
   (let* ((i (skip-blanks s end))
@@ -1547,6 +1762,12 @@
          (arg (latex-group s j #\{ #\})))
     (for (t (append (if opt (split-commas (car opt)) '())
                     (if arg (split-commas (car arg)) '())))
+      (when (or (member (locase-all (tm-string-trim-both t)) latex-forbidden-packages)
+                (string-contains? (locase-all t) "shell")
+                (string-starts? (locase-all (tm-string-trim-both t)) "convert")
+                (string-contains? (locase-all t) "write18"))
+        (tool-error (string-append "the LaTeX command \\" name " asks for `" (utf8-prefix t 40)
+                                   "', which runs programs or reads files: refused (nothing was changed)")))
       (when (not (plain-name-token? (tm-string-trim-both t)))
         (tool-error (string-append "the LaTeX command \\" name " has an argument that is not a plain name (a package, a class, a style or a file name of letters, digits, - _ . only; no path): `"
                                    (utf8-prefix t 40) "' (nothing was changed)"))))
@@ -1567,6 +1788,8 @@
             (else (loop (+ i 1) acc))))))
 
 (define (check-latex-source s)
+  (when (string-contains? (locase-all s) "filecontents")
+    (tool-error "the LaTeX environment filecontents writes files: refused (nothing was changed)"))
   ;; the importer of LaTeX reads the files of \input and the like: not accepted
   (for (o (latex-occurrences s))
     (when (member (car o) latex-forbidden)
@@ -1574,47 +1797,94 @@
     (when (member (car o) plain-arg-commands)
       (check-plain-arguments s (car o) (cdr o)))))
 
+(define (latex-extract-bibliography src)
+  ;; (the text without \bibliographystyle, \bibliography and \addbibresource,
+  ;; the style, the files): the importer would give a bibliography without its
+  ;; files; they become the bibliography of the standard style afterwards
+  (let loop ((occ (reverse (latex-occurrences src))) (text src) (style #f) (files '()))
+    (cond
+      ((null? occ) (list text style files))
+      ((member (car (car occ)) '("bibliographystyle" "bibliography" "addbibresource"))
+       (let* ((name (car (car occ))) (end (cdr (car occ)))
+              (start (- end (string-length name) 1))
+              (g (latex-group src (skip-blanks src end) #\{ #\})))
+         (if (not g)
+             (loop (cdr occ) text style files)
+             (let ((gend (cdr g)) (names (map tm-string-trim-both (split-commas (car g)))))
+               (loop (cdr occ)
+                     (string-append (substring text 0 start)
+                                    (substring text gend (string-length text)))
+                     (if (and (== name "bibliographystyle") (not style)) (car names) style)
+                     (if (== name "bibliography") (append names files) files))))))
+      (else (loop (cdr occ) text style files)))))
+
+(define (latex-document-source? src)
+  ;; has the text a title or a document environment: then the importer of
+  ;; whole documents (title, authors, date) is used
+  (let ((cmds (map car (latex-occurrences src))))
+    (or (member "maketitle" cmds) (member "title" cmds) (member "author" cmds)
+        (member "date" cmds)
+        (>= (string-search-forwards "\\\\begin{document}" 0 src) 0))))
+
+(define (latex-convert src)
+  ;; the stree of the LaTeX text @src (without bibliography commands)
+  (if (latex-document-source? src)
+      (let* ((whole (if (>= (string-search-forwards "\\\\begin{document}" 0 src) 0)
+                        src
+                        (string-append "\\\\documentclass{article}\\\\begin{document}" src
+                                       "\\\\end{document}")))
+             (r (convert whole "latex-document" "texmacs-stree")))
+        (if (and (func? r 'document) (list-find (cdr r) (lambda (x) (func? x 'body 1))))
+            (cadr (list-find (cdr r) (lambda (x) (func? x 'body 1))))
+            (convert src "latex-snippet" "texmacs-stree")))
+      (convert src "latex-snippet" "texmacs-stree")))
+
 (define (latex-normalize st)
-  ;; what the importer gives for the preamble commands: the class and the
-  ;; packages (the style of the document says them) and the resources are
-  ;; dropped, a bibliography style and a bibliography make the bibliography
-  ;; of the standard style, <bibliography|bib|style|files|body>
-  (let ((style #f))
-    (define (find-style t)
-      (cond ((func? t 'bibliographystyle 1)
-             (when (and (not style) (string? (cadr t))) (set! style (cadr t))))
-            ((pair? t) (for (c (cdr t)) (find-style c)))))
-    (define (drop? t)
-      (or (func? t 'documentclass) (func? t 'usepackage) (func? t 'addbibresource)
-          (func? t 'bibliographystyle) (func? t 'RequirePackage)
-          (func? t 'documentclass*) (func? t 'usepackage*) (func? t 'RequirePackage*)))
-    (define (rewrite t)
-      (cond ((not (pair? t)) t)
-            ((and (func? t 'bibliography 1) (string? (cadr t)))
-             `(bibliography "bib" ,(string-append "tm-" (or style "plain")) ,(cadr t)
-                            (document "")))
-            (else
-              (cons (car t)
-                    (let loop ((l (cdr t)) (acc '()))
-                      (cond ((null? l) (reverse acc))
-                            ((drop? (car l)) (loop (cdr l) acc))
-                            (else (loop (cdr l) (cons (rewrite (car l)) acc)))))))))
-    (define (clean t)
-      ;; (a concatenation or a document that became empty or single)
-      (cond ((not (pair? t)) t)
-            (else
-              (let* ((kids (map clean (cdr t)))
-                     (kids (if (memq (car t) '(document concat))
-                               (list-filter kids (lambda (k) (not (or (equal? k '(concat)) (equal? k "")))))
-                               kids)))
-                (cond ((and (eq? (car t) 'concat) (null? kids)) "")
-                      ((and (eq? (car t) 'concat) (null? (cdr kids))) (car kids))
-                      (else (cons (car t) kids)))))))
-    (find-style st)
-    (let ((r (clean (rewrite st))))
-      (when (or (equal? r '(document)) (equal? r "") (equal? r '(document "")))
-        (tool-error "the content has only commands of the preamble (class, packages, styles): there is nothing to insert (nothing was changed)"))
-      r)))
+  ;; what the importer leaves of LaTeX: the preamble commands are dropped (the
+  ;; style of the document says them), \autoref is a reference, \caption outside
+  ;; a figure is its text, \thanks a footnote, \hline and \maketitle go
+  (define (drop? t)
+    (or (func? t 'documentclass) (func? t 'usepackage) (func? t 'addbibresource)
+        (func? t 'bibliographystyle) (func? t 'RequirePackage)
+        (func? t 'documentclass*) (func? t 'usepackage*) (func? t 'RequirePackage*)
+        (func? t 'hline) (func? t 'maketitle) (func? t 'title) (func? t 'author)
+        (func? t 'date)))
+  (define (rewrite t)
+    (cond ((not (pair? t)) t)
+          ((func? t 'autoref 1) `(reference ,(rewrite (cadr t))))
+          ((func? t 'caption 1) (rewrite (cadr t)))
+          ((func? t 'thanks 1) `(footnote ,(rewrite (cadr t))))
+          (else
+            (cons (car t)
+                  (let loop ((l (cdr t)) (acc '()))
+                    (cond ((null? l) (reverse acc))
+                          ((drop? (car l)) (loop (cdr l) acc))
+                          (else (loop (cdr l) (cons (rewrite (car l)) acc)))))))))
+  (define (clean t)
+    (cond ((not (pair? t)) t)
+          (else
+            (let* ((kids (map clean (cdr t)))
+                   (kids (if (memq (car t) '(document concat))
+                             (list-filter kids (lambda (k) (not (or (equal? k '(concat)) (equal? k "")))))
+                             kids)))
+              (cond ((and (eq? (car t) 'concat) (null? kids)) "")
+                    ((and (eq? (car t) 'concat) (null? (cdr kids))) (car kids))
+                    (else (cons (car t) kids)))))))
+  (clean (rewrite st)))
+
+(define (latex-import src)
+  ;; the stree of the LaTeX text @src, with a bibliography of the standard style
+  ;; at the end if it had one
+  (let* ((x (latex-extract-bibliography src))
+         (r (latex-normalize (latex-convert (car x))))
+         (style (cadr x)) (files (caddr x))
+         (items (cond ((func? r 'document) (cdr r)) ((equal? r "") '()) (else (list r))))
+         (bib (if (null? files) '()
+                  (list `(bibliography "bib" ,(string-append "tm-" (or style "plain"))
+                                       ,(string-recompose files ",") (document ""))))))
+    (when (and (null? items) (null? bib))
+      (tool-error "the content has only commands of the preamble (class, packages, styles): there is nothing to insert (nothing was changed)"))
+    (cons 'document (append items bib))))
 
 (define (assigned-names t)
   ;; the names that the document itself defines (assign): macros of its
@@ -1657,20 +1927,29 @@
                                      "texmacs-snippet" "texmacs-stree")))
                       ((== fmt "latex")
                        (and (brackets-balanced? content #\{ #\})
-                            (convert content "latex-snippet" "texmacs-stree")))
+                            (list 'document "")))
                       (else
                         (convert content "markdown-snippet" "texmacs-stree"))))
               (lambda args #f))))
     (when (or (not st) (not (valid-stree? st 0)))
       (tool-error (string-append "the content does not parse as " fmt
                                  " (nothing was changed)")))
-    (when (== fmt "latex") (set! st (latex-normalize st)))
+    (when (== fmt "latex")
+      (set! st (let ((r (catch #t (lambda () (latex-import content))
+                          (lambda args (if (eq? (car args) 'mcp-tool-error) 'tool-error #f)))))
+                 (cond ((eq? r 'tool-error) (throw 'mcp-tool-error))
+                       ((not r) (tool-error (string-append "the content does not parse as latex (nothing was changed)")))
+                       (else r)))))
     (set! safety-defined? (and d (defined-predicate d)))
     (let ((r (catch #t
                (lambda () (check-safety st base) (check-arity st d) 'ok)
                (lambda args 'failed))))
       (set! safety-defined? #f)
       (when (!= r 'ok) (throw 'mcp-tool-error)))
+    ;; the second layer: the content as it expands
+    (when d
+      (let ((x (expand-in-document st d)))
+        (when x (check-expanded x base))))
     st))
 
 (define (content-items st)

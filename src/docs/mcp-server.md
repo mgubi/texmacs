@@ -175,6 +175,28 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
 - **What content is refused** (the whole call is refused, nothing is changed, and the
   reason names the tag). The tree of the content is parsed (or converted) first
   and walked completely, also what the LaTeX and Markdown importers make of it.
+  The filter has **two layers**, because a list of names of macros keeps leaking (a
+  wrapper macro, an alias made with `with` and `value`, a macro that calls the macro
+  named by its argument...):
+  1. *The tree as written* is checked by name: the classification below, the
+     allowlist of tags (defined by the style or the document), the characters of the
+     strings that become names in an export, the values of `with`, `cwith` and
+     `twith`, aliases (`<value|href>`, `<with|em|...>` where `em` is a tag), the macros
+     that call a macro named by an argument (`map` and the like, with a dangerous
+     name), the arity. This is the cheap first pass.
+  2. *The tree as it expands*: the content is evaluated in the environment of the
+     document (`texmacs-exec` in its buffer, after the `assign`s of the document), down
+     to the primitives, and the rules of the primitives are applied to the result,
+     whatever macro made it: the destination of every `link` and `hlink` (the scheme
+     rule), the file of every `image`, `include`, `include*`, `pattern`, `postscript`,
+     `video`, `sound` (the files rule, also for the full names that the evaluator
+     gives), `script` and `action` (only the commands `mouse-fold` and `mouse-unfold`
+     of the folding tags), `specific`, `latex`, and what the evaluator leaves of
+     `extern`, `hybrid`, `authorize`, `observer`. `hlink*`, `tmdoc-link`, `item-pic`,
+     `cite`, `reference`, the folding tags... are thus checked by what they become.
+  The document itself is not changed by the second layer: the content written is
+  inserted, not the expansion.
+
   Every one of the 370 primitives of the DRD (`src/Data/Drd/drd_std.cpp`) is
   classified below by its real name; the lists in `mcp-server.scm` are this table,
   and the suite `filter` checks that every name in them is a tag of the DRD.
@@ -269,11 +291,18 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     computed command (`button`, `toggle-box`, ...) is. The macros of the style are also checked for their number of arguments
     when the DRD knows it (`(theorem)` is refused); the macros that the document
     assigns itself are not, before they are typeset.
+  - *Values of the environment*: `with`, `cwith` and `twith` take only values of letters,
+    digits, blanks and `. _ - + * / % # , : =` (no quote, bracket, backslash, brace or
+    control character: they are written as attributes and commands in the exports); a
+    colour (`color`, `*-color`) is `#hex` (3 to 8 digits) or a name of letters, digits,
+    blanks and `-`; `font-size`, `font-base-size`, `magnification`, `dpi` are numbers.
+    A `with` that sets the name of a tag or of a macro, and a `value`, `quote-value` or
+    `or-value` of such a name, are refused (no alias).
   - *Names that go to an export*: the string arguments of `label`, `reference`, `pageref`,
     `eqref`, `cite`, `nocite`, `cite-detail`, `bibitem`, `smart-ref`, `ref`, of the file
     tags, and the values of a `with` (not its text), and the destination of a link, are
-    written as they are in an export to LaTeX or HTML. A backslash, a brace or a
-    control character is refused in all of them (`<label|a}\input{/etc/passwd}\x{>`
+    written as they are in an export to LaTeX or HTML. A backslash, a brace, a quote (`"` or `'`), `<`, `>` or a
+    control character is refused in all of them; an address also has no blank and no HTML entity (`&#106;`, `&colon;`) (`<label|a}\input{/etc/passwd}\x{>`
     would hijack the `.tex`); in labels and files also `%`, `#`, `$`, `&`, `^`, `~`; in
     addresses `^^` and a `%` that is not followed by two hexadecimal
     digits (a `#` fragment, `%20`, `&` and `~` are fine). The text of a `<latex|>` tag is
@@ -315,12 +344,17 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     `\bibliographystyle`, `\bibliography` and `\addbibresource` are accepted when their
     options and names are plain (letters, digits, `- _ .` and `=`, not starting with a
     dot, no `..`, no `/`, no `\`, no braces): `\usepackage{amsmath,amssymb}`,
-    `\documentclass[12pt]{article}`, `\bibliography{refs}`; a path is refused. After the
-    conversion the class, the packages and the resources are dropped (the style of the
+    `\documentclass[12pt]{article}`, `\bibliography{refs}`; a path is refused. A text with `\begin{document}`, `\title`, `\author`, `\date` or `\maketitle` is
+    imported as a whole document (`latex-document`: `doc-data` with the title, the authors
+    and the date; the style it chooses is ignored; `\thanks` becomes a footnote,
+    `\autoref` a reference, a bare `\caption` its text; `\hline` outside a table goes);
+    the class, the packages and the resources are dropped (the style of the
     document says them), and `\bibliographystyle{S}` with `\bibliography{F}` become
-    `<bibliography|bib|tm-S|F|<document|>>`, the form of the standard style (4 arguments;
-    the importer gives only 1), whose string arguments are then checked as names and
-    files; a text that has only such commands is refused as having nothing to insert. `\includegraphics` becomes an `image`.
+    `<bibliography|bib|tm-S|F|<document|>>` at the end, the form of the standard style
+    (4 arguments; the importer gives only 1), whose files (a list separated by commas)
+    are checked as files. Packages that run programs or read files (`minted`,
+    `catchfile`, `shellesc`, `pythontex`...), options with `shell` or `convert`, and
+    `filecontents` are refused; a text that has only such commands is refused as having nothing to insert. `\includegraphics` becomes an `image`.
   - *Trees that cannot be*: a primitive with a number of arguments it cannot have
     (`(with)`, `(frac "a")`, an empty `(table)`...) is refused, and so is a macro of the
     style with a number of arguments its definition does not have. A `with` with no
