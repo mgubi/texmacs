@@ -280,8 +280,18 @@ point_of (array<int>& offsets, int byte) {
   return TSPoint { (uint32_t) lo, (uint32_t) (byte - offsets[lo]) };
 }
 
+// the full parses of all the regions since the start (tests: an edit of a
+// long region parses part of it incrementally, not all of it again)
+static int full_parses_total= 0;
+
+int
+syntax_region_full_parses () {
+  return full_parses_total;
+}
+
 static void
 region_parse (syntax_region_rep* r, TSTree* old) {
+  if (old == NULL) full_parses_total++;
   TSInput input= { r, region_read, TSInputEncodingCustom, texmacs_decode };
   TSTree* t= ts_parser_parse (r->parser, old, input);
   if (old != NULL) ts_tree_delete (old);
@@ -706,8 +716,13 @@ group_update (syntax_group_rep* g) {
   // with it (it may be in a comment which does not end any more)
   while (ka + 1 < N(g->parts) && !tail_error && tail_has_error (g->parts[ka]))
     group_join (g, ka, ka + 1, 0);
-  // a part which is too long is cut again (when it is no longer in error)
-  if (N(g->parts[ka]->lines) > 3 * PART_ROWS && !tail_has_error (g->parts[ka])) {
+  // a part which is too long is cut again (when it is no longer in error,
+  // and when its tree has a place to cut at: cut_rows reads the tree which
+  // the part has, while cut_region parses the new parts from scratch, so
+  // that a part without such a place, e.g. statements at the top level of a
+  // C file, which are errors, was parsed whole again at each key)
+  if (N(g->parts[ka]->lines) > 3 * PART_ROWS && !tail_has_error (g->parts[ka]) &&
+      N(cut_rows (g->parts[ka], PART_ROWS)) > 0) {
     array<syntax_region_rep*> news= cut_region (g->parts[ka]);
     if (N(news) > 1) group_replace (g, ka, ka, news);
     else for (int i= 0; i < N(news); i++) region_delete (news[i]);

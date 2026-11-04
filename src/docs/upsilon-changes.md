@@ -12,6 +12,13 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 4 November 2026
+
+- **Typing in a long file which tree-sitter cannot cut into parts** (for
+  example statements at the top level of a C file, which are errors) no
+  longer parses the whole file again at each key: a key in such a file of
+  200000 lines took about 1 s, now 0.4 s.
+
 ## 3 November 2026
 
 - **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,
