@@ -815,7 +815,83 @@
 ;; Color conversions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmcolor->htmlcolor x)
+;; A value which goes into a style attribute cannot end its declaration or
+;; call a script: only the characters of colors and lengths are kept, and
+;; url(, expression( and the like are refused.
+(tm-define (tmhtml-css-safe s fallback)
+  (let ((low (string-downcase s)))
+    (if (and (null? (filter (lambda (c) (not (or (char-alphabetic? c)
+                                                 (char-numeric? c)
+                                                 (in? c '(#\space #\# #\( #\)
+                                                          #\, #\. #\% #\+
+                                                          #\- #\/ #\_)))))
+                            (string->list s)))
+             (not (string-occurs? "url(" low))
+             (not (string-occurs? "expression" low))
+             (not (string-occurs? "javascript" low)))
+        s
+        fallback)))
+
+;; The address of a link or of an image: javascript:, vbscript: and data:
+;; (but data:image/png, jpeg, gif and webp for an image) are not followed.
+;; The scheme is read as a browser reads it, without spaces and controls,
+;; with the entities for the colon and the other ones removed.
+;; only ASCII matters for the scheme of an address (integer->char fails above
+;; 255 on Guile 1.8): any other code point is a placeholder, removed later
+(define (tmhtml-entity-char n)
+  (if (and (> n 32) (< n 127)) (integer->char n) #\space))
+
+(define (tmhtml-url-normalize u)
+  ;; &#106; &#x6A; (leading zeros, the ; is optional) and the names colon, Tab
+  ;; and NewLine are decoded as a browser does before the scheme is read
+  (let ((n (string-length u)))
+    (define (digits i hex?)
+      (let loop ((j i))
+        (if (and (< j n)
+                 (let ((c (char-downcase (string-ref u j))))
+                   (or (char-numeric? c)
+                       (and hex? (string-index "abcdef" c)))))
+            (loop (+ j 1))
+            j)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n)
+          (string-downcase (apply string-append (reverse acc)))
+          (let ((c (string-ref u i)))
+            (cond ((and (== c #\&) (< (+ i 1) n) (== (string-ref u (+ i 1)) #\#))
+                   (let* ((hex? (and (< (+ i 2) n)
+                                     (in? (string-ref u (+ i 2)) '(#\x #\X))))
+                          (start (if hex? (+ i 3) (+ i 2)))
+                          (end (digits start hex?)))
+                     (if (= end start)
+                         (loop (+ i 1) (cons "&" acc))
+                         (let* ((code (string->number (substring u start end)
+                                                      (if hex? 16 10)))
+                                (next (if (and (< end n) (== (string-ref u end) #\;))
+                                          (+ end 1) end)))
+                           (loop next (cons (if (or (<= code 32) (== code 127)) ""
+                                                 (string (tmhtml-entity-char code)))
+                                            acc))))))
+                  ((and (== c #\&) (htmlout-entity-end u i))
+                   (let* ((e (htmlout-entity-end u i))
+                          (name (string-downcase (substring u (+ i 1) e))))
+                     (loop (+ e 1) (cons (if (== name "colon") ":" "") acc))))
+                  ((or (<= (char->integer c) 32) (== (char->integer c) 127))
+                   (loop (+ i 1) acc))
+                  (else (loop (+ i 1) (cons (string c) acc)))))))))
+
+(tm-define (tmhtml-safe-url u . image?)
+  (let ((n (tmhtml-url-normalize u)))
+    (if (or (string-starts? n "javascript:") (string-starts? n "vbscript:")
+            (and (string-starts? n "data:")
+                 (not (and (list>0? image?) (car image?)
+                           (or (string-starts? n "data:image/png")
+                               (string-starts? n "data:image/jpeg")
+                               (string-starts? n "data:image/gif")
+                               (string-starts? n "data:image/webp"))))))
+        "#"
+        u)))
+
+(tm-define (tmcolor->htmlcolor x)
   (with s (tmhtml-force-string x)
     (cond ((== s "light grey") "#d0d0d0")
 	  ((== s "pastel grey") "#dfdfdf")
@@ -837,9 +913,9 @@
 	  ((== s "pastel cyan") "#dfffff")
 	  ((== s "pastel orange") "#ffdfbf")
 	  ((== s "pastel brown") "#dfbfbf")
-	  (else s))))
+	  (else (tmhtml-css-safe s "inherit")))))
 
-(define (tmbgcolor->htmlbgcolor x)
+(tm-define (tmbgcolor->htmlbgcolor x)
   (with s (tmhtml-force-string x)
     (cond ((== s "light grey") "#80808060")
 	  ((== s "pastel grey") "#80808040")
@@ -897,7 +973,7 @@
 			       (= x (exact->inexact (inexact->exact x))))
 			  (inexact->exact x) x))))
 
-(define (tmlength->htmllength len . css?)
+(tm-define (tmlength->htmllength len . css?)
   (if (list>0? css?) (set! css? (car css?)) (set! css? #t))
   (and-let* ((s (tmhtml-force-string len))
              (len-str (if (string->number s) (string-append s "tmpt") s))
@@ -919,7 +995,7 @@
 	  ((and css? (== unit "ln"))
 	   (string-append (number->htmlstring val) "px"))
 	  ((and css? (== unit "@")) "auto")
-	  (css? len)
+	  (css? (tmhtml-css-safe s "auto"))
 	  (else (number->htmlstring (* cmpx val incm))))))
 
 (define (tmlength->px len)
@@ -948,7 +1024,7 @@
 
 (define (tmhtml-with-font-size val arg)
   (ahash-with tmhtml-env :mag val
-    (let* ((x (* (string->number val) 100))
+    (let* ((x (* (or (string->number val) 1) 100))
            (c (string-append "font-size: " (number->string x) "%"))
 	   (s (cond ((< x 1) "-4") ((< x 55) "-4") ((< x 65) "-3")
 		    ((< x 75) "-2") ((< x 95) "-1") ((< x 115) "0")
@@ -1115,7 +1191,7 @@
   ;; TODO: change label at start of content into ID attribute, move other
   ;; labels out (A elements cannot be nested!).
   (let* ((body (tmhtml (first l)))
-	 (to (cork->html (force-string (second l)))))
+	 (to (tmhtml-safe-url (cork->html (force-string (second l))))))
     (if (string-starts? to "$")
 	body ;; temporary fix for URLs like $TEXMACS_PATH/...
 	`((h:a (@ (href ,(tmhtml-suffix to))) ,@body)))))
@@ -1162,8 +1238,21 @@
                                    (substring h 0 7)
                                    h)))))))
 
+(tm-define (tmhtml-css-url u)
+  ;; the address in url('...'): no quote, parenthesis, backslash or ; in it,
+  ;; except the ; of data:image/png;base64,
+  (define data? (string-starts? (tmhtml-url-normalize u) "data:image/"))
+  (apply string-append
+         (map (lambda (c)
+                (if (or (in? c '(#\' #\" #\( #\) #\\ #\< #\>))
+                        (and (== c #\;) (not data?))
+                        (< (char->integer c) 32))
+                    (string-append "%" (number->string (char->integer c) 16))
+                    (string c)))
+              (string->list (tmhtml-safe-url u #t)))))
+
 (define (html-css-pattern x)
-  (let* ((u (tmhtml-force-string (cadr x)))
+  (let* ((u (tmhtml-css-url (tmhtml-force-string (cadr x))))
          (w (or (tmlength->htmllength (caddr x) #t) "100%"))
          (h (or (tmlength->htmllength (cadddr x) #t) "100%"))
          (im (string-append "background: url('" u "')"))
@@ -1294,7 +1383,7 @@
 (define (tmhtml-table l)
   (list (tmhtml-make-table (cons 'table l) '() '() '() '())))
 
-(define (tmhtml-tformat l)
+(tm-define (tmhtml-tformat l)
   (with t (tmtable-normalize (cons 'tformat l))
     (receive (tablef colf rowf cellf) (tmtable-properties* t)
       (list (tmhtml-make-table (cAr t) tablef colf rowf cellf)))))
@@ -1429,7 +1518,8 @@
          (tmhtml-png (cons 'image l)))
         (else
           ;; web images
-          (let* ((s (tmhtml-web-image-name (first l)))
+          (let* ((s (tmhtml-safe-url
+                     (cork->html (tmhtml-web-image-name (first l))) #t))
                  (w (tmlength->htmllength (second l) #f))
                  (h (tmlength->htmllength (third l) #f)))
             `((h:img (@ (class "image")
@@ -1458,10 +1548,10 @@
                    (list-intersperse
                      (cond ((== (length args) (length sty))
                             (map (lambda (x y)
-                                   (string-append x ":" (f y))) sty args))
+                                   (string-append x ":" (or (f y) "0"))) sty args))
                            ((>= 1 (length sty))
                             (map (lambda (y)
-                                   (string-append (car sty) ":" (f y))) args))
+                                   (string-append (car sty) ":" (or (f y) "0"))) args))
                            (else '()))
                      ";"))))
              funs args stys) ";"))))
@@ -1751,7 +1841,7 @@
 		      (src ,(tmhtml-force-string (car l)))))))
 
 (define (tmhtml-html-video l)
-  (let* ((dest (cork->html (force-string (car l))))
+  (let* ((dest (tmhtml-safe-url (cork->html (force-string (car l)))))
          (mp4 (string-append dest ".mp4"))
          (ogg (string-append dest ".ogg"))
          (webm (string-append dest ".webm"))

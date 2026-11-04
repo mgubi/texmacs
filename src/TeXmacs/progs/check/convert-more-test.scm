@@ -45,6 +45,8 @@
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
         (convert mathml tmmath)
+        (convert html tmhtml)
+        (convert html htmlout)
         (tools spell spell-lantool)
         (tools ai ai-translate)))
 
@@ -1863,6 +1865,101 @@
   (list->string (list-filter (map integer->char (iota 256))
                              (lambda (c) (nin? c (list #\< #\>))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; HTML export: attribute values and addresses
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A value of the document which ends up in an attribute (a color, a length,
+;; the address of a link, of an image) cannot end the attribute and start
+;; another one (onmouseover=...), nor a declaration of the style; a link or an
+;; image does not run javascript:.
+(define (html-of t) (export t "html-snippet"))
+
+(define (test-html-escape)
+  (check-group "html export: attributes and addresses")
+  (check= (html-of '(with "color" "red" "text")) "<font color=\"red\">text</font>")
+  (check= (html-of '(with "color" "red\" onmouseover=\"alert(1)" "text"))
+          "<font color=\"inherit\">text</font>")
+  (check= (html-of '(hlink "t" "http://a/b?x=1&y=2"))
+          "<a href=\"http://a/b?x=1&amp;y=2\">t</a>")
+  (check= (html-of '(hlink "t" "x\" onclick=\"y"))
+          "<a href=\"x&quot; onclick=&quot;y\">t</a>")
+  (check= (html-of '(hlink "t" "javascript:alert(1)")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" " Java&#9;script&colon;alert(1)"))
+          "<a href=\" Java&amp;#9;script&amp;colon;alert(1)\">t</a>")
+  (check= (tmhtml-safe-url " Java&#9;script&colon;alert(1)") "#")
+  (check= (html-of '(hlink "t" "data:text/html,x")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" "sec.html#a")) "<a href=\"sec.html#a\">t</a>")
+  (check= (html-of '(html-div-class "c\" onclick=\"x" "t"))
+          "<div class=\"c&quot; onclick=&quot;x\">\n  t\n</div>")
+  ;; the colors and the lengths of the styles (the tables of the editor
+  ;; need the expansion of its style macros, and give nothing here)
+  (check= (tmcolor->htmlcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "pastel red") "#ffdfdf")
+  (check= (tmbgcolor->htmlbgcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "red\" onmouseover=\"alert(1)") "inherit")
+  (check= (tmcolor->htmlcolor "red; position: fixed") "inherit")
+  (check= (tmbgcolor->htmlbgcolor "red}</style><script>") "inherit")
+  (check= (tmcolor->htmlcolor "url(javascript:alert(1))") "inherit")
+  (check= (tmlength->htmllength "1cm") "1cm")
+  (check= (tmlength->htmllength "1cm; position: fixed") #f)
+  ;; obfuscated schemes: numeric references with leading zeros, without ;
+  (for (u '("&#106;avascript:1" "javascript&#0058;1" "javascript&#x003a;1"
+            "javascript&#58 1" "&#x6A;avascript&colon;alert(1)" "JaVa\tScRiPt:1"))
+    (check= (tmhtml-safe-url u) "#"))
+  (check= (tmhtml-safe-url "page.html?a=1&b=2") "page.html?a=1&b=2")
+  ;; the full documents, as File > Export makes them
+  (let* ((cell (lambda (bg)
+                 (html-of-buffer
+                  `(document (tabular (tformat (cwith "1" "1" "1" "1" "cell-background" ,bg)
+                                               (table (row (cell "a")))))))))
+         (hostile "red\" onmouseover=\"alert(1)"))
+    (check-false (string-occurs? "onmouseover" (cell hostile)))
+    (check-true (string-occurs? "inherit" (cell hostile)))
+    (check-true (string-occurs? "background-color: #ff0000" (cell "#ff0000")))
+    )
+  ;; The patterns: the export of a document turns a pattern into a white
+  ;; background (an issue of its own), so the cell is converted here by
+  ;; tmhtml-tformat on a tree which was not expanded.
+  (let ((pat (lambda (u)
+               (apply string-append
+                      (map serialize-html
+                           (tmhtml-tformat
+                            `((cwith "1" "1" "1" "1" "cell-background"
+                                     (pattern ,u "100%" "100%" "red"))
+                              (table (row (cell "a"))))))))))
+    (check-false (string-occurs? "javascript" (pat "javascript:alert(1)")))
+    (check-true (string-occurs? "url('x%27%29%3bb:url%28http://evil/x')"
+                                (pat "x');b:url(http://evil/x")))
+    (check-false (string-occurs? "');position" (pat "x.png');position:fixed;b:url('")))
+    (check-true (string-occurs? "background: url('x.png'); background-size: 100% 100%"
+                                (pat "x.png")))
+    (check-true (string-occurs? "data:image/png;base64,AA"
+                                (pat "data:image/png;base64,AA"))))
+  ;; the addresses with characters beyond Latin 1 (Guile 1.8: integer->char
+  ;; stops at 255)
+  (for (u '("http://a/<#43B>.html" "http://a/<#20AC>x" "<#4E2D>.html"))
+    (check-true (string? (html-of-buffer `(document (hlink "t" ,u)))))
+    (check-true (string? (html-of-buffer `(document (image ,u "1cm" "1cm" "" "")))))
+    (check-true (string? (html-of-buffer `(document (html-video ,u "1" "2"))))))
+  (check= (tmhtml-safe-url "http://a/&#1083;&#8217;x") "http://a/&#1083;&#8217;x")
+  (check= (tmhtml-safe-url "&#1083;javascript:1") "&#1083;javascript:1")
+  (check-false (string-occurs? "javascript"
+               (html-of-buffer
+                '(document (image "&#x6A;avascript&colon;alert(1).png" "1cm" "1cm" "" "")))))
+  (check-false (string-occurs? "\" onerror"
+               (html-of-buffer
+                '(document (html-video "a\" onerror=\"x" "1" "2")))))
+  ;; values which are not lengths or numbers do not crash the export
+  (check-true (string? (html-of-buffer '(document (with "font-size" "big" "text")))))
+  (check-true (string? (html-of-buffer
+                        '(document (with "ornament-border" "x" "ornament-hpadding" "y" "t")))))
+  (check= (tmhtml-safe-url "javascript:x" #t) "#")
+  (check= (tmhtml-safe-url "data:image/png;base64,AA" #t) "data:image/png;base64,AA")
+  (check= (tmhtml-safe-url "data:image/svg+xml,x" #t) "#")
+  (check= (tmhtml-safe-url "images/a.png" #t) "images/a.png")
+  (check= (htmlout-attribute-value "a\"b<c>d&e&amp;f&#9;") "a&quot;b&lt;c&gt;d&amp;e&amp;f&#9;"))
+
 (define (test-serialize-special)
   (check-group "special characters")
   ;; tm: the control characters are written \@ + code
@@ -2491,7 +2588,7 @@
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
-                  test-serialize-special test-big-document test-pdf-export
+                  test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))
