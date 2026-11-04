@@ -548,14 +548,40 @@
          (missing (html-export-of-buffer
                    (pattern-cell-sample '(pattern "nowhere-yet.png"
                                                   "100%" "100%"))))
+         ;; a name which could break out of the url('...') stays white
+         (hostile (html-export-of-buffer
+                   (pattern-cell-sample
+                    '(pattern "x') ; background:url(javascript:1)"
+                              "100%" "100%"))))
+         (hostile2 (html-export-of-buffer
+                    (pattern-cell-sample
+                     '(pattern "javascript:alert(1)" "100%" "100%"))))
+         ;; a pattern which is not a background is as before
+         (as-color (html-export-of-buffer
+                    '(with "color" (pattern "nowhere-yet.png" "100%" "100%")
+                       "x")))
+         (as-ornament (html-export-of-buffer
+                       '(with "ornament-color"
+                          (pattern "nowhere-yet.png" "100%" "100%")
+                          (ornament "x"))))
          (plain (html-export-of-buffer
                  (pattern-cell-sample "red"))))
     (check-true (string-occurs? "background: url('" found))
-    (check-true (string-occurs? "paisley.png" found))
+    (check-true (string-occurs? (string-append "background: url('" shipped "')")
+                                found))
     (check-true (string-occurs? "background-size: " found))
     (check-true (string-occurs? "background: url('nowhere-yet.png')" missing))
     (check-true (string-occurs? "background-size: 100% 100%" missing))
     (check-false (string-occurs? "#FFFFFF" missing))
+    (for (h (list hostile hostile2))
+      (check-true (string-occurs? "background-color: #FFFFFF" h))
+      (check-false (string-occurs? "url(" h))
+      (check-false (string-occurs? "javascript" h)))
+    (for (h (list as-color as-ornament))
+      (check-false (string-occurs? "nowhere-yet" h))
+      (check-false (string-occurs? "color=\"\"" h))
+      (check-false (string-occurs? "color: ;" h))
+      (check-false (string-occurs? "color: \"" h)))
     ;; an ordinary color is as before
     (check-true (string-occurs? "background-color: " plain))
     (check-false (string-occurs? "url(" plain))))
