@@ -15,8 +15,9 @@ have the details, and the problems go to the
 ## 4 November 2026
 
 - **Typing in a long file which tree-sitter cannot cut into parts** (for
-  example statements at the top level of a C file, which are errors) no
-  longer parses the whole file again at each key: a key in such a file of
+  example indented statements at the top level of a C file, none of which
+  starts a line) no longer parses the whole file again at each key, and
+  opening it parses it once instead of twice: a key in such a file of
   200000 lines took about 1 s, now 0.4 s.
 
 ## 3 November 2026

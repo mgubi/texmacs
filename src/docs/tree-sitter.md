@@ -532,7 +532,8 @@ suite. As planned initially:
 
 Done (2026-10-17): `Plugins/TreeSitter/syntax_region.cpp`, glue
 `syntax-region-sexp`, `syntax-region-node-at`, `syntax-region-errors`,
-`syntax-region-statistics`, `syntax-region-forget` (region tree and
+`syntax-region-statistics`, `syntax-region-full-parses` (the full parses
+since the start, for tests), `syntax-region-forget` (region tree and
 language index; results with (row column) positions in the TeXmacs
 strings). One change to the design below: **no observer**. A region keeps
 the lines of its last parse (TeXmacs strings, shared, so the copy is

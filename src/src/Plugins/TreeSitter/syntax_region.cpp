@@ -719,8 +719,9 @@ group_update (syntax_group_rep* g) {
   // a part which is too long is cut again (when it is no longer in error,
   // and when its tree has a place to cut at: cut_rows reads the tree which
   // the part has, while cut_region parses the new parts from scratch, so
-  // that a part without such a place, e.g. statements at the top level of a
-  // C file, which are errors, was parsed whole again at each key)
+  // that a part without such a place, e.g. indented statements at the top
+  // level of a C file, no node of which starts a line, was parsed whole
+  // again at each key)
   if (N(g->parts[ka]->lines) > 3 * PART_ROWS && !tail_has_error (g->parts[ka]) &&
       N(cut_rows (g->parts[ka], PART_ROWS)) > 0) {
     array<syntax_region_rep*> news= cut_region (g->parts[ka]);
@@ -752,13 +753,18 @@ get_group (tree root, int language) {
   if (!cork_table_ready) init_cork_table ();
   release_orphans ();
   syntax_region_forget (root);
-  // (cut where the parse of the whole region has nodes at the top level)
+  // (cut where the parse of the whole region has nodes at the top level;
+  // without such a place, the whole region is the one part, and is not
+  // parsed a second time)
   syntax_region_rep* whole= new_region (root, language, region_lines (root), 0);
   syntax_group_rep* g= tm_new<syntax_group_rep> ();
   g->root= root;
   g->language= language;
-  g->parts= cut_region (whole);
-  region_delete (whole);
+  if (N(cut_rows (whole, PART_ROWS)) == 0) g->parts << whole;
+  else {
+    g->parts= cut_region (whole);
+    region_delete (whole);
+  }
   if (N(groups) >= max_groups) {
     group_delete (groups[N(groups) - 1]);
     groups->resize (N(groups) - 1);
