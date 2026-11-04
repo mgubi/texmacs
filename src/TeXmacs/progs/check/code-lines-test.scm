@@ -590,16 +590,15 @@
         (step (lambda () #t))
         (step kbd-down)
         (check= (car (list-tail (rel (cursor-path)) 3)) 1))))
-  ;; the importer keeps the tabs and the control characters, the exporter
-  ;; gives them back
+  ;; a text is imported as without the block: its tabs are spaces (a text
+  ;; is not a program; a tab <#9> would be an error in a line with markup
+  ;; or in paragraphs), the source files keep theirs (test-lines-root)
   (let ((old (getenv "TEXMACS_CODE_LINES"))
-        (text (string-append "a" (string #\tab) "b\n"
-                             (string (integer->char 1)) "c")))
+        (text (string-append "a" (string #\tab) "b\nc")))
     (code-lines-env "1")
     (with t (cpp-verbatim->texmacs text #f "utf-8")
       (with body (cadr (assoc 'body (cdr (tree->stree t))))
-        (check= body '(document "a<#9>b" "<#1>c"))
-        (check= (texmacs->code (stree->tree body) "utf-8") text)))
+        (check= body '(document "a       b" "c"))))
     (code-lines-env old)
     (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
 
@@ -829,6 +828,61 @@
       (check-true (in-prog?))
       (check-false (code-lines-document?)))))
 
+;; Fixes of the audit of 2f1ad9b0d1: a document inside a line of a block is
+;; typeset as paragraphs (code-lines is the mode of the block's document
+;; only: its long lines wrap), and a selection over several lines is as
+;; high as in paragraphs (the bounding rectangle of the block)
+(define (test-audit-7)
+  (check-group "documents in lines, selections of several lines")
+  (let* ((long (string-append "A long sentence of a paragraph inside a line,"
+                              " which wraps at the width of the page as any"
+                              " paragraph does, and is not a line of code"
+                              " running off the page."))
+         (doc (lambda (cl)
+                `(document "before"
+                           (with "font-family" "tt" "language" "verbatim"
+                             "code-lines" ,cl
+                             (document "a" "b"
+                                       (with "color" "blue"
+                                         (document ,long "second"))
+                                       "c" "d"))
+                           "after")))
+         (measure (lambda ()
+                    (let ((p (tree-bounding-rectangle
+                              (path->tree (at 1 6 2 2 0))))
+                          (b (tree-bounding-rectangle
+                              (path->tree (at 1 6 0)))))
+                      (list (- (caddr p) (car p)) (- (cadddr p) (cadr p))))))
+         (plain #f) (code #f))
+    (for (medium '("papyrus" "paper"))
+      (with-body (doc "false")
+        (lambda () (init-env "page-medium" medium) (step (lambda () #t))
+                (set! plain (measure))))
+      (with-body (doc "true")
+        (lambda () (init-env "page-medium" medium) (step (lambda () #t))
+                (set! code (measure))))
+      (check= code plain)))
+  ;; the bounding rectangle of a block (its lines selected) is that of its
+  ;; lines as paragraphs, at the top and at the bottom
+  (let* ((doc (lambda (cl)
+                `(document "before"
+                           (with "font-family" "tt" "language" "verbatim"
+                             "mode" "prog" "prog-language" "c"
+                             "code-lines" ,cl
+                             (document "<#9>int x;" "a<#9>b" "<#9>" "end"))
+                           "after")))
+         (ys (lambda ()
+               (with r (tree-bounding-rectangle (path->tree (at 1 10)))
+                 (list (cadr r) (cadddr r)))))
+         (plain #f) (code #f))
+    (with-body (doc "false")
+      (lambda () (init-env "page-medium" "papyrus") (step (lambda () #t))
+              (set! plain (ys))))
+    (with-body (doc "true")
+      (lambda () (init-env "page-medium" "papyrus") (step (lambda () #t))
+              (set! code (ys))))
+    (check= code plain)))
+
 ;; A block of one line with markup, in paper mode, is a paragraph of its
 ;; items (it had no rows, and was neither drawn nor reached by the cursor)
 (define (test-one-rich-line)
@@ -976,6 +1030,7 @@
   (test-cursor-in-block)
   (test-text-files)
   (test-audit-5)
+  (test-audit-7)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)

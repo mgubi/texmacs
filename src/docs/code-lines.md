@@ -36,8 +36,11 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
   source file or a text is not modified by it, since it does not save it.
 - **Saving.** The lines are saved as before; `tree_to_source` gives the file
   back byte for byte (tabs and the other control characters are `<#9>`,
-  `<#x>`; texts keep them too now). LaTeX writes the tabs of verbatim
-  content as spaces up to the next stop of 8 (`tmtex-expand-tabs`).
+  `<#x>`). A text (`verbatim_document_to_tree`) is imported as before, its
+  tabs as spaces: it is not a program, and a tab `<#9>` would be an error
+  in its other typesetting (a line with markup, its paragraphs). LaTeX
+  writes the tabs of verbatim content as spaces up to the next stop of 8
+  (`tmtex-expand-tabs`).
 - **The choice of the bridge** (`Typeset/Bridge/bridge_document.cpp`). The
   bridge of a document reads `code-lines` when it is typeset (the variable is
   then one of its inputs, so that a change of it typesets the document
@@ -45,8 +48,13 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
   hands the document to `bridge_code`, which makes none; the notifications
   and the typesetting then go to the one in use. Its paragraph bridges are
   made at the first typesetting only, not when the bridge is made, so that a
-  long file never has them. A `document` typeset by the concater (inside a
-  line, a cell) is typeset as paragraphs.
+  long file never has them. `code-lines` is the mode of that document only:
+  the documents inside its lines or its paragraphs are typeset as
+  paragraphs (it is false there, `rich_paragraph` and the paragraph mode of
+  `bridge_document`). A document with a line which holds paragraphs (a
+  document, a `with` of a document: `has_paragraphs_line`) is typeset as
+  paragraphs, since a line of code is one row and its paragraphs would not
+  wrap; a line of a source file is a string, the test is quick.
 
 ## Typesetting (`Typeset/Bridge/bridge_code.cpp`)
 

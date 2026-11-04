@@ -230,6 +230,17 @@ bridge bridge_docrange (typesetter ttt, tree st, path ip, array<bridge>& brs,
 
 bridge bridge_code (typesetter ttt, tree st, path ip);
 
+static bool
+has_paragraphs_line (tree doc) {
+  // a line which holds paragraphs (a document, a with of a document...):
+  // as a line of code, it would be typeset by the concater, its paragraphs
+  // as lines which do not wrap; the document is then typeset as paragraphs
+  // (a line of a source file is a string: the test is quick)
+  for (int i=0; i<N(doc); i++)
+    if (!is_atomic (doc[i]) && is_multi_paragraph (doc[i])) return true;
+  return false;
+}
+
 class bridge_document_rep: public bridge_rep {
 protected:
   int    mode; // DOC_UNKNOWN before the first typesetting
@@ -258,6 +269,7 @@ public:
   void my_exec_until (path p);
   bool my_typeset_will_be_complete ();
   void my_typeset (int desired_status);
+  void my_typeset_paragraphs (int desired_status);
 };
 
 bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
@@ -501,14 +513,26 @@ bridge_document_rep::my_typeset (int desired_status) {
   //cout << INDENT;
   // (lines of code, or paragraphs: see above)
   // (a document without lines is typeset as paragraphs: the code bridge
-  // would have a line which is not in the tree)
-  set_mode (env->read ("code-lines") == "true" && N(st) > 0?
+  // would have a line which is not in the tree; so is a document with a
+  // line of paragraphs, see has_paragraphs_line)
+  bool code_lines= (env->read ("code-lines") == "true");
+  set_mode (code_lines && N(st) > 0 && !has_paragraphs_line (st)?
             DOC_CODE: DOC_PARAGRAPHS);
   if (mode == DOC_CODE) {
     code->typeset (desired_status);
     st= code->st;
     return;
   }
+  // (code-lines is the mode of this document only: the documents inside
+  // its paragraphs are typeset as paragraphs)
+  tree old_mode;
+  if (code_lines) old_mode= env->local_begin ("code-lines", "false");
+  my_typeset_paragraphs (desired_status);
+  if (code_lines) env->local_end ("code-lines", old_mode);
+}
+
+void
+bridge_document_rep::my_typeset_paragraphs (int desired_status) {
   if (is_nil (acc)) {
     int i, n= N(st);
     array<line_item> a= ttt->a;

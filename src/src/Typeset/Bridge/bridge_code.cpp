@@ -765,7 +765,12 @@ bridge_code_rep::rich_paragraph (tree& t, path lip, SI width, SI cell,
                                  array<line_item> before,
                                  array<line_item> after,
                                  array<page_item>& l, stack_border& sb) {
+  // (code-lines is the mode of the document of the block only: a document
+  // inside the line, a cell, a with of several paragraphs, is typeset as
+  // paragraphs, see bridge_document.cpp)
+  tree old_mode= env->local_begin ("code-lines", "false");
   array<line_item> items= typeset_concat (env, t, lip);
+  env->local_end ("code-lines", old_mode);
   path eip= decorate_middle (lip);
   int cols= max (1, (int) (width / cell));
   array<line_item> a;

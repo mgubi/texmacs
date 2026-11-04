@@ -983,10 +983,31 @@ code_box_rep::find_selection (path lbp, path rbp) {
   // the second cursor
   cursor c1= find_cursor (lbp), c2= find_cursor (rbp);
   SI top= fn->y2, bot= fn->y1;
-  rectangles rs (rectangle (x1, c2->oy + bot, c2->ox, c2->oy + top));
+  // (the first and the last row as in a paragraph: up to the end of the
+  // text of the first, from the start of the last, as high as their
+  // characters, see code_ink; the rows between as one band)
+  SI y1a= c1->oy + bot, y1b= c1->oy + top, x1b= x2;
+  SI y2a= c2->oy + bot, y2b= c2->oy + top;
+  if (!rich (k1) && !rich (k2)) {
+    int r1= row_of (k1, p1), e1= row_end (k1, r1), a1= starts (k1) [r1];
+    int r2= row_of (k2, p2), a2= starts (k2) [r2];
+    string s1= line (k1), s2= line (k2);
+    array<SI> xp1;
+    xpositions (k1, e1, xp1);
+    x1b= max (c1->ox, xp1[e1] - xp1[a1]);
+    string m1= code_ink (s1, max (a1, min (p1, e1)), e1);
+    string m2= code_ink (s2, a2, max (a2, min (p2, row_end (k2, r2))));
+    SI ey1= 0, ey2= fn->yx;
+    if (N(m1) > 0) { metric ex; fn->get_extents (m1, ex); ey1= ex->y1; ey2= ex->y2; }
+    y1a= c1->oy + ey1; y1b= c1->oy + ey2;
+    ey1= 0; ey2= fn->yx;
+    if (N(m2) > 0) { metric ex; fn->get_extents (m2, ex); ey1= ex->y1; ey2= ex->y2; }
+    y2a= c2->oy + ey1; y2b= c2->oy + ey2;
+  }
+  rectangles rs (rectangle (x1, y2a, c2->ox, y2b));
   if (c2->oy + top < c1->oy + bot)
     rs= rectangles (rectangle (x1, c2->oy + top, x2, c1->oy + bot), rs);
-  rs= rectangles (rectangle (c1->ox, c1->oy + bot, x2, c1->oy + top), rs);
+  rs= rectangles (rectangle (c1->ox, y1a, x1b, y1b), rs);
   return selection (rs, find_tree_path (lbp), find_tree_path (rbp));
 }
 
