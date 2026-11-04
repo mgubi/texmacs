@@ -2133,14 +2133,25 @@ def s_static(w):
         accepted("%s: marginal-note" % st, d, "insert", where="last", content='(marginal-note "normal" "c" "A note")', format="stree")
     # (audit) variables that multiply the work are bounded
     d = opendoc("  Text.\n")
-    for var, bad, good in (("par-columns", "13", "4"), ("par-columns", "9999", "12"), ("font-size", "21", "2"),
-                           ("font-base-size", "101", "12"), ("magnification", "11", "2")):
+    for var, bad, good in (("par-columns", "13", "4"), ("par-columns", "9999", "12"), ("font-size", "9", "2"),
+                           ("font-size", "20", "8"), ("font-base-size", "101", "12"), ("magnification", "5", "2"),
+                           ("magnification", "10", "4")):
         r = refused("%s %s" % (var, bad), d, "insert", where="last", content='(with "%s" "%s" "x")' % (var, bad), format="stree")
         check("and the message says the limit (%s)" % var, "up to" in r)
         accepted("%s %s" % (var, good), d, "insert", where="last", content='(with "%s" "%s" "x")' % (var, good), format="stree")
+    accepted("the two multipliers together at their limits", d, "insert", where="last",
+             content='(with "magnification" "4" (with "font-size" "8" "x"))', format="stree")
+    refused("a magnification of 10 around a font-size of 20", d, "insert", where="last",
+            content='(with "magnification" "10" (with "font-size" "20" "x"))', format="stree")
     d = opendoc("  <assign|zz-ref|<macro|x|<hlink|t|<arg|x>>>>\n\n  Text.\n", "generic|smart-ref")
     refused("smart-ref with a label in capitals (it lower-cases)", d, "insert", where="last",
             content='(smart-ref "ZZ:javascript")', format="stree")
+    refused("smart-ref with an accented letter after the type", d, "insert", where="last",
+            content='(smart-ref "zz\u00e9:javascript")', format="stree")
+    refused("smart-ref with an accented letter before, and the type at the end", d, "insert", where="last",
+            content='(smart-ref "\u00e9zz:zz")', format="stree")
+    accepted("smart-ref with an accented letter before: the type is the end, j", d, "insert", where="last",
+             content='(smart-ref "\u00e9zz:j")', format="stree")
     d = opendoc("  Text.\n", "tmdoc")
     accepted("tmdoc: tmdoc-title", d, "insert", where="last", content='(tmdoc-title "A title")', format="stree")
     d = opendoc("  Text.\n", "generic|exam")

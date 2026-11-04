@@ -296,8 +296,9 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     The standard macros that the filter refuses for these reasons: the `tiled` family (`tiled`, `tiled*`,
     `align-tiled`, `tiled-items`: a `gui-tiled`/`ext-tiled-items` that loops on zero columns), `chunk-inc`,
     `note-declare`, `algo-new-keyword`, `src-package` and the definers (`new-*`, which define a name). The
-    variables whose value multiplies the work have limits: `par-columns` up to 12, `font-size` up to 20,
-    `font-base-size` up to 100, `magnification` up to 10, `dpi` up to 2400.
+    variables whose value multiplies the work have limits: `par-columns` up to 12, `font-size` up to 8,
+    `font-base-size` up to 100, `magnification` up to 4 (the two multiply each other: the product is at most 32,
+    which typesets in about 6 s and 0.7 GB for 30 big sums), `dpi` up to 2400.
     *Definers.* A macro that assigns a name made of an argument (`new-theorem`, `new-remark`,
     `new-exercise`, `new-figure`, `new-env`, `new-list`, `new-section`, `new-counter`...) has a place of the
     kind `define` and is dangerous: the content may not define anything (`<new-remark|strong|...>`

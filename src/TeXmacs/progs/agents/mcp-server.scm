@@ -1553,8 +1553,9 @@
 (define env-number-limits
   ;; the variables whose value multiplies the work: columns, a size factor, the base size
   ;; (in points), the magnification, the resolution
-  '(("par-columns" . 12) ("font-size" . 20) ("font-base-size" . 100)
-    ("magnification" . 10) ("dpi" . 2400)))
+  ;; (magnification and font-size multiply each other: 4 times 8 is the limit of the product)
+  '(("par-columns" . 12) ("font-size" . 8) ("font-base-size" . 100)
+    ("magnification" . 4) ("dpi" . 2400)))
 
 (define (env-limit-text var)
   (let ((x (assoc var env-number-limits)))
@@ -2758,7 +2759,8 @@
   ;; tries; it lower-cases the label first)
   (let* ((s (locase-all s0))
          (n (string-length s))
-         (alpha? (lambda (c) (char-alphabetic? c)))
+         ;; (ASCII letters only, as smart-ref-type does: an accented letter ends the type)
+         (alpha? (lambda (c) (or (and (char>=? c #\a) (char<=? c #\z)) (and (char>=? c #\A) (char<=? c #\Z)))))
          (i (let loop ((k 0)) (if (and (< k n) (alpha? (string-ref s k))) (loop (+ k 1)) k)))
          (j (let loop ((k n)) (if (and (> k 0) (alpha? (string-ref s (- k 1)))) (loop (- k 1)) k))))
     (list-filter (list (substring s 0 i) (substring s j n)) (lambda (x) (> (string-length x) 0)))))
