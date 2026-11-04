@@ -999,8 +999,10 @@
                          (sf-put! sf 'renew-errors (+ 1 (or (sf-get sf 'renew-errors) 0)))
                          (when (>= (sf-get sf 'renew-errors) 5)
                            (host-lost-lock! sf))))))
-              ((not (url-exists? (string->url (entry-path key))))
-               (host-write-entry! sf)))
+              (else
+                (sf-put! sf 'renew-errors 0)       ; (the lock is valid)
+                (when (not (url-exists? (string->url (entry-path key))))
+                  (host-write-entry! sf))))
         (when (and path (sf-host? sf) (> now (or (sf-get sf 'touch-at) 0)))
           (sf-put! sf 'touch-at (+ now 3600000))
           (shared-touch path)
@@ -1019,6 +1021,7 @@
 
 (define (host-lost-lock! sf)
   (stat! 'lock-lost)
+  (sf-put! sf 'renew-errors 0)
   (let ((file (save-recovered-copy! sf)))
     (set-message
      `(concat "Shared file: another process hosts this file now (the lock was removed)."

@@ -118,6 +118,7 @@ for name in "$@"; do
   done
   watch $pids
   wait 2>/dev/null
+  chmod -R u+rwx "$w" 2>/dev/null   # (a killed scenario may leave a folder closed)
   fails=0
   for role in A B; do
     if [ "$role" = "$dead" ]; then continue; fi
