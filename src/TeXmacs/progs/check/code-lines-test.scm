@@ -922,6 +922,46 @@
         (check= (get-env "mode") "math"))))
   (set-fast-environments fast?))
 
+;; The lines with layers (the colours of a language server, on almost all
+;; the lines of a file) are typeset again only when they change: a key
+;; typesets the line of the key, not all the lines with layers again; and a
+;; box kept for such a line is at its place after lines inserted before it
+(define (test-layered-lines)
+  (check-group "lines with layers typeset once")
+  (for (medium '("papyrus" "paper"))
+    (let* ((ls (map (lambda (i) (string-append "int x" (number->string i)
+                                               " = f (" (number->string i)
+                                               ");"))
+                    (.. 0 200)))
+           (doc `(document (with "font-family" "tt" "language" "verbatim"
+                             "code-lines" "true" (document ,@ls))))
+           (layers (stree->tree '(tuple (tuple "0" "3" "type")
+                                        (tuple "4" "6" "variable"))))
+           (rect (lambda (i) (tree-bounding-rectangle
+                              (path->tree (at 0 6 i))))))
+      (with-body doc
+        (lambda ()
+          (init-env "page-medium" medium)
+          (step (lambda () #t))
+          (for (t (tree-children (path->tree (at 0 6))))
+            (code-set-line-layers t layers (stree->tree '(tuple))))
+          (update-current-buffer)
+          (step (lambda () #t))
+          (go-to (at 0 6 100 3))
+          (step (lambda () #t))
+          (let ((n0 (typeset-code-rich-made)))
+            (step (lambda () (insert "a")))
+            (step (lambda () (insert "b")))
+            (check-true (<= (- (typeset-code-rich-made) n0) 4)))
+          ;; a line inserted before: the lines after it at their places
+          (with r (rect 150)
+            (go-to (at 0 6 10 0))
+            (step insert-return)
+            (check= (rect 151) (begin (update-current-buffer)
+                                      (step (lambda () #t))
+                                      (rect 151)))
+            (check-true (< (cadr (rect 151)) (cadr r)))))))))
+
 ;; A block of one line with markup, in paper mode, is a paragraph of its
 ;; items (it had no rows, and was neither drawn nor reached by the cursor)
 (define (test-one-rich-line)
@@ -1071,6 +1111,7 @@
   (test-audit-5)
   (test-audit-7)
   (test-audit-9)
+  (test-layered-lines)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)

@@ -22,6 +22,8 @@ static int code_rows_made= 0;
 int get_code_rows_made () { return code_rows_made; }
 static int code_records_made= 0;
 int get_code_records_made () { return code_records_made; }
+static int code_rich_made= 0;
+int get_code_rich_made () { return code_rich_made; }
 
 // The state of a line which the features of programs give (tree-sitter,
 // the language servers: System/Language/code_lines.hpp, and
@@ -138,7 +140,14 @@ struct code_rec_rep: concrete_struct {
   bool               rich;
   stack_border       psb;
   int                pass;   // (the pass in which it was typeset)
-  code_rec_rep (): wsig (0), psig (0), rich (false), pass (-1) {}
+  // outside paper mode, a string with layers (the colours and the hints of
+  // a language server): its box, used again while the line, its layers
+  // (a change of them typesets the line again: update-path, and the record
+  // goes) and what it was typeset with (lsig) are the same
+  box                lbox;
+  unsigned long long lsig;
+  path               llip;
+  code_rec_rep (): wsig (0), psig (0), rich (false), pass (-1), lsig (0) {}
 };
 
 class code_rec {
@@ -680,6 +689,16 @@ bridge_code_rep::my_typeset (int desired_status) {
   else {
     // the rows of a line as the lines of a paragraph, the lines as the
     // paragraphs of a document; a line with markup is a box of its items
+    // (what the box of a string with layers is typeset with: lsig)
+    unsigned long long lsig= sig_mix (sig_mix (wsig,
+      (unsigned long long) env->pen->get_color ()),
+      (unsigned long long) env->pen->get_width ());
+    for (int c=0; code_color_vars[c] != NULL; c++) {
+      string var= code_color_vars[c];
+      lsig= sig_mix (lsig, cols->contains (var)?
+                             1 + (unsigned long long) cols[var]: 0);
+    }
+    if (lsig == 0) lsig= 1;
     array<int> tall_k;
     array<string> tall_txt;
     array<array<int> > tall_st;
@@ -699,8 +718,26 @@ bridge_code_rep::my_typeset (int desired_status) {
         tall_k << i;
         tall_txt << string ("");
         tall_st << one_row[0];
-        tall_box << rich_box (doc[i], descend (ip, i), width,
-                              cell);
+        // (the path which the line keeps, renumbered in place by the
+        // editor: a box used again keeps a right path)
+        path lip= obtain_ip (doc[i]);
+        if (!ip_attached (lip) || is_nil (lip) || lip->item != i)
+          lip= descend (ip, i);
+        // (a string with layers is typeset again only when it changes, or
+        // what it is typeset with: the lines of a file which a language
+        // server colours are all such lines; a line with markup is
+        // typeset at each pass, its items depend on the macros)
+        code_rec r= recs[i];
+        bool keep= is_atomic (doc[i]) && !is_nil (r) &&
+                   typeset_caches_mode () != 0;
+        box b;
+        if (keep && !is_nil (r->lbox) && r->lsig == lsig && r->llip == lip)
+          b= r->lbox;
+        else {
+          b= rich_box (doc[i], lip, width, cell);
+          if (keep) { r->lbox= b; r->lsig= lsig; r->llip= lip; }
+        }
+        tall_box << b;
         tall_fold << fk;
       }
       else if ((!is_nil (recs[i]) && N(recs[i]->starts) > 1) || fk == 2) {
@@ -775,6 +812,7 @@ bridge_code_rep::rich_paragraph (tree& t, path lip, SI width, SI cell,
   // inside the line, a cell, a with of several paragraphs, is typeset as
   // paragraphs, see bridge_document.cpp)
   tree old_mode= env->local_begin ("code-lines", "false");
+  code_rich_made++;
   array<line_item> items= typeset_concat (env, t, lip);
   env->local_end ("code-lines", old_mode);
   path eip= decorate_middle (lip);
@@ -1038,11 +1076,18 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
     path lip= line_path (i);
     if (rich_line (doc[i])) {
       // a line with markup: typeset as a paragraph of its rows, at each
-      // pass (its items depend on the environment and the macros)
+      // pass (its items depend on the environment and the macros); a
+      // string with layers, only when it or what the rows share changed
+      // (see lbox)
       if (r->rich && r->pass == passes) return r;
+      if (is_atomic (doc[i]) && r->rich && r->psig == sig && r->lip == lip &&
+          typeset_caches_mode () != 0) {
+        r->pass= passes;
+        return r;
+      }
       r->pass= passes;
       r->rich= true;
-      r->psig= 0;
+      r->psig= (is_atomic (doc[i])? sig: 0);
       r->lip = lip;
       r->rows= array<box> ();
       r->bs  = array<box> ();
@@ -1130,9 +1175,10 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
     stack_border     fast_sb= ttt->sb;
     ttt->l = array<page_item> ();
     ttt->sb= stack_border ();
-    int made= code_rows_made;
+    int made= code_rows_made, rich_made= code_rich_made;
     all_paragraphs ();
     code_rows_made= made; // (the count is the one without the check)
+    code_rich_made= rich_made;
     if (!same_code_stack (fast_l, ttt->l))
       typeset_cache_mismatch ("lines of code used again");
     ttt->l = fast_l;

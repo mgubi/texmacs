@@ -22,6 +22,7 @@
   (typeset-redone-count get_typeset_redone (int))
   (typeset-code-rows-made get_code_rows_made (int))
   (typeset-code-records-made get_code_records_made (int))
+  (typeset-code-rich-made get_code_rich_made (int))
   (texmacs-version-release texmacs_version (string string))
   (version-before? version_inf (bool string string))
   (updater-supported? updater_supported (bool))

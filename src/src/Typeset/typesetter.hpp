@@ -69,6 +69,8 @@ int get_typeset_redone ();
 int get_code_rows_made ();
 // and the records of their lines (without the check mode)
 int get_code_records_made ();
+// and the lines typeset by the concater (with markup or layers)
+int get_code_rich_made ();
 // (the one place where bridges typeset again are counted: for both counters)
 void typeset_count_redone (int n);
 int get_typeset_check_mismatches ();

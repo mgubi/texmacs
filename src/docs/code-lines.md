@@ -103,7 +103,14 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
 - **Layers** (`code_line_has_layers`, `code_line_layers_of`: the colours and
   the inlay hints of a server). Such a line is typeset by the concater
   (`typeset_layered_string`) and put on the grid; a hint inside a token comes
-  before the token.
+  before the token. A server colours almost all the lines of a file: the
+  box of such a line (papyrus, `lbox` of its record) or its items (paper)
+  are used again while the line, its layers (a server which changes them
+  typesets the line again, `update-path`: the record goes) and what it is
+  typeset with (`lsig`: the fonts, the width, the colours) are the same.
+  A line with markup is typeset at each pass (its items depend on the
+  macros, it may have labels). `typeset-code-rich-made` counts the lines
+  typeset by the concater.
 - **Folds** (`code_line_fold_state`). A hidden line takes no room and is not
   drawn: in papyrus, the lines after it are a line higher; in paper, its page
   items are hidden, as `bridge_rep::fold_line` does. The line before hidden
@@ -162,13 +169,19 @@ the lines being copied at each key: #811 too (11 ms).
   box around the block, a level more in all its box paths; a source file
   has nothing after its lines.
 - **A line does not change the environment** of the lines after it (an
-  `assign` in a line, `exec_until` of the block does nothing).
+  `assign` in a line). The environment at a place is that of the markup on
+  the way to it in its own line (`bridge_code_rep::my_exec_until` walks the
+  line with `env->exec_until`, without the fast environments). With the
+  fast environments (the default), the environment at a place is made
+  from the changes of the tags along the path (`typeset_exec_until`,
+  `restricted_exec`), which also runs the assignments of the lines before
+  it: an `assign` in an earlier line is seen there, while the typesetting
+  and the other path do not see it.
 - **`get-env "code-lines"`** at a place inside a line or a paragraph of a
-  document typeset with code-lines gives `true`, while what is there is
-  typeset with `false`: the environment at a place is made from the
-  changes of the tags along the path (`typeset_exec_until`, the DRD), which
-  know nothing of this rule. Nothing reads it there (the menus read the
-  initial environment, `get-init`).
+  document typeset with code-lines gives `true` with the fast
+  environments, while what is there is typeset with `false` (the DRD knows
+  nothing of this rule); `false` without them. Nothing reads it there (the
+  menus read the initial environment, `get-init`).
 - **A document which changes mode** (a line of paragraphs inserted or
   removed, the variable switched) answers for its former mode whether the
   next pass is complete: the mode is decided when the document is
