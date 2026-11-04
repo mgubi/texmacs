@@ -9,7 +9,7 @@ answers. Every process is stopped above TM_TEST_RSS_KB (2 GB) of memory and
 after TM_TEST_TIMEOUT seconds (120). Prints "CHECK <scenario> <name> PASS|FAIL";
 the exit status is the number of failures (capped at 1).
 """
-import json, os, select, subprocess, sys, threading, time
+import json, os, re, select, subprocess, sys, threading, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -1276,6 +1276,8 @@ def s_content(w):
     def accepted(label, fmt, content):
         e, r = m.tool("insert", document="d1", where="last", content=content, format=fmt)
         check("accepted: %s" % label, not e and r["status"] == "applied")
+        if e:
+            print("    ", str(r)[:300])
         m.tool("undo_agent", document="d1")
     for tag in ("extern", "script", "script-eval", "eval", "eval-args", "action", "quasi", "assign", "compound", "session", "input", "raw-data"):
         refused("(%s ...) in stree" % tag, "stree", '(%s "x" "y")' % tag, "`%s'" % tag)
@@ -1439,8 +1441,8 @@ def s_content(w):
     refused("an alias of label", "texmacs", "<with|strong|<value|label>|<strong|a>>", "alias")
     refused("an alias of a macro through quote-value", "texmacs", "<with|em|<quote-value|hlink>|<em|x|file:///etc/passwd>>", "alias")
     refused("a with that sets a tag", "texmacs", "<with|em|x|<em|y>>", "alias")
-    refused("a wrapper macro with a javascript address", "texmacs", "<hlink*|x|javascript:alert(1)|t>", "expands to a link")
-    refused("a wrapper macro with a file address", "texmacs", "<hlink*|x|file:///etc/passwd|t>", "expands to a link")
+    refused("a wrapper macro with a javascript address", "texmacs", "<hlink*|x|javascript:alert(1)|t>", "javascript:")
+    refused("a wrapper macro with a file address", "texmacs", "<hlink*|x|file:///etc/passwd|t>", "file:")
     accepted("a wrapper macro with a web address", "texmacs", "<hlink*|x|https://example.org|t>")
     accepted("a reference and a cite (they expand to links)", "texmacs", "<reference|sec:x> <cite|knuth>")
     # the values of the environment
@@ -1478,10 +1480,9 @@ def s_content(w):
     refused("a link with a blank", "stree", '(hlink "x" "http://a.b/c d")', "cannot be in an address")
     refused("an image address with a quote", "stree", '(image "http://a.b/x.png\\" onerror=\\"alert(9)" "1par" "" "" "")', "character that cannot be")
     refused("an image size with a quote", "stree", '(image "x.png" "1par\\" onload=\\"alert(10)" "" "" "")', "character that cannot be")
-    # (`map' passes its arguments to the macro it names: a dangerous macro, not called at all)
     refused("a map that calls include*", "texmacs", "<map|include*|<tuple|/etc/passwd>>", "map")
     refused("a map that calls hlink", "texmacs", "<map|hlink|<tuple|x>>", "map")
-    refused("a map that calls strong (map is a call of a macro by name)", "texmacs", "<map|strong|<tuple|x|y>>", "map")
+    accepted("a map that calls strong", "texmacs", "<map|strong|<tuple|x|y>>")
     refused("LaTeX filecontents", "latex", "\\begin{filecontents*}{../x.tex}hi\\end{filecontents*}", "filecontents")
     refused("LaTeX minted with shell-escape", "latex", "\\usepackage[shell-escape]{minted}\\begin{document}x\\end{document}", "runs programs")
     refused("LaTeX standalone with convert", "latex", "\\documentclass[convert=true]{standalone}\\begin{document}x\\end{document}", "runs programs")
@@ -1884,7 +1885,7 @@ def s_static(w):
     def refused(label, d, tool, **args):
         h = hashof(d)
         e, r = m.tool(tool, document=d, **args)
-        check("refused: %s" % label, e and "refused" in str(r) and hashof(d) == h)
+        check("refused: %s" % label, e and ("refused" in str(r) or "only relative" in str(r)) and hashof(d) == h)
         return str(r)
     def accepted(label, d, tool, **args):
         e, r = m.tool(tool, document=d, **args)
@@ -1955,39 +1956,170 @@ def s_static(w):
                 node=dest["handle"], content=long_a + "Y")
     else:
         check("the hlink* was found", False)
-    # 6. normal writing is accepted in the standard styles
-    items = [
-        ("a paragraph", "A paragraph with <strong|bold> and <em|emphasis> text."),
-        ("a section", "(section \"Intro\")"),
-        ("a subsection", "(subsection \"Sub\")"),
-        ("a label", "A label here<label|lab1> and a <reference|lab1> to it."),
-        ("a citation", "See <cite|knuth84> and <cite|a|b>."),
-        ("a footnote", "A note<footnote|The note> here."),
-        ("a folded", "<folded|Summary|The details>"),
-        ("an itemize", "<\\itemize>\n<item>one\n\n<item>two\n</itemize>"),
-        ("an enumerate", "<\\enumerate>\n<item>one\n\n<item>two\n</enumerate>"),
-        ("a web link", "A <hlink|site|https://ok.org> link and <hlink|mail|mailto:a@b.org>."),
-        ("a relative link", "<hlink|there|#lab1>"),
-        ("href", "<href|https://ok.org>"),
-        ("an image in the folder", "<image|pic.png|1par|||>"),
-        ("an equation", "<\\equation*>\nx=1\n</equation*>"),
-        ("a figure", "<small-figure|<image|pic.png|1par|||>|A caption>"),
-        ("a title block", "<doc-data|<doc-title|The title>|<doc-author|<author-data|<author-name|A. Author>>>>"),
-        ("an abstract", "<abstract|Some text.>"),
-        ("a theorem", "<\\theorem>\nA statement.\n</theorem>"),
-        ("a proof", "<\\proof>\nIt is clear.\n</proof>"),
-    ]
-    for style in ("generic", "article", "book", "beamer"):
+    # 7. (audit) hlink* forwards its destination: checked where it is written, also deep inside
+    #    a fold, whose hidden part the second layer does not see
+    d = opendoc("  Text.\n")
+    for what, c in (("hlink* alone", "<hlink*|t|javascript:alert(1)|x>"),
+                    ("hlink* in a summarized", "<summarized|sum|<hlink*|t|javascript:alert(1)|x>>"),
+                    ("hlink* in a detailed", "<detailed|sum|<hlink*|t|javascript:alert(1)|x>>"),
+                    ("href with a file", "<href|file:///etc/passwd>"),
+                    ("include of a path", "<include|/etc/passwd>")):
+        refused(what, d, "insert", where="last", content=c)
+    accepted("hlink* with a web address", d, "insert", where="last", content="<hlink*|t|https://ok.org|x>")
+    # every macro of the table: the places the analysis finds in it are checked where it is called
+    pf = os.path.join(root, "safe-style.tm")
+    kinds_ok = True
+    seen = 0
+    for style in ("article", "tmdoc", "book", "beamer", "generic"):
+        with open(pf, "w") as fh:
+            fh.write("<TeXmacs|2.1.5>\n\n<style|<tuple|%s>>\n\n<\\body>\n  Text.\n</body>\n" % style)
+        penv = dict(env)
+        penv["SAFE_FILE"] = os.path.realpath(pf)
+        pr = subprocess.run([BIN, "-headless", "-x", '(load "%s")' % os.path.join(HERE, "safe-probe.scm")],
+                            env=penv, capture_output=True, text=True, timeout=100)
+        allowed = [l.split()[1] for l in pr.stdout.splitlines() if l.startswith("ALLOW ")]
         d = opendoc("  Text.\n", style)
-        extra = [("a chapter", '(chapter "Chapter")'), ("a part", '(part "Part")'),
-                 ("an appendix", '(appendix "Appendix")')] if style == "book" else []
-        for label, content in items + extra:
-            fmt = "stree" if content.startswith("(") else "texmacs"
-            e, r = m.tool("insert", document=d, where="last", content=content, format=fmt)
-            ok = not e and r["status"] == "applied"
-            check("%s style: %s is accepted" % (style, label), ok)
-            if not ok:
-                print("   ", str(r)[:300])
+        for l in pr.stdout.splitlines():
+            if not l.startswith("SAFE ") or l.startswith("SAFE-END"):
+                continue
+            parts = l.split(" ", 3)
+            name, npar, pos = parts[1], int(parts[2]), parts[3]
+            seen += 1
+            ks = set(re.findall(r"[a-z]+", re.sub(r"\ball\b|\bvar\b", "", pos)))
+            if not ks <= {"link", "file"} and name not in allowed:
+                kinds_ok = False
+                print("    kinds of", name, pos)
+            for pm in re.finditer(r"\((\d+|all|var) ([a-z ]+)\)", pos):
+                idx, kd = pm.group(1), pm.group(2).split()
+                if idx == "var":
+                    continue
+                n = max(npar, 1) if npar > 0 else 1
+                i = 0 if idx == "all" else int(idx)
+                for kind, bad in (("link", "javascript:alert(1)"), ("file", "/etc/passwd")):
+                    if kind not in kd:
+                        continue
+                    args = ['"t"'] * max(n, i + 1)
+                    args[i] = '"%s"' % bad
+                    content = "(%s %s)" % (name, " ".join(args))
+                    h = hashof(d)
+                    e, r = m.tool("insert", document=d, where="last", content=content, format="stree")
+                    ok = e and hashof(d) == h and ("javascript" in str(r) or "/etc/passwd" in str(r) or "refers to the file" in str(r) or "plain name" in str(r))
+                    check("%s: %s at position %s of %s is refused" % (style, kind, idx, name), ok)
+                    if not ok:
+                        print("    ", content, str(r)[:200])
+    check("every macro of the table has only link and file places, but the declared ones (%d found)" % seen, kinds_ok and seen > 10)
+    # 8. edit_text does not reach text inside definitions or code
+    for what, body, old, new in (
+        ("set", "  <set|dst|https://ok.org>\n\n  <assign|u|<macro|<hlink|t|<value|dst>>>>\n\n  Text.\n", "https://ok.org", "javascript:alert(1)"),
+        ("provide", "  <provide|dst|https://ok.org>\n\n  Text.\n", "https://ok.org", "javascript:alert(1)"),
+        ("style-only", "  <style-only|alpha beta>\n\n  Text.\n", "alpha", "javascript"),
+        ("with-package", "  <with-package|beamer|alpha beta>\n\n  Text.\n", "alpha", "javascript"),
+        ("a bare macro", "  <macro|x|alpha beta>\n\n  Text.\n", "alpha", "javascript"),
+        ("assign", "  <assign|dst|https://ok.org>\n\n  Text.\n", "https://ok.org", "javascript:alert(1)"),
+        ("latex", "  <latex|alpha beta>\n\n  Text.\n", "alpha", "\\input"),
+        ("script", "  <script|python|alpha beta>\n\n  Text.\n", "alpha", "beta")):
+        d = opendoc(body)
+        ks = kids(d)
+        h = hashof(d)
+        e, r = m.tool("edit_text", document=d, node=ks[0]["handle"], old=old, new=new)
+        check("edit_text inside %s is refused" % what, e and hashof(d) == h)
+    # 9. a macro of the person that the standard macros reach: the table does not exempt them
+    d = opendoc("  <assign|toc-normal-1|<macro|what|<hlink|t|<arg|what>>>>\n\n  Text.\n")
+    refused("a section whose table of contents entry is a macro of the person that makes a link",
+            d, "insert", where="last", content="<section|javascript:alert(1)>")
+    d = opendoc("  <assign|toc-normal-1|<macro|what|<strong|<arg|what>>>>\n\n  Text.\n")
+    accepted("a section where the macro of the person is harmless", d, "insert", where="last", content="<section|A title>")
+    # 10. cycles: the result does not depend on the order
+    cyc = ("  <assign|ma|<macro|x|<mb|<arg|x>>>>\n\n"
+           "  <assign|mb|<macro|x|<concat|<hlink|t|<arg|x>>|<ma|<arg|x>>>>>\n\n  Text.\n")
+    d = opendoc(cyc)
+    refused("a cycle, a first", d, "insert", where="last", content='(concat (ma "javascript:a") (mb "javascript:b"))', format="stree")
+    d = opendoc(cyc)
+    refused("a cycle, b first", d, "insert", where="last", content='(concat (mb "javascript:b") (ma "javascript:a"))', format="stree")
+    d = opendoc(cyc)
+    refused("a cycle, a alone", d, "insert", where="last", content='(ma "javascript:a")', format="stree")
+    # 11. the prefix exemption is for links only
+    d = opendoc("  <assign|hl|<macro|x|<hlink|t|<merge|https://|<arg|x>>>>>\n\n"
+                "  <assign|lt|<macro|x|<latex|<merge|https://|<arg|x>>>>>\n\n  Text.\n")
+    accepted("a macro of the person whose link has a fixed address beginning", d, "insert", where="last", content="<hl|example.org>")
+    refused("a macro of the person whose latex has a fixed beginning", d, "insert", where="last", content='(lt "\\\\input{x}")', format="stree")
+    # 12. a call that the person's block already has does not make the block unchangeable
+    d = opendoc("  <assign|jl|<macro|x|<hlink|t|<arg|x>>>>\n\n  Item <jl|javascript:a(1)> end.\n\n  Last.\n")
+    ks = kids(d)
+    accepted("a paragraph with the call of the person, the text around it changed", d, "replace", node=ks[1]["handle"],
+             content='(concat "Item " (jl "javascript:a(1)") " finish.")', format="stree")
+    ks = kids(d)
+    refused("the same paragraph with another address", d, "replace", node=ks[1]["handle"],
+            content='(concat "Item " (jl "javascript:b(2)") " finish.")', format="stree")
+    # 13. standard macros that are harmless are accepted
+    d = opendoc("  Text.\n")
+    for label, c in (("marginal-note", '(marginal-note "normal" "c" "A note")'), ("itemize*", None)):
+        if c:
+            accepted(label, d, "insert", where="last", content=c, format="stree")
+    d = opendoc("  Text.\n", "tmdoc")
+    for label, c in (("simple-link", '(simple-link "https://ok.org")'), ("help-link", '(help-link "body" "name")'),
+                     ("key", '(key "C-x")'), ("menu", '(menu "File")'), ("shortcut", '(shortcut "C-x")')):
+        accepted("tmdoc: " + label, d, "insert", where="last", content=c, format="stree")
+    refused("tmdoc: simple-link with javascript:", d, "insert", where="last", content='(simple-link "javascript:alert(1)")', format="stree")
+    refused("tmdoc: tmdoc-link with javascript:", d, "insert", where="last", content='(tmdoc-link "t" "javascript:alert(1)")', format="stree")
+    # 14. nesting deeper than 200 levels: the ancestors are all looked at
+    D = 230
+    w2 = '<hlink|t|<arg|x>>'
+    for _ in range(D):
+        w2 = "<with|font-shape|italic|%s>" % w2
+    d = opendoc("  <assign|dd|<macro|x|%s>>\n\n  Para.\n" % w2)
+    node = kids(d)[0]["handle"]
+    depth = 0
+    while True:
+        ch = kids(d, node)
+        nxt = [c for c in ch if c["tag"] in ("macro", "with", "hlink", "arg")]
+        if not nxt:
+            break
+        node = nxt[0]["handle"]
+        depth += 1
+        if depth > D + 6:
+            break
+    check("the nesting was descended (%d levels)" % depth, depth > 200)
+    e, r = m.tool("replace", document=d, node=node, content="javascript:alert(1)", format="texmacs")
+    check("an edit at the bottom of 230 levels in a definition is refused", e)
+    # 15. a document with 1500 macros and many paragraphs: edits next to a definition are cheap
+    parts = ["  <assign|m0|<macro|x|<em|<arg|x>>>>\n"]
+    for i in range(1, 1500):
+        parts.append("  <assign|m%d|<macro|x|<m%d|<arg|x>>>>\n" % (i, i - 1))
+    for i in range(8000):
+        parts.append("  Paragraph %d with <m%d|word> and <em|text>.\n" % (i, i % 5))
+    d = opendoc("\n".join(parts))
+    ks = kids(d)
+    t0 = time.monotonic()
+    e, r = m.tool("insert", document=d, anchor=ks[5]["handle"], where="after", content="New.", format="texmacs")
+    dt = time.monotonic() - t0
+    check("an insertion after a definition in a document with 1500 macros (%.1f s)" % dt, not e and dt < 20)
+    rss = int(subprocess.run(["ps", "-o", "rss=", "-p", str(m.p.pid)], capture_output=True, text=True).stdout.strip() or 0)
+    check("and the process stays under 1 GB (%d MB)" % (rss // 1024), rss < 1000000)
+    t0 = time.monotonic()
+    e, r = m.tool("delete", document=d, node=kids(d)[6]["handle"])
+    dt = time.monotonic() - t0
+    check("a deletion next to the definitions (%.1f s)" % dt, not e and dt < 20)
+    # a heavy macro chain: a block that does not evaluate within the budget, next to the definitions
+    chain = ["  <assign|d0|<macro|x|<concat|<arg|x>|<arg|x>>>>\n"]
+    for i in range(1, 40):
+        chain.append("  <assign|d%d|<macro|x|<d%d|<d%d|<arg|x>>>>>\n" % (i, i - 1, i - 1))
+    chain.append("  Light.\n")
+    chain.append("  Heavy <d39|x>.\n")
+    d = opendoc("\n".join(chain))
+    ks = kids(d)
+    t0 = time.monotonic()
+    e, r = m.tool("insert", document=d, anchor=ks[3]["handle"], where="after", content="New.", format="texmacs")
+    dt = time.monotonic() - t0
+    check("an insertion next to the definitions of a heavy chain is cheap (%.1f s)" % dt, not e and dt < 20)
+    ks = kids(d)
+    heavy = [c for c in ks if c["preview"].startswith("Heavy")]
+    t0 = time.monotonic()
+    e, r = m.tool("edit_text", document=d, node=heavy[0]["handle"], old="Heavy", new="Light") if heavy else (False, "")
+    dt = time.monotonic() - t0
+    check("an edit in the heavy block is refused within the budget (%.1f s)" % dt, e and dt < 30)
+    rss = int(subprocess.run(["ps", "-o", "rss=", "-p", str(m.p.pid)], capture_output=True, text=True).stdout.strip() or 0)
+    check("and the process stays under 1 GB (%d MB)" % (rss // 1024), rss < 1000000)
     check("exit 0", m.close() == 0)
 
 

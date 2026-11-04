@@ -203,11 +203,13 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
      any `error`). Only the *new* violations count (by their text, with their
      number): what the person already has, in their preamble or their text, stays and
      does not make the edits refused. So a leaf of an existing node (the address of a
-     link, a label, the file of an image, the value of a `with`), the macros whose
-     definition is changed (when an `assign` of the document changes, the whole
-     document is compared before and after), and the environment around the
-     insertion (a `with` of the person, a macro of theirs that depends on it) are
-     covered by construction.
+     link, a label, the file of an image, the value of a `with`) and the environment
+     around the insertion (a `with` of the person, a macro of theirs that depends on
+     it) are covered by construction. The definitions cannot be changed by the content
+     (the static rules below), so the rest of the document is not compared: an
+     edit costs the evaluation of its own block, whatever the size of the document
+     (a document with 20000 paragraphs and 1500 macros: 0.5 s for an insertion
+     next to a definition).
   *Static rules* (they do not depend on the evaluation, which is not the typesetter and has
   kept missing things, so layer 2 is an extra and not the protection):
   - *The definitions belong to the person.* An edit whose target is inside an `assign`,
@@ -217,35 +219,54 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     of layer 1.
   - *Dangerous macros are not called.* The macros of the document (its `assign`s) and of
     its style (read from the buffer at the time of the check) are analysed, without
-    evaluating anything, down to the primitives they call and transitively: a macro is
-    dangerous at a parameter when that parameter (or the value of a variable, which the
-    content can set with `with`) reaches the destination of a `hlink`, `link` or `url` (unless
-    it begins with `#`, `http://`, `https://` or `mailto:`), the file of an `image`, `include`,
-    `include*`, `pattern`, `postscript`, `video`, `sound`, an argument of `script`, `action`,
-    `extern`, `hybrid`, `authorize`, `observer`, `eval`, `quasi`, `specific`, `latex`, or the
-    name of a macro (`compound`, `apply`, `expand`, `map-args`), or when it is passed to
-    another dangerous macro, or to a macro called by a name that is computed (unless the name
-    is a choice between written names, or a fixed beginning with no macro of the document that
-    begins so and is dangerous). The content may not call such a macro, in any place
-    (directly, or inside `arg`, `quote-arg`, `value`, `compound`, `with`...): the
-    reason says "a call of the macro `x' is refused". The exception is the table of standard
-    macros of `safe-macros` in `mcp-server.scm`, whose sensitive argument is a title, a
-    label, a key or a text, or is checked where it is written (the rules of the tags, and
-    layer 2): the sections (`part` to `subparagraph` and their starred forms), `itemize`,
-    `enumerate`, `description` and their variants, the folds (`folded`, `unfolded`, `summarized`,
-    `detailed` and their `-std`, `-explain` forms), the title block (`doc-data`, `author-data`,
-    the `abstract-*`, `author-*-note`, `doc-*-text`, `custom-*`), the markings (`overline`,
-    `underline`, `strike-through`, `stressed`, `marked`, `deleted`, `todo`), `comma-separated`,
-    `semicolon-separated`, `concat-tuple`, `href`, `slink`, `hlink*`, `include`, and `tit` and
-    `title-left` of the beamer style. A macro of the same name that the document defines is
-    not in the table. The check is by name and cached for the edit (`mcp-dangerous-names`
-    gives the result for a document).
+    evaluating anything, down to the primitives they call, transitively (a worklist
+    that solves cycles together, so the result does not depend on the order). A place of
+    a macro is sensitive, by kinds: `link` (the destination of a `hlink`, `link` or `url`,
+    unless it begins with `#`, `http://`, `https://` or `mailto:`; this exemption is for
+    links only), `file` (the file of an `image`, `include`, `include*`, `pattern`,
+    `postscript`, `video`, `sound`, `attachment`, `ocr`, `bibliography`), `code` (the script
+    of an `action`, the function of an `extern` or `hybrid`, an argument of `script`,
+    `authorize`, `observer`, `eval`, `eval-args`, `specific`, `latex`, `find-file`) and `name` (the
+    name of a macro made from a parameter or a variable). The arguments of an `extern`
+    after the function and of an `action` after the script are data for a function that the
+    macro chose; a macro of the style whose function reads files or runs programs is in
+    `refused-style-macros`. A macro is dangerous at a parameter when that parameter (or
+    the value of a variable, which the content can set with `with`) reaches a sensitive
+    place, directly or through another macro. A call by a computed name with a fixed
+    beginning (a `merge` that begins with three characters or more) reaches the style's
+    macros, which are trusted, and the document's macros with that beginning, which are
+    analysed. The content may not call a dangerous macro, in any place (directly, or
+    inside `arg`, `quote-arg`, `value`, `compound`, `with`...): the reason says "a call of
+    the macro `x' is refused". The check is made on the document after the edit and
+    compared with the document before, by the key of the call (its whole text), so
+    that a call the person already has stays when the text around it is changed and the
+    paragraph is sent again, and a changed call is a new violation.
+    The exception is the table `safe-macros` of `mcp-server.scm`: the standard macros
+    that pass an argument to a link or a file (`href`, `slink`, `hlink*`, `include`, the note
+    macros `doc-note-text`, `doc-note-ref`, `doc-footnote-text`, `custom-*`, `author-*-note`,
+    and in the manuals `simple-link`, `help-link`, `hyper-link*`, `tmdoc-link`, `tmdoc-include`).
+    The places that the analysis finds in them are checked where the call is written, as
+    destinations and files (`check-safe-macro-arguments`); `tmdoc-link` and `tmdoc-include`,
+    where the analysis finds a `code` place (a search of the manuals by a name), have the
+    checks written in `safe-extra-checks`. The test `static` goes through the table for the
+    styles article, book, beamer, generic and tmdoc: no place but `link` and `file` (and
+    the declared ones), and a `javascript:` or `/etc/passwd` at each place is refused. A
+    macro of the table that the document defines itself, or one that calls (again and again)
+    a macro that the document defines, is not exempt: it is analysed like the others.
+    The sections, the lists, the folds, the title block and the like are not in the table:
+    the analysis finds nothing sensitive in them, unless the document redefines a macro
+    they use (`<assign|toc-normal-1|<macro|x|<hlink|t|<arg|x>>>>`), and then a `section`
+    is refused. The result for a style is given by `mcp-dangerous-names` and
+    `mcp-safe-report` (for the tests).
   *Names that are computed.* If the document reaches macros or variables by a name that is
   computed (`compound`, `apply`, `merge`, a `value` of something that is not a name...), the
-  users of a definition cannot be found by its name, and the edit of any definition checks the
-  whole document (definitions cannot be edited by the content at all, so this concerns the
-  edits of the person that the filter compares). *Violations of the person* (a link to
+  macros reached cannot be known by their names: see the analysis above (a fixed beginning
+  of the name limits them; else the name is a sensitive place). *Violations of the person* (a link to
   `javascript:`, an `action`) stay and do not make their sibling blocks refused.
+  *edit_text* does not reach the text inside definitions (`assign`, `set`, `reset`, `provide`,
+  `with-package`, `style-only`, a bare `macro`...) or code (`latex`, `script`, `extern`...):
+  such a text is not looked for, and the leaf that is edited is checked against all its
+  ancestors (without a limit of depth).
   *Errors* of the evaluator are violations: what it dropped cannot be checked (the call of a
   macro with a wrong `arg`, the budget, the nesting). The only exception is the list of the
   messages that standard macros give outside the typesetter and that are no danger: `bad
@@ -262,13 +283,10 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   `script`, `hybrid`, `action`, `compound`, `latex`, a `specific` for another program,
   the inputs and outputs of sessions...) is refused whatever the violations, and an
   edit in a block that does not evaluate within the budget is refused.
-  *Budgets.* The evaluation has a budget of 1.5 million steps for a block; a
-  comparison of the whole document (when a definition changed) evaluates the blocks
-  in batches of about 20000 nodes whose results are dropped at once, within 12 million
-  steps and 3 million nodes of results in all, and only the blocks that use the changed
-  definitions (the names of the `assign`s of the edited block, and of the
-  definitions that use them again and again, found as tags or as strings; all the blocks
-  if the style defines one of the names). An expansion that exceeds a budget is a
+  *Budgets.* The evaluation has a budget of 1.5 million steps for a block; the
+  check of a whole document (`create_document`) evaluates the blocks in batches of about
+  20000 nodes whose results are dropped at once, within 12 million steps and 3 million
+  nodes of results in all. An expansion that exceeds a budget is a
   violation, the edit is refused, and the server stays alive. The budget is a counter in
   the evaluator (`exec_budget_start`, `exec_budget_end` in `env_exec.cpp`, off unless
   asked). The recursion of macros stops when the stack is nearly full

@@ -1362,7 +1362,11 @@
   ;; a destination of a link: http, https, mailto, or a relative address
   ;; (a path, a #label, other.tm#label); not a network path (//host)
   (let ((scheme (url-scheme s)))
-    (cond (scheme (and (member scheme '("http" "https" "mailto")) #t))
+    (cond ((and (== scheme "tmfs") (string-starts? s "tmfs://help/")
+                (not (dotdot-in-path? s)))
+           ;; (the manuals of TeXmacs: what the help-link of the manuals makes)
+           #t)
+          (scheme (and (member scheme '("http" "https" "mailto")) #t))
           ((or (string-starts? (tm-string-trim-both s) "//")
                (string-starts? (tm-string-trim-both s) "\\"))
            #f)
@@ -1545,6 +1549,20 @@
                                        "' (letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)")))))
       (loop (cddr l)))))
 
+(define (check-link-destination tag a)
+  ;; the destination @a of a link made by the tag @tag, as written
+  (cond ((not (string? a))
+         (violate! (string-append "a `" (symbol->string tag)
+                                    "' whose destination is not written as plain text is refused (nothing was changed)")))
+        ((not (name-chars-ok? a 'address))
+         (violate! (string-append "a `" (symbol->string tag)
+                                    "' with the target `" (utf8-prefix (u8 a) 60)
+                                    "' is refused: a backslash, a brace, a control character or a bare % cannot be in an address (nothing was changed)")))
+        ((not (link-target-ok? a))
+         (violate! (string-append "a `" (symbol->string tag)
+                                    "' with the target `" (utf8-prefix (u8 a) 60)
+                                    "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)")))))
+
 (define (check-safety st base)
   ;; refuse content with markup that can run code, loop, or read what it
   ;; should not
@@ -1615,18 +1633,11 @@
        (let ((l (or (assq tag link-primitives) (assq tag link-macros))))
          (when l
            (let ((a (argument st (cdr l))))
-             (when a
-               (cond ((not (string? a))
-                      (violate! (string-append "a `" (symbol->string tag)
-                                                 "' whose destination is not written as plain text is refused (nothing was changed)")))
-                     ((not (name-chars-ok? a 'address))
-                      (violate! (string-append "a `" (symbol->string tag)
-                                                 "' with the target `" (utf8-prefix (u8 a) 60)
-                                                 "' is refused: a backslash, a brace, a control character or a bare % cannot be in an address (nothing was changed)")))
-                     ((not (link-target-ok? a))
-                      (violate! (string-append "a `" (symbol->string tag)
-                                                 "' with the target `" (utf8-prefix (u8 a) 60)
-                                                 "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)"))))))))
+             (when a (check-link-destination tag a)))))
+       ;; (a standard macro of the table that passes an argument to a link or a
+       ;; file: the argument is checked here, with the rules of the tags)
+       (when (and safety-doc (not (known-primitive? tag)) (safe-macro? safety-doc tag))
+         (check-safe-macro-arguments st base))
        (cond
          ((== tag 'specific)
           ;; (the body is for the program that exports it, unless the format is
@@ -1752,16 +1763,6 @@
   (cond ((tree-atomic? t) '())
         ((or (tm-is? t 'assign) (tm-is? t 'set) (tm-is? t 'reset)) (list (tm->stree t)))
         (else (append-map assign-nodes (tree-children t)))))
-
-(define (expand-in-document st d)
-  ;; the content evaluated in the environment of the document (after its
-  ;; own assigns), or #f if it cannot be
-  (catch #t
-    (lambda ()
-      (let ((pre (assign-nodes (doc-body d))))
-        (with-buffer (doc-url d)
-          (tm->stree (texmacs-exec (stree->tree (cons 'concat (append pre (list st)))))))))
-    (lambda args #f)))
 
 (define latex-forbidden
   '("input" "include" "includeonly" "InputIfFileExists" "verbatiminput" "lstinputlisting"
@@ -2033,13 +2034,10 @@
                        ((not r) (tool-error (string-append "the content does not parse as latex (nothing was changed)")))
                        (else r)))))
     (set! safety-defined? (and d (defined-predicate d)))
-    (set! safety-doc d)
-    (reset-danger!)
     (let ((r (catch #t
                (lambda () (check-safety st base) (check-arity st d) 'ok)
                (lambda args 'failed))))
       (set! safety-defined? #f)
-      (set! safety-doc #f)
       (when (!= r 'ok) (throw 'mcp-tool-error)))
     st))
 
@@ -2297,38 +2295,9 @@
 
 (define (inside-opaque? d t self?)
   ;; is @t (if @self?) or one of its ancestors up to the block an opaque node?
-  (let loop ((x (if self? t (tree-up t))) (n 0))
-    (and x (< n 200) (tree? x) (inside-body? d x) (not (body-root? d x))
-         (or (opaque-node? x) (loop (tree-up x) (+ n 1))))))
-
-(define (mentions? t names)
-  ;; does the tree use one of the names (as a tag, or as a string: a value)?
-  (cond ((tree-atomic? t) (and (ahash-ref names (tree->string t)) #t))
-        (else (or (and (ahash-ref names (symbol->string (tree-label t))) #t)
-                  (list-find (tree-children t) (lambda (c) (mentions? c names)))))))
-
-(define (assign-name-of st)
-  (and (pair? st) (memq (car st) '(assign set reset)) (pair? (cdr st)) (string? (cadr st)) (cadr st)))
-
-(define (definition-closure d names)
-  ;; the names, and the names of the definitions of the document that use them
-  ;; (again and again); #f if one is defined by the style (then everything may
-  ;; change)
-  (let ((defs (assign-nodes (doc-body d))) (set (make-ahash-table)))
-    (for (n names) (ahash-set! set n #t))
-    (let loop ()
-      (let ((grown #f))
-        (for (a defs)
-          (let ((n (assign-name-of a)))
-            (when (and n (not (ahash-ref set n))
-                       (mentions? (stree->tree a) set))
-              (ahash-set! set n #t)
-              (set! grown #t))))
-        (when grown (loop))))
-    (if (list-find (map car (ahash-table->list set))
-                   (lambda (n) (with-buffer (doc-url d) (style-has? n))))
-        #f
-        set)))
+  (let loop ((x (if self? t (tree-up t))))
+    (and x (tree? x) (inside-body? d x) (not (body-root? d x))
+         (or (opaque-node? x) (loop (tree-up x))))))
 
 ;;; Macros that pass an argument to something sensitive (static, no evaluation)
 ;;; The evaluator is not the typesetter, so what it makes keeps missing things.
@@ -2336,17 +2305,28 @@
 ;;; with the macros it calls (the style's and the document's, read at the time of
 ;;; the check), carries an argument (or the value of a variable, which the content
 ;;; can set with `with') to a link destination, a file, a script, a command or the
-;;; name of a macro, except the standard macros of `safe-macros', whose such
-;;; argument is checked by the rules above (the table is in the docs).
+;;; name of a macro. The kind of the place is kept: link, file, code, name, or pass
+;;; (an argument handed to a macro called by a computed name, which can be any
+;;; macro of the style). The standard macros of `safe-macros' are the exception:
+;;; the arguments that they pass to a link or a file are checked as such where the
+;;; call is written (check-safe-macro-arguments), derived from this analysis, and a
+;;; test checks that no other kind remains but the declared ones.
 
 (define sensitive-positions
-  ;; (tag . which arguments are sensitive: a position, last, or all)
-  '((hlink . 1) (link . last) (url . 0) (image . 0) (postscript . 0) (postscript* . 0)
-    (include . 0) (include* . 0) (pattern . 0) (video . 0) (sound . 0)
-    (script . all) (action . all) (extern . all) (hybrid . all) (authorize . all)
-    (observer . all) (eval . all) (eval-args . all) (quasi . all) (quasiquote . all)
-    (specific . all) (latex . all) (find-file . all) (find-file-upwards . all)
-    (attachment . 0) (ocr . 0) (bibliography . all)))
+  ;; (tag kind . which arguments are in such a place: a position, last, all)
+  '((hlink link 1) (link link last) (url link 0)
+    (image file 0) (postscript file 0) (postscript* file 0) (include file 0)
+    (include* file 0) (pattern file 0) (video file 0) (sound file 0)
+    (attachment file 0) (ocr file 0) (bibliography file all)
+    ;; (action: the script is the second argument; extern and hybrid: the function is
+    ;; the first one, the rest is data for it; the macros of the style that give
+    ;; a fixed function (doc-data, tm-ref...) are trusted, those whose function
+    ;; reads files or runs programs are in `refused-style-macros')
+    (script code all) (action code (1)) (extern code (0)) (hybrid code (0))
+    (authorize code all) (observer code all) (eval code all) (eval-args code all)
+    (specific code all) (latex code all)
+    (find-file code all) (find-file-upwards code all)
+    (compound name 0) (apply name 0) (expand name 0) (expand* name 0) (hide-expand name 0)))
 
 (define call-tags '(compound apply expand expand* hide-expand map-args))
 
@@ -2374,89 +2354,142 @@
         (else #f)))
 
 (define macro-table #f)          ; the local definitions: name -> definition
-(define danger-cache #f)         ; name -> list of dangerous parameter positions
+(define danger-cache #f)         ; name -> positions (solved)
+(define def-cache #f)            ; name -> macro tree, or 'none
+(define void-cache #f)           ; name -> does its closure have a local macro
 (define danger-doc #f)
 
 (define (reset-danger!)
   (set! macro-table #f)
-  (set! danger-cache #f))
+  (set! danger-cache #f)
+  (set! def-cache #f)
+  (set! void-cache #f))
 
 (define (danger-tables! d)
   (when (or (not macro-table) (not (eq? danger-doc d)))
     (set! danger-doc d)
     (set! macro-table (make-ahash-table))
     (set! danger-cache (make-ahash-table))
+    (set! def-cache (make-ahash-table))
+    (set! void-cache (make-ahash-table))
     (for (a (assign-nodes (doc-body d)))
       (when (and (eq? (car a) 'assign) (pair? (cdr a)) (string? (cadr a)) (pair? (cddr a)))
         (ahash-set! macro-table (cadr a) (caddr a))))))
 
 (define (local-macro? name)
-  (and macro-table (ahash-ref macro-table name) #t))
+  (and macro-table
+       (let ((x (ahash-ref macro-table name)))
+         (and (pair? x) (memq (car x) '(macro xmacro)) #t))))
 
 (define (macro-definition d name)
   ;; the macro tree of @name for the document: its own assign, else the
   ;; style's; #f if there is none
-  (let ((def (if (local-macro? name)
-                 (ahash-ref macro-table name)
-                 (with-buffer (doc-url d)
-                   (let ((x (tm->stree (get-init-tree name)))) (and (pair? x) x))))))
-    (and (pair? def) (memq (car def) '(macro xmacro)) def)))
+  (let ((c (ahash-ref def-cache name)))
+    (cond ((eq? c 'none) #f)
+          (c c)
+          (else
+            (let* ((def (if (ahash-ref macro-table name)
+                            (ahash-ref macro-table name)
+                            (with-buffer (doc-url d)
+                              (let ((x (tm->stree (get-init-tree name)))) (and (pair? x) x)))))
+                   (r (and (pair? def) (memq (car def) '(macro xmacro)) def)))
+              (ahash-set! def-cache name (or r 'none))
+              r)))))
 
 (define (macro-parameters def)
   (if (eq? (car def) 'xmacro)
       (list (cadr def))
       (reverse (cdr (reverse (cdr def))))))
 
-(define (flow-of d body params)
-  ;; the parameters that reach a sensitive place in @body ('var: a variable does)
+(define (literal-names e)
+  ;; the names that a name expression can have, if it is a written name or a
+  ;; choice (if) between written names; else #f
+  (cond ((string? e) (list e))
+        ((and (func? e 'if) (= (length (cdr e)) 3))
+         (let ((x (literal-names (caddr e))) (y (literal-names (cadddr e))))
+           (and x y (append x y))))
+        ((and (func? e 'if) (= (length (cdr e)) 2))
+         (literal-names (caddr e)))
+        (else #f)))
+
+(define (local-names-with-prefix prefix)
+  (list-filter (map car (ahash-table->list macro-table))
+               (lambda (n) (and (string-starts? n prefix) (local-macro? n)))))
+
+(define (called-names body)
+  ;; the names of the macros that @body can call: tags that are not primitives,
+  ;; the names of the compounds (the local macros that begin as a computed name)
   (let ((out '()))
-    (define (add! l) (for (x l) (when (not (member x out)) (set! out (cons x out)))))
-    (define (sink! a)
-      ;; the expression @a is in a sensitive place
-      (when (not (fixed-prefix? a))
-        (add! (param-refs a params))
-        (when (var-source? a) (add! '(var)))))
-    (define (everything! args)
-      (for (a args) (add! (param-refs a params)))
-      (add! '(var)))
+    (define (add! n) (when (not (member n out)) (set! out (cons n out))))
+    (define (visit e)
+      (when (and (pair? e) (symbol? (car e)))
+        (let ((tag (car e)) (args (cdr e)))
+          (cond ((memq tag '(compound apply expand expand* hide-expand))
+                 (when (pair? args)
+                   (let ((ns (literal-names (car args))))
+                     (if ns
+                         (for (n ns) (add! n))
+                         (let ((prefix (fixed-name-prefix (car args))))
+                           (for (n (if prefix (local-names-with-prefix prefix) (map car (ahash-table->list macro-table))))
+                             (add! n)))))))
+                ((eq? tag 'map-args) (when (and (pair? args) (string? (car args))) (add! (car args))))
+                ((memq tag '(macro xmacro func)) #f)
+                ((known-primitive? tag) #f)
+                (else (add! (symbol->string tag)))))
+        (for (c (cdr e)) (visit c))))
+    (visit body)
+    out))
+
+(define (fixed-name-prefix e)
+  ;; the written beginning (at least 3 characters) of a name that is made by a merge
+  (and (func? e 'merge) (pair? (cdr e)) (string? (cadr e)) (>= (string-length (cadr e)) 3)
+       (cadr e)))
+
+(define (kinds-add kinds k) (if (memq k kinds) kinds (cons k kinds)))
+
+(define (flow-of body params lookup)
+  ;; the parameters that reach a sensitive place in @body, as an alist (parameter
+  ;; . kinds of the places); the key `var' is for a variable that does
+  (let ((out '()))
+    (define (add! x k)
+      (let ((e (assoc x out)))
+        (if e
+            (set-cdr! e (kinds-add (cdr e) k))
+            (set! out (cons (list x k) out)))))
+    (define (sink! a k)
+      (when (not (and (eq? k 'link) (fixed-prefix? a)))
+        (for (x (param-refs a params)) (add! x k))
+        (when (var-source? a) (add! 'var k))))
     (define (call! name args)
-      (let ((dp (dangerous-positions d name)))
-        (when (pair? dp)
-          (let loop ((l args) (i 0))
-            (when (pair? l)
-              (when (or (memv i dp) (memq 'all dp)) (sink! (car l)))
-              (loop (cdr l) (+ i 1)))))))
-    (define (literal-names e)
-      ;; the names that a name expression can have, if it is a written name or a
-      ;; choice (if) between written names; else #f
-      (cond ((string? e) (list e))
-            ((and (func? e 'if) (= (length (cdr e)) 3))
-             (let ((x (literal-names (caddr e))) (y (literal-names (cadddr e))))
-               (and x y (append x y))))
-            ((and (func? e 'if) (= (length (cdr e)) 2))
-             (literal-names (caddr e)))
-            (else #f)))
+      (for (en (lookup name))
+        (cond ((eq? (car en) 'var) (for (k (cdr en)) (add! 'var k)))
+              ((eq? (car en) 'all) (for (a args) (for (k (cdr en)) (sink! a k))))
+              ((< (car en) (length args))
+               (for (k (cdr en)) (sink! (list-ref args (car en)) k))))))
     (define (computed-call! name-expr args)
-      ;; a call to a macro whose name is made: unless the macros that can be
-      ;; meant (the local ones with the fixed beginning) are harmless, all
-      ;; the arguments are in a sensitive place
-      (sink! name-expr)
-      (let ((prefix (and (func? name-expr 'merge) (pair? (cdr name-expr)) (string? (cadr name-expr))
-                         (cadr name-expr))))
-        (when (or (not prefix)
-                  (list-find (map car (ahash-table->list macro-table))
-                             (lambda (n) (and (string-starts? n prefix)
-                                              (pair? (dangerous-positions d n))))))
-          (everything! args))))
+      ;; a call to a macro whose name is made. With a fixed beginning, the macros
+      ;; that can be meant are the style's (trusted: a macro of the style that is
+      ;; not dangerous stays so) and the local ones with that beginning (analysed).
+      ;; A name that comes from a parameter or a variable is a sensitive place. Else the
+      ;; macro is unknown, and the arguments are handed to it.
+      (let ((prefix (fixed-name-prefix name-expr)))
+        (cond (prefix
+               (for (n (local-names-with-prefix prefix)) (call! n args)))
+              ((or (pair? (param-refs name-expr params)) (var-source? name-expr))
+               (sink! name-expr 'name))
+              (else
+                (for (a args) (sink! a 'pass))))))
     (define (visit e)
       (when (and (pair? e) (symbol? (car e)))
         (let* ((tag (car e)) (args (cdr e)) (sp (assq tag sensitive-positions)))
+          (when (and sp (not (memq tag call-tags)))
+            (let ((k (cadr sp)) (which (caddr sp)))
+              (cond ((eq? which 'all) (for (a args) (sink! a k)))
+                    ((eq? which 'last) (when (pair? args) (sink! (car (reverse args)) k)))
+                    ((pair? which)
+                     (for (i which) (when (< i (length args)) (sink! (list-ref args i) k))))
+                    ((< which (length args)) (sink! (list-ref args which) k)))))
           (cond
-            ((and sp (not (memq tag call-tags)))
-             (let ((which (cdr sp)))
-               (cond ((eq? which 'all) (for (a args) (sink! a)))
-                     ((eq? which 'last) (when (pair? args) (sink! (car (reverse args)))))
-                     ((< which (length args)) (sink! (list-ref args which))))))
             ((memq tag '(compound apply expand expand* hide-expand))
              (when (pair? args)
                (let ((names (literal-names (car args))))
@@ -2465,10 +2498,10 @@
                      (computed-call! (car args) (cdr args))))))
             ((eq? tag 'map-args)
              (when (and (pair? args) (string? (car args)))
-               (let ((hit (dangerous-positions d (car args))))
-                 (when (and (pair? hit) (>= (length args) 3) (string? (caddr args))
+               (let ((en (lookup (car args))))
+                 (when (and (pair? en) (>= (length args) 3) (string? (caddr args))
                             (member (caddr args) params))
-                   (add! (list (caddr args)))))))
+                   (for (e en) (for (k (cdr e)) (add! (caddr args) k)))))))
             ((memq tag '(macro xmacro func)) #f)
             ((known-primitive? tag) #f)
             (else (call! (symbol->string tag) args))))
@@ -2476,74 +2509,147 @@
     (visit body)
     out))
 
+(define (normalize-positions l)
+  ;; a canonical form (for the comparison of two results)
+  (define (kinds k) (sort k (lambda (a b) (string<? (symbol->string a) (symbol->string b)))))
+  (let ((idx (lambda (x) (cond ((number? x) x) ((eq? x 'all) 1000) (else 1001)))))
+    (sort (map (lambda (e) (cons (car e) (kinds (cdr e)))) l)
+          (lambda (a b) (< (idx (car a)) (idx (car b)))))))
+
+(define (positions-of d name lookup)
+  (let ((def (macro-definition d name)))
+    (if (not def)
+        '()
+        (let* ((params (macro-parameters def))
+               (hits (flow-of (car (reverse def)) params lookup)))
+          (normalize-positions
+           (append
+            (list-filter (map (lambda (h) (and (eq? (car h) 'var) (cons 'var (cdr h)))) hits) (lambda (x) x))
+            (if (eq? (car def) 'xmacro)
+                (let ((ks (apply append (map cdr (list-filter hits (lambda (h) (!= (car h) 'var)))))))
+                  (if (pair? ks) (list (cons 'all ks)) '()))
+                (let loop ((l params) (i 0) (acc '()))
+                  (cond ((null? l) (reverse acc))
+                        ((assoc (car l) hits)
+                         (loop (cdr l) (+ i 1) (cons (cons i (cdr (assoc (car l) hits))) acc)))
+                        (else (loop (cdr l) (+ i 1) acc)))))))))))
+
+(define (solve-danger! d name)
+  ;; the positions of @name and of the macros it reaches, solved together (cycles
+  ;; included) by a worklist that starts from nothing and grows
+  (let ((reach '()) (callers (make-ahash-table)) (cur (make-ahash-table)))
+    (let loop ((todo (list name)))
+      (when (pair? todo)
+        (let ((n (car todo)))
+          (if (or (member n reach) (ahash-ref danger-cache n) (not (macro-definition d n)))
+              (loop (cdr todo))
+              (let ((cs (called-names (car (reverse (macro-definition d n))))))
+                (set! reach (cons n reach))
+                (for (c cs) (ahash-set! callers c (cons n (or (ahash-ref callers c) '()))))
+                (loop (append (cdr todo) cs)))))))
+    (let ((lookup (lambda (n) (or (ahash-ref danger-cache n) (ahash-ref cur n) '()))))
+      (let loop ((queue (reverse reach)) (queued (make-ahash-table)))
+        (when (pair? queue)
+          (let* ((n (car queue)) (new (positions-of d n lookup)))
+            (ahash-remove! queued n)
+            (if (equal? new (or (ahash-ref cur n) '()))
+                (loop (cdr queue) queued)
+                (begin
+                  (ahash-set! cur n new)
+                  (let ((more (list-filter (or (ahash-ref callers n) '())
+                                           (lambda (c) (and (member c reach) (not (ahash-ref queued c)))))))
+                    (for (c more) (ahash-set! queued c #t))
+                    (loop (append (cdr queue) more) queued)))))))
+      (for (n reach) (ahash-set! danger-cache n (or (ahash-ref cur n) '()))))))
+
 (define (dangerous-positions d name)
-  ;; the positions (0, 1...) of the arguments of the macro @name that reach a
-  ;; sensitive place, ('all: all, because of a variable or an xmacro); () if none
+  ;; the places of the macro @name (a list of (position . kinds); `var': a
+  ;; variable, `all': every argument) that reach something sensitive; () if none
   ;; or if @name is not a macro
   (danger-tables! d)
-  (let ((c (ahash-ref danger-cache name)))
-    (cond ((eq? c 'busy) '())
-          (c c)
-          (else
-            (ahash-set! danger-cache name 'busy)
-            (let* ((def (macro-definition d name))
-                   (r (if (not def)
-                          '()
-                          (let* ((params (macro-parameters def))
-                                 (hits (flow-of d (car (reverse def)) params)))
-                            (cond ((memq 'var hits) '(all))
-                                  ((eq? (car def) 'xmacro) (if (pair? hits) '(all) '()))
-                                  (else
-                                    (let loop ((l params) (i 0) (acc '()))
-                                      (cond ((null? l) (reverse acc))
-                                            ((member (car l) hits) (loop (cdr l) (+ i 1) (cons i acc)))
-                                            (else (loop (cdr l) (+ i 1) acc))))))))))
-              (ahash-set! danger-cache name r)
-              r)))))
+  (when (not (ahash-ref danger-cache name))
+    (if (macro-definition d name)
+        (solve-danger! d name)
+        (ahash-set! danger-cache name '())))
+  (or (ahash-ref danger-cache name) '()))
 
-;; The standard macros that the content may call although they pass an argument
-;; to a sensitive place: their argument is a label, a key, a number or a text
-;; that the rules of the tags (name-tags, links) check where it is written. A
-;; macro that the document defines itself is never one of them.
+;; The standard macros that the content may call although they pass an argument to
+;; a link or a file: the arguments they pass on are checked where the call is written
+;; (check-safe-macro-arguments, from the places the analysis finds in them). A macro
+;; that the document defines itself is never one of them, nor one whose closure (the
+;; macros it calls, again and again) has a macro that the document defines: then it is
+;; analysed like any other.
 (define safe-macros
-  '("abstract-acm" "abstract-arxiv" "abstract-data" "abstract-keywords" "abstract-msc"
-    "abstract-pacs" "author-data" "author-email-note" "author-homepage-note"
-    "author-misc-note" "comma-separated" "semicolon-separated" "concat-tuple"
-    "deleted" "doc-data" "doc-footnote-text" "doc-note-text" "doc-note-ref"
-    "custom-footnote-text" "custom-note-ref" "marked" "overline" "underline"
-    "strike-through" "stressed" "todo" "todo*" "href" "slink" "hlink*" "include"
-    ;; sections (the title goes to the table of contents), lists and folds
-    "part" "part*" "chapter" "chapter*" "appendix" "appendix*" "section" "section*"
-    "subsection" "subsection*" "subsubsection" "subsubsection*" "paragraph" "paragraph*"
-    "subparagraph" "subparagraph*"
-    "itemize" "itemize-minus" "itemize-dot" "itemize-arrow" "enumerate" "enumerate-numeric"
-    "enumerate-roman" "enumerate-Roman" "enumerate-alpha" "enumerate-Alpha" "description"
-    "description-compact" "description-aligned" "description-dash" "description-long"
-    "folded" "folded-std" "folded-explain" "unfolded" "unfolded-std" "unfolded-explain"
-    "summarized" "summarized-std" "detailed" "detailed-std"
-    ;; the title of the slides of the beamer style
-    "tit" "title-left"))
+  '("author-affiliation-note" "author-email-note" "author-homepage-note"
+    "author-misc-note" "custom-footnote-text" "custom-note-ref" "custom-note-text"
+    "doc-footnote-text" "doc-note-ref" "doc-note-text"
+    "hlink*" "href" "slink" "include"
+    ;; the manuals (the tmdoc style)
+    "simple-link" "help-link" "hyper-link*" "tmdoc-link" "tmdoc-include"))
+
+;; What the analysis cannot give for a macro of the table, checked all the same where
+;; the call is written (position, kinds): `tmdoc-link' gives its destination to
+;; `tmdoc-file' (a search of the manuals by a name), `tmdoc-include' to a `find-file'.
+(define safe-extra-checks
+  '(("tmdoc-link" (1 link)) ("tmdoc-include" (0 file))))
+
+;; The macros of the table that have, for the analysis, a kind of place other than
+;; link, file and pass (the test checks that there are no others)
+(define safe-code-allowed '("tmdoc-link" "tmdoc-include"))
+
+(define (closure-has-local? d name)
+  ;; does a macro that the document defines lie in the closure of @name?
+  (let ((c (ahash-ref void-cache name)))
+    (cond ((eq? c 'yes) #t)
+          ((eq? c 'no) #f)
+          (else
+            (let ((seen (make-ahash-table)) (found #f))
+              (let loop ((todo (list name)))
+                (when (and (pair? todo) (not found))
+                  (let ((n (car todo)))
+                    (cond ((ahash-ref seen n) (loop (cdr todo)))
+                          ((local-macro? n) (set! found #t))
+                          (else
+                            (ahash-set! seen n #t)
+                            (let ((def (macro-definition d n)))
+                              (loop (if def
+                                        (append (cdr todo) (called-names (car (reverse def))))
+                                        (cdr todo)))))))))
+              (ahash-set! void-cache name (if found 'yes 'no))
+              found)))))
+
+(define (safe-macro? d tag)
+  ;; is @tag a macro of the table (not one that the document redefines, nor one
+  ;; that reaches a macro of the document)?
+  (let ((name (symbol->string tag)))
+    (danger-tables! d)
+    (and (member name safe-macros)
+         (not (closure-has-local? d name)))))
 
 (define (dangerous-call? d tag)
   ;; does the content call, with the tag @tag, a macro that is dangerous?
   (let ((name (symbol->string tag)))
     (danger-tables! d)
-    (and (not (and (member name safe-macros) (not (local-macro? name))))
+    (and (not (safe-macro? d tag))
          (pair? (dangerous-positions d name)))))
 
-(define computed-name-tags
-  '(compound apply expand expand* hide-expand map-args hybrid merge begin end))
-
-(define (computed-names? t)
-  ;; does the tree reach a macro or a variable by a name that is computed (a
-  ;; compound, a merge, a value of something that is not a name)? Then the users of
-  ;; a definition cannot be found by looking for its name.
-  (cond ((tree-atomic? t) #f)
-        ((memq (tree-label t) computed-name-tags) #t)
-        ((and (memq (tree-label t) '(value quote-value or-value))
-              (or (= (tree-arity t) 0) (not (tree-atomic? (tree-ref t 0)))))
-         #t)
-        (else (list-find (tree-children t) computed-names?))))
+(define (check-safe-macro-arguments st base)
+  ;; the arguments that a macro of the table passes to a link or a file are
+  ;; checked with the rules of the link and file tags
+  (let ((tag (car st)) (args (cdr st)))
+    (for (en (append (dangerous-positions safety-doc (symbol->string tag))
+                     (let ((x (assoc (symbol->string tag) safe-extra-checks))) (if x (cdr x) '()))))
+      (when (not (eq? (car en) 'var))
+        (let ((as (if (eq? (car en) 'all)
+                      args
+                      (if (< (car en) (length args)) (list (list-ref args (car en))) '()))))
+          (for (a as)
+            (when (memq 'link (cdr en)) (check-link-destination tag a))
+            (when (memq 'file (cdr en))
+              (if (string? a)
+                  (check-file-argument tag a base #f)
+                  (violate! (string-append "a `" (symbol->string tag)
+                                             "' has a file that is not written as a plain name: refused (nothing was changed)"))))))))))
 
 (define (definition-node? x)
   (and (tree-compound? x) (memq (tree-label x) definitional-tags) #t))
@@ -2556,9 +2662,9 @@
 
 (define (inside-definition? d t self?)
   ;; is @t (if @self?) or one of its ancestors inside the document body a definition?
-  (let loop ((x (if self? t (tree-up t))) (n 0))
-    (and x (< n 200) (tree? x) (inside-body? d x) (not (body-root? d x))
-         (or (definition-node? x) (loop (tree-up x) (+ n 1))))))
+  (let loop ((x (if self? t (tree-up t))))
+    (and x (tree? x) (inside-body? d x) (not (body-root? d x))
+         (or (definition-node? x) (loop (tree-up x))))))
 
 (define (guard-pre d t delete? . opt)
   ;; before an edit of the node @t (or of the document: #f): what is needed to
@@ -2579,14 +2685,9 @@
     (let ((viol (and blk i (block-violations d blk i))))
       (when (and viol (over-budget? viol))
         (tool-error "the block does not evaluate within the budget: the content filter refuses edits in it (nothing was changed)"))
-      (let* ((names (and (pair? defs) (filter-map assign-name-of defs)))
-             (closure (and names (definition-closure d names)))
-             (sel (and names (if (and closure (not (computed-names? (doc-body d))))
-                                 (lambda (b) (mentions? b closure))
-                                 #f))))
-        (list (and blk (ptr blk)) viol (assigns-signature d)
-              (and (pair? defs) (document-violations d sel))
-              sel (and closure names))))))
+      ;; (the definitions cannot be changed by the content, so the rest of the
+      ;; document is not compared: only the block of the edit and the new blocks)
+      (list (and blk (ptr blk)) viol (assigns-signature d)))))
 
 (define (filter-map f l)
   (let loop ((l l) (acc '()))
@@ -2626,23 +2727,7 @@
         (when (over-budget? after) (guard-fail! (list over-budget-reason)))
         (when (pair? new) (guard-fail! new))))
     (when (!= (assigns-signature d) (caddr pre))
-      (let ((full-before (cadddr pre)) (sel (list-ref pre 4)) (names (list-ref pre 5)))
-        (when (not full-before)
-          (guard-fail! (list "it changes the definitions of the document")))
-        ;; (the names that the edited definitions have now, and what uses them)
-        (let* ((now (if (and blk (tree? blk) (inside-body? d blk) (not (body-root? d blk)))
-                        (filter-map assign-name-of (assign-nodes (top-level-ancestor d blk)))
-                        '()))
-               (names2 (append (or names '()) now))
-               (closure2 (and sel (definition-closure d names2))))
-          (when (and sel (not closure2))
-            (guard-fail! (list "it changes a definition of the style")))
-          (when (and sel (computed-names? (doc-body d)))
-            (guard-fail! (list "the document reaches macros by computed names after the edit: the definitions cannot be checked by their users")))
-          (let ((after (document-violations d (if sel (lambda (b) (mentions? b closure2)) #f))))
-            (when (over-budget? after) (guard-fail! (list over-budget-reason)))
-            (let ((new (new-violations full-before after)))
-              (when (pair? new) (guard-fail! new)))))))))
+      (guard-fail! (list "it changes the definitions of the document")))))
 
 (define edit-reason #f)
 (define current-guard #f)
@@ -3029,7 +3114,9 @@
 (define (text-leaves t)
   ;; the strings of the visible text of @t
   (cond ((tree-atomic? t) (list t))
-        ((in? (tree-label t) skipped-text-tags) '())
+        ((or (in? (tree-label t) skipped-text-tags) (memq (tree-label t) definitional-tags)
+             (opaque-node? t))
+         '())
         (else (append-map text-leaves (tree-children t)))))
 
 (define (occurrences s what)
@@ -3094,6 +3181,8 @@
             (else
               (let* ((leaf (car (car hits))) (pos (cdr (car hits)))
                      (dist (disturbances d)))
+                (when (or (inside-definition? d leaf #t) (inside-opaque? d leaf #t))
+                  (tool-error "the text is inside a definition, or code or text for another program: the content filter refuses edits in it (nothing was changed)"))
                 (set-guard! d t (lambda () (list t)) #f #f 'text)
                 (run-edit! d
                   (lambda ()
@@ -3628,3 +3717,18 @@
                           (lambda (e) (pair? (cdr e))))))
       (reset-danger!)
       r)))
+
+(tm-define (mcp-safe-report doc)
+  (:synopsis "For the tests: the macros of the table of standard macros that the document's style defines: (name number-of-parameters positions), and the names allowed other kinds")
+  (let ((d (or (find-doc doc) (list "probe" (system->url doc) doc))))
+    (reset-danger!)
+    (danger-tables! d)
+    (let ((r (filter-map
+              (lambda (n)
+                (let ((def (macro-definition d n)))
+                  (and def
+                       (list n (if (eq? (car def) 'xmacro) -1 (length (macro-parameters def)))
+                             (dangerous-positions d n)))))
+              safe-macros)))
+      (reset-danger!)
+      (list r safe-code-allowed))))
