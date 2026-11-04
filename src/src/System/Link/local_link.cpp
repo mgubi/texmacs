@@ -651,22 +651,33 @@ shared_lock_valid (int id, string path) {
 }
 
 // Make the file again and lock it, in place of the lock @id: 1 if it worked
-// (nobody had it), 0 if another process holds a lock there (then that one is
-// the host, and the lock @id is still the old one), -1 for any other error
-// (no descriptor left, no room: nothing is known, try again).
+// (nobody had it), 0 if the lock is lost (another process holds a lock there,
+// then that one is the host; or the file can not be made: no such folder, not
+// allowed; or the file at the path is another one than the file of the lock),
+// -1 for any other error (no descriptor left, no room: nothing is known; the
+// caller tries again a few times, and then takes it for lost). The lock @id
+// is still the old one when it is not 1.
 int
 shared_lock_renew (int id, string path) {
 #ifndef OS_MINGW
-  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return -1;
+  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return 0;
   c_string p (path);
+  // (when something other is wrong: is the file at the path another one?)
+  struct stat a, b;
+  bool other= (fstat (shared_lock_fds[id], &a) == 0 &&
+               stat ((char*) p, &b) == 0 &&
+               (a.st_dev != b.st_dev || a.st_ino != b.st_ino));
   int fd= open ((char*) p, O_RDWR | O_CREAT, 0600);
-  if (fd < 0) return -1;
+  if (fd < 0) {
+    if (errno == ENOENT || errno == ENOTDIR || errno == EACCES) return 0;
+    return other? 0: -1;
+  }
   int fl= fcntl (fd, F_GETFD, 0);
   if (fl >= 0) fcntl (fd, F_SETFD, fl | FD_CLOEXEC);
   if (flock (fd, LOCK_EX | LOCK_NB) != 0) {
     int e= errno;
     ::close (fd);
-    return e == EWOULDBLOCK? 0: -1;
+    return (e == EWOULDBLOCK || other)? 0: -1;
   }
   ::close (shared_lock_fds[id]);
   shared_lock_fds[id]= fd;

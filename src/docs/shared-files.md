@@ -342,12 +342,17 @@ checks that the two documents end equal. Running them with
   not on the disk is then replaced by the new host's document (never combined
   with it). It is saved whole in the recovered folder with a notice, and has to
   be merged by hand.
-- **Up to one second with two hosts after an external removal of a lock
-  file.** The host checks once a second that its lock file is the file at the
-  path. If someone removes the file (a cleaner, `rm`) and another process makes
-  and locks a new one in that second, both host until the first check: the
-  first then stops, saves its document in the recovered folder and joins the
-  other. (Lock files are never removed by TeXmacs, and are touched hourly.)
+- **About a second with two hosts after an external removal of a lock
+  file, longer if the host is busy or the system cannot open files.** The host
+  checks once a second that its lock file is the file at the path. If someone
+  removes the file (a cleaner, `rm`) and another process makes and locks a new
+  one before that check, both host until it: the first then stops, saves its
+  document in the recovered folder and joins the other. A check that comes late
+  (a host busy typesetting) makes the window longer. When the file cannot be made
+  again, the answer is immediate if the reason is known (no such folder, not
+  allowed, another file at the path: the host steps down); for other errors
+  (no descriptor left, no room) the host tries at each check and steps down after
+  5, that is about 5 s.
 
 - The cursors of the participants, the names of the participants, the menus.
 - Two processes that start to host at the same instant are separated by the

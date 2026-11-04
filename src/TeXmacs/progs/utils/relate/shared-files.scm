@@ -137,8 +137,8 @@
 ;; lock without waiting; failing means that another process hosts the file.
 ;;
 ;; The entry f-<hash>.entry only tells how to reach the host: (entry key port
-;; token pid interactive host-id npeers), written (whole, replaced atomically) by the
-;; holder of the lock after it has got it. It is not trusted for anything
+;; token pid interactive host-id npeers), written (whole, replaced atomically)
+;; by the holder of the lock after it has got it. It is not trusted for anything
 ;; else: a stale entry (the host is gone) is found by the lock being free.
 
 (define (token=? a b)
@@ -621,7 +621,10 @@
 
 (define (pending-start! name)
   ;; the buffer of a file whose host is awaited
-  (ahash-set! sf-was-read-only (url->string name) (buffer-read-only? name))
+  ;; (the state before the first time only: later calls find it read-only)
+  (when (not (ahash-ref sf-was-read-only (url->string name)))
+    (ahash-set! sf-was-read-only (url->string name)
+                (if (buffer-read-only? name) 'yes 'no)))
   (buffer-set-read-only name #t)
   (set-message "Shared file: connecting to the process which had this file open (read-only for a moment)"
                "Shared file"))
@@ -629,7 +632,7 @@
 (define (pending-done! name)
   (ahash-remove! sf-pending (url->string name))
   (when (buffer-exists? name)
-    (buffer-set-read-only name (and (ahash-ref sf-was-read-only (url->string name)) #t)))
+    (buffer-set-read-only name (== (ahash-ref sf-was-read-only (url->string name)) 'yes)))
   (ahash-remove! sf-was-read-only (url->string name)))
 
 (define (pending-poll!)
@@ -641,7 +644,8 @@
                       (list name key deadline old-token (+ now 100)))
           (cond
             ((not (buffer-exists? name))
-             (ahash-remove! sf-pending (url->string name)))
+             (ahash-remove! sf-pending (url->string name))
+             (ahash-remove! sf-was-read-only (url->string name)))
             ((not (lock-free? key))
              ;; someone hosts: join it when its entry is new
              (let ((e (read-entry key)))
@@ -983,9 +987,18 @@
         (cond ((not path) (host-stop-sharing! sf))
               ((not (shared-lock-valid? h path))
                (with r (shared-lock-renew h path)
-                 (cond ((== r 1) (stat! 'lock-renewed) (host-write-entry! sf))
+                 (cond ((== r 1) (stat! 'lock-renewed)
+                        (sf-put! sf 'renew-errors 0)
+                        (host-write-entry! sf))
                        ((== r 0) (host-lost-lock! sf))
-                       (else (stat! 'lock-renew-error)))))      ; (try again)
+                       ;; any other error (no descriptor, no room): try again at
+                       ;; the next tick, but not for ever: another process may
+                       ;; be hosting; after 5 times the lock is taken for lost
+                       (else
+                         (stat! 'lock-renew-error)
+                         (sf-put! sf 'renew-errors (+ 1 (or (sf-get sf 'renew-errors) 0)))
+                         (when (>= (sf-get sf 'renew-errors) 5)
+                           (host-lost-lock! sf))))))
               ((not (url-exists? (string->url (entry-path key))))
                (host-write-entry! sf)))
         (when (and path (sf-host? sf) (> now (or (sf-get sf 'touch-at) 0)))
@@ -1626,7 +1639,10 @@
     ;; with no connection to a host (it is being sought, or does not answer)
     ;; what the person has here may be on no disk and in no host: the whole
     ;; document is saved, with a notice, which also covers a queued Save
-    (when (not (and c (local-alive? c)))
+    (when (and (not (and c (local-alive? c)))
+               (or (buffer-modified? (sf-buffer sf))
+                   (nnull? (sf-get sf 'pending)) (sf-get sf 'inflight)
+                   (sf-get sf 'save-wanted)))
       (let ((file (save-recovered-copy! sf)))
         (stat! 'closed-unconnected)
         (set-message

@@ -1,6 +1,6 @@
 ;; A participant that has no host (its host died, and a process which is not
-;; TeXmacs holds the lock) does not write the file when it is asked to: the
-;; Save is queued, and done when the participant becomes the host.
+;; TeXmacs holds the lock) and is closed with something that is not saved
+;; saves its whole document in the recovered folder, with a notice.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (A-steps)
