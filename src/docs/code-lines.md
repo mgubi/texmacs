@@ -146,7 +146,10 @@ cut at the nodes of the top level which start a line
 is one part, which an edit parses again incrementally (about 0.4 s for
 200000 lines), and which `group_update` tried to cut again at each key,
 parsing it whole (1 s more): a fix of tree-sitter of its own, outside this
-work, the same with and without the block: #811.
+work, the same with and without the block: #811. A file which had been typeset as paragraphs
+once (a line of paragraphs inserted and removed, Lines of code switched)
+was 3 times slower per key in a block (45 ms), tree-sitter's colours of all
+the lines being copied at each key: #811 too (11 ms).
 
 ## Known differences
 
@@ -160,6 +163,12 @@ work, the same with and without the block: #811.
   has nothing after its lines.
 - **A line does not change the environment** of the lines after it (an
   `assign` in a line, `exec_until` of the block does nothing).
+- **`get-env "code-lines"`** at a place inside a line or a paragraph of a
+  document typeset with code-lines gives `true`, while what is there is
+  typeset with `false`: the environment at a place is made from the
+  changes of the tags along the path (`typeset_exec_until`, the DRD), which
+  know nothing of this rule. Nothing reads it there (the menus read the
+  initial environment, `get-init`).
 
 ## Tests
 

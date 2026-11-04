@@ -257,6 +257,7 @@ public:
   void initialize ();
   void initialize_acc ();
   void set_mode (int m);
+  int  wanted_mode ();
 
   void notify_assign (path p, tree u);
   void notify_insert (path p, tree u);
@@ -274,6 +275,14 @@ public:
 
 bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
   bridge_rep (ttt, st, ip), mode (DOC_UNKNOWN), big_body (false) {}
+
+int
+bridge_document_rep::wanted_mode () {
+  // the mode of the document in the environment where it is: lines of code
+  // when code-lines is true, unless it has no lines or a line of paragraphs
+  return env->read ("code-lines") == "true" && N(st) > 0 &&
+         !has_paragraphs_line (st)? DOC_CODE: DOC_PARAGRAPHS;
+}
 
 void
 bridge_document_rep::set_mode (int m) {
@@ -459,8 +468,8 @@ bridge_document_rep::notify_change () {
 
 void
 bridge_document_rep::my_exec_until (path p) {
+  set_mode (wanted_mode ());
   if (mode == DOC_CODE) { code->my_exec_until (p); return; }
-  set_mode (DOC_PARAGRAPHS);
   if (is_nil (acc)) {
     int i;
     for (i=0; i<p->item; i++)
@@ -472,9 +481,10 @@ bridge_document_rep::my_exec_until (path p) {
 
 bool
 bridge_document_rep::my_typeset_will_be_complete () {
+  // (not typeset yet, or in another mode now: the bridges of the mode, the
+  // paragraphs or the lines, will all be made)
+  if (mode == DOC_UNKNOWN || mode != wanted_mode ()) return true;
   if (mode == DOC_CODE) return code->my_typeset_will_be_complete ();
-  // (not typeset yet: the paragraphs would all be made, as the lines)
-  if (mode == DOC_UNKNOWN) return (status & VALID_MASK) == CORRUPTED;
   if (is_nil (acc)) {
     int i, n= N(brs);
     for (i=0; i<n; i++)
@@ -516,8 +526,7 @@ bridge_document_rep::my_typeset (int desired_status) {
   // would have a line which is not in the tree; so is a document with a
   // line of paragraphs, see has_paragraphs_line)
   bool code_lines= (env->read ("code-lines") == "true");
-  set_mode (code_lines && N(st) > 0 && !has_paragraphs_line (st)?
-            DOC_CODE: DOC_PARAGRAPHS);
+  set_mode (wanted_mode ());
   if (mode == DOC_CODE) {
     code->typeset (desired_status);
     st= code->st;
