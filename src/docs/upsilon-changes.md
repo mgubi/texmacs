@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 3 November 2026
 
+- **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,
+  so `TeXmacs -headless -x ...` showed its windows and its icon in the Dock
+  and quit only on `(quit-TeXmacs)`; it now runs without a window, as the Qt
+  and Vue builds do, and quits after the commands given with `-x` or `-c`;
+  a dialog or the print panel asked for by a headless script is answered as
+  cancelled instead of waiting.
 - **Closing a program file** gives back the memory of its colours and its
   syntax tree: they stayed in the cache of tree-sitter until newer files
   pushed them out, about 5 MB for each close and reopen of a one-line 438 KB

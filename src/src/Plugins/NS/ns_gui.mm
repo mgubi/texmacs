@@ -1515,8 +1515,9 @@ ns_gui_rep::event_loop () {
       if (sel && [NSApp sendAction: sel to: nil from: nil]) return nil;
       return e;
     }];
-  if (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_SNAPSHOT") != "" ||
-      get_env ("TEXMACS_NS_BENCH") != "") {
+  if (!is_headless () &&
+      (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_SNAPSHOT") != "" ||
+       get_env ("TEXMACS_NS_BENCH") != "")) {
     // NOTE: when testing, TeXmacs is started in the background; the window
     // must be the key window, otherwise the editor loses its focus
     [NSApp activateIgnoringOtherApps: YES];
@@ -1747,6 +1748,10 @@ void gui_open (int& argc, char** argv)
   // QTTEXMACS: without this, they are all 0, a transparent black, which is
   // what the unknown color names give (#656)
   initialize_colors ();
+  // headless: also when the application was made earlier (the spell service
+  // or the images of the MacOS plugin may make it before the interface)
+  if (NSApp && is_headless ())
+    [NSApp setActivationPolicy: NSApplicationActivationPolicyProhibited];
   if (!NSApp) {
     // initialize app (an instance of TMApplication)
     [TMApplication sharedApplication];
