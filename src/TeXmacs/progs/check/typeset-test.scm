@@ -3396,6 +3396,45 @@
   (incl-clear-dir))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A macro which calls itself
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The evaluator and the typesetter expand a macro by recursion: one which
+;; calls itself used to overflow the stack of the process (a crash, with a
+;; stack_guard.hpp check now: an error when less than 1 MB is left).
+
+(define (test-runaway-macro-recursion)
+  (check-group "macro that calls itself")
+  (let ((def '(assign "loopm" (macro "x" (loopm (arg "x"))))))
+    ;; the evaluator
+    (check= (tree->stree (texmacs-expand `(concat ,def (loopm "a"))))
+            `(concat ,def (error "macro nesting too deep")))
+    ;; the typesetter, in a paragraph and as a block of its own: the
+    ;; document is typeset, and the error is a text of the page
+    (with-typeset-body
+     `(document ,def (concat "before " (loopm "a") " after") (loopm "b")
+                "end")
+     (lambda ()
+       (check-false (typeset-failed-buffer? (current-buffer)))
+       (check= (tree->stree (buffer-tree))
+               `(document ,def (concat "before " (loopm "a") " after")
+                          (loopm "b") "end"))
+       (check-true (> (get-page-count) 0))))
+    ;; the box of the error is not empty
+    (check-true (> (car (box `(concat ,def (loopm "a")) "w")) 0))
+    ;; a deep recursion which ends is not cut: 100 levels
+    (check= (tree->stree
+             (texmacs-expand
+              '(concat (assign "cnt" (macro "n" (if (greater (arg "n") "0")
+                                                    (cnt (minus (arg "n") "1"))
+                                                    "done")))
+                       (cnt "100"))))
+            '(concat (assign "cnt" (macro "n" (if (greater (arg "n") "0")
+                                                  (cnt (minus (arg "n") "1"))
+                                                  "done")))
+                     "done"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3458,4 +3497,5 @@
   (test-unknown-inputs-in-blocks)
   (test-zoom)
   (test-included-files)
+  (test-runaway-macro-recursion)
   (check-end))

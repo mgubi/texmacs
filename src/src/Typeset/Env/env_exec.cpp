@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -733,6 +734,9 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
+    // (a macro that calls itself: an error tree, not a stack overflow)
+    if (stack_nearly_full ())
+      return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);
