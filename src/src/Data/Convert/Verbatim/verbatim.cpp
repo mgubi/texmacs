@@ -567,8 +567,9 @@ source_document_to_tree (string s) {
                     tree (ASSOCIATE, "source-line-ends", ends),
                     tree (ASSOCIATE, "source-indent", indent));
   // (the lines typeset as a block of lines: the variable code-lines, see
-  // code_lines_wanted and bridge_code.cpp)
-  if (is_func (body, DOCUMENT) && code_lines_wanted ())
+  // code_lines_wanted and bridge_code.cpp; also for a file of one line or
+  // none, which the editor makes a document of, and which may grow)
+  if (code_lines_wanted ())
     init << tree (ASSOCIATE, "code-lines", "true");
   return tree (DOCUMENT, compound ("body", body), compound ("initial", init));
 }

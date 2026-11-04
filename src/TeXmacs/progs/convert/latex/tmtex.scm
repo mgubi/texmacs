@@ -2427,8 +2427,26 @@
         (else (string-append (tmtex-tt (car l)) "\n"
                              (tmtex-tt-document (cdr l))))))
 
+;; the tabs of a line of verbatim content (<#9>: the lines of a text or a
+;; source file keep their tabs, see verbatim.cpp) as spaces up to the next
+;; stop, every 8 columns; a character of Cork (<...>) is one column
+(define (tmtex-expand-tabs s)
+  (if (< (string-search-forwards "<#9>" 0 s) 0) s
+      (let loop ((i 0) (col 0) (acc '()))
+        (if (>= i (string-length s))
+            (apply string-append (reverse acc))
+            (let* ((j (if (char=? (string-ref s i) #\<)
+                          (with k (string-search-forwards ">" i s)
+                            (if (< k 0) (+ i 1) (+ k 1)))
+                          (+ i 1)))
+                   (c (substring s i j)))
+              (if (== c "<#9>")
+                  (with w (- 8 (modulo col 8))
+                    (loop j (+ col w) (cons (make-string w #\space) acc)))
+                  (loop j (+ col 1) (cons c acc))))))))
+
 (define (tmtex-tt x)
-  (cond ((string? x) (tmtex-verb-string x))
+  (cond ((string? x) (tmtex-verb-string (tmtex-expand-tabs x)))
         ((== x '(next-line)) "\n")
         ((func? x 'document) (tmtex-tt-document (cdr x)))
         ((func? x 'para) (tmtex-tt-document (cdr x)))

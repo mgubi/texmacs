@@ -22,8 +22,10 @@ have the details, and the problems go to the
   work as before. Tabs and control characters are kept and saved as they
   were; Format > Source code shows the invisible characters and can shrink
   formulas or images to the height of a line. Format > Source code > Lines
-  of code switches a document between lines and paragraphs, and the
-  preference `code lines` set to `off` opens files with a paragraph per line.
+  of code switches a document between lines and paragraphs, and Preferences
+  > Convert > Verbatim can open files with a paragraph per line. Texts
+  keep their tabs when they are saved, and LaTeX exports the tabs of texts
+  and source files as spaces.
   Files saved as TeXmacs documents open in other versions as ordinary
   paragraphs (#710, #797).
 - **Up and Down in very long documents** (more than about 1300 pages) no

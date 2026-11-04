@@ -29,11 +29,15 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
   loaded) and `verbatim_document_to_tree` (texts) set the variable unless
   the preference `code lines` is `off`; `TEXMACS_CODE_LINES=0` or `1`
   overrides it (tests). `code_lines_wanted` in
-  `Data/Convert/Verbatim/verbatim.cpp`. Format › Source code › Lines of code
-  switches it (`toggle-code-lines`).
+  `Data/Convert/Verbatim/verbatim.cpp`; also a file of one line or none.
+  Preferences › Convert › Verbatim (Source code) has the preference. Format ›
+  Source code › Lines of code switches a document (`toggle-code-lines`, in
+  `generic/format-menu.scm`, also offered for texts: `code-lines-text?`); a
+  source file or a text is not modified by it, since it does not save it.
 - **Saving.** The lines are saved as before; `tree_to_source` gives the file
   back byte for byte (tabs and the other control characters are `<#9>`,
-  `<#x>`).
+  `<#x>`; texts keep them too now). LaTeX writes the tabs of verbatim
+  content as spaces up to the next stop of 8 (`tmtex-expand-tabs`).
 - **The choice of the bridge** (`Typeset/Bridge/bridge_document.cpp`). The
   bridge of a document reads `code-lines` when it is typeset (the variable is
   then one of its inputs, so that a change of it typesets the document
