@@ -328,6 +328,7 @@ System/Misc/data_cache.cpp
 System/Misc/fakedlopen.c
 System/Misc/fast_alloc.cpp
 System/Misc/persistent.cpp
+System/Misc/stack_guard.cpp
 System/Misc/sys_utils.cpp
 Texmacs/Data/new_buffer.cpp
 Texmacs/Data/new_project.cpp

@@ -1562,6 +1562,16 @@ def s_styles(w):
     check("a macro assigned in another document: unknown", e and "unknown tag" in str(r))
     e, r = ins("d1", "<strong|x> <em|y>")
     check("the macros of the standard style are accepted", not e)
+    # the book style: chapter, part, appendix (the evaluator cannot do some counters of
+    # the style outside the typesetter; that is not a danger)
+    bk = os.path.join(w, "b.tm")
+    with open(bk, "w") as fh:
+        fh.write("<TeXmacs|2.1.5>\n\n<style|<tuple|book>>\n\n<\\body>\n  Text.\n</body>\n")
+    e, vb = m.tool("open_document", path=os.path.realpath(bk))
+    for what, content in (("chapter", '(chapter "A chapter")'), ("part", '(part "A part")'),
+                          ("appendix", '(appendix "An appendix")'), ("section", '(section "A section")')):
+        e, r = m.tool("insert", document=vb["document"], where="last", content=content, format="stree")
+        check("book style: %s is accepted" % what, not e and r["status"] == "applied")
     check("exit 0", m.close() == 0)
 
 
@@ -1589,6 +1599,7 @@ def s_guard(w):
         "  A paragraph with <hlink|a link|https://ok.org> in it.\n\n"
         "  A label here<label|lab1> and an image <image|pic.png|1par|||>.\n\n"
         "  <with|color|red|Red paragraph.>\n\n"
+        "  Bad link <hlink|t|javascript:x> here and <action|click|(system \"x\")> too.\n\n"
         "  Plain paragraph.\n")
     write_tm(f, body)
     f = os.path.realpath(f)
@@ -1715,6 +1726,23 @@ def s_guard(w):
     check("an edit of a definition under heavy uses is refused within the budgets (%.1f s)" % dt, e and dt < 100)
     r2 = m.request("ping")
     check("and the server is alive (the watchdog stops a process above 2 GB)", r2 is not None and "result" in r2)
+    # violations of the person that stay: sibling edits are accepted, a change of the address is not
+    badb = block("Bad link")
+    check_applied("an edit of the text around a javascript link of the person", "edit_text", node=badb["handle"], old="here and", new="there and")
+    check_applied("an insertion after such a block", "insert", anchor=badb["handle"], where="after", content="Inserted after.")
+    bl = node_in("Bad link", "hlink")
+    check_refused("a change of the address of that link", "replace", node=child(bl["handle"], 1)["handle"], content="javascript:y")
+    # a macro reached by a computed name: the definition cannot be checked by its users
+    cf = os.path.join(root, "c.tm")
+    write_tm(cf, "  <assign|url|https://ok.org>\n\n  <assign|foo|<macro|x|<hlink|t|<value|url>>>>\n\n"
+                 "  <compound|<merge|fo|o>|1>\n\n  Text here.\n")
+    e, vc = m.tool("open_document", path=os.path.realpath(cf))
+    dc = vc["document"]
+    t = m.tool("read", document=dc, format="text", max_size=100000)[1]
+    ua = [c for c in t["children"] if c["tag"] == "assign"][0]
+    leaf = m.tool("read", document=dc, node=ua["handle"], format="text")[1]["children"][1]
+    e, r = m.tool("replace", document=dc, node=leaf["handle"], content="javascript:alert(1)")
+    check("a definition used through a computed name: the edit to javascript: is refused", e and "content filter" in str(r))
     # set of the person: the context of the blocks after it
     t = m.tool("read", document="d1", format="text", max_size=100000)[1]
     st = [c for c in t["children"] if c["tag"] == "set"]
@@ -1790,6 +1818,29 @@ def s_recursion(w):
     except subprocess.TimeoutExpired:
         p.kill()
         out = ""
+    deep = os.path.join(w, "deep.tm")
+    inner = "deepest"
+    for i in range(100):
+        inner = "<\\itemize>\n<item>level %d\n\n%s\n</itemize>" % (i, inner)
+    write_tm(deep, inner + "\n")
+    env2 = dict(env)
+    env2["RECURSION_FILE"] = os.path.realpath(deep)
+    env2["RECURSION_PDF"] = os.path.join(os.path.realpath(w), "deep.pdf")
+    p2 = subprocess.Popen([BIN, "-headless", "-x", '(load "%s")' % os.path.join(HERE, "recursion-probe.scm")],
+                          env=env2, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    procs.append(p2)
+    try:
+        out2 = p2.communicate(timeout=100)[0].decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        p2.kill()
+        out2 = ""
+    check("100 nested itemize levels typeset and export", "EXPORT-OK" in out2 and p2.returncode == 0)
+    try:
+        txt = subprocess.run(["mutool", "draw", "-F", "txt", "-o", "-", env2["RECURSION_PDF"], "1-99"],
+                             capture_output=True, text=True, timeout=60).stdout
+        check("and no level is replaced by an error box", "level 99" in txt and "nesting" not in txt)
+    except Exception:
+        pass
     check("typesetting does not crash", "TYPESET-OK" in out)
     check("export to PDF does not crash", "EXPORT-OK" in out and os.path.exists(env["RECURSION_PDF"]))
     check("exit status 0", p.returncode == 0)

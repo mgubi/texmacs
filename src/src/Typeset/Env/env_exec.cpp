@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -217,13 +218,12 @@ texmacs_exec (edit_env env, tree cmd) {
 // writes): exec_budget_start (n) makes the evaluator give an error tree after
 // n steps (a macro that calls its argument twice, ten times nested, would take
 // a thousand years), exec_budget_end () gives what is left (negative if the
-// limit was reached). The nesting of the macros is limited always, here and in
-// the typesetter (concat_macro.cpp, bridge_compound.cpp): a macro that calls
-// itself would else overflow the stack of the process, which then crashes.
+// limit was reached). The recursion of the macros stops with an error tree when
+// the stack is nearly full (stack_guard.hpp), here and in the typesetter
+// (concat_macro.cpp, bridge_compound.cpp): a macro that calls itself would else
+// overflow the stack of the process, which then crashes.
 static bool exec_budget_on= false;
 static long exec_budget_left= 0;
-static int  exec_macro_depth= 0;
-static const int EXEC_MACRO_DEPTH_LIMIT= 1200;
 
 void
 exec_budget_start (int n) {
@@ -764,7 +764,7 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
-    if (exec_macro_depth >= EXEC_MACRO_DEPTH_LIMIT)
+    if (stack_nearly_full ())
       return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
@@ -781,9 +781,7 @@ edit_env_rep::exec_compound (tree t) {
 	macro_arg->item (f[i]->label)= st;
 	macro_src->item (f[i]->label)= obtain_ip (st);
       }
-    exec_macro_depth++;
     tree r= exec (f[n]);
-    exec_macro_depth--;
     macro_arg= macro_arg->next;
     macro_src= macro_src->next;
     return r;

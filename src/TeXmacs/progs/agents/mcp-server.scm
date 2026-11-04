@@ -1447,7 +1447,7 @@
          (when (not (and (file-name-ok? a base web?)
                          (name-chars-ok? a (if (url-scheme a) 'address 'file))))
            (violate! (string-append "the tag `" (symbol->string tag) "' refers to the file `"
-                                      (utf8-prefix (u8 a) 60)
+                                      (u8 a)
                                       "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)"))))
         (else
           (violate! (string-append "the tag `" (symbol->string tag)
@@ -1657,7 +1657,7 @@
                           (path-allowed? p)
                           (inside-folder? p (document-folder base))))
              (violate! (string-append "the content expands to a `" (symbol->string tag)
-                                        "' of the file `" (utf8-prefix (u8 a) 60)
+                                        "' of the file `" (u8 a)
                                         "', outside the folders of the server (or of the document): refused (nothing was changed)")))))
         (else (check-file-argument tag a base (and (memq tag web-file-tags) #t)))))
 
@@ -1671,41 +1671,56 @@
     ((pair? t)
      (let ((tag (car t)) (args (cdr t)))
        (for (c args) (check-expanded c base))
-       (set! cur-node t)
+       ;; (what the evaluator makes has generated ids: a violation here is told
+       ;; by its reason, which carries the destination, the file or the command)
+       (set! cur-node #f)
        (cond
          ((and (eq? tag 'link) (>= (length args) 3))
           (let* ((dest (car (reverse args))) (u (url-destination dest)))
             (cond ((func? dest 'script)
                    (when (not (and (pair? (cdr dest)) (member (cadr dest) allowed-scripts)))
-                     (violate! "the content expands to a link that runs a script: refused (nothing was changed)")))
+                     (violate! (string-append "the content expands to a link that runs a script: "
+                                              (if (and (pair? (cdr dest)) (string? (cadr dest))) (u8 (cadr dest)) "?")
+                                              " (nothing was changed)"))))
                   ((not u)
                    (when (and (pair? dest) (not (memq (car dest) '(id tuple))))
                      (violate! "the content expands to a link whose destination is not plain text: refused (nothing was changed)")))
                   ((or (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
-                   (violate! (string-append "the content expands to a link to `" (utf8-prefix (u8 u) 60)
+                   (violate! (string-append "the content expands to a link to `" (u8 u)
                                               "': only http, https, mailto and relative targets are accepted (nothing was changed)"))))))
          ((and (eq? tag 'hlink) (= (length args) 2))
           (let ((u (url-destination (cadr args))))
             (when (or (not u) (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
-              (violate! "the content expands to a link whose destination is not accepted: refused (nothing was changed)"))))
+              (violate! (string-append "the content expands to a link whose destination is not accepted: "
+                                       (if u (u8 u) "?") " (nothing was changed)")))))
          ((memq tag '(image postscript postscript* include include* pattern video sound))
           (when (pair? args)
             (check-expanded-file tag (car args) base)))
          ((eq? tag 'script)
           (when (not (and (pair? args) (member (car args) allowed-scripts)))
-            (violate! "the content expands to a script: refused (nothing was changed)")))
+            (violate! (string-append "the content expands to a script: "
+                                     (if (and (pair? args) (string? (car args))) (u8 (car args)) "?")
+                                     " (nothing was changed)"))))
          ((eq? tag 'action)
           (when (not (and (>= (length args) 2) (member (cadr args) allowed-scripts)))
-            (violate! "the content expands to an action: refused (nothing was changed)")))
+            (violate! (string-append "the content expands to an action: "
+                                     (if (and (>= (length args) 2) (string? (cadr args))) (u8 (cadr args)) "?")
+                                     " (nothing was changed)"))))
          ((eq? tag 'error)
-          (violate! (string-append "the content expands to an error: "
-                                   (if (and (pair? args) (string? (car args))) (utf8-prefix (u8 (car args)) 60) "?")
-                                   " (nothing was changed)")))
+          ;; (the other errors are those of the evaluator for macros it cannot take
+          ;; out of the context of the typesetter, such as `bad assign' in the
+          ;; counters of the book style: not a danger)
+          (when (and (pair? args) (member (car args) '("evaluation budget" "macro nesting too deep")))
+            (violate! (string-append "the content expands to an error: " (u8 (car args))
+                                     " (nothing was changed)"))))
          ((memq tag '(extern hybrid authorize observer eval-args))
           (refuse-tag tag "is left after the expansion of the content"))
          ((eq? tag 'specific)
           (when (not (and (pair? args) (member (car args) '("texmacs" "screen" "printer" "screen*" "printer*"))))
-            (violate! "the content expands to a text for another program (specific): refused (nothing was changed)")))
+            (violate! (string-append "the content expands to a text for another program (specific): "
+                                     (if (and (pair? args) (string? (car args))) (u8 (car args)) "?")
+                                     (if (and (pair? args) (pair? (cdr args)) (string? (cadr args))) (string-append " " (u8 (cadr args))) "")
+                                     " (nothing was changed)"))))
          ((eq? tag 'latex)
           (for (a args)
             (when (string? a)
@@ -2293,6 +2308,20 @@
         #f
         set)))
 
+(define computed-name-tags
+  '(compound apply expand expand* hide-expand map-args hybrid merge begin end))
+
+(define (computed-names? t)
+  ;; does the tree reach a macro or a variable by a name that is computed (a
+  ;; compound, a merge, a value of something that is not a name)? Then the users of
+  ;; a definition cannot be found by looking for its name.
+  (cond ((tree-atomic? t) #f)
+        ((memq (tree-label t) computed-name-tags) #t)
+        ((and (memq (tree-label t) '(value quote-value or-value))
+              (or (= (tree-arity t) 0) (not (tree-atomic? (tree-ref t 0)))))
+         #t)
+        (else (list-find (tree-children t) computed-names?))))
+
 (define (guard-pre d t delete?)
   ;; before an edit of the node @t (or of the document: #f): what is needed to
   ;; compare after it. Refuses an edit inside or of code, and in a block that
@@ -2307,7 +2336,9 @@
         (tool-error "the block does not evaluate within the budget: the content filter refuses edits in it (nothing was changed)"))
       (let* ((names (and (pair? defs) (filter-map assign-name-of defs)))
              (closure (and names (definition-closure d names)))
-             (sel (and names (if closure (lambda (b) (mentions? b closure)) #f))))
+             (sel (and names (if (and closure (not (computed-names? (doc-body d))))
+                                 (lambda (b) (mentions? b closure))
+                                 #f))))
         (list (and blk (ptr blk)) viol (assigns-signature d)
               (and (pair? defs) (document-violations d sel))
               sel (and closure names))))))
@@ -2361,6 +2392,8 @@
                (closure2 (and sel (definition-closure d names2))))
           (when (and sel (not closure2))
             (guard-fail! (list "it changes a definition of the style")))
+          (when (and sel (computed-names? (doc-body d)))
+            (guard-fail! (list "the document reaches macros by computed names after the edit: the definitions cannot be checked by their users")))
           (let ((after (document-violations d (if sel (lambda (b) (mentions? b closure2)) #f))))
             (when (over-budget? after) (guard-fail! (list over-budget-reason)))
             (let ((new (new-violations full-before after)))

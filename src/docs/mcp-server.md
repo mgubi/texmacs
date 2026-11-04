@@ -208,6 +208,16 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
      document is compared before and after), and the environment around the
      insertion (a `with` of the person, a macro of theirs that depends on it) are
      covered by construction.
+  *Names that are computed.* If the document reaches macros or variables by a name that is
+  computed (`compound`, `apply`, `merge`, a `value` of something that is not a name...), the
+  users of a definition cannot be found by its name, and the edit of any definition checks the
+  whole document. *Violations of the person* (a link to `javascript:`, an `action`) stay and
+  do not make their sibling blocks refused: what the evaluator makes is keyed by its reason,
+  which carries the destination, the file or the command, not by the generated nodes.
+  *Errors* of the evaluator are violations only when they are the budget or the nesting
+  (the evaluator cannot do some counters of the standard styles outside the typesetter, such
+  as the `bad assign` of the `book` style, and that is not a danger: `chapter`, `part` and
+  `appendix` are accepted).
   *Keys of the violations.* A violation is compared by its reason and the whole
   content of the node that has it (hashed, no truncation), so a change inside a
   node that already had a violation (a person's `<specific|html|...>`, their
@@ -226,11 +236,17 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   if the style defines one of the names). An expansion that exceeds a budget is a
   violation, the edit is refused, and the server stays alive. The budget is a counter in
   the evaluator (`exec_budget_start`, `exec_budget_end` in `env_exec.cpp`, off unless
-  asked). The nesting of macros is limited always, which protects the person's
-  TeXmacs: the evaluator stops at 1200 levels (`exec_compound`), the typesetter at 150
-  levels for the macros of a block (`bridge_compound.cpp`) and 300 for those inside a
-  paragraph (`concat_macro.cpp`), where it shows an error box (a macro that calls itself
-  overflowed the stack: typesetting and the export to PDF crashed). A `set` of the
+  asked). The recursion of macros stops when the stack is nearly full
+  (`stack_remaining`, `stack_nearly_full` in `System/Misc/stack_guard.cpp`: less than 1.5 MB
+  left on the stack of the thread, which is 8 MB for the main thread on macOS and Linux and
+  16 MB for the CMake build for Windows): the evaluator (`exec_compound`) then returns an
+  error tree and the typesetter (`concat_macro.cpp` for the macros inside a paragraph,
+  `bridge_compound.cpp` for the macros of a block) shows an error box, whatever the size of
+  the frames (about 8 KB for each level of macro in a paragraph). A macro that calls itself
+  used to overflow the stack and crash the process (typesetting, and the export to PDF);
+  the guard of the block-level recursion is needed (without it the document with
+  `<loopm|a>` crashes), and 100 nested `itemize` levels and a recursion 1100 levels deep
+  still render. A `set` of the
   person is taken as an `assign` of the variable when the context is built (the evaluator
   does not do it). Any failure of the check (an error, a budget) refuses the edit.
   An edit that is refused is cancelled before anything is sent to the host: the changes

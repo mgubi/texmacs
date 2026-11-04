@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "concater.hpp"
 
 /******************************************************************************
@@ -105,9 +106,9 @@ concater_rep::typeset_compound (tree t, path ip) {
     f= env->read (var);
   }
 
-  // (a macro that calls itself: an error box past a depth, not a stack overflow)
-  static int concat_macro_depth= 0;
-  if (concat_macro_depth >= 300 && is_applicable (f)) {
+  // (a macro that calls itself: an error box when the stack is nearly full,
+  // not a crash)
+  if (is_applicable (f) && stack_nearly_full ()) {
     // (not typeset_error: it shows the macro call, which would nest again)
     typeset (tree ("[macro nesting too deep]"), ip);
     return;
@@ -133,7 +134,6 @@ concater_rep::typeset_compound (tree t, path ip) {
           i<m? t[i+d]: attach_dip (tree (UNINIT), decorate_right(ip));
         env->macro_src->item (var)= i<m? descend (ip,i+d): decorate_right(ip);
       }
-    concat_macro_depth++;
     if (is_decoration (ip))
       typeset (attach_here (f[n], ip));
     else {
@@ -141,7 +141,6 @@ concater_rep::typeset_compound (tree t, path ip) {
       typeset (attach_right (f[n], ip));
       /*IF_NON_CHILD_ENFORCING(t)*/ marker (descend (ip, 1));
     }
-    concat_macro_depth--;
     env->macro_arg= env->macro_arg->next;
     env->macro_src= env->macro_src->next;
   }
