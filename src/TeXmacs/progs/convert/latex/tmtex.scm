@@ -504,7 +504,8 @@
                          (list '!symbol (list sy))))
                       ((not (logic-in? (car ss) latex-symbol%))
                        (display* "TeXmacs] non converted symbol: " s "\n")
-                       (list '!symbol (list 'nonconverted s2)))
+                       (list '!symbol
+                             (list 'nonconverted (tmtex-keep-chars s2 '(#\*)))))
                       (group? (list '!group ss))
                       (else (list '!symbol ss)))))))
 
@@ -1033,8 +1034,13 @@
                         (lambda (x) `(para ,@(cdr x)))))
   t)
 
+(define (tmtex-float-position pos)
+  ;; the placement of a float: h t b p ! H only
+  (list->string (filter (lambda (c) (in? c '(#\h #\t #\b #\p #\! #\H)))
+                        (string->list pos))))
+
 (define (tmtex-float-make wide? size type position x capt)
-  (let* ((pos (string-replace position "f" ""))
+  (let* ((pos (tmtex-float-position (string-replace position "f" "")))
          (type* (if wide? (string-append type "*") type))
          (body (tmtex x))
          (caption (tmtex (into-single-paragraph capt)))
@@ -1156,14 +1162,19 @@
 (define (tmtex-big-around l)
   (convert-around (cons 'big-around l)))
 
+(define (tmtex-large-name s)
+  ;; the name of a delimiter, in \left<name>: letters only, else a dot
+  (with r (tmtex-keep-chars s '())
+    (if (== r "") "." (string-append "\\" r))))
+
 (define (tmtex-large-decode s)
   (cond ((nstring? s) ".")
         ((in? s '("(" ")" "[" "]" "|" "/" ".")) s)
         ((in? s '("||" "<||>")) "\\|")
         ((== s "\\") "\\backslash")
         ((and (string-starts? s "<") (string-ends? s ">"))
-         (string-append "\\" (substring s 1 (- (string-length s) 1))))
-        (else (string-append "\\" s))))
+         (tmtex-large-name (substring s 1 (- (string-length s) 1))))
+        (else (tmtex-large-name s))))
 
 (define (tmtex-large-decode-text s)
   (cond ((nstring? s) "")
@@ -1509,7 +1520,8 @@
 ;; The format of a column: a letter, perhaps with a width, as p{12cm}
 (define (tmtex-halign-safe h)
   (let ((n (string-length h)))
-    (cond ((and (= n 1) (string-index "lcrLCRXPpmb" (string-ref h 0))) h)
+    (cond ((== h "@{}X@{}") h)
+          ((and (= n 1) (string-index "lcrLCRXPpmb" (string-ref h 0))) h)
           ((and (> n 3) (string-index "pmbX" (string-ref h 0))
                 (== (string-ref h 1) #\{) (== (string-ref h (- n 1)) #\})
                 (== (tmtex-safe-length (substring h 2 (- n 1)))
@@ -2406,7 +2418,7 @@
     (ahash-set! tmtex-dynamic (string->symbol (car l)) 'environment)
     (ahash-set! tmtex-dynamic (string->symbol var) 'environment)
     (if (and (logic-in? var latex-texmacs-theorem-environment%)) ""
-        `(newtheorem ,var (,@(cdr l))))))
+        `(newtheorem ,var ,(tmtex (cadr l))))))
 
 (define (tmtex-verbatim s l)
   (if (func? (car l) 'document)
