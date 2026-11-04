@@ -376,7 +376,7 @@
 (lazy-define (utils relate shared-files) shared-file-try-join shared-file-opened
              shared-file-leave shared-file-participant? shared-file-save-request
              shared-file-saved shared-file? shared-file-info shared-files-list
-             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use)
+             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use shared-set-agent! shared-agent? shared-agent-id?)
 ;(display "Booting the MCP server\n")
 (lazy-define (agents mcp-server) mcp-server-start mcp-handle-line)
 ;(display "Booting partial document facilities\n")

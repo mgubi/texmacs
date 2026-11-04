@@ -30,7 +30,7 @@ def check(name, ok):
 
 
 def watchdog():
-    start = time.time()
+    start = time.monotonic()
     while True:
         alive = [p for p in procs if p.poll() is None]
         if not alive and procs and getattr(watchdog, "done", False):
@@ -44,7 +44,7 @@ def watchdog():
                     p.kill()
             except Exception:
                 pass
-        if time.time() - start > TIMEOUT:
+        if time.monotonic() - start > TIMEOUT:
             print("  timeout: stopping the processes", file=sys.stderr)
             for p in alive:
                 p.kill()
@@ -77,9 +77,9 @@ class Mcp:
         self.p.stdin.flush()
 
     def read_line(self, timeout=40):
-        end = time.time() + timeout
+        end = time.monotonic() + timeout
         while b"\n" not in self.buf:
-            left = end - time.time()
+            left = end - time.monotonic()
             if left <= 0:
                 return None
             r, _, _ = select.select([self.p.stdout], [], [], min(left, 1))
@@ -154,8 +154,8 @@ class Mcp:
 
 
 def wait_file(path, timeout=30):
-    end = time.time() + timeout
-    while time.time() < end:
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
         if os.path.exists(path):
             return True
         time.sleep(0.05)
@@ -163,8 +163,8 @@ def wait_file(path, timeout=30):
 
 
 def poll(fn, timeout=15):
-    end = time.time() + timeout
-    while time.time() < end:
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
         v = fn()
         if v:
             return v
@@ -262,7 +262,9 @@ def s_protocol(w):
     tools = r["result"]["tools"] if r and "result" in r else []
     names = sorted(t["name"] for t in tools)
     check("tools listed", names == sorted(["list_documents", "open_document", "get_outline",
-                                           "read", "find", "get_references"]))
+                                           "read", "find", "get_references", "replace", "insert",
+                                           "delete", "edit_text", "undo_agent", "save_document",
+                                           "close_document", "create_document"]))
     check("tools have schemas", all(t.get("inputSchema", {}).get("type") == "object" and
                                     t.get("description") for t in tools))
     r = m.request("nothing/here")
@@ -822,12 +824,12 @@ def s_stalled(w):
     import signal
     os.kill(other.pid, signal.SIGSTOP)
     try:
-        t0 = time.time()
+        t0 = time.monotonic()
         ok = True
         for _ in range(40):
             e, v = m.tool("list_documents")
             ok = ok and not e and any(x["path"] == f for x in v["open_elsewhere"])
-        dt = time.time() - t0
+        dt = time.monotonic() - t0
         check("a stopped host stays listed (40 listings)", ok)
         check("and the server is not blocked (40 listings in under 20 s: %.1f s)" % dt, dt < 20)
     finally:
@@ -858,9 +860,340 @@ def s_logcap(w):
     check("exit 0", m.close() == 0)
 
 
+def block_texts(v):
+    return [c["preview"] for c in v["children"]]
+
+
+def s_edit(w):
+    """the editing tools in a file nobody else has open"""
+    env, home = make_env(w, "A")
+    f = os.path.join(w, "e.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    m = Mcp(env)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    e, t = m.tool("read", document="d1", format="texmacs")
+    k = t["children"]
+    h0, x0 = k[0]["handle"], k[0]["hash"]
+    h1, x1 = k[1]["handle"], k[1]["hash"]
+    # edit_text
+    e, r = m.tool("edit_text", document="d1", node=h0, old="First", new="Initial", expect=x0)
+    check("edit_text applied", not e and r["status"] == "applied" and r["undo_steps"] == 1)
+    e, t = m.tool("read", document="d1", node=r["changed"][0]["handle"], format="text")
+    check("edit_text: the text changed", not e and t["content"] == "Initial paragraph.")
+    e, r2 = m.tool("edit_text", document="d1", node=h1, old="paragraph", new="x", expect="BADHASH")
+    check("a stale hash is a conflict, nothing is changed", not e and r2["status"] == "conflict"
+          and r2["current_hash"] == x1 and "Second paragraph." in r2["current"] and r2["handle"])
+    e, r2 = m.tool("edit_text", document="d1", node=h1, old="a", new="x")
+    check("edit_text: several occurrences are an error that counts them", e and "occurs 3 times" in str(r2))
+    e, r2 = m.tool("edit_text", document="d1", node=h1, old="Zzz", new="x")
+    check("edit_text: no occurrence is an error", e and "not found" in str(r2))
+    e, r2 = m.tool("edit_text", document="d1", node=h1, old="Second", new="Café <b>", expect=x1)
+    e, t = m.tool("read", document="d1", node=r2["changed"][0]["handle"], format="text")
+    check("edit_text: utf8 and a literal < in the new text", not e and t["content"] == "Café <b> paragraph.")
+    # delete
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    nb = t["blocks"]
+    victim = t["children"][2]
+    e, r = m.tool("delete", document="d1", node=victim["handle"], expect="BAD")
+    check("delete with a stale hash: conflict", not e and r["status"] == "conflict")
+    e, r = m.tool("delete", document="d1", node=victim["handle"], expect=victim["hash"])
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    check("delete", not e and t["blocks"] == nb - 1 and victim["preview"] not in t["content"])
+    # undo_agent
+    steps_before = r["undo_steps"]
+    h_before = t["hash"]
+    e, u = m.tool("undo_agent", document="d1", steps=1)
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    check("undo_agent restores the deleted block", not e and t["blocks"] == nb and victim["preview"] in t["content"])
+    # replace
+    e, t = m.tool("read", document="d1", format="texmacs")
+    k = t["children"]
+    e, r = m.tool("replace", document="d1", node=k[1]["handle"], expect=k[1]["hash"],
+                  content="New <strong|second> para\n\nand a third", format="texmacs")
+    check("replace by two blocks", not e and r["status"] == "applied" and len(r["changed"]) == 2)
+    e, t = m.tool("read", document="d1", format="texmacs")
+    check("replace: the blocks are there, in order",
+          not e and t["content"].split("\n\n")[1:3] == ["New <strong|second> para", "and a third"])
+    n_blocks = t["blocks"]
+    e, r = m.tool("replace", document="d1", node=t["children"][0]["handle"], content="<strong|bad", format="texmacs")
+    check("replace: content which does not parse is refused", e and "does not parse" in str(r))
+    e, t2 = m.tool("read", document="d1", format="texmacs")
+    check("and nothing changed", t2["hash"] == t["hash"])
+    e, r = m.tool("replace", document="d1", node=t["children"][0]["handle"], content="(strong \"s\")", format="stree")
+    check("replace with stree", not e and r["changed"][0]["tag"] == "strong")
+    e, r = m.tool("replace", document="d1", node=t["children"][1]["handle"], content="\\textbf{tex}", format="latex")
+    check("replace with latex", not e and r["status"] == "applied")
+    e, r = m.tool("replace", document="d1", node=t["children"][2]["handle"], content="## Title\n\n* item", format="markdown")
+    check("replace with markdown", not e and r["status"] == "applied")
+    e, t = m.tool("read", document="d1", format="texmacs", max_size=100000)
+    check("the formats gave the right trees", "<strong|s>" in t["content"] and "<subsection|Title>" in t["content"]
+          and "<strong|tex>" in t["content"] or "textbf" not in t["content"])
+    e, r = m.tool("replace", document="d1", node=t["children"][0]["handle"], content="x", format="html")
+    check("an unknown format is refused", e)
+    # insert
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    first = t["children"][0]["handle"]
+    e, r = m.tool("insert", document="d1", anchor=first, where="before", content="At the top", format="texmacs")
+    check("insert before", not e and r["status"] == "applied")
+    e, r = m.tool("insert", document="d1", where="last", content="At the end\n\nand more", format="texmacs")
+    check("insert last in the document", not e and len(r["changed"]) == 2)
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    check("insert: first and last blocks", not e and t["content"].startswith("At the top") and t["content"].endswith("and more"))
+    e, r = m.tool("insert", document="d1", where="middle", content="x")
+    check("insert: a bad `where'", r is not None and not e is None and e)
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    last = t["children"][-1]["handle"]
+    e, r = m.tool("insert", document="d1", anchor=last, where="after", content="<em|tail>", format="texmacs")
+    check("insert after", not e and r["status"] == "applied")
+    e, u = m.tool("undo_agent", document="d1", steps=100)
+    e, t = m.tool("read", document="d1", format="texmacs", max_size=100000)
+    check("undo_agent undoes all the steps", not e and u["undo_steps"] == 0 and t["content"].startswith("First paragraph.\n\nSecond paragraph.\n\n<section|Third>"))
+    e, u = m.tool("undo_agent", document="d1")
+    check("nothing more to undo", e and "no step" in str(u))
+    # a step of the person (simulated by a file change is not possible): save
+    e, r = m.tool("edit_text", document="d1", node=t["children"][0]["handle"], old="First", new="Saved")
+    e, sv = m.tool("save_document", document="d1")
+    txt = open(f).read()
+    check("save_document writes the file", not e and sv["status"] == "saved" and "Saved paragraph." in txt)
+    # close
+    e, r = m.tool("edit_text", document="d1", node=m.tool("read", document="d1")[1]["children"][0]["handle"], old="Saved", new="Unsaved")
+    e, c = m.tool("close_document", document="d1")
+    check("close refuses unsaved changes", e and "unsaved" in str(c))
+    e, c = m.tool("close_document", document="d1", discard=True)
+    check("close with discard", not e and c["status"] == "closed")
+    e, l = m.tool("list_documents")
+    check("the document is not listed after close", not e and l["documents"] == [])
+    check("and the file keeps what was saved", "Unsaved" not in open(f).read())
+    # create
+    new = os.path.join(w, "created.tm")
+    e, c = m.tool("create_document", path=new, style="article", content="Hello <em|you>")
+    check("create_document", not e and c["style"] == ["article"] and os.path.exists(new))
+    e, t = m.tool("read", document=c["document"], format="texmacs")
+    check("create_document: the content", not e and "Hello <em|you>" in t["content"])
+    e, sv = m.tool("save_document", document=c["document"])
+    check("a created document is saved", not e and "Hello <em|you>" in open(new).read() and "<style|article>" in open(new).read())
+    e, c2 = m.tool("create_document", path=new)
+    check("create_document: the file exists", e and "exists" in str(c2))
+    e, c2 = m.tool("create_document", path=os.path.join(w, "nodir", "x.tm"))
+    check("create_document: no folder", e)
+    e, c2 = m.tool("create_document", path=os.path.join(w, "x.txt"))
+    check("create_document: .tm only", e)
+    e, c2 = m.tool("create_document", path=os.path.join(w, "y.tm"), content="<strong|bad")
+    check("create_document: bad content, no file", e and not os.path.exists(os.path.join(w, "y.tm")))
+    # the answer says what changed in the document by others
+    check("exit 0", m.close() == 0)
+    check("stdout carries only protocol lines", not m.bad_lines)
+
+
+def s_readonly(w):
+    """TEXMACS_MCP_READONLY and TEXMACS_MCP_ROOTS for the editing tools"""
+    roots = os.path.join(w, "root")
+    os.makedirs(roots, exist_ok=True)
+    f = os.path.join(roots, "r.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    env, home = make_env(w, "A")
+    env["TEXMACS_MCP_READONLY"] = "1"
+    m = Mcp(env)
+    m.initialize()
+    r = m.request("tools/list")
+    names = [t["name"] for t in r["result"]["tools"]]
+    check("read-only: the editing tools are not listed", names == ["list_documents", "open_document", "get_outline", "read", "find", "get_references"])
+    m.tool("open_document", path=f)
+    for tool, args in (("replace", {"document": "d1", "node": "n1", "content": "x"}),
+                       ("insert", {"document": "d1", "where": "last", "content": "x"}),
+                       ("delete", {"document": "d1", "node": "n1"}),
+                       ("edit_text", {"document": "d1", "node": "n1", "old": "a", "new": "b"}),
+                       ("undo_agent", {"document": "d1"}), ("save_document", {"document": "d1"}),
+                       ("close_document", {"document": "d1"}),
+                       ("create_document", {"path": os.path.join(roots, "n.tm")})):
+        e, v = m.tool(tool, **args)
+        check("read-only: %s is refused" % tool, e and "read-only" in str(v))
+    check("read-only: nothing was created", not os.path.exists(os.path.join(roots, "n.tm")))
+    check("exit 0", m.close() == 0)
+    env2, home2 = make_env(w, "B")
+    env2["TEXMACS_MCP_ROOTS"] = roots
+    m = Mcp(env2)
+    m.initialize()
+    e, v = m.tool("create_document", path=os.path.join(w, "outside.tm"))
+    check("roots: create_document outside is refused", e and "not allowed" in str(v) and not os.path.exists(os.path.join(w, "outside.tm")))
+    e, v = m.tool("create_document", path=roots + "/../outside.tm")
+    check("roots: .. is refused", e and not os.path.exists(os.path.join(w, "outside.tm")))
+    link = os.path.join(roots, "lnk")
+    os.symlink(w, link)
+    e, v = m.tool("create_document", path=link + "/viasym.tm")
+    check("roots: a symbolic link out is refused", e and not os.path.exists(os.path.join(w, "viasym.tm")))
+    e, v = m.tool("create_document", path=os.path.join(roots, "inside.tm"))
+    check("roots: create_document inside", not e and os.path.exists(os.path.join(roots, "inside.tm")))
+    check("exit 0", m.close() == 0)
+
+
+def hostcmd(w, state, text):
+    """send a command to the other TeXmacs (tests/mcp/host-edit.scm) and wait for its answer"""
+    state[0] += 1
+    i = state[0]
+    tmp = os.path.join(w, "sync", "tmp-%d" % i)
+    with open(tmp, "w") as fh:
+        fh.write(text)
+    os.replace(tmp, os.path.join(w, "sync", "cmd-%d" % i))
+    return wait_file(os.path.join(w, "sync", "ack-%d" % i), 30)
+
+
+def host_body(w, state):
+    try:
+        os.remove(os.path.join(w, "sync", "B-body"))
+    except OSError:
+        pass
+    hostcmd(w, state, "publish")
+    wait_file(os.path.join(w, "sync", "B-body"), 10)
+    time.sleep(0.2)
+    return open(os.path.join(w, "sync", "B-body")).read()
+
+
+def s_edit_shared(w):
+    """the agent edits a file which a second headless TeXmacs (the person) hosts
+    and edits too: the changes are merged, the person's are never refused, a
+    conflicting change of the agent is refused and reported"""
+    import threading
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "shared.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-edit.scm", f)
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins as a participant", not e and v["shared"]["role"] == "participant")
+    st = [0]
+    e, t = m.tool("read", document="d1", format="text")
+    k = t["children"]
+    # 1. an edit of the agent reaches the host
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="First", new="Initial", expect=k[0]["hash"])
+    check("shared: the edit is applied (acknowledged by the host)", not e and r["status"] == "applied")
+    hb = host_body(w, st)
+    check("shared: the host has the agent's text", "Initial paragraph." in str(hb))
+    # 2. the host types elsewhere; the agent sees it through a note
+    hostcmd(w, st, "type-p1 (h1)")
+    got = poll(lambda: (lambda r: r if not r[0] and "(h1)" in r[1]["content"] else None)(m.tool("read", document="d1", format="text")), 10)
+    check("shared: the agent reads the host's typing", got is not None)
+    e, t = m.tool("read", document="d1", format="text")
+    k = t["children"]
+    hostcmd(w, st, "type-p1 (h2)")
+    time.sleep(1.0)          # (no read: the note of the next call must tell)
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Initial", new="Start")
+    check("shared: a note tells that the document changed", not e and "changed since your last call" in r.get("note", ""))
+    # 3. the same paragraph, different places, at the same time: merged
+    e, t = m.tool("read", document="d1", format="text")
+    k = t["children"]
+    hostcmd(w, st, "pause")
+    hostcmd(w, st, "type-p0 !!")
+    res = {}
+    def agent_edit():
+        res["v"] = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Start", new="Begin")
+    th = threading.Thread(target=agent_edit)
+    th.start()
+    time.sleep(1.0)
+    hostcmd(w, st, "resume")
+    th.join(30)
+    e, r = res.get("v", (True, None))
+    check("shared: same paragraph, different places: applied (merged by the host)", not e and r["status"] == "applied")
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("shared: both converge, with both changes", "Begin paragraph.!!" in str(hb) and "Begin paragraph.!!" in t["content"])
+    # 4. a change of the agent in a paragraph the host deletes: refused, reported
+    e, t = m.tool("read", document="d1", format="text")
+    k = t["children"]
+    hostcmd(w, st, "pause")
+    hostcmd(w, st, "delete-p1")
+    res = {}
+    def agent_edit2():
+        res["v"] = m.tool("edit_text", document="d1", node=k[1]["handle"], old="Second", new="Gone")
+    th = threading.Thread(target=agent_edit2)
+    th.start()
+    time.sleep(1.0)
+    hostcmd(w, st, "resume")
+    th.join(30)
+    e, r = res.get("v", (True, None))
+    check("shared: an edit of a deleted paragraph is refused and reported", not e and r["status"] == "refused" and "reason" in r)
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("shared: the agent's copy is the host's document again", "Gone" not in str(hb) and "Gone" not in t["content"]
+          and str(hb).count("paragraph") == t["content"].count("paragraph"))
+    hostcmd(w, st, "stats")
+    time.sleep(0.2)
+    check("shared: the host refused exactly the agent's patch (its own were never refused)",
+          open(os.path.join(w, "sync", "stats")).read().strip() == "(1)")
+    # 5. expect: a conflict when the host changed the node
+    e, t = m.tool("read", document="d1", format="text")
+    k = t["children"]
+    old_hash = k[0]["hash"]
+    hostcmd(w, st, "type-p0 ??")
+    poll(lambda: (lambda r: r if not r[0] and "??" in r[1]["content"] else None)(m.tool("read", document="d1", format="text")), 10)
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Begin", new="Again", expect=old_hash)
+    check("shared: edit with a stale hash (the host typed in the node): conflict", not e and r["status"] == "conflict" and "??" in r["current"])
+    # 6. undo_agent in a shared file: after a refusal the older steps are forgotten
+    e, u = m.tool("undo_agent", document="d1")
+    check("shared: after a refused change the steps before are not undoable", e)
+    e, r = m.tool("edit_text", document="d1", node=m.tool("read", document="d1")[1]["children"][0]["handle"], old="Begin", new="Again")
+    check("shared: an edit after a refusal works", not e and r["status"] == "applied")
+    e, u = m.tool("undo_agent", document="d1")
+    check("shared: undo_agent works and reaches the host", not e and u["status"] == "applied")
+    hb = host_body(w, st)
+    check("shared: the host has the undone text", "Begin paragraph.!!??" in str(hb))
+    # 7. the person's undo skips the agent's change (it commutes)
+    e, t = m.tool("read", document="d1", format="text")
+    k = t["children"]
+    hostcmd(w, st, "type-p0 AA")
+    hostcmd(w, st, "type-p0 BB")
+    poll(lambda: (lambda r: r if not r[0] and "BB" in r[1]["content"] else None)(m.tool("read", document="d1", format="text")), 10)
+    e, t = m.tool("read", document="d1", format="text")
+    e, r = m.tool("insert", document="d1", where="last", content="Agent block", format="texmacs")
+    check("shared: the agent inserts a block", not e and r["status"] == "applied")
+    hb0 = host_body(w, st)
+    hostcmd(w, st, "undo")
+    hostcmd(w, st, "undo")
+    hb = host_body(w, st)
+    check("shared: the person's undo undid their own typing and kept the agent's block",
+          "AA" not in str(hb) and "BB" not in str(hb) and "Agent block" in str(hb))
+    # 8. the same inside the paragraph the person types in (the agent's change is at
+    # its start, far from what they type)
+    e, t = m.tool("read", document="d1", format="text")
+    p0 = t["children"][0]
+    hostcmd(w, st, "type-p0 CC")
+    hostcmd(w, st, "type-p0 DD")
+    poll(lambda: (lambda r: r if not r[0] and "DD" in r[1]["content"] else None)(m.tool("read", document="d1", format="text")), 10)
+    e, t = m.tool("read", document="d1", format="text")
+    e, r = m.tool("edit_text", document="d1", node=t["children"][0]["handle"], old="Begin", new="Start")
+    check("shared: the agent edits the start of the paragraph the person types in", not e and r["status"] == "applied")
+    hostcmd(w, st, "undo")
+    hostcmd(w, st, "undo")
+    hb = host_body(w, st)
+    check("shared: the person's two undos undo their typing and keep the agent's change",
+          "CC" not in str(hb) and "DD" not in str(hb) and "Start paragraph." in str(hb))
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("shared: the agent has the same document", "Start paragraph." in t["content"] and "CC" not in t["content"])
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+    out = open(os.path.join(w, "out-B")).read() if os.path.exists(os.path.join(w, "out-B")) else ""
+    check("the other TeXmacs passed its checks", out == "ok")
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
              "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

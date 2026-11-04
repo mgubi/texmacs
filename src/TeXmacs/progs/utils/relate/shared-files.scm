@@ -90,10 +90,26 @@
 
 (define sf-run-id (substring (shared-random-token) 0 8))   ; (a pid is reused)
 
+(define sf-agent? #f)                     ; is this process an agent (texmacs --mcp)?
+
+(tm-define (shared-set-agent! flag)
+  (:synopsis "Mark this process as an agent (`texmacs --mcp'): the ids it takes start with `agent.'")
+  (set! sf-agent? flag))
+
+(tm-define (shared-agent?)
+  (:synopsis "Is this process an agent?")
+  sf-agent?)
+
 (define (sf-new-id)
+  ;; (the id of a participant tells the host that it is an agent)
   (set! sf-serial (+ sf-serial 1))
-  (string-append (number->string (shared-process-id)) "." sf-run-id "."
+  (string-append (if sf-agent? "agent." "")
+                 (number->string (shared-process-id)) "." sf-run-id "."
                  (number->string sf-serial)))
+
+(tm-define (shared-agent-id? id)
+  (:synopsis "Is the participant id @id the one of an agent?")
+  (and (string? id) (string-starts? id "agent.")))
 
 (define (sf-by-name name)
   (and-with key (ahash-ref sf-by-buffer (url->string name))
@@ -120,7 +136,8 @@
           (length (sf-get sf 'peers))
           (sf-get sf 'host-id)
           (sf-get sf 'id)
-          (length (sf-get sf 'pending)))))
+          (length (sf-get sf 'pending))
+          (and (sf-get sf 'inflight) #t))))
 
 (tm-define (shared-files-list)
   (map (lambda (e) (cdr e)) (ahash-table->list sf-by-buffer)))
@@ -476,10 +493,28 @@
             (for (pp (meta-diff! (sf-meta sf) new))
               (sf-put! sf 'collect (cons pp (sf-get sf 'collect))))))))))
 
+(define (own-author sf)
+  ;; the author of the editor of the buffer: what this process types is
+  ;; its own, and its undo skips the others (it is current after
+  ;; start-editing)
+  (or (sf-get sf 'own-author)
+      (with a (catch #t
+                (lambda ()
+                  (with-buffer (sf-buffer sf)
+                    (start-editing)
+                    (get-author)))
+                (lambda args #f))
+        (when a (sf-put! sf 'own-author a))
+        a)))
+
 (define (author-of sf peer-id)
+  ;; the author (a number) of the changes of the participant @peer-id: its
+  ;; own for each one, so that the undo of the person skips them
   (with t (sf-get sf 'authors)
     (or (ahash-ref t peer-id)
-        (with a (new-author)
+        (with a (if (== peer-id (sf-get sf 'id))
+                    (or (own-author sf) (new-author))
+                    (new-author))
           (ahash-set! t peer-id a)
           a))))
 
@@ -1264,7 +1299,9 @@
 (define (report-lost! sf patches)
   (when (nnull? patches)
     (stat! 'lost)
-    (let* ((items (lost-contents patches))
+    ;; (an agent is told by its tool: nothing is saved for it)
+    (when (not sf-agent?)
+     (let* ((items (lost-contents patches))
            (name (url->system (sf-buffer sf)))
            (msg (string-append "Shared file: changes of yours to " name
                                " could not be combined with those of another process")))
@@ -1301,7 +1338,7 @@
                   (user-confirm "Changes of yours to a shared file could not be kept. Open the document with what you typed?" #t
                     (lambda (answ)
                       (when answ (load-buffer file))
-                      (noop))))))))))
+                      (noop)))))))))))
 
 (define (rollback-pending! sf)
   ;; undo the pending changes in the buffer: it becomes the confirmed
@@ -1347,13 +1384,13 @@
     (live-create key (sf-composite sf) state)
     (if modified (buffer-pretend-modified name) (buffer-pretend-saved name))))
 
-(define (participant-apply-remote! sf r from to)
+(define (participant-apply-remote! sf r from to author)
   ;; a patch of the host, against the confirmed state @from
   (let* ((key (sf-key sf))
          (d0 (live-current-document key))
          (pend (sf-get sf 'pending)))
     (cond ((null? pend)
-           (when (apply-in-place! sf r (author-of sf (sf-get sf 'host-id)))
+           (when (apply-in-place! sf r (author-of sf (or author (sf-get sf 'host-id))))
              (live-apply-patch key r to)
              (sf-notify-modified! sf)
              (sf-trim! key)))
@@ -1370,7 +1407,7 @@
                 ((not (rollback-pending! sf))
                  (report-lost! sf pend)
                  (participant-request-resync! sf))
-                ((not (apply-in-place! sf r (author-of sf (sf-get sf 'host-id))))
+                ((not (apply-in-place! sf r (author-of sf (or author (sf-get sf 'host-id)))))
                  (report-lost! sf pend)
                  (participant-request-resync! sf))
                 (else
@@ -1412,7 +1449,7 @@
                     (sf-trim! key))
                    (else
                      (participant-apply-remote! sf (scheme->patch psexp)
-                                                from to)))))
+                                                from to author)))))
           ((func? msg 'refused)
            (with (tag id cur) msg
              (when (== id (sf-get sf 'inflight))

@@ -381,6 +381,7 @@
                         (let ((d (list (string-append "d" (number->string mcp-doc-count))
                                        bu p)))
                           (set! mcp-docs (append mcp-docs (list d)))
+                          (snapshot! d)
                           d)))))))))
 
 (define (require-doc ref)
@@ -994,6 +995,716 @@
                   (loop (cdr l) (cons (car l) acc)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Editing (step 3): replace, insert, delete, edit_text, undo_agent, save,
+;; close, create
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A tool call that edits is one step: the edit is checked first (the node, the
+;; expected hash, the content), then done between mark-start and mark-end by
+;; the editor of the buffer, so that the modifications are of its author, one
+;; undo step, and, in a shared file, patches of this process (an agent) to the
+;; host. A failure in the middle is cancelled (mark-cancel). The host may
+;; refuse the patch (the document it was made for has changed too much): the
+;; tool waits for its answer and says `refused'. The agent undoes its own steps
+;; with undo_agent: each step keeps what is needed to undo it (the nodes it
+;; made, with their hashes, and the old content), and the undo is refused when
+;; someone changed these nodes meanwhile. (The undo of the editor skips the
+;; changes of the others only when they commute, and undoes them when they do
+;; not: it is not used for the agent.)
+
+(define (mcp-read-only?)
+  (let ((e (getenv "TEXMACS_MCP_READONLY")))
+    (and e (!= e "") (!= e "0"))))
+
+(define (require-writable)
+  (when (mcp-read-only?)
+    (tool-error "this server is read-only (TEXMACS_MCP_READONLY is set): it does not edit, save, create or close documents")))
+
+;;; The content
+
+(define edit-formats '("texmacs" "stree" "latex" "markdown"))
+(define max-content-size 4194304)
+
+(define (valid-stree? x depth)
+  (cond ((string? x) #t)
+        ((> depth 200) #f)
+        ((and (pair? x) (list? x) (symbol? (car x)))
+         (let loop ((l (cdr x)))
+           (or (null? l)
+               (and (valid-stree? (car l) (+ depth 1)) (loop (cdr l))))))
+        (else #f)))
+
+(define (stree-cork t)
+  ;; the stree @t with its strings from utf8 to Cork
+  (cond ((string? t) (utf8->cork t))
+        ((pair? t) (cons (car t) (map stree-cork (cdr t))))
+        (else t)))
+
+(define (utf8-escape s)
+  ;; the utf8 string @s written in the syntax of a .tm snippet: a character
+  ;; beyond ASCII becomes \<#xxxx\> (utf8->cork would also turn a `<' of
+  ;; the markup into a character)
+  (let ((n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n)
+          (apply string-append (reverse acc))
+          (let ((b (char->integer (string-ref s i))))
+            (if (< b 128)
+                (loop (+ i 1) (cons (string (string-ref s i)) acc))
+                (let* ((len (cond ((>= b 240) 4) ((>= b 224) 3) ((>= b 192) 2) (else 1)))
+                       (end (min n (+ i len)))
+                       (code (utf8-code (substring s i end))))
+                  (loop end (cons (string-append "\\<#" (hex-digits code) "\\>") acc)))))))))
+
+(define (brackets-balanced? s open close)
+  ;; the characters @open and @close match in @s (those after a backslash
+  ;; are plain)
+  (let ((n (string-length s)))
+    (let loop ((i 0) (depth 0))
+      (cond ((>= i n) (== depth 0))
+            ((char=? (string-ref s i) #\\) (loop (+ i 2) depth))
+            ((char=? (string-ref s i) open) (loop (+ i 1) (+ depth 1)))
+            ((char=? (string-ref s i) close)
+             (and (> depth 0) (loop (+ i 1) (- depth 1))))
+            (else (loop (+ i 1) depth))))))
+
+(define (parse-content content fmt)
+  ;; the stree of @content, written in the format @fmt; an error when it
+  ;; does not parse
+  (when (not (string? content))
+    (param-error "the argument `content' must be a string"))
+  (when (> (string-length content) max-content-size)
+    (tool-error "the content is too long"))
+  (when (not (member fmt edit-formats))
+    (tool-error (string-append "unknown format " fmt ", use one of: "
+                               (string-recompose edit-formats ", "))))
+  (let ((st (catch #t
+              (lambda ()
+                (cond ((== fmt "stree")
+                       (let ((x (string->object content)))
+                         (and (valid-stree? x 0) (stree-cork x))))
+                      ((== fmt "texmacs")
+                       (and (brackets-balanced? content #\< #\>)
+                            (convert (utf8-escape content)
+                                     "texmacs-snippet" "texmacs-stree")))
+                      ((== fmt "latex")
+                       (and (brackets-balanced? content #\{ #\})
+                            (convert content "latex-snippet" "texmacs-stree")))
+                      (else
+                        (convert content "markdown-snippet" "texmacs-stree"))))
+              (lambda args #f))))
+    (when (or (not st) (not (valid-stree? st 0)))
+      (tool-error (string-append "the content does not parse as " fmt
+                                 " (nothing was changed)")))
+    st))
+
+(define (content-items st)
+  ;; the blocks of the content: the children of a document, else the content
+  (cond ((func? st 'document)
+         (when (null? (cdr st)) (tool-error "the content is empty"))
+         (cdr st))
+        (else (list st))))
+
+(define (flatten-inline items)
+  ;; items of a concatenation: nested concatenations flattened, strings
+  ;; merged, empty strings dropped
+  (let loop ((l items) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((func? (car l) 'concat) (loop (append (cdr (car l)) (cdr l)) acc))
+          ((and (string? (car l)) (== (car l) "")) (loop (cdr l) acc))
+          ((and (string? (car l)) (pair? acc) (string? (car acc)))
+           (loop (cdr l) (cons (string-append (car acc) (car l)) (cdr acc))))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define (inline-stree items)
+  (let ((l (flatten-inline items)))
+    (cond ((null? l) "")
+          ((null? (cdr l)) (car l))
+          (else (cons 'concat l)))))
+
+(define (tree-of-stree st) (stree->tree st))
+
+;;; The answer
+
+(define (current-content t fmt)
+  (let ((f (if (member fmt read-formats) fmt "texmacs")))
+    (utf8-prefix (convert-checked t f) 4000)))
+
+(define (node-report d t)
+  (obj "handle" (make-handle! d t)
+       "tag" (node-tag t)
+       "hash" (hash-short t)
+       "preview" (utf8-prefix (squeeze (ntext t)) 80)))
+
+(define (conflict-result d t h expect fmt)
+  (obj "status" "conflict"
+       "document" (doc-id d)
+       "node" h
+       "expected" expect
+       "current_hash" (hash-short t)
+       "handle" (make-handle! d t)
+       "current" (current-content t fmt)
+       "message" "the node changed since you read it: nothing was changed. Look at `current', then retry with the new hash (or without `expect' to accept merging)."))
+
+(define (check-expect d t h expect fmt)
+  ;; #f if the node is as expected (or nothing is expected), else the
+  ;; conflict to give as the result
+  (and expect (!= expect (hash-short t))
+       (conflict-result d t h expect fmt)))
+
+;;; The steps of an agent, to undo them
+
+(define mcp-steps (make-ahash-table))       ; document id -> list of undo steps
+(define mcp-step-marks (make-ahash-table))  ; document id -> counters at the last step
+
+(define (disturbances)
+  ;; how many times the host refused a patch, took the document away or
+  ;; replaced it in this process: the steps before are not safe to undo
+  (+ (shared-stat 'rolled-back) (shared-stat 'lost) (shared-stat 'replaced)
+     (shared-stat 'dropped) (shared-stat 'resync)))
+
+(define (steps-of d) (or (ahash-ref mcp-steps (doc-id d)) '()))
+(define (push-step! d undo)
+  (ahash-set! mcp-steps (doc-id d) (cons undo (steps-of d)))
+  (ahash-set! mcp-step-marks (doc-id d) (disturbances)))
+(define (forget-steps! d)
+  (ahash-remove! mcp-steps (doc-id d)))
+
+(define (settle! d before)
+  ;; wait (at most 10 s) until the host has taken the changes of this process:
+  ;; ok, refused (the host did not take them, they are undone), timeout
+  (let ((u (doc-url d)))
+    (if (not (shared-file-participant? u))
+        'ok
+        (let ((t0 (texmacs-time)))
+          (let loop ((n 0))
+            (shared-poll)
+            (let ((i (shared-file-info u)))
+              (cond ((> (disturbances) before) 'refused)
+                    ((not i) 'ok)
+                    ((and (== (list-ref i 5) 0) (not (list-ref i 6)) (> n 0)) 'ok)
+                    ((> (- (texmacs-time) t0) 10000) 'timeout)
+                    (else (loop (+ n 1))))))))))
+
+(define edit-reason #f)
+
+(define (run-edit! d thunk)
+  ;; do @thunk (it changes the tree) as one step of the editor of the buffer,
+  ;; all or nothing; gives its value
+  (let ((u (doc-url d)) (failed #f) (value #f))
+    (with-buffer u
+      (start-editing)
+      (let ((a (get-author)))
+        (mark-start a)
+        (set! value (catch #t thunk
+                      (lambda args
+                        (mark-cancel a)
+                        (set! failed #t)
+                        #f)))
+        (when (not failed) (mark-end a))
+        (end-editing)))
+    (when failed
+      (let ((why edit-reason))
+        (set! edit-reason #f)
+        (tool-error (or why "the edit failed while it was made and was cancelled: nothing was changed"))))
+    value))
+
+(define (filter-live d nodes)
+  (list-filter nodes (lambda (t) (and (tree? t) (inside-body? d t)))))
+
+(define (finish-edit! d dist changed undo)
+  ;; after the edit: wait for the host, say what happened. @changed is a
+  ;; list of nodes, @undo the way to undo the step (or #f)
+  (let* ((outcome (settle! d dist))
+         (body (doc-body d)))
+    (cond ((== outcome 'refused)
+           (forget-steps! d)
+           (with-buffer (doc-url d) (clear-undo-history))
+           (snapshot! d)
+           (obj "status" "refused"
+                "document" (doc-id d)
+                "reason" "the host (the TeXmacs of the person) refused the change: the document had changed too much around it. The document is back to what the host has; nothing of yours is kept. Read again and retry."
+                "hash" (hash-short body)))
+          (else
+            (when undo (push-step! d undo))
+            (snapshot! d)
+            (let ((live (filter-live d changed)))
+              (apply obj
+                (append
+                  (list "status" (if (== outcome 'timeout) "pending" "applied")
+                        "document" (doc-id d)
+                        "hash" (hash-short body)
+                        "changed" (arr (map (lambda (t) (node-report d t)) live))
+                        "undo_steps" (num (length (steps-of d))))
+                  (if (== outcome 'timeout)
+                      (list "message" "the host did not answer within 10 s: the change is kept here and is sent when the host answers")
+                      '())
+                  (if (< (length live) (length changed))
+                      (list "message" "some of the changed nodes were changed again by someone else at the same time: read them again")
+                      '()))))))))
+
+;;; Notes: what changed since the last call about the document
+
+(define mcp-snaps (make-ahash-table))       ; document id -> hashes of the blocks
+
+(define (block-hashes d)
+  (map (lambda (t) (tree-hash t)) (tree-children (doc-body d))))
+
+(define (snapshot! d)
+  (ahash-set! mcp-snaps (doc-id d) (block-hashes d)))
+
+(define (common-prefix a b)
+  (let loop ((a a) (b b) (n 0))
+    (if (and (pair? a) (pair? b) (== (car a) (car b)))
+        (loop (cdr a) (cdr b) (+ n 1))
+        n)))
+
+(define (change-note d)
+  ;; a note when the blocks of @d changed since the last time (by others),
+  ;; else #f; the snapshot is brought up to date
+  (let ((old (ahash-ref mcp-snaps (doc-id d))))
+    (and old
+         (let ((new (block-hashes d)))
+           (and (!= old new)
+                (let* ((p (common-prefix old new))
+                       (s (common-prefix (reverse (list-tail old p))
+                                         (reverse (list-tail new p))))
+                       (n-old (- (length old) p s)) (n-new (- (length new) p s))
+                       (body (doc-body d))
+                       (sections
+                        (let loop ((i p) (acc '()))
+                          (if (>= i (+ p (max 1 n-new)))
+                              (reverse acc)
+                              (let ((sec (and (< i (tree-arity body))
+                                              (section-of d (tree-ref body i)))))
+                                (loop (+ i 1)
+                                      (if (and sec (not (member sec acc)))
+                                          (cons sec acc) acc)))))))
+                  (ahash-set! mcp-snaps (doc-id d) new)
+                  (string-append
+                   "The document changed since your last call (by someone else, or a resynchronization): "
+                   (number->string n-old) " block(s) from index " (number->string p)
+                   " replaced by " (number->string n-new)
+                   (if (null? sections) ""
+                       (string-append ", in the section(s): "
+                                      (string-recompose
+                                       (sublist sections 0 (min 5 (length sections))) "; ")))
+                   ". Its hash is now " (hash-short body)
+                   ". Handles to blocks you read before may be stale.")))))))
+
+;;; The nodes
+
+(define (editing-context args)
+  (require-writable)
+  (let ((d (require-doc (opt-string args "document" #f))))
+    (doc-refresh! d)
+    d))
+
+(define (body-root? d t) (tree-eq? t (doc-body d)))
+
+(define (parent-of d t)
+  (let ((p (tree-up t)))
+    (and p (inside-body? d p) p)))
+
+(define (target d args key)
+  ;; (handle . node) of the argument @key
+  (let ((h (opt-string args key #f)))
+    (when (not h) (tool-error (string-append "the argument `" key "' (a handle) is needed")))
+    (cons h (handle-node d h))))
+
+(define (ptr t) (tree->tree-pointer t))
+(define (deref p) (tree-pointer->tree p))
+
+(define (pointed-ok? d p hash)
+  ;; does the pointer @p still point at a node of the document with that hash?
+  ;; (A pointer follows its node when it is replaced as a whole, and goes to
+  ;; a neighbour when it is removed: the hash tells.)
+  (let ((t (deref p)))
+    (and (tree? t) (inside-body? d t) (== (tree-hash t) hash))))
+
+(define (same-nodes? d ptrs hashes)
+  (list-and (map (lambda (p h) (pointed-ok? d p h)) ptrs hashes)))
+
+;;; replace
+
+(define (undo-replace d new-nodes old-items)
+  ;; the step that put @new-nodes (siblings, in order) in place of @old-items
+  (let ((ptrs (map ptr new-nodes)) (hashes (map tree-hash new-nodes)))
+    (cons
+     (lambda ()
+       (or (same-nodes? d ptrs hashes)
+           "the nodes this step made were changed since"))
+     (lambda ()
+       (let* ((first (deref (car ptrs))) (parent (tree-up first)) (i (tree-index first))
+              (k (length ptrs)))
+         (tree-assign first (tree-of-stree
+                             (if (tm-is? parent 'document)
+                                 (car old-items)
+                                 (inline-stree old-items))))
+         (when (tm-is? parent 'document)
+           (when (> k 1) (tree-remove parent (+ i 1) (- k 1)))
+           (when (pair? (cdr old-items))
+             (tree-var-insert parent (+ i 1)
+                              (tree-of-stree (cons 'document (cdr old-items))))))
+         #t)))))
+
+(define (tool-replace args)
+  (let* ((d (editing-context args))
+         (fmt (opt-string args "format" "texmacs"))
+         (hn (target d args "node")) (h (car hn)) (t (cdr hn))
+         (expect (opt-string args "expect" #f))
+         (st (parse-content (opt-string args "content" #f) fmt))
+         (items (content-items st)))
+    (cond
+      ((body-root? d t)
+       (tool-error "the whole document cannot be replaced: replace its blocks, or create a new document"))
+      ((check-expect d t h expect fmt))
+      (else
+        (let* ((parent (parent-of d t)) (i (tree-index t))
+               (old (tm->stree t))
+               (dist (disturbances))
+               (block? (tm-is? parent 'document))
+               (inline? (tm-is? parent 'concat))
+               (nodes '()))
+          (when (and (not block?) (pair? (cdr items)))
+            (tool-error "the node is part of a paragraph: the content must be one item, not several blocks"))
+          (cond
+            (block?
+             (run-edit! d
+               (lambda ()
+                 (tree-assign t (tree-of-stree (car items)))
+                 (when (pair? (cdr items))
+                   (tree-var-insert parent (+ i 1)
+                                    (tree-of-stree (cons 'document (cdr items)))))
+                 (set! nodes (map (lambda (k) (tree-ref parent (+ i k)))
+                                  (iota (length items))))))
+             (finish-edit! d dist nodes (undo-replace d nodes (list old))))
+            (inline?
+             ;; (the paragraph is rebuilt, so that the strings are merged)
+             (let* ((pold (tm->stree parent))
+                    (kids (cdr pold))
+                    (new (inline-stree (append (sublist kids 0 i) items
+                                               (list-tail kids (+ i 1))))))
+               (run-edit! d
+                 (lambda ()
+                   (tree-assign parent (tree-of-stree new))
+                   (set! nodes (list parent))))
+               (finish-edit! d dist nodes (undo-replace d nodes (list pold)))))
+            (else
+              (run-edit! d
+                (lambda ()
+                  (tree-assign t (tree-of-stree (car items)))
+                  (set! nodes (list (tree-ref parent i)))))
+              (finish-edit! d dist nodes (undo-replace d nodes (list old))))))))))
+
+;;; insert
+
+(define (undo-insert d nodes)
+  ;; the step that inserted the sibling @nodes
+  (let ((ptrs (map ptr nodes)) (hashes (map tree-hash nodes)))
+    (cons
+     (lambda ()
+       (or (same-nodes? d ptrs hashes)
+           "the nodes this step made were changed since"))
+     (lambda ()
+       (let* ((first (deref (car ptrs))) (parent (tree-up first)) (i (tree-index first)))
+         (tree-remove parent i (length ptrs))
+         #t)))))
+
+(define (tool-insert args)
+  (let* ((d (editing-context args))
+         (fmt (opt-string args "format" "texmacs"))
+         (where (opt-string args "where" #f))
+         (ah (opt-string args "anchor" #f))
+         (anchor (if ah (handle-node d ah) (doc-body d)))
+         (expect (opt-string args "expect" #f))
+         (st (parse-content (opt-string args "content" #f) fmt))
+         (items (content-items st)))
+    (when (not (member where '("before" "after" "first" "last")))
+      (param-error "the argument `where' must be before, after, first or last"))
+    (cond
+      ((and (not ah) (member where '("before" "after")))
+       (tool-error "`before' and `after' need an anchor"))
+      ((and ah (body-root? d anchor) (member where '("before" "after")))
+       (tool-error "the document itself has no neighbours: use first or last"))
+      ((check-expect d anchor (or ah "the document") expect fmt))
+      ((and (tree-atomic? anchor) (member where '("first" "last")))
+       (tool-error "a text node has no children: use before or after, or edit_text"))
+      (else
+        (let* ((dist (disturbances))
+               (side? (member where '("before" "after")))
+               (parent (if side? (parent-of d anchor) anchor))
+               (pos (cond ((== where "before") (tree-index anchor))
+                          ((== where "after") (+ 1 (tree-index anchor)))
+                          ((== where "first") 0)
+                          (else (tree-arity anchor))))
+               (nodes '()))
+          (cond
+            ((tm-is? parent 'document)
+             (run-edit! d
+               (lambda ()
+                 (tree-var-insert parent pos (tree-of-stree (cons 'document items)))
+                 (set! nodes (map (lambda (k) (tree-ref parent (+ pos k)))
+                                  (iota (length items))))))
+             (finish-edit! d dist nodes (undo-insert d nodes)))
+            ((and (tm-is? parent 'concat) (not (tree-atomic? parent)))
+             ;; inside a paragraph: it is rebuilt, so that the strings are merged
+             (let* ((old (tm->stree parent)) (kids (cdr old))
+                    (new (inline-stree (append (sublist kids 0 pos) items
+                                               (list-tail kids pos)))))
+               (run-edit! d
+                 (lambda ()
+                   (tree-assign parent (tree-of-stree new))
+                   (set! nodes (list parent))))
+               (finish-edit! d dist nodes (undo-replace d nodes (list old)))))
+            (else
+              (tool-error "new content can be inserted among the blocks of a document and among the parts of a paragraph; here, replace the node instead"))))))))
+
+;;; delete
+
+(define (undo-delete d parent prev next old)
+  ;; the step that deleted the block @old between the siblings @prev and
+  ;; @next (nodes, or #f)
+  (let ((pp (and prev (ptr prev))) (hp (and prev (tree-hash prev)))
+        (pn (and next (ptr next))) (hn (and next (tree-hash next))))
+    (define (prev-ok?) (and prev (pointed-ok? d pp hp)))
+    (define (next-ok?) (and next (pointed-ok? d pn hn)))
+    (cons
+     (lambda ()
+       (or (prev-ok?) (next-ok?)
+           "the neighbours of the deleted block changed since"))
+     (lambda ()
+       (cond ((prev-ok?)
+              (let ((p (deref pp)))
+                (tree-var-insert (tree-up p) (+ 1 (tree-index p))
+                                 (tree-of-stree (list 'document old)))))
+             (else
+               (let ((n (deref pn)))
+                 (tree-var-insert (tree-up n) (tree-index n)
+                                  (tree-of-stree (list 'document old))))))
+       #t))))
+
+(define (tool-delete args)
+  (let* ((d (editing-context args))
+         (fmt (opt-string args "format" "texmacs"))
+         (hn (target d args "node")) (h (car hn)) (t (cdr hn))
+         (expect (opt-string args "expect" #f)))
+    (cond
+      ((body-root? d t) (tool-error "the whole document cannot be deleted"))
+      ((check-expect d t h expect fmt))
+      (else
+        (let* ((parent (parent-of d t)) (i (tree-index t))
+               (old (tm->stree t))
+               (dist (disturbances)))
+          (cond
+            ((tm-is? parent 'document)
+             (let ((prev (and (> i 0) (tree-ref parent (- i 1))))
+                   (next (and (< (+ i 1) (tree-arity parent)) (tree-ref parent (+ i 1)))))
+               (if (and (not prev) (not next))
+                   ;; (a document is never empty: its only block becomes an empty text)
+                   (let ((nodes '()))
+                     (run-edit! d (lambda ()
+                                    (tree-assign t (tree-of-stree ""))
+                                    (set! nodes (list (tree-ref parent 0)))))
+                     (finish-edit! d dist '() (undo-replace d nodes (list old))))
+                   (begin
+                     (run-edit! d (lambda () (tree-remove parent i 1)))
+                     (finish-edit! d dist '()
+                                   (undo-delete d parent prev next old))))))
+            ((tm-is? parent 'concat)
+             (let* ((pold (tm->stree parent))
+                    (kids (cdr pold))
+                    (new (inline-stree (append (sublist kids 0 i) (list-tail kids (+ i 1)))))
+                    (nodes '()))
+               (run-edit! d (lambda ()
+                              (tree-assign parent (tree-of-stree new))
+                              (set! nodes (list parent))))
+               (finish-edit! d dist nodes (undo-replace d nodes (list pold)))))
+            (else
+              (tool-error "this node is an argument of its tag and cannot be deleted by itself: replace it (with an empty text, say)"))))))))
+
+;;; edit_text
+
+(define skipped-text-tags '(label reference pageref eqref cite nocite cite-detail
+                            hlink href image postscript postscript* assign))
+
+(define (text-leaves t)
+  ;; the strings of the visible text of @t
+  (cond ((tree-atomic? t) (list t))
+        ((in? (tree-label t) skipped-text-tags) '())
+        (else (append-map text-leaves (tree-children t)))))
+
+(define (occurrences s what)
+  ;; the positions of @what in the string @s
+  (let loop ((from 0) (acc '()))
+    (let ((i (if (> from (string-length s)) -1 (string-search-forwards what from s))))
+      (if (< i 0)
+          (reverse acc)
+          (loop (+ i 1) (cons i acc))))))
+
+(define (undo-edit-text d leaf pos old new)
+  ;; the step that replaced @old by @new at @pos in the text @leaf
+  (let ((pl (ptr leaf)))
+    (cons
+     (lambda ()
+       (let ((l (deref pl)))
+         (or (and (tree? l) (inside-body? d l) (tree-atomic? l)
+                  (<= (+ pos (string-length new)) (string-length (tree->string l)))
+                  (== (substring (tree->string l) pos (+ pos (string-length new))) new))
+             "the text this step changed was changed since")))
+     (lambda ()
+       (let ((l (deref pl)))
+         (when (> (string-length new) 0) (tree-remove l pos (string-length new)))
+         (when (> (string-length old) 0) (tree-insert l pos old))
+         #t)))))
+
+(define (tool-edit-text args)
+  (let* ((d (editing-context args))
+         (hn (target d args "node")) (h (car hn)) (t (cdr hn))
+         (expect (opt-string args "expect" #f))
+         (old (opt-string args "old" #f))
+         (new (opt-string args "new" #f)))
+    (when (or (not old) (== old ""))
+      (tool-error "the argument `old' (the text to replace) is needed"))
+    (when (not new)
+      (tool-error "the argument `new' (the new text, possibly empty) is needed"))
+    (cond
+      ((check-expect d t h expect "texmacs"))
+      (else
+        (let* ((old* (utf8->cork old)) (new* (utf8->cork new))
+               (hits (append-map
+                      (lambda (leaf)
+                        (map (lambda (p) (cons leaf p))
+                             (occurrences (tree->string leaf) old*)))
+                      (text-leaves t))))
+          (cond
+            ((null? hits)
+             (tool-error "the text `old' was not found in the node (it must lie in one stretch of text without markup inside, and be written as it is)"))
+            ((pair? (cdr hits))
+             (tool-error (string-append "the text `old' occurs " (number->string (length hits))
+                                        " times in the node: give more of the text around it, so that it occurs once")))
+            (else
+              (let* ((leaf (car (car hits))) (pos (cdr (car hits)))
+                     (dist (disturbances)))
+                (run-edit! d
+                  (lambda ()
+                    (tree-remove leaf pos (string-length old*))
+                    (when (> (string-length new*) 0) (tree-insert leaf pos new*))))
+                (finish-edit! d dist (list t)
+                              (undo-edit-text d leaf pos old* new*))))))))))
+
+;;; undo_agent
+
+(define (tool-undo-agent args)
+  (let* ((d (editing-context args))
+         (steps (opt-int args "steps" 1 1 50))
+         (stack (steps-of d)))
+    (cond
+      ((null? stack)
+       (tool-error "there is no step of this session to undo in this document"))
+      ((> (disturbances) (or (ahash-ref mcp-step-marks (doc-id d)) 0))
+       (forget-steps! d)
+       (tool-error "the document was resynchronized or a change was refused since: the steps before cannot be undone safely"))
+      (else
+        (let* ((n (min steps (length stack)))
+               (todo (sublist stack 0 n))
+               (dist (disturbances)))
+          ;; each step is checked on the document as it is when its turn
+          ;; comes (the newer steps are undone first); if one cannot be
+          ;; undone everything is cancelled and nothing is changed
+          (set! edit-reason #f)
+          (run-edit! d
+            (lambda ()
+              (for (u todo)
+                (let ((c ((car u))))
+                  (when (string? c)
+                    (set! edit-reason (string-append "not undone: " c " (the step number " (number->string (- (length stack) (length (memq u stack)) -1)) " from the newest); nothing was changed"))
+                    (throw 'mcp-undo-refused))
+                  ((cdr u))))))
+          (ahash-set! mcp-steps (doc-id d) (list-tail stack n))
+          (let ((r (finish-edit! d dist '() #f)))
+            (apply obj (append (cdr r) (list "undone" (num n))))))))))
+
+;;; save, close, create
+
+(define (tool-save-document args)
+  (let* ((d (editing-context args)) (u (doc-url d)))
+    (settle! d (disturbances))
+    (save-buffer-main u)
+    ;; (a participant asks the host: wait for it)
+    (let loop ((n 0))
+      (when (and (shared-file-participant? u) (buffer-modified? u) (< n 500))
+        (shared-poll)
+        (loop (+ n 1))))
+    (obj "status" (if (buffer-modified? u) "pending" "saved")
+         "document" (doc-id d)
+         "path" (doc-path d)
+         "shared" (doc-shared d)
+         "hash" (hash-short (doc-body d)))))
+
+(define (tool-close-document args)
+  (let* ((d (editing-context args)) (u (doc-url d))
+         (discard (jbool (jref args "discard") #f)))
+    (when (and (buffer-modified? u) (not discard))
+      (tool-error "the document has unsaved changes: save_document first, or close it with discard=true"))
+    (when (buffer-modified? u) (buffer-pretend-saved u))
+    (for (e (ahash-table->list mcp-handles))
+      (when (== (caddr e) (doc-id d))
+        (tree-pointer-detach (cadr e))
+        (ahash-remove! mcp-handles (car e))))
+    (forget-steps! d)
+    (ahash-remove! mcp-snaps (doc-id d))
+    (set! mcp-docs (list-filter mcp-docs (lambda (x) (!= (doc-id x) (doc-id d)))))
+    (catch #t (lambda () (buffer-close u)) (lambda args #f))
+    (obj "status" "closed" "document" (doc-id d))))
+
+(define (tool-create-document args)
+  (require-writable)
+  (let* ((path (opt-string args "path" #f))
+         (style (opt-string args "style" "generic"))
+         (content (opt-string args "content" #f))
+         (fmt (opt-string args "format" "texmacs")))
+    (when (not path) (tool-error "the argument `path' is needed"))
+    (when (not (absolute-path? path)) (tool-error "the path must be absolute"))
+    (when (dotdot-in-path? path) (tool-error "a path with a component `..' is not accepted"))
+    (when (colon-in-path? path) (tool-error "a path with a colon (:) cannot be used"))
+    (when (not (string-ends? path ".tm")) (tool-error "the file name must end with .tm"))
+    (when (not (let loop ((i 0))
+                 (or (>= i (string-length style))
+                     (and (or (char-alphabetic? (string-ref style i))
+                              (char-numeric? (string-ref style i))
+                              (memv (string-ref style i) '(#\- #\_)))
+                          (loop (+ i 1))))))
+      (tool-error "the style is the name of a style, such as article"))
+    (let* ((slash (let loop ((i (- (string-length path) 1)))
+                    (cond ((< i 0) #f)
+                          ((char=? (string-ref path i) #\/) i)
+                          (else (loop (- i 1))))))
+           (dir (and slash (substring path 0 (max 1 slash))))
+           (rdir (and dir (shared-real-path dir))))
+      (when (or (not rdir) (== rdir ""))
+        (tool-error "the folder of the file does not exist"))
+      (let ((target (string-append (if (== rdir "/") "" rdir) "/"
+                                   (substring path (+ slash 1) (string-length path)))))
+        (when (not (path-allowed? target))
+          (tool-error (string-append "not allowed: " path
+                                     " is outside the folders of this server")))
+        (when (!= (shared-real-path target) "")
+          (tool-error "the file exists already: open it instead"))
+        (let ((items (and content (content-items (parse-content content fmt)))))
+          (string-save (string-append "<TeXmacs|" (texmacs-version) ">\n\n<style|<tuple|"
+                                      style ">>\n\n<\\body>\n  \n</body>\n")
+                       (system->url target))
+          (let ((d (open-doc! target)))
+            (when items
+              (run-edit! d
+                (lambda ()
+                  (tree-assign (doc-body d) (tree-of-stree (cons 'document items)))))
+              (forget-steps! d))
+            (snapshot! d)
+            (doc-info d)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The table of tools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1046,9 +1757,71 @@
                        (cons "limit" (prop "integer" "Most items per list (default 200)."))
                        (cons "start" (prop "integer" "Index of the first item of each list, to continue.")))
                  '("document"))
-         tool-get-references)))
+         tool-get-references)
+   ;; the tools which edit (a seventh element: #t)
+   (list "replace" "Replace a node"
+         "Replaces the node of a handle by content (one or several blocks if the node is a block of the document; one item if it is inside a paragraph). `expect' is the hash of the node from your last read: if the node changed since, nothing is done and the result is a `conflict' with its current content and a fresh handle (leave `expect' out to accept merging with the other change). One call is one undo step, all or nothing: content which does not parse is refused. Gives the new handles, or `refused' if the person's TeXmacs refused the change."
+         (schema (list (cons "document" document-prop)
+                       (cons "node" (prop "string" "Handle of the node to replace."))
+                       (cons "content" (prop "string" "The new content."))
+                       (cons "format" (prop "string" "Format of the content: texmacs (default, the .tm syntax of a snippet), stree, latex or markdown."))
+                       (cons "expect" (prop "string" "The hash of the node, as read.")))
+                 '("document" "node" "content"))
+         tool-replace #t)
+   (list "insert" "Insert content"
+         "Inserts content before or after a node (a block of the document, or a part of a paragraph), or as its first or last child; without `anchor' in the document itself (where first or last). Several blocks can be inserted among blocks. Optional `expect' is the hash of the anchor. One undo step."
+         (schema (list (cons "document" document-prop)
+                       (cons "anchor" (prop "string" "Handle of the node next to which to insert (none: the document)."))
+                       (cons "where" (prop "string" "before, after, first or last."))
+                       (cons "content" (prop "string" "The content to insert."))
+                       (cons "format" (prop "string" "texmacs (default), stree, latex or markdown."))
+                       (cons "expect" (prop "string" "The hash of the anchor, as read.")))
+                 '("document" "where" "content"))
+         tool-insert #t)
+   (list "delete" "Delete a node"
+         "Deletes a block of the document, or a part of a paragraph. `expect' is the hash of the node as read: if it changed, the result is a `conflict'. One undo step."
+         (schema (list (cons "document" document-prop)
+                       (cons "node" (prop "string" "Handle of the node to delete."))
+                       (cons "expect" (prop "string" "The hash of the node, as read.")))
+                 '("document" "node"))
+         tool-delete #t)
+   (list "edit_text" "Replace some text inside a node"
+         "Replaces one occurrence of a text by another inside a node, keeping the markup around it and the other text of the paragraph: the way to change a word or a sentence. The old text must occur exactly once in the node, in one stretch of text without markup inside (an error tells how many times it occurs). `expect` is the hash of the node as read. One undo step."
+         (schema (list (cons "document" document-prop)
+                       (cons "node" (prop "string" "Handle of the node (a paragraph, a theorem...)."))
+                       (cons "old" (prop "string" "The text to replace (plain text, once in the node)."))
+                       (cons "new" (prop "string" "The new text (may be empty)."))
+                       (cons "expect" (prop "string" "The hash of the node, as read.")))
+                 '("document" "node" "old" "new"))
+         tool-edit-text #t)
+   (list "undo_agent" "Undo your own last steps"
+         "Undoes the last steps (tool calls that edited) of this session in the document, newest first, as one step. It never touches the changes of others: it is refused, and nothing is done, if someone changed what a step made since."
+         (schema (list (cons "document" document-prop)
+                       (cons "steps" (prop "integer" "How many steps (default 1).")))
+                 '("document"))
+         tool-undo-agent #t)
+   (list "save_document" "Save a document"
+         "Saves the document to its file (asks the host when the file is shared)."
+         (schema (list (cons "document" document-prop)) '("document"))
+         tool-save-document #t)
+   (list "close_document" "Close a document"
+         "Closes the document in this session (a shared file is left, the others keep it). Refused if it has unsaved changes, unless discard is true."
+         (schema (list (cons "document" document-prop)
+                       (cons "discard" (prop "boolean" "Close although there are unsaved changes.")))
+                 '("document"))
+         tool-close-document #t)
+   (list "create_document" "Create a document"
+         "Creates a new .tm file (the path must be absolute, the folder must exist, the file must not) with a style, optionally with initial content, and opens it."
+         (schema (list (cons "path" (prop "string" "Absolute path of the new file, ending in .tm."))
+                       (cons "style" (prop "string" "Document style, e.g. generic (default), article, book, beamer."))
+                       (cons "content" (prop "string" "Initial content (optional)."))
+                       (cons "format" (prop "string" "Format of the content: texmacs (default), stree, latex or markdown.")))
+                 '("path"))
+         tool-create-document #t)))
 
 (define (tool-name t) (car t))
+
+(define (editing-tool? t) (and (> (length t) 5) (list-ref t 5)))
 
 (define (tools-list-result)
   (obj "tools"
@@ -1057,11 +1830,15 @@
                         "title" (cadr t)
                         "description" (caddr t)
                         "inputSchema" (cadddr t)
-                        "annotations" (obj "readOnlyHint" (bool #t)
-                                           "destructiveHint" (bool #f)
-                                           "idempotentHint" (bool #t)
+                        "annotations" (obj "readOnlyHint" (bool (not (editing-tool? t)))
+                                           "destructiveHint" (bool (and (editing-tool? t)
+                                                                        (member (car t) '("replace" "delete" "undo_agent"))
+                                                                        #t))
+                                           "idempotentHint" (bool (not (editing-tool? t)))
                                            "openWorldHint" (bool #f))))
-                 mcp-tools))))
+                 (list-filter mcp-tools
+                              (lambda (t) (or (not (editing-tool? t))
+                                              (not (mcp-read-only?)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The protocol
@@ -1071,7 +1848,7 @@
 (define latest-version "2025-06-18")
 
 (define server-instructions
-  "TeXmacs documents. Start with list_documents or open_document, then get_outline to see the structure of a long document, then read (format text is the cheapest; texmacs is exact) the blocks you need, using the handles of earlier results. find locates text, tags (tag:theorem), labels and sections; get_references lists labels, references and citations and the broken ones. A file the person has open in TeXmacs is joined live, so reads show their latest edits. This server only reads.")
+  "TeXmacs documents. Start with list_documents or open_document, then get_outline to see the structure of a long document, then read (format text is the cheapest; texmacs is exact) the blocks you need, using the handles of earlier results. find locates text, tags (tag:theorem), labels and sections; get_references lists labels, references and citations and the broken ones. A file the person has open in TeXmacs is joined live, so reads show their latest edits. Editing: replace, insert, delete and edit_text (the best for changing a word or a sentence) take the handle of a node and, for safety, `expect', the hash you read it with: if someone changed the node meanwhile you get a `conflict' with its current content and nothing is changed. Each call is one undo step, all or nothing; undo_agent undoes yours. Answers may carry a `note' when the document changed since your last call: read again what it names. save_document writes the file.")
 
 (define (result-message id result)
   (obj "jsonrpc" "2.0" "id" id "result" result))
@@ -1107,7 +1884,15 @@
         (catch #t
           (lambda ()
             (set! mcp-param-error-message #f)
-            (text-result (json-write ((list-ref tool 4) args)) #f))
+            (when (and (editing-tool? tool) (mcp-read-only?)) (require-writable))
+            (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
+                   (d (and dref (find-doc dref)))
+                   (note (and d (begin (doc-refresh! d) (change-note d))))
+                   (r ((list-ref tool 4) args)))
+              (text-result (json-write (if (and note (func? r 'attr))
+                                           (append r (list "note" note))
+                                           r))
+                           #f)))
           (lambda args*
             (cond ((and (pair? args*) (eq? (car args*) 'mcp-tool-error))
                    (text-result mcp-tool-error-message #t))
@@ -1290,6 +2075,7 @@
   (:synopsis "Serve MCP on the standard input and output, until the input ends")
   (when (not mcp-running?)
     (set! mcp-running? #t)
+    (shared-set-agent! #t)
     (set! mcp-last-activity (texmacs-time))
     (mcp-log "started, " (texmacs-version))
     (exec-delayed-pause mcp-tick)))

@@ -1,15 +1,47 @@
-# `texmacs --mcp`: TeXmacs as an MCP server (read only)
+# `texmacs --mcp`: TeXmacs as an MCP server
 
-Step 2 of the [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design)
+Steps 2 (reading) and 3 (editing, direct mode) of the [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design)
 (sections 4.1, 4.3, 5, 6, 8). An agent (Claude Code, Claude Desktop, any MCP
 client) starts `texmacs --mcp` as its MCP server over stdio and reads TeXmacs
-documents through it:
+documents through it, and edits them.
+
+## Registering the server
+
+**Claude Code**:
 
     claude mcp add texmacs -- texmacs --mcp
 
-This step only reads. Editing (`replace`, `insert`, `delete`, `edit_text`),
-agent modes and proposals, `check`, `render`, `export`, notifications and
-`get_changes` are the steps 3 to 6 of the design. The interface has no tool
+(`texmacs` is the launcher of TeXmacs Upsilon, `TeXmacs/bin/texmacs` of an
+installation; give its full path if it is not in the `PATH`. To limit the folders
+or to make the server read-only, put the variables in the command:
+`claude mcp add texmacs -e TEXMACS_MCP_ROOTS=$HOME/papers -- texmacs --mcp`.)
+
+**Claude desktop app**: add the server to `claude_desktop_config.json`
+(Settings > Developer > Edit Config; on macOS it is
+`~/Library/Application Support/Claude/claude_desktop_config.json`) and restart the
+app:
+
+    {
+      "mcpServers": {
+        "texmacs": {
+          "command": "/Applications/TeXmacs Upsilon.app/Contents/MacOS/texmacs",
+          "args": ["--mcp"],
+          "env": { "TEXMACS_MCP_ROOTS": "/Users/you/papers" }
+        }
+      }
+    }
+
+The path is that of the binary of the application (on macOS the launcher script is
+`Contents/Resources/bin/texmacs` or the executable in `Contents/MacOS`: use the one
+which exists in your installation; it must be the launcher or `texmacs.bin`
+with `--mcp`). Nothing is typed on the terminal: the app starts the process and talks
+to it over its standard input and output. `env` is optional.
+
+To work on a file together with a person who has it open in TeXmacs, turn on the
+preference `share-open-files` in both (TeXmacs and the home the server uses).
+
+Not yet: agent modes and proposals, `check`, `render`, `export` and resource
+notifications (steps 4 to 6 of the design). The interface has no tool
 that evaluates code, starts a plugin session, or touches preferences or the
 network (design 5.6). The real guarantee about files is weaker than "nothing
 but documents": `open_document` (and any tool given a path) opens **any file the
@@ -19,8 +51,8 @@ start the server with **`TEXMACS_MCP_ROOTS=dir1:dir2`**: only files whose
 canonical path (symbolic links resolved; a path with a `..` component is refused,
 and the file loaded is the canonical path that was checked) is inside one of the folders
 can be opened, and `list_documents` shows no other open file; the default is no
-limit. `TEXMACS_MCP_READONLY` is reserved for the editing steps (every tool
-reads today). Paths containing a colon cannot be opened (a colon separates
+limit. `TEXMACS_MCP_READONLY=1` makes the server refuse (and not list) the editing
+tools, `save_document`, `close_document` and `create_document`. Paths containing a colon cannot be opened (a colon separates
 the alternatives of a TeXmacs url) and give a clean error.
 
 ## The process
@@ -121,6 +153,78 @@ a string nor a number, or a missing or non-string method, is -32600.
 | `find` | `document`, `query`, `limit?` (50) | `count`, `truncated`, `matches`: handle, tag, hash, `section` (the title of the section it is in), `context` |
 | `get_references` | `document`, `limit?` (200), `start?` | `labels` (name, handle of the block that holds it, section), `references` (name, tag, handle, `defined`), `citations` (key, handle), `broken_references`, `duplicate_labels`; `labels_total`, `references_total`, `citations_total`, `truncated` (`limit` and `start` apply to the three lists) |
 
+The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
+
+| Tool | Arguments | Result |
+|---|---|---|
+| `replace` | `document`, `node`, `content`, `format?` (`texmacs` default, `stree`, `latex`, `markdown`), `expect?` | `status` `applied` with `hash` (the new hash of the document), `changed` (the new nodes: handle, tag, hash, preview) and `undo_steps`; or `conflict`; or `refused` |
+| `insert` | `document`, `anchor?`, `where` (`before`, `after`, `first`, `last`), `content`, `format?`, `expect?` | the same; no anchor means the document itself (`first`, `last`) |
+| `delete` | `document`, `node`, `expect?` | the same, `changed` empty |
+| `edit_text` | `document`, `node`, `old`, `new`, `expect?` | the same |
+| `undo_agent` | `document`, `steps?` (1) | the same, with `undone` |
+| `save_document` | `document` | `saved` (or `pending`), `path`, `shared` |
+| `close_document` | `document`, `discard?` | `closed`; refused with unsaved changes unless `discard` |
+| `create_document` | `path` (absolute, `.tm`, new, in an existing folder), `style?` (`generic`), `content?`, `format?` | the facts of the new document, opened |
+
+- **Content** is parsed first and refused, with nothing changed, if it does not
+  parse: `texmacs` (the syntax of a snippet, with `<`, `>` balanced; non-ASCII
+  characters are accepted as UTF-8), `stree` (read as data, never evaluated; a
+  string, or a tag with arguments), `latex` (braces balanced), `markdown`. A
+  `(document ...)` or several paragraphs are several blocks.
+- **A node** is a block of the document (then `replace` takes one or several
+  blocks), or a part of a paragraph (then one item; the paragraph is rebuilt
+  with the strings merged). The whole document cannot be replaced or deleted;
+  a node that is an argument of its tag cannot be deleted by itself.
+- **`edit_text`** is the fine-grained tool: the old text must occur exactly once
+  in the visible text of the node, inside one stretch of text without markup
+  (the error says how many times it occurs, or that it was not found); it
+  changes only those characters, so that the markup around it and a person's
+  typing elsewhere in the same paragraph are kept and merged by the host.
+- **`expect`** is the `hash` of the node as read (of the anchor for `insert`). If the
+  node changed since, nothing is done and the result is `{status: "conflict",
+  current, current_hash, handle}` (the current content in the format asked, at most
+  4000 characters, and a fresh handle). This holds even if the host could have
+  merged the two changes (design 7, question 1): leave `expect` out to accept
+  merging. The check is made on this process's copy of the document, which
+  follows the host within some 20 to 35 ms: a change of the person in that window is
+  merged or refused by the host, as for any change without `expect`.
+- **One call, one undo step, all or nothing.** The check and the parsing come
+  first; the change is made between `mark-start` and `mark-end` by the editor of the
+  buffer (so it carries the author of the editor of this process, and in a shared
+  file it goes to the host as patches of this process; the cursor moves are
+  stripped before they leave), and cancelled with `mark-cancel` if something fails
+  in the middle.
+- **Shared files.** The process marks itself as an agent when it joins (its
+  participant id starts with `agent.`, `shared-agent-id?`). Its patches go to the
+  host as those of any participant: the host applies them with an author of their
+  own (so that the person's undo skips them when they commute, tested: the
+  person types twice, the agent changes the start of the same paragraph, the person
+  undoes twice), rebases them when it can (`patch-can-pull?`) and refuses them
+  otherwise; the host's own changes are never refused. The tool waits (at most
+  10 s) for the host's answer: `applied`; `refused` (with a reason; the agent's copy
+  is the host's again, and the older steps of the agent are forgotten, as the
+  rollback made them unsafe to undo); or `pending` after 10 s (the host is busy: the
+  change is kept and sent when it answers). For an agent no file is written in the
+  `recovered` folder when its patch is lost: the refusal is its report. Propose
+  mode and the menu of the person are step 4: direct mode only.
+- **`undo_agent`** does not use the undo of the editor, which undoes the
+  changes of the person that do not commute with the step. Each step keeps what it
+  made (tree pointers and hashes) and the old content; a step is undone only if
+  what it made is as it left it (the later steps are undone first; if one cannot be,
+  the whole undo is cancelled and the reason is given). Limit: after the agent deletes
+  a block and undoes the deletion, the block is a new copy, and an older step that
+  touched that block can no longer be undone.
+- **Notes.** When the document changed since the last call about it (by the
+  person, or a resynchronization), the answer of the tool has a `note`: how many blocks
+  changed from which index, in which sections, and the new hash, since many clients
+  do not show the model notifications. The note is made by comparing the hashes of the
+  top-level blocks with those seen at the last call.
+- `save_document` saves in the host when the file is shared (it waits for
+  it); a file created by `create_document` is written with its style, then opened
+  as any file.
+- With `TEXMACS_MCP_READONLY` the editing tools are not listed and are refused;
+  `create_document` and the edits respect `TEXMACS_MCP_ROOTS`.
+
 Notes:
 
 - **`read` cuts between blocks** (the children of the body): it takes as many as
@@ -190,7 +294,17 @@ the work folder).
 - **The agent's TeXmacs uses the person's home** by default
   (`~/.TeXmacs_Upsilon`), so its preferences (`share-open-files`) apply to both; a
   client can set `TEXMACS_HOME_PATH` in the environment of the server.
-- Not done: cursors/presence of the agent, resources and notifications, limits
-  of folders and a read-only flag (design 6), `create_document`, `save_document`,
-  `close_document` (they come with editing), Windows, and a typesetter-based
-  `get_references`.
+- Not done: cursors/presence of the agent, resources and notifications, propose
+  mode and the menu (step 4), `check`, `render`, `export` (step 5), `get_changes`
+  (step 6), rebasing across a split or join of a paragraph far from the edit
+  (the host refuses these; planned), Windows, and a typesetter-based
+  `get_references`. Also not investigated: a report that `go-to-path` called from a
+  `delayed` command did not move the cursor in the window of a shared buffer.
+- The editor's undo of the person skips the agent's changes when they commute.
+  Remote patches were applied by a participant with the author of the host; they
+  now carry the author of their sender (`applied` has the id), and a participant
+  re-applies its own pending changes with the author of its own editor (they were
+  made foreign by the transformation). With two parties only the first was
+  already right; a third party shows the difference.
+- `beep` in a headless Qt build crashed (an undo that restores the saved
+  state called `QApplication::beep` without an application): it is skipped when headless.

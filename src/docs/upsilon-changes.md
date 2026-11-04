@@ -23,8 +23,18 @@ have the details, and the problems go to the
   `texmacs`, `stree`, `latex` or `markdown`, cut at a size, with handles and
   hashes of the blocks), `find` and `get_references`. With shared files on, a
   file the person has open is joined and the agent reads their latest edits.
-  `TEXMACS_MCP_ROOTS` limits the folders it opens. See
-  [mcp-server.md](mcp-server.md); tests in `tests/mcp`.
+  `TEXMACS_MCP_ROOTS` limits the folders it opens. Editing (second step): `replace`,
+  `insert`, `delete`, `edit_text` (change a word keeping the markup), `undo_agent`,
+  `save_document`, `close_document`, `create_document`; each call is one undo step,
+  all or nothing, with `expect` (the hash read) giving a `conflict` instead of
+  overwriting a change of the person; in a shared file the agent is a participant
+  whose patches the person's TeXmacs applies as another author (the person's undo
+  skips them) and may refuse, which the tool reports; answers carry a note when the
+  document changed. `TEXMACS_MCP_READONLY=1` turns editing off. Also: an undo in a
+  headless Qt process no longer crashes, and a participant applies the patches of
+  another participant with the author of their sender. See
+  [mcp-server.md](mcp-server.md) (it also says how to register the server in Claude
+  Code and in the Claude desktop app); tests in `tests/mcp`.
 
 ## 3 November 2026
 
