@@ -1232,6 +1232,10 @@ def s_content(w):
     f = os.path.join(roots, "c.tm")
     write_small(f)
     write_small(os.path.join(roots, "inc.tm"))
+    write_small(os.path.join(outside, "secret.tm"))
+    with open(os.path.join(roots, "pic.png"), "wb") as fh:
+        fh.write(b"x")
+    os.symlink(outside, os.path.join(roots, "lnk"))       # a link that leads out of the roots
     with open(os.path.join(roots, "inc.tex"), "w") as fh:
         fh.write("INCLUDED-TEX-CONTENT\n")
     f = os.path.realpath(f)
@@ -1281,10 +1285,78 @@ def s_content(w):
     accepted("a mail link", "stree", '(hlink "me" "mailto:a@b.org")')
     accepted("an include in the folder", "stree", '(include "inc.tm")')
     accepted("markdown: a link", "markdown", "[x](https://example.org)")
+    # the primitives of the DRD, by their real names (src/Data/Drd/drd_std.cpp)
+    refused("include*", "texmacs", "<include*|/etc/hosts>", "`include*'")
+    refused("include* in the folder behind a link", "texmacs", "<include*|lnk/secret.tm>", "`include*'")
+    refused("include behind a link", "texmacs", "<include|lnk/secret.tm>", "`include'")
+    refused("include with %2e%2e", "texmacs", "<include|%2e%2e/outside/secret.tm>", "`include'")
+    refused("include of a web address", "texmacs", "<include|HTTP://x/y>", "`include'")
+    refused("include of a network path", "texmacs", "<include|//host/x.tm>", "`include'")
+    refused("style-only*", "texmacs", "<style-only*|x>", "`style-only*'")
+    refused("style-with*", "texmacs", "<style-with*|x|y>", "`style-with*'")
+    refused("hybrid", "texmacs", "<hybrid|extern>", "`hybrid'")
+    refused("authorize", "texmacs", "<authorize|a|b>", "`authorize'")
+    refused("observer", "texmacs", "<observer|a|b>", "`observer'")
+    refused("while (a loop without limit)", "texmacs", "<while|true|x>", "`while'")
+    refused("for-each", "texmacs", "<for-each|x|y>", "`for-each'")
+    refused("range", "stree", '(range "0" "1000000000")', "`range'")
+    refused("pattern with an absolute file", "texmacs", "<with|color|<pattern|/etc/passwd|1cm|1cm>|x>", "`pattern'")
+    refused("pattern behind a link", "texmacs", "<with|color|<pattern|lnk/pic.png|1cm|1cm>|x>", "`pattern'")
+    refused("video", "texmacs", "<video|/etc/passwd>", "`video'")
+    refused("sound", "stree", '(sound "/etc/passwd")', "`sound'")
+    refused("find-file", "stree", '(image (find-file "/etc/passwd") "1par" "" "" "")', "`find-file'")
+    refused("a plugin input", "texmacs", "<scheme-input|default|1|(+ 1 2)>", "-input")
+    refused("shell-input", "texmacs", "<shell-input|a|b|c>", "-input")
+    refused("a macro", "texmacs", "<with|f|<macro|<f>>|<f>>", "`macro'")
+    refused("a macro that calls itself", "texmacs", "<with|f|<macro|x|<f|x>>|<f|a>>", "`macro'")
+    refused("apply", "stree", '(apply "f" "x")', "`apply'")
+    refused("expand", "stree", '(expand "f" "x")', "`expand'")
+    refused("set", "stree", '(set "x" "y")', "`set'")
+    refused("provide", "stree", '(provide "x" "y")', "`provide'")
+    refused("filter-style", "stree", '(filter-style "x")', "`filter-style'")
+    # links: the destination, written as plain text
+    refused("a destination through with/value", "texmacs", "<with|u|file:///etc/passwd|<hlink|a|<value|u>>>", "destination is not written")
+    refused("a destination through concat", "texmacs", "<hlink|a|<concat|file:|///etc/passwd>>", "destination is not written")
+    refused("a destination through merge", "texmacs", "<hlink|a|<merge|file|:///etc/passwd>>", "destination is not written")
+    refused("a destination that is a network path", "texmacs", "<hlink|a|//host/path>", "//host/path")
+    refused("a destination with blanks before the scheme", "texmacs", "<hlink|a| javascript:x>", "javascript:x")
+    refused("a tmfs destination", "texmacs", "<hlink|a|tmfs://exec/x>", "tmfs:")
+    refused("url", "texmacs", "<url|file:///etc/passwd>", "`url'")
+    refused("href", "texmacs", "<href|file:///etc/passwd>", "`href'")
+    refused("slink", "texmacs", "<slink|file:///etc/passwd>", "`slink'")
+    refused("a link in a locus", "texmacs", "<locus|<id|x>|<link|hyperlink|<id|x>|file:///etc/passwd>|text>", "`link'")
+    # raw text for other programs
+    refused("specific for latex", "stree", '(specific "latex" "\\\\input{/etc/passwd}")', "specific")
+    refused("specific for html", "stree", '(specific "html" "<script>alert(1)</script>")', "specific")
+    refused("a latex tag with \\input", "stree", '(latex "\\\\input{/etc/passwd}")', "\\input")
+    refused("latex: building a command name", "latex", "\\in\\string put{secret}", "\\string")
+    refused("latex: a definition that hides \\input", "latex", "\\newcommand{\\foo}{\\input{x}}", "\\input")
+    refused("latex: \\bibliography of an absolute file", "latex", "\\bibliography{/etc/passwd}", "refers to the file")
+    refused("latex: \\href to a file", "latex", "\\href{file:///etc/passwd}{x}", "file:")
+    refused("latex: \\url to javascript", "latex", "\\url{javascript:alert(1)}", "javascript:")
+    refused("markdown: ![x](../../etc/passwd)", "markdown", "![x](../../etc/passwd)", "refers to the file")
+    refused("markdown: [x](javascript:alert(1))", "markdown", "[x](javascript:alert(1))", "javascript:")
+    accepted("a link with a colon in its text", "texmacs", "<hlink|See: this|http://example.com>")
+    accepted("a link to a section", "texmacs", "<hlink|Section 1: intro|#sec:x>")
+    accepted("a link to a section of another file", "texmacs", "<hlink|a|other.tm#sec:x>")
+    accepted("a link with an uppercase scheme", "texmacs", "<hlink|a|HTTP://x.y>")
+    accepted("a link to the web with a query", "texmacs", "<hlink|a|https://x.org/a?b=c:d>")
+    accepted("a smart-ref", "texmacs", "<smart-ref|sec:x>")
+    accepted("a reference", "texmacs", "<reference|sec:x>")
+    accepted("a macro of a style which is not loaded", "texmacs", "<unknowntag|a|b>")
+    accepted("a macro of a style with one argument", "texmacs", "<foo|a>")
+    accepted("a theorem with a colon", "texmacs", "<theorem|Let x: then y.>")
+    accepted("a footnote with a colon", "texmacs", "<footnote|note: with colon>")
+    accepted("a pattern in the folder", "texmacs", "<with|color|<pattern|pic.png|1cm|1cm>|x>")
+    accepted("a specific for printer", "texmacs", "<specific|printer|x>")
+    accepted("a graphics with a point", "texmacs", "<graphics|<point|0|0>>")
+    accepted("a latex tag with plain text", "stree", '(latex "x^2")')
+    accepted("latex: \\bibliography of a relative name", "latex", "\\bibliography{refs}")
+    accepted("latex: href to the web", "latex", "\\href{https://example.org}{site}")
+    accepted("a get-attachment", "texmacs", "<get-attachment|a>")
     # trees with the wrong number of arguments (the typesetter crashed on `with')
     for bad in ('(with)', '(frac "a")', '(table)', '(row)', '(cell)', '(concat)', '(tformat)',
-                '(section)', '(cite)', '(sqrt)', '(document "a" (frac "b"))', '(strong)', '(math)',
-                '(rsub "a" "b")'):
+                '(sqrt)', '(document "a" (frac "b"))', '(rsub "a" "b")', '(tuple "a" (with))'):
         refused("malformed %s" % bad, "stree", bad, "cannot have")
     r = m.request("ping")
     check("the server is alive after the malformed trees", r is not None and "result" in r)
@@ -1307,11 +1379,29 @@ def s_content(w):
     check("exit 0", m.close() == 0)
 
 
+def s_filter(w):
+    """every name in the lists of refused content is a tag of the DRD"""
+    env, home = make_env(w, "A")
+    p = subprocess.Popen([BIN, "-headless", "-x",
+                          '(begin (display* "UNKNOWN-NAMES " (mcp-filter-unknown-names) "\\n") (quit-TeXmacs))'],
+                         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    procs.append(p)
+    try:
+        out = p.communicate(timeout=60)[0].decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out = ""
+    line = [l for l in out.splitlines() if l.startswith("UNKNOWN-NAMES")]
+    check("the probe ran", len(line) == 1)
+    check("every name of the lists is a tag of the DRD: %s" % (line[0] if line else "?"),
+          len(line) == 1 and line[0].strip() == "UNKNOWN-NAMES ()")
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "undo": s_undo, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "filter": s_filter, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]

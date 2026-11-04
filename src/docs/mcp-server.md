@@ -174,38 +174,116 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   `(document ...)` or several paragraphs are several blocks.
 - **What content is refused** (the whole call is refused, nothing is changed, and the
   reason names the tag). The tree of the content is parsed (or converted) first
-  and walked completely, also what the LaTeX and Markdown importers make of it:
-  - *Code*: `extern`, `script`, `script-eval`, `script-input`, `script-output`,
-    `eval`, `eval-args`, `quasi`, `quasiquote`, `unquote`, `unquote*`, `action`,
-    `input`, `output`, `session`, `shell-input`, `plugin-input` and `compound`
-    (which calls a macro by its name).
-  - *The definitions and the style of the whole document*: `assign`, `drd-props`,
-    `style-with`, `style-only`, `var-style-only`, `with-package`, `use-package`,
-    `use-module`; and `raw-data` (binary data).
-  - *Links* (`hlink`, `href`, `slink`, `smart-ref`, `locus`) whose target has a
-    scheme other than `http`, `https`, `mailto` (`script:`, `file:`,
-    `javascript:`...). Relative targets and `#labels` are accepted.
-  - *Files*: `image`, `postscript`, `postscript*`, `include`, `var-include`,
-    `tmdoc-include`, `include-section`, `sound`, `video`, `attachment`, `ocr` (the
-    first argument) and `bibliography` (the files): only a relative name, with no
-    `..`, no colon, not starting with `/`, `\` or `~`, which stays inside the roots
-    (`TEXMACS_MCP_ROOTS`) or, with no roots, inside the folder of the document (a
-    symbolic link that leads out is resolved and refused); `http` and `https`
-    addresses for `image` and `postscript`. The name must be a string.
-  - *LaTeX sources* that use `\input`, `\include`, `\includeonly`,
-    `\InputIfFileExists`, `\verbatiminput`, `\lstinputlisting`, `\openin`,
-    `\openout`, `\immediate`, `\write`, `\read`, `\readline`, `\catcode`,
-    `\scantokens`, `\csname`, `\directlua`, `\newwrite`, `\bibliography`,
-    `\addbibresource`, `\externaldocument` are refused before the conversion: the
-    importer would read the files itself. (`\includegraphics` is converted to an
-    `image`, and then checked as above.)
-  - *Trees that cannot be*: a tag known to the DRD with a number of arguments it
-    cannot have (`(with)`, `(frac "a")`, an empty `(table)`...) is refused. A
-    `with` with no argument crashed the typesetter; the typesetter now shows a
-    `with` with a wrong number of arguments as an inactive tree (`make_bridge`), so a
-    patch of another process with such a tree no longer crashes the person's
-    TeXmacs either. (Only `with` is guarded in C++: the other primitives with a
-    wrong arity go through the failure detection of the typesetter.)
+  and walked completely, also what the LaTeX and Markdown importers make of it.
+  Every one of the 370 primitives of the DRD (`src/Data/Drd/drd_std.cpp`) is
+  classified below by its real name; the lists in `mcp-server.scm` are this table,
+  and the suite `filter` checks that every name in them is a tag of the DRD.
+
+| Name | Class | Why / which argument |
+|---|---|---|
+| `extern` | refused: code or definition | can run a command |
+| `hybrid` | refused: code or definition | calls a function by its name |
+| `authorize` | refused: code or definition | authorizes the evaluation of code |
+| `observer` | refused: code or definition | calls a function |
+| `action` | refused: code or definition | runs an action when clicked |
+| `script` | refused: code or definition | can run code |
+| `eval` | refused: code or definition | evaluates code |
+| `eval-args` | refused: code or definition | evaluates code |
+| `quasi` | refused: code or definition | evaluates code |
+| `quasiquote` | refused: code or definition | evaluates code |
+| `unquote` | refused: code or definition | evaluates code |
+| `unquote*` | refused: code or definition | evaluates code |
+| `compound` | refused: code or definition | calls a macro by its name |
+| `apply` | refused: code or definition | calls a macro by its name |
+| `expand` | refused: code or definition | calls a macro by its name |
+| `expand*` | refused: code or definition | calls a macro by its name |
+| `hide-expand` | refused: code or definition | calls a macro by its name |
+| `begin` | refused: code or definition | calls a macro by its name |
+| `end` | refused: code or definition | calls a macro by its name |
+| `map-args` | refused: code or definition | evaluates the arguments of a macro |
+| `assign` | refused: code or definition | changes the definitions of the whole document |
+| `set` | refused: code or definition | changes the environment of the whole document |
+| `reset` | refused: code or definition | changes the environment of the whole document |
+| `provide` | refused: code or definition | changes the definitions of the whole document |
+| `macro` | refused: code or definition | defines a macro (a macro can call itself without end) |
+| `xmacro` | refused: code or definition | defines a macro |
+| `func` | refused: code or definition | defines a function |
+| `drd-props` | refused: code or definition | changes the properties of the tags |
+| `with-package` | refused: code or definition | loads a package |
+| `use-package` | refused: code or definition | loads a package |
+| `use-module` | refused: code or definition | loads a module |
+| `new-theme` | refused: code or definition | changes the themes |
+| `copy-theme` | refused: code or definition | changes the themes |
+| `apply-theme` | refused: code or definition | changes the themes |
+| `select-theme` | refused: code or definition | changes the themes |
+| `style-with` | refused: code or definition | changes the style |
+| `style-with*` | refused: code or definition | changes the style |
+| `style-only` | refused: code or definition | changes the style |
+| `style-only*` | refused: code or definition | changes the style |
+| `filter-style` | refused: code or definition | changes the style |
+| `raw-data` | refused: code or definition | is binary data |
+| `find-file` | refused: code or definition | looks for files |
+| `find-file-upwards` | refused: code or definition | looks for files |
+| `uninit` | refused: code or definition | is an internal marker |
+| `unknown` | refused: code or definition | is an internal marker |
+| `while` | refused: loop or resource | is a loop without a limit (it can use all the memory) |
+| `for-each` | refused: loop or resource | is a loop (it can use all the memory) |
+| `range` | refused: loop or resource | makes a list of any size |
+| `image` | file argument | the first argument |
+| `postscript` | file argument | the first argument |
+| `include` | file argument | the first argument |
+| `include*` | file argument | the first argument |
+| `video` | file argument | the first argument |
+| `sound` | file argument | the first argument |
+| `pattern` | file argument | the first argument |
+| `hlink` | link destination | the 2nd argument |
+| `link` | link destination | the last argument |
+| `url` | link destination | the argument |
+| `specific` | raw text | refused unless its format is `texmacs`, `screen` or `printer` |
+| `latex` | raw text | its text is scanned for the LaTeX commands that read files, run code or hide a command name |
+
+  *Safe*: the 310 other primitives (layout, mathematics, tables, graphics, effects,
+  animations, labels and references, arithmetic and comparisons, `if`, `case`,
+  `with`, `value`, `quote`, `copy`, `delay`, `hold`, `release`, ...):
+  `string`, `error`, `document`, `para`, `surround`, `concat`, `rigid`, `hgroup`, `hidden`, `freeze`, `unfreeze`, `hspace`, `vspace*`, `vspace`, `space`, `htab`, `move`, `shift`, `resize`, `clipped`, `repeat`, `repeat*`, `float`, `datoms`, `dlines`, `dpages`, `dbox`, `line-note`, `page-note`, `if-page-break`, `with-limits`, `line-break`, `new-line`, `next-line`, `no-break`, `no-indent`, `yes-indent`, `no-indent*`, `yes-indent*`, `page-break*`, `page-break`, `no-page-break*`, `no-page-break`, `no-break-here*`, `no-break-here`, `no-break-start`, `no-break-end`, `new-page*`, `new-page`, `new-dpage*`, `new-dpage`, `around`, `around*`, `big-around`, `left`, `mid`, `right`, `big`, `long-arrow`, `lprime`, `rprime`, `below`, `above`, `lsub`, `lsup`, `rsub`, `rsup`, `frac`, `sqrt`, `wide`, `wide*`, `neg`, `tree`, `syntax`, `tformat`, `twith`, `cwith`, `tmarker`, `table`, `row`, `cell`, `subtable`, `with`, `provides`, `value`, `quote-value`, `or-value`, `quote-arg`, `arg`, `get-label`, `get-arity`, `mark`, `mark*`, `expand-as`, `quote`, `copy`, `if`, `if*`, `case`, `dynamic-case`, `or`, `xor`, `and`, `not`, `plus`, `minus`, `times`, `over`, `div`, `mod`, `minimum`, `maximum`, `math-sqrt`, `exp`, `log`, `pow`, `cos`, `sin`, `tan`, `merge`, `length`, `number`, `date`, `translate`, `change-case`, `is-tuple`, `look-up`, `occurs-inside`, `equal`, `unequal`, `less`, `lesseq`, `greater`, `greatereq`, `blend`, `rgb-color`, `rgb-access`, `cm-length`, `mm-length`, `in-length`, `pt-length`, `bp-length`, `dd-length`, `pc-length`, `cc-length`, `fs-length`, `fbs-length`, `em-length`, `ln-length`, `sep-length`, `yfrac-length`, `ex-length`, `fn-length`, `fns-length`, `bls-length`, `fnbot-length`, `fntop-length`, `spc-length`, `xspc-length`, `par-length`, `paw-length`, `pag-length`, `gw-length`, `gh-length`, `gu-length`, `tmpt-length`, `px-length`, `guipx-length`, `lcorner-length`, `bcorner-length`, `rcorner-length`, `tcorner-length`, `ms-length`, `s-length`, `msec-length`, `sec-length`, `min-length`, `hr-length`, `active`, `active*`, `inactive`, `inactive*`, `rewrite-inactive`, `inline-tag`, `open-tag`, `middle-tag`, `close-tag`, `symbol`, `locus`, `id`, `hard-id`, `find-accessible`, `relay`, `set-binding`, `get-binding`, `has-binding`, `hidden-binding`, `label`, `reference`, `pageref`, `get-attachment`, `write`, `toc-notify`, `auto-id`, `cache-ref`, `tuple`, `attr`, `tmlen`, `collection`, `associate`, `backup`, `gradient`, `flag`, `hyphenate-as`, `anim-static`, `anim-dynamic`, `morph`, `anim-time`, `anim-portion`, `anim-compose`, `anim-repeat`, `anim-constant`, `anim-accelerate`, `anim-translate`, `anim-progressive`, `graphics`, `superpose`, `gr-group`, `gr-transform`, `gr-effect`, `text-at`, `math-at`, `document-at`, `point`, `line`, `cline`, `arc`, `carc`, `spline`, `spline*`, `cspline`, `bezier`, `cbezier`, `smooth`, `csmooth`, `penscript`, `calligraphy`, `fill`, `box-info`, `frame-direct`, `frame-inverse`, `is-equal`, `is-intersection`, `on-curve`, `on-text-border`, `on-grid`, `transform-3d`, `object-3d`, `triangle-3d`, `light-3d`, `light-diffuse`, `light-specular`, `eff-move`, `eff-magnify`, `eff-bubble`, `eff-crop`, `eff-turbulence`, `eff-fractal-noise`, `eff-hatch`, `eff-dots`, `eff-gaussian`, `eff-oval`, `eff-rectangular`, `eff-motion`, `eff-blur`, `eff-outline`, `eff-thicken`, `eff-erode`, `eff-degrade`, `eff-distort`, `eff-gnaw`, `eff-superpose`, `eff-add`, `eff-sub`, `eff-mul`, `eff-min`, `eff-max`, `eff-mix`, `eff-normalize`, `eff-monochrome`, `eff-color-matrix`, `eff-gradient`, `eff-make-transparent`, `eff-make-opaque`, `eff-recolor`, `eff-skin`, `canvas`, `ornament`, `art-box`, `format`, `line-sep`, `split`, `delay`, `hold`, `release`, `old-matrix`, `old-table`, `old-mosaic`, `old-mosaic-item`, `env`.
+
+  Other rules:
+  - *Macros* (tags that are not primitives): `session`, `input`, `output`, `script-input`,
+    `script-output`, `script-eval` and every tag ending in `-input` or `-output`
+    (`scheme-input`, `shell-input`...) are refused as code; `tmdoc-include`,
+    `include-section`, `attachment`, `ocr` (first argument) and `bibliography` (all
+    its string arguments) are file arguments; `href` and `slink` (first argument)
+    are link destinations. Any other tag unknown to the DRD, such as a macro of the
+    person's style which this process has not loaded, is accepted, and its
+    arguments are walked.
+  - *File arguments*: a plain string that is a relative name, with no `..` component, no
+    colon or scheme, not starting with `/`, `\` or `~`, no `%2e`, `%2f` or `%5c`,
+    that stays (symbolic links resolved, also for a file that does not exist yet) inside the
+    roots (`TEXMACS_MCP_ROOTS`) or, with no roots, inside the folder of the document;
+    `http` and `https` addresses for `image`, `postscript` and `pattern`. A file
+    written as anything but a plain string (`concat`, `value`, `merge`...) is refused.
+  - *Link destinations*: a plain string; the scheme (letters, digits, `+ - .` before a
+    colon, blanks at the start skipped, case ignored) must be `http`, `https` or
+    `mailto`; no scheme means a relative address, a `#label` or `other.tm#label`, which is
+    accepted (a link is followed by the person, not read by the server); `//host` is
+    refused. The other arguments of a link (its text) are not looked at, so
+    `<hlink|See: this|http://x.org>` is fine. `smart-ref`, `reference`, `pageref` and
+    `label` take labels, not addresses.
+  - *LaTeX sources*: `\input`, `\include`, `\includeonly`, `\InputIfFileExists`,
+    `\verbatiminput`, `\lstinputlisting`, `\openin`, `\openout`, `\immediate`, `\write`,
+    `\read`, `\readline`, `\catcode`, `\scantokens`, `\csname`, `\directlua`, `\luaexec`,
+    `\pdfshellescape`, `\newwrite`, `\externaldocument`, and the ways to build or hide a
+    command name (`\string`, `\expandafter`, `\noexpand`, `\def`, `\edef`, `\gdef`, `\xdef`,
+    `\futurelet`, `\makeatletter`, `\makeatother`) are refused before the conversion: the
+    importer would read the files itself. This also refuses them inside `verbatim`
+    (a false positive that stays). `\bibliography{refs}` is accepted (the
+    `bibliography` tag is checked as above), `\includegraphics` becomes an `image`.
+  - *Trees that cannot be*: a primitive with a number of arguments it cannot have
+    (`(with)`, `(frac "a")`, an empty `(table)`...) is refused. A `with` with no
+    argument crashed the typesetter; the typesetter now shows a `with` with a wrong
+    number of arguments as an inactive tree (`make_bridge`), so a patch of another
+    process with such a tree no longer crashes the person's TeXmacs either.
+    Macros are not checked.
   This is a filter on what the agent writes, not a sandbox: a document that the
   person opened already is not scanned, and the importers run in this process.
 - **A node** is a block of the document (then `replace` takes one or several
@@ -313,7 +391,8 @@ the work folder).
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `undo` | the undo of the editor in a headless process, single process (`undo-probe.scm`): the own steps, the step of another author skipped when it commutes, the undo back to the saved state (it crashed: `QApplication::beep` without an application) |
-| `content` | each case of the refused content (code, files, links, LaTeX and Markdown sources, malformed trees) and the accepted ones, with the document unchanged and the server alive; `create_document` with dangling links and refused content |
+| `filter` | every name of the lists of refused content is a tag of the DRD |
+| `content` | each case of the refused content (code, loops, files, links, LaTeX and Markdown sources, malformed trees) and the accepted ones, 126 checks, with the document unchanged and the server alive; `create_document` with dangling links and refused content |
 | `edit`, `readonly`, `edit-shared` | the editing tools: each tool, conflicts, undo_agent, all-or-nothing, save/close/create, read-only and roots; with a second headless TeXmacs hosting and editing (merge in one paragraph, a refusal reported, the person's undo skipping the agent's changes) |
 | `robust` | non-ASCII and newlines in every format and in the file name, a star in a name, colons refused, `TEXMACS_MCP_ROOTS` (outside file, `/etc/passwd`, `..`, a symbolic link), sections in concatenations, bad arguments and messages, 200000 nested arrays, a 34 MB line |
 | `hostdeath` | a server which has not opened the file lists it, the host is killed with `kill -9`, the file leaves the list; then the entry is given the pid of a live foreign process and a closed port: still not listed |

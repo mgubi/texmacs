@@ -1068,63 +1068,154 @@
              (and (> depth 0) (loop (+ i 1) (- depth 1))))
             (else (loop (+ i 1) depth))))))
 
-(define (known-tag? tag)
-  ;; does the DRD know the tag (a primitive, or a macro of a style loaded)?
-  (let loop ((n 0))
-    (and (<= n 16)
-         (or (tag-possible-arity? tag n) (loop (+ n 1))))))
+;;; What content is refused (design 5.6: no evaluation of code, nothing but the
+;;; documents is reached). Every primitive of the DRD (src/Data/Drd/drd_std.cpp)
+;;; is classified by its real name: refused as code or as a definition of the
+;;; whole document, refused as a loop or a resource, with a file argument, with
+;;; a link destination, or safe (all the others). The table is in
+;;; docs/mcp-server.md; the lists below are its source, and the suite checks
+;;; that every name in them is a tag of the DRD (mcp-filter-unknown-names).
+
+(define drd-primitives
+  '(
+    string unknown uninit error raw-data document para surround concat rigid
+    hgroup hidden freeze unfreeze hspace vspace* vspace space htab move shift
+    resize clipped repeat repeat* float datoms dlines dpages dbox line-note
+    page-note if-page-break with-limits line-break new-line next-line
+    no-break no-indent yes-indent no-indent* yes-indent* page-break*
+    page-break no-page-break* no-page-break no-break-here* no-break-here
+    no-break-start no-break-end new-page* new-page new-dpage* new-dpage
+    around around* big-around left mid right big long-arrow lprime rprime
+    below above lsub lsup rsub rsup frac sqrt wide wide* neg tree syntax
+    tformat twith cwith tmarker table row cell subtable assign provide with
+    provides value quote-value or-value macro drd-props quote-arg arg
+    compound xmacro get-label get-arity map-args eval-args new-theme
+    copy-theme apply-theme select-theme mark mark* expand-as eval quote quasi
+    quasiquote unquote unquote* copy if if* case dynamic-case while for-each
+    extern include* include with-package use-package use-module or xor and
+    not plus minus times over div mod minimum maximum math-sqrt exp log pow
+    cos sin tan merge length range number date translate change-case
+    find-file find-file-upwards is-tuple look-up occurs-inside equal unequal
+    less lesseq greater greatereq blend rgb-color rgb-access cm-length
+    mm-length in-length pt-length bp-length dd-length pc-length cc-length
+    fs-length fbs-length em-length ln-length sep-length yfrac-length
+    ex-length fn-length fns-length bls-length fnbot-length fntop-length
+    spc-length xspc-length par-length paw-length pag-length gw-length
+    gh-length gu-length tmpt-length px-length guipx-length lcorner-length
+    bcorner-length rcorner-length tcorner-length ms-length s-length
+    msec-length sec-length min-length hr-length filter-style style-with
+    style-with* style-only style-only* active active* inactive inactive*
+    rewrite-inactive inline-tag open-tag middle-tag close-tag symbol latex
+    hybrid locus id hard-id link url script observer find-accessible hlink
+    action relay set-binding get-binding has-binding hidden-binding label
+    reference pageref get-attachment write toc-notify auto-id cache-ref tuple
+    attr tmlen collection associate backup pattern gradient specific flag
+    hyphenate-as anim-static anim-dynamic morph anim-time anim-portion
+    anim-compose anim-repeat anim-constant anim-accelerate anim-translate
+    anim-progressive video sound graphics superpose gr-group gr-transform
+    gr-effect text-at math-at document-at point line cline arc carc spline
+    spline* cspline bezier cbezier smooth csmooth penscript calligraphy fill
+    image box-info frame-direct frame-inverse is-equal is-intersection
+    on-curve on-text-border on-grid transform-3d object-3d triangle-3d
+    light-3d light-diffuse light-specular eff-move eff-magnify eff-bubble
+    eff-crop eff-turbulence eff-fractal-noise eff-hatch eff-dots eff-gaussian
+    eff-oval eff-rectangular eff-motion eff-blur eff-outline eff-thicken
+    eff-erode eff-degrade eff-distort eff-gnaw eff-superpose eff-add eff-sub
+    eff-mul eff-min eff-max eff-mix eff-normalize eff-monochrome
+    eff-color-matrix eff-gradient eff-make-transparent eff-make-opaque
+    eff-recolor eff-skin canvas ornament art-box format line-sep split delay
+    hold release old-matrix old-table old-mosaic old-mosaic-item set reset
+    expand expand* hide-expand apply begin end func env authorize postscript ))
+
+(define code-reasons
+  '((extern . "can run a command") (hybrid . "calls a function by its name")
+    (authorize . "authorizes the evaluation of code") (observer . "calls a function")
+    (action . "runs an action when clicked") (script . "can run code")
+    (eval . "evaluates code") (eval-args . "evaluates code")
+    (quasi . "evaluates code") (quasiquote . "evaluates code")
+    (unquote . "evaluates code") (unquote* . "evaluates code")
+    (compound . "calls a macro by its name") (apply . "calls a macro by its name")
+    (expand . "calls a macro by its name") (expand* . "calls a macro by its name")
+    (hide-expand . "calls a macro by its name") (begin . "calls a macro by its name")
+    (end . "calls a macro by its name") (map-args . "evaluates the arguments of a macro")
+    (assign . "changes the definitions of the whole document")
+    (set . "changes the environment of the whole document")
+    (reset . "changes the environment of the whole document")
+    (provide . "changes the definitions of the whole document")
+    (macro . "defines a macro (a macro can call itself without end)")
+    (xmacro . "defines a macro") (func . "defines a function")
+    (drd-props . "changes the properties of the tags")
+    (with-package . "loads a package") (use-package . "loads a package")
+    (use-module . "loads a module")
+    (new-theme . "changes the themes") (copy-theme . "changes the themes")
+    (apply-theme . "changes the themes") (select-theme . "changes the themes")
+    (style-with . "changes the style") (style-with* . "changes the style")
+    (style-only . "changes the style") (style-only* . "changes the style")
+    (filter-style . "changes the style")
+    (raw-data . "is binary data")
+    (find-file . "looks for files") (find-file-upwards . "looks for files")
+    (uninit . "is an internal marker") (unknown . "is an internal marker")
+    (while . "is a loop without a limit (it can use all the memory)")
+    (for-each . "is a loop (it can use all the memory)")
+    (range . "makes a list of any size")))
+
+;; tags that are not primitives (macros of the standard styles): code of
+;; sessions and of scripts
+(define code-macro-reasons
+  '((session . "is a session that runs code") (input . "is the input of a session that runs code")
+    (output . "is the output of a session") (script-input . "can run code")
+    (script-output . "is the output of code") (script-eval . "can run code")))
+
+(define (suffix-reason tag)
+  ;; plugin inputs and outputs: scheme-input, shell-output...
+  (let ((s (symbol->string tag)))
+    (cond ((string-ends? s "-input") "is the input of a session that runs code")
+          ((string-ends? s "-output") "is the output of a session")
+          (else #f))))
+
+;; (tag . position of the first file in the arguments); the macros have no
+;; entry in the DRD of the primitives; for `bibliography' all the arguments
+;; are looked at (the importer of LaTeX gives it the files alone)
+(define file-primitives
+  '((image . 0) (postscript . 0) (include . 0) (include* . 0) (video . 0)
+    (sound . 0) (pattern . 0)))
+(define file-macros
+  '((tmdoc-include . 0) (include-section . 0) (attachment . 0) (ocr . 0)
+    (bibliography . 0)))
+
+;; (tag . position of the destination; last = the last argument)
+(define link-primitives '((hlink . 1) (link . last) (url . last)))
+(define link-macros '((href . 0) (slink . 0)))
+
+(define web-file-tags '(image postscript pattern))
+
+(define (filter-lists)
+  ;; for the tests: the names of all the lists (symbols)
+  (append (map car code-reasons) (map car file-primitives) (map car link-primitives)
+          '(specific latex)))
+
+(tm-define (mcp-filter-unknown-names)
+  (:synopsis "The names of the lists of refused content which are not tags of the DRD")
+  (list-filter (filter-lists)
+               (lambda (n) (not (known-primitive? n)))))
+
+(define (known-primitive? tag) (and (memq tag drd-primitives) #t))
 
 (define (check-arity st)
   ;; refuse a tree in which a tag known to the DRD has a number of arguments
-  ;; it cannot have (a `with' with none crashes the typesetter)
+  ;; it cannot have (a `with' with none crashes the typesetter). Only the
+  ;; primitives are checked: the macros (of the styles, loaded or not) are
+  ;; accepted, and the arguments of all are walked.
   (cond ((string? st) #t)
         ((pair? st)
          (let ((n (length (cdr st))))
-           (when (and (not (== (car st) 'document)) (known-tag? (car st))
+           (when (and (not (== (car st) 'document)) (known-primitive? (car st))
                       (not (tag-possible-arity? (car st) n)))
              (tool-error (string-append "the tag `" (symbol->string (car st))
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
            (for (c (cdr st)) (check-arity c))))
         (else #t)))
-
-;;; What content is refused (design 5.6: no evaluation of code, nothing but the
-;;; documents is reached)
-
-(define code-tags
-  '(extern script script-eval script-input script-output eval eval-args quasi
-    quasiquote unquote unquote* action input output session shell-input
-    plugin-input compound
-    ;; (they change the environment or the definitions of the whole document)
-    assign drd-props style-with style-only var-style-only with-package
-    use-package use-module raw-data))
-
-(define why-refused
-  '((extern . "can run a command")
-    (script . "can run code") (script-eval . "can run code")
-    (script-input . "can run code") (script-output . "is the output of code")
-    (eval . "evaluates code") (eval-args . "evaluates code")
-    (quasi . "evaluates code") (quasiquote . "evaluates code")
-    (unquote . "evaluates code") (unquote* . "evaluates code")
-    (action . "runs an action when clicked") (input . "is the input of a session that runs code")
-    (output . "is the output of a session") (session . "is a session that runs code")
-    (shell-input . "can run a command") (plugin-input . "can run code")
-    (compound . "calls a macro by its name")
-    (assign . "changes the definitions of the whole document")
-    (drd-props . "changes the properties of the tags")
-    (style-with . "changes the style") (style-only . "changes the style")
-    (var-style-only . "changes the style") (with-package . "loads a package")
-    (use-package . "loads a package") (use-module . "loads a module")
-    (raw-data . "is binary data")))
-
-(define file-tags
-  ;; tags whose first argument is a file (position of the first file, and
-  ;; whether all the following arguments are files too)
-  '((image . 0) (postscript . 0) (postscript* . 0) (include . 0) (var-include . 0)
-    (tmdoc-include . 0) (include-section . 0) (sound . 0) (video . 0)
-    (attachment . 0) (ocr . 0) (bibliography . 2)))
-
-(define link-tags '(hlink href slink smart-ref locus))
 
 (define (document-folder base)
   (let ((r (shared-real-path base)))
@@ -1136,11 +1227,45 @@
                                            (substring folder 0 (- (string-length folder) 1))
                                            folder) "/"))))
 
+(define (scheme-char? c)
+  (or (char-alphabetic? c) (char-numeric? c) (memv c '(#\+ #\- #\.))))
+
 (define (url-scheme s)
-  ;; the scheme of a link (before a colon, if no slash comes first), or #f
-  (let ((i (string-search-forwards ":" 0 s)) (j (string-search-forwards "/" 0 s)))
-    (and (> i 0) (or (< j 0) (< i j))
-         (locase-all (substring s 0 i)))))
+  ;; the scheme of an address (letters, digits, + - . before a colon, with
+  ;; nothing like / ? # before it), in lowercase, or #f. Blanks at the start
+  ;; are skipped (a browser does).
+  (let* ((n (string-length s))
+         (start (let loop ((i 0))
+                  (if (and (< i n) (memv (string-ref s i) '(#\space #\tab #\newline)))
+                      (loop (+ i 1)) i))))
+    (let loop ((i start))
+      (cond ((>= i n) #f)
+            ((char=? (string-ref s i) #\:)
+             (and (> i start) (char-alphabetic? (string-ref s start))
+                  (locase-all (substring s start i))))
+            ((scheme-char? (string-ref s i)) (loop (+ i 1)))
+            (else #f)))))
+
+(define (percent-dots? s)
+  ;; %2e or %2f (a dot or a slash written in hexadecimal)
+  (let ((l (locase-all s)))
+    (or (>= (string-search-forwards "%2e" 0 l) 0)
+        (>= (string-search-forwards "%2f" 0 l) 0)
+        (>= (string-search-forwards "%5c" 0 l) 0))))
+
+(define (resolve-existing path)
+  ;; the canonical form of @path, also when the end of it does not exist: the
+  ;; longest part that exists is resolved (a link to another folder leads
+  ;; there), and the rest is added
+  (let loop ((p path) (rest ""))
+    (let ((real (shared-real-path p)))
+      (if (and (string? real) (!= real ""))
+          (string-append real rest)
+          (let ((i (let scan ((k (- (string-length p) 1)))
+                     (cond ((<= k 0) #f) ((char=? (string-ref p k) #\/) k) (else (scan (- k 1)))))))
+            (if i
+                (loop (substring p 0 i) (string-append (substring p i (string-length p)) rest))
+                (string-append p rest)))))))
 
 (define (file-name-ok? name base web?)
   ;; may the document refer to the file @name? A relative name, without `..',
@@ -1153,62 +1278,103 @@
           ((== name "") #t)
           ((or (string-starts? name "/") (string-starts? name "\\")
                (string-starts? name "~") (colon-in-path? name)
-               (dotdot-in-path? name))
+               (dotdot-in-path? name) (percent-dots? name))
            #f)
           (else
             (let* ((folder (document-folder base))
                    (joined (string-append folder "/" name))
-                   (real (shared-real-path joined))
-                   (p (if (and (string? real) (!= real "")) real joined)))
+                   (p (resolve-existing joined)))
               (if (mcp-roots)
                   (path-allowed? p)
                   (inside-folder? p folder)))))))
 
-(define (string-args st)
-  (list-filter (cdr st) string?))
+(define (link-target-ok? s)
+  ;; a destination of a link: http, https, mailto, or a relative address
+  ;; (a path, a #label, other.tm#label); not a network path (//host)
+  (let ((scheme (url-scheme s)))
+    (cond (scheme (and (member scheme '("http" "https" "mailto")) #t))
+          ((or (string-starts? (tm-string-trim-both s) "//")
+               (string-starts? (tm-string-trim-both s) "\\"))
+           #f)
+          (else #t))))
+
+(define (refuse-tag tag why)
+  (tool-error (string-append "the tag `" (symbol->string tag) "' " why
+                             ": the content is refused (nothing was changed)")))
+
+(define (argument st k)
+  ;; the argument number k of the tree (last: the last one), or #f
+  (let ((args (cdr st)))
+    (cond ((null? args) #f)
+          ((eq? k 'last) (car (reverse args)))
+          ((< k (length args)) (list-ref args k))
+          (else #f))))
+
+(define (check-file-argument tag a base web?)
+  (cond ((string? a)
+         (when (not (file-name-ok? a base web?))
+           (tool-error (string-append "the tag `" (symbol->string tag) "' refers to the file `"
+                                      (utf8-prefix (u8 a) 60)
+                                      "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)"))))
+        (else
+          (tool-error (string-append "the tag `" (symbol->string tag)
+                                     "' has a file that is not written as a plain name: refused (nothing was changed)")))))
 
 (define (check-safety st base)
-  ;; refuse content with markup that can run code or read what it should not
+  ;; refuse content with markup that can run code, loop, or read what it
+  ;; should not
   (cond
     ((string? st) #t)
     ((pair? st)
      (let ((tag (car st)))
        ;; (the arguments first: what is inside is named in the reason)
        (for (c (cdr st)) (check-safety c base))
-       (when (memq tag code-tags)
-         (tool-error (string-append "the tag `" (symbol->string tag) "' "
-                                    (or (let ((e (assq tag why-refused))) (and e (cdr e)))
-                                        "is not accepted")
-                                    ": the content is refused (nothing was changed)")))
-       (when (memq tag link-tags)
-         (for (a (string-args st))
-           (let ((scheme (url-scheme a)))
-             (when (and scheme (not (member scheme '("http" "https" "mailto"))))
-               (tool-error (string-append "a `" (symbol->string tag)
-                                          "' with the target `" (utf8-prefix (u8 a) 60)
-                                          "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)"))))))
-       (let ((f (assq tag file-tags)))
+       (cond
+         ((assq tag code-reasons) => (lambda (e) (refuse-tag tag (cdr e))))
+         ((assq tag code-macro-reasons) => (lambda (e) (refuse-tag tag (cdr e))))
+         ((suffix-reason tag) => (lambda (why) (refuse-tag tag why))))
+       (let ((f (or (assq tag file-primitives) (assq tag file-macros))))
          (when f
            (let loop ((l (list-tail (cdr st) (min (cdr f) (length (cdr st))))) (first? #t))
              (when (pair? l)
-               (cond ((string? (car l))
-                      (when (and (or first? (> (cdr f) 0))
-                                 (not (file-name-ok? (car l) base (memq tag '(image postscript postscript*)))))
-                        (tool-error (string-append "the tag `" (symbol->string tag)
-                                                   "' refers to the file `" (utf8-prefix (u8 (car l)) 60)
-                                                   "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)")))
-                      (loop (cdr l) #f))
-                     ((and first? (pair? (car l)))
-                      (tool-error (string-append "the tag `" (symbol->string tag)
-                                                 "' has a file that is not a name: refused (nothing was changed)")))
-                     (else (loop (cdr l) #f)))))))))
+               (cond (first?
+                      (check-file-argument tag (car l) base (and (memq tag web-file-tags) #t)))
+                     ((and (memq tag '(bibliography)) (string? (car l)))
+                      ;; (the files of a bibliography, the style: names)
+                      (check-file-argument tag (car l) base #f)))
+               (loop (cdr l) #f)))))
+       (let ((l (or (assq tag link-primitives) (assq tag link-macros))))
+         (when l
+           (let ((a (argument st (cdr l))))
+             (when a
+               (cond ((not (string? a))
+                      (tool-error (string-append "a `" (symbol->string tag)
+                                                 "' whose destination is not written as plain text is refused (nothing was changed)")))
+                     ((not (link-target-ok? a))
+                      (tool-error (string-append "a `" (symbol->string tag)
+                                                 "' with the target `" (utf8-prefix (u8 a) 60)
+                                                 "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)"))))))))
+       (cond
+         ((== tag 'specific)
+          ;; (the body is for the program that exports it, unless the format is
+          ;; one of TeXmacs: then it is TeXmacs markup, checked as the rest)
+          (let ((fmt (argument st 0)))
+            (when (not (and (string? fmt) (member fmt '("texmacs" "screen" "printer"))))
+              (tool-error (string-append "a `specific' for the format `"
+                                         (if (string? fmt) (utf8-prefix (u8 fmt) 20) "?")
+                                         "' (text for another program) is refused: only texmacs, screen and printer (nothing was changed)")))))
+         ((== tag 'latex)
+          (for (a (cdr st))
+            (when (string? a) (check-latex-source a)))))))
     (else #t)))
 
 (define latex-forbidden
   '("input" "include" "includeonly" "InputIfFileExists" "verbatiminput" "lstinputlisting"
     "openin" "openout" "immediate" "write" "read" "readline" "catcode" "scantokens"
-    "csname" "directlua" "luaexec" "pdfshellescape" "newwrite" "openin" "bibliography"
-    "addbibresource" "externaldocument"))
+    "csname" "directlua" "luaexec" "pdfshellescape" "newwrite" "externaldocument"
+    ;; (ways to build a command name, or a definition that may hide one)
+    "string" "expandafter" "noexpand" "def" "edef" "gdef" "xdef" "futurelet"
+    "makeatletter" "makeatother"))
 
 (define (latex-commands s)
   ;; the names of the commands (\name) in @s
@@ -1227,7 +1393,7 @@
   ;; the importer of LaTeX reads the files of \input and the like: not accepted
   (for (c (latex-commands s))
     (when (member c latex-forbidden)
-      (tool-error (string-append "the LaTeX command \\" c " is refused (it reads files or runs code): the content is refused (nothing was changed)")))))
+      (tool-error (string-append "the LaTeX command \\" c " is refused (it reads files, runs code or hides a command name): the content is refused (nothing was changed)")))))
 
 (define (parse-content content fmt base)
   ;; the stree of @content, written in the format @fmt; an error when it
