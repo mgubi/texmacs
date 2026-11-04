@@ -1769,20 +1769,67 @@
       (list 'custombinding (force-string (cAr l)))
       ""))
 
+;; Keys of labels, references, citations and bibliography items, which
+;; LaTeX reads as arguments of \label, \ref, \cite, \bibitem...: a key
+;; with a brace, a backslash, a comma, a percent sign, a hash, a space or
+;; another special character would end the argument and let the rest of the
+;; key be read as LaTeX (\input{...}).  The letters, the digits and
+;; : - . _ / + stay as they are (so that the usual exports do not change),
+;; as do the characters beyond ASCII and the <name> and <#hex> notations of
+;; Cork; any other ASCII character becomes =XX, with XX its hexadecimal
+;; code, which is what = itself becomes too, so that two keys which differ
+;; give two keys which differ.  All keys go through this one function, so
+;; that a reference still finds its label, a citation its \bibitem.
+
+(define (tmtex-ref-key-char-ok? c)
+  (or (char-alphabetic? c) (char-numeric? c) (> (char->integer c) 127)
+      (in? c '(#\: #\- #\. #\_ #\/ #\+))))
+
+(define (tmtex-ref-key-hex2 n)
+  (let ((h "0123456789ABCDEF"))
+    (string (string-ref h (quotient n 16)) (string-ref h (remainder n 16)))))
+
+(define (tmtex-ref-key-notation-end s i n)
+  ;; the end of a <name> or <#hex> notation which starts at i, or #f
+  (let loop ((j (+ i 1)))
+    (cond ((>= j n) #f)
+          ((== (string-ref s j) #\>) (and (> j (+ i 1)) j))
+          ((or (char-alphabetic? (string-ref s j))
+               (char-numeric? (string-ref s j))
+               (in? (string-ref s j) '(#\# #\-)))
+           (loop (+ j 1)))
+          (else #f))))
+
+(define (tmtex-ref-key x)
+  (let* ((s (force-string x))
+         (n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n)
+          (apply string-append (reverse acc))
+          (let* ((c (string-ref s i))
+                 (j (and (== c #\<) (tmtex-ref-key-notation-end s i n))))
+            (cond (j (loop (+ j 1) (cons (substring s i (+ j 1)) acc)))
+                  ((and (< (char->integer c) 128)
+                        (or (not (tmtex-ref-key-char-ok? c)) (== c #\=)))
+                   (loop (+ i 1)
+                         (cons (string-append
+                                "=" (tmtex-ref-key-hex2 (char->integer c))) acc)))
+                  (else (loop (+ i 1) (cons (string c) acc)))))))))
+
 (define (tmtex-label l)
-  (list 'label (force-string (car l))))
+  (list 'label (tmtex-ref-key (car l))))
 
 (define (tmtex-reference l)
-  (list 'ref (force-string (car l))))
+  (list 'ref (tmtex-ref-key (car l))))
 
 (define (tmtex-pageref l)
-  (list 'pageref (force-string (car l))))
+  (list 'pageref (tmtex-ref-key (car l))))
 
 (define (tmtex-eqref s l)
-  (list 'eqref (force-string (car l))))
+  (list 'eqref (tmtex-ref-key (car l))))
 
 (define (tmtex-smart-ref s l)
-  (let* ((ss (map force-string l))
+  (let* ((ss (map tmtex-ref-key l))
          (key (string-recompose ss ",")))
     (list 'Cref key)))
 
@@ -1839,11 +1886,20 @@
 (define (tmtex-graphics l)
   (tmtex-eps (cons 'graphics l)))
 
+;; A file name with a backslash, a brace or a hash cannot be written in
+;; \includegraphics{...}: the image is then converted into a file with a
+;; name of our own, as one which is not next to the target.
+(define (tmtex-file-name-safe? name)
+  (null? (filter (lambda (c) (or (in? c '(#\\ #\{ #\} #\#))
+                                 (< (char->integer c) 32)))
+                 (string->list name))))
+
 (define (tmtex-as-eps name)
   (let* ((u (url-relative (save-target-url) (unix->url name)))
          (suffix (url-suffix u))
          (fm (string-append (format-from-suffix suffix) "-file")))
-    (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg")))
+    (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg"))
+             (tmtex-file-name-safe? name))
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
@@ -2844,9 +2900,9 @@
 
 (define (tmtex-bibitem*-std s l)
   (cond ((= (length l) 1)
-         `(bibitem ,(car l)))
+         `(bibitem ,(tmtex-ref-key (car l))))
         ((= (length l) 2)
-         `(bibitem (!option ,(tmtex (car l))) ,(cadr l)))
+         `(bibitem (!option ,(tmtex (car l))) ,(tmtex-ref-key (cadr l))))
         (else
           (begin
             (display* "TeXmacs] non converted bibitem content: "
@@ -3000,9 +3056,32 @@
       (set! lst `(!indent (!paragraph ,@(cdr lst)))))
     `(!document (,tag ,arg ,lan ,lst))))
 
+;; The address of \href: # and % are written \# and \%, as hyperref wants;
+;; a backslash, a brace and ^ would be read as LaTeX, and end the argument
+;; or start a command, so they become the percent codes of a URL (\%5C...),
+;; which is what they are in an address.
+(define (tmtex-url-code c)
+  (string-append "%" (tmtex-ref-key-hex2 (char->integer c))))
+
+(define (tmtex-url-encode s)
+  ;; \ { } ^ and the characters which are not printable, in percent codes
+  (apply string-append
+         (map (lambda (c)
+                (if (or (in? c '(#\\ #\{ #\} #\^))
+                        (< (char->integer c) 32) (== (char->integer c) 127))
+                    (tmtex-url-code c)
+                    (string c)))
+              (string->list s))))
+
+(define (tmtex-url-escape s)
+  ;; for \url, which keeps the underscore as it is
+  (with r (string-replace (tmtex-url-encode s) "%" "\\%")
+    (string-replace r "#" "\\#")))
+
 (define (escape-hyperref-url l)
   (cond ((string? l)
-         (let* ((r1 (string-replace l "\\" "\\\\"))
+         (let* ((r0 (tmtex-url-encode l))
+                (r1 (string-replace r0 "%" "\\%"))
                 (r2 (string-replace r1 "#" "\\#"))
                 (r3 (string-replace r2 "_" "\\_")))
            r3))
@@ -3016,11 +3095,12 @@
   (let* ((h (cadr l))
          (d (tmtex (car l))))
     (if (and (string? h) (string-starts? h "#"))
-        (list 'hyperref `(!option ,(string-drop h 1)) d)
+        (list 'hyperref `(!option ,(tmtex-ref-key (string-drop h 1))) d)
         (list 'href (tmtex-hyperref h) d))))
 
 (define (tmtex-href s l)
-  (list 'url (tmtex-verb-string (car l))))
+  (with r (tmtex-verb-string (car l))
+    (list 'url (if (string? r) (tmtex-url-escape r) r))))
 
 (define (tmtex-action s l)
   (list 'tmaction (tmtex (car l)) (tmtex (cadr l))))
@@ -3063,8 +3143,9 @@
         ((nstring? (car l))
          (display* "TeXmacs] non converted citation: " (car l) "\n")
          (tmtex-cite-list (cdr l)))
-        ((null? (cdr l)) (car l))
-        (else (string-append (car l) "," (tmtex-cite-list (cdr l))))))
+        ((null? (cdr l)) (tmtex-ref-key (car l)))
+        (else (string-append (tmtex-ref-key (car l)) ","
+                             (tmtex-cite-list (cdr l))))))
 
 (tm-define (tmtex-cite s l)
   (tex-apply 'cite (tmtex-cite-list l)))
@@ -3117,13 +3198,13 @@
   (tex-apply 'citetext (tmtex (car l))))
 
 (define (tmtex-cite-author s l)
-  (tex-apply 'citeauthor (tmtex (car l))))
+  (tex-apply 'citeauthor (tmtex-ref-key (car l))))
 
 (define (tmtex-cite-author* s l)
-  (tex-apply 'citeauthor* (tmtex (car l))))
+  (tex-apply 'citeauthor* (tmtex-ref-key (car l))))
 
 (define (tmtex-cite-year s l)
-  (tex-apply 'citeyear (tmtex (car l))))
+  (tex-apply 'citeyear (tmtex-ref-key (car l))))
 
 (define (tmtex-natbib-triple s l)
   `(protect (citeauthoryear ,@(map tmtex l))))

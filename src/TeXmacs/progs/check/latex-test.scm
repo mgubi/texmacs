@@ -186,7 +186,45 @@
   (check= (tl '(cite "k")) "{\\cite{k}}")
   (check= (tl '(cite "k" "l")) "{\\cite{k,l}}")
   (check= (tl '(hlink "t" "http://x")) "\\href{http://x}{t}")
-  (check= (tl '(url "http://x")) "{\\url{http://x}}"))
+  (check= (tl '(url "http://x")) "{\\url{http://x}}")
+  ;; ordinary keys are written as they are
+  (check= (tl '(label "sec:a-b.c_d/e+f1")) "\\label{sec:a-b.c_d/e+f1}")
+  (check= (tl '(reference "sec:a-b.c_d/e+f1")) "\\ref{sec:a-b.c_d/e+f1}")
+  (check= (tl '(cite "Knuth:84" "b_c")) "{\\cite{Knuth:84,b_c}}"))
+
+;; A key with a brace, a backslash, a comma, a percent sign, a hash, a space
+;; or another special character cannot end its argument and start LaTeX (a
+;; file read by \input, or a command run by \write18); the label, the
+;; references and the citations write it in the same way.
+(define (test-export-hostile-keys)
+  (check-group "export: keys and addresses which are not plain")
+  (with evil "a}\\input{/etc/passwd}\\x{"
+    (with enc "a=7D=5Cinput=7B/etc/passwd=7D=5Cx=7B"
+      (check= (tl `(label ,evil)) (string-append "\\label{" enc "}"))
+      (check= (tl `(reference ,evil)) (string-append "\\ref{" enc "}"))
+      (check= (tl `(pageref ,evil)) (string-append "\\pageref{" enc "}"))
+      (check= (tl `(eqref ,evil)) (string-append "\\eqref{" enc "}"))
+      (check= (tl `(cite ,evil "k")) (string-append "{\\cite{" enc ",k}}"))
+      (check= (tl `(nocite ,evil)) (string-append "{\\nocite{" enc "}}"))
+      (check= (tl `(hlink "t" ,(string-append "#" evil)))
+              (string-append "\\hyperref[" enc "]{t}"))
+      (check= (tl `(bibitem* "[1]" ,evil))
+              (string-append "\\bibitem[[1]]{" enc "}"))))
+  (check= (tl '(label "a b%c#d&e$f~g^h,i=j"))
+          "\\label{a=20b=25c=23d=26e=24f=7Eg=5Eh=2Ci=3Dj}")
+  (check= (tl '(label "a=7D")) "\\label{a=3D7D}")
+  (check= (tl '(cite "k,l")) "{\\cite{k=2Cl}}")
+  (check= (tl '(label "<#4E2D>x")) "\\label{<#4E2D>x}")
+  ;; addresses
+  (check= (tl '(hlink "t" "http://a/b}\\input{x}\\z{"))
+          "\\href{http://a/b\\%7D\\%5Cinput\\%7Bx\\%7D\\%5Cz\\%7B}{t}")
+  (check= (tl '(hlink "t" "http://a/b%20c#d?x=1&y=2_3~4"))
+          "\\href{http://a/b\\%20c\\#d?x=1&y=2\\_3~4}{t}")
+  (check= (tl '(href "http://a/b}\\input{x}\\z{"))
+          "\\url{http://a/b\\%7D\\%5Cinput\\%7Bx\\%7D\\%5Cz\\%7B}")
+  (check= (tl '(href "http://a/b%c#d_e~f"))
+          "\\url{http://a/b\\%c\\#d_e~f}")
+  (check= (tl '(href "http://x")) "\\url{http://x}"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Export: mathematics
@@ -1361,6 +1399,7 @@
   (test-export-sections)
   (test-export-lists)
   (test-export-references)
+  (test-export-hostile-keys)
   (test-export-math)
   (test-export-boxes)
   (test-export-big)
