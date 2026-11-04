@@ -2444,6 +2444,9 @@
         ((== x '(next-line)) "\n")
         ((func? x 'document) (tmtex-tt-document (cdr x)))
         ((func? x 'para) (tmtex-tt-document (cdr x)))
+        ;; (a block of lines: a source file or a text, whose body is
+        ;; verbatim content)
+        ((func? x 'code-lines 1) (tmtex-tt (cadr x)))
         ((func? x 'concat)
          (apply string-append (map-in-order tmtex-tt (cdr x))))
         ((func? x 'mtm 2) (tmtex-tt (cAr x)))
