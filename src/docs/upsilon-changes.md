@@ -12,6 +12,19 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 4 November 2026
+
+- **`texmacs --mcp`** (desktop applications, first step, read only): TeXmacs
+  as an MCP server over stdio for an agent such as Claude Code
+  (`claude mcp add texmacs -- texmacs --mcp`). A headless TeXmacs which speaks
+  JSON-RPC on its standard input and output (everything else goes to
+  `system/mcp.log` of the home) and exits when the input ends. Tools:
+  `list_documents`, `open_document`, `get_outline`, `read` (as `text`,
+  `texmacs`, `stree`, `latex` or `markdown`, cut at a size, with handles and
+  hashes of the blocks), `find` and `get_references`. With shared files on, a
+  file the person has open is joined and the agent reads their latest edits.
+  See [mcp-server.md](mcp-server.md); tests in `tests/mcp`.
+
 ## 3 November 2026
 
 - **Shared files** (desktop applications, off by default): with the

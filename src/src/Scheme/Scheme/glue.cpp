@@ -1309,6 +1309,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "lsp_link.hpp"
 #endif
 #include "local_link.hpp"
+#include "mcp_stdio.hpp"
 #include "code_lines.hpp"
 #include "code_regions.hpp"
 #include "convert.hpp"

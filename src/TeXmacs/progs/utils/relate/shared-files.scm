@@ -222,6 +222,32 @@
         (map (lambda (n) (if (symbol? n) (symbol->string n) n)) l)
         '())))
 
+(tm-define (shared-files-in-use)
+  (:synopsis "The files which other processes of the user host: ((path interactive pid) ...)")
+  ;; (for `texmacs --mcp': what the person has open; a file of this process
+  ;; is not listed, nor an entry whose host is gone, which is found by its
+  ;; lock being free)
+  (let ((dir (shared-user-dir)))
+    (if (== dir "")
+        '()
+        (let loop ((names (list-dir-names dir)) (acc '()))
+          (cond ((null? names) (reverse acc))
+                ((not (string-ends? (car names) ".entry")) (loop (cdr names) acc))
+                (else
+                  (let* ((u (string->url (string-append dir "/" (car names))))
+                         (e (catch #t
+                              (lambda () (string->object (string-load u)))
+                              (lambda args #f))))
+                    (if (and (func? e 'entry) (== (length e) 8)
+                             (string? (cadr e))
+                             (read-entry (cadr e))
+                             (not (ahash-ref sf-table (cadr e)))
+                             (not (lock-free? (cadr e))))
+                        (loop (cdr names)
+                              (cons (list (cadr e) (list-ref e 5) (list-ref e 4))
+                                    acc))
+                        (loop (cdr names) acc)))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Messages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

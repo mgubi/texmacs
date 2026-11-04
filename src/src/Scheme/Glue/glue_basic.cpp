@@ -2288,6 +2288,46 @@ tmg_shared_touch (tmscm arg1) {
 }
 
 tmscm
+tmg_mcp_stdio_activeP () {
+  // TMSCM_DEFER_INTS;
+  bool out= mcp_stdio_active ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_mcp_stdin_read () {
+  // TMSCM_DEFER_INTS;
+  string out= mcp_stdin_read ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_mcp_stdin_eofP () {
+  // TMSCM_DEFER_INTS;
+  bool out= mcp_stdin_eof ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_mcp_stdout_write (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "mcp-stdout-write");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= mcp_stdout_write (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_tt_existsP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
@@ -13094,6 +13134,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("shared-lock-valid?",  tmg_shared_lock_validP, 2, 0, 0);
   tmscm_install_procedure ("shared-lock-renew",  tmg_shared_lock_renew, 2, 0, 0);
   tmscm_install_procedure ("shared-touch",  tmg_shared_touch, 1, 0, 0);
+  tmscm_install_procedure ("mcp-stdio-active?",  tmg_mcp_stdio_activeP, 0, 0, 0);
+  tmscm_install_procedure ("mcp-stdin-read",  tmg_mcp_stdin_read, 0, 0, 0);
+  tmscm_install_procedure ("mcp-stdin-eof?",  tmg_mcp_stdin_eofP, 0, 0, 0);
+  tmscm_install_procedure ("mcp-stdout-write",  tmg_mcp_stdout_write, 1, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);

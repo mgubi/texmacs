@@ -1539,6 +1539,38 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(mcp-stdio-active?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|mcp_stdio_active> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(mcp-stdin-read)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|mcp_stdin_read> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(mcp-stdin-eof?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|mcp_stdin_eof> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(mcp-stdout-write <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|mcp_stdout_write> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(tt-exists? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

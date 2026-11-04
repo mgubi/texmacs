@@ -216,6 +216,12 @@
   (shared-lock-valid? shared_lock_valid (bool int string))
   (shared-lock-renew shared_lock_renew (int int string))
   (shared-touch shared_touch (void string))
+
+  ;; standard input and output of texmacs --mcp (progs/agents/mcp-server.scm)
+  (mcp-stdio-active? mcp_stdio_active (bool))
+  (mcp-stdin-read mcp_stdin_read (string))
+  (mcp-stdin-eof? mcp_stdin_eof (bool))
+  (mcp-stdout-write mcp_stdout_write (bool string))
   
   ;; routines for the font database
   (tt-exists? tt_font_exists (bool string))
