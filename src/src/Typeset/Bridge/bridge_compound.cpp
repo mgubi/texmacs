@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "bridge.hpp"
 #include "drd_std.hpp"
 
@@ -193,6 +194,11 @@ bridge_compound_rep::my_typeset (int desired_status) {
     else f= tree (_ERROR, st);
     d= 0;
   }
+
+  // A macro that calls itself would nest the bridges until the stack of the
+  // process overflows: past a depth, an error box is shown instead.
+  if (is_applicable (f) && stack_nearly_full ())
+    f= tree (_ERROR, "macro nesting too deep");
 
   if (is_applicable (f)) {
     int i, n=N(f)-1, m=N(st)-d;
