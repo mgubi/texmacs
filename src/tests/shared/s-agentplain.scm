@@ -1,6 +1,7 @@
-;; Patches of a participant that is not an agent are not filtered and not
-;; turned into proposals, whatever the mode: the person's own second window,
-;; another TeXmacs of the person.
+;; A participant that does not say it is an agent but is headless is treated
+;; as one (the host does not rely on the id the participant chose); the person
+;; can mark it as a person (shared-treat-as-person!, Tools > Agents), and then
+;; its patches are not filtered nor turned into proposals.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (A-steps)
@@ -9,13 +10,20 @@
    (act "load" (load-buffer FILE))
    (act "go" (sync-set! "a-loaded"))
    (wait-sync "b-joined")
-   (act "no agents" (check "no agent on the file" (null? (shared-file-agents (the-name)))))
+   (step "listed" (= (length (shared-file-agents (the-name))) 1))
+   (act "check 0" (check "the headless participant is taken for an agent although its id does not say so"
+                         (not (shared-agent-id? (car (shared-file-agents (the-name))))))
+        (check "and the person is told" (= (shared-stat 'unmarked-joined) 1)))
+   (wait-sync "b-refused")
+   (act "check 1" (check "its javascript link was refused" (not (string-contains? (object->string (body-stree)) "javascript")))
+        (check "counted" (= (shared-stat 'agent-refused) 1))
+        (check "marked as a person" (shared-treat-as-person! (the-name) (car (shared-file-agents (the-name))) #t))
+        (sync-set! "a-marked"))
    (wait-sync "b-edited")
    (step "A sees" (string-contains? (object->string (body-stree)) "javascript"))
-   (act "check" (check "the link is applied, as the person's own" #t)
-        (check "no proposal, no refusal" (and (null? (shared-proposals (the-name))) (= (shared-stat 'agent-refused) 0)
-                                               (= (shared-stat 'agent-proposed) 0)))
-        (check "the gate did not run" (= (car (shared-file-gate-stats (the-name))) 0))
+   (act "check 2" (check "the link of a person is applied" #t)
+        (check "no proposal, no more refusal" (and (null? (shared-proposals (the-name))) (= (shared-stat 'agent-refused) 1)
+                                                    (= (shared-stat 'agent-proposed) 0)))
         (publish-body!) (sync-set! "a-done"))
    (wait-sync "b-done")))
 
@@ -25,8 +33,14 @@
    (act "load" (load-buffer FILE))
    (act "participant" (check "B participates" (== (role-of) 'participant)))
    (act "sig" (sync-set! "b-joined"))
+   (act "edit" (tree-var-insert (body) 4 (stree->tree '(document (hlink "x" "javascript:alert(1)")))))
+   (step "refused" (> (shared-stat 'rolled-back) 0))
+   (act "v" (check "refused with the rule" (let ((v (shared-file-verdict (the-name)))) (and v (eq? (car v) 'refused)))))
+   (step "clean" (and (== (para-count) 4) (== (pending-count) 0)))
+   (act "sig" (sync-set! "b-refused"))
+   (wait-sync "a-marked")
    (act "edit" (tree-var-insert (body) 4 (stree->tree '(document (hlink "x" "javascript:alert(1)")))) (insert-text! 1 5 "AA"))
-   (step "sent" (and (== (pending-count) 0) (> (shared-stat 'submitted) 0)))
+   (step "sent" (and (== (pending-count) 0) (> (shared-stat 'submitted) 1)))
    (act "sig" (sync-set! "b-edited"))
    (wait-sync "a-done")
    (act "out" (publish-body!) (sync-set! "b-done"))))

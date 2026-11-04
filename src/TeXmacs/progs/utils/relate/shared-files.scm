@@ -423,6 +423,57 @@
   (let ((l (modification->scheme m)))
     (scheme->modification (list (car l) (cdr (cadr l)) (caddr l)))))
 
+;; The patches of the other processes are not trusted. Their shape is checked
+;; before any patch function sees them (a modification with a path that is
+;; too short made the process die in C++), and a patch of a participant is
+;; rebuilt with the inverses computed from the document, not the ones it sent.
+
+(define mod-kinds '(assign insert remove split join assign-node insert-node remove-node set-cursor))
+
+(define (mod-min-length k)
+  ;; the length of the path under the shared tree (the part 0 or 1 comes first)
+  (cond ((memq k '(assign assign-node)) 1)
+        ((memq k '(remove split)) 3)
+        (else 2)))
+
+(define (mod-shape-ok? x)
+  (and (list? x) (= (length x) 3) (memq (car x) mod-kinds)
+       (let ((path (cadr x)))
+         (and (list? path)
+              (list-and (map (lambda (i) (and (integer? i) (>= i 0))) path))
+              (>= (length path) (mod-min-length (car x)))
+              (memv (car path) '(0 1))
+              #t))))
+
+(define (patch-shape-ok? x depth)
+  (and (pair? x) (list? x) (< depth 64)
+       (cond ((eq? (car x) 'pair)
+              (and (= (length x) 3) (mod-shape-ok? (cadr x)) (mod-shape-ok? (caddr x))))
+             ((eq? (car x) 'compound)
+              (list-and (map (lambda (c) (patch-shape-ok? c (+ depth 1))) (cdr x))))
+             (else #f))))
+
+(define (patch-forward-mods x)
+  ;; the forward modifications of a patch of the right shape, in order, without
+  ;; the cursor
+  (cond ((eq? (car x) 'pair)
+         (if (eq? (car (cadr x)) 'set-cursor) '() (list (cadr x))))
+        (else (append-map patch-forward-mods (cdr x)))))
+
+(define (rebuild-patch x doc)
+  ;; the patch of the shape-checked @x on the document @doc, with the inverses
+  ;; of the document; #f if it does not apply
+  (catch #t
+    (lambda ()
+      (let loop ((l (patch-forward-mods x)) (t doc) (acc '()))
+        (if (null? l)
+            (patch-compound (reverse acc))
+            (let ((m (scheme->modification (car l))))
+              (and (modification-applicable? t m)
+                   (let ((p1 (patch-pair m (modification-invert m t))))
+                     (loop (cdr l) (patch-apply t p1) (cons p1 acc))))))))
+    (lambda args #f)))
+
 (define (split-patch p part)
   ;; the modifications of @p which are under child @part of the shared tree,
   ;; with their paths relative to it; #f for a kind of patch which a patch
@@ -959,16 +1010,42 @@
 ;; the level being style, links, code or limits. A host which is not
 ;; interactive (an agent's process, a test) applies the patches as before.
 
-(define (agent-peer? peer) (shared-agent-id? (peer-id peer)))
+;; Who is an agent. The id `agent.*' is chosen by the participant, so it is not
+;; what the host relies on: a participant that is not interactive (a headless
+;; process, whatever its id) is treated as an agent unless the person said it is
+;; not (shared-treat-as-person!, the menu). The local link is NOT a security
+;; boundary against a process of the same user that has a shell (it can claim to
+;; be interactive, or edit the file on disk): the host's filter protects the
+;; person from the content that an agent writes, through the usual paths.
+
+(define sf-host-modes (make-ahash-table))     ; file key -> mode chosen by the person
+(define sf-host-persons (make-ahash-table))   ; file key -> ids of participants taken for persons
+
+(define (peer-person? sf peer)
+  (and (member (peer-id peer) (or (ahash-ref sf-host-persons (sf-key sf)) '())) #t))
+
+(define (agent-peer? sf peer)
+  (and (not (peer-person? sf peer))
+       (or (shared-agent-id? (peer-id peer))
+           (not (peer-interactive? peer)))))
 
 (define (agent-gated? sf peer)
-  (and (sf-get sf 'interactive) (agent-peer? peer)))
+  (and (sf-get sf 'interactive) (agent-peer? sf peer)))
+
+(tm-define (shared-treat-as-person! name id flag)
+  (:synopsis "The host of @name: take the participant @id for a person (flag #t) or for an agent (#f)")
+  (and-with sf (sf-by-name name)
+    (and (sf-host? sf)
+         (let* ((l (or (ahash-ref sf-host-persons (sf-key sf)) '()))
+                (l2 (list-filter l (lambda (x) (!= x id)))))
+           (ahash-set! sf-host-persons (sf-key sf) (if flag (cons id l2) l2))
+           #t))))
 
 (tm-define (shared-agent-mode name)
   (:synopsis "The mode (propose, direct, read-only) the host of @name applies to agents")
   (and-with sf (sf-by-name name)
     (if (sf-host? sf)
-        (or (sf-get sf 'agent-mode) (if (sf-get sf 'interactive) 'propose 'direct))
+        (or (ahash-ref sf-host-modes (sf-key sf)) (if (sf-get sf 'interactive) 'propose 'direct))
         (sf-get sf 'agent-mode))))
 
 (tm-define (shared-set-agent-mode! name mode)
@@ -976,16 +1053,18 @@
   (and-with sf (sf-by-name name)
     (and (sf-host? sf) (memq mode '(propose direct read-only))
          (begin
-           (sf-put! sf 'agent-mode mode)
+           ;; (in the process, not in the record of the file: it is kept when
+           ;; the file is handed over and comes back)
+           (ahash-set! sf-host-modes (sf-key sf) mode)
            (for (p (sf-get sf 'peers))
-             (when (agent-peer? p) (msg-send (peer-link p) (list 'mode mode))))
+             (when (agent-peer? sf p) (msg-send (peer-link p) (list 'mode mode))))
            #t))))
 
 (tm-define (shared-file-agents name)
   (:synopsis "The ids of the agents that have @name open with this host")
   (with sf (sf-by-name name)
     (if (and sf (sf-host? sf))
-        (map peer-id (list-filter (sf-get sf 'peers) agent-peer?))
+        (map peer-id (list-filter (sf-get sf 'peers) (lambda (p) (agent-peer? sf p))))
         '())))
 
 ;; The blocks that a patch changes: (first n-old n-new), #f if none, 'bad
@@ -994,7 +1073,8 @@
       'bad
       (let* ((ko (tree-children old)) (kn (tree-children new))
              (lo (length ko)) (ln (length kn))
-             (same? (lambda (a b) (or (tree-eq? a b) (== (tree-hash a) (tree-hash b))))))
+             ;; (equal trees, not equal hashes: a hash can be forged)
+             (same? (lambda (a b) (or (tree-eq? a b) (equal? (tm->stree a) (tm->stree b))))))
         (let loop ((a ko) (b kn) (p 0))
           (if (and (pair? a) (pair? b) (same? (car a) (car b)))
               (loop (cdr a) (cdr b) (+ p 1))
@@ -1110,6 +1190,18 @@
            (map version-normalize (cdr r)))
           (else (list (version-normalize r))))))
 
+(define (first-text st)
+  (cond ((string? st) st)
+        ((pair? st) (let loop ((l (cdr st)))
+                      (cond ((null? l) #f)
+                            ((first-text (car l)))
+                            (else (loop (cdr l))))))
+        (else #f)))
+
+(define (proposal-preview new-sts old-sts)
+  (let ((t (or (list-or (map first-text new-sts)) (list-or (map first-text old-sts)) "")))
+    (if (> (string-length t) 40) (string-append (substring t 0 40) "...") t)))
+
 (define (prop-get pr k) (ahash-ref pr k))
 (define (prop-put! pr k v) (ahash-set! pr k v))
 
@@ -1152,11 +1244,12 @@
     (host-flush! sf)))
 
 (tm-define (shared-proposals name)
-  (:synopsis "The proposals of agents on @name: (id status index owner)")
+  (:synopsis "The proposals of agents on @name: (id status index owner preview)")
   (and-with sf (sf-by-name name)
     (if (sf-host? sf)
         (map (lambda (pr) (list (prop-get pr 'id) (prop-get pr 'status)
-                                (proposal-index sf pr) (prop-get pr 'owner)))
+                                (proposal-index sf pr) (prop-get pr 'owner)
+                                (prop-get pr 'preview)))
              (reverse (or (sf-get sf 'proposals) '())))
         (or (sf-get sf 'proposals) '()))))
 
@@ -1202,7 +1295,7 @@
   (let ((sent (or (sf-get sf 'prop-sent)
                   (let ((t (make-ahash-table))) (sf-put! sf 'prop-sent t) t))))
     (for (p (sf-get sf 'peers))
-      (when (agent-peer? p)
+      (when (agent-peer? sf p)
         (let ((l (map (lambda (pr) (list (prop-get pr 'id) (prop-get pr 'status)
                                          (proposal-index sf pr)))
                       (reverse (list-filter (or (sf-get sf 'proposals) '())
@@ -1238,6 +1331,7 @@
     (prop-put! pr 'status "pending")
     (prop-put! pr 'ptr (tree->tree-pointer (tree-ref body p)))
     (prop-put! pr 'index p)
+    (prop-put! pr 'preview (proposal-preview new-sts old-sts))
     (prop-put! pr 'old old-sts)
     (prop-put! pr 'new new-sts)
     (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
@@ -1255,6 +1349,13 @@
   (and-with sf (sf-by-name name)
     (and (sf-get sf 'conn)
          (begin (msg-send (sf-get sf 'conn) (list 'withdraw id)) #t))))
+
+(tm-define (shared-file-save-refused name)
+  (:synopsis "The agent: the reason why the host refused its Save, once, or #f")
+  (and-with sf (sf-by-name name)
+    (with v (sf-get sf 'save-refused)
+      (sf-put! sf 'save-refused #f)
+      v)))
 
 (tm-define (shared-file-verdict name)
   (:synopsis "The agent: what the host answered to its last refused patch: (kind id data), once")
@@ -1307,13 +1408,24 @@
 (define (host-handle-patch* sf peer id base psexp)
   (let* ((key (sf-key sf))
          (cur (live-current-state key))
-         (p0 (patch-remove-set-cursor (scheme->patch psexp)))
-         (p (cond ((== base cur) p0)
-                  ((in? base (live-get-history key))
-                   (with r (rebase-over-history key base p0)
-                     (when r (stat! 'rebased))
-                     r))
-                  (else #f))))
+         (shape? (patch-shape-ok? psexp 0))
+         (base-doc (and shape?
+                        (cond ((== base cur) (live-current-document key))
+                              ((in? base (live-get-history key))
+                               (live-get-document key base))
+                              (else #f))))
+         (p0 (and base-doc (rebuild-patch psexp base-doc)))
+         (p (cond ((not p0) #f)
+                  ((== base cur) p0)
+                  (else
+                    (with r (rebase-over-history key base p0)
+                      (when r (stat! 'rebased))
+                      r)))))
+    (when (not shape?)
+      (stat! 'malformed)
+      (msg-send (peer-link peer)
+                (list 'refused id cur
+                      (list (list "patch" "code" "a patch of a shape that the host does not accept")))))
     (cond ((and p (patch-applicable? p (live-current-document key))
                 (agent-gated? sf peer)
                 (with g (agent-gate sf peer p)
@@ -1349,7 +1461,7 @@
                  (stat! 'refused)
                  (host-reset-live! sf)
                  (msg-send (peer-link peer) (list 'refused id cur)))))
-          (else
+          (shape?
             (stat! 'refused)
             (sf-debug "refused a patch of " (peer-id peer) " from " base "\n")
             (msg-send (peer-link peer) (list 'refused id cur))))))
@@ -1395,23 +1507,53 @@
                                   (lambda (p) (!= (peer-id p) id)))
                      (list (list id link interactive seq pid))))
     (host-send-welcome sf link base id interactive pid inflight)
-    (when (shared-agent-id? id)
+    (when (agent-peer? sf (list id link interactive seq pid))
       (msg-send link (list 'mode (shared-agent-mode (sf-buffer sf))))
       (when (sf-get sf 'prop-sent) (ahash-remove! (sf-get sf 'prop-sent) id)))
+    (when (and (sf-get sf 'interactive) (agent-peer? sf (list id link interactive seq pid))
+               (not (shared-agent-id? id)))
+      (stat! 'unmarked-joined)
+      (set-message "Shared file: a program that is not marked as an agent joined; it is treated as an agent (Tools > Agents)"
+                   "Shared file"))
     (send-roster sf)
     ;; an interactive process hosts rather than a headless one: it is
     ;; offered the file
     (when interactive (host-offer-handover! sf))))
 
 (define (host-handle-message sf peer msg)
+  ;; (a message of a shape that is not expected gets an answer, and does not
+  ;; stop the host)
+  (let ((ok (catch #t
+              (lambda () (host-handle-message* sf peer msg) #t)
+              (lambda args #f))))
+    (when (not ok)
+      (stat! 'malformed)
+      (catch #t
+        (lambda ()
+          (msg-send (peer-link peer)
+                    (list 'refused "malformed" (live-current-state (sf-key sf))
+                          (list (list "message" "code" "a message that the host does not understand")))))
+        (lambda args #f)))))
+
+(define (host-handle-message* sf peer msg)
   (cond ((func? msg 'patch)
-         (with (tag id base p) msg
-           (host-handle-patch sf peer id base p)))
+         (if (and (list? msg) (= (length msg) 4) (string? (cadr msg)) (list? (cadddr msg)))
+             (with (tag id base p) msg
+               (host-handle-patch sf peer id base p))
+             (throw (quote malformed))))
         ((func? msg 'save)
-         (host-save sf))
+         (if (and (agent-gated? sf peer) (!= (shared-agent-mode (sf-buffer sf)) 'direct))
+             (begin
+               (stat! 'save-refused)
+               (msg-send (peer-link peer)
+                         (list 'save-refused
+                               "the person has not let agents save this document: the person saves it")))
+             (host-save sf)))
         ((func? msg 'leave)
          (drop-peer! sf peer))
         ((func? msg 'withdraw)
+         (when (not (and (list? msg) (= (length msg) 2) (string? (cadr msg))))
+           (throw (quote malformed)))
          (with pr (proposal-find sf (cadr msg))
            (when (and pr (proposal-pending? pr) (== (prop-get pr 'owner) (peer-id peer)))
              (proposal-resolve! sf pr 'old "withdrawn"))))
@@ -1819,7 +1961,8 @@
     (cond ((func? msg 'applied)
            (with (tag from to author id psexp) msg
              (seen! sf id)
-             (cond ((!= from (live-current-state key))
+             (cond ((or (!= from (live-current-state key))
+                        (not (patch-shape-ok? psexp 0)))
                     (participant-request-resync! sf))
                    ((and id (== id (sf-get sf 'inflight))
                          (== author (sf-get sf 'id)))
@@ -1833,6 +1976,8 @@
                                                 from to author)))))
           ((func? msg 'mode)
            (sf-put! sf 'agent-mode (cadr msg)))
+          ((func? msg 'save-refused)
+           (sf-put! sf 'save-refused (cadr msg)))
           ((func? msg 'proposals)
            (sf-put! sf 'proposals (cadr msg)))
           ((or (func? msg 'refused) (func? msg 'proposed))
@@ -2079,8 +2224,10 @@
                        (with (tag from to psexp roster host-id) m
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
-                         (participant-apply-remote! sf (scheme->patch psexp)
-                                                    from to #f)))
+                         (if (patch-shape-ok? psexp 0)
+                             (participant-apply-remote! sf (scheme->patch psexp)
+                                                        from to #f)
+                             (participant-request-resync! sf))))
                       ((func? m 'welcome-reset)
                        (reconnect-ok! sf)
                        (with (tag state doc modified roster host-id) m

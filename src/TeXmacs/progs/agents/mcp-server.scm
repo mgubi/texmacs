@@ -1618,6 +1618,10 @@
        ;; (the arguments first: what is inside is named in the reason)
        (for (c (cdr st)) (check-safety c base))
        (set! cur-node st)
+       ;; (version markup is what the person's TeXmacs writes for a proposal)
+       (when (memq tag '(version-both version-old version-new version-suppressed))
+         (violate! (string-append "version markup (`" (symbol->string tag)
+                                    "') is written by the person's TeXmacs for a proposal: the content may not contain it (nothing was changed)")))
        ;; the tags that are not primitives: only those the style of the
        ;; document (or the document itself, by assign) defines, and not the
        ;; ones that run commands: the rest would be written as raw macros
@@ -3039,6 +3043,7 @@
   ;; to allow (style, links) or never (code, limits, mode)
   (let ((has (lambda (s) (>= (string-search-forwards s 0 r) 0))))
     (cond ((has "definitions of the document") (list "definitions" "style"))
+          ((has "version markup") (list "version-markup" "mode"))
           ((or (has "budget") (has "digits") (has "at most") (has "loop") (has "nesting")
                (has "too deep") (has "recursion"))
            (list "limits" "limits"))
@@ -3603,20 +3608,32 @@
 
 ;;; save, close, create
 
+(define mcp-save-refused-reason #f)
+
 (define (tool-save-document args)
+  (set! mcp-save-refused-reason #f)
   (let* ((d (editing-context args)) (u (doc-url d)))
     (settle! d (disturbances d))
     (save-buffer-main u)
     ;; (a participant asks the host: wait for it)
     (let loop ((n 0))
-      (when (and (shared-file-participant? u) (buffer-modified? u) (< n 500))
-        (shared-poll)
+      (when (and (shared-file-participant? u) (buffer-modified? u) (< n 500)
+                 (not (and (shared-poll) #f))
+                 (let ((why (shared-file-save-refused u)))
+                   (if why (begin (set! mcp-save-refused-reason why) #f) #t)))
         (loop (+ n 1))))
-    (obj "status" (if (buffer-modified? u) "pending" "saved")
-         "document" (doc-id d)
-         "path" (doc-path d)
-         "shared" (doc-shared d)
-         "hash" (hash-short (doc-body d)))))
+    (let ((why (shared-file-save-refused u)))
+      (when why (set! mcp-save-refused-reason why)))
+    (apply obj
+      (append
+       (list "status" (cond (mcp-save-refused-reason "refused")
+                            ((buffer-modified? u) "pending")
+                            (else "saved"))
+             "document" (doc-id d)
+             "path" (doc-path d)
+             "shared" (doc-shared d)
+             "hash" (hash-short (doc-body d)))
+       (if mcp-save-refused-reason (list "reason" (u8 mcp-save-refused-reason)) '())))))
 
 (define (tool-close-document args)
   (let* ((d (editing-context args)) (u (doc-url d))

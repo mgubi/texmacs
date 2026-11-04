@@ -26,6 +26,8 @@
    (step "B hosts" (and (== (role-of) 'host) (= (peers-count) 1)))
    (act "check" (check "B got the document of A" (== (text-of 1) "HelloAA world."))
         (check "B is the host" (== (role-of) 'host)))
+   ;; (A is headless: the interactive host takes it for an agent until told it is a person)
+   (act "person" (for (id (shared-file-agents (the-name))) (shared-treat-as-person! (the-name) id #t)))
    (wait-sync "a-edited")
    (step "A's edit" (== (text-of 2) "SecA2ond paragraph."))
    (act "edit" (insert-text! 3 5 "B3") (sync-set! "b-edited"))

@@ -51,6 +51,18 @@
   (list-filter (or (shared-proposals (current-buffer)) '())
                (lambda (e) (== (cadr e) "pending"))))
 
+(define (short-agent id)
+  ;; "agent.1234.xxxx.1" -> "agent 1234"
+  (let ((l (string-tokenize-by-char id #\.)))
+    (if (and (pair? l) (pair? (cdr l)) (== (car l) "agent"))
+        (string-append "agent " (cadr l))
+        (if (and (pair? l) (pair? (cdr l))) (string-append "program " (car l)) id))))
+
+(define (unmarked-agents)
+  ;; the participants taken for agents although they do not say so
+  (list-filter (shared-file-agents (current-buffer))
+               (lambda (id) (not (shared-agent-id? id)))))
+
 (tm-menu (agents-menu)
   ((check "Propose edits (I accept or reject them)" "v"
           (== (shared-agent-mode (current-buffer)) 'propose))
@@ -62,8 +74,13 @@
           (== (shared-agent-mode (current-buffer)) 'read-only))
    (shared-set-agent-mode! (current-buffer) 'read-only))
   ---
+  (for (id (unmarked-agents))
+    (when #t
+      ((eval (string-append "Treat " (short-agent id) " as a person"))
+       (shared-treat-as-person! (current-buffer) id #t))))
+  ---
   (for (e (pending-proposals))
-    (-> (eval (string-append "Proposal " (car e)))
+    (-> (eval (string-append "Proposal " (car e) " (" (short-agent (cadddr e)) "): " (list-ref e 4)))
         ("Accept" (shared-proposal-resolve! (current-buffer) (car e) 'new))
         ("Reject" (shared-proposal-resolve! (current-buffer) (car e) 'old))))
   (when (nnull? (pending-proposals))

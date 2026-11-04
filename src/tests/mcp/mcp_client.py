@@ -1346,7 +1346,10 @@ def s_propose(w):
     k = handles()
     e, r = m.tool("edit_text", document="d1", node=k[1]["handle"], old="Second", new="Pending")
     check("a pending proposal", not e and r["status"] == "proposed")
-    os.remove(os.path.join(w, "sync", "saved")) if os.path.exists(os.path.join(w, "sync", "saved")) else None
+    e, r = m.tool("save_document", document="d1")
+    check("propose: the agent's Save is refused", not e and r["status"] == "refused" and "person" in r.get("reason", ""))
+    e, r = m.tool("insert", document="d1", where="last", content="<version-both|a|b>")
+    check("version markup written by the agent is refused", e and "version" in str(r))
     hostcmd(w, st, "save")
     time.sleep(1.0)
     txt = open(f, errors="replace").read()

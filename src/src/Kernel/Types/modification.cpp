@@ -226,8 +226,32 @@ can_set_cursor (tree t, path p, int pos, tree data) {
   return pos >= 0 && pos <= right_index (subtree (t, p));
 }
 
+static bool
+has_valid_path (modification mod) {
+  // the accessors fail (and the process dies) on a path that is too short,
+  // as a modification made by another process may have
+  int n= N (mod->p);
+  switch (mod->k) {
+  case MOD_ASSIGN:
+  case MOD_ASSIGN_NODE:
+    return true;
+  case MOD_REMOVE:
+  case MOD_SPLIT:
+    return n >= 2;
+  case MOD_INSERT:
+  case MOD_JOIN:
+  case MOD_INSERT_NODE:
+  case MOD_REMOVE_NODE:
+  case MOD_SET_CURSOR:
+    return n >= 1;
+  default:
+    return false;
+  }
+}
+
 bool
 is_applicable (tree t, modification mod) {
+  if (!has_valid_path (mod)) return false;
   switch (mod->k) {
   case MOD_ASSIGN:
     return can_assign (t, root (mod), mod->t);

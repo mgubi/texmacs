@@ -169,6 +169,8 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
   otherwise), `where` (`index` of the block, `section`). **`withdraw_proposal`**
   (`document`, `id`): takes a pending proposal back; the person's document goes back
   to the old version.
+- **`save_document`** answers `refused` (with `reason`) when the file is open in the person's TeXmacs and the mode is not `direct`: the person saves it.
+- **Version markup** (`version-both`...) in content is refused (rule `version-markup`): only the person's TeXmacs writes it, for a proposal.
 - **Notes.** When the person accepted or rejected a proposal, the agent's next answer
   has a `note` ("Your proposal p1 was accepted by the person."), once.
 - **The host's filter.** The same rules as the agent's own check, run by the host on
@@ -181,6 +183,7 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
 - Tests: `tests/mcp/check.sh propose` (the host is a headless process that plays the
   person: `SH_INTERACTIVE`, commands `mode`, `accept`, `reject`, `save`...), and
   `tests/shared/check.sh agent agentplain` for the host with a hand-written agent.
+- The host does not trust the id: a headless participant is an agent whatever its id, until the person marks it. The local link is not a security boundary against a process of the same user (see shared-files.md).
 - Deferred (stage B): trusted agents, the person's dialog and MCP elicitation for
   edits that break a rule.
 

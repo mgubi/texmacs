@@ -370,6 +370,40 @@ process hosts, or only headless ones), the agent edits directly, as before.
   paragraphs (one walk of the document to find its definitions), less if they are
   few; `shared-file-gate-stats` gives the count and the time.
 
+### Hardening of the host (audit of stage A)
+
+- **Who is an agent.** The id `agent.*` is chosen by the participant, so the host
+  does not rely on it: every participant that is not interactive (headless,
+  whatever its id) is treated as an agent, unless the person marks it as a person
+  (`shared-treat-as-person!`, **Tools > Agents > Treat ... as a person**, kept in the
+  person's process for the file). A message tells the person when such a program
+  joins. **The local link is not a security boundary against a process of the same
+  user that has a shell**: such a process can claim to be interactive, or write the
+  file on disk. The filter protects the person from what an agent writes through the
+  usual paths; it is not a sandbox.
+- **Shape of patches.** Every patch of a participant is checked before any patch
+  function sees it: only `pair` and `compound`, each modification of a known kind with
+  a path under the part 0 (style) or 1 (body) of at least the length that kind needs
+  (a modification at the root once made the host die in C++, `tm_throw` "empty path").
+  A patch of another shape is refused with the rule `patch`. The same check is made by
+  a participant on what the host sends (it asks for the document again if it fails),
+  and in C++ `is_applicable (tree, modification)` now answers false for a path that
+  is too short, whoever calls it.
+- **Inverses.** The inverse that a participant sends is ignored: the host rebuilds the
+  patch with the inverses it computes from the document (`rebuild-patch`), so
+  rebasing, history and undo never use a forged inverse.
+- **Malformed messages** (`(withdraw)`, `(patch 1)`, a patch with an id that is not a
+  string...) get the answer `(refused "malformed" state reasons)` and the host goes on.
+- **The Save of an agent** is refused (`(save-refused reason)`, `save_document` answers
+  `refused`) unless the mode is `direct`.
+- **Blocks that changed** are found by equality of trees, not of hashes (a hash can be
+  forged).
+- **The mode** is kept in the person's process for the file, so it survives a handover
+  and coming back.
+- **Version markup** written by an agent (`version-both` ...) is refused (rule
+  `version-markup`, level `mode`): only the host writes it, for a proposal. The menu
+  shows, for each pending proposal, the agent and a preview of its text.
+
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a
 participant (`msg-text` now raises the print length). The tests had small documents.
@@ -394,7 +428,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) and `agentplain` (a participant that is not an agent is not filtered). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) and `agentmode` (the mode survives a handover). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with
