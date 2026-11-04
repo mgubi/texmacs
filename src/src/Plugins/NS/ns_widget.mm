@@ -678,7 +678,7 @@ ns_popup_widget_rep::send (slot s, blackbox val) {
     {
       check_type<bool> (val, s);
       if (open_box<bool> (val)) {
-        [p orderFront: nil];
+        if (!is_headless ()) [p orderFront: nil]; // as the windows (above)
         [p startMonitoring];
       }
       else {
@@ -690,7 +690,10 @@ ns_popup_widget_rep::send (slot s, blackbox val) {
     case SLOT_MOUSE_GRAB:
     {
       check_type<bool> (val, s);
-      if (open_box<bool> (val)) { [p orderFront: nil]; [p startMonitoring]; }
+      if (open_box<bool> (val)) {
+        if (!is_headless ()) [p orderFront: nil];
+        [p startMonitoring];
+      }
     }
       break;
     default:
