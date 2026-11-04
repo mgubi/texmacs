@@ -915,6 +915,7 @@ edit_typeset_rep::exec_html (tree t, path p) {
   hashmap<string,tree> P (UNINIT, patch);
   H->join (P);
   prefix_specific (H, "tmhtml-");
+  H ("html-keep-patterns")= "true";
   tree w (WITH);
   tree doc_title= search_doc_title (t);
   if (doc_title != "")
