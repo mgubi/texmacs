@@ -1544,9 +1544,22 @@
                    (and (or (char-alphabetic? (string-ref v i)) (char-numeric? (string-ref v i))
                             (memv (string-ref v i) '(#\space #\-)))
                         (loop (+ i 1)))))))
-        ((member var '("font-size" "font-base-size" "magnification" "dpi"))
-         (and (number-string? v) (number-bounded? v)))
+        ((assoc var env-number-limits)
+         ;; (a number that multiplies the work of the typesetter: bounded)
+         (and (number-string? v) (number-bounded? v)
+              (let ((x (string->number v))) (and x (<= x (cdr (assoc var env-number-limits)))))))
         (else (number-bounded? v))))
+
+(define env-number-limits
+  ;; the variables whose value multiplies the work: columns, a size factor, the base size
+  ;; (in points), the magnification, the resolution
+  '(("par-columns" . 12) ("font-size" . 20) ("font-base-size" . 100)
+    ("magnification" . 10) ("dpi" . 2400)))
+
+(define (env-limit-text var)
+  (let ((x (assoc var env-number-limits)))
+    (string-append (if x (string-append "a number up to " (number->string (cdr x)) " for `" var "'; ") "")
+                   "other numbers and lengths have at most 4 digits before the point and 6 after it; ")))
 
 (define (check-env-pairs tag vars-and-values)
   ;; (var value var value ...) of a with, cwith or twith
@@ -1555,7 +1568,7 @@
       (let ((var (car l)) (val (cadr l)))
         (when (string? var)
           (when (and (not (string? val)) (pair? val)
-                     (or (member var '("font-size" "font-base-size" "magnification" "dpi"))
+                     (or (assoc var env-number-limits)
                          (and (or (== var "color") (string-ends? var "-color"))
                               (not (memq (car val) '(pattern gradient rgb-color blend tuple quote))))))
             (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
@@ -1566,7 +1579,8 @@
           (when (and (string? val) (not (env-value-ok? var val)))
             (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
                                        "' to a value that is not accepted: `" (utf8-prefix (u8 val) 40)
-                                       "' (letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)")))))
+                                       "' (" (env-limit-text var)
+                                       "letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)")))))
       (loop (cddr l)))))
 
 (define (check-link-destination tag a)
@@ -2739,9 +2753,11 @@
                                     (and (macro-definition d m)
                                          (pair? (dangerous-positions d m)))))))))))))
 
-(define (label-types s)
-  ;; the letters at the beginning and at the end of the label (the types that smart-ref tries)
-  (let* ((n (string-length s))
+(define (label-types s0)
+  ;; the letters at the beginning and at the end of the label (the types that smart-ref
+  ;; tries; it lower-cases the label first)
+  (let* ((s (locase-all s0))
+         (n (string-length s))
          (alpha? (lambda (c) (char-alphabetic? c)))
          (i (let loop ((k 0)) (if (and (< k n) (alpha? (string-ref s k))) (loop (+ k 1)) k)))
          (j (let loop ((k n)) (if (and (> k 0) (alpha? (string-ref s (- k 1)))) (loop (- k 1)) k))))

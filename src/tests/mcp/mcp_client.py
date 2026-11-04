@@ -2131,6 +2131,16 @@ def s_static(w):
     for st in ("elsart", "amsart", "jsc", "ifac", "svjour", "article", "book", "beamer"):
         d = opendoc("  Text.\n", st)
         accepted("%s: marginal-note" % st, d, "insert", where="last", content='(marginal-note "normal" "c" "A note")', format="stree")
+    # (audit) variables that multiply the work are bounded
+    d = opendoc("  Text.\n")
+    for var, bad, good in (("par-columns", "13", "4"), ("par-columns", "9999", "12"), ("font-size", "21", "2"),
+                           ("font-base-size", "101", "12"), ("magnification", "11", "2")):
+        r = refused("%s %s" % (var, bad), d, "insert", where="last", content='(with "%s" "%s" "x")' % (var, bad), format="stree")
+        check("and the message says the limit (%s)" % var, "up to" in r)
+        accepted("%s %s" % (var, good), d, "insert", where="last", content='(with "%s" "%s" "x")' % (var, good), format="stree")
+    d = opendoc("  <assign|zz-ref|<macro|x|<hlink|t|<arg|x>>>>\n\n  Text.\n", "generic|smart-ref")
+    refused("smart-ref with a label in capitals (it lower-cases)", d, "insert", where="last",
+            content='(smart-ref "ZZ:javascript")', format="stree")
     d = opendoc("  Text.\n", "tmdoc")
     accepted("tmdoc: tmdoc-title", d, "insert", where="last", content='(tmdoc-title "A title")', format="stree")
     d = opendoc("  Text.\n", "generic|exam")
