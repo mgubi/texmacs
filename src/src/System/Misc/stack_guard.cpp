@@ -28,9 +28,17 @@ stack_remaining () {
   char here;
   if (!init) {
     init= true;
-    ULONG_PTR l= 0, h= 0;
-    GetCurrentThreadStackLimits (&l, &h);
-    low= (char*) l;
+    // (the function exists from Windows 8 on, and the headers declare it only
+    // for _WIN32_WINNT >= 0x0602: it is looked for at run time; without it, the
+    // depth of the stack is not known)
+    typedef void (WINAPI *limits_fn) (PULONG_PTR, PULONG_PTR);
+    HMODULE k= GetModuleHandleA ("kernel32.dll");
+    limits_fn f= k == NULL ? NULL : (limits_fn) GetProcAddress (k, "GetCurrentThreadStackLimits");
+    if (f != NULL) {
+      ULONG_PTR l= 0, h= 0;
+      f (&l, &h);
+      low= (char*) l;
+    }
   }
   if (low == NULL) return -1;
   return (long) (&here - low);
@@ -38,6 +46,12 @@ stack_remaining () {
 #else
 #  include <pthread.h>
 #  include <sys/resource.h>
+#  if defined (__FreeBSD__) || defined (__DragonFly__) || defined (__OpenBSD__)
+#    include <pthread_np.h>
+#  endif
+#  if defined (__OpenBSD__)
+#    include <signal.h>
+#  endif
 long
 stack_remaining () {
   // (the low end of the stack of the thread is asked once for each thread)
@@ -59,14 +73,27 @@ stack_remaining () {
         size= (size_t) rl.rlim_cur;
     }
     low= high - size;
-#  else
+#  elif defined (__linux__) || defined (__NetBSD__) || defined (__GLIBC__)
     pthread_attr_t a;
     if (pthread_getattr_np (pthread_self (), &a) == 0) {
       void* addr= NULL; size_t size= 0;
       if (pthread_attr_getstack (&a, &addr, &size) == 0) low= (char*) addr;
       pthread_attr_destroy (&a);
     }
+#  elif defined (__FreeBSD__) || defined (__DragonFly__)
+    pthread_attr_t a;
+    pthread_attr_init (&a);
+    if (pthread_attr_get_np (pthread_self (), &a) == 0) {
+      void* addr= NULL; size_t size= 0;
+      if (pthread_attr_getstack (&a, &addr, &size) == 0) low= (char*) addr;
+    }
+    pthread_attr_destroy (&a);
+#  elif defined (__OpenBSD__)
+    stack_t ss;
+    if (pthread_stackseg_np (pthread_self (), &ss) == 0)
+      low= (char*) ss.ss_sp - ss.ss_size;
 #  endif
+    // (on other systems the depth of the stack is not known: no check)
   }
   if (low == NULL) return -1;
   return (long) (&here - low);

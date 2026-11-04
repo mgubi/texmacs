@@ -208,22 +208,57 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
      document is compared before and after), and the environment around the
      insertion (a `with` of the person, a macro of theirs that depends on it) are
      covered by construction.
+  *Static rules* (they do not depend on the evaluation, which is not the typesetter and has
+  kept missing things, so layer 2 is an extra and not the protection):
+  - *The definitions belong to the person.* An edit whose target is inside an `assign`,
+    `set`, `reset`, `macro`, `xmacro`, `provide`, `drd-props`, `with-package` and the like,
+    or that replaces or deletes a node with one inside (also a paragraph that holds a
+    definition), is refused. New content that defines something is refused by the allowlist
+    of layer 1.
+  - *Dangerous macros are not called.* The macros of the document (its `assign`s) and of
+    its style (read from the buffer at the time of the check) are analysed, without
+    evaluating anything, down to the primitives they call and transitively: a macro is
+    dangerous at a parameter when that parameter (or the value of a variable, which the
+    content can set with `with`) reaches the destination of a `hlink`, `link` or `url` (unless
+    it begins with `#`, `http://`, `https://` or `mailto:`), the file of an `image`, `include`,
+    `include*`, `pattern`, `postscript`, `video`, `sound`, an argument of `script`, `action`,
+    `extern`, `hybrid`, `authorize`, `observer`, `eval`, `quasi`, `specific`, `latex`, or the
+    name of a macro (`compound`, `apply`, `expand`, `map-args`), or when it is passed to
+    another dangerous macro, or to a macro called by a name that is computed (unless the name
+    is a choice between written names, or a fixed beginning with no macro of the document that
+    begins so and is dangerous). The content may not call such a macro, in any place
+    (directly, or inside `arg`, `quote-arg`, `value`, `compound`, `with`...): the
+    reason says "a call of the macro `x' is refused". The exception is the table of standard
+    macros of `safe-macros` in `mcp-server.scm`, whose sensitive argument is a title, a
+    label, a key or a text, or is checked where it is written (the rules of the tags, and
+    layer 2): the sections (`part` to `subparagraph` and their starred forms), `itemize`,
+    `enumerate`, `description` and their variants, the folds (`folded`, `unfolded`, `summarized`,
+    `detailed` and their `-std`, `-explain` forms), the title block (`doc-data`, `author-data`,
+    the `abstract-*`, `author-*-note`, `doc-*-text`, `custom-*`), the markings (`overline`,
+    `underline`, `strike-through`, `stressed`, `marked`, `deleted`, `todo`), `comma-separated`,
+    `semicolon-separated`, `concat-tuple`, `href`, `slink`, `hlink*`, `include`, and `tit` and
+    `title-left` of the beamer style. A macro of the same name that the document defines is
+    not in the table. The check is by name and cached for the edit (`mcp-dangerous-names`
+    gives the result for a document).
   *Names that are computed.* If the document reaches macros or variables by a name that is
   computed (`compound`, `apply`, `merge`, a `value` of something that is not a name...), the
   users of a definition cannot be found by its name, and the edit of any definition checks the
-  whole document. *Violations of the person* (a link to `javascript:`, an `action`) stay and
-  do not make their sibling blocks refused: what the evaluator makes is keyed by its reason,
-  which carries the destination, the file or the command, not by the generated nodes.
-  *Errors* of the evaluator are violations only when they are the budget or the nesting
-  (the evaluator cannot do some counters of the standard styles outside the typesetter, such
-  as the `bad assign` of the `book` style, and that is not a danger: `chapter`, `part` and
-  `appendix` are accepted).
-  *Keys of the violations.* A violation is compared by its reason and the whole
-  content of the node that has it (hashed, no truncation), so a change inside a
-  node that already had a violation (a person's `<specific|html|...>`, their
-  `<extern|...>`, a long `javascript:` address) is a new violation; the definitions of
-  the document (`assign`, `macro`, `set`...) are the exception, being tied to no
-  content. An edit inside, or of, code or raw text for another program (`extern`,
+  whole document (definitions cannot be edited by the content at all, so this concerns the
+  edits of the person that the filter compares). *Violations of the person* (a link to
+  `javascript:`, an `action`) stay and do not make their sibling blocks refused.
+  *Errors* of the evaluator are violations: what it dropped cannot be checked (the call of a
+  macro with a wrong `arg`, the budget, the nesting). The only exception is the list of the
+  messages that standard macros give outside the typesetter and that are no danger: `bad
+  assign` of the counters of the `book` style (`chapter`, `part` and `appendix` are accepted).
+  *Keys of the violations.* A violation is compared by its reason and a hash of the
+  whole content that causes it, never by the reason alone: for the content as written,
+  the whole node (no truncation); for the content as it expands, the destination, the file,
+  the text of the script, of the command or of the LaTeX (the generated ids and attributes of
+  the evaluator are not in it, so the same expansion has the same key twice). So a change
+  inside a node that already had a violation (a person's `<specific|html|...>`, their
+  `<extern|...>`, a long `javascript:` address, the text of a script or of a LaTeX command)
+  is a new violation. The messages cut the echoed addresses and commands to 80 characters,
+  the keys do not. An edit inside, or of, code or raw text for another program (`extern`,
   `script`, `hybrid`, `action`, `compound`, `latex`, a `specific` for another program,
   the inputs and outputs of sessions...) is refused whatever the violations, and an
   edit in a block that does not evaluate within the budget is refused.

@@ -1478,9 +1478,10 @@ def s_content(w):
     refused("a link with a blank", "stree", '(hlink "x" "http://a.b/c d")', "cannot be in an address")
     refused("an image address with a quote", "stree", '(image "http://a.b/x.png\\" onerror=\\"alert(9)" "1par" "" "" "")', "character that cannot be")
     refused("an image size with a quote", "stree", '(image "x.png" "1par\\" onload=\\"alert(10)" "" "" "")', "character that cannot be")
-    refused("a map that calls include*", "texmacs", "<map|include*|<tuple|/etc/passwd>>", "that calls")
-    refused("a map that calls hlink", "texmacs", "<map|hlink|<tuple|x>>", "that calls")
-    accepted("a map that calls strong", "texmacs", "<map|strong|<tuple|x|y>>")
+    # (`map' passes its arguments to the macro it names: a dangerous macro, not called at all)
+    refused("a map that calls include*", "texmacs", "<map|include*|<tuple|/etc/passwd>>", "map")
+    refused("a map that calls hlink", "texmacs", "<map|hlink|<tuple|x>>", "map")
+    refused("a map that calls strong (map is a call of a macro by name)", "texmacs", "<map|strong|<tuple|x|y>>", "map")
     refused("LaTeX filecontents", "latex", "\\begin{filecontents*}{../x.tex}hi\\end{filecontents*}", "filecontents")
     refused("LaTeX minted with shell-escape", "latex", "\\usepackage[shell-escape]{minted}\\begin{document}x\\end{document}", "runs programs")
     refused("LaTeX standalone with convert", "latex", "\\documentclass[convert=true]{standalone}\\begin{document}x\\end{document}", "runs programs")
@@ -1662,7 +1663,7 @@ def s_guard(w):
     rbody = child(rb["handle"], 2)
     check("the body of the with was found", rbody["preview"] == "Red paragraph.")
     check_refused("a pass-through macro inside a with that makes a link", "replace", node=rbody["handle"], content="<ctxm|javascript:alert(1)>")
-    check_applied("the same macro outside it (plain text)", "insert", where="last", content="<ctxm|javascript:alert(1)>")
+    check_refused("the same macro outside it: it passes its argument to a link, and is not called at all", "insert", where="last", content="<ctxm|javascript:alert(1)>")
     rb = block("Red paragraph")
     check_refused("a value of with replaced by a compound", "replace", node=rb["handle"], content='(with "color" (concat "red" "\\"") "x")', format="stree")
     # a node that is code or raw text for another program: no edit inside it, whatever it was
@@ -1772,8 +1773,8 @@ def s_guard(w):
         hl = child(mac["handle"], 1)
         e, r = m.tool("replace", document="d1", node=hl["handle"], content='<bar|<arg|x>>')
         check("the two-step: the macro now calls a macro of the person which makes a link of the argument, "
-              "and a use with javascript: exists: refused by the check of the document",
-              e and "content filter" in str(r) and state()["hash"] == base2)
+              "and a use with javascript: exists: refused (the definitions are the person's)",
+              e and "refused" in str(r) and state()["hash"] == base2)
     else:
         check("the macro foo was found", False)
     m.tool("undo_agent", document="d1")
@@ -1838,19 +1839,163 @@ def s_recursion(w):
     try:
         txt = subprocess.run(["mutool", "draw", "-F", "txt", "-o", "-", env2["RECURSION_PDF"], "1-99"],
                              capture_output=True, text=True, timeout=60).stdout
-        check("and no level is replaced by an error box", "level 99" in txt and "nesting" not in txt)
     except Exception:
-        pass
+        txt = None
+    if txt is None:
+        # (no mutool here: the text of the PDF cannot be read; the check is skipped, and said so)
+        print("    SKIP no level is replaced by an error box (mutool is not available)")
+    else:
+        check("and no level is replaced by an error box", "level 99" in txt and "nesting" not in txt)
     check("typesetting does not crash", "TYPESET-OK" in out)
     check("export to PDF does not crash", "EXPORT-OK" in out and os.path.exists(env["RECURSION_PDF"]))
     check("exit status 0", p.returncode == 0)
+
+
+def s_static(w):
+    """the static rules of the filter: the definitions belong to the person, the
+    content does not call a macro that passes an argument to a link, a file, a
+    script or a macro name (whatever it is wrapped in), errors of the evaluation
+    refuse the content, the keys of the violations have the whole content; and
+    normal writing in the standard styles is accepted"""
+    env, home = make_env(w, "A")
+    root = os.path.join(w, "root")
+    os.makedirs(root, exist_ok=True)
+    env["TEXMACS_MCP_ROOTS"] = root
+    with open(os.path.join(root, "pic.png"), "wb") as fh:
+        fh.write(b"x")
+    m = Mcp(env)
+    m.initialize()
+    count = [0]
+    def opendoc(body, style="generic"):
+        count[0] += 1
+        f = os.path.join(root, "s%d.tm" % count[0])
+        with open(f, "w") as fh:
+            fh.write("<TeXmacs|2.1.5>\n\n<style|<tuple|%s>>\n\n<\\body>\n%s</body>\n" % (style, body))
+        e, v = m.tool("open_document", path=os.path.realpath(f))
+        return v["document"]
+    def kids(d, node=None):
+        a = dict(document=d, format="text", max_size=1000000)
+        if node:
+            a["node"] = node
+        e, r = m.tool("read", **a)
+        return r["children"] if isinstance(r, dict) else []
+    def hashof(d):
+        return m.tool("read", document=d, format="texmacs", max_size=1000000)[1]["hash"]
+    def refused(label, d, tool, **args):
+        h = hashof(d)
+        e, r = m.tool(tool, document=d, **args)
+        check("refused: %s" % label, e and "refused" in str(r) and hashof(d) == h)
+        return str(r)
+    def accepted(label, d, tool, **args):
+        e, r = m.tool(tool, document=d, **args)
+        ok = not e and r["status"] == "applied"
+        check("accepted: %s" % label, ok)
+        if not ok:
+            print("   ", str(r)[:300])
+        return ok
+    # 1. an evaluator error does not hide a link: the macro is called through arg, quote-arg, value...
+    body = "  <assign|foo|<macro|x|<hlink|t|<arg|x>>>>\n\n  Ordinary.\n\n  Last.\n"
+    d = opendoc(body)
+    last = kids(d)[-1]["handle"]
+    for what, c in (("arg", '(concat "Pre " (arg (foo "javascript:alert(1)")) " post.")'),
+                    ("quote-arg", '(concat "Pre " (quote-arg (foo "javascript:alert(1)")) " post.")'),
+                    ("value", '(concat "Pre " (value (foo "javascript:alert(1)")) " post.")'),
+                    ("direct", '(concat "Pre " (foo "javascript:alert(1)") " post.")'),
+                    ("a harmless address", '(concat "Pre " (foo "https://ok.org") " post.")'),
+                    ("compound", '(compound "foo" "javascript:alert(1)")')):
+        refused("a call of the macro of the person (%s)" % what, d, "replace", node=last, content=c, format="stree")
+        last = kids(d)[-1]["handle"]
+    # 2. macros of the style that compute names, definitions the person uses
+    for v, use in (("style", "<inc-counter|foo>"), ("direct", "<inc-foo>")):
+        d = opendoc("  <assign|dst|https://ok.org>\n\n  <assign|inc-foo|<macro|<hlink|t|<value|dst>>>>\n\n"
+                    "  U %s text.\n\n  Ordinary.\n" % use)
+        ks = kids(d)
+        inner = kids(d, ks[0]["handle"])
+        refused("the address of a definition of the person is changed to javascript: (%s)" % v, d, "replace",
+                node=inner[1]["handle"], content="javascript:alert(1)")
+        refused("the definition of the person is deleted (%s)" % v, d, "delete", node=ks[0]["handle"])
+        refused("the definition of the person is replaced (%s)" % v, d, "replace", node=ks[0]["handle"],
+                content="<assign|dst|javascript:alert(1)>")
+        refused("a use of that macro (%s)" % v, d, "insert", where="last", content=use)
+        accepted("plain text next to the definitions (%s)" % v, d, "insert", where="last", content="Plain text.")
+        ks = kids(d)
+        accepted("an insertion after a definition (%s)" % v, d, "insert", anchor=ks[0]["handle"], where="after", content="After the definition.")
+    # a block that has a definition inside
+    d = opendoc("  Before <assign|bar|<macro|x|<strong|<arg|x>>>> after.\n\n  Last.\n")
+    ks = kids(d)
+    refused("a paragraph with a definition inside is replaced", d, "replace", node=ks[0]["handle"], content="Nothing.")
+    refused("a paragraph with a definition inside is deleted", d, "delete", node=ks[0]["handle"])
+    # 3. the old audit cases: a macro of the person that passes the argument on, content swapped
+    for v, pre, use, new in (
+        ("script", "<assign|sc|<macro|x|<script|python|<arg|x>>>>", "<sc|print(1)>", '(sc "import os; os.system(\\"id\\")")'),
+        ("latex", "<assign|lt|<macro|x|<latex|<arg|x>>>>", "<lt|\\\\input{a.tex}>", '(lt "\\\\input{/etc/passwd}")'),
+        ("javascript link", "<assign|jl|<macro|x|<hlink|t|<arg|x>>>>", "<jl|javascript:a(1)>", '(jl "javascript:evil(2)")'),
+        ("image", "<assign|im|<macro|x|<image|<arg|x>|1cm|1cm||>>>", "<im|/etc/hosts>", '(im "/etc/passwd")'),
+        ("not plain text", "<assign|jl|<macro|x|<hlink|t|<arg|x>>>>", "<jl|<with|a|b|javascript:a(1)>>", '(jl (with "a" "b" "javascript:evil"))')):
+        d = opendoc("  " + pre + "\n\n  Item " + use + " end.\n\n  Last.\n")
+        ks = kids(d)
+        refused("%s: the person's call is swapped for another content" % v, d, "replace", node=ks[1]["handle"],
+                content='(concat "Item " %s " end.")' % new, format="stree")
+    # the person's own calls stay: an edit of the text around them is accepted
+    d = opendoc("  <assign|jl|<macro|x|<hlink|t|<arg|x>>>>\n\n  Item <jl|javascript:a(1)> end.\n\n  Last.\n")
+    ks = kids(d)
+    accepted("an edit of the text around a call of the person", d, "edit_text", node=ks[1]["handle"], old="end", new="finish")
+    # 4. errors of the evaluation refuse the content (but not the benign ones)
+    d = opendoc("  <assign|bad|<macro|x|<arg|y>>>\n\n  Text.\n")
+    r = refused("a macro whose expansion is an error", d, "insert", where="last", content="<bad|x>")
+    check("and the reason says why", "error" in r)
+    # 5. the key of a violation has the whole content: a long address that the person has
+    long_a = "javascript:" + "a" * 100
+    d = opendoc("  Long <hlink*|t|%sX|> link.\n\n  Last.\n" % long_a)
+    ks = kids(d)
+    hl = [c for c in kids(d, ks[0]["handle"]) if c["tag"] == "hlink*"]
+    if hl:
+        dest = kids(d, hl[0]["handle"])[1]
+        refused("the end of a long javascript address of a standard macro is changed", d, "replace",
+                node=dest["handle"], content=long_a + "Y")
+    else:
+        check("the hlink* was found", False)
+    # 6. normal writing is accepted in the standard styles
+    items = [
+        ("a paragraph", "A paragraph with <strong|bold> and <em|emphasis> text."),
+        ("a section", "(section \"Intro\")"),
+        ("a subsection", "(subsection \"Sub\")"),
+        ("a label", "A label here<label|lab1> and a <reference|lab1> to it."),
+        ("a citation", "See <cite|knuth84> and <cite|a|b>."),
+        ("a footnote", "A note<footnote|The note> here."),
+        ("a folded", "<folded|Summary|The details>"),
+        ("an itemize", "<\\itemize>\n<item>one\n\n<item>two\n</itemize>"),
+        ("an enumerate", "<\\enumerate>\n<item>one\n\n<item>two\n</enumerate>"),
+        ("a web link", "A <hlink|site|https://ok.org> link and <hlink|mail|mailto:a@b.org>."),
+        ("a relative link", "<hlink|there|#lab1>"),
+        ("href", "<href|https://ok.org>"),
+        ("an image in the folder", "<image|pic.png|1par|||>"),
+        ("an equation", "<\\equation*>\nx=1\n</equation*>"),
+        ("a figure", "<small-figure|<image|pic.png|1par|||>|A caption>"),
+        ("a title block", "<doc-data|<doc-title|The title>|<doc-author|<author-data|<author-name|A. Author>>>>"),
+        ("an abstract", "<abstract|Some text.>"),
+        ("a theorem", "<\\theorem>\nA statement.\n</theorem>"),
+        ("a proof", "<\\proof>\nIt is clear.\n</proof>"),
+    ]
+    for style in ("generic", "article", "book", "beamer"):
+        d = opendoc("  Text.\n", style)
+        extra = [("a chapter", '(chapter "Chapter")'), ("a part", '(part "Part")'),
+                 ("an appendix", '(appendix "Appendix")')] if style == "book" else []
+        for label, content in items + extra:
+            fmt = "stree" if content.startswith("(") else "texmacs"
+            e, r = m.tool("insert", document=d, where="last", content=content, format=fmt)
+            ok = not e and r["status"] == "applied"
+            check("%s style: %s is accepted" % (style, label), ok)
+            if not ok:
+                print("   ", str(r)[:300])
+    check("exit 0", m.close() == 0)
 
 
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "undo": s_undo, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]

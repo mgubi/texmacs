@@ -34,7 +34,13 @@ have the details, and the problems go to the
   headless Qt process no longer crashes, and a participant applies the patches of
   another participant with the author of their sender. See
   [mcp-server.md](mcp-server.md) (it also says how to register the server in Claude
-  Code and in the Claude desktop app); tests in `tests/mcp`.
+  Code and in the Claude desktop app); tests in `tests/mcp`. The content filter
+  protecting the person from markup written by the agent has static rules besides
+  the checks of the expanded content: the definitions of the document (`assign`,
+  `macro`, `set`...) cannot be edited, content may not call a macro of the document
+  or of its style that passes an argument on to a link, a file, a script or a macro
+  name (except a table of standard macros: sections, lists, folds, title blocks), and
+  errors of the evaluator refuse the content.
 
 ## 3 November 2026
 
