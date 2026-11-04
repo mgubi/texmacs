@@ -19,9 +19,16 @@ core, not a mechanism of its own. Tracking issue: #797.
   (tests). `code_lines_wanted` in `Data/Convert/Verbatim/verbatim.cpp`.
 - **Saving.** `print_verbatim` writes the lines of the block as they are
   (`CODE_LINES`), so `tree_to_source` gives the file back byte for byte (tabs
-  and the other control characters are `<#9>`, `<#x>`). HTML and LaTeX
-  export the lines of a block as the paragraphs of the document around it
-  (`splice-code-lines` in `tmhtml.scm` and `tmtex.scm`), as before the block.
+  and the other control characters are `<#9>`, `<#x>`).
+- **A primitive as the others.** Where primitives are handled case by case,
+  `code-lines` is there as the tags of the same kind (`datoms`, `dbox`...,
+  whose body is their last child): the converters export its document
+  (`tmhtml.scm`, `tmtex.scm` with `tmtex-tt` for verbatim content,
+  `tmmarkdown.scm`, `tmoffice.scm`), so that a text exports as before the
+  block; `is_multi_paragraph` (`tree.cpp`) and `is_long_arg` (source mode)
+  take it as a document (inserted in a paragraph, it splits it); the
+  serializer of the grammars (`packrat_serializer.cpp`) serializes its
+  document. A new place which lists the primitives should list it too.
 - **The cursor.** The tag has an inner border (`drd_std.cpp`): the cursor is
   always in a line, never before or after the block, so that a file opens
   with the cursor in its first line, and Home and End of the document stay

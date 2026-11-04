@@ -293,6 +293,7 @@ bool
 is_multi_paragraph (tree t) {
   switch (L(t)) {
   case DOCUMENT:
+  case CODE_LINES: // (a block of lines: a document of strings)
     return true;
   case SURROUND:
     return is_multi_paragraph (t[2]);

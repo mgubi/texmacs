@@ -1215,7 +1215,7 @@
   ((:or rigid hgroup freeze unfreeze syntax move shift resize clipped
         repeat repeat*)
    tmmd-first)
-  ((:or datoms dlines dpages dbox locus float) tmmd-last)
+  ((:or datoms dlines dpages dbox code-lines locus float) tmmd-last)
   (phantom tmmd-noop)
 
   ;; what has no meaning in Markdown

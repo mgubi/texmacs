@@ -681,6 +681,21 @@
     (system-remove u)
     (code-lines-env old)))
 
+;; A block is a block of paragraphs, as the document of its lines, where the
+;; editor asks (is_multi_paragraph): inserted in a paragraph, it splits the
+;; paragraph, as a with of a document does, instead of going into the line
+(define (test-block-is-block)
+  (check-group "a block of lines is a block")
+  (check-true (tree-multi-paragraph?
+               (stree->tree '(code-lines (document "a" "b")))))
+  (with-body '(document "abc" "def")
+    (lambda ()
+      (go-to (at 0 1))
+      (step (lambda ()
+              (insert (stree->tree '(code-lines (document "x" "y"))))))
+      (check= (tree->stree (buffer-get-body (current-buffer)))
+              '(document "a" (code-lines (document "x" "y")) "bc" "def")))))
+
 ;; A block exports as the document of its lines: a paragraph per line, as
 ;; before the block (HTML and LaTeX dropped it, or made an unknown macro)
 (define (test-export-formats)
@@ -691,7 +706,7 @@
      (lambda (fm)
        (check= (convert block "texmacs-tree" fm)
                (convert plain "texmacs-tree" fm)))
-     '("html-snippet" "latex-snippet" "verbatim-snippet"))
+     '("html-snippet" "latex-snippet" "verbatim-snippet" "markdown-snippet"))
     (check-true (string-contains? (convert block "texmacs-tree" "html-snippet")
                                   "x = 1")))
   ;; a text or a source file, whose lines are verbatim content (language
@@ -862,6 +877,7 @@
   (test-shrink)
   (test-lines-root)
   (test-cursor-in-block)
+  (test-block-is-block)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)
