@@ -204,7 +204,6 @@
   (local-send-raw local_send_raw (bool int string))
   (local-close local_close (void int))
   (shared-process-id shared_process_id (int))
-  (shared-process-alive? shared_process_alive (bool int))
   (shared-real-path shared_real_path (string string))
   (shared-user-dir shared_user_dir (string))
   (shared-list-dir shared_list_dir (scheme_tree string))
@@ -215,7 +214,7 @@
   (shared-lock-acquire shared_lock_acquire (int string))
   (shared-lock-release shared_lock_release (void int))
   (shared-lock-valid? shared_lock_valid (bool int string))
-  (shared-lock-renew shared_lock_renew (bool int string))
+  (shared-lock-renew shared_lock_renew (int int string))
   (shared-touch shared_touch (void string))
   
   ;; routines for the font database

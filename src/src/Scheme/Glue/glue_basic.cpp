@@ -2132,19 +2132,6 @@ tmg_shared_process_id () {
 }
 
 tmscm
-tmg_shared_process_aliveP (tmscm arg1) {
-  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-process-alive?");
-
-  int in1= tmscm_to_int (arg1);
-
-  // TMSCM_DEFER_INTS;
-  bool out= shared_process_alive (in1);
-  // TMSCM_ALLOW_INTS;
-
-  return bool_to_tmscm (out);
-}
-
-tmscm
 tmg_shared_real_path (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-real-path");
 
@@ -2281,10 +2268,10 @@ tmg_shared_lock_renew (tmscm arg1, tmscm arg2) {
   string in2= tmscm_to_string (arg2);
 
   // TMSCM_DEFER_INTS;
-  bool out= shared_lock_renew (in1, in2);
+  int out= shared_lock_renew (in1, in2);
   // TMSCM_ALLOW_INTS;
 
-  return bool_to_tmscm (out);
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -13095,7 +13082,6 @@ initialize_glue_basic () {
   tmscm_install_procedure ("local-send-raw",  tmg_local_send_raw, 2, 0, 0);
   tmscm_install_procedure ("local-close",  tmg_local_close, 1, 0, 0);
   tmscm_install_procedure ("shared-process-id",  tmg_shared_process_id, 0, 0, 0);
-  tmscm_install_procedure ("shared-process-alive?",  tmg_shared_process_aliveP, 1, 0, 0);
   tmscm_install_procedure ("shared-real-path",  tmg_shared_real_path, 1, 0, 0);
   tmscm_install_procedure ("shared-user-dir",  tmg_shared_user_dir, 0, 0, 0);
   tmscm_install_procedure ("shared-list-dir",  tmg_shared_list_dir, 1, 0, 0);

@@ -205,7 +205,6 @@
 "local-send-raw"
 "local-close"
 "shared-process-id"
-"shared-process-alive?"
 "shared-real-path"
 "shared-user-dir"
 "shared-list-dir"

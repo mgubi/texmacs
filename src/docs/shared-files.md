@@ -55,7 +55,7 @@ and the host registers itself in `load-buffer-open`, after any load.
 
 | File | What |
 |---|---|
-| `src/System/Link/local_link.{hpp,cpp}` | loopback links (`local-listen`, `local-accept`, `local-connect`, `local-send`, `local-receive`, ...) as `tm_link_rep` over a nonblocking socket of 127.0.0.1, with `write_packet`/`read_packet` (the `<length>\n<payload>` packets) of `tm_link`; the helpers of the entries (`shared-user-dir`, `shared-real-path`, `shared-create-file`, `shared-replace-file`, `shared-random-token`, `shared-process-alive?`) |
+| `src/System/Link/local_link.{hpp,cpp}` | loopback links (`local-listen`, `local-accept`, `local-connect`, `local-send`, `local-receive`, ...) as `tm_link_rep` over a nonblocking socket of 127.0.0.1, with `write_packet`/`read_packet` (the `<length>\n<payload>` packets) of `tm_link`; the helpers of the entries (`shared-user-dir`, `shared-real-path`, `shared-create-file`, `shared-replace-file`, `shared-random-token`, `shared-lock-acquire`) |
 | `src/Data/Observers/tree_pointer.cpp` | `tree-observe`: a tree pointer whose callback is a Scheme function (what the live documents have in the markup `live-io`), here on the body of a buffer |
 | `TeXmacs/progs/utils/relate/shared-files.scm` | the protocol; uses `live-document.scm` for the states of a file (`live-create`, `live-apply-patch`, `live-get-patch-list`, `live-get-document`, `live-forget-prior`) |
 | `tm-files.scm`, `tm-server.scm` | the hooks: join, host at load, save, autosave, close, save as |
@@ -95,7 +95,7 @@ broadcasting, saving) is done while the process holds the lock, which is an
 invariant of one process.
 
 The entry `f-<hash>.entry` only tells how to reach the host:
-`(entry key port token pid interactive host-id)`: the canonical path (symlinks
+`(entry key port token pid interactive host-id npeers)` (8 fields): the canonical path (symlinks
 and relative names resolved by `realpath`), the port of the host on 127.0.0.1,
 a random token of 128 bits from `/dev/urandom`, the pid, whether the host is
 interactive, and its id. It is written (whole, replaced atomically by
@@ -333,6 +333,21 @@ checks that the two documents end equal. Running them with
 `TM_SHARED_PREF=off` must fail all but `off`.
 
 ## Open points, limits
+
+- **A participant's confirmed work can be replaced, then saved whole.** A
+  participant that is busy for more than about 1.3 s (the wait of a joiner is
+  300 ms for each participant in the entry, and one second) while its host
+  dies, while a third process opens the file meanwhile, can see that process
+  host the file from the disk. The participant's confirmed work that was
+  not on the disk is then replaced by the new host's document (never combined
+  with it). It is saved whole in the recovered folder with a notice, and has to
+  be merged by hand.
+- **Up to one second with two hosts after an external removal of a lock
+  file.** The host checks once a second that its lock file is the file at the
+  path. If someone removes the file (a cleaner, `rm`) and another process makes
+  and locks a new one in that second, both host until the first check: the
+  first then stops, saves its document in the recovered folder and joins the
+  other. (Lock files are never removed by TeXmacs, and are touched hourly.)
 
 - The cursors of the participants, the names of the participants, the menus.
 - Two processes that start to host at the same instant are separated by the

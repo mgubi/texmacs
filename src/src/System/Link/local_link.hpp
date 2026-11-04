@@ -37,7 +37,6 @@ void   local_close (int id);
 
 // Helpers of the shared files: the process, the per-user folder, paths
 int    shared_process_id ();
-bool   shared_process_alive (int pid);
 string shared_real_path (string path);  // canonical path, "" if none
 string shared_user_dir ();              // per-user folder (0700), "" if none
 tree   shared_list_dir (string dir);    // the names in a folder (a tuple)
@@ -48,7 +47,7 @@ string shared_random_token ();
 int    shared_lock_acquire (string path); // a handle; -1 if held, -2 on error
 void   shared_lock_release (int id);
 bool   shared_lock_valid (int id, string path);  // still the file at path?
-bool   shared_lock_renew (int id, string path);  // make it again and lock it
+int    shared_lock_renew (int id, string path);  // 1 made and locked, 0 held by another, -1 error
 void   shared_touch (string path);          // 32 hex digits from the system
 
 #endif // LOCAL_LINK_H

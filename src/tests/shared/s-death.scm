@@ -21,7 +21,7 @@
    (act "edit while the host does not hear"
         (shared-pause! #t) (insert-text! 3 5 "BB") (sync-set! "b-edited"))
    (step "A is dead" (let ((e (shared-entry (the-name))))
-                       (not (shared-process-alive? (list-ref e 4)))))
+                       (!= 0 (system (string-append "kill -0 " (number->string (list-ref e 4)) " 2>/dev/null")))))
    (act "resume" (shared-pause! #f))
    (step "B is the host" (== (role-of) 'host))
    (step "committed" (== (pending-count) 0))

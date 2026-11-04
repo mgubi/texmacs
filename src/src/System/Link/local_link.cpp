@@ -418,19 +418,6 @@ shared_process_id () {
 #endif
 }
 
-bool
-shared_process_alive (int pid) {
-#ifndef OS_MINGW
-  if (pid <= 0) return false;
-  if (kill ((pid_t) pid, 0) == 0) return true;
-  return errno == EPERM;
-#else
-  // (not told: a dead host is found when its port refuses the connection)
-  (void) pid;
-  return true;
-#endif
-}
-
 string
 shared_real_path (string path) {
   c_string p (path);
@@ -663,25 +650,30 @@ shared_lock_valid (int id, string path) {
 #endif
 }
 
-// Make the file again and lock it, in place of the lock @id: true if it
-// worked (nobody had it), false if another process holds a lock there (then
-// that one is the host, and the lock @id is still the old one).
-bool
+// Make the file again and lock it, in place of the lock @id: 1 if it worked
+// (nobody had it), 0 if another process holds a lock there (then that one is
+// the host, and the lock @id is still the old one), -1 for any other error
+// (no descriptor left, no room: nothing is known, try again).
+int
 shared_lock_renew (int id, string path) {
 #ifndef OS_MINGW
-  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return false;
+  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return -1;
   c_string p (path);
   int fd= open ((char*) p, O_RDWR | O_CREAT, 0600);
-  if (fd < 0) return false;
+  if (fd < 0) return -1;
   int fl= fcntl (fd, F_GETFD, 0);
   if (fl >= 0) fcntl (fd, F_SETFD, fl | FD_CLOEXEC);
-  if (flock (fd, LOCK_EX | LOCK_NB) != 0) { ::close (fd); return false; }
+  if (flock (fd, LOCK_EX | LOCK_NB) != 0) {
+    int e= errno;
+    ::close (fd);
+    return e == EWOULDBLOCK? 0: -1;
+  }
   ::close (shared_lock_fds[id]);
   shared_lock_fds[id]= fd;
-  return true;
+  return 1;
 #else
   (void) id; (void) path;
-  return false;
+  return -1;
 #endif
 }
 

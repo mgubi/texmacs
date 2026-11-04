@@ -88,9 +88,11 @@
   (:synopsis "For the tests: tell if this process counts as interactive")
   (set! sf-interactive flag))
 
+(define sf-run-id (substring (shared-random-token) 0 8))   ; (a pid is reused)
+
 (define (sf-new-id)
   (set! sf-serial (+ sf-serial 1))
-  (string-append (number->string (shared-process-id)) "."
+  (string-append (number->string (shared-process-id)) "." sf-run-id "."
                  (number->string sf-serial)))
 
 (define (sf-by-name name)
@@ -135,7 +137,7 @@
 ;; lock without waiting; failing means that another process hosts the file.
 ;;
 ;; The entry f-<hash>.entry only tells how to reach the host: (entry key port
-;; token pid interactive host-id), written (whole, replaced atomically) by the
+;; token pid interactive host-id npeers), written (whole, replaced atomically) by the
 ;; holder of the lock after it has got it. It is not trusted for anything
 ;; else: a stale entry (the host is gone) is found by the lock being free.
 
@@ -615,15 +617,20 @@
               (list name key (+ (texmacs-time) wait) old-token 0))
   (shared-ensure-tick!))
 
+(define sf-was-read-only (make-ahash-table))
+
 (define (pending-start! name)
   ;; the buffer of a file whose host is awaited
+  (ahash-set! sf-was-read-only (url->string name) (buffer-read-only? name))
   (buffer-set-read-only name #t)
   (set-message "Shared file: connecting to the process which had this file open (read-only for a moment)"
                "Shared file"))
 
 (define (pending-done! name)
   (ahash-remove! sf-pending (url->string name))
-  (when (buffer-exists? name) (buffer-set-read-only name #f)))
+  (when (buffer-exists? name)
+    (buffer-set-read-only name (and (ahash-ref sf-was-read-only (url->string name)) #t)))
+  (ahash-remove! sf-was-read-only (url->string name)))
 
 (define (pending-poll!)
   (let ((now (texmacs-time)))
@@ -973,16 +980,29 @@
     (when (> now (or (sf-get sf 'lock-check) 0))
       (sf-put! sf 'lock-check (+ now 1000))
       (let ((path (lock-path key)) (h (sf-get sf 'lock)))
-        (cond ((not (shared-lock-valid? h path))
-               (if (shared-lock-renew h path)
-                   (begin (stat! 'lock-renewed) (host-write-entry! sf))
-                   (host-lost-lock! sf)))
+        (cond ((not path) (host-stop-sharing! sf))
+              ((not (shared-lock-valid? h path))
+               (with r (shared-lock-renew h path)
+                 (cond ((== r 1) (stat! 'lock-renewed) (host-write-entry! sf))
+                       ((== r 0) (host-lost-lock! sf))
+                       (else (stat! 'lock-renew-error)))))      ; (try again)
               ((not (url-exists? (string->url (entry-path key))))
                (host-write-entry! sf)))
-        (when (and (sf-host? sf) (> now (or (sf-get sf 'touch-at) 0)))
+        (when (and path (sf-host? sf) (> now (or (sf-get sf 'touch-at) 0)))
           (sf-put! sf 'touch-at (+ now 3600000))
           (shared-touch path)
           (shared-touch (entry-path key)))))))
+
+(define (host-stop-sharing! sf)
+  ;; the folder of the locks can not be had any more: this file is no longer
+  ;; shared; the participants seek a host (and find none, or one)
+  (stat! 'folder-lost)
+  (set-message "Shared file: the folder of the shared files is not available; this file is no longer shared"
+               "Shared file")
+  (send-peers sf (list 'released (sf-get sf 'token) #f (roster-of sf)))
+  (for (p (sf-get sf 'peers)) (local-close (peer-link p)))
+  (sf-put! sf 'peers '())
+  (sf-destroy! sf))
 
 (define (host-lost-lock! sf)
   (stat! 'lock-lost)
@@ -1603,6 +1623,18 @@
           (participant-tick sf)
           (loop))))
     (report-lost! sf (sf-get sf 'pending))
+    ;; with no connection to a host (it is being sought, or does not answer)
+    ;; what the person has here may be on no disk and in no host: the whole
+    ;; document is saved, with a notice, which also covers a queued Save
+    (when (not (and c (local-alive? c)))
+      (let ((file (save-recovered-copy! sf)))
+        (stat! 'closed-unconnected)
+        (set-message
+         `(concat "Shared file: the host of this file was not reachable when it was closed."
+                  ,(if file
+                       `(concat " Your document is saved in " (verbatim ,(url->system file)))
+                       " It could not be saved."))
+         "Shared file")))
     (when c
       (msg-send c (list 'leave))
       (local-close c))

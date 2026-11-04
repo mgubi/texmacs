@@ -1443,14 +1443,6 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(shared-process-alive? <scm-arg|int>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|shared_process_alive> which returns
-    <scm|bool>.
-  </explain>
-
-  <\explain>
     <scm|(shared-real-path <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1535,7 +1527,7 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|shared_lock_renew> which returns
-    <scm|bool>.
+    <scm|int>.
   </explain>
 
   <\explain>

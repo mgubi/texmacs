@@ -29,6 +29,7 @@
 #   lockdel     the lock file removed under a host
 #   race        a joiner waits for the seeking participants of a gone host
 #   seeksave    Save with no host is queued
+#   closeunconn a participant closed with no host saves its whole document
 #   diffdir     one folder whatever TMPDIR and XDG_RUNTIME_DIR
 #   dupe        a patch sent twice; a replaced document is saved whole
 #   slow        a host that is alive but stalled is not replaced
@@ -53,7 +54,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or
@@ -84,7 +85,7 @@ for name in "$@"; do
   case $name in
     takeover-window) scen=takeover; bflags="" ;;
     off)             pref=off ;;
-    death|seeksave)  dead=A ;;
+    death|seeksave|closeunconn)  dead=A ;;
   esac
   pref=${TM_SHARED_PREF:-$pref}
   w="$run/$name"
