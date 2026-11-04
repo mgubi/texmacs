@@ -169,6 +169,12 @@ the lines being copied at each key: #811 too (11 ms).
   changes of the tags along the path (`typeset_exec_until`, the DRD), which
   know nothing of this rule. Nothing reads it there (the menus read the
   initial environment, `get-init`).
+- **A document which changes mode** (a line of paragraphs inserted or
+  removed, the variable switched) answers for its former mode whether the
+  next pass is complete: the mode is decided when the document is
+  typeset, in its environment (`wanted_mode`), which is not the one in
+  which the question is asked. Nothing was seen to depend on it (labels
+  and references come out the same).
 
 ## Tests
 

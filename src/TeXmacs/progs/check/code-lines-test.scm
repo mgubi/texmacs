@@ -883,6 +883,28 @@
               (set! code (ys))))
     (check= code plain)))
 
+;; The environment computed by exec_until (without the fast environments)
+;; inside a document nested in a block which is typeset as paragraphs: the
+;; assignments before the place are kept (the nested document is typeset
+;; as paragraphs, and exec_until goes through it as such; it took code-lines
+;; from the environment of exec_until and dropped its paragraphs)
+(define (test-audit-9)
+  (check-group "environments in a block typeset as paragraphs")
+  (define fast? (== (get-preference "fast environments") "on"))
+  (set-fast-environments #f)
+  (with-body '(document (with "code-lines" "true"
+                          (document "a"
+                                    (with "color" "red"
+                                      (document "x" (assign "zz" "7") "y"))
+                                    "b")))
+    (lambda ()
+      (go-to (at 0 2 1 2 2 1))
+      (step (lambda () #t))
+      (check= (get-env "zz") "7")
+      (step (lambda () (insert "Q")))
+      (check= (get-env "zz") "7")))
+  (set-fast-environments fast?))
+
 ;; A block of one line with markup, in paper mode, is a paragraph of its
 ;; items (it had no rows, and was neither drawn nor reached by the cursor)
 (define (test-one-rich-line)
@@ -1031,6 +1053,7 @@
   (test-text-files)
   (test-audit-5)
   (test-audit-7)
+  (test-audit-9)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)

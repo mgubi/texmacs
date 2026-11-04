@@ -278,8 +278,11 @@ bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
 
 int
 bridge_document_rep::wanted_mode () {
-  // the mode of the document in the environment where it is: lines of code
-  // when code-lines is true, unless it has no lines or a line of paragraphs
+  // the mode of the document in the environment where it is typeset (only
+  // my_typeset is in it: exec_until and my_typeset_will_be_complete are
+  // called in others, and use the mode which my_typeset chose): lines of
+  // code when code-lines is true, unless it has no lines or a line of
+  // paragraphs
   return env->read ("code-lines") == "true" && N(st) > 0 &&
          !has_paragraphs_line (st)? DOC_CODE: DOC_PARAGRAPHS;
 }
@@ -468,8 +471,12 @@ bridge_document_rep::notify_change () {
 
 void
 bridge_document_rep::my_exec_until (path p) {
-  set_mode (wanted_mode ());
+  // (the mode of the last typesetting; exec_until comes after it)
   if (mode == DOC_CODE) { code->my_exec_until (p); return; }
+  set_mode (DOC_PARAGRAPHS);
+  // (the paragraphs are typeset with code-lines false: see my_typeset)
+  if (env->read ("code-lines") == "true")
+    env->write_update ("code-lines", "false");
   if (is_nil (acc)) {
     int i;
     for (i=0; i<p->item; i++)
@@ -481,9 +488,9 @@ bridge_document_rep::my_exec_until (path p) {
 
 bool
 bridge_document_rep::my_typeset_will_be_complete () {
-  // (not typeset yet, or in another mode now: the bridges of the mode, the
-  // paragraphs or the lines, will all be made)
-  if (mode == DOC_UNKNOWN || mode != wanted_mode ()) return true;
+  // (the mode of the last typesetting: the environment here is not the one
+  // of the document, see wanted_mode; not typeset yet: all will be made)
+  if (mode == DOC_UNKNOWN) return true;
   if (mode == DOC_CODE) return code->my_typeset_will_be_complete ();
   if (is_nil (acc)) {
     int i, n= N(brs);
