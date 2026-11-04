@@ -37,8 +37,10 @@ string shared_user_dir () { return ""; }
 tree   shared_list_dir (string) { return tuple (); }
 bool   shared_set_private (string) { return false; }
 bool   shared_create_file (string, string) { return false; }
+bool   shared_create_document (string, string) { return false; }
+bool   shared_lexists (string) { return false; }
 bool   shared_replace_file (string, string) { return false; }
-string shared_random_token () { return ""; }
+string shared_random_token () { return "00000000000000000000000000000000"; }
 int    shared_lock_acquire (string) { return -2; }
 void   shared_lock_release (int) {}
 bool   shared_lock_valid (int, string) { return false; }
@@ -597,6 +599,42 @@ shared_list_dir (string dir) {
 
 // A file is made with its whole content, or not at all: the entries of the
 // shared files are read by other processes at any time
+bool
+shared_lexists (string path) {
+#ifndef OS_MINGW
+  c_string p (path);
+  struct stat st;
+  return lstat ((char*) p, &st) == 0;
+#else
+  c_string p (path);
+  FILE* f= fopen ((char*) p, "rb");
+  if (f != NULL) { fclose (f); return true; }
+  return false;
+#endif
+}
+
+bool
+shared_create_document (string path, string s) {
+  // (never follows a link: O_EXCL fails on any existing path, a dangling
+  // symbolic link included)
+  c_string p (path);
+#ifndef OS_MINGW
+  int fd= open ((char*) p, O_WRONLY | O_CREAT | O_EXCL, 0666);
+  if (fd < 0) return false;
+  c_string c (s);
+  int n= N(s), done= 0;
+  while (done < n) {
+    int r= (int) ::write (fd, ((char*) c) + done, n - done);
+    if (r <= 0) { ::close (fd); unlink ((char*) p); return false; }
+    done += r;
+  }
+  ::close (fd);
+  return true;
+#else
+  return shared_create_file (path, s);
+#endif
+}
+
 bool
 shared_create_file (string path, string s) {
   c_string p (path);

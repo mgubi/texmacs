@@ -172,6 +172,42 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   characters are accepted as UTF-8), `stree` (read as data, never evaluated; a
   string, or a tag with arguments), `latex` (braces balanced), `markdown`. A
   `(document ...)` or several paragraphs are several blocks.
+- **What content is refused** (the whole call is refused, nothing is changed, and the
+  reason names the tag). The tree of the content is parsed (or converted) first
+  and walked completely, also what the LaTeX and Markdown importers make of it:
+  - *Code*: `extern`, `script`, `script-eval`, `script-input`, `script-output`,
+    `eval`, `eval-args`, `quasi`, `quasiquote`, `unquote`, `unquote*`, `action`,
+    `input`, `output`, `session`, `shell-input`, `plugin-input` and `compound`
+    (which calls a macro by its name).
+  - *The definitions and the style of the whole document*: `assign`, `drd-props`,
+    `style-with`, `style-only`, `var-style-only`, `with-package`, `use-package`,
+    `use-module`; and `raw-data` (binary data).
+  - *Links* (`hlink`, `href`, `slink`, `smart-ref`, `locus`) whose target has a
+    scheme other than `http`, `https`, `mailto` (`script:`, `file:`,
+    `javascript:`...). Relative targets and `#labels` are accepted.
+  - *Files*: `image`, `postscript`, `postscript*`, `include`, `var-include`,
+    `tmdoc-include`, `include-section`, `sound`, `video`, `attachment`, `ocr` (the
+    first argument) and `bibliography` (the files): only a relative name, with no
+    `..`, no colon, not starting with `/`, `\` or `~`, which stays inside the roots
+    (`TEXMACS_MCP_ROOTS`) or, with no roots, inside the folder of the document (a
+    symbolic link that leads out is resolved and refused); `http` and `https`
+    addresses for `image` and `postscript`. The name must be a string.
+  - *LaTeX sources* that use `\input`, `\include`, `\includeonly`,
+    `\InputIfFileExists`, `\verbatiminput`, `\lstinputlisting`, `\openin`,
+    `\openout`, `\immediate`, `\write`, `\read`, `\readline`, `\catcode`,
+    `\scantokens`, `\csname`, `\directlua`, `\newwrite`, `\bibliography`,
+    `\addbibresource`, `\externaldocument` are refused before the conversion: the
+    importer would read the files itself. (`\includegraphics` is converted to an
+    `image`, and then checked as above.)
+  - *Trees that cannot be*: a tag known to the DRD with a number of arguments it
+    cannot have (`(with)`, `(frac "a")`, an empty `(table)`...) is refused. A
+    `with` with no argument crashed the typesetter; the typesetter now shows a
+    `with` with a wrong number of arguments as an inactive tree (`make_bridge`), so a
+    patch of another process with such a tree no longer crashes the person's
+    TeXmacs either. (Only `with` is guarded in C++: the other primitives with a
+    wrong arity go through the failure detection of the typesetter.)
+  This is a filter on what the agent writes, not a sandbox: a document that the
+  person opened already is not scanned, and the importers run in this process.
 - **A node** is a block of the document (then `replace` takes one or several
   blocks), or a part of a paragraph (then one item; the paragraph is rebuilt
   with the strings merged). The whole document cannot be replaced or deleted;
@@ -215,6 +251,7 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   the whole undo is cancelled and the reason is given). Limit: after the agent deletes
   a block and undoes the deletion, the block is a new copy, and an older step that
   touched that block can no longer be undone.
+- **Counters.** The refusals, the resynchronizations and the documents replaced are counted for each shared file (`shared-file-stat`), so that a refusal in another document during the wait of an edit is not mistaken for its own.
 - **Notes.** When the document changed since the last call about it (by the
   person, or a resynchronization), the answer of the tool has a `note`: how many blocks
   changed from which index, in which sections, and the new hash, since many clients
@@ -276,6 +313,7 @@ the work folder).
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `undo` | the undo of the editor in a headless process, single process (`undo-probe.scm`): the own steps, the step of another author skipped when it commutes, the undo back to the saved state (it crashed: `QApplication::beep` without an application) |
+| `content` | each case of the refused content (code, files, links, LaTeX and Markdown sources, malformed trees) and the accepted ones, with the document unchanged and the server alive; `create_document` with dangling links and refused content |
 | `edit`, `readonly`, `edit-shared` | the editing tools: each tool, conflicts, undo_agent, all-or-nothing, save/close/create, read-only and roots; with a second headless TeXmacs hosting and editing (merge in one paragraph, a refusal reported, the person's undo skipping the agent's changes) |
 | `robust` | non-ASCII and newlines in every format and in the file name, a star in a name, colons refused, `TEXMACS_MCP_ROOTS` (outside file, `/etc/passwd`, `..`, a symbolic link), sections in concatenations, bad arguments and messages, 200000 nested arrays, a 34 MB line |
 | `hostdeath` | a server which has not opened the file lists it, the host is killed with `kill -9`, the file leaves the list; then the entry is given the pid of a live foreign process and a closed port: still not listed |

@@ -952,6 +952,14 @@ def s_edit(w):
     check("undo_agent undoes all the steps", not e and u["undo_steps"] == 0 and t["content"].startswith("First paragraph.\n\nSecond paragraph.\n\n<section|Third>"))
     e, u = m.tool("undo_agent", document="d1")
     check("nothing more to undo", e and "no step" in str(u))
+    # edit_text with an empty `new', and its undo (checked with the text around)
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    e, r = m.tool("edit_text", document="d1", node=t["children"][0]["handle"], old=" paragraph", new="")
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    check("edit_text with an empty new deletes the text", not e and t["children"][0]["preview"] == "First.")
+    e, u = m.tool("undo_agent", document="d1")
+    e, t = m.tool("read", document="d1", format="text", max_size=100000)
+    check("and its undo puts it back", not e and t["children"][0]["preview"] == "First paragraph.")
     # a step of the person (simulated by a file change is not possible): save
     e, r = m.tool("edit_text", document="d1", node=t["children"][0]["handle"], old="First", new="Saved")
     e, sv = m.tool("save_document", document="d1")
@@ -1212,11 +1220,98 @@ def s_undo(w):
     check("three undo checks", len(checks) == 3)
 
 
+def s_content(w):
+    """what content is refused: markup that runs code or reads files, trees with
+    the wrong number of arguments; also create_document and links"""
+    roots = os.path.join(w, "root")
+    os.makedirs(roots, exist_ok=True)
+    outside = os.path.join(w, "outside")
+    os.makedirs(outside, exist_ok=True)
+    env, home = make_env(w, "A")
+    env["TEXMACS_MCP_ROOTS"] = roots
+    f = os.path.join(roots, "c.tm")
+    write_small(f)
+    write_small(os.path.join(roots, "inc.tm"))
+    with open(os.path.join(roots, "inc.tex"), "w") as fh:
+        fh.write("INCLUDED-TEX-CONTENT\n")
+    f = os.path.realpath(f)
+    rr = os.path.realpath(roots)
+    m = Mcp(env)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    base_hash = t["hash"]
+    def refused(label, fmt, content, word):
+        e, r = m.tool("insert", document="d1", where="last", content=content, format=fmt)
+        e2, t2 = m.tool("read", document="d1", format="stree", max_size=100000)
+        check("refused: %s" % label, e and word in str(r) and t2["hash"] == base_hash)
+    def accepted(label, fmt, content):
+        e, r = m.tool("insert", document="d1", where="last", content=content, format=fmt)
+        check("accepted: %s" % label, not e and r["status"] == "applied")
+        m.tool("undo_agent", document="d1")
+    for tag in ("extern", "script", "script-eval", "eval", "eval-args", "action", "quasi", "assign", "compound", "session", "input", "raw-data"):
+        refused("(%s ...) in stree" % tag, "stree", '(%s "x" "y")' % tag, "`%s'" % tag)
+    refused("hlink to script:", "stree", '(hlink "click" "script:(system \\"id\\")")', "script:")
+    refused("hlink to file:", "stree", '(hlink "x" "file:///etc/passwd")', "file:")
+    refused("hlink to javascript:", "stree", '(hlink "x" "javascript:alert(1)")', "javascript:")
+    refused("href to script:", "stree", '(href "script:foo")', "script:")
+    refused("image from file:///", "stree", '(image "file:///etc/passwd" "1par" "" "" "")', "file:")
+    refused("image with an absolute path", "stree", '(image "/etc/hosts" "1par" "" "" "")', "/etc/hosts")
+    refused("image with ..", "stree", '(image "../outside/x.png" "1par" "" "" "")', "..")
+    refused("image with raw data", "stree", '(image (tuple (raw-data "abc") "png") "1par" "" "" "")', "raw-data")
+    refused("include of an absolute path", "stree", '(include "%s/inc.tm")' % rr, "refers to the file")
+    refused("include of an absolute path outside", "stree", '(include "/etc/passwd")', "refers to the file")
+    refused("include with ..", "stree", '(include "../outside/x.tm")', "..")
+    refused("postscript with an absolute path", "stree", '(postscript "/etc/hosts" "1par" "" "" "")', "refers to the file")
+    refused("bibliography with an absolute file", "stree", '(bibliography "bib" "plain" "/etc/hosts")', "refers to the file")
+    refused("texmacs: include", "texmacs", "<include|/etc/hosts>", "refers to the file")
+    refused("texmacs: extern", "texmacs", '<extern|(system "id")>', "`extern'")
+    refused("texmacs: hlink to script:", "texmacs", "<hlink|x|script:foo>", "script:")
+    refused("texmacs: action", "texmacs", "<action|go|(system \"id\")>", "`action'")
+    refused("latex: \\input", "latex", "\\input{%s/inc.tex}" % rr, "\\input")
+    refused("latex: \\include", "latex", "\\include{%s/inc}" % rr, "\\include")
+    refused("latex: \\verbatiminput", "latex", "\\verbatiminput{/etc/hosts}", "\\verbatiminput")
+    refused("latex: \\includegraphics of an absolute path", "latex", "\\includegraphics{/etc/hosts}", "refers to the file")
+    refused("markdown: an image with an absolute path", "markdown", "![x](/etc/hosts)", "refers to the file")
+    refused("markdown: a link to script:", "markdown", "[x](script:foo)", "script:")
+    accepted("an image from the web", "stree", '(image "https://example.org/x.png" "1par" "" "" "")')
+    accepted("an image in the folder", "stree", '(image "pics/x.png" "1par" "" "" "")')
+    accepted("a link to the web", "stree", '(hlink "site" "https://example.org/")')
+    accepted("a link to a label", "stree", '(hlink "here" "#sec")')
+    accepted("a mail link", "stree", '(hlink "me" "mailto:a@b.org")')
+    accepted("an include in the folder", "stree", '(include "inc.tm")')
+    accepted("markdown: a link", "markdown", "[x](https://example.org)")
+    # trees with the wrong number of arguments (the typesetter crashed on `with')
+    for bad in ('(with)', '(frac "a")', '(table)', '(row)', '(cell)', '(concat)', '(tformat)',
+                '(section)', '(cite)', '(sqrt)', '(document "a" (frac "b"))', '(strong)', '(math)',
+                '(rsub "a" "b")'):
+        refused("malformed %s" % bad, "stree", bad, "cannot have")
+    r = m.request("ping")
+    check("the server is alive after the malformed trees", r is not None and "result" in r)
+    e, t2 = m.tool("read", document="d1", format="text")
+    check("and reads", not e)
+    # create_document and links
+    e, c = m.tool("create_document", path=os.path.join(roots, "n1.tm"), content='(extern "x")', format="stree")
+    check("create_document: refused content, no file", e and not os.path.exists(os.path.join(roots, "n1.tm")))
+    link = os.path.join(roots, "dangling.tm")
+    target = os.path.join(outside, "new.tm")
+    os.symlink(target, link)
+    e, c = m.tool("create_document", path=link)
+    check("create_document: a dangling link is refused", e and not os.path.exists(target))
+    link2 = os.path.join(roots, "tofile.tm")
+    os.symlink(os.path.join(outside, "x.tm"), link2)
+    e, c = m.tool("create_document", path=link2)
+    check("create_document: another dangling link is refused", e and not os.path.exists(os.path.join(outside, "x.tm")))
+    e, c = m.tool("create_document", path=os.path.join(roots, "n2.tm"), content="ok text")
+    check("create_document: still works", not e)
+    check("exit 0", m.close() == 0)
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
-             "undo": s_undo, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
+             "undo": s_undo, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
     SCEN = sys.argv[1]

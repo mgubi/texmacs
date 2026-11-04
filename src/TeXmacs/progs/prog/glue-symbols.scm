@@ -210,6 +210,8 @@
 "shared-list-dir"
 "shared-set-private"
 "shared-create-file"
+"shared-create-document"
+"shared-lexists?"
 "shared-replace-file"
 "shared-random-token"
 "shared-lock-acquire"

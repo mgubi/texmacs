@@ -1068,9 +1068,171 @@
              (and (> depth 0) (loop (+ i 1) (- depth 1))))
             (else (loop (+ i 1) depth))))))
 
-(define (parse-content content fmt)
+(define (known-tag? tag)
+  ;; does the DRD know the tag (a primitive, or a macro of a style loaded)?
+  (let loop ((n 0))
+    (and (<= n 16)
+         (or (tag-possible-arity? tag n) (loop (+ n 1))))))
+
+(define (check-arity st)
+  ;; refuse a tree in which a tag known to the DRD has a number of arguments
+  ;; it cannot have (a `with' with none crashes the typesetter)
+  (cond ((string? st) #t)
+        ((pair? st)
+         (let ((n (length (cdr st))))
+           (when (and (not (== (car st) 'document)) (known-tag? (car st))
+                      (not (tag-possible-arity? (car st) n)))
+             (tool-error (string-append "the tag `" (symbol->string (car st))
+                                        "' cannot have " (number->string n)
+                                        " argument(s) (nothing was changed)")))
+           (for (c (cdr st)) (check-arity c))))
+        (else #t)))
+
+;;; What content is refused (design 5.6: no evaluation of code, nothing but the
+;;; documents is reached)
+
+(define code-tags
+  '(extern script script-eval script-input script-output eval eval-args quasi
+    quasiquote unquote unquote* action input output session shell-input
+    plugin-input compound
+    ;; (they change the environment or the definitions of the whole document)
+    assign drd-props style-with style-only var-style-only with-package
+    use-package use-module raw-data))
+
+(define why-refused
+  '((extern . "can run a command")
+    (script . "can run code") (script-eval . "can run code")
+    (script-input . "can run code") (script-output . "is the output of code")
+    (eval . "evaluates code") (eval-args . "evaluates code")
+    (quasi . "evaluates code") (quasiquote . "evaluates code")
+    (unquote . "evaluates code") (unquote* . "evaluates code")
+    (action . "runs an action when clicked") (input . "is the input of a session that runs code")
+    (output . "is the output of a session") (session . "is a session that runs code")
+    (shell-input . "can run a command") (plugin-input . "can run code")
+    (compound . "calls a macro by its name")
+    (assign . "changes the definitions of the whole document")
+    (drd-props . "changes the properties of the tags")
+    (style-with . "changes the style") (style-only . "changes the style")
+    (var-style-only . "changes the style") (with-package . "loads a package")
+    (use-package . "loads a package") (use-module . "loads a module")
+    (raw-data . "is binary data")))
+
+(define file-tags
+  ;; tags whose first argument is a file (position of the first file, and
+  ;; whether all the following arguments are files too)
+  '((image . 0) (postscript . 0) (postscript* . 0) (include . 0) (var-include . 0)
+    (tmdoc-include . 0) (include-section . 0) (sound . 0) (video . 0)
+    (attachment . 0) (ocr . 0) (bibliography . 2)))
+
+(define link-tags '(hlink href slink smart-ref locus))
+
+(define (document-folder base)
+  (let ((r (shared-real-path base)))
+    (if (and (string? r) (!= r "")) r base)))
+
+(define (inside-folder? p folder)
+  (or (== p folder)
+      (string-starts? p (string-append (if (string-ends? folder "/")
+                                           (substring folder 0 (- (string-length folder) 1))
+                                           folder) "/"))))
+
+(define (url-scheme s)
+  ;; the scheme of a link (before a colon, if no slash comes first), or #f
+  (let ((i (string-search-forwards ":" 0 s)) (j (string-search-forwards "/" 0 s)))
+    (and (> i 0) (or (< j 0) (< i j))
+         (locase-all (substring s 0 i)))))
+
+(define (file-name-ok? name base web?)
+  ;; may the document refer to the file @name? A relative name, without `..',
+  ;; that stays inside the folders of the server (the roots), or, with no
+  ;; roots, inside the folder of the document; with @web?, an address
+  ;; http: or https: is good too
+  (let ((scheme (url-scheme name)))
+    (cond ((and scheme web? (member scheme '("http" "https"))) #t)
+          (scheme #f)
+          ((== name "") #t)
+          ((or (string-starts? name "/") (string-starts? name "\\")
+               (string-starts? name "~") (colon-in-path? name)
+               (dotdot-in-path? name))
+           #f)
+          (else
+            (let* ((folder (document-folder base))
+                   (joined (string-append folder "/" name))
+                   (real (shared-real-path joined))
+                   (p (if (and (string? real) (!= real "")) real joined)))
+              (if (mcp-roots)
+                  (path-allowed? p)
+                  (inside-folder? p folder)))))))
+
+(define (string-args st)
+  (list-filter (cdr st) string?))
+
+(define (check-safety st base)
+  ;; refuse content with markup that can run code or read what it should not
+  (cond
+    ((string? st) #t)
+    ((pair? st)
+     (let ((tag (car st)))
+       ;; (the arguments first: what is inside is named in the reason)
+       (for (c (cdr st)) (check-safety c base))
+       (when (memq tag code-tags)
+         (tool-error (string-append "the tag `" (symbol->string tag) "' "
+                                    (or (let ((e (assq tag why-refused))) (and e (cdr e)))
+                                        "is not accepted")
+                                    ": the content is refused (nothing was changed)")))
+       (when (memq tag link-tags)
+         (for (a (string-args st))
+           (let ((scheme (url-scheme a)))
+             (when (and scheme (not (member scheme '("http" "https" "mailto"))))
+               (tool-error (string-append "a `" (symbol->string tag)
+                                          "' with the target `" (utf8-prefix (u8 a) 60)
+                                          "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)"))))))
+       (let ((f (assq tag file-tags)))
+         (when f
+           (let loop ((l (list-tail (cdr st) (min (cdr f) (length (cdr st))))) (first? #t))
+             (when (pair? l)
+               (cond ((string? (car l))
+                      (when (and (or first? (> (cdr f) 0))
+                                 (not (file-name-ok? (car l) base (memq tag '(image postscript postscript*)))))
+                        (tool-error (string-append "the tag `" (symbol->string tag)
+                                                   "' refers to the file `" (utf8-prefix (u8 (car l)) 60)
+                                                   "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)")))
+                      (loop (cdr l) #f))
+                     ((and first? (pair? (car l)))
+                      (tool-error (string-append "the tag `" (symbol->string tag)
+                                                 "' has a file that is not a name: refused (nothing was changed)")))
+                     (else (loop (cdr l) #f)))))))))
+    (else #t)))
+
+(define latex-forbidden
+  '("input" "include" "includeonly" "InputIfFileExists" "verbatiminput" "lstinputlisting"
+    "openin" "openout" "immediate" "write" "read" "readline" "catcode" "scantokens"
+    "csname" "directlua" "luaexec" "pdfshellescape" "newwrite" "openin" "bibliography"
+    "addbibresource" "externaldocument"))
+
+(define (latex-commands s)
+  ;; the names of the commands (\name) in @s
+  (let ((n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (cond ((>= i n) acc)
+            ((char=? (string-ref s i) #\\)
+             (let scan ((j (+ i 1)))
+               (if (and (< j n) (char-alphabetic? (string-ref s j)))
+                   (scan (+ j 1))
+                   (loop (max (+ i 2) j)
+                         (if (> j (+ i 1)) (cons (substring s (+ i 1) j) acc) acc)))))
+            (else (loop (+ i 1) acc))))))
+
+(define (check-latex-source s)
+  ;; the importer of LaTeX reads the files of \input and the like: not accepted
+  (for (c (latex-commands s))
+    (when (member c latex-forbidden)
+      (tool-error (string-append "the LaTeX command \\" c " is refused (it reads files or runs code): the content is refused (nothing was changed)")))))
+
+(define (parse-content content fmt base)
   ;; the stree of @content, written in the format @fmt; an error when it
-  ;; does not parse
+  ;; does not parse, has a tag with a wrong number of arguments, or has
+  ;; markup which is refused (@base is the folder of the document)
   (when (not (string? content))
     (param-error "the argument `content' must be a string"))
   (when (> (string-length content) max-content-size)
@@ -1078,6 +1240,7 @@
   (when (not (member fmt edit-formats))
     (tool-error (string-append "unknown format " fmt ", use one of: "
                                (string-recompose edit-formats ", "))))
+  (when (== fmt "latex") (check-latex-source content))
   (let ((st (catch #t
               (lambda ()
                 (cond ((== fmt "stree")
@@ -1096,6 +1259,8 @@
     (when (or (not st) (not (valid-stree? st 0)))
       (tool-error (string-append "the content does not parse as " fmt
                                  " (nothing was changed)")))
+    (check-safety st base)
+    (check-arity st)
     st))
 
 (define (content-items st)
@@ -1157,16 +1322,19 @@
 (define mcp-steps (make-ahash-table))       ; document id -> list of undo steps
 (define mcp-step-marks (make-ahash-table))  ; document id -> counters at the last step
 
-(define (disturbances)
-  ;; how many times the host refused a patch, took the document away or
-  ;; replaced it in this process: the steps before are not safe to undo
-  (+ (shared-stat 'rolled-back) (shared-stat 'lost) (shared-stat 'replaced)
-     (shared-stat 'dropped) (shared-stat 'resync)))
+(define (disturbances d)
+  ;; how many times the host refused a patch of this document, took the
+  ;; document away or replaced it in this process: the steps before are not
+  ;; safe to undo
+  (let ((u (doc-url d)))
+    (+ (shared-file-stat u 'rolled-back) (shared-file-stat u 'lost)
+       (shared-file-stat u 'replaced) (shared-file-stat u 'dropped)
+       (shared-file-stat u 'resync))))
 
 (define (steps-of d) (or (ahash-ref mcp-steps (doc-id d)) '()))
 (define (push-step! d undo)
   (ahash-set! mcp-steps (doc-id d) (cons undo (steps-of d)))
-  (ahash-set! mcp-step-marks (doc-id d) (disturbances)))
+  (ahash-set! mcp-step-marks (doc-id d) (disturbances d)))
 (define (forget-steps! d)
   (ahash-remove! mcp-steps (doc-id d)))
 
@@ -1180,7 +1348,7 @@
           (let loop ((n 0))
             (shared-poll)
             (let ((i (shared-file-info u)))
-              (cond ((> (disturbances) before) 'refused)
+              (cond ((> (disturbances d) before) 'refused)
                     ((not i) 'ok)
                     ((and (== (list-ref i 5) 0) (not (list-ref i 6)) (> n 0)) 'ok)
                     ((> (- (texmacs-time) t0) 10000) 'timeout)
@@ -1306,6 +1474,13 @@
   (let ((p (tree-up t)))
     (and p (inside-body? d p) p)))
 
+(define (doc-base d)
+  ;; the folder of the document
+  (let* ((p (doc-path d))
+         (i (let loop ((k (- (string-length p) 1)))
+              (cond ((< k 0) #f) ((char=? (string-ref p k) #\/) k) (else (loop (- k 1)))))))
+    (if (and i (> i 0)) (substring p 0 i) "/")))
+
 (define (target d args key)
   ;; (handle . node) of the argument @key
   (let ((h (opt-string args key #f)))
@@ -1353,7 +1528,7 @@
          (fmt (opt-string args "format" "texmacs"))
          (hn (target d args "node")) (h (car hn)) (t (cdr hn))
          (expect (opt-string args "expect" #f))
-         (st (parse-content (opt-string args "content" #f) fmt))
+         (st (parse-content (opt-string args "content" #f) fmt (doc-base d)))
          (items (content-items st)))
     (cond
       ((body-root? d t)
@@ -1362,7 +1537,7 @@
       (else
         (let* ((parent (parent-of d t)) (i (tree-index t))
                (old (tm->stree t))
-               (dist (disturbances))
+               (dist (disturbances d))
                (block? (tm-is? parent 'document))
                (inline? (tm-is? parent 'concat))
                (nodes '()))
@@ -1418,7 +1593,7 @@
          (ah (opt-string args "anchor" #f))
          (anchor (if ah (handle-node d ah) (doc-body d)))
          (expect (opt-string args "expect" #f))
-         (st (parse-content (opt-string args "content" #f) fmt))
+         (st (parse-content (opt-string args "content" #f) fmt (doc-base d)))
          (items (content-items st)))
     (when (not (member where '("before" "after" "first" "last")))
       (param-error "the argument `where' must be before, after, first or last"))
@@ -1431,7 +1606,7 @@
       ((and (tree-atomic? anchor) (member where '("first" "last")))
        (tool-error "a text node has no children: use before or after, or edit_text"))
       (else
-        (let* ((dist (disturbances))
+        (let* ((dist (disturbances d))
                (side? (member where '("before" "after")))
                (parent (if side? (parent-of d anchor) anchor))
                (pos (cond ((== where "before") (tree-index anchor))
@@ -1495,7 +1670,7 @@
       (else
         (let* ((parent (parent-of d t)) (i (tree-index t))
                (old (tm->stree t))
-               (dist (disturbances)))
+               (dist (disturbances d)))
           (cond
             ((tm-is? parent 'document)
              (let ((prev (and (> i 0) (tree-ref parent (- i 1))))
@@ -1543,18 +1718,28 @@
           (loop (+ i 1) (cons i acc))))))
 
 (define (undo-edit-text d leaf pos old new)
-  ;; the step that replaced @old by @new at @pos in the text @leaf
-  (let ((pl (ptr leaf)))
+  ;; the step that replaced @old by @new at @pos in the text @leaf (called
+  ;; after the change): it is undone if @new, and the text around it, are as
+  ;; it left them (the text around is what tells when @new is empty)
+  (let* ((pl (ptr leaf)) (text (tree->string leaf))
+         (nl (string-length new))
+         (left (substring text (max 0 (- pos 12)) pos))
+         (right (substring text (+ pos nl) (min (string-length text) (+ pos nl 12)))))
     (cons
      (lambda ()
        (let ((l (deref pl)))
          (or (and (tree? l) (inside-body? d l) (tree-atomic? l)
-                  (<= (+ pos (string-length new)) (string-length (tree->string l)))
-                  (== (substring (tree->string l) pos (+ pos (string-length new))) new))
+                  (let ((now (tree->string l)))
+                    (and (<= (+ pos nl) (string-length now))
+                         (>= pos (string-length left))
+                         (== (substring now pos (+ pos nl)) new)
+                         (== (substring now (- pos (string-length left)) pos) left)
+                         (<= (+ pos nl (string-length right)) (string-length now))
+                         (== (substring now (+ pos nl) (+ pos nl (string-length right))) right))))
              "the text this step changed was changed since")))
      (lambda ()
        (let ((l (deref pl)))
-         (when (> (string-length new) 0) (tree-remove l pos (string-length new)))
+         (when (> nl 0) (tree-remove l pos nl))
          (when (> (string-length old) 0) (tree-insert l pos old))
          #t)))))
 
@@ -1585,7 +1770,7 @@
                                         " times in the node: give more of the text around it, so that it occurs once")))
             (else
               (let* ((leaf (car (car hits))) (pos (cdr (car hits)))
-                     (dist (disturbances)))
+                     (dist (disturbances d)))
                 (run-edit! d
                   (lambda ()
                     (tree-remove leaf pos (string-length old*))
@@ -1602,13 +1787,13 @@
     (cond
       ((null? stack)
        (tool-error "there is no step of this session to undo in this document"))
-      ((> (disturbances) (or (ahash-ref mcp-step-marks (doc-id d)) 0))
+      ((> (disturbances d) (or (ahash-ref mcp-step-marks (doc-id d)) 0))
        (forget-steps! d)
        (tool-error "the document was resynchronized or a change was refused since: the steps before cannot be undone safely"))
       (else
         (let* ((n (min steps (length stack)))
                (todo (sublist stack 0 n))
-               (dist (disturbances)))
+               (dist (disturbances d)))
           ;; each step is checked on the document as it is when its turn
           ;; comes (the newer steps are undone first); if one cannot be
           ;; undone everything is cancelled and nothing is changed
@@ -1629,7 +1814,7 @@
 
 (define (tool-save-document args)
   (let* ((d (editing-context args)) (u (doc-url d)))
-    (settle! d (disturbances))
+    (settle! d (disturbances d))
     (save-buffer-main u)
     ;; (a participant asks the host: wait for it)
     (let loop ((n 0))
@@ -1689,18 +1874,29 @@
         (when (not (path-allowed? target))
           (tool-error (string-append "not allowed: " path
                                      " is outside the folders of this server")))
-        (when (!= (shared-real-path target) "")
-          (tool-error "the file exists already: open it instead"))
-        (let ((items (and content (content-items (parse-content content fmt)))))
-          (string-save (string-append "<TeXmacs|" (texmacs-version) ">\n\n<style|<tuple|"
-                                      style ">>\n\n<\\body>\n  \n</body>\n")
-                       (system->url target))
-          (let ((d (open-doc! target)))
-            (when items
-              (run-edit! d
-                (lambda ()
-                  (tree-assign (doc-body d) (tree-of-stree (cons 'document items)))))
-              (forget-steps! d))
+        (when (shared-lexists? target)
+          (tool-error "the file exists already (or is a link): open it instead"))
+        (let ((items (and content (content-items (parse-content content fmt rdir)))))
+          ;; (made with O_EXCL: no existing path is followed or overwritten)
+          (when (not (shared-create-document
+                      target
+                      (string-append "<TeXmacs|" (texmacs-version) ">\n\n<style|<tuple|"
+                                     style ">>\n\n<\\body>\n  \n</body>\n")))
+            (tool-error "the file could not be created"))
+          (let ((d (catch #t
+                     (lambda ()
+                       (let ((d (open-doc! target)))
+                         (when items
+                           (run-edit! d
+                             (lambda ()
+                               (tree-assign (doc-body d) (tree-of-stree (cons 'document items)))))
+                           (forget-steps! d))
+                         d))
+                     (lambda args
+                       ;; (what was made is removed)
+                       (catch #t (lambda () (system-remove (system->url target)))
+                         (lambda args #f))
+                       (tool-error "the document could not be made: the file was removed")))))
             (snapshot! d)
             (doc-info d)))))))
 

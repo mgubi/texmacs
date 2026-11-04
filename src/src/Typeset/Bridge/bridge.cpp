@@ -11,6 +11,7 @@
 
 #include "bridge.hpp"
 #include "code_lines.hpp"
+#include "drd_std.hpp"
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include "Boxes/construct.hpp"
@@ -75,6 +76,13 @@ make_bridge (typesetter ttt, tree st, path ip) {
   // cout << "Make bridge " << st << ", " << ip << LF;
   // cout << "Preamble mode= " << ttt->env->preamble << LF;
   if (ttt->env->preamble)
+    return make_inactive_bridge (ttt, st, ip);
+  // A `with' with no argument (or with the wrong number) is indexed by its
+  // bridge: it is shown as an inactive tree, so that a document, or a patch
+  // from another process, with such a tree does not crash the typesetter.
+  // (The other primitives with a wrong arity are left to the failure
+  // detection of the typesetter, which the tests of `typeset' exercise.)
+  if (L(st) == WITH && !std_drd->correct_arity (WITH, N(st)))
     return make_inactive_bridge (ttt, st, ip);
   switch (L(st)) {
   case _ERROR:

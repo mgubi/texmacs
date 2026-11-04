@@ -43,6 +43,8 @@ string shared_real_path (string path);  // canonical path, "" if none
 string shared_user_dir ();              // per-user folder (0700), "" if none
 tree   shared_list_dir (string dir);    // the names in a folder (a tuple)
 bool   shared_set_private (string path);// chmod 0600 on a file (not Windows)
+bool   shared_create_document (string path, string s); // like shared_create_file, mode 0666 & ~umask
+bool   shared_lexists (string path);       // does the path exist in any form (a dangling link too)?
 bool   shared_create_file (string path, string s); // fails if it exists
 bool   shared_replace_file (string path, string s);// atomically (tmp + rename)
 string shared_random_token ();

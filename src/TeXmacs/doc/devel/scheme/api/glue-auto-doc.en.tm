@@ -1483,6 +1483,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(shared-create-document <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_create_document> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-lexists? <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_lexists> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(shared-replace-file <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

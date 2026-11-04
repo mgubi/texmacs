@@ -44,6 +44,18 @@
 (define (stat! name)
   (ahash-set! sf-stats name (+ 1 (or (ahash-ref sf-stats name) 0))))
 
+(define (sf-stat! sf name)
+  ;; counted for the process and for the file (for the tools of an agent)
+  (stat! name)
+  (let ((t (or (sf-get sf 'stats)
+               (let ((t (make-ahash-table))) (ahash-set! sf 'stats t) t))))
+    (ahash-set! t name (+ 1 (or (ahash-ref t name) 0)))))
+
+(tm-define (shared-file-stat name event)
+  (:synopsis "How many times @event (a symbol) happened to the shared file @name")
+  (with sf (sf-by-name name)
+    (or (and sf (sf-get sf 'stats) (ahash-ref (sf-get sf 'stats) event)) 0)))
+
 (tm-define (shared-stat name)
   (:synopsis "For the tests: how many times @name (a symbol) happened")
   (or (ahash-ref sf-stats name) 0))
@@ -661,7 +673,9 @@
 
 (tm-define (shared-files-on?)
   (:synopsis "Is the sharing of open files switched on (preference)?")
-  (== (get-preference "share-open-files") "on"))
+  (and (== (get-preference "share-open-files") "on")
+       ;; (the browser and Windows have no folder of entries: nothing is shared)
+       (!= (shared-user-dir) "")))
 
 (define (shareable-key name)
   ;; the canonical path of the file @name when it can be shared, else #f:
@@ -1298,7 +1312,7 @@
 
 (define (report-lost! sf patches)
   (when (nnull? patches)
-    (stat! 'lost)
+    (sf-stat! sf 'lost)
     ;; (an agent is told by its tool: nothing is saved for it)
     (when (not sf-agent?)
      (let* ((items (lost-contents patches))
@@ -1365,7 +1379,7 @@
     ;; it is not the same, it is first saved in the recovered folder.
     (when (!= (sf-composite-stree sf) doc)
       (let ((file (save-recovered-copy! sf)))
-        (stat! 'replaced)
+        (sf-stat! sf 'replaced)
         (set-message
          `(concat "Shared file: the document of the host replaces yours."
                   ,(if file
@@ -1419,7 +1433,7 @@
                                      (loop (cdr l) (cons (car l) done)))
                                     (else (reverse done))))))
                     (when (< (length ok) (length pend))
-                      (stat! 'dropped)
+                      (sf-stat! sf 'dropped)
                       (report-lost! sf (list-tail pend (length ok))))
                     (sf-put! sf 'pending ok)
                     ;; (the patch which was sent is still on its way if it
@@ -1428,7 +1442,7 @@
                     (sf-trim! key)))))))))
 
 (define (participant-request-resync! sf)
-  (stat! 'resync)
+  (sf-stat! sf 'resync)
   (sf-debug "resync\n")
   (when (sf-get sf 'conn)
     (msg-send (sf-get sf 'conn) (list 'resync))))
@@ -1453,7 +1467,7 @@
           ((func? msg 'refused)
            (with (tag id cur) msg
              (when (== id (sf-get sf 'inflight))
-               (stat! 'rolled-back)
+               (sf-stat! sf 'rolled-back)
                (sf-debug "my patch was refused\n")
                (report-lost! sf (sf-get sf 'pending))
                (when (not (rollback-pending! sf))
@@ -1693,7 +1707,7 @@
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
                          (participant-apply-remote! sf (scheme->patch psexp)
-                                                    from to)))
+                                                    from to #f)))
                       ((func? m 'welcome-reset)
                        (reconnect-ok! sf)
                        (with (tag state doc modified roster host-id) m

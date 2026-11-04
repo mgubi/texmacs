@@ -2195,6 +2195,34 @@ tmg_shared_create_file (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_shared_create_document (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-create-document");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "shared-create-document");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_create_document (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_lexistsP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-lexists?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_lexists (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_shared_replace_file (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-replace-file");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "shared-replace-file");
@@ -13166,6 +13194,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("shared-list-dir",  tmg_shared_list_dir, 1, 0, 0);
   tmscm_install_procedure ("shared-set-private",  tmg_shared_set_private, 1, 0, 0);
   tmscm_install_procedure ("shared-create-file",  tmg_shared_create_file, 2, 0, 0);
+  tmscm_install_procedure ("shared-create-document",  tmg_shared_create_document, 2, 0, 0);
+  tmscm_install_procedure ("shared-lexists?",  tmg_shared_lexistsP, 1, 0, 0);
   tmscm_install_procedure ("shared-replace-file",  tmg_shared_replace_file, 2, 0, 0);
   tmscm_install_procedure ("shared-random-token",  tmg_shared_random_token, 0, 0, 0);
   tmscm_install_procedure ("shared-lock-acquire",  tmg_shared_lock_acquire, 1, 0, 0);

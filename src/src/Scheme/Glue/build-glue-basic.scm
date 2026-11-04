@@ -209,6 +209,8 @@
   (shared-list-dir shared_list_dir (scheme_tree string))
   (shared-set-private shared_set_private (bool string))
   (shared-create-file shared_create_file (bool string string))
+  (shared-create-document shared_create_document (bool string string))
+  (shared-lexists? shared_lexists (bool string))
   (shared-replace-file shared_replace_file (bool string string))
   (shared-random-token shared_random_token (string))
   (shared-lock-acquire shared_lock_acquire (int string))
