@@ -20,7 +20,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tex-env-name s)
-  (if (string? s) (string-replace s "-" "") s))
+  ;; the name of an environment is written in \begin{...}: a character which
+  ;; is not a letter, a digit or one of * _ : . @ cannot be in it
+  (if (string? s)
+      (list->string
+       (filter (lambda (c) (or (char-alphabetic? c) (char-numeric? c)
+                               (in? c '(#\* #\_ #\: #\. #\@))))
+               (string->list s)))
+      s))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface for unicode output
@@ -416,9 +423,35 @@
               (output-tex "}")))
         (texout-args (cdr l)))))
 
+;; The name of a macro is written after a backslash: a control symbol is one
+;; character, a control word is made of letters (and digits, * and @ of the
+;; macros of TeXmacs); a brace, a percent sign... in a longer name would end
+;; the argument or comment out the rest, so they are dropped, but for the
+;; \{ \} \| of the names such as left\{.
+(define (texout-safe-macro-name name)
+  (let ((n (string-length name)))
+    (if (<= n 1) name
+        (let loop ((i 0) (acc '()))
+          (if (>= i n)
+              (list->string (reverse acc))
+              (let ((c (string-ref name i))
+                    (next (and (< (+ i 1) n) (string-ref name (+ i 1)))))
+                (cond ((or (char-alphabetic? c) (char-numeric? c)
+                           (> (char->integer c) 127)
+                           (in? c '(#\* #\@ #\( #\) #\[ #\] #\/ #\. #\< #\> #\= #\+ #\- #\|)))
+                       (loop (+ i 1) (cons c acc)))
+                      ((and (== c #\\) next
+                            (or (char-alphabetic? next) (in? next '(#\{ #\} #\|))))
+                       (loop (+ i 1) (cons c acc)))
+                      ((and (in? c '(#\{ #\} #\|)) (> i 0)
+                            (== (string-ref name (- i 1)) #\\))
+                       (loop (+ i 1) (cons c acc)))
+                      (else (loop (+ i 1) acc)))))))))
+
 (define (texout-apply what args)
   (output-tex
-    (if (string? what) what (string-append "\\" (symbol->string what))))
+    (if (string? what) what
+        (string-append "\\" (texout-safe-macro-name (symbol->string what)))))
   (texout-args args))
 
 (define (texout-protect? env)
