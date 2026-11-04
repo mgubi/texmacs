@@ -2040,7 +2040,7 @@
   ((:or rigid hgroup freeze unfreeze syntax move shift resize
         repeat repeat*)
    tmof-first)
-  ((:or datoms dlines dpages dbox code-lines locus float) tmof-last)
+  ((:or datoms dlines dpages dbox locus float) tmof-last)
   (phantom tmof-noop)
 
   ;; what has no meaning in Markdown

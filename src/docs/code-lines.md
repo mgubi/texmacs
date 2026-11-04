@@ -1,50 +1,48 @@
 # Blocks of lines of code (`code-lines`)
 
 A source file of hundreds of thousands of lines (#710: a 19.8 MB `parser.c`
-passed 3 GB while it was typeset) is typeset as a **block of lines**: the tag
-`code-lines`, typeset by a bridge and a box of its own. A plain line is a row
-of a monospaced font on a grid of cells, with no line items and no paragraph
-of its own in papyrus mode. The features of programs (tree-sitter, the language
-servers, see [code-features.md](code-features.md)) work in it as in a
-document of lines: the block is one more client of the line state of the
-core, not a mechanism of its own. Tracking issue: #797.
+passed 3 GB while it was typeset) is typeset as a **block of lines**: its
+document of lines is typeset by a bridge and a box of their own, chosen by the
+environment variable `code-lines`. A plain line is a row of a monospaced font
+on a grid of cells, with no line items and no paragraph of its own in papyrus
+mode. The features of programs (tree-sitter, the language servers, see
+[code-features.md](code-features.md)) work in it as in any document of lines:
+the tree is the same, only its typesetting differs. Tracking issue: #797.
 
-## The tree
+## The tree and the variable
 
-    (document (code-lines (document "line 0" "line 1" ...)))
+    (document "line 0" "line 1" ...)      with code-lines = true
 
+- **No tag.** The lines are an ordinary document; the environment variable
+  `code-lines` (`true`, default `false`, `env_default.cpp`) says that it is
+  typeset as lines of code. A source or text file has it in its initial
+  environment; a block in another document is
+  `<with|code-lines|true|<document|...>>`. Everything which works on a
+  document of lines (editing, undo, search, the cursor, the converters, the
+  language servers, tree-sitter, `go-to-line`) works unchanged, and an older
+  TeXmacs, which ignores the variable, shows and edits the lines as
+  paragraphs. (A first version had a tag `code-lines` around the document:
+  every place which lists the primitives, the cursor, the focus and the
+  converters needed a case for it, and the lines of a buffer were no longer
+  its body; see #798.)
 - **Loading.** `source_document_to_tree` (source files, saved as they were
-  loaded) and `verbatim_document_to_tree` (texts) make the block unless the
-  preference `code lines` is `off`; `TEXMACS_CODE_LINES=0` or `1` overrides it
-  (tests). `code_lines_wanted` in `Data/Convert/Verbatim/verbatim.cpp`.
-- **Saving.** `print_verbatim` writes the lines of the block as they are
-  (`CODE_LINES`), so `tree_to_source` gives the file back byte for byte (tabs
-  and the other control characters are `<#9>`, `<#x>`).
-- **A primitive as the others.** Where primitives are handled case by case,
-  `code-lines` is there as the tags of the same kind (`datoms`, `dbox`...,
-  whose body is their last child): the converters export its document
-  (`tmhtml.scm`, `tmtex.scm` with `tmtex-tt` for verbatim content,
-  `tmmarkdown.scm`, `tmoffice.scm`), so that a text exports as before the
-  block; `is_multi_paragraph` (`tree.cpp`) and `is_long_arg` (source mode)
-  take it as a document (inserted in a paragraph, it splits it); the
-  serializer of the grammars (`packrat_serializer.cpp`) serializes its
-  document. A new place which lists the primitives should list it too.
-- **The cursor.** The tag has an inner border (`drd_std.cpp`): the cursor is
-  always in a line, never before or after the block, so that a file opens
-  with the cursor in its first line, and Home and End of the document stay
-  in the lines. The focus skips the block (`focus_search`), as a document:
-  in a source file it is the buffer, as without the block.
-- **The lines of a buffer.** `code_lines_root` (glue `code-lines-root`,
-  `System/Language/code_lines.hpp`) is the one definition of "line *l*, offset
-  *o*": the document of the lines, which is the one inside the block for a
-  file loaded as a block, and the tree itself otherwise. Everything which
-  addresses the lines of a buffer goes through it: the language servers
-  (`lsp-target-root`, `lsp-target-path`, `lsp-target-lo`, the edits, the
-  decorations), tree-sitter's region (`treesit_language_rep::highlight`),
-  `go-to-line`. The folds and tree-sitter's colours find the lines of a line
-  from its parent document, which is the inner document: they needed nothing.
-  Tests which place the cursor in a source file ask for the lines the same
-  way (`line-path` in `lsp-test`, `line-cursor` in `links-test`).
+  loaded) and `verbatim_document_to_tree` (texts) set the variable unless
+  the preference `code lines` is `off`; `TEXMACS_CODE_LINES=0` or `1`
+  overrides it (tests). `code_lines_wanted` in
+  `Data/Convert/Verbatim/verbatim.cpp`. Format › Source code › Lines of code
+  switches it (`toggle-code-lines`).
+- **Saving.** The lines are saved as before; `tree_to_source` gives the file
+  back byte for byte (tabs and the other control characters are `<#9>`,
+  `<#x>`).
+- **The choice of the bridge** (`Typeset/Bridge/bridge_document.cpp`). The
+  bridge of a document reads `code-lines` when it is typeset (the variable is
+  then one of its inputs, so that a change of it typesets the document
+  again) and either makes the bridges of its paragraphs, one per line, or
+  hands the document to `bridge_code`, which makes none; the notifications
+  and the typesetting then go to the one in use. Its paragraph bridges are
+  made at the first typesetting only, not when the bridge is made, so that a
+  long file never has them. A `document` typeset by the concater (inside a
+  line, a cell) is typeset as paragraphs.
 
 ## Typesetting (`Typeset/Bridge/bridge_code.cpp`)
 

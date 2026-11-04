@@ -177,11 +177,6 @@
 (define (at . l) (append (buffer-path) l))
 (define (rel p) (list-tail p (length (buffer-path))))
 (define (cursor) (rel (cursor-path)))
-(define (line-cursor)
-  ;; the line and the offset of the cursor in the lines of the buffer (of
-  ;; the block of lines of a source file or a text, code-lines-root)
-  (list-tail (cursor-path)
-             (length (tree->path (code-lines-root (buffer-tree))))))
 (define (bt . l) (apply tree-ref (cons (buffer-tree) l)))
 (define (st . l) (tree->stree (apply bt l)))
 
@@ -891,8 +886,7 @@
       (check= large-asked 2)
       (check-true (buffer-exists? f))
       (check= (current-buffer) f)
-      ;; (the line 3 of the block of lines of the file: code-lines)
-      (check= (line-cursor) '(3 0))
+      (check= (cursor) '(3 0))
       (buffer-close f)
       (switch-to-buffer here)
       ;; a relative link: it names the file of the directory of the buffer
@@ -917,7 +911,7 @@
         (check-true (buffer-exists? f))
         (check-false (buffer-exists? decoy))
         (check= (current-buffer) f)
-        (check= (line-cursor) '(3 0))
+        (check= (cursor) '(3 0))
         (buffer-close f)
         (buffer-close other)
         (system-remove decoy)
@@ -948,7 +942,7 @@
     (go-to-url (file-url f "?line=3"))
     (check-true (string-contains? (buffer-text (current-buffer)) "line3"))
     (check= (url->system (url-tail (current-buffer))) "file-query.scm")
-    (check= (line-cursor) '(3 0))
+    (check= (cursor) '(3 0))
     ;; the buffer is the one of the file opened by its name: the same url (on
     ;; Windows it was a malformed one, #789), not a second buffer, and a
     ;; link relative to it names the files beside it
@@ -965,7 +959,7 @@
       (go-to-url (file-url f "?line=2"))
       (check= (length (buffer-list)) open)
       (check= (url->stree (current-buffer)) (url->stree f))
-      (check= (line-cursor) '(2 0))
+      (check= (cursor) '(2 0))
       (buffer-close (current-buffer))
       (switch-to-buffer here))
     ;; from a buffer of the web, a file: link stays local (the load is
@@ -983,7 +977,7 @@
       (string-save "aa\nbb cc\ndd\n" (url->system g))
       (go-to-url (file-url g "?line=2&column=1"))
       (check= (url->system (url-tail (current-buffer))) "file query.scm")
-      (check= (line-cursor) '(2 1))
+      (check= (cursor) '(2 1))
       (buffer-close (current-buffer))
       (switch-to-buffer here)
       (system-remove g))
@@ -1022,7 +1016,7 @@
       (go-to-url (file-url big "?line=3"))
       (large-pending #t)
       (check= (url->system (url-tail (current-buffer))) "file-large.scm")
-      (check= (line-cursor) '(3 0))
+      (check= (cursor) '(3 0))
       (set-large-load-test-interactive! #f)
       (buffer-close (current-buffer))
       (switch-to-buffer here))))

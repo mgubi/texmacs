@@ -256,17 +256,3 @@ code_indent_end (string s) {
   }
   return i;
 }
-
-/******************************************************************************
-* The lines of program code of a tree (see code_lines.hpp)
-******************************************************************************/
-
-tree
-code_lines_root (tree t) {
-  if (is_func (t, DOCUMENT, 1)) {
-    tree b= t[0];
-    if (is_func (b, CODE_LINES, 1) && is_func (b[0], DOCUMENT)) return b[0];
-  }
-  if (is_func (t, CODE_LINES, 1) && is_func (t[0], DOCUMENT)) return t[0];
-  return t;
-}

@@ -36,7 +36,6 @@ bridge bridge_locus (typesetter, tree, path);
 bridge bridge_ornament (typesetter, tree, path);
 bridge bridge_art_box (typesetter, tree, path);
 bridge bridge_canvas (typesetter, tree, path);
-bridge bridge_code (typesetter, tree, path);
 
 bridge nil_bridge;
 
@@ -82,8 +81,6 @@ make_bridge (typesetter ttt, tree st, path ip) {
     return bridge_auto (ttt, st, ip, error_m, true);
   case DOCUMENT:
     return bridge_document (ttt, st, ip);
-  case CODE_LINES:
-    return bridge_code (ttt, st, ip);
   case SURROUND:
     return bridge_surround (ttt, st, ip);
   case HIDDEN:

@@ -541,7 +541,6 @@
 
 (define (block-document? x)
   (cond ((func? x 'document) #t)
-	((func? x 'code-lines 1) #t)
 	((func? x 'concat) (list-any block-document? (cdr x)))
 	((func? x 'surround 3) (block-document? (cAr x)))
 	((func? x 'with) (block-document? (cAr x)))
@@ -1993,7 +1992,6 @@
   (dlines tmhtml-datoms)
   (dpages tmhtml-datoms)
   (dbox tmhtml-datoms)
-  (code-lines tmhtml-datoms)
   
   (with-limits tmhtml-noop)
   (line-break tmhtml-noop)

@@ -1,7 +1,7 @@
 
 /******************************************************************************
 * MODULE     : code_boxes.cpp
-* DESCRIPTION: boxes for the lines of source code (the tag code-lines)
+* DESCRIPTION: boxes for the lines of source code (code-lines)
 * COPYRIGHT  : (C) 2026  the TeXmacs contributors
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -21,8 +21,8 @@
 extern int redraw_uninterrupted; // (boxes.cpp)
 
 /******************************************************************************
-* A code box shows the lines i0, i0+1... of a document of strings (the child of
-* <code-lines|<document|line|...>>) as one box, without a box per line or per
+* A code box shows the lines i0, i0+1... of a document of strings (typeset as
+* lines of code, see bridge_code.cpp) as one box, without a box per line or per
 * token, and nothing is made for a line until it is drawn or the cursor is
 * in it. Its box paths are (k, pos): the line i0+k of the document, at the
 * position pos in its string.
@@ -413,7 +413,7 @@ struct code_box_rep: public box_rep {
     tree t= line_tree (k);
     return is_atomic (t)? t->label: string (""); }
   path   line_ip (int k) {
-    return single? ip: descend (descend (ip, 0), i0+k); }
+    return single? ip: descend (ip, i0+k); }
   array<int> starts (int k) {
     if (single) { array<int> r; r << ra; return r; }
     int j= tall_index (k);
@@ -828,7 +828,7 @@ code_box_rep::find_right_box_path () {
 
 path
 code_box_rep::find_box_path (path p, bool& found) {
-  // p: a path in the edit tree; the lines are at reverse (ip) * (0, i, ...)
+  // p: a path in the edit tree; the lines are at reverse (ip) * (i, ...)
   found= false;
   path me= reverse (ip);
   if (!is_accessible (ip)) return path (0, 0);
@@ -844,12 +844,12 @@ code_box_rep::find_box_path (path p, bool& found) {
     }
     return path (0, ra);
   }
-  if (N(p) >= N(me) + 2 && head (p, N(me)) == me && p[N(me)] == 0) {
-    int i= p[N(me)+1];
+  if (N(p) >= N(me) + 2 && head (p, N(me)) == me) {
+    int i= p[N(me)];
     if (i >= i0 && i < i0 + nr_lines ()) {
       int k= i - i0;
       if (rich (k)) return path (k, rich_box (k)->find_box_path (p, found));
-      if (N(p) == N(me) + 3) {
+      if (N(p) == N(me) + 2) {
         found= true;
         return path (k, max (0, min (last_item (p), N (line (k)))));
       }

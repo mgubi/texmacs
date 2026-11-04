@@ -223,12 +223,10 @@
        (in-buffer u
          (lambda ()
            ;; (the cursor follows the text: its line may be replaced)
-           ;; (the lines of a source file: code-lines-root)
-           (let* ((body (if (pair? opt) (car opt)
-                            (code-lines-root (buffer-tree))))
+           (let* ((body (if (pair? opt) (car opt) (buffer-tree)))
                   (old (lsp-lines body))
                   (lines (lsp-apply-to-lines old edits))
-                  (b (tree->path body))
+                  (b (if (pair? opt) (tree->path body) (buffer-path)))
                   (p (cursor-path))
                   (lo (and (list-starts? p b)
                            (with r (list-tail p (length b))
@@ -324,9 +322,7 @@
                         (or (!= v mine)
                             (and u (buffer-exists? u)
                                  (lsp-document-changed-since?
-                                  c key (or (cadr pl)
-                                            (code-lines-root
-                                             (buffer-get-body u)))))))))
+                                  c key (or (cadr pl) (buffer-get-body u))))))))
                (cdr dc))))))
 
 ;; the edits which servers asked for (workspace/applyEdit), since the start:

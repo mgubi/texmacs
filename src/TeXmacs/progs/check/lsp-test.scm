@@ -732,14 +732,6 @@
 (define lsp-dir
   (url->system (url-append (url-temp-dir) "lsp-tmp")))
 
-;; The lines of a source file (code-lines-root: those of its block of lines,
-;; when it is loaded as one), and the place of the offset o of the line l
-(define (lines-of u)
-  (code-lines-root (buffer-get-body u)))
-
-(define (line-path lo)
-  (append (tree->path (lines-of (current-buffer))) lo))
-
 (define (lsp-file name)
   ;; a system path, with the separators of the system (as those of the
   ;; buffers, "\\" on Windows)
@@ -782,7 +774,7 @@
       (check= (lsp-buffer-line 9) "")
       (check= (lsp-buffer-position 1 9)
               '(attr "line" (json-number "1") "character" (json-number "9")))
-      (go-to-path (line-path '(1 9)))
+      (go-to-path (append (buffer-path) '(1 9)))
       (check= (lsp-cursor-position)
               '(attr "line" (json-number "1") "character" (json-number "9")))
       (test-lines-of-buffer u)
@@ -799,7 +791,7 @@
   ;; the decorations and the folds of the lines of @u, without a server
   ;; (its text is given back at the end)
   (check-group "decorations and folds of lines")
-  (let* ((body (lines-of u))
+  (let* ((body (buffer-get-body u))
          (saved (tree->stree body))
          (uri (lsp-buffer-uri))
          (red (lambda (l) (list l (list '((0 3 "red")) '())))))
@@ -837,14 +829,14 @@
     (lsp-fold-block 0 2)
     (check= (lsp-folds) '((0 2) (1 2)))
     ;; (the cursor after the fold: arriving in a hidden line opens it)
-    (go-to-path (line-path '(3 0)))
+    (go-to-path (append (buffer-path) '(3 0)))
     (tree-remove! body 0 1)
     (tree-insert! body 0 (list (car (cdr saved))))
     (check= (lsp-folds) '((0 2) (1 2)))
     (check-true (lsp-line-folded? (tree-ref body 2)))
     (tree-insert! (tree-ref body 2) 0 " ")
     (check= (lsp-folds) '((0 1)))
-    (go-to-path (line-path '(0 0)))
+    (go-to-path (append (buffer-path) '(0 0)))
     (lsp-unfold-all)
     (check= (lsp-folds) '())
     (check-false (lsp-line-folded? (tree-ref body 1)))
@@ -865,7 +857,7 @@
         (check= (lsp-diagnostic-range (car l) (lsp-buffer-lines))
                 '(1 9 1 10))))
     ;; the cursor on main
-    (go-to-path (line-path '(0 5)))
+    (go-to-path (append (buffer-path) '(0 5)))
     (with a (lsp-request-wait c "textDocument/hover"
                               (lsp-object "textDocument" (lsp-object "uri" uri)
                                           "position" (lsp-cursor-position))
@@ -922,7 +914,7 @@
         (check= (lsp-block-of-path (lsp-file "proj/src/.notes.tm-block2.cpp"))
                 (list path (car (cadr bs)) "cpp"))
         ;; outside of the blocks, the document is not code
-        (go-to-path (line-path '(0 0)))
+        (go-to-path (append (buffer-path) '(0 0)))
         (check-false (lsp-cursor-block))
         (check= (lsp-buffer-language) #f)
         ;; not followed when the blocks are not
@@ -1132,7 +1124,7 @@
                  "}\n"))
 
 (define (cursor-rel)
-  (list-tail (cursor-path) (length (line-path '()))))
+  (list-tail (cursor-path) (length (buffer-path))))
 
 (define (test-editor)
   (check-group "editor")
@@ -1153,18 +1145,18 @@
         (lsp-show-diagnostics)
         (with errs (get-alt-selection "code-errors")
           (check-true (>= (length errs) 2))
-          (check-true (in? (line-path '(2 9)) errs)))
+          (check-true (in? (append (buffer-path) '(2 9)) errs)))
         ;; from the start to the first error
-        (go-to-path (line-path '(0 0)))
+        (go-to-path (append (buffer-path) '(0 0)))
         (lsp-next-diagnostic #t)
         (check= (cursor-rel) '(2 9))
         ;; the definition of compute_value
-        (go-to-path (line-path '(2 16)))
+        (go-to-path (append (buffer-path) '(2 16)))
         (lsp-goto-definition)
         (check= (current-buffer) u)
         (check= (cursor-rel) '(0 4))
         ;; completion of comp
-        (go-to-path (line-path '(3 6)))
+        (go-to-path (append (buffer-path) '(3 6)))
         (check-true (lsp-completion-here?))
         (with r (lsp-request-wait c "textDocument/completion"
                                   (lsp-object "textDocument"
@@ -1205,7 +1197,7 @@
         (check= (get-alt-selection "code-errors") '())
         ;; information at the cursor, in a balloon at the line, which must
         ;; be typeset (the event loop does it before each key)
-        (go-to-path (line-path '(2 16)))
+        (go-to-path (append (buffer-path) '(2 16)))
         (update-forced)
         (lsp-hover)
         (lsp-hover-close)
@@ -1219,7 +1211,7 @@
                                                    (list (lsp-ref (lsp-read s)
                                                                   "method"))))
                              (send s)))
-          (go-to-path (line-path '(3 2)))
+          (go-to-path (append (buffer-path) '(3 2)))
           (insert "x")
           (buffer-save u)
           (version-notify-saved u)
@@ -1501,7 +1493,7 @@
                    "clangd"))
       (check-true (make-menu-widget '(horizontal (link texmacs-focus-icons)) 0))
       ;; a quick fix: did you mean twice?
-      (go-to-path (line-path '(2 10)))
+      (go-to-path (append (buffer-path) '(2 10)))
       (with r (lsp-code-actions-at-cursor)
         (check-true (and r (nnull? (cadr r))))
         (when (and r (nnull? (cadr r)))
@@ -1510,7 +1502,7 @@
       ;; (the cursor stays where it was, its line was replaced)
       (check= (cursor-rel) '(2 10))
       ;; the signature of twice
-      (go-to-path (line-path '(3 20)))
+      (go-to-path (append (buffer-path) '(3 20)))
       (with a (lsp-request-wait c "textDocument/signatureHelp"
                                 (lsp-object "textDocument" (lsp-object "uri" uri)
                                             "position" (lsp-cursor-position))
@@ -1521,7 +1513,7 @@
                                       "int v")))
       ;; the references of twice (after the fix: three places), and the
       ;; outline of the file, on pages
-      (go-to-path (line-path '(0 8)))
+      (go-to-path (append (buffer-path) '(0 8)))
       (lsp-references)
       (with page (current-buffer)
         (check-true (url-rooted-tmfs? page))
@@ -1541,7 +1533,7 @@
         (switch-to-buffer u)
         (buffer-close page))
       ;; the uses of twice, highlighted (three places)
-      (go-to-path (line-path '(0 8)))
+      (go-to-path (append (buffer-path) '(0 8)))
       (lsp-highlight-at-cursor)
       (lsp-wait c (lambda () (nnull? (lsp-highlights))) 10000)
       (check= (length (lsp-highlights)) 3)
@@ -1549,16 +1541,16 @@
       ;; folding the block of main: its lines stay in the document, but
       ;; are not shown; the cursor which comes in opens it
       (with text (lsp-buffer-text)
-        (go-to-path (line-path '(2 2)))
+        (go-to-path (append (buffer-path) '(2 2)))
         (lsp-fold)
         (check= (lsp-folds) '((1 3)))
-        (check-true (lsp-line-folded? (tree-ref (lines-of (current-buffer)) 2)))
-        (check-false (lsp-line-folded? (tree-ref (lines-of (current-buffer)) 1)))
+        (check-true (lsp-line-folded? (tree-ref (buffer-tree) 2)))
+        (check-false (lsp-line-folded? (tree-ref (buffer-tree) 1)))
         (check= (cursor-rel) '(1 13))
         (check= (lsp-buffer-text) text)
         (lsp-unfold)
         (check= (lsp-folds) '())
-        (check-false (lsp-line-folded? (tree-ref (lines-of (current-buffer)) 2))))
+        (check-false (lsp-line-folded? (tree-ref (buffer-tree) 2))))
       ;; the symbols of the project, the calls of twice
       (lsp-find-symbol "twice")
       (with page (current-buffer)
@@ -1567,7 +1559,7 @@
           (check-true (string-contains? s "src/actions.cpp")))
         (switch-to-buffer u)
         (buffer-close page))
-      (go-to-path (line-path '(0 8)))
+      (go-to-path (append (buffer-path) '(0 8)))
       (lsp-call-hierarchy)
       (with page (current-buffer)
         (check-true (url-rooted-tmfs? page))
@@ -1586,7 +1578,7 @@
           (check= (list (car (car (cadr d))) (cadr (car (cadr d))))
                   '(6 11))))
       ;; a rename everywhere
-      (go-to-path (line-path '(0 8)))
+      (go-to-path (append (buffer-path) '(0 8)))
       (lsp-rename "thrice")
       (with all (apply string-append (lsp-buffer-lines))
         (check-false (string-contains? all "twice"))

@@ -218,8 +218,22 @@ bridge_block (typesetter ttt, path ip) {
 bridge bridge_docrange (typesetter ttt, tree st, path ip, array<bridge>& brs,
 			int begin, int end, bool divide);
 
+// A document is typeset as paragraphs, or, when the environment variable
+// code-lines is true (a source file, a text: see verbatim.cpp), as lines of
+// code, by bridge_code (bridge_code.cpp), which makes no bridge, paragraph
+// or box per line. The mode is chosen when the document is typeset (the
+// variable is then an input of the bridge, see bridge.cpp): the bridges of
+// the paragraphs, one for each line, are only made in the paragraph mode
+#define DOC_UNKNOWN 0
+#define DOC_PARAGRAPHS 1
+#define DOC_CODE 2
+
+bridge bridge_code (typesetter ttt, tree st, path ip);
+
 class bridge_document_rep: public bridge_rep {
 protected:
+  int    mode; // DOC_UNKNOWN before the first typesetting
+  bridge code; // the bridge of the lines of code (DOC_CODE)
   array<bridge> brs;
   bridge acc; // binary splitting acceleration for long documents
   hashmap<int,bridge> blocks; // by the number of their first paragraph
@@ -231,10 +245,13 @@ public:
   bridge_document_rep (typesetter ttt, tree st, path ip);
   void initialize ();
   void initialize_acc ();
+  void set_mode (int m);
 
   void notify_assign (path p, tree u);
   void notify_insert (path p, tree u);
   void notify_remove (path p, int nr);
+  void notify_split  (path p);
+  void notify_join   (path p);
   bool notify_macro  (int type, string var, int l, path p, tree u);
   void notify_change ();
 
@@ -244,9 +261,24 @@ public:
 };
 
 bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), big_body (false)
-{
-  initialize ();
+  bridge_rep (ttt, st, ip), mode (DOC_UNKNOWN), big_body (false) {}
+
+void
+bridge_document_rep::set_mode (int m) {
+  // the bridges of the mode m (those of the other mode are dropped)
+  if (mode == m) return;
+  mode= m;
+  if (m == DOC_CODE) {
+    brs= array<bridge> ();
+    blocks= hashmap<int,bridge> ();
+    acc= bridge ();
+    code= bridge_code (ttt, st, ip);
+  }
+  else {
+    code= bridge ();
+    initialize ();
+  }
+  status= CORRUPTED;
 }
 
 void
@@ -278,6 +310,10 @@ bridge_document_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
   ASSERT (!is_nil (p) || is_func (u, DOCUMENT) || is_func (u, PARA),
 	  "nil path");
+  if (mode == DOC_CODE) {
+    code->notify_assign (p, u); st= code->st; status= CORRUPTED; return; }
+  if (is_nil (p) && mode == DOC_UNKNOWN) { st= u; status= CORRUPTED; return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_nil (p)) { st= u; initialize (); }
   else {
     if (is_atom (p)) {
@@ -297,6 +333,9 @@ void
 bridge_document_rep::notify_insert (path p, tree u) {
   //cout << "Insert " << p << ", " << u << " in " << st << "\n";
   ASSERT (!is_nil (p), "nil path");
+  if (mode == DOC_CODE) {
+    code->notify_insert (p, u); st= code->st; status= CORRUPTED; return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_atom (p)) {
     int i, j, n= N(brs), pos= p->item, nr= N(u);
     array<bridge> brs2 (n+nr);
@@ -325,6 +364,9 @@ void
 bridge_document_rep::notify_remove (path p, int nr) {
   // cout << "Remove " << p << ", " << nr << " in " << st << "\n";
   ASSERT (!is_nil (p), "nil path");
+  if (mode == DOC_CODE) {
+    code->notify_remove (p, nr); st= code->st; status= CORRUPTED; return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_atom (p)) {
     int i, n= N(brs), pos= p->item;
     array<bridge> brs2 (n-nr);
@@ -358,8 +400,27 @@ bridge_document_rep::notify_remove (path p, int nr) {
   status= CORRUPTED;
 }
 
+void
+bridge_document_rep::notify_split (path p) {
+  if (mode == DOC_CODE) {
+    code->notify_split (p); st= code->st; status= CORRUPTED; return; }
+  bridge_rep::notify_split (p);
+}
+
+void
+bridge_document_rep::notify_join (path p) {
+  if (mode == DOC_CODE) {
+    code->notify_join (p); st= code->st; status= CORRUPTED; return; }
+  bridge_rep::notify_join (p);
+}
+
 bool
 bridge_document_rep::notify_macro (int tp, string var, int l, path p, tree u) {
+  if (mode == DOC_CODE) {
+    bool flag= code->notify_macro (tp, var, l, p, u);
+    if (flag) status= CORRUPTED;
+    return flag;
+  }
   bool flag= false;
   int i, n= N(brs);
   for (i=0; i<n; i++)
@@ -374,6 +435,7 @@ bridge_document_rep::notify_macro (int tp, string var, int l, path p, tree u) {
 void
 bridge_document_rep::notify_change () {
   status= CORRUPTED;
+  if (mode == DOC_CODE) { code->notify_change (); return; }
   if (!is_nil (acc)) acc->notify_change ();
   if (N(brs)>0) brs[0]->notify_change ();
   if (N(brs)>1) brs[N(brs)-1]->notify_change ();
@@ -385,6 +447,8 @@ bridge_document_rep::notify_change () {
 
 void
 bridge_document_rep::my_exec_until (path p) {
+  if (mode == DOC_CODE) { code->my_exec_until (p); return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_nil (acc)) {
     int i;
     for (i=0; i<p->item; i++)
@@ -396,6 +460,9 @@ bridge_document_rep::my_exec_until (path p) {
 
 bool
 bridge_document_rep::my_typeset_will_be_complete () {
+  if (mode == DOC_CODE) return code->my_typeset_will_be_complete ();
+  // (not typeset yet: the paragraphs would all be made, as the lines)
+  if (mode == DOC_UNKNOWN) return (status & VALID_MASK) == CORRUPTED;
   if (is_nil (acc)) {
     int i, n= N(brs);
     for (i=0; i<n; i++)
@@ -432,6 +499,13 @@ bridge_document_rep::typeset_one (int i, int n, int desired_status,
 void
 bridge_document_rep::my_typeset (int desired_status) {
   //cout << INDENT;
+  // (lines of code, or paragraphs: see above)
+  set_mode (env->read ("code-lines") == "true"? DOC_CODE: DOC_PARAGRAPHS);
+  if (mode == DOC_CODE) {
+    code->typeset (desired_status);
+    st= code->st;
+    return;
+  }
   if (is_nil (acc)) {
     int i, n= N(st);
     array<line_item> a= ttt->a;

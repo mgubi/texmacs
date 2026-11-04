@@ -46,10 +46,9 @@
   ;; the lines of @text, imported as the file @name
   (let* ((u (url-append dir name)))
     (string-save text u)
-    ;; (its lines: those of its block of lines, code-lines-root)
     (with doc (tree->stree (tree-import u (url-format u)))
       (with b (list-find (cdr doc) (lambda (x) (func? x 'body)))
-        (and b (tree->stree (code-lines-root (stree->tree (cadr b)))))))))
+        (and b (cadr b))))))
 
 (define (test-round-trips)
   (check-group "round trips")

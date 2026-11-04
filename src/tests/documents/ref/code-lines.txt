@@ -5,37 +5,31 @@ Lines of code
 
 1 Lines of code
 
-A block of lines of source code (the tag code-lines), typeset as lines on a grid, with the colors of
-the syntax and soft line breaks.
+A block of lines of source code (the variable code-lines), typeset as lines on a grid, with the colors
+of the syntax and soft line breaks.
 /* a comment of several lines,
 
 which ends here */ int first= 1;
-
 #define TWICE(x) \
 
 ((x) + (x))
-
 // an inline comment with /* in it
 int identifiers_are_drawn (int a, int b) {
 
 return a < b? TWICE (a): b;
-
 }
 
-int bbbbbbbbbooooooooolllllllllddddddddd_________nnnnnnnnnaaaaaaaaammmmmmmmmeeeeeeeee= 2; // emphasis in a comment
+int bold_name= 2; // emphasis in a comment
 int red_value= 3;
 double area=
 ß r 2; /* math */
-
 int underlined= 4;
 
 double ratio=
 
 a
 b
-
 c + d ; // a tall line
-
 int total= alpha_one + alpha_two + alpha_three + alpha_four + alpha_five +
 alpha_six + alpha_seven + alpha_eight + alpha_nine + alpha_ten;
 

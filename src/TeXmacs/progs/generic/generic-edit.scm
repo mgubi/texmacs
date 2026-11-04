@@ -778,22 +778,16 @@
 (tm-define (select-all)
   (tree-select (buffer-tree)))
 
-(define (lines-document t)
-  ;; the document of the lines: in a source file or a text, the lines of
-  ;; its block of lines (code-lines), also when the cursor is not in it
-  (code-lines-root t))
-
 (tm-define (go-to-line n . opt-from)
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
   (with-innermost t 'document
-    (tree-go-to (lines-document t) n 0)))
+    (tree-go-to t n 0)))
 
 (tm-define (go-to-column c . opt-from)
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
   (with-innermost t 'document
-    (let* ((d (lines-document t))
-           (p (tree-cursor-path d)))
-      (tree-go-to d (cADr p) c))))
+    (with p (tree-cursor-path t)
+      (tree-go-to t (cADr p) c))))
 
 (tm-define (select-word w t col)
   (:synopsis "Selects word @w in tree @t, more or less around column @col")

@@ -2,7 +2,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; MODULE      : code-lines-test.scm
-;; DESCRIPTION : tests of the lines of source code (the tag code-lines)
+;; DESCRIPTION : tests of the lines of source code (code-lines)
 ;; COPYRIGHT   : (C) 2026  Massimiliano Gubinelli
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
@@ -11,9 +11,11 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; <code-lines|<document|line|...>> holds lines of source code, typeset by
+;; A document typeset with the environment variable code-lines = true (a
+;; source file, a text: verbatim.cpp) holds lines of source code, typeset by
 ;; one bridge as one box, without a paragraph per line
-;; (Typeset/Bridge/bridge_code.cpp, Typeset/Boxes/Basic/code_boxes.cpp). It
+;; (Typeset/Bridge/bridge_document.cpp hands it to
+;; Typeset/Bridge/bridge_code.cpp, Typeset/Boxes/Basic/code_boxes.cpp). It
 ;; must look and behave as the same lines in a document: the same places,
 ;; the same cursor movements, the same editing and the same text when
 ;; exported. Box based movements need the changes applied to the view
@@ -49,11 +51,11 @@
                (document ,@lines))))
 (define (code-doc)
   `(document (with "font-family" "tt" "language" "verbatim"
-               (code-lines (document ,@lines)))))
+               (with "code-lines" "true" (document ,@lines)))))
 
 (define (line-path code? i)
   ;; the path of the line @i in the body of the current buffer
-  (if code? (list 0 4 0 i) (list 0 4 i)))
+  (if code? (list 0 4 2 i) (list 0 4 i)))
 
 (define (at . l) (append (buffer-path) l))
 
@@ -122,29 +124,29 @@
   (check-group "editing the lines")
   (with-body (code-doc)
     (lambda ()
-      (go-to (at 0 4 0 0 3))
+      (go-to (at 0 4 2 0 3))
       (step (lambda () (insert "XY")))
-      (check= (tree->stree (path->tree (at 0 4 0 0))) "intXY a;")
+      (check= (tree->stree (path->tree (at 0 4 2 0))) "intXY a;")
       (step insert-return)
-      (check= (tree->stree (path->tree (at 0 4 0 0))) "intXY")
-      (check= (tree->stree (path->tree (at 0 4 0 1))) " a;")
-      (check= (rel (cursor-path)) '(0 4 0 1 0))
-      (check= (tree-arity (path->tree (at 0 4 0))) 6)
+      (check= (tree->stree (path->tree (at 0 4 2 0))) "intXY")
+      (check= (tree->stree (path->tree (at 0 4 2 1))) " a;")
+      (check= (rel (cursor-path)) '(0 4 2 1 0))
+      (check= (tree-arity (path->tree (at 0 4 2))) 6)
       (step kbd-backspace)
-      (check= (tree->stree (path->tree (at 0 4 0 0))) "intXY a;")
-      (check= (tree-arity (path->tree (at 0 4 0))) 5)
-      (check= (rel (cursor-path)) '(0 4 0 0 5))
+      (check= (tree->stree (path->tree (at 0 4 2 0))) "intXY a;")
+      (check= (tree-arity (path->tree (at 0 4 2))) 5)
+      (check= (rel (cursor-path)) '(0 4 2 0 5))
       ;; the cursor still goes through the box after the edits
       (step kbd-down)
-      (check= (rel (cursor-path)) '(0 4 0 1 5)))))
+      (check= (rel (cursor-path)) '(0 4 2 1 5)))))
 
 ;; lines which are not strings (markup put inside by hand) are typeset
 ;; without an error
 (define (test-odd-contents)
   (check-group "odd contents")
-  (with-body '(document (code-lines (document "a" (strong "b") "c")))
+  (with-body '(document (with "code-lines" "true" (document "a" (strong "b") "c")))
     (lambda ()
-      (go-to (at 0 0 2 1))
+      (go-to (at 0 2 2 1))
       (step kbd-up)
       (check-true (list? (cursor-path))))))
 
@@ -153,7 +155,7 @@
 ;; lines are inserted, changed and joined, every line is where it is in a
 ;; document which had the same edits, and the cursor goes where it goes there
 (define (all-rects code?)
-  (let* ((n (tree-arity (path->tree (apply at (if code? '(0 4 0) '(0 4))))))
+  (let* ((n (tree-arity (path->tree (apply at (if code? '(0 4 2) '(0 4))))))
          (r0 (tree-bounding-rectangle
               (path->tree (apply at (line-path code? 0))))))
     (map (lambda (i)
@@ -210,7 +212,7 @@
   (let* ((r '())
          (cur (lambda () (list-tail (rel (cursor-path)) 3)))
          (goto (lambda (i pos)
-                 (go-to (at 0 4 0 i pos))
+                 (go-to (at 0 4 2 i pos))
                  (step (lambda () #t)))))
     (init-env "page-medium" medium)
     (step (lambda () #t))
@@ -228,7 +230,7 @@
 (define (test-wrapping)
   (check-group "soft line breaks")
   (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document ,@wrap-lines)))))
+                           (with "code-lines" "true" (document ,@wrap-lines)))))
          (paper #f) (papyrus #f))
     (with-body doc (lambda () (set! paper (wrap-run "paper"))))
     (with-body doc (lambda () (set! papyrus (wrap-run "papyrus"))))
@@ -256,21 +258,21 @@
                           (string-append "  line " (number->string i) ";")))
                     (.. 0 300)))
          (doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document ,@many))))))
+                           (with "code-lines" "true" (document ,@many))))))
     (with-body doc
       (lambda ()
         (init-env "page-medium" "paper")
         (step (lambda () #t))
-        (go-to (at 0 4 0 150 3))
+        (go-to (at 0 4 2 150 3))
         (step (lambda () #t))
         (let ((n0 (typeset-code-rows-made)))
           (step (lambda () (insert "Q")))
           (check-true (<= (- (typeset-code-rows-made) n0) 4))
-          (check= (tree->string (path->tree (at 0 4 0 150))) "  lQine 150;"))
+          (check= (tree->string (path->tree (at 0 4 2 150))) "  lQine 150;"))
         (let ((n0 (typeset-code-rows-made)))
           (step insert-return)
           (check-true (<= (- (typeset-code-rows-made) n0) 6)))
-        (go-to (at 0 4 0 157 3))
+        (go-to (at 0 4 2 157 3))
         (step (lambda () #t))
         (let ((n0 (typeset-code-rows-made)))
           ;; (the line 157 was the line 156: a wrapped line)
@@ -288,7 +290,7 @@
                           (string-append "  line " (number->string i) ";")))
                     (.. 0 100)))
          (doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document ,@many))))))
+                           (with "code-lines" "true" (document ,@many))))))
     (with-body doc
       (lambda ()
         (init-env "page-medium" "papyrus")
@@ -297,7 +299,7 @@
                       (let ((n0 (typeset-code-records-made)))
                         (step thunk)
                         (- (typeset-code-records-made) n0)))))
-          (go-to (at 0 4 0 1 3))
+          (go-to (at 0 4 2 1 3))
           (step (lambda () #t))
           ;; a key in a short line, Return, a key in the new line, joining
           ;; it again, removing a wrapped line: no record made again but
@@ -306,13 +308,13 @@
           (check= (made insert-return) 0)
           (check= (made (lambda () (insert "R"))) 0)
           (check= (made (lambda () (kbd-backspace) (kbd-backspace))) 0)
-          (check= (tree->string (path->tree (at 0 4 0 1))) "  lQine 1;")
-          (go-to (at 0 4 0 13 4))
+          (check= (tree->string (path->tree (at 0 4 2 1))) "  lQine 1;")
+          (go-to (at 0 4 2 13 4))
           (step (lambda () #t))
           (check= (made (lambda () (insert "S"))) 1)
           (check= (made insert-return) 1)
           (check= (made kbd-backspace) 1)
-          (check= (tree->string (path->tree (at 0 4 0 13)))
+          (check= (tree->string (path->tree (at 0 4 2 13)))
                   (string-append (substring soft-line 0 4) "S"
                                  (substring soft-line 4
                                             (string-length soft-line))))
@@ -336,10 +338,10 @@
                                (.. 0 40))))
          (doc `(document (with "font-family" "tt" "language" "verbatim"
                                 "mode" "prog" "prog-language" "cpp"
-                           (code-lines (document ,@c-lines))))))
+                           (with "code-lines" "true" (document ,@c-lines))))))
     (with-body doc
       (lambda ()
-        (let ((line (lambda (i) (at 0 8 0 i))))
+        (let ((line (lambda (i) (at 0 8 2 i))))
           ;; open a comment, which goes to the next star and slash
           (go-to (append (line 10) '(0)))
           (step (lambda () (insert "/* ")))
@@ -368,11 +370,11 @@
                                (.. 0 20))))
          (doc `(document (with "font-family" "tt" "language" "verbatim"
                                 "mode" "prog" "prog-language" "scala"
-                           (code-lines (document ,@s-lines))))))
+                           (with "code-lines" "true" (document ,@s-lines))))))
     (with-body doc
       (lambda ()
-        (let ((d (path->tree (at 0 8 0))))
-          (go-to (at 0 8 0 10 0))
+        (let ((d (path->tree (at 0 8 2))))
+          (go-to (at 0 8 2 10 0))
           (step (lambda () #t))
           (step (lambda () (tree-remove! d 0 1)))
           (step (lambda () (tree-insert! d 0 '("/* again"))))
@@ -400,13 +402,13 @@
          (note (lambda (x) (set! r (cons x r))))
          (cur (lambda () (list-tail (rel (cursor-path)) 3)))
          (goto (lambda (l)
-                 (go-to (apply at (append '(0 4 0) l)))
+                 (go-to (apply at (append '(0 4 2) l)))
                  (step (lambda () #t)))))
     (init-env "page-medium" medium)
     (step (lambda () #t))
     ;; the places of the plain lines after the line with a fraction
     (let* ((y (lambda (i) (cadr (tree-bounding-rectangle
-                                 (path->tree (at 0 4 0 i))))))
+                                 (path->tree (at 0 4 2 i))))))
            (y0 (y 0)))
       (note (list (- (y 3) y0) (- (y 4) y0))))
     ;; down from the column 6 of a plain line: the column 6 of the next,
@@ -416,18 +418,18 @@
     (note (cur))
     ;; an edit in strong
     (step (lambda () (insert "Z")))
-    (note (tree->stree (path->tree (at 0 4 0 1))))
+    (note (tree->stree (path->tree (at 0 4 2 1))))
     ;; into the math, and an edit there
     (goto '(2 1 0 0 1))
     (step (lambda () (insert "q")))
-    (note (tree->stree (path->tree (at 0 4 0 2 1 0 0))))
+    (note (tree->stree (path->tree (at 0 4 2 2 1 0 0))))
     (note (cur))
     (reverse r)))
 
 (define (test-markup)
   (check-group "lines with markup")
   (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document ,@markup-lines)))))
+                           (with "code-lines" "true" (document ,@markup-lines)))))
          (paper #f) (papyrus #f))
     (with-body doc (lambda () (set! paper (markup-run "paper"))))
     (with-body doc (lambda () (set! papyrus (markup-run "papyrus"))))
@@ -453,20 +455,20 @@
          (note (lambda (x) (set! r (cons x r))))
          (cur (lambda () (list-tail (rel (cursor-path)) 3)))
          (y (lambda (i) (cadr (tree-bounding-rectangle
-                               (path->tree (at 0 4 0 i)))))))
+                               (path->tree (at 0 4 2 i)))))))
     (init-env "page-medium" medium)
     (init-env "code-tall-objects" "shrink")
     (step (lambda () #t))
     (note (list (- (y 3) (y 1)) (- (y 4) (y 1))))
     ;; (the plain document: the places only)
-    (when (not (tree-atomic? (path->tree (at 0 4 0 2))))
-      (go-to (at 0 4 0 2 1 0 1 0 0))
+    (when (not (tree-atomic? (path->tree (at 0 4 2 2))))
+      (go-to (at 0 4 2 2 1 0 1 0 0))
       (step (lambda () #t))
       (step kbd-right)
       (note (cur))
       (step (lambda () (insert "q")))
-      (note (tree->stree (path->tree (at 0 4 0 2 1 0 1 0))))
-      (go-to (at 0 4 0 1 0 2))
+      (note (tree->stree (path->tree (at 0 4 2 2 1 0 1 0))))
+      (go-to (at 0 4 2 1 0 2))
       (step (lambda () #t))
       (step kbd-down) (step kbd-down)
       (note (cur)))
@@ -475,11 +477,11 @@
 (define (test-shrink)
   (check-group "tall objects shrunk to a row")
   (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document ,@markup-lines)))))
+                           (with "code-lines" "true" (document ,@markup-lines)))))
          (plain (map (lambda (l) (if (string? l) l "x= a+b; // note"))
                      markup-lines))
          (pdoc `(document (with "font-family" "tt" "language" "verbatim"
-                            (code-lines (document ,@plain)))))
+                            (with "code-lines" "true" (document ,@plain)))))
          (runs '()))
     (for-each (lambda (medium)
                 (with-body doc
@@ -502,19 +504,23 @@
     (lambda ()
       (check= (texmacs->code (path->tree (at 0 4)) "utf-8")
               (string-join lines "\n"))))
-  ;; the importer makes the tag, unless the preference "code lines" is
-  ;; "off" or TEXMACS_CODE_LINES is 0 (1: always)
+  ;; the importer gives the lines, typeset as a block (the variable
+  ;; code-lines in the initial environment), unless the preference "code
+  ;; lines" is "off" or TEXMACS_CODE_LINES is 0 (1: always)
   (let ((old (getenv "TEXMACS_CODE_LINES"))
         (body (lambda ()
                 (with t (tree->stree (cpp-verbatim->texmacs "a\nb" #f "utf-8"))
-                  (cadr (assoc 'body (cdr t)))))))
+                  (list (cadr (assoc 'body (cdr t)))
+                        (and (in? '(associate "code-lines" "true")
+                                  (cdadr (assoc 'initial (cdr t))))
+                             #t))))))
     (code-lines-env "1")
-    (check= (body) '(document (code-lines (document "a" "b"))))
+    (check= (body) '((document "a" "b") #t))
     (code-lines-env #f)
     (when (!= (get-preference "code lines") "off")
-      (check= (body) '(document (code-lines (document "a" "b")))))
+      (check= (body) '((document "a" "b") #t)))
     (code-lines-env "0")
-    (check= (body) '(document "a" "b"))
+    (check= (body) '((document "a" "b") #f))
     ;; (#f: as it was, not set)
     (code-lines-env old)
     (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
@@ -534,7 +540,7 @@
          (cur (lambda () (list-tail (rel (cursor-path)) 3)))
          (note (lambda () (set! r (cons (cur) r))))
          (goto (lambda (i pos)
-                 (go-to (at 0 4 0 i pos))
+                 (go-to (at 0 4 2 i pos))
                  (step (lambda () #t)))))
     (init-env "page-medium" medium)
     (init-env "code-invisibles" invis)
@@ -550,7 +556,7 @@
 (define (test-tabs)
   (check-group "tabs and invisible characters")
   (let* ((doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document ,@tab-lines)))))
+                           (with "code-lines" "true" (document ,@tab-lines)))))
          (expected '((0 5) (1 9) (2 6) (3 11) (0 4)))
          (runs '()))
     (for-each
@@ -568,19 +574,19 @@
       (lambda ()
         (init-env "prog-tab-width" "4")
         (step (lambda () #t))
-        (go-to (at 0 4 0 1 5))
+        (go-to (at 0 4 2 1 5))
         (step (lambda () #t))
         (step kbd-up)
         (check= (list-tail (rel (cursor-path)) 3) '(0 5)))))
   ;; a line of tabs is broken into rows as wide as the page
   (let* ((tabs (apply string-append (make-list 40 "<#9>x")))
          (doc `(document (with "font-family" "tt" "language" "verbatim"
-                           (code-lines (document "a" ,tabs "b"))))))
+                           (with "code-lines" "true" (document "a" ,tabs "b"))))))
     (with-body doc
       (lambda ()
         (init-env "page-medium" "papyrus")
         (step (lambda () #t))
-        (go-to (at 0 4 0 1 0))
+        (go-to (at 0 4 2 1 0))
         (step (lambda () #t))
         (step kbd-down)
         (check= (car (list-tail (rel (cursor-path)) 3)) 1))))
@@ -592,8 +598,8 @@
     (code-lines-env "1")
     (with t (cpp-verbatim->texmacs text #f "utf-8")
       (with body (cadr (assoc 'body (cdr (tree->stree t))))
-        (check= body '(document (code-lines (document "a<#9>b" "<#1>c"))))
-        (check= (texmacs->code (stree->tree (cadr body)) "utf-8") text)))
+        (check= body '(document "a<#9>b" "<#1>c"))
+        (check= (texmacs->code (stree->tree body) "utf-8") text)))
     (code-lines-env old)
     (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
 
@@ -601,28 +607,20 @@
 ;; With the features of programs (src/docs/code-features.md)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The lines of a source file are those of its block (code-lines-root): the
-;; queries of the features (line, offset) are the same with or without it
+;; A source file is loaded as its lines, typeset as a block (the variable
+;; code-lines in its initial environment), and saved as it was loaded (its
+;; tabs, its line ends)
 (define (test-lines-root)
   (check-group "the lines of a source file")
-  (let ((block (stree->tree '(document (code-lines (document "a" "b")))))
-        (plain (stree->tree '(document "a" "b"))))
-    (check= (tree->stree (code-lines-root block)) '(document "a" "b"))
-    (check= (tree->stree (code-lines-root (tree-ref block 0)))
-            '(document "a" "b"))
-    (check= (tree->stree (code-lines-root plain)) '(document "a" "b"))
-    (check-true (== (code-lines-root plain) plain)))
-  ;; a source file is loaded as a block, and saved as it was loaded (its
-  ;; tabs, its line ends)
   (let ((old (getenv "TEXMACS_CODE_LINES"))
         (text (string-append "int f ()\r\n{\r\n" (string #\tab)
                              "return 0;\r\n}\r\n")))
     (code-lines-env "1")
-    (with t (cpp-source->texmacs text)
-      (with body (cadr (assoc 'body (cdr (tree->stree t))))
-        (check= body `(document (code-lines (document "int f ()" "{"
-                                                      "<#9>return 0;" "}"
-                                                      ""))))))
+    (with t (tree->stree (cpp-source->texmacs text))
+      (check= (cadr (assoc 'body (cdr t)))
+              '(document "int f ()" "{" "<#9>return 0;" "}" ""))
+      (check-true (in? '(associate "code-lines" "true")
+                       (cdadr (assoc 'initial (cdr t))))))
     ;; (saved as source-files-test does: loaded in a buffer, exported)
     (let* ((dir (url-append (url-temp-dir) "code-lines-test"))
            (u (url-append dir "a.cpp"))
@@ -631,7 +629,6 @@
       (string-save text u)
       (when (buffer-exists? u) (buffer-close u))
       (buffer-load u)
-      (check-true (tree-is? (tree-ref (buffer-get-body u) 0) 'code-lines))
       (buffer-export u v (url-format u))
       (buffer-close u)
       (check= (string-load v) text)
@@ -640,24 +637,11 @@
     (code-lines-env old)
     (check= (or (getenv "TEXMACS_CODE_LINES") "") (or old ""))))
 
-;; The cursor stays in the lines of a block: the first and the last place
-;; of a document of a block, and the place where a source file opens, are
-;; in its lines (the tag has an inner border, drd_std.cpp), so that what is
-;; typed there goes into the lines and not before or after the block
+;; A source file opens with the cursor in its first line, typed text goes
+;; there, and the start and the end of the document are those of its lines
+;; (they were before and after a tag of the block, when the block was one)
 (define (test-cursor-in-block)
-  (check-group "the cursor in the block")
-  (with-body '(document (code-lines (document "ab" "cd" "ef")))
-    (lambda ()
-      (go-to (at 0 0 1 1))
-      (step (lambda () #t))
-      (step go-end)
-      (check= (rel (cursor-path)) '(0 0 2 2))
-      (step (lambda () (insert "x")))
-      (step go-start)
-      (check= (rel (cursor-path)) '(0 0 0 0))
-      (step (lambda () (insert "y")))
-      (check= (tree->stree (path->tree (at 0)))
-              '(code-lines (document "yab" "cd" "efx")))))
+  (check-group "the cursor in a source file")
   (let* ((old (getenv "TEXMACS_CODE_LINES"))
          (prev (current-buffer))
          (dir (url-append (url-temp-dir) "code-lines-test"))
@@ -671,36 +655,24 @@
     (apply-changes)
     (with r (check-run
              (lambda ()
-               (insert "x")
-               (update-forced)
-               (apply-changes)
-               (tree->stree (buffer-get-body u))))
-      (check= r '(document (code-lines (document "xint a;" "int b;" "")))))
+               (let ((ins (lambda (s) (insert s) (update-forced)
+                                  (apply-changes))))
+                 (ins "x")
+                 (go-end) (ins "z")
+                 (go-start) (ins "y")
+                 (list (get-init "code-lines")
+                       (tree->stree (buffer-get-body u))))))
+      (check= r '("true" (document "yxint a;" "int b;" "z"))))
     (buffer-close u)
     (when (buffer-exists? prev) (switch-to-buffer prev))
     (system-remove u)
     (code-lines-env old)))
 
-;; A block is a block of paragraphs, as the document of its lines, where the
-;; editor asks (is_multi_paragraph): inserted in a paragraph, it splits the
-;; paragraph, as a with of a document does, instead of going into the line
-(define (test-block-is-block)
-  (check-group "a block of lines is a block")
-  (check-true (tree-multi-paragraph?
-               (stree->tree '(code-lines (document "a" "b")))))
-  (with-body '(document "abc" "def")
-    (lambda ()
-      (go-to (at 0 1))
-      (step (lambda ()
-              (insert (stree->tree '(code-lines (document "x" "y"))))))
-      (check= (tree->stree (buffer-get-body (current-buffer)))
-              '(document "a" (code-lines (document "x" "y")) "bc" "def")))))
-
 ;; A block exports as the document of its lines: a paragraph per line, as
 ;; before the block (HTML and LaTeX dropped it, or made an unknown macro)
 (define (test-export-formats)
   (check-group "export of a block to other formats")
-  (let ((block (stree->tree '(document (code-lines (document "x = 1" "y <less> 2")))))
+  (let ((block (stree->tree '(document (with "code-lines" "true" (document "x = 1" "y <less> 2")))))
         (plain (stree->tree '(document "x = 1" "y <less> 2"))))
     (for-each
      (lambda (fm)
@@ -715,21 +687,22 @@
         (dir (url-append (url-temp-dir) "code-lines-test")))
     (system-mkdir dir)
     (for (f '("t.txt" "b.c"))
-      (let* ((u (url-append dir f))
-             (v (url-append dir (string-append f ".tex")))
-             (latex (lambda (cl)
+      (for (fm '("latex" "html" "markdown"))
+        (let* ((u (url-append dir f))
+               (v (url-append dir (string-append f "." fm)))
+               (out (lambda (cl)
                       (code-lines-env cl)
                       (when (buffer-exists? u) (buffer-close u))
                       (buffer-load u)
-                      (buffer-export u v "latex")
+                      (buffer-export u v fm)
                       (buffer-close u)
                       (string-load v))))
-        (string-save "int a;\nb = 2;\n" u)
-        (with with-block (latex "1")
-          (check-true (string-contains? with-block "b = 2"))
-          (check= with-block (latex "0")))
-        (system-remove u)
-        (system-remove v)))
+          (string-save "int a;\nb = 2;\n" u)
+          (with with-block (out "1")
+            (check-true (string-contains? with-block "b = 2"))
+            (check= with-block (out "0")))
+          (system-remove u)
+          (system-remove v))))
     (code-lines-env old)))
 
 ;; A block of one line with markup, in paper mode, is a paragraph of its
@@ -740,17 +713,17 @@
     (for-each
      (lambda (medium)
        (with-body `(document (with "font-family" "tt" "language" "verbatim"
-                               (code-lines
+                               (with "code-lines" "true"
                                 (document (concat "a " (strong "bc"))))))
          (lambda ()
            (init-env "page-medium" medium)
            (step (lambda () #t))
            ;; (its text is typeset: as wide in paper mode as in papyrus)
-           (with r (tree-bounding-rectangle (path->tree (at 0 4 0 0 1 0)))
+           (with r (tree-bounding-rectangle (path->tree (at 0 4 2 0 1 0)))
              (set! widths (cons (- (caddr r) (car r)) widths)))
-           (go-to (at 0 4 0 0 1 0 1))
+           (go-to (at 0 4 2 0 1 0 1))
            (step (lambda () (insert "Q")))
-           (check= (tree->stree (path->tree (at 0 4 0 0)))
+           (check= (tree->stree (path->tree (at 0 4 2 0)))
                    '(concat "a " (strong "bQc"))))))
      '("paper" "papyrus"))
     (check-true (> (car widths) 1000))
@@ -762,9 +735,9 @@
   (let* ((r '())
          (note (lambda (x) (set! r (cons x r))))
          (cur (lambda () (list-tail (rel (cursor-path)) 3)))
-         (root (path->tree (at 0 4 0)))
+         (root (path->tree (at 0 4 2)))
          (y (lambda (i) (cadr (tree-bounding-rectangle
-                               (path->tree (at 0 4 0 i)))))))
+                               (path->tree (at 0 4 2 i)))))))
     (init-env "page-medium" medium)
     (step (lambda () #t))
     (with y1 (y 1)
@@ -775,7 +748,7 @@
       ;; down from the line 0: over the fold (papyrus), or into it, which
       ;; opens it (code-cursor-in-fold, paper: as in a document of lines
       ;; without the block); never in a hidden line
-      (go-to (at 0 4 0 0 1))
+      (go-to (at 0 4 2 0 1))
       (step (lambda () #t))
       (step kbd-down)
       (note (or (and (== (cur) '(3 1)) (code-hidden? root 1))
@@ -788,7 +761,7 @@
 (define (test-folds)
   (check-group "folds of lines")
   (let ((doc `(document (with "font-family" "tt" "language" "verbatim"
-                          (code-lines (document "x" "x" "x" "x" "x"))))))
+                          (with "code-lines" "true" (document "x" "x" "x" "x" "x"))))))
     (for (medium '("paper" "papyrus"))
       (with-body doc
         (lambda ()
@@ -802,14 +775,14 @@
   (check-group "layers of lines")
   (let ((doc `(document (with "font-family" "tt" "language" "verbatim"
                                "mode" "prog" "prog-language" "cpp"
-                          (code-lines (document "abc" "abc" "abc"))))))
+                          (with "code-lines" "true" (document "abc" "abc" "abc"))))))
     (for (medium '("paper" "papyrus"))
       (with-body doc
         (lambda ()
           (init-env "page-medium" medium)
           (step (lambda () #t))
           ;; (the block is the argument 8 of the with)
-          (let* ((line (path->tree (at 0 8 0 1)))
+          (let* ((line (path->tree (at 0 8 2 1)))
                  (x (lambda () (car (tree-bounding-rectangle line))))
                  (x0 (x)))
             ;; a hint in a token comes before the token (typeset_layered_
@@ -820,7 +793,7 @@
             (update-path (tree->path line))
             (step (lambda () #t))
             (check-true (> (x) x0))
-            (go-to (at 0 8 0 1 1))
+            (go-to (at 0 8 2 1 1))
             (step (lambda () #t))
             (step kbd-right)
             (check= (list-tail (rel (cursor-path)) 3) '(1 2))
@@ -838,10 +811,10 @@
   (check-group "tree-sitter in a block")
   (when (defined? 'tree-sitter-program-language)
     (with-body `(document (with "mode" "prog" "prog-language" "c"
-                                "font-family" "tt"
-                            (code-lines (document "/* a" "b */" "int x;"))))
+                                "font-family" "tt" "code-lines" "true"
+                            (document "/* a" "b */" "int x;")))
       (lambda ()
-        (let* ((inner (path->tree (at 0 6 0)))
+        (let* ((inner (path->tree (at 0 8)))
                (colors (tree-sitter-line-colors "c" (tree-ref inner 1)))
                (lan (tree-sitter-program-language "c")))
           ;; (the second line of the comment: the region has the lines)
@@ -877,7 +850,6 @@
   (test-shrink)
   (test-lines-root)
   (test-cursor-in-block)
-  (test-block-is-block)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)

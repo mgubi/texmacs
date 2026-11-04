@@ -1240,10 +1240,8 @@
                    "``x'' -- y"))
        (check= (import (string-append "x = 1\n  y " (u8 #xE9 #x3B1) " <\n") snip)
                '(document "x = 1" "  y \xe9<alpha> <less>" ""))
-       ;; (a source file is a block of lines of code: code-lines)
        (check= (import "x = 1\n  y\n" doc)
-               '(document (body (document (code-lines
-                                           (document "x = 1" "  y" ""))))
+               '(document (body (document "x = 1" "  y" ""))
                           (initial (collection
                                     (associate "language" "verbatim")
                                     (associate "font-family" "tt")
@@ -1251,7 +1249,9 @@
                                     ;; (to save the file as it was)
                                     (associate "source-encoding" "utf-8")
                                     (associate "source-line-ends" "unix")
-                                    (associate "source-indent" "spaces")))))
+                                    (associate "source-indent" "spaces")
+                                    ;; (typeset as lines of code)
+                                    (associate "code-lines" "true")))))
        (with code '(document "def f(x):" "    return x <less> 1" "" "# \xe9")
          (check= (import (export code snip) snip) code))))
    code-formats)

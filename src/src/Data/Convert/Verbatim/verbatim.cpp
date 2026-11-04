@@ -140,10 +140,6 @@ print_verbatim (string& buf, tree t, bool wrap) {
     case SYNTAX:
       print_verbatim_arg (buf, t[0], wrap);
       break;
-    case CODE_LINES:
-      // a block of lines (as they are: not wrapped)
-      if (N(t) == 1) print_verbatim (buf, t[0], false);
-      break;
     case TABLE:
       print_verbatim_table (buf, t, wrap);
       break;
@@ -430,7 +426,8 @@ encode_keeping_controls (string s, string enc) {
   return r;
 }
 
-// Is a verbatim document (a text, a source file) made of a code-lines block?
+// Is a verbatim document (a text, a source file) typeset as a block of lines
+// (the environment variable code-lines)?
 // The preference "code lines" ("on" unless "off"), unless TEXMACS_CODE_LINES
 // is 0 or 1
 static bool
@@ -445,24 +442,26 @@ tree
 verbatim_document_to_tree (string s, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
   tree t;
-  if (code_lines_wanted () && !wrap) {
-    // the lines as <code-lines|<document|...>>, typeset by one bridge
-    // without a paragraph per line (see bridge_code.cpp, #710); the tabs
-    // are kept (a block of lines shows them at their stops), and the
-    // backspaces are characters as the others
+  bool block= code_lines_wanted () && !wrap;
+  if (block) {
+    // the lines, typeset as a block of lines (the environment variable
+    // code-lines, see bridge_code.cpp, #710); the tabs are kept (a block
+    // shows them at their stops), and the backspaces are characters as
+    // the others
     string r= encode_keeping_controls (mac_to_unix (dos_to_unix (s)), enc);
     tree d (DOCUMENT);
     int j= 0;
     for (int i=0; i<N(r); i++)
       if (r[i] == '\n') { d << r (j, i); j= i+1; }
     d << r (j, N(r));
-    t= tree (DOCUMENT, tree (CODE_LINES, d));
+    t= d;
   }
   else t= verbatim_to_tree (s, wrap, enc);
   tree init = tree (COLLECTION,
                     tree (ASSOCIATE, LANGUAGE, "verbatim"),
                     tree (ASSOCIATE, FONT_FAMILY, "tt"),
                     tree (ASSOCIATE, PAR_FIRST, "0cm"));
+  if (block) init << tree (ASSOCIATE, "code-lines", "true");
   return tree (DOCUMENT, compound ("body", t), compound ("initial", init));
 }
 
@@ -559,9 +558,6 @@ source_document_to_tree (string s) {
         body << tree (source_line_to_cork (s (j, i)));
         j= i+1;
       }
-    // (a block of lines, typeset as such: see code_lines_wanted; the lines
-    // of the file are those of the block, code_lines_root)
-    if (code_lines_wanted ()) body= tree (DOCUMENT, tree (CODE_LINES, body));
   }
   tree init = tree (COLLECTION,
                     tree (ASSOCIATE, LANGUAGE, "verbatim"),
@@ -570,6 +566,10 @@ source_document_to_tree (string s) {
                     tree (ASSOCIATE, "source-encoding", enc),
                     tree (ASSOCIATE, "source-line-ends", ends),
                     tree (ASSOCIATE, "source-indent", indent));
+  // (the lines typeset as a block of lines: the variable code-lines, see
+  // code_lines_wanted and bridge_code.cpp)
+  if (is_func (body, DOCUMENT) && code_lines_wanted ())
+    init << tree (ASSOCIATE, "code-lines", "true");
   return tree (DOCUMENT, compound ("body", body), compound ("initial", init));
 }
 

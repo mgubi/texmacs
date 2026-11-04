@@ -105,10 +105,6 @@ packrat_parser_rep::serialize (tree t, path p) {
       for (int i=0; i<N(t); i++)
         serialize (t[i], p * i);
       break;
-    case CODE_LINES:
-      // (a block of lines: its document)
-      if (N(t) == 1) serialize (t[0], p * 0);
-      break;
     case RIGID:
     case HGROUP:
       serialize (t[0], p * 0);

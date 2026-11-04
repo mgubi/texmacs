@@ -1,7 +1,7 @@
 
 /******************************************************************************
 * MODULE     : code_boxes.hpp
-* DESCRIPTION: the lines of source code (the tag code-lines): boxes, soft
+* DESCRIPTION: the lines of source code (code-lines): boxes, soft
 *              line breaks and colours of the syntax
 * COPYRIGHT  : (C) 2026  the TeXmacs contributors
 *******************************************************************************

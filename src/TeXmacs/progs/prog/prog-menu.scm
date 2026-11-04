@@ -24,12 +24,21 @@
   (dynamic (focus-code-icons t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The lines of source code (the tag code-lines): the spaces, the tabs, the
+;; The lines of source code (the document typeset as lines of code, the
+;; variable code-lines, or as paragraphs): the spaces, the tabs, the
 ;; ends of the lines and the other control characters can be shown, and the
 ;; objects taller than a line shrunk to it (settings of the document; the
 ;; tabs stop every prog-tab-width characters, the preference "editor:code
 ;; tab width")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (code-lines?)
+  (== (get-init "code-lines") "true"))
+
+(tm-define (toggle-code-lines)
+  (:synopsis "Typeset the document as lines of code, or as paragraphs")
+  (:check-mark "v" code-lines?)
+  (init-env "code-lines" (if (code-lines?) "false" "true")))
 
 (tm-define (code-invisibles?)
   (== (get-init "code-invisibles") "true"))
@@ -48,6 +57,7 @@
   (init-env "code-tall-objects" (if (code-shrink-tall?) "natural" "shrink")))
 
 (menu-bind code-lines-menu
+  ("Lines of code" (toggle-code-lines))
   ("Show invisible characters" (toggle-code-invisibles))
   ("Shrink tall objects to a line" (toggle-code-shrink-tall)))
 

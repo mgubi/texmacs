@@ -175,13 +175,6 @@ init_std_drd () {
         var_repeat (1, 1, BIFORM) -> accessible (1) ->
         name ("decorate pages"));
   init (DBOX, "dbox", fixed (0) -> name ("decorated box"));
-  // lines of source code: a document of strings (see bridge_code.cpp); the
-  // cursor is always in its lines, never before or after the block (else
-  // the start of a file opened as a block, Home or End of the document,
-  // would be outside of its lines, and what is typed there too)
-  init (CODE_LINES, "code-lines",
-        fixed (1) -> accessible (0) -> inner_border () ->
-        name ("code lines"));
   init (LINE_NOTE, "line-note",
         fixed (1, 2, BIFORM) -> length (1) ->
         name ("line note"));

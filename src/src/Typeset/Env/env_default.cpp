@@ -113,6 +113,7 @@ initialize_default_env () {
   env (MATH_BOT_SWELL_END)  = "-2.5ex"; // maximal padding reached here
 
   env (PROG_LANGUAGE)    = "scheme";    // the default programming language
+  env ("code-lines")     = "false";     // a document typeset as lines of code
   env ("code-invisibles") = "false";     // show the spaces, tabs... there
   env ("code-tall-objects")= "natural";  // or shrink to the rows there
   env (PROG_SCRIPTS)     = "none";      // the scripting language

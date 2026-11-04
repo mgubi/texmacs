@@ -1,7 +1,8 @@
 
 /******************************************************************************
 * MODULE     : bridge_code.cpp
-* DESCRIPTION: Bridge for the lines of source code (the tag code-lines)
+* DESCRIPTION: Bridge for the lines of source code (a document typeset as
+*              lines of code: the environment variable code-lines)
 * COPYRIGHT  : (C) 2026  the TeXmacs contributors
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -83,8 +84,10 @@ static const char* code_color_vars[]= {
   NULL };
 
 /******************************************************************************
-* <code-lines|<document|line|...>> holds lines of source code, as strings.
-* They are typeset by one bridge, without a bridge, a paragraph or a box per
+* A document whose environment has code-lines = true (a source file, a text:
+* see verbatim.cpp) holds lines of source code, as strings: bridge_document
+* hands it to this bridge (see bridge_document.cpp), which typesets them
+* without a bridge, a paragraph or a box per
 * line (see code_boxes.cpp): outside paper mode as one box, in paper mode as
 * one box per row (the pager breaks the pages between them). A line wider
 * than the paragraph is broken into rows (soft line breaks: code_breaks):
@@ -255,13 +258,13 @@ bridge_code_rep::line_changed (int i) {
   plain[i]= 0;
 }
 
-// The paths are relative to st= <code-lines|<document|line|...>>: (0, i) is
-// the line i, (0, i, ...) is inside it. st is not changed here (see above),
-// except when it is assigned as a whole
+// The paths are relative to st, the document of the lines: (i) is the line
+// i, (i, ...) is inside it. st is not changed here (see above), except when
+// it is assigned as a whole
 void
 bridge_code_rep::notify_assign (path p, tree u) {
   status= CORRUPTED;
-  if (N(p) >= 2 && p->item == 0) line_changed (p->next->item);
+  if (N(p) >= 1) line_changed (p->item);
   else {
     st= substitute (st, p, u);
     lines_unknown ();
@@ -271,17 +274,16 @@ bridge_code_rep::notify_assign (path p, tree u) {
 void
 bridge_code_rep::notify_insert (path p, tree u) {
   status= CORRUPTED;
-  if (N(p) == 2 && p->item == 0 && is_compound (u))
-    lines_inserted (p->next->item, N(u));
-  else if (N(p) >= 3 && p->item == 0) line_changed (p->next->item);
+  if (N(p) == 1 && is_compound (u)) lines_inserted (p->item, N(u));
+  else if (N(p) >= 2) line_changed (p->item);
   else lines_unknown ();
 }
 
 void
 bridge_code_rep::notify_remove (path p, int nr) {
   status= CORRUPTED;
-  if (N(p) == 2 && p->item == 0) lines_removed (p->next->item, nr);
-  else if (N(p) >= 3 && p->item == 0) line_changed (p->next->item);
+  if (N(p) == 1) lines_removed (p->item, nr);
+  else if (N(p) >= 2) line_changed (p->item);
   else lines_unknown ();
 }
 
@@ -289,12 +291,12 @@ void
 bridge_code_rep::notify_split (path p) {
   // p= q * pos * at: the child pos of q split at at
   status= CORRUPTED;
-  if (N(p) == 3 && p->item == 0) {
-    int i= p->next->item;
+  if (N(p) == 2) {
+    int i= p->item;
     line_changed (i);
     lines_inserted (i+1, 1);
   }
-  else if (N(p) > 3 && p->item == 0) line_changed (p->next->item);
+  else if (N(p) > 2) line_changed (p->item);
   else lines_unknown ();
 }
 
@@ -302,12 +304,12 @@ void
 bridge_code_rep::notify_join (path p) {
   // p= q * pos: the children pos and pos+1 of q joined
   status= CORRUPTED;
-  if (N(p) == 2 && p->item == 0) {
-    int i= p->next->item;
+  if (N(p) == 1) {
+    int i= p->item;
     line_changed (i);
     lines_removed (i+1, 1);
   }
-  else if (N(p) > 2 && p->item == 0) line_changed (p->next->item);
+  else if (N(p) > 1) line_changed (p->item);
   else lines_unknown ();
 }
 
@@ -508,7 +510,8 @@ same_rec (code_rec r, tree& t, unsigned long long wsig) {
 void
 bridge_code_rep::my_typeset (int desired_status) {
   (void) desired_status;
-  tree doc= (N(st) == 1? st[0]: tree (DOCUMENT, ""));
+  // (st is the document of the lines, see bridge_document.cpp)
+  tree doc= st;
   if (!is_func (doc, DOCUMENT)) doc= tree (DOCUMENT, doc);
   if (N(doc) == 0) doc= tree (DOCUMENT, "");
   int n= N(doc);
@@ -650,7 +653,7 @@ bridge_code_rep::my_typeset (int desired_status) {
         continue;
       }
       array<int> st= (is_nil (recs[i])? one_row[0]: recs[i]->starts);
-      path lip= descend (descend (ip, 0), i);
+      path lip= descend (ip, i);
       string text= (is_atomic (doc[i])? doc[i]->label: string (""));
       array<box> rows;
       for (int r=0; r<N(st); r++)
@@ -682,7 +685,7 @@ bridge_code_rep::my_typeset (int desired_status) {
         tall_k << i;
         tall_txt << string ("");
         tall_st << one_row[0];
-        tall_box << rich_box (doc[i], descend (descend (ip, 0), i), width,
+        tall_box << rich_box (doc[i], descend (ip, i), width,
                               cell);
         tall_fold << fk;
       }
@@ -717,12 +720,12 @@ bridge_code_rep::typeset_paragraphs (tree doc, array<array<box> > pars,
     array<line_item> after = (i == N1? ttt->b: array<line_item> ());
     // (a paragraph per line, also for a block of one line, in paper mode)
     if (N(pars[i]) == 0 && N(pars) == N(doc) && rich_line (doc[i]))
-      rich_paragraph (doc[i], descend (descend (ip, 0), i), width, cell,
+      rich_paragraph (doc[i], descend (ip, i), width, cell,
                       before, after, l, sb);
     else code_paragraph (env, ip, pars[i], before, after, l, sb);
     // (a line of its own: the folds, in paper mode)
     if (N(pars) == N(doc))
-      fold_items (l, fold_kind (doc, i), descend (descend (ip, 0), i), env);
+      fold_items (l, fold_kind (doc, i), descend (ip, i), env);
     ttt->insert_stack (l, sb);
   }
 }
@@ -877,7 +880,7 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
                                 unsigned long long wsig, SI cell,
                                 SI rpitch) {
   int n= N(doc);
-  path dip= descend (ip, 0);
+  path dip= ip;
   auto line_path= [&] (int i) -> path {
     // the path which the line keeps, renumbered in place by the editor
     path lip= obtain_ip (doc[i]);
