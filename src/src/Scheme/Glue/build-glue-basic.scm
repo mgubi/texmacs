@@ -224,6 +224,7 @@
   (mcp-stdout-write mcp_stdout_write (bool string))
   (mcp-json-valid? mcp_json_valid (bool string))
   (shared-pid-alive? shared_pid_alive (bool int))
+  (shared-port-probe shared_port_probe (int int))
   
   ;; routines for the font database
   (tt-exists? tt_font_exists (bool string))

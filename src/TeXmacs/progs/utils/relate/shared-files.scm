@@ -222,12 +222,30 @@
         (map (lambda (n) (if (symbol? n) (symbol->string n) n)) l)
         '())))
 
+(define entry-verdicts (make-ahash-table))   ; key -> (time pid port alive?)
+(define entry-verdict-ttl 5000)
+
+(define (entry-alive-now? pid port)
+  (and (integer? pid) (shared-pid-alive? pid)
+       (integer? port)
+       (!= (shared-port-probe port) 0)))
+
 (define (entry-alive? e)
-  ;; is the process of the entry @e there? (No connection is made and no
-  ;; lock taken: a host that is stopped, or starting, is not disturbed, and
-  ;; its queue of connections does not fill; a stopped process is alive.)
-  (let ((pid (list-ref e 4)))
-    (and (integer? pid) (shared-pid-alive? pid))))
+  ;; is the host of the entry @e there? The process must exist (kill 0; a
+  ;; host that is stopped is alive), and its port must not refuse a
+  ;; connection (the port of a process id that was reused by another program,
+  ;; or of a zombie, is closed); a port that does not answer within 100 ms is
+  ;; taken to be a busy host. No lock is taken. The verdict is kept for 5 s,
+  ;; so that listing again and again does not fill the queue of a host that
+  ;; is stopped.
+  (let* ((key (cadr e)) (pid (list-ref e 4)) (port (list-ref e 2))
+         (old (ahash-ref entry-verdicts key)) (now (texmacs-time)))
+    (if (and old (< (- now (car old)) entry-verdict-ttl)
+             (== (cadr old) pid) (== (caddr old) port))
+        (cadddr old)
+        (let ((alive (entry-alive-now? pid port)))
+          (ahash-set! entry-verdicts key (list now pid port alive))
+          alive))))
 
 (tm-define (shared-files-in-use)
   (:synopsis "The files which other processes of the user host: ((path interactive pid) ...)")

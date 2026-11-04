@@ -2354,6 +2354,19 @@ tmg_shared_pid_aliveP (tmscm arg1) {
 }
 
 tmscm
+tmg_shared_port_probe (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-port-probe");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= shared_port_probe (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_tt_existsP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
@@ -13166,6 +13179,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("mcp-stdout-write",  tmg_mcp_stdout_write, 1, 0, 0);
   tmscm_install_procedure ("mcp-json-valid?",  tmg_mcp_json_validP, 1, 0, 0);
   tmscm_install_procedure ("shared-pid-alive?",  tmg_shared_pid_aliveP, 1, 0, 0);
+  tmscm_install_procedure ("shared-port-probe",  tmg_shared_port_probe, 1, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);

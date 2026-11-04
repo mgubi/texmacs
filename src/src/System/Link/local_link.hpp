@@ -37,6 +37,7 @@ void   local_close (int id);
 
 // Helpers of the shared files: the process, the per-user folder, paths
 int    shared_process_id ();
+int    shared_port_probe (int port);        // 1 accepts, 0 refused, -1 unknown (100 ms at most)
 bool   shared_pid_alive (int pid);          // does a process with that id exist?
 string shared_real_path (string path);  // canonical path, "" if none
 string shared_user_dir ();              // per-user folder (0700), "" if none

@@ -22,6 +22,7 @@
 #ifndef OS_MINGW
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <dirent.h>
 #include <sys/types.h>
@@ -408,6 +409,40 @@ local_send_raw (int id, string s) {
 /******************************************************************************
 * Helpers of the shared files
 ******************************************************************************/
+
+int
+shared_port_probe (int port) {
+#ifndef OS_MINGW
+  if (port <= 0 || port > 65535) return 0;
+  int fd= (int) socket (AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) return -1;
+  int fl= fcntl (fd, F_GETFL, 0);
+  fcntl (fd, F_SETFL, fl | O_NONBLOCK);
+  struct sockaddr_in addr;
+  memset (&addr, 0, sizeof (addr));
+  addr.sin_family     = AF_INET;
+  addr.sin_addr.s_addr= htonl (INADDR_LOOPBACK);
+  addr.sin_port       = htons ((unsigned short) port);
+  int r= connect (fd, (struct sockaddr*) &addr, sizeof (addr));
+  int res= -1;
+  if (r == 0) res= 1;
+  else if (errno == ECONNREFUSED) res= 0;
+  else if (errno == EINPROGRESS) {
+    struct pollfd p;
+    p.fd= fd; p.events= POLLOUT; p.revents= 0;
+    if (poll (&p, 1, 100) > 0) {
+      int err= 0; socklen_t len= sizeof (err);
+      getsockopt (fd, SOL_SOCKET, SO_ERROR, &err, &len);
+      res= (err == 0)? 1: (err == ECONNREFUSED? 0: -1);
+    }
+  }
+  close (fd);
+  return res;
+#else
+  (void) port;
+  return -1;
+#endif
+}
 
 bool
 shared_pid_alive (int pid) {

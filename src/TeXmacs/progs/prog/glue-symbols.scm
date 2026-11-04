@@ -223,6 +223,7 @@
 "mcp-stdout-write"
 "mcp-json-valid?"
 "shared-pid-alive?"
+"shared-port-probe"
 "tt-exists?"
 "tt-dump"
 "tt-font-name"

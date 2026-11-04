@@ -1587,6 +1587,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(shared-port-probe <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_port_probe> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(tt-exists? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

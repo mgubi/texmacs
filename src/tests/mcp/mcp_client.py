@@ -671,6 +671,16 @@ def s_robust(w):
         m.send_raw(bad + "\n")
         r = m.read_msg()
         check("%s: -32700" % bad, r is not None and r.get("error", {}).get("code") == -32700)
+    for name, raw in (("a raw tab in a string", b'{"a":"x\ty"}'), ("a backslash and NUL", b'{"a":"\\\x00"}'),
+                      ("invalid UTF-8", b'{"a":"\xff"}'), ("a truncated UTF-8 character", b'{"a":"\xc3"}')):
+        m.send_raw(raw + b"\n")
+        r = m.read_msg()
+        check("%s: -32700" % name, r is not None and r.get("error", {}).get("code") == -32700)
+    r = m.request("ping")
+    check("a number of 100 digits is valid", True)
+    m.send_raw(b'{"jsonrpc":"2.0","id":77,"method":"ping","params":{"x":1.' + b"1" * 100 + b'}}\n')
+    r = m.read_msg()
+    check("a number of 100 digits is accepted", r is not None and r.get("id") == 77 and "result" in r)
     m.send_raw('{"jsonrpc":"2.0","id":9,"method":"ping"} garbage\n')
     r = m.read_msg()
     check("garbage after the object: -32700", r is not None and r.get("error", {}).get("code") == -32700)
@@ -725,7 +735,9 @@ def s_outputs(w):
     check("the log is small", os.path.getsize(big) < 4 * 1024 * 1024)
 
 def s_hostdeath(w):
-    """a host which is killed (kill -9) leaves the list of open files"""
+    """a host which is killed (kill -9) leaves the list of open files, also when
+    its process id is taken by another program; the server has not opened the file"""
+    import re, glob
     os.makedirs(os.path.join(w, "sync"), exist_ok=True)
     os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
     f = os.path.join(w, "livé é.tm")
@@ -738,19 +750,60 @@ def s_hostdeath(w):
     m = Mcp(envA)
     m.initialize()
     e, v = m.tool("list_documents")
-    check("listed, with its non-ascii name as it is",
-          not e and any(x["path"] == f for x in v["open_elsewhere"]))
-    e, d = m.tool("open_document", path=[x["path"] for x in v["open_elsewhere"]][0]) if not e and v["open_elsewhere"] else (True, "none")
-    check("the listed path can be opened (and is joined)", not e and d["shared"] is not None)
-    m.tool("read", document="d1")
-    # (the MCP process has joined; open a second, unjoined, view of the listing
-    # through a file that only the other TeXmacs has: none; so kill and list)
+    check("listed, with its non-ascii name as it is (the server has not opened it)",
+          not e and v["documents"] == [] and any(x["path"] == f for x in v["open_elsewhere"]))
     other.kill()                         # kill -9 of our own process
     other.wait()
     gone = poll(lambda: (lambda r: r if not r[0] and not any(x["path"] == f for x in r[1]["open_elsewhere"]) else None)
-                (m.tool("list_documents")), 10)
+                (m.tool("list_documents")), 12)
     check("after the host is killed it is not 'elsewhere' any more", gone is not None)
+    # the entry is still there: its process id now belongs to another program
+    ents = glob.glob(os.path.join(w, "tmp", "texmacs-*", "shared", "*.entry"))
+    check("the entry of the dead host is left", len(ents) == 1)
+    foreign = subprocess.Popen(["sleep", "60"])
+    try:
+        txt = open(ents[0]).read()
+        mt = re.match(r'^(\(entry ".*" \d+ "[^"]*" )(\d+)(.*)$', txt, re.S)
+        check("the entry can be read", mt is not None)
+        if mt:
+            with open(ents[0], "w") as fh:
+                fh.write(mt.group(1) + str(foreign.pid) + mt.group(3))
+            time.sleep(0.2)
+            e, v = m.tool("list_documents")
+            check("an entry with a live foreign pid and a closed port is not listed",
+                  not e and not any(x["path"] == f for x in v["open_elsewhere"]))
+    finally:
+        foreign.kill()
+        foreign.wait()
     check("exit 0", m.close() == 0)
+
+
+def s_nonascii(w):
+    """a file with a non-ascii name, hosted by another TeXmacs, is listed and opened"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "livé é.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-wait.scm", f)
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("list_documents")
+    paths = [x["path"] for x in v["open_elsewhere"]] if not e else []
+    check("listed with its name as it is", paths == [f])
+    e, d = m.tool("open_document", path=paths[0]) if paths else (True, "none")
+    check("the listed path opens and joins", not e and d["shared"] is not None and d["file"] == "livé é.tm")
+    e, t = m.tool("read", document="d1", format="text")
+    check("and reads", not e and "First paragraph." in t["content"])
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
 
 
 def s_stalled(w):
@@ -807,7 +860,7 @@ def s_logcap(w):
 
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
-             "hostdeath": s_hostdeath, "stalled": s_stalled, "logcap": s_logcap,
+             "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
              "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

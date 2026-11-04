@@ -39,7 +39,7 @@ standard input and output, and ends when the input ends.
   neither the protocol input nor its output. (Before the home is known the
   descriptors go to `/dev/null`: the first lines of start-up are lost.)
   `TEXMACS_MCP_DEBUG=1` also logs every message. A log over 4 MB is renamed to
-  `mcp.log.1` when the server starts and during the run (checked every 64 ticks; `TEXMACS_MCP_LOG_CAP` sets the cap, for tests).
+  `mcp.log.1` (mode 0600) when the server starts and during the run (checked every 64 ticks; `TEXMACS_MCP_LOG_CAP` sets the cap, for tests). Several servers may share one home: a server renames the file only if its descriptor is still the file `mcp.log`, else it just reopens it; if a rename fails it stops trying.
 - **The launcher** `TeXmacs/bin/texmacs` (from `misc/scripts/texmacs.in`) runs
   the binary with standard input from `/dev/null`; for `--mcp` it keeps the input.
   `claude mcp add texmacs -- texmacs --mcp` thus works with the launcher.
@@ -56,9 +56,7 @@ standard input and output, and ends when the input ends.
   (`mcp-server-start`, `mcp-handle-line`), so Qt, Vue and Cocoa, Guile and s7,
   share them. The JSON reader and writer are those of C++ (`json->typed-tree`,
   `typed-tree->json`, which the LSP client uses too); the reader is lenient, so a
-  line is first checked by a strict validator in C++ (`mcp_json_valid`: literals,
-  numbers that are finite, strings and escapes, brackets, depth 512, nothing after
-  the value) and refused as a parse error if it fails.
+  line is first checked by a strict validator in C++ (`mcp_json_valid`: valid UTF-8 (no overlong forms or surrogates); the literals `true`, `false`, `null`; numbers in the JSON grammar of any length whose value is finite; strings without raw control characters (below U+0020) and with only the escapes `\" \\ \/ \b \f \n \r \t \uXXXX` (a lone surrogate in `\u` is accepted); a comma between and no comma after the members; the value an object or an array nested at most 512 deep; nothing after it but blanks) and refused as a parse error if it fails.
 - **A client that is gone**: when a write to the output fails the server ends
   (SIGPIPE is ignored in this mode).
 - **End of input** (or of the pipe) is a clean exit: the documents are closed
@@ -116,7 +114,7 @@ a string nor a number, or a missing or non-string method, is -32600.
 
 | Tool | Arguments | Result |
 |---|---|---|
-| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its process exists (`kill(pid, 0)`: no connection is made and no lock taken, so a stopped or starting host is not disturbed; a reused process id can list a file wrongly) |
+| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its process exists (`kill(pid, 0)`; a stopped one is alive) and its port does not refuse a connection (a non-blocking connect, at most 100 ms; a port that does not answer counts as a busy host; the port of a reused process id or of a zombie is closed). No lock is taken, and each verdict is kept for 5 s so that listing again and again does not fill the queue of a stopped host |
 | `open_document` | `path` (absolute) | the same facts for the document (the same id when it is open already) |
 | `get_outline` | `document`, `limit?` (300), `start?` | `title`, `hash`, `blocks`, `sections`: `handle`, `tag`, `level` (part 0, chapter 1, section 2... subparagraph 6), `title`, `labels`, `index` (position among the top-level blocks), `chars` (size to the next section), `hash`; also `total`, `next_start` (continue with `start`). Sections are found also in a concatenation (`<section|A><label|x>` and the LaTeX importer make `(concat (section ..) (label ..))`) |
 | `read` | `document`, `node?` (a handle), `format?` (`text` default, `texmacs`, `stree`, `latex`, `markdown`), `max_size?` (characters, default 12000, 200 to 400000), `start?` | `content`, `hash`, `tag`, `truncated`, and for a document or a `document` node `start`, `end`, `blocks`, `next_start` (continue with `start`) and `children` (handle, index, tag, hash, preview, at most 200); for another node the first 50 children |
@@ -173,9 +171,10 @@ the work folder).
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `robust` | non-ASCII and newlines in every format and in the file name, a star in a name, colons refused, `TEXMACS_MCP_ROOTS` (outside file, `/etc/passwd`, `..`, a symbolic link), sections in concatenations, bad arguments and messages, 200000 nested arrays, a 34 MB line |
-| `hostdeath` | a host killed with `kill -9` leaves the list of open files; a non-ASCII name is listed as it is and can be opened |
+| `hostdeath` | a server which has not opened the file lists it, the host is killed with `kill -9`, the file leaves the list; then the entry is given the pid of a live foreign process and a closed port: still not listed |
+| `nonascii` | a file with a non-ASCII name, hosted elsewhere, is listed as it is, opens, joins and reads |
 | `stalled` | a host stopped with SIGSTOP stays listed and 40 listings do not block the server |
-| `logcap` | the log is rotated during the run |
+| `logcap` | the log is rotated during the run, also with two servers on one home; the older log is private |
 | `outputs` | the outline and the references cut and continued; the server ends when the client is gone |
 
 ## Decisions and open points

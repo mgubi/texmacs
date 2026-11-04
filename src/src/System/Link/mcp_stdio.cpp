@@ -85,17 +85,28 @@ mcp_stdio_active () {
 #ifndef OS_MINGW
 // A log which grew over the cap during the run is kept as mcp.log.1 (the
 // older one is replaced) and a new one is started.
+static bool mcp_rotate_failed= false;
+
 static void
 mcp_rotate_log () {
-  if (N(mcp_log_path) == 0) return;
-  struct stat st;
+  if (N(mcp_log_path) == 0 || mcp_rotate_failed) return;
+  struct stat st, sp;
   if (fstat (1, &st) != 0 || !S_ISREG (st.st_mode) || st.st_size <= MCP_LOG_CAP)
     return;
   char* cur= as_charp (mcp_log_path);
   char* old= as_charp (mcp_log_path * ".1");
-  rename (cur, old);
-  int log= open (cur, O_WRONLY | O_CREAT | O_APPEND, 0600);
-  if (log >= 0) { dup2 (log, 1); dup2 (log, 2); close (log); }
+  // Only the process whose descriptor is the file mcp.log renames it: if
+  // another server (of the same home) has rotated it already, this one just
+  // follows the new file.
+  bool same= stat (cur, &sp) == 0 && sp.st_ino == st.st_ino && sp.st_dev == st.st_dev;
+  if (same) {
+    if (rename (cur, old) != 0) mcp_rotate_failed= true;
+    else chmod (old, 0600);
+  }
+  if (!mcp_rotate_failed) {
+    int log= open (cur, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (log >= 0) { dup2 (log, 1); dup2 (log, 2); close (log); }
+  }
   tm_delete_array (cur);
   tm_delete_array (old);
 }
@@ -179,6 +190,7 @@ namespace {
       while (i < n) {
         unsigned char c= s[i++];
         if (c == '"') return true;
+        if (c < 0x20) return false;          // (a raw control character)
         if (c == '\\') {
           if (i >= n) return false;
           char e= s[i++];
@@ -186,7 +198,7 @@ namespace {
             for (int k= 0; k < 4; k++, i++)
               if (i >= n || !isxdigit ((unsigned char) s[i])) return false;
           }
-          else if (!strchr ("\"\\/bfnrt", e)) return false;
+          else if (e == 0 || !strchr ("\"\\/bfnrt", e)) return false;
         }
       }
       return false;
@@ -209,11 +221,13 @@ namespace {
         if (i >= n || !isdigit ((unsigned char) s[i])) return false;
         while (i < n && isdigit ((unsigned char) s[i])) i++;
       }
-      char buf[64];
       int len= i - b;
-      if (len >= 64) return false;
+      char* buf= (char*) malloc (len + 1);
+      if (buf == NULL) return false;
       memcpy (buf, s + b, len); buf[len]= '\0';
-      return isfinite (strtod (buf, NULL));
+      bool ok= isfinite (strtod (buf, NULL));
+      free (buf);
+      return ok;
     }
     bool value (int depth) {
       blank ();
@@ -249,10 +263,34 @@ namespace {
   };
 }
 
+static bool
+valid_utf8 (const unsigned char* s, int n) {
+  int i= 0;
+  while (i < n) {
+    unsigned char c= s[i];
+    int k= 0;
+    if (c < 0x80) { i++; continue; }
+    else if (c >= 0xC2 && c <= 0xDF) k= 1;
+    else if (c >= 0xE0 && c <= 0xEF) k= 2;
+    else if (c >= 0xF0 && c <= 0xF4) k= 3;
+    else return false;
+    if (i + k >= n) return false;
+    for (int j= 1; j <= k; j++)
+      if ((s[i+j] & 0xC0) != 0x80) return false;
+    if (c == 0xE0 && s[i+1] < 0xA0) return false;      // overlong
+    if (c == 0xED && s[i+1] >= 0xA0) return false;      // surrogates
+    if (c == 0xF0 && s[i+1] < 0x90) return false;
+    if (c == 0xF4 && s[i+1] >= 0x90) return false;
+    i += k + 1;
+  }
+  return true;
+}
+
 bool
 mcp_json_valid (string t) {
-  json_check c (&(t[0]), N(t));
   if (N(t) == 0) return false;
+  if (!valid_utf8 ((const unsigned char*) &(t[0]), N(t))) return false;
+  json_check c (&(t[0]), N(t));
   c.blank ();
   if (c.i >= c.n || (c.s[c.i] != '{' && c.s[c.i] != '[')) return false;
   if (!c.value (0)) return false;
