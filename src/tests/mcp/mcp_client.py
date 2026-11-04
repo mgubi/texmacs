@@ -1885,7 +1885,10 @@ def s_static(w):
     def refused(label, d, tool, **args):
         h = hashof(d)
         e, r = m.tool(tool, document=d, **args)
-        check("refused: %s" % label, e and ("refused" in str(r) or "only relative" in str(r)) and hashof(d) == h)
+        ok = e and ("refused" in str(r) or "only relative" in str(r)) and hashof(d) == h
+        check("refused: %s" % label, ok)
+        if not ok:
+            print("    ", str(r)[:300])
         return str(r)
     def accepted(label, d, tool, **args):
         e, r = m.tool(tool, document=d, **args)
@@ -2008,6 +2011,93 @@ def s_static(w):
                     if not ok:
                         print("    ", content, str(r)[:200])
     check("every macro of the table has only link and file places, but the declared ones (%d found)" % seen, kinds_ok and seen > 10)
+    # 7b. (audit) the functions of extern: every function used by the standard styles and packages
+    #     is on the reviewed list or makes its macro dangerous
+    tsdir = os.path.join(TOP, "TeXmacs")
+    groups = {}
+    used = set()
+    for sub in ("styles", "packages"):
+        for dp, dn, fn in os.walk(os.path.join(tsdir, sub)):
+            for f in fn:
+                if not f.endswith(".ts"):
+                    continue
+                txt = open(os.path.join(dp, f), errors="replace").read()
+                if "<extern|" not in txt:
+                    continue
+                parts = re.split(r"<assign\|([^|<>]+)\|<\\?x?macro\|", txt)
+                for k in range(1, len(parts), 2):
+                    for fm in re.finditer(r"<extern\|([^|<>]+)", parts[k + 1].split("\n  <assign|")[0]):
+                        groups.setdefault((sub, f[:-3]), {}).setdefault(fm.group(1), set()).add(parts[k])
+                        used.add(fm.group(1))
+    lst = os.path.join(w, "extern.list")
+    docs = []
+    with open(lst, "w") as fh:
+        for (sub, nm), fmap in sorted(groups.items()):
+            pf2 = os.path.join(root, "ext-%s-%s.tm" % (sub, nm))
+            tup = nm if sub == "styles" else "generic|%s" % nm
+            with open(pf2, "w") as g:
+                g.write("<TeXmacs|2.1.5>\n\n<style|<tuple|%s>>\n\n<\\body>\n  Text.\n</body>\n" % tup)
+            names = sorted(set().union(*fmap.values()))
+            fh.write("%s\t%s\n" % (os.path.realpath(pf2), ",".join(names)))
+            docs.append((nm, fmap))
+    penv = dict(env)
+    penv["EXTERN_LIST"] = lst
+    pr = subprocess.run([BIN, "-headless", "-x", '(load "%s")' % os.path.join(HERE, "extern-probe.scm")],
+                        env=penv, capture_output=True, text=True, timeout=300)
+    out = pr.stdout.splitlines()
+    allowed = set(re.findall(r'"([^"]+)"', next((l for l in out if l.startswith("ALLOWED ")), "")))
+    refused_macros = set(re.findall(r'"([^"]+)"', next((l for l in out if l.startswith("REFUSED ")), "")))
+    dangerous = {}
+    defined = {}
+    cur = []
+    for l in out:
+        if l.startswith("DEFINED "):
+            cur = re.findall(r'"([^"]+)"', l)
+        elif l.startswith("DANGER "):
+            dangerous.setdefault(len(defined), set()).add(l.split()[1])
+        elif l.startswith("DONE "):
+            defined[len(defined)] = set(cur)
+    bad = []
+    nchecked = 0
+    for gi, (nm, fmap) in enumerate(docs):
+        for fn_, macros in fmap.items():
+            if fn_ in allowed:
+                continue
+            for mname in macros:
+                if mname in defined.get(gi, set()):
+                    nchecked += 1
+                    if mname not in dangerous.get(gi, set()) and mname not in refused_macros:
+                        bad.append((nm, mname, fn_))
+    check("every extern function of the standard styles is on the list or makes its macro dangerous (%d macros, %d functions on the list)" % (nchecked, len(allowed)),
+          not bad and nchecked > 20 and "EXTERN-END" in pr.stdout)
+    if bad:
+        print("    ", bad[:10])
+    check("every function on the list is used by a standard style or package",
+          all((a in used) for a in allowed) or print("    ", sorted(a for a in allowed if a not in used)))
+    # map and the choice lists: the function is a name, the arguments are code
+    d = opendoc("  Text.\n")
+    for what, c in (("a computed name", '(map (merge "inc" "lude") (tuple "/etc/hosts"))'),
+                    ("a concat name", '(map (concat "inc" "lude") (tuple "/etc/hosts"))'),
+                    ("a choice of names", '(map (if "true" "include" "strong") (tuple "/etc/hosts"))'),
+                    ("a written dangerous name", '(map "include" (tuple "/etc/hosts"))'),
+                    ("a value", '(with "f" "include" (map (value "f") (tuple "/etc/hosts")))')):
+        refused("map with %s" % what, d, "insert", where="last", content=c, format="stree")
+    accepted("map with a written harmless name", d, "insert", where="last", content='(map "strong" (tuple "x" "y"))', format="stree")
+    d = opendoc("  Text.\n", "new-gui")
+    for tg in ("choice-list", "check-list"):
+        refused("%s, code in data" % tg, d, "insert", where="last",
+                content='(%s "(system \\"id\\")" "b")' % tg, format="stree")
+    # a computed name whose family has a macro that is refused
+    d = opendoc("  <assign|gm|<macro|n|<compound|<merge|tmdoc-|<arg|n>>|x>>>\n\n  Text.\n", "tmdoc")
+    refused("a macro of the person that reaches the macros tmdoc-*", d, "insert", where="last", content='(gm "image")', format="stree")
+    d = opendoc("  <assign|gm|<macro|n|<compound|<merge|itemize-|<arg|n>>|x>>>\n\n  Text.\n")
+    accepted("a macro of the person that reaches the macros itemize-*", d, "insert", where="last", content='(gm "dot")', format="stree")
+    # tmfs://help/ : the manuals, not the files
+    d = opendoc("  Text.\n")
+    refused("tmfs help file", d, "insert", where="last", content="<hlink|x|tmfs://help/file/etc/hosts>")
+    refused("tmfs help http", d, "insert", where="last", content="<hlink|x|tmfs://help/http/example.org/a>")
+    refused("tmfs git", d, "insert", where="last", content="<hlink|x|tmfs://git/a>")
+    accepted("tmfs help article", d, "insert", where="last", content="<hlink|x|tmfs://help/article/tm/doc/main/man-intro.en.tm>")
     # 8. edit_text does not reach text inside definitions or code
     for what, body, old, new in (
         ("set", "  <set|dst|https://ok.org>\n\n  <assign|u|<macro|<hlink|t|<value|dst>>>>\n\n  Text.\n", "https://ok.org", "javascript:alert(1)"),

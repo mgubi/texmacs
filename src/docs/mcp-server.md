@@ -225,12 +225,11 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     unless it begins with `#`, `http://`, `https://` or `mailto:`; this exemption is for
     links only), `file` (the file of an `image`, `include`, `include*`, `pattern`,
     `postscript`, `video`, `sound`, `attachment`, `ocr`, `bibliography`), `code` (the script
-    of an `action`, the function of an `extern` or `hybrid`, an argument of `script`,
+    of an `action`, an `extern` argument for a function not on the list, an argument of `hybrid`, `script`,
     `authorize`, `observer`, `eval`, `eval-args`, `specific`, `latex`, `find-file`) and `name` (the
-    name of a macro made from a parameter or a variable). The arguments of an `extern`
-    after the function and of an `action` after the script are data for a function that the
-    macro chose; a macro of the style whose function reads files or runs programs is in
-    `refused-style-macros`. A macro is dangerous at a parameter when that parameter (or
+    name of a macro made from a parameter or a variable). The arguments of an `action` after
+    the script are data for a function that the macro chose; a macro of the style whose function reads
+    files or runs programs is in `refused-style-macros`; for `extern` see below. A macro is dangerous at a parameter when that parameter (or
     the value of a variable, which the content can set with `with`) reaches a sensitive
     place, directly or through another macro. A call by a computed name with a fixed
     beginning (a `merge` that begins with three characters or more) reaches the style's
@@ -241,6 +240,63 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
     compared with the document before, by the key of the call (its whole text), so
     that a call the person already has stays when the text around it is changed and the
     paragraph is sent again, and a changed call is a new violation.
+    *The functions of `extern`.* A macro of the style that calls `<extern|function|...>` runs the
+    Scheme function on its arguments, so those arguments are code unless the function was read and
+    is on the reviewed list `extern-functions` (builders of trees from their arguments: no
+    evaluation, no files, no commands); any other function makes all the arguments of the extern
+    sensitive places of the kind `code`, and the macro dangerous (the manuals' `mirror`, `live-io`,
+    `gui-choice-list` which runs a command on a click, `ext-smart-ref` which builds
+    a call from a name taken from the arguments, `ext-select`, which was not reviewed, are among them). Where a function on the list builds
+    a call by a name taken from an argument (`ext-map`, `ext-typed-ref*`, the `gui-*` list builders),
+    that argument is a place of the kind `name`: a macro that passes a parameter to it is dangerous
+    at that parameter, except that a call may give a written name of a macro that is not itself
+    dangerous (`<map|strong|...>` is accepted, `<map|<merge|inc|lude>|...>` is not). The list, each
+    function read in `TeXmacs/progs`:
+
+    | Function | Why it is harmless |
+    |---|---|
+    | `doc-data` | builds the title block (select and tree builders: title-markup.scm) |
+    | `author-data` | builds the author block (select) |
+    | `abstract-data` | builds the abstract (select) |
+    | `doc-data-exam` | the title block of the exam style, doc-data with a prefix |
+    | `ext-concat-tuple` | concatenation of the children of a tuple with a separator |
+    | `ext-tm-ref` | a child of the tree by a path of up, next, previous, first, last or numbers |
+    | `ext-tm-arity` | arity of such a node |
+    | `ext-tm-index` | index of such a node |
+    | `ext-tm-last?` | is such a node the last child |
+    | `ext-numbered` | adds numbered-line around the lines of a document |
+    | `ext-listing` | builds the table of a numbered listing |
+    | `texmacs-version-release*` | the number of the version |
+    | `texmacs-version` | the version, no argument |
+    | `ext-language-suffix` | the two letters of the language |
+    | `natbib-get` | author or year of a natbib citation: string operations |
+    | `ext-typed-ref` | reference with a type: builds concat and reference trees |
+    | `ext-typed-ref*` | same, with the macro that is applied to the references (argument 1: a name) (name at argument 1) |
+    | `ext-map` | applies the macro named by argument 0 to each element of the tuple (argument 1) (name at argument 0) |
+    | `screens-index` | index of the screen |
+    | `screens-arity` | number of screens |
+    | `screens-bar` | bar of screens: numbers and the fixed command screens-switch-to |
+    | `math-check` | packrat check of a math cell |
+    | `math-check-table` | same for the cells of a table |
+    | `ext-tiled-items` | table of tiles |
+    | `ext-vertical-items` | table of items |
+    | `tmdoc-key` | the keys of a shortcut, rewritten |
+    | `tmdoc-key*` | same |
+    | `tmdoc-shortcut` | the shortcut bound to a command, rewritten |
+    | `tmdoc-render-keys` | render-key trees |
+    | `tmdoc-menu-font` | the font of the menus |
+    | `gui-tiled` | table of tiles in a tag named by argument 0 (name at argument 0) |
+    | `gui-hlist-table` | table of a horizontal list, in a tag named by argument 0 (name at argument 0) |
+    | `gui-vlist-table` | table of a vertical list, in a tag named by argument 0 (name at argument 0) |
+    | `tm-register-new-list-tag` | registers a symbol as a list tag |
+
+    The test `static` scans the macros of the standard styles and packages: every function of
+    `extern` that they use is on this list, or its macro is dangerous or in `refused-style-macros`.
+    A call by a computed name with a fixed beginning counts as dangerous when a macro that the
+    content may not call (the refused, the files, the links, the code) begins so (a macro of the
+    person that builds `tmdoc-` and a name reaches `tmdoc-image`). The links to `tmfs://help/`
+    are accepted only in the form `tmfs://help/article/tm/doc/...` that `help-link` makes (not `file/`
+    or `http/`, which open any file).
     The exception is the table `safe-macros` of `mcp-server.scm`: the standard macros
     that pass an argument to a link or a file (`href`, `slink`, `hlink*`, `include`, the note
     macros `doc-note-text`, `doc-note-ref`, `doc-footnote-text`, `custom-*`, `author-*-note`,

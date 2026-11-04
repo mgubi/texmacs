@@ -1362,9 +1362,10 @@
   ;; a destination of a link: http, https, mailto, or a relative address
   ;; (a path, a #label, other.tm#label); not a network path (//host)
   (let ((scheme (url-scheme s)))
-    (cond ((and (== scheme "tmfs") (string-starts? s "tmfs://help/")
+    (cond ((and (== scheme "tmfs") (string-starts? s "tmfs://help/article/tm/doc/")
                 (not (dotdot-in-path? s)))
-           ;; (the manuals of TeXmacs: what the help-link of the manuals makes)
+           ;; (the manuals of TeXmacs, the form that the help-link of the manuals
+           ;; makes; not tmfs://help/file/ or http/, which open any file)
            #t)
           (scheme (and (member scheme '("http" "https" "mailto")) #t))
           ((or (string-starts? (tm-string-trim-both s) "//")
@@ -1587,7 +1588,7 @@
        ;; (a macro that passes an argument to a link, a file, a script or a
        ;; macro name is not called by the content, with a few standard exceptions)
        (when (and safety-doc (not (known-primitive? tag)) (not (assq tag code-reasons))
-                  (dangerous-call? safety-doc tag))
+                  (dangerous-call? safety-doc st))
          (violate! (string-append "a call of the macro `" (symbol->string tag)
                                     "' is refused: it passes an argument (or the value of a variable) to a link, a file, a script or the name of a macro, which the filter cannot check (nothing was changed)")))
        ;; (aliases, and what is written into the exports as attributes)
@@ -2318,11 +2319,8 @@
     (image file 0) (postscript file 0) (postscript* file 0) (include file 0)
     (include* file 0) (pattern file 0) (video file 0) (sound file 0)
     (attachment file 0) (ocr file 0) (bibliography file all)
-    ;; (action: the script is the second argument; extern and hybrid: the function is
-    ;; the first one, the rest is data for it; the macros of the style that give
-    ;; a fixed function (doc-data, tm-ref...) are trusted, those whose function
-    ;; reads files or runs programs are in `refused-style-macros')
-    (script code all) (action code (1)) (extern code (0)) (hybrid code (0))
+    ;; (action: the script is the second argument; extern: see extern-functions)
+    (script code all) (action code (1)) (hybrid code all)
     (authorize code all) (observer code all) (eval code all) (eval-args code all)
     (specific code all) (latex code all)
     (find-file code all) (find-file-upwards code all)
@@ -2440,6 +2438,51 @@
     (visit body)
     out))
 
+;; The reviewed list of the functions of `extern' (the macros of the standard styles and
+;; packages that call a Scheme function on their arguments): the arguments of a
+;; function on the list are data, those of the other ones count as code. For each
+;; function: its name, why it is harmless, and the places of its arguments (after the name) that
+;; are the names of macros that it calls. Each function was read in TeXmacs/progs:
+;; builders of trees from the arguments, without evaluation, files, or commands.
+(define extern-functions
+  '(("doc-data" "builds the title block (select and tree builders: title-markup.scm)")
+    ("author-data" "builds the author block (select)")
+    ("abstract-data" "builds the abstract (select)")
+    ("doc-data-exam" "the title block of the exam style, doc-data with a prefix")
+    ("ext-concat-tuple" "concatenation of the children of a tuple with a separator")
+    ("ext-tm-ref" "a child of the tree by a path of up, next, previous, first, last or numbers")
+    ("ext-tm-arity" "arity of such a node")
+    ("ext-tm-index" "index of such a node")
+    ("ext-tm-last?" "is such a node the last child")
+    ("ext-numbered" "adds numbered-line around the lines of a document")
+    ("ext-listing" "builds the table of a numbered listing")
+    ("texmacs-version-release*" "the number of the version")
+    ("texmacs-version" "the version, no argument")
+    ("ext-language-suffix" "the two letters of the language")
+    ("natbib-get" "author or year of a natbib citation: string operations")
+    ("ext-typed-ref" "reference with a type: builds concat and reference trees")
+    ("ext-typed-ref*" "same, with the macro that is applied to the references (argument 1: a name)" 1)
+    ("ext-map" "applies the macro named by argument 0 to each element of the tuple (argument 1)" 0)
+    ("screens-index" "index of the screen") ("screens-arity" "number of screens")
+    ("screens-bar" "bar of screens: numbers and the fixed command screens-switch-to")
+    ("math-check" "packrat check of a math cell") ("math-check-table" "same for the cells of a table")
+    ("ext-tiled-items" "table of tiles") ("ext-vertical-items" "table of items")
+    ("tmdoc-key" "the keys of a shortcut, rewritten") ("tmdoc-key*" "same")
+    ("tmdoc-shortcut" "the shortcut bound to a command, rewritten")
+    ("tmdoc-render-keys" "render-key trees") ("tmdoc-menu-font" "the font of the menus")
+    ("gui-tiled" "table of tiles in a tag named by argument 0" 0)
+    ("gui-hlist-table" "table of a horizontal list, in a tag named by argument 0" 0)
+    ("gui-vlist-table" "table of a vertical list, in a tag named by argument 0" 0)
+    ("tm-register-new-list-tag" "registers a symbol as a list tag")))
+
+(define (bad-names-with-prefix? prefix)
+  ;; does a macro that the content may not call begin with @prefix?
+  (list-find (append (map car code-reasons) (map car code-macro-reasons)
+                     (map car file-primitives) (map car file-macros)
+                     (map car link-primitives) (map car link-macros)
+                     refused-style-macros name-tags)
+             (lambda (x) (string-starts? (symbol->string x) prefix))))
+
 (define (fixed-name-prefix e)
   ;; the written beginning (at least 3 characters) of a name that is made by a merge
   (and (func? e 'merge) (pair? (cdr e)) (string? (cadr e)) (>= (string-length (cadr e)) 3)
@@ -2473,7 +2516,11 @@
       ;; A name that comes from a parameter or a variable is a sensitive place. Else the
       ;; macro is unknown, and the arguments are handed to it.
       (let ((prefix (fixed-name-prefix name-expr)))
-        (cond (prefix
+        (cond ((and prefix (bad-names-with-prefix? prefix))
+               ;; (the family has a macro that the content may not call)
+               (sink! name-expr 'name)
+               (add! 'var 'name))
+              (prefix
                (for (n (local-names-with-prefix prefix)) (call! n args)))
               ((or (pair? (param-refs name-expr params)) (var-source? name-expr))
                (sink! name-expr 'name))
@@ -2496,6 +2543,14 @@
                  (if names
                      (for (n names) (call! n (cdr args)))
                      (computed-call! (car args) (cdr args))))))
+            ((eq? tag 'extern)
+             ;; the function named is run with the other arguments as data: only the
+             ;; functions of the reviewed list take data, the other ones take code
+             (let ((f (and (pair? args) (string? (car args)) (assoc (car args) extern-functions))))
+               (if f
+                   (for (i (cddr f))
+                     (when (< i (length (cdr args))) (sink! (list-ref (cdr args) i) 'name)))
+                   (for (a args) (sink! a 'code)))))
             ((eq? tag 'map-args)
              (when (and (pair? args) (string? (car args)))
                (let ((en (lookup (car args))))
@@ -2626,12 +2681,23 @@
     (and (member name safe-macros)
          (not (closure-has-local? d name)))))
 
-(define (dangerous-call? d tag)
-  ;; does the content call, with the tag @tag, a macro that is dangerous?
-  (let ((name (symbol->string tag)))
+(define (dangerous-call? d st)
+  ;; does the node @st call a macro that is dangerous? A place that is only the name of
+  ;; a macro (`map') is harmless when the name is written and is that of a macro that
+  ;; is not dangerous itself.
+  (let* ((tag (car st)) (name (symbol->string tag)) (args (cdr st)))
     (danger-tables! d)
     (and (not (safe-macro? d tag))
-         (pair? (dangerous-positions d name)))))
+         (list-find (dangerous-positions d name)
+                    (lambda (en)
+                      (not (and (number? (car en)) (equal? (cdr en) '(name))
+                                (< (car en) (length args))
+                                (let ((a (list-ref args (car en))))
+                                  (and (string? a)
+                                       (not (dangerous-name? a))
+                                       (not (member a safe-macros))
+                                       (null? (dangerous-positions d a))))))))
+         #t)))
 
 (define (check-safe-macro-arguments st base)
   ;; the arguments that a macro of the table passes to a link or a file are
@@ -3732,3 +3798,20 @@
               safe-macros)))
       (reset-danger!)
       (list r safe-code-allowed))))
+
+(tm-define (mcp-extern-allowlist)
+  (:synopsis "For the tests: the names of the functions of extern whose arguments are data")
+  (map car extern-functions))
+
+(tm-define (mcp-defined-names doc names)
+  (:synopsis "For the tests: which of @names are macros for the style of @doc")
+  (let ((d (or (find-doc doc) (list "probe" (system->url doc) doc))))
+    (reset-danger!)
+    (danger-tables! d)
+    (let ((r (list-filter names (lambda (n) (macro-definition d n)))))
+      (reset-danger!)
+      r)))
+
+(tm-define (mcp-refused-style-macros)
+  (:synopsis "For the tests: the macros of the styles that the content may not call")
+  (map symbol->string refused-style-macros))
