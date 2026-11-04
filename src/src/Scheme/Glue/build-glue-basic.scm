@@ -212,6 +212,8 @@
   (shared-create-file shared_create_file (bool string string))
   (shared-replace-file shared_replace_file (bool string string))
   (shared-random-token shared_random_token (string))
+  (shared-lock-acquire shared_lock_acquire (int string))
+  (shared-lock-release shared_lock_release (void int))
   
   ;; routines for the font database
   (tt-exists? tt_font_exists (bool string))

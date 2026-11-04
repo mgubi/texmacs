@@ -26,6 +26,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -307,27 +308,30 @@ local_accept () {
 int
 local_connect (int port) {
   if (!local_sockets_ready ()) return -1;
-  int fd= (int) L_SOCKET (AF_INET, SOCK_STREAM, 0);
-  if (fd < 0) return -1;
   struct sockaddr_in addr;
   memset (&addr, 0, sizeof (addr));
   addr.sin_family     = AF_INET;
   addr.sin_addr.s_addr= htonl (INADDR_LOOPBACK);
   addr.sin_port       = htons ((unsigned short) port);
-  // (a connection to the loopback is made or refused at once)
-  int r= -1, err= 0;
+  // (a connection to the loopback is made or refused at once; after an
+  // interrupted connect the state of the socket is not defined: try again
+  // with a new one)
+  int fd= -1, err= 0;
   for (int tries= 0; tries < 3; tries++) {
-    r= L_CONNECT ((L_SOCK_T) fd, (struct sockaddr*) &addr, sizeof (addr));
-    if (r == 0) break;
+    fd= (int) L_SOCKET (AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    if (L_CONNECT ((L_SOCK_T) fd, (struct sockaddr*) &addr, sizeof (addr)) == 0)
+      break;
     err= L_ERRNO;
+    L_CLOSE ((L_SOCK_T) fd);
+    fd= -1;
 #ifndef OS_MINGW
     if (err != EINTR) break;
 #else
     break;
 #endif
   }
-  if (r != 0) {
-    L_CLOSE ((L_SOCK_T) fd);
+  if (fd < 0) {
 #ifndef OS_MINGW
     return err == ECONNREFUSED? -2: -1;
 #else
@@ -594,4 +598,45 @@ shared_random_token () {
     r << hex[buf[i] & 15];
   }
   return r;
+}
+
+// The authority to host a file is an exclusive advisory lock (flock) on a
+// file of the per-user folder: held exactly while the process lives and keeps
+// it (the system frees it when the process dies, however it dies, and never
+// while it only stalls). The descriptor is not given to programs that are
+// started (close on exec).
+static array<int> shared_lock_fds;
+
+int
+shared_lock_acquire (string path) {
+#ifndef OS_MINGW
+  c_string p (path);
+  int fd= open ((char*) p, O_RDWR | O_CREAT, 0600);
+  if (fd < 0) return -2;
+  int fl= fcntl (fd, F_GETFD, 0);
+  if (fl >= 0) fcntl (fd, F_SETFD, fl | FD_CLOEXEC);
+  if (flock (fd, LOCK_EX | LOCK_NB) != 0) {
+    int e= errno;
+    ::close (fd);
+    return e == EWOULDBLOCK? -1: -2;   // -1: someone holds it
+  }
+  for (int i=0; i<N(shared_lock_fds); i++)
+    if (shared_lock_fds[i] < 0) { shared_lock_fds[i]= fd; return i; }
+  shared_lock_fds << fd;
+  return N(shared_lock_fds) - 1;
+#else
+  (void) path;
+  return -2;
+#endif
+}
+
+void
+shared_lock_release (int id) {
+#ifndef OS_MINGW
+  if (id < 0 || id >= N(shared_lock_fds) || shared_lock_fds[id] < 0) return;
+  ::close (shared_lock_fds[id]);   // (closing frees the lock)
+  shared_lock_fds[id]= -1;
+#else
+  (void) id;
+#endif
 }

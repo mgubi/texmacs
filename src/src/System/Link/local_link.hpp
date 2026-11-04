@@ -44,6 +44,8 @@ tree   shared_list_dir (string dir);    // the names in a folder (a tuple)
 bool   shared_set_private (string path);// chmod 0600 on a file (not Windows)
 bool   shared_create_file (string path, string s); // fails if it exists
 bool   shared_replace_file (string path, string s);// atomically (tmp + rename)
-string shared_random_token ();          // 32 hex digits from the system
+string shared_random_token ();
+int    shared_lock_acquire (string path); // a handle; -1 if held, -2 on error
+void   shared_lock_release (int id);          // 32 hex digits from the system
 
 #endif // LOCAL_LINK_H

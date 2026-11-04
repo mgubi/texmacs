@@ -1507,6 +1507,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(shared-lock-acquire <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_lock_acquire> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-lock-release <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_lock_release> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(tt-exists? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

@@ -213,6 +213,8 @@
 "shared-create-file"
 "shared-replace-file"
 "shared-random-token"
+"shared-lock-acquire"
+"shared-lock-release"
 "tt-exists?"
 "tt-dump"
 "tt-font-name"

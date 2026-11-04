@@ -2232,6 +2232,32 @@ tmg_shared_random_token () {
 }
 
 tmscm
+tmg_shared_lock_acquire (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-lock-acquire");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= shared_lock_acquire (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_lock_release (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-lock-release");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  shared_lock_release (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_tt_existsP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
@@ -13034,6 +13060,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("shared-create-file",  tmg_shared_create_file, 2, 0, 0);
   tmscm_install_procedure ("shared-replace-file",  tmg_shared_replace_file, 2, 0, 0);
   tmscm_install_procedure ("shared-random-token",  tmg_shared_random_token, 0, 0, 0);
+  tmscm_install_procedure ("shared-lock-acquire",  tmg_shared_lock_acquire, 1, 0, 0);
+  tmscm_install_procedure ("shared-lock-release",  tmg_shared_lock_release, 1, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);

@@ -79,16 +79,27 @@ The folder is `$XDG_RUNTIME_DIR` (Linux) or `$TMPDIR` or `/tmp`, then
 must be a directory owned by the user (else no sharing). It does not depend on
 `TEXMACS_HOME_PATH`.
 
-One entry per file, `f-<hash of the canonical path>.entry`, containing
+**Who hosts a file is decided by the system.** For each file the folder has
+`f-<hash of the canonical path>.lock`, and a process is the host of the file
+exactly while it holds an exclusive advisory lock on it (`flock` with
+`LOCK_EX|LOCK_NB`; the descriptor is close-on-exec). The system frees the lock
+when the process dies, however it dies (`kill -9` too), and never while it only
+stalls. Becoming host is getting the lock without waiting; failing means that
+another process hosts. There is no test of a pid, no probe of a port, no age
+of a file, no election by timeout; every action of a host (accepting a patch,
+broadcasting, saving) is done while the process holds the lock, which is an
+invariant of one process.
+
+The entry `f-<hash>.entry` only tells how to reach the host:
 `(entry key port token pid interactive host-id)`: the canonical path (symlinks
-and relative names resolved by `realpath`), the port of the host on
-127.0.0.1, a random token of 128 bits from `/dev/urandom` (on Windows, a weak
-fallback: the folder is the protection), the pid, whether the host is
-interactive, and its id. An entry is created with `O_EXCL` by the host and
-replaced atomically (temporary file and rename) when hosting changes, so that
-two processes which open the file together do not both host it, and a reader
-never sees half an entry. A host whose connection is refused has a stale
-entry, which is removed; the entries of dead pids are swept when a host starts.
+and relative names resolved by `realpath`), the port of the host on 127.0.0.1,
+a random token of 128 bits from `/dev/urandom`, the pid, whether the host is
+interactive, and its id. It is written (whole, replaced atomically by
+temporary file and rename) by the holder of the lock after it has got it, and
+never trusted for authority: a leftover entry, empty, damaged or of a process
+that is gone, makes no difference, since the lock is free then. An entry is
+removed when a host leaves with nobody; leftovers stay (one small file per
+shared file).
 
 ## Transport
 
@@ -212,66 +223,46 @@ Priority: interactive first (`(not (headless?))`), then the earlier to have
 joined (the host's roster, broadcast at each join and leave, has a sequence
 number for each).
 
-- **Join**: a process which loads a file with an entry connects, says hello,
-  gets `(welcome state document modified roster host)` (waiting 500 ms at the
-  most, in a loop on the main thread) and makes the buffer from it
-  (`buffer-set`, `buffer-pretend-saved`). **A host whose process is alive is
-  never replaced**: if its port accepts the connection but it does not answer
-  in time (it is busy or stopped), the file is opened from the file, not
-  shared, with a message in the footer. An entry is removed when its port
-  refuses the connection (the process is gone, or is another program with the
-  same pid: nothing serves the file there), or when it is empty or damaged and
-  more than 5 s old (a create that did not end). So two hosts never write the
-  same file.
-- **An interactive process joins a file hosted by an interactive one**: it is
-  a participant (the first interactive process hosts). **An interactive
-  process joins a file hosted by a non-interactive one**:
-  the host flushes its changes and sends `(become-host state rid)` to it. In
-  three steps, so that a target that is busy for longer than the host waits
-  (4 s here, 1.5 s when the host leaves) cannot become a second host: the
-  target, if its state is the host's (else `host-failed`), answers
-  `(host-accept rid)` and does nothing else; the host, only while its
-  handover is on and not given up, answers `(host-go rid state)` (after that
-  it waits 4 s more for the end), else `(host-no rid)`; on host-go the
-  target listens, replaces the entry (new token) and answers `(host-ready port
-  token)`. The old host then sends `(rehost port token id)` to the others and
-  connects itself to the new host, as a participant. Pending changes are
-  sent again to the new host with their state (the new host has the history, as
-  it kept the states); a participant whose state it does not have gets the whole
-  document (its pending changes are dropped, and it is told).
-- **The host closes the file** (`buffer-close`): the same handover to the
-  first participant by priority, waiting for the answer (1.5 s at most), then it
-  leaves; without a participant it removes its entry. Changes of the host which
-  were not yet sent are sent before.
+- **Join**: a process which loads a file reads its entry, connects, says
+  hello, gets `(welcome state document modified roster host)` (waiting 500 ms
+  at the most, in a loop on the main thread, which is the one wait that is
+  left) and makes the buffer from it (`buffer-set`, `buffer-pretend-saved`).
+  If the host does not answer in time or the connection fails, the lock tells:
+  free, then there is no host (the file is loaded and this process hosts it);
+  held, then a host exists which is busy or stopped, and the file is opened
+  from the file, not shared, with a message in the footer. **A stalled host is
+  never replaced: it holds the lock.** (Any error of `local-connect` other than
+  a refusal gives the same: the lock decides.)
+- **Host at load**: after a normal load the process tries the lock; if it gets
+  it, it hosts (listens, writes the entry). If not, a host appeared meanwhile:
+  it joins it, replacing what it read, or opens unshared with the message.
+- **Giving up the file** (the file is closed, or a non-interactive host has an
+  interactive participant, offered at the hello of the interactive process
+  and again every 5 s): the host sends all its changes, then
+  `(released token preferred roster)` to all, closes its links, frees the lock
+  and, unless it is leaving, goes on as a participant. There is no waiting and
+  no state in between.
+- **Seeking** (after `released`, or when the link of a host is dead, which is
+  how its death is seen): each participant tries the lock, the preferred one
+  (first by priority, interactive first) at once, the next ones 300 ms later
+  each, the old host last. Whoever gets it hosts (its pending changes become
+  new states, it writes a new entry with a new token); the others read the
+  entry, skipping the one of the host they had (same token), and connect to
+  it, sending their state: same, the patch since, or the whole document (their
+  pending changes are then dropped and saved, see "Changes that are not kept").
+  The delays only say who is asked first: the lock decides. While the lock is
+  held and the entry is not new, the participants queue their changes and try
+  again, five times a second (the lock) and once a second (a host that holds
+  it but does not answer, with the message "the host is not answering; your
+  changes are kept" after the second failure). A preferred process that
+  stalls only delays hosting: the next one takes the lock, and offers the file
+  again later if it is not interactive.
+- **No time decides who hosts**, so there is no moment with two hosts: a host
+  is the one that holds the lock, and a process gives up the role by freeing
+  it, never by a message.
 - **A buffer removed by the C++ code without `buffer-close`** (the window and
   buffer killed together): `notify-buffer-closed`, which `remove_buffer`
   calls, makes the process leave the sharing as above.
-- **Never take over a host that is alive.** The same rule holds when a
-  participant elects itself (the host died, or a reconnection to a new host
-  timed out): `become-host!` does nothing while the entry belongs to another
-  process that is alive and whose port accepts connections; the participant
-  goes on trying to reach it, once a second, without blocking, and keeps its
-  changes (a new host which stalls for longer than a participant waits is not
-  replaced). After the second failed attempt a message says that the host is
-  not answering and that the changes are kept. An election that finds the
-  entry of a host that is gone removes it and makes its own with `O_EXCL`; if
-  that fails, someone else was first and this process joins it.
-- **The entry is checked** by its host every 3 s: if it is not the host's own
-  any more (its token), another process has taken the file; this process
-  saves a copy of its document in the recovered folder and joins that host
-  (if the entry is missing it is made again). Changes of an entry (replace,
-  remove if the token is such) are made holding a lock file (`O_EXCL`; one
-  older than 3 s is removed), so that a newer entry is never removed.
-- **Connection errors:** `local-connect` gives -2 when the connection is
-  refused, -1 for any other error. Only a refusal means that nothing serves the
-  file there; any other error (too many files, not allowed) leaves the entry
-  and the file unshared.
-- **The host dies**: the participants see the link close. Each computes the
-  candidates from the last roster (without the dead host); the first becomes
-  host from its own copy (its pending changes become new states); the others
-  wait up to 3 s for an entry of another host and connect to it (hello with
-  their state: same, or the patch since, or the whole document), then
-  leave out the candidate that did not appear and try the next one.
 
 ## Tests
 
@@ -284,9 +275,16 @@ participant, once), `concurrent` (edits at once in different paragraphs:
 rebased by the host, transformed by the participant), `refuse` (the host
 deletes what the participant edits, in both orders, and a patch with a state
 the host does not know), `handover`, `death` (kill -9), `takeover` (and
-`takeover-window`: B with a window on the offscreen platform), `off`
-(preference off), `stale` (an entry of a dead process; a wrong token and a
-packet that is not a message are closed). The tests pause the polling
+`takeover-window`: B with a window on the offscreen platform), `late` (the
+interactive target of a handover stalls: the old host gets the lock back, keeps
+its change, and gives the file again when the target is back; one host at a
+time), `hostage` (a new host that stalls is not replaced, and the message
+is shown), `lockheld` (a lock held by a process that is not TeXmacs, a `perl`
+started by the test: nobody hosts, then one hosts and the other joins),
+`corrupt` (entries that are empty or of a program that serves nothing make no
+difference), `off` (preference off), `stale` (an entry of a dead process; a
+wrong token and a packet that is not a message are closed), `slow`, `attack`,
+`conflict`, `meta`, `save`. The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with
@@ -295,14 +293,19 @@ checks that the two documents end equal. Running them with
 ## Open points, limits
 
 - The cursors of the participants, the names of the participants, the menus.
-- Two processes which start to host at the same instant are separated by the
-  entry (`O_EXCL`). When the host dies, a process that opens the file before
-  its successor has written the new entry finds a dead pid and hosts; the
-  entry is replaced atomically by whichever writes last, and the other joins
-  it (or resyncs). A `git pull` over a shared file is the business of the host
-  at save time, as before.
-- A joining process waits for the welcome in a loop (500 ms at the most); two
-  processes joining each other at once would wait for each other that long.
+- Two processes that start to host at the same instant are separated by the
+  lock. A `git pull` over a shared file is the business of the host at save
+  time, as before. The lock is advisory: a program that does not take it is not
+  stopped (the files are written by the host, as before, without a lock on the
+  document itself). `flock` on a network file system (the folder is local) is
+  not a concern here.
+- A host that dies after it applied a patch and before it sent it: the patch is
+  sent again by its author to the new host, which does not know it was
+  applied, if the other participants did not get it (and is then applied
+  once); if one of them did get it, the new host (that one, or a participant
+  that has it) has it, and the author's second copy is a patch against an older
+  state, rebased or refused as any other.
+- A joining process waits for the welcome in a loop (500 ms at the most).
 - Undo after a remote patch: a crash in `edit_modify_rep::undo` was seen
   headless; it happens with the feature off too (pre-existing), and is not
   studied here.
@@ -312,8 +315,8 @@ checks that the two documents end equal. Running them with
   handled.
 - Heavy use of undo: not studied (design 3.5).
 - Windows: the feature is off there (the preference has no effect): it needs a
-  system source of random numbers (`BCryptGenRandom`) and an exclusive create
-  of the entries, which were not written, and the winsock code was never built.
+  system source of random numbers (`BCryptGenRandom`) and a file lock
+  (`LockFileEx`), which were not written, and the winsock code was never built.
 - While any file is shared, the 20 ms polling command runs (a `recv` per link
   and an `accept`); with the preference off, or no file shared, no timer, no
   socket and no folder is made.

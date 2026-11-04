@@ -13,6 +13,7 @@
    (act "check" (check "A did not take the place of the stalled host"
                        (and (== (role-of) 'participant)
                             (not (== (list-ref (shared-entry (the-name)) 4) (shared-process-id)))))
+        (check "A said that the host does not answer" (>= (shared-stat 'host-silent) 1))
         (sync-set! "a-waited"))
    (wait-sync "b-done")))
 
