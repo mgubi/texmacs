@@ -1903,6 +1903,43 @@
   (check= (tmcolor->htmlcolor "url(javascript:alert(1))") "inherit")
   (check= (tmlength->htmllength "1cm") "1cm")
   (check= (tmlength->htmllength "1cm; position: fixed") #f)
+  ;; obfuscated schemes: numeric references with leading zeros, without ;
+  (for (u '("&#106;avascript:1" "javascript&#0058;1" "javascript&#x003a;1"
+            "javascript&#58 1" "&#x6A;avascript&colon;alert(1)" "JaVa\tScRiPt:1"))
+    (check= (tmhtml-safe-url u) "#"))
+  (check= (tmhtml-safe-url "page.html?a=1&b=2") "page.html?a=1&b=2")
+  ;; the full documents, as File > Export makes them
+  (let* ((cell (lambda (bg)
+                 (html-of-buffer
+                  `(document (tabular (tformat (cwith "1" "1" "1" "1" "cell-background" ,bg)
+                                               (table (row (cell "a")))))))))
+         (hostile "red\" onmouseover=\"alert(1)"))
+    (check-false (string-occurs? "onmouseover" (cell hostile)))
+    (check-true (string-occurs? "inherit" (cell hostile)))
+    (check-true (string-occurs? "background-color: #ff0000" (cell "#ff0000")))
+    (check-false (string-occurs? "position"
+                                 (cell '(pattern "x.png" "1cm;position:fixed" "100%"
+                                                 "red;position:fixed"))))
+    (check-false (string-occurs? "javascript"
+                                 (cell '(pattern "javascript:alert(1)" "100%" "100%" "red"))))
+    (check-false (string-occurs? "evil"
+                                 (cell '(pattern "x&#39;);b:url(http://evil/x" "100%" "100%"))))
+)
+  ;; the address of a pattern, in url('...') (the pattern itself is not
+  ;; reached by the export of a cell in this configuration)
+  (check= (tmhtml-css-url "data:image/png;base64,AA") "data:image/png;base64,AA")
+  (check= (tmhtml-css-url "x.png') ;b:url(a") "x.png%27%29 %3bb:url%28a")
+  (check= (tmhtml-css-url "javascript:alert(1)") "#")
+  (check-false (string-occurs? "javascript"
+               (html-of-buffer
+                '(document (image "&#x6A;avascript&colon;alert(1).png" "1cm" "1cm" "" "")))))
+  (check-false (string-occurs? "\" onerror"
+               (html-of-buffer
+                '(document (html-video "a\" onerror=\"x" "1" "2")))))
+  ;; values which are not lengths or numbers do not crash the export
+  (check-true (string? (html-of-buffer '(document (with "font-size" "big" "text")))))
+  (check-true (string? (html-of-buffer
+                        '(document (with "ornament-border" "x" "ornament-hpadding" "y" "t")))))
   (check= (tmhtml-safe-url "javascript:x" #t) "#")
   (check= (tmhtml-safe-url "data:image/png;base64,AA" #t) "data:image/png;base64,AA")
   (check= (tmhtml-safe-url "data:image/svg+xml,x" #t) "#")

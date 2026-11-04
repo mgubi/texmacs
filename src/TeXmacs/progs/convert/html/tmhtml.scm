@@ -836,17 +836,46 @@
 ;; (but data:image/png, jpeg, gif and webp for an image) are not followed.
 ;; The scheme is read as a browser reads it, without spaces and controls,
 ;; with the entities for the colon and the other ones removed.
+(define (tmhtml-entity-char n)
+  ;; the character of a code point of a numeric reference, or ""
+  (if (and (> n 0) (< n 1114112) (not (and (>= n 55296) (< n 57344))))
+      (integer->char n)
+      #\space))
+
 (define (tmhtml-url-normalize u)
+  ;; &#106; &#x6A; (leading zeros, the ; is optional) and the names colon, Tab
+  ;; and NewLine are decoded as a browser does before the scheme is read
   (let ((n (string-length u)))
+    (define (digits i hex?)
+      (let loop ((j i))
+        (if (and (< j n)
+                 (let ((c (char-downcase (string-ref u j))))
+                   (or (char-numeric? c)
+                       (and hex? (string-index "abcdef" c)))))
+            (loop (+ j 1))
+            j)))
     (let loop ((i 0) (acc '()))
       (if (>= i n)
           (string-downcase (apply string-append (reverse acc)))
-          (let ((c (string-ref u i))
-                (e (and (== (string-ref u i) #\&) (htmlout-entity-end u i))))
-            (cond (e (let ((name (string-downcase (substring u (+ i 1) e))))
-                       (loop (+ e 1)
-                             (cons (if (in? name '("colon" "#58" "#x3a")) ":" "")
-                                   acc))))
+          (let ((c (string-ref u i)))
+            (cond ((and (== c #\&) (< (+ i 1) n) (== (string-ref u (+ i 1)) #\#))
+                   (let* ((hex? (and (< (+ i 2) n)
+                                     (in? (string-ref u (+ i 2)) '(#\x #\X))))
+                          (start (if hex? (+ i 3) (+ i 2)))
+                          (end (digits start hex?)))
+                     (if (= end start)
+                         (loop (+ i 1) (cons "&" acc))
+                         (let* ((code (string->number (substring u start end)
+                                                      (if hex? 16 10)))
+                                (next (if (and (< end n) (== (string-ref u end) #\;))
+                                          (+ end 1) end)))
+                           (loop next (cons (if (or (<= code 32) (== code 127)) ""
+                                                 (string (tmhtml-entity-char code)))
+                                            acc))))))
+                  ((and (== c #\&) (htmlout-entity-end u i))
+                   (let* ((e (htmlout-entity-end u i))
+                          (name (string-downcase (substring u (+ i 1) e))))
+                     (loop (+ e 1) (cons (if (== name "colon") ":" "") acc))))
                   ((or (<= (char->integer c) 32) (== (char->integer c) 127))
                    (loop (+ i 1) acc))
                   (else (loop (+ i 1) (cons (string c) acc)))))))))
@@ -996,7 +1025,7 @@
 
 (define (tmhtml-with-font-size val arg)
   (ahash-with tmhtml-env :mag val
-    (let* ((x (* (string->number val) 100))
+    (let* ((x (* (or (string->number val) 1) 100))
            (c (string-append "font-size: " (number->string x) "%"))
 	   (s (cond ((< x 1) "-4") ((< x 55) "-4") ((< x 65) "-3")
 		    ((< x 75) "-2") ((< x 95) "-1") ((< x 115) "0")
@@ -1210,11 +1239,14 @@
                                    (substring h 0 7)
                                    h)))))))
 
-(define (tmhtml-css-url u)
-  ;; the address in url('...'): no quote, parenthesis, backslash or ; in it
+(tm-define (tmhtml-css-url u)
+  ;; the address in url('...'): no quote, parenthesis, backslash or ; in it,
+  ;; except the ; of data:image/png;base64,
+  (define data? (string-starts? (tmhtml-url-normalize u) "data:image/"))
   (apply string-append
          (map (lambda (c)
-                (if (or (in? c '(#\' #\" #\( #\) #\\ #\; #\< #\>))
+                (if (or (in? c '(#\' #\" #\( #\) #\\ #\< #\>))
+                        (and (== c #\;) (not data?))
                         (< (char->integer c) 32))
                     (string-append "%" (number->string (char->integer c) 16))
                     (string c)))
@@ -1487,7 +1519,8 @@
          (tmhtml-png (cons 'image l)))
         (else
           ;; web images
-          (let* ((s (tmhtml-safe-url (tmhtml-web-image-name (first l)) #t))
+          (let* ((s (tmhtml-safe-url
+                     (cork->html (tmhtml-web-image-name (first l))) #t))
                  (w (tmlength->htmllength (second l) #f))
                  (h (tmlength->htmllength (third l) #f)))
             `((h:img (@ (class "image")
@@ -1516,10 +1549,10 @@
                    (list-intersperse
                      (cond ((== (length args) (length sty))
                             (map (lambda (x y)
-                                   (string-append x ":" (f y))) sty args))
+                                   (string-append x ":" (or (f y) "0"))) sty args))
                            ((>= 1 (length sty))
                             (map (lambda (y)
-                                   (string-append (car sty) ":" (f y))) args))
+                                   (string-append (car sty) ":" (or (f y) "0"))) args))
                            (else '()))
                      ";"))))
              funs args stys) ";"))))
