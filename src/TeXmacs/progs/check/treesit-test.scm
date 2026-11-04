@@ -520,7 +520,14 @@
           (tree-insert! (tree-ref d i) 5 "y")
           (tree-sitter-line-colors "c" (tree-ref d i)))
         (check= (- (syntax-region-full-parses) n1) 0))
-      (check= (tree->string (tree-ref d 4002)) "    xy4002 = f (4002);"))
+      (check= (tree->string (tree-ref d 4002)) "    xy4002 = f (4002);")
+      ;; (the region is a group of parts: a function at the start of a line
+      ;; in the middle is a place to cut at, and gives two parts, which the
+      ;; statistics count; a region not in a group would have no parts)
+      (tree-insert! d 4500 '("int g (int x) {" "  return x;" "}"))
+      (tree-sitter-line-colors "c" (tree-ref d 4500))
+      (with lan (tree-sitter-program-language "c")
+        (check= (length (syntax-region-statistics d lan)) 3)))
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
