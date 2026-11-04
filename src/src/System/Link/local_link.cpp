@@ -409,6 +409,18 @@ local_send_raw (int id, string s) {
 * Helpers of the shared files
 ******************************************************************************/
 
+bool
+shared_pid_alive (int pid) {
+#ifndef OS_MINGW
+  if (pid <= 0) return false;
+  // (a stopped process exists: this does not touch it, nor its sockets)
+  return kill ((pid_t) pid, 0) == 0 || errno == EPERM;
+#else
+  (void) pid;
+  return true;
+#endif
+}
+
 int
 shared_process_id () {
 #ifndef OS_MINGW

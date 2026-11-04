@@ -222,6 +222,8 @@
   (mcp-stdin-read mcp_stdin_read (string))
   (mcp-stdin-eof? mcp_stdin_eof (bool))
   (mcp-stdout-write mcp_stdout_write (bool string))
+  (mcp-json-valid? mcp_json_valid (bool string))
+  (shared-pid-alive? shared_pid_alive (bool int))
   
   ;; routines for the font database
   (tt-exists? tt_font_exists (bool string))

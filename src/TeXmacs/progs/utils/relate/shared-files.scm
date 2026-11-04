@@ -222,19 +222,18 @@
         (map (lambda (n) (if (symbol? n) (symbol->string n) n)) l)
         '())))
 
-(define (entry-answers? e)
-  ;; does the host of the entry @e accept connections? (The lock is not taken
-  ;; to know, not to make a process which is starting to host fail to get it;
-  ;; a connection which says nothing is closed by the host after 5 s.)
-  (let ((c (local-connect (list-ref e 2))))
-    (when (>= c 0) (local-close c))
-    (>= c 0)))
+(define (entry-alive? e)
+  ;; is the process of the entry @e there? (No connection is made and no
+  ;; lock taken: a host that is stopped, or starting, is not disturbed, and
+  ;; its queue of connections does not fill; a stopped process is alive.)
+  (let ((pid (list-ref e 4)))
+    (and (integer? pid) (shared-pid-alive? pid))))
 
 (tm-define (shared-files-in-use)
   (:synopsis "The files which other processes of the user host: ((path interactive pid) ...)")
   ;; (for `texmacs --mcp': what the person has open; a file of this process
   ;; is not listed, nor an entry whose host is gone, which is found by its
-  ;; port refusing connections)
+  ;; process being gone)
   (let ((dir (shared-user-dir)))
     (if (== dir "")
         '()
@@ -246,11 +245,14 @@
                          (e (catch #t
                               (lambda () (string->object (string-load u)))
                               (lambda args #f))))
-                    (if (and (func? e 'entry) (== (length e) 8)
-                             (string? (cadr e))
-                             (read-entry (cadr e))
-                             (not (ahash-ref sf-table (cadr e)))
-                             (entry-answers? e))
+                    (if (catch #t
+                          (lambda ()
+                            (and (func? e 'entry) (== (length e) 8)
+                                 (string? (cadr e))
+                                 (read-entry (cadr e))
+                                 (not (ahash-ref sf-table (cadr e)))
+                                 (entry-alive? e)))
+                          (lambda args #f))
                         (loop (cdr names)
                               (cons (list (cadr e) (list-ref e 5) (list-ref e 4))
                                     acc))

@@ -16,7 +16,8 @@ but documents": `open_document` (and any tool given a path) opens **any file the
 user can read**, as TeXmacs would, through its importers (a `.tex`, `.md`,
 or a plain text file such as `/etc/passwd` opens as a document). To limit it,
 start the server with **`TEXMACS_MCP_ROOTS=dir1:dir2`**: only files whose
-canonical path (symbolic links and `..` resolved) is inside one of the folders
+canonical path (symbolic links resolved; a path with a `..` component is refused,
+and the file loaded is the canonical path that was checked) is inside one of the folders
 can be opened, and `list_documents` shows no other open file; the default is no
 limit. `TEXMACS_MCP_READONLY` is reserved for the editing steps (every tool
 reads today). Paths containing a colon cannot be opened (a colon separates
@@ -38,7 +39,7 @@ standard input and output, and ends when the input ends.
   neither the protocol input nor its output. (Before the home is known the
   descriptors go to `/dev/null`: the first lines of start-up are lost.)
   `TEXMACS_MCP_DEBUG=1` also logs every message. A log over 4 MB is renamed to
-  `mcp.log.1` when the server starts.
+  `mcp.log.1` when the server starts and during the run (checked every 64 ticks; `TEXMACS_MCP_LOG_CAP` sets the cap, for tests).
 - **The launcher** `TeXmacs/bin/texmacs` (from `misc/scripts/texmacs.in`) runs
   the binary with standard input from `/dev/null`; for `--mcp` it keeps the input.
   `claude mcp add texmacs -- texmacs --mcp` thus works with the launcher.
@@ -55,8 +56,9 @@ standard input and output, and ends when the input ends.
   (`mcp-server-start`, `mcp-handle-line`), so Qt, Vue and Cocoa, Guile and s7,
   share them. The JSON reader and writer are those of C++ (`json->typed-tree`,
   `typed-tree->json`, which the LSP client uses too); the reader is lenient, so a
-  line whose brackets or quotes do not match is refused beforehand as a parse
-  error.
+  line is first checked by a strict validator in C++ (`mcp_json_valid`: literals,
+  numbers that are finite, strings and escapes, brackets, depth 512, nothing after
+  the value) and refused as a parse error if it fails.
 - **A client that is gone**: when a write to the output fails the server ends
   (SIGPIPE is ignored in this mode).
 - **End of input** (or of the pipe) is a clean exit: the documents are closed
@@ -68,9 +70,9 @@ standard input and output, and ends when the input ends.
 
 JSON-RPC 2.0, one message per line (a CR before the newline is accepted; a blank
 line is skipped; a line over 32 MB is dropped up to its newline, with one error
--32600). A line must be one object or array with matching brackets and quotes,
-nested at most 512 deep (the C++ reader crashes on hundreds of thousands of levels
-and accepts garbage), with nothing after it: else -32700. An id that is neither
+-32600). A line must be one strictly valid JSON object or array, nested at most 512 deep
+(the C++ reader crashes on hundreds of thousands of levels and accepts garbage):
+else -32700. The 32 MB cap is on the length of the whole line. An id that is neither
 a string nor a number, or a missing or non-string method, is -32600.
 
 - `initialize`: answers the client's `protocolVersion` if it is one of
@@ -114,7 +116,7 @@ a string nor a number, or a missing or non-string method, is -32600.
 
 | Tool | Arguments | Result |
 |---|---|---|
-| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its port accepts a connection (the lock is not taken, so that a process starting to host is not disturbed) |
+| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its process exists (`kill(pid, 0)`: no connection is made and no lock taken, so a stopped or starting host is not disturbed; a reused process id can list a file wrongly) |
 | `open_document` | `path` (absolute) | the same facts for the document (the same id when it is open already) |
 | `get_outline` | `document`, `limit?` (300), `start?` | `title`, `hash`, `blocks`, `sections`: `handle`, `tag`, `level` (part 0, chapter 1, section 2... subparagraph 6), `title`, `labels`, `index` (position among the top-level blocks), `chars` (size to the next section), `hash`; also `total`, `next_start` (continue with `start`). Sections are found also in a concatenation (`<section|A><label|x>` and the LaTeX importer make `(concat (section ..) (label ..))`) |
 | `read` | `document`, `node?` (a handle), `format?` (`text` default, `texmacs`, `stree`, `latex`, `markdown`), `max_size?` (characters, default 12000, 200 to 400000), `start?` | `content`, `hash`, `tag`, `truncated`, and for a document or a `document` node `start`, `end`, `blocks`, `next_start` (continue with `start`) and `children` (handle, index, tag, hash, preview, at most 200); for another node the first 50 children |
@@ -171,6 +173,9 @@ the work folder).
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `robust` | non-ASCII and newlines in every format and in the file name, a star in a name, colons refused, `TEXMACS_MCP_ROOTS` (outside file, `/etc/passwd`, `..`, a symbolic link), sections in concatenations, bad arguments and messages, 200000 nested arrays, a 34 MB line |
+| `hostdeath` | a host killed with `kill -9` leaves the list of open files; a non-ASCII name is listed as it is and can be opened |
+| `stalled` | a host stopped with SIGSTOP stays listed and 40 listings do not block the server |
+| `logcap` | the log is rotated during the run |
 | `outputs` | the outline and the references cut and continued; the server ends when the client is gone |
 
 ## Decisions and open points

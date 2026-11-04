@@ -607,7 +607,7 @@ def s_robust(w):
     e, v = m.tool("open_document", path="/etc/passwd")
     check("/etc/passwd is refused", e and "not allowed" in str(v))
     e, v = m.tool("open_document", path=roots + "/../outside.tm")
-    check("a .. path out of the roots is refused", e and "not allowed" in str(v))
+    check("a .. path out of the roots is refused", e and "not accepted" in str(v))
     link = os.path.join(roots, "link.tm")
     try:
         os.symlink(os.path.realpath(outside), link)
@@ -617,6 +617,22 @@ def s_robust(w):
         pass
     e, v = m.tool("read", document=os.path.realpath(outside))
     check("read by an outside path is refused", e and "not allowed" in str(v))
+    # a path is checked as it is loaded: `..' cannot step out of the roots
+    inner = os.path.join(roots, "deep")
+    os.makedirs(inner, exist_ok=True)
+    sec = os.path.join(w, "secret.tm")
+    write_tm(sec, "Secret.\n")
+    os.symlink(inner, os.path.join(roots, "link_deep"))
+    for name, path in (("a nonexistent folder and ..", roots + "/nonexist/../../secret.tm"),
+                       ("many ..", roots + "/../../../../../../" + os.path.realpath(sec)),
+                       ("..", roots + "/deep/../../secret.tm"),
+                       ("a symbolic link and ..", roots + "/link_deep/../../secret.tm")):
+        e, v = m.tool("open_document", path=path)
+        check("%s: refused" % name, e and ("not accepted" in str(v) or "not allowed" in str(v)))
+        e, v = m.tool("read", document=path)
+        check("%s: read refused too" % name, e)
+    e, v = m.tool("list_documents")
+    check("nothing outside was opened", not e and all(x["path"].startswith(os.path.realpath(roots)) for x in v["documents"]))
     # sections in concatenations
     e, v = m.tool("open_document", path=os.path.realpath(nested))
     did = v["document"]
@@ -651,6 +667,10 @@ def s_robust(w):
     m.send_raw('{"jsonrpc":"2.0","id":8,"method":5}\n')
     r = m.read_msg()
     check("a method that is not a string: -32600", r is not None and r.get("error", {}).get("code") == -32600)
+    for bad in ('{"a":tru}', '{"a":1e999}', '{"a":01}', '{"a":"\\x"}', '{"a":[1,]}', '{"a" 1}'):
+        m.send_raw(bad + "\n")
+        r = m.read_msg()
+        check("%s: -32700" % bad, r is not None and r.get("error", {}).get("code") == -32700)
     m.send_raw('{"jsonrpc":"2.0","id":9,"method":"ping"} garbage\n')
     r = m.read_msg()
     check("garbage after the object: -32700", r is not None and r.get("error", {}).get("code") == -32700)
@@ -704,8 +724,90 @@ def s_outputs(w):
     big = os.path.join(home, "system", "mcp.log")
     check("the log is small", os.path.getsize(big) < 4 * 1024 * 1024)
 
+def s_hostdeath(w):
+    """a host which is killed (kill -9) leaves the list of open files"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "livé é.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-wait.scm", f)
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("list_documents")
+    check("listed, with its non-ascii name as it is",
+          not e and any(x["path"] == f for x in v["open_elsewhere"]))
+    e, d = m.tool("open_document", path=[x["path"] for x in v["open_elsewhere"]][0]) if not e and v["open_elsewhere"] else (True, "none")
+    check("the listed path can be opened (and is joined)", not e and d["shared"] is not None)
+    m.tool("read", document="d1")
+    # (the MCP process has joined; open a second, unjoined, view of the listing
+    # through a file that only the other TeXmacs has: none; so kill and list)
+    other.kill()                         # kill -9 of our own process
+    other.wait()
+    gone = poll(lambda: (lambda r: r if not r[0] and not any(x["path"] == f for x in r[1]["open_elsewhere"]) else None)
+                (m.tool("list_documents")), 10)
+    check("after the host is killed it is not 'elsewhere' any more", gone is not None)
+    check("exit 0", m.close() == 0)
+
+
+def s_stalled(w):
+    """a host which is stopped (SIGSTOP) stays listed and does not block the server"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "stalled.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-wait.scm", f)
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    import signal
+    os.kill(other.pid, signal.SIGSTOP)
+    try:
+        t0 = time.time()
+        ok = True
+        for _ in range(40):
+            e, v = m.tool("list_documents")
+            ok = ok and not e and any(x["path"] == f for x in v["open_elsewhere"])
+        dt = time.time() - t0
+        check("a stopped host stays listed (40 listings)", ok)
+        check("and the server is not blocked (40 listings in under 20 s: %.1f s)" % dt, dt < 20)
+    finally:
+        os.kill(other.pid, signal.SIGCONT)
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+
+
+def s_logcap(w):
+    """the log is rotated during the run when it is over the cap"""
+    env, home = make_env(w, "A")
+    env["TEXMACS_MCP_DEBUG"] = "1"
+    env["TEXMACS_MCP_LOG_CAP"] = "30000"
+    m = Mcp(env)
+    m.initialize()
+    for _ in range(600):
+        m.request("ping")
+        time.sleep(0.005)
+    time.sleep(1)
+    m.request("ping")
+    logf = os.path.join(home, "system", "mcp.log")
+    check("the log was rotated", os.path.exists(logf + ".1"))
+    check("the log is under about the cap", os.path.getsize(logf) < 90000)
+    check("exit 0", m.close() == 0)
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
+             "hostdeath": s_hostdeath, "stalled": s_stalled, "logcap": s_logcap,
              "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

@@ -2328,6 +2328,32 @@ tmg_mcp_stdout_write (tmscm arg1) {
 }
 
 tmscm
+tmg_mcp_json_validP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "mcp-json-valid?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= mcp_json_valid (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_shared_pid_aliveP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-pid-alive?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_pid_alive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_tt_existsP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
@@ -13138,6 +13164,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("mcp-stdin-read",  tmg_mcp_stdin_read, 0, 0, 0);
   tmscm_install_procedure ("mcp-stdin-eof?",  tmg_mcp_stdin_eofP, 0, 0, 0);
   tmscm_install_procedure ("mcp-stdout-write",  tmg_mcp_stdout_write, 1, 0, 0);
+  tmscm_install_procedure ("mcp-json-valid?",  tmg_mcp_json_validP, 1, 0, 0);
+  tmscm_install_procedure ("shared-pid-alive?",  tmg_shared_pid_aliveP, 1, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);

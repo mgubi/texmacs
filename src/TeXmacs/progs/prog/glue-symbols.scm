@@ -221,6 +221,8 @@
 "mcp-stdin-read"
 "mcp-stdin-eof?"
 "mcp-stdout-write"
+"mcp-json-valid?"
+"shared-pid-alive?"
 "tt-exists?"
 "tt-dump"
 "tt-font-name"

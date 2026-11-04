@@ -64,39 +64,8 @@
         ((func? t 'json-boolean 1) (== (cadr t) "true"))
         (else default)))
 
-(define json-max-depth 512)
-
-(define (json-balanced? s)
-  ;; is @s one object or array, with its brackets and quotes matching, nested
-  ;; at most json-max-depth deep, and nothing after it? (The reader of C++ is
-  ;; lenient: it reads some text which is not JSON, and it crashes on a
-  ;; nesting of hundreds of thousands of levels; this is checked first.)
-  (let ((n (string-length s)))
-    (let loop ((i 0) (depth 0) (in-string? #f) (state 'start))
-      ;; state: start (nothing yet), open (inside the value), done (closed)
-      (if (>= i n)
-          (and (== state 'done) (not in-string?))
-          (let ((c (string-ref s i)))
-            (cond (in-string?
-                   (cond ((char=? c #\\) (loop (+ i 2) depth #t state))
-                         ((char=? c #\") (loop (+ i 1) depth #f state))
-                         (else (loop (+ i 1) depth #t state))))
-                  ((memv c '(#\space #\tab #\newline #\return))
-                   (loop (+ i 1) depth #f state))
-                  ((== state 'done) #f)
-                  ((and (== state 'start) (not (memv c '(#\{ #\[)))) #f)
-                  ((char=? c #\") (loop (+ i 1) depth #t state))
-                  ((memv c '(#\{ #\[))
-                   (and (< depth json-max-depth)
-                        (loop (+ i 1) (+ depth 1) #f 'open)))
-                  ((memv c '(#\} #\]))
-                   (and (> depth 0)
-                        (loop (+ i 1) (- depth 1) #f
-                              (if (== depth 1) 'done 'open))))
-                  (else (loop (+ i 1) depth #f state))))))))
-
 (define (json-parse s)
-  (and (string? s) (!= s "") (json-balanced? s)
+  (and (string? s) (!= s "") (mcp-json-valid? s)
        (catch #t
          (lambda () (tree->stree (json->typed-tree s)))
          (lambda args #f))))
@@ -361,6 +330,14 @@
   ;; url, so that open-doc! refuses it. Wildcards in a name are plain.)
   (system->url path))
 
+(define (dotdot-in-path? path)
+  ;; is there a component `..' in @path?
+  (let loop ((l (string-tokenize-by-char
+                 (string-replace path "\\" "/") #\/)))
+    (cond ((null? l) #f)
+          ((== (car l) "..") #t)
+          (else (loop (cdr l))))))
+
 (define (colon-in-path? path)
   ;; (after the letter of a drive, as in C:\dir)
   (let ((rest (if (and (> (string-length path) 1) (== (string-ref path 1) #\:))
@@ -375,26 +352,36 @@
     (list-find (buffer-list) (lambda (b) (== (url->string b) name)))))
 
 (define (open-doc! path)
-  (let* ((p (canonical-path path)) (old (find-doc path)))
+  ;; The file that is checked is the file that is loaded: the canonical path
+  ;; (symbolic links resolved) of a file which exists; a path with a
+  ;; component `..' is refused (it would be resolved, in a url, by
+  ;; names that do not exist).
+  (let* ((old (find-doc path)))
     (cond (old old)
+          ((dotdot-in-path? path)
+           (tool-error "a path with a component `..' is not accepted"))
           ((colon-in-path? path)
            (tool-error "a path with a colon (:) cannot be opened: TeXmacs urls use it as a separator"))
-          ((not (path-allowed? p))
-           (tool-error (string-append "not allowed: " path
-                                      " is outside the folders of this server")))
-          ((not (url-exists? (path-url path)))
-           (tool-error (string-append "no such file: " path)))
           (else
-            (let* ((u0 (path-url path))
-                   (bu (or (find-buffer u0)
-                           (begin (load-buffer u0) (find-buffer u0)))))
-              (when (not bu)
-                (tool-error (string-append "could not open " path)))
-              (set! mcp-doc-count (+ mcp-doc-count 1))
-              (let ((d (list (string-append "d" (number->string mcp-doc-count))
-                             bu p)))
-                (set! mcp-docs (append mcp-docs (list d)))
-                d))))))
+            (let ((p (shared-real-path path)))
+              (cond ((or (not (string? p)) (== p ""))
+                     (tool-error (string-append "no such file: " path)))
+                    ((not (path-allowed? p))
+                     (tool-error (string-append "not allowed: " path
+                                                " is outside the folders of this server")))
+                    ((colon-in-path? p)
+                     (tool-error "a path with a colon (:) cannot be opened: TeXmacs urls use it as a separator"))
+                    (else
+                      (let* ((u0 (path-url p))
+                             (bu (or (find-buffer u0)
+                                     (begin (load-buffer u0) (find-buffer u0)))))
+                        (when (not bu)
+                          (tool-error (string-append "could not open " path)))
+                        (set! mcp-doc-count (+ mcp-doc-count 1))
+                        (let ((d (list (string-append "d" (number->string mcp-doc-count))
+                                       bu p)))
+                          (set! mcp-docs (append mcp-docs (list d)))
+                          d)))))))))
 
 (define (require-doc ref)
   ;; the document @ref (an id or a path), opened if it is a path
@@ -660,7 +647,7 @@
     (obj "documents" (arr mine)
          "open_elsewhere"
          (arr (map (lambda (e)
-                     (obj "path" (u8 (car e))
+                     (obj "path" (car e)
                           "person" (bool (cadr e))
                           "pid" (num (caddr e))))
                    (list-filter (shared-files-in-use)
@@ -1247,9 +1234,15 @@
                  (set! mcp-skipping? #f)
                  (loop (substring s (+ i 1) (string-length s)))))
               ((>= i 0)
-               (let ((line (take-line! (substring s 0 i))))
-                 (process-line! line)
-                 (loop (substring s (+ i 1) (string-length s)))))
+               (if (> (+ mcp-chunks-length i) mcp-max-line)
+                   (begin
+                     (mcp-log "a line is too long, dropped")
+                     (set! mcp-chunks '())
+                     (set! mcp-chunks-length 0)
+                     (send! (error-message #f -32600 "message too long")))
+                   (let ((line (take-line! (substring s 0 i))))
+                     (process-line! line)))
+               (loop (substring s (+ i 1) (string-length s))))
               (else
                 (set! mcp-chunks (cons s mcp-chunks))
                 (set! mcp-chunks-length (+ mcp-chunks-length (string-length s)))

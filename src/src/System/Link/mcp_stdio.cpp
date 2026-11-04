@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 
 #ifndef OS_MINGW
@@ -26,6 +27,9 @@
 static int  mcp_in = -1;        // the protocol input (the original stdin)
 static int  mcp_out= -1;        // the protocol output (the original stdout)
 static bool mcp_eof= false;
+static string mcp_log_path;                 // the log file ("" if none)
+static int  mcp_ticks= 0;
+static off_t MCP_LOG_CAP= 4 * 1024 * 1024;   // (TEXMACS_MCP_LOG_CAP: the tests)
 
 void
 mcp_stdio_setup (string log_file) {
@@ -45,7 +49,7 @@ mcp_stdio_setup (string log_file) {
     char* tmp= as_charp (log_file);
     // (a log of more than 4 MB is kept as mcp.log.1, replacing the older one)
     struct stat st;
-    if (stat (tmp, &st) == 0 && st.st_size > 4 * 1024 * 1024) {
+    if (stat (tmp, &st) == 0 && st.st_size > MCP_LOG_CAP) {
       char* old= as_charp (log_file * ".1");
       rename (tmp, old);
       tm_delete_array (old);
@@ -53,6 +57,9 @@ mcp_stdio_setup (string log_file) {
     log= open (tmp, O_WRONLY | O_CREAT | O_APPEND, 0600);
     tm_delete_array (tmp);
   }
+  mcp_log_path= log_file;
+  if (getenv ("TEXMACS_MCP_LOG_CAP") != NULL && atoi (getenv ("TEXMACS_MCP_LOG_CAP")) > 0)
+    MCP_LOG_CAP= (off_t) atoi (getenv ("TEXMACS_MCP_LOG_CAP"));
   if (log < 0) log= open ("/dev/null", O_WRONLY);
   if (log >= 0) { dup2 (log, 1); dup2 (log, 2); close (log); }
   signal (SIGPIPE, SIG_IGN);
@@ -75,9 +82,29 @@ mcp_stdio_active () {
   return mcp_out >= 0;
 }
 
+#ifndef OS_MINGW
+// A log which grew over the cap during the run is kept as mcp.log.1 (the
+// older one is replaced) and a new one is started.
+static void
+mcp_rotate_log () {
+  if (N(mcp_log_path) == 0) return;
+  struct stat st;
+  if (fstat (1, &st) != 0 || !S_ISREG (st.st_mode) || st.st_size <= MCP_LOG_CAP)
+    return;
+  char* cur= as_charp (mcp_log_path);
+  char* old= as_charp (mcp_log_path * ".1");
+  rename (cur, old);
+  int log= open (cur, O_WRONLY | O_CREAT | O_APPEND, 0600);
+  if (log >= 0) { dup2 (log, 1); dup2 (log, 2); close (log); }
+  tm_delete_array (cur);
+  tm_delete_array (old);
+}
+#endif
+
 string
 mcp_stdin_read () {
 #ifndef OS_MINGW
+  if (++mcp_ticks % 64 == 0) mcp_rotate_log ();
   if (mcp_in < 0 || mcp_eof) return "";
   struct pollfd p;
   p.fd= mcp_in; p.events= POLLIN; p.revents= 0;
@@ -126,4 +153,109 @@ mcp_stdout_write (string s) {
   (void) s;
   return false;
 #endif
+}
+
+/******************************************************************************
+* A strict JSON check
+******************************************************************************/
+
+#include <math.h>
+
+namespace {
+  struct json_check {
+    const char* s;
+    int n, i;
+    json_check (const char* s2, int n2): s (s2), n (n2), i (0) {}
+    void blank () {
+      while (i < n && (s[i]==' ' || s[i]=='\t' || s[i]=='\n' || s[i]=='\r')) i++;
+    }
+    bool lit (const char* w) {
+      int k= (int) strlen (w);
+      if (i + k > n || strncmp (s + i, w, k) != 0) return false;
+      i += k; return true;
+    }
+    bool str () {                         // at the opening quote
+      i++;
+      while (i < n) {
+        unsigned char c= s[i++];
+        if (c == '"') return true;
+        if (c == '\\') {
+          if (i >= n) return false;
+          char e= s[i++];
+          if (e == 'u') {
+            for (int k= 0; k < 4; k++, i++)
+              if (i >= n || !isxdigit ((unsigned char) s[i])) return false;
+          }
+          else if (!strchr ("\"\\/bfnrt", e)) return false;
+        }
+      }
+      return false;
+    }
+    bool number () {
+      int b= i;
+      if (i < n && s[i] == '-') i++;
+      if (i >= n) return false;
+      if (s[i] == '0') i++;
+      else if (s[i] >= '1' && s[i] <= '9') while (i < n && isdigit ((unsigned char) s[i])) i++;
+      else return false;
+      if (i < n && s[i] == '.') {
+        i++;
+        if (i >= n || !isdigit ((unsigned char) s[i])) return false;
+        while (i < n && isdigit ((unsigned char) s[i])) i++;
+      }
+      if (i < n && (s[i] == 'e' || s[i] == 'E')) {
+        i++;
+        if (i < n && (s[i] == '+' || s[i] == '-')) i++;
+        if (i >= n || !isdigit ((unsigned char) s[i])) return false;
+        while (i < n && isdigit ((unsigned char) s[i])) i++;
+      }
+      char buf[64];
+      int len= i - b;
+      if (len >= 64) return false;
+      memcpy (buf, s + b, len); buf[len]= '\0';
+      return isfinite (strtod (buf, NULL));
+    }
+    bool value (int depth) {
+      blank ();
+      if (i >= n) return false;
+      char c= s[i];
+      if (c == '"') return str ();
+      if (c == 't') return lit ("true");
+      if (c == 'f') return lit ("false");
+      if (c == 'n') return lit ("null");
+      if (c == '{' || c == '[') {
+        if (depth >= 512) return false;
+        char close= (c == '{')? '}': ']';
+        i++; blank ();
+        if (i < n && s[i] == close) { i++; return true; }
+        while (true) {
+          blank ();
+          if (c == '{') {
+            if (i >= n || s[i] != '"' || !str ()) return false;
+            blank ();
+            if (i >= n || s[i] != ':') return false;
+            i++;
+          }
+          if (!value (depth + 1)) return false;
+          blank ();
+          if (i >= n) return false;
+          if (s[i] == ',') { i++; continue; }
+          if (s[i] == close) { i++; return true; }
+          return false;
+        }
+      }
+      return number ();
+    }
+  };
+}
+
+bool
+mcp_json_valid (string t) {
+  json_check c (&(t[0]), N(t));
+  if (N(t) == 0) return false;
+  c.blank ();
+  if (c.i >= c.n || (c.s[c.i] != '{' && c.s[c.i] != '[')) return false;
+  if (!c.value (0)) return false;
+  c.blank ();
+  return c.i == c.n;
 }

@@ -37,6 +37,7 @@ void   local_close (int id);
 
 // Helpers of the shared files: the process, the per-user folder, paths
 int    shared_process_id ();
+bool   shared_pid_alive (int pid);          // does a process with that id exist?
 string shared_real_path (string path);  // canonical path, "" if none
 string shared_user_dir ();              // per-user folder (0700), "" if none
 tree   shared_list_dir (string dir);    // the names in a folder (a tuple)

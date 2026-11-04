@@ -28,4 +28,10 @@ string mcp_stdin_read ();       // the bytes available now, or ""
 bool   mcp_stdin_eof ();        // the end of the input was reached
 bool   mcp_stdout_write (string s); // all of s on the protocol output
 
+// Is s one JSON object or array, strictly (literals, numbers that fit a
+// double, strings and their escapes, brackets), nested at most 512 deep,
+// with nothing after it? The reader of the protocol (json->typed-tree) is
+// lenient and crashes on a nesting of hundreds of thousands of levels.
+bool   mcp_json_valid (string s);
+
 #endif // MCP_STDIO_H

@@ -15,6 +15,9 @@
 #   launcher   the script TeXmacs/bin/texmacs keeps stdin for --mcp
 #   robust     utf8 and newlines in every format, odd paths, TEXMACS_MCP_ROOTS,
 #              sections in concatenations, bad arguments and messages, limits
+#   hostdeath  a host killed with kill -9 leaves the list of open files
+#   stalled    a host stopped with SIGSTOP stays listed, the server is not blocked
+#   logcap     the log is rotated during the run
 #   outputs    outline and references cut and continued; a vanished client
 #
 # Every process is stopped above TM_TEST_RSS_KB (default 2 GB) and after
@@ -28,7 +31,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs shared mcp-host unshared
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared hostdeath stalled
 status=0
 for name in "$@"; do
   w="$run/$name"

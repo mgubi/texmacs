@@ -1571,6 +1571,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(mcp-json-valid? <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|mcp_json_valid> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(shared-pid-alive? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_pid_alive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(tt-exists? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
