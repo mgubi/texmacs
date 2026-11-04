@@ -20,7 +20,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tex-env-name s)
-  (if (string? s) (string-replace s "-" "") s))
+  ;; the name of an environment is written in \begin{...}: a character which
+  ;; is not a letter, a digit or one of * _ : . @ cannot be in it
+  (if (string? s)
+      (list->string
+       (filter (lambda (c) (or (char-alphabetic? c) (char-numeric? c)
+                               (in? c '(#\* #\_ #\: #\. #\@))))
+               (string->list s)))
+      s))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface for unicode output

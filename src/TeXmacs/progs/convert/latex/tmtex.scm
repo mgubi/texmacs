@@ -963,9 +963,21 @@
 (define (tmtex-new-line l)
   (if (tmtex-math-mode?) (tmtex-next-line l) (tex-apply '!newline)))
 
+;; The value of a length, a language or a column format is written as it is
+;; in \hspace{...}, \foreignlanguage{...}...: only the characters which such
+;; a value can have are kept, so that it cannot end its argument.
+(define (tmtex-keep-chars s allowed)
+  (list->string
+   (filter (lambda (c) (or (char-alphabetic? c) (char-numeric? c)
+                           (in? c allowed)))
+           (string->list s))))
+
+(define (tmtex-safe-length s)
+  (tmtex-keep-chars s '(#\. #\+ #\- #\* #\/ #\space)))
+
 (tm-define (tmtex-decode-length len)
   ;; FIXME: should be completed
-  (with s (force-string len)
+  (with s (tmtex-safe-length (force-string len))
     (cond ((string-ends? s "fn")   (string-replace s "fn"   "em"))
           ((string-ends? s "tab")  (string-replace s "tab"  "em"))
           ((string-ends? s "spc")  (string-replace s "spc"  "em"))
@@ -1203,7 +1215,8 @@
         ((== s "amalg") "coprod")
         ((== s "pluscup") "uplus")
         ((== s ".") "bignone")
-        (else (string-append "big" s))))
+        ((== s (tmtex-keep-chars s '())) (string-append "big" s))
+        (else "bignone")))
 
 (define (tmtex-big l)
   (list (string->symbol (tmtex-big-decode (car l)))))
@@ -1493,10 +1506,21 @@
                 (cons (car ha) (tmtex-table-args-assemble
                                 (cdr lb) (cdr rb) (cdr ha)))))))
 
+;; The format of a column: a letter, perhaps with a width, as p{12cm}
+(define (tmtex-halign-safe h)
+  (let ((n (string-length h)))
+    (cond ((and (= n 1) (string-index "lcrLCRXPpmb" (string-ref h 0))) h)
+          ((and (> n 3) (string-index "pmbX" (string-ref h 0))
+                (== (string-ref h 1) #\{) (== (string-ref h (- n 1)) #\})
+                (== (tmtex-safe-length (substring h 2 (- n 1)))
+                    (substring h 2 (- n 1))))
+           h)
+          (else "l"))))
+
 (define (tmtex-table-args p)
   (let ((lb (p 'cols 'lborder))
         (rb (p 'cols 'rborder))
-        (l (p 'cols 'halign)))
+        (l (map tmtex-halign-safe (p 'cols 'halign))))
     (apply string-append
            (tmtex-table-args-assemble lb (cons (car lb) rb) l))))
 
@@ -1581,7 +1605,8 @@
   (set! x (tmlength->texlength x))
   (list (list '!begin "tmparsep" x) arg))
 
-(define (tmtex-make-lang val arg)
+(define (tmtex-make-lang val* arg)
+  (define val (if (string? val*) (tmtex-keep-chars val* '(#\_ #\-)) val*))
   (if (== val "verbatim")
     `(tt ,arg)
     (begin
@@ -1773,17 +1798,21 @@
 ;; LaTeX reads as arguments of \label, \ref, \cite, \bibitem...: a key
 ;; with a brace, a backslash, a comma, a percent sign, a hash, a space or
 ;; another special character would end the argument and let the rest of the
-;; key be read as LaTeX (\input{...}).  The letters, the digits and
-;; : - . _ / + stay as they are (so that the usual exports do not change),
-;; as do the characters beyond ASCII and the <name> and <#hex> notations of
-;; Cork; any other ASCII character becomes =XX, with XX its hexadecimal
-;; code, which is what = itself becomes too, so that two keys which differ
-;; give two keys which differ.  All keys go through this one function, so
+;; key be read as LaTeX (\input{...}).  Only the characters which end or
+;; change an argument are written in another way: \ { } % # ^ ~ , & " [ ]
+;; = and the control characters become =XX, with XX the hexadecimal code
+;; (= is one of them, so that two keys which differ give two keys which
+;; differ), and the <#hex> notation of a Cork character becomes =uXXXXXX
+;; (it holds a #).  Everything else stays as it is, such as the letters, the
+;; digits, : - . _ / + @ ' ( ) ; $ and the characters beyond ASCII, so that
+;; the keys of a BibTeX file used with \bibliography still match.  All keys go through this one function, so
 ;; that a reference still finds its label, a citation its \bibitem.
 
 (define (tmtex-ref-key-char-ok? c)
-  (or (char-alphabetic? c) (char-numeric? c) (> (char->integer c) 127)
-      (in? c '(#\: #\- #\. #\_ #\/ #\+))))
+  (let ((n (char->integer c)))
+    (and (> n 31) (!= n 127)
+         (not (in? c '(#\\ #\{ #\} #\% #\# #\^ #\~ #\, #\& #\"
+                       #\[ #\] #\=))))))
 
 (define (tmtex-ref-key-hex2 n)
   (let ((h "0123456789ABCDEF"))
@@ -1800,6 +1829,16 @@
            (loop (+ j 1)))
           (else #f))))
 
+(define (tmtex-ref-key-notation n)
+  ;; <#hex> holds a #: =u and six hexadecimal digits; <name> stays
+  (let ((h (substring n 2 (- (string-length n) 1))))
+    (if (and (string-starts? n "<#") (> (string-length h) 0)
+             (<= (string-length h) 6)
+             (null? (filter (lambda (c) (not (string-index "0123456789abcdefABCDEF" c)))
+                            (string->list h))))
+        (string-append "=u" (make-string (- 6 (string-length h)) #\0) h)
+        n)))
+
 (define (tmtex-ref-key x)
   (let* ((s (force-string x))
          (n (string-length s)))
@@ -1808,7 +1847,8 @@
           (apply string-append (reverse acc))
           (let* ((c (string-ref s i))
                  (j (and (== c #\<) (tmtex-ref-key-notation-end s i n))))
-            (cond (j (loop (+ j 1) (cons (substring s i (+ j 1)) acc)))
+            (cond (j (loop (+ j 1) (cons (tmtex-ref-key-notation
+                                           (substring s i (+ j 1))) acc)))
                   ((and (< (char->integer c) 128)
                         (or (not (tmtex-ref-key-char-ok? c)) (== c #\=)))
                    (loop (+ i 1)
@@ -1889,8 +1929,8 @@
 ;; A file name with a backslash, a brace or a hash cannot be written in
 ;; \includegraphics{...}: the image is then converted into a file with a
 ;; name of our own, as one which is not next to the target.
-(define (tmtex-file-name-safe? name)
-  (null? (filter (lambda (c) (or (in? c '(#\\ #\{ #\} #\#))
+(tm-define (tmtex-file-name-safe? name)
+  (null? (filter (lambda (c) (or (in? c '(#\\ #\{ #\} #\# #\^))
                                  (< (char->integer c) 32)))
                  (string->list name))))
 
@@ -2786,7 +2826,7 @@
   ;; an aligned for columns aligned right and left in turn, else an array
   (tmtex-env-set "mode" "math")
   (let* ((p (tmtable-parser (car l)))
-         (ha (p 'cols 'halign))
+         (ha (map tmtex-halign-safe (p 'cols 'halign)))
          (env (if (tmtex-aligned-columns? ha)
                   '(!begin "aligned")
                   `(!begin "array" ,(apply string-append ha))))
@@ -2878,10 +2918,22 @@
                      (s2 (tmtex-bib-max (cdr l))))
                 (if (< (string-length s1) (string-length s2)) s2 s1)))))
 
+;; the names of the styles and of the BibTeX files, in \bibliographystyle{...}
+;; and \bibliography{...}: a character which ends the argument or is read as
+;; LaTeX becomes an underscore
+(tm-define (tmtex-safe-file-names s)
+  (list->string
+   (map (lambda (c) (if (or (in? c '(#\\ #\{ #\} #\% #\# #\^ #\~ #\"))
+                            (< (char->integer c) 32) (== (char->integer c) 127))
+                        #\_ c))
+        (string->list s))))
+
 (tm-define (tmtex-biblio s l titled?)
   (if tmtex-indirect-bib?
-      (tex-concat (list (list 'bibliographystyle (force-string (cadr l)))
-                        (list 'bibliography (force-string (caddr l)))))
+      (tex-concat (list (list 'bibliographystyle
+                              (tmtex-safe-file-names (force-string (cadr l))))
+                        (list 'bibliography
+                              (tmtex-safe-file-names (force-string (caddr l))))))
       (let* ((doc (tmtex-bib-sub (cadddr l)))
              (max (tmtex-textual (tmtex-bib-max doc)))
              (tls tmtex-languages)
