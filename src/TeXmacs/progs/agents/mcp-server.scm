@@ -410,6 +410,15 @@
              "participants" (num (+ 1 (caddr i))))
         jnull)))
 
+(define (doc-agent-mode d)
+  ;; what the host of the file does with this agent's edits: propose (they
+  ;; become proposals of the person to accept), direct, read-only; direct
+  ;; when nobody else has the file
+  (let ((u (doc-url d)))
+    (if (shared-file-participant? u)
+        (let ((m (shared-agent-mode u))) (if m (symbol->string m) "unknown"))
+        "direct")))
+
 (define (doc-info d)
   (let ((u (doc-url d)))
     (obj "document" (doc-id d)
@@ -422,6 +431,7 @@
                                       (else '())))))
          "modified" (bool (buffer-modified? u))
          "shared" (doc-shared d)
+         "agent_mode" (doc-agent-mode d)
          "blocks" (num (tree-arity (doc-body d)))
          "hash" (hash-short (doc-body d)))))
 
@@ -2030,7 +2040,9 @@
 (define (defined-predicate d)
   ;; is the tag defined for the document: by its style (and packages) as this
   ;; process has loaded them, or by an assign of the document
-  (let ((locals (assigned-names (doc-body d))))
+  (let ((locals (if host-cache
+                    (append-map assigned-names-st (apply append host-cache))
+                    (assigned-names (doc-body d)))))
     (lambda (tag)
       (let ((name (symbol->string tag)))
         (or (and (member name locals) #t)
@@ -2249,8 +2261,21 @@
     (set! safety-doc #f)
     r))
 
+(define host-cache #f)   ; during the check of a host: the definitions of each block
+
+(define (assigned-names-st st)
+  (cond ((not (pair? st)) '())
+        ((and (eq? (car st) 'assign) (pair? (cdr st)) (string? (cadr st)))
+         (cons (cadr st) (append-map assigned-names-st (cddr st))))
+        (else (append-map assigned-names-st (cdr st)))))
+
 (define (assigns-before d i)
   ;; the definitions of the blocks before the block number @i
+  (if host-cache
+      (apply append (sublist host-cache 0 (min i (length host-cache))))
+      (assigns-before* d i)))
+
+(define (assigns-before* d i)
   (let loop ((l (tree-children (doc-body d))) (k 0) (acc '()))
     (if (or (null? l) (>= k i))
         acc
@@ -2423,7 +2448,7 @@
     (set! danger-cache (make-ahash-table))
     (set! def-cache (make-ahash-table))
     (set! void-cache (make-ahash-table))
-    (for (a (assign-nodes (doc-body d)))
+    (for (a (if host-cache (apply append host-cache) (assign-nodes (doc-body d))))
       (when (and (eq? (car a) 'assign) (pair? (cdr a)) (string? (cadr a)) (pair? (cddr a)))
         (ahash-set! macro-table (cadr a) (caddr a))))))
 
@@ -2939,6 +2964,16 @@
 (define (filter-live d nodes)
   (list-filter nodes (lambda (t) (and (tree? t) (inside-body? d t)))))
 
+(define (wait-for-markup! d s0)
+  ;; the host has made the proposal in its document and sends it: wait (at
+  ;; most 3 s) until the state of the document is not the state @s0 any more
+  (let* ((u (doc-url d)) (t0 (texmacs-time)))
+    (let loop ()
+      (shared-poll)
+      (let ((i (shared-file-info u)))
+        (when (and i (equal? (cadr i) s0) (< (- (texmacs-time) t0) 3000))
+          (loop))))))
+
 (define (finish-edit! d dist changed undo)
   ;; after the edit: wait for the host, say what happened. @changed is a
   ;; list of nodes, @undo the way to undo the step (or #f)
@@ -2947,11 +2982,33 @@
     (cond ((== outcome 'refused)
            (forget-steps! d)
            (with-buffer (doc-url d) (clear-undo-history))
-           (snapshot! d)
-           (obj "status" "refused"
-                "document" (doc-id d)
-                "reason" "the host (the TeXmacs of the person) refused the change: the document had changed too much around it. The document is back to what the host has; nothing of yours is kept. Read again and retry."
-                "hash" (hash-short body)))
+           (let ((v (shared-file-verdict (doc-url d))))
+             (when (and v (eq? (car v) 'proposed)) (wait-for-markup! d (cadddr v)))
+             (snapshot! d)
+             (cond
+               ((and v (eq? (car v) 'proposed))
+                (obj "status" "proposed"
+                     "document" (doc-id d)
+                     "proposal" (caddr v)
+                     "message" "the person's TeXmacs keeps your change as a proposal (old and new version side by side): the person accepts or rejects it. Your copy of the document is back to the host's, with the proposal in it. list_proposals tells what became of it; withdraw_proposal takes it back."
+                     "hash" (hash-short body)))
+               ((and v (eq? (car v) 'refused))
+                (obj "status" "refused"
+                     "document" (doc-id d)
+                     "reason" (u8 (string-append "the host (the person's TeXmacs) refused the change: "
+                                                  (caddr (car (caddr v)))
+                                                  (if (pair? (cdr (caddr v)))
+                                                      (string-append " (and " (number->string (length (cdr (caddr v)))) " more)")
+                                                      "")
+                                                  ". The document is back to what the host has; nothing of yours is kept."))
+                     "rules" (arr (map (lambda (r) (obj "rule" (car r) "level" (cadr r) "content" (u8 (caddr r))))
+                                       (caddr v)))
+                     "hash" (hash-short body)))
+               (else
+                 (obj "status" "refused"
+                      "document" (doc-id d)
+                      "reason" "the host (the TeXmacs of the person) refused the change: the document had changed too much around it. The document is back to what the host has; nothing of yours is kept. Read again and retry."
+                      "hash" (hash-short body))))))
           (else
             (when undo (push-step! d undo))
             (snapshot! d)
@@ -2969,6 +3026,96 @@
                   (if (< (length live) (length changed))
                       (list "message" "some of the changed nodes were changed again by someone else at the same time: read them again")
                       '()))))))))
+
+;;; The host's check of the patches of agents (the person's TeXmacs, see
+;;; shared-files.scm): the same rules, applied to the document before and
+;;; after a patch, which is applied to a copy (a tree shared with the
+;;; document, nothing is changed). The changed blocks are @range (first n-old
+;;; n-new); the violations of the blocks after, as written and as they expand,
+;;; that were not in the blocks before are the answer, as (rule level text).
+
+(define (violation-class r)
+  ;; (rule level) of the reason @r: the level is what a person could be asked
+  ;; to allow (style, links) or never (code, limits, mode)
+  (let ((has (lambda (s) (>= (string-search-forwards s 0 r) 0))))
+    (cond ((has "definitions of the document") (list "definitions" "style"))
+          ((or (has "budget") (has "digits") (has "at most") (has "loop") (has "nesting")
+               (has "too deep") (has "recursion"))
+           (list "limits" "limits"))
+          ((or (has "a call of the macro") (has "passes an argument") (has "runs commands"))
+           (list "dangerous-macro" "code"))
+          ((and (or (has "link") (has "hlink") (has "target"))
+                (not (has "runs a script")) (not (has "expands to an action")))
+           (list "link" "links"))
+          ((or (has "script") (has "action") (has "extern") (has "specific") (has "LaTeX")
+               (has "latex") (has "another program") (has "hybrid") (has "eval")
+               (has "another program"))
+           (list "code" "code"))
+          ((or (has "file") (has "image") (has "include") (has "a path")) (list "file" "links"))
+          ((or (has "character") (has "backslash")) (list "names" "links"))
+          ((or (has "defin") (has "alias") (has "not defined by the style") (has "unknown tag")
+               (has "package") (has "style"))
+           (list "style" "style"))
+          (else (list "other" "code")))))
+
+(define (range-blocks body range . new?)
+  ;; the blocks of @body in the range (the old ones, or the new ones)
+  (sublist (tree-children body) (car range)
+           (+ (car range) (if (pair? new?) (caddr range) (cadr range)))))
+
+(define (assign-signature-of blocks)
+  ;; (the blocks outside the range are the same in both: the definitions
+  ;; differ only if those of the blocks in it do)
+  (map-append assign-nodes blocks))
+
+(define (opaque-strees t)
+  (cond ((tree-atomic? t) '())
+        ((opaque-node? t) (list (tm->stree t)))
+        (else (append-map opaque-strees (tree-children t)))))
+
+(define (map-append f . ls) (apply append (apply map (cons f ls))))
+
+(define (host-block-violations d old new p n-old n-new)
+  (let* ((kn (sublist (tree-children new) p (+ p n-new)))
+         (ko (sublist (tree-children old) p (+ p n-old)))
+         (inew (map (lambda (k) (+ p k)) (iota n-new)))
+         (iold (map (lambda (k) (+ p k)) (iota n-old)))
+         (base (doc-base d)))
+    (reset-danger!)
+    (let* ((lit-new (map (lambda (b) (literal-violations (tm->stree b) base d)) kn))
+           (lit-old (map (lambda (b) (literal-violations (tm->stree b) base d)) ko))
+           (fresh (new-violations (apply append lit-old) (apply append lit-new))))
+      (cond
+        ((pair? fresh) fresh)
+        ((pair? (new-violations (append-map opaque-strees ko) (append-map opaque-strees kn)))
+         (list "it adds or changes code or text for another program (extern, script, latex, specific...): only the person writes that"))
+        (else
+          (let ((after (map-append (lambda (b i lit) (block-violations d b i lit)) kn inew lit-new)))
+            (cond ((null? after) '())
+                  ((over-budget? after) (list over-budget-reason))
+                  (else
+                    (new-violations
+                     (map-append (lambda (b i lit) (block-violations d b i lit)) ko iold lit-old)
+                     after)))))))))
+
+(tm-define (mcp-host-check u old new range)
+  ;; the new violations of the patched body @new (a tree) against @old, for
+  ;; the document @u: a list of (rule level text), empty if the change is fine
+  (let* ((d (list "host" u (url->system u)))
+         (_ (set! host-cache (map assign-nodes (tree-children old))))
+         (found (catch #t
+                  (lambda ()
+                    (if (!= (assign-signature-of (range-blocks old range))
+                            (assign-signature-of (range-blocks new range #t)))
+                        (list "it changes the definitions of the document")
+                        (host-block-violations d old new (car range) (cadr range) (caddr range))))
+                  (lambda args (set! host-cache #f) (apply throw args)))))
+    (reset-danger!)
+    (set! host-cache #f)
+    (map (lambda (r)
+           (let ((c (violation-class r)) (t (reason-text r)))
+             (list (car c) (cadr c) (if (> (string-length t) 400) (substring t 0 400) t))))
+         found)))
 
 ;;; Notes: what changed since the last call about the document
 
@@ -3382,6 +3529,78 @@
           (let ((r (finish-edit! d dist '() #f)))
             (apply obj (append (cdr r) (list "undone" (num n))))))))))
 
+;;; Proposals (the mode `propose' of the host: shared-files.scm)
+
+(define mcp-prop-seen (make-ahash-table))    ; "d1/p3" -> the status told
+
+(define (proposal-entries d)
+  ;; (id status index) of the proposals of this agent on the document
+  (if (shared-file-participant? (doc-url d))
+      (map (lambda (e) (list (car e) (cadr e) (caddr e)))
+           (or (shared-proposals (doc-url d)) '()))
+      '()))
+
+(define (proposal-key d id) (string-append (doc-id d) "/" id))
+
+(define (proposal-note d)
+  ;; what became of the proposals since the last call, or #f
+  (let ((l (list-filter (proposal-entries d)
+                        (lambda (e) (and (!= (cadr e) "pending")
+                                         (!= (ahash-ref mcp-prop-seen (proposal-key d (car e)))
+                                             (cadr e)))))))
+    (and (nnull? l)
+         (begin
+           (for (e l) (ahash-set! mcp-prop-seen (proposal-key d (car e)) (cadr e)))
+           (string-recompose
+            (map (lambda (e)
+                   (string-append "Your proposal " (car e) " was "
+                                  (cond ((== (cadr e) "accepted") "accepted by the person")
+                                        ((== (cadr e) "rejected") "rejected by the person")
+                                        ((== (cadr e) "withdrawn") "withdrawn")
+                                        (else "resolved by the person (changed, neither as proposed nor as before)"))
+                                  "."))
+                 l)
+            " ")))))
+
+(define (proposal-where d e)
+  (let ((i (caddr e)) (body (doc-body d)))
+    (if (and (>= i 0) (< i (tree-arity body)))
+        (let ((sec (section-of d (tree-ref body i))))
+          (apply obj (append (list "index" (num i))
+                             (if sec (list "section" (u8 sec)) '()))))
+        (obj "index" (num i)))))
+
+(define (tool-list-proposals args)
+  (let ((d (require-doc (opt-string args "document" #f))))
+    (doc-refresh! d)
+    (obj "document" (doc-id d)
+         "agent_mode" (doc-agent-mode d)
+         "proposals"
+         (arr (map (lambda (e)
+                     (ahash-set! mcp-prop-seen (proposal-key d (car e)) (cadr e))
+                     (obj "id" (car e) "status" (cadr e) "where" (proposal-where d e)))
+                   (proposal-entries d))))))
+
+(define (tool-withdraw-proposal args)
+  (let* ((d (editing-context args)) (u (doc-url d))
+         (id (opt-string args "id" #f)))
+    (when (not id) (tool-error "the argument `id' (a proposal of list_proposals) is needed"))
+    (let ((e (list-find (proposal-entries d) (lambda (e) (== (car e) id)))))
+      (when (not e) (tool-error (string-append "no proposal " id " of yours on this document")))
+      (when (== (cadr e) "pending")
+        (shared-file-send-withdraw u id)
+        (let ((t0 (texmacs-time)))
+          (let loop ()
+            (shared-poll)
+            (when (and (== (cadr (or (list-find (proposal-entries d) (lambda (x) (== (car x) id))) e)) "pending")
+                       (< (- (texmacs-time) t0) 5000))
+              (loop)))))
+      (let ((now (or (list-find (proposal-entries d) (lambda (x) (== (car x) id))) e)))
+        (ahash-set! mcp-prop-seen (proposal-key d id) (cadr now))
+        (obj "status" (if (== (cadr now) "pending") "pending" (cadr now))
+             "proposal" id
+             "document" (doc-id d))))))
+
 ;;; save, close, create
 
 (define (tool-save-document args)
@@ -3583,6 +3802,16 @@
                        (cons "expect" (prop "string" "The hash of the node, as read.")))
                  '("document" "node" "old" "new"))
          tool-edit-text #t)
+   (list "list_proposals" "Your pending proposals"
+         "When the person has the document open and its mode for agents is `propose' (see agent_mode in list_documents), each of your edits is kept as a proposal: old and new version side by side in the person's document, which they accept or reject. This lists yours: id, status (pending, accepted, rejected, withdrawn, resolved) and where (index of the block, section)."
+         (schema (list (cons "document" document-prop)) '("document"))
+         tool-list-proposals)
+   (list "withdraw_proposal" "Withdraw a pending proposal"
+         "Takes back a proposal that is still pending: the person's document goes back to the old version."
+         (schema (list (cons "document" document-prop)
+                       (cons "id" (prop "string" "The proposal (p1...), from the answer of the edit or from list_proposals.")))
+                 '("document" "id"))
+         tool-withdraw-proposal #t)
    (list "undo_agent" "Undo your own last steps"
          "Undoes the last steps (tool calls that edited) of this session in the document, newest first, as one step. It never touches the changes of others: it is refused, and nothing is done, if someone changed what a step made since."
          (schema (list (cons "document" document-prop)
@@ -3637,7 +3866,7 @@
 (define latest-version "2025-06-18")
 
 (define server-instructions
-  "TeXmacs documents. Start with list_documents or open_document, then get_outline to see the structure of a long document, then read (format text is the cheapest; texmacs is exact) the blocks you need, using the handles of earlier results. find locates text, tags (tag:theorem), labels and sections; get_references lists labels, references and citations and the broken ones. A file the person has open in TeXmacs is joined live, so reads show their latest edits. Editing: replace, insert, delete and edit_text (the best for changing a word or a sentence) take the handle of a node and, for safety, `expect', the hash you read it with: if someone changed the node meanwhile you get a `conflict' with its current content and nothing is changed. Each call is one undo step, all or nothing; undo_agent undoes yours. Answers may carry a `note' when the document changed since your last call: read again what it names. save_document writes the file.")
+  "TeXmacs documents. Start with list_documents or open_document, then get_outline to see the structure of a long document, then read (format text is the cheapest; texmacs is exact) the blocks you need, using the handles of earlier results. find locates text, tags (tag:theorem), labels and sections; get_references lists labels, references and citations and the broken ones. A file the person has open in TeXmacs is joined live, so reads show their latest edits. Editing: replace, insert, delete and edit_text (the best for changing a word or a sentence) take the handle of a node and, for safety, `expect', the hash you read it with: if someone changed the node meanwhile you get a `conflict' with its current content and nothing is changed. Each call is one undo step, all or nothing; undo_agent undoes yours. Answers may carry a `note' when the document changed since your last call, or when the person accepted or rejected a proposal: read again what it names. When the person has the document open, your edits may come back as `status: proposed' (the person decides; see list_proposals and withdraw_proposal), or as `refused' with the rules in `rules'; `agent_mode' of list_documents says which. save_document writes the file.")
 
 (define (result-message id result)
   (obj "jsonrpc" "2.0" "id" id "result" result))
@@ -3676,7 +3905,10 @@
             (when (and (editing-tool? tool) (mcp-read-only?)) (require-writable))
             (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
                    (d (and dref (find-doc dref)))
-                   (note (and d (begin (doc-refresh! d) (change-note d))))
+                   (note (and d (begin (doc-refresh! d)
+                                       (let ((a (change-note d)) (b (proposal-note d)))
+                                         (cond ((and a b) (string-append a " " b))
+                                               (else (or a b)))))))
                    (r ((list-ref tool 4) args)))
               (text-result (json-write (if (and note (func? r 'attr))
                                            (append r (list "note" note))

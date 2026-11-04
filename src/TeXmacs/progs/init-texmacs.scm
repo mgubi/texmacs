@@ -376,9 +376,11 @@
 (lazy-define (utils relate shared-files) shared-file-try-join shared-file-opened
              shared-file-leave shared-file-participant? shared-file-save-request
              shared-file-saved shared-file? shared-file-info shared-files-list
-             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use shared-set-agent! shared-agent? shared-agent-id? shared-file-stat shared-collect-mark shared-collect-restore!)
+             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use shared-set-agent! shared-agent? shared-agent-id? shared-file-stat shared-collect-mark shared-collect-restore!
+             shared-agent-mode shared-set-agent-mode! shared-file-agents shared-proposals shared-proposal-resolve! shared-file-send-withdraw shared-file-verdict shared-changed-blocks shared-file-gate-stats)
+(lazy-define (version version-compare) compare-versions version-normalize)
 ;(display "Booting the MCP server\n")
-(lazy-define (agents mcp-server) mcp-server-start mcp-handle-line mcp-filter-unknown-names)
+(lazy-define (agents mcp-server) mcp-server-start mcp-handle-line mcp-filter-unknown-names mcp-host-check)
 ;(display "Booting partial document facilities\n")
 (lazy-define (part part-shared) buffer-initialize buffer-notify)
 (lazy-menu (part part-menu) document-master-menu)

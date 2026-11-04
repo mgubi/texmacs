@@ -40,6 +40,41 @@
               (reinit-plugin-cache))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Agents on a shared file (docs/mcp-server.md)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (agents-here?)
+  (and (shared-file? (current-buffer))
+       (nnull? (shared-file-agents (current-buffer)))))
+
+(define (pending-proposals)
+  (list-filter (or (shared-proposals (current-buffer)) '())
+               (lambda (e) (== (cadr e) "pending"))))
+
+(tm-menu (agents-menu)
+  ((check "Propose edits (I accept or reject them)" "v"
+          (== (shared-agent-mode (current-buffer)) 'propose))
+   (shared-set-agent-mode! (current-buffer) 'propose))
+  ((check "Let them edit directly" "v"
+          (== (shared-agent-mode (current-buffer)) 'direct))
+   (shared-set-agent-mode! (current-buffer) 'direct))
+  ((check "Read only (refuse their edits)" "v"
+          (== (shared-agent-mode (current-buffer)) 'read-only))
+   (shared-set-agent-mode! (current-buffer) 'read-only))
+  ---
+  (for (e (pending-proposals))
+    (-> (eval (string-append "Proposal " (car e)))
+        ("Accept" (shared-proposal-resolve! (current-buffer) (car e) 'new))
+        ("Reject" (shared-proposal-resolve! (current-buffer) (car e) 'old))))
+  (when (nnull? (pending-proposals))
+    ("Accept all"
+     (for-each (lambda (e) (shared-proposal-resolve! (current-buffer) (car e) 'new))
+               (pending-proposals)))
+    ("Reject all"
+     (for-each (lambda (e) (shared-proposal-resolve! (current-buffer) (car e) 'old))
+               (pending-proposals)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Tools menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -76,6 +111,9 @@
           ("Pop server settings" (interactive email-settings))))
   (-> "Project"
       (link project-manage-menu))
+  (if (agents-here?)
+      (-> "Agents"
+          (link agents-menu)))
   (-> "Statistics"
       ("Count characters" (show-character-count))
       ("Count words" (show-word-count))

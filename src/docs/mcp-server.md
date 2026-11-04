@@ -40,8 +40,8 @@ to it over its standard input and output. `env` is optional.
 To work on a file together with a person who has it open in TeXmacs, turn on the
 preference `share-open-files` in both (TeXmacs and the home the server uses).
 
-Not yet: agent modes and proposals, `check`, `render`, `export` and resource
-notifications (steps 4 to 6 of the design). The interface has no tool
+Not yet: `check`, `render`, `export` and resource
+notifications (steps 5 and 6 of the design; step 4, modes and proposals, is below). The interface has no tool
 that evaluates code, starts a plugin session, or touches preferences or the
 network (design 5.6). The real guarantee about files is weaker than "nothing
 but documents": `open_document` (and any tool given a path) opens **any file the
@@ -143,6 +143,47 @@ a string nor a number, or a missing or non-string method, is -32600.
   When the MCP process is the only one, it hosts the file, and when the person
   opens it later hosting moves to them (shared-files.md).
 
+## Modes and proposals (step 4, stage A)
+
+When the person's TeXmacs hosts the file, the host (not the agent, not the document)
+decides, per file, what the patches of agents become. `agent_mode` of
+`list_documents` and `open_document` tells: `propose` (the default when a person
+has the file open), `direct`, `read-only`; `direct` also when nobody else has the
+file (the agent edits directly, as before) and `unknown` before the host has said.
+The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
+
+- **Edit tools** (`replace`, `insert`, `delete`, `edit_text`, `undo_agent`) answer:
+  - `applied` (direct mode);
+  - `proposed`, with `proposal` (`p3`): the person's TeXmacs keeps the change as a
+    proposal in the document (both versions side by side, the markup of Version >
+    Compare); the agent's copy goes back to the host's document and contains the
+    proposal. The step cannot be undone with `undo_agent`;
+  - `refused`, with `reason` and `rules`, a list of `{rule, level, content}`:
+    `read-only` (mode), or a rule of the content filter applied by the host
+    (`definitions`, `link`, `file`, `names`, `dangerous-macro`, `code`, `limits`,
+    `style`, `pending` = the blocks hold a pending proposal), with the level:
+    `style` and `links` are what a person might be asked to allow later, `code`,
+    `limits` and `mode` never.
+- **`list_proposals`** (`document`): `proposals`: `id`, `status` (`pending`,
+  `accepted`, `rejected`, `withdrawn`, `resolved` = the person changed the markup
+  otherwise), `where` (`index` of the block, `section`). **`withdraw_proposal`**
+  (`document`, `id`): takes a pending proposal back; the person's document goes back
+  to the old version.
+- **Notes.** When the person accepted or rejected a proposal, the agent's next answer
+  has a `note` ("Your proposal p1 was accepted by the person."), once.
+- **The host's filter.** The same rules as the agent's own check, run by the host on
+  the patched document (`mcp-host-check`): see shared-files.md. They apply to
+  proposals too: refused content never becomes a proposal. The agent's own check still
+  runs first, so a normal agent never meets the host's refusal; it matters for a client
+  that speaks the local link itself.
+- **Proposals in the saved file**: kept as markup, so a saved file holds both versions
+  (valid and readable); ids and authors live in the host's records only.
+- Tests: `tests/mcp/check.sh propose` (the host is a headless process that plays the
+  person: `SH_INTERACTIVE`, commands `mode`, `accept`, `reject`, `save`...), and
+  `tests/shared/check.sh agent agentplain` for the host with a hand-written agent.
+- Deferred (stage B): trusted agents, the person's dialog and MCP elicitation for
+  edits that break a rule.
+
 ## The tools
 
 | Tool | Arguments | Result |
@@ -163,6 +204,8 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
 | `delete` | `document`, `node`, `expect?` | the same, `changed` empty |
 | `edit_text` | `document`, `node`, `old`, `new`, `expect?` | the same |
 | `undo_agent` | `document`, `steps?` (1) | the same, with `undone` |
+| `list_proposals` | `document` | `proposals` (`id`, `status`, `where`), `agent_mode` |
+| `withdraw_proposal` | `document`, `id` | `status` (`withdrawn`, or the status it had), `proposal` |
 | `save_document` | `document` | `saved` (or `pending`), `path`, `shared` |
 | `close_document` | `document`, `discard?` | `closed`; refused with unsaved changes unless `discard` |
 | `create_document` | `path` (absolute, `.tm`, new, in an existing folder), `style?` (`generic`), `content?`, `format?` | the facts of the new document, opened |

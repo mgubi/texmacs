@@ -12,6 +12,24 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 5 November 2026
+
+- **Agents on a shared file: modes, proposals, the host's filter** (desktop
+  applications; step 4, stage A, of the MCP server design). When the person's
+  TeXmacs hosts a file that an agent (`texmacs --mcp`) edits, the person decides what
+  the agent's edits become, per file, from **Tools > Agents**: `propose` (the
+  default: each edit is kept as a proposal in the document, old and new version side
+  by side with the markup of Version > Compare, to accept or reject there or with the
+  Version tools; the agent hears of the outcome), `direct`, or `read-only`. The host
+  also applies the content rules of the MCP server to the agent's patches itself, so
+  an agent that bypasses `texmacs --mcp` is filtered too; a refusal says the rule, its
+  level and the content. New tools `list_proposals` and `withdraw_proposal`,
+  `agent_mode` in `list_documents`, and the edit tools answer `proposed`. A saved
+  file with pending proposals holds both versions. Also fixed: under s7 a shared
+  document of more than 40 blocks was cut when it was sent to a participant. See
+  [mcp-server.md](mcp-server.md) and [shared-files.md](shared-files.md); tests
+  `tests/shared` (`agent`, `agentplain`) and `tests/mcp` (`propose`).
+
 ## 4 November 2026
 
 - **`texmacs --mcp`** (desktop applications, first step, read only): TeXmacs

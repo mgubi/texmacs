@@ -186,10 +186,12 @@ def make_env(w, name, share="off"):
     return env, home
 
 
-def start_other(w, env, script, file):
+def start_other(w, env, script, file, extra=None):
     """the other TeXmacs (a headless process with a script of tests/mcp)"""
     sync = os.path.join(w, "sync")
     e = dict(env)
+    if extra:
+        e.update(extra)
     e.update(SH_ROLE="B", SH_SYNC=sync, SH_FILE=file, SH_OUT=os.path.join(w, "out-B"),
              SH_DIR=os.path.join(TOP, "tests", "shared"))
     log = open(os.path.join(w, "log-B"), "wb")
@@ -264,7 +266,8 @@ def s_protocol(w):
     check("tools listed", names == sorted(["list_documents", "open_document", "get_outline",
                                            "read", "find", "get_references", "replace", "insert",
                                            "delete", "edit_text", "undo_agent", "save_document",
-                                           "close_document", "create_document"]))
+                                           "close_document", "create_document", "list_proposals",
+                                           "withdraw_proposal"]))
     check("tools have schemas", all(t.get("inputSchema", {}).get("type") == "object" and
                                     t.get("description") for t in tools))
     r = m.request("nothing/here")
@@ -1008,7 +1011,7 @@ def s_readonly(w):
     m.initialize()
     r = m.request("tools/list")
     names = [t["name"] for t in r["result"]["tools"]]
-    check("read-only: the editing tools are not listed", names == ["list_documents", "open_document", "get_outline", "read", "find", "get_references"])
+    check("read-only: the editing tools are not listed", names == ["list_documents", "open_document", "get_outline", "read", "find", "get_references", "list_proposals"])
     m.tool("open_document", path=f)
     for tool, args in (("replace", {"document": "d1", "node": "n1", "content": "x"}),
                        ("insert", {"document": "d1", "where": "last", "content": "x"}),
@@ -1212,6 +1215,147 @@ def s_edit_shared(w):
     e, r = m.tool("replace", document="d1", node=dest(), content="https://other.org")
     n3 = peers()
     check("shared: an accepted edit is sent once (%d, %d)" % (n2, n3), not e and n3 == n2 + 1)
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+    out = open(os.path.join(w, "out-B")).read() if os.path.exists(os.path.join(w, "out-B")) else ""
+    check("the other TeXmacs passed its checks", out == "ok")
+
+
+def s_propose(w):
+    """the person's TeXmacs (a second process, interactive) applies the modes to the
+    agent: propose (proposals the person accepts or rejects, the agent withdraws
+    them and hears of the outcome), direct, read-only"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "shared.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_INTERACTIVE": "1"})
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins as a participant", not e and v["shared"]["role"] == "participant")
+    def mode():
+        return m.tool("list_documents")[1]["documents"][0].get("agent_mode")
+    got = poll(lambda: mode() == "propose", 10)
+    check("list_documents tells the mode: propose (the default with a person)", got)
+    st = [0]
+    def handles():
+        return m.tool("read", document="d1", format="text")[1]["children"]
+    def proposals_of_host():
+        try:
+            os.remove(os.path.join(w, "sync", "proposals"))
+        except OSError:
+            pass
+        hostcmd(w, st, "proposals")
+        wait_file(os.path.join(w, "sync", "proposals"), 10)
+        time.sleep(0.1)
+        return open(os.path.join(w, "sync", "proposals")).read()
+    k = handles()
+    # 1. an edit becomes a proposal
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="First", new="Initial", expect=k[0]["hash"])
+    check("propose: the edit is proposed", not e and r["status"] == "proposed" and r.get("proposal") == "p1")
+    hb = host_body(w, st)
+    check("propose: the host's document holds both versions", "version-both" in hb and "First" in hb and "Initial" in hb)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("propose: the agent's copy is the host's, with the proposal", "version-both" in t["content"])
+    e, lp = m.tool("list_proposals", document="d1")
+    check("list_proposals: one pending, with its place", not e and len(lp["proposals"]) == 1 and lp["proposals"][0]["status"] == "pending"
+          and lp["proposals"][0]["where"]["index"] == 0)
+    e, u = m.tool("undo_agent", document="d1")
+    check("a proposed change cannot be undone by undo_agent", e)
+    # 2. the person accepts: the agent's next answer has a note
+    hostcmd(w, st, "accept p1")
+    time.sleep(0.5)
+    e, t = m.tool("read", document="d1", format="text")
+    check("accepted: the note tells the agent (once)", "proposal p1 was accepted" in t.get("note", ""))
+    e, lp = m.tool("list_proposals", document="d1")
+    check("accepted: listed as accepted", not e and lp["proposals"][0]["status"] == "accepted")
+    hb = host_body(w, st)
+    check("accepted: the new text in the host's document", "Initial paragraph." in hb and "version-both" not in hb)
+    e, t = m.tool("read", document="d1", format="text")
+    check("and not again", "proposal p1" not in t.get("note", ""))
+    k = t["children"]
+    # 3. reject
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Initial", new="Other")
+    check("a second proposal", not e and r["status"] == "proposed" and r["proposal"] == "p2")
+    hostcmd(w, st, "reject p2")
+    time.sleep(0.5)
+    e, t = m.tool("read", document="d1", format="text")
+    check("rejected: the note, and the old text", "proposal p2 was rejected" in t.get("note", "") and "Initial paragraph." in t["content"])
+    k = t["children"]
+    # 4. withdraw
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Initial", new="Third")
+    check("a third proposal", not e and r["status"] == "proposed" and r["proposal"] == "p3")
+    e, r = m.tool("withdraw_proposal", document="d1", id="p3")
+    check("withdraw_proposal", not e and r["status"] == "withdrawn")
+    hb = host_body(w, st)
+    check("withdrawn: the host's document is clean", "version-both" not in hb and "Initial paragraph." in hb)
+    e, r = m.tool("withdraw_proposal", document="d1", id="p9")
+    check("an unknown proposal is an error", e)
+    # 5. insertion and deletion are proposals too
+    e, r = m.tool("insert", document="d1", where="last", content="Added block.")
+    check("an insertion is proposed", not e and r["status"] == "proposed")
+    hostcmd(w, st, "accept p4")
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    check("accepted insertion", "Added block." in hb and "version-both" not in hb)
+    k = handles()
+    e, r = m.tool("delete", document="d1", node=k[-1]["handle"])
+    check("a deletion is proposed", not e and r["status"] == "proposed")
+    hb = host_body(w, st)
+    check("both versions while pending", "version-both" in hb and "Added block." in hb)
+    hostcmd(w, st, "accept p5")
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    check("accepted deletion", "Added block." not in hb and "version-both" not in hb)
+    # 6. the person's undo after accepting brings the proposal back, not the agent's undone
+    hostcmd(w, st, "undo")
+    hb = host_body(w, st)
+    check("the person's undo of the accept restores the markup", "version-both" in hb)
+    hostcmd(w, st, "redo")
+    # 7. direct
+    hostcmd(w, st, "mode direct")
+    poll(lambda: mode() == "direct", 10)
+    check("the agent sees the new mode: direct", mode() == "direct")
+    k = handles()
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Initial", new="Direct")
+    check("direct: applied", not e and r["status"] == "applied")
+    hb = host_body(w, st)
+    check("direct: in the host's document", "Direct paragraph." in hb and "version-both" not in hb)
+    # 8. read-only
+    hostcmd(w, st, "mode read-only")
+    poll(lambda: mode() == "read-only", 10)
+    k = handles()
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Direct", new="Nothing")
+    check("read-only: refused with the rule", not e and r["status"] == "refused" and r["rules"][0]["rule"] == "read-only"
+          and "read-only" in r["reason"])
+    hb = host_body(w, st)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("read-only: both copies unchanged", "Nothing" not in hb and "Nothing" not in t["content"] and "Direct paragraph." in hb)
+    # 9. back to propose; the saved file with a pending proposal is readable
+    hostcmd(w, st, "mode propose")
+    poll(lambda: mode() == "propose", 10)
+    k = handles()
+    e, r = m.tool("edit_text", document="d1", node=k[1]["handle"], old="Second", new="Pending")
+    check("a pending proposal", not e and r["status"] == "proposed")
+    os.remove(os.path.join(w, "sync", "saved")) if os.path.exists(os.path.join(w, "sync", "saved")) else None
+    hostcmd(w, st, "save")
+    time.sleep(1.0)
+    txt = open(f, errors="replace").read()
+    check("the saved file holds both versions of the pending proposal", "version-both" in txt and "Second" in txt and "Pending" in txt)
+    # 10. an agent that closes with a pending proposal: the proposal stays in the person's document
+    e, r = m.tool("close_document", document="d1", discard=True)
+    check("the agent leaves", not e)
+    hb = host_body(w, st)
+    check("the pending proposal stays in the person's document", "version-both" in hb)
     sync_set(w, "c-done")
     check("exit 0", m.close() == 0)
     try:
@@ -2274,7 +2418,7 @@ def s_static(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

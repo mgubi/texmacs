@@ -322,8 +322,16 @@
 ;; Messages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (msg-text msg)
+  ;; s7 prints at most 40 elements of a list unless print-length is raised: a
+  ;; document of more than 40 blocks was cut when it was sent
+  (if (s7-scheme?)
+      (let-temporarily (((*s7* 'print-length) 9223372036854775807))
+        (object->string msg))
+      (object->string msg)))
+
 (define (msg-send link msg)
-  (local-send link (object->string msg)))
+  (local-send link (msg-text msg)))
 
 (define (msg-receive link)
   ;; the next message of a link, or #f
@@ -937,6 +945,326 @@
   (sort l priority-less?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Agents: the mode of a file, the filter, proposals (docs/mcp-server.md)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The host of a file the person has open decides what the patches of the
+;; participants marked as agents (ids `agent.*') do: `propose' (the default:
+;; each patch becomes a proposal in the document, old and new version side by
+;; side, with the markup of Version > Compare), `direct' (applied) or
+;; `read-only' (refused). The mode is in the state of the host for the file,
+;; not in the document; the agent is told. The content rules of the MCP
+;; server are applied by the host to the patches of agents in every mode
+;; (mcp-host-check); a refusal carries structured reasons (rule level text),
+;; the level being style, links, code or limits. A host which is not
+;; interactive (an agent's process, a test) applies the patches as before.
+
+(define (agent-peer? peer) (shared-agent-id? (peer-id peer)))
+
+(define (agent-gated? sf peer)
+  (and (sf-get sf 'interactive) (agent-peer? peer)))
+
+(tm-define (shared-agent-mode name)
+  (:synopsis "The mode (propose, direct, read-only) the host of @name applies to agents")
+  (and-with sf (sf-by-name name)
+    (if (sf-host? sf)
+        (or (sf-get sf 'agent-mode) (if (sf-get sf 'interactive) 'propose 'direct))
+        (sf-get sf 'agent-mode))))
+
+(tm-define (shared-set-agent-mode! name mode)
+  (:synopsis "The host of @name: choose the mode for the agents (propose, direct, read-only)")
+  (and-with sf (sf-by-name name)
+    (and (sf-host? sf) (memq mode '(propose direct read-only))
+         (begin
+           (sf-put! sf 'agent-mode mode)
+           (for (p (sf-get sf 'peers))
+             (when (agent-peer? p) (msg-send (peer-link p) (list 'mode mode))))
+           #t))))
+
+(tm-define (shared-file-agents name)
+  (:synopsis "The ids of the agents that have @name open with this host")
+  (with sf (sf-by-name name)
+    (if (and sf (sf-host? sf))
+        (map peer-id (list-filter (sf-get sf 'peers) agent-peer?))
+        '())))
+
+;; The blocks that a patch changes: (first n-old n-new), #f if none, 'bad
+(tm-define (shared-changed-blocks old new)
+  (if (not (and (tm-is? old 'document) (tm-is? new 'document)))
+      'bad
+      (let* ((ko (tree-children old)) (kn (tree-children new))
+             (lo (length ko)) (ln (length kn))
+             (same? (lambda (a b) (or (tree-eq? a b) (== (tree-hash a) (tree-hash b))))))
+        (let loop ((a ko) (b kn) (p 0))
+          (if (and (pair? a) (pair? b) (same? (car a) (car b)))
+              (loop (cdr a) (cdr b) (+ p 1))
+              (if (and (null? a) (null? b))
+                  #f
+                  (let sloop ((ra (reverse a)) (rb (reverse b)) (s 0))
+                    (if (and (pair? ra) (pair? rb) (same? (car ra) (car rb)))
+                        (sloop (cdr ra) (cdr rb) (+ s 1))
+                        (list p (- lo p s) (- ln p s))))))))))
+
+(define (version-tag-in? st)
+  (and (pair? st)
+       (or (and (memq (car st) '(version-both version-old version-new)) #t)
+           (list-or (map version-tag-in? (cdr st))))))
+
+(define (blocks-stree body p n)
+  (map tm->stree (sublist (tree-children body) p (+ p n))))
+
+(define (agent-filter u old new range)
+  ;; the reasons (rule level text) why the content rules refuse the change, or '()
+  (catch #t
+    (lambda () (mcp-host-check u old new range))
+    (lambda args
+      (list (list "check" "code" "the content check of the host failed: the change is refused")))))
+
+(define (agent-gate sf peer p)
+  (let* ((t0 (texmacs-time)) (r (agent-gate* sf peer p)))
+    (sf-put! sf 'gate-count (+ 1 (or (sf-get sf 'gate-count) 0)))
+    (sf-put! sf 'gate-ms (+ (- (texmacs-time) t0) (or (sf-get sf 'gate-ms) 0)))
+    r))
+
+(tm-define (shared-file-gate-stats name)
+  (:synopsis "For the tests: how many patches of agents the host checked, and the time (ms)")
+  (and-with sf (sf-by-name name)
+    (list (or (sf-get sf 'gate-count) 0) (or (sf-get sf 'gate-ms) 0))))
+
+(define (agent-gate* sf peer p)
+  ;; what the host does with the patch @p of the agent @peer: 'apply, (refuse
+  ;; reason ...) or (propose range new-body)
+  (let ((mode (shared-agent-mode (sf-buffer sf))) (u (sf-buffer sf)))
+    (if (== mode 'read-only)
+        (list 'refuse (list "read-only" "mode"
+                            "the person has made this document read-only for agents"))
+        (let ((mp (split-patch p 0)) (bp (split-patch p 1)))
+          (cond
+            ((or (not mp) (not bp))
+             (list 'refuse (list "patch" "code" "a patch of a kind that the host does not accept from an agent")))
+            ((patch-modifies? mp)
+             (list 'refuse (list "style" "style" "the style and the settings of the document belong to the person")))
+            (else
+              (let* ((old (sf-body sf)) (new (patch-apply old bp))
+                     (range (shared-changed-blocks old new)))
+                (cond
+                  ((not range) 'apply)
+                  ((== range 'bad)
+                   (list 'refuse (list "patch" "code" "the patch does not keep the document a sequence of blocks")))
+                  ((list-or (map version-tag-in? (blocks-stree old (car range) (cadr range))))
+                   (list 'refuse (list "pending" "mode"
+                                       "the blocks hold version markup (a pending proposal): resolve or withdraw it first")))
+                  (else
+                    (let ((viol (agent-filter u old new range)))
+                      (cond ((pair? viol) (cons 'refuse viol))
+                            ((== mode 'direct) 'apply)
+                            (else (list 'propose range new)))))))))))))
+
+;; Proposals: a pending proposal is a block of the document that holds the
+;; markup of Version > Compare (version-both with the old and the new
+;; blocks, or the word by word differences of compare-versions when one block
+;; replaces one block), so a saved document with pending proposals is a valid,
+;; readable document: both versions are in the file. The author and the id
+;; are in the host's records (not in the document): after a reload the markup
+;; is plain version markup, to be resolved with the Version tools.
+
+(define (proposal-markup old-sts new-sts)
+  (define (docof l) (if (null? l) '(document (version-suppressed)) (cons 'document l)))
+  (define (coarse) (list 'version-both (docof old-sts) (docof new-sts)))
+  (if (and (pair? old-sts) (null? (cdr old-sts)) (pair? new-sts) (null? (cdr new-sts)))
+      (or (catch #t
+            (lambda ()
+              (with r (compare-versions (car old-sts) (car new-sts))
+                (and (version-tag-in? r) r)))
+            (lambda args #f))
+          (coarse))
+      (coarse)))
+
+(define (vresolve st k)
+  ;; the stree @st with the version @k (0 old, 1 new) of every difference;
+  ;; 'none for what is absent in that version
+  (cond ((not (pair? st)) st)
+        ((memq (car st) '(version-both version-old version-new))
+         (vresolve (list-ref st (+ k 1)) k))
+        ((eq? (car st) 'version-suppressed) 'none)
+        ((eq? (car st) 'document)
+         (let loop ((cs (cdr st)) (acc '()))
+           (if (null? cs)
+               (if (null? acc) 'none (cons 'document (reverse acc)))
+               (let ((r (vresolve (car cs) k)))
+                 (cond ((eq? r 'none) (loop (cdr cs) acc))
+                       ((and (pair? (car cs)) (memq (car (car cs)) '(version-both version-old version-new))
+                             (pair? r) (eq? (car r) 'document))
+                        (loop (cdr cs) (append (reverse (cdr r)) acc)))
+                       (else (loop (cdr cs) (cons r acc))))))))
+        (else (cons (car st)
+                    (map (lambda (c) (let ((r (vresolve c k))) (if (eq? r 'none) "" r)))
+                         (cdr st))))))
+
+(define (resolved-blocks st k)
+  ;; the blocks that replace the block @st
+  (let ((r (vresolve st k)))
+    (cond ((eq? r 'none) '())
+          ((and (pair? st) (memq (car st) '(version-both version-old version-new))
+                (pair? r) (eq? (car r) 'document))
+           (map version-normalize (cdr r)))
+          (else (list (version-normalize r))))))
+
+(define (prop-get pr k) (ahash-ref pr k))
+(define (prop-put! pr k v) (ahash-set! pr k v))
+
+(define (proposal-tree sf pr)
+  ;; the block of the proposal, or #f when it is not in the document
+  (let ((t (tree-pointer->tree (prop-get pr 'ptr))) (body (sf-body sf)))
+    (and (tree? t) (not (tm-is? t 'uninit)) (not (tree-eq? t body))
+         (let ((up (tree-up t))) (and up (tree-eq? up body)))
+         t)))
+
+(define (proposal-index sf pr)
+  (let ((t (proposal-tree sf pr)))
+    (if t (tree-index t) (or (prop-get pr 'index) -1))))
+
+(define (proposal-find sf id)
+  (with l (list-filter (or (sf-get sf 'proposals) '()) (lambda (pr) (== (prop-get pr 'id) id)))
+    (and (nnull? l) (car l))))
+
+(define (proposal-pending? pr) (== (prop-get pr 'status) "pending"))
+
+(define (proposal-resolve! sf pr which status)
+  ;; replace the markup of the proposal by its old or its new version (an edit
+  ;; of the person), and note the outcome
+  (let ((t (proposal-tree sf pr)))
+    (when (and t (version-tag-in? (tm->stree t)))
+      (let ((blocks (resolved-blocks (tm->stree t) (if (== which 'new) 1 0)))
+            (parent (tree-up t)) (i (tree-index t)))
+        (prop-put! pr 'index i)
+        (with-buffer (sf-buffer sf)
+          (start-editing)
+          (cond ((null? blocks) (tree-remove parent i 1))
+                (else
+                  (tree-assign t (stree->tree (car blocks)))
+                  (when (pair? (cdr blocks))
+                    (tree-var-insert parent (+ i 1)
+                                     (stree->tree (cons 'document (cdr blocks)))))))
+          (end-editing))))
+    (prop-put! pr 'status status)
+    (sf-put! sf 'prop-changed #t)
+    (host-flush! sf)))
+
+(tm-define (shared-proposals name)
+  (:synopsis "The proposals of agents on @name: (id status index owner)")
+  (and-with sf (sf-by-name name)
+    (if (sf-host? sf)
+        (map (lambda (pr) (list (prop-get pr 'id) (prop-get pr 'status)
+                                (proposal-index sf pr) (prop-get pr 'owner)))
+             (reverse (or (sf-get sf 'proposals) '())))
+        (or (sf-get sf 'proposals) '()))))
+
+(tm-define (shared-proposal-resolve! name id which)
+  (:synopsis "The person on @name: accept (which = new) or reject (old) the proposal @id")
+  (and-with sf (sf-by-name name)
+    (and (sf-host? sf)
+         (with pr (proposal-find sf id)
+           (and pr (proposal-pending? pr)
+                (begin
+                  (proposal-resolve! sf pr which (if (== which 'new) "accepted" "rejected"))
+                  #t))))))
+
+(define (proposals-classify! sf pr)
+  ;; the markup of a pending proposal is gone (the person used the Version
+  ;; tools, or edited): was the new or the old version kept?
+  (let* ((body (sf-body sf))
+         (sts (map tm->stree (tree-children body)))
+         (has (lambda (seq)
+                (let ((n (length seq)))
+                  (and (> n 0) (>= (length sts) n)
+                       (let loop ((l sts))
+                         (cond ((< (length l) n) #f)
+                               ((equal? (sublist l 0 n) seq) #t)
+                               (else (loop (cdr l))))))))))
+    (prop-put! pr 'status
+               (cond ((has (prop-get pr 'new)) "accepted")
+                     ((has (prop-get pr 'old)) "rejected")
+                     (else "resolved")))))
+
+(define (proposals-poll! sf)
+  (for (pr (or (sf-get sf 'proposals) '()))
+    (when (proposal-pending? pr)
+      (let ((t (proposal-tree sf pr)))
+        (if (and t (version-tag-in? (tm->stree t)))
+            (prop-put! pr 'index (tree-index t))
+            (proposals-classify! sf pr))))))
+
+(define (proposals-sync! sf)
+  ;; tell each agent about its proposals when they changed
+  (when (nnull? (or (sf-get sf 'proposals) '()))
+    (proposals-poll! sf))
+  (let ((sent (or (sf-get sf 'prop-sent)
+                  (let ((t (make-ahash-table))) (sf-put! sf 'prop-sent t) t))))
+    (for (p (sf-get sf 'peers))
+      (when (agent-peer? p)
+        (let ((l (map (lambda (pr) (list (prop-get pr 'id) (prop-get pr 'status)
+                                         (proposal-index sf pr)))
+                      (reverse (list-filter (or (sf-get sf 'proposals) '())
+                                            (lambda (pr) (== (prop-get pr 'owner) (peer-id p))))))))
+          (when (!= l (or (ahash-ref sent (peer-id p)) '()))
+            (ahash-set! sent (peer-id p) l)
+            (msg-send (peer-link p) (list 'proposals l))))))))
+
+(define (proposal-create! sf peer range new)
+  ;; the patch of the agent @peer becomes a proposal in the document; gives
+  ;; its id
+  (let* ((u (sf-buffer sf)) (body (sf-body sf))
+         (p (car range)) (n-old (cadr range)) (n-new (caddr range))
+         (old-sts (blocks-stree body p n-old))
+         (new-sts (blocks-stree new p n-new))
+         (n (+ 1 (or (sf-get sf 'prop-counter) 0)))
+         (id (string-append "p" (number->string n)))
+         (markup (proposal-markup old-sts new-sts))
+         (au (author-of sf (peer-id peer)))
+         (pr (make-ahash-table)))
+    (sf-put! sf 'prop-counter n)
+    (with-buffer u
+      (start-editing)
+      (with-author au
+        (cond ((> n-old 0)
+               (tree-assign (tree-ref body p) (stree->tree markup))
+               (when (> n-old 1) (tree-remove body (+ p 1) (- n-old 1))))
+              (else
+                (tree-var-insert body p (stree->tree (list 'document markup))))))
+      (end-editing))
+    (prop-put! pr 'id id)
+    (prop-put! pr 'owner (peer-id peer))
+    (prop-put! pr 'status "pending")
+    (prop-put! pr 'ptr (tree->tree-pointer (tree-ref body p)))
+    (prop-put! pr 'index p)
+    (prop-put! pr 'old old-sts)
+    (prop-put! pr 'new new-sts)
+    (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
+      ;; (the resolved ones are kept for a while, so that the agent hears of them)
+      (sf-put! sf 'proposals
+               (let loop ((l l) (resolved 0))
+                 (cond ((null? l) '())
+                       ((proposal-pending? (car l)) (cons (car l) (loop (cdr l) resolved)))
+                       ((>= resolved 30) (loop (cdr l) resolved))
+                       (else (cons (car l) (loop (cdr l) (+ resolved 1))))))))
+    id))
+
+(tm-define (shared-file-send-withdraw name id)
+  (:synopsis "The agent: withdraw its proposal @id from the host of @name")
+  (and-with sf (sf-by-name name)
+    (and (sf-get sf 'conn)
+         (begin (msg-send (sf-get sf 'conn) (list 'withdraw id)) #t))))
+
+(tm-define (shared-file-verdict name)
+  (:synopsis "The agent: what the host answered to its last refused patch: (kind id data), once")
+  (and-with sf (sf-by-name name)
+    (with v (sf-get sf 'verdict)
+      (sf-put! sf 'verdict #f)
+      v)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The host: its own changes, the patches of the others
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -986,7 +1314,24 @@
                      (when r (stat! 'rebased))
                      r))
                   (else #f))))
-    (cond ((and p (patch-applicable? p (live-current-document key)))
+    (cond ((and p (patch-applicable? p (live-current-document key))
+                (agent-gated? sf peer)
+                (with g (agent-gate sf peer p)
+                  (cond ((eq? g 'apply) #f)
+                        ((eq? (car g) 'refuse)
+                         (sf-stat! sf 'agent-refused)
+                         (msg-send (peer-link peer) (list 'refused id cur (cdr g)))
+                         #t)
+                        (else
+                          (sf-stat! sf 'agent-proposed)
+                          (let ((pid (proposal-create! sf peer (cadr g) (caddr g))))
+                            ;; (the agent takes its change back first, then
+                            ;; hears of the markup that the host made)
+                            (msg-send (peer-link peer) (list 'proposed id cur pid))
+                            (host-flush! sf))
+                          #t))))
+           #t)
+          ((and p (patch-applicable? p (live-current-document key)))
            ;; (applied to the buffer first: if that fails nothing moves, but
            ;; the buffer and the live document differ: start again from the
            ;; buffer, so that the host heals)
@@ -1050,6 +1395,9 @@
                                   (lambda (p) (!= (peer-id p) id)))
                      (list (list id link interactive seq pid))))
     (host-send-welcome sf link base id interactive pid inflight)
+    (when (shared-agent-id? id)
+      (msg-send link (list 'mode (shared-agent-mode (sf-buffer sf))))
+      (when (sf-get sf 'prop-sent) (ahash-remove! (sf-get sf 'prop-sent) id)))
     (send-roster sf)
     ;; an interactive process hosts rather than a headless one: it is
     ;; offered the file
@@ -1063,6 +1411,10 @@
          (host-save sf))
         ((func? msg 'leave)
          (drop-peer! sf peer))
+        ((func? msg 'withdraw)
+         (with pr (proposal-find sf (cadr msg))
+           (when (and pr (proposal-pending? pr) (== (prop-get pr 'owner) (peer-id peer)))
+             (proposal-resolve! sf pr 'old "withdrawn"))))
         ((func? msg 'resync)
          (host-flush! sf)
          (msg-send (peer-link peer)
@@ -1084,6 +1436,7 @@
       (sf-debug "peer " (peer-id p) " is gone\n")
       (drop-peer! sf p)))
   (host-check-lock! sf)
+  (proposals-sync! sf)
   ;; a headless host retries to give the file to an interactive participant
   (let ((now (texmacs-time)))
     (when (> now (or (sf-get sf 'offer-at) 0))
@@ -1478,12 +1831,18 @@
                    (else
                      (participant-apply-remote! sf (scheme->patch psexp)
                                                 from to author)))))
-          ((func? msg 'refused)
-           (with (tag id cur) msg
+          ((func? msg 'mode)
+           (sf-put! sf 'agent-mode (cadr msg)))
+          ((func? msg 'proposals)
+           (sf-put! sf 'proposals (cadr msg)))
+          ((or (func? msg 'refused) (func? msg 'proposed))
+           (with (tag id cur data) (if (= (length msg) 3) (append msg (list #f)) msg)
              (when (== id (sf-get sf 'inflight))
                (sf-stat! sf 'rolled-back)
                (sf-debug "my patch was refused\n")
-               (report-lost! sf (sf-get sf 'pending))
+               (if data
+                   (sf-put! sf 'verdict (list tag id data cur))
+                   (report-lost! sf (sf-get sf 'pending)))
                (when (not (rollback-pending! sf))
                  (participant-request-resync! sf))
                (when (!= cur (live-current-state key))

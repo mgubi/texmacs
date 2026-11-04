@@ -4,7 +4,7 @@ Several TeXmacs processes of the same user which open the same file stay in
 sync, with no server. This is part 1a of step 1 of the
 [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design)
 (sections 3 and 4.4). Not in this part: the cursors of the other
-participants, `texmacs --mcp`, agents and proposals, the menus.
+participants, `texmacs --mcp`, the menus (but see Agents below).
 
 **Switch.** The preference `share-open-files` (`on`/`off`), default **off**:
 nothing changes for a user who does not turn it on. There is no menu yet:
@@ -306,6 +306,74 @@ number for each).
   buffer killed together): `notify-buffer-closed`, which `remove_buffer`
   calls, makes the process leave the sharing as above.
 
+## Agents: modes, the host's filter, proposals
+
+(Step 4, stage A, of the MCP server design.) A participant whose id begins
+with `agent.` (the process of `texmacs --mcp` takes such ids, `shared-set-agent!`)
+is an agent. When the **host is interactive** (the person's TeXmacs; a test sets
+it with `shared-set-interactive!`), the host decides what to do with each patch of
+an agent, in `host-handle-patch*` (`agent-gate`). Patches of other participants
+are never touched. When no interactive TeXmacs hosts the file (the agent's own
+process hosts, or only headless ones), the agent edits directly, as before.
+
+- **Mode per file**, kept by the host (`shared-set-agent-mode!`, `shared-agent-mode`;
+  not in the document, not settable by an agent, told to the agents with the message
+  `(mode m)`): `propose` (the default when the host is interactive), `direct` or
+  `read-only`. The menu **Tools > Agents** (shown when an agent has the file) sets
+  it, with a check mark, and lists the pending proposals to accept or reject one by
+  one or all.
+- **The filter.** In every mode the host runs the content rules of the MCP server
+  (`mcp-host-check` in `agents/mcp-server.scm`, see mcp-server.md) on the patch: the
+  patch is applied to the body as a pure function (`patch-apply`, which shares the
+  unchanged blocks), `shared-changed-blocks` finds the top-level blocks that differ
+  (by sharing, then by hash), and the violations of the new blocks (as written and as
+  they expand) that the old blocks did not have are the refusal. The same functions
+  as the agent's own check are used, not copies; the definitions (`assign`, `set`,
+  `reset`) of the changed blocks must be the same before and after, and code nodes
+  (`extern`, `script`, `latex`, `specific`...) cannot be added or changed. A patch that
+  changes the style or the initial environment, or has an odd shape, is refused. A
+  failure of the check refuses the patch.
+- **A refusal** is the message `(refused id state ((rule level text) ...))`: `rule`
+  names the rule (definitions, link, file, names, dangerous-macro, code, limits,
+  style, read-only, pending, other), `level` says what a person could be asked to
+  allow (`style`, `links`) or never (`code`, `limits`, `mode`), `text` is the reason
+  with the content concerned. The agent takes its change back (as for any refusal)
+  and `shared-file-verdict` gives it the reasons once. (Stage B uses the levels.)
+- **Propose.** The patch is not applied. The host answers `(proposed id state pid)`
+  (the agent takes its change back), then edits its own document, as the agent's
+  author (the person's undo skips it): the changed blocks are replaced by one block
+  that holds the markup of Version > Compare. When one block replaces one block it
+  is the word-by-word difference of `compare-versions`; otherwise a single
+  `version-both` with the old and the new blocks (`(version-suppressed)` for an
+  empty side). The agent receives that edit as a normal patch of the host. The
+  person accepts or rejects with **Tools > Agents** (`shared-proposal-resolve!`,
+  which replaces the markup by the new or the old version as an edit of the person,
+  so the person's undo brings the markup back) or with the Version tools (the host
+  notices that the markup is gone and finds out which version was kept: accepted,
+  rejected, or resolved when it was edited). A patch of an agent that touches blocks
+  with version markup is refused (`pending`).
+- **The host's records** (`shared-proposals`): id (`p1`...), owner, status
+  (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are
+  kept (30) so that the agent hears. The host sends each agent the list of its
+  proposals when it changes (`(proposals ((id status index) ...))`); the agent
+  withdraws one with `(withdraw id)` (`shared-file-send-withdraw`).
+- **Proposals in the saved file.** The markup is part of the document, so a saved
+  file with pending proposals holds both versions and is valid and readable (it is
+  the markup of Version > Compare, which the Version tools resolve). The author and
+  the id are not in the file: they are in the host's records, so after a reload the
+  markup is plain version markup. Keeping them only on screen was rejected: a
+  document saved by the person's Save, by an autosave, or closed, would lose the
+  agent's work silently; both versions in the file lose nothing. The cost is that a
+  saved file can hold markup that the agent no longer owns.
+- **Cost on the host.** The check runs once per patch of an agent, in the person's
+  window: about 1 ms for a small document, 35 to 45 ms for a document of 5000
+  paragraphs (one walk of the document to find its definitions), less if they are
+  few; `shared-file-gate-stats` gives the count and the time.
+
+A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
+elements, so a document of more than 40 blocks was cut when it was sent to a
+participant (`msg-text` now raises the print length). The tests had small documents.
+
 ## Tests
 
 `tests/shared/check.sh [scenario...]` runs each scenario (`s-<name>.scm`) with
@@ -326,7 +394,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) and `agentplain` (a participant that is not an agent is not filtered). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with

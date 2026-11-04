@@ -8,6 +8,13 @@
 ;;   pause / resume     stop / go on serving the links
 ;;   undo               undo the last step of its own
 ;;   stats              write the number of patches refused to the sync file stats
+;; With SH_INTERACTIVE set the process counts as the person's (interactive): it
+;; applies the modes to agents (docs/shared-files.md), and
+;;   mode M             propose, direct or read-only
+;;   accept ID / reject ID   resolve the proposal ID of an agent
+;;   proposals          write (id status index owner) of the proposals to the sync file proposals
+;;   save               save the buffer
+;;   gate               write the count and the time (ms) the host spent checking agents' patches
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (typing! i text)
@@ -29,8 +36,17 @@
           ((== name "pause") (shared-pause! #t))
           ((== name "resume") (shared-pause! #f))
           ((== name "undo") (with-buffer (the-name) (undo 0)))
+          ((== name "redo") (with-buffer (the-name) (redo 0)))
           ((== name "peers")
            (sync-write! "peers" (number->string (shared-stat 'peer-patches))))
+          ((== name "mode") (shared-set-agent-mode! (the-name) (string->symbol arg)))
+          ((== name "accept") (shared-proposal-resolve! (the-name) arg 'new))
+          ((== name "reject") (shared-proposal-resolve! (the-name) arg 'old))
+          ((== name "proposals")
+           (sync-write! "proposals" (object->string (shared-proposals (the-name)))))
+          ((== name "save") (save-buffer-main (the-name)))
+          ((== name "gate")
+           (sync-write! "gate" (object->string (shared-file-gate-stats (the-name)))))
           ((== name "stats")
            (sync-write! "stats" (object->string (list (shared-stat 'refused)))))
           (else (display* "unknown command " c "\n")))))
@@ -51,7 +67,8 @@
 
 (run-steps
  (append
-  (list (act "load" (load-buffer FILE))
+  (list (act "interactive" (when (getenv "SH_INTERACTIVE") (shared-set-interactive! #t)))
+        (act "load" (load-buffer FILE))
         (act "host" (check "the other TeXmacs hosts" (== (role-of) 'host)))
         (act "go" (sync-set! "h-loaded")))
   (command-steps 60)))
