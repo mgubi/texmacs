@@ -45,6 +45,8 @@
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
         (convert mathml tmmath)
+        (convert html tmhtml)
+        (convert html htmlout)
         (tools spell spell-lantool)
         (tools ai ai-translate)))
 
@@ -1863,6 +1865,50 @@
   (list->string (list-filter (map integer->char (iota 256))
                              (lambda (c) (nin? c (list #\< #\>))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; HTML export: attribute values and addresses
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A value of the document which ends up in an attribute (a color, a length,
+;; the address of a link, of an image) cannot end the attribute and start
+;; another one (onmouseover=...), nor a declaration of the style; a link or an
+;; image does not run javascript:.
+(define (html-of t) (export t "html-snippet"))
+
+(define (test-html-escape)
+  (check-group "html export: attributes and addresses")
+  (check= (html-of '(with "color" "red" "text")) "<font color=\"red\">text</font>")
+  (check= (html-of '(with "color" "red\" onmouseover=\"alert(1)" "text"))
+          "<font color=\"inherit\">text</font>")
+  (check= (html-of '(hlink "t" "http://a/b?x=1&y=2"))
+          "<a href=\"http://a/b?x=1&amp;y=2\">t</a>")
+  (check= (html-of '(hlink "t" "x\" onclick=\"y"))
+          "<a href=\"x&quot; onclick=&quot;y\">t</a>")
+  (check= (html-of '(hlink "t" "javascript:alert(1)")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" " Java&#9;script&colon;alert(1)"))
+          "<a href=\" Java&amp;#9;script&amp;colon;alert(1)\">t</a>")
+  (check= (tmhtml-safe-url " Java&#9;script&colon;alert(1)") "#")
+  (check= (html-of '(hlink "t" "data:text/html,x")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" "sec.html#a")) "<a href=\"sec.html#a\">t</a>")
+  (check= (html-of '(html-div-class "c\" onclick=\"x" "t"))
+          "<div class=\"c&quot; onclick=&quot;x\">\n  t\n</div>")
+  ;; the colors and the lengths of the styles (the tables of the editor
+  ;; need the expansion of its style macros, and give nothing here)
+  (check= (tmcolor->htmlcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "pastel red") "#ffdfdf")
+  (check= (tmbgcolor->htmlbgcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "red\" onmouseover=\"alert(1)") "inherit")
+  (check= (tmcolor->htmlcolor "red; position: fixed") "inherit")
+  (check= (tmbgcolor->htmlbgcolor "red}</style><script>") "inherit")
+  (check= (tmcolor->htmlcolor "url(javascript:alert(1))") "inherit")
+  (check= (tmlength->htmllength "1cm") "1cm")
+  (check= (tmlength->htmllength "1cm; position: fixed") #f)
+  (check= (tmhtml-safe-url "javascript:x" #t) "#")
+  (check= (tmhtml-safe-url "data:image/png;base64,AA" #t) "data:image/png;base64,AA")
+  (check= (tmhtml-safe-url "data:image/svg+xml,x" #t) "#")
+  (check= (tmhtml-safe-url "images/a.png" #t) "images/a.png")
+  (check= (htmlout-attribute-value "a\"b<c>d&e&amp;f&#9;") "a&quot;b&lt;c&gt;d&amp;e&amp;f&#9;"))
+
 (define (test-serialize-special)
   (check-group "special characters")
   ;; tm: the control characters are written \@ + code
@@ -2491,7 +2537,7 @@
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
-                  test-serialize-special test-big-document test-pdf-export
+                  test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))
