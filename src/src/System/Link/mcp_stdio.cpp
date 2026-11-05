@@ -112,14 +112,13 @@ mcp_rotate_log () {
 }
 #endif
 
-string
-mcp_stdin_read () {
+static string
+mcp_stdin_poll (int ms) {
 #if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
-  if (++mcp_ticks % 64 == 0) mcp_rotate_log ();
   if (mcp_in < 0 || mcp_eof) return "";
   struct pollfd p;
   p.fd= mcp_in; p.events= POLLIN; p.revents= 0;
-  int r= poll (&p, 1, 0);
+  int r= poll (&p, 1, ms);
   if (r <= 0) return "";
   char buf[65536];
   ssize_t n= read (mcp_in, buf, sizeof (buf));
@@ -131,8 +130,25 @@ mcp_stdin_read () {
   if (n == 0) { mcp_eof= true; return ""; }
   return string (buf, (int) n);
 #else
+  (void) ms;
   return "";
 #endif
+}
+
+string
+mcp_stdin_read () {
+#if !defined(OS_MINGW) && !defined(__EMSCRIPTEN__)
+  if (++mcp_ticks % 64 == 0) mcp_rotate_log ();
+#endif
+  return mcp_stdin_poll (0);
+}
+
+string
+mcp_stdin_wait (int ms) {
+  // (waits in the system, no process, at most 200 ms at a time)
+  if (ms < 0) ms= 0;
+  if (ms > 200) ms= 200;
+  return mcp_stdin_poll (ms);
 }
 
 bool

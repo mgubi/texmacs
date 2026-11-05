@@ -1399,6 +1399,11 @@ def s_propose(w):
     check("the other TeXmacs passed its checks", out == "ok")
 
 
+def hexs(x):
+    """the way the preference agent-trust writes a name or a path"""
+    return "".join("%04x" % ord(c) for c in x)
+
+
 def hostread(w, st, cmd, name):
     """ask the person's TeXmacs (host-edit.scm) for a file of results"""
     try:
@@ -1593,9 +1598,9 @@ def s_trust(w):
     tr = hostread(w, st, "trust", "trust")
     check("the remembered grant is listed, apart from the sessions", '"remember" "tm-test" "style"' in tr)
     prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
-    check("it is in the preferences of the person (not in the document)", "agent-trust" in prefs and "tm-test" in prefs)
+    check("it is in the preferences of the person (not in the document)", "agent-trust" in prefs and hexs("tm-test") in prefs)
     hbody = hb()
-    check("and not in the document", "tm-test" not in hbody and "agent-trust" not in hbody)
+    check("and not in the document", hexs("tm-test") not in hbody and "agent-trust" not in hbody)
     # 9. the session ends when the agent disconnects; the remembered grant stays
     e, r = m.tool("close_document", document="d1", discard=True)
     time.sleep(0.5)
@@ -1636,7 +1641,7 @@ def s_trust(w):
     hostcmd(w, st, "answer %s refuse" % q[0][0])
     a.wait()
     prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
-    check("the preference does not hold it any more", "tm-test" not in prefs)
+    check("the preference does not hold it any more", hexs("tm-test") not in prefs)
     sync_set(w, "c-done")
     check("exit 0", m.close() == 0)
     try:
@@ -1694,7 +1699,7 @@ def s_trust_persist(w):
         check("phase 1: asked, and remembered", q and r[1]["status"] == "proposed")
     run(f1, "p-agent", p1)
     prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
-    check("the grant is in the preferences of the person", "agent-trust" in prefs and "p-agent" in prefs)
+    check("the grant is in the preferences of the person", "agent-trust" in prefs and hexs("p-agent") in prefs)
     def p2(m, d, w2, st):
         tr = hostread(w2, st, "trust", "trust")
         check("after a restart of the host the grant is listed", '"remember" "p-agent" "style"' in tr)
@@ -1717,7 +1722,7 @@ def s_trust_persist(w):
         check("revoked in the person's TeXmacs: asked again", q and r[1]["status"] == "refused")
     run(f1, "p-agent", p5)
     prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
-    check("and the preferences do not hold it any more", "p-agent" not in prefs)
+    check("and the preferences do not hold it any more", hexs("p-agent") not in prefs)
     def p6(m, d, w2, st):
         q, r = ask_once(m, d, w2, st, "<assign|rf|1>", None)
         check("after the revocation a restarted host asks too", bool(q))
@@ -1783,6 +1788,18 @@ def s_elicit(w):
     check("allow once: applied", not e and r["status"] == "applied")
     e, r, asked = edit(STYLE, say("refuse"))
     check("and the next edit is asked again", len(asked) == 1)
+    # a rule found later in the call is asked about again, not passed silently
+    h1 = hash_()
+    n_seen = [0]
+    def once_then_refuse(params):
+        n_seen[0] += 1
+        return {"action": "accept", "content": {"answer": "once" if n_seen[0] == 1 else "refuse"}}
+    e, r, asked = edit(LINK, once_then_refuse)
+    check("once covers what was shown, not the rules found later: asked again (%d questions)" % len(asked), len(asked) == 2)
+    check("and the second refusal cancels the whole edit", isinstance(r, dict) and r["status"] == "refused" and hash_() == h1)
+    n_seen[0] = 0
+    e, r, asked = edit(LINK, lambda params: {"action": "accept", "content": {"answer": "once"}})
+    check("allowed each time: applied", not e and r["status"] == "applied" and len(asked) == 2)
     # code and limits are never asked about
     for label, content in (("extern", "<extern|foo>"), ("script", "<script|scheme|x>"), ("par-columns", "<with|par-columns|99|x>"),
                            ("a loop", "<while|a|b>"), ("version markup", "<version-both|a|b>"),
@@ -1800,7 +1817,7 @@ def s_elicit(w):
     check("trusting style does not allow a link: it asks, for links only", len(asked) == 1 and ch == ["refuse", "once", "session:links", "remember:links"])
     check("and the link is refused", isinstance(r, dict) and r["status"] == "refused" and r["rules"][0]["level"] == "links")
     e, r, asked = edit("<concat|" + (STYLE % 95) + "|<hlink|s|ftp://y.org>>", say("refuse"))
-    check("a definition and a link: only the link is asked about", len(asked) == 1 and "definitions" not in asked[0]["message"] and "ftp://y.org" in asked[0]["message"])
+    check("a definition and a link: only the link is asked about", len(asked) == 1 and "- definitions" not in asked[0]["message"] and "ftp://y.org" in asked[0]["message"])
     e, r, asked = edit(LINK, say("session:links"))
     check("session links: applied", not e and r["status"] == "applied")
     check("the link is there", "ftp://x" in str(m.tool("read", document="d1", format="texmacs", max_size=100000)[1]["content"]))
@@ -1811,7 +1828,7 @@ def s_elicit(w):
     e, r, asked = m2.tool_el(say("remember:style"), "insert", document="d1", where="last", content="<assign|rem|1>")
     check("remember: applied", not e and r["status"] == "applied")
     prefs = open(os.path.join(home, "system", "preferences.scm"), errors="replace").read()
-    check("in the preferences of the person", "agent-trust" in prefs and "el-client" in prefs and "e.tm" in prefs)
+    check("in the preferences of the person", "agent-trust" in prefs and hexs("el-client") in prefs and hexs("e.tm") in prefs)
     check("exit 0 (first)", m.close() == 0)
     check("exit 0 (second)", m2.close() == 0)
     m3 = Mcp(env)
@@ -1864,6 +1881,14 @@ def s_levels(w):
         ("<hlink|x|file:///etc/hosts>", "link", "links", True),
         ("<include|/etc/hosts>", "file", "links", True),
         ("<label|a}b>", "names", "links", True),
+        ("<with|em|<value|mirror>|x>", "code", "code", False),
+        ("<with|em|<value|toggle-button>|x>", "code", "code", False),
+        ("<with|em|<value|radio-button>|x>", "code", "code", False),
+        ("<with|em|<value|widget-cmd>|x>", "code", "code", False),
+        ("<value|mirror>", "code", "code", False),
+        ("<value|toggle-button>", "code", "code", False),
+        ("<value|widget-cmd>", "code", "code", False),
+        ("<value|radio-button>", "code", "code", False),
         ("<extern|x>", "code", "code", False),
         ("<script|scheme|x>", "code", "code", False),
         ("<use-module|(x)>", "code", "code", False),
@@ -1884,6 +1909,97 @@ def s_levels(w):
         if not ok:
             print("    got:", str(r)[:400])
     check("exit 0", m.close() == 0)
+
+
+def s_trustpref(w):
+    """the preference agent-trust: names and paths with quotes, backslashes, newlines and non-ASCII
+    characters, a bad entry, a restart, the limit (trustpref-probe.scm, two processes, one home)"""
+    env, home = make_env(w, "A")
+    n = 0
+    for phase in ("write", "read"):
+        e = dict(env)
+        e["TRUST_PHASE"] = phase
+        p = subprocess.Popen([BIN, "-headless", "-x", '(load "%s")' % os.path.join(HERE, "trustpref-probe.scm")],
+                             env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        procs.append(p)
+        try:
+            out = p.communicate(timeout=90)[0].decode("utf-8", "replace")
+        except subprocess.TimeoutExpired:
+            p.kill()
+            out = ""
+        check("%s: the probe ran to its end" % phase, "TRUSTPREF-DONE" in out)
+        for l in [l for l in out.splitlines() if l.startswith("CHECK ")]:
+            check("%s: %s" % (phase, l[6:-5]), l.endswith("PASS"))
+            n += 1
+    check("all the probe checks were seen", n >= 9)
+
+
+def s_redef(w):
+    """a definition that changes the meaning of text the document already has: the person is told which
+    name and how often it is used, it is asked about every time (no grant covers it), and the text that uses
+    the name is checked again under the new definition"""
+    global TIMEOUT
+    TIMEOUT = max(TIMEOUT, 200)
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "r.tm")
+    with open(f, "w") as fh:
+        fh.write("<TeXmacs|2.1.5>\n\n<style|<tuple|generic>>\n\n<\\body>\n"
+                 "  First <strong|bold> and <strong|again>.\n\n  Second <em|x>.\n</body>\n")
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_INTERACTIVE": "1", "TEXMACS_ASK_TIMEOUT": "20000"})
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    poll(lambda: m.tool("list_documents")[1]["documents"][0].get("agent_mode") == "propose", 10)
+    st = [0]
+    def edit(content):
+        return AsyncTool(m, "insert", document="d1", where="last", content=content)
+    def questions(content, answers):
+        """edit, and answer the successive questions with answers (a list of strings); the questions seen"""
+        a = edit(content)
+        seen = []
+        for ans in answers:
+            q = wait_ask(w, st)
+            if not q:
+                break
+            seen.append(q[0])
+            hostcmd(w, st, "answer %s %s" % (q[0][0], ans))
+            time.sleep(0.5)
+        return seen, a.wait()
+    seen, r = questions("<assign|strong|<macro|x|<hlink|<arg|x>|https://ok.example>>>", ["session style", "once"])
+    check("redefining `strong' asks", len(seen) >= 1)
+    if not seen:
+        print("    got:", str(r)[:600])
+    check("the question names the macro and how many times the document uses it",
+          seen and "redefines `strong'" in seen[0][3] and "2 time(s)" in seen[0][3])
+    check("the levels shown: style and redefinition", seen and seen[0][2] == ["style", "redefinition"])
+    check("a grant for the session of style does not cover it: asked again, for redefinition only",
+          len(seen) == 2 and seen[1][2] == ["redefinition"])
+    check("allowed once: a proposal", r[1]["status"] == "proposed")
+    txt = hostread(w, st, "proposals", "proposals")
+    for pid in re.findall(r'\("(p\d+)" "pending"', txt):
+        hostcmd(w, st, "accept " + pid)
+    seen, r = questions("<assign|strong|<macro|x|<hlink|<arg|x>|https://ok2.example>>>", ["refuse"])
+    check("a second redefinition is asked again even with style trusted", len(seen) == 1 and "redefinition" in seen[0][2])
+    seen, r = questions("<assign|brandnew|hello>", [])
+    check("a new name: no question about a redefinition (style is trusted)", not seen and r[1]["status"] == "proposed")
+    # the text that uses the name is checked under the new definition
+    for pid in re.findall(r'\("(p\d+)" "pending"', hostread(w, st, "proposals", "proposals")):
+        hostcmd(w, st, "accept " + pid)
+    seen, r = questions("<assign|em|<macro|x|<hlink|<arg|x>|ftp://e.example>>>", ["refuse"])
+    check("the new definition of `em' makes the existing text a link of a scheme that needs links: shown",
+          seen and "expands to a link" in seen[0][3] and "redefines `em'" in seen[0][3] and "links" in seen[0][2])
+    check("the levels asked: links among them", seen and "links" in seen[0][2] and "redefinition" in seen[0][2])
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
 
 
 def s_undo(w):
@@ -2982,7 +3098,7 @@ def s_static(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "trust": s_trust, "trust-persist": s_trust_persist, "elicit": s_elicit, "levels": s_levels,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "trust": s_trust, "trust-persist": s_trust_persist, "elicit": s_elicit, "levels": s_levels, "redef": s_redef, "trustpref": s_trustpref,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

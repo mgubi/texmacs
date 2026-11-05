@@ -7,6 +7,7 @@
 ;; are never asked about. The person is played by A: the policy file says what
 ;; it answers.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
+(define STEP-TIMEOUT 90000)   ; (the hand-written client waits for the host's answers)
 
 (define (policy) (if (sync-has? "policy") (sync-read "policy") "refuse"))
 
@@ -22,7 +23,7 @@
 
 (define (A-steps)
   (list
-   (act "interactive" (shared-set-interactive! #t))
+   (act "interactive" (shared-set-interactive! #t) (shared-set-ask-max! 1))
    (act "load" (load-buffer FILE))
    (act "direct" (shared-set-agent-mode! (the-name) 'direct))
    (act "go" (sync-set! "a-loaded") (person!))
@@ -32,8 +33,9 @@
           (check "the first link (granted for the session) is in the document" (string-contains? s "ftp://a.org"))
           (check "the definition that was never granted is not" (not (string-contains? s "\"foo\"")))
           (check "the link of the second connection is not" (not (string-contains? s "ftp://c.org")))
+          (check "nor the links that waited for the person" (not (string-contains? s "ftp://cap")))
           (check "no code" (not (string-contains? s "extern")))
-          (check "the host asked 4 times" (= (shared-stat 'agent-asked) 4))
+          (check "the host asked at least 4 times" (>= (shared-stat 'agent-asked) 4))
           (check "and nothing is trusted any more (the connections are gone)" (null? (shared-trust (the-name))))
           (check "level code is not grantable" (not (shared-grantable-level? "code")))
           (check "limits are not grantable" (not (shared-grantable-level? "limits")))
@@ -58,7 +60,8 @@
 (define (connect! id name junk?)
   (let* ((e (shared-entry (the-name))) (c (local-connect (caddr e))))
     (local-send c (object->string (list 'hello (cadddr e) (cadr e) id 4242 #f #f #f)))
-    (let* ((w (recv-all c 600)) (wm (and (pair? w) (string->object (car w)))))
+    (let* ((w (let loop ((i 0)) (let ((r (recv-all c 600))) (if (or (pair? r) (> i 5)) r (loop (+ i 1))))))
+           (wm (and (pair? w) (string->object (car w)))))
       (set! cur (cadr wm))
       (when name (local-send c (object->string (list 'agent-name name))))
       (when junk?
@@ -119,6 +122,15 @@
           (check "and refused" (and (any-has? fr "refused") (not (any-has? fr "applied"))))
           (local-send c "(leave)")
           (local-close c)))
+   ;; the number of open questions is capped (3; the test lowers it to 1): the next is refused as pending
+   (act "cap" (sync-write! "policy" "hold")
+        (let* ((c1 (connect! "agent.cap1" "raw" #f)) (f1 (send-patch! c1 '(hlink "a" "ftp://cap1.org")))
+               (c2 (connect! "agent.cap2" "raw" #f)) (f2 (send-patch! c2 '(hlink "a" "ftp://cap2.org"))))
+          (check "a question is open" (any-has? f1 "asking"))
+          (check "the next is refused as pending, not asked" (and (any-has? f2 "pending") (not (any-has? f2 "asking"))))
+          (sync-write! "policy" "refuse")
+          (recv-all c1 1500)
+          (for (c (list c1 c2)) (local-send c "(leave)") (local-close c))))
    (act "done" (publish-body!) (sync-set! "b-done"))
    (wait-sync "a-done")))
 

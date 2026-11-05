@@ -25,7 +25,7 @@ have the details, and the problems go to the
   (granted separately: trusting style does not allow links); code, loops and the other limits are
   never asked about and never granted. A trusted edit in propose mode is still a proposal. Tools >
   Agents lists the grants and revokes each. The agent's name is only what its client says: trust by
-  name is a convenience, not a security boundary. Refusals say whether the person was asked and
+  name is a convenience, not a security boundary. Redefining a macro that the text already uses is asked about every time, naming it and counting its uses. Refusals say whether the person was asked and
   answered (`asked`, `answer`, `grantable`). See [mcp-server.md](mcp-server.md); tests `tests/mcp`
   (`trust`, `trust-persist`, `elicit`) and `tests/shared` (`trust`).
 - **Agents on a shared file: modes, proposals, the host's filter** (desktop

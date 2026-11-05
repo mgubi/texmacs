@@ -2334,6 +2334,19 @@ tmg_mcp_stdin_read () {
 }
 
 tmscm
+tmg_mcp_stdin_wait (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "mcp-stdin-wait");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= mcp_stdin_wait (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_mcp_stdin_eofP () {
   // TMSCM_DEFER_INTS;
   bool out= mcp_stdin_eof ();
@@ -13227,6 +13240,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("shared-touch",  tmg_shared_touch, 1, 0, 0);
   tmscm_install_procedure ("mcp-stdio-active?",  tmg_mcp_stdio_activeP, 0, 0, 0);
   tmscm_install_procedure ("mcp-stdin-read",  tmg_mcp_stdin_read, 0, 0, 0);
+  tmscm_install_procedure ("mcp-stdin-wait",  tmg_mcp_stdin_wait, 1, 0, 0);
   tmscm_install_procedure ("mcp-stdin-eof?",  tmg_mcp_stdin_eofP, 0, 0, 0);
   tmscm_install_procedure ("mcp-stdout-write",  tmg_mcp_stdout_write, 1, 0, 0);
   tmscm_install_procedure ("mcp-json-valid?",  tmg_mcp_json_validP, 1, 0, 0);

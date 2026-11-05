@@ -378,7 +378,7 @@
              shared-file-saved shared-file? shared-file-info shared-files-list
              shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use shared-set-agent! shared-agent? shared-agent-id? shared-file-stat shared-collect-mark shared-collect-restore!
              shared-agent-mode shared-set-agent-mode! shared-file-agents shared-proposals shared-proposal-resolve! shared-file-send-withdraw shared-file-verdict shared-changed-blocks shared-file-gate-stats shared-treat-as-person! shared-file-save-refused shared-file-agent-info shared-sanitize-patch shared-test-send-peers! shared-body-patch shared-patch-acceptable?
-             shared-set-agent-name! shared-grantable-level? shared-trust-remembered? shared-trust-remember! shared-trust-forget! shared-asks shared-ask-answer! shared-trust shared-trust-revoke! shared-file-gated? shared-file-asking-until shared-trust-key)
+             shared-set-agent-name! shared-grantable-level? shared-trust-remembered? shared-trust-remember! shared-trust-forget! shared-asks shared-ask-answer! shared-trust shared-trust-revoke! shared-file-gated? shared-file-asking-until shared-trust-key shared-set-ask-max!)
 (lazy-define (texmacs menus tools-menu) agent-ask-dialog)
 (lazy-define (version version-compare) compare-versions version-normalize)
 ;(display "Booting the MCP server\n")

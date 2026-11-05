@@ -201,25 +201,25 @@ is never granted.
   host keeps the patch, tells the agent `(asking id ms)` (the agent then waits for the
   answer, as long as the host's time plus 5 s, instead of 10 s), and answers when the
   person has. The time is 60 s (`TEXMACS_ASK_TIMEOUT` ms, for the tests); nobody answering
-  is a refusal. One question at a time for an agent (a second edit gets a refusal with
-  `answer: "pending"`).
+  is a refusal. One question at a time for an agent, and at most 3 questions open for a host (a further edit gets a refusal with
+  `answer: "pending"`), so at most 3 dialogs.
 - When nobody else has the file (the server hosts alone, or only headless processes):
   **MCP elicitation** (`elicitation/create`, protocol 2025-06-18 and later) to the client,
   if it declared `capabilities.elicitation` at `initialize`; the same text, and an
   enumeration of the answers. The server writes the request and, until the answer
-  comes (the time above), reads its input for it only: other lines wait and are handled
+  comes (the time above), reads its input for it only (other files it hosts are served): other lines wait and are handled
   after the call (`mcp-deferred`); `notifications/cancelled` is sent for a request that
   timed out. A client without the capability (or a negotiated version before 2025-06-18)
   gets the refusal as before, with `asked: false, grantable: true` and the reason "nobody
-  could be asked". The waiting polls every 50 ms with a `sleep` of the shell.
+  could be asked". While it waits the server blocks in `poll` on its input for at most 50 ms at a time (`mcp-stdin-wait`, no process is started) and serves the shared files it hosts.
 
 **The answers.**
 | Answer | Meaning |
 |---|---|
 | refuse | the edit is refused (also: decline or cancel of the elicitation, an answer not offered, closing the dialog and waiting) |
-| allow once | this edit, whatever its rules (of the levels shown) |
+| allow once | this edit only: exactly the rules that were shown, for exactly that patch. The host keeps the patch and its text, and handles it again when answered; the grant exists during that call only, and is not kept under the patch id (a client chooses the ids and may reuse one). An agent that reuses the id for another edit gets nothing. On the agent's side the rules found later in the same call (after the expansion) are not covered: they are asked about again, or refused |
 | trust for this session | the agent, this file, the level (`style` or `links`, chosen in the dialog, one button per level): until the agent disconnects (a new connection starts again) or the person quits |
-| remember for this file | in the preference `agent-trust` of the person (their `TEXMACS_HOME_PATH`, never in the document): a list of (real path of the file, the agent's name, level); offered only when the agent has a name |
+| remember for this file | in the preference `agent-trust` of the person (their `TEXMACS_HOME_PATH`, never in the document): entries `<path>:<name>:<level>` separated by blanks, the path and the name written as four hexadecimal digits per character (so no quote, backslash, newline or non-ASCII character can break the reading), at most 200 entries; an entry that does not read is skipped, the others stay; offered only when the agent has a name (at the limit, or without a name, it is a session grant). The preference is read at each use in the process that checks; a revocation made in another process is seen by a running agent process only when that process starts again |
 
 **The levels, and why each rule is at its level.** Every rule says its class when it is
 raised (`violate-as!` in `mcp-server.scm`: SOH rule STX level ETX before the text);
@@ -230,12 +230,13 @@ text copied from the agent's content into a message cannot change the class of a
 |---|---|---|
 | `definitions` | `style` (1) | `assign`, `set`, `reset`, `provide`, `macro`, `xmacro`, `func`, `drd-props`; a `with` or `value` that makes an alias of a tag; any change of the definitions of the document. The person's own definitions are theirs, but a trusted agent may write the macros of its own text; what its macros do is still checked at each call (below). |
 | `style` | `style` (1) | packages, themes, `style-with`, `filter-style`: layout, no code |
-| `link` | `links` (2) | a link whose target is a string with a scheme other than http, https, mailto (`ftp:`, `file:`...), or with characters of an export's syntax. Acts only when clicked. Granted separately: trusting style never implies links |
+| `link` | `links` (2), shown as "links, files and names in exports" | a link whose target is a string with a scheme other than http, https, mailto (`ftp:`, `file:`...), or with characters of an export's syntax. Acts only when clicked. Granted separately: trusting style never implies links |
 | `file` | `links` (2) | a file (image, include...) written as a plain name but outside the folders of the document or of the server, `..`, a scheme: reads files into the document or its exports |
-| `names` | `links` (2) | strings that become names in an export (labels, keys, `with` values): backslashes, braces, quotes... |
+| `names` | `links` (2) | strings that become names in an export (labels, keys, `with` values): backslashes, braces, quotes... They are written raw into LaTeX and HTML (the exporters escape them too), which is why the level is named "links, files and names in exports" in the dialogs |
+| `redefinition` | `redefinition` (asked every time) | a changed definition (an `assign` of a name, or a `set`/`reset`) that the text of the document already uses, directly or through other macros: `<assign|strong|<macro|x|<hlink|<arg|x>|https://e.example>>>` turns every existing `strong` into a link. The host (and the agent's own check) expands the blocks that use a changed name under the old and under the new definitions, and what is new there is a violation of its own level (a link needs `links`, code is refused); and the question says plainly "it redefines `strong', which the document already uses N time(s)". No grant (session or remembered) covers it: trust lifts a filter, it does not change what the person's text means behind their back |
 | `dangerous-macro` | `code` (never) | a call of a macro that passes an argument to a link, a file, a script or a macro name: the filter cannot check what the call does |
 | `unknown-tag` | `code` (never) | a tag the style does not define is written by the exporters as a raw command (`\verbatiminput`) |
-| `code` | `code` (never) | `extern`, `script`, `action`, `hybrid`, `eval`, `compound`, `specific` for another program, `latex`, sessions, `raw-data`, `use-module`, `find-file`, internal markers, a link whose target is not plain text, errors of the expansion: runs in TeXmacs, in TeX or in a browser. "Code stays mine" (decision of 4 November) |
+| `code` | `code` (never) | `extern`, `script`, `action`, `hybrid`, `eval`, `compound`, `specific` for another program, `latex`, sessions, `raw-data`, `use-module`, `find-file`, an alias (`with` or `value`) of a macro that acts on a click, runs code or reads a file or a link (`mirror`, `toggle-button`, `radio-button`, `widget-cmd`...: `alias-class`), internal markers, a link whose target is not plain text, errors of the expansion: runs in TeXmacs, in TeX or in a browser. "Code stays mine" (decision of 4 November) |
 | `limits`, `structure` | `limits` (never) | loops, number caps (`par-columns`, sizes, `dpi`...), the step budget, recursion, nesting; the arity of tags, tables and spans: they protect the person's TeXmacs from crashes and hangs, and are not a matter of trust |
 | `version-markup`, `pending`, `read-only`, `settings` | `mode` (never) | the markup of proposals, a pending proposal, the person's mode, the style and settings of the document: only the person's TeXmacs |
 
@@ -803,7 +804,7 @@ the work folder).
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `undo` | the undo of the editor in a headless process, single process (`undo-probe.scm`): the own steps, the step of another author skipped when it commutes, the undo back to the saved state (it crashed: `QApplication::beep` without an application) |
-| `trust`, `trust-persist`, `elicit` | trusted agents: the person's dialog (played by the commands of the second TeXmacs), the preferences across restarts, MCP elicitation (see "Trusted agents") |
+| `trust`, `trust-persist`, `elicit`, `redef`, `trustpref` | trusted agents: the person's dialog (played by the commands of the second TeXmacs), the preferences across restarts, MCP elicitation (see "Trusted agents") |
 | `filter` | every name of the lists of refused content is a tag of the DRD |
 | `content` | each case of the refused content (code, loops, files, links, LaTeX and Markdown sources, malformed trees) and the accepted ones, 126 checks, with the document unchanged and the server alive; `create_document` with dangling links and refused content |
 | `edit`, `readonly`, `edit-shared` | the editing tools: each tool, conflicts, undo_agent, all-or-nothing, save/close/create, read-only and roots; with a second headless TeXmacs hosting and editing (merge in one paragraph, a refusal reported, the person's undo skipping the agent's changes) |
@@ -856,5 +857,8 @@ the work folder).
   - `find-file` and `use-module` are code (never), although `find-file` could be a `links` (files) rule.
   - The waiting for the answer of a client blocks that one call (the server reads its input but handles no other
     request until it ends).
+  - A grant for definitions lets a macro be defined that is not used yet: a later use is analysed with the definition in
+    the document. A redefinition of a name that is already used is asked about every time (`redefinition`); the check of
+    the text that uses it looks at up to 200 blocks.
 - `beep` in a headless Qt build crashed (an undo that restores the saved
   state called `QApplication::beep` without an application): it is skipped when headless.

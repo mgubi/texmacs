@@ -1541,6 +1541,19 @@
                  (string-append "the tag `" (symbol->string tag) "' " why
                                 ": the content is refused (nothing was changed)"))))
 
+(define (value-name val)
+  ;; the name in (value "name") and the like, or #f
+  (and (pair? val) (memq (car val) '(value quote-value or-value)) (pair? (cdr val)) (string? (cadr val))
+       (cadr val)))
+
+(define (alias-class names)
+  ;; (rule level) of an alias that involves the tags @names: an alias of a macro that acts on a
+  ;; click, runs code, or reads a file or a link (mirror, toggle-button, radio-button, widget-cmd...)
+  ;; is code, else a definition
+  (if (list-find names (lambda (n) (and (string? n) (dangerous-name? n))))
+      (list "code" "code")
+      (list "definitions" "style")))
+
 (define (tag-class tag)
   ;; (rule level) of a tag that the content may not have: definitions and
   ;; styles can be granted by the person; loops are limits; the rest is code
@@ -1789,7 +1802,7 @@
             (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
                                      "' to something that is not plain text: refused (nothing was changed)")))
           (when (tag-name? var)
-            (violate-as! "definitions" "style"
+            (violate-as! (car (alias-class (list var (value-name val)))) (cadr (alias-class (list var (value-name val))))
                          (string-append "a `" (symbol->string tag) "' that sets `" (utf8-prefix (u8 var) 40)
                                        "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))
           (when (and (string? val) (not (env-value-ok? var val)))
@@ -1870,7 +1883,7 @@
              ((eq? tag 'tformat) (check-spans st))
              ((memq tag '(value quote-value or-value))
               (when (and (pair? (cdr st)) (string? (cadr st)) (tag-name? (cadr st)))
-                (violate-as! "definitions" "style"
+                (violate-as! (car (alias-class (list (cadr st)))) (cadr (alias-class (list (cadr st))))
                              (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)
                                            "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))))
        ;; macros which call the macro named by an argument
@@ -3103,7 +3116,7 @@
         (judge-or-refuse! d (list over-budget-reason) 'tool))
       ;; (the definitions cannot be changed by the content, so the rest of the
       ;; document is not compared: only the block of the edit and the new blocks)
-      (list (and blk (ptr blk)) viol (assigns-signature d) lit))))
+      (list (and blk (ptr blk)) viol (assigns-signature d) lit (assign-nodes (doc-body d))))))
 
 (define (filter-map f l)
   (let loop ((l l) (acc '()))
@@ -3149,7 +3162,9 @@
         (when (over-budget? after) (guard-fail! (list over-budget-reason)))
         (when (pair? new) (guard-fail! new))))
     (when (!= (assigns-signature d) (caddr pre))
-      (guard-fail! (list (marked "definitions" "style" "it changes the definitions of the document"))))))
+      (guard-fail! (cons (marked "definitions" "style" "it changes the definitions of the document")
+                         (redefinition-violations d (map tm->stree (tree-children (doc-body d))) (doc-base d)
+                                                  (list-ref pre 4) (assign-nodes (doc-body d))))))))
 
 (define edit-reason #f)
 (define current-guard #f)
@@ -3331,6 +3346,77 @@
                      (map-append (lambda (b i lit) (block-violations d b i lit)) ko iold lit-old)
                      after)))))))))
 
+;; A definition that changes: the text that the document already has changes
+;; meaning (a `strong' that becomes a link). The blocks that use a changed name,
+;; directly or through other macros, are expanded under the old and the new
+;; definitions, and what is new is a violation of its own level (a link needs
+;; links, code is refused); and the person is told, as a rule that no grant covers
+;; (`redefinition', asked every time), which names the document already uses and how often.
+(define (st-mentions? st name)
+  (cond ((pair? st) (or (eq? (car st) (string->symbol name))
+                        (list-or (map (lambda (x) (st-mentions? x name)) (cdr st)))))
+        ((string? st) (== st name))
+        (else #f)))
+
+(define (st-uses st name)
+  ;; how many times the tag or the name is used (not counting the name an assign defines)
+  (cond ((pair? st)
+         (+ (if (eq? (car st) (string->symbol name)) 1 0)
+            (apply + (map (lambda (x) (st-uses x name))
+                          (if (and (eq? (car st) 'assign) (pair? (cdr st))) (cddr st) (cdr st))))))
+        ((string? st) (if (== st name) 1 0))
+        (else 0)))
+
+(define (changed-definitions old-as new-as)
+  ;; the names of the definitions that only one of the lists has, or '* when a set or reset is among them
+  (let* ((diff (append (list-filter new-as (lambda (x) (not (member x old-as))))
+                       (list-filter old-as (lambda (x) (not (member x new-as))))))
+         (names (map (lambda (a) (and (pair? a) (eq? (car a) 'assign) (pair? (cdr a)) (string? (cadr a)) (cadr a)))
+                     diff)))
+    (if (list-find names not)
+        '*
+        (let loop ((l names) (acc '()))
+          (cond ((null? l) (reverse acc))
+                ((member (car l) acc) (loop (cdr l) acc))
+                (else (loop (cdr l) (cons (car l) acc))))))))
+
+(define (affected-names names old-as new-as)
+  ;; the names, and those of the assigns whose body mentions an affected name, to the end
+  (let ((all (append new-as old-as)))
+    (let loop ((set names))
+      (let ((more (filter-map (lambda (a)
+                                (and (pair? a) (eq? (car a) 'assign) (pair? (cdr a)) (string? (cadr a))
+                                     (not (member (cadr a) set))
+                                     (list-or (map (lambda (n) (st-mentions? (cddr a) n)) set))
+                                     (cadr a)))
+                              all)))
+        (if (null? more) set (loop (append set more)))))))
+
+(define (redefinition-violations d blocks base old-as new-as)
+  ;; the reasons that the change of definitions from @old-as to @new-as brings to the text @blocks (strees)
+  (let ((names (changed-definitions old-as new-as)))
+    (if (null? names)
+        '()
+        (let* ((all? (eq? names '*))
+               (aff (if all? '* (affected-names names old-as new-as)))
+               (sel0 (list-filter blocks (lambda (b) (or all? (list-or (map (lambda (n) (st-mentions? b n)) aff))))))
+               (sel (if (> (length sel0) 200) (sublist sel0 0 200) sel0))
+               (notices
+                (if all?
+                    (list (marked "redefinition" "redefinition"
+                                  "it changes a setting of the document (set, reset) that all the text depends on"))
+                    (filter-map
+                      (lambda (n)
+                        (let ((k (apply + (map (lambda (b) (st-uses b n)) blocks))))
+                          (and (> k 0)
+                               (marked "redefinition" "redefinition"
+                                       (string-append "it redefines `" n "', which the document already uses "
+                                                      (number->string k) " time(s): the text written with it changes meaning")))))
+                      names)))
+               (before (append-map (lambda (b) (expansion-violations b base d old-as block-budget)) sel))
+               (after (append-map (lambda (b) (expansion-violations b base d new-as block-budget)) sel)))
+          (append notices (new-violations before after))))))
+
 (define (definitions-preview blocks-old blocks-new)
   ;; the definitions that the new blocks have and the old ones lack, for the person
   (let* ((old (assign-signature-of blocks-old))
@@ -3354,7 +3440,12 @@
                                       (string-append "it changes the definitions of the document"
                                                      (definitions-preview (range-blocks old range)
                                                                           (range-blocks new range #t))))
-                              (host-block-violations d old new (car range) (cadr range) (caddr range) #t))
+                              (append
+                                (host-block-violations d old new (car range) (cadr range) (caddr range) #t)
+                                ;; (and what the new definitions do to the text that exists)
+                                (redefinition-violations d (map tm->stree (tree-children new)) (doc-base d)
+                                                         (apply append host-cache)
+                                                         (map-append assign-nodes (tree-children new)))))
                         (host-block-violations d old new (car range) (cadr range) (caddr range))))
                   (lambda args (set! host-cache #f) (apply throw args)))))
     (reset-danger!)
@@ -3380,7 +3471,7 @@
 (define asking-allowed? #t)        ; #f where there is no edit to ask about (create_document)
 (define client-name #f)            ; the name the client gives at initialize (not verified)
 (define client-elicits? #f)        ; did the client declare the elicitation capability?
-(define call-approved '())         ; the levels let through for this tool call
+(define call-approved '())         ; the reasons (texts) the person let through for this tool call
 (define session-grants '())        ; ((path level) ...) granted for this session
 (define mcp-waiting? #f)           ; reading the client's answer to a request of ours
 (define mcp-deferred '())          ; the lines read meanwhile, to be handled after
@@ -3403,12 +3494,13 @@
   (let ((u (doc-url d)))
     (and (shared-file-participant? u) (shared-file-gated? u))))
 
-(define (level-covered? d level)
-  (and (shared-grantable-level? level)
-       (or (member level call-approved)
-           (member (list (doc-path d) level) session-grants)
-           (and client-name (shared-trust-remembered? (doc-path d) client-name level)))
-       #t))
+(define (reason-covered? d r level)
+  ;; has the person let this reason through for this call, or trusted the agent with its level?
+  (or (and (member (reason-text r) call-approved) #t)
+      (and (member level '("style" "links"))
+           (or (member (list (doc-path d) level) session-grants)
+               (and client-name (shared-trust-remembered? (doc-path d) client-name level)))
+           #t)))
 
 (define (refusal-json reasons how asked answer grantable note)
   ;; the answer to the agent when an edit is refused by the filter: the first
@@ -3450,7 +3542,7 @@
          (rest (list-filter pairs
                             (lambda (p)
                               (not (and d (shared-grantable-level? (caddr p))
-                                        (or gated (level-covered? d (caddr p))))))))
+                                        (or gated (reason-covered? d (car p) (caddr p))))))))
          (rest-reasons (map car rest)))
     (cond
       ((null? rest) #t)
@@ -3466,7 +3558,8 @@
           (cond ((eq? a 'timeout) (refusal-json reasons how #t "timeout" #t ""))
                 ((or (eq? a 'refuse) (not (pair? a))) (refusal-json reasons how #t "refused" #t ""))
                 ((== (car a) "once")
-                 (set! call-approved (append levels call-approved))
+                 ;; (only what was shown: a rule found later in the call is asked about again)
+                 (set! call-approved (append (map reason-text rest-reasons) call-approved))
                  (judge d reasons how (+ depth 1)))
                 (else
                   (let ((level (cdr a)))
@@ -3487,9 +3580,11 @@
   ;; ((code . title) ...) of the answers offered
   (append
     (list (cons "refuse" "Refuse") (cons "once" "Allow this edit"))
-    (map (lambda (l) (cons (string-append "session:" l) (string-append "Trust " l " for this session"))) levels)
+    (map (lambda (l) (cons (string-append "session:" l) (string-append "Trust " l " for this session")))
+         (list-filter levels (lambda (l) (member l '("style" "links")))))
     (if client-name
-        (map (lambda (l) (cons (string-append "remember:" l) (string-append "Remember " l " for this file"))) levels)
+        (map (lambda (l) (cons (string-append "remember:" l) (string-append "Remember " l " for this file")))
+             (list-filter levels (lambda (l) (member l '("style" "links")))))
         '())))
 
 (define (ask-by-elicitation d reasons levels)
@@ -3504,7 +3599,7 @@
                         (map (lambda (r) (string-append "- " (car (reason-class r)) " (" (cadr (reason-class r)) "): "
                                                         (utf8-prefix (reason-text r) 300) "\n"))
                              reasons))
-                 "\nTrusting an agent by name is a convenience for honest programs, not a security boundary. Code, loops and the other limits are never allowed."))
+                 "\nLevels: style = definitions, styles and layout; links = links, files and names in exports; redefinition = it changes what the document already says (asked every time). Trusting an agent by name is a convenience for honest programs, not a security boundary. Code, loops and the other limits are never allowed."))
          (schema (obj "type" "object"
                       "properties" (obj "answer" (obj "type" "string"
                                                       "title" "Your answer"
@@ -3542,10 +3637,13 @@
                      ((not mcp-running?) 'gone)
                      ((> (- (texmacs-time) t0) timeout) 'timeout)
                      (else
-                       (let ((s (mcp-stdin-read)))
+                       ;; (waits in the system for the input, at most 50 ms; the
+                       ;; other files that this process hosts are served meanwhile)
+                       (let ((s (mcp-stdin-wait 50)))
+                         (shared-poll)
                          (cond ((!= s "") (feed! s) (loop))
                                ((mcp-stdin-eof?) 'gone)
-                               (else (var-eval-system "sleep 0.05") (loop)))))))))
+                               (else (loop)))))))))
         (set! mcp-waiting? #f)
         (set! elicit-wait-id #f)
         (when (eq? result 'timeout)

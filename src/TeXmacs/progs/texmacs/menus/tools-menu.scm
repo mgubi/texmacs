@@ -79,7 +79,8 @@
 
 (define (rule-level-name level)
   (cond ((== level "style") "style: definitions, styles and layout")
-        ((== level "links") "links and files")
+        ((== level "links") "links, files and names in exports")
+        ((== level "redefinition") "it changes what the document already says")
         (else level)))
 
 (define (wrap-lines s n)
@@ -123,11 +124,11 @@
         (append
           (list (list "Refuse" "refuse" "") (list "Allow this edit" "once" ""))
           (map (lambda (l) (list (string-append "Trust " l " for this session") "session" l))
-               (cadddr q))
+               (list-filter (cadddr q) (lambda (l) (member l '("style" "links")))))
           (if (== (cadr q) "unknown")
               '()
               (map (lambda (l) (list (string-append "Remember " l " for this file") "remember" l))
-                   (cadddr q)))))))
+                   (list-filter (cadddr q) (lambda (l) (member l '("style" "links"))))))))))
 
 (tm-widget ((agent-ask-widget name qid) done)
   (padded

@@ -221,6 +221,7 @@
 "shared-touch"
 "mcp-stdio-active?"
 "mcp-stdin-read"
+"mcp-stdin-wait"
 "mcp-stdin-eof?"
 "mcp-stdout-write"
 "mcp-json-valid?"

@@ -386,11 +386,9 @@ is left is **asked** (`(ask ...)`, every rule of level `style` or `links`) or **
   the new fifth item of a `refused` (the agent's verdict gets it). An answer with a grant
   puts the patch again through `host-handle-patch` on the next tick (`sf 'redo`): it is
   rebased as any patch, checked again, and becomes a proposal or is applied according to the mode.
-- **Grants** are the host's: `once` (the levels of the question, for that patch id),
+- **Grants** are the host's: `once` (the violations shown, for the patch that was asked about: it is a state of the host during the handling again of that patch (`sf 'once-active`), not kept under a patch id, which the client chooses),
   `session` (peer id, name, level; ended by `drop-peer!`, so by the agent leaving or by the
-  end of the process) and `remember` (the preference `agent-trust`, a list of (real path
-  of the file, name, level), read by `get-preference` at each check, so a revocation in any
-  process counts). `shared-trust` lists them, `shared-trust-revoke!` takes one back
+  end of the process) and `remember` (the preference `agent-trust`, hex-encoded entries, read by `get-preference` at each check). `shared-trust` lists them, `shared-trust-revoke!` takes one back
   (Tools > Agents). The agent cannot say anything that is a grant: the host reads no
   message but the ones it knows, and the only thing an agent says about itself is its name,
   `(agent-name "...")` after the `hello` (the first one for a connection counts, printable ASCII,
