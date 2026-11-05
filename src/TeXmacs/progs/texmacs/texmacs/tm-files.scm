@@ -414,6 +414,9 @@
     (cond ((and (shared-files-in-use?) (shared-file-save-request name))
            ;; another process hosts the file: it writes it
            (noop))
+          ((shared-file-save-guard name)
+           ;; a live TeXmacs holds the file and this buffer is not its participant
+           (noop))
           (else (save-buffer-check-permissions name opts)))))
 
 (tm-define (save-buffer . l)
@@ -455,6 +458,8 @@
   ;;(display* "save-buffer-as-check-permissions " new-name ", " name "\n")
   (cond ((os-android?)
          (save-buffer-as-check-other new-name name opts))
+        ((shared-file-save-guard new-name)
+         (noop))
         ((cannot-write? new-name "Save file")
          (noop))
         ((and (url-test? new-name "f") (nin? :overwrite opts))
@@ -520,7 +525,9 @@
 
 (define (export-buffer-check-permissions name to fm opts)
   ;;(display* "export-buffer-check-permissions " name ", " to ", " fm "\n")
-  (cond ((cannot-write? to "Export file")
+  (cond ((shared-file-save-guard to)
+         (noop))
+        ((cannot-write? to "Export file")
          (noop))
         ((and (url-test? to "f") (nin? :overwrite opts))
          (user-confirm "File already exists. Really overwrite?" #f

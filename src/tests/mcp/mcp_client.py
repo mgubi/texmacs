@@ -2500,7 +2500,9 @@ def s_not_joined(w):
         check(tag + ": the file is as it was", open(f).read() == before)
         e, r = m.tool("read", document=d, format="text")
         check(tag + ": the document can be read", not e)
+        probe_d[0] = d
         return d
+    probe_d = [None]
     d = probe("refused welcome")
     m.tool("close_document", document=d, discard=True)
     os.kill(other.pid, signal.SIGSTOP)
@@ -2508,12 +2510,69 @@ def s_not_joined(w):
         probe("busy host")
     finally:
         os.kill(other.pid, signal.SIGCONT)
+    d2 = probe_d[0]
+    # the host quits: the lock is free and the copy is stale, but the buffer stays read-only
     sync_set(w, "c-done")
-    check("exit 0", m.close() == 0)
     try:
         other.wait(timeout=30)
     except subprocess.TimeoutExpired:
         other.kill()
+    time.sleep(0.5)
+    e, r = m.tool("insert", document=d2, where="last", content="Changed", format="texmacs")
+    check("host gone: the buffer is still read-only and says to reopen it", e and "read-only" in str(r) and "open it again" in str(r))
+    e, r = m.tool("read", document=d2, format="text")
+    check("host gone: a note says the copy may be out of date", not e and "out of date" in r.get("note", ""))
+    e, r = m.tool("save_document", document=d2)
+    check("host gone: the save is refused", e and "read-only" in str(r))
+    check("host gone: the file is as it was", open(f).read() == before)
+    # another process takes the file: the buffer is still not its participant
+    # (the new host has a document that can be shared: the file is rewritten without the bad link)
+    write_small(f)
+    before = open(f).read()
+    w2 = os.path.join(w, "two")
+    os.makedirs(os.path.join(w2, "sync"), exist_ok=True)
+    other2 = start_other(w2, envB, "host-wait.scm", f)
+    check("a new host has loaded the file", wait_file(os.path.join(w2, "sync", "h-loaded")))
+    e, r = m.tool("insert", document=d2, where="last", content="Changed", format="texmacs")
+    check("a new host: an insert is refused", e and "read-only" in str(r))
+    e, r = m.tool("save_document", document=d2)
+    check("a new host: the save is refused", e and "read-only" in str(r))
+    check("a new host: the file is as it was", open(f).read() == before)
+    m.tool("close_document", document=d2, discard=True)
+    e, v = m.tool("open_document", path=f)
+    check("closed and opened again, the document joins the new host", not e and v.get("shared") is not None and v["shared"]["role"] == "participant")
+    check("exit 0", m.close() == 0)
+    sync_set(w2, "c-done")
+    try:
+        other2.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other2.kill()
+    # a server which does not share (the preference is off) does not write a file a live host holds
+    w3 = os.path.join(w, "three")
+    os.makedirs(os.path.join(w3, "sync"), exist_ok=True)
+    envD, homeD = make_env(w, "D", "off")
+    f3 = os.path.join(w, "live3.tm")
+    write_small(f3)
+    f3 = os.path.realpath(f3)
+    before3 = open(f3).read()
+    other3 = start_other(w3, envB, "host-wait.scm", f3)
+    check("a host has loaded the file for the server which does not share", wait_file(os.path.join(w3, "sync", "h-loaded")))
+    m3 = Mcp(envD)
+    m3.initialize()
+    e, v = m3.tool("open_document", path=f3)
+    d3 = v.get("document", "d1") if not e else "d1"
+    check("not sharing: open_document says the file is held, read-only", not e and v.get("agent_mode") == "read-only" and "not joined" in v.get("note", ""))
+    e, r = m3.tool("insert", document=d3, where="last", content="Changed", format="texmacs")
+    check("not sharing: an insert is refused", e and "read-only" in str(r))
+    e, r = m3.tool("save_document", document=d3)
+    check("not sharing: the save is refused", e and "read-only" in str(r))
+    check("not sharing: the file is as it was", open(f3).read() == before3)
+    check("exit 0 (not sharing)", m3.close() == 0)
+    sync_set(w3, "c-done")
+    try:
+        other3.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other3.kill()
 
 
 def s_gui_host(w):

@@ -1060,11 +1060,12 @@
                       (pending-done! name)
                       (with r (join-host name key e)
                         (cond ((== r #t) #t)
-                              ((== r 'busy) (tell-unshared name))
-                              ((pair? r) (tell-unshared name r))
+                              ((== r 'busy) (mark-not-joined! name r) (tell-unshared name))
+                              ((pair? r) (mark-not-joined! name r) (tell-unshared name r))
                               (else (host-start name key 0)))))
                      ((> now deadline)
                       (pending-done! name)
+                      (mark-not-joined! name 'busy)
                       (tell-unshared name)))))
             ((> now deadline)
              ;; nobody took the file: from the disk
@@ -1076,7 +1077,8 @@
 (define (unshared-why r)
   ;; r: 'busy or (refused . tag)
   (if (pair? r)
-      (string-append "its content cannot be shared (" (cdr r) ")")
+      (string-append "its content cannot be shared: the document has a malformed "
+                     (cdr r) " (a wrong number of arguments, or a structure the editor does not accept)")
       "its process does not answer"))
 
 (define (tell-unshared name . r)
@@ -1086,17 +1088,46 @@
                   "; it is opened from the file, without sharing, and not saved")
    "Shared file"))
 
+(define (mark-not-joined! name r)
+  ;; the file is open in a live host and this buffer is not its participant:
+  ;; read-only for the life of the buffer (until it is closed and opened again)
+  (set-shared-files-in-use! #t)
+  (ahash-set! sf-not-joined (url->string name)
+              (string-append "open in the person's TeXmacs but not joined: " (unshared-why r))))
+
 (tm-define (shared-file-not-joined name)
   (:synopsis "Why the buffer @name is not joined to the live TeXmacs that holds its file, or #f")
-  ;; (the file is open in a live host, and this process has not joined it:
-  ;; it must not write the file)
+  ;; (kept as long as the buffer lives: when the host has gone the copy is stale,
+  ;; and when another host has come the buffer is still not its participant)
   (and (not (sf-by-name name))
        (with why (ahash-ref sf-not-joined (url->string name))
          (and why
-              (with key (shareable-key name)
-                (if (and key (not (lock-free? key)))
-                    why
-                    (begin (ahash-remove! sf-not-joined (url->string name)) #f)))))))
+              (if (shared-file-not-joined-stale? name)
+                  (string-append why "; the person's TeXmacs has closed the file since, so this copy may be out of date: close the document and open it again")
+                  why)))))
+
+(tm-define (shared-file-not-joined-stale? name)
+  (:synopsis "Is the file of the not joined buffer @name no longer held by a live host?")
+  (and (ahash-ref sf-not-joined (url->string name))
+       (with key (shareable-key name)
+         (and key (lock-free? key)))))
+
+(tm-define (shared-file-held-elsewhere? name)
+  (:synopsis "Does a live TeXmacs hold the file @name (its lock), while this process is not its host or participant?")
+  ;; (the lock is there whatever the preference: a process that does not share
+  ;; must not write a file that a live host holds)
+  (and (url? name)
+       (with key (shareable-key name)
+         (and key (not (ahash-ref sf-table key)) (not (lock-free? key))))))
+
+(tm-define (shared-file-save-guard name)
+  (:synopsis "A save, or an export, to @name: refuse it (message, #t) while a live host holds the file")
+  (let ((u (if (url? name) name (system->url name))))
+    (and (shared-file-held-elsewhere? u)
+         (begin
+           (set-message "Shared file: not saved: this file is open in another TeXmacs which holds it (use Save as for a copy under another name)"
+                        "Save file")
+           #t))))
 
 (define (arity-bad-tag st)
   ;; the tag of the innermost subtree the arity check refuses
@@ -1113,10 +1144,7 @@
   ;; answer: the file is read as usual, not shared. It is never hosted
   ;; meanwhile: the lock is what makes a host, and a stalled host keeps it.
   (ahash-set! sf-unshared (url->string name) (texmacs-time))
-  (set-shared-files-in-use! #t)
-  (ahash-set! sf-not-joined (url->string name)
-              (string-append "open in the person's TeXmacs but not joined: "
-                             (unshared-why (if (null? r) 'busy (car r)))))
+  (mark-not-joined! name (if (null? r) 'busy (car r)))
   (tell-unshared name (if (null? r) 'busy (car r))))
 
 (define (abandoned! name key entry)
@@ -1193,6 +1221,8 @@
   (cond ((ahash-ref sf-pending (url->string name))
          (pending-start! name))
         ((let ((t (ahash-ref sf-unshared (url->string name))))
+           (when (not (and t (< (- (texmacs-time) t) 10000)))
+             (ahash-remove! sf-not-joined (url->string name)))
            (ahash-remove! sf-unshared (url->string name))
            (and t (< (- (texmacs-time) t) 10000)))
          (noop))
@@ -1224,6 +1254,7 @@
                   (with r (join-host name key e)
                     (cond ((== r #t) #t)
                           ((== r 'busy) (note-unshared! name))
+                          ((pair? r) (note-unshared! name r))
                           ((< tries 3) (host-start name key (+ tries 1)))
                           (else (note-unshared! name))))))))))
 
@@ -2025,11 +2056,11 @@
 
 (tm-define (shared-file-save-request name)
   (:synopsis "A Save of the buffer @name: handled here when another process hosts it")
-  (when (and (not (sf-by-name name)) (shared-file-not-joined name))
-    (set-message "Shared file: not saved: this file is open in another TeXmacs which holds it (use Save as for a copy)"
-                 "Save file"))
   (if (and (not (sf-by-name name)) (shared-file-not-joined name))
-      #t
+      (begin
+        (set-message "Shared file: not saved: this file is open in another TeXmacs which holds it (use Save as for a copy under another name)"
+                     "Save file")
+        #t)
   (and-with sf (sf-by-name name)
     (and (== (sf-get sf 'role) 'participant)
          (begin
@@ -2760,5 +2791,6 @@
 (tm-define (notify-buffer-closed name)
   (former name)
   (ahash-remove! sf-unshared name)
+  (ahash-remove! sf-not-joined name)
   (when (shared-files-in-use?)
     (shared-file-leave (string->url name))))

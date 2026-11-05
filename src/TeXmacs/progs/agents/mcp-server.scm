@@ -413,7 +413,11 @@
 (define (doc-not-joined d)
   ;; why the file is open in the person's TeXmacs and this server has not
   ;; joined it (then it is read-only), or #f
-  (shared-file-not-joined (doc-url d)))
+  (let ((u (doc-url d)))
+    (or (shared-file-not-joined u)
+        ;; (this process does not share, or never joined, but a live TeXmacs holds the file)
+        (and (shared-file-held-elsewhere? u)
+             "open in the person's TeXmacs but not joined: this server does not share the file (share-open-files is off in its home)"))))
 
 (define (doc-agent-mode d)
   ;; what the host of the file does with this agent's edits: propose (they
@@ -440,6 +444,11 @@
          "agent_mode" (doc-agent-mode d)
          "blocks" (num (tree-arity (doc-body d)))
          "hash" (hash-short (doc-body d)))))
+
+(define (stale-note d)
+  ;; the person's TeXmacs has closed the file this buffer was not joined to
+  (and (shared-file-not-joined-stale? (doc-url d))
+       "The person's TeXmacs has closed this file since: this copy may be out of date and is read-only; close the document and open it again."))
 
 (define (not-joined-note d)
   (let ((w (doc-not-joined d))) (and w (string-append w "; read-only"))))
@@ -4089,7 +4098,7 @@
             (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
                    (d (and dref (find-doc dref)))
                    (note (and d (begin (doc-refresh! d)
-                                       (let ((a (change-note d)) (b (proposal-note d)))
+                                       (let ((a (or (stale-note d) (change-note d))) (b (proposal-note d)))
                                          (cond ((and a b) (string-append a " " b))
                                                (else (or a b)))))))
                    (r ((list-ref tool 4) args)))
