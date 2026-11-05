@@ -1314,6 +1314,39 @@
           (set! r (list (y '(1 1 1 3)) (y '(1 2 4 3 2)))))))
     r))
 
+(define (block-moves cl medium)
+  (let ((r '()))
+    (with-body `(document "prev"
+                          (with "font-family" "tt" "code-lines" ,cl
+                            (document "short" "c"
+                                      (concat "x " (strong "short"))))
+                          "next")
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (let ((mv (lambda (from keys)
+                    (go-to (apply at from)) (step (lambda () #t))
+                    (map (lambda (k) (step k) (rel (cursor-path))) keys))))
+          (set! r (list (mv '(1 4 2 1 1) (list kbd-up kbd-up))
+                        (mv '(1 4 2 1 1) (list kbd-down))
+                        (mv '(1 4 2 1 1) (list kbd-right kbd-right)))))))
+    (with-body `(document "first"
+                          (surround "Ab" ""
+                            (with "font-family" "tt" "code-lines" ,cl
+                              (document "aaa" "bb")))
+                          "next")
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (let ((mv (lambda (from keys)
+                    (go-to (apply at from)) (step (lambda () #t))
+                    (map (lambda (k) (step k) (rel (cursor-path))) keys))))
+          (set! r (append r
+                    (list (mv '(1 0 1) (list kbd-right kbd-right kbd-right))
+                          (mv '(1 2 4 0 1)
+                              (list kbd-left kbd-left kbd-left))))))))
+    r))
+
 (define (test-block-ends)
   (check-group "the places before and after a block")
   (for (medium '("papyrus" "paper"))
@@ -1336,6 +1369,34 @@
         (if (== (car ends) '(1 4 2 1))
             (check= (cadr c) (cadr p))
             (check-true (< (abs (- (car c) (car p))) 10000))))))
+  ;; the places at the ends of a block, at the same x as the markers of
+  ;; the bridges around it (told apart by their deltas, as in a line): Up
+  ;; and Down from the end of a last line with markup, Right and Left
+  ;; across the start of a block after a text, as with paragraphs
+  (for (medium '("papyrus" "paper"))
+    (check= (block-moves "true" medium)
+            (block-moves "false" medium)))
+  ;; a selection to a hidden line (the last lines folded): drawn on the
+  ;; line shown, not below it
+  (with-body `(document "prev" (with "font-family" "tt" "code-lines" "true"
+                                 (document "a" "b" "c" "d"))
+                        "next")
+    (lambda ()
+      (init-env "page-medium" "papyrus")
+      (step (lambda () #t))
+      (code-fold-lines (path->tree (at 1 4)) 0 3)
+      (step (lambda () #t))
+      (selection-set (at 1 4 0 0) (at 1 4 0 1))
+      (step (lambda () #t))
+      (let ((one (selection-rectangles)))
+        (selection-set (at 1 4 0 0) (at 1 4 3 1))
+        (step (lambda () #t))
+        (check= (selection-rectangles) one)
+        (selection-set (at 1 4 0 0) (at 1 1))
+        (step (lambda () #t))
+        (check= (selection-rectangles) one))
+      (selection-cancel)
+      (step (lambda () #t))))
   ;; what comes after the block (a QED): on the baseline of its last line
   (let ((r (block-qed-and-line "papyrus")))
     (check= (car r) (cadr r)))

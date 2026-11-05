@@ -556,7 +556,12 @@ struct code_box_rep: public box_rep {
   void   end_of_lines (SI& x, SI& y);
   bool   on_last_row (SI y);
   bool   on_first_row (SI y) {
-    int k, i; row_at (y, k, i); return k == 0 && i == 0; }
+    int k, i; row_at (y, k, i);
+    if (k != 0 || i != 0) return false;
+    if (!rich (0)) return true;
+    // (a line with markup may be wrapped: its first row only)
+    SI gap= max (rpitch - (fn->y2 - fn->y1), (SI) 0);
+    return y >= base (0, 0) + fn->y1 - gap / 2; }
   box    row_box (int k, int i) {
     int a= starts (k) [i], b= row_end (k, i);
     return text_box (line_ip (k), a, line (k) (a, b), fn, pen); }
@@ -573,6 +578,8 @@ struct code_box_rep: public box_rep {
   path      find_rip ();
   path      find_left_box_path ();
   path      find_right_box_path ();
+  path      shown_box_path (path bp);
+  path      line_end_box_path (int k);
   path      find_box_path (path p, bool& found);
   path      find_tree_path (path bp);
   cursor    find_cursor (path bp);
@@ -907,12 +914,8 @@ code_box_rep::end_of_lines (SI& x, SI& y) {
     // (the end of its last row: a line with markup may be wrapped, and the
     // right end of its box is that of its widest row)
     box b= rich_box (k);
-    // the last place in the line (rip: after its last child, a line of
-    // the concater has no place after itself), as the cursor there
-    bool found= false;
-    path bp= b->find_box_path (reverse (b->find_rip ()), found);
-    if (!found) bp= b->find_right_box_path ();
-    cursor cu= b->find_cursor (bp);
+    path bp= find_right_box_path ();
+    cursor cu= b->find_cursor (bp->next);
     x= b->x0 + cu->ox; y= b->y0 + cu->oy;
     return;
   }
@@ -1057,9 +1060,33 @@ code_box_rep::find_left_box_path () {
 
 path
 code_box_rep::find_right_box_path () {
+  // (the end of the last line shown: hidden lines at the end take no row)
   int k= nr_lines () - 1;
-  if (rich (k)) return path (k, rich_box (k)->find_right_box_path ());
+  while (k > 0 && fold (k) == 1) k--;
+  return line_end_box_path (k);
+}
+
+path
+code_box_rep::line_end_box_path (int k) {
+  // the end of the line k (of the last row of a line with markup)
+  if (rich (k)) {
+    box b= rich_box (k);
+    bool found= false;
+    path bp= b->find_box_path (reverse (b->find_rip ()), found);
+    if (!found) bp= b->find_right_box_path ();
+    return path (k, bp);
+  }
   return path (k, single? rb: N (line (k)));
+}
+
+path
+code_box_rep::shown_box_path (path bp) {
+  // where a place is drawn: on a hidden line (no row), at the end of the
+  // line shown before it
+  int k= bp->item;
+  if (k <= 0 || fold (k) != 1) return bp;
+  while (k > 0 && fold (k) == 1) k--;
+  return line_end_box_path (k);
 }
 
 path
@@ -1118,6 +1145,7 @@ cursor
 code_box_rep::find_cursor (path bp) {
   if (is_atom (bp))
     bp= (bp->item == 0? find_left_box_path (): find_right_box_path ());
+  bp= shown_box_path (bp);
   int k= max (0, min (bp->item, nr_lines () - 1));
   if (rich (k)) {
     box b= rich_box (k);
@@ -1154,6 +1182,12 @@ selection
 code_box_rep::find_selection (path lbp, path rbp) {
   if (is_atom (lbp)) lbp= find_left_box_path ();
   if (is_atom (rbp)) rbp= find_right_box_path ();
+  if (lbp != shown_box_path (lbp) || rbp != shown_box_path (rbp)) {
+    // (an end on a hidden line: drawn as at the end of the line shown
+    // before it, with the paths of the places selected)
+    selection sel= find_selection (shown_box_path (lbp), shown_box_path (rbp));
+    return selection (sel->rs, find_tree_path (lbp), find_tree_path (rbp));
+  }
   int k1= lbp->item, k2= rbp->item;
   if (k1 == k2 && rich (k1)) {
     box b= rich_box (k1);
@@ -1327,6 +1361,23 @@ struct code_block_box_rep: public composite_box_rep {
   path find_right_box_path () {
     int n= N(bs); return path (n-1, bs[n-1]->find_right_box_path ()); }
   selection find_selection (path lbp, path rbp);
+  cursor find_cursor (path bp) {
+    // places at the same x are told apart by their deltas, in their order,
+    // as in a line of text: at the end of the last line, the end of the
+    // line 0 and the markers after the block 1, 2...; at the start of the
+    // first line, the markers before the block -1, 0, ... and the start of
+    // the line nb-1 (the line around the block adds 1 at its left end, x
+    // 0: there they are 0, 1, ..., nb, after the end of what is before the
+    // block, -1, as with zero-width items of a line)
+    cursor cu= composite_box_rep::find_cursor (bp);
+    if (!is_atom (bp)) {
+      int c= bp->item;
+      if (c < nb) cu->delta= c - 1;
+      else if (c > nb) cu->delta= c - nb;
+      else if (nb > 0 && cu->ox == sx (nb) && bp->next == path (0, 0))
+        cu->delta= nb - 1;
+    }
+    return cu; }
 };
 
 selection
@@ -1355,23 +1406,31 @@ path
 code_block_box_rep::find_box_path (SI x, SI y, SI delta, bool force,
                                    bool& found) {
   code_box_rep* cb= (code_box_rep*) bs[nb].operator-> ();
-  // (the markers have no width: as in the last line of a paragraph, those
-  // after the block from the end of its text, but only right of it when
-  // the last row is empty, else the last line could not be reached; those
-  // before the block left of its first row)
-  if (na > 0 && (x > ex || (x == ex && ex > 0)) &&
-      cb->on_last_row (y - sy (nb)))
-    for (int c= nb+1; c <= nb+na; c++) {
+  // (the markers have no width, at the places of the end of the last line
+  // and of the start of the first one, and a delta tells them apart, as in
+  // a line of text: see find_cursor. A click, of delta 0, goes to those
+  // after the block right of the text of its last row (at its end, to the
+  // line), to those before it from its left)
+  if (na > 0 && (x > ex || (x == ex && delta >= 1)) &&
+      cb->on_last_row (y - sy (nb))) {
+    int c0= (x == ex? nb + min (delta, (SI) na): nb + 1);
+    for (int i=0; i<na; i++) {
+      int c= nb + 1 + (c0 - nb - 1 + i) % na;
       path r= path (c, bs[c]->find_box_path (x - sx (c), y - sy (c),
-                                             delta, force, found));
+                                             0, force, found));
       if (found) return r;
     }
-  if (nb > 0 && x < 0 && cb->on_first_row (y - sy (nb)))
-    for (int c= nb-1; c >= 0; c--) {
+  }
+  if (nb > 0 && (x < 0 || (x == 0 && delta <= nb - 2)) &&
+      cb->on_first_row (y - sy (nb))) {
+    int c0= (x == 0? max ((int) delta + 1, 0): nb - 1);
+    for (int i=0; i<nb; i++) {
+      int c= (c0 - i + nb) % nb;
       path r= path (c, bs[c]->find_box_path (x - sx (c), y - sy (c),
-                                             delta, force, found));
+                                             0, force, found));
       if (found) return r;
     }
+  }
   return path (nb, bs[nb]->find_box_path (x - sx (nb), y - sy (nb),
                                           delta, force, found));
 }
