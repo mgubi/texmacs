@@ -49,25 +49,39 @@
   The menu appears only while an agent is joined to the document of the
   current window, and only in the window that hosts the file: the first one
   that opened it. A second window of the file (another TeXmacs process, which
-  joined the first) never shows it. To check, ask the agent for <verbatim|list_documents>: the
-  entry of the file must have <verbatim|shared> not null, and
-  <verbatim|agent_mode> says the mode (<verbatim|propose> when you have the
-  file open). If <verbatim|shared> is null the agent has the file alone, and
-  the file is not shared with your window (see the preference above). If the
-  entry has <verbatim|agent_mode> <verbatim|read-only> and a note saying that
-  the file is open in your TeXmacs but not joined, the agent could not join
-  your window (it does not answer, or the content cannot be shared); it
-  neither edits nor saves the file then.
+  joined the first) never shows it. To check, ask the agent for <verbatim|list_documents> and look at the
+  entry of the file:
+
+  <\itemize>
+    <item><verbatim|shared> with the role <verbatim|participant> and
+    <verbatim|agent_mode> <verbatim|propose> (or the mode you chose): the
+    agent joined your window.
+
+    <item>The role <verbatim|host> with one participant: the agent holds the
+    file alone, and your window did not join it (the file was opened in the
+    agent first, or it was loaded before sharing was on).
+
+    <item><verbatim|shared> null, <verbatim|agent_mode>
+    <verbatim|read-only> and a note saying that the file is open in your
+    <TeXmacs> but not joined: the agent could not join your window (the
+    process does not answer, or the content cannot be shared). The agent
+    neither edits nor saves the file then, and a Save in a window of yours
+    that did not join is refused too (use Save as for a copy). This stays so
+    until the agent closes the document and opens it again.
+  </itemize>
 
   <paragraph*|The agent cannot save>
 
   When you have the file open and the mode is not direct, you save the file.
+  When the agent could not join your window (read-only, ``not joined''), its
+  save is refused whatever the mode: the file is yours, and it must close
+  the document and open it again.
 
   <paragraph*|The server keeps running, or uses a lot of the processor>
 
-  It ends when the agent closes its end. An idle server uses a few per cent of a
-  processor at most (about 1.5 per cent was measured). Use the process list to stop a program which has
-  outlived its agent.
+  It ends when the agent closes its end. An idle server uses about 1.5 per
+  cent of a processor (a few per cent at most). Use the process list to stop
+  a program which has outlived its agent.
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 

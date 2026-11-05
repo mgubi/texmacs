@@ -38,7 +38,9 @@
 
   <paragraph*|Tools for editing>
 
-  They are not offered when <verbatim|TEXMACS_MCP_READONLY> is set. Each
+  They are not offered when <verbatim|TEXMACS_MCP_READONLY> is set; nor
+  are <verbatim|withdraw_proposal>, <verbatim|save_document>,
+  <verbatim|close_document> and <verbatim|create_document>. Each
   call is one step which can be undone, and it is applied entirely or not at
   all. An edit says the hash of the node as the agent read it; if the node
   has changed since, the answer is a <em|conflict> with the current content.

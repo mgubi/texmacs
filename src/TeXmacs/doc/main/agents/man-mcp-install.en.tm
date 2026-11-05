@@ -5,8 +5,13 @@
 <\body>
   <tmdoc-title|Installing and connecting an agent>
 
-  There is nothing to install besides <TeXmacs> Upsilon itself: the server is
-  the program, started with the option <verbatim|--mcp>. What you do is to
+  The server needs <TeXmacs> Upsilon (the option <verbatim|--mcp> is not in
+  the official <TeXmacs>), which you can download from
+  <hlink|mgubi.github.io/texmacs|https://mgubi.github.io/texmacs/>. To work
+  on a file which is open in your <TeXmacs>, your <TeXmacs> and the agent's
+  must be the same version of <TeXmacs> Upsilon. There is nothing to install
+  besides it: the server is the program, started with the option
+  <verbatim|--mcp>. What you do is to
   tell your agent which command to run. The agent then starts <TeXmacs> by
   itself, when it needs it, and stops it when it is done.
 
@@ -59,8 +64,12 @@
   </verbatim-code>
 
   By default <verbatim|claude mcp add> registers the server for the current
-  project folder only (the <em|local> scope). Add <verbatim|-s user> to have
-  it in every project.
+  project folder only (the <em|local> scope): run it in the folder where you
+  will use <name|Claude Code>, or add <verbatim|-s user> to have the server
+  in every project. Then start a new <name|Claude Code> session (or use
+  <verbatim|/mcp> in the running one). <verbatim|claude mcp list> shows the
+  server, and <verbatim|claude mcp remove texmacs> removes it (in the same
+  scope).
 
   <paragraph*|<name|Claude Desktop>>
 
@@ -126,8 +135,8 @@
   <paragraph*|The home folder and the log>
 
   The server uses the same home folder as the application:
-  <verbatim|~/.TeXmacs_Upsilon> (<verbatim|%APPDATA%\\TeXmacs_Upsilon> on
-  <name|Windows>), or the folder given by <verbatim|TEXMACS_HOME_PATH>. Your
+  <verbatim|~/.TeXmacs_Upsilon> or the folder given by
+  <verbatim|TEXMACS_HOME_PATH>. Your
   preferences are read from there. Nothing which <TeXmacs> prints can
   disturb the protocol: everything goes to the file
   <verbatim|system/mcp.log> of the home folder, which is renamed when it

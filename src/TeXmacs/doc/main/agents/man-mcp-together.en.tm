@@ -74,16 +74,31 @@
   the one at the cursor or all of them, and <em|Check connection>, which
   asks the agent's program and says in the footer whether it answers.
 
+  When a window joins a file, or an agent joins yours, a message in the
+  footer says so (<em|an agent joined this document>), and another one says
+  when a program which is not marked as an agent joined, or when the file
+  could not be joined (<em|this file is open in another <TeXmacs>, but
+  ...; it is opened from the file, without sharing, and not saved>).
+
   <paragraph*|Who is an agent>
 
   A program which joins your file without a window is taken for an agent,
-  whatever name it gives itself. If it is in fact something you trust, the
-  menu <menu|Tools|Agents> has an entry <menu|Treat ... as a person>.
+  whatever name it gives itself. The entry <menu|Treat ... as a person> of
+  <menu|Tools|Agents> appears only for a program which does not mark itself
+  as an agent; <verbatim|texmacs --mcp> does, so it never gets it.
 
   <paragraph*|Saving>
 
   When you have the file open, you save it: in the propose and read only
   modes the agent's <verbatim|save_document> is refused.
+
+  If a file is held by a <TeXmacs> which the agent (or another window) could
+  not join, it is opened without sharing and <em|read only>: the agent
+  neither edits nor saves it, and a Save in such a window is refused, with a
+  message, so that it never overwrites the file of the window that holds it
+  (Save as writes a copy). The same guard applies to export and to Save as
+  over that file, and it does not depend on the preference. It stays so
+  until the agent closes the document and opens it again.
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 

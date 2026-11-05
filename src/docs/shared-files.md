@@ -3,8 +3,10 @@
 Several TeXmacs processes of the same user which open the same file stay in
 sync, with no server. This is part 1a of step 1 of the
 [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design)
-(sections 3 and 4.4). Not in this part: the cursors of the other
-participants, `texmacs --mcp`, the menus (but see Agents below).
+(sections 3 and 4.4). It is on by default, with a toggle in Edit > Preferences >
+Other (see Switch). Not done: the cursors and the names of the other participants
+(the menus, Tools > Agents and the preference, and `texmacs --mcp` exist; see
+Agents below).
 
 **Switch.** The preference `share-open-files` (`on`/`off`), default **on**
 (since 5 November 2026). To turn it off: Edit > Preferences > Other > "Share
@@ -251,6 +253,18 @@ changed on disk. Really save?" for the save of the previous host. (The same
 call is made when a participant joins.) `autosave-buffer` skips the buffers of
 participants. Save as, and closing, leave the sharing of the buffer.
 
+**A Save that is refused.** A buffer that was not joined to a live host (the cases above:
+the host stalled, did not answer, refused the welcome, or this process did not share)
+keeps that state for the life of the buffer, and its Save is refused with a message (Save
+as writes a copy): it would overwrite the file of the window that holds it. The guard
+(`shared-file-save-guard`, called by `save-buffer-main`, the exports and Save as in
+`tm-files.scm`) looks at the lock of the file, so it holds **whatever the
+preference** says, also for a process that does not share; Save as and export to the
+path of such a file are refused too. When the host has closed the file meanwhile the
+copy is stale: the message says to close and reopen. For an agent
+(`texmacs --mcp`) the document is read only and `save_document` answers `refused`
+(mcp-server.md, "A file the server could not join").
+
 ## Hosting
 
 Priority: interactive first (`(not (headless?))`), then the earlier to have
@@ -264,8 +278,9 @@ number for each).
   If the host does not answer in time or the connection fails, the lock tells:
   free, then there is no host (the file is loaded and this process hosts it);
   held, then a host exists which is busy or stopped, and the file is opened
-  from the file, not shared, with a message in the footer. **A stalled host is
-  never replaced: it holds the lock.** (Any error of `local-connect` other than
+  from the file, not shared, with a message in the footer, **not saved over the host's
+  file** (a Save in this window is refused, see Saving) and, for an agent in it, read
+  only. **A stalled host is never replaced: it holds the lock.** (Any error of `local-connect` other than
   a refusal gives the same: the lock decides.)
 - **A host that is gone, with participants** (the entry is there, the lock is
   free, the entry says that it had participants): they are seeking the lock, and
@@ -280,7 +295,8 @@ number for each).
   it, it hosts (listens, writes the entry). If not, a host appeared meanwhile:
   it joins it, replacing what it read; if the host has no entry yet (it is
   starting) it waits for it in the same way (two seconds), read-only; if the host
-  does not answer, it opens unshared with the message.
+  does not answer, it opens unshared with the message (not saved, and read only for an
+  agent, as above).
 - **Giving up the file** (the file is closed, or a non-interactive host has an
   interactive participant, offered at the hello of the interactive process
   and again every 5 s): the host sends all its changes, then
@@ -354,7 +370,7 @@ process hosts, or only headless ones), the agent edits directly, as before.
   style, read-only, pending, other), `level` says what a person could be asked to
   allow (`style`, `links`) or never (`code`, `limits`, `mode`), `text` is the reason
   with the content concerned. The agent takes its change back (as for any refusal)
-  and `shared-file-verdict` gives it the reasons once. (Stage B, trusted agents, would use the levels; it was built, then set aside on 5 November: see the wiki page MCP-security.)
+  and `shared-file-verdict` gives it the reasons once. (Stage B, trusted agents, would use the levels; it was built, then set aside on 5 November 2026: see the wiki page MCP-security.)
 - **Propose.** The patch is not applied. The host answers `(proposed id state pid)`
   (the agent takes its change back), then edits its own document, as the agent's
   author (the person's undo skips it): the changed blocks are replaced by one block
@@ -603,7 +619,7 @@ checks that the two documents end equal. Running them with
   (no descriptor left, no room) the host tries at each check and steps down after
   5, that is about 5 s.
 
-- The cursors of the participants, the names of the participants, the menus.
+- The cursors of the participants and the names of the participants (the menus exist).
 - Two processes that start to host at the same instant are separated by the
   lock. A `git pull` over a shared file is the business of the host at save
   time, as before. The lock is advisory: a program that does not take it is not

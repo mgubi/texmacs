@@ -27,7 +27,9 @@
     name of another macro. The macros are analysed, not just listed by name.
 
     <item*|Links, files and names>A link goes to a relative address, an
-    anchor, <verbatim|http>, <verbatim|https> or <verbatim|mailto>. A file
+    anchor, <verbatim|http>, <verbatim|https> or <verbatim|mailto>; a link
+    to an absolute path or with <verbatim|..> is accepted too, because a
+    link only acts when you click it. A file
     (an image, an inclusion) is a relative name inside the folder of the
     document or the folders allowed. Labels, keys and values which end up in
     an export have no backslashes, braces, quotes or angle brackets.
