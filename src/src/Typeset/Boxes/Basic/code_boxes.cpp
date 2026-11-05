@@ -17,8 +17,52 @@
 #include "colors.hpp"
 #include "code_boxes.hpp"
 #include "Boxes/change.hpp"
+#include "code_lines.hpp"
 
 extern int redraw_uninterrupted; // (boxes.cpp)
+
+bool
+code_line_hints (tree t, SI cell, array<int>& hp, array<SI>& hw,
+                 array<string>& ht) {
+  if (!code_line_has_hints (t)) return false;
+  code_line_layers l;
+  if (!code_line_layers_of (t, l) || N(l.hint_pos) == 0) return false;
+  for (int k=0; k<N(l.hint_pos); k++) {
+    string h= l.hint_text[k];
+    int chars= 0, i= 0;
+    while (i < N(h)) { tm_char_forwards (h, i); chars++; }
+    hp << l.hint_pos[k];
+    hw << (SI) chars * cell;
+    ht << h;
+  }
+  return true;
+}
+
+// The runs of colours of a line with the colours of its layers over them
+// (the semantic tokens of a language server, code_lines.hpp): a piece of a
+// layer has its colour, the rest that of the syntax, as in
+// typeset_layered_string. The pieces are in order and do not overlap
+static void
+code_overlay_layers (code_runs_entry& c, code_line_layers& l,
+                     code_runs_entry& out) {
+  out.line= -1; out.text= c.text; out.state= c.state;
+  int k= 0;
+  for (int r=0; r<N(c.starts); r++) {
+    int x= c.starts[r], b= c.ends[r];
+    while (x < b) {
+      while (k < N(l.col_start) && l.col_end[k] <= x) k++;
+      int y= b;
+      string col= c.cols[r];
+      if (k < N(l.col_start) && l.col_start[k] <= x) {
+        col= l.col_color[k];
+        y= min (y, l.col_end[k]);
+      }
+      else if (k < N(l.col_start)) y= min (y, l.col_start[k]);
+      out.starts << x; out.ends << y; out.cols << col;
+      x= y;
+    }
+  }
+}
 
 /******************************************************************************
 * A code box shows the lines i0, i0+1... of a document of strings (typeset as
@@ -91,7 +135,8 @@ code_ink (string s, int a, int b) {
 }
 
 void
-code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos) {
+code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos,
+           array<int> hp, array<SI> hw) {
   int n= max (0, min (N(s), upto));
   string t= s (0, n);
   array<SI> raw (n + 1);
@@ -100,8 +145,16 @@ code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos) {
   xpos= array<SI> (n + 1);
   xpos[0]= raw[0];
   SI shift= 0;
-  int i= 0;
+  int i= 0, h= 0;
+  // (the hints before the character at i: it and those after it further)
+  auto hints_at= [&] (int i) {
+    while (h < N(hp) && hp[h] <= i) {
+      if (hp[h] == i) { shift += hw[h]; xpos[i] += hw[h]; }
+      h++;
+    }
+  };
   while (i < n) {
+    hints_at (i);
     int j= i;
     int c= code_control (t, i, j);
     if (c < 0) {
@@ -123,17 +176,19 @@ code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos) {
     shift= end - raw[j];
     i= j;
   }
+  hints_at (n);
 }
 
 array<int>
-code_breaks (string s, font fn, SI width, SI cell, int tabw) {
+code_breaks (string s, font fn, SI width, SI cell, int tabw,
+             array<int> hp, array<SI> hw) {
   // the starts of the rows of s, at most width wide
   array<int> r;
   r << 0;
   int n= N(s);
   if (n == 0 || width <= 0) return r;
   array<SI> xpos;
-  code_xpos (s, n, fn, cell, tabw, xpos);
+  code_xpos (s, n, fn, cell, tabw, xpos, hp, hw);
   if (xpos[n] <= width) return r;
   int a= 0, i= 0, after_space= -1;
   while (i < n) {
@@ -466,7 +521,14 @@ struct code_box_rep: public box_rep {
   // code_xpos), the position in the row i of the line k nearest to x, and
   // the extents of the text between two positions (as a text box)
   void   xpositions (int k, int upto, array<SI>& xp) {
-    code_xpos (line (k), upto, fn, cell, tabw, xp); }
+    // (with the inlay hints of the line: see code_line_hints)
+    array<int> hp; array<SI> hw; array<string> ht;
+    hints (k, hp, hw, ht);
+    code_xpos (line (k), upto, fn, cell, tabw, xp, hp, hw); }
+  bool   hints (int k, array<int>& hp, array<SI>& hw, array<string>& ht) {
+    tree t= line_tree (k);
+    return is_atomic (t) && same_text (t->label, line (k)) &&
+           code_line_hints (t, cell, hp, hw, ht); }
   int    pos_at (int k, int i, SI x, SI delta);
   // (the last line of the block does not end with a newline)
   bool   has_end (int k) {
@@ -671,7 +733,14 @@ code_box_rep::display (renderer ren) {
     // (the number of the line in the document: for one row, the path of
     // the line has it)
     int li= (single? (is_nil (ip)? 0: ip->item): i0 + k);
-    code_runs_entry& c= lx->runs (li, s);
+    code_runs_entry& c0= lx->runs (li, s);
+    // (the colours of the layers of a server over those of the syntax)
+    code_line_layers layers;
+    code_runs_entry over;
+    bool layered= code_line_layers_of (t, layers) &&
+                  N(layers.col_start) > 0 && same_text (t->label, s);
+    if (layered) code_overlay_layers (c0, layers, over);
+    code_runs_entry& c= (layered? over: c0);
     array<SI> xpos;
     xpositions (k, N(s), xpos);
     array<int> st= starts (k);
@@ -704,6 +773,27 @@ code_box_rep::display (renderer ren) {
           if (v > s2) v= s2;
           fn->draw (ren, s (u, v), xpos[u] - xpos[a], y);
           u= v;
+        }
+      }
+      // the inlay hints of a server, in grey in the room before their
+      // characters (a space is not drawn: see typeset_layer_text)
+      array<int> hp; array<SI> hw; array<string> ht;
+      if (hints (k, hp, hw, ht)) {
+        bool last= (i == N(st) - 1);
+        ren->set_pencil (pencil (named_color ("#909090")));
+        for (int h=0; h<N(hp); h++) {
+          int p= hp[h];
+          if (p < a || p > b || (p == b && !last)) continue;
+          SI x= xpos[p] - hw[h] - xpos[a];
+          string txt= ht[h];
+          int u= 0, cnt= 0;
+          while (u < N(txt)) {
+            int v= u;
+            tm_char_forwards (txt, v);
+            if (txt[u] != ' ') fn->draw (ren, txt (u, v), x + cnt * cell, y);
+            cnt++;
+            u= v;
+          }
         }
       }
       if (invis || search_forwards ("<#9>", a, s) >= 0)

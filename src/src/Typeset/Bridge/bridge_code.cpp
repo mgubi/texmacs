@@ -27,17 +27,18 @@ int get_code_rich_made () { return code_rich_made; }
 
 // The state of a line which the features of programs give (tree-sitter,
 // the language servers: System/Language/code_lines.hpp, and
-// src/docs/code-features.md). A line with layers (the colours of a server,
-// inlay hints) is typeset by the concater (typeset_layered_string), as a
-// line with markup; the folds hide lines, as bridge_rep::fold_line does
+// src/docs/code-features.md). The layers of a server are drawn by the box:
+// its colours over those of the syntax, its inlay hints in the room which
+// they take before their characters (code_boxes.cpp); the folds hide
+// lines, as bridge_rep::fold_line does
 
 extern bool typeset_folds; // (not when printing, see bridge.cpp)
 
 static inline bool
 rich_line (tree t) {
-  // a line typeset by the concater: with markup, or with layers
-  if (!is_atomic (t)) return true;
-  return code_line_has_layers (t);
+  // a line typeset by the concater: with markup (the layers of a server,
+  // colours and hints, are drawn by the box)
+  return !is_atomic (t);
 }
 
 static inline int
@@ -140,14 +141,7 @@ struct code_rec_rep: concrete_struct {
   bool               rich;
   stack_border       psb;
   int                pass;   // (the pass in which it was typeset)
-  // outside paper mode, a string with layers (the colours and the hints of
-  // a language server): its box, used again while the line, its layers
-  // (a change of them typesets the line again: update-path, and the record
-  // goes) and what it was typeset with (lsig) are the same
-  box                lbox;
-  unsigned long long lsig;
-  path               llip;
-  code_rec_rep (): wsig (0), psig (0), rich (false), pass (-1), lsig (0) {}
+  code_rec_rep (): wsig (0), psig (0), rich (false), pass (-1) {}
 };
 
 class code_rec {
@@ -496,17 +490,19 @@ bridge_code_rep::line_rec (tree& t, font fn, SI width, SI cw,
   // be too wide, or with markup, unless always: a character is at most cw
   // wide, also <...>)
   bool plain= !rich_line (t);
-  // (a tab, <#9>, is at most tabw cells wide)
+  // (a tab, <#9>, is at most tabw cells wide; inlay hints take room)
   bool tabs= plain && search_forwards ("<#9>", t->label) >= 0;
-  if (!always && plain && !tabs && (SI) N(t->label) * cw <= width)
+  array<int> hp; array<SI> hw; array<string> ht;
+  bool hints= plain && code_line_hints (t, gcell, hp, hw, ht);
+  if (!always && plain && !tabs && !hints && (SI) N(t->label) * cw <= width)
     return code_rec ();
   code_rec r (true);
   code_records_made++;
   r->line= t;
   r->text= (is_atomic (t)? t->label: string (""));
   r->wsig= wsig;
-  if (plain && (tabs || (SI) N(t->label) * cw > width))
-    r->starts= code_breaks (t->label, fn, width, gcell, tabw);
+  if (plain && (tabs || hints || (SI) N(t->label) * cw > width))
+    r->starts= code_breaks (t->label, fn, width, gcell, tabw, hp, hw);
   else r->starts << 0;
   return r;
 }
@@ -689,16 +685,6 @@ bridge_code_rep::my_typeset (int desired_status) {
   else {
     // the rows of a line as the lines of a paragraph, the lines as the
     // paragraphs of a document; a line with markup is a box of its items
-    // (what the box of a string with layers is typeset with: lsig)
-    unsigned long long lsig= sig_mix (sig_mix (wsig,
-      (unsigned long long) env->pen->get_color ()),
-      (unsigned long long) env->pen->get_width ());
-    for (int c=0; code_color_vars[c] != NULL; c++) {
-      string var= code_color_vars[c];
-      lsig= sig_mix (lsig, cols->contains (var)?
-                             1 + (unsigned long long) cols[var]: 0);
-    }
-    if (lsig == 0) lsig= 1;
     array<int> tall_k;
     array<string> tall_txt;
     array<array<int> > tall_st;
@@ -718,26 +704,8 @@ bridge_code_rep::my_typeset (int desired_status) {
         tall_k << i;
         tall_txt << string ("");
         tall_st << one_row[0];
-        // (the path which the line keeps, renumbered in place by the
-        // editor: a box used again keeps a right path)
-        path lip= obtain_ip (doc[i]);
-        if (!ip_attached (lip) || is_nil (lip) || lip->item != i)
-          lip= descend (ip, i);
-        // (a string with layers is typeset again only when it changes, or
-        // what it is typeset with: the lines of a file which a language
-        // server colours are all such lines; a line with markup is
-        // typeset at each pass, its items depend on the macros)
-        code_rec r= recs[i];
-        bool keep= is_atomic (doc[i]) && !is_nil (r) &&
-                   typeset_caches_mode () != 0;
-        box b;
-        if (keep && !is_nil (r->lbox) && r->lsig == lsig && r->llip == lip)
-          b= r->lbox;
-        else {
-          b= rich_box (doc[i], lip, width, cell);
-          if (keep) { r->lbox= b; r->lsig= lsig; r->llip= lip; }
-        }
-        tall_box << b;
+        tall_box << rich_box (doc[i], descend (ip, i), width,
+                              cell);
         tall_fold << fk;
       }
       else if ((!is_nil (recs[i]) && N(recs[i]->starts) > 1) || fk == 2) {
@@ -1076,18 +1044,11 @@ bridge_code_rep::typeset_paper (tree doc, font fn, pencil pen, code_lexer lx,
     path lip= line_path (i);
     if (rich_line (doc[i])) {
       // a line with markup: typeset as a paragraph of its rows, at each
-      // pass (its items depend on the environment and the macros); a
-      // string with layers, only when it or what the rows share changed
-      // (see lbox)
+      // pass (its items depend on the environment and the macros)
       if (r->rich && r->pass == passes) return r;
-      if (is_atomic (doc[i]) && r->rich && r->psig == sig && r->lip == lip &&
-          typeset_caches_mode () != 0) {
-        r->pass= passes;
-        return r;
-      }
       r->pass= passes;
       r->rich= true;
-      r->psig= (is_atomic (doc[i])? sig: 0);
+      r->psig= 0;
       r->lip = lip;
       r->rows= array<box> ();
       r->bs  = array<box> ();

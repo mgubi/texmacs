@@ -51,6 +51,9 @@ bool code_line_layers_of (tree line, code_line_layers& l);
 // whether @line has layers (as code_line_layers_of, without making them: a
 // test for each line of a long file at each typesetting)
 bool code_line_has_layers (tree line);
+// whether it has hints (which take room in the line: the colours alone do
+// not, and a block of lines draws them, see code_boxes.cpp)
+bool code_line_has_hints (tree line);
 tree code_line_layers_tree (tree line);
 
 // positions in a line of program code (a Cork string, see src/docs/code-features.md):

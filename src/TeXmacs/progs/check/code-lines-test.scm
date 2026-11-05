@@ -922,12 +922,12 @@
         (check= (get-env "mode") "math"))))
   (set-fast-environments fast?))
 
-;; The lines with layers (the colours of a language server, on almost all
-;; the lines of a file) are typeset again only when they change: a key
-;; typesets the line of the key, not all the lines with layers again; and a
-;; box kept for such a line is at its place after lines inserted before it
+;; The lines with layers (the colours and the hints of a language server,
+;; on almost all the lines of a file) are drawn by the box, as the colours
+;; of the syntax: no line with layers is typeset by the concater, at a key
+;; or when lines are inserted before them (code_boxes.cpp)
 (define (test-layered-lines)
-  (check-group "lines with layers typeset once")
+  (check-group "lines with layers drawn by the box")
   (for (medium '("papyrus" "paper"))
     (let* ((ls (map (lambda (i) (string-append "int x" (number->string i)
                                                " = f (" (number->string i)
@@ -943,16 +943,20 @@
         (lambda ()
           (init-env "page-medium" medium)
           (step (lambda () #t))
-          (for (t (tree-children (path->tree (at 0 6))))
-            (code-set-line-layers t layers (stree->tree '(tuple))))
-          (update-current-buffer)
-          (step (lambda () #t))
+          (with n0 (typeset-code-rich-made)
+            (for (t (tree-children (path->tree (at 0 6))))
+              (code-set-line-layers t layers
+                                    (stree->tree '(tuple (tuple "4" "v:")))))
+            (update-current-buffer)
+            (step (lambda () #t))
+            ;; (no line typeset by the concater, also the first time)
+            (check= (- (typeset-code-rich-made) n0) 0))
           (go-to (at 0 6 100 3))
           (step (lambda () #t))
           (let ((n0 (typeset-code-rich-made)))
             (step (lambda () (insert "a")))
             (step (lambda () (insert "b")))
-            (check-true (<= (- (typeset-code-rich-made) n0) 4)))
+            (check= (- (typeset-code-rich-made) n0) 0))
           ;; a line inserted before: the lines after it at their places
           (with r (rect 150)
             (go-to (at 0 6 10 0))
@@ -1040,10 +1044,10 @@
           (step (lambda () #t))
           ;; (the block is the argument 8 of the with)
           (let* ((line (path->tree (at 0 8 2 1)))
-                 (x (lambda () (car (tree-bounding-rectangle line))))
+                 (x (lambda () (caddr (tree-bounding-rectangle line))))
                  (x0 (x)))
-            ;; a hint in a token comes before the token (typeset_layered_
-            ;; string): the text of the line is further
+            ;; a hint takes room before its character (the box draws it,
+            ;; code_line_hints): the end of the line is further
             (code-set-line-layers line
                                   (stree->tree '(tuple (tuple "0" "1" "red")))
                                   (stree->tree '(tuple (tuple "1" "hint:"))))

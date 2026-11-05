@@ -90,10 +90,20 @@ int code_control (string s, int i, int& j);
 // the positions of the characters of s up to upto, from the start of the
 // line: as the font gives them, but a tab goes to the next stop (every tabw
 // cells of width cell) and another control character is a cell wide
+// (hp, hw: the inlay hints of a language server, before the characters hp,
+// hw wide: the characters from hp on are further; see code_line_hints)
 void code_xpos (string s, int upto, font fn, SI cell, int tabw,
-                array<SI>& xpos);
+                array<SI>& xpos, array<int> hp= array<int> (),
+                array<SI> hw= array<SI> ());
 // the starts of the rows of the text s, at most width wide
-array<int> code_breaks (string s, font fn, SI width, SI cell, int tabw);
+array<int> code_breaks (string s, font fn, SI width, SI cell, int tabw,
+                        array<int> hp= array<int> (),
+                        array<SI> hw= array<SI> ());
+// the inlay hints of the line t (its layers, code_lines.hpp): their
+// positions, their widths (a cell for each character, as the other
+// characters of the grid) and their texts; false when it has none
+bool code_line_hints (tree t, SI cell, array<int>& hp, array<SI>& hw,
+                      array<string>& ht);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines

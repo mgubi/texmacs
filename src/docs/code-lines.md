@@ -100,17 +100,20 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
   highlight observers of the line, which `treesit-schedule-updates` changes
   after a parse (an `update-path` of the line, which drops what the block
   kept for it).
-- **Layers** (`code_line_has_layers`, `code_line_layers_of`: the colours and
-  the inlay hints of a server). Such a line is typeset by the concater
-  (`typeset_layered_string`) and put on the grid; a hint inside a token comes
-  before the token. A server colours almost all the lines of a file: the
-  box of such a line (papyrus, `lbox` of its record) or its items (paper)
-  are used again while the line, its layers (a server which changes them
-  typesets the line again, `update-path`: the record goes) and what it is
-  typeset with (`lsig`: the fonts, the width, the colours) are the same.
-  A line with markup is typeset at each pass (its items depend on the
-  macros, it may have labels). `typeset-code-rich-made` counts the lines
-  typeset by the concater.
+- **Layers** (`code_line_layers_of`: the colours and the inlay hints of a
+  server, on almost all the lines of a file). They are drawn by the box, as
+  the colours of the syntax, only for the lines which are drawn: a line
+  with layers is a plain line, typeset by nothing. The colours of the
+  layers are put over those of the syntax (`code_overlay_layers`, as
+  `typeset_layered_string` does in a paragraph); a hint takes the room of
+  its characters (a cell each) before its character, in the positions of
+  the line (`code_line_hints`, `code_xpos`: the cursor, the clicks, the
+  selections and the soft line breaks see it; the cursor at its character
+  is after it) and is drawn in grey. Nothing is kept, so nothing goes out
+  of date: a change of the layers, the language, the colours or the
+  comments before the line is seen at the next drawing.
+  `typeset-code-rich-made` counts the lines typeset by the concater (with
+  markup).
 - **Folds** (`code_line_fold_state`). A hidden line takes no room and is not
   drawn: in papyrus, the lines after it are a line higher; in paper, its page
   items are hidden, as `bridge_rep::fold_line` does. The line before hidden

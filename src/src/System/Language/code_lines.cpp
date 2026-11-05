@@ -160,6 +160,12 @@ code_line_layers_of (tree t, code_line_layers& l) {
 }
 
 bool
+code_line_has_hints (tree t) {
+  if (!is_atomic (t) || is_nil (t->obs)) return false;
+  return has_highlight (t, CODE_LAYER_HINTS);
+}
+
+bool
 code_line_has_layers (tree t) {
   if (!is_atomic (t) || is_nil (t->obs)) return false;
   return has_highlight (t, CODE_LAYER_COLORS) ||
