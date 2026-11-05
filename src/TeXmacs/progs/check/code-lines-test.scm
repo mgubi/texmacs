@@ -1217,6 +1217,83 @@
             (check-true (and (pair? st) (pair? (cdr st))
                              (>= (cadr st) 1)))))))))
 
+;; The places before and after a block nested in markup: Up, Down and
+;; clicks around it, and the cursor after it when its last line is wrapped
+;; markup or folded, are those of the same lines as paragraphs
+(define block-long-markup
+  `(concat "x " (strong ,(apply string-append (make-list 60 "word ")))))
+
+(define (block-ends-run cl medium lines fold)
+  (let ((r '()))
+    (with-body `(document "before text"
+                          (with "font-family" "tt" "code-lines" ,cl
+                            (document ,@lines))
+                          "next paragraph")
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (when fold
+          (code-fold-lines (path->tree (at 1 4)) 0 fold)
+          (step (lambda () #t)))
+        (let* ((cxy (lambda (p)
+                      (go-to (apply at p)) (step (lambda () #t))
+                      (list (get-cursor-x) (get-cursor-y))))
+               (mv (lambda (from keys)
+                     (go-to (apply at from)) (step (lambda () #t))
+                     (map (lambda (k) (step k) (rel (cursor-path))) keys)))
+               (click (lambda (x y)
+                        (mouse-any "press-left" x y 1 1000.0 '())
+                        (mouse-any "release-left" x y 0 1100.0 '())
+                        (step (lambda () #t))
+                        (rel (cursor-path)))))
+          (set! r (list (cxy '(1 1))
+                        (mv '(1 1) (list kbd-up kbd-up kbd-down kbd-down))
+                        (mv '(2 2) (list kbd-up kbd-up))))
+          (when (not fold)
+            (let ((p1 (cxy '(1 4 1 0))) (p0 (cxy '(1 4 0 0))))
+              (set! r (append r
+                        (list (click (- (car p1) 2000) (+ (cadr p1) 100))
+                              (click (- (car p0) 2000)
+                                     (+ (cadr p0) 100))))))))))
+    r))
+
+(define (block-end-and-line cl medium lines fold end)
+  ;; the cursor after the block, and at a place of its last line
+  (let ((r #f))
+    (with-body `(document "before text"
+                          (with "font-family" "tt" "code-lines" ,cl
+                            (document ,@lines))
+                          "next paragraph")
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (when fold
+          (code-fold-lines (path->tree (at 1 4)) 0 fold)
+          (step (lambda () #t)))
+        (let ((cxy (lambda (p)
+                     (go-to (apply at p)) (step (lambda () #t))
+                     (list (get-cursor-x) (get-cursor-y)))))
+          (set! r (list (cxy '(1 1)) (cxy end))))))
+    r))
+
+(define (test-block-ends)
+  (check-group "the places before and after a block")
+  (for (medium '("papyrus" "paper"))
+    ;; Up, Down, clicks left of the lines: as with paragraphs
+    (check= (block-ends-run "true" medium '("short" "longer line here" "cc") #f)
+            (block-ends-run "false" medium '("short" "longer line here" "cc") #f))
+    ;; a last line with markup, wrapped (at other places than as a
+    ;; paragraph: a grid of cells): after the block is at its end
+    (let ((r (block-end-and-line "true" medium (list "a" "b" block-long-markup)
+                                 #f '(1 4 2 1 1))))
+      (check= (car r) (cadr r))))
+  ;; the last lines folded (papyrus; in paper mode, as with paragraphs, the
+  ;; hidden lines are clipped to a point): after the block is on the
+  ;; baseline of the line shown
+  (let ((r (block-end-and-line "true" "papyrus" '("a" "b" "c" "d") 3
+                               '(1 4 0 1))))
+    (check= (car r) (cadr r))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1250,6 +1327,7 @@
   (test-hints)
   (test-export-formats)
   (test-one-rich-line)
+  (test-block-ends)
   (test-folds)
   (test-layers)
   (test-tree-sitter)
