@@ -1294,21 +1294,18 @@
         (else #t)))
 
 (define (table-structure-bad? st)
-  ;; the children of a table are rows and those of a row are cells, not strings,
-  ;; and a tformat ends with a table: the typesetter indexes them
+;; What the typesetter and the editor cannot take: a table with no row, a row with no
+  ;; cell, a child of a table that is a string or has no child (a row is expected: loose
+  ;; rows with something, like a `with', `document', `arg' or a macro, typeset), a child of
+  ;; a row with no child, a tformat that ends with a string, and a document with no
+  ;; paragraph. (Found by experiment: strings in a row, `with', `document' and `arg' as the
+  ;; child of a row are fine.)
+  (define (empty-node? k) (and (pair? k) (null? (cdr k))))
   (let ((tag (car st)) (kids (cdr st)))
     (or (and (eq? tag 'document) (null? kids))   ; (the editor puts a document with an empty paragraph in its place)
-        (and (memq tag '(table row)) (or (null? kids) (list-or (map string? kids))))
-        ;; (a table of anything but rows: the typesetter takes them for rows and cells; a
-        ;; macro of the styles may make a row or a cell, a primitive that is not one cannot)
-        (and (eq? tag 'table)
-             (list-or (map (lambda (k) (and (pair? k) (symbol? (car k)) (!= (car k) 'row)
-                                            (or (known-primitive? (car k)) (memq (car k) '(set-cursor cursor cursor-clear start end)))))
-                           kids)))
-        (and (eq? tag 'row)
-             (list-or (map (lambda (k) (and (pair? k) (symbol? (car k)) (!= (car k) 'cell)
-                                            (or (known-primitive? (car k)) (memq (car k) '(set-cursor cursor cursor-clear start end)))))
-                           kids)))
+        (and (memq tag '(table row)) (null? kids))
+        (and (eq? tag 'table) (or (list-or (map string? kids)) (list-or (map empty-node? kids))))
+        (and (eq? tag 'row) (list-or (map empty-node? kids)))
         (and (eq? tag 'tformat) (pair? kids) (string? (cAr kids))))))
 
 (tm-define (mcp-stree-arity-ok? st)

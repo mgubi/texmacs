@@ -90,6 +90,7 @@
    (act "assign-node-string" (attempt "assign-node to the label of a string" (patch-msg (pp '(assign-node (1 3) "string") '(assign-node (1 3) concat))) "refused"))
    (act "symbol-quote" (attempt "a long message with a tag like l'x is read (and refused as unknown), not dropped"
                                 (patch-msg (ins-block 4 (list 'concat (make-string 3500 #\x) (list (string->symbol "l'x") "a")))) "refused"))
+   (act "table-tuple" (attempt "a table of tuples is refused" (patch-msg (ins-block 4 '(table (tuple)))) "arity"))
    (act "ornament" (attempt "an ornament is inserted" (patch-msg (ins-block 6 '(ornament "x"))) "applied"))
    (act "ornament-empty" (attempt "removing the only child of the ornament is refused (arity)" (patch-msg (pp '(remove (1 6 0 1) "") '(insert (1 6 0) "x"))) "arity"))
    (act "wrong-syntax" (attempt "a deep tree hidden by #| |# is dropped"

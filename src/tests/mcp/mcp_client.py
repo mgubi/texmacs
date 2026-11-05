@@ -1637,6 +1637,16 @@ def s_content(w):
     for bad in ('(with)', '(frac "a")', '(table)', '(row)', '(cell)', '(concat)', '(tformat)',
                 '(sqrt)', '(document "a" (frac "b"))', '(rsub "a" "b")', '(tuple "a" (with))'):
         refused("malformed %s" % bad, "stree", bad, "cannot have")
+    # tables: what the typesetter and the editor cannot take is refused, loose rows are not
+    for bad in ('(table "X")', '(table (row (cell "a")) "X")', '(table (tuple))',
+                '(table (row (tuple)))', '(tformat (table (row (cell "a"))) "X")'):
+        refused("table structure %s" % bad, "stree", bad, "needed")
+    refused("a table of set-cursor", "stree", '(table (set-cursor))', "`set-cursor'")
+    refused("an empty row among rows", "stree", '(table (row (cell "a")) (row))', "needed")
+    for ok in ('(table (row (cell "a") (cell "b")))', '(table (row (with "color" "blue" "x")))',
+               '(table (row (document "a")))', '(table (row "1" "2"))', '(table (row (concat "a" "b")))',
+               '(tformat (twith "table-width" "1par") (table (row (cell "a"))))'):
+        accepted("table shape %s" % ok, "stree", ok)
     r = m.request("ping")
     check("the server is alive after the malformed trees", r is not None and "result" in r)
     e, t2 = m.tool("read", document="d1", format="text")
