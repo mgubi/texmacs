@@ -540,9 +540,7 @@
 
 (define (test-html-pattern-background)
   (check-group "html export: a pattern as background of a cell")
-  ;; (a document holds the name of a pattern as url->unix gives it, see
-  ;; encode-pattern-name: with / on Windows too)
-  (let* ((shipped (url->unix
+  (let* ((shipped (url->system
                    (url-resolve "$TEXMACS_PATH/misc/patterns/floral/paisley.png"
                                 "r")))
          (found (html-export-of-buffer
@@ -571,8 +569,18 @@
          (plain (html-export-of-buffer
                  (pattern-cell-sample "red"))))
     (check-true (string-occurs? "background: url('" found))
-    (check-true (string-occurs? (string-append "background: url('" shipped "')")
+    ;; the file which was found, by an address a browser reads: as it is
+    ;; on Unix, file:///D:/... for D:\... on Windows
+    (check-true (string-occurs? (string-append "background: url('"
+                                               (tmhtml-pattern-address shipped)
+                                               "')")
                                 found))
+    (check-true (string-occurs? "/misc/patterns/floral/paisley.png')" found))
+    (check-false (string-occurs? "%5c" found))
+    (check= (tmhtml-pattern-address "D:\\a\\b c.png") "file:///D:/a/b c.png")
+    (check= (tmhtml-pattern-address "c:/a/b.png") "file:///c:/a/b.png")
+    (check= (tmhtml-pattern-address "/a/b.png") "/a/b.png")
+    (check= (tmhtml-pattern-address "floral/paisley.png") "floral/paisley.png")
     (check-true (string-occurs? "background-size: " found))
     (check-true (string-occurs? "background: url('nowhere-yet.png')" missing))
     (check-true (string-occurs? "background-size: 100% 100%" missing))
