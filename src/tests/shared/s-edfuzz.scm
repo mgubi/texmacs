@@ -24,7 +24,7 @@
         (let ((i (rnd (- (length s) 1))))
           (loop (list-ref s (+ i 1)) (cons i acc)))
         (reverse acc))))
-(define trees (list "" "ab" "x" '(frac "a" "b") '(tuple "a" (frac "b" "c")) '(concat "u" "v") '(document "n") '(tuple) '(frac "a") '(label "l") '(table (row (cell "a"))) '(tformat (twith "table-width" "1par") (table (row (cell "a") (cell "b")))) '(with "color" "red" "x") '(cursor "1") '(cursor-clear "1") '(hlink "a" "b") '(graphics (line (point "0" "0") (point "1" "1"))) '(ornament "a") '(sqrt) '(cell "z") '(row (cell "c")) '(document) '(concat) '(set-cursor "1")))
+(define trees (list "" "ab" "x" '(frac "a" "b") '(tuple "a" (frac "b" "c")) '(concat "u" "v") '(document "n") '(tuple) '(frac "a") '(label "l") '(table (row (cell "a"))) '(tformat (twith "table-width" "1par") (table (row (cell "a") (cell "b")))) '(with "color" "red" "x") '(cursor "1") '(cursor-clear "1") '(hlink "a" "b") '(graphics (line (point "0" "0") (point "1" "1"))) '(table "X") '(tformat (table "X")) '(row "x") '(table (row "X")) '(cell (table "X")) '(subtable (table (row (cell "a")))) '(ornament "a") '(sqrt) '(cell "z") '(row (cell "c")) '(document) '(concat) '(set-cursor "1")))
 (define (gen-mod st)
   (let* ((np (rand-node-path st))
          (n (stree-ref st np))
@@ -81,6 +81,8 @@
   (set! shadow dt0)
   (tree-set (bt) (tree-ref dt0 1)))
 
+(define typeset-every (string->number (or (getenv "FZ_TYPESET") "3")))   ; typeset every n patches
+
 (define (fuzz-buffer!)
   (let ((file (string-append SYNC "/ed.tm")))
     (string-save "<TeXmacs|2.1.2>\n\n<style|<tuple|generic>>\n\n<\\body>\n  abc\n</body>\n" (string->url file))
@@ -95,12 +97,16 @@
           (lambda (p t2)
             (when p
               (let ((bp (shared-body-patch p)))
-                (when (and bp (patch-applicable? bp (bt)))
+                (when (and bp (patch-applicable? bp (bt)) (shared-patch-acceptable? p (tree-ref shadow 1)))
                   (with-author 12345 (patch-inplace-apply (bt) bp))
                   (set! nap (+ nap 1))
                   (set! shadow t2)
+                  (when (== 0 (modulo nap typeset-every))
+                    (when (getenv "FZ_DEBUG") (string-save (object->string (tm->stree (bt))) (string->url (getenv "FZ_DEBUG"))))
+                    (update-forced))
                   (unless (== (tm->stree (bt)) (tm->stree (tree-ref shadow 1)))
                     (set! nmis (+ nmis 1))
+                    (when (< nmis 4) (log2! (list "MISMATCH" i (patch->scheme p))))
                     (reset!)))))))
         (when (> (string-length (object->string (tm->stree shadow))) 4000) (reset!))
         (loop (+ i 1))))
@@ -110,7 +116,8 @@
   (list
    (act "fuzz" (fuzz-buffer!)
         (check "the editor survived the random patches" #t)
-        (check "and many of them applied" (> nap 100)))
+        (check "and many of them applied" (> nap 100))
+        (check "applied in place they give what they give as a pure function" (= nmis 0)))
    (act "go" (sync-set! "a-done"))
    (wait-sync "b-done")))
 (define (B-steps)

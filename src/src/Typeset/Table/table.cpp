@@ -86,6 +86,10 @@ table_rep::typeset (tree t, path iq) {
 void
 table_rep::typeset_table (tree fm, tree t, path ip) {
   int i;
+  // (a table that is not a table, from a patch of another process or a file:
+  // a string is a table with one row and one cell)
+  if (is_atomic (t)) t= tree (TABLE, tree (ROW, tree (CELL, t)));
+  if (N(t) == 0) t= tree (TABLE, tree (ROW, tree (CELL, "")));
   nr_rows= N(t);
   nr_cols= 0;
   T= tm_new_array<cell*> (nr_rows);
@@ -107,6 +111,9 @@ void
 table_rep::typeset_row (int i, tree fm, tree t, path ip) {
   //ASSERT (i==0 || nr_cols == N(t), "inconsistent number of columns");
   int j;
+  // (a row that is a string: a row with one cell)
+  if (is_atomic (t)) t= tree (ROW, tree (CELL, t));
+  if (N(t) == 0) t= tree (ROW, tree (CELL, ""));
   nr_cols= (i==0? N(t): min (nr_cols, N(t)));
   T[i]= tm_new_array<cell> (nr_cols);
   STACK_NEW_ARRAY (subformat, tree, nr_cols);

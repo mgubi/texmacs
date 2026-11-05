@@ -475,6 +475,28 @@ process hosts, or only headless ones), the agent edits directly, as before.
   patch in 2000 the buffer after the in-place application differs from the same patch applied
   as a pure function (the editor corrects the tree: not studied).
 
+- **Structure.** Besides the arity, a patch (and the agent's content) is refused when a table
+  has a string for a row, a row a string for a cell, a `tformat` ends with a string, a table or a
+  row has no child, or a `document` has none (the editor puts a document with an empty
+  paragraph in its place, so the host and the participants would differ). The typesetter
+  (`table.cpp`) also treats a string where a table or a row is expected as a table or a row with
+  one cell, an empty table or row as one with an empty cell, and the curves of the graphics
+  (`concat_graphics.cpp`) show an error unless all their points have two or three
+  coordinates and the same number: all of them crashed it.
+- **`assign-node` to the label of a string** was applicable (`can_assign_node`): the compound
+  became a "string" made of the pointers to its children. It is refused in C++ and by the shape
+  check (the label must be a symbol).
+- **Symbols.** `#`, `'`, `,`, backquote and `|` are accepted by the scanner of messages inside a
+  token, after a character of an atom (the printer writes the name of a macro like `l'x` so,
+  and the reader reads it as one symbol), never at the start of a token or after a space, a
+  parenthesis or the end of a string.
+- `edfuzz` now also typesets (`update-forced` every third patch, `FZ_TYPESET` to change it),
+  applies only what the host accepts (`shared-patch-acceptable?`) and fails if the buffer after
+  an in-place application differs from the pure result (it did for empty documents, and for
+  `assign-node` to a string). 7 runs of 20000 iterations pass. Typesetting arbitrary garbage
+  (another primitive with children that its box code does not expect) can still crash the
+  typesetter: it was never made robust to every tree.
+
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a
 participant (`msg-text` now raises the print length). The tests had small documents.

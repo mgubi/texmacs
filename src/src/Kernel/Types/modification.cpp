@@ -206,7 +206,9 @@ can_join (tree t, path p, int pos) {
 
 bool
 can_assign_node (tree t, path p, tree_label op) {
-  (void) op;
+  // (the new label of a compound is not that of a string: it would become a
+  // "string" made of the pointers to its children)
+  if (op == TMSTRING || op == UNKNOWN || op == UNINIT) return false;
   return has_subtree (t, p) && is_compound (subtree (t, p));
 }
 

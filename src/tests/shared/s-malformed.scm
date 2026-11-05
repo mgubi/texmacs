@@ -85,6 +85,11 @@
                                               ")) (remove (1 4 1) \"\")))")) #f))
    (act "alive after deep" (attempt "and the host answers after it" (patch-msg (ins-block 4 "good one")) "applied"))
    (act "dishonest" (attempt "a dishonest inverse: the forward patch counts" (patch-msg (pp '(insert (1 5) (document "good two")) '(insert (1 0) (document "evil")))) "applied"))
+   (act "table-x" (attempt "a table with a string for a row is refused (typesetter crash)" (patch-msg (ins-block 4 '(table "X"))) "arity"))
+   (act "empty-table" (attempt "an empty table is refused" (patch-msg (ins-block 4 '(table (row)))) "arity"))
+   (act "assign-node-string" (attempt "assign-node to the label of a string" (patch-msg (pp '(assign-node (1 3) "string") '(assign-node (1 3) concat))) "refused"))
+   (act "symbol-quote" (attempt "a long message with a tag like l'x is read (and refused as unknown), not dropped"
+                                (patch-msg (ins-block 4 (list 'concat (make-string 3500 #\x) (list (string->symbol "l'x") "a")))) "refused"))
    (act "ornament" (attempt "an ornament is inserted" (patch-msg (ins-block 6 '(ornament "x"))) "applied"))
    (act "ornament-empty" (attempt "removing the only child of the ornament is refused (arity)" (patch-msg (pp '(remove (1 6 0 1) "") '(insert (1 6 0) "x"))) "arity"))
    (act "wrong-syntax" (attempt "a deep tree hidden by #| |# is dropped"

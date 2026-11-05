@@ -347,28 +347,37 @@
 (define (nesting-ok? s)
   ;; Messages are written by object->string: parentheses, atoms, strings, numbers,
   ;; #t and #f. Anything else outside a string (#\x, #| |#, ; comments, quote
-  ;; characters, | symbols, backslashes) makes the message refused: the reader
-  ;; knows more syntax than this scanner, and what it hides defeats the count.
+  ;; characters at the start of a token, | symbols, backslashes) makes the message
+  ;; refused: the reader knows more syntax than this scanner, and what it hides
+  ;; defeats the count. The characters # ' , ` | inside a token (the name of a
+  ;; macro like `l'x') are part of the symbol for the reader, and the printer
+  ;; writes them so: they are accepted when the previous character belongs to
+  ;; an atom (never after a space, a parenthesis or the end of a string, where
+  ;; they would start something).
   (or (< (string-length s) (* 2 sf-max-depth))
       (let ((n (string-length s)))
-        (let loop ((i 0) (depth 0) (in-str #f))
+        (let loop ((i 0) (depth 0) (in-str #f) (atom #f))
           (if (>= i n)
               (not in-str)
               (let ((c (string-ref s i)))
                 (cond (in-str
-                        (cond ((char=? c #\\) (loop (+ i 2) depth #t))
-                              ((char=? c #\") (loop (+ i 1) depth #f))
-                              (else (loop (+ i 1) depth #t))))
-                      ((char=? c #\") (loop (+ i 1) depth #t))
+                        (cond ((char=? c #\\) (loop (+ i 2) depth #t #f))
+                              ((char=? c #\") (loop (+ i 1) depth #f #f))
+                              (else (loop (+ i 1) depth #t #f))))
+                      ((char=? c #\") (loop (+ i 1) depth #t #f))
                       ((char=? c #\()
-                       (and (< depth sf-max-depth) (loop (+ i 1) (+ depth 1) #f)))
-                      ((char=? c #\)) (loop (+ i 1) (max 0 (- depth 1)) #f))
-                      ((char=? c #\#)
+                       (and (< depth sf-max-depth) (loop (+ i 1) (+ depth 1) #f #f)))
+                      ((char=? c #\)) (loop (+ i 1) (max 0 (- depth 1)) #f #f))
+                      ((or (char=? c #\space) (char=? c #\newline) (char=? c #\tab) (char=? c #\return))
+                       (loop (+ i 1) depth #f #f))
+                      ((and (char=? c #\#) (not atom))
                        (and (< (+ i 1) n) (memv (string-ref s (+ i 1)) '(#\t #\f))
                             (or (>= (+ i 2) n) (delimiter? (string-ref s (+ i 2))))
-                            (loop (+ i 2) depth #f)))
-                      ((memv c '(#\| #\; #\' #\` #\, #\\)) #f)
-                      (else (loop (+ i 1) depth #f)))))))))
+                            (loop (+ i 2) depth #f #f)))
+                      ((memv c '(#\; #\\)) #f)
+                      ((memv c '(#\# #\| #\' #\` #\,))
+                       (and atom (loop (+ i 1) depth #f #t)))
+                      (else (loop (+ i 1) depth #f #t)))))))))
 
 (define (read-object-checked s)
   ;; the object written in @s, if it is not nested too deep (see nesting-ok?)
@@ -483,7 +492,8 @@
 (define (mod-shape-ok? x)
   (and (list? x) (= (length x) 3) (memq (car x) mod-kinds)
        (let ((path (cadr x)))
-         (and (list? path)
+         (and (or (not (eq? (car x) 'assign-node)) (symbol? (caddr x)))
+              (list? path)
               (list-and (map (lambda (i) (and (integer? i) (>= i 0) (<= i 1000000))) path))
               (>= (length path) (mod-min-length (car x)))
               (memv (car path) '(0 1))
@@ -1178,11 +1188,16 @@
         (or (not bp)
             (let* ((new (patch-apply body bp)) (range (shared-changed-blocks body new)))
               (cond ((not range) #t)
+                    ((and (tm-is? new 'document) (= (tree-arity new) 0)) #f)
                     ((eq? range 'bad) #f)
                     (else (list-and (map (lambda (b) (mcp-stree-arity-ok? (tm->stree b)))
                                          (sublist (tree-children new) (car range)
                                                   (+ (car range) (caddr range))))))))))) 
     (lambda args #f)))
+
+(tm-define (shared-patch-acceptable? p body)
+  (:synopsis "For the tests: does the host accept the patch @p on the body @body as far as arities and structure go?")
+  (patch-arity-ok? p body))
 
 (define (blocks-stree body p n)
   (map tm->stree (sublist (tree-children body) p (+ p n))))

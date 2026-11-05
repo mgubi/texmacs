@@ -1287,8 +1287,19 @@
              (violate! (string-append "the tag `" (symbol->string tag)
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
+           (when (table-structure-bad? st)
+             (violate! (string-append "the tag `" (symbol->string tag)
+                                        "' has a string where a row, a cell or a table is needed (nothing was changed)")))
            (for (c (cdr st)) (check-arity c d))))
         (else #t)))
+
+(define (table-structure-bad? st)
+  ;; the children of a table are rows and those of a row are cells, not strings,
+  ;; and a tformat ends with a table: the typesetter indexes them
+  (let ((tag (car st)) (kids (cdr st)))
+    (or (and (eq? tag 'document) (null? kids))   ; (the editor puts a document with an empty paragraph in its place)
+        (and (memq tag '(table row)) (or (null? kids) (list-or (map string? kids))))
+        (and (eq? tag 'tformat) (pair? kids) (string? (cAr kids))))))
 
 (tm-define (mcp-stree-arity-ok? st)
   ;; no tag that the DRD knows as a primitive has a number of children it cannot
@@ -1296,6 +1307,7 @@
   ;; `canvas', `hlink', `with'...). For any tree that comes from another process.
   (cond ((not (pair? st)) #t)
         ((not (symbol? (car st))) #f)
+        ((table-structure-bad? st) #f)
         (else
           (and (or (eq? (car st) 'document)
                    (not (known-primitive? (car st)))
