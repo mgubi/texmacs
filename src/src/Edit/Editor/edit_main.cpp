@@ -650,6 +650,18 @@ edit_main_rep::show_selection () {
   cout << "logical   selection: " << sel->start << " --- " << sel->end << "\n";
 }
 
+array<int>
+edit_main_rep::get_selection_rectangles () {
+  // the rectangles of the selection as it is drawn (x1 y1 x2 y2 each), for
+  // the tests
+  array<int> r;
+  for (rectangles rs= selection_rects; !is_nil (rs); rs= rs->next) {
+    rectangle q= rs->item;
+    r << (int) q->x1 << (int) q->y1 << (int) q->x2 << (int) q->y2;
+  }
+  return r;
+}
+
 void
 edit_main_rep::show_meminfo () {
   mem_info ();

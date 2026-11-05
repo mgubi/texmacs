@@ -183,8 +183,22 @@ the lines being copied at each key: #811 too (11 ms).
   justify; in the others that cursor is at the right margin.
   In papyrus mode the markers of the bridges around a block (the places
   before and after it) are inside the block box (`code_block_box`), at the
-  start of its first line and at the end of its last one, and only a click
-  left of the first row or right of the text of the last row reaches them.
+  start of its first line and at the end of its last one: a click reaches
+  those after it from the end of the text of the last row (only right of
+  it when the last row is empty, so that an empty last line can be
+  reached; in paper mode, as with paragraphs, a click on an empty last
+  line goes after the block), those before it left of the first row. What
+  else comes after the block (the right part of a surround, a QED) is on
+  the baseline of its last line, after the box (at the right margin).
+- **Text before a block** (the left part of a surround, "Proof."), papyrus
+  mode: it is in the line of the paragraph with the block, which it moves
+  right (past the margin for a full row), and Up and Down from the
+  paragraphs around go to it rather than into the block (the line finds
+  its children by their x).
+- **Up after a block whose last lines are folded** goes into the hidden
+  lines, as with paragraphs (in paper mode, the cursor after such a block
+  is on the baseline of the next paragraph, also as with paragraphs: the
+  hidden lines are clipped to a point).
 - **A line does not change the environment** of the lines after it (an
   `assign` in a line). The environment at a place is that of the markup on
   the way to it in its own line (`bridge_code_rep::my_exec_until` walks the

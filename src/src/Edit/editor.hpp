@@ -654,6 +654,7 @@ public:
   virtual void show_path () = 0;
   virtual void show_cursor () = 0;
   virtual void show_selection () = 0;
+  virtual array<int> get_selection_rectangles () = 0;
   virtual void show_meminfo () = 0;
   virtual void edit_special () = 0;
   virtual void edit_test () = 0;

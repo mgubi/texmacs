@@ -1322,15 +1322,45 @@ struct code_block_box_rep: public composite_box_rep {
       finalize (); }
   operator tree () { return tree (TUPLE, "code block", (tree) bs[nb]); }
   path find_box_path (SI x, SI y, SI delta, bool force, bool& found);
+  path find_left_box_path () {
+    return path (0, bs[0]->find_left_box_path ()); }
+  path find_right_box_path () {
+    int n= N(bs); return path (n-1, bs[n-1]->find_right_box_path ()); }
+  selection find_selection (path lbp, path rbp);
 };
+
+selection
+code_block_box_rep::find_selection (path lbp, path rbp) {
+  // (as a line of text: the part in each child; the markers have no width,
+  // only the part in the lines of the block is shown)
+  if (!is_atom (lbp) && !is_atom (rbp) && lbp->item == rbp->item)
+    return composite_box_rep::find_selection (lbp, rbp);
+  int n= N(bs);
+  int i1= is_atom (lbp)? 0: lbp->item;
+  int i2= is_atom (rbp)? n-1: rbp->item;
+  path lp= find_tree_path (lbp), rp= find_tree_path (rbp);
+  rectangles rs;
+  if (i1 <= nb && nb <= i2) {
+    path l= (i1 == nb && !is_atom (lbp)? lbp->next:
+             bs[nb]->find_left_box_path ());
+    path r= (i2 == nb && !is_atom (rbp)? rbp->next:
+             bs[nb]->find_right_box_path ());
+    selection sel= bs[nb]->find_selection (l, r);
+    rs= translate (sel->rs, sx (nb), sy (nb));
+  }
+  return selection (rs, lp, rp);
+}
 
 path
 code_block_box_rep::find_box_path (SI x, SI y, SI delta, bool force,
                                    bool& found) {
   code_box_rep* cb= (code_box_rep*) bs[nb].operator-> ();
-  // (as in the line of a paragraph, the markers have no width: those
-  // after the text from its end, those before it to its left)
-  if (na > 0 && x >= ex && cb->on_last_row (y - sy (nb)))
+  // (the markers have no width: as in the last line of a paragraph, those
+  // after the block from the end of its text, but only right of it when
+  // the last row is empty, else the last line could not be reached; those
+  // before the block left of its first row)
+  if (na > 0 && (x > ex || (x == ex && ex > 0)) &&
+      cb->on_last_row (y - sy (nb)))
     for (int c= nb+1; c <= nb+na; c++) {
       path r= path (c, bs[c]->find_box_path (x - sx (c), y - sy (c),
                                              delta, force, found));

@@ -3760,6 +3760,15 @@ tmg_show_selection () {
 }
 
 tmscm
+tmg_selection_rectangles () {
+  // TMSCM_DEFER_INTS;
+  array_int out= get_current_editor()->get_selection_rectangles ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
+}
+
+tmscm
 tmg_show_meminfo () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_meminfo ();
@@ -4110,6 +4119,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("show-path",  tmg_show_path, 0, 0, 0);
   tmscm_install_procedure ("show-cursor",  tmg_show_cursor, 0, 0, 0);
   tmscm_install_procedure ("show-selection",  tmg_show_selection, 0, 0, 0);
+  tmscm_install_procedure ("selection-rectangles",  tmg_selection_rectangles, 0, 0, 0);
   tmscm_install_procedure ("show-meminfo",  tmg_show_meminfo, 0, 0, 0);
   tmscm_install_procedure ("edit-special",  tmg_edit_special, 0, 0, 0);
   tmscm_install_procedure ("edit-test",  tmg_edit_test, 0, 0, 0);

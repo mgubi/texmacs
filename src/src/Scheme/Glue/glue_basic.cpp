@@ -48,18 +48,18 @@ tmg_typeset_code_rows_made () {
 }
 
 tmscm
-tmg_typeset_code_rich_made () {
+tmg_typeset_code_records_made () {
   // TMSCM_DEFER_INTS;
-  int out= get_code_rich_made ();
+  int out= get_code_records_made ();
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
 }
 
 tmscm
-tmg_typeset_code_records_made () {
+tmg_typeset_code_rich_made () {
   // TMSCM_DEFER_INTS;
-  int out= get_code_records_made ();
+  int out= get_code_rich_made ();
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);

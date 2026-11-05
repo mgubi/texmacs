@@ -415,7 +415,21 @@ code_paragraph (edit_env env, path ip, array<box> rows,
     lazy_paragraph par (env, ip);
     par->a= range (before, 0, nb);
     par->a << line_item (STD_ITEM, OP_SKIP, blk, HYPH_INVALID);
-    par->a << range (after, na, N(after));
+    // (the other items after the block, the right part of a surround, a
+    // QED: after it, on the baseline of its last line)
+    code_box_end (rows[0], ex, ey);
+    for (int i=na; i<N(after); i++) {
+      line_item it= after[i];
+      if (ey == 0) { par->a << it; continue; }
+      box mb= move_box (decorate_middle (ip), it->b, 0, ey, true);
+      // (not a string or a marker item any more: its box is not a text box)
+      int tp= (it->type == STRING_ITEM || it->type == MARKER_ITEM?
+                STD_ITEM: it->type);
+      line_item ni (tp, it->op_type, mb, it->penalty, it->t);
+      ni->spc= it->spc; ni->cor= it->cor; ni->limits= it->limits;
+      ni->lan= it->lan; ni->fn= it->fn;
+      par->a << ni;
+    }
     par->format_paragraph ();
     l= par->sss->l;
     sb= par->sss->sb;

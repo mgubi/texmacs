@@ -1276,6 +1276,44 @@
           (set! r (list (cxy '(1 1)) (cxy end))))))
     r))
 
+(define (block-selection-heights cl medium from to)
+  ;; the bottom and the top of the rectangles of a selection
+  (let ((r #f))
+    (with-body `(document "before text"
+                          (with "font-family" "tt" "code-lines" ,cl
+                            (document "aaaa" "bbbbbb" "cc" "dddd"))
+                          "next paragraph")
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (selection-set (apply at from) (apply at to))
+        (step (lambda () #t))
+        (let loop ((l (selection-rectangles)) (lo #f) (hi #f))
+          (if (null? l) (set! r (list lo hi))
+              (let ((y1 (cadr l)) (y2 (cadddr l)))
+                (loop (list-tail l 4)
+                      (if lo (min lo y1) y1) (if hi (max hi y2) y2)))))
+        (selection-cancel)
+        (step (lambda () #t))))
+    r))
+
+(define (block-qed-and-line medium)
+  ;; the y of the end of a QED after a block, and of its last line
+  (let ((r #f))
+    (with-body `(document "first"
+                          (surround "" (concat (htab "5mm") "QED")
+                            (with "font-family" "tt" "code-lines" "true"
+                              (document "aaa" "bb" "c" "dd")))
+                          "next")
+      (lambda ()
+        (init-env "page-medium" medium)
+        (step (lambda () #t))
+        (let ((y (lambda (p)
+                   (go-to (apply at p)) (step (lambda () #t))
+                   (get-cursor-y))))
+          (set! r (list (y '(1 1 1 3)) (y '(1 2 4 3 2)))))))
+    r))
+
 (define (test-block-ends)
   (check-group "the places before and after a block")
   (for (medium '("papyrus" "paper"))
@@ -1287,6 +1325,37 @@
     (let ((r (block-end-and-line "true" medium (list "a" "b" block-long-markup)
                                  #f '(1 4 2 1 1))))
       (check= (car r) (cadr r))))
+  ;; a selection across an end of the block, from or to its line 2: its
+  ;; top or bottom as with paragraphs (a row of a block is selected a little
+  ;; lower in paper mode; the whole block is several lines more)
+  (for (medium '("papyrus" "paper"))
+    (for (ends '(((1 4 2 1) (2 3)) ((1 4 2 1) (1 1)) ((0 2) (1 4 2 1))))
+      (let ((c (block-selection-heights "true" medium (car ends) (cadr ends)))
+            (p (block-selection-heights "false" medium (car ends)
+                                        (cadr ends))))
+        (if (== (car ends) '(1 4 2 1))
+            (check= (cadr c) (cadr p))
+            (check-true (< (abs (- (car c) (car p))) 10000))))))
+  ;; what comes after the block (a QED): on the baseline of its last line
+  (let ((r (block-qed-and-line "papyrus")))
+    (check= (car r) (cadr r)))
+  ;; an empty last line is reached by Left and by a click (papyrus)
+  (with-body `(document "xx" (with "font-family" "tt" "code-lines" "true"
+                               (document "aa" ""))
+                        "yy")
+    (lambda ()
+      (init-env "page-medium" "papyrus")
+      (step (lambda () #t))
+      (go-to (at 2 0)) (step (lambda () #t))
+      (step kbd-left) (step kbd-left)
+      (check= (rel (cursor-path)) '(1 4 1 0))
+      (go-to (at 1 4 1 0)) (step (lambda () #t))
+      (let ((x (get-cursor-x)) (y (get-cursor-y)))
+        (go-to (at 0 0)) (step (lambda () #t))
+        (mouse-any "press-left" x (+ y 100) 1 1000.0 '())
+        (mouse-any "release-left" x (+ y 100) 0 1100.0 '())
+        (step (lambda () #t))
+        (check= (rel (cursor-path)) '(1 4 1 0)))))
   ;; the last lines folded (papyrus; in paper mode, as with paragraphs, the
   ;; hidden lines are clipped to a point): after the block is on the
   ;; baseline of the line shown
