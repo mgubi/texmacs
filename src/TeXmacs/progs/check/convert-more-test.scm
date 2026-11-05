@@ -540,7 +540,9 @@
 
 (define (test-html-pattern-background)
   (check-group "html export: a pattern as background of a cell")
-  (let* ((shipped (url->system
+  ;; (a document holds the name of a pattern as url->unix gives it, see
+  ;; encode-pattern-name: with / on Windows too)
+  (let* ((shipped (url->unix
                    (url-resolve "$TEXMACS_PATH/misc/patterns/floral/paisley.png"
                                 "r")))
          (found (html-export-of-buffer
