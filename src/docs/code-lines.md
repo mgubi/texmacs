@@ -181,8 +181,10 @@ the lines being copied at each key: #811 too (11 ms).
   of each row would break). In paper mode, the rows of the paragraphs
   made with the items of the bridges around the block (its first and last
   lines) end where their text ends, in the modes left and justify
-  (`code_row_to_text`), so that a text before the block fits before its
-  first row and the cursor after it is after its text; in the modes
+  (`code_row_to_text`), so that a text before the block ("Proof.") is
+  followed by its first row when the row leaves room for it (a wrapped
+  first line is wrapped at the width of the page, and then starts on the
+  next line), and the cursor after it is after its text; in the modes
   center and right that cursor is at the right margin.
 - **A block nested in markup, papyrus mode** (`<with|code-lines|true|...>`,
   a surround, a proof; not a source file, which has nothing around its
