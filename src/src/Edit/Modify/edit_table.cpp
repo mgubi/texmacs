@@ -349,8 +349,10 @@ edit_table_rep::table_get_format (
     if (is_func (st[k], CWITH, 6) && (st[k][4] == var)) {
       int row1, col1, row2, col2;
       with_read (st[k], nr_rows, nr_cols, row1, col1, row2, col2);
-      for (i=row1; i<=row2; i++)
-        for (j=col1; j<=col2; j++)
+      // (a range that is partly or wholly outside the table, as a file or a patch can
+      // give, is clipped: val has nr_rows rows and nr_cols columns)
+      for (i=max (row1, 0); i<=min (row2, nr_rows-1); i++)
+        for (j=max (col1, 0); j<=min (col2, nr_cols-1); j++)
           val[i][j]= st[k][5];
     }
 }

@@ -1647,6 +1647,13 @@ def s_content(w):
     for bad in ('(table (row (cell "a") (cell "b")) (row (cell "e")))', '(table (row (cell "a") (cell "b") (cell "c")) (row (cell "e")))',
                 '(table (row (cell "a")) (row (cell "b") (cell "c")))'):
         refused("ragged table %s" % bad, "stree", bad, "needed")
+    for a, b, c, d, var, v in (("1", "1", "5", "5", "cell-row-span", "2"), ("1", "1", "5", "5", "cell-col-span", "1"),
+                               ("1", "1", "3", "3", "cell-col-span", "2"), ("3", "3", "1", "1", "cell-col-span", "2"),
+                               ("1", "1", "-5", "-5", "cell-col-span", "2"), ("1", "1", "1", "9", "cell-col-span", "2"),
+                               ("1", "9", "1", "1", "cell-col-span", "2")):
+        refused("span outside the table %s %s %s %s %s" % (a, b, c, d, var), "stree",
+                '(tformat (cwith "%s" "%s" "%s" "%s" "%s" "%s") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d"))))' % (a, b, c, d, var, v),
+                "not all in the table")
     refused("a table of set-cursor", "stree", '(table (set-cursor))', "`set-cursor'")
     refused("an empty row among rows", "stree", '(table (row (cell "a")) (row))', "needed")
     for bad, word in (('(table (row (cell "a")) (frac "a" "b"))', "needed"),

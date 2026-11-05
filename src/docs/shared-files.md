@@ -523,6 +523,17 @@ process hosts, or only headless ones), the agent edits directly, as before.
   caught; the cases tried were harmless), and refuses only a block that becomes bad: a block that
   fails the rule and is the same as a block of the document before the patch (a legacy
   `(tformat (table ...) "x")`) does not stop other patches.
+- **Spans outside the table, ragged tables.** A span `cwith` whose cells are not all in the table
+  as written (`(cwith "1" "1" "5" "5" "cell-row-span" "2")` on a 2x2 table, a negative range that
+  starts before the first row...) is refused; the editor wrote the format of the cells in an array
+  of the size of the table and aborted on insert-row and insert-column. In C++, `table_get_format`
+  clips the range of a cwith, and `handle_span` of the typesetter cuts the spans to the final
+  number of rows and columns (rows of different lengths made the earlier cut too large). Ragged
+  tables (rows of unequal length) are refused for agents and peers; **a ragged table loaded from a
+  file** no longer aborts, but its column operations are odd: `table-remove-column` on a table
+  with a one-cell row deletes the whole table (it can be undone), and `table-set-columns` inserts
+  in the middle of the wide row. Nothing was changed for that: the tables of the corpus are
+  rectangular.
 
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a

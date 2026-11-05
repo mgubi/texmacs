@@ -94,6 +94,8 @@
    (act "table-frac" (attempt "a table with a child that is not a row is refused" (patch-msg (ins-block 4 '(table (frac "a" "b")))) "arity"))
    (act "decoration" (attempt "the decoration of a cell is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-decoration" "x") (table (row (cell "a")))))) "arity"))
    (act "row-span" (attempt "a span that goes beyond the table is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "3") (table (row (cell "a")) (row (cell "b")))))) "arity"))
+   (act "span-outside" (attempt "a span on cells outside the table is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "5" "5" "cell-row-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")))))) "arity"))
+   (act "span-outside-rows" (attempt "a span on rows outside the table is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "9" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")))))) "arity"))
    (act "ragged-table" (attempt "a table whose rows differ in length is refused" (patch-msg (ins-block 4 '(table (row (cell "a") (cell "b")) (row (cell "e"))))) "arity"))
    (act "ragged-col-span" (attempt "a column span that runs over a ragged table is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")) (row (cell "e")))))) "arity"))
    (act "row-span-huge" (attempt "a span of 1000000000 is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "1000000000") (table (row (cell "a")))))) "arity"))

@@ -421,6 +421,10 @@ table_rep::handle_span () {
     for (j=0; j<nr_cols; j++) {
       cell C= T[i][j];
       if (!is_nil (C)) {
+        // (the spans were cut when the rows were typeset, with the number of columns
+        // at that time: rows of different lengths make it smaller afterwards)
+        C->row_span= max (1, min (C->row_span, nr_rows - i));
+        C->col_span= max (1, min (C->col_span, nr_cols - j));
         for (ii=0; ii<C->row_span; ii++)
           for (jj=0; jj<C->col_span; jj++)
             if ((ii != 0) || (jj != 0))

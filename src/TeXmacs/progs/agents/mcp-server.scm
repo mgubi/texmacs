@@ -1647,6 +1647,13 @@
   (let ((p (table-attribute-problem tag var val)))
     (when p (violate! p))))
 
+(define (inside-range? a b n)
+  ;; is the range a..b of a cwith (1-based, negative from the end) wholly inside n rows or columns?
+  (let ((x (string->number a)) (y (string->number b)))
+    (and x y (integer? x) (integer? y)
+         (let ((i1 (if (>= x 0) (- x 1) (+ n x))) (i2 (if (> y 0) (- y 1) (+ n y))))
+           (and (<= 0 i1) (<= i1 i2) (< i2 n))))))
+
 (define (decode-range a b n)
   ;; the first and last cell (0-based) of the range a..b of a cwith in n rows or columns
   (let ((x (string->number a)) (y (string->number b)))
@@ -1674,7 +1681,14 @@
                 ;; where the typesetter clips it: the tables have rows of the same length, see
                 ;; table-structure-bad?; a span of 0 or text, as while its value is edited in
                 ;; source view, is clamped to 1 by the typesetter)
-                (when (and (string? var) (== var "cell-row-span") (positive-integer-string? val)
+                ;; (a span whose cells are not all in the table, as written: the editor writes the
+                ;; format of the cells in an array of the size of the table and aborts)
+                (when (and (string? var) (member var span-vars) nr nc (every-string? (list-head args 4))
+                           (not (and (inside-range? (car args) (cadr args) nr)
+                                     (inside-range? (caddr args) (cadddr args) nc))))
+                  (set! problem
+                        (string-append "a `cwith' gives `" var "' to cells that are not all in the table: refused (nothing was changed)")))
+                (when (and (not problem) (string? var) (== var "cell-row-span") (positive-integer-string? val)
                            (> (string->number val) 1))
                   (let* ((n (string->number val))
                          (rr (and nr (every-string? (list-head args 4))
