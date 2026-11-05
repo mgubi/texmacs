@@ -1290,8 +1290,20 @@
                     (string c)))
               (string->list (tmhtml-safe-url u #t)))))
 
+(tm-define (tmhtml-pattern-address s)
+  ;; the address of the image of a pattern for the page: the export gives
+  ;; the file it found as a name of the system, which on Windows is
+  ;; D:\a\b.png, a file:///D:/a/b.png for a browser
+  (if (and (>= (string-length s) 3)
+           (char-alphabetic? (string-ref s 0))
+           (== (string-ref s 1) #\:)
+           (in? (string-ref s 2) '(#\\ #\/)))
+      (string-append "file:///" (string-replace s "\\" "/"))
+      s))
+
 (define (html-css-pattern x)
-  (let* ((u (tmhtml-css-url (tmhtml-force-string (cadr x))))
+  (let* ((u (tmhtml-css-url
+             (tmhtml-pattern-address (tmhtml-force-string (cadr x)))))
          (w (or (tmlength->htmllength (caddr x) #t) "100%"))
          (h (or (tmlength->htmllength (cadddr x) #t) "100%"))
          (im (string-append "background: url('" u "')"))
