@@ -36,6 +36,9 @@
 	(when (url-exists-in-help? "about/welcome/upsilon-texmacs.en.tm")
 	  ("Upsilon features"
 	   (load-help-article "about/welcome/upsilon-texmacs")))
+	(when (url-exists-in-help? "main/agents/man-mcp.en.tm")
+	  ("AI agents (MCP server)"
+	   (load-help-article "main/agents/man-mcp")))
 	;; the browser build (web-files is defined by the Vue plugin there)
 	(if (defined? 'web-files)
 	    ("TeXmacs in the browser"

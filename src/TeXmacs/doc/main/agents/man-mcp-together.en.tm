@@ -1,0 +1,85 @@
+<TeXmacs|2.1>
+
+<style|<tuple|tmdoc|english>>
+
+<\body>
+  <tmdoc-title|Working together with the agent>
+
+  The most useful way of working is to have the document open in your
+  <TeXmacs> while the agent works on it. This needs the files to be
+  <em|shared>, and the agent is then a participant of the document, as a
+  coauthor would be.
+
+  <paragraph*|Shared files>
+
+  When the preference <menu|Edit|Preferences|Other|Share files open in
+  several TeXmacs windows> is on, a file which is open in one <TeXmacs> and
+  which another <TeXmacs> of the same user opens is not read again from the
+  disk: the second joins the first, and both show the same document, live.
+  The agent's server is such a program. Without sharing, the agent opens
+  the file from the disk, alone, and what it does reaches you only through
+  the file.
+
+  Whether the preference is on when you have not touched it depends on
+  the version; if the agent does not see your open document (the answer to
+  <verbatim|list_documents> lists the file as open elsewhere, and the
+  agent cannot work on it live), check the preference, in the home folder
+  that both programs use. The preference is not available on
+  <name|Windows>.
+
+  <paragraph*|The three modes>
+
+  For each file that is open in your <TeXmacs>, you decide what becomes of
+  the edits of the agents, with <menu|Tools|Agents>. The menu appears when
+  an agent has joined the file.
+
+  <\description>
+    <item*|<menu|Propose edits (I accept or reject them)>>The default when
+    you have the file open. The edits do not change your text: they appear
+    as <em|proposals>.
+
+    <item*|<menu|Let them edit directly>>The edits are applied at once. This
+    is also what happens when nobody has the file open.
+
+    <item*|<menu|Read only (refuse their edits)>>The agent can read, and
+    every edit is refused.
+  </description>
+
+  The agent is told the mode in the answer of its tools.
+
+  <paragraph*|Proposals>
+
+  A proposal shows both versions in the document, with the same markup as
+  <menu|Version|Compare>: the old text and the new one side by side, in
+  colours. In <menu|Tools|Agents> there is a submenu for each pending
+  proposal, with <menu|Accept> and <menu|Reject>, and the entries
+  <menu|Accept all> and <menu|Reject all>. The agent is told, once, in its
+  next answer, whether a proposal of its own was accepted or rejected, and
+  it can take a pending one back (<verbatim|withdraw_proposal>).
+
+  A file which is saved while proposals are pending holds both versions as
+  markup; so accept or reject them before saving.
+
+  <paragraph*|Who is an agent>
+
+  A program which joins your file without a window is taken for an agent,
+  whatever name it gives itself. If it is in fact something you trust, the
+  menu <menu|Tools|Agents> has an entry <menu|Treat ... as a person>.
+
+  <paragraph*|Saving>
+
+  When you have the file open, you save it: in the propose and read only
+  modes the agent's <verbatim|save_document> is refused.
+
+  <tmdoc-copyright|2026|Massimiliano Gubinelli>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
+</body>
+
+<initial|<\collection>
+</collection>>

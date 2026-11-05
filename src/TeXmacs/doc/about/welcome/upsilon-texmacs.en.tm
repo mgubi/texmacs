@@ -147,6 +147,16 @@
   dropping them; the keys are kept in an encrypted wallet. See the
   <hlink|help of the AI plug-in|../../../plugins/ai/doc/ai.en.tm>.
 
+  <section|Agents>
+
+  <with|font-series|bold|<verbatim|texmacs --mcp>> runs <TeXmacs> as a
+  server of the <name|Model Context Protocol> for an AI agent such as
+  <name|Claude Code> or <name|Claude Desktop>, which reads and edits your
+  documents by their structure (outline, sections, references, edits by
+  node). When you have the document open, the edits of the agent reach it,
+  as proposals which you accept or reject (<menu|Tools|Agents>). See
+  <hlink|Working with an AI agent|../../main/agents/man-mcp.en.tm>.
+
   <section|Documentation and tests>
 
   <\itemize>
