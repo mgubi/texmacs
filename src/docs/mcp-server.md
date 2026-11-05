@@ -24,7 +24,7 @@ app:
     {
       "mcpServers": {
         "texmacs": {
-          "command": "/Applications/TeXmacs Upsilon.app/Contents/MacOS/texmacs",
+          "command": "/Applications/TeXmacs Upsilon.app/Contents/MacOS/TeXmacs",
           "args": ["--mcp"],
           "env": { "TEXMACS_MCP_ROOTS": "/Users/you/papers" }
         }

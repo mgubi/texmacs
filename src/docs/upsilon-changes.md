@@ -67,6 +67,9 @@ have the details, and the problems go to the
   Edit > Preferences > Other > "Share files open in several TeXmacs windows"
   (it applies to the files loaded afterwards). Batch conversions
   (`texmacs -c`) never share.
+- **Help > AI agents (MCP server)**: new help pages on installing and using
+  `texmacs --mcp` (connecting Claude Code and Claude Desktop, the tools, working
+  with the agent on an open file, the content rules, troubleshooting).
 
 ## 3 November 2026
 

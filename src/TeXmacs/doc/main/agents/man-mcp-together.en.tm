@@ -13,19 +13,20 @@
   <paragraph*|Shared files>
 
   When the preference <menu|Edit|Preferences|Other|Share files open in
-  several TeXmacs windows> is on, a file which is open in one <TeXmacs> and
+  several TeXmacs windows> is on (the default), a file which is open in one <TeXmacs> and
   which another <TeXmacs> of the same user opens is not read again from the
   disk: the second joins the first, and both show the same document, live.
   The agent's server is such a program. Without sharing, the agent opens
   the file from the disk, alone, and what it does reaches you only through
   the file.
 
-  Whether the preference is on when you have not touched it depends on
-  the version; if the agent does not see your open document (the answer to
-  <verbatim|list_documents> lists the file as open elsewhere, and the
-  agent cannot work on it live), check the preference, in the home folder
-  that both programs use. The preference is not available on
-  <name|Windows>.
+  Sharing is on by default, and can be turned off in the same place; the
+  preference applies to the files loaded afterwards, and not to a batch
+  conversion (<verbatim|texmacs -c>), which never shares. If the agent does
+  not see your open document (the answer to <verbatim|list_documents> lists
+  the file as open elsewhere, and the agent cannot work on it live), check
+  that the preference is on in the home folder that both programs use. The
+  preference is not available on <name|Windows> and in the browser.
 
   <paragraph*|The three modes>
 
