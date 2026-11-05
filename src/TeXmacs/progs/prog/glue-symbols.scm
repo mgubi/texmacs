@@ -1329,6 +1329,7 @@
 "syntax-region-last-nodes"
 "syntax-region-captures"
 "syntax-region-statistics"
+"syntax-region-full-parses"
 "syntax-region-forget"
 "syntax-region-indent"
 "syntax-region-errors-with"

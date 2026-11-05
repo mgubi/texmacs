@@ -499,6 +499,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gs-executable)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_gs_executable> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(rescue-mode?)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -10424,6 +10432,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|syntax_region_statistics> which returns
     <scm|array_int>.
+  </explain>
+
+  <\explain>
+    <scm|(syntax-region-full-parses)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_full_parses> which returns
+    <scm|int>.
   </explain>
 
   <\explain>
