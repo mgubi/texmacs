@@ -112,9 +112,14 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
   character is before the hint, the character after it, as editors put the
   cursor next to a parameter hint: a row which starts at a hint starts
   with it, a space before a hint ends before it) and is drawn in grey, on
-  the row of its character. Nothing is kept, so nothing goes out
-  of date: a change of the layers, the language, the colours or the
-  comments before the line is seen at the next drawing.
+  the row of its character. The colours are not kept: a change of the
+  layers, the language, the colours or the comments before the line is
+  seen at the next drawing. The hints take room, so they are in the
+  record of the line with its soft line breaks (`line_rec`): a change of
+  the hints is seen when the line is typeset again, which the server
+  asks for in the current buffer (`update-path` in lsp-decorate.scm); in
+  another buffer, a line which the new hints make wider than the page
+  wraps when it is next edited.
   `typeset-code-rich-made` counts the lines typeset by the concater (with
   markup).
 - **Folds** (`code_line_fold_state`). A hidden line takes no room and is not

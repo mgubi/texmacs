@@ -2421,20 +2421,28 @@
         (set! tmtex-appendices? #t)
         (list '!concat '(appendix) app)))))
 
+(define tmtex-tt-col 0) ;; the column in the current line (see the tabs)
+
 (define (tmtex-tt-document l)
   (cond ((null? l) "")
-        ((null? (cdr l)) (tmtex-tt (car l)))
-        (else (string-append (tmtex-tt (car l)) "\n"
-                             (tmtex-tt-document (cdr l))))))
+        (else
+          (set! tmtex-tt-col 0)
+          ;; (the line before the next ones: the column goes in order)
+          (let ((h (tmtex-tt (car l))))
+            (if (null? (cdr l)) h
+                (string-append h "\n" (tmtex-tt-document (cdr l))))))))
 
 ;; the tabs of a line of verbatim content (<#9>: the lines of a text or a
 ;; source file keep their tabs, see verbatim.cpp) as spaces up to the next
-;; stop, every 8 columns; a character of Cork (<...>) is one column
+;; stop, every 8 columns; a character of Cork (<...>) is one column. The
+;; column goes on from the strings before in the line (tmtex-tt-col), also
+;; across markup
 (define (tmtex-expand-tabs s)
-  (if (< (string-search-forwards "<#9>" 0 s) 0) s
-      (let loop ((i 0) (col 0) (acc '()))
+  (if (< (string-search-forwards "<" 0 s) 0)
+      (begin (set! tmtex-tt-col (+ tmtex-tt-col (string-length s))) s)
+      (let loop ((i 0) (col tmtex-tt-col) (acc '()))
         (if (>= i (string-length s))
-            (apply string-append (reverse acc))
+            (begin (set! tmtex-tt-col col) (apply string-append (reverse acc)))
             (let* ((j (if (char=? (string-ref s i) #\<)
                           (with k (string-search-forwards ">" i s)
                             (if (< k 0) (+ i 1) (+ k 1)))
@@ -2447,7 +2455,7 @@
 
 (define (tmtex-tt x)
   (cond ((string? x) (tmtex-verb-string (tmtex-expand-tabs x)))
-        ((== x '(next-line)) "\n")
+        ((== x '(next-line)) (set! tmtex-tt-col 0) "\n")
         ((func? x 'document) (tmtex-tt-document (cdr x)))
         ((func? x 'para) (tmtex-tt-document (cdr x)))
         ((func? x 'concat)

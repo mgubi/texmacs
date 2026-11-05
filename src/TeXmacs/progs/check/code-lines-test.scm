@@ -679,7 +679,14 @@
                (convert plain "texmacs-tree" fm)))
      '("html-snippet" "latex-snippet" "verbatim-snippet" "markdown-snippet"))
     (check-true (string-contains? (convert block "texmacs-tree" "html-snippet")
-                                  "x = 1")))
+                                  "x = 1"))
+    ;; the column of a tab in LaTeX goes on across the markup of its line
+    (check-true (string-contains?
+                 (convert (stree->tree '(verbatim (document
+                                                   (concat "a" (with "color" "red" "bc")
+                                                           "<#9>d"))))
+                          "texmacs-tree" "latex-snippet")
+                 "abc     d")))
   ;; a text or a source file, whose lines are verbatim content (language
   ;; verbatim): the same LaTeX as without the block (it was an empty alltt)
   (let ((old (getenv "TEXMACS_CODE_LINES"))

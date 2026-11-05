@@ -646,8 +646,20 @@ cpp_parse_token (hashmap<string,string>& colored, string s, int& pos,
     return cpp_parse_token (colored, s, pos, state, pre);
   }
   if (pre) {
-    int e= search_forwards ("/*", pos, s);
-    pos= (e < 0? n: e);
+    // (up to a comment of several lines, not in a string, and not after a
+    // comment of one line: as in_cpp_comment)
+    int i= pos;
+    while (i < n) {
+      if (s[i] == '"' || s[i] == '\'') {
+        char q= s[i++];
+        while (i < n && s[i] != q) i += (s[i] == '\\'? 2: 1);
+        if (i < n) i++;
+      }
+      else if (i + 1 < n && s[i] == '/' && s[i+1] == '/') i= n;
+      else if (i + 1 < n && s[i] == '/' && s[i+1] == '*') break;
+      else i++;
+    }
+    pos= min (i, n);
     if (pos == opos) pos++;
     return "preprocessor-color";
   }
