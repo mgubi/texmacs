@@ -1067,8 +1067,28 @@ make_lazy_table (edit_env env, tree t, path ip) {
 * User interface
 ******************************************************************************/
 
+static bool
+is_empty_table (tree t) {
+  // a table with no row or a row with no cell cannot be shown (the cursor
+  // would go to a cell that is not there): an error is shown in its place
+  // (is_func is false for a tree with no child)
+  while (is_compound (t) && L(t) == TFORMAT && N(t) > 0) t= t[N(t)-1];
+  if (is_atomic (t)) return false;
+  if (N(t) == 0) return true;
+  for (int i=0; i<N(t); i++)
+    if (is_compound (t[i]) && L(t[i]) == ROW && N(t[i]) == 0) return true;
+  return false;
+}
+
+static box
+empty_table_box (edit_env env, tree t, path ip) {
+  (void) t;
+  return typeset_as_concat (env, tree (_ERROR, "empty table or row"), ip);
+}
+
 box
 typeset_as_table (edit_env env, tree t, path ip) {
+  if (is_empty_table (t)) return empty_table_box (env, t, ip);
   table T (env);
   T->typeset (t, ip);
   T->handle_decorations ();
@@ -1083,6 +1103,11 @@ typeset_as_table (edit_env env, tree t, path ip) {
 
 array<box>
 typeset_as_var_table (edit_env env, tree t, path ip) {
+  if (is_empty_table (t)) {
+    array<box> bs;
+    bs << empty_table_box (env, t, ip);
+    return bs;
+  }
   table T (env);
   T->typeset (t, ip);
   T->handle_decorations ();

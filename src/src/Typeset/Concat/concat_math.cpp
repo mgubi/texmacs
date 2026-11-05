@@ -676,16 +676,6 @@ concater_rep::typeset_tree (tree t, path ip) {
 
 void
 concater_rep::typeset_table (tree t, path ip) {
-  // A table with no row, or a row with no cell, cannot be shown (and would
-  // make the cursor go where there is no cell): an error is shown instead.
-  {
-    tree t0= t;
-    while (is_func (t0, TFORMAT) && N(t0) > 0) t0= t0[N(t0)-1];
-    bool empty= is_atomic (t0) || N(t0) == 0;
-    for (int i=0; !empty && i<N(t0); i++)
-      if (is_func (t0[i], ROW) && N(t0[i]) == 0) empty= true;
-    if (empty && !is_atomic (t0)) { typeset_error (t, ip); return; }
-  }
   box b= typeset_as_table (env, t, ip);
   if (b->w () <= env->table_max) { print (b); return; }
   if (env->read (TABLE_WIDTH) != "") { print (b); return; }

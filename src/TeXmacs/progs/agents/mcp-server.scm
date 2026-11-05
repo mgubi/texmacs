@@ -1299,6 +1299,16 @@
   (let ((tag (car st)) (kids (cdr st)))
     (or (and (eq? tag 'document) (null? kids))   ; (the editor puts a document with an empty paragraph in its place)
         (and (memq tag '(table row)) (or (null? kids) (list-or (map string? kids))))
+        ;; (a table of anything but rows: the typesetter takes them for rows and cells; a
+        ;; macro of the styles may make a row or a cell, a primitive that is not one cannot)
+        (and (eq? tag 'table)
+             (list-or (map (lambda (k) (and (pair? k) (symbol? (car k)) (!= (car k) 'row)
+                                            (or (known-primitive? (car k)) (memq (car k) '(set-cursor cursor cursor-clear start end)))))
+                           kids)))
+        (and (eq? tag 'row)
+             (list-or (map (lambda (k) (and (pair? k) (symbol? (car k)) (!= (car k) 'cell)
+                                            (or (known-primitive? (car k)) (memq (car k) '(set-cursor cursor cursor-clear start end)))))
+                           kids)))
         (and (eq? tag 'tformat) (pair? kids) (string? (cAr kids))))))
 
 (tm-define (mcp-stree-arity-ok? st)

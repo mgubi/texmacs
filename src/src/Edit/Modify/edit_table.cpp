@@ -159,13 +159,15 @@ path
 edit_table_rep::search_row (path fp, int row) {
   fp= search_table (fp) * row;
   tree st= subtree (et, fp);
-  if (!is_func (st, ROW))
+  // (is_func is false for a row with no cell, which a patch can make)
+  if (!(is_compound (st) && L(st) == ROW) && N(st) > 0)
     return search_row (fp, N(st)-1);
   return fp;
 }
 
 path
 edit_table_rep::search_cell (path p, int col) {
+  if (N (subtree (et, p)) == 0) return p;   // (a row with no cell)
   p= p * col;
   tree st= subtree (et, p);
   if (is_func (st, TFORMAT))
@@ -613,6 +615,9 @@ edit_table_rep::table_go_to (path fp, int row, int col, bool at_start) {
   int nr_rows, nr_cols;
   fp= search_format (fp);
   table_get_extents (fp, nr_rows, nr_cols);
+  // (a table with no row or a row with no cell, as a patch of another process
+  // can make: there is no cell to go to)
+  if (nr_rows <= 0 || nr_cols <= 0) return;
   if (row<0) row= 0;
   if (col<0) col= 0;
   if (row>=nr_rows) row= nr_rows-1;
