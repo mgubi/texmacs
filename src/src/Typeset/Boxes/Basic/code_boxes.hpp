@@ -107,6 +107,9 @@ bool code_line_hints (tree t, SI cell, array<int>& hp, array<SI>& hw,
 // the room of the hints before the character p (the position p is before
 // it, the character after it)
 SI code_hint_before (int p, array<int>& hp, array<SI>& hw);
+// the end of the last row of the last line of a code box (a code_box or a
+// code_row_box) and its baseline; false for another box
+bool code_box_end (box b, SI& x, SI& y);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines

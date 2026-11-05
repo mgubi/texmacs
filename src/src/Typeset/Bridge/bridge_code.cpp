@@ -397,7 +397,31 @@ code_paragraph (edit_env env, path ip, array<box> rows,
                            HYPH_INVALID, tree (NEXT_LINE));
     par->a << line_item (STD_ITEM, OP_SKIP, rows[i], HYPH_INVALID);
   }
-  par->a << after;
+  // (the items after the block, the markers of the bridges around it,
+  // where the cursor after the block goes. In paper mode a row ends where
+  // its text ends (code_row_box), so they come after the last row as after
+  // the last line of a paragraph. In papyrus mode the block is one box as
+  // wide as the page, and they must stay after it, since a line finds its
+  // children by their x: they are only moved down to the baseline of the
+  // last line (ey is 0 for a row or a block of one line))
+  SI ex, ey;
+  if (N(after) > 0 && N(rows) > 0 && code_box_end (rows[N(rows)-1], ex, ey) &&
+      ey != 0) {
+    for (int i=0; i<N(after); i++) {
+      line_item it= after[i];
+      box mb= move_box (decorate_middle (ip), it->b, 0, ey, true);
+      // (not a string or a marker item any more: its box is not a text
+      // box; these are the empty markers after the block, the last items
+      // of its line: no space goes past them, nothing is broken)
+      int tp= (it->type == STRING_ITEM || it->type == MARKER_ITEM?
+                STD_ITEM: it->type);
+      line_item ni (tp, it->op_type, mb, it->penalty, it->t);
+      ni->spc= it->spc; ni->cor= it->cor; ni->limits= it->limits;
+      ni->lan= it->lan; ni->fn= it->fn;
+      par->a << ni;
+    }
+  }
+  else par->a << after;
   par->format_paragraph ();
   l= par->sss->l;
   sb= par->sss->sb;

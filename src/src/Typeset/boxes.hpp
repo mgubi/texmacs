@@ -31,6 +31,7 @@
 #define TEXT_BOX      5
 #define SHORTER_BOX   6
 #define BIG_OP_BOX    7
+#define CODE_BOX      8
 
 class player;
 

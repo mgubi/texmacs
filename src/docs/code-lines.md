@@ -174,6 +174,13 @@ the lines being copied at each key: #811 too (11 ms).
   is put below its bottom at the separation instead. It would take a stack
   box around the block, a level more in all its box paths; a source file
   has nothing after its lines.
+- **The cursor just after a block nested in markup** (`<with|code-lines|true|...>`,
+  papyrus mode) is drawn on the baseline of the last line, but at the right
+  margin rather than after its text. The block is one box as wide as the
+  page, and a line finds its children by their x, so the markers of the
+  bridges around it must stay after the box (`code_paragraph`). In paper
+  mode a row ends where its text ends, and the cursor is where it is after
+  the same lines as paragraphs. A source file has nothing around its lines.
 - **A line does not change the environment** of the lines after it (an
   `assign` in a line). The environment at a place is that of the markup on
   the way to it in its own line (`bridge_code_rep::my_exec_until` walks the

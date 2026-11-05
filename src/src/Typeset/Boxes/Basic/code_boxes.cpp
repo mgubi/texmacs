@@ -550,6 +550,9 @@ struct code_box_rep: public box_rep {
                           array<int> hp= array<int> (),
                           array<SI> hw= array<SI> ());
   void   draw_fold_mark (renderer ren, int k);
+  void   draw_hint (renderer ren, string txt, SI x, SI y);
+  int    get_type () { return CODE_BOX; }
+  void   end_of_lines (SI& x, SI& y);
   box    row_box (int k, int i) {
     int a= starts (k) [i], b= row_end (k, i);
     return text_box (line_ip (k), a, line (k) (a, b), fn, pen); }
@@ -652,8 +655,16 @@ code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
   cell (cell2), tabw (tabw2), invis (invis2),
   single (true), ra (ra2), rb (rb2), one_text (text)
 {
+  // (a row ends where its text ends, with the hints at the end of the
+  // line, as a line of a paragraph: what comes after the block, the
+  // cursor after it, comes after the text of its last row)
+  array<SI> xp;
+  xpositions (0, rb, xp);
+  SI end= xp[rb] - xp[ra];
+  array<int> hp; array<SI> hw; array<string> ht;
+  if (rb == N(text) && hints (0, hp, hw, ht)) end += code_hint_before (rb, hp, hw);
   x1= x3= 0;
-  x2= width;
+  x2= max (end, (SI) 0);
   x4= width + 4 * cell; // (the mark of the end of the line, see above)
   y1= y3= fn->y1;
   y2= y4= fn->y2;
@@ -737,10 +748,16 @@ code_box_rep::display (renderer ren) {
     string s= line (k);
     if (!is_atomic (t)) continue;
     if (N(s) == 0) {
+      // (the hints of an empty line, at its start)
+      array<int> hp; array<SI> hw; array<string> ht;
+      bool hinted= hints (k, hp, hw, ht);
+      if (hinted)
+        for (int h=0; h<N(hp); h++)
+          if (hp[h] == 0) draw_hint (ren, ht[h], 0, base (k, 0));
       if (invis && (!single || rb == 0)) {
         array<SI> xp (1);
         xp[0]= 0;
-        draw_invisibles (ren, s, xp, 0, 0, has_end (k), base (k, 0));
+        draw_invisibles (ren, s, xp, 0, 0, has_end (k), base (k, 0), hp, hw);
       }
       continue;
     }
@@ -775,6 +792,21 @@ code_box_rep::display (renderer ren) {
         int mid= (r0 + r1) / 2;
         if (c.ends[mid] <= a) r0= mid + 1; else r1= mid;
       }
+      // (the hints of the row, drawn in the order of the text, before the
+      // pieces after them: the text of a printed file is read in order)
+      int hn= 0;
+      auto hints_upto= [&] (int u) {
+        bool some= false;
+        while (hinted && hn < N(hp) && hp[hn] <= u) {
+          int p= hp[hn];
+          if (p >= a && (p < b || (p == b && b == N(s)))) {
+            draw_hint (ren, ht[hn], xpos[p] - xpos[a], y);
+            some= true;
+          }
+          hn++;
+        }
+        return some;
+      };
       for (int r=r0; r<N(c.starts) && c.starts[r] < b; r++) {
         int s1= max (c.starts[r], a), s2= min (c.ends[r], b);
         if (s1 >= s2) continue;
@@ -795,30 +827,14 @@ code_box_rep::display (renderer ren) {
             tm_char_forwards (s, v);
           if (v > s2) v= s2;
           SI before= (hinted? code_hint_before (u, hp, hw): 0);
+          if (hints_upto (u)) ren->set_pencil (pencil (cl));
           fn->draw (ren, s (u, v), xpos[u] + before - xpos[a], y);
           u= v;
         }
       }
-      // the inlay hints of a server, in grey in the room before their
-      // characters, on the row of their character (one at the end of the
-      // line on its last row; a space is not drawn: see typeset_layer_text)
-      if (hinted) {
-        ren->set_pencil (pencil (named_color ("#909090")));
-        for (int h=0; h<N(hp); h++) {
-          int p= hp[h];
-          if (p < a || p > b || (p == b && b != N(s))) continue;
-          SI x= xpos[p] - xpos[a];
-          string txt= ht[h];
-          int u= 0, cnt= 0;
-          while (u < N(txt)) {
-            int v= u;
-            tm_char_forwards (txt, v);
-            if (txt[u] != ' ') fn->draw (ren, txt (u, v), x + cnt * cell, y);
-            cnt++;
-            u= v;
-          }
-        }
-      }
+      // the hints after the last piece (before spaces, control
+      // characters, or at the end of the line)
+      hints_upto (b);
       if (invis || search_forwards ("<#9>", a, s) >= 0)
         draw_invisibles (ren, s, xpos, a, b,
                          i == N(st) - 1 && (!single || rb == N(s)) &&
@@ -885,6 +901,48 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
 }
 
 void
+code_box_rep::end_of_lines (SI& x, SI& y) {
+  // the end of the last row of the last line (after its hints) and its
+  // baseline
+  int k= nr_lines () - 1;
+  if (rich (k)) {
+    box b= rich_box (k);
+    x= b->x0 + b->x2; y= b->y0;
+    return;
+  }
+  int i= nr_rows (k) - 1, a= starts (k) [i], e= row_end (k, i);
+  array<SI> xp;
+  xpositions (k, e, xp);
+  x= xp[e] - xp[a];
+  array<int> hp; array<SI> hw; array<string> ht;
+  if (e == N (line (k)) && hints (k, hp, hw, ht))
+    x += code_hint_before (e, hp, hw);
+  y= base (k, i);
+}
+
+bool
+code_box_end (box b, SI& x, SI& y) {
+  if (is_nil (b) || b->get_type () != CODE_BOX) return false;
+  ((code_box_rep*) b.operator-> ())->end_of_lines (x, y);
+  return true;
+}
+
+void
+code_box_rep::draw_hint (renderer ren, string txt, SI x, SI y) {
+  // an inlay hint of a server, in grey, a cell for each character from x
+  // (a space is not drawn: see typeset_layer_text)
+  ren->set_pencil (pencil (named_color ("#909090")));
+  int u= 0, cnt= 0;
+  while (u < N(txt)) {
+    int v= u;
+    tm_char_forwards (txt, v);
+    if (txt[u] != ' ') fn->draw (ren, txt (u, v), x + cnt * cell, y);
+    cnt++;
+    u= v;
+  }
+}
+
+void
 code_box_rep::draw_fold_mark (renderer ren, int k) {
   // after the last row of the line k: a space, then "..." (as the mark of
   // bridge_rep::fold_line)
@@ -895,6 +953,9 @@ code_box_rep::draw_fold_mark (renderer ren, int k) {
     array<SI> xp;
     xpositions (k, row_end (k, i), xp);
     x= xp[row_end (k, i)] - xp[starts (k) [i]];
+    // (after the hints at the end of the line)
+    array<int> hp; array<SI> hw; array<string> ht;
+    if (hints (k, hp, hw, ht)) x += code_hint_before (row_end (k, i), hp, hw);
   }
   x += fn->spc->def;
   ren->set_pencil (pencil (named_color ("dark grey"), pen->get_width ()));
@@ -909,13 +970,18 @@ code_box_rep::pos_at (int k, int i, SI x, SI delta) {
   int a= starts (k) [i], b= row_end (k, i), j;
   array<SI> xp;
   xpositions (k, b, xp);
+  array<int> hp; array<SI> hw; array<string> ht;
+  bool hinted= hints (k, hp, hw, ht);
   SI x0= xp[a];
   int p= a, last= a;
   while (p < b) {
     int q= p;
     if (code_control (s, p, j) >= 0) q= j; else tm_char_forwards (s, q);
     if (q > b) q= b;
-    SI m= ((xp[p] - x0) + (xp[q] - x0)) >> 1;
+    // (the middle of the character, after the hints before it: see
+    // code_xpos)
+    SI from= xp[p] + (hinted? code_hint_before (p, hp, hw): 0);
+    SI m= ((from - x0) + (xp[q] - x0)) >> 1;
     if (x < m || (x == m && delta < 0)) return p;
     last= p;
     p= q;
