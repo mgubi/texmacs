@@ -121,11 +121,41 @@ class Mcp:
             m["params"] = params
         self.send_raw(json.dumps(m) + "\n")
 
-    def initialize(self, version="2025-06-18"):
-        r = self.request("initialize", {"protocolVersion": version, "capabilities": {},
-                                        "clientInfo": {"name": "tm-test", "version": "1"}})
+    def initialize(self, version="2025-06-18", name="tm-test", elicitation=False):
+        caps = {"elicitation": {}} if elicitation else {}
+        r = self.request("initialize", {"protocolVersion": version, "capabilities": caps,
+                                        "clientInfo": {"name": name, "version": "1"}})
         self.notify("notifications/initialized")
         return r
+
+    def tool_el(self, answerer, name, timeout=40, **args):
+        """like tool, for a client that answers the server's elicitation requests:
+        answerer(params) gives the response (a dict: action, content), or None for no
+        answer. (is_error, value, requests): the requests are the params received"""
+        self.n += 1
+        mid = self.n
+        self.send_raw(json.dumps({"jsonrpc": "2.0", "id": mid, "method": "tools/call",
+                                  "params": {"name": name, "arguments": args}}) + "\n")
+        asked = []
+        end = time.monotonic() + timeout
+        while True:
+            m = self.read_msg(max(0.1, end - time.monotonic()))
+            if m is None:
+                return (True, None, asked)
+            if m.get("method") == "elicitation/create":
+                asked.append(m["params"])
+                a = answerer(m["params"])
+                if a is not None:
+                    self.send_raw(json.dumps({"jsonrpc": "2.0", "id": m["id"], "result": a}) + "\n")
+                continue
+            if m.get("id") == mid:
+                res = m["result"]
+                text = res["content"][0]["text"]
+                try:
+                    v = json.loads(text)
+                except Exception:
+                    v = text
+                return (bool(res.get("isError")), v, asked)
 
     def tool(self, name, **args):
         """(is_error, value): the JSON value of the text of the result, or the text"""
@@ -1369,6 +1399,493 @@ def s_propose(w):
     check("the other TeXmacs passed its checks", out == "ok")
 
 
+def hostread(w, st, cmd, name):
+    """ask the person's TeXmacs (host-edit.scm) for a file of results"""
+    try:
+        os.remove(os.path.join(w, "sync", name))
+    except OSError:
+        pass
+    hostcmd(w, st, cmd)
+    wait_file(os.path.join(w, "sync", name), 10)
+    time.sleep(0.05)
+    try:
+        return open(os.path.join(w, "sync", name)).read()
+    except OSError:
+        return ""
+
+
+class AsyncTool:
+    """a tool call made in a thread, so that the test can play the person meanwhile"""
+    def __init__(self, m, name, **args):
+        self.res = None
+        self.t = threading.Thread(target=self._run, args=(m, name, args), daemon=True)
+        self.t.start()
+
+    def _run(self, m, name, args):
+        self.res = m.tool(name, **args)
+
+    def wait(self, timeout=60):
+        self.t.join(timeout)
+        return self.res
+
+
+def asks_of(w, st):
+    """the questions of the host: (qid, agent name, [levels])"""
+    txt = hostread(w, st, "asks", "asks")
+    out = []
+    for mm in re.finditer(r'\("(q\d+)" "([^"]*)" \((.*?)\) \(((?:"[a-z]+" ?)*)\) \d+\)', txt, re.S):
+        out.append((mm.group(1), mm.group(2), re.findall(r'"([a-z]+)"', mm.group(4)), mm.group(3)))
+    return out
+
+
+def wait_ask(w, st, timeout=15):
+    return poll(lambda: asks_of(w, st), timeout)
+
+
+STYLE = "<assign|zz%d|hello>"
+LINK = "<hlink|site|ftp://x%d.org>"
+
+
+def s_trust(w):
+    """a person's TeXmacs (interactive) asks the first time an agent's edit breaks a rule
+    of a level that can be granted (style, links), and keeps the grants: once, for the
+    session, remembered; code and limits are never asked about"""
+    global TIMEOUT
+    TIMEOUT = max(TIMEOUT, 240)
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "shared.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_INTERACTIVE": "1", "TEXMACS_ASK_TIMEOUT": "6000"})
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins as a participant", not e and v["shared"]["role"] == "participant")
+    st = [0]
+    poll(lambda: m.tool("list_documents")[1]["documents"][0].get("agent_mode") == "propose", 10)
+    n = [0]
+    doc = ["d1"]
+    def edit(content):
+        n[0] += 1
+        return AsyncTool(m, "insert", document=doc[0], where="last", content=content % n[0] if "%d" in content else content)
+    def accept_all():
+        txt = hostread(w, st, "proposals", "proposals")
+        for pid in re.findall(r'\("(p\d+)" "pending"', txt):
+            hostcmd(w, st, "accept " + pid)
+        time.sleep(0.3)
+    def hb():
+        return host_body(w, st)
+    # 1. the first time the person is asked: the name, the rule, its level and the content
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    check("a style edit makes the host ask the person", bool(q))
+    check("the question names the agent as it claims to be", q and q[0][1] == "tm-test")
+    check("the question has the level: style", q and q[0][2] == ["style"])
+    check("the question shows the rule and the content", q and "definitions" in q[0][3] and "zz1" in q[0][3])
+    if q:
+        print("    question:", q[0])
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    e, r = a.wait()
+    check("refused: the answer says so (asked, refused, could be granted)",
+          not e and r["status"] == "refused" and r["asked"] is True and r["answer"] == "refused" and r["grantable"] is True)
+    check("the rules come with their level", r["rules"][0]["rule"] == "definitions" and r["rules"][0]["level"] == "style")
+    check("refused: the person's document is unchanged", "zz1" not in hb() and "version-both" not in hb())
+    # 2. nobody answers: refused after the time, the answer says timeout
+    t0 = time.monotonic()
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    check("the second question is asked again (refusing is not remembered)", bool(q))
+    e, r = a.wait()
+    dt = time.monotonic() - t0
+    check("no answer: refused with answer timeout after about the time (%.1f s)" % dt,
+          not e and r["status"] == "refused" and r["asked"] is True and r["answer"] == "timeout" and 5 < dt < 30)
+    check("and the question is gone", not asks_of(w, st))
+    # 3. allow once: in propose mode the trusted edit is still a proposal, and the next edit asks again
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    hostcmd(w, st, "answer %s once" % q[0][0])
+    e, r = a.wait()
+    check("allow once: the edit becomes a proposal (trust lifts the filter, not the review)",
+          not e and r["status"] == "proposed")
+    check("the host holds both versions", "version-both" in hb())
+    accept_all()
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    check("once is once: the next edit asks again", bool(q))
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    a.wait()
+    # 4. never asked: code, limits, version markup
+    for label, content in (("code (extern)", "<extern|foo>"), ("code (script)", "<script|scheme|x>"),
+                           ("a limit (par-columns)", "<with|par-columns|99|x>"),
+                           ("a loop", "<while|a|b>")):
+        a = edit(content)
+        e, r = a.wait()
+        asked = asks_of(w, st)
+        ok = isinstance(r, dict) and r.get("status") == "refused" and r.get("asked") is False and r.get("grantable") is False and not asked
+        check("never asked, never granted: %s" % label, ok)
+        if not ok:
+            print("    got:", e, str(r)[:300], asked)
+    # 5. trust for the session: style only
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    hostcmd(w, st, "answer %s session style" % q[0][0])
+    e, r = a.wait()
+    check("trust for the session: the edit is a proposal", not e and r["status"] == "proposed")
+    accept_all()
+    tr = hostread(w, st, "trust", "trust")
+    check("the trust is listed: session, the agent, style", '"session" "tm-test" "style"' in tr)
+    e, r = edit(STYLE).wait()
+    check("trusted: the next style edit is not asked about (proposed at once)", not e and r["status"] == "proposed")
+    accept_all()
+    # a grant for style does not allow a link
+    a = edit(LINK)
+    q = wait_ask(w, st)
+    check("trusting style does not imply links: a link asks, for links only", q and q[0][2] == ["links"])
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    e, r = a.wait()
+    check("and the link is refused", r["status"] == "refused" and r["rules"][0]["level"] == "links")
+    a = edit("<concat|" + (STYLE % 90) + "|<hlink|s|ftp://y.org>>")
+    q = wait_ask(w, st)
+    check("an edit with a definition and a link: only the link is asked", q and q[0][2] == ["links"])
+    if q:
+        hostcmd(w, st, "answer %s refuse" % q[0][0])
+    r = a.wait()
+    if not q:
+        print("    got:", str(r)[:400])
+    # 6. links for the session, then revoked
+    a = edit(LINK)
+    q = wait_ask(w, st)
+    hostcmd(w, st, "answer %s session links" % q[0][0])
+    e, r = a.wait()
+    check("links granted separately: the link is proposed", not e and r["status"] == "proposed")
+    accept_all()
+    tr = hostread(w, st, "trust", "trust")
+    peer = re.search(r'"session" "tm-test" "links" "([^"]*)"', tr)
+    check("both levels are listed", peer and '"session" "tm-test" "style"' in tr)
+    hostcmd(w, st, "revoke session tm-test links " + (peer.group(1) if peer else ""))
+    a = edit(LINK)
+    q = wait_ask(w, st)
+    check("revoked: the link asks again", bool(q))
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    a.wait()
+    tr = hostread(w, st, "trust", "trust")
+    check("revoked: the list shows style only", '"links"' not in tr and '"style"' in tr)
+    # 7. a mixed answer: "session style" when asked about a link and a style edit at once is not possible; direct mode
+    hostcmd(w, st, "mode direct")
+    poll(lambda: m.tool("list_documents")[1]["documents"][0].get("agent_mode") == "direct", 10)
+    e, r = edit(STYLE).wait()
+    check("direct mode and trusted: applied", not e and r["status"] == "applied")
+    hostcmd(w, st, "mode propose")
+    poll(lambda: m.tool("list_documents")[1]["documents"][0].get("agent_mode") == "propose", 10)
+    # 8. remember for this file
+    hostcmd(w, st, "revoke session tm-test style " + re.search(r'"session" "tm-test" "style" "([^"]*)"', hostread(w, st, "trust", "trust")).group(1))
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    check("after the revocation of style it asks again", bool(q))
+    hostcmd(w, st, "answer %s remember style" % q[0][0])
+    e, r = a.wait()
+    check("remembered: the edit is a proposal", not e and r["status"] == "proposed")
+    accept_all()
+    tr = hostread(w, st, "trust", "trust")
+    check("the remembered grant is listed, apart from the sessions", '"remember" "tm-test" "style"' in tr)
+    prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
+    check("it is in the preferences of the person (not in the document)", "agent-trust" in prefs and "tm-test" in prefs)
+    hbody = hb()
+    check("and not in the document", "tm-test" not in hbody and "agent-trust" not in hbody)
+    # 9. the session ends when the agent disconnects; the remembered grant stays
+    e, r = m.tool("close_document", document="d1", discard=True)
+    time.sleep(0.5)
+    tr = hostread(w, st, "trust", "trust")
+    check("the agent left: no session grant remains", '"session"' not in tr and '"remember" "tm-test" "style"' in tr)
+    e, v = m.tool("open_document", path=f)
+    doc[0] = v["document"]
+    check("the agent joins again", not e and v["shared"]["role"] == "participant")
+    poll(lambda: m.tool("list_documents")[1]["documents"][0].get("agent_mode") == "propose", 10)
+    e, r = edit(STYLE).wait()
+    check("remembered: not asked again", not e and r["status"] == "proposed")
+    if e or r["status"] != "proposed":
+        print("    got:", str(r)[:300], asks_of(w, st))
+    accept_all()
+    a = edit(LINK)
+    q = wait_ask(w, st)
+    check("and a link is asked (the session grant of links ended with the agent)", q and q[0][2] == ["links"])
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    a.wait()
+    # 10. another name gets nothing: the trust is by name
+    m2 = Mcp(envA)
+    m2.initialize(name="other-agent")
+    e, v = m2.tool("open_document", path=f)
+    poll(lambda: m2.tool("list_documents")[1]["documents"][0].get("agent_mode") == "propose", 10)
+    a2 = AsyncTool(m2, "insert", document="d1", where="last", content=STYLE % 70)
+    q = wait_ask(w, st)
+    check("another agent name is asked", q and q[0][1] == "other-agent")
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    a2.wait()
+    check("exit 0 (second agent)", m2.close() == 0)
+    # 11. revoke the remembered grant
+    hostcmd(w, st, "revoke remember tm-test style")
+    tr = hostread(w, st, "trust", "trust")
+    check("revoked: the remembered grant is gone", '"remember"' not in tr)
+    a = edit(STYLE)
+    q = wait_ask(w, st)
+    check("and the agent is asked again", bool(q))
+    hostcmd(w, st, "answer %s refuse" % q[0][0])
+    a.wait()
+    prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
+    check("the preference does not hold it any more", "tm-test" not in prefs)
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+    out = open(os.path.join(w, "out-B")).read() if os.path.exists(os.path.join(w, "out-B")) else ""
+    check("the other TeXmacs passed its checks", out == "ok")
+
+
+def s_trust_persist(w):
+    """what the person remembers is kept in their preferences: it survives a restart of the
+    person's TeXmacs, belongs to one file and to one agent name, and is revocable"""
+    global TIMEOUT
+    TIMEOUT = max(TIMEOUT, 300)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    f1 = os.path.join(w, "one.tm")
+    f2 = os.path.join(w, "two.tm")
+    write_small(f1)
+    write_small(f2)
+    f1 = os.path.realpath(f1)
+    f2 = os.path.realpath(f2)
+    phase = [0]
+    def run(f, name, fn):
+        """a person's TeXmacs on f (home B again) and an agent called name; fn(m, d, w2, st)"""
+        phase[0] += 1
+        w2 = os.path.join(w, "phase%d" % phase[0])
+        os.makedirs(os.path.join(w2, "sync"), exist_ok=True)
+        other = start_other(w2, envB, "host-edit.scm", f, {"SH_INTERACTIVE": "1", "TEXMACS_ASK_TIMEOUT": "6000"})
+        check("phase %d: the host has loaded the file" % phase[0], wait_file(os.path.join(w2, "sync", "h-loaded")))
+        m = Mcp(envA)
+        m.initialize(name=name)
+        e, v = m.tool("open_document", path=f)
+        check("phase %d: the agent joins" % phase[0], not e and v["shared"]["role"] == "participant")
+        poll(lambda: m.tool("list_documents")[1]["documents"][0].get("agent_mode") == "propose", 10)
+        st = [0]
+        fn(m, v["document"], w2, st)
+        sync_set(w2, "c-done")
+        m.close()
+        try:
+            other.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            other.kill()
+    def ask_once(m, d, w2, st, content, answer):
+        a = AsyncTool(m, "insert", document=d, where="last", content=content)
+        q = wait_ask(w2, st)
+        if q and answer:
+            hostcmd(w2, st, "answer %s %s" % (q[0][0], answer))
+        r = a.wait()
+        return q, r
+    def p1(m, d, w2, st):
+        q, r = ask_once(m, d, w2, st, "<assign|ra|1>", "remember style")
+        check("phase 1: asked, and remembered", q and r[1]["status"] == "proposed")
+    run(f1, "p-agent", p1)
+    prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
+    check("the grant is in the preferences of the person", "agent-trust" in prefs and "p-agent" in prefs)
+    def p2(m, d, w2, st):
+        tr = hostread(w2, st, "trust", "trust")
+        check("after a restart of the host the grant is listed", '"remember" "p-agent" "style"' in tr)
+        e, r = m.tool("insert", document=d, where="last", content="<assign|rb|1>")
+        check("after a restart of the host: not asked, proposed", not e and r["status"] == "proposed" and not asks_of(w2, st))
+        hostcmd(w2, st, "accept p1")
+    run(f1, "p-agent", p2)
+    def p3(m, d, w2, st):
+        q, r = ask_once(m, d, w2, st, "<assign|rc|1>", "refuse")
+        check("another name on the same file is asked", q and r[1]["status"] == "refused")
+    run(f1, "q-agent", p3)
+    def p4(m, d, w2, st):
+        q, r = ask_once(m, d, w2, st, "<assign|rd|1>", "refuse")
+        check("the same name on another file is asked: the grant is per file", q and r[1]["status"] == "refused")
+        check("and no trust is listed there", '"remember"' not in hostread(w2, st, "trust", "trust"))
+    run(f2, "p-agent", p4)
+    def p5(m, d, w2, st):
+        hostcmd(w2, st, "revoke remember p-agent style")
+        q, r = ask_once(m, d, w2, st, "<assign|re|1>", "refuse")
+        check("revoked in the person's TeXmacs: asked again", q and r[1]["status"] == "refused")
+    run(f1, "p-agent", p5)
+    prefs = open(os.path.join(homeB, "system", "preferences.scm"), errors="replace").read()
+    check("and the preferences do not hold it any more", "p-agent" not in prefs)
+    def p6(m, d, w2, st):
+        q, r = ask_once(m, d, w2, st, "<assign|rf|1>", None)
+        check("after the revocation a restarted host asks too", bool(q))
+    run(f1, "p-agent", p6)
+
+
+def s_elicit(w):
+    """no person has the file open: the client is asked by elicitation (MCP 2025-06-18), if it
+    declared the capability; the answers, the levels, and what is never asked"""
+    global TIMEOUT
+    TIMEOUT = max(TIMEOUT, 240)
+    f = os.path.join(w, "e.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    env, home = make_env(w, "A")
+    env["TEXMACS_ASK_TIMEOUT"] = "3000"
+    m = Mcp(env)
+    m.initialize(name="el-client", elicitation=True)
+    e, v = m.tool("open_document", path=f)
+    check("the file is not shared (nobody else has it)", not e and v["shared"] is None)
+    def hash_():
+        return m.tool("read", document="d1", format="texmacs", max_size=100000)[1]["hash"]
+    h0 = hash_()
+    n = [0]
+    def say(answer, action="accept"):
+        def f_(params):
+            if answer is None:
+                return None
+            if action != "accept":
+                return {"action": action}
+            return {"action": "accept", "content": {"answer": answer}}
+        return f_
+    def edit(content, answerer):
+        n[0] += 1
+        return m.tool_el(answerer, "insert", document="d1", where="last",
+                         content=content % n[0] if "%d" in content else content)
+    e, r, asked = edit(STYLE, say("refuse"))
+    check("a style edit: the client is asked once", len(asked) == 1)
+    msg = asked[0]["message"] if asked else ""
+    check("the question names the client (as it says), the rule and the content",
+          "el-client" in msg and "definitions" in msg and "assign" in msg and "cannot verify" in msg)
+    ch = asked[0]["requestedSchema"]["properties"]["answer"]["enum"] if asked else []
+    check("the choices: refuse, once, session and remember for style only",
+          ch == ["refuse", "once", "session:style", "remember:style"])
+    check("refused by the person: status refused, asked, answer, grantable",
+          isinstance(r, dict) and r["status"] == "refused" and r["asked"] is True and r["answer"] == "refused" and r["grantable"] is True)
+    check("the rule and its level are given", r["rules"][0]["rule"] == "definitions" and r["rules"][0]["level"] == "style")
+    check("nothing was changed", hash_() == h0)
+    for action in ("decline", "cancel"):
+        e, r, asked = edit(STYLE, say(None, action) if False else (lambda p, a=action: {"action": a}))
+        check("%s counts as a refusal" % action, isinstance(r, dict) and r["status"] == "refused" and r["answer"] == "refused")
+    e, r, asked = edit(STYLE, say("bogus"))
+    check("an answer that was not offered is a refusal", isinstance(r, dict) and r["status"] == "refused")
+    t0 = time.monotonic()
+    e, r, asked = edit(STYLE, say(None))
+    dt = time.monotonic() - t0
+    check("no answer in time: refused, answer timeout (%.1f s)" % dt,
+          isinstance(r, dict) and r["status"] == "refused" and r["answer"] == "timeout" and 2.5 < dt < 20)
+    check("and the server still answers", m.request("ping") is not None)
+    check("nothing was changed by the refusals", hash_() == h0)
+    # once
+    e, r, asked = edit(STYLE, say("once"))
+    check("allow once: applied", not e and r["status"] == "applied")
+    e, r, asked = edit(STYLE, say("refuse"))
+    check("and the next edit is asked again", len(asked) == 1)
+    # code and limits are never asked about
+    for label, content in (("extern", "<extern|foo>"), ("script", "<script|scheme|x>"), ("par-columns", "<with|par-columns|99|x>"),
+                           ("a loop", "<while|a|b>"), ("version markup", "<version-both|a|b>"),
+                           ("a dangerous link", "<hlink|x|<value|y>>"), ("an unknown tag", "<nonexistent-zz|x>")):
+        e, r, asked = edit(content, say("once"))
+        check("never asked: %s" % label,
+              not asked and isinstance(r, dict) and r["status"] == "refused" and r["asked"] is False and r["grantable"] is False)
+    # session style: not the links
+    e, r, asked = edit(STYLE, say("session:style"))
+    check("session style: applied", not e and r["status"] == "applied")
+    e, r, asked = edit(STYLE, say("refuse"))
+    check("and style is not asked again", not asked and not e and r["status"] == "applied")
+    e, r, asked = edit(LINK, say("refuse"))
+    ch = asked[0]["requestedSchema"]["properties"]["answer"]["enum"] if asked else []
+    check("trusting style does not allow a link: it asks, for links only", len(asked) == 1 and ch == ["refuse", "once", "session:links", "remember:links"])
+    check("and the link is refused", isinstance(r, dict) and r["status"] == "refused" and r["rules"][0]["level"] == "links")
+    e, r, asked = edit("<concat|" + (STYLE % 95) + "|<hlink|s|ftp://y.org>>", say("refuse"))
+    check("a definition and a link: only the link is asked about", len(asked) == 1 and "definitions" not in asked[0]["message"] and "ftp://y.org" in asked[0]["message"])
+    e, r, asked = edit(LINK, say("session:links"))
+    check("session links: applied", not e and r["status"] == "applied")
+    check("the link is there", "ftp://x" in str(m.tool("read", document="d1", format="texmacs", max_size=100000)[1]["content"]))
+    # remember
+    m2 = Mcp(env)
+    m2.initialize(name="el-client", elicitation=True)
+    m2.tool("open_document", path=f)
+    e, r, asked = m2.tool_el(say("remember:style"), "insert", document="d1", where="last", content="<assign|rem|1>")
+    check("remember: applied", not e and r["status"] == "applied")
+    prefs = open(os.path.join(home, "system", "preferences.scm"), errors="replace").read()
+    check("in the preferences of the person", "agent-trust" in prefs and "el-client" in prefs and "e.tm" in prefs)
+    check("exit 0 (first)", m.close() == 0)
+    check("exit 0 (second)", m2.close() == 0)
+    m3 = Mcp(env)
+    m3.initialize(name="el-client", elicitation=True)
+    m3.tool("open_document", path=f)
+    e, r, asked = m3.tool_el(say("refuse"), "insert", document="d1", where="last", content="<assign|rem2|1>")
+    check("a new session, the same name: remembered, not asked", not asked and not e and r["status"] == "applied")
+    e, r, asked = m3.tool_el(say("refuse"), "insert", document="d1", where="last", content=LINK % 50)
+    check("but not the links (the session grant ended)", len(asked) == 1)
+    check("exit 0 (third)", m3.close() == 0)
+    m4 = Mcp(env)
+    m4.initialize(name="another-client", elicitation=True)
+    m4.tool("open_document", path=f)
+    e, r, asked = m4.tool_el(say("refuse"), "insert", document="d1", where="last", content="<assign|rem3|1>")
+    check("another name is asked: the trust is by name", len(asked) == 1)
+    check("exit 0 (fourth)", m4.close() == 0)
+    # a client without the capability, or with an old protocol: refused, not asked
+    m5 = Mcp(env)
+    m5.initialize(name="plain-client")
+    m5.tool("open_document", path=f)
+    e, r, asked = m5.tool_el(say("once"), "insert", document="d1", where="last", content="<assign|nc|1>")
+    check("no elicitation capability: refused, nothing asked, could be granted",
+          not asked and isinstance(r, dict) and r["status"] == "refused" and r["asked"] is False and r["grantable"] is True)
+    check("the reason says that nobody could be asked", "nobody could be asked" in r["reason"])
+    check("exit 0 (fifth)", m5.close() == 0)
+    m6 = Mcp(env)
+    m6.initialize(version="2024-11-05", name="old-client", elicitation=True)
+    m6.tool("open_document", path=f)
+    e, r, asked = m6.tool_el(say("once"), "insert", document="d1", where="last", content="<assign|nd|1>")
+    check("a protocol version before elicitation: not asked", not asked and isinstance(r, dict) and r["status"] == "refused")
+    check("exit 0 (sixth)", m6.close() == 0)
+
+
+def s_levels(w):
+    """the level of each rule, as docs/mcp-server.md tells it: what the person can grant (style, links),
+    and what is never granted (code, limits, mode)"""
+    f = os.path.join(w, "l.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    env, home = make_env(w, "A")
+    m = Mcp(env)
+    m.initialize()
+    m.tool("open_document", path=f)
+    table = [
+        ("<assign|a|b>", "definitions", "style", True),
+        ("<set|font-size|2>", "definitions", "style", True),
+        ("<with|em|<value|strong>|x>", "definitions", "style", True),
+        ("<with-package|x|y>", "style", "style", True),
+        ("<hlink|x|ftp://a.org>", "link", "links", True),
+        ("<hlink|x|file:///etc/hosts>", "link", "links", True),
+        ("<include|/etc/hosts>", "file", "links", True),
+        ("<label|a}b>", "names", "links", True),
+        ("<extern|x>", "code", "code", False),
+        ("<script|scheme|x>", "code", "code", False),
+        ("<use-module|(x)>", "code", "code", False),
+        ("<find-file|x>", "code", "code", False),
+        ("<hlink|x|<value|y>>", "code", "code", False),
+        ("<with|par-columns|99|x>", "limits", "limits", False),
+        ("<while|a|b>", "limits", "limits", False),
+        ("<range|1|2>", "limits", "limits", False),
+        ("<table|x>", "structure", "limits", False),
+        ("<version-both|a|b>", "version-markup", "mode", False),
+        ("<nonexistent-zz|x>", "unknown-tag", "code", False),
+    ]
+    for content, rule, level, grantable in table:
+        e, r = m.tool("insert", document="d1", where="last", content=content)
+        ok = isinstance(r, dict) and r.get("status") == "refused" and r.get("grantable") is grantable \
+            and any(x["rule"] == rule and x["level"] == level for x in r["rules"])
+        check("%s: rule %s, level %s%s" % (content, rule, level, "" if grantable else " (never)"), ok)
+        if not ok:
+            print("    got:", str(r)[:400])
+    check("exit 0", m.close() == 0)
+
+
 def s_undo(w):
     """the editor's undo in a headless process (single process, no sharing)"""
     f = os.path.join(w, "u.tm")
@@ -2465,7 +2982,7 @@ def s_static(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "trust": s_trust, "trust-persist": s_trust_persist, "elicit": s_elicit, "levels": s_levels,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

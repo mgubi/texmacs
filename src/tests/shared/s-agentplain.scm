@@ -4,11 +4,19 @@
 ;; its patches are not filtered nor turned into proposals.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
+;; (the person refuses at once what the host asks about: a link of a scheme that is not accepted)
+(define (auto-refuse!)
+  (exec-delayed-pause
+   (lambda ()
+     (for (q (or (shared-asks (the-name)) '()))
+       (shared-ask-answer! (the-name) (car q) "refuse"))
+     20)))
+
 (define (A-steps)
   (list
    (act "interactive" (shared-set-interactive! #t))
    (act "load" (load-buffer FILE))
-   (act "go" (sync-set! "a-loaded"))
+   (act "go" (sync-set! "a-loaded") (auto-refuse!))
    (wait-sync "b-joined")
    (step "listed" (= (length (shared-file-agents (the-name))) 1))
    (act "check 0" (check "the headless participant is taken for an agent although its id does not say so"

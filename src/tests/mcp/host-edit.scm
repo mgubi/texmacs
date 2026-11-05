@@ -14,6 +14,11 @@
 ;;   accept ID / reject ID   resolve the proposal ID of an agent
 ;;   proposals          write (id status index owner) of the proposals to the sync file proposals
 ;;   save               save the buffer
+;;   asks               write the questions to the person to the sync file asks
+;;   answer QID A [L]   answer a question: refuse, once, session L, remember L
+;;   trust              write what the person has granted (shared-trust)
+;;   revoke KIND NAME LEVEL [PEER]   take a grant back
+;;   stat NAME          write the counter NAME
 ;;   gate               write the count and the time (ms) the host spent checking agents' patches
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
@@ -45,6 +50,20 @@
           ((== name "proposals")
            (sync-write! "proposals" (object->string (shared-proposals (the-name)))))
           ((== name "save") (save-buffer-main (the-name)))
+          ((== name "asks") (sync-write! "asks" (object->string (shared-asks (the-name)))))
+          ((== name "answer")
+           ;; answer QID ANSWER [LEVEL]
+           (sync-write! "answer" (object->string
+                                  (apply shared-ask-answer! (cons (the-name) (string-tokenize-by-char arg #\space))))))
+          ((== name "trust") (sync-write! "trust" (object->string (shared-trust (the-name)))))
+          ((== name "revoke")
+           ;; revoke KIND NAME LEVEL PEER
+           (let ((l (string-tokenize-by-char arg #\space)))
+             (sync-write! "revoke" (object->string
+                                    (shared-trust-revoke! (the-name) (list-ref l 0) (list-ref l 1) (list-ref l 2)
+                                                          (if (> (length l) 3) (list-ref l 3) ""))))))
+          ((== name "stat")
+           (sync-write! "stat" (object->string (shared-stat (string->symbol arg)))))
           ((== name "gate")
            (sync-write! "gate" (object->string (shared-file-gate-stats (the-name)))))
           ((== name "stats")
@@ -71,4 +90,4 @@
         (act "load" (load-buffer FILE))
         (act "host" (check "the other TeXmacs hosts" (== (role-of) 'host)))
         (act "go" (sync-set! "h-loaded")))
-  (command-steps 60)))
+  (command-steps 150)))

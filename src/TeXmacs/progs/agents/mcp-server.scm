@@ -1095,10 +1095,48 @@
 (define (violate! msg)
   (if collecting?
       (set! collected (cons (string-append msg " #" (node-key)) collected))
-      (tool-error msg)))
+      (tool-error (reason-text msg))))
+
+;; The class of a rule is written in its reason: SOH rule STX level ETX.
+;; A reason without it is `code' (never granted): only the rules that the
+;; person may be asked about are marked as such, so a rule forgotten here is
+;; refused, never granted. The levels: style (definitions, packages, styles),
+;; links (links, files, names that go into exports), and the ones that are
+;; never granted: code, limits, mode.
+(define soh (string (integer->char 1)))
+(define stx (string (integer->char 2)))
+(define etx (string (integer->char 3)))
+
+(define (marked rule level msg)
+  (string-append soh rule stx level etx msg))
+
+(define (violate-as! rule level msg)
+  (violate! (marked rule level msg)))
+
+(define (reason-text* r)
+  ;; a reason without its class mark
+  (if (string-starts? r soh)
+      (let ((i (string-search-forwards etx 0 r)))
+        (if (>= i 0) (substring r (+ i 1) (string-length r)) r))
+      r))
+
+(define (reason-class r)
+  ;; (rule level) of the reason @r
+  (cond ((string-starts? r soh)
+         (let* ((i (string-search-forwards stx 0 r))
+                (j (string-search-forwards etx 0 r)))
+           (if (and (> i 1) (> j i))
+               (list (substring r 1 i) (substring r (+ i 1) j))
+               (list "code" "code"))))
+        ((or (string-starts? r over-budget-reason) (string-starts? r cannot-evaluate-reason))
+         (list "limits" "limits"))
+        (else (list "code" "code"))))
 
 (define (reason-text r)
-  ;; a reason without the key of its node
+  ;; a reason without the key of its node and the mark of its class
+  (reason-text* (reason-key-free r)))
+
+(define (reason-key-free r)
   (let ((i (let loop ((k (- (string-length r) 1)))
              (cond ((< k 0) #f) ((char=? (string-ref r k) #\#) k) (else (loop (- k 1)))))))
     (if (and i (> i 0)) (substring r 0 (- i 1)) r)))
@@ -1284,11 +1322,13 @@
            (when (and (not (== tag 'document))
                       (or (known-primitive? tag) (known-macro-arity? tag))
                       (not (tag-possible-arity? tag n)))
-             (violate! (string-append "the tag `" (symbol->string tag)
+             (violate-as! "structure" "limits"
+                          (string-append "the tag `" (symbol->string tag)
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
            (when (table-structure-bad? st)
-             (violate! (string-append "the tag `" (symbol->string tag)
+             (violate-as! "structure" "limits"
+                          (string-append "the tag `" (symbol->string tag)
                                         "' has a string where a row, a cell or a table is needed (nothing was changed)")))
            (if (memq tag '(macro xmacro))
                (with-global in-macro-body? #t (for (c (cdr st)) (check-arity c d)))
@@ -1496,8 +1536,22 @@
   ;; (a definition of the document is a violation that stays when the person
   ;; changes it: its reason is not tied to the content of the node)
   (when (memq tag definitional-tags) (set! cur-node #f))
-  (violate! (string-append "the tag `" (symbol->string tag) "' " why
-                             ": the content is refused (nothing was changed)")))
+  (let ((c (tag-class tag)))
+    (violate-as! (car c) (cadr c)
+                 (string-append "the tag `" (symbol->string tag) "' " why
+                                ": the content is refused (nothing was changed)"))))
+
+(define (tag-class tag)
+  ;; (rule level) of a tag that the content may not have: definitions and
+  ;; styles can be granted by the person; loops are limits; the rest is code
+  (cond ((memq tag '(assign set reset provide macro xmacro func drd-props))
+         (list "definitions" "style"))
+        ((memq tag '(with-package use-package new-theme copy-theme apply-theme
+                     select-theme style-with style-with* style-only style-only*
+                     filter-style))
+         (list "style" "style"))
+        ((memq tag '(while for-each range)) (list "limits" "limits"))
+        (else (list "code" "code"))))
 
 (define (argument st k)
   ;; the argument number k of the tree (last: the last one), or #f
@@ -1511,7 +1565,8 @@
   (cond ((string? a)
          (when (not (and (file-name-ok? a base web?)
                          (name-chars-ok? a (if (url-scheme a) 'address 'file))))
-           (violate! (string-append "the tag `" (symbol->string tag) "' refers to the file `"
+           (violate-as! "file" "links"
+                        (string-append "the tag `" (symbol->string tag) "' refers to the file `"
                                       (utf8-prefix (u8 a) 80)
                                       "': only relative names without .. inside the folders of the server (or of the document), and http(s) images, are accepted (nothing was changed)"))))
         (else
@@ -1645,7 +1700,7 @@
 
 (define (check-table-attribute tag var val)
   (let ((p (table-attribute-problem tag var val)))
-    (when p (violate! p))))
+    (when p (violate-as! "structure" "limits" p))))
 
 (define (inside-range? a b n)
   ;; is the range a..b of a cwith (1-based, negative from the end) wholly inside n rows or columns?
@@ -1702,7 +1757,7 @@
 
 (define (check-spans st)
   (let ((p (spans-problem st)))
-    (when p (violate! p))))
+    (when p (violate-as! "structure" "limits" p))))
 
 (define (attribute-problem st)
   ;; why a with, cwith, twith or tformat @st sets a table attribute it may not, or #f
@@ -1734,13 +1789,23 @@
             (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
                                      "' to something that is not plain text: refused (nothing was changed)")))
           (when (tag-name? var)
-            (violate! (string-append "a `" (symbol->string tag) "' that sets `" (utf8-prefix (u8 var) 40)
+            (violate-as! "definitions" "style"
+                         (string-append "a `" (symbol->string tag) "' that sets `" (utf8-prefix (u8 var) 40)
                                        "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))
           (when (and (string? val) (not (env-value-ok? var val)))
-            (violate! (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
-                                       "' to a value that is not accepted: `" (utf8-prefix (u8 val) 40)
-                                       "' (" (env-limit-text var)
-                                       "letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)")))))
+            (if (and (value-chars-ok? val)
+                     (not (or (== var "color") (string-ends? var "-color"))))
+                ;; (a number that is too large or too long: the typesetter's work)
+                (violate-as! "limits" "limits"
+                             (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
+                                            "' to a value that is not accepted: `" (utf8-prefix (u8 val) 40)
+                                            "' (" (env-limit-text var)
+                                            "letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name, a size a number) (nothing was changed)"))
+                ;; (text that would be written into an export)
+                (violate-as! "names" "links"
+                             (string-append "a `" (symbol->string tag) "' sets `" (utf8-prefix (u8 var) 40)
+                                            "' to a value that is not accepted: `" (utf8-prefix (u8 val) 40)
+                                            "' (letters, digits, blanks and . _ - + * / % # , : = only; a colour is #hex or a name) (nothing was changed)"))))))
       (loop (cddr l)))))
 
 (define (check-link-destination tag a)
@@ -1749,11 +1814,13 @@
          (violate! (string-append "a `" (symbol->string tag)
                                     "' whose destination is not written as plain text is refused (nothing was changed)")))
         ((not (name-chars-ok? a 'address))
-         (violate! (string-append "a `" (symbol->string tag)
+         (violate-as! "link" "links"
+                      (string-append "a `" (symbol->string tag)
                                     "' with the target `" (utf8-prefix (u8 a) 60)
                                     "' is refused: a backslash, a brace, a control character or a bare % cannot be in an address (nothing was changed)")))
         ((not (link-target-ok? a))
-         (violate! (string-append "a `" (symbol->string tag)
+         (violate-as! "link" "links"
+                      (string-append "a `" (symbol->string tag)
                                     "' with the target `" (utf8-prefix (u8 a) 60)
                                     "' is refused: only http, https, mailto and relative targets are accepted (nothing was changed)")))))
 
@@ -1769,7 +1836,8 @@
        (set! cur-node st)
        ;; (version markup is what the person's TeXmacs writes for a proposal)
        (when (memq tag '(version-both version-old version-new version-suppressed))
-         (violate! (string-append "version markup (`" (symbol->string tag)
+         (violate-as! "version-markup" "mode"
+                      (string-append "version markup (`" (symbol->string tag)
                                     "') is written by the person's TeXmacs for a proposal: the content may not contain it (nothing was changed)")))
        ;; the tags that are not primitives: only those the style of the
        ;; document (or the document itself, by assign) defines, and not the
@@ -1780,13 +1848,15 @@
          (cond ((memq tag refused-style-macros)
                 (refuse-tag tag "is a macro of the styles that runs commands, reads files or acts on a click"))
                ((not (and safety-defined? (safety-defined? tag)))
-                (violate! (string-append "unknown tag `" (symbol->string tag)
+                (violate-as! "unknown-tag" "code"
+                             (string-append "unknown tag `" (symbol->string tag)
                                            "' (not defined by the style of the document): the content is refused (nothing was changed)")))))
        ;; (a macro that passes an argument to a link, a file, a script or a
        ;; macro name is not called by the content, with a few standard exceptions)
        (when (and safety-doc (not (known-primitive? tag)) (not (assq tag code-reasons))
                   (dangerous-call? safety-doc st))
-         (violate! (string-append "a call of the macro `" (symbol->string tag)
+         (violate-as! "dangerous-macro" "code"
+                      (string-append "a call of the macro `" (symbol->string tag)
                                     "' is refused: it passes an argument (or the value of a variable) to a link, a file, a script or the name of a macro, which the filter cannot check (nothing was changed)")))
        ;; (aliases, and what is written into the exports as attributes)
        (cond ((eq? tag 'with)
@@ -1800,18 +1870,21 @@
              ((eq? tag 'tformat) (check-spans st))
              ((memq tag '(value quote-value or-value))
               (when (and (pair? (cdr st)) (string? (cadr st)) (tag-name? (cadr st)))
-                (violate! (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)
+                (violate-as! "definitions" "style"
+                             (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)
                                            "' (the name of a tag or of a macro) is refused: it would make an alias of the tag (nothing was changed)")))))
        ;; macros which call the macro named by an argument
        (when (memq tag macro-by-name-tags)
          (for (a (cdr st))
            (when (and (string? a) (dangerous-name? a))
-             (violate! (string-append "a `" (symbol->string tag) "' that calls `" (utf8-prefix (u8 a) 40)
+             (violate-as! "dangerous-macro" "code"
+                          (string-append "a `" (symbol->string tag) "' that calls `" (utf8-prefix (u8 a) 40)
                                         "' is refused: that macro is not accepted in the content (nothing was changed)")))))
        (when (memq tag name-tags)
          (for (a (cdr st))
            (when (and (string? a) (not (name-chars-ok? a (name-kind tag))))
-             (violate! (string-append "a string in a `" (symbol->string tag) "' has a character that cannot be in a name (a backslash, a brace, a control character, % # $ & ^ ~ ...): `"
+             (violate-as! "names" "links"
+                          (string-append "a string in a `" (symbol->string tag) "' has a character that cannot be in a name (a backslash, a brace, a control character, % # $ & ^ ~ ...): `"
                                         (utf8-prefix (u8 a) 40) "' (nothing was changed)")))))
        (cond
          ((assq tag code-reasons) => (lambda (e) (refuse-tag tag (cdr e))))
@@ -1877,7 +1950,8 @@
            (when (not (if (mcp-roots)
                           (path-allowed? p)
                           (inside-folder? p (document-folder base))))
-             (violate! (string-append "the content expands to a `" (symbol->string tag)
+             (violate-as! "file" "links"
+                          (string-append "the content expands to a `" (symbol->string tag)
                                         "' of the file `" (utf8-prefix (u8 a) 80)
                                         "', outside the folders of the server (or of the document): refused (nothing was changed)")))))
         (else (check-file-argument tag a base (and (memq tag web-file-tags) #t)))))
@@ -1911,13 +1985,15 @@
                    (when (and (pair? dest) (not (memq (car dest) '(id tuple))))
                      (violate! "the content expands to a link whose destination is not plain text: refused (nothing was changed)")))
                   ((or (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
-                   (violate! (string-append "the content expands to a link to `" (utf8-prefix (u8 u) 80)
+                   (violate-as! "link" "links"
+                                  (string-append "the content expands to a link to `" (utf8-prefix (u8 u) 80)
                                               "': only http, https, mailto and relative targets are accepted (nothing was changed)"))))))
          ((and (eq? tag 'hlink) (= (length args) 2))
           (set! cur-node (cadr args))
           (let ((u (url-destination (cadr args))))
             (when (or (not u) (not (name-chars-ok? u 'address)) (not (link-target-ok? u)))
-              (violate! (string-append "the content expands to a link whose destination is not accepted: "
+              ((if u (lambda (m) (violate-as! "link" "links" m)) violate!)
+               (string-append "the content expands to a link whose destination is not accepted: "
                                        (if u (utf8-prefix (u8 u) 80) "?") " (nothing was changed)")))))
          ((memq tag '(image postscript postscript* include include* pattern video sound))
           (when (pair? args)
@@ -2243,7 +2319,15 @@
                (lambda () (check-safety st base) (check-arity st d) 'ok)
                (lambda args 'failed))))
       (set! safety-defined? #f)
-      (when (!= r 'ok) (throw 'mcp-tool-error)))
+      (when (!= r 'ok)
+        ;; (the first reason is the message of the error; all of them, with
+        ;; their classes, are collected to tell what the person could allow)
+        (let ((first mcp-tool-error-message)
+              (all (literal-violations st base d)))
+          (set! mcp-tool-error-message first)
+          (if (and (pair? all) d asking-allowed?)
+              (judge-or-refuse! d all 'tool)
+              (throw 'mcp-tool-error)))))
     st))
 
 (define (content-items st)
@@ -2334,7 +2418,7 @@
               (cond ((> (disturbances d) before) 'refused)
                     ((not i) 'ok)
                     ((and (== (list-ref i 5) 0) (not (list-ref i 6)) (> n 0)) 'ok)
-                    ((> (- (texmacs-time) t0) 10000) 'timeout)
+                    ((> (texmacs-time) (max (+ t0 10000) (or (shared-file-asking-until u) 0))) 'timeout)
                     (else (loop (+ n 1))))))))))
 
 ;;; The filter of the document: an edit may not introduce a violation
@@ -3010,13 +3094,13 @@
     (when (and t (not (body-root? d t))
                (or (inside-definition? d t (not (eq? mode 'sibling)))
                    (and (memq mode '(replace)) (contains-definition? t))))
-      (tool-error "the definitions of the document (assign, set, macro...) belong to the person: the content filter refuses edits inside them, and edits that replace or delete a node that has one inside: the edit is refused (nothing was changed)"))
+      (judge-or-refuse! d (list (marked "definitions" "style" "the definitions of the document (assign, set, macro...) belong to the person: the content filter refuses edits inside them, and edits that replace or delete a node that has one inside: the edit is refused (nothing was changed)")) 'tool))
     (when (and t (inside-opaque? d t (not delete?)))
-      (tool-error "this node is code or text for another program, or inside one (extern, script, hybrid, action, specific, latex...): the content filter refuses edits in it (nothing was changed)"))
+      (judge-or-refuse! d (list "this node is code or text for another program, or inside one (extern, script, hybrid, action, specific, latex...): the content filter refuses edits in it (nothing was changed)") 'tool))
     (let* ((lit (and blk i (block-literal-violations d blk i)))
            (viol (and blk i (block-violations d blk i lit))))
       (when (and viol (over-budget? viol))
-        (tool-error "the block does not evaluate within the budget: the content filter refuses edits in it (nothing was changed)"))
+        (judge-or-refuse! d (list over-budget-reason) 'tool))
       ;; (the definitions cannot be changed by the content, so the rest of the
       ;; document is not compared: only the block of the edit and the new blocks)
       (list (and blk (ptr blk)) viol (assigns-signature d) lit))))
@@ -3027,16 +3111,16 @@
           ((f (car l)) => (lambda (x) (loop (cdr l) (cons x acc))))
           (else (loop (cdr l) acc)))))
 
+(define guard-doc #f)
+
 (define (guard-fail! reasons)
-  (set! edit-reason
-        (string-append "the edit is refused: it would introduce what the content filter refuses ("
-                       (utf8-prefix (u8 (reason-text (car reasons))) 200)
-                       (if (pair? (cdr reasons)) (string-append ", and " (number->string (length (cdr reasons))) " more") "")
-                       "); nothing was changed"))
-  (throw 'mcp-guard-refused))
+  ;; the edit introduced what the filter refuses: unless the person lets it
+  ;; through (asked, or trusted) it is cancelled
+  (judge-or-refuse! guard-doc reasons 'guard))
 
 (define (guard-post d pre new-nodes skip-block?)
   ;; after the edit, inside its transaction: refuse it if it introduced a violation
+  (set! guard-doc d)
   (let* ((old-ptr (car pre)) (old-viol (cadr pre))
          (blk (and old-ptr (not skip-block?) (deref old-ptr)))
          (blocks (let loop ((l (append (if (and blk (tree? blk) (inside-body? d blk)
@@ -3065,7 +3149,7 @@
         (when (over-budget? after) (guard-fail! (list over-budget-reason)))
         (when (pair? new) (guard-fail! new))))
     (when (!= (assigns-signature d) (caddr pre))
-      (guard-fail! (list "it changes the definitions of the document")))))
+      (guard-fail! (list (marked "definitions" "style" "it changes the definitions of the document"))))))
 
 (define edit-reason #f)
 (define current-guard #f)
@@ -3128,6 +3212,14 @@
         (when (and i (equal? (cadr i) s0) (< (- (texmacs-time) t0) 3000))
           (loop))))))
 
+(define (asked-note info)
+  ;; what the host's answer adds when the person was asked
+  (cond ((not (and info (car info))) "")
+        ((== (cadr info) "refused") ": the person was asked and refused")
+        ((== (cadr info) "timeout") ": the person was asked and did not answer in time")
+        ((== (cadr info) "pending") ": the person is already being asked about another edit of yours")
+        (else "")))
+
 (define (finish-edit! d dist changed undo)
   ;; after the edit: wait for the host, say what happened. @changed is a
   ;; list of nodes, @undo the way to undo the step (or #f)
@@ -3154,9 +3246,14 @@
                                                   (if (pair? (cdr (caddr v)))
                                                       (string-append " (and " (number->string (length (cdr (caddr v)))) " more)")
                                                       "")
+                                                  (asked-note (and (> (length v) 4) (list-ref v 4)))
                                                   ". The document is back to what the host has; nothing of yours is kept."))
                      "rules" (arr (map (lambda (r) (obj "rule" (car r) "level" (cadr r) "content" (u8 (caddr r))))
                                        (caddr v)))
+                     "asked" (bool (and (> (length v) 4) (list-ref v 4) (car (list-ref v 4))))
+                     "answer" (let ((i (and (> (length v) 4) (list-ref v 4))))
+                                (if (and i (cadr i)) (cadr i) jnull))
+                     "grantable" (bool (and (> (length v) 4) (list-ref v 4) (caddr (list-ref v 4))))
                      "hash" (hash-short body)))
                (else
                  (obj "status" "refused"
@@ -3188,31 +3285,6 @@
 ;;; n-new); the violations of the blocks after, as written and as they expand,
 ;;; that were not in the blocks before are the answer, as (rule level text).
 
-(define (violation-class r)
-  ;; (rule level) of the reason @r: the level is what a person could be asked
-  ;; to allow (style, links) or never (code, limits, mode)
-  (let ((has (lambda (s) (>= (string-search-forwards s 0 r) 0))))
-    (cond ((has "definitions of the document") (list "definitions" "style"))
-          ((has "version markup") (list "version-markup" "mode"))
-          ((or (has "budget") (has "digits") (has "at most") (has "loop") (has "nesting")
-               (has "too deep") (has "recursion"))
-           (list "limits" "limits"))
-          ((or (has "a call of the macro") (has "passes an argument") (has "runs commands"))
-           (list "dangerous-macro" "code"))
-          ((and (or (has "link") (has "hlink") (has "target"))
-                (not (has "runs a script")) (not (has "expands to an action")))
-           (list "link" "links"))
-          ((or (has "script") (has "action") (has "extern") (has "specific") (has "LaTeX")
-               (has "latex") (has "another program") (has "hybrid") (has "eval")
-               (has "another program"))
-           (list "code" "code"))
-          ((or (has "file") (has "image") (has "include") (has "a path")) (list "file" "links"))
-          ((or (has "character") (has "backslash")) (list "names" "links"))
-          ((or (has "defin") (has "alias") (has "not defined by the style") (has "unknown tag")
-               (has "package") (has "style"))
-           (list "style" "style"))
-          (else (list "other" "code")))))
-
 (define (range-blocks body range . new?)
   ;; the blocks of @body in the range (the old ones, or the new ones)
   (sublist (tree-children body) (car range)
@@ -3230,12 +3302,17 @@
 
 (define (map-append f . ls) (apply append (apply map (cons f ls))))
 
-(define (host-block-violations d old new p n-old n-new)
+(define (host-block-violations d old new p n-old n-new . opt)
+  ;; the new violations of the blocks p ... of @new against those of @old; with
+  ;; the optional argument #t (the definitions change) only what is wrong as
+  ;; written: the blocks are not evaluated (the definitions they would be
+  ;; evaluated in are in doubt)
   (let* ((kn (sublist (tree-children new) p (+ p n-new)))
          (ko (sublist (tree-children old) p (+ p n-old)))
          (inew (map (lambda (k) (+ p k)) (iota n-new)))
          (iold (map (lambda (k) (+ p k)) (iota n-old)))
-         (base (doc-base d)))
+         (base (doc-base d))
+         (literal-only? (and (pair? opt) (car opt))))
     (reset-danger!)
     (let* ((lit-new (map (lambda (b) (literal-violations (tm->stree b) base d)) kn))
            (lit-old (map (lambda (b) (literal-violations (tm->stree b) base d)) ko))
@@ -3244,6 +3321,7 @@
         ((pair? fresh) fresh)
         ((pair? (new-violations (append-map opaque-strees ko) (append-map opaque-strees kn)))
          (list "it adds or changes code or text for another program (extern, script, latex, specific...): only the person writes that"))
+        (literal-only? '())
         (else
           (let ((after (map-append (lambda (b i lit) (block-violations d b i lit)) kn inew lit-new)))
             (cond ((null? after) '())
@@ -3252,6 +3330,14 @@
                     (new-violations
                      (map-append (lambda (b i lit) (block-violations d b i lit)) ko iold lit-old)
                      after)))))))))
+
+(define (definitions-preview blocks-old blocks-new)
+  ;; the definitions that the new blocks have and the old ones lack, for the person
+  (let* ((old (assign-signature-of blocks-old))
+         (fresh (list-filter (assign-signature-of blocks-new) (lambda (x) (not (member x old))))))
+    (if (null? fresh)
+        ""
+        (string-append ": " (utf8-prefix (object->string (car fresh)) 160)))))
 
 (tm-define (mcp-host-check u old new range)
   ;; the new violations of the patched body @new (a tree) against @old, for
@@ -3262,15 +3348,218 @@
                   (lambda ()
                     (if (!= (assign-signature-of (range-blocks old range))
                             (assign-signature-of (range-blocks new range #t)))
-                        (list "it changes the definitions of the document")
+                        ;; (what else is wrong as written counts too: a grant for
+                        ;; definitions is not one for links)
+                        (cons (marked "definitions" "style"
+                                      (string-append "it changes the definitions of the document"
+                                                     (definitions-preview (range-blocks old range)
+                                                                          (range-blocks new range #t))))
+                              (host-block-violations d old new (car range) (cadr range) (caddr range) #t))
                         (host-block-violations d old new (car range) (cadr range) (caddr range))))
                   (lambda args (set! host-cache #f) (apply throw args)))))
     (reset-danger!)
     (set! host-cache #f)
     (map (lambda (r)
-           (let ((c (violation-class r)) (t (reason-text r)))
+           (let ((c (reason-class r)) (t (reason-text r)))
              (list (car c) (cadr c) (if (> (string-length t) 400) (substring t 0 400) t))))
          found)))
+
+;;; Asking the person (step 4, stage B: docs/mcp-server.md, "Trusted agents")
+;;;
+;;; An edit that breaks a rule of the content filter is not simply refused
+;;; when the rule is of a level that the person may grant (style, links), and
+;;; every rule it breaks is: the person is asked, once, with the content.
+;;;   - the file is open in the person's TeXmacs (the host filters this agent
+;;;     itself, `gated'): the edit goes to the host, which decides and asks in
+;;;     a dialog; the agent's own check lets those rules through, and the
+;;;     host's check, the same rules, is the one that counts;
+;;;   - nobody else has the file: the client is asked by elicitation
+;;;     (elicitation/create), if it declared the capability; else refused.
+;;; The levels `code', `limits' and `mode' are never asked about.
+
+(define asking-allowed? #t)        ; #f where there is no edit to ask about (create_document)
+(define client-name #f)            ; the name the client gives at initialize (not verified)
+(define client-elicits? #f)        ; did the client declare the elicitation capability?
+(define call-approved '())         ; the levels let through for this tool call
+(define session-grants '())        ; ((path level) ...) granted for this session
+(define mcp-waiting? #f)           ; reading the client's answer to a request of ours
+(define mcp-deferred '())          ; the lines read meanwhile, to be handled after
+(define elicit-serial 0)
+(define elicit-wait-id #f)
+(define elicit-answer #f)
+
+(define (ask-timeout-ms)
+  (let ((e (getenv "TEXMACS_ASK_TIMEOUT")))
+    (or (and e (string->number e) (max 100 (string->number e))) 60000)))
+
+(define (clean-client-name n)
+  ;; printable ASCII, at most 64 characters (what the host shows and keys on)
+  (list->string
+   (map (lambda (c) (if (and (>= (char->integer c) 32) (< (char->integer c) 127)) c #\?))
+        (string->list (if (> (string-length n) 64) (substring n 0 64) n)))))
+
+(define (person-gated? d)
+  ;; does the host of the file (the person's TeXmacs) filter my patches?
+  (let ((u (doc-url d)))
+    (and (shared-file-participant? u) (shared-file-gated? u))))
+
+(define (level-covered? d level)
+  (and (shared-grantable-level? level)
+       (or (member level call-approved)
+           (member (list (doc-path d) level) session-grants)
+           (and client-name (shared-trust-remembered? (doc-path d) client-name level)))
+       #t))
+
+(define (refusal-json reasons how asked answer grantable note)
+  ;; the answer to the agent when an edit is refused by the filter: the first
+  ;; reason, all the rules with their level, and whether the person was asked
+  (let* ((cl (map reason-class reasons))
+         (texts (map reason-text reasons))
+         (text (cond ((== how 'guard)
+                      (string-append "the edit is refused: it would introduce what the content filter refuses ("
+                                     (utf8-prefix (u8 (car texts)) 200)
+                                     (if (pair? (cdr texts))
+                                         (string-append ", and " (number->string (length (cdr texts))) " more")
+                                         "")
+                                     "); nothing was changed"))
+                     (else (car texts)))))
+    (json-write
+     (apply obj
+       (append
+         (list "status" "refused"
+               "reason" (string-append text note)
+               "rules" (arr (map (lambda (c t) (obj "rule" (car c) "level" (cadr c)
+                                                    "content" (utf8-prefix t 400)))
+                                 cl texts))
+               "asked" (bool asked))
+         (if answer (list "answer" answer) '())
+         (list "grantable" (bool grantable)))))))
+
+(define (distinct-levels cl)
+  (let loop ((l cl) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((member (cadr (car l)) acc) (loop (cdr l) acc))
+          (else (loop (cdr l) (cons (cadr (car l)) acc))))))
+
+(define (judge d reasons how depth)
+  ;; #t if the edit may go on, else the text of the refusal
+  (let* ((pairs (map (lambda (r) (cons r (reason-class r))) reasons))
+         (gated (and d (person-gated? d)))
+         ;; (the reasons which neither the host (it decides, with the same
+         ;; rules) nor a grant covers)
+         (rest (list-filter pairs
+                            (lambda (p)
+                              (not (and d (shared-grantable-level? (caddr p))
+                                        (or gated (level-covered? d (caddr p))))))))
+         (rest-reasons (map car rest)))
+    (cond
+      ((null? rest) #t)
+      ((not (list-and (map (lambda (p) (shared-grantable-level? (caddr p))) rest)))
+       (refusal-json reasons how #f #f #f ""))
+      ((not (and d client-elicits? asking-allowed? (< depth 3)))
+       (refusal-json reasons how #f #f #t
+                     (if (and d client-elicits? asking-allowed?) ""
+                         ": nobody could be asked (the client does not offer elicitation and the person does not have the file open)")))
+      (else
+        (let* ((levels (distinct-levels (map cdr rest)))
+               (a (ask-by-elicitation d rest-reasons levels)))
+          (cond ((eq? a 'timeout) (refusal-json reasons how #t "timeout" #t ""))
+                ((or (eq? a 'refuse) (not (pair? a))) (refusal-json reasons how #t "refused" #t ""))
+                ((== (car a) "once")
+                 (set! call-approved (append levels call-approved))
+                 (judge d reasons how (+ depth 1)))
+                (else
+                  (let ((level (cdr a)))
+                    (set! session-grants (cons (list (doc-path d) level) session-grants))
+                    (when (and (== (car a) "remember") client-name)
+                      (shared-trust-remember! (doc-path d) client-name level))
+                    (judge d reasons how (+ depth 1))))))))))
+
+(define (judge-or-refuse! d reasons how)
+  ;; refuse (throw) unless the edit may go on
+  (let ((r (judge d reasons how 0)))
+    (when (string? r)
+      (if (== how 'guard)
+          (begin (set! edit-reason r) (throw 'mcp-guard-refused))
+          (begin (set! mcp-tool-error-message r) (throw 'mcp-tool-error))))))
+
+(define (answer-choices levels)
+  ;; ((code . title) ...) of the answers offered
+  (append
+    (list (cons "refuse" "Refuse") (cons "once" "Allow this edit"))
+    (map (lambda (l) (cons (string-append "session:" l) (string-append "Trust " l " for this session"))) levels)
+    (if client-name
+        (map (lambda (l) (cons (string-append "remember:" l) (string-append "Remember " l " for this file"))) levels)
+        '())))
+
+(define (ask-by-elicitation d reasons levels)
+  ;; ask the client's user: 'refuse, 'timeout, ("once"), ("session" . level),
+  ;; ("remember" . level)
+  (let* ((choices (answer-choices levels))
+         (text (string-append
+                 "The agent \"" (or client-name "unknown") "\" (the name its client gives itself; TeXmacs cannot verify it) wants to edit "
+                 (utf8-prefix (u8 (url->system (doc-url d))) 200)
+                 ", and the edit breaks rules of the content filter:\n"
+                 (apply string-append
+                        (map (lambda (r) (string-append "- " (car (reason-class r)) " (" (cadr (reason-class r)) "): "
+                                                        (utf8-prefix (reason-text r) 300) "\n"))
+                             reasons))
+                 "\nTrusting an agent by name is a convenience for honest programs, not a security boundary. Code, loops and the other limits are never allowed."))
+         (schema (obj "type" "object"
+                      "properties" (obj "answer" (obj "type" "string"
+                                                      "title" "Your answer"
+                                                      "enum" (arr (map car choices))
+                                                      "enumNames" (arr (map cdr choices))
+                                                      "default" "refuse"))
+                      "required" (arr (list "answer"))))
+         (r (elicit! text schema (ask-timeout-ms))))
+    (cond ((or (eq? r 'timeout) (eq? r 'gone)) 'timeout)
+          ((not r) 'refuse)
+          ((!= (jstring (jref r "result" "action")) "accept") 'refuse)
+          (else
+            (let ((a (jstring (jref r "result" "content" "answer"))))
+              (cond ((not (and a (assoc a choices))) 'refuse)
+                    ((== a "once") (list "once"))
+                    ((string-starts? a "session:") (cons "session" (substring a 8 (string-length a))))
+                    ((string-starts? a "remember:") (cons "remember" (substring a 9 (string-length a))))
+                    (else 'refuse)))))))
+
+(define (elicit! message schema timeout)
+  ;; send a request elicitation/create to the client and wait for its answer
+  ;; (the lines that come meanwhile are kept for later): the response object,
+  ;; 'timeout, or 'gone when the client is gone
+  (set! elicit-serial (+ elicit-serial 1))
+  (let ((id (string-append "tm-elicit-" (number->string elicit-serial))))
+    (set! elicit-wait-id id)
+    (set! elicit-answer #f)
+    (set! mcp-waiting? #t)
+    (send! (obj "jsonrpc" "2.0" "id" id "method" "elicitation/create"
+                "params" (obj "message" message "requestedSchema" schema)))
+    (let ((t0 (texmacs-time)))
+      (let ((result
+             (let loop ()
+               (cond (elicit-answer elicit-answer)
+                     ((not mcp-running?) 'gone)
+                     ((> (- (texmacs-time) t0) timeout) 'timeout)
+                     (else
+                       (let ((s (mcp-stdin-read)))
+                         (cond ((!= s "") (feed! s) (loop))
+                               ((mcp-stdin-eof?) 'gone)
+                               (else (var-eval-system "sleep 0.05") (loop)))))))))
+        (set! mcp-waiting? #f)
+        (set! elicit-wait-id #f)
+        (when (eq? result 'timeout)
+          (send! (obj "jsonrpc" "2.0" "method" "notifications/cancelled"
+                      "params" (obj "requestId" id "reason" "no answer in time"))))
+        result))))
+
+(define (answer-to-ours? line)
+  ;; is the line the response to the request we are waiting for? (then it is kept)
+  (let ((msg (json-parse line)))
+    (and msg (func? msg 'attr) elicit-wait-id
+         (not (jref msg "method"))
+         (== (jref msg "id") elicit-wait-id)
+         (begin (set! elicit-answer msg) #t))))
 
 ;;; Notes: what changed since the last call about the document
 
@@ -3848,7 +4137,7 @@
                       (let* ((d (open-doc! target))
                              (items (and content
                                          (content-items
-                                          (parse-content content fmt rdir d)))))
+                                          (with-global asking-allowed? #f (parse-content content fmt rdir d))))))
                         (when items
                           (run-edit! d
                             (lambda ()
@@ -4033,7 +4322,7 @@
 (define latest-version "2025-06-18")
 
 (define server-instructions
-  "TeXmacs documents. Start with list_documents or open_document, then get_outline to see the structure of a long document, then read (format text is the cheapest; texmacs is exact) the blocks you need, using the handles of earlier results. find locates text, tags (tag:theorem), labels and sections; get_references lists labels, references and citations and the broken ones. A file the person has open in TeXmacs is joined live, so reads show their latest edits. Editing: replace, insert, delete and edit_text (the best for changing a word or a sentence) take the handle of a node and, for safety, `expect', the hash you read it with: if someone changed the node meanwhile you get a `conflict' with its current content and nothing is changed. Each call is one undo step, all or nothing; undo_agent undoes yours. Answers may carry a `note' when the document changed since your last call, or when the person accepted or rejected a proposal: read again what it names. When the person has the document open, your edits may come back as `status: proposed' (the person decides; see list_proposals and withdraw_proposal), or as `refused' with the rules in `rules'; `agent_mode' of list_documents says which. save_document writes the file.")
+  "TeXmacs documents. Start with list_documents or open_document, then get_outline to see the structure of a long document, then read (format text is the cheapest; texmacs is exact) the blocks you need, using the handles of earlier results. find locates text, tags (tag:theorem), labels and sections; get_references lists labels, references and citations and the broken ones. A file the person has open in TeXmacs is joined live, so reads show their latest edits. Editing: replace, insert, delete and edit_text (the best for changing a word or a sentence) take the handle of a node and, for safety, `expect', the hash you read it with: if someone changed the node meanwhile you get a `conflict' with its current content and nothing is changed. Each call is one undo step, all or nothing; undo_agent undoes yours. Answers may carry a `note' when the document changed since your last call, or when the person accepted or rejected a proposal: read again what it names. When the person has the document open, your edits may come back as `status: proposed' (the person decides; see list_proposals and withdraw_proposal), or as `refused' with the rules in `rules'; `agent_mode' of list_documents says which. When an edit breaks a rule of the content filter that the person may allow (level style or links), the person is asked (in their TeXmacs, or through your client by elicitation) and the call waits for the answer, up to a minute: a refusal then says `asked', the `answer' (refused, timeout) and whether it was `grantable'; an edit that is refused with `asked: false, grantable: false' (code, limits) is never asked about: do not retry it. save_document writes the file.")
 
 (define (result-message id result)
   (obj "jsonrpc" "2.0" "id" id "result" result))
@@ -4069,6 +4358,7 @@
         (catch #t
           (lambda ()
             (set! mcp-param-error-message #f)
+            (set! call-approved '())
             (when (and (editing-tool? tool) (mcp-read-only?)) (require-writable))
             (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
                    (d (and dref (find-doc dref)))
@@ -4097,6 +4387,13 @@
     ((== method "initialize")
      (let* ((v (jstring (jref params "protocolVersion")))
             (version (if (and v (member v supported-versions)) v latest-version)))
+       ;; (the name of the client is only what it says; and whether it can
+       ;; ask its user a question)
+       (set! client-name (let ((n (jstring (jref params "clientInfo" "name"))))
+                           (and n (!= n "") (clean-client-name n))))
+       (when client-name (shared-set-agent-name! client-name))
+       (set! client-elicits? (and (member version '("2025-06-18" "2025-11-25"))
+                                  (func? (jref params "capabilities" "elicitation") 'attr)))
        (result-message
         id
         (obj "protocolVersion" version
@@ -4186,8 +4483,21 @@
 (define (process-line! line)
   (let ((line (strip-cr line)))
     (when (!= line "")
-      (let ((r (mcp-handle-line line)))
-        (when r (send! r))))))
+      (cond ((and mcp-waiting? (answer-to-ours? line)) (noop))
+            ;; (waiting for the client's answer to a request of ours: the
+            ;; other lines are handled after the tool call)
+            (mcp-waiting? (set! mcp-deferred (append mcp-deferred (list line))))
+            (else
+              (let ((r (mcp-handle-line line)))
+                (when r (send! r))))))))
+
+(define (drain-deferred!)
+  (let loop ()
+    (when (and (pair? mcp-deferred) (not mcp-waiting?) mcp-running?)
+      (let ((l (car mcp-deferred)))
+        (set! mcp-deferred (cdr mcp-deferred))
+        (process-line! l)
+        (loop)))))
 
 (define (take-line! piece)
   ;; the line that ends with the beginning of @piece
@@ -4242,6 +4552,7 @@
       #t
       (catch #t
         (lambda ()
+          (drain-deferred!)
           (let ((s (mcp-stdin-read)))
             (when (!= s "")
               (set! mcp-last-activity (texmacs-time))

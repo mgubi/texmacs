@@ -45,7 +45,9 @@
 
 (define (agents-here?)
   (and (shared-file? (current-buffer))
-       (nnull? (shared-file-agents (current-buffer)))))
+       (or (nnull? (shared-file-agents (current-buffer)))
+           (nnull? (shared-trust (current-buffer)))
+           (nnull? (shared-asks (current-buffer))))))
 
 (define (pending-proposals)
   (list-filter (or (shared-proposals (current-buffer)) '())
@@ -71,6 +73,84 @@
   (list-filter (shared-file-agents (current-buffer))
                (lambda (id) (not (shared-agent-id? id)))))
 
+;; The person is asked when an agent's edit breaks a rule of the content filter
+;; (docs/mcp-server.md, "Trusted agents"). The window is not modal; if nobody
+;; answers in time the edit is refused.
+
+(define (rule-level-name level)
+  (cond ((== level "style") "style: definitions, styles and layout")
+        ((== level "links") "links and files")
+        (else level)))
+
+(define (wrap-lines s n)
+  ;; the text @s cut in lines of at most @n characters, at spaces
+  (let loop ((words (string-tokenize-by-char s #\space)) (cur "") (acc '()))
+    (cond ((null? words) (reverse (if (== cur "") acc (cons cur acc))))
+          ((== cur "") (loop (cdr words) (car words) acc))
+          ((> (+ (string-length cur) 1 (string-length (car words))) n)
+           (loop words "" (cons cur acc)))
+          (else (loop (cdr words) (string-append cur " " (car words)) acc)))))
+
+(define (agent-ask-question name qid)
+  (with l (list-filter (or (shared-asks name) '()) (lambda (q) (== (car q) qid)))
+    (and (nnull? l) (car l))))
+
+(define (agent-ask-lines name qid)
+  (with q (agent-ask-question name qid)
+    (if (not q)
+        (list "This question has been answered, or the time is over.")
+        (append
+          (wrap-lines (string-append "The agent called \"" (cadr q)
+                                     "\" (the name it gives itself, which TeXmacs cannot verify)"
+                                     " wants to make an edit that breaks a rule of the content filter.") 80)
+          (list "")
+          (append-map
+            (lambda (v)
+              (wrap-lines (string-append (car v) " (" (rule-level-name (cadr v)) "): "
+                                         (if (> (string-length (caddr v)) 240)
+                                             (substring (caddr v) 0 240)
+                                             (caddr v)))
+                          80))
+            (caddr q))
+          (list "")
+          (wrap-lines "Trusting an agent by name is a convenience for honest programs, not a security boundary: another program of yours can give itself the same name. Code, loops and other limits are never allowed. If you do not answer in time, the edit is refused." 80)))))
+
+(define (agent-ask-buttons name qid)
+  ;; (label answer level) of the answers that the person can give
+  (with q (agent-ask-question name qid)
+    (if (not q)
+        '()
+        (append
+          (list (list "Refuse" "refuse" "") (list "Allow this edit" "once" ""))
+          (map (lambda (l) (list (string-append "Trust " l " for this session") "session" l))
+               (cadddr q))
+          (if (== (cadr q) "unknown")
+              '()
+              (map (lambda (l) (list (string-append "Remember " l " for this file") "remember" l))
+                   (cadddr q)))))))
+
+(tm-widget ((agent-ask-widget name qid) done)
+  (padded
+    (for (l (agent-ask-lines name qid))
+      (hlist (text l) >>))
+    ======
+    (for (b (agent-ask-buttons name qid))
+      (hlist >> ((eval (car b)) (done (cadr b) (caddr b))) >>))))
+
+(tm-define (agent-ask-dialog name qid)
+  (:synopsis "Ask the person about the question @qid of agents on the file @name")
+  (when (agent-ask-question name qid)
+    (dialogue-window (agent-ask-widget name qid)
+                     (lambda (answer level)
+                       (if (member answer '("session" "remember"))
+                           (shared-ask-answer! name qid answer level)
+                           (shared-ask-answer! name qid answer)))
+                     "An agent asks for permission")))
+
+(define (trust-label e)
+  (string-append (cadr e) ": " (rule-level-name (caddr e))
+                 (if (== (car e) "session") " (this session)" " (remembered)")))
+
 (tm-menu (agents-menu)
   ((check "Propose edits (I accept or reject them)" "v"
           (== (shared-agent-mode (current-buffer)) 'propose))
@@ -86,6 +166,15 @@
     (when #t
       ((eval (string-append "Treat " (agent-label id) " as a person"))
        (shared-treat-as-person! (current-buffer) id #t))))
+  ---
+ (for (q (or (shared-asks (current-buffer)) '()))
+    ((eval (string-append "Answer the question of " (cadr q) "..."))
+     (agent-ask-dialog (current-buffer) (car q))))
+  (when (nnull? (shared-trust (current-buffer)))
+    ---
+    (for (e (shared-trust (current-buffer)))
+      ((eval (string-append "Revoke " (trust-label e)))
+       (shared-trust-revoke! (current-buffer) (car e) (cadr e) (caddr e) (cadddr e)))))
   ---
   (for (e (pending-proposals))
     (-> (eval (string-append "Proposal " (car e) " (" (short-agent (cadddr e)) "): " (list-ref e 4)))

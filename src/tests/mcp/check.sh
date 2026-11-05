@@ -19,6 +19,11 @@
 #              refusal, conflict, undo, the person's undo skips the agent
 #   propose    the person's TeXmacs (interactive) applies the modes to the agent: proposals
 #              (accept, reject, withdraw, notes), direct, read-only, the saved file
+#   trust      the person's TeXmacs asks the first time an agent's edit breaks a rule that can be
+#              granted: refuse, timeout, once, session, remember, by level, by name; code never asked
+#   trust-persist  remembered grants across restarts of the person's TeXmacs, per file, per name, revoked
+#   elicit     no person: MCP elicitation of the client (accept, decline, cancel, no answer, no capability)
+#   levels     the level of each rule of the content filter (style, links; code, limits, mode never)
 #   filter     every name of the lists of refused content is a tag of the DRD
 #   styles     tags of the style of the document and of its assigns are accepted
 #   recursion  a macro that calls itself: typesetting and PDF export do not crash
@@ -48,7 +53,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose undo recursion filter content styles static guard hostdeath nonascii stalled
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose trust trust-persist elicit levels undo recursion filter content styles static guard hostdeath nonascii stalled
 status=0
 for name in "$@"; do
   w="$run/$name"

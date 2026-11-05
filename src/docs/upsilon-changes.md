@@ -14,6 +14,20 @@ have the details, and the problems go to the
 
 ## 5 November 2026
 
+- **Agents: the person is asked, and can trust an agent** (desktop applications; step 4,
+  stage B, of the MCP server design). When an agent's edit breaks a rule of the content filter
+  of a level that can be granted, the edit is no longer simply refused: the first time, the
+  person is asked, in a dialog of their TeXmacs when the file is open there (it never blocks the
+  editor; no answer in a minute is a refusal), or through the agent's client when nobody else
+  has the file (MCP elicitation, if the client supports it). The answers: refuse, allow this edit,
+  trust the agent for this session, or remember it for this file (in the person's preferences, not
+  in the document). Level 1 is style (definitions, packages, styles), level 2 is links and files
+  (granted separately: trusting style does not allow links); code, loops and the other limits are
+  never asked about and never granted. A trusted edit in propose mode is still a proposal. Tools >
+  Agents lists the grants and revokes each. The agent's name is only what its client says: trust by
+  name is a convenience, not a security boundary. Refusals say whether the person was asked and
+  answered (`asked`, `answer`, `grantable`). See [mcp-server.md](mcp-server.md); tests `tests/mcp`
+  (`trust`, `trust-persist`, `elicit`) and `tests/shared` (`trust`).
 - **Agents on a shared file: modes, proposals, the host's filter** (desktop
   applications; step 4, stage A, of the MCP server design). When the person's
   TeXmacs hosts a file that an agent (`texmacs --mcp`) edits, the person decides what

@@ -38,6 +38,9 @@
 #   agent       the host applies a mode (propose, direct, read-only) and the content
 #               rules to a participant that is an agent; proposals accepted, rejected, withdrawn
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
+#   trust       the host asks the person when an agent breaks a rule of a level that can be granted;
+#               a hand-written client that claims grants is asked about; session grants belong to the
+#               connection and the level; code is never asked about
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
 #   fuzz        random patches with hostile integers through the patch functions: no crash
 #   edfuzz      random patches applied to a real buffer (editor and typesetter): no crash
@@ -62,7 +65,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentplain malformed agentmode fuzz edfuzz
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentplain trust malformed agentmode fuzz edfuzz
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or
