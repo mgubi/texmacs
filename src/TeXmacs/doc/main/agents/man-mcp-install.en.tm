@@ -51,12 +51,16 @@
     claude mcp add texmacs -- "/Applications/TeXmacs Upsilon.app/Contents/MacOS/TeXmacs" --mcp
   </verbatim-code>
 
-  Environment variables are added with <verbatim|-e>, before the name of the
-  server:
+  Environment variables are added with <verbatim|-e>, after the name of the
+  server and before the <verbatim|-->:
 
   <\verbatim-code>
     claude mcp add texmacs -e TEXMACS_MCP_ROOTS=$HOME/papers -- texmacs --mcp
   </verbatim-code>
+
+  By default <verbatim|claude mcp add> registers the server for the current
+  project folder only (the <em|local> scope). Add <verbatim|-s user> to have
+  it in every project.
 
   <paragraph*|<name|Claude Desktop>>
 
@@ -66,6 +70,7 @@
   restart the application:
 
   <\verbatim-code>
+
     {
 
     \ \ "mcpServers": {
@@ -83,6 +88,8 @@
     \ \ }
 
     }
+
+  
   </verbatim-code>
 
   <paragraph*|Another client>
@@ -99,15 +106,18 @@
     open files, separated by colons (<verbatim|/home/me/papers:/home/me/notes>).
     Without it, the agent can open any file which you can read. Paths with
     <verbatim|..> are refused, and symbolic links are resolved before the
-    check.
+    check. This limits what the server opens, not what the other tools of the
+    agent can do; see <hlink|What an agent may not do|man-mcp-rules.en.tm>.
 
     <item*|<verbatim|TEXMACS_MCP_READONLY>>If it is set (and is neither empty
     nor <verbatim|0>), the server does not offer the tools which change
-    anything: the edits, <verbatim|save_document>, <verbatim|close_document>
-    and <verbatim|create_document>.
+    anything: <verbatim|replace>, <verbatim|insert>, <verbatim|delete>,
+    <verbatim|edit_text>, <verbatim|undo_agent>, <verbatim|withdraw_proposal>,
+    <verbatim|save_document>, <verbatim|close_document> and
+    <verbatim|create_document>.
 
-    <item*|<verbatim|TEXMACS_MCP_DEBUG>>Set to <verbatim|1>, it also writes
-    every message to the log.
+    <item*|<verbatim|TEXMACS_MCP_DEBUG>>If it is set (to any value), the server
+    also writes every message to the log.
 
     <item*|<verbatim|TEXMACS_HOME_PATH>>The folder of the user files of
     <TeXmacs> (see below).

@@ -44,14 +44,23 @@
   the agent's own copy, and the agent saves. The menu <menu|Tools|Agents>
   shows up only once an agent has joined the file.
 
+  <paragraph*|<menu|Tools|Agents> is not in the menu>
+
+  The menu appears only while an agent is joined to the document of the
+  current window. To check, ask the agent for <verbatim|list_documents>: the
+  entry of the file must have <verbatim|shared> not null, and
+  <verbatim|agent_mode> says the mode (<verbatim|propose> when you have the
+  file open). If <verbatim|shared> is null the agent has the file alone, and
+  the file is not shared with your window (see the preference above).
+
   <paragraph*|The agent cannot save>
 
   When you have the file open and the mode is not direct, you save the file.
 
   <paragraph*|The server keeps running, or uses a lot of the processor>
 
-  It ends when the agent closes its end. An idle server uses less than one
-  per cent of a processor. Use the process list to stop a program which has
+  It ends when the agent closes its end. An idle server uses a few per cent of a
+  processor at most (about 1.5 per cent was measured). Use the process list to stop a program which has
   outlived its agent.
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>

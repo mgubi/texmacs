@@ -73,7 +73,7 @@ have the details, and the problems go to the
 
 ## 3 November 2026
 
-- **Shared files** (desktop applications, off by default): with the
+- **Shared files** (desktop applications, off by default; on by default since 5 November): with the
   preference `share-open-files` set to `on`, several TeXmacs processes of the
   same user which open the same `.tm` file stay in sync, with no server. The
   process which opens the file first hosts it and writes it; the others join it
