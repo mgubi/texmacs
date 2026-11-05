@@ -18,7 +18,7 @@ have the details, and the problems go to the
   file is typeset as one block of monospaced rows, not as a paragraph per
   line, so that large files open and edit quickly (a key in a C file of
   200000 lines takes 14 ms instead of 50 ms, and Return 16 ms instead of
-  150 ms; in paper mode a key 250 ms instead of 360 ms).
+  150 ms; in paper mode a key 270 ms instead of 360 ms).
   Tree-sitter colours, the language servers, folds and markup in a line
   work as before. Tabs and control characters are kept and saved as they
   were; Format > Source code shows the invisible characters and can shrink

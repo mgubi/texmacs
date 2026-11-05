@@ -686,7 +686,17 @@
                                                    (concat "a" (with "color" "red" "bc")
                                                            "<#9>d"))))
                           "texmacs-tree" "latex-snippet")
-                 "abc     d")))
+                 "abc     d"))
+    ;; a backslash or a brace, escaped before (\textbackslash , \{), is
+    ;; one column; the column starts at 0 in each verbatim content
+    (let ((tex (convert (stree->tree '(document
+                                       (verbatim (document "a\\<#9>b" "{<#9>c"))
+                                       (verbatim (document "xyz"))
+                                       (specific "latex" "Y<#9>Z")))
+                        "texmacs-tree" "latex-snippet")))
+      (check-true (string-contains? tex "a\\textbackslash       b"))
+      (check-true (string-contains? tex "\\{       c"))
+      (check-true (string-contains? tex "Y       Z"))))
   ;; a text or a source file, whose lines are verbatim content (language
   ;; verbatim): the same LaTeX as without the block (it was an empty alltt)
   (let ((old (getenv "TEXMACS_CODE_LINES"))

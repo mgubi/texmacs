@@ -1896,7 +1896,7 @@
     (list 'Cref key)))
 
 (define (tmtex-specific l)
-  (cond ((== (car l) "latex") (tmtex-tt (cadr l)))
+  (cond ((== (car l) "latex") (tmtex-tt-start (cadr l)))
         ((== (car l) "image") (tmtex-eps (cadr l)))
         ((== (car l) "printer") (tmtex (cadr l)))
         ((== (car l) "odd") `(ifthispageodd ,(tmtex (cadr l)) ""))
@@ -2434,24 +2434,40 @@
 
 ;; the tabs of a line of verbatim content (<#9>: the lines of a text or a
 ;; source file keep their tabs, see verbatim.cpp) as spaces up to the next
-;; stop, every 8 columns; a character of Cork (<...>) is one column. The
-;; column goes on from the strings before in the line (tmtex-tt-col), also
-;; across markup
+;; stop, every 8 columns; a character of Cork (<...>) is one column, and so
+;; are the escapes of a backslash and of the braces which the verbatim
+;; environments put before (\textbackslash , \{, \}). The column goes on from
+;; the strings before in the line (tmtex-tt-col), also across markup
 (define (tmtex-expand-tabs s)
-  (if (< (string-search-forwards "<" 0 s) 0)
+  (if (and (< (string-search-forwards "<" 0 s) 0)
+           (< (string-search-forwards "\\" 0 s) 0))
       (begin (set! tmtex-tt-col (+ tmtex-tt-col (string-length s))) s)
       (let loop ((i 0) (col tmtex-tt-col) (acc '()))
         (if (>= i (string-length s))
             (begin (set! tmtex-tt-col col) (apply string-append (reverse acc)))
-            (let* ((j (if (char=? (string-ref s i) #\<)
-                          (with k (string-search-forwards ">" i s)
-                            (if (< k 0) (+ i 1) (+ k 1)))
-                          (+ i 1)))
+            (let* ((j (cond ((char=? (string-ref s i) #\<)
+                             (with k (string-search-forwards ">" i s)
+                               (if (< k 0) (+ i 1) (+ k 1))))
+                            ((char=? (string-ref s i) #\\)
+                             (cond ((string-starts? (substring s i (string-length s))
+                                                    "\\textbackslash ")
+                                    (+ i 15))
+                                   ((and (< (+ i 1) (string-length s))
+                                         (in? (string-ref s (+ i 1)) '(#\{ #\})))
+                                    (+ i 2))
+                                   (else (+ i 1))))
+                            (else (+ i 1))))
                    (c (substring s i j)))
               (if (== c "<#9>")
                   (with w (- 8 (modulo col 8))
                     (loop j (+ col w) (cons (make-string w #\space) acc)))
                   (loop j (+ col 1) (cons c acc))))))))
+
+;; the conversion of verbatim content from its start (the column of the
+;; tabs at 0: the content before does not count)
+(define (tmtex-tt-start x)
+  (set! tmtex-tt-col 0)
+  (tmtex-tt x))
 
 (define (tmtex-tt x)
   (cond ((string? x) (tmtex-verb-string (tmtex-expand-tabs x)))
@@ -2505,7 +2521,7 @@
 
 (define (tmtex-verbatim s l)
   (if (func? (car l) 'document)
-      (list '!verbatim (tmtex-tt (escape-braces (escape-backslashes (car l)))))
+      (list '!verbatim (tmtex-tt-start (escape-braces (escape-backslashes (car l)))))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (sharp-fix t)
@@ -2519,7 +2535,7 @@
 
 (define (tmtex-verbatim* s l)
   (if (func? (car l) 'document)
-      (list '!verbatim* (sharp-fix (tmtex-tt (car l))))
+      (list '!verbatim* (sharp-fix (tmtex-tt-start (car l))))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (tmtex-code-inline s l)
@@ -2543,7 +2559,7 @@
   ;; (set! l (unescape-angles l))
   ;; NOTE: instead, we now unescape in tmtex-verb-string
   (tmtex-env-set "mode" "text")
-  (with src (list '!verbatim* (tmtex-tt (cadr l)))
+  (with src (list '!verbatim* (tmtex-tt-start (cadr l)))
     (tmtex-add-preview-packages src)
     (tmtex-env-reset "mode")
     (list '!unindent src)))
@@ -3201,7 +3217,7 @@
         (else (map escape-hyperref-url l))))
 
 (define (tmtex-hyperref u)
-  (tmtex-tt (escape-hyperref-url u)))
+  (tmtex-tt-start (escape-hyperref-url u)))
 
 (define (tmtex-hlink s l)
   (let* ((h (cadr l))

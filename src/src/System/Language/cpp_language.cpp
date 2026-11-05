@@ -646,8 +646,11 @@ cpp_parse_token (hashmap<string,string>& colored, string s, int& pos,
     return cpp_parse_token (colored, s, pos, state, pre);
   }
   if (pre) {
-    // (up to a comment of several lines, not in a string, and not after a
-    // comment of one line: as in_cpp_comment)
+    // (up to a comment of several lines, not in a string and not after a
+    // comment of one line, as the compiler reads it; begin_comment, for
+    // in_cpp_comment of paragraphs, does neither. Not seen: a comment of
+    // one line continued by a backslash, after which "/*" on the next line
+    // still opens a comment here)
     int i= pos;
     while (i < n) {
       if (s[i] == '"' || s[i] == '\'') {
