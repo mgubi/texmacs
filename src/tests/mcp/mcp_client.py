@@ -1657,9 +1657,12 @@ def s_content(w):
                       ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "3") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
                       ('(tformat (cwith "2" "2" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
                       ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "0") (table (row (cell "a") (cell "b"))))', "cell-col-span"),
-                      ('(with "cell-row-span" "2" (table (row (cell "a"))))', "cell-row-span")):
+                      ('(with "cell-row-span" "2" (table (row (cell "a"))))', "cell-row-span"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")) (row (cell "e"))))', "cell-col-span")):
         refused("table attribute/structure %s" % bad, "stree", bad, word)
-    for ok in ('(tformat (twith "table-width" "1par") "x")',
+    for ok in ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (cwith "1" "1" "1" "1" "cell-halign" "c") (table (row (cell "a")) (row (cell "b"))))',
+               '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "3") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d"))))',
+               '(tformat (twith "table-width" "1par") "x")',
                '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))',
                '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b"))))',
                '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "1") (table (row (cell "a"))))',

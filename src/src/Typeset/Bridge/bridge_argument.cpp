@@ -83,18 +83,38 @@ bridge_argument_rep::notify_macro (int tp, string var, int l, path p, tree u) {
       int n= N(prefix);
       if ((var == name) && (N(p) >= n) && (head (p, n) == prefix)) {
 	p= tail (p, n);
-	switch (tp) {
-	case MACRO_ASSIGN:
-	  if (is_nil (p)) replace_bridge (body, u, body->ip);
-	  else body->notify_assign (p, u);
-	  break;
-	case MACRO_INSERT:
-	  body->notify_insert (p, u);
-	  break;
-	case MACRO_REMOVE:
-	  body->notify_remove (p, as_int (u->label));
-	  break;
+	// The place of the change need not be in the body that this bridge
+	// has (an `arg' with an index that is out of range gives a body that is
+	// an error): the change is then left to the next typesetting, which makes
+	// the body again (initialize compares it with the argument).
+	bool here= true;
+	if (!is_nil (p)) {
+	  path q= path_up (p);
+	  if (tp == MACRO_ASSIGN) here= has_subtree (body->st, p);
+	  else {
+	    here= has_subtree (body->st, q);
+	    if (here && tp == MACRO_REMOVE) {
+	      tree sq= subtree (body->st, q);
+	      int  nr= as_int (u->label);
+	      int  n = is_atomic (sq)? N(sq->label): N(sq);
+	      here= nr >= 0 && last_item (p) >= 0 && last_item (p) <= n && nr <= n - last_item (p);
+	    }
+	  }
 	}
+	if (here)
+	  switch (tp) {
+	  case MACRO_ASSIGN:
+	    if (is_nil (p)) replace_bridge (body, u, body->ip);
+	    else body->notify_assign (p, u);
+	    break;
+	  case MACRO_INSERT:
+	    body->notify_insert (p, u);
+	    break;
+	  case MACRO_REMOVE:
+	    body->notify_remove (p, as_int (u->label));
+	    break;
+	  }
+	else valid= false;
       }
       else flag= false;
     }

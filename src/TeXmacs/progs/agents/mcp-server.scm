@@ -1660,6 +1660,10 @@
          (nr (and rows (length rows)))
          (nc (and rows (pair? rows) (list-and (map (lambda (r) (and (pair? r) (eq? (car r) 'row))) rows))
                   (apply min (map (lambda (r) (length (cdr r))) rows))))
+         (ragged? (and rows (pair? rows)
+                       (not (list-and (map (lambda (r) (and (pair? r) (eq? (car r) 'row)
+                                                            (= (length (cdr r)) (length (cdr (car rows))))))
+                                           rows)))))
          (problem #f))
     (for (c kids)
       (when (and (not problem) (pair? c) (eq? (car c) 'cwith) (>= (length c) 7))
@@ -1667,10 +1671,12 @@
           (let loop ((l (list-tail args 4)))
             (when (and (not problem) (pair? l) (pair? (cdr l)))
               (let ((var (car l)) (val (cadr l)))
-                ;; (only the spans of rows crashed the editor in the experiments; the documents of
-                ;; the corpus give column spans that run over the table, which is clipped)
-                (when (and (string? var) (== var "cell-row-span") (positive-integer-string? val)
-                           (> (string->number val) 1))
+                ;; (a row span must fit; a column span may run over a rectangular table, as in the
+                ;; corpus, where the typesetter clips it, but not over one whose rows differ in length;
+                ;; ; a span of 0 or text, as while its value is edited in source view, is clamped to 1 by the typesetter)
+                (when (and (string? var) (member var span-vars) (positive-integer-string? val)
+                           (> (string->number val) 1)
+                           (or (== var "cell-row-span") ragged?))
                   (let* ((n (string->number val))
                          (rr (and nr (every-string? (list-head args 4))
                                   (decode-range (car args) (cadr args) nr)))

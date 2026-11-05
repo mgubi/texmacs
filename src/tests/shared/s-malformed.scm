@@ -94,6 +94,7 @@
    (act "table-frac" (attempt "a table with a child that is not a row is refused" (patch-msg (ins-block 4 '(table (frac "a" "b")))) "arity"))
    (act "decoration" (attempt "the decoration of a cell is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-decoration" "x") (table (row (cell "a")))))) "arity"))
    (act "row-span" (attempt "a span that goes beyond the table is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "3") (table (row (cell "a")) (row (cell "b")))))) "arity"))
+   (act "ragged-col-span" (attempt "a column span that runs over a ragged table is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")) (row (cell "e")))))) "arity"))
    (act "row-span-huge" (attempt "a span of 1000000000 is refused" (patch-msg (ins-block 4 '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "1000000000") (table (row (cell "a")))))) "arity"))
    (act "tformat-string-after-table" (attempt "a string after the table of a tformat is refused" (patch-msg (ins-block 4 '(tformat (table (row (cell "a"))) "x"))) "arity"))
    (act "macro-table-arg" (attempt "a macro whose table has an argument for a row is refused" (patch-msg (ins-block 4 '(with "m" (macro "x" (table (arg "x"))) "t"))) "arity"))

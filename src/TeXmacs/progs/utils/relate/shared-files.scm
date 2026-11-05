@@ -1196,14 +1196,19 @@
                     ((and (tm-is? new 'document) (= (tree-arity new) 0)) #f)
                     ((eq? range 'bad) #f)
                     (else
-                      (let ((sts (map tm->stree (sublist (tree-children new) (car range)
-                                                         (+ (car range) (caddr range))))))
-                        (and (list-and (map mcp-stree-arity-ok? sts))
+                      (let* ((sts (map tm->stree (sublist (tree-children new) (car range)
+                                                          (+ (car range) (caddr range)))))
                              ;; (a patch that touches a definition: the blocks that use it
                              ;; are not known, so the whole document is looked at)
-                             (or (not (list-or (map st-has-assign? sts)))
-                                 (list-and (map (lambda (b) (mcp-stree-arity-ok? (tm->stree b)))
-                                                (tree-children new))))))))))))
+                             (cands (if (list-or (map st-has-assign? sts))
+                                        (map tm->stree (tree-children new))
+                                        sts))
+                             (bad (list-filter cands (lambda (st) (not (mcp-stree-arity-ok? st))))))
+                        ;; only a block that is bad and was not there before makes the patch refused
+                        ;; (a legacy block that fails the rule must not stop every other patch)
+                        (or (null? bad)
+                            (let ((old-sts (map tm->stree (tree-children body))))
+                              (not (list-or (map (lambda (st) (not (member st old-sts))) bad))))))))))))
     (lambda args #f)))
 
 (tm-define (shared-patch-acceptable? p body)

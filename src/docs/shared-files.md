@@ -511,6 +511,18 @@ process hosts, or only headless ones), the agent edits directly, as before.
   when a patch removes rows is caught because the table and its `cwith` are in the same
   top-level block. What is left: a macro that is called with an argument of the wrong kind
   (`(m "s")` for a `tformat` that ends with `(arg "x")`) is not looked at once expanded.
+- **Later rounds.** A column span that runs over a table whose rows differ in length is
+  refused (over a rectangular table the typesetter clips it, as the corpus has); a row span still
+  has to fit. The typesetter takes a span of 0 or text (while its value is being edited in
+  source view) for 1 (`cell.cpp`), which was the abort with two cwith. An `(arg x k)` with an
+  index that is out of range in an `xmacro` no longer aborts the editor (`bridge_argument.cpp`
+  leaves a change whose place is not in the body to the next typesetting), so xmacros are not
+  refused (the styles have 220 of them, 57 with a constant index). **The recheck of the whole
+  document when a patch touches a definition looks at the blocks as written, not after
+  expanding the macros** (a definition can make an unchanged caller different without being
+  caught; the cases tried were harmless), and refuses only a block that becomes bad: a block that
+  fails the rule and is the same as a block of the document before the patch (a legacy
+  `(tformat (table ...) "x")`) does not stop other patches.
 
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a

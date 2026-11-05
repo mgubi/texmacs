@@ -92,6 +92,7 @@
     (switch-to-buffer f)
     (empty-table-cases!)
     (editor-probe-cases!)
+    (recheck-cases!)
     (tree-set (bt) (tree-ref dt0 1))
     (let loop ((i start))
       (when (< i endi)
@@ -146,7 +147,12 @@
                  (document "p" (tformat (table (row (cell "a")) (row (cell "b" ) (cell "c")))) "q")
                  (document "p" (tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b")))) "q")
                  (document "p" (table (row (with "color" "blue" "x"))) "q")
-                 (document "p" (table (row "1" "2") (row (document "a") "b")) "q"))))
+                 (document "p" (table (row "1" "2") (row (document "a") "b")) "q")
+                 ;; (an arg with an index out of range in an xmacro aborted the editor on delete)
+                 (document "p" (with "m" (xmacro "x" (arg "x" "1")) (m (frac "a" "b"))) "q")
+                 (document "p" (tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")))) "q")
+                 (document "p" (tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (cwith "1" "1" "1" "1" "cell-halign" "c") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")))) "q")
+                 (document "p" (tformat (cwith "1" "1" "1" "1" "cell-col-span" "3") (cwith "1" "1" "1" "1" "cell-halign" "c") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")))) "q"))))
     (for-each
      (lambda (st)
        (tree-set (bt) (stree->tree st))
@@ -167,6 +173,23 @@
      cases)
     (check "the editor survives the table operations on the accepted shapes" #t)
     (tree-set (bt) (stree->tree '(document "p")))))
+
+(define (recheck-cases!)
+  ;; a patch that touches a definition makes the host look at the whole document, but only
+  ;; a block that becomes bad refuses it, not a legacy block that was bad before
+  (let ((body (stree->tree '(document "a" (tformat (table (row (cell "a"))) "x")))))
+    (check "a definition is accepted next to a legacy bad block"
+           (shared-patch-acceptable?
+            (scheme->patch '(pair (insert (1 2) (document (assign "m" "v"))) (remove (1 2 1) ""))) body))
+    (check "a new bad block is refused"
+           (not (shared-patch-acceptable?
+                 (scheme->patch '(pair (insert (1 2) (document (tformat (table (row (cell "b"))) "y"))) (remove (1 2 1) ""))) body)))
+    (check "a ragged table with a column span that runs over it is refused"
+           (not (shared-patch-acceptable?
+                 (scheme->patch '(pair (insert (1 2) (document (tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "e")))))) (remove (1 2 1) ""))) body)))
+    (check "a row span with another cwith is accepted (the typesetter clamps the span)"
+           (shared-patch-acceptable?
+            (scheme->patch '(pair (insert (1 2) (document (tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (cwith "1" "1" "1" "1" "cell-halign" "c") (table (row (cell "a")) (row (cell "b")))))) (remove (1 2 1) ""))) body))))
 
 (define (A-steps)
   (list
