@@ -22,6 +22,34 @@
 	      (xmacro "x" (eval-args "x"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Displayed formulas
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Their tags stay, for the HTML export, under names of their own (one with
+;; tmhtml- at its start would redefine the tag itself). What is in them is
+;; evaluated in display style, so that tables are not a level smaller, and as
+;; a formula for the evaluation, which records its environment (html-formula,
+;; see exec_with). A style may color them (math-colored of alt-colors.ts), but
+;; not the number of equation-lab.
+
+(define (tmhtml-display-body x)
+  (with body `(with "html-formula" "display" "math-display" "true" ,x)
+    `(if (provides "math-colored") (math-colored ,body) ,body)))
+
+(define tmhtml-display-macros
+  `((associate "equation*"
+               (macro "x" (html-display ,(tmhtml-display-body '(arg "x")))))
+    (associate "equations-base"
+               (macro "x" (html-equations-base
+                           ,(tmhtml-display-body '(arg "x")))))
+    (associate "equation-lab"
+               (macro "x" "n" (html-equation-lab
+                               ,(tmhtml-display-body '(arg "x")) (arg "n"))))
+    ,(tmhtml-env-macro 'html-display)
+    ,(tmhtml-env-macro 'html-equations-base)
+    ,(tmhtml-env-macro 'html-equation-lab)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -41,10 +69,11 @@
 	     verbatim code tt underline overline strike-through
 	     deleted marked fill-out
 	     hidden-title doc-title-block
-	     equation* equation-lab equations-base
 	     ;; arrays of LaTeX which TeXmacs does not define: kept for
 	     ;; the LaTeX of MathJax, as they would otherwise vanish (#611)
 	     gathered subarray
+	     ;; these expand to nothing here, and only take space when typeset
+	     phantom hphantom vphantom
              wide-float draw-over draw-under
              html-tag html-attr
 	     html-div-style html-div-class html-style html-class
@@ -55,6 +84,7 @@
              mouse-over-balloon mouse-over-balloon*
              hover-balloon hover-balloon*
              popup-balloon popup-balloon*))
+    ,@tmhtml-display-macros
     ;; FIXME: should apply 'filter_style' to the environment
     ;; in an appropriate way to avoid adding the primitives below
     ,@(map tmhtml-env-macro

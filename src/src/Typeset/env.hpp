@@ -351,6 +351,14 @@ public:
                                             // were loaded (see clean_unused)
   bool                         refs_settled;// tables cleaned by a pass since
   link_repository              link_env;    // current links
+  // The formulas of the HTML export, typeset apart: exec_with records the
+  // environment of each, as the variables changed since formula_base; the
+  // number of formula_envs[i] is formula_first + i
+  bool                         record_formulas;
+  int                          formula_depth;
+  int                          formula_first;
+  hashmap<string,tree>         formula_base;
+  array<hashmap<string,tree> > formula_envs;
   array<array<int> >           size_cache;  // math font size cache
   array<rectangle>             white_zones; // text exclusion zones for curves
 
@@ -885,6 +893,9 @@ public:
   void local_start (hashmap<string,tree>& prev_back);
   void local_update (hashmap<string,tree>& oldpat, hashmap<string,tree>& chg);
   void local_changes (hashmap<string,tree>& chg);
+  void start_recording_formulas (hashmap<string,tree> base, int first);
+  void stop_recording_formulas ();
+  int record_formula ();
   inline array<int>* input_vars () { return env.in_vars; }
   inline unsigned long long* input_hash () { return env.in_hash; }
   // a hash of the values of the variables 'vars' (by env_var_id): those

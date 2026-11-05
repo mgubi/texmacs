@@ -538,8 +538,6 @@ extern tree the_et;
 
 #define READS_MAX 256
 
-#define LOOKUPS_MAX 64
-
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
 void
@@ -716,8 +714,6 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * or typeset again what read a binding which changed: see "Passes" in
 * Edit/Editor/edit_typeset.cpp.
 ******************************************************************************/
-
-#define INPUTS_MAX 256
 
 // The line items which a bridge got from the bridges around it: the
 // markers (made again each time the bridge around is typeset) by what they

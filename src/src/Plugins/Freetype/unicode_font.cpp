@@ -1471,12 +1471,6 @@ math_table_rubber_font (font base) {
   return rubber_unicode_font (base, u->ot_face);
 }
 
-inline int
-decode_index (FT_Face face, int i) {
-  if (i < 0xc000000) return ft_get_char_index (face, i);
-  return i - 0xc000000;
-}
-
 inline unsigned int
 unicode_font_rep::get_glyphID (string s) {
   // <@XXXX>

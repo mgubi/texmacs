@@ -1069,6 +1069,46 @@ typeset_as_atomic (edit_env env, tree t, path ip) {
   }
 }
 
+// A line which is not broken here, but cut where the line breaker could break
+// it, for something else to break it (a browser): one box when it is shorter
+// than long_width, else boxes of at least min_width. gaps gets the space
+// to leave after each of them.
+array<box>
+typeset_as_segments (edit_env env, tree t, path ip,
+                     SI long_width, SI min_width, array<SI>& gaps) {
+  // rigid as in typeset_as_concat: it draws the decorations of atoms
+  concater ccc= tm_new<concater_rep> (env, true);
+  ccc->typeset (t, ip);
+  ccc->finish ();
+  array<line_item> a= ccc->a;
+  tm_delete (ccc);
+  array<SI> sp= carried_spaces (a);
+  array<box> r;
+  gaps= array<SI> ();
+  int i, n= N(a), start= 0;
+  SI total= 0, w= 0;
+  for (i=0; i<n; i++) total += a[i]->b->w () + sp[i];
+  bool cut= total >= long_width;
+  for (i=0; i<n; i++) {
+    w += a[i]->b->w () + sp[i];
+    total -= a[i]->b->w () + sp[i];
+    if (i == n-1 || (cut && w >= min_width && total >= min_width &&
+                     a[i]->penalty < HYPH_PANIC)) {
+      array<box> items (i + 1 - start);
+      array<SI>  spc (i + 1 - start);
+      for (int j=start; j<=i; j++) {
+        items[j-start]= a[j]->b;
+        spc  [j-start]= j == start? 0: sp[j-1];
+      }
+      r << concat_box (ip, items, spc);
+      gaps << sp[i];
+      start= i + 1;
+      w= 0;
+    }
+  }
+  return r;
+}
+
 tree
 box_info (edit_env env, tree t, string what) {
   box b= typeset_as_atomic (env, attach_here (t, decorate ()));

@@ -7315,6 +7315,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(html-math-defs)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_math_defs> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
     <scm|(extract-attachments <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -10096,6 +10104,38 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|print_snippet> which returns
     <scm|array_SI>.
+  </explain>
+
+  <\explain>
+    <scm|(print-snippet-in <scm-arg|url> <scm-arg|content> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|print_snippet_in> which returns
+    <scm|array_SI>.
+  </explain>
+
+  <\explain>
+    <scm|(html-math-snippet <scm-arg|content> <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_math_snippet> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(html-snippet-id <scm-arg|content> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_snippet_id> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(html-snippet-last)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_snippet_last> which returns
+    <scm|int>.
   </explain>
 
   <\explain>

@@ -12453,6 +12453,15 @@ tmg_bib_abbreviate (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_html_math_defs () {
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= html_math_defs ();
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
 tmg_extract_attachments (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "extract-attachments");
 
@@ -13455,6 +13464,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("bib-empty?",  tmg_bib_emptyP, 2, 0, 0);
   tmscm_install_procedure ("bib-field",  tmg_bib_field, 2, 0, 0);
   tmscm_install_procedure ("bib-abbreviate",  tmg_bib_abbreviate, 3, 0, 0);
+  tmscm_install_procedure ("html-math-defs",  tmg_html_math_defs, 0, 0, 0);
   tmscm_install_procedure ("extract-attachments",  tmg_extract_attachments, 1, 0, 0);
   tmscm_install_procedure ("pdf-make-attachments",  tmg_pdf_make_attachments, 3, 0, 0);
   tmscm_install_procedure ("pdf-get-linked-file-paths",  tmg_pdf_get_linked_file_paths, 2, 0, 0);

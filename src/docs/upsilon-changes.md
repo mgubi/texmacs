@@ -12,6 +12,17 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 5 November 2026
+
+- **HTML export: formulas as static pictures, typeset by TeXmacs** (desktop):
+  a new choice in **Preferences → Converters → TeXmacs → Html** (static SVG,
+  MathJax, MathML, images or HTML tables) replaces the separate toggles. With
+  static SVG, each formula is drawn as TeXmacs typesets it, in the fonts,
+  macros and colours of the document; the page needs no MathJax, no scripts
+  and no web fonts. Long formulas wrap, links in formulas work, the search of
+  the browser finds formulas by their LaTeX and a copy gives them as `$...$`,
+  and a page read back into TeXmacs gives the formulas again (#770).
+
 ## 3 November 2026
 
 - **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,

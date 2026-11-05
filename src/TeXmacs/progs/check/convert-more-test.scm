@@ -45,6 +45,8 @@
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
         (convert mathml tmmath)
+        (convert html tmhtml)
+        (convert html htmlout)
         (tools spell spell-lantool)
         (tools ai ai-translate)))
 
@@ -527,6 +529,64 @@
                  (align* (document (tformat (table (row (cell "a")
                                                         (cell "=b")))))))
                "\\begin{array}{rl}")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Patterns as backgrounds in the Html export
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (pattern-cell-sample bg)
+  `(block* (tformat (cwith "1" "1" "1" "1" "cell-background" ,bg)
+                    (table (row (cell "a"))))))
+
+(define (test-html-pattern-background)
+  (check-group "html export: a pattern as background of a cell")
+  (let* ((shipped (url->system
+                   (url-resolve "$TEXMACS_PATH/misc/patterns/floral/paisley.png"
+                                "r")))
+         (found (html-export-of-buffer
+                 (pattern-cell-sample `(pattern ,shipped "50px" ""))))
+         ;; the image is not (yet) where the document is: the page may
+         ;; find it next to it
+         (missing (html-export-of-buffer
+                   (pattern-cell-sample '(pattern "nowhere-yet.png"
+                                                  "100%" "100%"))))
+         ;; a name which could break out of the url('...') stays white
+         (hostile (html-export-of-buffer
+                   (pattern-cell-sample
+                    '(pattern "x') ; background:url(javascript:1)"
+                              "100%" "100%"))))
+         (hostile2 (html-export-of-buffer
+                    (pattern-cell-sample
+                     '(pattern "javascript:alert(1)" "100%" "100%"))))
+         ;; a pattern which is not a background is as before
+         (as-color (html-export-of-buffer
+                    '(with "color" (pattern "nowhere-yet.png" "100%" "100%")
+                       "x")))
+         (as-ornament (html-export-of-buffer
+                       '(with "ornament-color"
+                          (pattern "nowhere-yet.png" "100%" "100%")
+                          (ornament "x"))))
+         (plain (html-export-of-buffer
+                 (pattern-cell-sample "red"))))
+    (check-true (string-occurs? "background: url('" found))
+    (check-true (string-occurs? (string-append "background: url('" shipped "')")
+                                found))
+    (check-true (string-occurs? "background-size: " found))
+    (check-true (string-occurs? "background: url('nowhere-yet.png')" missing))
+    (check-true (string-occurs? "background-size: 100% 100%" missing))
+    (check-false (string-occurs? "#FFFFFF" missing))
+    (for (h (list hostile hostile2))
+      (check-true (string-occurs? "background-color: #FFFFFF" h))
+      (check-false (string-occurs? "url(" h))
+      (check-false (string-occurs? "javascript" h)))
+    (for (h (list as-color as-ornament))
+      (check-false (string-occurs? "nowhere-yet" h))
+      (check-false (string-occurs? "color=\"\"" h))
+      (check-false (string-occurs? "color: ;" h))
+      (check-false (string-occurs? "color: \"" h)))
+    ;; an ordinary color is as before
+    (check-true (string-occurs? "background-color: " plain))
+    (check-false (string-occurs? "url(" plain))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MathML import
@@ -1913,6 +1973,101 @@
   (list->string (list-filter (map integer->char (iota 256))
                              (lambda (c) (nin? c (list #\< #\>))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; HTML export: attribute values and addresses
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A value of the document which ends up in an attribute (a color, a length,
+;; the address of a link, of an image) cannot end the attribute and start
+;; another one (onmouseover=...), nor a declaration of the style; a link or an
+;; image does not run javascript:.
+(define (html-of t) (export t "html-snippet"))
+
+(define (test-html-escape)
+  (check-group "html export: attributes and addresses")
+  (check= (html-of '(with "color" "red" "text")) "<font color=\"red\">text</font>")
+  (check= (html-of '(with "color" "red\" onmouseover=\"alert(1)" "text"))
+          "<font color=\"inherit\">text</font>")
+  (check= (html-of '(hlink "t" "http://a/b?x=1&y=2"))
+          "<a href=\"http://a/b?x=1&amp;y=2\">t</a>")
+  (check= (html-of '(hlink "t" "x\" onclick=\"y"))
+          "<a href=\"x&quot; onclick=&quot;y\">t</a>")
+  (check= (html-of '(hlink "t" "javascript:alert(1)")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" " Java&#9;script&colon;alert(1)"))
+          "<a href=\" Java&amp;#9;script&amp;colon;alert(1)\">t</a>")
+  (check= (tmhtml-safe-url " Java&#9;script&colon;alert(1)") "#")
+  (check= (html-of '(hlink "t" "data:text/html,x")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" "sec.html#a")) "<a href=\"sec.html#a\">t</a>")
+  (check= (html-of '(html-div-class "c\" onclick=\"x" "t"))
+          "<div class=\"c&quot; onclick=&quot;x\">\n  t\n</div>")
+  ;; the colors and the lengths of the styles (the tables of the editor
+  ;; need the expansion of its style macros, and give nothing here)
+  (check= (tmcolor->htmlcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "pastel red") "#ffdfdf")
+  (check= (tmbgcolor->htmlbgcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "red\" onmouseover=\"alert(1)") "inherit")
+  (check= (tmcolor->htmlcolor "red; position: fixed") "inherit")
+  (check= (tmbgcolor->htmlbgcolor "red}</style><script>") "inherit")
+  (check= (tmcolor->htmlcolor "url(javascript:alert(1))") "inherit")
+  (check= (tmlength->htmllength "1cm") "1cm")
+  (check= (tmlength->htmllength "1cm; position: fixed") #f)
+  ;; obfuscated schemes: numeric references with leading zeros, without ;
+  (for (u '("&#106;avascript:1" "javascript&#0058;1" "javascript&#x003a;1"
+            "javascript&#58 1" "&#x6A;avascript&colon;alert(1)" "JaVa\tScRiPt:1"))
+    (check= (tmhtml-safe-url u) "#"))
+  (check= (tmhtml-safe-url "page.html?a=1&b=2") "page.html?a=1&b=2")
+  ;; the full documents, as File > Export makes them
+  (let* ((cell (lambda (bg)
+                 (html-of-buffer
+                  `(document (tabular (tformat (cwith "1" "1" "1" "1" "cell-background" ,bg)
+                                               (table (row (cell "a")))))))))
+         (hostile "red\" onmouseover=\"alert(1)"))
+    (check-false (string-occurs? "onmouseover" (cell hostile)))
+    (check-true (string-occurs? "inherit" (cell hostile)))
+    (check-true (string-occurs? "background-color: #ff0000" (cell "#ff0000")))
+    )
+  ;; The patterns: the export of a document turns a pattern into a white
+  ;; background (an issue of its own), so the cell is converted here by
+  ;; tmhtml-tformat on a tree which was not expanded.
+  (let ((pat (lambda (u)
+               (apply string-append
+                      (map serialize-html
+                           (tmhtml-tformat
+                            `((cwith "1" "1" "1" "1" "cell-background"
+                                     (pattern ,u "100%" "100%" "red"))
+                              (table (row (cell "a"))))))))))
+    (check-false (string-occurs? "javascript" (pat "javascript:alert(1)")))
+    (check-true (string-occurs? "url('x%27%29%3bb:url%28http://evil/x')"
+                                (pat "x');b:url(http://evil/x")))
+    (check-false (string-occurs? "');position" (pat "x.png');position:fixed;b:url('")))
+    (check-true (string-occurs? "background: url('x.png'); background-size: 100% 100%"
+                                (pat "x.png")))
+    (check-true (string-occurs? "data:image/png;base64,AA"
+                                (pat "data:image/png;base64,AA"))))
+  ;; the addresses with characters beyond Latin 1 (Guile 1.8: integer->char
+  ;; stops at 255)
+  (for (u '("http://a/<#43B>.html" "http://a/<#20AC>x" "<#4E2D>.html"))
+    (check-true (string? (html-of-buffer `(document (hlink "t" ,u)))))
+    (check-true (string? (html-of-buffer `(document (image ,u "1cm" "1cm" "" "")))))
+    (check-true (string? (html-of-buffer `(document (html-video ,u "1" "2"))))))
+  (check= (tmhtml-safe-url "http://a/&#1083;&#8217;x") "http://a/&#1083;&#8217;x")
+  (check= (tmhtml-safe-url "&#1083;javascript:1") "&#1083;javascript:1")
+  (check-false (string-occurs? "javascript"
+               (html-of-buffer
+                '(document (image "&#x6A;avascript&colon;alert(1).png" "1cm" "1cm" "" "")))))
+  (check-false (string-occurs? "\" onerror"
+               (html-of-buffer
+                '(document (html-video "a\" onerror=\"x" "1" "2")))))
+  ;; values which are not lengths or numbers do not crash the export
+  (check-true (string? (html-of-buffer '(document (with "font-size" "big" "text")))))
+  (check-true (string? (html-of-buffer
+                        '(document (with "ornament-border" "x" "ornament-hpadding" "y" "t")))))
+  (check= (tmhtml-safe-url "javascript:x" #t) "#")
+  (check= (tmhtml-safe-url "data:image/png;base64,AA" #t) "data:image/png;base64,AA")
+  (check= (tmhtml-safe-url "data:image/svg+xml,x" #t) "#")
+  (check= (tmhtml-safe-url "images/a.png" #t) "images/a.png")
+  (check= (htmlout-attribute-value "a\"b<c>d&e&amp;f&#9;") "a&quot;b&lt;c&gt;d&amp;e&amp;f&#9;"))
+
 (define (test-serialize-special)
   (check-group "special characters")
   ;; tm: the control characters are written \@ + code
@@ -2309,6 +2464,44 @@
     (check-true (!= html ""))
     (check-false (url-exists? image))
     (check-false (url-exists? beside)))
+  (check-group "html images: formulas in their environment")
+  ;; the fonts around a formula and of all the preambles; the size of the
+  ;; text around is that of HTML
+  (let* ((height
+          (lambda (body)
+            (let* ((s (html-export-of-buffer
+                       body '("texmacs->html:images" . "on")
+                       '("texmacs->html:static-math" . "off")
+                       '("texmacs->html:mathjax" . "off")
+                       '("texmacs->html:mathml" . "off")))
+                   (i (string-search-forwards "height: " 0 s)))
+              (if (< i 0) ""
+                  (substring s i (string-search-forwards "em" i s))))))
+         (f '(math (big "sum")))
+         (plain (height `(document ,f))))
+    (check-false (== plain ""))
+    (check-false (== (height `(document (with "math-font" "Fira" ,f))) plain))
+    (with fira '(hide-preamble (assign "math-font" "Fira"))
+      (check-false (== (height `(document (hide-preamble (assign "y" "1"))
+                                          ,fira ,f))
+                       plain)))
+    (check= (height `(document (with "font-size" "2" ,f))) plain))
+  ;; equal formulas in other environments share their image
+  (let* ((s (html-export-of-buffer
+             '(document (concat (math "a") " " (with "color" "red" (math "b"))
+                                " " (math "a")))
+             '("texmacs->html:images" . "on")
+             '("texmacs->html:static-math" . "off")
+             '("texmacs->html:mathjax" . "off")
+             '("texmacs->html:mathml" . "off")))
+         (srcs (let loop ((i 0) (acc '()))
+                 (with j (string-search-forwards "src=\"" i s)
+                   (if (< j 0) (reverse acc)
+                       (with k (string-search-forwards "\"" (+ j 5) s)
+                         (loop k (cons (substring s (+ j 5) k) acc))))))))
+    (check= (length srcs) 3)
+    (check= (car srcs) (caddr srcs))
+    (check-false (== (car srcs) (cadr srcs))))
   (check-group "conversion for the clipboard: the images")
   (let* ((dir (url-append (temp-dir) "clipboard"))
          (ext (eps-suffix))
@@ -2533,7 +2726,7 @@
   (system-mkdir (temp-dir))
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
-                  test-html-mathjax-formulas
+                  test-html-mathjax-formulas test-html-pattern-background
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
@@ -2541,7 +2734,7 @@
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
-                  test-serialize-special test-big-document test-pdf-export
+                  test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

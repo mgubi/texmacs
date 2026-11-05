@@ -1345,6 +1345,7 @@ tmscm_to_list_tree (tmscm p) {
 
 #include "Pdf/pdf_hummus_extract_attachment.hpp"
 #include "Pdf/pdf_hummus_make_attachment.hpp"
+#include "Html_math/html_math.hpp"
 
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"
