@@ -186,16 +186,18 @@ def make_env(w, name, share="off"):
     return env, home
 
 
-def start_other(w, env, script, file, extra=None):
-    """the other TeXmacs (a headless process with a script of tests/mcp)"""
+def start_other(w, env, script, file, extra=None, gui=False, role="B"):
+    """the other TeXmacs (a headless process with a script of tests/mcp; with
+    gui=True a process with the Qt interface, offscreen, as the person's)"""
     sync = os.path.join(w, "sync")
     e = dict(env)
     if extra:
         e.update(extra)
-    e.update(SH_ROLE="B", SH_SYNC=sync, SH_FILE=file, SH_OUT=os.path.join(w, "out-B"),
+    e.update(SH_ROLE=role, SH_SYNC=sync, SH_FILE=file, SH_OUT=os.path.join(w, "out-" + role),
              SH_DIR=os.path.join(TOP, "tests", "shared"))
-    log = open(os.path.join(w, "log-B"), "wb")
-    p = subprocess.Popen([BIN, "-headless", "-X", "-x",
+    e["QT_QPA_PLATFORM"] = "offscreen"
+    log = open(os.path.join(w, "log-" + role), "wb")
+    p = subprocess.Popen([BIN] + ([] if gui else ["-headless"]) + ["-X", "-x",
                           '(load "%s")' % os.path.join(HERE, script)],
                          env=e, stdout=log, stderr=subprocess.STDOUT)
     procs.append(p)
@@ -2462,10 +2464,61 @@ def s_static(w):
     check("exit 0", m.close() == 0)
 
 
+def s_gui_host(w):
+    """a TeXmacs with its window (Qt, offscreen: the person's, not headless) hosts a
+    file whose initial environment is an empty collection, as a saved file has;
+    the MCP server joins it (agent_mode propose, an insert becomes a proposal,
+    Tools > Agents shows the agent), and a second window of another process joins too"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "gui.tm")
+    write_small(f)
+    with open(f, "a") as fh:
+        fh.write("\n<\\initial>\n  <\\collection>\n  </collection>\n</initial>\n")
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    envC, homeC = make_env(w, "C", "on")
+    other = start_other(w, envB, "host-edit.scm", f, gui=True)
+    sync = os.path.join(w, "sync")
+    check("the GUI host has loaded the file", wait_file(os.path.join(sync, "h-loaded"), 60))
+    st = [0]
+    # a second window (another process, with its interface) joins the host
+    third = start_other(w, envC, "host-join.scm", f, gui=True, role="C")
+    sync_set(w, "c-opened")
+    check("the second window edited", wait_file(os.path.join(sync, "h-edited"), 60))
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    check("the host has the edit of the second window", "FROMB-" in hb)
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins the window of a GUI host", not e and v["shared"] is not None and v["shared"]["role"] == "participant")
+    check("agent_mode is propose", not e and v.get("agent_mode") == "propose")
+    e, t = m.tool("read", document="d1", format="text")
+    first = t["children"][0]
+    e, r = m.tool("insert", document="d1", anchor=first["handle"], where="before", content="Inserted by the agent", format="texmacs")
+    check("an insert becomes a proposal", not e and r.get("status") == "proposed")
+    hb = host_body(w, st)
+    check("the proposal is in the document of the host", "version-both" in hb and "Inserted by the agent" in hb)
+    hostcmd(w, st, "agents-here")
+    check("(agents-here?) is true in the host", wait_file(os.path.join(sync, "agents-here"), 10)
+          and open(os.path.join(sync, "agents-here")).read() == "#t")
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    for p in (other, third):
+        try:
+            p.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            p.kill()
+    out = open(os.path.join(w, "out-C")).read() if os.path.exists(os.path.join(w, "out-C")) else ""
+    check("the second window passed its checks", out == "ok")
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

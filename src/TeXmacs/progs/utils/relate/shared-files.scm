@@ -970,6 +970,9 @@
                    (buffer-pretend-modified name)
                    (buffer-pretend-saved name))
                (sf-debug "joined " key " state " state "\n")
+               (when inter
+                 (set-message "Shared file: shared with another TeXmacs window; edits are kept in sync"
+                              "Shared file"))
                #t)))
           (else
             (when (>= c 0) (local-close c))
@@ -1644,11 +1647,14 @@
     (when (agent-peer? sf (list id link interactive seq pid))
       (msg-send link (list 'mode (shared-agent-mode (sf-buffer sf))))
       (when (sf-get sf 'prop-sent) (ahash-remove! (sf-get sf 'prop-sent) id)))
-    (when (and (sf-get sf 'interactive) (agent-peer? sf (list id link interactive seq pid))
-               (not (shared-agent-id? id)))
-      (stat! 'unmarked-joined)
-      (set-message "Shared file: a program that is not marked as an agent joined; it is treated as an agent (Tools > Agents)"
-                   "Shared file"))
+    (when (and (sf-get sf 'interactive) (agent-peer? sf (list id link interactive seq pid)))
+      (if (shared-agent-id? id)
+          (set-message "Shared file: an agent joined this document (Tools > Agents)"
+                       "Shared file")
+          (begin
+            (stat! 'unmarked-joined)
+            (set-message "Shared file: a program that is not marked as an agent joined; it is treated as an agent (Tools > Agents)"
+                         "Shared file"))))
     (send-roster sf)
     ;; an interactive process hosts rather than a headless one: it is
     ;; offered the file

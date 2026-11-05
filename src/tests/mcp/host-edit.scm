@@ -14,6 +14,7 @@
 ;;   accept ID / reject ID   resolve the proposal ID of an agent
 ;;   proposals          write (id status index owner) of the proposals to the sync file proposals
 ;;   save               save the buffer
+;;   agents-here      write #t when Tools > Agents has an agent (agents-here?)
 ;;   gate               write the count and the time (ms) the host spent checking agents' patches
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
@@ -44,6 +45,12 @@
           ((== name "reject") (shared-proposal-resolve! (the-name) arg 'old))
           ((== name "proposals")
            (sync-write! "proposals" (object->string (shared-proposals (the-name)))))
+          ((== name "agents-here")
+           (sync-write! "agents-here"
+                        (object->string
+                         (with-buffer (the-name)
+                           (and (shared-file? (current-buffer))
+                                (nnull? (shared-file-agents (current-buffer))))))))
           ((== name "save") (save-buffer-main (the-name)))
           ((== name "gate")
            (sync-write! "gate" (object->string (shared-file-gate-stats (the-name)))))

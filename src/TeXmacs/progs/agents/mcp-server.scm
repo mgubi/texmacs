@@ -1331,6 +1331,9 @@
         ((and (memq (car st) '(with cwith twith tformat)) (attribute-problem st)) #f)
         (else
           (and (or (eq? (car st) 'document)
+                   ;; (an empty collection is the initial environment of a file that
+                   ;; has none set: every file the editor saves has one)
+                   (eq? (car st) 'collection)
                    (not (known-primitive? (car st)))
                    (tag-possible-arity? (car st) (length (cdr st))))
                (let loop ((l (cdr st)))
