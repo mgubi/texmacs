@@ -60,6 +60,14 @@ have the details, and the problems go to the
   name (except a table of standard macros: sections, lists, folds, title blocks), and
   errors of the evaluator refuse the content.
 
+## 5 November 2026
+
+- **Shared files are on by default** (desktop applications): a file open in
+  several TeXmacs windows or processes of the user stays in sync. To turn it off:
+  Edit > Preferences > Other > "Share files open in several TeXmacs windows"
+  (it applies to the files loaded afterwards). Batch conversions
+  (`texmacs -c`) never share.
+
 ## 3 November 2026
 
 - **Shared files** (desktop applications, off by default): with the

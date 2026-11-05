@@ -38,7 +38,8 @@ with `--mcp`). Nothing is typed on the terminal: the app starts the process and 
 to it over its standard input and output. `env` is optional.
 
 To work on a file together with a person who has it open in TeXmacs, turn on the
-preference `share-open-files` in both (TeXmacs and the home the server uses).
+preference `share-open-files` in both (TeXmacs and the home the server uses);
+it is on by default.
 
 Not yet: `check`, `render`, `export` and resource
 notifications (steps 5 and 6 of the design; step 4, modes and proposals, is below). The interface has no tool
@@ -136,8 +137,8 @@ a string nor a number, or a missing or non-string method, is -32600.
   At most 40000 handles are kept (the older half goes).
 - A file is opened as TeXmacs opens one: **joined** when another process of the
   user hosts it (the person's TeXmacs, or a headless one) and
-  `share-open-files` is on in both, **alone** otherwise (the default of the
-  preference is off). Before each tool call the links of the shared files are
+  `share-open-files` is on in both, **alone** otherwise (the preference is on by
+  default). Before each tool call the links of the shared files are
   served (`shared-poll`), so that what the host has sent is in. The `shared`
   field tells: `{role: host|participant, state, participants}` or `null`.
   When the MCP process is the only one, it hosts the file, and when the person

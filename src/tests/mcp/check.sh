@@ -11,7 +11,7 @@
 #   shared     a second headless TeXmacs hosts the file; the MCP server joins
 #              it and reads the host's live edit and deletion
 #   mcp-host   the MCP server hosts the file; another TeXmacs joins and edits
-#   unshared   share-open-files off (the default): nothing is shared
+#   unshared   share-open-files off: nothing is shared
 #   edit       the editing tools in a file nobody else has open: each tool, conflict,
 #              undo_agent, save, close, create, bad input
 #   readonly   TEXMACS_MCP_READONLY and TEXMACS_MCP_ROOTS for the editing tools

@@ -312,7 +312,7 @@
 ;; of read, and only the host of a shared file writes it. The module is loaded
 ;; when a file is first shared; until then these hooks cost nothing.
 (define-preferences
-  ("share-open-files" "off" noop))
+  ("share-open-files" "on" noop))
 
 (define (shared-participant? name)
   (and (shared-files-in-use?) (shared-file-participant? name)))
@@ -815,7 +815,7 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
-  (when (shared-files-wanted?) (shared-file-opened name))
+  (when (shared-files-wanted? opts) (shared-file-opened name))
   (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
@@ -857,13 +857,16 @@
 
 (define (load-buffer-check-autosave name opts)
   ;;(display* "load-buffer-check-autosave " name ", " opts "\n")
-  (cond ((and (shared-files-wanted?) (shared-file-try-join name))
+  (cond ((and (shared-files-wanted? opts) (shared-file-try-join name))
          ;; another process has the file open: its document, not the file
          (load-buffer-open name opts))
         (else (load-buffer-check-autosave* name opts))))
 
-(define (shared-files-wanted?)
-  (== (get-preference "share-open-files") "on"))
+;; (:strict is the load of a batch conversion, texmacs -c: it converts the file
+;; on the disk and neither hosts nor joins)
+(define (shared-files-wanted? opts)
+  (and (== (get-preference "share-open-files") "on")
+       (nin? :strict opts)))
 
 (define (load-buffer-check-autosave* name opts)
   (if (and (autosave-propose name) (nin? :strict opts))

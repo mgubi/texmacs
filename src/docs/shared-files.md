@@ -6,10 +6,17 @@ sync, with no server. This is part 1a of step 1 of the
 (sections 3 and 4.4). Not in this part: the cursors of the other
 participants, `texmacs --mcp`, the menus (but see Agents below).
 
-**Switch.** The preference `share-open-files` (`on`/`off`), default **off**:
-nothing changes for a user who does not turn it on. There is no menu yet:
-`(set-preference "share-open-files" "on")`. It is read when a file is loaded;
-a file already shared stays so.
+**Switch.** The preference `share-open-files` (`on`/`off`), default **on**
+(since 5 November 2026). To turn it off: Edit > Preferences > Other > "Share
+files open in several TeXmacs windows" (the item is not shown where sharing
+does not exist: Windows, the browser), or
+`(set-preference "share-open-files" "off")`. It is read when a file is loaded,
+so a change applies to the files loaded afterwards; a file already shared stays
+so. Sharing needs a plain local `.tm` file; a batch conversion
+(`texmacs -c in.tm out.pdf`, which loads with `:strict`) never hosts nor joins:
+it converts the file on the disk. In the browser and on Windows there is no
+per-user folder (`shared-user-dir` gives ""), so nothing is shared whatever the
+preference says: no folder, lock or port is made.
 
 ## What is shared
 
