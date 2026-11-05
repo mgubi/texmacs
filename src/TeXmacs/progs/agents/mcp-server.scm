@@ -1535,10 +1535,15 @@
 (define (refuse-tag tag why)
   ;; (a definition of the document is a violation that stays when the person
   ;; changes it: its reason is not tied to the content of the node)
-  (when (memq tag definitional-tags) (set! cur-node #f))
-  (let ((c (tag-class tag)))
+  (let* ((st cur-node)
+         (_ (when (memq tag definitional-tags) (set! cur-node #f)))
+         (c (tag-class tag st))
+         (name (defined-name st))
+         (what (and name (memq tag '(provide drd-props))
+                    (string-append " of `" (utf8-prefix (u8 name) 40) "' ("
+                                   (name-description name) ")"))))
     (violate-as! (car c) (cadr c)
-                 (string-append "the tag `" (symbol->string tag) "' " why
+                 (string-append "the tag `" (symbol->string tag) "'" (or what "") " " why
                                 ": the content is refused (nothing was changed)"))))
 
 (define (value-name val)
@@ -1549,22 +1554,58 @@
 (define (alias-class names)
   ;; (rule level) of an alias that involves the tags @names: an alias of a macro that acts on a
   ;; click, runs code, or reads a file or a link (mirror, toggle-button, radio-button, widget-cmd...)
-  ;; is code, else a definition
+  ;; is code; any other alias changes what an existing tag means: a redefinition
   (if (list-find names (lambda (n) (and (string? n) (dangerous-name? n))))
       (list "code" "code")
-      (list "definitions" "style")))
+      (list "redefinition" "redefinition")))
 
-(define (tag-class tag)
-  ;; (rule level) of a tag that the content may not have: definitions and
-  ;; styles can be granted by the person; loops are limits; the rest is code
-  (cond ((memq tag '(assign set reset provide macro xmacro func drd-props))
-         (list "definitions" "style"))
-        ((memq tag '(with-package use-package new-theme copy-theme apply-theme
-                     select-theme style-with style-with* style-only style-only*
-                     filter-style))
-         (list "style" "style"))
-        ((memq tag '(while for-each range)) (list "limits" "limits"))
-        (else (list "code" "code"))))
+;; What already exists. Defining a NEW name is a question of style; changing anything that already
+;; exists (a name defined by the style, a package or the document, an alias of a tag, the style or
+;; the packages themselves) changes the meaning of what the person has written: a `redefinition',
+;; asked every time, which no grant covers.
+(define existing-override #f)   ; during the check after an edit: the names the document had before it
+
+(define (existing-names d)
+  ;; the names that the document defines itself (assign), before the edit
+  (or existing-override
+      (cond (host-cache (append-map assigned-names-st (apply append host-cache)))
+            ((and d (not (and (pair? d) (== (car d) "host")))) (assigned-names (doc-body d)))
+            (else '()))))
+
+(define (style-defines? d name)
+  ;; does the style (with its packages) of the document @d define @name?
+  (catch #t (lambda () (and (with-buffer (doc-url d) (style-has? name)) #t))
+    (lambda args #f)))
+
+(define (name-exists? name)
+  ;; is @name defined by the document or by its style (and packages)?
+  (or (and (member name (existing-names safety-doc)) #t)
+      (and safety-doc (style-defines? safety-doc name))))
+
+(define (name-description name)
+  (if (member name (existing-names safety-doc)) "a definition of the document" "a macro of the style"))
+
+(define (defined-name st)
+  ;; the name that a provide, drd-props, assign... defines: its first argument, a string, or #f
+  (and (pair? st) (pair? (cdr st)) (string? (cadr st)) (cadr st)))
+
+(define (tag-class tag . opt)
+  ;; (rule level) of a tag that the content may not have: new definitions can be granted by the
+  ;; person (style), the rest of the definitions and any change of the style or of the packages
+  ;; are redefinitions (asked every time); loops are limits; the rest is code
+  (let* ((st (and (pair? opt) (car opt))) (name (defined-name st)))
+    (cond ((memq tag '(provide drd-props))
+           (if (and name (name-exists? name))
+               (list "redefinition" "redefinition")
+               (list "definitions" "style")))
+          ((memq tag '(assign set reset macro xmacro func))
+           (list "definitions" "style"))
+          ((memq tag '(with-package use-package new-theme copy-theme apply-theme
+                       select-theme style-with style-with* style-only style-only*
+                       filter-style))
+           (list "redefinition" "redefinition"))
+          ((memq tag '(while for-each range)) (list "limits" "limits"))
+          (else (list "code" "code")))))
 
 (define (argument st k)
   ;; the argument number k of the tree (last: the last one), or #f
@@ -3134,6 +3175,7 @@
 (define (guard-post d pre new-nodes skip-block?)
   ;; after the edit, inside its transaction: refuse it if it introduced a violation
   (set! guard-doc d)
+  (set! existing-override (append-map assigned-names-st (list-ref pre 4)))
   (let* ((old-ptr (car pre)) (old-viol (cadr pre))
          (blk (and old-ptr (not skip-block?) (deref old-ptr)))
          (blocks (let loop ((l (append (if (and blk (tree? blk) (inside-body? d blk)
@@ -3184,6 +3226,7 @@
   (let ((u (doc-url d)) (failed #f) (value #f) (g current-guard)
         (mark (shared-collect-mark (doc-url d))))
     (set! current-guard #f)
+    (set! in-transaction? #t)
     (with-buffer u
       (start-editing)
       (let ((a (get-author)))
@@ -3205,6 +3248,8 @@
               (set! failed #t))))
         (when (not failed) (mark-end a))
         (end-editing)))
+    (set! in-transaction? #f)
+    (set! existing-override #f)
     ;; (an edit that was cancelled never reaches the host: not even with its
     ;; inverse)
     (when failed (shared-collect-restore! u mark))
@@ -3347,11 +3392,17 @@
                      after)))))))))
 
 ;; A definition that changes: the text that the document already has changes
-;; meaning (a `strong' that becomes a link). The blocks that use a changed name,
-;; directly or through other macros, are expanded under the old and the new
-;; definitions, and what is new is a violation of its own level (a link needs
-;; links, code is refused); and the person is told, as a rule that no grant covers
-;; (`redefinition', asked every time), which names the document already uses and how often.
+;; meaning (a `strong' that becomes a link). A NEW name is a plain question of style;
+;; a name that already exists (in the document, its style or its packages) is a
+;; `redefinition': asked every time, no grant covers it, and said plainly (the name, how
+;; many times the document uses it, or that it is a macro of the style). The text that
+;; may be affected, the blocks that use the name directly or through other macros (all of
+;; them when it is a macro of the style, which they may use without naming it), is expanded
+;; under the old and the new definitions, with one budget for all of it, and what is new
+;; is a violation of its own level (a link needs links, code is refused). More blocks than
+;; the cap, or more work than the budget, is refused: the person cannot judge what was not checked.
+(define redefinition-block-cap 200)
+
 (define (st-mentions? st name)
   (cond ((pair? st) (or (eq? (car st) (string->symbol name))
                         (list-or (map (lambda (x) (st-mentions? x name)) (cdr st)))))
@@ -3368,12 +3419,15 @@
         (else 0)))
 
 (define (changed-definitions old-as new-as)
-  ;; the names of the definitions that only one of the lists has, or '* when a set or reset is among them
+  ;; the names of the definitions that only one of the lists has, or '* when a set or reset (or
+  ;; something that is not a plain assign) is among them
   (let* ((diff (append (list-filter new-as (lambda (x) (not (member x old-as))))
                        (list-filter old-as (lambda (x) (not (member x new-as))))))
-         (names (map (lambda (a) (and (pair? a) (eq? (car a) 'assign) (pair? (cdr a)) (string? (cadr a)) (cadr a)))
+         (names (map (lambda (a) (if (and (pair? a) (eq? (car a) 'assign) (pair? (cdr a)) (string? (cadr a)))
+                                     (cadr a)
+                                     'other))
                      diff)))
-    (if (list-find names not)
+    (if (member 'other names)
         '*
         (let loop ((l names) (acc '()))
           (cond ((null? l) (reverse acc))
@@ -3392,30 +3446,64 @@
                               all)))
         (if (null? more) set (loop (append set more)))))))
 
+(define (budgeted-violations d blocks base assigns left)
+  ;; the violations of the expansion of @blocks under @assigns with at most @left steps in all:
+  ;; (violations . steps left); the violations are (over-budget-reason) when the steps run out
+  (let loop ((l blocks) (left left) (acc '()))
+    (cond ((null? l) (cons acc left))
+          ((<= left 0) (cons (list over-budget-reason) 0))
+          (else
+            (let ((r (expand-blocks d (list (car l)) assigns left)))
+              (if (not r)
+                  (cons (list over-budget-reason) 0)
+                  (loop (cdr l) (- left (car r))
+                        (append acc (collect-violations
+                                     (lambda () (for (x (cdr r)) (check-expanded x base))))))))))))
+
 (define (redefinition-violations d blocks base old-as new-as)
   ;; the reasons that the change of definitions from @old-as to @new-as brings to the text @blocks (strees)
   (let ((names (changed-definitions old-as new-as)))
     (if (null? names)
         '()
         (let* ((all? (eq? names '*))
-               (aff (if all? '* (affected-names names old-as new-as)))
-               (sel0 (list-filter blocks (lambda (b) (or all? (list-or (map (lambda (n) (st-mentions? b n)) aff))))))
-               (sel (if (> (length sel0) 200) (sublist sel0 0 200) sel0))
+               (old-names (append-map assigned-names-st old-as))
+               ;; (a macro of the style that the document does not define itself: the text may
+               ;; use it without naming it)
+               (style-names (if all? '() (list-filter names (lambda (n) (and (not (member n old-names))
+                                                                         (style-defines? d n))))))
+               (exist (if all? '() (list-filter names (lambda (n) (or (member n old-names) (member n style-names))))))
                (notices
                 (if all?
                     (list (marked "redefinition" "redefinition"
                                   "it changes a setting of the document (set, reset) that all the text depends on"))
-                    (filter-map
-                      (lambda (n)
-                        (let ((k (apply + (map (lambda (b) (st-uses b n)) blocks))))
-                          (and (> k 0)
-                               (marked "redefinition" "redefinition"
-                                       (string-append "it redefines `" n "', which the document already uses "
-                                                      (number->string k) " time(s): the text written with it changes meaning")))))
-                      names)))
-               (before (append-map (lambda (b) (expansion-violations b base d old-as block-budget)) sel))
-               (after (append-map (lambda (b) (expansion-violations b base d new-as block-budget)) sel)))
-          (append notices (new-violations before after))))))
+                    (map (lambda (n)
+                           (let ((k (apply + (map (lambda (b) (st-uses b n)) blocks))))
+                             (marked "redefinition" "redefinition"
+                                     (cond ((> k 0)
+                                            (string-append "it redefines `" n "', which the document already uses "
+                                                           (number->string k) " time(s): the text written with it changes meaning"))
+                                           ((member n style-names)
+                                            (string-append "it redefines `" n "', a macro of the style, which the text may use without naming it"))
+                                           (else (string-append "it redefines `" n "', a definition of the document"))))))
+                         exist)))
+               (aff (if all? '* (affected-names names old-as new-as)))
+               (everything? (or all? (pair? style-names)))
+               (sel (list-filter blocks (lambda (b) (or everything? (list-or (map (lambda (n) (st-mentions? b n)) aff)))))))
+          (cond
+            ((and (null? exist) (not all?)) '())
+            ((> (length sel) redefinition-block-cap)
+             (append notices
+                     (list (marked "limits" "limits"
+                                   (string-append "the definitions change what " (number->string (length sel))
+                                                  " blocks expand to (more than " (number->string redefinition-block-cap)
+                                                  "): they cannot all be checked")))))
+            (else
+              (let* ((b (budgeted-violations d sel base old-as document-budget))
+                     (a (budgeted-violations d sel base new-as (cdr b))))
+                (append notices
+                        (if (or (over-budget? (car b)) (over-budget? (car a)))
+                            (list over-budget-reason)
+                            (new-violations (car b) (car a)))))))))))
 
 (define (definitions-preview blocks-old blocks-new)
   ;; the definitions that the new blocks have and the old ones lack, for the person
@@ -3468,6 +3556,8 @@
 ;;;     (elicitation/create), if it declared the capability; else refused.
 ;;; The levels `code', `limits' and `mode' are never asked about.
 
+(define mcp-extra-note #f)         ; a note for the agent in the next answer
+(define in-transaction? #f)        ; an edit is made tentatively and not yet approved
 (define asking-allowed? #t)        ; #f where there is no edit to ask about (create_document)
 (define client-name #f)            ; the name the client gives at initialize (not verified)
 (define client-elicits? #f)        ; did the client declare the elicitation capability?
@@ -3560,12 +3650,18 @@
                 ((== (car a) "once")
                  ;; (only what was shown: a rule found later in the call is asked about again)
                  (set! call-approved (append (map reason-text rest-reasons) call-approved))
+                 ;; (a definition that was shown is the change of the definitions that the
+                 ;; check after the edit finds: the same fact)
+                 (when (list-find rest (lambda (p) (== (cadr p) "definitions")))
+                   (set! call-approved (cons "it changes the definitions of the document" call-approved)))
                  (judge d reasons how (+ depth 1)))
                 (else
                   (let ((level (cdr a)))
                     (set! session-grants (cons (list (doc-path d) level) session-grants))
-                    (when (and (== (car a) "remember") client-name)
-                      (shared-trust-remember! (doc-path d) client-name level))
+                    (when (== (car a) "remember")
+                      (when (not (and client-name (shared-trust-remember! (doc-path d) client-name level)))
+                        (set! mcp-extra-note
+                              "The remembered grants are full (200) or the client has no name: the grant is for this session only.")))
                     (judge d reasons how (+ depth 1))))))))))
 
 (define (judge-or-refuse! d reasons how)
@@ -3583,7 +3679,9 @@
     (map (lambda (l) (cons (string-append "session:" l) (string-append "Trust " l " for this session")))
          (list-filter levels (lambda (l) (member l '("style" "links")))))
     (if client-name
-        (map (lambda (l) (cons (string-append "remember:" l) (string-append "Remember " l " for this file")))
+        (map (lambda (l) (cons (string-append "remember:" l)
+                               (string-append "Remember " l " for this file"
+                                              (if (shared-trust-full?) " (the list is full: for this session only)" ""))))
              (list-filter levels (lambda (l) (member l '("style" "links")))))
         '())))
 
@@ -3640,7 +3738,9 @@
                        ;; (waits in the system for the input, at most 50 ms; the
                        ;; other files that this process hosts are served meanwhile)
                        (let ((s (mcp-stdin-wait 50)))
-                         (shared-poll)
+                         ;; (never inside the transaction of an edit that is not approved yet:
+                         ;; the shared file would send the tentative change to the participants)
+                         (when (not in-transaction?) (shared-poll))
                          (cond ((!= s "") (feed! s) (loop))
                                ((mcp-stdin-eof?) 'gone)
                                (else (loop)))))))))
@@ -4457,6 +4557,8 @@
           (lambda ()
             (set! mcp-param-error-message #f)
             (set! call-approved '())
+            (set! in-transaction? #f)
+            (set! mcp-extra-note #f)
             (when (and (editing-tool? tool) (mcp-read-only?)) (require-writable))
             (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
                    (d (and dref (find-doc dref)))
@@ -4464,7 +4566,10 @@
                                        (let ((a (change-note d)) (b (proposal-note d)))
                                          (cond ((and a b) (string-append a " " b))
                                                (else (or a b)))))))
-                   (r ((list-ref tool 4) args)))
+                   (r ((list-ref tool 4) args))
+                   (note (cond ((and note mcp-extra-note) (string-append note " " mcp-extra-note))
+                               (else (or note mcp-extra-note)))))
+              (set! mcp-extra-note #f)
               (text-result (json-write (if (and note (func? r 'attr))
                                            (append r (list "note" note))
                                            r))

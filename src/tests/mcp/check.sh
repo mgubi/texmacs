@@ -24,6 +24,8 @@
 #   trust-persist  remembered grants across restarts of the person's TeXmacs, per file, per name, revoked
 #   elicit     no person: MCP elicitation of the client (accept, decline, cancel, no answer, no capability)
 #   trustpref  the remembered grants with quotes, newlines and non-ASCII in names and paths, the limit
+#   elicit-race  a participant edits while the client is asked: the tentative edit is never published
+#   redef-budget  the check of a redefinition has one budget and a cap on the blocks
 #   redef      a definition that changes text the document already has: named, counted, asked every time
 #   levels     the level of each rule of the content filter (style, links; code, limits, mode never)
 #   filter     every name of the lists of refused content is a tag of the DRD
@@ -55,7 +57,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose trust trust-persist elicit redef levels trustpref undo recursion filter content styles static guard hostdeath nonascii stalled
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose trust trust-persist elicit elicit-race redef redef-budget levels trustpref undo recursion filter content styles static guard hostdeath nonascii stalled
 status=0
 for name in "$@"; do
   w="$run/$name"

@@ -127,7 +127,9 @@
                (list-filter (cadddr q) (lambda (l) (member l '("style" "links")))))
           (if (== (cadr q) "unknown")
               '()
-              (map (lambda (l) (list (string-append "Remember " l " for this file") "remember" l))
+              (map (lambda (l) (list (string-append "Remember " l " for this file"
+                                                    (if (shared-trust-full?) " (the list is full: for this session only)" ""))
+                                     "remember" l))
                    (list-filter (cadddr q) (lambda (l) (member l '("style" "links"))))))))))
 
 (tm-widget ((agent-ask-widget name qid) done)
@@ -171,6 +173,11 @@
  (for (q (or (shared-asks (current-buffer)) '()))
     ((eval (string-append "Answer the question of " (cadr q) "..."))
      (agent-ask-dialog (current-buffer) (car q))))
+  (when (nnull? (shared-trust-all))
+    ---
+    ("Forget the remembered grants of files that no longer exist"
+     (shared-trust-forget-missing!))
+    ("Forget all the remembered grants" (shared-trust-forget-all!)))
   (when (nnull? (shared-trust (current-buffer)))
     ---
     (for (e (shared-trust (current-buffer)))

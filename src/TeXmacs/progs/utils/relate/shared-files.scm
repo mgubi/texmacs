@@ -1241,14 +1241,22 @@
 (define (hex-encode str)
   (apply string-append (map (lambda (c) (hex4 (char->integer c))) (string->list str))))
 
+(define (hex-char? c)
+  (or (and (char>=? c #\0) (char<=? c #\9)) (and (char>=? c #\a) (char<=? c #\f))))
+
 (define (hex-decode h)
-  ;; the string, or #f
-  (and (= (modulo (string-length h) 4) 0)
-       (let loop ((i 0) (acc '()))
-         (if (>= i (string-length h))
-             (list->string (reverse acc))
-             (let ((n (string->number (substring h i (+ i 4)) 16)))
-               (and n (loop (+ i 4) (cons (integer->char n) acc))))))))
+  ;; the string, or #f when @h is not made of groups of exactly four digits 0-9a-f, each at most 00ff
+  (catch #t
+    (lambda ()
+      (and (> (string-length h) 0) (= (modulo (string-length h) 4) 0)
+           (list-and (map hex-char? (string->list h)))
+           (let loop ((i 0) (acc '()))
+             (if (>= i (string-length h))
+                 (list->string (reverse acc))
+                 (let ((n (string->number (substring h i (+ i 4)) 16)))
+                   (and n (integer? n) (>= n 0) (<= n 255)
+                        (loop (+ i 4) (cons (integer->char n) acc))))))))
+    (lambda args #f)))
 
 (define (trust-read)
   ;; ((path name level) ...)
@@ -1258,11 +1266,14 @@
         (let loop ((l (string-tokenize-by-char s #\space)) (acc '()))
           (if (null? l)
               (reverse acc)
-              (let* ((parts (string-tokenize-by-char (car l) #\:))
-                     (e (and (= (length parts) 3)
-                             (trustable-level? (caddr parts))
-                             (let ((p (hex-decode (car parts))) (n (hex-decode (cadr parts))))
-                               (and p n (list p n (caddr parts)))))))
+              (let* ((parts (catch #t (lambda () (string-tokenize-by-char (car l) #\:)) (lambda args '())))
+                     (e (catch #t
+                          (lambda ()
+                            (and (= (length parts) 3)
+                                 (trustable-level? (caddr parts))
+                                 (let ((p (hex-decode (car parts))) (n (hex-decode (cadr parts))))
+                                   (and p n (list p n (caddr parts))))))
+                          (lambda args #f))))
                 (loop (cdr l) (if e (cons e acc) acc))))))))
 
 (define (trust-write! l)
@@ -1286,6 +1297,26 @@
          (cond ((member (list path name level) l) #t)
                ((>= (length l) trust-max) #f)
                (else (trust-write! (append l (list (list path name level)))) #t)))))
+
+(tm-define (shared-trust-full?)
+  (:synopsis "Is the list of remembered grants full (a remember is then for the session only)?")
+  (>= (length (trust-read)) trust-max))
+
+(tm-define (shared-trust-all)
+  (:synopsis "Everything remembered: ((path name level) ...)")
+  (trust-read))
+
+(tm-define (shared-trust-forget-all!)
+  (:synopsis "Forget every remembered grant")
+  (trust-write! '())
+  #t)
+
+(tm-define (shared-trust-forget-missing!)
+  (:synopsis "Forget the remembered grants of files that no longer exist; the number forgotten")
+  (let* ((l (trust-read))
+         (keep (list-filter l (lambda (e) (url-exists? (system->url (car e)))))))
+    (trust-write! keep)
+    (- (length l) (length keep))))
 
 (tm-define (shared-trust-forget! path name level)
   (:synopsis "Revoke what was remembered")

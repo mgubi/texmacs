@@ -1800,6 +1800,27 @@ def s_elicit(w):
     n_seen[0] = 0
     e, r, asked = edit(LINK, lambda params: {"action": "accept", "content": {"answer": "once"}})
     check("allowed each time: applied", not e and r["status"] == "applied" and len(asked) == 2)
+    # a setting, and a macro of the style: redefinitions, asked about (they used to fail as "check failed")
+    for label, content, text in (("set", "<set|font-size|2>", "setting of the document"),
+                                 ("reset", "<reset|font-size>", "setting of the document"),
+                                 ("a macro of the style", "<assign|section-sep|<macro|x|y>>", "a macro of the style")):
+        msgs = []
+        def keep(params, msgs=msgs):
+            msgs.append(params["message"])
+            return {"action": "accept", "content": {"answer": "once" if len(msgs) == 1 else "refuse"}}
+        hh = hash_()
+        e, r, asked = edit(content, keep)
+        if len(asked) != 2 or text not in asked[1]["message"]:
+            print("    got2:", [a["message"][-700:] for a in asked], asked[-1]["requestedSchema"]["properties"]["answer"]["enum"] if asked else None)
+        check("%s: asked as a redefinition (%d questions)" % (label, len(asked)),
+              len(asked) == 2 and text in asked[1]["message"] and "redefinition" in asked[1]["message"]
+              and asked[1]["requestedSchema"]["properties"]["answer"]["enum"] == ["refuse", "once"])
+        if len(asked) != 2:
+            print("    got:", len(asked), str(r)[:300], [a["message"][-400:] for a in asked])
+        check("%s: the second refusal cancels the edit" % label, isinstance(r, dict) and r["status"] == "refused" and hash_() == hh)
+    # a new name: only a question of style
+    e, r, asked = edit("<assign|zzbrandnew|1>", say("once"))
+    check("a new name is asked once, as style", len(asked) == 1 and "redefines" not in asked[0]["message"] and not e)
     # code and limits are never asked about
     for label, content in (("extern", "<extern|foo>"), ("script", "<script|scheme|x>"), ("par-columns", "<with|par-columns|99|x>"),
                            ("a loop", "<while|a|b>"), ("version markup", "<version-both|a|b>"),
@@ -1875,8 +1896,13 @@ def s_levels(w):
     table = [
         ("<assign|a|b>", "definitions", "style", True),
         ("<set|font-size|2>", "definitions", "style", True),
-        ("<with|em|<value|strong>|x>", "definitions", "style", True),
-        ("<with-package|x|y>", "style", "style", True),
+        ("<with|em|<value|strong>|x>", "redefinition", "redefinition", True),
+        ("<provide|brandnewname|1>", "definitions", "style", True),
+        ("<provide|strong|1>", "redefinition", "redefinition", True),
+        ("<drd-props|brandnewname|arity|1>", "definitions", "style", True),
+        ("<drd-props|strong|arity|1>", "redefinition", "redefinition", True),
+        ("<use-package|x>", "redefinition", "redefinition", True),
+        ("<with-package|x|y>", "redefinition", "redefinition", True),
         ("<hlink|x|ftp://a.org>", "link", "links", True),
         ("<hlink|x|file:///etc/hosts>", "link", "links", True),
         ("<include|/etc/hosts>", "file", "links", True),
@@ -1931,7 +1957,7 @@ def s_trustpref(w):
         for l in [l for l in out.splitlines() if l.startswith("CHECK ")]:
             check("%s: %s" % (phase, l[6:-5]), l.endswith("PASS"))
             n += 1
-    check("all the probe checks were seen", n >= 9)
+    check("all the probe checks were seen", n >= 14)
 
 
 def s_redef(w):
@@ -2000,6 +2026,115 @@ def s_redef(w):
         other.wait(timeout=30)
     except subprocess.TimeoutExpired:
         other.kill()
+
+
+def s_elicit_race(w):
+    """the MCP server hosts the file and asks its client about an edit that is made tentatively; a
+    participant edits meanwhile; the edit is refused: nobody ever sees it and the documents converge"""
+    global TIMEOUT
+    TIMEOUT = max(TIMEOUT, 200)
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "hosted.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    m = Mcp(envA)
+    m.initialize(name="race-client", elicitation=True)
+    e, v = m.tool("open_document", path=f)
+    check("the MCP server hosts the file", not e and v["shared"]["role"] == "host")
+    other = start_other(w, envB, "host-join2.scm", f)
+    sync_set(w, "c-opened")
+    check("the other TeXmacs joined", wait_file(os.path.join(w, "sync", "b-joined")))
+    time.sleep(1)
+    n = [0]
+    def ans(params):
+        n[0] += 1
+        if n[0] == 1:
+            return {"action": "accept", "content": {"answer": "once"}}
+        # (the second question is asked with the edit made tentatively in the document)
+        sync_set(w, "go")
+        wait_file(os.path.join(w, "sync", "b-edited"), 10)
+        time.sleep(2)
+        sync_set(w, "dump1")
+        wait_file(os.path.join(w, "sync", "b-dumped1"), 10)
+        return {"action": "accept", "content": {"answer": "refuse"}}
+    e, r, asked = m.tool_el(ans, "insert", document="d1", where="last", content="<hlink|site|ftp://race.org>")
+    check("two questions, the second refused", len(asked) == 2 and isinstance(r, dict) and r["status"] == "refused")
+    def rd(name):
+        p = os.path.join(w, "sync", name)
+        return open(p).read() if os.path.exists(p) else ""
+    check("the participant never saw the tentative edit", "ftp://race.org" not in rd("b-body1"))
+    def converged():
+        t = m.tool("read", document="d1", format="texmacs", max_size=100000)[1]["content"]
+        return "FROMB-" in t and "ftp://" not in t
+    check("the participant's edit reaches the server", bool(poll(converged, 15)))
+    sync_set(w, "dump2")
+    wait_file(os.path.join(w, "sync", "b-dumped2"), 10)
+    b2 = rd("b-body2")
+    check("and the participant's document has it, without the refused edit", "FROMB-" in b2 and "ftp://" not in b2)
+    t = m.tool("read", document="d1", format="stree", max_size=100000)[1]["content"]
+    check("the two documents converge", "FROMB-" in t and re.sub(r"\s+", "", b2).count("FROMB-") == 1)
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+
+
+def s_redef_budget(w):
+    """the check of the text that a redefinition affects has one budget for all of it and a cap on the
+    blocks: a chain of macros that expands to 20000 leaves, or 250 blocks, is refused, in time"""
+    global TIMEOUT
+    TIMEOUT = max(TIMEOUT, 240)
+    env, home = make_env(w, "A")
+    env["TEXMACS_ASK_TIMEOUT"] = "20000"
+    m = Mcp(env)
+    m.initialize(name="budget-client", elicitation=True)
+    def make(name, nblocks):
+        f = os.path.join(w, name)
+        with open(f, "w") as fh:
+            fh.write("<TeXmacs|2.1.5>\n\n<style|<tuple|generic>>\n\n<\\body>\n"
+                     + "".join("  Block %d <em|x> <strong|y>.\n\n" % i for i in range(nblocks)) + "</body>\n")
+        return os.path.realpath(f)
+    def yes(params):
+        ch = params["requestedSchema"]["properties"]["answer"]["enum"]
+        return {"action": "accept", "content": {"answer": "session:style" if "session:style" in ch else "once"}}
+    def ins(doc, c):
+        t0 = time.monotonic()
+        e, r, asked = m.tool_el(yes, "insert", document=doc, where="last", content=c)
+        return r, asked, time.monotonic() - t0
+    f1 = make("chain.tm", 100)
+    e, v = m.tool("open_document", path=f1)
+    d1 = v["document"]
+    chain = ["<assign|e0|<macro|x|<arg|x>>>"]
+    for i in range(1, 10):
+        chain.append("<assign|e%d|<macro|x|<concat|<e%d|<arg|x>>|<e%d|<arg|x>>|<e%d|<arg|x>>>>>" % (i, i - 1, i - 1, i - 1))
+    ok = True
+    for c in chain:
+        r, asked, dt = ins(d1, c)
+        ok = ok and isinstance(r, dict) and r.get("status") == "applied"
+    check("the macros of the chain are defined (new names: a question of style)", ok)
+    r, asked, dt = ins(d1, "<assign|em|<macro|x|<e9|<arg|x>>>>")
+    check("redefining `em' through the chain: refused as over the budget, in time (%.1f s)" % dt,
+          isinstance(r, dict) and r["status"] == "refused" and any(x["level"] == "limits" for x in r["rules"]) and dt < 60)
+    check("not asked, never granted", not any("redefin" in a["message"] for a in asked) and r["grantable"] is False)
+    check("the server is alive and small", m.request("ping") is not None)
+    rss = int(subprocess.run(["ps", "-o", "rss=", "-p", str(m.p.pid)], capture_output=True, text=True).stdout.strip() or 0)
+    check("and under 1.4 GB (%d MB)" % (rss // 1024), rss < 1400000)
+    f2 = make("many.tm", 250)
+    e, v = m.tool("open_document", path=f2)
+    r, asked, dt = ins(v["document"], "<assign|em|<macro|x|<strong|<arg|x>>>>")
+    check("250 blocks use the name: refused for the cap, not skipped",
+          isinstance(r, dict) and r["status"] == "refused" and "cannot all be checked" in str(r["rules"]))
+    f3 = make("few.tm", 20)
+    e, v = m.tool("open_document", path=f3)
+    r, asked, dt = ins(v["document"], "<assign|em|<macro|x|<strong|<arg|x>>>>")
+    check("20 blocks: a redefinition question, and applied once allowed", isinstance(r, dict) and r.get("status") == "applied"
+          and any("redefines `em'" in a["message"] and "20 time(s)" in a["message"] for a in asked))
+    check("exit 0", m.close() == 0)
 
 
 def s_undo(w):
@@ -3098,7 +3233,7 @@ def s_static(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "trust": s_trust, "trust-persist": s_trust_persist, "elicit": s_elicit, "levels": s_levels, "redef": s_redef, "trustpref": s_trustpref,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "trust": s_trust, "trust-persist": s_trust_persist, "elicit": s_elicit, "levels": s_levels, "elicit-race": s_elicit_race, "redef-budget": s_redef_budget, "redef": s_redef, "trustpref": s_trustpref,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

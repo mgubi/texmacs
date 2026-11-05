@@ -34,7 +34,26 @@
           (let loop ((i 0))
             (when (< i 250) (shared-trust-remember! "/limit" (string-append "n" (number->string i)) "style") (loop (+ i 1))))
           (show-ok "the limit of 200 entries" (not (shared-trust-remember! "/limit" "one-more" "style")))
-          (show-ok "entries before the limit are kept" (shared-trust-remembered? "/limit" "n0" "style")))))
+          (show-ok "entries before the limit are kept" (shared-trust-remembered? "/limit" "n0" "style"))
+          (show-ok "the list is full" (shared-trust-full?))
+          ;; entries that were corrupted by hand: each is skipped, nothing throws, the good one stays
+          (set-preference "agent-trust"
+                          (string-append "d800:0041:style ffff:0041:style 0100:0041:style -041:0041:style +041:0041:style "
+                                         "0.50:0041:style 1/10:0041:style 1e+1:0041:style #x41:0041:style 0041:004:style "
+                                         "::style ::: 00zz:0041:style 0041:0041:style"))
+          (show-ok "corrupt entries are skipped, the good one is read, nothing throws"
+                   (and (shared-trust-remembered? "A" "A" "style")
+                        (= (length (shared-trust-all)) 1)))
+          (show-ok "and the list is not full any more" (not (shared-trust-full?)))
+          ;; forgetting: the grants of files that no longer exist, then all
+          (shared-trust-remember! "/" "keeper" "style")
+          (shared-trust-remember! "/no/such/folder/file.tm" "ghost" "style")
+          (show-ok "forget the grants of missing files: one is forgotten, the others stay"
+                   (and (= (shared-trust-forget-missing!) 2)
+                        (shared-trust-remembered? "/" "keeper" "style")
+                        (not (shared-trust-remembered? "/no/such/folder/file.tm" "ghost" "style"))))
+          (shared-trust-forget-all!)
+          (show-ok "forget all" (null? (shared-trust-all))))))
   (lambda args (display* "CHECK exception " args " FAIL\n")))
 (display* "TRUSTPREF-DONE\n")
 (quit-TeXmacs)
