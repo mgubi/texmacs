@@ -180,8 +180,9 @@ bool
 can_remove (tree t, path p, int pos, int nr) {
   if (!has_subtree (t, p)) return false;
   tree st= subtree (t, p);
-  if (is_atomic (st)) return pos >= 0 && pos+nr <= N(st->label);
-  else return pos >= 0 && pos+nr <= N(st);
+  // (written so that pos+nr cannot overflow: the numbers come from other processes)
+  int n= is_atomic (st)? N(st->label): N(st);
+  return pos >= 0 && nr >= 0 && pos <= n && nr <= n - pos;
 }
 
 bool
@@ -197,7 +198,7 @@ can_join (tree t, path p, int pos) {
   if (!has_subtree (t, p)) return false;
   tree st= subtree (t, p);
   if (is_atomic (st)) return false;  // a string has no children to join
-  if (pos < 0 || pos+1 >= N(st)) return false;
+  if (pos < 0 || pos >= N(st) - 1) return false;
   if (is_atomic (st[pos]) && is_atomic (st[pos+1])) return true;
   if (is_compound (st[pos]) && is_compound (st[pos+1])) return true;
   return false;

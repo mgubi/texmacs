@@ -58,6 +58,14 @@
         (string-append "agent " (cadr l))
         (if (and (pair? l) (pair? (cdr l))) (string-append "program " (car l)) id))))
 
+(define (agent-label id)
+  ;; the id does not say much: add the process id and its command line
+  (let ((i (shared-file-agent-info (current-buffer) id)))
+    (if i
+        (string-append (short-agent id) " (pid " (number->string (car i))
+                       (if (cadr i) (string-append ": " (cadr i)) "") ")")
+        (short-agent id))))
+
 (define (unmarked-agents)
   ;; the participants taken for agents although they do not say so
   (list-filter (shared-file-agents (current-buffer))
@@ -76,7 +84,7 @@
   ---
   (for (id (unmarked-agents))
     (when #t
-      ((eval (string-append "Treat " (short-agent id) " as a person"))
+      ((eval (string-append "Treat " (agent-label id) " as a person"))
        (shared-treat-as-person! (current-buffer) id #t))))
   ---
   (for (e (pending-proposals))

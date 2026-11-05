@@ -404,6 +404,35 @@ process hosts, or only headless ones), the agent edits directly, as before.
   `version-markup`, level `mode`): only the host writes it, for a proposal. The menu
   shows, for each pending proposal, the agent and a preview of its text.
 
+- **Integers.** Every integer of a path is bounded to 0..10^6 by the shape check, and the
+  C++ tests of applicability (`can_remove`, `can_join`) are written so that the sums
+  cannot overflow (`join (1 2147483647)` and `remove (1 2147483646 2147483647)` used to
+  kill the host). `scheme->patch` of what comes from another process is always in a
+  `catch` (`safe-patch`).
+- **A host that sends garbage.** A participant checks that a patch of the host is of the
+  right shape and applies to its confirmed document before it calls `patch-invert` or
+  anything else that aborts on a patch that does not apply; otherwise it asks for the
+  document again. Every call of `patch-invert`, `patch-pull`, `patch-co-pull`,
+  `patch-can-pull?`, `modification-invert` and `patch-apply` in `shared-files.scm` is
+  made on a patch that `patch-applicable?` accepted on the same document (or that the
+  host built itself). The C++ primitives themselves still abort on a patch that does not
+  apply: the glue was not changed.
+- **The person mark** (`shared-treat-as-person!`) is dropped when the participant
+  leaves. While it is connected, a process that takes the id of a marked one is not
+  told apart (the id is the only thing the host has). The menu names the process
+  (pid and command line, `shared-file-agent-info`). There is no preference to treat the
+  person's own headless TeXmacs as a person; the menu is the way, once per connection.
+- **Random patches** (`tests/shared` scenario `fuzz`): a few thousand random patches
+  with small and hostile integers go through `patch-applicable?`, the host's
+  `shared-sanitize-patch`, `patch-invert`, `patch-apply`, `patch-pull`, `patch-co-pull`,
+  `patch-can-pull?` and `patch-commute?`; the process must survive (`FZ_N`, `FZ_SEED`
+  for longer runs: 5 runs of 40000 found nothing). The first version of the fuzz, which
+  called `patch-can-pull?` on patches of a shape that the host refuses, found a crash in
+  `swap (modification&, modification&)`: that is why the shape check comes first.
+- An agent edit elsewhere in a document that holds the person's version markup (or a
+  pending proposal) is accepted (and becomes a proposal in propose mode); the markup is
+  not touched (`agent` scenario).
+
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a
 participant (`msg-text` now raises the print length). The tests had small documents.
@@ -428,7 +457,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) and `agentmode` (the mode survives a handover). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) and `fuzz` (random patches with hostile integers, no crash). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with

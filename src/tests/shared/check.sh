@@ -39,6 +39,7 @@
 #               rules to a participant that is an agent; proposals accepted, rejected, withdrawn
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
+#   fuzz        random patches with hostile integers through the patch functions: no crash
 #   malformed   patches and messages of a wrong shape are refused and the host goes on
 #
 # TM_SHARED_PREF=off runs them with the preference off (they must then fail,
@@ -60,7 +61,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentplain malformed agentmode
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentplain malformed agentmode fuzz
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or

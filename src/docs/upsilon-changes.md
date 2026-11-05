@@ -28,7 +28,7 @@ have the details, and the problems go to the
   file with pending proposals holds both versions. Also fixed: under s7 a shared
   document of more than 40 blocks was cut when it was sent to a participant. See
   [mcp-server.md](mcp-server.md) and [shared-files.md](shared-files.md); tests
-  `tests/shared` (`agent`, `agentplain`, `malformed`, `agentmode`) and `tests/mcp` (`propose`). Hardening: a patch with a malformed path no longer kills the host (shape check, and `is_applicable` answers false in C++), inverses sent by participants are recomputed, a headless participant is treated as an agent until the person marks it, an agent's Save is refused outside the direct mode, and the mode chosen is kept when the file is handed over.
+  `tests/shared` (`agent`, `agentplain`, `malformed`, `agentmode`) and `tests/mcp` (`propose`). Hardening: a patch with a malformed path no longer kills the host (shape check, and `is_applicable` answers false in C++), inverses sent by participants are recomputed, a headless participant is treated as an agent until the person marks it, an agent's Save is refused outside the direct mode, and the mode chosen is kept when the file is handed over. Integer overflows in the applicability tests of modifications (C++) no longer kill the host, a participant checks what its host sends, and a fuzz scenario runs random patches through the patch functions.
 
 ## 4 November 2026
 

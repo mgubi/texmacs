@@ -440,7 +440,7 @@
   (and (list? x) (= (length x) 3) (memq (car x) mod-kinds)
        (let ((path (cadr x)))
          (and (list? path)
-              (list-and (map (lambda (i) (and (integer? i) (>= i 0))) path))
+              (list-and (map (lambda (i) (and (integer? i) (>= i 0) (<= i 1000000))) path))
               (>= (length path) (mod-min-length (car x)))
               (memv (car path) '(0 1))
               #t))))
@@ -452,6 +452,15 @@
              ((eq? (car x) 'compound)
               (list-and (map (lambda (c) (patch-shape-ok? c (+ depth 1))) (cdr x))))
              (else #f))))
+
+(define (safe-patch psexp)
+  ;; the patch of the shape-checked @psexp, or #f (also if the integers do not fit)
+  (and (patch-shape-ok? psexp 0)
+       (catch #t (lambda () (scheme->patch psexp)) (lambda args #f))))
+
+(tm-define (shared-sanitize-patch psexp doc)
+  (:synopsis "The patch of a participant on the document @doc with the inverses of the document, or #f (for the tests)")
+  (and (patch-shape-ok? psexp 0) (rebuild-patch psexp doc)))
 
 (define (patch-forward-mods x)
   ;; the forward modifications of a patch of the right shape, in order, without
@@ -981,6 +990,11 @@
     (send-peers sf (list 'roster r))))
 
 (define (drop-peer! sf p)
+  ;; (the mark "this is a person" goes with the connection: a process that
+  ;; claims the id of a marked one while it is connected is not told apart)
+  (ahash-set! sf-host-persons (sf-key sf)
+              (list-filter (or (ahash-ref sf-host-persons (sf-key sf)) '())
+                           (lambda (x) (!= x (peer-id p)))))
   (local-close (peer-link p))
   (sf-put! sf 'peers (list-filter (sf-get sf 'peers)
                                   (lambda (q) (!= (peer-id q) (peer-id p)))))
@@ -1059,6 +1073,19 @@
            (for (p (sf-get sf 'peers))
              (when (agent-peer? sf p) (msg-send (peer-link p) (list 'mode mode))))
            #t))))
+
+(tm-define (shared-file-agent-info name id)
+  (:synopsis "The host: what is known of the participant @id: (pid command), command a short text or #f")
+  (and-with sf (sf-by-name name)
+    (with p (find-peer sf id)
+      (and p
+           (let* ((pid (peer-pid p))
+                  (cmd (catch #t
+                         (lambda ()
+                           (with r (var-eval-system (string-append "ps -o command= -p " (number->string pid) " 2>/dev/null"))
+                             (if (> (string-length r) 60) (substring r 0 60) r)))
+                         (lambda args #f))))
+             (list pid (and cmd (!= cmd "") cmd)))))))
 
 (tm-define (shared-file-agents name)
   (:synopsis "The ids of the agents that have @name open with this host")
@@ -1715,6 +1742,11 @@
     (when (and (sf-get sf 'conn) (sf-get sf 'last-msg))
       (msg-send (sf-get sf 'conn) (sf-get sf 'last-msg)))))
 
+(tm-define (shared-test-send-peers! name msg)
+  (:synopsis "For the tests: the host sends @msg to all its participants")
+  (and-with sf (sf-by-name name)
+    (when (sf-host? sf) (send-peers sf msg) #t)))
+
 (tm-define (shared-test-bad-base! name flag)
   (:synopsis "For the tests: submit the patches against a state which does not exist")
   (and-with sf (sf-by-name name)
@@ -1912,7 +1944,12 @@
   (let* ((key (sf-key sf))
          (d0 (live-current-document key))
          (pend (sf-get sf 'pending)))
-    (cond ((null? pend)
+    (cond ((not (catch #t (lambda () (patch-applicable? r d0)) (lambda args #f)))
+           ;; (a patch that does not apply to the confirmed document: patch-invert
+           ;; and the others abort on it)
+           (stat! 'bad-remote)
+           (participant-request-resync! sf))
+          ((null? pend)
            (when (apply-in-place! sf r (author-of sf (or author (sf-get sf 'host-id))))
              (live-apply-patch key r to)
              (sf-notify-modified! sf)
@@ -1962,17 +1999,17 @@
            (with (tag from to author id psexp) msg
              (seen! sf id)
              (cond ((or (!= from (live-current-state key))
-                        (not (patch-shape-ok? psexp 0)))
+                        (not (safe-patch psexp)))
                     (participant-request-resync! sf))
                    ((and id (== id (sf-get sf 'inflight))
                          (== author (sf-get sf 'id)))
                     ;; the host took my patch: it is confirmed
-                    (live-apply-patch key (scheme->patch psexp) to)
+                    (live-apply-patch key (safe-patch psexp) to)
                     (sf-put! sf 'pending (if (nnull? (sf-get sf 'pending)) (cdr (sf-get sf 'pending)) '()))
                     (sf-put! sf 'inflight #f)
                     (sf-trim! key))
                    (else
-                     (participant-apply-remote! sf (scheme->patch psexp)
+                     (participant-apply-remote! sf (safe-patch psexp)
                                                 from to author)))))
           ((func? msg 'mode)
            (sf-put! sf 'agent-mode (cadr msg)))
@@ -2224,8 +2261,8 @@
                        (with (tag from to psexp roster host-id) m
                          (sf-put! sf 'roster roster)
                          (sf-put! sf 'reconnecting #f)
-                         (if (patch-shape-ok? psexp 0)
-                             (participant-apply-remote! sf (scheme->patch psexp)
+                         (if (safe-patch psexp)
+                             (participant-apply-remote! sf (safe-patch psexp)
                                                         from to #f)
                              (participant-request-resync! sf))))
                       ((func? m 'welcome-reset)
