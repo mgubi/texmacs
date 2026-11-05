@@ -1287,26 +1287,30 @@
              (violate! (string-append "the tag `" (symbol->string tag)
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
-           (when (table-structure-bad? st)
+           (when (and (not in-macro-body?) (table-structure-bad? st))
              (violate! (string-append "the tag `" (symbol->string tag)
                                         "' has a string where a row, a cell or a table is needed (nothing was changed)")))
-           (for (c (cdr st)) (check-arity c d))))
+           (if (memq tag '(macro xmacro))
+               (with-global in-macro-body? #t (for (c (cdr st)) (check-arity c d)))
+               (for (c (cdr st)) (check-arity c d)))))
         (else #t)))
 
 (define (table-structure-bad? st)
-;; What the typesetter and the editor cannot take: a table with no row, a row with no
-  ;; cell, a child of a table that is a string or has no child (a row is expected: loose
-  ;; rows with something, like a `with', `document', `arg' or a macro, typeset), a child of
-  ;; a row with no child, a tformat that ends with a string, and a document with no
-  ;; paragraph. (Found by experiment: strings in a row, `with', `document' and `arg' as the
-  ;; child of a row are fine.)
-  (define (empty-node? k) (and (pair? k) (null? (cdr k))))
+;; What the typesetter and the editor cannot take (found by experiment: the editor
+  ;; crashes on a key press at the edge of a table whose children are not all rows,
+  ;; whatever they are, a macro that expands to a row included): a table with no row, a
+  ;; row with no cell, a child of a table that is not a `row' with something in it, a
+  ;; tformat that does not end with a table, and a document with no paragraph. The
+  ;; children of a row are free (a `with', a `document', a string...).
   (let ((tag (car st)) (kids (cdr st)))
     (or (and (eq? tag 'document) (null? kids))   ; (the editor puts a document with an empty paragraph in its place)
         (and (memq tag '(table row)) (null? kids))
-        (and (eq? tag 'table) (or (list-or (map string? kids)) (list-or (map empty-node? kids))))
-        (and (eq? tag 'row) (list-or (map empty-node? kids)))
-        (and (eq? tag 'tformat) (pair? kids) (string? (cAr kids))))))
+        (and (eq? tag 'table)
+             (list-or (map (lambda (k) (not (and (pair? k) (eq? (car k) 'row) (pair? (cdr k))))) kids)))
+        (and (eq? tag 'tformat) (pair? kids)
+             (let ((l (cAr kids))) (and (pair? l) (not (eq? (car l) 'table))))))))   ;; (a string is allowed: a document of the corpus has one)
+
+(define in-macro-body? #f)   ; (the bodies of macros hold tables whose rows come from arguments)
 
 (tm-define (mcp-stree-arity-ok? st)
   ;; no tag that the DRD knows as a primitive has a number of children it cannot
@@ -1314,14 +1318,17 @@
   ;; `canvas', `hlink', `with'...). For any tree that comes from another process.
   (cond ((not (pair? st)) #t)
         ((not (symbol? (car st))) #f)
-        ((table-structure-bad? st) #f)
+        ((and (not (memq (car st) '(macro xmacro))) (not in-macro-body?) (table-structure-bad? st)) #f)
         (else
           (and (or (eq? (car st) 'document)
                    (not (known-primitive? (car st)))
                    (tag-possible-arity? (car st) (length (cdr st))))
                (let loop ((l (cdr st)))
                  (or (not (pair? l))
-                     (and (mcp-stree-arity-ok? (car l)) (loop (cdr l)))))))))
+                     (and (if (memq (car st) '(macro xmacro))
+                              (with-global in-macro-body? #t (mcp-stree-arity-ok? (car l)))
+                              (mcp-stree-arity-ok? (car l)))
+                          (loop (cdr l)))))))))
 
 (define (known-macro-arity? tag)
   ;; does the DRD give a macro an arity (it is not the default of the tags
@@ -1605,11 +1612,71 @@
     (string-append (if x (string-append "a number up to " (number->string (cdr x)) " for `" var "'; ") "")
                    "other numbers and lengths have at most 4 digits before the point and 6 after it; ")))
 
+;; Table attributes (found by experiment, with the editor and the typesetter): the
+;; decoration of a cell hangs the typesetter, whatever its value; a span that is not a
+;; positive integer (or that goes beyond the table) crashes them.
+(define (positive-integer-string? v)
+  (and (string? v) (> (string-length v) 0) (< (string-length v) 4)
+       (list-and (map char-numeric? (string->list v)))
+       (> (string->number v) 0)))
+
+(define span-vars '("cell-row-span" "cell-col-span"))
+
+(define (check-table-attribute tag var val)
+  (cond ((== var "cell-decoration")
+         (violate! (string-append "a `" (symbol->string tag) "' sets `cell-decoration': the decoration of a cell is not accepted in the content (nothing was changed)")))
+        ((member var span-vars)
+         (when (or (not (positive-integer-string? val))
+                   (and (not (eq? tag 'cwith)) (!= val "1")))
+           (violate! (string-append "a `" (symbol->string tag) "' sets `" var "' to something that is not a positive whole number"
+                                    (if (eq? tag 'cwith) "" " (only a cwith of a table can set a span)")
+                                    ": refused (nothing was changed)"))))))
+
+(define (decode-range a b n)
+  ;; the first and last cell (0-based) of the range a..b of a cwith in n rows or columns
+  (let ((x (string->number a)) (y (string->number b)))
+    (and x y (integer? x) (integer? y)
+         (cons (max 0 (if (>= x 0) (- x 1) (+ n x)))
+               (min (- n 1) (if (> y 0) (- y 1) (+ n y)))))))
+
+(define (check-spans st)
+  ;; the cwith of a tformat that gives a span: it must fit in the table that the tformat
+  ;; holds
+  (let* ((kids (cdr st))
+         (tbl (and (pair? kids) (let ((l (cAr kids))) (and (pair? l) (eq? (car l) 'table) l))))
+         (rows (and tbl (cdr tbl)))
+         (nr (and rows (length rows)))
+         (nc (and rows (pair? rows) (list-and (map (lambda (r) (and (pair? r) (eq? (car r) 'row))) rows))
+                  (apply min (map (lambda (r) (length (cdr r))) rows)))))
+    (for (c kids)
+      (when (and (pair? c) (eq? (car c) 'cwith) (>= (length c) 7))
+        (let ((args (cdr c)))
+          (let loop ((l (list-tail args 4)))
+            (when (and (pair? l) (pair? (cdr l)))
+              (let ((var (car l)) (val (cadr l)))
+                (when (and (string? var) (member var span-vars) (positive-integer-string? val)
+                           (> (string->number val) 1))
+                  (let* ((n (string->number val))
+                         (rr (and nr (every-string? (list-head args 4))
+                                  (decode-range (car args) (cadr args) nr)))
+                         (cc (and nc (every-string? (list-head args 4))
+                                  (decode-range (caddr args) (cadddr args) nc))))
+                    (when (not (and rr cc
+                                    (if (== var "cell-row-span")
+                                        (<= (+ (cdr rr) n) nr)
+                                        (<= (+ (cdr cc) n) nc))))
+                      (violate! (string-append "a `cwith' gives `" var "' " val
+                                               " that does not fit in the table (the table must be written next to it, and the cells must have room): refused (nothing was changed)"))))))
+              (loop (cddr l)))))))))
+
+(define (every-string? l) (list-and (map string? l)))
+
 (define (check-env-pairs tag vars-and-values)
   ;; (var value var value ...) of a with, cwith or twith
   (let loop ((l vars-and-values))
     (when (and (pair? l) (pair? (cdr l)))
       (let ((var (car l)) (val (cadr l)))
+        (when (string? var) (check-table-attribute tag var val))
         (when (string? var)
           (when (and (not (string? val)) (pair? val)
                      (or (assoc var env-number-limits)
@@ -1681,6 +1748,7 @@
                 (check-env-pairs tag (list-tail (cdr st) 4))))
              ((eq? tag 'twith)
               (check-env-pairs tag (cdr st)))
+             ((eq? tag 'tformat) (check-spans st))
              ((memq tag '(value quote-value or-value))
               (when (and (pair? (cdr st)) (string? (cadr st)) (tag-name? (cadr st)))
                 (violate! (string-append "a `" (symbol->string tag) "' of `" (utf8-prefix (u8 (cadr st)) 40)

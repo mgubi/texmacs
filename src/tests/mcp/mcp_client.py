@@ -1419,7 +1419,10 @@ def s_content(w):
     def refused(label, fmt, content, word):
         e, r = m.tool("insert", document="d1", where="last", content=content, format=fmt)
         e2, t2 = m.tool("read", document="d1", format="stree", max_size=100000)
-        check("refused: %s" % label, e and word in str(r) and t2["hash"] == base_hash)
+        ok = e and word in str(r) and t2["hash"] == base_hash
+        check("refused: %s" % label, ok)
+        if not ok:
+            print("    got:", label, e, str(r)[:160], t2["hash"] == base_hash)
     def accepted(label, fmt, content):
         e, r = m.tool("insert", document="d1", where="last", content=content, format=fmt)
         check("accepted: %s" % label, not e and r["status"] == "applied")
@@ -1639,11 +1642,26 @@ def s_content(w):
         refused("malformed %s" % bad, "stree", bad, "cannot have")
     # tables: what the typesetter and the editor cannot take is refused, loose rows are not
     for bad in ('(table "X")', '(table (row (cell "a")) "X")', '(table (tuple))',
-                '(table (row (tuple)))', '(tformat (table (row (cell "a"))) "X")'):
+                '(tformat (cwith "1" "1" "1" "1" "cell-halign" "c") (frac "a" "b"))'):
         refused("table structure %s" % bad, "stree", bad, "needed")
     refused("a table of set-cursor", "stree", '(table (set-cursor))', "`set-cursor'")
     refused("an empty row among rows", "stree", '(table (row (cell "a")) (row))', "needed")
-    for ok in ('(table (row (cell "a") (cell "b")))', '(table (row (with "color" "blue" "x")))',
+    for bad, word in (('(table (row (cell "a")) (frac "a" "b"))', "needed"),
+                      ('(table (with "color" "red" (row (cell "a"))))', "needed"),
+                      ('(tformat (arg "x"))', "needed"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-decoration" "x") (table (row (cell "a"))))', "cell-decoration"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "-3") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "x") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "3") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
+                      ('(tformat (cwith "2" "2" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "5") (table (row (cell "a") (cell "b"))))', "cell-col-span"),
+                      ('(with "cell-row-span" "2" (table (row (cell "a"))))', "cell-row-span")):
+        refused("table attribute/structure %s" % bad, "stree", bad, word)
+    for ok in ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))',
+               '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b"))))',
+               '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "1") (table (row (cell "a"))))',
+               '(tformat (cwith "1" "-1" "1" "-1" "cell-halign" "c") (table (row (cell "a"))))',
+               '(table (row (cell "a") (cell "b")))', '(table (row (with "color" "blue" "x")))',
                '(table (row (document "a")))', '(table (row "1" "2"))', '(table (row (concat "a" "b")))',
                '(tformat (twith "table-width" "1par") (table (row (cell "a"))))'):
         accepted("table shape %s" % ok, "stree", ok)

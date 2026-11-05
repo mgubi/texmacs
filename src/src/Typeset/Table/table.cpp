@@ -1076,7 +1076,7 @@ is_empty_table (tree t) {
   if (is_atomic (t)) return false;
   if (N(t) == 0) return true;
   for (int i=0; i<N(t); i++)
-    if (is_compound (t[i]) && N(t[i]) == 0) return true;   // (row or not)
+    if (is_compound (t[i]) && N(t[i]) == 0 && L(t[i]) != TMARKER) return true;   // (a row or not; a marker has no child)
   return false;
 }
 
