@@ -162,8 +162,8 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
     `read-only` (mode), or a rule of the content filter applied by the host
     (`definitions`, `link`, `file`, `names`, `dangerous-macro`, `code`, `limits`,
     `style`, `pending` = the blocks hold a pending proposal), with the level:
-    `style` and `links` are what a person can be asked to allow (see "Trusted
-    agents" below), `code`, `limits` and `mode` never.
+    `style` and `links` are what a person might be asked to allow later, `code`,
+    `limits` and `mode` never.
 - **`list_proposals`** (`document`): `proposals`: `id`, `status` (`pending`,
   `accepted`, `rejected`, `withdrawn`, `resolved` = the person changed the markup
   otherwise), `where` (`index` of the block, `section`). **`withdraw_proposal`**
@@ -184,113 +184,8 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
   person: `SH_INTERACTIVE`, commands `mode`, `accept`, `reject`, `save`...), and
   `tests/shared/check.sh agent agentplain` for the host with a hand-written agent.
 - The host does not trust the id: a headless participant is an agent whatever its id, until the person marks it. The local link is not a security boundary against a process of the same user (see shared-files.md).
-
-## Trusted agents (step 4, stage B)
-
-The first time an agent's edit breaks a rule of the content filter, the person is
-asked instead of the edit being refused outright, if every rule it breaks is of a level
-that can be granted. The person may let that one edit through, or trust the agent. Code
-is never granted.
-
-**Who is asked.**
-- When the file is open in the person's TeXmacs (the host filters this agent: `gated`):
-  a **dialog in that TeXmacs** (`agent-ask-dialog` in `texmacs/menus/tools-menu.scm`, a
-  `dialogue-window`, never modal: the editor stays usable; the entry "Answer the question
-  of ..." in Tools > Agents opens it again). It shows the agent's name *as it claims it*,
-  the rule, its level and the offending content (a link's target, the definition). The
-  host keeps the patch, tells the agent `(asking id ms)` (the agent then waits for the
-  answer, as long as the host's time plus 5 s, instead of 10 s), and answers when the
-  person has. The time is 60 s (`TEXMACS_ASK_TIMEOUT` ms, for the tests); nobody answering
-  is a refusal. One question at a time for an agent, and at most 3 questions open for a host (a further edit gets a refusal with
-  `answer: "pending"`), so at most 3 dialogs.
-- When nobody else has the file (the server hosts alone, or only headless processes):
-  **MCP elicitation** (`elicitation/create`, protocol 2025-06-18 and later) to the client,
-  if it declared `capabilities.elicitation` at `initialize`; the same text, and an
-  enumeration of the answers. The server writes the request and, until the answer
-  comes (the time above), reads its input for it only (other files it hosts are served): other lines wait and are handled
-  after the call (`mcp-deferred`); `notifications/cancelled` is sent for a request that
-  timed out. A client without the capability (or a negotiated version before 2025-06-18)
-  gets the refusal as before, with `asked: false, grantable: true` and the reason "nobody
-  could be asked". While it waits the server blocks in `poll` on its input for at most 50 ms at a time (`mcp-stdin-wait`, no process is started) and serves the shared files it hosts, except while an edit is made tentatively in the document (the question of the check after the edit): then nothing is served, so that the participants never see an edit that is not approved yet (`elicit-race` scenario).
-
-**The answers.**
-| Answer | Meaning |
-|---|---|
-| refuse | the edit is refused (also: decline or cancel of the elicitation, an answer not offered, closing the dialog and waiting) |
-| allow once | this edit only: exactly the rules that were shown, for exactly that patch. The host keeps the patch and its text, and handles it again when answered; the grant exists during that call only, and is not kept under the patch id (a client chooses the ids and may reuse one). An agent that reuses the id for another edit gets nothing. On the agent's side the rules found later in the same call (after the expansion) are not covered: they are asked about again, or refused |
-| trust for this session | the agent, this file, the level (`style` or `links`, chosen in the dialog, one button per level): until the agent disconnects (a new connection starts again) or the person quits |
-| remember for this file | in the preference `agent-trust` of the person (their `TEXMACS_HOME_PATH`, never in the document): entries `<path>:<name>:<level>` separated by blanks, the path and the name written as four hexadecimal digits per character (so no quote, backslash, newline or non-ASCII character can break the reading), at most 200 entries; an entry that does not read is skipped, the others stay (each group is exactly four digits 0-9a-f and at most 00ff, the name and the path are not empty, a hand-corrupted entry never raises); offered only when the agent has a name (at the limit, or without a name, it is a session grant, and the dialog, the choices of the elicitation and a `note` of the tool's answer say so). Tools > Agents has entries "Forget the remembered grants of files that no longer exist" and "Forget all the remembered grants". The preference is read at each use in the process that checks; a revocation made in another process is seen by a running agent process only when that process starts again |
-
-**The levels, and why each rule is at its level.** Every rule says its class when it is
-raised (`violate-as!` in `mcp-server.scm`: SOH rule STX level ETX before the text);
-a rule that does not is `code`, so a rule forgotten in the table is never granted, and
-text copied from the agent's content into a message cannot change the class of a rule.
-
-| Rule | Level | What and why |
-|---|---|---|
-| `definitions` | `style` (1) | `assign`, `set`, `reset`, `provide`, `macro`, `xmacro`, `func`, `drd-props`; a `with` or `value` that makes an alias of a tag; any change of the definitions of the document. The person's own definitions are theirs, but a trusted agent may write the macros of its own text; what its macros do is still checked at each call (below). |
-| `style` | `style` (1) | packages, themes, `style-with`, `filter-style`: layout, no code |
-| `link` | `links` (2), shown as "links, files and names in exports" | a link whose target is a string with a scheme other than http, https, mailto (`ftp:`, `file:`...), or with characters of an export's syntax. Acts only when clicked. Granted separately: trusting style never implies links |
-| `file` | `links` (2) | a file (image, include...) written as a plain name but outside the folders of the document or of the server, `..`, a scheme: reads files into the document or its exports |
-| `names` | `links` (2) | strings that become names in an export (labels, keys, `with` values): backslashes, braces, quotes... They are written raw into LaTeX and HTML (the exporters escape them too), which is why the level is named "links, files and names in exports" in the dialogs |
-| `redefinition` | `redefinition` (asked every time) | the rule: **defining a new name is a question of style; changing anything that already exists is a redefinition.** That is: an `assign`, `provide` or `drd-props` of a name that the document, its style or its packages already define (`strong`, `section-sep`...: whether or not the text names it, since a macro of the style is used through other macros), an alias of an existing tag (`with` or `value`), a `set` or `reset`, and any `use-package`, `with-package` or other change of the style, themes or packages. It changes what the person's text means: `<assign|strong|<macro|x|<hlink|<arg|x>|https://e.example>>>` turns every existing `strong` into a link. The question says what is changed: the name and how many times the document uses it, or "a macro of the style", or "a definition of the document", or "a setting of the document". For an `assign` the blocks that use the name (directly or through other macros; all the blocks for a macro of the style or a setting) are expanded under the old and the new definitions with ONE budget for all of it (the budget of a document, `document-budget`); what is new there is a violation of its own level (a link needs `links`, code is refused). More than 200 such blocks, or more work than the budget, is refused (level `limits`): the person cannot judge what was not checked. No grant (session or remembered) covers a redefinition: trust lifts a filter, it does not change what the person's text means behind their back |
-| `dangerous-macro` | `code` (never) | a call of a macro that passes an argument to a link, a file, a script or a macro name: the filter cannot check what the call does |
-| `unknown-tag` | `code` (never) | a tag the style does not define is written by the exporters as a raw command (`\verbatiminput`) |
-| `code` | `code` (never) | `extern`, `script`, `action`, `hybrid`, `eval`, `compound`, `specific` for another program, `latex`, sessions, `raw-data`, `use-module`, `find-file`, an alias (`with` or `value`) of a macro that acts on a click, runs code or reads a file or a link (`mirror`, `toggle-button`, `radio-button`, `widget-cmd`...: `alias-class`), internal markers, a link whose target is not plain text, errors of the expansion: runs in TeXmacs, in TeX or in a browser. "Code stays mine" (decision of 4 November) |
-| `limits`, `structure` | `limits` (never) | loops, number caps (`par-columns`, sizes, `dpi`...), the step budget, recursion, nesting; the arity of tags, tables and spans: they protect the person's TeXmacs from crashes and hangs, and are not a matter of trust |
-| `version-markup`, `pending`, `read-only`, `settings` | `mode` (never) | the markup of proposals, a pending proposal, the person's mode, the style and settings of the document: only the person's TeXmacs |
-
-**The host decides, the agent's own check does not.** The agent's own check runs first
-(it refuses what is never granted, and everything when no one could be asked). When the
-host filters it (`gated`: the host tells it in the `mode` message, and tells it again when
-the person marks it as a person: such a peer is not filtered, and not asked), it lets the
-grantable rules through to the host; the host runs the same rules on the patch
-(`mcp-host-check`), subtracts what it has granted, and asks about the rest or refuses.
-Nothing the agent sends is a grant: a client of the local link that sends
-`(grant ...)` or claims anything is asked or refused like any other (`shared/trust`
-scenario). The host's check, when the definitions change, also reports what is wrong as
-written in the new blocks (a definition and a link in one edit: the link is asked about
-even if the definitions are trusted). It cannot evaluate those blocks (the definitions
-they would be evaluated in are in doubt), so a macro defined in an edit is first used
-in a later one, where the definitions are in the document and every call is analysed.
-**Proposal mode still applies**: a trusted edit in `propose` mode becomes a proposal;
-trust lifts the filter, not the review.
-
-**The name is not verified.** The agent's name is `clientInfo.name` of its `initialize`
-(at most 64 printable characters), sent to the host after the `hello` (`agent-name`, the
-first one counts). The local link is not a security boundary against a process of the same
-user: another program can give itself the same name and be trusted. Trust by name is a
-convenience for honest agents, not a security boundary: the dialog and the docs say so.
-Session grants are tied to the connection (the participant id), not to the name.
-
-**Visible and revocable**: Tools > Agents lists, for the file, each grant ("name: level
-(this session)" or "(remembered)") with an entry "Revoke ...", and the questions waiting
-(`shared-trust`, `shared-trust-revoke!`, `shared-asks`, `shared-ask-answer!`). The menu is
-also shown when only grants exist. Remembered grants of files that are not open are in the
-preference `agent-trust`.
-
-**Refusals** (agent side: a result with `isError` and a JSON text; host side: a result
-with `status: refused`) have the structured fields `rules` (`rule`, `level`, `content`),
-`asked` (the person, or the client, was asked), `answer` (`refused` or `timeout`, or
-`pending`; absent when not asked) and `grantable` (every rule is of a level the person can
-grant: false for code and limits, "do not retry").
-
-**Tools' answers in short**
-- applied / proposed after a grant: as before;
-- refused, `asked: true, answer: "refused"`: the person said no;
-- refused, `asked: true, answer: "timeout"`: nobody answered in time;
-- refused, `asked: false, grantable: false`: never granted, never asked;
-- refused, `asked: false, grantable: true`: no one could be asked.
-
-Tests: `tests/mcp/check.sh trust` (the person's TeXmacs plays the person with the commands
-`asks`, `answer`, `trust`, `revoke` of `host-edit.scm`: refuse, timeout, once, session,
-remember, per level, per name, revoke, direct mode, the session ending when the agent leaves),
-`trust-persist` (restart of the host, another file, another name, revocation),
-`elicit` (a fake client that accepts, declines, cancels, answers garbage, does not answer,
-lacks the capability or speaks an old version; code, limits and version markup never asked;
-`remember` in the preferences), and `tests/shared/check.sh trust` (a hand-written client
-that claims grants, session grants tied to the connection).
-
+- Deferred (stage B): trusted agents, the person's dialog and MCP elicitation for
+  edits that break a rule.
 
 ## The tools
 
@@ -804,7 +699,6 @@ the work folder).
 | `unshared` | the preference off (the default): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `undo` | the undo of the editor in a headless process, single process (`undo-probe.scm`): the own steps, the step of another author skipped when it commutes, the undo back to the saved state (it crashed: `QApplication::beep` without an application) |
-| `trust`, `trust-persist`, `elicit`, `elicit-race`, `redef`, `redef-budget`, `trustpref` | trusted agents: the person's dialog (played by the commands of the second TeXmacs), the preferences across restarts, MCP elicitation (see "Trusted agents") |
 | `filter` | every name of the lists of refused content is a tag of the DRD |
 | `content` | each case of the refused content (code, loops, files, links, LaTeX and Markdown sources, malformed trees) and the accepted ones, 126 checks, with the document unchanged and the server alive; `create_document` with dangling links and refused content |
 | `edit`, `readonly`, `edit-shared` | the editing tools: each tool, conflicts, undo_agent, all-or-nothing, save/close/create, read-only and roots; with a second headless TeXmacs hosting and editing (merge in one paragraph, a refusal reported, the person's undo skipping the agent's changes) |
@@ -841,24 +735,5 @@ the work folder).
   made foreign by the transformation). With two parties only the first was
   already right; a third party shows the difference.
 - On the report that the person's second Cmd-Z removed the agent's last insertion: the archiver (`archiver_rep::undo`) undoes the steps of the editor's author, and it undoes the steps of other authors that do not commute with them (it first undoes the foreign step above); the steps that commute are swapped out of the way when they are added. Two cases are tested and keep the agent's change (the agent inserts a block; the agent changes the start of the paragraph the person types in, the person undoes twice). A change that does not commute with the person's typing (the same place, or a deleted node) is undone with it by the editor's undo: that is the behaviour of the archiver, not of the patches' authors. Patches are received with the author of their sender since this work. The rollback of a refused change and the re-application of pending changes use the author of the process's own editor (they are its own steps).
-- **Open questions of stage B** (the conservative choice was taken, change it if wanted):
-  - *Allow once* covers all the rules of the question (all levels shown), for that edit only. A patch that
-    waited for the person is re-handled when answered; if the host's history no longer holds the state it was
-    made against it is refused as stale and the agent retries (the grant for the session or remembered
-    still applies; a "once" does not).
-  - *Remember* is offered only for an agent with a name; an agent that sends none can only be granted
-    for the session.
-  - A question closed with the window (not answered) is a refusal at the end of the time; the window is not closed by the
-    timeout (it then says the question is over).
-  - The grants are by file path: a file that is moved or copied has no trust; an agent name is not unique.
-  - Elicitation offers *remember*; the preference is then written by the agent's process, in the person's home.
-    A client that is a program, not a person, could answer for the person: the client is trusted to put the
-    question to its user.
-  - `find-file` and `use-module` are code (never), although `find-file` could be a `links` (files) rule.
-  - The waiting for the answer of a client blocks that one call (the server reads its input but handles no other
-    request until it ends).
-  - A grant for definitions lets a macro be defined that is not used yet: a later use is analysed with the definition in
-    the document. A redefinition of a name that is already used is asked about every time (`redefinition`); the check of
-    the text that uses it looks at up to 200 blocks.
 - `beep` in a headless Qt build crashed (an undo that restores the saved
   state called `QApplication::beep` without an application): it is skipped when headless.

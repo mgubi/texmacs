@@ -15,22 +15,13 @@
 (define (insert-block! i st)
   (tree-var-insert (body) i (stree->tree (list 'document st))))
 
-;; The person refuses at once what the host asks about (the rules a person may
-;; grant: links, definitions); the trust itself is tested by s-trust.scm.
-(define (auto-refuse!)
-  (exec-delayed-pause
-   (lambda ()
-     (for (q (or (shared-asks (the-name)) '()))
-       (shared-ask-answer! (the-name) (car q) "refuse"))
-     20)))
-
 (define (A-steps)
   (list
    (act "interactive" (shared-set-interactive! #t))
    (act "load" (load-buffer FILE))
    (act "host" (check "A hosts" (== (role-of) 'host)))
    (act "mode" (check "default mode with a person: propose" (eq? (shared-agent-mode (the-name)) 'propose)))
-   (act "go" (sync-set! "a-loaded") (auto-refuse!))
+   (act "go" (sync-set! "a-loaded"))
    (wait-sync "b-joined")
    (step "agent listed" (= (length (shared-file-agents (the-name))) 1))
    (act "menu" (switch-to-buffer (the-name))

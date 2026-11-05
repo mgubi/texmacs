@@ -839,8 +839,7 @@
   (let ((c (local-connect (caddr entry))))
     (when (>= c 0)
       (msg-send c (list 'hello (cadddr entry) key id (shared-process-id)
-                        interactive base #f))
-      (send-agent-name! c))
+                        interactive base #f)))
     c))
 
 (define sf-join-wait 500)   ; ms: the most a join makes the interface wait
@@ -1061,7 +1060,6 @@
   (local-close (peer-link p))
   (sf-put! sf 'peers (list-filter (sf-get sf 'peers)
                                   (lambda (q) (!= (peer-id q) (peer-id p)))))
-  (trust-forget-peer! sf p)
   (send-roster sf))
 
 (define (priority-less? a b)
@@ -1117,8 +1115,6 @@
          (let* ((l (or (ahash-ref sf-host-persons (sf-key sf)) '()))
                 (l2 (list-filter l (lambda (x) (!= x id)))))
            (ahash-set! sf-host-persons (sf-key sf) (if flag (cons id l2) l2))
-           ;; (the participant is told whether it is filtered by the host)
-           (and-with p (find-peer sf id) (send-mode! sf p))
            #t))))
 
 (tm-define (shared-agent-mode name)
@@ -1137,7 +1133,7 @@
            ;; the file is handed over and comes back)
            (ahash-set! sf-host-modes (sf-key sf) mode)
            (for (p (sf-get sf 'peers))
-             (when (agent-peer? sf p) (send-mode! sf p)))
+             (when (agent-peer? sf p) (msg-send (peer-link p) (list 'mode mode))))
            #t))))
 
 (tm-define (shared-file-agent-info name id)
@@ -1159,372 +1155,6 @@
     (if (and sf (sf-host? sf))
         (map peer-id (list-filter (sf-get sf 'peers) (lambda (p) (agent-peer? sf p))))
         '())))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Trusted agents: asking the person (docs/mcp-server.md, "Trusted agents")
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; When the content rules refuse a patch of an agent, the host may ask the
-;; person (a dialog, never modal; or the commands of the tests) instead of
-;; refusing outright, if every rule broken is of a level that can be granted:
-;; `style' and `links'. The levels `code', `limits' and `mode' are never asked
-;; about and never granted. The answers: refuse; allow this edit (once); trust
-;; the agent at the levels for this session (until it disconnects or this
-;; process ends); remember (in the preferences of the person, never in the
-;; document: the file and the name the agent gives itself, level by level).
-;; The host decides: nothing the agent says (its name aside, which is only
-;; a label) is taken for a grant. The name is not verified.
-
-(define sf-session-trust (make-ahash-table))  ; file key -> ((peer-id name level) ...)
-(define sf-ask-serial 0)
-
-(define sf-agent-name #f)       ; the name this process (an agent) gives itself
-
-(define (clean-agent-name s)
-  ;; a name of printable ASCII, at most 64 characters
-  (and (string? s) (!= s "")
-       (let* ((t (if (> (string-length s) 64) (substring s 0 64) s)))
-         (list->string
-          (map (lambda (c) (if (and (>= (char->integer c) 32) (< (char->integer c) 127)) c #\?))
-               (string->list t))))))
-
-(tm-define (shared-set-agent-name! name)
-  (:synopsis "The agent: the name (of its client) that it gives itself to the hosts of files")
-  (set! sf-agent-name (clean-agent-name name)))
-
-(define (send-agent-name! c)
-  (when (and sf-agent? sf-agent-name)
-    (msg-send c (list 'agent-name sf-agent-name))))
-
-(define (host-set-peer-name! sf peer msg)
-  ;; the name an agent claims, once for a connection
-  (when (and (list? msg) (= (length msg) 2) (string? (cadr msg)))
-    (let ((l (or (sf-get sf 'names) '())))
-      (when (not (assoc (peer-id peer) l))
-        (sf-put! sf 'names (cons (cons (peer-id peer) (clean-agent-name (cadr msg))) l))))))
-
-(define (peer-claimed-name sf peer)
-  ;; the name the agent claimed, or #f
-  (let ((e (assoc (peer-id peer) (or (sf-get sf 'names) '()))))
-    (and e (cdr e))))
-
-(define (send-mode! sf peer)
-  ;; the mode, and whether the host filters this participant
-  (msg-send (peer-link peer)
-            (list 'mode (shared-agent-mode (sf-buffer sf)) (and (agent-gated? sf peer) #t))))
-
-;; Levels. The rules are classified by mcp-host-check as (rule level text).
-;; (`redefinition' is asked about every time: no grant covers it)
-(define (grantable-level? level) (and (member level '("style" "links" "redefinition")) #t))
-
-(tm-define (shared-grantable-level? level)
-  (:synopsis "Can the person grant the level (style, links)? code, limits and mode never")
-  (grantable-level? level))
-
-(define (violations-grantable? viol)
-  (and (pair? viol) (list-and (map (lambda (v) (grantable-level? (cadr v))) viol))))
-
-;; What is remembered, in the preference "agent-trust": entries separated by
-;; blanks, each `<path>:<name>:<level>' with the path and the name written as
-;; four hexadecimal digits per character (so no quote, backslash, newline or
-;; non-ASCII character of a name or of a path can break the reading); the file
-;; is its real path. An entry that does not read is skipped, the others stay.
-;; At most 200 entries. The preference is read at each use in this process; a
-;; change made by another process is seen when this one starts again.
-(define (trustable-level? level) (and (member level '("style" "links")) #t))
-(define trust-max 200)
-
-(define (hex4 n)
-  (let ((h (number->string n 16)))
-    (string-append (make-string (max 0 (- 4 (string-length h))) #\0) h)))
-
-(define (hex-encode str)
-  (apply string-append (map (lambda (c) (hex4 (char->integer c))) (string->list str))))
-
-(define (hex-char? c)
-  (or (and (char>=? c #\0) (char<=? c #\9)) (and (char>=? c #\a) (char<=? c #\f))))
-
-(define (hex-decode h)
-  ;; the string, or #f when @h is not made of groups of exactly four digits 0-9a-f, each at most 00ff
-  (catch #t
-    (lambda ()
-      (and (> (string-length h) 0) (= (modulo (string-length h) 4) 0)
-           (list-and (map hex-char? (string->list h)))
-           (let loop ((i 0) (acc '()))
-             (if (>= i (string-length h))
-                 (list->string (reverse acc))
-                 (let ((n (string->number (substring h i (+ i 4)) 16)))
-                   (and n (integer? n) (>= n 0) (<= n 255)
-                        (loop (+ i 4) (cons (integer->char n) acc))))))))
-    (lambda args #f)))
-
-(define (trust-read)
-  ;; ((path name level) ...)
-  (let ((s (get-preference "agent-trust")))
-    (if (or (not (string? s)) (== s "default"))
-        '()
-        (let loop ((l (string-tokenize-by-char s #\space)) (acc '()))
-          (if (null? l)
-              (reverse acc)
-              (let* ((parts (catch #t (lambda () (string-tokenize-by-char (car l) #\:)) (lambda args '())))
-                     (e (catch #t
-                          (lambda ()
-                            (and (= (length parts) 3)
-                                 (trustable-level? (caddr parts))
-                                 (let ((p (hex-decode (car parts))) (n (hex-decode (cadr parts))))
-                                   (and p n (list p n (caddr parts))))))
-                          (lambda args #f))))
-                (loop (cdr l) (if e (cons e acc) acc))))))))
-
-(define (trust-write! l)
-  (if (null? l)
-      (reset-preference "agent-trust")
-      (set-preference "agent-trust"
-                      (string-recompose
-                       (map (lambda (e) (string-append (hex-encode (car e)) ":" (hex-encode (cadr e)) ":" (caddr e)))
-                            l)
-                       " "))))
-
-(tm-define (shared-trust-remembered? path name level)
-  (:synopsis "Is the agent called @name trusted by the person for the file @path at @level, in the preferences?")
-  (and (string? name) (string? path) (trustable-level? level)
-       (and (member (list path name level) (trust-read)) #t)))
-
-(tm-define (shared-trust-remember! path name level)
-  (:synopsis "Remember in the preferences that the agent @name is trusted for @path at @level (false at the limit)")
-  (and (string? name) (string? path) (trustable-level? level)
-       (let ((l (trust-read)))
-         (cond ((member (list path name level) l) #t)
-               ((>= (length l) trust-max) #f)
-               (else (trust-write! (append l (list (list path name level)))) #t)))))
-
-(tm-define (shared-trust-full?)
-  (:synopsis "Is the list of remembered grants full (a remember is then for the session only)?")
-  (>= (length (trust-read)) trust-max))
-
-(tm-define (shared-trust-all)
-  (:synopsis "Everything remembered: ((path name level) ...)")
-  (trust-read))
-
-(tm-define (shared-trust-forget-all!)
-  (:synopsis "Forget every remembered grant")
-  (trust-write! '())
-  #t)
-
-(tm-define (shared-trust-forget-missing!)
-  (:synopsis "Forget the remembered grants of files that no longer exist; the number forgotten")
-  (let* ((l (trust-read))
-         (keep (list-filter l (lambda (e) (url-exists? (system->url (car e)))))))
-    (trust-write! keep)
-    (- (length l) (length keep))))
-
-(tm-define (shared-trust-forget! path name level)
-  (:synopsis "Revoke what was remembered")
-  (trust-write! (list-filter (trust-read) (lambda (e) (!= e (list path name level)))))
-  #t)
-
-(define (session-trust sf)
-  (or (ahash-ref sf-session-trust (sf-key sf)) '()))
-
-(define (trust-granted? sf peer level)
-  ;; has the person trusted this agent with @level for this file?
-  (and (trustable-level? level)
-       (let ((name (peer-claimed-name sf peer)))
-         (or (and (member (list (peer-id peer) (or name "") level) (session-trust sf)) #t)
-             (and name (shared-trust-remembered? (sf-key sf) name level))))))
-
-(define (trust-forget-peer! sf p)
-  ;; the agent has gone: its session trust ends, its questions too
-  (ahash-set! sf-session-trust (sf-key sf)
-              (list-filter (session-trust sf) (lambda (e) (!= (car e) (peer-id p)))))
-  (sf-put! sf 'asks (list-filter (or (sf-get sf 'asks) '()) (lambda (q) (!= (cadr q) (peer-id p)))))
-  (sf-put! sf 'redo (list-filter (or (sf-get sf 'redo) '()) (lambda (e) (!= (car e) (peer-id p))))))
-
-;; "Allow this edit": exactly the violations that were shown for exactly that
-;; patch. The grant exists only while the host handles again the patch that was
-;; asked about (asks-poll!, synchronously, from the saved base and text): it is
-;; not kept under a patch id, which a client chooses and may reuse. It is gone on
-;; every path out of that call (applied, refused, stale, error).
-(define (once-violations sf peer id)
-  (let ((a (sf-get sf 'once-active)))
-    (if (and a (== (car a) (peer-id peer)) (== (cadr a) id)) (cddr a) '())))
-
-(define (trust-remaining sf peer id viol)
-  ;; the violations which neither a grant nor the person's "once" covers
-  (let ((once (once-violations sf peer id)))
-    (list-filter viol (lambda (v)
-                        (not (or (member v once)
-                                 (trust-granted? sf peer (cadr v))))))))
-
-;; The questions: (qid peer-id patch-id base psexp violations deadline name)
-(define (q-id q) (list-ref q 0))
-(define (q-peer q) (list-ref q 1))
-(define (q-patch q) (list-ref q 2))
-(define (q-base q) (list-ref q 3))
-(define (q-psexp q) (list-ref q 4))
-(define (q-viol q) (list-ref q 5))
-(define (q-deadline q) (list-ref q 6))
-(define (q-name q) (list-ref q 7))
-
-(define (ask-timeout)
-  ;; ms the person has to answer (TEXMACS_ASK_TIMEOUT, for the tests)
-  (let ((e (getenv "TEXMACS_ASK_TIMEOUT")))
-    (or (and e (string->number e) (max 100 (string->number e))) 60000)))
-
-(define sf-ask-max 3)    ; the most questions open at a time for a host
-
-(tm-define (shared-set-ask-max! n)
-  (:synopsis "For the tests: the most questions that may be open at a time (3)")
-  (set! sf-ask-max n))
-
-(define (ask-max) sf-ask-max)
-
-(define (find-ask sf qid)
-  (with l (list-filter (or (sf-get sf 'asks) '()) (lambda (q) (== (q-id q) qid)))
-    (and (nnull? l) (car l))))
-
-(define (ask-levels q)
-  (let loop ((l (q-viol q)) (acc '()))
-    (cond ((null? l) (reverse acc))
-          ((member (cadr (car l)) acc) (loop (cdr l) acc))
-          (else (loop (cdr l) (cons (cadr (car l)) acc))))))
-
-(define (ask-open! sf peer id base psexp viol cur)
-  (if (or (list-find (or (sf-get sf 'asks) '()) (lambda (q) (== (q-peer q) (peer-id peer))))
-          (>= (length (or (sf-get sf 'asks) '())) (ask-max)))
-      ;; (one question at a time for an agent)
-      (msg-send (peer-link peer)
-                (list 'refused id cur viol (list #t "pending" #t)))
-      (let* ((timeout (ask-timeout))
-             (qid (begin (set! sf-ask-serial (+ sf-ask-serial 1))
-                         (string-append "q" (number->string sf-ask-serial))))
-             (q (list qid (peer-id peer) id base psexp viol (+ (texmacs-time) timeout)
-                      (or (peer-claimed-name sf peer) "unknown"))))
-        (sf-put! sf 'asks (append (or (sf-get sf 'asks) '()) (list q)))
-        (msg-send (peer-link peer) (list 'asking id timeout))
-        (sf-debug "asking the person about " qid "\n")
-        (when (not (headless?))
-          (set-message "An agent asks for your permission (Tools > Agents)" "Agents")
-          (let ((name (sf-buffer sf)))
-            (delayed (:idle 1) (agent-ask-dialog name qid)))))))
-
-(define (ask-send-refused! sf q answer)
-  ;; the person refused, or did not answer in time
-  (sf-stat! sf 'agent-refused)
-  (and-with p (find-peer sf (q-peer q))
-    (msg-send (peer-link p)
-              (list 'refused (q-patch q) (live-current-state (sf-key sf)) (q-viol q)
-                    (list #t answer #t)))))
-
-(define (ask-remove! sf q)
-  (sf-put! sf 'asks (list-filter (or (sf-get sf 'asks) '()) (lambda (x) (!= (q-id x) (q-id q))))))
-
-(define (asks-poll! sf)
-  ;; the questions whose time is up are refused; the patches whose question
-  ;; was answered with a grant are handled again
-  (let ((now (texmacs-time)))
-    (for (q (list-filter (or (sf-get sf 'asks) '()) (lambda (q) (> now (q-deadline q)))))
-      (ask-remove! sf q)
-      (sf-stat! sf 'ask-timeout)
-      (ask-send-refused! sf q "timeout")))
-  (let ((todo (or (sf-get sf 'redo) '())))
-    (when (nnull? todo)
-      (sf-put! sf 'redo '())
-      (for (e todo)
-        (and-with p (find-peer sf (car e))
-          (with (pid id base psexp once) e
-            (sf-put! sf 'once-active (and once (cons* (peer-id p) id once)))
-            (catch #t
-              (lambda () (host-handle-patch sf p id base psexp))
-              (lambda args (noop)))
-            (sf-put! sf 'once-active #f)))))))
-
-(tm-define (shared-asks name)
-  (:synopsis "The host: the questions to the person: (qid agent-name violations levels ms-left)")
-  (and-with sf (sf-by-name name)
-    (map (lambda (q) (list (q-id q) (q-name q) (q-viol q) (ask-levels q)
-                           (max 0 (- (q-deadline q) (texmacs-time)))))
-         (or (sf-get sf 'asks) '()))))
-
-(define (ask-grant! sf q level scope)
-  (let ((p (find-peer sf (q-peer q))) (name (q-name q)))
-    (cond ((not (trustable-level? level)) #f)
-          ((== scope "session")
-           (and p (let ((e (list (peer-id p) (or (peer-claimed-name sf p) "") level)))
-                    (when (not (member e (session-trust sf)))
-                      (ahash-set! sf-session-trust (sf-key sf) (cons e (session-trust sf))))
-                    #t)))
-          ((not (trustable-level? level)) #f)
-          (else
-            ;; (at the limit of remembered entries, or without a name: for the session)
-            (or (and p (peer-claimed-name sf p)
-                     (shared-trust-remember! (sf-key sf) name level))
-                (ask-grant! sf q level "session"))))))
-
-(define (ask-redo! sf q once?)
-  (ask-remove! sf q)
-  (sf-put! sf 'redo (append (or (sf-get sf 'redo) '())
-                            (list (list (q-peer q) (q-patch q) (q-base q) (q-psexp q)
-                                        (and once? (q-viol q)))))))
-
-(tm-define (shared-ask-answer! name qid answer . levels)
-  (:synopsis "The person: answer the question @qid: refuse, once, session or remember (the last two with the levels to grant)")
-  (and-with sf (sf-by-name name)
-    (and (sf-host? sf)
-         (with q (find-ask sf qid)
-           (and q
-                (cond
-                  ((== answer "refuse")
-                   (ask-remove! sf q)
-                   (sf-stat! sf 'ask-refused)
-                   (ask-send-refused! sf q "refused")
-                   #t)
-                  ((== answer "once")
-                   (and (find-peer sf (q-peer q))
-                        (begin (ask-redo! sf q #t) #t)))
-                  ((member answer '("session" "remember"))
-                   (let ((ls (list-filter levels (lambda (l) (and (string? l) (member l (ask-levels q)))))))
-                     (and (pair? ls)
-                          (list-and (map (lambda (l) (ask-grant! sf q l answer)) ls))
-                          (begin (ask-redo! sf q #f) #t))))
-                  (else #f)))))))
-
-(tm-define (shared-trust name)
-  (:synopsis "The host: what the person has granted for @name: (kind agent-name level peer-id), kind session or remember")
-  (and-with sf (sf-by-name name)
-    (if (sf-host? sf)
-        (append
-          (map (lambda (e) (list "session" (cadr e) (caddr e) (car e))) (session-trust sf))
-          (map (lambda (e) (list "remember" (cadr e) (caddr e) ""))
-               (list-filter (trust-read) (lambda (e) (== (car e) (sf-key sf))))))
-        '())))
-
-(tm-define (shared-trust-revoke! name kind agent-name level peer-id)
-  (:synopsis "The host: take back a grant of shared-trust")
-  (and-with sf (sf-by-name name)
-    (and (sf-host? sf)
-         (cond ((== kind "session")
-                (ahash-set! sf-session-trust (sf-key sf)
-                            (list-filter (session-trust sf)
-                                         (lambda (e) (!= e (list peer-id agent-name level)))))
-                #t)
-               ((== kind "remember")
-                (shared-trust-forget! (sf-key sf) agent-name level))
-               (else #f)))))
-
-(tm-define (shared-file-gated? name)
-  (:synopsis "The agent: does the host of @name filter my patches and ask the person?")
-  (and-with sf (sf-by-name name)
-    (and (not (sf-host? sf)) (sf-get sf 'gated) #t)))
-
-(tm-define (shared-file-asking-until name)
-  (:synopsis "The agent: until when (ms) the host waits for the person's answer, or #f")
-  (and-with sf (sf-by-name name)
-    (sf-get sf 'asking-until)))
-
-(tm-define (shared-trust-key name)
-  (:synopsis "The real path under which the trust of the file @name is kept")
-  (and-with sf (sf-by-name name) (sf-key sf)))
 
 ;; The blocks that a patch changes: (first n-old n-new), #f if none, 'bad
 (tm-define (shared-changed-blocks old new)
@@ -1595,8 +1225,8 @@
     (lambda args
       (list (list "check" "code" "the content check of the host failed: the change is refused")))))
 
-(define (agent-gate sf peer p id)
-  (let* ((t0 (texmacs-time)) (r (agent-gate* sf peer p id)))
+(define (agent-gate sf peer p)
+  (let* ((t0 (texmacs-time)) (r (agent-gate* sf peer p)))
     (sf-put! sf 'gate-count (+ 1 (or (sf-get sf 'gate-count) 0)))
     (sf-put! sf 'gate-ms (+ (- (texmacs-time) t0) (or (sf-get sf 'gate-ms) 0)))
     r))
@@ -1606,10 +1236,9 @@
   (and-with sf (sf-by-name name)
     (list (or (sf-get sf 'gate-count) 0) (or (sf-get sf 'gate-ms) 0))))
 
-(define (agent-gate* sf peer p id)
-  ;; what the host does with the patch @p (of id @id) of the agent @peer:
-  ;; 'apply, (refuse reason ...), (ask reason ...) when the person may let it
-  ;; through, or (propose range new-body)
+(define (agent-gate* sf peer p)
+  ;; what the host does with the patch @p of the agent @peer: 'apply, (refuse
+  ;; reason ...) or (propose range new-body)
   (let ((mode (shared-agent-mode (sf-buffer sf))) (u (sf-buffer sf)))
     (if (== mode 'read-only)
         (list 'refuse (list "read-only" "mode"
@@ -1619,7 +1248,7 @@
             ((or (not mp) (not bp))
              (list 'refuse (list "patch" "code" "a patch of a kind that the host does not accept from an agent")))
             ((patch-modifies? mp)
-             (list 'refuse (list "settings" "mode" "the style and the settings of the document belong to the person")))
+             (list 'refuse (list "style" "style" "the style and the settings of the document belong to the person")))
             (else
               (let* ((old (sf-body sf)) (new (patch-apply old bp))
                      (range (shared-changed-blocks old new)))
@@ -1631,14 +1260,10 @@
                    (list 'refuse (list "pending" "mode"
                                        "the blocks hold version markup (a pending proposal): resolve or withdraw it first")))
                   (else
-                    (let* ((viol (agent-filter u old new range))
-                           ;; (what the person trusts the agent with, or let through
-                           ;; for this edit, is not a violation for the host)
-                           (rest (trust-remaining sf peer id viol)))
-                      (cond ((null? rest)
-                             (if (== mode 'direct) 'apply (list 'propose range new)))
-                            ((violations-grantable? rest) (cons 'ask rest))
-                            (else (cons 'refuse rest)))))))))))))
+                    (let ((viol (agent-filter u old new range)))
+                      (cond ((pair? viol) (cons 'refuse viol))
+                            ((== mode 'direct) 'apply)
+                            (else (list 'propose range new)))))))))))))
 
 ;; Proposals: a pending proposal is a block of the document that holds the
 ;; markup of Version > Compare (version-both with the old and the new
@@ -1937,17 +1562,11 @@
            #t)
           ((and p (patch-applicable? p (live-current-document key))
                 (agent-gated? sf peer)
-                (with g (agent-gate sf peer p id)
+                (with g (agent-gate sf peer p)
                   (cond ((eq? g 'apply) #f)
                         ((eq? (car g) 'refuse)
                          (sf-stat! sf 'agent-refused)
-                         (msg-send (peer-link peer)
-                                   (list 'refused id cur (cdr g)
-                                         (list #f #f (violations-grantable? (cdr g)))))
-                         #t)
-                        ((eq? (car g) 'ask)
-                         (sf-stat! sf 'agent-asked)
-                         (ask-open! sf peer id base psexp (cdr g) cur)
+                         (msg-send (peer-link peer) (list 'refused id cur (cdr g)))
                          #t)
                         (else
                           (sf-stat! sf 'agent-proposed)
@@ -2023,7 +1642,7 @@
                      (list (list id link interactive seq pid))))
     (host-send-welcome sf link base id interactive pid inflight)
     (when (agent-peer? sf (list id link interactive seq pid))
-      (send-mode! sf (list id link interactive seq pid))
+      (msg-send link (list 'mode (shared-agent-mode (sf-buffer sf))))
       (when (sf-get sf 'prop-sent) (ahash-remove! (sf-get sf 'prop-sent) id)))
     (when (and (sf-get sf 'interactive) (agent-peer? sf (list id link interactive seq pid))
                (not (shared-agent-id? id)))
@@ -2066,8 +1685,6 @@
              (host-save sf)))
         ((func? msg 'leave)
          (drop-peer! sf peer))
-        ((func? msg 'agent-name)
-         (host-set-peer-name! sf peer msg))
         ((func? msg 'withdraw)
          (when (not (and (list? msg) (= (length msg) 2) (string? (cadr msg))))
            (throw (quote malformed)))
@@ -2095,7 +1712,6 @@
       (sf-debug "peer " (peer-id p) " is gone\n")
       (drop-peer! sf p)))
   (host-check-lock! sf)
-  (asks-poll! sf)
   (proposals-sync! sf)
   ;; a headless host retries to give the file to an interactive participant
   (let ((now (texmacs-time)))
@@ -2511,27 +2127,18 @@
                      (participant-apply-remote! sf (safe-patch psexp)
                                                 from to author)))))
           ((func? msg 'mode)
-           (sf-put! sf 'agent-mode (cadr msg))
-           ;; (does the host filter my patches itself, and ask the person?)
-           (sf-put! sf 'gated (and (= (length msg) 3) (caddr msg) #t)))
-          ((func? msg 'asking)
-           ;; (the person has been asked: wait for the answer)
-           (when (and (= (length msg) 3) (number? (caddr msg)))
-             (sf-put! sf 'asking-until (+ (texmacs-time) (min 600000 (caddr msg)) 5000))))
+           (sf-put! sf 'agent-mode (cadr msg)))
           ((func? msg 'save-refused)
            (sf-put! sf 'save-refused (cadr msg)))
           ((func? msg 'proposals)
            (sf-put! sf 'proposals (cadr msg)))
           ((or (func? msg 'refused) (func? msg 'proposed))
-           (with (tag id cur data info) (cond ((= (length msg) 3) (append msg (list #f #f)))
-                                              ((= (length msg) 4) (append msg (list #f)))
-                                              (else msg))
+           (with (tag id cur data) (if (= (length msg) 3) (append msg (list #f)) msg)
              (when (== id (sf-get sf 'inflight))
                (sf-stat! sf 'rolled-back)
                (sf-debug "my patch was refused\n")
-               (sf-put! sf 'asking-until #f)
                (if data
-                   (sf-put! sf 'verdict (list tag id data cur info))
+                   (sf-put! sf 'verdict (list tag id data cur))
                    (report-lost! sf (sf-get sf 'pending)))
                (when (not (rollback-pending! sf))
                  (participant-request-resync! sf))
@@ -2730,8 +2337,7 @@
              (msg-send c (list 'hello token (sf-key sf) (sf-get sf 'id)
                                (shared-process-id) (sf-get sf 'interactive)
                                (live-current-state (sf-key sf))
-                               (sf-get sf 'last-inflight)))
-             (send-agent-name! c))
+                               (sf-get sf 'last-inflight))))
             (else (participant-reconnect-failed! sf))))))
 
 (define (participant-reconnect-failed! sf)

@@ -370,37 +370,6 @@ process hosts, or only headless ones), the agent edits directly, as before.
   paragraphs (one walk of the document to find its definitions), less if they are
   few; `shared-file-gate-stats` gives the count and the time.
 
-### Trusted agents: asking the person (stage B)
-
-The host can ask the person instead of refusing (design and levels: mcp-server.md,
-"Trusted agents"). In `agent-gate*` the violations of `mcp-host-check` come as
-(rule level text); what a grant covers (`trust-remaining`) is taken away, and what
-is left is **asked** (`(ask ...)`, every rule of level `style` or `links`) or **refused**
-(one of level `code`, `limits` or `mode`: never asked about).
-
-- **The question** is kept by the host (`sf 'asks`: id `q1`..., the peer, the patch id,
-  its base and text, the violations, the time, the name the agent claims), the agent is
-  told `(asking id ms)` and waits that long; it is shown in a dialog (not in a headless
-  process: the tests use `shared-asks` and `shared-ask-answer!`) and ends by an answer or by
-  the time (`TEXMACS_ASK_TIMEOUT`, 60 s): `(refused id state reasons (asked answer grantable))`,
-  the new fifth item of a `refused` (the agent's verdict gets it). An answer with a grant
-  puts the patch again through `host-handle-patch` on the next tick (`sf 'redo`): it is
-  rebased as any patch, checked again, and becomes a proposal or is applied according to the mode.
-- **Grants** are the host's: `once` (the violations shown, for the patch that was asked about: it is a state of the host during the handling again of that patch (`sf 'once-active`), not kept under a patch id, which the client chooses),
-  `session` (peer id, name, level; ended by `drop-peer!`, so by the agent leaving or by the
-  end of the process) and `remember` (the preference `agent-trust`, hex-encoded entries, read by `get-preference` at each check). `shared-trust` lists them, `shared-trust-revoke!` takes one back
-  (Tools > Agents). The agent cannot say anything that is a grant: the host reads no
-  message but the ones it knows, and the only thing an agent says about itself is its name,
-  `(agent-name "...")` after the `hello` (the first one for a connection counts, printable ASCII,
-  64 characters), which is a label and is not verified.
-- **The `mode` message** has a third item: `(mode propose gated)`, `gated` being whether
-  the host filters this participant (an interactive host, an agent not marked as a person).
-  It is sent again when the person marks a participant as a person. An agent whose host
-  gates it lets the rules that can be granted through to the host; otherwise it applies
-  them itself and asks its client (elicitation).
-- A patch of an agent that changes the definitions is also checked as written for the
-  other rules, so that a grant for definitions does not let a link through.
-
 ### Hardening of the host (audit of stage A)
 
 - **Who is an agent.** The id `agent.*` is chosen by the participant, so the host
@@ -590,7 +559,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `trust` (the host asks the person; a hand-written client that claims grants is asked about; session grants belong to the connection and the level; code is never asked about), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) and `edfuzz` (random patches applied to a real buffer). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) and `edfuzz` (random patches applied to a real buffer). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with

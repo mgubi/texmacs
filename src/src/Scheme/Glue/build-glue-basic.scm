@@ -222,7 +222,6 @@
   ;; standard input and output of texmacs --mcp (progs/agents/mcp-server.scm)
   (mcp-stdio-active? mcp_stdio_active (bool))
   (mcp-stdin-read mcp_stdin_read (string))
-  (mcp-stdin-wait mcp_stdin_wait (string int))
   (mcp-stdin-eof? mcp_stdin_eof (bool))
   (mcp-stdout-write mcp_stdout_write (bool string))
   (mcp-json-valid? mcp_json_valid (bool string))

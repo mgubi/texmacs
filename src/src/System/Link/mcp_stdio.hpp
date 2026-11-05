@@ -25,7 +25,6 @@ bool   mcp_stdio_active ();
 bool   mcp_requested (int argc, char** argv); // is --mcp on the command line?
 
 string mcp_stdin_read ();       // the bytes available now, or ""
-string mcp_stdin_wait (int ms); // the same, waiting at most ms milliseconds for them
 bool   mcp_stdin_eof ();        // the end of the input was reached
 bool   mcp_stdout_write (string s); // all of s on the protocol output
 
