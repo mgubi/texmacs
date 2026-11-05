@@ -110,10 +110,8 @@ SI code_hint_before (int p, array<int>& hp, array<SI>& hw);
 // the end of the last row of the last line of a code box (a code_box or a
 // code_row_box) and its baseline; false for another box
 bool code_box_end (box b, SI& x, SI& y);
-// a code box of papyrus mode (all the lines of a block), and the same with
-// the boxes of the markers before and after it at its two ends
-bool code_block_box_possible (box b);
-box  code_block_box (path ip, box code, array<box> before, array<box> after);
+// a code box of papyrus mode (all the lines of a block)
+bool code_box_all_lines (box b);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines

@@ -181,16 +181,26 @@ the lines being copied at each key: #811 too (11 ms).
   of each row would break). In paper mode, only the last row ends at its
   text, for the cursor after the block, and only in the modes left and
   justify; in the others that cursor is at the right margin.
-  In papyrus mode the markers of the bridges around a block (the places
-  before and after it) are inside the block box (`code_block_box`), at the
-  start of its first line and at the end of its last one. As in a line of
-  text, the places at the same x are told apart by their deltas, in their
-  order (`code_block_box_rep::find_cursor`); a click reaches the markers
-  after the block right of the end of the text of its last row (at its
-  end, the line), those before it left of its first row (in paper mode, as
-  with paragraphs, a click on an empty last line goes after the block).
-  What else comes after the block (the right part of a surround, a QED) is
-  on the baseline of its last line, after the box: past the right margin.
+  In paper mode an empty last row is not narrowed (a Right from before
+  it would go past it).
+- **A block nested in markup, papyrus mode** (`<with|code-lines|true|...>`,
+  a surround, a proof; not a source file, which has nothing around its
+  lines): the block is one box as wide as the page in the line of its
+  paragraph, which finds its children by their x, and the markers of the
+  bridges around it (the places before and after it) stay at the two ends
+  of that line, as in a line of text:
+  - the cursor after the block is drawn on the baseline of its last line,
+    but at the right margin; what else comes after it (the right part of a
+    surround, a QED) is there too, past the margin;
+  - Up and Down from the paragraphs around go before or after the block
+    rather than into its first or last line;
+  - a click at or left of the left end of a line goes before the block.
+  Moving these places into the box of the block (a composite with the
+  markers at the ends of its first and last lines, tried in November 2026)
+  needs the rules by which a line of text tells apart the places at the
+  same x (deltas, the outermost marker first), and its approximations left
+  the cursor stuck in or skipping places of nested blocks: the line of the
+  paragraph keeps them.
 - **Text before a block** (the left part of a surround, "Proof."), papyrus
   mode: it is in the line of the paragraph with the block, which it moves
   right (past the margin for a full row), and Up and Down from the

@@ -18,7 +18,6 @@
 #include "code_boxes.hpp"
 #include "Boxes/change.hpp"
 #include "code_lines.hpp"
-#include "Boxes/composite.hpp"
 
 extern int redraw_uninterrupted; // (boxes.cpp)
 
@@ -554,14 +553,6 @@ struct code_box_rep: public box_rep {
   void   draw_hint (renderer ren, string txt, SI x, SI y);
   int    get_type () { return CODE_BOX; }
   void   end_of_lines (SI& x, SI& y);
-  bool   on_last_row (SI y);
-  bool   on_first_row (SI y) {
-    int k, i; row_at (y, k, i);
-    if (k != 0 || i != 0) return false;
-    if (!rich (0)) return true;
-    // (a line with markup may be wrapped: its first row only)
-    SI gap= max (rpitch - (fn->y2 - fn->y1), (SI) 0);
-    return y >= base (0, 0) + fn->y1 - gap / 2; }
   box    row_box (int k, int i) {
     int a= starts (k) [i], b= row_end (k, i);
     return text_box (line_ip (k), a, line (k) (a, b), fn, pen); }
@@ -927,24 +918,6 @@ code_box_rep::end_of_lines (SI& x, SI& y) {
   if (e == N (line (k)) && hints (k, hp, hw, ht))
     x += code_hint_before (e, hp, hw);
   y= base (k, i);
-}
-
-bool
-code_box_rep::on_last_row (SI y) {
-  // whether y is in the band of the last row of the last line shown (or
-  // below it)
-  int kl= nr_lines () - 1;
-  while (kl > 0 && fold (kl) == 1) kl--;
-  int k, i;
-  row_at (y, k, i);
-  if (k > kl) return true;
-  if (k < kl) return false;
-  if (rich (kl)) {
-    SI ex, ey;
-    end_of_lines (ex, ey);
-    return y <= ey + fn->y2;
-  }
-  return i == nr_rows (kl) - 1;
 }
 
 bool
@@ -1337,119 +1310,8 @@ code_fit_box (box b, SI bot, SI top) {
   return tm_new<code_fit_box_rep> (b, s, dy);
 }
 
-/******************************************************************************
-* A block of papyrus mode with the markers of the bridges around it (the
-* places of the cursor before and after the block): the markers before at the
-* start of the first line, those after at the end of the last one. A line
-* of a paragraph finds its children by their x; inside the block, only a
-* click to the right of the text of the last row goes to the markers after
-* it, and to the left of the first row to those before it (as in the first
-* and the last lines of a paragraph)
-******************************************************************************/
-
-struct code_block_box_rep: public composite_box_rep {
-  int nb, na;   // the markers before, the code box (bs[nb]), those after
-  SI  ex;       // the end of the last row of the last line
-  code_block_box_rep (path ip, array<box> bs, array<SI> xs, array<SI> ys,
-                      int nb2, int na2, SI ex2):
-    composite_box_rep (ip, bs, xs, ys), nb (nb2), na (na2), ex (ex2) {
-      finalize (); }
-  operator tree () { return tree (TUPLE, "code block", (tree) bs[nb]); }
-  path find_box_path (SI x, SI y, SI delta, bool force, bool& found);
-  path find_left_box_path () {
-    return path (0, bs[0]->find_left_box_path ()); }
-  path find_right_box_path () {
-    int n= N(bs); return path (n-1, bs[n-1]->find_right_box_path ()); }
-  selection find_selection (path lbp, path rbp);
-  cursor find_cursor (path bp) {
-    // places at the same x are told apart by their deltas, in their order,
-    // as in a line of text: at the end of the last line, the end of the
-    // line 0 and the markers after the block 1, 2...; at the start of the
-    // first line, the markers before the block -1, 0, ... and the start of
-    // the line nb-1 (the line around the block adds 1 at its left end, x
-    // 0: there they are 0, 1, ..., nb, after the end of what is before the
-    // block, -1, as with zero-width items of a line)
-    cursor cu= composite_box_rep::find_cursor (bp);
-    if (!is_atom (bp)) {
-      int c= bp->item;
-      if (c < nb) cu->delta= c - 1;
-      else if (c > nb) cu->delta= c - nb;
-      else if (nb > 0 && cu->ox == sx (nb) && bp->next == path (0, 0))
-        cu->delta= nb - 1;
-    }
-    return cu; }
-};
-
-selection
-code_block_box_rep::find_selection (path lbp, path rbp) {
-  // (as a line of text: the part in each child; the markers have no width,
-  // only the part in the lines of the block is shown)
-  if (!is_atom (lbp) && !is_atom (rbp) && lbp->item == rbp->item)
-    return composite_box_rep::find_selection (lbp, rbp);
-  int n= N(bs);
-  int i1= is_atom (lbp)? 0: lbp->item;
-  int i2= is_atom (rbp)? n-1: rbp->item;
-  path lp= find_tree_path (lbp), rp= find_tree_path (rbp);
-  rectangles rs;
-  if (i1 <= nb && nb <= i2) {
-    path l= (i1 == nb && !is_atom (lbp)? lbp->next:
-             bs[nb]->find_left_box_path ());
-    path r= (i2 == nb && !is_atom (rbp)? rbp->next:
-             bs[nb]->find_right_box_path ());
-    selection sel= bs[nb]->find_selection (l, r);
-    rs= translate (sel->rs, sx (nb), sy (nb));
-  }
-  return selection (rs, lp, rp);
-}
-
-path
-code_block_box_rep::find_box_path (SI x, SI y, SI delta, bool force,
-                                   bool& found) {
-  code_box_rep* cb= (code_box_rep*) bs[nb].operator-> ();
-  // (the markers have no width, at the places of the end of the last line
-  // and of the start of the first one, and a delta tells them apart, as in
-  // a line of text: see find_cursor. A click, of delta 0, goes to those
-  // after the block right of the text of its last row (at its end, to the
-  // line), to those before it from its left)
-  if (na > 0 && (x > ex || (x == ex && delta >= 1)) &&
-      cb->on_last_row (y - sy (nb))) {
-    int c0= (x == ex? nb + min (delta, (SI) na): nb + 1);
-    for (int i=0; i<na; i++) {
-      int c= nb + 1 + (c0 - nb - 1 + i) % na;
-      path r= path (c, bs[c]->find_box_path (x - sx (c), y - sy (c),
-                                             0, force, found));
-      if (found) return r;
-    }
-  }
-  if (nb > 0 && (x < 0 || (x == 0 && delta <= nb - 2)) &&
-      cb->on_first_row (y - sy (nb))) {
-    int c0= (x == 0? max ((int) delta + 1, 0): nb - 1);
-    for (int i=0; i<nb; i++) {
-      int c= (c0 - i + nb) % nb;
-      path r= path (c, bs[c]->find_box_path (x - sx (c), y - sy (c),
-                                             0, force, found));
-      if (found) return r;
-    }
-  }
-  return path (nb, bs[nb]->find_box_path (x - sx (nb), y - sy (nb),
-                                          delta, force, found));
-}
-
 bool
-code_block_box_possible (box b) {
+code_box_all_lines (box b) {
   return !is_nil (b) && b->get_type () == CODE_BOX &&
          !((code_box_rep*) b.operator-> ())->single;
-}
-
-box
-code_block_box (path ip, box code, array<box> before, array<box> after) {
-  SI ex, ey;
-  ((code_box_rep*) code.operator-> ())->end_of_lines (ex, ey);
-  array<box> bs;
-  array<SI>  xs, ys;
-  for (int i=0; i<N(before); i++) { bs << before[i]; xs << (SI) 0; ys << (SI) 0; }
-  bs << code; xs << (SI) 0; ys << (SI) 0;
-  for (int i=0; i<N(after); i++) { bs << after[i]; xs << ex; ys << ey; }
-  return tm_new<code_block_box_rep> (ip, bs, xs, ys,
-                                     N(before), N(after), ex);
 }

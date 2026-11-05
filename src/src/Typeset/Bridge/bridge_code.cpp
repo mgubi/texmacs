@@ -388,39 +388,23 @@ static void
 code_paragraph (edit_env env, path ip, array<box> rows,
                 array<line_item> before, array<line_item> after,
                 array<page_item>& l, stack_border& sb) {
-  // the items before and after the block, the markers of the bridges
-  // around it, give the places of the cursor before and after it. The rows
-  // (and the block, in papyrus mode) are as wide as the page, so that the
-  // paragraph mode does not move them (a block is not aligned); then:
-  // - papyrus mode: the markers next to the block (empty items) go into
-  //   it, at the start of its first line and at the end of its last one
-  //   (code_block_box): in the line of the paragraph, which finds its
-  //   children by their x, they would be at its left and right ends;
+  // the items after the block (the markers of the bridges around it, the
+  // place of the cursor after it; a QED) are put after it in the line of
+  // the paragraph, which finds its children by their x. The rows (and the
+  // block, in papyrus mode) are as wide as the page, so that the paragraph
+  // mode does not move them (a block is not aligned); then:
+  // - papyrus mode: the items stay after the box, at the right margin, and
+  //   are moved down to the baseline of its last line;
   // - paper mode: the last row is made to end where its text ends, unless
-  //   the paragraph mode would then move it (center, right: the cursor
-  //   after the block is then at the margin).
+  //   it is empty or the paragraph mode would then move it (center, right:
+  //   the cursor after the block is then at the margin).
   SI ex= 0, ey= 0;
-  if (N(rows) == 1 && code_block_box_possible (rows[0]) &&
-      (N(before) > 0 || N(after) > 0)) {
-    auto empty= [] (line_item it) {
-      return (it->type == MARKER_ITEM || it->type == STRING_ITEM) &&
-             it->b->w () == 0; };
-    int nb= N(before), na= 0;
-    while (nb > 0 && empty (before[nb-1])) nb--;
-    while (na < N(after) && empty (after[na])) na++;
-    array<box> bb, ab;
-    for (int i=nb; i<N(before); i++) bb << before[i]->b;
-    for (int i=0; i<na; i++) ab << after[i]->b;
-    box blk= code_block_box (decorate_middle (ip), rows[0], bb, ab);
-    lazy_paragraph par (env, ip);
-    par->a= range (before, 0, nb);
-    par->a << line_item (STD_ITEM, OP_SKIP, blk, HYPH_INVALID);
-    // (the other items after the block, the right part of a surround, a
-    // QED: after it, on the baseline of its last line)
-    code_box_end (rows[0], ex, ey);
-    for (int i=na; i<N(after); i++) {
+  bool moved= false;
+  if (N(after) > 0 && N(rows) == 1 && code_box_all_lines (rows[0]) &&
+      code_box_end (rows[0], ex, ey) && ey != 0) {
+    array<line_item> down;
+    for (int i=0; i<N(after); i++) {
       line_item it= after[i];
-      if (ey == 0) { par->a << it; continue; }
       box mb= move_box (decorate_middle (ip), it->b, 0, ey, true);
       // (not a string or a marker item any more: its box is not a text box)
       int tp= (it->type == STRING_ITEM || it->type == MARKER_ITEM?
@@ -428,21 +412,19 @@ code_paragraph (edit_env env, path ip, array<box> rows,
       line_item ni (tp, it->op_type, mb, it->penalty, it->t);
       ni->spc= it->spc; ni->cor= it->cor; ni->limits= it->limits;
       ni->lan= it->lan; ni->fn= it->fn;
-      par->a << ni;
+      down << ni;
     }
-    par->format_paragraph ();
-    l= par->sss->l;
-    sb= par->sss->sb;
-    return;
+    after= down;
+    moved= true;
   }
-  if (N(after) > 0 && N(rows) > 0 && code_box_end (rows[N(rows)-1], ex, ey)) {
+  if (!moved && N(after) > 0 && N(rows) > 0 &&
+      code_box_end (rows[N(rows)-1], ex, ey)) {
     string mode= as_string (env->read (PAR_MODE));
-    if (mode == "left" || mode == "justify") {
-      box last= rows[N(rows)-1];
+    box last= rows[N(rows)-1];
+    if ((mode == "left" || mode == "justify") && ex > last->x1) {
       rows= copy (rows);
       rows[N(rows)-1]= resize_box (decorate_middle (ip), last, last->x1,
-                                   last->y1, max (ex, last->x1),
-                                   last->y2, true);
+                                   last->y1, ex, last->y2, true);
     }
   }
   lazy_paragraph par (env, ip);
