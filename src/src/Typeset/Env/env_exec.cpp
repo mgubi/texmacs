@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -212,10 +213,40 @@ texmacs_exec (edit_env env, tree cmd) {
 * Evaluation of trees
 ******************************************************************************/
 
+// A limit on the work of the evaluator, for the programs that evaluate text
+// which does not come from the person (texmacs --mcp checks what an agent
+// writes): exec_budget_start (n) makes the evaluator give an error tree after
+// n steps (a macro that calls its argument twice, ten times nested, would take
+// a thousand years), exec_budget_end () gives what is left (negative if the
+// limit was reached). The recursion of the macros stops with an error tree when
+// the stack is nearly full (stack_guard.hpp), here and in the typesetter
+// (concat_macro.cpp, bridge_compound.cpp): a macro that calls itself would else
+// overflow the stack of the process, which then crashes.
+static bool exec_budget_on= false;
+static long exec_budget_left= 0;
+
+void
+exec_budget_start (int n) {
+  exec_budget_on  = true;
+  exec_budget_left= n;
+}
+
+int
+exec_budget_end () {
+  long left= exec_budget_left;
+  exec_budget_on= false;
+  exec_budget_left= 0;
+  if (left > 2000000000L) left= 2000000000L;
+  if (left < -2000000000L) left= -2000000000L;
+  return (int) left;
+}
+
 tree
 edit_env_rep::exec (tree t) {
   // cout << "Execute: " << t << "\n";
   if (is_atomic (t)) return t;
+  if (exec_budget_on && --exec_budget_left < 0)
+    return tree (_ERROR, "evaluation budget");
   switch (L(t)) {
   case MOVE:
   case SHIFT:
@@ -733,6 +764,8 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
+    if (stack_nearly_full ())
+      return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);

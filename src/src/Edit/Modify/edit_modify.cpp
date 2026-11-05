@@ -12,6 +12,7 @@
 #include "modification.hpp"
 #include "edit_modify.hpp"
 #include "tm_window.hpp"
+#include "drd_std.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
 #endif
@@ -38,10 +39,33 @@ edit_modify_rep::notify_assign (path p, tree u) {
   ::notify_assign (get_typesetter (), p / rp, u);
 }
 
+// A primitive that loses (or gains) children can end with a number of them
+// that it cannot have, for example `(ornament)' after a patch of another
+// process: the bridges index its children. The typesetter is then told that
+// the tree is assigned, so that its parent makes a new bridge for it, which
+// shows it as an inactive tree (see make_bridge).
+extern bool bridge_needs_arity (tree_label l);   // (bridge.cpp)
+
+static bool
+wrong_arity_after (tree t, int n) {
+  return is_compound (t) && L(t) < START_EXTENSIONS && n >= 0 &&
+         bridge_needs_arity (L(t)) &&
+         !std_drd->correct_arity (L(t), n);
+}
+
 void
 edit_modify_rep::notify_insert (path p, tree u) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  path q= path_up (p);
+  if (!is_nil (q) && rp <= q && has_subtree (et, q) && is_compound (subtree (et, q)) &&
+      is_compound (u) &&
+      wrong_arity_after (subtree (et, q), N (subtree (et, q)) + N (u))) {
+    tree st= subtree (et, q);
+    int  l = last_item (p);
+    ::notify_assign (get_typesetter (), q / rp, (st (0, l) * u) * st (l, N(st)));
+    return;
+  }
   ::notify_insert (get_typesetter (), p / rp, u);
 }
 
@@ -49,6 +73,14 @@ void
 edit_modify_rep::notify_remove (path p, int nr) {
   if (!(rp <= p)) return;
   cur_pos= position_new (tp);
+  path q= path_up (p);
+  if (!is_nil (q) && rp <= q && has_subtree (et, q) && is_compound (subtree (et, q)) &&
+      wrong_arity_after (subtree (et, q), N (subtree (et, q)) - nr)) {
+    tree st= subtree (et, q);
+    int  l = last_item (p);
+    ::notify_assign (get_typesetter (), q / rp, st (0, l) * st (l+nr, N(st)));
+    return;
+  }
   ::notify_remove (get_typesetter (), p / rp, nr);
 }
 
@@ -90,6 +122,8 @@ edit_modify_rep::notify_remove_node (path p) {
 void
 edit_modify_rep::notify_set_cursor (path p, tree data) {
   if (!(rp <= p)) return;
+  // (the data come from other processes: an atomic tree has no children)
+  if (!is_compound (data) || N (data) == 0) return;
   if (data[0] == as_string (author)) {
     if (is_compound (data, "cursor", 1) ||
         is_compound (data, "cursor-clear", 1)) {

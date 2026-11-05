@@ -269,6 +269,10 @@
 
 (define (save-buffer-save name opts)
   ;;(display* "save-buffer-save " name "\n")
+  (save-buffer-save* name opts)
+  (when (shared-files-in-use?) (shared-file-saved name)))
+
+(define (save-buffer-save* name opts)
   (with vname `(verbatim ,(utf8->cork (url->system name)))
     (if (buffer-save name)
         (begin
@@ -302,6 +306,16 @@
              (set-message msg action))
            #t)
           (else #f))))
+
+;; Shared files (utils relate shared-files): when the preference "share-open-files"
+;; is on, a file open in another TeXmacs process of the user is joined instead
+;; of read, and only the host of a shared file writes it. The module is loaded
+;; when a file is first shared; until then these hooks cost nothing.
+(define-preferences
+  ("share-open-files" "off" noop))
+
+(define (shared-participant? name)
+  (and (shared-files-in-use?) (shared-file-participant? name)))
 
 ;; The typesetting of a buffer which failed (edit_typeset_rep::typeset_sub):
 ;; the document was replaced by an empty one, and a copy of it saved in
@@ -393,9 +407,14 @@
 
 (tm-define (save-buffer-main . args)
   ;;(display* "save-buffer-main\n")
-  (if (or (null? args) (not (url? (car args))))
-      (save-buffer-check-permissions (current-buffer) args)
-      (save-buffer-check-permissions (car args) (cdr args))))
+  (let* ((name (if (or (null? args) (not (url? (car args))))
+                   (current-buffer)
+                   (car args)))
+         (opts (if (or (null? args) (not (url? (car args)))) args (cdr args))))
+    (cond ((and (shared-files-in-use?) (shared-file-save-request name))
+           ;; another process hosts the file: it writes it
+           (noop))
+          (else (save-buffer-check-permissions name opts)))))
 
 (tm-define (save-buffer . l)
   (apply save-buffer-main l))
@@ -406,6 +425,7 @@
 
 (define (save-buffer-as-save new-name name opts)
   ;;(display* "save-buffer-as-save " new-name ", " name "\n")
+  (when (shared-files-in-use?) (shared-file-leave name))
   (if (and (url-scratch? name) (url-exists? name)) (system-remove name))
   (buffer-rename name new-name)
   (buffer-pretend-modified new-name)
@@ -572,6 +592,7 @@
 (tm-define (autosave-buffer name)
   ;;(display* "autosave-buffer " name "\n")
   (when (and (buffer-modified-since-autosave? name)
+             (not (shared-participant? name))
              (not (typeset-failed-buffer? name))
              (url-autosave name "~"))
     ;;(display* "Autosave " name "\n")
@@ -794,6 +815,7 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
+  (when (shared-files-wanted?) (shared-file-opened name))
   (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
@@ -835,6 +857,15 @@
 
 (define (load-buffer-check-autosave name opts)
   ;;(display* "load-buffer-check-autosave " name ", " opts "\n")
+  (cond ((and (shared-files-wanted?) (shared-file-try-join name))
+         ;; another process has the file open: its document, not the file
+         (load-buffer-open name opts))
+        (else (load-buffer-check-autosave* name opts))))
+
+(define (shared-files-wanted?)
+  (== (get-preference "share-open-files") "on"))
+
+(define (load-buffer-check-autosave* name opts)
   (if (and (autosave-propose name) (nin? :strict opts))
       (with question (if (autosave-rescue? name)
                          "Rescue file from crash?"

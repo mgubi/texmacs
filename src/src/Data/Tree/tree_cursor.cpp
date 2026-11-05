@@ -483,10 +483,23 @@ keep_positive (path p) {
 * Exported routines for cursor paths in trees
 ******************************************************************************/
 
+static path
+within_tree (tree t, path p) {
+  // the longest part of @p which leads into @t (a modification made by another
+  // process can leave the cursor of this one in a place that is not there any more)
+  if (is_nil (p)) return p;
+  if (is_atom (p)) {
+    int n= is_atomic (t)? N(t->label): 1;
+    return (p->item < 0 || p->item > n)? path (0): p;
+  }
+  if (is_atomic (t) || p->item < 0 || p->item >= arity (t)) return path (0);
+  return path (p->item, within_tree (t[p->item], p->next));
+}
+
 path
 correct_cursor (tree t, path p, bool forwards) {
   //cout << "Correct cursor " << p << " in " << t << ", " << forwards << "\n";
-  p= keep_positive (p);
+  p= within_tree (t, keep_positive (p));
   path pp= pre_correct (t, p);
   if (forwards) return right_correct (t, pp);
   else return left_correct (t, pp);

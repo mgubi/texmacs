@@ -54,7 +54,7 @@ bridge_expand_as (typesetter ttt, tree st, path ip) {
 void
 bridge_expand_as_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || is_func (u, EXPAND_AS), "nil path");
+  ASSERT (!is_nil (p) || is_func (u, EXPAND_AS) || L(u) == L(st), "nil path");
   if (is_nil (p) || (p->item != 1)) {
     st= substitute (st, p, u);
     initialize ();
