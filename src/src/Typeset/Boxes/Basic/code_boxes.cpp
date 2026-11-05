@@ -655,16 +655,8 @@ code_box_rep::code_box_rep (path lip, tree one, string text, int ra2,
   cell (cell2), tabw (tabw2), invis (invis2),
   single (true), ra (ra2), rb (rb2), one_text (text)
 {
-  // (a row ends where its text ends, with the hints at the end of the
-  // line, as a line of a paragraph: what comes after the block, the
-  // cursor after it, comes after the text of its last row)
-  array<SI> xp;
-  xpositions (0, rb, xp);
-  SI end= xp[rb] - xp[ra];
-  array<int> hp; array<SI> hw; array<string> ht;
-  if (rb == N(text) && hints (0, hp, hw, ht)) end += code_hint_before (rb, hp, hw);
   x1= x3= 0;
-  x2= max (end, (SI) 0);
+  x2= width;
   x4= width + 4 * cell; // (the mark of the end of the line, see above)
   y1= y3= fn->y1;
   y2= y4= fn->y2;

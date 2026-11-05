@@ -1076,7 +1076,26 @@
           ;; cursor is on the baseline of the last line, after the box)
           (let ((t (after "true")) (f (after "false")))
             (check= (car t) (car f))
-            (check= (caddr t) (caddr f)))))))
+            (check= (caddr t) (caddr f))))))
+  ;; a block is not aligned by the paragraph mode: its lines start at the
+  ;; left margin (with lines of different widths, which the rows of paper
+  ;; mode, made from those of line 1, would not follow)
+  (for (medium '("papyrus" "paper"))
+    (for (pm '("center" "right"))
+      (let ((xs '()))
+        (with-body `(document (with "font-family" "tt" "par-mode" ,pm
+                                "code-lines" "true"
+                                (document "a" ,(make-string 38 #\b) "cc"
+                                          ,(make-string 12 #\d) "e")))
+          (lambda ()
+            (init-env "page-medium" medium)
+            (step (lambda () #t))
+            (set! xs (map (lambda (i)
+                            (go-to (at 0 6 i 0))
+                            (step (lambda () #t))
+                            (get-cursor-x))
+                          (.. 0 5)))))
+        (check= (length (list-remove-duplicates xs)) 1)))))
 
 ;; A block of one line with markup, in paper mode, is a paragraph of its
 ;; items (it had no rows, and was neither drawn nor reached by the cursor)

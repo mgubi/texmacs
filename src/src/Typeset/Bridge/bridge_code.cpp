@@ -388,6 +388,30 @@ static void
 code_paragraph (edit_env env, path ip, array<box> rows,
                 array<line_item> before, array<line_item> after,
                 array<page_item>& l, stack_border& sb) {
+  // the items after the block, the markers of the bridges around it, give
+  // the place of the cursor after the block. The rows (and the block, in
+  // papyrus mode) are as wide as the page, so that the paragraph mode does
+  // not move them; but then the markers would come at the right margin:
+  // - the last row of a block in paper mode, or a block of one line (y of
+  //   its end 0): it is made to end where its text ends, unless the
+  //   paragraph mode would then move it (center, right: a block is not
+  //   aligned, and the cursor after it stays at the margin);
+  // - a block of several lines in papyrus mode: the markers must stay after
+  //   the box, since a line finds its children by their x; they are only
+  //   moved down to the baseline of its last line.
+  SI ex= 0, ey= 0;
+  bool at_end= (N(after) > 0 && N(rows) > 0 &&
+                code_box_end (rows[N(rows)-1], ex, ey));
+  if (at_end && ey == 0) {
+    string mode= as_string (env->read (PAR_MODE));
+    if (mode == "left" || mode == "justify") {
+      box last= rows[N(rows)-1];
+      rows= copy (rows);
+      rows[N(rows)-1]= resize_box (decorate_middle (ip), last, last->x1,
+                                   last->y1, max (ex, last->x1),
+                                   last->y2, true);
+    }
+  }
   lazy_paragraph par (env, ip);
   par->a= copy (before); // (<< below would append to 'before')
   for (int i=0; i<N(rows); i++) {
@@ -397,16 +421,7 @@ code_paragraph (edit_env env, path ip, array<box> rows,
                            HYPH_INVALID, tree (NEXT_LINE));
     par->a << line_item (STD_ITEM, OP_SKIP, rows[i], HYPH_INVALID);
   }
-  // (the items after the block, the markers of the bridges around it,
-  // where the cursor after the block goes. In paper mode a row ends where
-  // its text ends (code_row_box), so they come after the last row as after
-  // the last line of a paragraph. In papyrus mode the block is one box as
-  // wide as the page, and they must stay after it, since a line finds its
-  // children by their x: they are only moved down to the baseline of the
-  // last line (ey is 0 for a row or a block of one line))
-  SI ex, ey;
-  if (N(after) > 0 && N(rows) > 0 && code_box_end (rows[N(rows)-1], ex, ey) &&
-      ey != 0) {
+  if (at_end && ey != 0) {
     for (int i=0; i<N(after); i++) {
       line_item it= after[i];
       box mb= move_box (decorate_middle (ip), it->b, 0, ey, true);

@@ -181,6 +181,13 @@ the lines being copied at each key: #811 too (11 ms).
   bridges around it must stay after the box (`code_paragraph`). In paper
   mode a row ends where its text ends, and the cursor is where it is after
   the same lines as paragraphs. A source file has nothing around its lines.
+- **A block is not aligned** by the paragraph mode (`par-mode` center or
+  right): its lines start at the left margin, as in an editor of code.
+  The rows are as wide as the page (the rows of the lines of paper mode
+  are made from those of line 1, which an offset depending on the width
+  of each row would break). Only the last row ends at its text, for the
+  cursor after the block, and only in the modes left and justify; in the
+  others that cursor is at the right margin.
 - **A line does not change the environment** of the lines after it (an
   `assign` in a line). The environment at a place is that of the markup on
   the way to it in its own line (`bridge_code_rep::my_exec_until` walks the
