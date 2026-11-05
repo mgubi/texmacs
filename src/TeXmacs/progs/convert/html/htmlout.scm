@@ -154,6 +154,8 @@
 (define (htmlout x)
   (cond ((string? x) (htmlout-text x))
 	((null? x) (noop))
+	((func? x '*RAW*) ; markup as it is: neither broken into lines nor scanned
+	 (apply output-verbatim (cdr x)))
 	((or (func? x '!concat) (func? x '*TOP*))
 	 (for-each htmlout (cdr x)))
 	((htmlout-p-simplify? x)

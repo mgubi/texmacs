@@ -27,6 +27,10 @@
 
 //box empty_box (path ip, int x1=0, int y1=0, int x2=0, int y2=0);
 bool enable_fastenv= false;
+int edit_typeset_rep::html_count= 0;
+int edit_typeset_rep::html_snippet_count= 0;
+int edit_typeset_rep::html_snippet_made= -1;
+array<edit_typeset_rep*> edit_typeset_rep::html_recorders;
 
 /******************************************************************************
 * Contructors, destructors and notification of modifications
@@ -38,6 +42,7 @@ edit_typeset_rep::edit_typeset_rep ():
   cur (hashmap<string,tree> (UNINIT)),
   stydef (UNINIT), pre (UNINIT), pre_version (0), prep_version (-1),
   prep_env (UNINIT), init (UNINIT), fin (UNINIT), grefs (UNINIT),
+  recording_html (false),
   env (drd, buf->buf->master,
        buf->data->ref, (buf->prj==NULL? grefs: buf->prj->data->ref),
        buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux),
@@ -45,11 +50,13 @@ edit_typeset_rep::edit_typeset_rep ():
   // The bridges of the document are made in set_data, which follows each
   // creation of an editor (get_new_view) and replaces whatever the typesetter
   // holds: the constructor makes bridges for an empty document only.
-  ttt (new_typesetter (env, tree (DOCUMENT), reverse (rp))) {
+  ttt (new_typesetter (env, tree (DOCUMENT), reverse (rp))),
+  html_first (0), html_base (UNINIT) {
     init_update ();
 }
 
 edit_typeset_rep::~edit_typeset_rep () {
+  forget_html_envs ();
   // the boxes of the document go first; those which the typesetter keeps
   // (pages, shoves, the repaint log) go with it, in delete_typesetter
   eb= box ();
@@ -827,7 +834,9 @@ edit_typeset_rep::exec (tree t, hashmap<string,tree> H, bool expand_refs) {
   hashmap<string,tree> H2;
   env->read_env (H2);
   env->write_env (H);
+  if (recording_html) env->start_recording_formulas (H, html_count);
   t= env->exec (t);
+  if (recording_html) env->stop_recording_formulas ();
   if (expand_refs)
     t= expand_references (t, buf->data->ref, *env->global_ref);
   t= simplify_execed (t);
@@ -939,15 +948,53 @@ edit_typeset_rep::exec_html (tree t, path p) {
     w << string ("html-extra-javascript") << H["html-extra-javascript"];
   if (H->contains ("html-site-version"))
     w << string ("html-site-version") << H["html-site-version"];
-  if (N(w) == 0) return exec (t, H);
-  else {
+  if (N(w) != 0) {
     w << t;
-    return exec (w, H);
+    t= w;
   }
-  //tree r= exec (t, H);
-  //cout << "In: " << t << "\n";
-  //cout << "Out: " << r << "\n";
-  //return r;
+  // The formulas which the export typesets apart do it in their environment
+  // (see html_recorders): the one at the start of the buffer, from the
+  // prepared one, and what changed in it before them, recorded by the
+  // evaluation
+  typeset_prepare ();
+  hashmap<string,tree> prep;
+  env->read_env (prep);
+  hashmap<string,tree> start= cur[p];
+  hashmap<string,tree> base (UNINIT);
+  iterator<string> it= iterate (start);
+  while (it->busy ()) {
+    string var= it->next ();
+    tree* v= prep->find (var);
+    if (v == NULL || !strong_equal (*v, start[var])) base (var)= start[var];
+  }
+  it= iterate (prep);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (!start->contains (var)) base (var)= env_absent ();
+  }
+  forget_html_envs ();
+  html_first= html_count;
+  html_base= base;
+  recording_html= true;
+  t= exec (t, H);
+  recording_html= false;
+  html_envs= env->formula_envs;
+  env->formula_envs= array<hashmap<string,tree> > ();
+  html_count += N(html_envs);
+  html_recorders << this;
+  return t;
+}
+
+void
+edit_typeset_rep::forget_html_envs () {
+  // the numbers of the environments of an earlier expansion find nothing
+  array<edit_typeset_rep*> a;
+  for (int i=0; i<N(html_recorders); i++)
+    if (html_recorders[i] != this) a << html_recorders[i];
+  html_recorders= a;
+  html_base= hashmap<string,tree> (UNINIT);
+  html_envs= array<hashmap<string,tree> > ();
+  html_snippets= hashmap<tree,array<html_snippet> > ();
 }
 
 tree

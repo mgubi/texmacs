@@ -954,6 +954,9 @@
   (bib-abbreviate bib_abbreviate
 		  (scheme_tree scheme_tree scheme_tree scheme_tree))
       
+  ;; static formulas of the HTML export
+  (html-math-defs html_math_defs (scheme_tree))
+
   ;; pdf-tm support
   (extract-attachments scm_extract_attachments (bool url))
   (pdf-make-attachments pdf_hummus_make_attachments (bool url array_url url))

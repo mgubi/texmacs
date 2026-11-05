@@ -3460,6 +3460,64 @@ tmg_print_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_print_snippet_in (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "print-snippet-in");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "print-snippet-in");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "print-snippet-in");
+
+  url in1= tmscm_to_url (arg1);
+  content in2= tmscm_to_content (arg2);
+  int in3= tmscm_to_int (arg3);
+
+  // TMSCM_DEFER_INTS;
+  array_SI out= get_current_editor()->print_snippet_in (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return array_SI_to_tmscm (out);
+}
+
+tmscm
+tmg_html_math_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "html-math-snippet");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "html-math-snippet");
+  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "html-math-snippet");
+
+  content in1= tmscm_to_content (arg1);
+  int in2= tmscm_to_int (arg2);
+  bool in3= tmscm_to_bool (arg3);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= get_current_editor()->html_math_snippet (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_html_snippet_id (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "html-snippet-id");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "html-snippet-id");
+
+  content in1= tmscm_to_content (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->html_snippet_id (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_html_snippet_last () {
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->html_snippet_last ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_graphics_file_to_clipboard (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "graphics-file-to-clipboard");
 
@@ -4043,6 +4101,10 @@ initialize_glue_editor () {
   tmscm_install_procedure ("print",  tmg_print, 0, 0, 0);
   tmscm_install_procedure ("print-pages",  tmg_print_pages, 2, 0, 0);
   tmscm_install_procedure ("print-snippet",  tmg_print_snippet, 3, 0, 0);
+  tmscm_install_procedure ("print-snippet-in",  tmg_print_snippet_in, 3, 0, 0);
+  tmscm_install_procedure ("html-math-snippet",  tmg_html_math_snippet, 3, 0, 0);
+  tmscm_install_procedure ("html-snippet-id",  tmg_html_snippet_id, 2, 0, 0);
+  tmscm_install_procedure ("html-snippet-last",  tmg_html_snippet_last, 0, 0, 0);
   tmscm_install_procedure ("graphics-file-to-clipboard",  tmg_graphics_file_to_clipboard, 1, 0, 0);
   tmscm_install_procedure ("export-postscript",  tmg_export_postscript, 1, 0, 0);
   tmscm_install_procedure ("export-pages-postscript",  tmg_export_pages_postscript, 3, 0, 0);

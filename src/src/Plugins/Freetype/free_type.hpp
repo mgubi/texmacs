@@ -19,6 +19,7 @@ bool ft_present ();
 #ifdef USE_FREETYPE
 #include <ft2build.h>
 #include FT_FREETYPE_H 
+#include FT_OUTLINE_H
 
 extern FT_Library ft_library;
 
@@ -51,6 +52,9 @@ extern FT_Error (*ft_get_kerning)    (FT_Face        face,
                                       FT_UInt        kern_mode,
                                       FT_Vector      *akerning);
 extern FT_Error (*ft_done_face)      (FT_Face        face);
+extern FT_Error (*ft_outline_decompose) (FT_Outline*              outline,
+                                         const FT_Outline_Funcs*  funcs,
+                                         void*                    user);
 
 #endif
 

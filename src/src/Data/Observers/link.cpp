@@ -95,7 +95,7 @@ unregister_link (soft_link ln) {
 * Link repositories
 ******************************************************************************/
 
-link_repository_rep::link_repository_rep () {}
+link_repository_rep::link_repository_rep (): record (true) {}
 
 link_repository_rep::~link_repository_rep () {
   while (!is_nil (loci)) {
@@ -113,6 +113,7 @@ link_repository_rep::~link_repository_rep () {
 
 void
 link_repository_rep::insert_locus (string id, tree t) {
+  if (!record) return;
   observer obs= tree_pointer (t, true);
   register_pointer (id, obs);
   attach_observer (t, obs);
@@ -122,6 +123,7 @@ link_repository_rep::insert_locus (string id, tree t) {
 
 void
 link_repository_rep::insert_locus (string id, tree t, string cb) {
+  if (!record) return;
   observer obs= scheme_observer (t, cb);
   register_pointer (id, obs);
   attach_observer (t, obs);
@@ -131,6 +133,7 @@ link_repository_rep::insert_locus (string id, tree t, string cb) {
 
 void
 link_repository_rep::insert_link (soft_link ln) {
+  if (!record) return;
   register_link (ln);
   links= list<soft_link> (ln, links);
 }

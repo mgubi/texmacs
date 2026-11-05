@@ -702,19 +702,78 @@ edit_env_rep::exec_with (tree t) {
 
   // for (i=0; i<k; i++) monitored_write_update (vars[i], newv[i]);
   for (i=0; i<k; i++) write_update (vars[i], newv[i]);
+  int formula= -1;
+  if (record_formulas && formula_depth == 0)
+    for (i=0; i<k; i++)
+      if ((vars[i] == MODE && newv[i] == "math" && oldv[i] != "math") ||
+          (vars[i] == "html-formula" && newv[i] == "display"))
+        formula= record_formula ();
+  if (formula >= 0) formula_depth++;
   tree r= exec (t[n-1]);
+  if (formula >= 0) formula_depth--;
   for (i=k-1; i>=0; i--) write_update (vars[i], oldv[i]);
 
-  tree u (WITH, n);
-  for (i=0; i<k; i++) {
-    u[i<<1]    = vars[i];
-    u[(i<<1)+1]= tree (QUOTE, newv[i]);
+  // a recorded formula has the number of its environment as first variable
+  int o= (formula >= 0? 2: 0);
+  tree u (WITH, n + o);
+  if (formula >= 0) {
+    u[0]= "html-formula-env";
+    u[1]= as_string (formula);
   }
-  u[n-1]= r;
+  for (i=0; i<k; i++) {
+    u[o + (i<<1)]    = vars[i];
+    u[o + (i<<1) + 1]= tree (QUOTE, newv[i]);
+  }
+  u[n-1+o]= r;
   STACK_DELETE_ARRAY(vars);
   STACK_DELETE_ARRAY(oldv);
   STACK_DELETE_ARRAY(newv);
   return u;
+}
+
+/******************************************************************************
+* The environments of the formulas of the HTML export (see exec_html)
+******************************************************************************/
+
+void
+edit_env_rep::start_recording_formulas (hashmap<string,tree> base,
+                                        int first) {
+  record_formulas= true;
+  formula_depth= 0;
+  formula_first= first;
+  formula_base= base;
+  formula_envs= array<hashmap<string,tree> > ();
+  // the variables written from now on: env_table::touch
+  env.follow= true;
+  env.touched= array<string> ();
+  env.touched_set= hashmap<string,bool> (false);
+}
+
+void
+edit_env_rep::stop_recording_formulas () {
+  record_formulas= false;
+  env.follow= false;
+  env.touched= array<string> ();
+  env.touched_set= hashmap<string,bool> (false);
+}
+
+int
+edit_env_rep::record_formula () {
+  // the variables which differ from formula_base, env_absent () for those
+  // which went; the same number as the formula before when they are the
+  // same (equal formulas elsewhere share their images, see tmhtml-png)
+  hashmap<string,tree> diff (UNINIT);
+  for (int i=0; i<N(env.touched); i++) {
+    string s= env.touched[i];
+    tree v= env.value (s);
+    tree* b= formula_base->find (s);
+    if (b == NULL? !strong_equal (v, env_absent ()): !strong_equal (v, *b))
+      diff (s)= v;
+  }
+  int n= N(formula_envs);
+  if (n > 0 && formula_envs[n-1] == diff) return formula_first + n-1;
+  formula_envs << diff;
+  return formula_first + n;
 }
 
 tree
