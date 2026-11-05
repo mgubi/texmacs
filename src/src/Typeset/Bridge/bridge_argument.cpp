@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "bridge.hpp"
+#include "modification.hpp"
 
 class bridge_argument_rep: public bridge_rep {
 protected:
@@ -87,18 +88,22 @@ bridge_argument_rep::notify_macro (int tp, string var, int l, path p, tree u) {
 	// has (an `arg' with an index that is out of range gives a body that is
 	// an error): the change is then left to the next typesetting, which makes
 	// the body again (initialize compares it with the argument).
+	// (it is asked of the modification code itself whether the change applies to the body:
+	// nothing that reaches insert_at, remove_at and the like can then throw)
 	bool here= true;
-	if (!is_nil (p)) {
-	  path q= path_up (p);
-	  if (tp == MACRO_ASSIGN) here= has_subtree (body->st, p);
-	  else {
-	    here= has_subtree (body->st, q);
-	    if (here && tp == MACRO_REMOVE) {
-	      tree sq= subtree (body->st, q);
-	      int  nr= as_int (u->label);
-	      int  n = is_atomic (sq)? N(sq->label): N(sq);
-	      here= nr >= 0 && last_item (p) >= 0 && last_item (p) <= n && nr <= n - last_item (p);
-	    }
+	if (is_nil (p)) here= (tp == MACRO_ASSIGN);
+	else {
+	  path q  = path_up (p);
+	  int  pos= last_item (p);
+	  switch (tp) {
+	  case MACRO_ASSIGN: here= is_applicable (body->st, mod_assign (p, u)); break;
+	  case MACRO_INSERT: here= is_applicable (body->st, mod_insert (q, pos, u)); break;
+	  case MACRO_REMOVE: {
+	    int nr= is_atomic (u)? as_int (u->label): -1;
+	    here= nr >= 0 && is_applicable (body->st, mod_remove (q, pos, nr));
+	    break;
+	  }
+	  default: here= false; break;
 	  }
 	}
 	if (here)
