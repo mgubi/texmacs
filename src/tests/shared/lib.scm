@@ -11,7 +11,7 @@
 (define ROLE (getenv "SH_ROLE"))
 (define FILE (getenv "SH_FILE"))
 (define OUT  (getenv "SH_OUT"))
-(define STEP-TIMEOUT 20000)
+(define STEP-TIMEOUT (or (and (getenv "SH_STEP_TIMEOUT") (string->number (getenv "SH_STEP_TIMEOUT"))) 20000))
 
 (define results '())
 

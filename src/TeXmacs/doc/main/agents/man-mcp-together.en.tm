@@ -61,6 +61,19 @@
   A file which is saved while proposals are pending holds both versions as
   markup; so accept or reject them before saving.
 
+  <paragraph*|What the window shows>
+
+  While a file is shared, the footer of its window says so: <em|Shared:
+  hosting>, with the number of windows, or <em|Shared: joined> in a window
+  that joined another. When an agent works on the file the footer names it,
+  its mode and the proposals waiting (<em|Shared with agent 1234
+  (propose), 1 proposal>). In the window that hosts the file the focus bar
+  also has a group for the agent: whether it is connected (or has not
+  answered for some seconds, or has left), the mode, the number of proposals
+  with buttons to go to the previous and the next one and to accept or reject
+  the one at the cursor or all of them, and <em|Check connection>, which
+  asks the agent's program and says in the footer whether it answers.
+
   <paragraph*|Who is an agent>
 
   A program which joins your file without a window is taken for an agent,

@@ -329,6 +329,15 @@ process hosts, or only headless ones), the agent edits directly, as before.
   `read-only`. The menu **Tools > Agents** (shown when an agent has the file) sets
   it, with a check mark, and lists the pending proposals to accept or reject one by
   one or all.
+- **Feedback.** While the buffer is shared the footer shows `shared-file-footer-text`
+  (the `footer-hook` in `init-texmacs.scm`; cheap: nothing is done while
+  `shared-files-in-use?` is false). In the host's window, when an agent has the file, the
+  focus bar (`texmacs-focus-icons` in `generic/generic-menu.scm`, `shared-agents-focus?`)
+  shows the agent and its connection, the mode, the pending proposals (previous, next,
+  accept and reject here, all) and Check connection. The host pings its agents every two
+  seconds when it has a person (`(ping T)`, answered `(pong T)` at the participant's next
+  tick); any message counts as heard, `shared-agent-connection` says connected, silent
+  for more than five seconds, or gone. Tested by `tests/mcp` `gui-host`.
 - **The filter.** In every mode the host runs the content rules of the MCP server
   (`mcp-host-check` in `agents/mcp-server.scm`, see mcp-server.md) on the patch: the
   patch is applied to the body as a pure function (`patch-apply`, which shares the

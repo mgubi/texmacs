@@ -812,6 +812,38 @@
   (assuming (not (in-graphics?))
     (dynamic (standard-focus-icons (focus-tree)))))
 
+;; The agent of a shared file, in the window that hosts it (docs/mcp-server.md);
+;; nothing is computed for a file that is not shared
+(tm-menu (agent-focus-icons)
+  (with name (current-buffer)
+    (mini #t (group (eval (shared-agents-focus-text name))))
+    (mini #t
+      (=> (eval (string-append "Mode: " (symbol->string (or (shared-agent-mode name) 'propose))))
+          ("Propose" (shared-set-agent-mode! name 'propose))
+          ("Direct" (shared-set-agent-mode! name 'direct))
+          ("Read only" (shared-set-agent-mode! name 'read-only))))
+    (mini #t (group (eval (string-append "Proposals: "
+                                         (number->string (shared-file-pending-count name))))))
+    (when (> (shared-file-pending-count name) 0)
+      ((balloon "<" "Previous proposal") (shared-proposal-go! name -1))
+      ((balloon ">" "Next proposal") (shared-proposal-go! name 1))
+      (when (shared-proposal-at-cursor name)
+        ((balloon "Accept" "Accept the proposal here")
+         (shared-proposal-resolve-here! name 'new))
+        ((balloon "Reject" "Reject the proposal here")
+         (shared-proposal-resolve-here! name 'old)))
+      (=> "All"
+          ("Accept all" (shared-proposal-resolve-all! name 'new))
+          ("Reject all" (shared-proposal-resolve-all! name 'old))))
+    ((balloon "Check connection" "Ping the agent and say in the footer if it answers")
+     (shared-agent-check-connection name))))
+
+(tm-menu (texmacs-focus-icons)
+  (:require (shared-agents-focus?))
+  (dynamic (former))
+  //
+  (dynamic (agent-focus-icons)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menus for customizable environments
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -829,6 +829,171 @@
          (and (!= key "") (!= (shared-user-dir) "") key))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; What the footer and the focus bar show
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (shared-agent-short id)
+  (:synopsis "A short name of the participant @id: agent 1234, program name")
+  (let ((l (string-tokenize-by-char id #\.)))
+    (if (and (pair? l) (pair? (cdr l)) (== (car l) "agent"))
+        (string-append "agent " (cadr l))
+        (if (and (pair? l) (pair? (cdr l))) (string-append "program " (car l)) id))))
+
+(define (count-text n one many)
+  (string-append (number->string n) " " (if (== n 1) one many)))
+
+(tm-define (shared-file-pending-count name)
+  (:synopsis "The number of proposals of agents waiting for the person on @name")
+  (with l (or (shared-proposals name) '())
+    (length (list-filter l (lambda (e) (== (cadr e) "pending"))))))
+
+(tm-define (shared-file-footer-text name)
+  (:synopsis "The text the footer shows for the shared file @name, or #f")
+  ;; (cheap: tables and counts, no message)
+  (let ((sf (sf-by-name name)))
+    (cond
+      ((not sf)
+       (and (shared-file-not-joined name)
+            "Not shared: open in another TeXmacs"))
+      ((sf-host? sf)
+       (let* ((agents (shared-file-agents name))
+              (n (length (sf-get sf 'peers)))
+              (windows (+ 1 (- n (length agents)))))
+         (cond ((null? agents)
+                (if (> n 0)
+                    (string-append "Shared: hosting, " (number->string windows) " windows")
+                    "Shared: hosting"))
+               (else
+                 (let ((np (shared-file-pending-count name)))
+                   (string-append
+                    "Shared with " (shared-agent-short (car agents))
+                    (if (> (length agents) 1)
+                        (string-append " and " (count-text (- (length agents) 1) "other" "others"))
+                        "")
+                    " (" (symbol->string (or (shared-agent-mode name) 'propose)) ")"
+                    (if (> np 0) (string-append ", " (count-text np "proposal" "proposals")) "")))))))
+      (else "Shared: joined"))))
+
+(tm-define (shared-agents-focus?)
+  (:synopsis "Does the current buffer have an agent, here, as host (then the focus bar shows the agent)?")
+  (and (shared-files-in-use?)
+       (nnull? (shared-file-agents (current-buffer)))))
+
+(tm-define (shared-agent-connection name id)
+  (:synopsis "The agent @id of the host @name: connected, (silent SECONDS) or gone")
+  (let ((sf (sf-by-name name)))
+    (with p (and sf (sf-host? sf) (find-peer sf id))
+      (cond ((not p) 'gone)
+            ((not (local-alive? (peer-link p))) 'gone)
+            (else
+              (let* ((t (ahash-ref sf-heard (heard-key sf id)))
+                     (dt (if t (- (texmacs-time) t) 0)))
+                (if (> dt 5000)
+                    (list 'silent (quotient dt 1000))
+                    'connected)))))))
+
+(tm-define (shared-agent-connection-text name id)
+  (:synopsis "The connection of the agent @id as a short text")
+  (with c (shared-agent-connection name id)
+    (cond ((== c 'connected) "connected")
+          ((== c 'gone) "disconnected")
+          (else (string-append "not answering for " (number->string (cadr c)) " s")))))
+
+(tm-define (shared-agents-focus-text name)
+  (:synopsis "The agent of the focus bar: name and connection")
+  (let ((l (shared-file-agents name)))
+    (if (null? l) ""
+        (string-append (shared-agent-short (car l)) ": "
+                       (shared-agent-connection-text name (car l))))))
+
+(define sf-check-result (make-ahash-table))   ; name -> text
+
+(tm-define (shared-agent-check-connection name)
+  (:synopsis "Ping the agents of @name; the answer is shown in the footer a second later")
+  (and-with sf (sf-by-name name)
+    (and (sf-host? sf)
+         (let ((agents (shared-file-agents name)) (now (texmacs-time)))
+           (for (id agents)
+             (with p (find-peer sf id)
+               (when p (msg-send (peer-link p) (list 'ping now)))))
+           (ahash-set! sf-check-result (url->string name) #f)
+           (set-message "Shared file: checking the connection to the agent..." "Shared file")
+           (delayed (:pause 1000)
+             (shared-agent-check-report name now))
+           #t))))
+
+(tm-define (shared-agent-check-report name since)
+  (:synopsis "Say how the agents of @name answered the ping sent at @since")
+  (and-with sf (sf-by-name name)
+    (let* ((agents (shared-file-agents name))
+           (txt (if (null? agents)
+                    "Shared file: no agent is connected"
+                    (string-recompose
+                     (map (lambda (id)
+                            (let ((t (ahash-ref sf-heard (heard-key sf id))))
+                              (string-append
+                               (shared-agent-short id) ": "
+                               (if (and t (>= t since)) "answers"
+                                   (if (== (shared-agent-connection name id) 'gone)
+                                       "disconnected" "does not answer")))))
+                          agents)
+                     ", "))))
+      (ahash-set! sf-check-result (url->string name) txt)
+      (set-message (if (string-starts? txt "Shared") txt (string-append "Shared file: " txt))
+                   "Shared file")
+      txt)))
+
+(tm-define (shared-agent-last-check name)
+  (:synopsis "For the tests: the text of the last connection check")
+  (ahash-ref sf-check-result (url->string name)))
+
+;; The proposals of the focus bar: the pending ones, in the order of the
+;; document, and the one at the cursor (the block with the cursor)
+(define (pending-by-index name)
+  (list-sort (list-filter (or (shared-proposals name) '())
+                          (lambda (e) (== (cadr e) "pending")))
+             (lambda (a b) (< (caddr a) (caddr b)))))
+
+(define (cursor-block-index)
+  ;; the index of the block of the body with the cursor, or #f (the path of the
+  ;; cursor starts with that of the body)
+  (let* ((cp (cursor-path)) (bp (tree->path (buffer-get-body (current-buffer)))))
+    (and (list? cp) (list? bp) (> (length cp) (length bp))
+         (== (list-head cp (length bp)) bp)
+         (integer? (list-ref cp (length bp)))
+         (list-ref cp (length bp)))))
+
+(tm-define (shared-proposal-at-cursor name)
+  (:synopsis "The id of the pending proposal in the block with the cursor, or #f")
+  (let* ((i (cursor-block-index)))
+    (and i
+         (let ((l (list-filter (pending-by-index name) (lambda (e) (== (caddr e) i)))))
+           (and (nnull? l) (car (car l)))))))
+
+(tm-define (shared-proposal-go! name dir)
+  (:synopsis "Go to the next (dir 1) or previous (-1) pending proposal; its id or #f")
+  (let* ((l (pending-by-index name))
+         (i (or (cursor-block-index) -1)))
+    (and (nnull? l)
+         (let* ((cands (if (> dir 0)
+                           (list-filter l (lambda (e) (> (caddr e) i)))
+                           (reverse (list-filter l (lambda (e) (< (caddr e) i))))))
+                (e (if (nnull? cands) (car cands)
+                       (if (> dir 0) (car l) (car (reverse l))))))
+           (tree-go-to (tree-ref (buffer-get-body (current-buffer)) (caddr e)) :start)
+           (car e)))))
+
+(tm-define (shared-proposal-resolve-all! name which)
+  (:synopsis "Accept (new) or reject (old) all pending proposals of @name")
+  (for (e (pending-by-index name))
+    (shared-proposal-resolve! name (car e) which)))
+
+(tm-define (shared-proposal-resolve-here! name which)
+  (:synopsis "Accept or reject the proposal at the cursor")
+  (with id (shared-proposal-at-cursor name)
+    (and id (shared-proposal-resolve! name id which))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Joining
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1682,6 +1847,7 @@
              (append (list-filter (sf-get sf 'peers)
                                   (lambda (p) (!= (peer-id p) id)))
                      (list (list id link interactive seq pid))))
+    (heard! sf id)
     (host-send-welcome sf link base id interactive pid inflight)
     (when (agent-peer? sf (list id link interactive seq pid))
       (msg-send link (list 'mode (shared-agent-mode (sf-buffer sf))))
@@ -1736,6 +1902,7 @@
          (with pr (proposal-find sf (cadr msg))
            (when (and pr (proposal-pending? pr) (== (prop-get pr 'owner) (peer-id peer)))
              (proposal-resolve! sf pr 'old "withdrawn"))))
+        ((func? msg 'pong) (noop))
         ((func? msg 'resync)
          (host-flush! sf)
          (msg-send (peer-link peer)
@@ -1751,6 +1918,7 @@
     (let loop ()
       (with m (msg-receive (peer-link p))
         (when m
+          (heard! sf (peer-id p))
           (host-handle-message sf p m)
           (when (find-peer sf (peer-id p)) (loop)))))
     (when (and (find-peer sf (peer-id p)) (not (local-alive? (peer-link p))))
@@ -1758,11 +1926,29 @@
       (drop-peer! sf p)))
   (host-check-lock! sf)
   (proposals-sync! sf)
+  (host-ping-agents! sf)
   ;; a headless host retries to give the file to an interactive participant
   (let ((now (texmacs-time)))
     (when (> now (or (sf-get sf 'offer-at) 0))
       (sf-put! sf 'offer-at (+ now 5000))
       (host-offer-handover! sf))))
+
+;; Is an agent there? A host with a person pings its agents every two seconds
+;; (ping T), which the participants answer with (pong T) at their next tick; any
+;; message also counts as heard. The focus bar shows when it was.
+(define sf-heard (make-ahash-table))   ; "key|id" -> time of the last message
+
+(define (heard-key sf id) (string-append (sf-key sf) "|" id))
+(define (heard! sf id) (ahash-set! sf-heard (heard-key sf id) (texmacs-time)))
+
+(define (host-ping-agents! sf)
+  (when (sf-get sf 'interactive)
+    (let ((now (texmacs-time)))
+      (when (> now (or (sf-get sf 'ping-at) 0))
+        (sf-put! sf 'ping-at (+ now 2000))
+        (for (p (sf-get sf 'peers))
+          (when (agent-peer? sf p)
+            (msg-send (peer-link p) (list 'ping now))))))))
 
 (define (host-check-lock! sf)
   ;; The lock is a file: if it has been removed (or replaced) another process
@@ -2163,7 +2349,10 @@
 
 (define (participant-handle-message sf msg)
   (let ((key (sf-key sf)))
-    (cond ((func? msg 'applied)
+    (cond ((func? msg 'ping)
+           (when (and (== (length msg) 2) (sf-get sf 'conn))
+             (msg-send (sf-get sf 'conn) (list 'pong (cadr msg)))))
+          ((func? msg 'applied)
            (with (tag from to author id psexp) msg
              (seen! sf id)
              (cond ((or (!= from (live-current-state key))

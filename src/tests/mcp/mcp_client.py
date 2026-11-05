@@ -2531,17 +2531,28 @@ def s_gui_host(w):
     envA, homeA = make_env(w, "A", "on")
     envB, homeB = make_env(w, "B", "on")
     envC, homeC = make_env(w, "C", "on")
-    other = start_other(w, envB, "host-edit.scm", f, gui=True)
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_STEP_TIMEOUT": "180000"}, gui=True)
     sync = os.path.join(w, "sync")
     check("the GUI host has loaded the file", wait_file(os.path.join(sync, "h-loaded"), 60))
     st = [0]
     # a second window (another process, with its interface) joins the host
-    third = start_other(w, envC, "host-join.scm", f, gui=True, role="C")
+    third = start_other(w, envC, "host-join.scm", f, {"SH_STEP_TIMEOUT": "180000"}, gui=True, role="C")
     sync_set(w, "c-opened")
     check("the second window edited", wait_file(os.path.join(sync, "h-edited"), 60))
     time.sleep(0.5)
     hb = host_body(w, st)
     check("the host has the edit of the second window", "FROMB-" in hb)
+    def ev(expr, wait=10):
+        try:
+            os.remove(os.path.join(sync, "eval"))
+        except OSError:
+            pass
+        hostcmd(w, st, "eval " + expr)
+        wait_file(os.path.join(sync, "eval"), wait)
+        time.sleep(0.1)
+        return open(os.path.join(sync, "eval")).read() if os.path.exists(os.path.join(sync, "eval")) else ""
+    check("footer: hosting with a second window", "Shared: hosting, 2 windows" in ev("(shared-file-footer-text (current-buffer))"))
+    check("the focus bar group is not shown without an agent", ev("(shared-agents-focus?)") == "#f")
     m = Mcp(envA)
     m.initialize()
     e, v = m.tool("open_document", path=f)
@@ -2556,8 +2567,60 @@ def s_gui_host(w):
     hostcmd(w, st, "agents-here")
     check("(agents-here?) is true in the host", wait_file(os.path.join(sync, "agents-here"), 10)
           and open(os.path.join(sync, "agents-here")).read() == "#t")
-    sync_set(w, "c-done")
+    # the footer and the focus bar of the host
+    check("footer: shared with the agent, its mode and the proposal",
+          all(x in ev("(shared-file-footer-text (current-buffer))") for x in ("Shared with agent", "(propose)", "1 proposal")))
+    check("footer: the footer hook adds it to the left footer",
+          "Shared with agent" in ev("(tree->stree (footer-hook (stree->tree \"x\")))"))
+    check("focus bar: the group is shown", ev("(shared-agents-focus?)") == "#t")
+    check("focus bar: the focus icons build with the group",
+          ev("(and (make-menu-widget (list (quote horizontal) (list (quote link) (quote texmacs-focus-icons))) 0) #t)") == "#t")
+    check("focus bar: the agent is connected", "connected" in ev("(shared-agents-focus-text (current-buffer))"))
+    check("focus bar: one proposal pending", ev("(shared-file-pending-count (current-buffer))") == "1")
+    ev("(go-to (list 1 0))")
+    check("focus bar: no proposal at the cursor away from it", ev("(shared-proposal-at-cursor (current-buffer))") == "#f")
+    check("focus bar: next proposal goes to it", ev("(shared-proposal-go! (current-buffer) 1)") == '"p1"')
+    check("focus bar: the proposal at the cursor", ev("(shared-proposal-at-cursor (current-buffer))") == '"p1"')
+    shots = os.path.join(w, "shots")
+    os.makedirs(shots, exist_ok=True)
+    try:
+        os.remove(os.path.join(sync, "snapshot"))
+    except OSError:
+        pass
+    ev("(begin (update-menus) #t)")
+    time.sleep(1.0)
+    hostcmd(w, st, "snapshot " + shots)
+    check("a snapshot of the host window was taken", wait_file(os.path.join(sync, "snapshot"), 20)
+          and os.path.exists(os.path.join(shots, "window-0.png")))
+    ev("(shared-set-agent-mode! (current-buffer) (quote read-only))")
+    check("focus bar: the mode dropdown's action sets the mode", ev("(shared-agent-mode (current-buffer))") == "read-only")
+    e, v = m.tool("list_documents")
+    check("the agent sees the mode", not e and v["documents"][0].get("agent_mode") == "read-only")
+    ev("(shared-set-agent-mode! (current-buffer) (quote propose))")
+    check("focus bar: the footer follows the mode", "(propose)" in ev("(shared-file-footer-text (current-buffer))"))
+    ids = ev("(shared-file-agents (current-buffer))")
+    aid = ids.strip("()\"").split(" ")[0].strip('"')
+    # the agent is stopped: not answering after five seconds
+    import signal
+    os.kill(m.p.pid, signal.SIGSTOP)
+    try:
+        got = poll(lambda: "not answering" in ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + aid + '"')), 20)
+        check("connection: a stopped agent is not answering", bool(got))
+        ev("(shared-agent-check-connection (current-buffer))")
+        time.sleep(1.6)
+        check("check connection: a stopped agent does not answer", "does not answer" in ev("(shared-agent-last-check (current-buffer))"))
+    finally:
+        os.kill(m.p.pid, signal.SIGCONT)
+    got = poll(lambda: ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + aid + '"')) == '"connected"', 20)
+    check("connection: connected again when it goes on", bool(got))
+    ev("(shared-agent-check-connection (current-buffer))")
+    time.sleep(1.6)
+    check("check connection: the agent answers", "answers" in ev("(shared-agent-last-check (current-buffer))"))
     check("exit 0", m.close() == 0)
+    got = poll(lambda: ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + aid + '"')) == '"disconnected"', 20)
+    check("connection: disconnected when the agent leaves", bool(got))
+    check("focus bar: the group is gone with the agent", ev("(shared-agents-focus?)") == "#f")
+    sync_set(w, "c-done")
     for p in (other, third):
         try:
             p.wait(timeout=60)
