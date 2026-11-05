@@ -896,6 +896,7 @@
                       (with r (join-host name key e)
                         (cond ((== r #t) #t)
                               ((== r 'busy) (tell-unshared name))
+                              ((pair? r) (tell-unshared name r))
                               (else (host-start name key 0)))))
                      ((> now deadline)
                       (pending-done! name)
@@ -905,16 +906,53 @@
              (pending-done! name)
              (host-start name key 0))))))))
 
-(define (tell-unshared name)
-  (set-message "Shared file: the process which has this file open does not answer; it is opened from the file, without sharing"
-               "Shared file"))
+(define sf-not-joined (make-ahash-table))  ; (url->string name) -> why it was not joined
 
-(define (note-unshared! name)
+(define (unshared-why r)
+  ;; r: 'busy or (refused . tag)
+  (if (pair? r)
+      (string-append "its content cannot be shared (" (cdr r) ")")
+      "its process does not answer"))
+
+(define (tell-unshared name . r)
+  (set-message
+   (string-append "Shared file: this file is open in another TeXmacs, but "
+                  (unshared-why (if (null? r) 'busy (car r)))
+                  "; it is opened from the file, without sharing, and not saved")
+   "Shared file"))
+
+(tm-define (shared-file-not-joined name)
+  (:synopsis "Why the buffer @name is not joined to the live TeXmacs that holds its file, or #f")
+  ;; (the file is open in a live host, and this process has not joined it:
+  ;; it must not write the file)
+  (and (not (sf-by-name name))
+       (with why (ahash-ref sf-not-joined (url->string name))
+         (and why
+              (with key (shareable-key name)
+                (if (and key (not (lock-free? key)))
+                    why
+                    (begin (ahash-remove! sf-not-joined (url->string name)) #f)))))))
+
+(define (arity-bad-tag st)
+  ;; the tag of the innermost subtree the arity check refuses
+  (if (not (pair? st))
+      "?"
+      (let loop ((l (cdr st)))
+        (cond ((null? l) (if (symbol? (car st)) (symbol->string (car st)) "?"))
+              ((and (pair? (car l)) (not (mcp-stree-arity-ok? (car l))))
+               (arity-bad-tag (car l)))
+              (else (loop (cdr l)))))))
+
+(define (note-unshared! name . r)
   ;; another process holds the lock of the file (it hosts it) but does not
   ;; answer: the file is read as usual, not shared. It is never hosted
   ;; meanwhile: the lock is what makes a host, and a stalled host keeps it.
   (ahash-set! sf-unshared (url->string name) (texmacs-time))
-  (tell-unshared name))
+  (set-shared-files-in-use! #t)
+  (ahash-set! sf-not-joined (url->string name)
+              (string-append "open in the person's TeXmacs but not joined: "
+                             (unshared-why (if (null? r) 'busy (car r)))))
+  (tell-unshared name (if (null? r) 'busy (car r))))
 
 (define (abandoned! name key entry)
   ;; the lock of the file is free but its entry is there: the host is gone
@@ -939,6 +977,7 @@
                          (with r (join-host name key entry)
                            (cond ((== r #t) #t)
                                  ((== r 'busy) (note-unshared! name) #f)
+                                 ((pair? r) (note-unshared! name r) #f)
                                  (else (abandoned! name key entry)))))))))))
 
 ;; (join-host with a buffer which exists, read from the file, replaces it)
@@ -952,7 +991,7 @@
     (cond ((and m (func? m 'welcome) (== (length m) 7)
                 (not (mcp-stree-arity-ok? (caddr m))))
            (local-close c)
-           'busy)
+           (cons 'refused (arity-bad-tag (caddr m))))
           ((and m (func? m 'welcome) (== (length m) 7))
            (with (tag state doc modified roster host-id meta) m
              (buffer-set name (stree->tree doc))
@@ -1800,6 +1839,11 @@
 
 (tm-define (shared-file-save-request name)
   (:synopsis "A Save of the buffer @name: handled here when another process hosts it")
+  (when (and (not (sf-by-name name)) (shared-file-not-joined name))
+    (set-message "Shared file: not saved: this file is open in another TeXmacs which holds it (use Save as for a copy)"
+                 "Save file"))
+  (if (and (not (sf-by-name name)) (shared-file-not-joined name))
+      #t
   (and-with sf (sf-by-name name)
     (and (== (sf-get sf 'role) 'participant)
          (begin
@@ -1814,7 +1858,7 @@
                             "Save asked to the host of the file"
                             "Save queued: the host of the file is not reachable now; it is saved when it answers")
                         "Save file")
-           #t))))
+           #t)))))
 
 (tm-define (shared-file-saved name)
   (:synopsis "Called after the buffer @name has been saved to its file")
@@ -2028,7 +2072,12 @@
 (define (participant-reset! sf state doc modified)
   (if (mcp-stree-arity-ok? (caddr doc))
       (participant-reset!* sf state doc modified)
-      (stat! 'bad-remote)))
+      (begin
+        (stat! 'bad-remote)
+        (set-message
+         (string-append "Shared file: the host sent a document which cannot be shared ("
+                        (arity-bad-tag (caddr doc)) "); it is not applied")
+         "Shared file"))))
 
 (define (participant-reset!* sf state doc modified)
   ;; the document of the host replaces everything, pending changes included

@@ -13,6 +13,7 @@
 #   mcp-host   the MCP server hosts the file; another TeXmacs joins and edits
 #   gui-host   a Qt host with its window (offscreen): the server joins (propose, a proposal,
 #              Tools > Agents), and a second window joins
+#   not-joined a file the server cannot join (refused welcome, stopped host): note, read-only, no save
 #   unshared   share-open-files off: nothing is shared
 #   edit       the editing tools in a file nobody else has open: each tool, conflict,
 #              undo_agent, save, close, create, bad input
@@ -50,7 +51,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose gui-host undo recursion filter content styles static guard hostdeath nonascii stalled
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose gui-host not-joined undo recursion filter content styles static guard hostdeath nonascii stalled
 status=0
 for name in "$@"; do
   w="$run/$name"

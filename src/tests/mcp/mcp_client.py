@@ -2464,6 +2464,58 @@ def s_static(w):
     check("exit 0", m.close() == 0)
 
 
+def s_not_joined(w):
+    """a file a live TeXmacs holds but the server could not join (the host sends a
+    document the checks refuse; the host is stopped): the agent is told, the mode is
+    read-only, edits and save are refused, the file on disk is not written"""
+    import signal
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    f = os.path.join(w, "refused.tm")
+    write_small(f)
+    with open(f, "a") as fh:
+        fh.write("\n<\\initial>\n  <\\collection>\n  </collection>\n</initial>\n")
+    with open(f) as fh:
+        txt = fh.read().replace("  Second paragraph.", "  Second paragraph.\n\n  <hlink|only one>")
+    with open(f, "w") as fh:
+        fh.write(txt)
+    f = os.path.realpath(f)
+    before = open(f).read()
+    other = start_other(w, envB, "host-wait.scm", f)
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    def probe(tag):
+        e, v = m.tool("open_document", path=f)
+        check(tag + ": open_document is answered", not e and v.get("shared") is None)
+        d = v.get("document", "d1")
+        check(tag + ": it has a note that says why", not e and "not joined" in v.get("note", ""))
+        check(tag + ": agent_mode is read-only", not e and v.get("agent_mode") == "read-only")
+        e, r = m.tool("insert", document=d, where="last", content="Changed", format="texmacs")
+        check(tag + ": an insert is refused", e and "read-only" in str(r))
+        e, r = m.tool("save_document", document=d)
+        check(tag + ": the save is refused", e and "read-only" in str(r))
+        check(tag + ": the file is as it was", open(f).read() == before)
+        e, r = m.tool("read", document=d, format="text")
+        check(tag + ": the document can be read", not e)
+        return d
+    d = probe("refused welcome")
+    m.tool("close_document", document=d, discard=True)
+    os.kill(other.pid, signal.SIGSTOP)
+    try:
+        probe("busy host")
+    finally:
+        os.kill(other.pid, signal.SIGCONT)
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+
+
 def s_gui_host(w):
     """a TeXmacs with its window (Qt, offscreen: the person's, not headless) hosts a
     file whose initial environment is an empty collection, as a saved file has;
@@ -2518,7 +2570,7 @@ def s_gui_host(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host, "not-joined": s_not_joined,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

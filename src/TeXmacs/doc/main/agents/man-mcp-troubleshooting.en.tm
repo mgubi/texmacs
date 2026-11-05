@@ -47,11 +47,17 @@
   <paragraph*|<menu|Tools|Agents> is not in the menu>
 
   The menu appears only while an agent is joined to the document of the
-  current window. To check, ask the agent for <verbatim|list_documents>: the
+  current window, and only in the window that hosts the file: the first one
+  that opened it. A second window of the file (another TeXmacs process, which
+  joined the first) never shows it. To check, ask the agent for <verbatim|list_documents>: the
   entry of the file must have <verbatim|shared> not null, and
   <verbatim|agent_mode> says the mode (<verbatim|propose> when you have the
   file open). If <verbatim|shared> is null the agent has the file alone, and
-  the file is not shared with your window (see the preference above).
+  the file is not shared with your window (see the preference above). If the
+  entry has <verbatim|agent_mode> <verbatim|read-only> and a note saying that
+  the file is open in your TeXmacs but not joined, the agent could not join
+  your window (it does not answer, or the content cannot be shared); it
+  neither edits nor saves the file then.
 
   <paragraph*|The agent cannot save>
 
