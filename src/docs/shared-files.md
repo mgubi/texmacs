@@ -338,7 +338,7 @@ process hosts, or only headless ones), the agent edits directly, as before.
   style, read-only, pending, other), `level` says what a person could be asked to
   allow (`style`, `links`) or never (`code`, `limits`, `mode`), `text` is the reason
   with the content concerned. The agent takes its change back (as for any refusal)
-  and `shared-file-verdict` gives it the reasons once. (Stage B uses the levels.)
+  and `shared-file-verdict` gives it the reasons once. (Stage B, trusted agents, would use the levels; it was built, then set aside on 5 November: see the wiki page MCP-security.)
 - **Propose.** The patch is not applied. The host answers `(proposed id state pid)`
   (the agent takes its change back), then edits its own document, as the agent's
   author (the person's undo skips it): the changed blocks are replaced by one block
