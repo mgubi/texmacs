@@ -19,6 +19,7 @@
     (texmacs texmacs tm-print)
     (texmacs keyboard config-kbd)
     (convert latex init-latex)
+    (convert html html-formulas)
     (language natural)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -137,9 +138,12 @@
     (-> "Converters"
         (-> "TeXmacs -> Html"
 ;           (toggle ("Use CSS" "texmacs->html:css"))
-            (toggle ("Use MathJax" "texmacs->html:mathjax"))
-            (toggle ("Use MathML" "texmacs->html:mathml"))
-            (toggle ("Export formulas as images" "texmacs->html:images")))
+            (-> "Mathematical formulas"
+                ("Static SVG" (html-formulas-set "static"))
+                ("MathJax" (html-formulas-set "mathjax"))
+                ("MathML" (html-formulas-set "mathml"))
+                ("Images" (html-formulas-set "images"))
+                ("HTML tables" (html-formulas-set "html"))))
         (-> "LaTeX -> TeXmacs"
             (toggle ("Import sophisticated objects as pictures"
                      "latex->texmacs:fallback-on-pictures"))

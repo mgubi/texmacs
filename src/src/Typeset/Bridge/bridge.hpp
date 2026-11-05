@@ -132,6 +132,9 @@ void add_inputs (edit_env env, bool known, array<int> vars,
 // the reads and lookups of a bridge below for the record of the bridge above
 void add_reads (edit_env env, bool known, array<int> reads,
                 array<string> keys, array<tree> values);
+// the most inputs and lookups which a record holds (more: not known)
+#define INPUTS_MAX 256
+#define LOOKUPS_MAX 64
 // do the references and attachments looked up still have these values?
 // ('stamp': the labels_stamp of the tables when they last had them, or 0)
 bool same_lookups (edit_env env, array<string> keys, array<tree> values,
