@@ -147,6 +147,7 @@ public:
   void     change_style (tree style);
   void     change_style_local (tree style);
   tree     get_init_all ();
+  int      get_meta_hash ();
   void     init_env (string var, tree by);
   void     init_default (string var);
   void     init_env_local (string var, tree by);

@@ -17,12 +17,10 @@
 // a crash: the recursions of macros stop when less than STACK_MARGIN is left,
 // whatever the size of the stack (8 MB on the main thread of macOS and Linux,
 // 16 MB with the CMake build for Windows, less in other threads) and the size
-// of the frames (about 8 KB for each level of macro in a paragraph: with an
-// 8 MB stack, a recursion of 800 levels is typeset; before, one of 1500 was a
-// crash).
+// of the frames (about 8 KB for each level of macro in a paragraph).
 long stack_remaining ();
 
-#define STACK_MARGIN (1024L * 1024L)
+#define STACK_MARGIN (1536L * 1024L)
 
 inline bool
 stack_nearly_full () {

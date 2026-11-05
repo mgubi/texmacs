@@ -1034,6 +1034,8 @@ CONCRETE_NULL_CODE(edit_env);
 
 tm_ostream& operator << (tm_ostream& out, edit_env env);
 tree texmacs_exec (edit_env env, tree cmd);
+void exec_budget_start (int n);   // the evaluator gives an error after n steps
+int  exec_budget_end ();          // what is left (negative: the limit was reached)
 tree load_inclusion (url u); // implemented in tm_file.cpp
 bool inclusion_busy (url u);
 void inclusion_enter (url u);

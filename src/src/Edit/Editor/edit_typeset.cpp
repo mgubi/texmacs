@@ -1211,6 +1211,21 @@ edit_typeset_rep::init_style (string name) {
   notify_change (THE_ENVIRONMENT);
 }
 
+int
+edit_typeset_rep::get_meta_hash () {
+  // a number that changes when the style or the initial environment do (the
+  // sum over the variables, so that the order of the table does not matter,
+  // the variables of the window left out)
+  unsigned int h= 7 * (unsigned int) hash (the_style) + 1;
+  iterator<string> it= iterate (init);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (is_view_init_variable (var)) continue;
+    h += (1000003u * (unsigned int) hash (var)) ^ (unsigned int) hash (init [var]);
+  }
+  return (int) (h & 0x7fffffff);
+}
+
 tree
 edit_typeset_rep::get_init_all () {
   return (tree) init;

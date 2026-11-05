@@ -66,7 +66,9 @@ bridge_compound (typesetter ttt, tree st, path ip) {
 void
 bridge_compound_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || L(u) >= START_EXTENSIONS, "nil path");
+  // (the tree may keep its tag when children are inserted or removed, also
+  // for the primitives that this bridge handles: include, style-only, active...)
+  ASSERT (!is_nil (p) || L(u) >= START_EXTENSIONS || L(u) == L(st), "nil path");
   if (is_nil (p) || (p->item == 0) || is_nil (body)) {
     st= substitute (st, p, u);
     valid= false;

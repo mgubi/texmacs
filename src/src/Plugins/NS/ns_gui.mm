@@ -1897,10 +1897,12 @@ clear_selection (string key) {
 ******************************************************************************/
 int char_clip=0;
 
+bool is_headless ();
+
 void 
 beep () {
-  // Issue a beep
-  NSBeep ();
+  // Issue a beep (not in a headless process)
+  if (!is_headless ()) NSBeep ();
 }
 
 void 
