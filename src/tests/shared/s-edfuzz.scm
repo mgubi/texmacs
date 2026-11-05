@@ -72,7 +72,7 @@
 
 
 (define (log2! s) (display s) (newline))
-(define nap 0) (define nmis 0) (define nreset 0)
+(define nap 0) (define nmis 0) (define nreset 0) (define nfail 0)
 (define f #f)
 (define (bt) (buffer-get-body f))
 (define shadow dt0)
@@ -104,13 +104,17 @@
                   (when (== 0 (modulo nap typeset-every))
                     (when (getenv "FZ_DEBUG") (string-save (object->string (tm->stree (bt))) (string->url (getenv "FZ_DEBUG"))))
                     (update-forced))
+                  ;; (a typesetting failure replaces the tree by the editor's recovery:
+                  ;; not a divergence of the patches)
+                  (if (typeset-failed-buffer? f)
+                      (begin (set! nfail (+ nfail 1)) (when (< nfail 4) (log2! (list "FAILED-DOC" (tm->stree (bt)) (patch->scheme p)))) (typeset-failure-forget f) (reset!))
                   (unless (== (tm->stree (bt)) (tm->stree (tree-ref shadow 1)))
                     (set! nmis (+ nmis 1))
                     (when (< nmis 4) (log2! (list "MISMATCH" i (patch->scheme p))))
-                    (reset!)))))))
+                    (reset!))))))))
         (when (> (string-length (object->string (tm->stree shadow))) 4000) (reset!))
         (loop (+ i 1))))
-    (log2! (list "EDDONE" nap nmis nreset))))
+    (log2! (list "EDDONE" nap nmis nreset (list "typesetting failures" nfail)))))
 
 (define (A-steps)
   (list
