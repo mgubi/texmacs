@@ -23,7 +23,7 @@
    (wait-sync "b-done")
    (act "alive" (check "the host is alive and hosts" (== (role-of) 'host))
         (check "its document is unchanged but for the good patches"
-               (== (body-stree) '(document (section "Intro") "Hello world." "Second paragraph." "Third one." "good one" "good two")))
+               (== (body-stree) '(document (section "Intro") "Hello world." "Second paragraph." "Third one." "good one" "good two" (ornament "x"))))
         (check "it counted the malformed ones" (>= (shared-stat 'malformed) 8))
         (publish-body!) (sync-set! "a-done"))))
 
@@ -85,14 +85,24 @@
                                               ")) (remove (1 4 1) \"\")))")) #f))
    (act "alive after deep" (attempt "and the host answers after it" (patch-msg (ins-block 4 "good one")) "applied"))
    (act "dishonest" (attempt "a dishonest inverse: the forward patch counts" (patch-msg (pp '(insert (1 5) (document "good two")) '(insert (1 0) (document "evil")))) "applied"))
+   (act "ornament" (attempt "an ornament is inserted" (patch-msg (ins-block 6 '(ornament "x"))) "applied"))
+   (act "ornament-empty" (attempt "removing the only child of the ornament is refused (arity)" (patch-msg (pp '(remove (1 6 0 1) "") '(insert (1 6 0) "x"))) "arity"))
+   (act "wrong-syntax" (attempt "a deep tree hidden by #| |# is dropped"
+                                (lambda (c i)
+                                  (string-append "(patch \"" i "/1\" \"" c "\" #| \" |# (pair (insert (1 4) (document "
+                                                 (apply string-append (make-list 100000 "(frac "))
+                                                 "\"a\""
+                                                 (make-string 100000 #\))
+                                                 ")) (remove (1 4 1) \"\")))")) #f))
+   (act "alive after syntax" (attempt "and the host answers after it" (lambda (c i) "(withdraw)") "refused"))
    (act "ready" (sync-set! "b-ready"))
    (wait-sync "a-bad-sent")
    (step "told" (and (>= (shared-stat 'bad-remote) 1) (>= (shared-stat 'resync) 1)))
-   (step "resynced" (= (para-count) 6))
+   (step "resynced" (= (para-count) 7))
    (act "ok" (check "the participant survived a host that sends patches that do not apply" #t))
    (act "b-done" (sync-set! "b-done"))
    (wait-sync "a-done")
-   (step "synced" (= (para-count) 6))
+   (step "synced" (= (para-count) 7))
    (act "out" (publish-body!))))
 
 (run-steps (if (== ROLE "A") (A-steps) (B-steps)))

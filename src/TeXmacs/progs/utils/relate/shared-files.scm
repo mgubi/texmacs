@@ -222,7 +222,7 @@
     (with u (string->url path)
       (and (url-exists? u)
            (with e (catch #t
-                     (lambda () (string->object (string-load u)))
+                     (lambda () (read-object-checked (string-load u)))
                      (lambda args #f))
              (and (func? e 'entry) (== (length e) 8) (== (cadr e) key) e))))))
 
@@ -303,7 +303,7 @@
                 (else
                   (let* ((u (string->url (string-append dir "/" (car names))))
                          (e (catch #t
-                              (lambda () (string->object (string-load u)))
+                              (lambda () (read-object-checked (string-load u)))
                               (lambda args #f))))
                     (if (catch #t
                           (lambda ()
@@ -340,12 +340,20 @@
 ;; to 200.) Short messages cannot be that deep, so they are not scanned.
 (define sf-max-depth 1500)
 
+(define (delimiter? c)
+  (or (char=? c #\space) (char=? c #\newline) (char=? c #\tab) (char=? c #\return)
+      (char=? c #\() (char=? c #\))))
+
 (define (nesting-ok? s)
+  ;; Messages are written by object->string: parentheses, atoms, strings, numbers,
+  ;; #t and #f. Anything else outside a string (#\x, #| |#, ; comments, quote
+  ;; characters, | symbols, backslashes) makes the message refused: the reader
+  ;; knows more syntax than this scanner, and what it hides defeats the count.
   (or (< (string-length s) (* 2 sf-max-depth))
       (let ((n (string-length s)))
         (let loop ((i 0) (depth 0) (in-str #f))
           (if (>= i n)
-              #t
+              (not in-str)
               (let ((c (string-ref s i)))
                 (cond (in-str
                         (cond ((char=? c #\\) (loop (+ i 2) depth #t))
@@ -355,7 +363,16 @@
                       ((char=? c #\()
                        (and (< depth sf-max-depth) (loop (+ i 1) (+ depth 1) #f)))
                       ((char=? c #\)) (loop (+ i 1) (max 0 (- depth 1)) #f))
+                      ((char=? c #\#)
+                       (and (< (+ i 1) n) (memv (string-ref s (+ i 1)) '(#\t #\f))
+                            (or (>= (+ i 2) n) (delimiter? (string-ref s (+ i 2))))
+                            (loop (+ i 2) depth #f)))
+                      ((memv c '(#\| #\; #\' #\` #\, #\\)) #f)
                       (else (loop (+ i 1) depth #f)))))))))
+
+(define (read-object-checked s)
+  ;; the object written in @s, if it is not nested too deep (see nesting-ok?)
+  (and (nesting-ok? s) (string->object s)))
 
 (define (msg-receive link)
   ;; the next message of a link, or #f
@@ -484,6 +501,10 @@
   ;; the patch of the shape-checked @psexp, or #f (also if the integers do not fit)
   (and (patch-shape-ok? psexp 0)
        (catch #t (lambda () (scheme->patch psexp)) (lambda args #f))))
+
+(tm-define (shared-body-patch p)
+  (:synopsis "For the tests: the part of the patch @p that is under the body")
+  (split-patch p 1))
 
 (tm-define (shared-sanitize-patch psexp doc)
   (:synopsis "The patch of a participant on the document @doc with the inverses of the document, or #f (for the tests)")
@@ -918,7 +939,11 @@
   (let* ((id (sf-new-id)) (inter (shared-interactive?))
          (c (do-hello key entry id inter #f))
          (m (and (>= c 0) (msg-wait c sf-join-wait))))
-    (cond ((and m (func? m 'welcome) (== (length m) 7))
+    (cond ((and m (func? m 'welcome) (== (length m) 7)
+                (not (mcp-stree-arity-ok? (caddr m))))
+           (local-close c)
+           'busy)
+          ((and m (func? m 'welcome) (== (length m) 7))
            (with (tag state doc modified roster host-id meta) m
              (buffer-set name (stree->tree doc))
              (let ((sf (sf-make name key 'participant)))
@@ -1143,6 +1168,21 @@
   (and (pair? st)
        (or (and (memq (car st) '(version-both version-old version-new)) #t)
            (list-or (map version-tag-in? (cdr st))))))
+
+(define (patch-arity-ok? p body)
+  ;; does the body, after the patch @p of a peer, have no tag with an arity it
+  ;; cannot have? (@body: the body it applies to)
+  (catch #t
+    (lambda ()
+      (let ((bp (split-patch p 1)))
+        (or (not bp)
+            (let* ((new (patch-apply body bp)) (range (shared-changed-blocks body new)))
+              (cond ((not range) #t)
+                    ((eq? range 'bad) #f)
+                    (else (list-and (map (lambda (b) (mcp-stree-arity-ok? (tm->stree b)))
+                                         (sublist (tree-children new) (car range)
+                                                  (+ (car range) (caddr range))))))))))) 
+    (lambda args #f)))
 
 (define (blocks-stree body p n)
   (map tm->stree (sublist (tree-children body) p (+ p n))))
@@ -1481,6 +1521,15 @@
                 (list 'refused id cur
                       (list (list "patch" "code" "a patch of a shape that the host does not accept")))))
     (cond ((and p (patch-applicable? p (live-current-document key))
+                (not (patch-arity-ok? p (tree-ref (live-current-document key) 1)))
+                (begin
+                  (sf-stat! sf 'arity-refused)
+                  (msg-send (peer-link peer)
+                            (list 'refused id cur
+                                  (list (list "arity" "code" "a tag would have a number of children it cannot have"))))
+                  #t))
+           #t)
+          ((and p (patch-applicable? p (live-current-document key))
                 (agent-gated? sf peer)
                 (with g (agent-gate sf peer p)
                   (cond ((eq? g 'apply) #f)
@@ -1940,6 +1989,11 @@
     ok))
 
 (define (participant-reset! sf state doc modified)
+  (if (mcp-stree-arity-ok? (caddr doc))
+      (participant-reset!* sf state doc modified)
+      (stat! 'bad-remote)))
+
+(define (participant-reset!* sf state doc modified)
   ;; the document of the host replaces everything, pending changes included
   (let* ((key (sf-key sf)) (name (sf-buffer sf)))
     ;; The document of this process is replaced as a whole, never combined
@@ -1971,7 +2025,8 @@
   (let* ((key (sf-key sf))
          (d0 (live-current-document key))
          (pend (sf-get sf 'pending)))
-    (cond ((not (catch #t (lambda () (patch-applicable? r d0)) (lambda args #f)))
+    (cond ((or (not (catch #t (lambda () (patch-applicable? r d0)) (lambda args #f)))
+               (not (patch-arity-ok? r (tree-ref d0 1))))
            ;; (a patch that does not apply to the confirmed document: patch-invert
            ;; and the others abort on it)
            (stat! 'bad-remote)

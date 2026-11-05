@@ -1290,6 +1290,20 @@
            (for (c (cdr st)) (check-arity c d))))
         (else #t)))
 
+(tm-define (mcp-stree-arity-ok? st)
+  ;; no tag that the DRD knows as a primitive has a number of children it cannot
+  ;; have (the bridges of the typesetter index the children of `ornament',
+  ;; `canvas', `hlink', `with'...). For any tree that comes from another process.
+  (cond ((not (pair? st)) #t)
+        ((not (symbol? (car st))) #f)
+        (else
+          (and (or (eq? (car st) 'document)
+                   (not (known-primitive? (car st)))
+                   (tag-possible-arity? (car st) (length (cdr st))))
+               (let loop ((l (cdr st)))
+                 (or (not (pair? l))
+                     (and (mcp-stree-arity-ok? (car l)) (loop (cdr l)))))))))
+
 (define (known-macro-arity? tag)
   ;; does the DRD give a macro an arity (it is not the default of the tags
   ;; it does not know, which have only the arity 0)? Then it is the macro's.

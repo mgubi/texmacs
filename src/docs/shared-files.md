@@ -450,6 +450,31 @@ process hosts, or only headless ones), the agent edits directly, as before.
 - **Confirmation.** When the host says it took my patch but `live-apply-patch` fails, the
   participant asks for the document again (it used to drop its pending patch and go on).
 
+- **Syntax of messages.** The count of the nesting is made by a scanner that knows only what
+  `object->string` writes: parentheses, atoms, strings, numbers, `#t` and `#f`. A message that
+  has anything else outside a string (`#\x`, `#| |#`, `;`, quote characters, `|`, a backslash)
+  is dropped, because the reader knows more syntax than the scanner (a deep tree hidden
+  behind a comment defeated it). The same check is made on the entry files.
+- **Arity.** For every peer (agent or person), a patch is refused (rule `arity`) if the
+  blocks it changes have a tag that the DRD knows as a primitive with a number of children it
+  cannot have (`(ornament)`, `(with)`, `(hlink "x")`...); a participant that receives such a
+  patch from its host, or such a document in a welcome, asks for the document again (or does
+  not join). `mcp-stree-arity-ok?` is the test, from the rule of the agent's filter.
+- **The editor and the typesetter** no longer crash on such trees, whoever makes them (a
+  patch that got through, another version, a file): `make_bridge` shows every primitive with
+  a wrong arity as an inactive tree, an insertion or a removal that leaves a primitive with a
+  wrong arity is told to the typesetter as an assignment of that tree (`edit_modify.cpp`), the
+  assertions of the bridges accept the same tag when children come or go, the bridges of
+  `with`, `formatting` and the ornaments (and canvas, locus...) do not index a child that is
+  not there, and the correction of the cursor (`correct_cursor`) keeps only the part of the
+  cursor path that leads into the tree.
+- **Random patches in a real buffer** (scenario `edfuzz`, `FZ_N` and `FZ_SEED`): the patches
+  that the host would accept are applied in place to a buffer of a process that has the
+  editor, as a host or a participant does. It found the crashes above (ornament, canvas,
+  compound, formatting, with, the cursor); 8 runs of 20000 iterations pass. In about one
+  patch in 2000 the buffer after the in-place application differs from the same patch applied
+  as a pure function (the editor corrects the tree: not studied).
+
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a
 participant (`msg-text` now raises the print length). The tests had small documents.
@@ -474,7 +499,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) and `fuzz` (random patches with hostile integers, no crash). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) and `edfuzz` (random patches applied to a real buffer). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with

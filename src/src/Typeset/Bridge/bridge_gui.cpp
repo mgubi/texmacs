@@ -49,8 +49,10 @@ bridge_ornamented_rep::bridge_ornamented_rep (
 
 void
 bridge_ornamented_rep::initialize () {
-  if (is_nil(body)) body= make_bridge (ttt, st[idx], descend (ip, idx));
-  else replace_bridge (body, st[idx], descend (ip, idx));
+  // (a patch from another process can leave the tree without its child)
+  tree u= idx < N(st)? st[idx]: tree ("");
+  if (is_nil(body)) body= make_bridge (ttt, u, descend (ip, idx));
+  else replace_bridge (body, u, descend (ip, idx));
 }
 
 /******************************************************************************

@@ -71,6 +71,20 @@ make_inactive_bridge (typesetter ttt, tree st, path ip) {
   else return bridge_auto (ttt, st, ip, inactive_auto, false);
 }
 
+bool
+bridge_needs_arity (tree_label l) {
+  // does the bridge of this primitive index its children?
+  switch (l) {
+  case WITH: case CANVAS: case ORNAMENT: case ART_BOX:
+  case DATOMS: case DLINES: case DPAGES: case TFORMAT:
+  case SURROUND: case LOCUS: case MARK: case VAR_MARK: case EXPAND_AS:
+  case HLINK: case ACTION:
+    return true;
+  default:
+    return false;
+  }
+}
+
 bridge
 make_bridge (typesetter ttt, tree st, path ip) {
   // cout << "Make bridge " << st << ", " << ip << LF;
@@ -80,9 +94,13 @@ make_bridge (typesetter ttt, tree st, path ip) {
   // A `with' with no argument (or with the wrong number) is indexed by its
   // bridge: it is shown as an inactive tree, so that a document, or a patch
   // from another process, with such a tree does not crash the typesetter.
-  // (The other primitives with a wrong arity are left to the failure
-  // detection of the typesetter, which the tests of `typeset' exercise.)
-  if (L(st) == WITH && !std_drd->correct_arity (WITH, N(st)))
+  // The same for the other primitives whose bridge indexes its children
+  // (`ornament', `canvas', `hlink'...): a patch can leave `(ornament)' with no
+  // child. (The other primitives with a wrong arity are left to the failure
+  // detection of the typesetter, which the tests of `typeset' exercise, as
+  // for `anim-compose'.)
+  if (is_compound (st) && bridge_needs_arity (L(st)) &&
+      !std_drd->correct_arity (L(st), N(st)))
     return make_inactive_bridge (ttt, st, ip);
   switch (L(st)) {
   case _ERROR:
