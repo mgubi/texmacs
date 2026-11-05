@@ -395,9 +395,13 @@ code_paragraph (edit_env env, path ip, array<box> rows,
   // mode does not move them (a block is not aligned); then:
   // - papyrus mode: the items stay after the box, at the right margin, and
   //   are moved down to the baseline of its last line;
-  // - paper mode: the last row is made to end where its text ends, unless
-  //   it is empty or the paragraph mode would then move it (center, right:
-  //   the cursor after the block is then at the margin).
+  // - paper mode: the rows of the paragraph are made to end where their
+  //   text ends, as the lines of a paragraph (a text before the block fits
+  //   before its first row, the cursor after it is after its last), unless
+  //   the paragraph mode would then move them (center, right: the cursor
+  //   after the block is then at the margin). The rows of the lines between
+  //   (typeset_paper, without items before or after them) stay as wide as
+  //   the page: their phrases are made from those of line 1.
   SI ex= 0, ey= 0;
   bool moved= false;
   if (N(after) > 0 && N(rows) == 1 && code_box_all_lines (rows[0]) &&
@@ -417,14 +421,14 @@ code_paragraph (edit_env env, path ip, array<box> rows,
     after= down;
     moved= true;
   }
-  if (!moved && N(after) > 0 && N(rows) > 0 &&
-      code_box_end (rows[N(rows)-1], ex, ey)) {
+  // (only with items before or after the rows: the phrases of the lines
+  // between are made from paragraphs without them, whose page items must
+  // hold the very boxes of their rows: see get_phrase)
+  if (!moved && (N(before) > 0 || N(after) > 0)) {
     string mode= as_string (env->read (PAR_MODE));
-    box last= rows[N(rows)-1];
-    if ((mode == "left" || mode == "justify") && ex > last->x1) {
+    if (mode == "left" || mode == "justify") {
       rows= copy (rows);
-      rows[N(rows)-1]= resize_box (decorate_middle (ip), last, last->x1,
-                                   last->y1, ex, last->y2, true);
+      for (int i=0; i<N(rows); i++) rows[i]= code_row_to_text (rows[i]);
     }
   }
   lazy_paragraph par (env, ip);
@@ -919,7 +923,7 @@ bridge_code_rep::rich_box (tree& t, path lip, SI width, SI cell) {
     bs << empty_box (decorate_middle (lip), 0, env->fn->y1, 0, env->fn->y2);
     xs << (SI) 0; ys << (SI) 0;
   }
-  return composite_box (decorate_middle (lip), bs, xs, ys);
+  return code_rich_rows_box (decorate_middle (lip), bs, xs, ys);
 }
 
 void

@@ -112,6 +112,10 @@ SI code_hint_before (int p, array<int>& hp, array<SI>& hw);
 bool code_box_end (box b, SI& x, SI& y);
 // a code box of papyrus mode (all the lines of a block)
 bool code_box_all_lines (box b);
+// a row of paper mode ending where its text ends (it is as wide as the page)
+box  code_row_to_text (box row);
+// the rows of a line with markup, found by y (see rich_box)
+box  code_rich_rows_box (path ip, array<box> bs, array<SI> xs, array<SI> ys);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines

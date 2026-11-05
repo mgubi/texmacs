@@ -178,11 +178,12 @@ the lines being copied at each key: #811 too (11 ms).
   right): its lines start at the left margin, as in an editor of code.
   The rows are as wide as the page (the rows of the lines of paper mode
   are made from those of line 1, which an offset depending on the width
-  of each row would break). In paper mode, only the last row ends at its
-  text, for the cursor after the block, and only in the modes left and
-  justify; in the others that cursor is at the right margin.
-  In paper mode an empty last row is not narrowed (a Right from before
-  it would go past it).
+  of each row would break). In paper mode, the rows of the paragraphs
+  made with the items of the bridges around the block (its first and last
+  lines) end where their text ends, in the modes left and justify
+  (`code_row_to_text`), so that a text before the block fits before its
+  first row and the cursor after it is after its text; in the modes
+  center and right that cursor is at the right margin.
 - **A block nested in markup, papyrus mode** (`<with|code-lines|true|...>`,
   a surround, a proof; not a source file, which has nothing around its
   lines): the block is one box as wide as the page in the line of its
@@ -195,6 +196,9 @@ the lines being copied at each key: #811 too (11 ms).
   - Up and Down from the paragraphs around go before or after the block
     rather than into its first or last line;
   - a click at or left of the left end of a line goes before the block.
+  - Right from the end of the last line may go past some of the places
+    after the block (their markers are at the right margin, and the
+    editor looks for the next place by steps to the right which grow).
   Moving these places into the box of the block (a composite with the
   markers at the ends of its first and last lines, tried in November 2026)
   needs the rules by which a line of text tells apart the places at the

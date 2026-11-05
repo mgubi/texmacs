@@ -1397,6 +1397,56 @@
                     r))))
       (check= (walk "true" kbd-right '(0 2)) (walk "false" kbd-right '(0 2)))
       (check= (walk "true" kbd-left '(2 3)) (walk "false" kbd-left '(2 3)))))
+;; paper mode: the first row after "Proof.", the cursor after a block whose
+  ;; last line is empty, as with paragraphs
+  (let ((places
+         (lambda (cl doc ps)
+           (let ((r #f))
+             (with-body (doc cl)
+               (lambda ()
+                 (init-env "page-medium" "paper")
+                 (step (lambda () #t))
+                 (set! r (map (lambda (p)
+                                (go-to (apply at p)) (step (lambda () #t))
+                                (list (get-cursor-x) (get-cursor-y)))
+                              ps))))
+             r))))
+    (for (c (list (list (lambda (cl)
+                          `(document "prev"
+                             (proof (document
+                                      (with "font-family" "tt" "code-lines" ,cl
+                                        (document "ab" "c" "de"))))
+                             "next"))
+                        '((1 0) (1 0 0 4 0 0) (1 0 0 1)))
+                  (list (lambda (cl)
+                          `(document "prev"
+                             (with "font-family" "tt" "code-lines" ,cl
+                               (document "" "c" ""))
+                             "next"))
+                        '((1 4 0 0) (1 4 2 0) (1 1)))))
+      (check= (places "true" (car c) (cadr c))
+              (places "false" (car c) (cadr c)))))
+  ;; Right and Left through a wrapped line with markup (its rows found by
+  ;; y), papyrus, as with paragraphs
+  (let ((walk
+         (lambda (cl key from)
+           (let ((r '()))
+             (with-body `(document (with "font-family" "tt" "code-lines" ,cl
+                                     (document "ab"
+                                       (concat ,(apply string-append
+                                                       (make-list 30 "word "))
+                                               (em "e")))))
+               (lambda ()
+                 (init-env "page-medium" "papyrus")
+                 (step (lambda () #t))
+                 (go-to (apply at from)) (step (lambda () #t))
+                 (set! r (map (lambda (i) (step key) (rel (cursor-path)))
+                              (.. 0 160)))))
+             r))))
+    (check= (walk "true" kbd-right '(0 4 1 0 0))
+            (walk "false" kbd-right '(0 4 1 0 0)))
+    (check= (walk "true" kbd-left '(0 4 1 1 1))
+            (walk "false" kbd-left '(0 4 1 1 1))))
   ;; Up and Down from the end of a last line with markup, Right and Left
   ;; across the start of a block after a text, as with paragraphs
   (for (medium '("papyrus" "paper"))

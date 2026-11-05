@@ -1249,6 +1249,26 @@ code_row_box (path lip, tree line, string text, int a, int b, font fn,
                                cell, tabw, invis, width);
 }
 
+box
+code_row_to_text (box row) {
+  // the same row, ending where its text ends (with the hints at the end of
+  // its line), as a line of a paragraph; another box as it is
+  if (is_nil (row) || row->get_type () != CODE_BOX) return row;
+  code_box_rep* r= (code_box_rep*) row.operator-> ();
+  if (!r->single) return row;
+  code_box_rep* nr=
+    code_new (r->ip, r->doc, r->one_text, r->ra, r->rb, r->fn, r->pen,
+              r->lx, r->cols, r->cell, r->tabw, r->invis, row->x2);
+  array<SI> xp;
+  nr->xpositions (0, nr->rb, xp);
+  SI end= xp[nr->rb] - xp[nr->ra];
+  array<int> hp; array<SI> hw; array<string> ht;
+  if (nr->rb == N(nr->one_text) && nr->hints (0, hp, hw, ht))
+    end += code_hint_before (nr->rb, hp, hw);
+  nr->x2= max (end, (SI) 0);
+  return nr;
+}
+
 /******************************************************************************
 * A box scaled down to the height of a row (code-tall-objects: shrink)
 *
@@ -1314,4 +1334,36 @@ bool
 code_box_all_lines (box b) {
   return !is_nil (b) && b->get_type () == CODE_BOX &&
          !((code_box_rep*) b.operator-> ())->single;
+}
+
+/******************************************************************************
+* The rows of a line with markup (the lines of its paragraph), one under the
+* other, the baseline of the first at 0: a row is found by y, as in a stack
+* (a composite box would find them by x, as if they were side by side)
+******************************************************************************/
+
+struct code_rich_rows_box_rep: public composite_box_rep {
+  code_rich_rows_box_rep (path ip, array<box> bs, array<SI> xs,
+                          array<SI> ys):
+    composite_box_rep (ip, bs, xs, ys) { finalize (); }
+  operator tree () { return tree ("code rich rows"); }
+  int find_child (SI x, SI y, SI delta, bool force) {
+    (void) x; (void) delta;
+    // the row whose band (half way to the rows above and below) has y
+    int n= N(bs), best= -1;
+    for (int i=0; i<n; i++) {
+      if (!force && !bs[i]->accessible ()) continue;
+      if (best == -1) { best= i; continue; }
+      // (below the middle of the gap between best and i: i)
+      SI mid= ((sy(best) + bs[best]->y1) + (sy(i) + bs[i]->y2)) >> 1;
+      if (y < mid) best= i;
+      else break;
+    }
+    return best;
+  }
+};
+
+box
+code_rich_rows_box (path ip, array<box> bs, array<SI> xs, array<SI> ys) {
+  return tm_new<code_rich_rows_box_rep> (ip, bs, xs, ys);
 }
