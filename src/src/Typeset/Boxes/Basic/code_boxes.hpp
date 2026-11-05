@@ -104,6 +104,9 @@ array<int> code_breaks (string s, font fn, SI width, SI cell, int tabw,
 // characters of the grid) and their texts; false when it has none
 bool code_line_hints (tree t, SI cell, array<int>& hp, array<SI>& hw,
                       array<string>& ht);
+// the room of the hints before the character p (the position p is before
+// it, the character after it)
+SI code_hint_before (int p, array<int>& hp, array<SI>& hw);
 
 // the lines i0, ..., i0+n-1 of doc (the special lines tall_k of the box
 // have the texts tall_txt, broken into rows at tall_st, or, for the lines

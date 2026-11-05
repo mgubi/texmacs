@@ -108,8 +108,11 @@ the tree is the same, only its typesetting differs. Tracking issue: #797.
   `typeset_layered_string` does in a paragraph); a hint takes the room of
   its characters (a cell each) before its character, in the positions of
   the line (`code_line_hints`, `code_xpos`: the cursor, the clicks, the
-  selections and the soft line breaks see it; the cursor at its character
-  is after it) and is drawn in grey. Nothing is kept, so nothing goes out
+  selections and the soft line breaks see it; the position of the
+  character is before the hint, the character after it, as editors put the
+  cursor next to a parameter hint: a row which starts at a hint starts
+  with it, a space before a hint ends before it) and is drawn in grey, on
+  the row of its character. Nothing is kept, so nothing goes out
   of date: a change of the layers, the language, the colours or the
   comments before the line is seen at the next drawing.
   `typeset-code-rich-made` counts the lines typeset by the concater (with

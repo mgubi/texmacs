@@ -146,10 +146,14 @@ code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos,
   xpos[0]= raw[0];
   SI shift= 0;
   int i= 0, h= 0;
-  // (the hints before the character at i: it and those after it further)
+  // (the hints before the character at i: the position i is before them,
+  // the character after them, and those after it further; pend: their
+  // width, where the character starts)
+  SI pend= 0;
   auto hints_at= [&] (int i) {
+    pend= 0;
     while (h < N(hp) && hp[h] <= i) {
-      if (hp[h] == i) { shift += hw[h]; xpos[i] += hw[h]; }
+      if (hp[h] == i) { shift += hw[h]; pend += hw[h]; }
       h++;
     }
   };
@@ -166,7 +170,7 @@ code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos,
       continue;
     }
     // a tab, to the next stop; another control character, a cell
-    SI x= xpos[i], end= x + cell;
+    SI x= xpos[i] + pend, end= x + cell;
     if (c == 9 && tabw > 0 && cell > 0) {
       SI stop= (SI) tabw * cell;
       end= (x / stop + 1) * stop;
@@ -176,7 +180,13 @@ code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos,
     shift= end - raw[j];
     i= j;
   }
-  hints_at (n);
+}
+
+SI
+code_hint_before (int p, array<int>& hp, array<SI>& hw) {
+  SI w= 0;
+  for (int h=0; h<N(hp); h++) if (hp[h] == p) w += hw[h];
+  return w;
 }
 
 array<int>
@@ -189,13 +199,15 @@ code_breaks (string s, font fn, SI width, SI cell, int tabw,
   if (n == 0 || width <= 0) return r;
   array<SI> xpos;
   code_xpos (s, n, fn, cell, tabw, xpos, hp, hw);
-  if (xpos[n] <= width) return r;
+  // (the hints at the end of the line take room in its last row)
+  SI tail= code_hint_before (n, hp, hw);
+  if (xpos[n] + tail <= width) return r;
   int a= 0, i= 0, after_space= -1;
   while (i < n) {
     int j= i;
     if (code_control (s, i, j) < 0) { j= i; tm_char_forwards (s, j); }
     if (j > n) j= n;
-    if (xpos[j] - xpos[a] > width && i > a) {
+    if (xpos[j] + (j == n? tail: 0) - xpos[a] > width && i > a) {
       int b= (after_space > a? after_space: i);
       r << b;
       a= b;
@@ -534,7 +546,9 @@ struct code_box_rep: public box_rep {
   bool   has_end (int k) {
     return invis == 1 && (single || i0 + k < N(doc) - 1); }
   void   draw_invisibles (renderer ren, string s, array<SI>& xp, int a,
-                          int b, bool last, SI y);
+                          int b, bool last, SI y,
+                          array<int> hp= array<int> (),
+                          array<SI> hw= array<SI> ());
   void   draw_fold_mark (renderer ren, int k);
   box    row_box (int k, int i) {
     int a= starts (k) [i], b= row_end (k, i);
@@ -743,6 +757,13 @@ code_box_rep::display (renderer ren) {
     code_runs_entry& c= (layered? over: c0);
     array<SI> xpos;
     xpositions (k, N(s), xpos);
+    // (the inlay hints of a server: the position of a hint is before it,
+    // its character after it, see code_xpos)
+    array<int> hp; array<SI> hw; array<string> ht;
+    bool hinted= hints (k, hp, hw, ht);
+    auto hint_at= [&] (int p) {
+      for (int h=0; h<N(hp); h++) if (hp[h] == p) return true;
+      return false; };
     array<int> st= starts (k);
     int lo= (k == ka? ia: 0), hi= (k == kb? ib: N(st) - 1);
     for (int i= lo; i <= hi && i < N(st); i++) {
@@ -767,24 +788,26 @@ code_box_rep::display (renderer ren) {
         while (u < s2) {
           if (s[u] == ' ') { u++; continue; }
           if (code_control (s, u, j) >= 0) { u= j; continue; }
+          // (a piece is cut at a hint, which is drawn before its character)
           int v= u;
-          while (v < s2 && s[v] != ' ' && code_control (s, v, j) < 0)
+          while (v < s2 && s[v] != ' ' && code_control (s, v, j) < 0 &&
+                 (v == u || !hinted || !hint_at (v)))
             tm_char_forwards (s, v);
           if (v > s2) v= s2;
-          fn->draw (ren, s (u, v), xpos[u] - xpos[a], y);
+          SI before= (hinted? code_hint_before (u, hp, hw): 0);
+          fn->draw (ren, s (u, v), xpos[u] + before - xpos[a], y);
           u= v;
         }
       }
       // the inlay hints of a server, in grey in the room before their
-      // characters (a space is not drawn: see typeset_layer_text)
-      array<int> hp; array<SI> hw; array<string> ht;
-      if (hints (k, hp, hw, ht)) {
-        bool last= (i == N(st) - 1);
+      // characters, on the row of their character (one at the end of the
+      // line on its last row; a space is not drawn: see typeset_layer_text)
+      if (hinted) {
         ren->set_pencil (pencil (named_color ("#909090")));
         for (int h=0; h<N(hp); h++) {
           int p= hp[h];
-          if (p < a || p > b || (p == b && !last)) continue;
-          SI x= xpos[p] - hw[h] - xpos[a];
+          if (p < a || p > b || (p == b && b != N(s))) continue;
+          SI x= xpos[p] - xpos[a];
           string txt= ht[h];
           int u= 0, cnt= 0;
           while (u < N(txt)) {
@@ -799,7 +822,7 @@ code_box_rep::display (renderer ren) {
       if (invis || search_forwards ("<#9>", a, s) >= 0)
         draw_invisibles (ren, s, xpos, a, b,
                          i == N(st) - 1 && (!single || rb == N(s)) &&
-                         has_end (k), y);
+                         has_end (k), y, hp, hw);
     }
   }
 }
@@ -809,7 +832,8 @@ code_box_rep::display (renderer ren) {
 // its end (an arrow back) when it is the last row of the line
 void
 code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
-                               int a, int b, bool last, SI y) {
+                               int a, int b, bool last, SI y,
+                               array<int> hp, array<SI> hw) {
   ren->set_pencil (pencil (named_color ("#a0a0a0"), max (fn->wline, PIXEL)));
   SI x0= xp[a], ym= y + fn->yx / 2, d= max (cell / 12, PIXEL), h= cell / 4;
   int i= a;
@@ -817,7 +841,9 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
     int j= i;
     int c= code_control (s, i, j);
     if (c < 0) { j= i; tm_char_forwards (s, j); }
-    SI xa= xp[i] - x0, xb= xp[min (j, N(xp) - 1)] - x0;
+    // (the character starts after the hints before it: see code_xpos)
+    SI xa= xp[i] + code_hint_before (i, hp, hw) - x0;
+    SI xb= xp[min (j, N(xp) - 1)] - x0;
     // (the tabs are always shown, as by typeset_prog_tab; the others, and
     // the tabs as arrows to their stops, with code-invisibles)
     if (c < 0 && s[i] == ' ') {
@@ -848,8 +874,8 @@ code_box_rep::draw_invisibles (renderer ren, string s, array<SI>& xp,
     i= j;
   }
   if (last) {
-    // the end of the line
-    SI x= xp[min (b, N(xp) - 1)] - x0 + cell / 6;
+    // the end of the line (after the hints at its end)
+    SI x= xp[min (b, N(xp) - 1)] + code_hint_before (b, hp, hw) - x0 + cell / 6;
     SI r= x + (cell * 2) / 3, tp= y + fn->yx, md= y + fn->yx / 3;
     ren->line (r, tp, r, md);
     ren->line (r, md, x, md);

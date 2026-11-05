@@ -966,6 +966,66 @@
                                       (rect 151)))
             (check-true (< (cadr (rect 151)) (cadr r)))))))))
 
+;; The inlay hints drawn by the box (code_line_hints, code_xpos): the
+;; position of a hint is before it, its character after it; a hint at the
+;; start of a line or of a row takes its room at the start, one inside a
+;; token between its characters (the audit of f09a27ca48: a hint at the
+;; start of a row was drawn in the margin, without room)
+(define (test-hints)
+  (check-group "inlay hints in a block")
+  (for (medium '("papyrus" "paper"))
+    (let* ((long (apply string-append
+                        (map (lambda (i) (string-append "word" (number->string i)
+                                                        " "))
+                             (.. 0 40))))
+           (doc `(document (with "font-family" "tt" "mode" "prog"
+                             "prog-language" "cpp" "code-lines" "true"
+                             (document "abcdefgh" "abcdefgh" ,long))))
+           (x (lambda (l i)
+                (go-to (at 0 8 l i)) (step (lambda () #t))
+                (get-cursor-x)))
+           (y (lambda (l i)
+                (go-to (at 0 8 l i)) (step (lambda () #t))
+                (get-cursor-y))))
+      (with-body doc
+        (lambda ()
+          (init-env "page-medium" medium)
+          (step (lambda () #t))
+          (let ((blk (path->tree (at 0 8))))
+            (code-set-line-layers (tree-ref blk 0) (stree->tree '(tuple))
+                                  (stree->tree '(tuple (tuple "0" "S")
+                                                       (tuple "3" "HH"))))
+            (update-path (tree->path (tree-ref blk 0)))
+            ;; a hint before each word of the long line (the rows start
+            ;; at words: each row starts with a hint)
+            (code-set-line-layers
+             (tree-ref blk 2) (stree->tree '(tuple))
+             (stree->tree
+              `(tuple ,@(let loop ((i 0) (pos 0) (acc '()))
+                          (if (>= i 40) (reverse acc)
+                              (loop (+ i 1)
+                                    (+ pos (string-length
+                                            (string-append
+                                             "word" (number->string i) " ")))
+                                    (cons `(tuple ,(number->string pos) "p:")
+                                          acc)))))))
+            (update-path (tree->path (tree-ref blk 2)))
+            (step (lambda () #t))
+            (let* ((cell (- (x 1 1) (x 1 0))))
+              (check= (x 0 0) (x 1 0))
+              (check= (- (x 0 1) (x 0 0)) (* 2 cell))
+              (check= (- (x 0 3) (x 0 2)) cell)
+              (check= (- (x 0 4) (x 0 3)) (* 3 cell))
+              ;; the first position of the second row of the long line: at
+              ;; the start of the row, and its hint (if any) after it
+              (let* ((y0 (y 2 0))
+                     (b (let loop ((i 1))
+                          (if (or (>= i (string-length long))
+                                  (!= (y 2 i) y0)) i (loop (+ i 1))))))
+                (check-true (< b (string-length long)))
+                (check= (x 2 b) (x 2 0))
+                (check= (- (x 2 (+ b 1)) (x 2 b)) (* 3 cell))))))))))
+
 ;; A block of one line with markup, in paper mode, is a paragraph of its
 ;; items (it had no rows, and was neither drawn nor reached by the cursor)
 (define (test-one-rich-line)
@@ -1116,6 +1176,7 @@
   (test-audit-7)
   (test-audit-9)
   (test-layered-lines)
+  (test-hints)
   (test-export-formats)
   (test-one-rich-line)
   (test-folds)
