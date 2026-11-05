@@ -1648,16 +1648,19 @@ def s_content(w):
     refused("an empty row among rows", "stree", '(table (row (cell "a")) (row))', "needed")
     for bad, word in (('(table (row (cell "a")) (frac "a" "b"))', "needed"),
                       ('(table (with "color" "red" (row (cell "a"))))', "needed"),
+                      ('(tformat (table (row (cell "a"))) "x")', "needed"),
+                      ('(tformat (twith "table-width" "1par") (table (row (cell "a"))) "")', "needed"),
                       ('(tformat (arg "x"))', "needed"),
                       ('(tformat (cwith "1" "1" "1" "1" "cell-decoration" "x") (table (row (cell "a"))))', "cell-decoration"),
                       ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "-3") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
                       ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "x") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
                       ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "3") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
                       ('(tformat (cwith "2" "2" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
-                      ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "5") (table (row (cell "a") (cell "b"))))', "cell-col-span"),
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "0") (table (row (cell "a") (cell "b"))))', "cell-col-span"),
                       ('(with "cell-row-span" "2" (table (row (cell "a"))))', "cell-row-span")):
         refused("table attribute/structure %s" % bad, "stree", bad, word)
-    for ok in ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))',
+    for ok in ('(tformat (twith "table-width" "1par") "x")',
+               '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))',
                '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b"))))',
                '(tformat (cwith "1" "1" "1" "1" "cell-row-span" "1") (table (row (cell "a"))))',
                '(tformat (cwith "1" "-1" "1" "-1" "cell-halign" "c") (table (row (cell "a"))))',

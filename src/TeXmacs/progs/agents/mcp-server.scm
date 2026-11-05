@@ -1287,7 +1287,7 @@
              (violate! (string-append "the tag `" (symbol->string tag)
                                         "' cannot have " (number->string n)
                                         " argument(s) (nothing was changed)")))
-           (when (and (not in-macro-body?) (table-structure-bad? st))
+           (when (table-structure-bad? st)
              (violate! (string-append "the tag `" (symbol->string tag)
                                         "' has a string where a row, a cell or a table is needed (nothing was changed)")))
            (if (memq tag '(macro xmacro))
@@ -1296,19 +1296,25 @@
         (else #t)))
 
 (define (table-structure-bad? st)
-;; What the typesetter and the editor cannot take (found by experiment: the editor
+  ;; What the typesetter and the editor cannot take (found by experiment: the editor
   ;; crashes on a key press at the edge of a table whose children are not all rows,
-  ;; whatever they are, a macro that expands to a row included): a table with no row, a
-  ;; row with no cell, a child of a table that is not a `row' with something in it, a
-  ;; tformat that does not end with a table, and a document with no paragraph. The
-  ;; children of a row are free (a `with', a `document', a string...).
+  ;; whatever they are, a macro that expands to a row included, and on a row insertion
+  ;; in a tformat that has a string after its table): a table with no row, a row with no
+  ;; cell, a child of a table that is not a `row' with something in it, a tformat that
+  ;; does not end with a table (a string is allowed if there is no table in it, and
+  ;; inside a macro an `arg' or an `extern', which the corpus has 70 and 6 times), and a document with no
+  ;; paragraph. The children of a row are free (a `with', a `document', a string...).
   (let ((tag (car st)) (kids (cdr st)))
     (or (and (eq? tag 'document) (null? kids))   ; (the editor puts a document with an empty paragraph in its place)
         (and (memq tag '(table row)) (null? kids))
         (and (eq? tag 'table)
              (list-or (map (lambda (k) (not (and (pair? k) (eq? (car k) 'row) (pair? (cdr k))))) kids)))
         (and (eq? tag 'tformat) (pair? kids)
-             (let ((l (cAr kids))) (and (pair? l) (not (eq? (car l) 'table))))))))   ;; (a string is allowed: a document of the corpus has one)
+             (let ((l (cAr kids)))
+               (cond ((string? l) (list-or (map (lambda (k) (and (pair? k) (eq? (car k) 'table))) kids)))
+                     ((pair? l) (not (or (eq? (car l) 'table)
+                                         (and in-macro-body? (memq (car l) '(arg extern))))))
+                     (else #t)))))))
 
 (define in-macro-body? #f)   ; (the bodies of macros hold tables whose rows come from arguments)
 
@@ -1318,7 +1324,8 @@
   ;; `canvas', `hlink', `with'...). For any tree that comes from another process.
   (cond ((not (pair? st)) #t)
         ((not (symbol? (car st))) #f)
-        ((and (not (memq (car st) '(macro xmacro))) (not in-macro-body?) (table-structure-bad? st)) #f)
+        ((table-structure-bad? st) #f)
+        ((and (memq (car st) '(with cwith twith tformat)) (attribute-problem st)) #f)
         (else
           (and (or (eq? (car st) 'document)
                    (not (known-primitive? (car st)))
@@ -1622,15 +1629,20 @@
 
 (define span-vars '("cell-row-span" "cell-col-span"))
 
-(define (check-table-attribute tag var val)
+(define (table-attribute-problem tag var val)
+  ;; why the table attribute @var may not be set to @val by a @tag, or #f
   (cond ((== var "cell-decoration")
-         (violate! (string-append "a `" (symbol->string tag) "' sets `cell-decoration': the decoration of a cell is not accepted in the content (nothing was changed)")))
-        ((member var span-vars)
-         (when (or (not (positive-integer-string? val))
-                   (and (not (eq? tag 'cwith)) (!= val "1")))
-           (violate! (string-append "a `" (symbol->string tag) "' sets `" var "' to something that is not a positive whole number"
-                                    (if (eq? tag 'cwith) "" " (only a cwith of a table can set a span)")
-                                    ": refused (nothing was changed)"))))))
+         (string-append "a `" (symbol->string tag) "' sets `cell-decoration': the decoration of a cell is not accepted in the content (nothing was changed)"))
+        ((and (member var span-vars)
+              (or (not (positive-integer-string? val)) (and (not (eq? tag 'cwith)) (!= val "1"))))
+         (string-append "a `" (symbol->string tag) "' sets `" var "' to something that is not a positive whole number"
+                        (if (eq? tag 'cwith) "" " (only a cwith of a table can set a span)")
+                        ": refused (nothing was changed)"))
+        (else #f)))
+
+(define (check-table-attribute tag var val)
+  (let ((p (table-attribute-problem tag var val)))
+    (when p (violate! p))))
 
 (define (decode-range a b n)
   ;; the first and last cell (0-based) of the range a..b of a cwith in n rows or columns
@@ -1639,22 +1651,25 @@
          (cons (max 0 (if (>= x 0) (- x 1) (+ n x)))
                (min (- n 1) (if (> y 0) (- y 1) (+ n y)))))))
 
-(define (check-spans st)
+(define (spans-problem st)
   ;; the cwith of a tformat that gives a span: it must fit in the table that the tformat
-  ;; holds
+  ;; holds. Why not, or #f.
   (let* ((kids (cdr st))
          (tbl (and (pair? kids) (let ((l (cAr kids))) (and (pair? l) (eq? (car l) 'table) l))))
          (rows (and tbl (cdr tbl)))
          (nr (and rows (length rows)))
          (nc (and rows (pair? rows) (list-and (map (lambda (r) (and (pair? r) (eq? (car r) 'row))) rows))
-                  (apply min (map (lambda (r) (length (cdr r))) rows)))))
+                  (apply min (map (lambda (r) (length (cdr r))) rows))))
+         (problem #f))
     (for (c kids)
-      (when (and (pair? c) (eq? (car c) 'cwith) (>= (length c) 7))
+      (when (and (not problem) (pair? c) (eq? (car c) 'cwith) (>= (length c) 7))
         (let ((args (cdr c)))
           (let loop ((l (list-tail args 4)))
-            (when (and (pair? l) (pair? (cdr l)))
+            (when (and (not problem) (pair? l) (pair? (cdr l)))
               (let ((var (car l)) (val (cadr l)))
-                (when (and (string? var) (member var span-vars) (positive-integer-string? val)
+                ;; (only the spans of rows crashed the editor in the experiments; the documents of
+                ;; the corpus give column spans that run over the table, which is clipped)
+                (when (and (string? var) (== var "cell-row-span") (positive-integer-string? val)
                            (> (string->number val) 1))
                   (let* ((n (string->number val))
                          (rr (and nr (every-string? (list-head args 4))
@@ -1665,9 +1680,29 @@
                                     (if (== var "cell-row-span")
                                         (<= (+ (cdr rr) n) nr)
                                         (<= (+ (cdr cc) n) nc))))
-                      (violate! (string-append "a `cwith' gives `" var "' " val
-                                               " that does not fit in the table (the table must be written next to it, and the cells must have room): refused (nothing was changed)"))))))
-              (loop (cddr l)))))))))
+                      (set! problem
+                            (string-append "a `cwith' gives `" var "' " val
+                                           " that does not fit in the table (the table must be written next to it, and the cells must have room): refused (nothing was changed)")))))
+                (loop (cddr l))))))))
+    problem))
+
+(define (check-spans st)
+  (let ((p (spans-problem st)))
+    (when p (violate! p))))
+
+(define (attribute-problem st)
+  ;; why a with, cwith, twith or tformat @st sets a table attribute it may not, or #f
+  (let ((tag (car st)) (args (cdr st)))
+    (cond ((eq? tag 'tformat) (spans-problem st))
+          ((memq tag '(with cwith twith))
+           (let* ((pairs (cond ((eq? tag 'with) (if (pair? args) (list-head args (- (length args) 1)) '()))
+                               ((eq? tag 'cwith) (if (>= (length args) 4) (list-tail args 4) '()))
+                               (else args))))
+             (let loop ((l pairs))
+               (and (pair? l) (pair? (cdr l))
+                    (or (and (string? (car l)) (table-attribute-problem tag (car l) (cadr l)))
+                        (loop (cddr l)))))))
+          (else #f))))
 
 (define (every-string? l) (list-and (map string? l)))
 

@@ -91,6 +91,7 @@
     (load-buffer f)
     (switch-to-buffer f)
     (empty-table-cases!)
+    (editor-probe-cases!)
     (tree-set (bt) (tree-ref dt0 1))
     (let loop ((i start))
       (when (< i endi)
@@ -136,6 +137,36 @@
                        (and (not (typeset-failed-buffer? f)) (== (tm->stree (bt)) st)))
                 (typeset-failure-forget f))
               cases)))
+
+(define (editor-probe-cases!)
+  ;; the shapes that the host accepts must survive the table operations of the editor
+  ;; (insert-row in a tformat that had a string after its table aborted the process)
+  (let ((cases '((document "p" (tformat "") "q")
+                 (document "p" (tformat (twith "table-width" "1par") "x") "q")
+                 (document "p" (tformat (table (row (cell "a")) (row (cell "b" ) (cell "c")))) "q")
+                 (document "p" (tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b")))) "q")
+                 (document "p" (table (row (with "color" "blue" "x"))) "q")
+                 (document "p" (table (row "1" "2") (row (document "a") "b")) "q"))))
+    (for-each
+     (lambda (st)
+       (tree-set (bt) (stree->tree st))
+       (update-forced)
+       (for-each
+        (lambda (p)
+          (catch #t
+            (lambda ()
+              (apply tree-go-to (append (list (bt)) p (list :start)))
+              (update-forced)
+              (for-each (lambda (op) (op) (update-forced))
+                        (list (lambda () (table-insert-row #t)) (lambda () (table-insert-column #t))
+                              (lambda () (key-press "backspace")) (lambda () (key-press "delete"))
+                              (lambda () (key-press "return")) (lambda () (table-remove-row #t))
+                              (lambda () (undo 0)))))
+            (lambda a #f)))
+        '((1) (1 0) (1 0 0) (1 0 0 0) (1 0 1 0 0) (1 1 0 0 0))))
+     cases)
+    (check "the editor survives the table operations on the accepted shapes" #t)
+    (tree-set (bt) (stree->tree '(document "p")))))
 
 (define (A-steps)
   (list

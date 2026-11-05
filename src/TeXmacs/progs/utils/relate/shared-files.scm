@@ -1179,6 +1179,11 @@
        (or (and (memq (car st) '(version-both version-old version-new)) #t)
            (list-or (map version-tag-in? (cdr st))))))
 
+(define (st-has-assign? st)
+  (and (pair? st)
+       (or (and (memq (car st) '(assign macro xmacro)) #t)
+           (list-or (map st-has-assign? (cdr st))))))
+
 (define (patch-arity-ok? p body)
   ;; does the body, after the patch @p of a peer, have no tag with an arity it
   ;; cannot have? (@body: the body it applies to)
@@ -1190,9 +1195,15 @@
               (cond ((not range) #t)
                     ((and (tm-is? new 'document) (= (tree-arity new) 0)) #f)
                     ((eq? range 'bad) #f)
-                    (else (list-and (map (lambda (b) (mcp-stree-arity-ok? (tm->stree b)))
-                                         (sublist (tree-children new) (car range)
-                                                  (+ (car range) (caddr range))))))))))) 
+                    (else
+                      (let ((sts (map tm->stree (sublist (tree-children new) (car range)
+                                                         (+ (car range) (caddr range))))))
+                        (and (list-and (map mcp-stree-arity-ok? sts))
+                             ;; (a patch that touches a definition: the blocks that use it
+                             ;; are not known, so the whole document is looked at)
+                             (or (not (list-or (map st-has-assign? sts)))
+                                 (list-and (map (lambda (b) (mcp-stree-arity-ok? (tm->stree b)))
+                                                (tree-children new))))))))))))
     (lambda args #f)))
 
 (tm-define (shared-patch-acceptable? p body)

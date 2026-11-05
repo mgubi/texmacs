@@ -24,6 +24,7 @@
    (act "check 2" (check "the link of a person is applied" #t)
         (check "no proposal, no more refusal" (and (null? (shared-proposals (the-name))) (= (shared-stat 'agent-refused) 1)
                                                     (= (shared-stat 'agent-proposed) 0)))
+        (check "a person's patch with a cell decoration is refused by the host too" (= (shared-stat 'arity-refused) 1))
         (publish-body!) (sync-set! "a-done"))
    (wait-sync "b-done")))
 
@@ -41,6 +42,9 @@
    (wait-sync "a-marked")
    (act "edit" (tree-var-insert (body) 4 (stree->tree '(document (hlink "x" "javascript:alert(1)")))) (insert-text! 1 5 "AA"))
    (step "sent" (and (== (pending-count) 0) (> (shared-stat 'submitted) 1)))
+   ;; what a person (a participant marked so) may not do either: a cell decoration hangs the typesetter
+   (act "bad table" (tree-var-insert (body) (para-count) (stree->tree '(document (tformat (cwith "1" "1" "1" "1" "cell-decoration" "x") (table (row (cell "a"))))))))
+   (step "taken back" (and (>= (shared-stat 'rolled-back) 2) (== (pending-count) 0)))
    (act "sig" (sync-set! "b-edited"))
    (wait-sync "a-done")
    (act "out" (publish-body!) (sync-set! "b-done"))))

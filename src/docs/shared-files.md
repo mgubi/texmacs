@@ -497,6 +497,21 @@ process hosts, or only headless ones), the agent edits directly, as before.
   (another primitive with children that its box code does not expect) can still crash the
   typesetter: it was never made robust to every tree.
 
+- **Tables (peers and agents alike).** The structure rule and the table attributes are checked
+  by `mcp-stree-arity-ok?`, so the host's check of a peer's patch, the join and the welcome get
+  them as the agent's filter does: every child of a `table` is a non-empty `row`; a `tformat` ends
+  with a `table` (a string is allowed only when the tformat holds no table, and inside a macro
+  body an `arg` or an `extern`, the two shapes the 2229 documents of the corpus have in macros);
+  no `cell-decoration` (it hangs the typesetter); `cell-row-span` and `cell-col-span` positive
+  whole numbers, a row span other than 1 only in a `cwith` of a `tformat` that holds the table
+  and only if it fits (column spans that run over the table are clipped by the typesetter, the
+  corpus has some). Macro bodies are checked like the rest: `(macro "x" (table (arg "x")))`
+  is refused. A patch whose changed blocks hold an `assign` or a macro is checked on the whole
+  document, since the blocks that use the definition are not known. A span that stops fitting
+  when a patch removes rows is caught because the table and its `cwith` are in the same
+  top-level block. What is left: a macro that is called with an argument of the wrong kind
+  (`(m "s")` for a `tformat` that ends with `(arg "x")`) is not looked at once expanded.
+
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a
 participant (`msg-text` now raises the print length). The tests had small documents.
