@@ -433,6 +433,23 @@ process hosts, or only headless ones), the agent edits directly, as before.
   pending proposal) is accepted (and becomes a proposal in propose mode); the markup is
   not touched (`agent` scenario).
 
+- **No set-cursor.** No patch that is sent carries a `set-cursor` (the cursor changes are
+  taken out before a patch is sent), so the shape check refuses it from a peer; the
+  editor (`edit_modify_rep::notify_set_cursor`) also checks that the data is a tree with
+  children (it read the first child of a string and crashed).
+- **Depth.** The conversions of trees are recursive and crash about 100000 levels deep
+  (`stree->tree`, `tm->stree`, `patch->scheme`, `object->string`, and the reader). A message
+  whose parentheses are nested more than 1500 deep is dropped before it is read
+  (`nesting-ok?` in `msg-receive`, for the hello, the welcome, the patches, the catch-up;
+  messages shorter than 3000 characters cannot be that deep and are not scanned; a document
+  of 400 KB is scanned in a fraction of a second). The
+  agent's own content is limited to 200 levels by the MCP filter. A message dropped gets no
+  answer. **Not covered (pre-existing):** a `.tm` file with a tree 100000 levels deep, opened
+  from disk, makes TeXmacs crash in the same recursive conversions; the stack guard of
+  #812/#813 could cover them.
+- **Confirmation.** When the host says it took my patch but `live-apply-patch` fails, the
+  participant asks for the document again (it used to drop its pending patch and go on).
+
 A pre-existing bug found on the way: under s7 `object->string` cut every list at 40
 elements, so a document of more than 40 blocks was cut when it was sent to a
 participant (`msg-text` now raises the print length). The tests had small documents.

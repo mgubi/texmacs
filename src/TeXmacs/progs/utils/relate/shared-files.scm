@@ -333,10 +333,35 @@
 (define (msg-send link msg)
   (local-send link (msg-text msg)))
 
+;; The conversions of trees (reading, stree->tree, patch->scheme, object->string)
+;; are recursive and a tree that is 100000 levels deep crashes them. A message
+;; whose parentheses are nested more than sf-max-depth deep is dropped before it
+;; is read. (Documents have a few tens of levels; the agent's content is limited
+;; to 200.) Short messages cannot be that deep, so they are not scanned.
+(define sf-max-depth 1500)
+
+(define (nesting-ok? s)
+  (or (< (string-length s) (* 2 sf-max-depth))
+      (let ((n (string-length s)))
+        (let loop ((i 0) (depth 0) (in-str #f))
+          (if (>= i n)
+              #t
+              (let ((c (string-ref s i)))
+                (cond (in-str
+                        (cond ((char=? c #\\) (loop (+ i 2) depth #t))
+                              ((char=? c #\") (loop (+ i 1) depth #f))
+                              (else (loop (+ i 1) depth #t))))
+                      ((char=? c #\") (loop (+ i 1) depth #t))
+                      ((char=? c #\()
+                       (and (< depth sf-max-depth) (loop (+ i 1) (+ depth 1) #f)))
+                      ((char=? c #\)) (loop (+ i 1) (max 0 (- depth 1)) #f))
+                      (else (loop (+ i 1) depth #f)))))))))
+
 (define (msg-receive link)
   ;; the next message of a link, or #f
   (with s (local-receive link)
     (and (!= s "")
+         (nesting-ok? s)
          (catch #t
            (lambda () (string->object s))
            (lambda args #f)))))
@@ -428,7 +453,9 @@
 ;; too short made the process die in C++), and a patch of a participant is
 ;; rebuilt with the inverses computed from the document, not the ones it sent.
 
-(define mod-kinds '(assign insert remove split join assign-node insert-node remove-node set-cursor))
+;; (no set-cursor: the patches that are sent never have one, and the editor
+;; reads the data of one)
+(define mod-kinds '(assign insert remove split join assign-node insert-node remove-node))
 
 (define (mod-min-length k)
   ;; the length of the path under the shared tree (the part 0 or 1 comes first)
@@ -2004,10 +2031,12 @@
                    ((and id (== id (sf-get sf 'inflight))
                          (== author (sf-get sf 'id)))
                     ;; the host took my patch: it is confirmed
-                    (live-apply-patch key (safe-patch psexp) to)
-                    (sf-put! sf 'pending (if (nnull? (sf-get sf 'pending)) (cdr (sf-get sf 'pending)) '()))
-                    (sf-put! sf 'inflight #f)
-                    (sf-trim! key))
+                    (if (live-apply-patch key (safe-patch psexp) to)
+                        (begin
+                          (sf-put! sf 'pending (if (nnull? (sf-get sf 'pending)) (cdr (sf-get sf 'pending)) '()))
+                          (sf-put! sf 'inflight #f)
+                          (sf-trim! key))
+                        (participant-request-resync! sf)))
                    (else
                      (participant-apply-remote! sf (safe-patch psexp)
                                                 from to author)))))

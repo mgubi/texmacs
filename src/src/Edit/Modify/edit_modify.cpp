@@ -90,6 +90,8 @@ edit_modify_rep::notify_remove_node (path p) {
 void
 edit_modify_rep::notify_set_cursor (path p, tree data) {
   if (!(rp <= p)) return;
+  // (the data come from other processes: an atomic tree has no children)
+  if (!is_compound (data) || N (data) == 0) return;
   if (data[0] == as_string (author)) {
     if (is_compound (data, "cursor", 1) ||
         is_compound (data, "cursor-clear", 1)) {

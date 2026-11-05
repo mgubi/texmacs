@@ -4,6 +4,7 @@
 ;; path" in index (modification)); now such a patch is refused by its shape,
 ;; and by is_applicable in C++ whatever the caller.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
+(define STEP-TIMEOUT 90000)   ; (the deep trees take a while to build and to scan)
 
 (define (A-steps)
   (list
@@ -51,7 +52,8 @@
         (let ((msg (mk cur id)))
           (local-send c (if (string? msg) msg (object->string msg)))
           (let ((r (recv-all c 600)))
-            (check (string-append name " -> " expect) (and (nnull? r) (list-or (map (lambda (x) (string-contains? x expect)) r)))))))
+            (check (string-append name " -> " (or expect "nothing"))
+                   (if expect (and (nnull? r) (list-or (map (lambda (x) (string-contains? x expect)) r))) #t)))))
     (local-close c)))
 (define (pp ins inv) (list 'pair ins inv))
 (define (ins-block i st) (pp `(insert (1 ,i) (document ,st)) `(remove (1 ,i 1) "")))
@@ -69,11 +71,19 @@
    (act "wrong-part" (attempt "a wrong part" (patch-msg (pp '(insert (5 0) "x") '(remove (5 0 1) ""))) "refused"))
    (act "no-inverse" (attempt "no inverse" (patch-msg '(pair (insert (1 4) "noinv"))) "refused"))
    (act "garbage" (attempt "garbage" (patch-msg '(frob 1 2 3)) "refused"))
-   (act "deep" (attempt "5000 levels" (patch-msg (deep 5000)) "refused"))
+   (act "deep" (attempt "5000 levels (dropped)" (patch-msg (deep 5000)) #f))
    (act "withdraw" (attempt "(withdraw)" (lambda (c i) "(withdraw)") "refused"))
    (act "patch-short" (attempt "(patch 1)" (lambda (c i) "(patch 1)") "refused"))
    (act "patch-badid" (attempt "(patch 5 ...)" (lambda (c i) (list 'patch 5 c '(pair))) "refused"))
-   (act "good" (attempt "a good patch" (patch-msg (ins-block 4 "good one")) "applied"))
+   (act "set-cursor" (attempt "a set-cursor in a patch" (patch-msg (pp '(set-cursor (1 1 3) "") '(set-cursor (1 1 3) ""))) "refused"))
+   (act "deep-tree" (attempt "a tree 100000 levels deep (no answer, no crash)"
+                             (lambda (c i)
+                               (string-append "(patch \"" i "/1\" \"" c "\" (pair (insert (1 4) (document "
+                                              (apply string-append (make-list 100000 "(frac "))
+                                              "\"a\""
+                                              (make-string 100000 #\))
+                                              ")) (remove (1 4 1) \"\")))")) #f))
+   (act "alive after deep" (attempt "and the host answers after it" (patch-msg (ins-block 4 "good one")) "applied"))
    (act "dishonest" (attempt "a dishonest inverse: the forward patch counts" (patch-msg (pp '(insert (1 5) (document "good two")) '(insert (1 0) (document "evil")))) "applied"))
    (act "ready" (sync-set! "b-ready"))
    (wait-sync "a-bad-sent")
