@@ -58,9 +58,16 @@ static void
 table_get_extents (tree T, int& nr_rows, int& nr_cols) {
   while (is_func (T, TFORMAT)) T= T[N(T)-1];
   nr_rows= N(T);
-  T= T[0];
-  while (is_func (T, TFORMAT)) T= T[N(T)-1];
-  nr_cols= N(T);
+  // (the number of columns is that of the narrowest row: the rows of a table
+  // from a file or a patch need not have the same length, and the cells are
+  // looked up by (row, column))
+  nr_cols= -1;
+  for (int i=0; i<nr_rows; i++) {
+    tree R= T[i];
+    while (is_func (R, TFORMAT)) R= R[N(R)-1];
+    if (nr_cols < 0 || N(R) < nr_cols) nr_cols= N(R);
+  }
+  if (nr_cols < 0) nr_cols= 0;
 }
 
 static void

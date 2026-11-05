@@ -1308,7 +1308,10 @@
     (or (and (eq? tag 'document) (null? kids))   ; (the editor puts a document with an empty paragraph in its place)
         (and (memq tag '(table row)) (null? kids))
         (and (eq? tag 'table)
-             (list-or (map (lambda (k) (not (and (pair? k) (eq? (car k) 'row) (pair? (cdr k))))) kids)))
+             (or (list-or (map (lambda (k) (not (and (pair? k) (eq? (car k) 'row) (pair? (cdr k))))) kids))
+                 ;; rows of unequal length (the editor aborts on a column operation in one whose
+                 ;; first row is wider than a later one, and the corpus has none)
+                 (not (list-and (map (lambda (k) (= (length k) (length (car kids)))) kids)))))
         (and (eq? tag 'tformat) (pair? kids)
              (let ((l (cAr kids)))
                (cond ((string? l) (list-or (map (lambda (k) (and (pair? k) (eq? (car k) 'table))) kids)))
@@ -1660,10 +1663,6 @@
          (nr (and rows (length rows)))
          (nc (and rows (pair? rows) (list-and (map (lambda (r) (and (pair? r) (eq? (car r) 'row))) rows))
                   (apply min (map (lambda (r) (length (cdr r))) rows))))
-         (ragged? (and rows (pair? rows)
-                       (not (list-and (map (lambda (r) (and (pair? r) (eq? (car r) 'row)
-                                                            (= (length (cdr r)) (length (cdr (car rows))))))
-                                           rows)))))
          (problem #f))
     (for (c kids)
       (when (and (not problem) (pair? c) (eq? (car c) 'cwith) (>= (length c) 7))
@@ -1671,21 +1670,16 @@
           (let loop ((l (list-tail args 4)))
             (when (and (not problem) (pair? l) (pair? (cdr l)))
               (let ((var (car l)) (val (cadr l)))
-                ;; (a row span must fit; a column span may run over a rectangular table, as in the
-                ;; corpus, where the typesetter clips it, but not over one whose rows differ in length;
-                ;; ; a span of 0 or text, as while its value is edited in source view, is clamped to 1 by the typesetter)
-                (when (and (string? var) (member var span-vars) (positive-integer-string? val)
-                           (> (string->number val) 1)
-                           (or (== var "cell-row-span") ragged?))
+                ;; (a row span must fit; a column span may run over the table, as in the corpus,
+                ;; where the typesetter clips it: the tables have rows of the same length, see
+                ;; table-structure-bad?; a span of 0 or text, as while its value is edited in
+                ;; source view, is clamped to 1 by the typesetter)
+                (when (and (string? var) (== var "cell-row-span") (positive-integer-string? val)
+                           (> (string->number val) 1))
                   (let* ((n (string->number val))
                          (rr (and nr (every-string? (list-head args 4))
-                                  (decode-range (car args) (cadr args) nr)))
-                         (cc (and nc (every-string? (list-head args 4))
-                                  (decode-range (caddr args) (cadddr args) nc))))
-                    (when (not (and rr cc
-                                    (if (== var "cell-row-span")
-                                        (<= (+ (cdr rr) n) nr)
-                                        (<= (+ (cdr cc) n) nc))))
+                                  (decode-range (car args) (cadr args) nr))))
+                    (when (not (and rr (<= (+ (cdr rr) n) nr)))
                       (set! problem
                             (string-append "a `cwith' gives `" var "' " val
                                            " that does not fit in the table (the table must be written next to it, and the cells must have room): refused (nothing was changed)")))))

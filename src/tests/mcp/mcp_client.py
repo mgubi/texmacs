@@ -1644,6 +1644,9 @@ def s_content(w):
     for bad in ('(table "X")', '(table (row (cell "a")) "X")', '(table (tuple))',
                 '(tformat (cwith "1" "1" "1" "1" "cell-halign" "c") (frac "a" "b"))'):
         refused("table structure %s" % bad, "stree", bad, "needed")
+    for bad in ('(table (row (cell "a") (cell "b")) (row (cell "e")))', '(table (row (cell "a") (cell "b") (cell "c")) (row (cell "e")))',
+                '(table (row (cell "a")) (row (cell "b") (cell "c")))'):
+        refused("ragged table %s" % bad, "stree", bad, "needed")
     refused("a table of set-cursor", "stree", '(table (set-cursor))', "`set-cursor'")
     refused("an empty row among rows", "stree", '(table (row (cell "a")) (row))', "needed")
     for bad, word in (('(table (row (cell "a")) (frac "a" "b"))', "needed"),
@@ -1658,7 +1661,7 @@ def s_content(w):
                       ('(tformat (cwith "2" "2" "1" "1" "cell-row-span" "2") (table (row (cell "a")) (row (cell "b"))))', "cell-row-span"),
                       ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "0") (table (row (cell "a") (cell "b"))))', "cell-col-span"),
                       ('(with "cell-row-span" "2" (table (row (cell "a"))))', "cell-row-span"),
-                      ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")) (row (cell "e"))))', "cell-col-span")):
+                      ('(tformat (cwith "1" "1" "1" "1" "cell-col-span" "2") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d")) (row (cell "e"))))', "needed")):
         refused("table attribute/structure %s" % bad, "stree", bad, word)
     for ok in ('(tformat (cwith "1" "1" "1" "1" "cell-row-span" "2") (cwith "1" "1" "1" "1" "cell-halign" "c") (table (row (cell "a")) (row (cell "b"))))',
                '(tformat (cwith "1" "1" "1" "1" "cell-col-span" "3") (table (row (cell "a") (cell "b")) (row (cell "c") (cell "d"))))',
