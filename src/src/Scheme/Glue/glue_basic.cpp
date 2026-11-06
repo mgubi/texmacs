@@ -2260,6 +2260,19 @@ tmg_shared_lock_acquire (tmscm arg1) {
 }
 
 tmscm
+tmg_shared_lock_heldP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shared-lock-held?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= shared_lock_held (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_shared_lock_release (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "shared-lock-release");
 
@@ -13221,6 +13234,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("shared-replace-file",  tmg_shared_replace_file, 2, 0, 0);
   tmscm_install_procedure ("shared-random-token",  tmg_shared_random_token, 0, 0, 0);
   tmscm_install_procedure ("shared-lock-acquire",  tmg_shared_lock_acquire, 1, 0, 0);
+  tmscm_install_procedure ("shared-lock-held?",  tmg_shared_lock_heldP, 1, 0, 0);
   tmscm_install_procedure ("shared-lock-release",  tmg_shared_lock_release, 1, 0, 0);
   tmscm_install_procedure ("shared-lock-valid?",  tmg_shared_lock_validP, 2, 0, 0);
   tmscm_install_procedure ("shared-lock-renew",  tmg_shared_lock_renew, 2, 0, 0);

@@ -214,6 +214,7 @@
   (shared-replace-file shared_replace_file (bool string string))
   (shared-random-token shared_random_token (string))
   (shared-lock-acquire shared_lock_acquire (int string))
+  (shared-lock-held? shared_lock_held (bool string))
   (shared-lock-release shared_lock_release (void int))
   (shared-lock-valid? shared_lock_valid (bool int string))
   (shared-lock-renew shared_lock_renew (int int string))

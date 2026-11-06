@@ -16,7 +16,7 @@ TOP = os.path.abspath(os.path.join(HERE, "..", ".."))
 BIN = os.path.join(TOP, "TeXmacs", "bin", "texmacs.bin")
 LAUNCHER = os.path.join(TOP, "TeXmacs", "bin", "texmacs")
 RSS_CAP = int(os.environ.get("TM_TEST_RSS_KB", "2000000"))
-TIMEOUT = int(os.environ.get("TM_TEST_TIMEOUT", "120"))
+TIMEOUT = int(os.environ.get("TM_TEST_TIMEOUT", "240"))
 
 results = []
 SCEN = ""
@@ -2575,6 +2575,101 @@ def s_not_joined(w):
         other3.kill()
 
 
+def host_eval(w, st, expr, wait=10):
+    """evaluate a Scheme expression in the buffer of the other TeXmacs (host-edit.scm)"""
+    sync = os.path.join(w, "sync")
+    try:
+        os.remove(os.path.join(sync, "eval"))
+    except OSError:
+        pass
+    hostcmd(w, st, "eval " + expr)
+    wait_file(os.path.join(sync, "eval"), wait)
+    time.sleep(0.1)
+    p = os.path.join(sync, "eval")
+    return open(p).read() if os.path.exists(p) else ""
+
+
+def s_save_guard(w):
+    """the guard of the saves: an error of the lock folder is not a host; nothing is
+    made in the folder with sharing off; the window of a process that did not join
+    says that the other TeXmacs closed the file"""
+    import glob
+    import signal
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    # 1. the folder of the locks can not be written (the lock can not be made): the save works
+    ro = os.path.join(w, "tmp-ro")
+    os.makedirs(os.path.join(ro, "texmacs-%d" % os.getuid(), "shared"), exist_ok=True)
+    os.chmod(os.path.join(ro, "texmacs-%d" % os.getuid(), "shared"), 0o500)
+    envF, homeF = make_env(w, "F", "on")
+    envF["TEXMACS_SHARED_DIR"] = ro
+    f = os.path.join(w, "ro.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    m = Mcp(envF)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("unwritable lock folder: the document opens and is not held", not e and v.get("agent_mode") == "direct")
+    e, r = m.tool("insert", document="d1", where="last", content="Added", format="texmacs")
+    check("unwritable lock folder: an edit works", not e)
+    e, r = m.tool("save_document", document="d1")
+    check("unwritable lock folder: the save works", not e and r.get("status") == "saved" and "Added" in open(f).read())
+    check("exit 0", m.close() == 0)
+    os.chmod(os.path.join(ro, "texmacs-%d" % os.getuid(), "shared"), 0o700)
+    # 2. sharing off: a save makes nothing in the folder
+    fresh = os.path.join(w, "tmp-fresh")
+    os.makedirs(fresh, exist_ok=True)
+    envG, homeG = make_env(w, "G", "off")
+    envG["TEXMACS_SHARED_DIR"] = fresh
+    g = os.path.join(w, "off.tm")
+    write_small(g)
+    g = os.path.realpath(g)
+    m = Mcp(envG)
+    m.initialize()
+    e, v = m.tool("open_document", path=g)
+    e, r = m.tool("insert", document="d1", where="last", content="Added", format="texmacs")
+    e, r = m.tool("save_document", document="d1")
+    check("sharing off: the save works", not e and r.get("status") == "saved" and "Added" in open(g).read())
+    check("sharing off: no lock file is left by the saves", glob.glob(os.path.join(fresh, "texmacs-*", "shared", "*.lock")) == [])
+    check("exit 0", m.close() == 0)
+    # 3. a window that did not join, once the other TeXmacs has gone, says so
+    envA, homeA = make_env(w, "A", "on")
+    envP, homeP = make_env(w, "P", "on")
+    h = os.path.join(w, "stale.tm")
+    write_small(h)
+    h = os.path.realpath(h)
+    before = open(h).read()
+    w4 = os.path.join(w, "four")
+    w5 = os.path.join(w, "five")
+    for d in (w4, w5):
+        os.makedirs(os.path.join(d, "sync"), exist_ok=True)
+    host = start_other(w4, envA, "host-wait.scm", h)
+    check("the host has loaded the file", wait_file(os.path.join(w4, "sync", "h-loaded")))
+    os.kill(host.pid, signal.SIGSTOP)
+    try:
+        person = start_other(w5, envP, "host-edit.scm", h, {"SH_STEP_TIMEOUT": "120000"})
+        check("the person's process has loaded the file", wait_file(os.path.join(w5, "sync", "h-loaded"), 60))
+        st = [0]
+        t = host_eval(w5, st, "(shared-file-footer-text (current-buffer))")
+        check("not joined: the footer says that the file is open in another TeXmacs", "Not shared: open in another TeXmacs" in t)
+    finally:
+        os.kill(host.pid, signal.SIGCONT)
+    sync_set(w4, "c-done")
+    try:
+        host.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        host.kill()
+    time.sleep(0.5)
+    t = host_eval(w5, st, "(shared-file-footer-text (current-buffer))")
+    check("stale: the footer says that the other TeXmacs closed the file", "closed this file; close it and open it again" in t)
+    check("stale: a Save is a refusal", host_eval(w5, st, "(shared-file-save-request (current-buffer))") == "#t")
+    check("stale: the file is as it was", open(h).read() == before)
+    sync_set(w5, "c-done")
+    try:
+        person.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        person.kill()
+
+
 def s_gui_host(w):
     """a TeXmacs with its window (Qt, offscreen: the person's, not headless) hosts a
     file whose initial environment is an empty collection, as a saved file has;
@@ -2594,13 +2689,6 @@ def s_gui_host(w):
     sync = os.path.join(w, "sync")
     check("the GUI host has loaded the file", wait_file(os.path.join(sync, "h-loaded"), 60))
     st = [0]
-    # a second window (another process, with its interface) joins the host
-    third = start_other(w, envC, "host-join.scm", f, {"SH_STEP_TIMEOUT": "180000"}, gui=True, role="C")
-    sync_set(w, "c-opened")
-    check("the second window edited", wait_file(os.path.join(sync, "h-edited"), 60))
-    time.sleep(0.5)
-    hb = host_body(w, st)
-    check("the host has the edit of the second window", "FROMB-" in hb)
     def ev(expr, wait=10):
         try:
             os.remove(os.path.join(sync, "eval"))
@@ -2610,6 +2698,14 @@ def s_gui_host(w):
         wait_file(os.path.join(sync, "eval"), wait)
         time.sleep(0.1)
         return open(os.path.join(sync, "eval")).read() if os.path.exists(os.path.join(sync, "eval")) else ""
+    check("footer: nothing is said of a file hosted alone", ev("(shared-file-footer-text (current-buffer))") == "#f")
+    # a second window (another process, with its interface) joins the host
+    third = start_other(w, envC, "host-join.scm", f, {"SH_STEP_TIMEOUT": "180000"}, gui=True, role="C")
+    sync_set(w, "c-opened")
+    check("the second window edited", wait_file(os.path.join(sync, "h-edited"), 60))
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    check("the host has the edit of the second window", "FROMB-" in hb)
     check("footer: hosting with a second window", "Shared: hosting, 2 windows" in ev("(shared-file-footer-text (current-buffer))"))
     check("the focus bar group is not shown without an agent", ev("(shared-agents-focus?)") == "#f")
     m = Mcp(envA)
@@ -2634,7 +2730,8 @@ def s_gui_host(w):
     check("focus bar: the group is shown", ev("(shared-agents-focus?)") == "#t")
     check("focus bar: the focus icons build with the group",
           ev("(and (make-menu-widget (list (quote horizontal) (list (quote link) (quote texmacs-focus-icons))) 0) #t)") == "#t")
-    check("focus bar: the agent is connected", "connected" in ev("(shared-agents-focus-text (current-buffer))"))
+    txt = ev("(shared-agents-focus-text (current-buffer))")
+    check("focus bar: the agent is named, with no remark when it is connected", "agent" in txt and ":" not in txt)
     check("focus bar: one proposal pending", ev("(shared-file-pending-count (current-buffer))") == "1")
     ev("(go-to (list 1 0))")
     check("focus bar: no proposal at the cursor away from it", ev("(shared-proposal-at-cursor (current-buffer))") == "#f")
@@ -2659,6 +2756,19 @@ def s_gui_host(w):
     check("focus bar: the footer follows the mode", "(propose)" in ev("(shared-file-footer-text (current-buffer))"))
     ids = ev("(shared-file-agents (current-buffer))")
     aid = ids.strip("()\"").split(" ")[0].strip('"')
+    # an older program never answers a ping: it is not shown as not answering
+    envE, homeE = make_env(w, "E", "on")
+    envE["TEXMACS_SHARED_NOPONG"] = "1"
+    m2 = Mcp(envE)
+    m2.initialize()
+    e, v = m2.tool("open_document", path=f)
+    check("a second agent joins", not e and v["shared"] is not None)
+    ids2 = ev("(shared-file-agents (current-buffer))")
+    others = [x.strip('"') for x in ids2.strip("()").split(" ") if x.strip('"') != aid]
+    time.sleep(8)
+    check("an agent that never answers a ping is shown as connected",
+          len(others) == 1 and ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + others[0] + '"')) == '"connected"')
+    check("exit 0 (second agent)", m2.close() == 0)
     # the agent is stopped: not answering after five seconds
     import signal
     os.kill(m.p.pid, signal.SIGSTOP)
@@ -2692,7 +2802,7 @@ def s_gui_host(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host, "not-joined": s_not_joined,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host, "not-joined": s_not_joined, "save-guard": s_save_guard,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

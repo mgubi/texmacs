@@ -215,6 +215,7 @@
 "shared-replace-file"
 "shared-random-token"
 "shared-lock-acquire"
+"shared-lock-held?"
 "shared-lock-release"
 "shared-lock-valid?"
 "shared-lock-renew"

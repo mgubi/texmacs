@@ -63,16 +63,22 @@
 
   <paragraph*|What the window shows>
 
-  While a file is shared, the footer of its window says so: <em|Shared:
-  hosting>, with the number of windows, or <em|Shared: joined> in a window
-  that joined another. When an agent works on the file the footer names it,
-  its mode and the proposals waiting (<em|Shared with agent 1234
-  (propose), 1 proposal>). In the window that hosts the file the focus bar
-  also has a group for the agent: whether it is connected (or has not
-  answered for some seconds, or has left), the mode, the number of proposals
-  with buttons to go to the previous and the next one and to accept or reject
-  the one at the cursor or all of them, and <em|Check connection>, which
-  asks the agent's program and says in the footer whether it answers.
+  While a file is shared with something, the footer of its window says so:
+  <em|Shared: hosting>, with the number of windows, or <em|Shared: joined>
+  in a window that joined another. A file that only one window has open
+  says nothing. When an agent works on the file the footer names it, its
+  mode and the proposals waiting (<em|Shared with agent 1234 (propose), 1
+  proposal>). A window which could not join the other <TeXmacs> that holds
+  its file says <em|Not shared>, and, when that <TeXmacs> has closed the
+  file since, that the document must be closed and opened again.
+
+  In the window that hosts the file the focus bar also has a group for the
+  agent, when there is one: its name (with a remark when it is busy or does
+  not answer for some seconds, or has left), the mode, the number of
+  proposals with buttons to go to the previous and the next one and to accept
+  or reject the one at the cursor, and a <em|...> menu with <em|Accept all>,
+  <em|Reject all> and <em|Check connection>, which asks the agent's program
+  and says in the footer whether it answers.
 
   When a window joins a file, or an agent joins yours, a message in the
   footer says so (<em|an agent joined this document>), and another one says

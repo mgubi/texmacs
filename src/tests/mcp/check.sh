@@ -14,6 +14,7 @@
 #   gui-host   a Qt host with its window (offscreen): the server joins (propose, a proposal,
 #              Tools > Agents), and a second window joins
 #   not-joined a file the server cannot join (refused welcome, stopped host): note, read-only, no save
+#   save-guard the lock folder: an error is not a host, no litter with sharing off, the stale wording
 #   unshared   share-open-files off: nothing is shared
 #   edit       the editing tools in a file nobody else has open: each tool, conflict,
 #              undo_agent, save, close, create, bad input
@@ -41,7 +42,7 @@
 #   outputs    outline and references cut and continued; a vanished client
 #
 # Every process is stopped above TM_TEST_RSS_KB (default 2 GB) and after
-# TM_TEST_TIMEOUT seconds (default 120); the work folder is TM_TEST_HOME (not
+# TM_TEST_TIMEOUT seconds (default 240); the work folder is TM_TEST_HOME (not
 # under /tmp, which is a link on macOS) or tests/build/mcp. Needs python3.
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -51,7 +52,7 @@ base="${TM_TEST_HOME:-$top/tests/build/mcp}"
 run="$base/run-$$"
 mkdir -p "$run" || exit 1
 PY=${PYTHON:-python3}
-[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose gui-host not-joined undo recursion filter content styles static guard hostdeath nonascii stalled
+[ $# -eq 0 ] && set -- protocol launcher tools robust outputs logcap shared mcp-host unshared edit readonly edit-shared propose gui-host not-joined save-guard undo recursion filter content styles static guard hostdeath nonascii stalled
 status=0
 for name in "$@"; do
   w="$run/$name"
