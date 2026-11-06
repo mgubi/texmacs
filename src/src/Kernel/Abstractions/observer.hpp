@@ -161,6 +161,7 @@ bool ip_attached (path ip);
 
 tree obtain_tree (observer o);
 observer tree_pointer_new (tree t);
+observer tree_pointer_cb_new (tree t, string cb); // calls the Scheme function cb
 void tree_pointer_delete (observer o);
 
 path obtain_position (observer o);

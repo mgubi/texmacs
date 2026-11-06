@@ -423,6 +423,17 @@ adjust_extremities (curve& c, array<rectangle> a) {
   }
 }
 
+static bool
+same_dimension (array<point>& a) {
+  // the points of a curve are all of the dimension of the first (a point that
+  // is not one, like a string, has dimension 0): the code of the curves
+  // supposes it, and a tree from another process need not respect it
+  if (N(a) > 0 && (N(a[0]) < 2 || N(a[0]) > 3)) return false;
+  for (int i=1; i<N(a); i++)
+    if (N(a[i]) != N(a[0])) return false;
+  return true;
+}
+
 void
 concater_rep::typeset_line (tree t, path ip, bool close) {
 BEGIN_MAGNIFY
@@ -437,7 +448,7 @@ BEGIN_MAGNIFY
     a << copy (a[0]);
     cip << cip[0];
   }
-  if (N(a) == 0 || N(a[0]) == 0) typeset_error (t, ip);
+  if (N(a) == 0 || N(a[0]) == 0 || !same_dimension (a)) typeset_error (t, ip);
   else {
     if (N(a) == 1) {
       a << copy (a[0]);
@@ -462,7 +473,7 @@ BEGIN_MAGNIFY
   array<path> cip(n);
   for (i=0; i<n; i++)
     cip[i]= descend (ip, i);
-  if (N(a) == 0 || N(a[0]) == 0) typeset_error (t, ip);
+  if (N(a) == 0 || N(a[0]) == 0 || !same_dimension (a)) typeset_error (t, ip);
   else {
     if (n != 3 || linearly_dependent (a[0], a[1], a[2]) ||
         (N (intersection (midperp (a[0], a[1], a[2]),
@@ -489,7 +500,7 @@ BEGIN_MAGNIFY
   array<path> cip(n);
   for (i=0; i<n; i++)
     cip[i]= descend (ip, i);
-  if (N(a) == 0 || N(a[0]) == 0) typeset_error (t, ip);
+  if (N(a) == 0 || N(a[0]) == 0 || !same_dimension (a)) typeset_error (t, ip);
   else {
     if (N(a) == 1) {
       a << copy (a[0]);
@@ -525,7 +536,7 @@ BEGIN_MAGNIFY
   array<path> cip(n);
   for (i=0; i<n; i++)
     cip[i]= descend (ip, i);
-  if (N(a) == 0 || N(a[0]) == 0) typeset_error (t, ip);
+  if (N(a) == 0 || N(a[0]) == 0 || !same_dimension (a)) typeset_error (t, ip);
   else {
     if (N(a) == 1) {
       a << copy (a[0]);

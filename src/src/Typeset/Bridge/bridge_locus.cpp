@@ -56,7 +56,7 @@ bridge_locus (typesetter ttt, tree st, path ip) {
 void
 bridge_locus_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || is_func (u, LOCUS), "nil path");
+  ASSERT (!is_nil (p) || is_func (u, LOCUS) || L(u) == L(st), "nil path");
   if (is_nil (p)) {
     st= u;
     initialize ();

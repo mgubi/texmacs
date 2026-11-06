@@ -58,9 +58,16 @@ static void
 table_get_extents (tree T, int& nr_rows, int& nr_cols) {
   while (is_func (T, TFORMAT)) T= T[N(T)-1];
   nr_rows= N(T);
-  T= T[0];
-  while (is_func (T, TFORMAT)) T= T[N(T)-1];
-  nr_cols= N(T);
+  // (the number of columns is that of the narrowest row: the rows of a table
+  // from a file or a patch need not have the same length, and the cells are
+  // looked up by (row, column))
+  nr_cols= -1;
+  for (int i=0; i<nr_rows; i++) {
+    tree R= T[i];
+    while (is_func (R, TFORMAT)) R= R[N(R)-1];
+    if (nr_cols < 0 || N(R) < nr_cols) nr_cols= N(R);
+  }
+  if (nr_cols < 0) nr_cols= 0;
 }
 
 static void
@@ -159,13 +166,15 @@ path
 edit_table_rep::search_row (path fp, int row) {
   fp= search_table (fp) * row;
   tree st= subtree (et, fp);
-  if (!is_func (st, ROW))
+  // (is_func is false for a row with no cell, which a patch can make)
+  if (!(is_compound (st) && L(st) == ROW) && N(st) > 0)
     return search_row (fp, N(st)-1);
   return fp;
 }
 
 path
 edit_table_rep::search_cell (path p, int col) {
+  if (N (subtree (et, p)) == 0) return p;   // (a row with no cell)
   p= p * col;
   tree st= subtree (et, p);
   if (is_func (st, TFORMAT))
@@ -340,8 +349,10 @@ edit_table_rep::table_get_format (
     if (is_func (st[k], CWITH, 6) && (st[k][4] == var)) {
       int row1, col1, row2, col2;
       with_read (st[k], nr_rows, nr_cols, row1, col1, row2, col2);
-      for (i=row1; i<=row2; i++)
-        for (j=col1; j<=col2; j++)
+      // (a range that is partly or wholly outside the table, as a file or a patch can
+      // give, is clipped: val has nr_rows rows and nr_cols columns)
+      for (i=max (row1, 0); i<=min (row2, nr_rows-1); i++)
+        for (j=max (col1, 0); j<=min (col2, nr_cols-1); j++)
           val[i][j]= st[k][5];
     }
 }
@@ -613,6 +624,9 @@ edit_table_rep::table_go_to (path fp, int row, int col, bool at_start) {
   int nr_rows, nr_cols;
   fp= search_format (fp);
   table_get_extents (fp, nr_rows, nr_cols);
+  // (a table with no row or a row with no cell, as a patch of another process
+  // can make: there is no cell to go to)
+  if (nr_rows <= 0 || nr_cols <= 0) return;
   if (row<0) row= 0;
   if (col<0) col= 0;
   if (row>=nr_rows) row= nr_rows-1;

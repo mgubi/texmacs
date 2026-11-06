@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -212,10 +213,40 @@ texmacs_exec (edit_env env, tree cmd) {
 * Evaluation of trees
 ******************************************************************************/
 
+// A limit on the work of the evaluator, for the programs that evaluate text
+// which does not come from the person (texmacs --mcp checks what an agent
+// writes): exec_budget_start (n) makes the evaluator give an error tree after
+// n steps (a macro that calls its argument twice, ten times nested, would take
+// a thousand years), exec_budget_end () gives what is left (negative if the
+// limit was reached). The recursion of the macros stops with an error tree when
+// the stack is nearly full (stack_guard.hpp), here and in the typesetter
+// (concat_macro.cpp, bridge_compound.cpp): a macro that calls itself would else
+// overflow the stack of the process, which then crashes.
+static bool exec_budget_on= false;
+static long exec_budget_left= 0;
+
+void
+exec_budget_start (int n) {
+  exec_budget_on  = true;
+  exec_budget_left= n;
+}
+
+int
+exec_budget_end () {
+  long left= exec_budget_left;
+  exec_budget_on= false;
+  exec_budget_left= 0;
+  if (left > 2000000000L) left= 2000000000L;
+  if (left < -2000000000L) left= -2000000000L;
+  return (int) left;
+}
+
 tree
 edit_env_rep::exec (tree t) {
   // cout << "Execute: " << t << "\n";
   if (is_atomic (t)) return t;
+  if (exec_budget_on && --exec_budget_left < 0)
+    return tree (_ERROR, "evaluation budget");
   switch (L(t)) {
   case MOVE:
   case SHIFT:
@@ -671,6 +702,8 @@ edit_env_rep::exec_provide (tree t) {
   return tree (ASSIGN, r, v);
 }
 
+static int keep_patterns_off= 0;
+
 tree
 edit_env_rep::exec_with (tree t) {
   int i, n= N(t), k= (n-1)>>1; // is k=0 allowed ?
@@ -684,7 +717,10 @@ edit_env_rep::exec_with (tree t) {
       string var= var_t->label;
       vars[i]= var;
       oldv[i]= read (var);
+      // (a pattern is kept by the HTML export only as a background color)
+      if (var != BG_COLOR) keep_patterns_off++;
       newv[i]= exec (t[(i<<1)+1]);
+      if (var != BG_COLOR) keep_patterns_off--;
     }
     else {
       STACK_DELETE_ARRAY(vars);
@@ -696,19 +732,78 @@ edit_env_rep::exec_with (tree t) {
 
   // for (i=0; i<k; i++) monitored_write_update (vars[i], newv[i]);
   for (i=0; i<k; i++) write_update (vars[i], newv[i]);
+  int formula= -1;
+  if (record_formulas && formula_depth == 0)
+    for (i=0; i<k; i++)
+      if ((vars[i] == MODE && newv[i] == "math" && oldv[i] != "math") ||
+          (vars[i] == "html-formula" && newv[i] == "display"))
+        formula= record_formula ();
+  if (formula >= 0) formula_depth++;
   tree r= exec (t[n-1]);
+  if (formula >= 0) formula_depth--;
   for (i=k-1; i>=0; i--) write_update (vars[i], oldv[i]);
 
-  tree u (WITH, n);
-  for (i=0; i<k; i++) {
-    u[i<<1]    = vars[i];
-    u[(i<<1)+1]= tree (QUOTE, newv[i]);
+  // a recorded formula has the number of its environment as first variable
+  int o= (formula >= 0? 2: 0);
+  tree u (WITH, n + o);
+  if (formula >= 0) {
+    u[0]= "html-formula-env";
+    u[1]= as_string (formula);
   }
-  u[n-1]= r;
+  for (i=0; i<k; i++) {
+    u[o + (i<<1)]    = vars[i];
+    u[o + (i<<1) + 1]= tree (QUOTE, newv[i]);
+  }
+  u[n-1+o]= r;
   STACK_DELETE_ARRAY(vars);
   STACK_DELETE_ARRAY(oldv);
   STACK_DELETE_ARRAY(newv);
   return u;
+}
+
+/******************************************************************************
+* The environments of the formulas of the HTML export (see exec_html)
+******************************************************************************/
+
+void
+edit_env_rep::start_recording_formulas (hashmap<string,tree> base,
+                                        int first) {
+  record_formulas= true;
+  formula_depth= 0;
+  formula_first= first;
+  formula_base= base;
+  formula_envs= array<hashmap<string,tree> > ();
+  // the variables written from now on: env_table::touch
+  env.follow= true;
+  env.touched= array<string> ();
+  env.touched_set= hashmap<string,bool> (false);
+}
+
+void
+edit_env_rep::stop_recording_formulas () {
+  record_formulas= false;
+  env.follow= false;
+  env.touched= array<string> ();
+  env.touched_set= hashmap<string,bool> (false);
+}
+
+int
+edit_env_rep::record_formula () {
+  // the variables which differ from formula_base, env_absent () for those
+  // which went; the same number as the formula before when they are the
+  // same (equal formulas elsewhere share their images, see tmhtml-png)
+  hashmap<string,tree> diff (UNINIT);
+  for (int i=0; i<N(env.touched); i++) {
+    string s= env.touched[i];
+    tree v= env.value (s);
+    tree* b= formula_base->find (s);
+    if (b == NULL? !strong_equal (v, env_absent ()): !strong_equal (v, *b))
+      diff (s)= v;
+  }
+  int n= N(formula_envs);
+  if (n > 0 && formula_envs[n-1] == diff) return formula_first + n-1;
+  formula_envs << diff;
+  return formula_first + n;
 }
 
 tree
@@ -733,6 +828,8 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
+    if (stack_nearly_full ())
+      return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);
@@ -2419,6 +2516,23 @@ pattern_fallback (tree base, tree bg) {
   return tree (get_paper_color (bg));
 }
 
+// Whether a pattern may be kept in the HTML export (html-keep-patterns) when
+// its image is not found, and where it is a background: the label must be a
+// plain relative or absolute file name (no scheme, no quotes, no spaces)
+static bool
+safe_pattern_label (string s) {
+  if (s == "" || starts (s, "//")) return false;
+  for (int i=0; i<N(s); i++) {
+    char c= s[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') ||
+          c == '.' || c == '_' || c == '~' || c == '/' || c == '%' ||
+          c == '-'))
+      return false;
+  }
+  return true;
+}
+
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (_ERROR, "bad pattern");
@@ -2438,6 +2552,15 @@ edit_env_rep::exec_pattern (tree t) {
   url image= pattern_file (base_file_name, label);
   if (is_none (image)) {
     (void) picture_lookup ('q', label, image, 0, 0);
+    // the HTML export keeps a pattern whose image is not found here (the
+    // image may be where the page is served): the page shows it or not
+    if (env.contains ("html-keep-patterns") && keep_patterns_off == 0 &&
+        N(t) >= 3 && safe_pattern_label (label)) {
+      tree r (_PATTERN, label, exec_string (t[1]), exec_string (t[2]));
+      if (N(t) >= 4) r << exec (t[3]);
+      if (N(t) == 5) r << arg5;
+      return r;
+    }
     return pattern_fallback (base, env [BG_COLOR]);
   }
   int imw_pt, imh_pt;

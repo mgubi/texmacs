@@ -323,6 +323,66 @@ get_buffer_style (url name) {
   return copy (vw->ed->get_style ());
 }
 
+// The style and the initial environment of a buffer, as the shared files
+// (utils relate shared-files) take them: (meta style initial), the initial
+// environment as in the file (without the variables of the window), from the
+// editor of the buffer which was used last (the editors keep their own copies).
+tree
+get_buffer_meta (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return "";
+  new_data data;
+  tm_view vw= N(buf->vws) == 0? NULL: concrete_view (get_recent_view (name));
+  if (vw == NULL) {
+    data->style= copy (buf->data->style);
+    data->init = copy (buf->data->init);
+  }
+  else vw->ed->get_data (data);
+  hashmap<string,tree> init= copy (data->init);
+  iterator<string> it= iterate (data->init);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (is_view_init_variable (var)) init->reset (var);
+  }
+  return compound ("meta", data->style, make_collection (init));
+}
+
+// A number which changes when the style or the initial environment of
+// get_buffer_meta do (the sum over the variables, so that the order of the
+// table does not matter): the shared files compare it at each tick, before
+// they build and compare the trees.
+int
+get_buffer_meta_hash (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return 0;
+  tm_view vw= N(buf->vws) == 0? NULL: concrete_view (get_recent_view (name));
+  if (vw != NULL) return vw->ed->get_meta_hash ();
+  unsigned int h= 7 * (unsigned int) hash (buf->data->style) + 1;
+  iterator<string> it= iterate (buf->data->init);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (is_view_init_variable (var)) continue;
+    h += (1000003u * (unsigned int) hash (var)) ^ (unsigned int) hash (buf->data->init [var]);
+  }
+  return (int) (h & 0x7fffffff);
+}
+
+void
+set_buffer_init (url name, string var, tree val) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf) || is_view_init_variable (var)) return;
+  if (N(buf->vws) == 0) buf->data->init (var)= copy (val);
+  else buf->vws[0]->ed->init_env (var, copy (val));
+}
+
+void
+reset_buffer_init (url name, string var) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf) || is_view_init_variable (var)) return;
+  if (N(buf->vws) == 0) buf->data->init->reset (var);
+  else buf->vws[0]->ed->init_default (var);
+}
+
 void
 set_buffer_style (url name, tree style) {
   // the style of the buffer, in its data and in all its views (the first

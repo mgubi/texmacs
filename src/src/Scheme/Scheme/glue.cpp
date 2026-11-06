@@ -1308,6 +1308,8 @@ tmscm_to_list_tree (tmscm p) {
 #ifdef USE_LSP
 #include "lsp_link.hpp"
 #endif
+#include "local_link.hpp"
+#include "mcp_stdio.hpp"
 #include "code_lines.hpp"
 #include "code_regions.hpp"
 #include "convert.hpp"
@@ -1345,6 +1347,7 @@ tmscm_to_list_tree (tmscm p) {
 
 #include "Pdf/pdf_hummus_extract_attachment.hpp"
 #include "Pdf/pdf_hummus_make_attachment.hpp"
+#include "Html_math/html_math.hpp"
 
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"

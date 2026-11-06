@@ -226,6 +226,7 @@ Plugins/Freetype/tt_font.cpp
 Plugins/Freetype/tt_tools.cpp
 Plugins/Freetype/unicode_font.cpp
 Plugins/Freetype/unicode_math_font.cpp
+Plugins/Html_math/html_math.cpp
 Plugins/Ghostscript/ghostscript.cpp
 Plugins/Ghostscript/gs_utilities.cpp
 Plugins/Gnutls/gnutls.cpp
@@ -308,6 +309,8 @@ System/Language/verb_language.cpp
 System/Link/cmdline_link.cpp
 System/Link/connection.cpp
 System/Link/dyn_link.cpp
+System/Link/local_link.cpp
+System/Link/mcp_stdio.cpp
 System/Link/lsp_link.cpp
 System/Language/code_lines.cpp
 System/Language/code_regions.cpp
@@ -326,6 +329,7 @@ System/Misc/data_cache.cpp
 System/Misc/fakedlopen.c
 System/Misc/fast_alloc.cpp
 System/Misc/persistent.cpp
+System/Misc/stack_guard.cpp
 System/Misc/sys_utils.cpp
 Texmacs/Data/new_buffer.cpp
 Texmacs/Data/new_project.cpp

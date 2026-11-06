@@ -1532,8 +1532,11 @@ gui_version () {
   return "sdl";
 }
 
+bool is_headless ();
+
 void
 beep () {
+  if (is_headless ()) return;
 #ifdef OS_MACOS
   mac_beep ();
 #else

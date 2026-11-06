@@ -69,6 +69,9 @@ FT_Error (*ft_palette_select) (FT_Face        face,
                                FT_UShort      palette_index,
                                FT_Color**     apalette)= NULL;
 #endif
+FT_Error (*ft_outline_decompose) (FT_Outline*              outline,
+                                  const FT_Outline_Funcs*  funcs,
+                                  void*                    user);
 
 typedef FT_Error (*glyph_renderer) (FT_GlyphSlot, FT_Render_Mode);
 
@@ -94,6 +97,7 @@ ft_initialize () {
   ft_palette_data_get= FT_Palette_Data_Get;
   ft_palette_select= FT_Palette_Select;
 #endif
+  ft_outline_decompose= FT_Outline_Decompose;
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "With linked TrueType support\n";
 #else
@@ -145,6 +149,9 @@ ft_initialize () {
   if (ft_palette_data_get == NULL || ft_palette_select == NULL)
     ft_get_color_glyph_layer= NULL;
 #endif
+  (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Outline_Decompose",
+       (pointer&) ft_outline_decompose);
+  if (ft_outline_decompose == NULL) return true;
   debug_on (status);
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "Installed TrueType support\n";

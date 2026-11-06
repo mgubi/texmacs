@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <iostream>
 #include <thread>
+#include "mcp_stdio.hpp"
 
 #define EXPERIMENTAL_REEXEC_DETACHED 0
 
@@ -238,6 +239,8 @@ int main (int argc, char** argv) {
   reexec_detached (argc, argv);
 #endif
 
+  // `texmacs --mcp' keeps its standard output for the protocol
+  if (mcp_requested (argc, argv)) mcp_stdio_setup ("");
   texmacs_init_guile_hooks ();
   setup_texmacs_path ();
   if (get_env ("APPIMAGE") != "") {

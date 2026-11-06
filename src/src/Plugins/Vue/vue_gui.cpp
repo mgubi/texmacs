@@ -7544,7 +7544,10 @@ void clear_selection (string key) {
 * Miscellaneous
 ******************************************************************************/
 
+bool is_headless ();
+
 void beep () {
+  if (is_headless ()) return;
   // Issue a beep: the system alert sound on macOS, the console bell
   // elsewhere (SDL has no beep of its own)
 #ifdef OS_MACOS

@@ -1223,10 +1223,12 @@ qt_gui_rep::put_graphics_on_clipboard (url file) {
 
 int char_clip = 0;
 
+bool is_headless ();
+
 void
 beep () {
-    // Issue a beep
-  QApplication::beep();
+    // Issue a beep (not in a headless process: there is no application)
+  if (!is_headless ()) QApplication::beep();
 }
 
 void

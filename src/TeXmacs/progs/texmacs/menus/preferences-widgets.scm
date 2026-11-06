@@ -479,26 +479,21 @@
 
 ;; Html ----------
 
-(define (export-formulas-as-mathjax on?)
-  (set-boolean-preference "texmacs->html:mathjax" on?)
-  (when on?
-    (set-boolean-preference "texmacs->html:mathml" #f)
-    (set-boolean-preference "texmacs->html:images" #f)
-    (refresh-now "texmacs to html")))
+(define html-formula-names
+  '(("static" "Static SVG")
+    ("mathjax" "MathJax")
+    ("mathml" "MathML")
+    ("images" "Images")
+    ("html" "HTML tables")))
 
-(define (export-formulas-as-mathml on?)
-  (set-boolean-preference "texmacs->html:mathml" on?)
-  (when on?
-    (set-boolean-preference "texmacs->html:mathjax" #f)
-    (set-boolean-preference "texmacs->html:images" #f)
-    (refresh-now "texmacs to html")))
+(define (html-formula-name mode)
+  (translate (cadr (assoc mode html-formula-names))))
 
-(define (export-formulas-as-images on?)
-  (set-boolean-preference "texmacs->html:images" on?)
-  (when on?
-    (set-boolean-preference "texmacs->html:mathjax" #f)
-    (set-boolean-preference "texmacs->html:mathml" #f)
-    (refresh-now "texmacs to html")))
+(define (html-formula-choose name)
+  (for-each (lambda (p)
+              (when (== (translate (cadr p)) name)
+                (html-formulas-set (car p))))
+            html-formula-names))
 
 (tm-widget (html-preferences-widget)
   ======
@@ -509,15 +504,10 @@
       (meti (hlist // (text "Use CSS for more advanced formatting"))
         (toggle (set-boolean-preference "texmacs->html:css" answer)
                 (get-boolean-preference "texmacs->html:css")))
-      (meti (hlist // (text "Export mathematical formulas as MathJax"))
-        (toggle (export-formulas-as-mathjax answer)
-                (get-boolean-preference "texmacs->html:mathjax")))
-      (meti (hlist // (text "Export mathematical formulas as MathML"))
-        (toggle (export-formulas-as-mathml answer)
-                (get-boolean-preference "texmacs->html:mathml")))
-      (meti (hlist // (text "Export mathematical formulas as images"))
-        (toggle (export-formulas-as-images answer)
-                (get-boolean-preference "texmacs->html:images"))))
+      (meti (hlist // (text "Export mathematical formulas as"))
+        (enum (html-formula-choose answer)
+              (map html-formula-name (map car html-formula-names))
+              (html-formula-name (html-formulas)) "10em")))
     ===
     (hlist
       (text "CSS stylesheet:") //

@@ -31,8 +31,39 @@ protected:
   hashmap<string,tree> init;              // environment changes w.r.t. style
   hashmap<string,tree> fin;               // environment changes w.r.t. doc
   hashmap<string,tree> grefs;             // global references
+  bool                 recording_html;    // exec_html records the formulas
   edit_env env;                           // the environment for typesetting
   typesetter ttt;                         // the (not) yet typesetted document
+
+public:
+  // The environments of the formulas of the last expansion of the buffer for
+  // the HTML export (exec_html). They have the numbers html_first, ... and
+  // numbers are never given twice, in all editors: formula html_first + i is
+  // typeset in the prepared environment, patched with html_base and then
+  // with html_envs[i] (recorded by edit_env_rep::record_formula).
+  static int html_count;                          // numbers given so far
+  static array<edit_typeset_rep*> html_recorders; // editors with formulas
+  int html_first;
+  hashmap<string,tree> html_base;         // environment at the start
+  array<hashmap<string,tree> > html_envs; // changes for each formula
+  void forget_html_envs ();
+  // The formulas typeset for the export, with what their typesetting read,
+  // as a bridge records it (see bridge_rep::same_inputs): a formula whose
+  // inputs have the same values, in whatever environment, is the same, and
+  // has the same number (html_snippet_id), for the caches of the export
+  struct html_snippet {
+    int id;
+    unsigned long long state;    // the derived state (fonts, colour...)
+    array<int> vars;             // the variables read before written
+    unsigned long long vals;     // a hash of their values
+    array<string> keys;          // the references looked up
+    array<tree> values;          // and their values
+    bool zoom;                   // the zoom factor was read
+    tree zoom_at;                // (its value)
+  };
+  static int html_snippet_count;  // numbers given so far
+  static int html_snippet_made;   // the number of the last one typeset
+  hashmap<tree,array<html_snippet> > html_snippets;
 
 protected:
   typesetter           get_typesetter ();
@@ -116,6 +147,7 @@ public:
   void     change_style (tree style);
   void     change_style_local (tree style);
   tree     get_init_all ();
+  int      get_meta_hash ();
   void     init_env (string var, tree by);
   void     init_default (string var);
   void     init_env_local (string var, tree by);
