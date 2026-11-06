@@ -11,6 +11,7 @@
 
 #include "bridge.hpp"
 #include "code_lines.hpp"
+#include "drd_std.hpp"
 #include "iterator.hpp"
 #include "sys_utils.hpp" // get_env
 #include "Boxes/construct.hpp"
@@ -70,11 +71,36 @@ make_inactive_bridge (typesetter ttt, tree st, path ip) {
   else return bridge_auto (ttt, st, ip, inactive_auto, false);
 }
 
+bool
+bridge_needs_arity (tree_label l) {
+  // does the bridge of this primitive index its children?
+  switch (l) {
+  case WITH: case CANVAS: case ORNAMENT: case ART_BOX:
+  case DATOMS: case DLINES: case DPAGES: case TFORMAT:
+  case SURROUND: case LOCUS: case MARK: case VAR_MARK: case EXPAND_AS:
+  case HLINK: case ACTION:
+    return true;
+  default:
+    return false;
+  }
+}
+
 bridge
 make_bridge (typesetter ttt, tree st, path ip) {
   // cout << "Make bridge " << st << ", " << ip << LF;
   // cout << "Preamble mode= " << ttt->env->preamble << LF;
   if (ttt->env->preamble)
+    return make_inactive_bridge (ttt, st, ip);
+  // A `with' with no argument (or with the wrong number) is indexed by its
+  // bridge: it is shown as an inactive tree, so that a document, or a patch
+  // from another process, with such a tree does not crash the typesetter.
+  // The same for the other primitives whose bridge indexes its children
+  // (`ornament', `canvas', `hlink'...): a patch can leave `(ornament)' with no
+  // child. (The other primitives with a wrong arity are left to the failure
+  // detection of the typesetter, which the tests of `typeset' exercise, as
+  // for `anim-compose'.)
+  if (is_compound (st) && bridge_needs_arity (L(st)) &&
+      !std_drd->correct_arity (L(st), N(st)))
     return make_inactive_bridge (ttt, st, ip);
   switch (L(st)) {
   case _ERROR:
@@ -538,8 +564,6 @@ extern tree the_et;
 
 #define READS_MAX 256
 
-#define LOOKUPS_MAX 64
-
 // the reads and the lookups of a bridge which was typeset or used again,
 // for the record of the bridge above it
 void
@@ -716,8 +740,6 @@ same_page_items (array<page_item> l1, array<page_item> l2) {
 * or typeset again what read a binding which changed: see "Passes" in
 * Edit/Editor/edit_typeset.cpp.
 ******************************************************************************/
-
-#define INPUTS_MAX 256
 
 // The line items which a bridge got from the bridges around it: the
 // markers (made again each time the bridge around is typeset) by what they

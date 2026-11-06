@@ -239,6 +239,17 @@ jobs:
           echo "$out"
           echo "$out" | grep -q "^Revision $want " || { echo "error: -v does not say $want"; exit 1; }
 
+      # the disk image, attached once for the checks below and detached at
+      # the end of the job; NOTE: on the runners of GitHub, the image just
+      # made sometimes cannot be attached for minutes (Resource temporarily
+      # unavailable): attach-dmg.sh says what holds it, stops XProtect and
+      # attaches a copy
+      - name: Attach the disk image
+        run: |
+          mnt="$RUNNER_TEMP/dmg-mount"
+          packages/macos/attach-dmg.sh "$DMG" "$mnt"
+          echo "MNT=$mnt" >> "$GITHUB_ENV"
+
       # the application of the disk image, with each architecture: a test
       # home, a document with big red text on the command line, and the
       # windows saved as PNGs (every 3 seconds with Cocoa, at each redraw
@@ -247,14 +258,7 @@ jobs:
       # software renderer of OpenGL, or MuPDF when there is no context)
       - name: Smoke test (the application of the disk image shows a document)
         run: |
-          mnt=$(mktemp -d)
-          # NOTE: again when it fails (Resource temporarily unavailable, on
-          # the runners of GitHub)
-          for i in 1 2 3 4 5; do
-            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" && break
-            [ $i = 5 ] && exit 1
-            sleep $((i * 10))
-          done
+          mnt="$MNT"
           status=0
           for a in arm64 x86_64; do
             home=$(mktemp -d)
@@ -279,7 +283,6 @@ jobs:
             tail -20 "$home/log.txt"
             [ $ok = yes ] || { echo "error: the document is not shown with $a"; status=1; }
           done
-          hdiutil detach "$mnt"
           exit $status
 
       # the Ghostscript of the application of the disk image, with each
@@ -287,12 +290,7 @@ jobs:
       # the system, and TeXmacs runs it for an EPS image (#662)
       - name: Bundled tools (Ghostscript)
         run: |
-          mnt=$(mktemp -d)
-          for i in 1 2 3 4 5; do
-            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" && break
-            [ $i = 5 ] && exit 1
-            sleep $((i * 10))
-          done
+          mnt="$MNT"
           version=$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)
           app="$mnt/$APP_NAME.app"
           ls -l "$app/Contents/Resources/share/TeXmacs/bin/gs"
@@ -304,7 +302,6 @@ jobs:
             packages/bundled-tools/check.sh -r "$app/Contents/Resources/share/TeXmacs" \
               -v "$version" -- arch -$a "$app/Contents/MacOS/TeXmacs" -headless || status=1
           done
-          hdiutil detach "$mnt"
           exit $status
 
       # failures of the Cocoa interface which used to be silent or to abort
@@ -314,18 +311,16 @@ jobs:
       - name: Cocoa checks (tests/cocoa/check.sh)
         if: matrix.gui == 'cocoa'
         run: |
-          mnt=$(mktemp -d)
-          for i in 1 2 3 4 5; do
-            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" && break
-            [ $i = 5 ] && exit 1
-            sleep $((i * 10))
-          done
+          mnt="$MNT"
           status=0
           TM_TEST_HOME=$(mktemp -d) BIN="$mnt/$APP_NAME.app/Contents/MacOS/TeXmacs" \
             tests/cocoa/check.sh || status=$?
           [ $status = 0 ] || tail -40 tests/build/cocoa/*.log
-          hdiutil detach "$mnt"
           exit $status
+
+      - name: Detach the disk image
+        if: always() && env.MNT != ''
+        run: hdiutil detach "$MNT" || hdiutil detach -force "$MNT" || true
 
       # also when they pass: what the windows did (key, main, active)
       - uses: actions/upload-artifact@v7

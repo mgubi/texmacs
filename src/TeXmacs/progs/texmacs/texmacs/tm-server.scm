@@ -319,8 +319,19 @@
 (tm-define (typeset-failed-buffer? name)
   (ahash-ref typeset-failed-buffers (url->string name)))
 
+;; Shared files (utils relate shared-files, see tm-files.scm): set when a
+;; file is first shared, so that the hooks cost nothing before
+(define shared-files-in-use #f)
+
+(tm-define (shared-files-in-use?)
+  shared-files-in-use)
+
+(tm-define (set-shared-files-in-use! flag)
+  (set! shared-files-in-use flag))
+
 (tm-define (buffer-close name)
   (typeset-failure-forget name)
+  (when (shared-files-in-use?) (shared-file-leave name))
   (cpp-buffer-close name))
 
 (tm-define (buffers-modified?)

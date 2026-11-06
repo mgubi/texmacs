@@ -280,8 +280,18 @@ point_of (array<int>& offsets, int byte) {
   return TSPoint { (uint32_t) lo, (uint32_t) (byte - offsets[lo]) };
 }
 
+// the full parses of all the regions since the start (tests: an edit of a
+// long region parses part of it incrementally, not all of it again)
+static int full_parses_total= 0;
+
+int
+syntax_region_full_parses () {
+  return full_parses_total;
+}
+
 static void
 region_parse (syntax_region_rep* r, TSTree* old) {
+  if (old == NULL) full_parses_total++;
   TSInput input= { r, region_read, TSInputEncodingCustom, texmacs_decode };
   TSTree* t= ts_parser_parse (r->parser, old, input);
   if (old != NULL) ts_tree_delete (old);
@@ -465,6 +475,8 @@ region_delete (syntax_region_rep* r) {
 static syntax_region_rep* new_region (tree root, int language,
                                       array<string> lines, int first);
 
+static void release_orphans ();
+
 static syntax_region_rep*
 get_region (tree root, int language) {
   // the region of root, parsed and up to date, or NULL
@@ -492,6 +504,7 @@ get_region (tree root, int language) {
       else region_update (r);
       return r;
     }
+  release_orphans ();
   syntax_region_rep* r= new_region (root, language, region_lines (root), 0);
   int total= region_bytes (r);
   for (int i= 0; i < N(regions); i++) total += region_bytes (regions[i]);
@@ -605,11 +618,12 @@ cut_rows (syntax_region_rep* r, int target) {
 }
 
 static array<syntax_region_rep*>
-cut_region (syntax_region_rep* r) {
-  // the parts of the lines of r (from its first line), at its cuts
+cut_region (syntax_region_rep* r, array<int> cuts) {
+  // the parts of the lines of r (from its first line), at its cuts (given
+  // by cut_rows)
   array<syntax_region_rep*> parts;
-  array<int> cuts= cut_rows (r, PART_ROWS);
   int start= 0, n= N(r->lines);
+  cuts= copy (cuts);
   cuts << n;
   for (int i= 0; i < N(cuts); i++) {
     parts << new_region (r->root, r->language, range (r->lines, start, cuts[i]),
@@ -703,11 +717,16 @@ group_update (syntax_group_rep* g) {
   // with it (it may be in a comment which does not end any more)
   while (ka + 1 < N(g->parts) && !tail_error && tail_has_error (g->parts[ka]))
     group_join (g, ka, ka + 1, 0);
-  // a part which is too long is cut again (when it is no longer in error)
+  // a part which is too long is cut again (when it is no longer in error,
+  // and when its tree has a place to cut at: cut_rows reads the tree which
+  // the part has, linear in its nodes at the top level, while cut_region
+  // parses the new parts from scratch, so that a part without such a
+  // place, e.g. indented statements at the top level of a C file, no node
+  // of which starts a line, was parsed whole again at each key)
   if (N(g->parts[ka]->lines) > 3 * PART_ROWS && !tail_has_error (g->parts[ka])) {
-    array<syntax_region_rep*> news= cut_region (g->parts[ka]);
-    if (N(news) > 1) group_replace (g, ka, ka, news);
-    else for (int i= 0; i < N(news); i++) region_delete (news[i]);
+    array<int> cuts= cut_rows (g->parts[ka], PART_ROWS);
+    // (with a cut, two parts or more)
+    if (N(cuts) > 0) group_replace (g, ka, ka, cut_region (g->parts[ka], cuts));
   }
 }
 
@@ -732,14 +751,21 @@ get_group (tree root, int language) {
   if (N(root) < GROUP_MIN_ROWS) return NULL;
   if (tree_sitter_get_language (language) == NULL) return NULL;
   if (!cork_table_ready) init_cork_table ();
+  release_orphans ();
   syntax_region_forget (root);
-  // (cut where the parse of the whole region has nodes at the top level)
+  // (cut where the parse of the whole region has nodes at the top level;
+  // without such a place, the whole region is the one part, and is not
+  // parsed a second time)
   syntax_region_rep* whole= new_region (root, language, region_lines (root), 0);
   syntax_group_rep* g= tm_new<syntax_group_rep> ();
   g->root= root;
   g->language= language;
-  g->parts= cut_region (whole);
-  region_delete (whole);
+  array<int> cuts= cut_rows (whole, PART_ROWS);
+  if (N(cuts) == 0) g->parts << whole;
+  else {
+    g->parts= cut_region (whole, cuts);
+    region_delete (whole);
+  }
   if (N(groups) >= max_groups) {
     group_delete (groups[N(groups) - 1]);
     groups->resize (N(groups) - 1);
@@ -792,6 +818,42 @@ syntax_region_forget (tree root) {
       for (int j= i; j + 1 < N(regions); j++) regions[j]= regions[j+1];
       regions->resize (N(regions) - 1);
       return;
+    }
+}
+
+static bool
+detached_root (tree root) {
+  // is root detached from the documents? obtain_ip gives the detached path
+  // for a tree whose document was closed, and also for a tree which has no
+  // observer of its position, so a tree which was never in a document (made
+  // by a script, typeset apart) is released too: it is parsed again if it is
+  // highlighted again. Keeping those trees to the cache instead was worse:
+  // highlighting big files fills the 256 slots with roots which have an
+  // observer but no position (about 1650 evictions in one run of the audit,
+  // 11 of them of roots with a position; they are, we guess, the copies of
+  // the code blocks which the typesetter makes), and they pushed out the
+  // regions of the open documents.
+  path ip= obtain_ip (root);
+  return !is_nil (ip) && !ip_attached (ip);
+}
+
+static void
+release_orphans () {
+  // The regions of the documents which were closed. The tree of a closed
+  // buffer is held by its region, with the syntax tree and the colours of
+  // its text, as long as no newer region pushes it out of the cache: some
+  // megabytes for each file opened and closed again (#765).
+  for (int i= N(groups) - 1; i >= 0; i--)
+    if (detached_root (groups[i]->root)) {
+      group_delete (groups[i]);
+      for (int j= i; j + 1 < N(groups); j++) groups[j]= groups[j+1];
+      groups->resize (N(groups) - 1);
+    }
+  for (int i= N(regions) - 1; i >= 0; i--)
+    if (detached_root (regions[i]->root)) {
+      region_delete (regions[i]);
+      for (int j= i; j + 1 < N(regions); j++) regions[j]= regions[j+1];
+      regions->resize (N(regions) - 1);
     }
 }
 
@@ -1242,21 +1304,21 @@ highlight_region (syntax_region_rep* r, int query, array<int> colors,
   return r->hl_cols;
 }
 
-array<array<int> >
+array<array<array<int> > >
 syntax_region_highlight (tree root, int language, int query, array<int> colors,
                          int injections, ts_injection_resolver resolve,
                          int epoch, array<int>* recoloured, bool* all) {
   // (see highlight_region; in a long region, the colours of its parts one
-  // after the other: each part colours the lines of its edits)
+  // after the other: each part colours the lines of its edits. They are
+  // given part by part: appending them into one array of the lines copied
+  // the lines before each part again, at each key, quadratic in the number
+  // of parts; and the caller only needs the lines which were coloured)
   array<syntax_region_rep*> rs= regions_of (root, language);
-  if (N(rs) == 1)
-    return highlight_region (rs[0], query, colors, injections, resolve,
-                             epoch, recoloured, all);
-  array<array<int> > cols;
+  array<array<array<int> > > parts (N(rs));
   for (int k= 0; k < N(rs); k++)
-    cols << highlight_region (rs[k], query, colors, injections, resolve,
-                              epoch, recoloured, all);
-  return cols;
+    parts[k]= highlight_region (rs[k], query, colors, injections, resolve,
+                                epoch, recoloured, all);
+  return parts;
 }
 
 /******************************************************************************

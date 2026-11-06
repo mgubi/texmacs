@@ -399,11 +399,60 @@
       (htmltm-tex-image (shtml-attr-non-null a 'alt))
       (htmltm-image env a c)))
 
+(define (htmltm-static-source env x)
+  ;; the MathML of a static formula: a string before it has been written out
+  (cond ((nlist? x) '())
+        ((in? (car x) '(h:math m:math math)) (htmltm env x))
+        ((func? x '*TOP*)
+         (append-map (cut htmltm-static-source env <>) (cdr x)))
+        ((and (func? x '*RAW* 1) (string-starts? (cadr x) "<math"))
+         (htmltm-static-source env (parse-html-snippet (cadr x))))
+        (else '())))
+
+(define (htmltm-nesting s)
+  ;; the depth of the parentheses of s, outside strings
+  (let loop ((i 0) (d 0) (m 0) (str? #f) (esc? #f))
+    (if (>= i (string-length s)) m
+        (let ((c (string-ref s i)))
+          (cond (esc? (loop (+ i 1) d m str? #f))
+                (str? (loop (+ i 1) d m (!= c #\") (== c #\\)))
+                ((== c #\") (loop (+ i 1) d m #t #f))
+                ((== c #\() (loop (+ i 1) (+ d 1) (max m (+ d 1)) #f #f))
+                ((== c #\)) (loop (+ i 1) (- d 1) m #f #f))
+                (else (loop (+ i 1) d m #f #f)))))))
+
+;; Tags which a page could use to reach files, scripts or the document
+(define htmltm-static-refused
+  '(include image extern action assign provide set-binding hidden-binding
+    script eval specific video graphics style use-package use-module
+    tmdoc-include link links mark macro xmacro quasi quote-value))
+
+(define (htmltm-static-safe? x)
+  (cond ((string? x) #t)
+        ((not (and (pair? x) (symbol? (car x)) (list? x))) #f)
+        ((in? (car x) htmltm-static-refused) #f)
+        ((string-occurs? "include" (symbol->string (car x))) #f)
+        (else (list-and (map htmltm-static-safe? (cdr x))))))
+
+(define (htmltm-static-tree s)
+  ;; the formula as written by tmhtml-static-formula*, or #f: only formulas,
+  ;; and not too deep for the reader (pages need not be ours)
+  (and (string? s) (< (string-length s) 100000) (<= (htmltm-nesting s) 200)
+       (catch #t
+         (lambda ()
+           (with x (string->object (utf8->cork s))
+             (and (htmltm-static-safe? x) (list `(math ,x)))))
+         (lambda args #f))))
+
 (define (htmltm-wikipedia-span env a c)
   (cond ((== (shtml-attr-non-null a 'class) "mwe-math-element")
          (if (and (pair? c) (func? (car c) 'h:span))
              (htmltm env (car c))
              (htmltm-pass env a c)))
+        ((== (shtml-attr-non-null a 'class) "tm-math")
+         ;; a static formula of our export: its source, else its hidden MathML
+         (or (htmltm-static-tree (shtml-attr-non-null a 'data-tm))
+             (append-map (cut htmltm-static-source env <>) c)))
         ((== (shtml-attr-non-null a 'class) "texhtml")
          (list `(math ,(htmltm-args-serial env c))))
         (else (htmltm-pass env a c))))
@@ -441,8 +490,13 @@
   ;; Convert a shxml element to texmacs.
   ;; Return a list which is either null, or contains a single serial node.
   ;; All methods must use this return convention.
-  (sxml-dispatch (lambda (env t) (list (xmltm-text t)))
-		 htmltm-pass env t))
+  (cond ((func? t '*RAW*) (htmltm-static-source env t))
+        ((and (pair? t) (symbol? (car t))
+              (string-starts? (symbol->string (car t))
+                              "http://www.w3.org/2000/svg:"))
+         '()) ; the parser keeps the namespace of inline drawings in their names
+        (else (sxml-dispatch (lambda (env t) (list (xmltm-text t)))
+                             htmltm-pass env t))))
 
 (define (cleanup-root env root)
   (sxml-set-content root (htmltm-space-mixed env (sxml-content root))))
@@ -582,6 +636,7 @@
 
   ;;; Extensions
   (mathjax (handler :collapse :inline htmltm-mathjax))
+  (svg htmltm-drop) ; drawings, and the glyphs of static formulas
   
   ;;; Math tag in HTML5 (no namespace prefix)
   (math (handler :mixed :inline htmltm-math))

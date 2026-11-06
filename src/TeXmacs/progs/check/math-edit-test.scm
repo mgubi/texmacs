@@ -635,6 +635,31 @@
                         #t #f))
           '(concat (left "langle") "a" (right "rangle"))))
 
+;; Brackets nested n deep take n steps of the upgrade; the steps were
+;; recursive calls of 1 KB of the stack each, so that about 8000 levels
+;; overflowed the stack of the program (#551, a crash report of
+;; symbol_types in upgrade_brackets). They are a loop now.
+(define (nested-parens n)
+  (stree->tree (string-append (apply string-append (make-list n "("))
+                              "x"
+                              (apply string-append (make-list n ")")))))
+
+(define (around-depth t)
+  ;; the number of nested (around "(" ... ")") and the innermost content
+  (let loop ((t t) (d 0))
+    (if (and (tree-is? t 'around) (== (tree->stree (tree-ref t 0)) "(")
+             (== (tree->stree (tree-ref t 2)) ")"))
+        (loop (tree-ref t 1) (+ d 1))
+        (list d (tree->stree t)))))
+
+(define (test-deep-brackets)
+  (check= (tree->stree (tree-upgrade-brackets (nested-parens 3) "math"))
+          '(around "(" (around "(" (around "(" "x" ")") ")") ")"))
+  (check= (around-depth (tree-upgrade-brackets (nested-parens 300) "math"))
+          '(300 "x"))
+  (check= (around-depth (tree-upgrade-brackets (nested-parens 1000) "math"))
+          '(1000 "x")))
+
 ;; Backspace and delete over brackets: removing one bracket of a pair
 ;; leaves a missing bracket, removing the other one too removes the pair
 ;; and keeps its content, an empty pair goes at once.
@@ -1197,7 +1222,8 @@
   (for-each run-group
             (list test-enter-math test-formula-variants test-fractions
                   test-scripts test-roots test-big-operators test-brackets
-                  test-bracket-shapes test-bracket-deletion test-primes
+                  test-bracket-shapes test-deep-brackets
+                  test-bracket-deletion test-primes
                   test-wide test-other-structures test-matrices test-remove
                   test-navigation test-keyboard test-spaces test-correct
                   test-grammar test-undo))

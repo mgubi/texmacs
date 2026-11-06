@@ -332,7 +332,7 @@ bridge_document (typesetter ttt, tree st, path ip) {
 void
 bridge_document_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || is_func (u, DOCUMENT) || is_func (u, PARA),
+  ASSERT (!is_nil (p) || is_func (u, DOCUMENT) || is_func (u, PARA) || L(u) == L(st),
 	  "nil path");
   if (mode == DOC_CODE) {
     code->notify_assign (p, u); st= code->st; status= CORRUPTED; return; }

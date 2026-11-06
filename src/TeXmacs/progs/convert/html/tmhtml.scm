@@ -31,10 +31,15 @@
 (define tmhtml-css? #t)
 (define tmhtml-mathjax? #f)
 (define tmhtml-mathml? #f)
+(define tmhtml-static-math? #f)
+(define tmhtml-static-cache (make-ahash-table))
+(define tmhtml-in-file? #f)
 (define tmhtml-images? #f)
 (define tmhtml-image-embed? #f)
 (define tmhtml-image-serial 0)
 (define tmhtml-image-cache (make-ahash-table))
+(define tmhtml-snippet-ids (make-ahash-table))
+(define tmhtml-static-texs (make-ahash-table))
 (define tmhtml-image-root-url (unix->url "image"))
 (define tmhtml-image-root-string "image")
 (define tmhtml-image-loose? #t)
@@ -53,7 +58,18 @@
 	(== (assoc-ref opts "texmacs->html:images") "on"))
   (set! tmhtml-image-embed?
 	(== (assoc-ref opts "texmacs->html:image-embed") "on"))
+  (set! tmhtml-static-math?
+	(== (assoc-ref opts "texmacs->html:static-math") "on"))
+  ;; MathML only when it is the format of the formulas, for the doctype and
+  ;; the suffix of the links: an older preference may remain on with another
+  (when (or tmhtml-static-math? tmhtml-mathjax?)
+    (set! tmhtml-mathml? #f))
+  (set! tmhtml-static-cache (make-ahash-table))
+  (set! tmhtml-in-file? #f)
+  (when tmhtml-static-math? (html-math-defs))
   (set! tmhtml-image-cache (make-ahash-table))
+  (set! tmhtml-snippet-ids (make-ahash-table))
+  (set! tmhtml-static-texs (make-ahash-table))
   (set! tmhtml-image-serial 0)
   (set! tmhtml-image-loose? (url-none? current-save-target))
   (if tmhtml-image-loose?
@@ -202,6 +218,7 @@
     (with-extract-sub w var post)))
 
 (define (tmhtml-file l)
+  (set! tmhtml-in-file? #t)
   ;; This handler is special:
   ;; Since !file is a special node used only at the top of trees
   ;; it produces a single node, and not a nodeset like other handlers.
@@ -270,7 +287,13 @@
           (with script `(h:script (@ (language "javascript")
                                      (defer "<implicit>")) ,code)
             (set! xhead (append xhead (list script))))))
-    (if tmhtml-mathjax?
+    (if tmhtml-static-math?
+	(with style `(h:style (@ (type "text/css"))
+		      ,(string-append ".tm-src { " tmhtml-static-hidden " } "
+                                      ".tm-math { " tmhtml-static-math " } "
+                                      ".tm-tex { " tmhtml-static-text " }"))
+	  (set! xhead (append xhead (list style)))))
+    (if (and tmhtml-mathjax? (not tmhtml-static-math?))
 	(let* ((site "https://cdn.jsdelivr.net/")
                (loc "npm/mathjax@3/es5/tex-mml-chtml.js")
                (src (string-append site loc))
@@ -291,7 +314,7 @@
 		  (content ,(string-append "TeXmacs " (texmacs-version)))))
        ,css
        ,@xhead)
-      (h:body ,@body))))
+      (h:body ,@(tmhtml-static-defs) ,@body))))
 
 (define (tmhtml-finalize-document top)
   ;; @top must be a node produced by tmhtml-file
@@ -622,16 +645,17 @@
   ;;(display* "l << " l "\n")
   (set! l (tmconcat-structure-tabs l))
   ;;(display* "l >> " l "\n")
-  (tmhtml-post-simplify-nodes
-   (let ((l (tmhtml-list l)))
-     (cond ((null? l) '())
-	   ((string? (car l)) l)
-	   ((heading? l) (tmhtml-post-heading l))
-	   ((list-any sxhtml-table? l) (tmhtml-post-table l))
-	   ((and (null? (cdr l)) (pair? (car l))
-		 (== (caar l) 'h:div) (== (cadar l) '(@ (class "left-tab"))))
-	    (cddar l))
-	   (else l)))))
+  (tmhtml-static-bind-punctuation
+   (tmhtml-post-simplify-nodes
+    (let ((l (tmhtml-list l)))
+      (cond ((null? l) '())
+            ((string? (car l)) l)
+            ((heading? l) (tmhtml-post-heading l))
+            ((list-any sxhtml-table? l) (tmhtml-post-table l))
+            ((and (null? (cdr l)) (pair? (car l))
+                  (== (caar l) 'h:div) (== (cadar l) '(@ (class "left-tab"))))
+             (cddar l))
+            (else l))))))
 
 (define (tmhtml-align-left l)
   (with r (tmhtml-concat l)
@@ -818,7 +842,83 @@
 ;; Color conversions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmcolor->htmlcolor x)
+;; A value which goes into a style attribute cannot end its declaration or
+;; call a script: only the characters of colors and lengths are kept, and
+;; url(, expression( and the like are refused.
+(tm-define (tmhtml-css-safe s fallback)
+  (let ((low (string-downcase s)))
+    (if (and (null? (filter (lambda (c) (not (or (char-alphabetic? c)
+                                                 (char-numeric? c)
+                                                 (in? c '(#\space #\# #\( #\)
+                                                          #\, #\. #\% #\+
+                                                          #\- #\/ #\_)))))
+                            (string->list s)))
+             (not (string-occurs? "url(" low))
+             (not (string-occurs? "expression" low))
+             (not (string-occurs? "javascript" low)))
+        s
+        fallback)))
+
+;; The address of a link or of an image: javascript:, vbscript: and data:
+;; (but data:image/png, jpeg, gif and webp for an image) are not followed.
+;; The scheme is read as a browser reads it, without spaces and controls,
+;; with the entities for the colon and the other ones removed.
+;; only ASCII matters for the scheme of an address (integer->char fails above
+;; 255 on Guile 1.8): any other code point is a placeholder, removed later
+(define (tmhtml-entity-char n)
+  (if (and (> n 32) (< n 127)) (integer->char n) #\space))
+
+(define (tmhtml-url-normalize u)
+  ;; &#106; &#x6A; (leading zeros, the ; is optional) and the names colon, Tab
+  ;; and NewLine are decoded as a browser does before the scheme is read
+  (let ((n (string-length u)))
+    (define (digits i hex?)
+      (let loop ((j i))
+        (if (and (< j n)
+                 (let ((c (char-downcase (string-ref u j))))
+                   (or (char-numeric? c)
+                       (and hex? (string-index "abcdef" c)))))
+            (loop (+ j 1))
+            j)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n)
+          (string-downcase (apply string-append (reverse acc)))
+          (let ((c (string-ref u i)))
+            (cond ((and (== c #\&) (< (+ i 1) n) (== (string-ref u (+ i 1)) #\#))
+                   (let* ((hex? (and (< (+ i 2) n)
+                                     (in? (string-ref u (+ i 2)) '(#\x #\X))))
+                          (start (if hex? (+ i 3) (+ i 2)))
+                          (end (digits start hex?)))
+                     (if (= end start)
+                         (loop (+ i 1) (cons "&" acc))
+                         (let* ((code (string->number (substring u start end)
+                                                      (if hex? 16 10)))
+                                (next (if (and (< end n) (== (string-ref u end) #\;))
+                                          (+ end 1) end)))
+                           (loop next (cons (if (or (<= code 32) (== code 127)) ""
+                                                 (string (tmhtml-entity-char code)))
+                                            acc))))))
+                  ((and (== c #\&) (htmlout-entity-end u i))
+                   (let* ((e (htmlout-entity-end u i))
+                          (name (string-downcase (substring u (+ i 1) e))))
+                     (loop (+ e 1) (cons (if (== name "colon") ":" "") acc))))
+                  ((or (<= (char->integer c) 32) (== (char->integer c) 127))
+                   (loop (+ i 1) acc))
+                  (else (loop (+ i 1) (cons (string c) acc)))))))))
+
+(tm-define (tmhtml-safe-url u . image?)
+  (let ((n (tmhtml-url-normalize u)))
+    (if (or (string-starts? n "javascript:") (string-starts? n "vbscript:")
+            (and (string-starts? n "data:")
+                 (not (and (list>0? image?) (car image?)
+                           (or (string-starts? n "data:image/png")
+                               (string-starts? n "data:image/jpeg")
+                               (string-starts? n "data:image/gif")
+                               (string-starts? n "data:image/webp"))))))
+        "#"
+        u)))
+
+(tm-define (tmcolor->htmlcolor x)
   (with s (tmhtml-force-string x)
     (cond ((== s "light grey") "#d0d0d0")
 	  ((== s "pastel grey") "#dfdfdf")
@@ -840,9 +940,9 @@
 	  ((== s "pastel cyan") "#dfffff")
 	  ((== s "pastel orange") "#ffdfbf")
 	  ((== s "pastel brown") "#dfbfbf")
-	  (else s))))
+	  (else (tmhtml-css-safe s "inherit")))))
 
-(define (tmbgcolor->htmlbgcolor x)
+(tm-define (tmbgcolor->htmlbgcolor x)
   (with s (tmhtml-force-string x)
     (cond ((== s "light grey") "#80808060")
 	  ((== s "pastel grey") "#80808040")
@@ -900,7 +1000,7 @@
 			       (= x (exact->inexact (inexact->exact x))))
 			  (inexact->exact x) x))))
 
-(define (tmlength->htmllength len . css?)
+(tm-define (tmlength->htmllength len . css?)
   (if (list>0? css?) (set! css? (car css?)) (set! css? #t))
   (and-let* ((s (tmhtml-force-string len))
              (len-str (if (string->number s) (string-append s "tmpt") s))
@@ -922,7 +1022,7 @@
 	  ((and css? (== unit "ln"))
 	   (string-append (number->htmlstring val) "px"))
 	  ((and css? (== unit "@")) "auto")
-	  (css? len)
+	  (css? (tmhtml-css-safe s "auto"))
 	  (else (number->htmlstring (* cmpx val incm))))))
 
 (define (tmlength->px len)
@@ -951,7 +1051,7 @@
 
 (define (tmhtml-with-font-size val arg)
   (ahash-with tmhtml-env :mag val
-    (let* ((x (* (string->number val) 100))
+    (let* ((x (* (or (string->number val) 1) 100))
            (c (string-append "font-size: " (number->string x) "%"))
 	   (s (cond ((< x 1) "-4") ((< x 55) "-4") ((< x 65) "-3")
 		    ((< x 75) "-2") ((< x 95) "-1") ((< x 115) "0")
@@ -1021,6 +1121,9 @@
 	((null? (cdr l)) (tmhtml (car l)))
 	((null? (cddr l)) '())
 	((func? (cAr l) 'graphics) (tmhtml-png (cons 'with l)))
+	;; not through tmhtml-with-one: each number is a new value
+	((== (car l) "html-formula-env")
+	 (tmhtml-with-formula-env (cadr l) `(with ,@(cddr l))))
 	(else
 	 (let* ((var (tmhtml-force-string (car l)))
 		(val (tmhtml-force-string (cadr l)))
@@ -1118,7 +1221,7 @@
   ;; TODO: change label at start of content into ID attribute, move other
   ;; labels out (A elements cannot be nested!).
   (let* ((body (tmhtml (first l)))
-	 (to (cork->html (force-string (second l)))))
+	 (to (tmhtml-safe-url (cork->html (force-string (second l))))))
     (if (string-starts? to "$")
 	body ;; temporary fix for URLs like $TEXMACS_PATH/...
 	`((h:a (@ (href ,(tmhtml-suffix to))) ,@body)))))
@@ -1174,8 +1277,33 @@
                                    (substring h 0 7)
                                    h)))))))
 
+(tm-define (tmhtml-css-url u)
+  ;; the address in url('...'): no quote, parenthesis, backslash or ; in it,
+  ;; except the ; of data:image/png;base64,
+  (define data? (string-starts? (tmhtml-url-normalize u) "data:image/"))
+  (apply string-append
+         (map (lambda (c)
+                (if (or (in? c '(#\' #\" #\( #\) #\\ #\< #\>))
+                        (and (== c #\;) (not data?))
+                        (< (char->integer c) 32))
+                    (string-append "%" (number->string (char->integer c) 16))
+                    (string c)))
+              (string->list (tmhtml-safe-url u #t)))))
+
+(tm-define (tmhtml-pattern-address s)
+  ;; the address of the image of a pattern for the page: the export gives
+  ;; the file it found as a name of the system, which on Windows is
+  ;; D:\a\b.png, a file:///D:/a/b.png for a browser
+  (if (and (>= (string-length s) 3)
+           (char-alphabetic? (string-ref s 0))
+           (== (string-ref s 1) #\:)
+           (in? (string-ref s 2) '(#\\ #\/)))
+      (string-append "file:///" (string-replace s "\\" "/"))
+      s))
+
 (define (html-css-pattern x)
-  (let* ((u (tmhtml-force-string (cadr x)))
+  (let* ((u (tmhtml-css-url
+             (tmhtml-pattern-address (tmhtml-force-string (cadr x)))))
          (w (or (tmlength->htmllength (caddr x) #t) "100%"))
          (h (or (tmlength->htmllength (cadddr x) #t) "100%"))
          (im (string-append "background: url('" u "')"))
@@ -1306,7 +1434,7 @@
 (define (tmhtml-table l)
   (list (tmhtml-make-table (cons 'table l) '() '() '() '())))
 
-(define (tmhtml-tformat l)
+(tm-define (tmhtml-tformat l)
   (with t (tmtable-normalize (cons 'tformat l))
     (receive (tablef colf rowf cellf) (tmtable-properties* t)
       (list (tmhtml-make-table (cAr t) tablef colf rowf cellf)))))
@@ -1340,20 +1468,68 @@
          (s (url->string (url-tail css))))
     (if (string-starts? s "web-") 19000.0 20625.0)))
 
-(define (tmhtml-png y)
-  ;; converts generic markup that can be displayed on screen to png format
-  (let* ((mag (ahash-ref tmhtml-env :mag))
+(define (tmhtml-formula-with? x)
+  ;; a formula of the expansion of a buffer: a with whose first variable is
+  ;; the number of the environment of the formula (see exec_with)
+  (and (func? x 'with) (>= (length x) 4) (== (cadr x) "html-formula-env")))
+
+(define (tmhtml-formula-body x)
+  ;; the formula x without the number of its environment
+  (cons 'with (cdddr x)))
+
+(define (tmhtml-formula-env-of x)
+  ;; the number of the environment of the formula x, under the with and the
+  ;; documents around it, but not of a formula inside other markup of x
+  (cond ((tmhtml-formula-with? x) (string->number (caddr x)))
+        ((func? x 'with) (tmhtml-formula-env-of (cAr x)))
+        ((func? x 'document 1) (tmhtml-formula-env-of (cadr x)))
+        (else #f)))
+
+(define (tmhtml-without-envs x)
+  (cond ((nlist? x) x)
+        ((tmhtml-formula-with? x)
+         (tmhtml-without-envs (tmhtml-formula-body x)))
+        (else (cons (car x) (map tmhtml-without-envs (cdr x))))))
+
+(define (tmhtml-snippet-key x nr)
+  ;; the key of x in the caches of the export, before it is typeset; the
+  ;; same formula in the same environment without looking again
+  (if (not nr) (object->string x)
+      (let* ((k (object->string (cons nr x)))
+             (id (or (ahash-ref tmhtml-snippet-ids k) (html-snippet-id x nr))))
+        (and (>= id 0) (begin (ahash-set! tmhtml-snippet-ids k id) id)))))
+
+(define (tmhtml-snippet-made x nr)
+  ;; the key of x once it is typeset, or #f when its inputs are not known
+  (if (not nr) (object->string x)
+      (with id (html-snippet-last)
+        (and (>= id 0)
+             (begin
+               (ahash-set! tmhtml-snippet-ids (object->string (cons nr x)) id)
+               id)))))
+
+(define (tmhtml-png y*)
+  ;; converts generic markup that can be displayed on screen to png format;
+  ;; a formula in its environment, at the size of the text around it
+  (let* ((nr (or (tmhtml-formula-env-of y*) (ahash-ref tmhtml-env :static-env)))
+         (y (if nr `(with "font-size" "1" ,(tmhtml-without-envs y*)) y*))
+         (mag (ahash-ref tmhtml-env :mag))
 	 (x (if (or tmhtml-css? (nstring? mag) (== mag "1")) y
                 (with nmag `(times (value "magnification") ,mag)
                   `(with "magnification" ,nmag ,y))))
 	 (l1 (tmhtml-collect-labels y))
 	 (l2 (if (null? l1) l1 (list (car l1)))))
-    (with cached (ahash-ref tmhtml-image-cache x)
+    ;; a formula by the number of what its typesetting read (equal formulas
+    ;; whose environments differ in nothing which they read are the same),
+    ;; something else as a string (the hash of Guile only sees the top of a
+    ;; list)
+    (with cached (ahash-ref tmhtml-image-cache (tmhtml-snippet-key x nr))
       (if (not cached)
 	  (receive (name-url name-string) (tmhtml-image-names "png" x)
 	    ;;(display* x " -> " name-url ", " name-string "\n")
 	    (let* ((cleared? (image-target-clear name-url))
-                   (extents (print-snippet name-url x #t))
+                   (extents (if nr (print-snippet-in name-url x nr)
+                                (print-snippet name-url x #t)))
                    (written (image-target-written name-url cleared?))
                    (m (magic-png-number))
                    (unit (/ 6000.0 (* (ninth extents) (tenth extents) m)))
@@ -1385,7 +1561,8 @@
                             `())))
 	      ;;(display* x " -> " extents "\n")
 	      (set! cached img)
-	      (ahash-set! tmhtml-image-cache x cached)))
+	      (with key (tmhtml-snippet-made x nr)
+                (when key (ahash-set! tmhtml-image-cache key cached)))))
 	  cached))))
 
 (define (tmhtml-graphics l)
@@ -1464,7 +1641,8 @@
          (tmhtml-png (cons 'image l)))
         (else
           ;; web images
-          (let* ((s (tmhtml-web-image-name (first l)))
+          (let* ((s (tmhtml-safe-url
+                     (cork->html (tmhtml-web-image-name (first l))) #t))
                  (w (tmlength->htmllength (second l) #f))
                  (h (tmlength->htmllength (third l) #f)))
             `((h:img (@ (class "image")
@@ -1494,10 +1672,10 @@
                    (list-intersperse
                      (cond ((== (length args) (length sty))
                             (map (lambda (x y)
-                                   (string-append x ":" (f y))) sty args))
+                                   (string-append x ":" (or (f y) "0"))) sty args))
                            ((>= 1 (length sty))
                             (map (lambda (y)
-                                   (string-append (car sty) ":" (f y))) args))
+                                   (string-append (car sty) ":" (or (f y) "0"))) args))
                            (else '()))
                      ";"))))
              funs args stys) ";"))))
@@ -1561,22 +1739,37 @@
 ;; ID attribute of the resulting xhtml element. When that is done, remove the
 ;; warning comment from htmltm-handler.
 
+(define (tmhtml-static-bold thunk)
+  ;; for the formulas which thunk writes: the tag is written in bold
+  (ahash-with tmhtml-env :static-bold #t
+    (thunk)))
+
 (define (tmhtml-post-item args)
   (let* ((i (car args))
          (r (tmhtml (cadr args))))
     (if (or (tm-is? i 'item) (null? (cdr i)))
         `((h:li ,@r))
-        `((h:dt ,@(tmhtml (cadr i)))
-          (h:dd ,@r)))))
+        (with desc? (ahash-ref tmhtml-env :description)
+          `((h:dt ,@(if (and tmhtml-static-math? (not desc?))
+                        ;; a name in bold is proper to description
+                        '((@ (style "font-weight: normal"))) '())
+                  ,@(if (and tmhtml-static-math? desc?)
+                        (tmhtml-static-bold (lambda () (tmhtml (cadr i))))
+                        (tmhtml (cadr i))))
+            (h:dd ,@r))))))
 
 (define (tmhtml-itemize args)
-  `((h:ul ,@(tmhtml (transform-items (car args))))))
+  (ahash-with tmhtml-env :description #f
+    `((h:ul ,@(tmhtml (transform-items (car args)))))))
 
 (define (tmhtml-enumerate args)
-  `((h:ol ,@(tmhtml (transform-items (car args))))))
+  (ahash-with tmhtml-env :description #f
+    `((h:ol ,@(tmhtml (transform-items (car args)))))))
 
 (define (tmhtml-description args)
-  `((h:dl ,@(tmhtml (transform-items (car args))))))
+  ;; the names of its items are bold, unlike those of itemize
+  (ahash-with tmhtml-env :description #t
+    `((h:dl ,@(tmhtml (transform-items (car args)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Verbatim
@@ -1638,21 +1831,58 @@
   (with first (simplify-document (car l))
     (with x `(with "mode" "math" (with "math-display" "true" ,first))
       (ahash-with tmhtml-env :math-display #t
-        `((h:center ,@(tmhtml x)))))))
+        (if tmhtml-static-math?
+            ;; boxes of formulas have no line height around them
+            `((h:center (@ (style "margin: 0.5em 0"))
+                        ,@(tmhtml (if (tmhtml-recorded? (car l)) (car l) x))))
+            `((h:center ,@(tmhtml x))))))))
+
+(define (tmhtml-recorded? x)
+  ;; a formula of the expansion of a buffer (see tmhtml-display-body)
+  (cond ((tmhtml-formula-with? x) #t)
+        ((func? x 'with) (tmhtml-recorded? (cAr x)))
+        ((func? x 'document 1) (tmhtml-recorded? (cadr x)))
+        (else #f)))
 
 (define (tmhtml-equation-lab l)
   (with first (simplify-document (car l))
-    (with x `(with "mode" "math" (with "math-display" "true" ,first))
+    (with x (if (and tmhtml-static-math? (tmhtml-recorded? (car l))) (car l)
+                `(with "mode" "math" (with "math-display" "true" ,first)))
       (ahash-with tmhtml-env :math-display #t
-        `((h:table (@ (width "100%"))
+        `((h:table (@ (width "100%")
+                      ,@(if tmhtml-static-math?
+                            '((style "margin: 0.5em 0")) '()))
                    (h:tr (h:td (@ (align "center") (width "100%"))
                                ,@(tmhtml x))
                          (h:td (@ (align "right"))
                                "(" ,@(tmhtml (cadr l)) ")"))))))))
 
-(define (tmhtml-mathjax-formula* x)
-  ;;(display* "x= " x "\n")
+(define (tmhtml-mathjax-mode-after l text?)
+  ;; is it text after the variables @l of a with, which end with its body?
+  (cond ((or (null? l) (null? (cdr l))) text?)
+        ((== (car l) "mode")
+         (tmhtml-mathjax-mode-after (cddr l) (!= (cadr l) "math")))
+        (else (tmhtml-mathjax-mode-after (cddr l) text?))))
+
+(define (tmhtml-mathjax-no-text-phantoms x text?)
+  ;; MathJax runs no macros in \text: the phantom would be shown as its source
+  (cond ((or (nlist? x) (null? x)) x)
+        ((and text? (in? (car x) '(phantom hphantom vphantom))) "")
+        (else
+         (let ((in-text?
+                (cond ((tm-func? x 'with)
+                       (tmhtml-mathjax-mode-after (cdr x) text?))
+                      ((== (car x) 'text) #t)
+                      ((== (car x) 'math) #f)
+                      (else text?))))
+           (cons (car x)
+                 (map (cut tmhtml-mathjax-no-text-phantoms <> in-text?)
+                      (cdr x)))))))
+
+(define (tmhtml-mathjax-formula* x*)
+  ;;(display* "x= " x* "\n")
   (let* ((opts (list (cons "texmacs->latex:mathjax" "on")))
+         (x (tmhtml-mathjax-no-text-phantoms x* #f))
          (s (serialize-latex (texmacs->latex x opts)))
          (display? (ahash-ref tmhtml-env :math-display))
          (style (if display? "\\displaystyle " ""))
@@ -1673,6 +1903,468 @@
          (ahash-with tmhtml-env :math-display #t
            (tmhtml-mathjax-formula (cadddr x))))
         (else (tmhtml-mathjax-formula* x))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Static formulas: typeset here and written as SVG (Plugins/Html_math)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (tmhtml-static-defs)
+  ;; the outlines of the glyphs used so far, once for the whole document
+  (with defs (html-math-defs)
+    (if (null? defs) '() (list `(*RAW* ,defs)))))
+
+;; Tags kept as tags in HTML, which write the text in them in bold
+(define tmhtml-static-bold-tags
+  '(strong chapter-title section-title subsection-title subsubsection-title
+    paragraph-title subparagraph-title))
+
+(define (tmhtml-static-strip-labels x)
+  ;; their anchors are written apart; typesetting them here would change the
+  ;; references of the buffer
+  (cond ((nlist? x) x)
+        ((func? x 'label) "")
+        ((null? (tmhtml-collect-labels x)) x)
+        (else (cons (car x) (map tmhtml-static-strip-labels (cdr x))))))
+
+(define (tmhtml-static-strip-numbering x)
+  ;; the counters, which the import would set again
+  (cond ((nlist? x) x)
+        ((tm-in? x '(assign hidden-binding)) "")
+        (else (cons (car x) (map tmhtml-static-strip-numbering (cdr x))))))
+
+(define (tmhtml-static-tree x)
+  ;; its size follows the HTML text around it, and so does bold
+  `(with "mode" "math" "magnification" "1" "font-size" "1"
+         ,@(if (ahash-ref tmhtml-env :static-bold)
+               '("font-series" "bold" "math-font-series" "bold") '())
+         ,(tmhtml-static-strip-labels x)))
+
+(define (tmhtml-display-formula x)
+  ;; the body of a displayed formula, see tmhtml-display-body
+  (and (func? x 'with) (>= (length x) 4) (== (cadr x) "html-formula")
+       (cons* 'with "mode" "math" (cdddr x))))
+
+(define (tmhtml-with-formula-env val arg)
+  ;; a formula, with the number of its environment (see exec_with)
+  (ahash-with tmhtml-env :static-env (string->number val)
+    (tmhtml (or (tmhtml-display-formula arg) arg))))
+
+(define tmhtml-keep-envs? #f)
+
+(define (tmhtml-keep-env x y)
+  ;; y for the formula x of the expansion, with its environment if it is kept
+  (if tmhtml-keep-envs?
+      `(with "html-formula-env" ,(caddr x)
+             ,@(if (func? y 'with) (cdr y) (list y)))
+      y))
+
+(define (tmhtml-unrecord x)
+  ;; the expansion as for the other ways to write formulas: their tags, and
+  ;; only for images the environments of formulas (see tmhtml-png)
+  (cond ((nlist? x) x)
+        ((tmhtml-formula-with? x)
+         (tmhtml-keep-env x (tmhtml-unrecord (tmhtml-formula-body x))))
+        ((func? x 'html-display)
+         (cons 'equation* (map tmhtml-undisplay (cdr x))))
+        ((func? x 'html-equations-base)
+         (cons 'equations-base (map tmhtml-undisplay (cdr x))))
+        ((func? x 'html-equation-lab)
+         (cons 'equation-lab (map tmhtml-undisplay (cdr x))))
+        (else (cons (car x) (map tmhtml-unrecord (cdr x))))))
+
+(define (tmhtml-recorded-somewhere? x)
+  (and (pair? x)
+       (or (tmhtml-formula-with? x)
+           (list-or (map tmhtml-recorded-somewhere? (cdr x))))))
+
+(define (tmhtml-record x)
+  ;; a tree which is not the expansion of a buffer is expanded as one, in the
+  ;; current buffer, so that its formulas have their environment
+  (cond ((tmhtml-recorded-somewhere? x) x)
+        ((func? x '!file)
+         `(!file ,(tree->stree (html-expand (stree->tree (cadr x))))
+                 ,@(cddr x)))
+        (else (tree->stree (html-expand (stree->tree x))))))
+
+(define (tmhtml-undisplay x)
+  ;; the formula of tmhtml-display-body, which equation* makes again; the
+  ;; with of math-colored around it only serves the static formulas
+  (or (tmhtml-undisplay-body x) (tmhtml-unrecord x)))
+
+(define (tmhtml-undisplay-body x)
+  (cond ((and (func? x 'with 5)
+              (== (cdr (cDr x)) '("html-formula" "display"
+                                  "math-display" "true")))
+         (tmhtml-unrecord (cAr x)))
+        ((tmhtml-formula-with? x)
+         (with y (tmhtml-undisplay-body (tmhtml-formula-body x))
+           (and y (tmhtml-keep-env x y))))
+        ((and (func? x 'with) (pair? (cdr x))) (tmhtml-undisplay-body (cAr x)))
+        (else #f)))
+
+(define (tmhtml-static-links s)
+  ;; the targets of the links, as those of the links of the text
+  (with start "<a href=\""
+    (let loop ((pos 0) (acc '()))
+      (let ((i (string-search-forwards start pos s)))
+        (if (< i 0)
+            (apply string-append
+                   (reverse (cons (substring s pos (string-length s)) acc)))
+            (let* ((b (+ i (string-length start)))
+                   (e (string-search-forwards "\"" b s)))
+              (loop e (cons* (tmhtml-suffix (substring s b e))
+                             (substring s pos b) acc))))))))
+
+(define (tmhtml-static-svgs x)
+  ;; several boxes for a long inline formula, for the browser to break it
+  (let* ((nr (or (ahash-ref tmhtml-env :static-env) -1))
+         (t (tmhtml-static-tree x))
+         (key (tmhtml-snippet-key t nr))
+         (known (and key (ahash-ref tmhtml-static-cache key))))
+    (or known
+        ;; a displayed formula is not cut: html_math_snippet sees it
+        (let* ((r (html-math-snippet t nr #t))
+               (l (map (lambda (s) `(*RAW* ,(tmhtml-static-links s)))
+                       (if (string? r) (list r) r)))
+               (made (tmhtml-snippet-made t nr)))
+          (when made (ahash-set! tmhtml-static-cache made l))
+          l))))
+
+(define tmhtml-static-hidden
+  (string-append "position:absolute;width:1px;height:1px;overflow:hidden;"
+                 "clip:rect(0 0 0 0);-webkit-user-select:none;user-select:none"))
+
+;; A formula is selected as a whole: Safari otherwise selects its hidden
+;; MathML when a drag starts on it (it needs the -webkit- prefixes)
+(define tmhtml-static-math
+  "position:relative;-webkit-user-select:all;user-select:all")
+
+;; The formula as LaTeX, as transparent text over it: it is found by the
+;; search of the browser and copied with the text around it (the hidden
+;; MathML, for screen readers, is not selected); the links of the formula
+;; are below it
+(define tmhtml-static-text
+  (string-append "position:absolute;left:0;top:0;width:100%;height:100%;"
+                 "overflow:hidden;white-space:nowrap;color:transparent;"
+                 "pointer-events:none"))
+
+(define (tmhtml-static-pictures? x)
+  (and (pair? x)
+       (or (in? (car x) '(graphics image draw-over draw-under tree))
+           (and (== (car x) 'specific) (pair? (cdr x)) (== (cadr x) "image"))
+           (list-or (map tmhtml-static-pictures? (cdr x))))))
+
+(define (tmhtml-static-tex x)
+  ;; the LaTeX of the formula x, or #f: none for a formula with pictures,
+  ;; which the converter would write as files; a cell of a displayed table
+  ;; is a formula of the text
+  (let* ((display? (and (ahash-ref tmhtml-env :math-display)
+                        (not (ahash-ref tmhtml-env :static-cell))))
+         (key (object->string (cons display? x)))
+         (known (ahash-ref tmhtml-static-texs key)))
+    (if known (car known)
+        (with r (and (not (tmhtml-static-pictures? x))
+                     (tmhtml-static-tex* x (if display? "$$" "$")))
+          (ahash-set! tmhtml-static-texs key (list r))
+          r))))
+
+(define (tmhtml-static-tex* x d)
+  (catch #t
+    (lambda ()
+      (let* ((opts (list (cons "texmacs->latex:mathjax" "on")))
+             (y (tmhtml-unrecord
+                 (tmhtml-static-strip-numbering
+                  (tmhtml-static-strip-labels x))))
+             (z (tmhtml-mathjax-no-text-phantoms y #f))
+             (s (serialize-latex (texmacs->latex z opts)))
+             ;; (the lines of the LaTeX are one line of text)
+             (t (and (string? s) (string-replace s "\n" " "))))
+        (and t (not (string-null? (tm-string-trim-both t)))
+             (cork->html (string-append d t d)))))
+    (lambda args #f)))
+
+(define (tmhtml-static-text-layer x)
+  (with s (tmhtml-static-tex x)
+    (if (not s) '()
+        (list `(h:span (@ (class "tm-tex") (aria-hidden "true")
+                          ,@(if tmhtml-in-file? '()
+                                `((style ,tmhtml-static-text))))
+                       ,s)))))
+
+;; The MathML of a formula is written as one string, not as part of the SXML
+;; tree of the document, so that its many nodes do not go through the later
+;; passes on the tree and the writer of HTML one by one.
+(define (tmhtml-markup x)
+  (if (string? x) x
+      (let* ((s (symbol->string (car x)))
+             (n (if (string-starts? s "m:")
+                    (substring s 2 (string-length s)) s))
+             (at? (and (pair? (cdr x)) (func? (cadr x) '@)))
+             (at (if at? (cdadr x) '()))
+             (kids (if at? (cddr x) (cdr x))))
+        (string-append
+         "<" n
+         (apply string-append
+                (map (lambda (a)
+                       (string-append " " (symbol->string (car a)) "=\""
+                                      (tmmath-escape (cadr a) #t)
+                                      "\""))
+                     at))
+         ">" (apply string-append (map tmhtml-markup kids)) "</" n ">"))))
+
+(define (tmhtml-static-source x)
+  ;; hidden MathML: for screen readers, and to read the formula back
+  (catch #t
+    (lambda ()
+      (list `(*RAW* ,(tmhtml-markup
+                      `(math (@ (xmlns "http://www.w3.org/1998/Math/MathML")
+                                ,(if tmhtml-in-file?
+                                     '(class "tm-src")
+                                     `(style ,tmhtml-static-hidden)))
+                             ,(texmacs->mathml x tmhtml-env))))))
+    (lambda args '())))
+
+;; Browsers break lines after an inline <svg>, even before a comma (and
+;; a word joiner does not prevent it): the last box of a formula and the
+;; punctuation after it go together. Outside the formula: on import it is
+;; replaced by its source, and the punctuation remains.
+
+(define (tmhtml-static-node? x)
+  (and (pair? x) (== (car x) 'h:span)
+       (pair? (cdr x)) (func? (cadr x) '@)
+       (in? '(class "tm-math") (cdadr x))))
+
+(define (tmhtml-static-box? x)
+  ;; a box of a formula, not its glyphs nor its hidden MathML
+  (and (func? x '*RAW*)
+       (string-starts? (cadr x)
+                       (string-append "<svg xmlns=\"http://www.w3.org/2000/"
+                                      "svg\" aria-hidden=\"true\" fill="))))
+
+(define (tmhtml-punctuation-end s)
+  ;; the number of punctuation characters at the beginning of s
+  (let loop ((i 0))
+    (if (and (< i (string-length s))
+             (in? (string-ref s i)
+                  '(#\, #\. #\; #\: #\! #\? #\) #\])))
+        (loop (+ i 1))
+        i)))
+
+(define (tmhtml-static-bind-punctuation l)
+  (cond ((or (not tmhtml-static-math?) (null? l) (null? (cdr l))) l)
+        ((and (tmhtml-static-node? (car l)) (string? (cadr l))
+              (> (tmhtml-punctuation-end (cadr l)) 0))
+         (let* ((n (tmhtml-punctuation-end (cadr l)))
+                (rest (substring (cadr l) n (string-length (cadr l))))
+                (kids (cddr (car l)))
+                (boxes (list-filter kids tmhtml-static-box?))
+                (others (list-filter kids (non tmhtml-static-box?))))
+           (append
+            ;; (a formula of one box goes with the punctuation as a whole,
+            ;; with its text, see tmhtml-static-text)
+            (if (null? (cDr boxes))
+                (list `(h:span (@ (style "white-space:nowrap")) ,(car l)
+                               ,(substring (cadr l) 0 n)))
+                (list `(h:span ,(cadr (car l)) ,@(cDr boxes) ,@others)
+                      `(h:span (@ (style "white-space:nowrap")) ,(cAr boxes)
+                               ,(substring (cadr l) 0 n))))
+            (if (string-null? rest) '() (list rest))
+            (tmhtml-static-bind-punctuation (cddr l)))))
+        (else (cons (car l) (tmhtml-static-bind-punctuation (cdr l))))))
+
+(define (tmhtml-static-unwrap x vars)
+  ;; the body of a displayed formula, and the variables of the with around it
+  (cond ((and (func? x 'with) (even? (length x)))
+         (tmhtml-static-unwrap (cAr x) (append vars (cDr (cdr x)))))
+        ((func? x 'document 1) (tmhtml-static-unwrap (cadr x) vars))
+        (else (cons vars x))))
+
+(define (tmhtml-static-table-parts x formats)
+  ;; the table of nested tformat, and their formats
+  (cond ((func? x 'tformat)
+         (tmhtml-static-table-parts (cAr x) (append formats (cDr (cdr x)))))
+        ((func? x 'table) (cons formats x))
+        ((func? x 'document 1) (tmhtml-static-table-parts (cadr x) formats))
+        (else #f)))
+
+(define (tmhtml-static-table-width formats)
+  ;; the width of a table as wide as the paragraph, in HTML
+  (let* ((l (list-filter formats
+                         (lambda (f) (and (func? f 'twith 2)
+                                          (== (cadr f) "table-width")))))
+         (w (and (nnull? l) (caddr (cAr l)))))
+    (and (string? w) (string-ends? w "par")
+         (with n (string->number (substring w 0 (- (string-length w) 3)))
+           (and n (string-append (number->string (* 100 n)) "%"))))))
+
+(define (tmhtml-static-cell-format formats row rows col cols var)
+  ;; the value of a variable of a cell, the last which the formats give
+  (let loop ((l formats) (val #f))
+    (if (null? l) val
+        (let* ((f (car l))
+               (index (lambda (s n)
+                        (with i (and (string? s) (string->number s))
+                          (if (and i (< i 0)) (+ n i 1) (or i 0)))))
+               (hit? (and (func? f 'cwith 6) (== (list-ref f 5) var)
+                          (<= (index (list-ref f 1) rows) row)
+                          (>= (index (list-ref f 2) rows) row)
+                          (<= (index (list-ref f 3) cols) col)
+                          (>= (index (list-ref f 4) cols) col))))
+          (loop (cdr l) (if hit? (list-ref f 6) val))))))
+
+(define (tmhtml-static-text? y)
+  ;; text, in any markup: a with which sets the mode to text
+  (and (tm-func? y 'with)
+       (or (let loop ((l (cDr (cdr y))))
+             (and (pair? l) (pair? (cdr l))
+                  (or (and (== (car l) "mode") (== (cadr l) "text"))
+                      (loop (cddr l)))))
+           (tmhtml-static-text? (cAr y)))))
+
+(define (tmhtml-static-number? x)
+  ;; what is after an htab of a displayed formula is its number (a label of
+  ;; any form, as text) when it is text, besides counters and labels
+  (with l (if (tm-func? x 'concat) (tm-children x) (list x))
+    (and (list-or (map tmhtml-static-text? l))
+         (list-and (map (lambda (y)
+                          (or (== y "") (tmhtml-static-text? y)
+                              (tm-in? y '(assign hidden-binding label))))
+                        l)))))
+
+(define (tmhtml-static-cell vars x align width)
+  `(h:td (@ (align ,align) ,@(if width `((width ,width)) '()))
+         ,@(if (== x "") '()
+               (ahash-with tmhtml-env :math #t
+                 (ahash-with tmhtml-env :static-cell #t
+                   (tmhtml-static-formula*
+                    (if (null? vars) x `(with ,@vars ,x))))))))
+
+(define (tmhtml-static-number-cell x)
+  `(h:td (@ (align "right"))
+         ,@(ahash-with tmhtml-env :math #f
+             (ahash-with tmhtml-env :math-display #f
+               (tmhtml x)))))
+
+(define (tmhtml-static-cell-body c)
+  (if (func? c 'cell 1) (cadr c) c))
+
+(define (tmhtml-static-htab? x)
+  (list-or (map (lambda (y) (tm-func? y 'htab)) (tm-concat-children x))))
+
+(define (tmhtml-static-row vars row r rows cols formats numbers?)
+  (let* ((cells (map tmhtml-static-cell-body (cdr row)))
+         (last (split-htab (cAr cells)))
+         (number? (tmhtml-static-number? (cadr last)))
+         (cells* (if number? (append (cDr cells) (list (car last))) cells))
+         (parts (map (lambda (c)
+                       (or (string->number
+                            (or (tmhtml-static-cell-format formats 1 rows c cols
+                                                           "cell-hpart")
+                                "0"))
+                           0))
+                     (... 1 cols)))
+         (sum (apply + parts))
+         (cell (lambda (c col)
+                 (let* ((h (tmhtml-static-cell-format formats r rows col cols
+                                                      "cell-halign"))
+                        (p (if (<= col cols) (list-ref parts (- col 1)) 0)))
+                   (tmhtml-static-cell
+                    vars c
+                    ;; the default of TeXmacs is left
+                    (cond ((== h "c") "center") ((== h "r") "right")
+                          (else "left"))
+                    (and (> sum 0) (> p 0)
+                         (string-append
+                          (number->string (inexact->exact
+                                           (round (/ (* 100 p) sum))))
+                          "%")))))))
+    `(h:tr ,@(map cell cells* (... 1 (length cells*)))
+           ,@(if numbers?
+                 (list (tmhtml-static-number-cell (if number? (cadr last) "")))
+                 '()))))
+
+(define (tmhtml-static-split-htabs x)
+  ;; the parts of x between its htab
+  (with s (split-htab x)
+    (if (tmhtml-static-htab? (cadr s))
+        (cons (car s) (tmhtml-static-split-htabs (cadr s)))
+        (list (car s) (cadr s)))))
+
+(define (tmhtml-static-display-table x)
+  ;; a displayed formula which is laid out on the page, in a table of HTML:
+  ;; its parts are formulas and its numbers text; or #f
+  (let* ((u (tmhtml-static-unwrap x '()))
+         (vars (car u))
+         (body (cdr u))
+         (tab (tmhtml-static-table-parts body '())))
+    (cond (tab
+           (let* ((rows (list-filter (cddr tab) (cut func? <> 'row)))
+                  (cols (if (null? rows) 0 (length (cdar rows))))
+                  (number-of (lambda (r)
+                               (cadr (split-htab
+                                      (tmhtml-static-cell-body (cAr r))))))
+                  (numbers? (list-or (map (lambda (r)
+                                            (tmhtml-static-number?
+                                             (number-of r)))
+                                          rows))))
+             (and (> cols 0)
+                  `((h:table (@ ,@(with w (tmhtml-static-table-width (car tab))
+                                    (if w `((width ,w)) '())))
+                             ,@(map (lambda (row r)
+                                      (tmhtml-static-row
+                                       vars row r (length rows)
+                                       cols (car tab) numbers?))
+                                    rows (... 1 (length rows))))))))
+          ((and (tm-func? body 'concat) (tmhtml-static-htab? body))
+           (let* ((parts (tmhtml-static-split-htabs body))
+                  (number? (tmhtml-static-number? (cAr parts)))
+                  (fs (if number? (cDr parts) parts))
+                  (n (length fs))
+                  ;; the space of the htab, shared
+                  (cell (lambda (f i)
+                          (tmhtml-static-cell
+                           vars f "center"
+                           (string-append
+                            (number->string (quotient 100 n)) "%")))))
+             `((h:table (@ (width "100%"))
+                        (h:tr ,@(map cell fs (... 1 n))
+                              ,@(if number?
+                                    (list (tmhtml-static-number-cell
+                                           (cAr parts)))
+                                    '()))))))
+          (else #f))))
+
+(define (tmhtml-static-source-tree x)
+  ;; the formula, with the tags of the expansion of a buffer as in TeXmacs
+  (with y (if (func? x 'with 1) (cadr x) x)
+    (cork->html (object->string
+                 (tmhtml-unrecord
+                  (tmhtml-static-strip-numbering
+                   (tmhtml-static-strip-labels y)))))))
+
+(define (tmhtml-static-formula x)
+  (or (and (ahash-ref tmhtml-env :math-display)
+           (tmhtml-static-display-table x))
+      (tmhtml-static-formula* x)))
+
+(define (tmhtml-static-formula* x)
+  (with svgs (tmhtml-static-svgs x)
+    (cond ((nnull? svgs)
+           (append (tmhtml-math-labels x)
+                   (list `(h:span (@ (class "tm-math")
+                                     ,@(if tmhtml-in-file? '()
+                                           `((style ,tmhtml-static-math)))
+                                     ;; to read it back
+                                     (data-tm ,(tmhtml-static-source-tree x)))
+                                  ,@(tmhtml-static-text-layer x)
+                                  ,@svgs
+                                  ,@(tmhtml-static-source x)))))
+          ((!= tmhtml-image-root-string "image")
+           (tmhtml-png `(with "mode" "math" ,x)))
+          (else (append (tmhtml-math-labels x)
+                        (list `(m:math
+                                (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
+                                ,(texmacs->mathml x tmhtml-env))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Equation arrays
@@ -1787,7 +2479,7 @@
 		      (src ,(tmhtml-force-string (car l)))))))
 
 (define (tmhtml-html-video l)
-  (let* ((dest (cork->html (force-string (car l))))
+  (let* ((dest (tmhtml-safe-url (cork->html (force-string (car l)))))
          (mp4 (string-append dest ".mp4"))
          (ogg (string-append dest ".ogg"))
          (webm (string-append dest ".webm"))
@@ -1921,6 +2613,11 @@
 		 (append x (tmhtml-list (cdr l))))))))
 
 (define (tmhtml-implicit-compound l)
+  (if (and tmhtml-static-math? (in? (car l) tmhtml-static-bold-tags))
+      (tmhtml-static-bold (lambda () (tmhtml-implicit-compound* l)))
+      (tmhtml-implicit-compound* l)))
+
+(define (tmhtml-implicit-compound* l)
   (or (tmhtml-dispatch 'tmhtml-stdmarkup% l)
       (and (!= tmhtml-site-version "2")
            (tmhtml-dispatch 'tmhtml-tmdocmarkup% l))
@@ -1940,7 +2637,9 @@
   ;; Main conversion function.
   ;; Takes a TeXmacs tree in Scheme notation and produce a SXML node-set.
   ;; All handler functions have a similar prototype.
-  (cond ((and tmhtml-mathjax? (ahash-ref tmhtml-env :math))
+  (cond ((and tmhtml-static-math? (ahash-ref tmhtml-env :math))
+         (tmhtml-static-formula x))
+        ((and tmhtml-mathjax? (ahash-ref tmhtml-env :math))
          (append (tmhtml-math-labels x)
                  (tmhtml-mathjax-formula x)))
         ((and tmhtml-mathml? (ahash-ref tmhtml-env :math))
@@ -2148,7 +2847,10 @@
   (doc-title-block ,tmhtml-doc-title-block)
   (equation* ,tmhtml-equation*)
   (equation-lab ,tmhtml-equation-lab)
+  (html-equation-lab ,tmhtml-equation-lab)
   (equations-base ,tmhtml-equation*)
+  (html-display ,tmhtml-equation*)
+  (html-equations-base ,tmhtml-equation*)
   (wide-float ,tmhtml-float)
   (draw-over ,tmhtml-draw-over)
   (draw-under ,tmhtml-draw-under)
@@ -2250,10 +2952,15 @@
 	(texmacs->html doc opts))
       (begin
 	(tmhtml-initialize opts)
-	((if (func? x '!file)
-	     tmhtml-finalize-document
-	     tmhtml-finalize-selection)
-	 (tmhtml-root x)))))
+	(set! tmhtml-keep-envs?
+	      (and tmhtml-images? (not tmhtml-mathjax?) (not tmhtml-mathml?)))
+	(set! x (if tmhtml-static-math? (tmhtml-record x) (tmhtml-unrecord x)))
+	(if (func? x '!file)
+	    (tmhtml-finalize-document (tmhtml-root x))
+	    (with l (tmhtml-root x)
+	      ;; the glyphs of static formulas once, after them
+	      (tmhtml-finalize-selection
+	       (if tmhtml-static-math? (append l (tmhtml-static-defs)) l)))))))
 
 (tm-define (texmacs->html* x)
   (texmacs->html x '(("texmacs->html:image-embed" . "on")

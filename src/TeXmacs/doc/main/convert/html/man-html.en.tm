@@ -12,22 +12,37 @@
   <menu|File|Export|Html>. <TeXmacs> makes moderate use of <name|Css> in
   order to improve the presentation of the generated <name|Html>.
 
-  By default, <TeXmacs> does its best in order to render formulas using
-  existing <name|Html>/<name|Css> primitives. When selecting
-  <menu|Edit|Preferences|Converters|TeXmacs-\<gtr\>Html|Use MathML>, all
-  formulas will be exported as <name|MathML>. Notice that this requires you
-  to save the generated documents using the <verbatim|.xhtml> extension.
+  The way in which mathematical formulas are exported is chosen using
+  <menu|Edit|Preferences|Converters|TeXmacs-\<gtr\>Html|Mathematical
+  formulas>:
 
-  Similarly, the user may force <TeXmacs> to export all mathematical formulas
-  as images using <menu|Edit|Preferences|Converters|TeXmacs-\<gtr\>Html|Export
-  formulas as images>. If your destination file is called
-  <verbatim|name.html>, then the images are stored in the same directory in
-  files <verbatim|name-1.png>, <rigid|<verbatim|name-2.png>> and so on. Even
-  when formulas are not exported as images, notice that all graphics drawn
-  using <TeXmacs> are exported in this way. In particular, the exportation of
-  a <TeXmacs> file with pictures may give rise to the creation of additional
-  image files. You may also force arbitrary content to be exported as an
-  image using <menu|Format|Specific|Image>.
+  <\description>
+    <item*|Static SVG>Formulas are typeset by <TeXmacs> at the time of the
+    export and written as <name|Svg> in the page, in the fonts of the
+    document and in the environment where they are, together with their
+    source, for importing the page back, and a hidden <name|MathML> version
+    for screen readers. The page needs no scripts or web fonts.
+
+    <item*|MathJax>Formulas are written in <LaTeX> and typeset by the
+    <name|MathJax> script when the page is read in a browser.
+
+    <item*|MathML>Formulas are exported as <name|MathML>. Notice that this
+    requires you to save the generated documents using the
+    <verbatim|.xhtml> extension.
+
+    <item*|Images>This is the default. If your destination file is called
+    <verbatim|name.html>, then the images are stored in the same directory in
+    files <verbatim|name-1.png>, <rigid|<verbatim|name-2.png>> and so on.
+
+    <item*|HTML tables><TeXmacs> does its best in order to render formulas
+    using existing <name|Html>/<name|Css> primitives.
+  </description>
+
+  Even when formulas are not exported as images, notice that all graphics
+  drawn using <TeXmacs> are exported in this way. In particular, the
+  exportation of a <TeXmacs> file with pictures may give rise to the creation
+  of additional image files. You may also force arbitrary content to be
+  exported as an image using <menu|Format|Specific|Image>.
 
   <TeXmacs> also provides a facility for the creation of entire websites. For
   this, you just have to regroup the files for your website into a single

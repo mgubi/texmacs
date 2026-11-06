@@ -346,6 +346,7 @@ public:
   virtual void     change_style (tree style) = 0;
   virtual void     change_style_local (tree style) = 0;
   virtual tree     get_init_all () = 0;
+  virtual int      get_meta_hash () = 0;  // style and initial environment: see get_buffer_meta_hash
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
   virtual void     init_env_local (string var, tree by) = 0;
@@ -636,6 +637,10 @@ public:
   virtual void export_ps (url ps_name,
 			  string first="1", string last="1000000") = 0;
   virtual array<SI> print_snippet (url u, tree t, bool conserve_preamble) = 0;
+  virtual array<SI> print_snippet_in (url u, tree t, int env_nr) = 0;
+  virtual scheme_tree html_math_snippet (tree t, int env_nr, bool breakable) = 0;
+  virtual int html_snippet_id (tree t, int env_nr) = 0;
+  virtual int html_snippet_last () = 0;
   virtual bool graphics_file_to_clipboard (url output) = 0;
   virtual void footer_eval (string s) = 0;
   virtual tree the_line () = 0;

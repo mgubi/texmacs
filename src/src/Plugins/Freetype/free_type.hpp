@@ -20,6 +20,7 @@ bool ft_present ();
 #include <ft2build.h>
 #include FT_FREETYPE_H 
 #include FT_TRUETYPE_TABLES_H
+#include FT_OUTLINE_H
 
 extern FT_Library ft_library;
 
@@ -78,6 +79,9 @@ extern FT_Error (*ft_palette_select) (FT_Face        face,
                                       FT_UShort      palette_index,
                                       FT_Color**     apalette);
 #endif
+extern FT_Error (*ft_outline_decompose) (FT_Outline*              outline,
+                                         const FT_Outline_Funcs*  funcs,
+                                         void*                    user);
 
 #endif
 

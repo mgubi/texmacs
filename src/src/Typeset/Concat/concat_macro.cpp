@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "concater.hpp"
 
 /******************************************************************************
@@ -103,6 +104,14 @@ concater_rep::typeset_compound (tree t, path ip) {
     }
     d= 0;
     f= env->read (var);
+  }
+
+  // (a macro that calls itself: an error box when the stack is nearly full,
+  // not a crash)
+  if (is_applicable (f) && stack_nearly_full ()) {
+    // (not typeset_error: it shows the macro call, which would nest again)
+    typeset (tree ("[macro nesting too deep]"), ip);
+    return;
   }
 
   if (is_applicable (f)) {

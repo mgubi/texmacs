@@ -217,6 +217,9 @@ public:
                                              array<line_item>& a);
   friend box              typeset_as_box (edit_env env, tree t, path ip);
   friend box              typeset_as_atomic (edit_env env, tree t, path ip);
+  friend array<box> typeset_as_segments (edit_env env, tree t, path ip,
+                                         SI long_width, SI min_width,
+                                         array<SI>& gaps);
   friend array<line_item> typeset_concat (edit_env env, tree t, path ip);
   friend array<line_item> typeset_concat_range (edit_env env, tree t, path ip,
 						int i1, int i2);

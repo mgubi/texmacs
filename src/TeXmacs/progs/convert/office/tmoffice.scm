@@ -321,8 +321,9 @@
 
 (define (tmof-big-operator name)
   ;; the name of a big operator which the converter of MathML knows, or
-  ;; its character: an integral is the same with its limits under it
-  ;; (intlim) and upright (upint)
+  ;; its character, in the encoding of TeXmacs (the converter writes it in
+  ;; UTF-8): an integral is the same with its limits under it (intlim) and
+  ;; upright (upint)
   (let* ((n (string-length name))
          (s (if (and (> n 3) (string-ends? name "lim")) (substring name 0 (- n 3))
                 name))
@@ -330,7 +331,7 @@
                 (substring s 2 (string-length s))
                 s))
          (code (assoc-ref tmof-big-operators s)))
-    (if code (office-utf8 code) s)))
+    (if code (utf8->cork (office-utf8 code)) s)))
 
 (define (tmof-math-clean x)
   ;; a formula without what is not seen, and with its fractions, its

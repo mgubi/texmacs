@@ -237,10 +237,10 @@ cell_rep::format_cell (tree fm) {
     hyphen= as_string (env->exec (var[CELL_HYPHEN]));
   else hyphen= "n";
   if (var->contains (CELL_ROW_SPAN))
-    row_span= as_int (env->exec (var[CELL_ROW_SPAN]));
+    row_span= max (1, as_int (env->exec (var[CELL_ROW_SPAN])));   // (a span of 0 or a text, while it is being edited, aborts)
   else row_span= 1;
   if (var->contains (CELL_COL_SPAN))
-    col_span= as_int (env->exec (var[CELL_COL_SPAN]));
+    col_span= max (1, as_int (env->exec (var[CELL_COL_SPAN])));
   else col_span= 1;
   if (var->contains (CELL_SWELL))
     swell= env->as_length (env->exec (var[CELL_SWELL])) >> 1;

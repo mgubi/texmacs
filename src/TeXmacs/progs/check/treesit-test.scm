@@ -490,6 +490,47 @@
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
+;; a long region which has no place to be cut at (indented statements at the
+;; top level of a C file: no node of the top level starts a line) is one
+;; part; it is parsed once when it is first coloured, and an edit parses it
+;; incrementally, without parsing it whole again to look for cuts which are
+;; not there (syntax_region.cpp, get_group and group_update: it was about a
+;; second at each key in a file of 200000 such lines)
+(define (test-long-uncut-region)
+  (check-group "long region without cuts")
+  (let* ((u (string->url "tmfs://aux/treesit-uncut"))
+         (old (current-buffer))
+         (lines (map (lambda (i)
+                       (string-append "    x" (number->string i) " = f ("
+                                      (number->string i) ");"))
+                     (iota 9000))))
+    (buffer-set-body u (stree->tree `(document ,@lines)))
+    (switch-to-buffer u)
+    (let ((d (buffer-get-body u))
+          (n0 (syntax-region-full-parses)))
+      (tree-sitter-line-colors "c" (tree-ref d 0))
+      ;; (one parse of the whole region, which is one part, without errors:
+      ;; else the test would not test anything)
+      (check= (- (syntax-region-full-parses) n0) 1)
+      (with lan (tree-sitter-program-language "c")
+        (check= (length (syntax-region-statistics d lan)) 2)
+        (check= (syntax-region-errors d lan) '()))
+      (let ((n1 (syntax-region-full-parses)))
+        (for (i '(4000 4001 4002))
+          (tree-insert! (tree-ref d i) 5 "y")
+          (tree-sitter-line-colors "c" (tree-ref d i)))
+        (check= (- (syntax-region-full-parses) n1) 0))
+      (check= (tree->string (tree-ref d 4002)) "    xy4002 = f (4002);")
+      ;; (the region is a group of parts: a function at the start of a line
+      ;; in the middle is a place to cut at, and gives two parts, which the
+      ;; statistics count; a region not in a group would have no parts)
+      (tree-insert! d 4500 '("int g (int x) {" "  return x;" "}"))
+      (tree-sitter-line-colors "c" (tree-ref d 4500))
+      (with lan (tree-sitter-program-language "c")
+        (check= (length (syntax-region-statistics d lan)) 3)))
+    (buffer-close u)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 ;; the colours of the lines of a buffer after edits (the text, the offsets
 ;; and the colours of the region are changed in place by a keystroke, made
 ;; again when lines come or go) are those of a fresh copy of its lines
@@ -1563,6 +1604,7 @@
   (test-highlight)
   (test-highlight-edits)
   (test-long-regions)
+  (test-long-uncut-region)
   (test-scan)
   (test-edit)
   (test-scanners)

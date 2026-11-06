@@ -12,6 +12,32 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 5 November 2026
+
+- **HTML export: formulas as static pictures, typeset by TeXmacs** (desktop):
+  a new choice in **Preferences → Converters → TeXmacs → Html** (static SVG,
+  MathJax, MathML, images or HTML tables) replaces the separate toggles. With
+  static SVG, each formula is drawn as TeXmacs typesets it, in the fonts,
+  macros and colours of the document; the page needs no MathJax, no scripts
+  and no web fonts. Long formulas wrap, links in formulas work, the search of
+  the browser finds formulas by their LaTeX and a copy gives them as `$...$`,
+  and a page read back into TeXmacs gives the formulas again (#770).
+- **Agents on a shared file: modes, proposals, the host's filter** (desktop
+  applications; step 4, stage A, of the MCP server design). When the person's
+  TeXmacs hosts a file that an agent (`texmacs --mcp`) edits, the person decides what
+  the agent's edits become, per file, from **Tools > Agents**: `propose` (the
+  default: each edit is kept as a proposal in the document, old and new version side
+  by side with the markup of Version > Compare, to accept or reject there or with the
+  Version tools; the agent hears of the outcome), `direct`, or `read-only`. The host
+  also applies the content rules of the MCP server to the agent's patches itself, so
+  an agent that bypasses `texmacs --mcp` is filtered too; a refusal says the rule, its
+  level and the content. New tools `list_proposals` and `withdraw_proposal`,
+  `agent_mode` in `list_documents`, and the edit tools answer `proposed`. A saved
+  file with pending proposals holds both versions. Also fixed: under s7 a shared
+  document of more than 40 blocks was cut when it was sent to a participant. See
+  [mcp-server.md](mcp-server.md) and [shared-files.md](shared-files.md); tests
+  `tests/shared` (`agent`, `agentplain`, `malformed`, `agentmode`) and `tests/mcp` (`propose`). Hardening: a patch with a malformed path no longer kills the host (shape check, and `is_applicable` answers false in C++), inverses sent by participants are recomputed, a headless participant is treated as an agent until the person marks it, an agent's Save is refused outside the direct mode, and the mode chosen is kept when the file is handed over. Integer overflows in the applicability tests of modifications (C++) no longer kill the host, a participant checks what its host sends, and a fuzz scenario runs random patches through the patch functions. Messages nested more than 1500 levels are dropped before they are read, a patch with a cursor change from another process is refused, and the editor no longer crashes on cursor data that is a string. A patch that leaves a tag with a number of children it cannot have (an `ornament` with none) is refused, and the typesetter and the cursor correction no longer crash on such trees (found by a fuzz of patches applied to a real buffer). Tables with a string for a row, empty tables and curves whose points differ in dimension no longer crash the typesetter, and a patch that changes a compound into a string label is refused.
+
 ## 4 November 2026
 
 - **Source files and texts open as a block of lines**: a source or text
@@ -30,8 +56,68 @@ have the details, and the problems go to the
   paragraphs (#710, #797).
 - **Up and Down in very long documents** (more than about 1300 pages) no
   longer jump to a wrong line.
+- **Typing in a long file which tree-sitter cannot cut into parts** (for
+  example indented statements at the top level of a C file, none of which
+  starts a line) no longer parses the whole file again at each key, and
+  opening it parses it once instead of twice: a key in such a file of
+  200000 lines took about 1 s, now 0.4 s.
+- **A key in a long program file** no longer copies the colours of all its
+  lines: about 11 ms less per key in a C file of 200000 lines (55 to 44 ms
+  as paragraphs, 17 to 10 ms as a block of lines, #798).
+- **`texmacs --mcp`** (desktop applications, first step, read only): TeXmacs
+  as an MCP server over stdio for an agent such as Claude Code
+  (`claude mcp add texmacs -- texmacs --mcp`). A headless TeXmacs which speaks
+  JSON-RPC on its standard input and output (everything else goes to
+  `system/mcp.log` of the home) and exits when the input ends. Tools:
+  `list_documents`, `open_document`, `get_outline`, `read` (as `text`,
+  `texmacs`, `stree`, `latex` or `markdown`, cut at a size, with handles and
+  hashes of the blocks), `find` and `get_references`. With shared files on, a
+  file the person has open is joined and the agent reads their latest edits.
+  `TEXMACS_MCP_ROOTS` limits the folders it opens. Editing (second step): `replace`,
+  `insert`, `delete`, `edit_text` (change a word keeping the markup), `undo_agent`,
+  `save_document`, `close_document`, `create_document`; each call is one undo step,
+  all or nothing, with `expect` (the hash read) giving a `conflict` instead of
+  overwriting a change of the person; in a shared file the agent is a participant
+  whose patches the person's TeXmacs applies as another author (the person's undo
+  skips them) and may refuse, which the tool reports; answers carry a note when the
+  document changed. `TEXMACS_MCP_READONLY=1` turns editing off. Also: an undo in a
+  headless Qt process no longer crashes, and a participant applies the patches of
+  another participant with the author of their sender. See
+  [mcp-server.md](mcp-server.md) (it also says how to register the server in Claude
+  Code and in the Claude desktop app); tests in `tests/mcp`. The content filter
+  protecting the person from markup written by the agent has static rules besides
+  the checks of the expanded content: the definitions of the document (`assign`,
+  `macro`, `set`...) cannot be edited, content may not call a macro of the document
+  or of its style that passes an argument on to a link, a file, a script or a macro
+  name (except a table of standard macros: sections, lists, folds, title blocks), and
+  errors of the evaluator refuse the content.
 
 ## 3 November 2026
+
+- **Shared files** (desktop applications, off by default): with the
+  preference `share-open-files` set to `on`, several TeXmacs processes of the
+  same user which open the same `.tm` file stay in sync, with no server. The
+  process which opens the file first hosts it and writes it; the others join it
+  and get its document instead of reading the file, send their changes to the
+  host, and ask it to save. An interactive TeXmacs hosts rather than a headless one
+  (hosting moves to it from a headless one); when the host closes the
+  file, or dies, the next participant takes over. Not on Windows. See
+  [shared-files.md](shared-files.md). First part of the shared files of the
+  [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design);
+  the style and the initial environment (packages, page setup, language,
+  fonts) are shared with the text; there is no menu for the preference yet,
+  nor cursors of the other participants.
+
+- **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,
+  so `TeXmacs -headless -x ...` showed its windows and its icon in the Dock
+  and quit only on `(quit-TeXmacs)`; it now runs without a window, as the Qt
+  and Vue builds do, and quits after the commands given with `-x` or `-c`;
+  a dialog or the print panel asked for by a headless script is answered as
+  cancelled instead of waiting.
+- **Closing a program file** gives back the memory of its colours and its
+  syntax tree: they stayed in the cache of tree-sitter until newer files
+  pushed them out, about 5 MB for each close and reopen of a one-line 438 KB
+  JavaScript file, 11 MB for a file of 12000 lines (#765).
 
 - **Names with a `*`**: opening a file name with a `*` (`dir/*.tm`) opens
   the one file that matches, or says how many match, instead of stopping

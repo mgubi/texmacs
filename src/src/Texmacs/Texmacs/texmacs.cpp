@@ -31,6 +31,7 @@
 #include "data_cache.hpp"
 #include "tm_window.hpp"
 #include "client_server.hpp"
+#include "mcp_stdio.hpp"
 
 #if defined(QTWKTEXMACS)
 #include "Qtwk/QTWKApplication.hpp"
@@ -460,6 +461,12 @@ set_global_options  (int argc, char** argv)  {
       else if ((s == "-X")) {
         exec_exit= false;
       }
+      else if (s == "-mcp") {
+        // a headless TeXmacs which serves MCP on its standard input and
+        // output (progs/agents/mcp-server.scm); it ends with its input
+        exec_exit= false;
+        my_init_cmds= my_init_cmds * " (mcp-server-start)";
+      }
       else if (s == "-server") set_server ();
       else if (s == "-port") {
         i++;
@@ -528,6 +535,7 @@ set_global_options  (int argc, char** argv)  {
         cout << "  -h         Display this help message\n";
         cout << "  -H         Run TeXmacs in headless mode\n";
         cout << "  -i [file]  Specify scheme initialization file\n";
+        cout << "  --mcp      Serve the Model Context Protocol on stdin and stdout\n";
         cout << "  -p         Get the TeXmacs path\n";
         cout << "  -q         Quit after the commands and the files\n";
         cout << "  -r         Reverse video mode\n";
@@ -818,12 +826,20 @@ immediate_options (int argc, char** argv) {
 #endif
     }
 
-#if defined (QTTEXMACS) || defined (VUETEXMACS)
+#if defined (QTTEXMACS) || defined (VUETEXMACS) || defined (AQUATEXMACS)
     else if (s == "-headless" || s == "-H" || s == "-C" ||
 	     s == "-build-website" || s == "-W" ||
 	     s == "-update-website" || s == "-U")
       headless_mode= true;
 #endif
+    else if (s == "-mcp") {
+      headless_mode= true;
+      string home= get_env ("TEXMACS_HOME_PATH");
+      string sys = home * "/system";
+      mkdir (url_system (home));
+      mkdir (url_system (sys));
+      mcp_stdio_setup (sys * "/mcp.log");
+    }
     else if (s == "-log-file" && i + 1 < argc) {
       i++;
       char* log_file = argv[i];

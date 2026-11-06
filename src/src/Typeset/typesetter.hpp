@@ -85,6 +85,8 @@ double edit_profile_now ();        // ms, from an arbitrary origin
 
 box        typeset_as_concat (edit_env env, tree t, path ip);
 box        typeset_as_box (edit_env env, tree t, path ip);
+array<box> typeset_as_segments (edit_env env, tree t, path ip,
+                                SI long_width, SI min_width, array<SI>& gaps);
 box        typeset_as_atomic (edit_env env, tree t, path ip);
 box        typeset_as_stack (edit_env env, tree t, path ip);
 box        typeset_as_table (edit_env env, tree t, path ip);

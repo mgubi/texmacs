@@ -40,8 +40,10 @@ bridge_with_rep::bridge_with_rep (typesetter ttt, tree st, path ip):
 void
 bridge_with_rep::initialize () {
   last= N(st)-1;
-  if (is_nil(body)) body= make_bridge (ttt, st[last], descend (ip, last));
-  else replace_bridge (body, st[last], descend (ip, last));
+  // (a patch from another process can leave the tree with no child)
+  tree u= last >= 0? st[last]: tree ("");
+  if (is_nil(body)) body= make_bridge (ttt, u, descend (ip, last >= 0? last: 0));
+  else replace_bridge (body, u, descend (ip, last >= 0? last: 0));
 }
 
 bridge
@@ -56,7 +58,7 @@ bridge_with (typesetter ttt, tree st, path ip) {
 void
 bridge_with_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || is_func (u, WITH), "nil path");
+  ASSERT (!is_nil (p) || is_func (u, WITH) || L(u) == L(st), "nil path");
   if (is_nil (p)) {
     st=u;
     initialize ();

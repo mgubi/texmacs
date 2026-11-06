@@ -133,6 +133,7 @@ public:
 
   /* special routines for printers */
   virtual bool is_printer ();
+  virtual bool compiled_extensions ();
   virtual void get_extents (SI& w, SI& h);
   virtual void set_page_nr (int nr);
   virtual void next_page ();

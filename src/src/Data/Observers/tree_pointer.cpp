@@ -211,6 +211,13 @@ scheme_observer (tree ref, string cb) {
   return tm_new<tree_pointer_rep> (ref, cb);
 }
 
+observer
+tree_pointer_cb_new (tree ref, string cb) {
+  observer obs= scheme_observer (ref, cb);
+  attach_observer (ref, obs);
+  return obs;
+}
+
 tree
 obtain_tree (observer obs) {
   tree t;

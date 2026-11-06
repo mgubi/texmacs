@@ -215,6 +215,15 @@ tmg_syntax_region_statistics (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_syntax_region_full_parses () {
+  // TMSCM_DEFER_INTS;
+  int out= syntax_region_full_parses ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_syntax_region_forget (tmscm arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "syntax-region-forget");
 
@@ -666,6 +675,7 @@ initialize_glue_treesit () {
   tmscm_install_procedure ("syntax-region-last-nodes",  tmg_syntax_region_last_nodes, 2, 0, 0);
   tmscm_install_procedure ("syntax-region-captures",  tmg_syntax_region_captures, 3, 0, 0);
   tmscm_install_procedure ("syntax-region-statistics",  tmg_syntax_region_statistics, 2, 0, 0);
+  tmscm_install_procedure ("syntax-region-full-parses",  tmg_syntax_region_full_parses, 0, 0, 0);
   tmscm_install_procedure ("syntax-region-forget",  tmg_syntax_region_forget, 1, 0, 0);
   tmscm_install_procedure ("syntax-region-indent",  tmg_syntax_region_indent, 5, 0, 0);
   tmscm_install_procedure ("syntax-region-errors-with",  tmg_syntax_region_errors_with, 5, 0, 0);

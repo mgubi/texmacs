@@ -37,6 +37,17 @@
   (with y (cork->utf8 x)
     (if (and (== x y) (== (string-ref y 0) #\<)) "?" y)))
 
+(define-public (tmmath-escape s . quote?)
+  ;; s as XML text, or as the value of an attribute when quote? is true
+  (with r (string-replace (string-replace s "&" "&amp;") "<" "&lt;")
+    (if (and (nnull? quote?) (car quote?))
+        (string-replace r "\"" "&quot;")
+        r)))
+
+(define (tmmath-symbol x)
+  ;; a symbol with no entry in the tables: "?" when it has no character
+  (if (string-null? x) x (tmmath-escape (cork->utf8* x))))
+
 (define (tmmath-concat-item x)
   (if (string? x)
       (with type (math-symbol-type x)
@@ -45,8 +56,8 @@
 	      ((logic-ref tm->mathml-operator% x) => (lambda (y) `(m:mo ,y)))
               ((and (string-starts? x "<up-") (== (string-length x) 6))
                `(m:mo ,(substring x 4 5)))
-	      ((in? type '("unknown" "symbol")) `(m:mi ,(cork->utf8* x)))
-	      (else `(m:mo ,(cork->utf8* x)))))
+	      ((in? type '("unknown" "symbol")) `(m:mi ,(tmmath-symbol x)))
+	      (else `(m:mo ,(tmmath-symbol x)))))
       (tmmath x)))
 
 (define (tmmath-concat! l)
@@ -78,7 +89,7 @@
 
 (define (tmmath-large x)
   (with y (logic-ref tm->mathml-large% x)
-    (if y y (cork->utf8 x))))
+    (if y y (tmmath-symbol x))))
 
 (define (tmmath-left l) `(m:mo (@ (form "prefix")) ,(tmmath-large (car l))))
 (define (tmmath-mid l) `(m:mo ,(tmmath-large (car l))))
@@ -87,7 +98,7 @@
 (define (tmmath-big l)
   (cond ((== (car l) ".") "")
 	((logic-ref tm->mathml-big% (car l)) => (lambda (y) `(m:mo ,y)))
-	(else `(m:mo ,(car l)))))
+	(else `(m:mo ,(tmmath-symbol (car l))))))
 
 (define (tmmath-lsub l) (tmmath-concat `((lsub ,(car l)))))
 (define (tmmath-lsup l) (tmmath-concat `((lsup ,(car l)))))
@@ -291,6 +302,7 @@
   ;; which are otherwise stripped by the MathML processor from <mtext> tags
   ;; see https://www.xmlmind.com/tutorials/MathML/
   (let* ((s (texmacs->code x  "utf-8"))
+         (s (tmmath-escape s))
          (s (if (string-starts? s " ") 
             (string-append "&#xA0; " (substring s 1 (string-length s))) s))
          (s (if (string-ends? s " ") 
@@ -301,6 +313,15 @@
 ;; Main conversion routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmmath-hlink l)
+  (if (null? l) '(m:mrow) (tmmath (car l))))
+
+(define (tmmath-locus l)
+  (if (null? l) '(m:mrow) (tmmath (cAr l))))
+
+(define (tmmath-reference l)
+  (if (null? l) '(m:mrow) (tmmath-text (car l))))
+
 (define (tmmath-dispatch htable l)
   (let ((x (logic-ref ,htable (car l))))
     (and (procedure? x)
@@ -310,6 +331,12 @@
   (if (!= (ahash-ref tmmath-env "mode") "math")
       (cond ((string? x) (tmmath-text x))
             ((== (car x) 'with) (tmmath-with (cdr x)))
+            ;; their ids and targets are not text
+            ((== (car x) 'hlink) (tmmath-hlink (cdr x)))
+            ((== (car x) 'locus) (tmmath-locus (cdr x)))
+            ((== (car x) 'reference) (tmmath-reference (cdr x)))
+            ((in? (car x) '(label phantom hphantom vphantom)) '(m:mrow))
+            ((== (car x) 'action) (tmmath-hlink (cdr x)))
             (else `(m:mrow ,@(map tmmath (cdr x)))))
       (cond ((string? x) (tmmath-concat (list x)))
             (else (or (tmmath-dispatch 'tmmath-primitives% x) "")))))
@@ -319,6 +346,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-dispatcher tmmath-primitives%
+  (hlink tmmath-hlink)
+  (locus tmmath-locus)
+  (reference tmmath-reference)
   ;; Mathematics
   (concat tmmath-concat)
   (concat! tmmath-concat!)

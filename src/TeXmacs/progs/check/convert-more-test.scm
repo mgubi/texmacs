@@ -34,7 +34,8 @@
 ;;   - the C++ parsers of Coq vernacular and JSON, the compressed trees and
 ;;     their tables (freed after each request of AI or LanguageTool);
 ;;   - the serializations (tm, stm, tmml, stree) of the control characters
-;;     and of a document of 2000 paragraphs, each in less than 2 s.
+;;     and of a document of 2000 paragraphs, each in at most 20 times the
+;;     time of 250 paragraphs (a conversion which does not scale).
 ;;
 ;; Strings of TeXmacs trees are Cork-encoded: "\xe9" is e acute in Cork,
 ;; "\xc3\xa9" the same in UTF-8. Expected UTF-8 strings are built by u8
@@ -44,6 +45,8 @@
 (texmacs-module (check convert-more-test)
   (:use (check check-lib)
         (convert mathml tmmath)
+        (convert html tmhtml)
+        (convert html htmlout)
         (tools spell spell-lantool)
         (tools ai ai-translate)))
 
@@ -526,6 +529,74 @@
                  (align* (document (tformat (table (row (cell "a")
                                                         (cell "=b")))))))
                "\\begin{array}{rl}")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Patterns as backgrounds in the Html export
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (pattern-cell-sample bg)
+  `(block* (tformat (cwith "1" "1" "1" "1" "cell-background" ,bg)
+                    (table (row (cell "a"))))))
+
+(define (test-html-pattern-background)
+  (check-group "html export: a pattern as background of a cell")
+  (let* ((shipped (url->system
+                   (url-resolve "$TEXMACS_PATH/misc/patterns/floral/paisley.png"
+                                "r")))
+         (found (html-export-of-buffer
+                 (pattern-cell-sample `(pattern ,shipped "50px" ""))))
+         ;; the image is not (yet) where the document is: the page may
+         ;; find it next to it
+         (missing (html-export-of-buffer
+                   (pattern-cell-sample '(pattern "nowhere-yet.png"
+                                                  "100%" "100%"))))
+         ;; a name which could break out of the url('...') stays white
+         (hostile (html-export-of-buffer
+                   (pattern-cell-sample
+                    '(pattern "x') ; background:url(javascript:1)"
+                              "100%" "100%"))))
+         (hostile2 (html-export-of-buffer
+                    (pattern-cell-sample
+                     '(pattern "javascript:alert(1)" "100%" "100%"))))
+         ;; a pattern which is not a background is as before
+         (as-color (html-export-of-buffer
+                    '(with "color" (pattern "nowhere-yet.png" "100%" "100%")
+                       "x")))
+         (as-ornament (html-export-of-buffer
+                       '(with "ornament-color"
+                          (pattern "nowhere-yet.png" "100%" "100%")
+                          (ornament "x"))))
+         (plain (html-export-of-buffer
+                 (pattern-cell-sample "red"))))
+    (check-true (string-occurs? "background: url('" found))
+    ;; the file which was found, by an address a browser reads: as it is
+    ;; on Unix, file:///D:/... for D:\... on Windows
+    (check-true (string-occurs? (string-append "background: url('"
+                                               (tmhtml-pattern-address shipped)
+                                               "')")
+                                found))
+    (check-true (string-occurs? "/misc/patterns/floral/paisley.png')" found))
+    (check-false (string-occurs? "%5c" found))
+    (check= (tmhtml-pattern-address "D:\\a\\b c.png") "file:///D:/a/b c.png")
+    (check= (tmhtml-pattern-address "c:/a/b.png") "file:///c:/a/b.png")
+    (check= (tmhtml-pattern-address "/a/b.png") "/a/b.png")
+    (check= (tmhtml-pattern-address "floral/paisley.png") "floral/paisley.png")
+    (check-true (string-occurs? "background-size: " found))
+    (check-true (string-occurs? "background: url('nowhere-yet.png')" missing))
+    (check-true (string-occurs? "background-size: 100% 100%" missing))
+    (check-false (string-occurs? "#FFFFFF" missing))
+    (for (h (list hostile hostile2))
+      (check-true (string-occurs? "background-color: #FFFFFF" h))
+      (check-false (string-occurs? "url(" h))
+      (check-false (string-occurs? "javascript" h)))
+    (for (h (list as-color as-ornament))
+      (check-false (string-occurs? "nowhere-yet" h))
+      (check-false (string-occurs? "color=\"\"" h))
+      (check-false (string-occurs? "color: ;" h))
+      (check-false (string-occurs? "color: \"" h)))
+    ;; an ordinary color is as before
+    (check-true (string-occurs? "background-color: " plain))
+    (check-false (string-occurs? "url(" plain))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MathML import
@@ -1914,6 +1985,101 @@
   (list->string (list-filter (map integer->char (iota 256))
                              (lambda (c) (nin? c (list #\< #\>))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; HTML export: attribute values and addresses
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A value of the document which ends up in an attribute (a color, a length,
+;; the address of a link, of an image) cannot end the attribute and start
+;; another one (onmouseover=...), nor a declaration of the style; a link or an
+;; image does not run javascript:.
+(define (html-of t) (export t "html-snippet"))
+
+(define (test-html-escape)
+  (check-group "html export: attributes and addresses")
+  (check= (html-of '(with "color" "red" "text")) "<font color=\"red\">text</font>")
+  (check= (html-of '(with "color" "red\" onmouseover=\"alert(1)" "text"))
+          "<font color=\"inherit\">text</font>")
+  (check= (html-of '(hlink "t" "http://a/b?x=1&y=2"))
+          "<a href=\"http://a/b?x=1&amp;y=2\">t</a>")
+  (check= (html-of '(hlink "t" "x\" onclick=\"y"))
+          "<a href=\"x&quot; onclick=&quot;y\">t</a>")
+  (check= (html-of '(hlink "t" "javascript:alert(1)")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" " Java&#9;script&colon;alert(1)"))
+          "<a href=\" Java&amp;#9;script&amp;colon;alert(1)\">t</a>")
+  (check= (tmhtml-safe-url " Java&#9;script&colon;alert(1)") "#")
+  (check= (html-of '(hlink "t" "data:text/html,x")) "<a href=\"#\">t</a>")
+  (check= (html-of '(hlink "t" "sec.html#a")) "<a href=\"sec.html#a\">t</a>")
+  (check= (html-of '(html-div-class "c\" onclick=\"x" "t"))
+          "<div class=\"c&quot; onclick=&quot;x\">\n  t\n</div>")
+  ;; the colors and the lengths of the styles (the tables of the editor
+  ;; need the expansion of its style macros, and give nothing here)
+  (check= (tmcolor->htmlcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "pastel red") "#ffdfdf")
+  (check= (tmbgcolor->htmlbgcolor "#ff0000") "#ff0000")
+  (check= (tmcolor->htmlcolor "red\" onmouseover=\"alert(1)") "inherit")
+  (check= (tmcolor->htmlcolor "red; position: fixed") "inherit")
+  (check= (tmbgcolor->htmlbgcolor "red}</style><script>") "inherit")
+  (check= (tmcolor->htmlcolor "url(javascript:alert(1))") "inherit")
+  (check= (tmlength->htmllength "1cm") "1cm")
+  (check= (tmlength->htmllength "1cm; position: fixed") #f)
+  ;; obfuscated schemes: numeric references with leading zeros, without ;
+  (for (u '("&#106;avascript:1" "javascript&#0058;1" "javascript&#x003a;1"
+            "javascript&#58 1" "&#x6A;avascript&colon;alert(1)" "JaVa\tScRiPt:1"))
+    (check= (tmhtml-safe-url u) "#"))
+  (check= (tmhtml-safe-url "page.html?a=1&b=2") "page.html?a=1&b=2")
+  ;; the full documents, as File > Export makes them
+  (let* ((cell (lambda (bg)
+                 (html-of-buffer
+                  `(document (tabular (tformat (cwith "1" "1" "1" "1" "cell-background" ,bg)
+                                               (table (row (cell "a")))))))))
+         (hostile "red\" onmouseover=\"alert(1)"))
+    (check-false (string-occurs? "onmouseover" (cell hostile)))
+    (check-true (string-occurs? "inherit" (cell hostile)))
+    (check-true (string-occurs? "background-color: #ff0000" (cell "#ff0000")))
+    )
+  ;; The patterns: the export of a document turns a pattern into a white
+  ;; background (an issue of its own), so the cell is converted here by
+  ;; tmhtml-tformat on a tree which was not expanded.
+  (let ((pat (lambda (u)
+               (apply string-append
+                      (map serialize-html
+                           (tmhtml-tformat
+                            `((cwith "1" "1" "1" "1" "cell-background"
+                                     (pattern ,u "100%" "100%" "red"))
+                              (table (row (cell "a"))))))))))
+    (check-false (string-occurs? "javascript" (pat "javascript:alert(1)")))
+    (check-true (string-occurs? "url('x%27%29%3bb:url%28http://evil/x')"
+                                (pat "x');b:url(http://evil/x")))
+    (check-false (string-occurs? "');position" (pat "x.png');position:fixed;b:url('")))
+    (check-true (string-occurs? "background: url('x.png'); background-size: 100% 100%"
+                                (pat "x.png")))
+    (check-true (string-occurs? "data:image/png;base64,AA"
+                                (pat "data:image/png;base64,AA"))))
+  ;; the addresses with characters beyond Latin 1 (Guile 1.8: integer->char
+  ;; stops at 255)
+  (for (u '("http://a/<#43B>.html" "http://a/<#20AC>x" "<#4E2D>.html"))
+    (check-true (string? (html-of-buffer `(document (hlink "t" ,u)))))
+    (check-true (string? (html-of-buffer `(document (image ,u "1cm" "1cm" "" "")))))
+    (check-true (string? (html-of-buffer `(document (html-video ,u "1" "2"))))))
+  (check= (tmhtml-safe-url "http://a/&#1083;&#8217;x") "http://a/&#1083;&#8217;x")
+  (check= (tmhtml-safe-url "&#1083;javascript:1") "&#1083;javascript:1")
+  (check-false (string-occurs? "javascript"
+               (html-of-buffer
+                '(document (image "&#x6A;avascript&colon;alert(1).png" "1cm" "1cm" "" "")))))
+  (check-false (string-occurs? "\" onerror"
+               (html-of-buffer
+                '(document (html-video "a\" onerror=\"x" "1" "2")))))
+  ;; values which are not lengths or numbers do not crash the export
+  (check-true (string? (html-of-buffer '(document (with "font-size" "big" "text")))))
+  (check-true (string? (html-of-buffer
+                        '(document (with "ornament-border" "x" "ornament-hpadding" "y" "t")))))
+  (check= (tmhtml-safe-url "javascript:x" #t) "#")
+  (check= (tmhtml-safe-url "data:image/png;base64,AA" #t) "data:image/png;base64,AA")
+  (check= (tmhtml-safe-url "data:image/svg+xml,x" #t) "#")
+  (check= (tmhtml-safe-url "images/a.png" #t) "images/a.png")
+  (check= (htmlout-attribute-value "a\"b<c>d&e&amp;f&#9;") "a&quot;b&lt;c&gt;d&amp;e&amp;f&#9;"))
+
 (define (test-serialize-special)
   (check-group "special characters")
   ;; tm: the control characters are written \@ + code
@@ -1992,52 +2158,107 @@
          (r (thunk)))
     (cons r (- (texmacs-time) t0))))
 
-(define (fastest-run thunk tries)
-  ;; @thunk timed up to @tries times, until once in less than 2 s: the
-  ;; shared runners of CI are sometimes slower for a moment (the tmml
-  ;; check took 2003 and 2101 ms there), while a slow conversion stays slow
+;; The time of a conversion depends on the machine: on the shared runners
+;; of CI the tmml check (the only one of about 1 s: the others take some
+;; 10 ms) took 2003, 2101 and 2161 ms against a limit of 2 s. What these
+;; checks are meant to catch is a conversion which does not scale (a loop
+;; over the document in a loop over its paragraphs, 8 times as long for a
+;; document 4 times as long...), so each conversion is also timed on 250
+;; paragraphs, in the same process (a slow machine is slow for both), and the
+;; big one may take at most scaling-factor times the small one (linear is 8,
+;; 7 to 9 measured for tmml, quadratic 64), but at least 4 s (the small
+;; times are too short, and noisy, to be a reference) and at most 10 s.
+(define scaling-small 250)
+(define scaling-big 2000)
+(define scaling-factor 20)
+
+(define (scaling-limit small-ms)
+  ;; the limit in ms of the big run, from the time of the small one
+  (min 10000 (max 4000 (* scaling-factor small-ms))))
+
+(define (fastest-run thunk tries ok?)
+  ;; @thunk timed up to @tries times, until once with a time in ms which
+  ;; satisfies @ok?: a run may be slow for a moment (the garbage collector,
+  ;; a neighbour on a shared runner), while a slow conversion stays slow
   (with r (timed thunk)
-    (if (or (<= tries 1) (< (cdr r) 2000)) r
-        (with r2 (fastest-run thunk (- tries 1))
+    (if (or (<= tries 1) (ok? (cdr r))) r
+        (with r2 (fastest-run thunk (- tries 1) ok?)
           (if (< (cdr r2) (cdr r)) r2 r)))))
 
-(define (check-fast what thunk expected)
-  ;; @thunk gives @expected in less than 2 s (the fastest of up to 3 runs)
-  (with r (check-run (lambda () (fastest-run thunk 3)))
-    (if (and (pair? r) (== (car r) 'error))
-        (check-report #f what (object->string r))
-        (begin
-          (check-report (equal? (car r) expected) what "wrong result")
-          (check-report (< (cdr r) 2000) (string-append what " in < 2 s")
-                        (string-append (number->string (cdr r)) " ms"))))))
+(define (check-fast what make expect)
+  ;; the thunk (make n) of a conversion of a document of @n paragraphs gives
+  ;; (expect n), and the big run takes at most (scaling-limit small-time) ms
+  (let* ((rs (check-run (lambda ()
+                          (fastest-run (make scaling-small) 3
+                                       (lambda (ms) #f)))))
+         (limit (if (and (pair? rs) (integer? (cdr rs)))
+                    (scaling-limit (cdr rs))
+                    4000))
+         (rb (check-run (lambda ()
+                          (fastest-run (make scaling-big) 3
+                                       (lambda (ms) (< ms limit)))))))
+    (cond ((and (pair? rs) (== (car rs) 'error))
+           (check-report #f what (object->string rs)))
+          ((and (pair? rb) (== (car rb) 'error))
+           (check-report #f what (object->string rb)))
+          (else
+           (check-report (equal? (car rs) (expect scaling-small))
+                         what "wrong result")
+           (check-report (equal? (car rb) (expect scaling-big))
+                         what "wrong result")
+           (check-report (< (cdr rb) limit)
+                         (string-append what " scales")
+                         (string-append (number->string (cdr rb)) " ms for "
+                                        (number->string scaling-big)
+                                        " paragraphs, "
+                                        (number->string (cdr rs)) " ms for "
+                                        (number->string scaling-small)
+                                        ", limit "
+                                        (number->string limit)))))))
 
-;; A document of 2000 paragraphs goes through each serialization and back
-;; in less than 2 s.
+(define (big-file n)
+  (tmfile (big-document n)))
+
+;; A document of 2000 paragraphs goes through each serialization and back,
+;; in at most 20 times the time of one of 250 paragraphs (4 s at least).
 (define (test-big-document)
   (check-group "big document")
-  (let* ((body (big-document 2000))
-         (doc (tmfile body))
-         (t (stree->tree doc)))
-    (check-fast "stree->tree" (lambda () (st (stree->tree doc))) doc)
-    (check-fast "tree->stree" (lambda () (tree->stree t)) doc)
-    (with s (serialize-texmacs t)
-      (check-true (> (string-length s) 100000))
-      (check-fast "tm" (lambda () (st (parse-texmacs (serialize-texmacs t)))) doc))
-    (check-fast "stm" (lambda () (import (export doc "stm-document") "stm-document"))
-                doc)
-    (check-fast "tmml" (lambda () (import (export doc "tmml-document") "tmml-document"))
-                doc)
-    (check-fast "verbatim"
-                (lambda () (length (cdr (import (export body "verbatim-snippet")
-                                                "verbatim-snippet"))))
-                2000)
-    (check-fast "texmacs-file"
-                (lambda ()
-                  (let* ((u (export doc "texmacs-file"))
-                         (r (st (convert u "texmacs-file" "texmacs-tree"))))
-                    (system-remove u)
-                    r))
-                doc))
+  (with s (serialize-texmacs (stree->tree (big-file 2000)))
+    (check-true (> (string-length s) 100000)))
+  (check-fast "stree->tree"
+              (lambda (n) (with doc (big-file n) (lambda () (st (stree->tree doc)))))
+              big-file)
+  (check-fast "tree->stree"
+              (lambda (n) (with t (stree->tree (big-file n))
+                            (lambda () (tree->stree t))))
+              big-file)
+  (check-fast "tm"
+              (lambda (n) (with t (stree->tree (big-file n))
+                            (lambda () (st (parse-texmacs (serialize-texmacs t))))))
+              big-file)
+  (check-fast "stm"
+              (lambda (n) (with doc (big-file n)
+                            (lambda () (import (export doc "stm-document")
+                                               "stm-document"))))
+              big-file)
+  (check-fast "tmml"
+              (lambda (n) (with doc (big-file n)
+                            (lambda () (import (export doc "tmml-document")
+                                               "tmml-document"))))
+              big-file)
+  (check-fast "verbatim"
+              (lambda (n) (with body (big-document n)
+                            (lambda () (length (cdr (import (export body "verbatim-snippet")
+                                                            "verbatim-snippet"))))))
+              identity)
+  (check-fast "texmacs-file"
+              (lambda (n) (with doc (big-file n)
+                            (lambda ()
+                              (let* ((u (export doc "texmacs-file"))
+                                     (r (st (convert u "texmacs-file" "texmacs-tree"))))
+                                (system-remove u)
+                                r))))
+              big-file)
   (with body (cons 'document (make-list 2000 "x"))
     (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 2000))
   ;; 4000 elements at the top, a paragraph and a table for the fraction
@@ -2255,6 +2476,44 @@
     (check-true (!= html ""))
     (check-false (url-exists? image))
     (check-false (url-exists? beside)))
+  (check-group "html images: formulas in their environment")
+  ;; the fonts around a formula and of all the preambles; the size of the
+  ;; text around is that of HTML
+  (let* ((height
+          (lambda (body)
+            (let* ((s (html-export-of-buffer
+                       body '("texmacs->html:images" . "on")
+                       '("texmacs->html:static-math" . "off")
+                       '("texmacs->html:mathjax" . "off")
+                       '("texmacs->html:mathml" . "off")))
+                   (i (string-search-forwards "height: " 0 s)))
+              (if (< i 0) ""
+                  (substring s i (string-search-forwards "em" i s))))))
+         (f '(math (big "sum")))
+         (plain (height `(document ,f))))
+    (check-false (== plain ""))
+    (check-false (== (height `(document (with "math-font" "Fira" ,f))) plain))
+    (with fira '(hide-preamble (assign "math-font" "Fira"))
+      (check-false (== (height `(document (hide-preamble (assign "y" "1"))
+                                          ,fira ,f))
+                       plain)))
+    (check= (height `(document (with "font-size" "2" ,f))) plain))
+  ;; equal formulas in other environments share their image
+  (let* ((s (html-export-of-buffer
+             '(document (concat (math "a") " " (with "color" "red" (math "b"))
+                                " " (math "a")))
+             '("texmacs->html:images" . "on")
+             '("texmacs->html:static-math" . "off")
+             '("texmacs->html:mathjax" . "off")
+             '("texmacs->html:mathml" . "off")))
+         (srcs (let loop ((i 0) (acc '()))
+                 (with j (string-search-forwards "src=\"" i s)
+                   (if (< j 0) (reverse acc)
+                       (with k (string-search-forwards "\"" (+ j 5) s)
+                         (loop k (cons (substring s (+ j 5) k) acc))))))))
+    (check= (length srcs) 3)
+    (check= (car srcs) (caddr srcs))
+    (check-false (== (car srcs) (cadr srcs))))
   (check-group "conversion for the clipboard: the images")
   (let* ((dir (url-append (temp-dir) "clipboard"))
          (ext (eps-suffix))
@@ -2479,7 +2738,7 @@
   (system-mkdir (temp-dir))
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
-                  test-html-mathjax-formulas
+                  test-html-mathjax-formulas test-html-pattern-background
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
@@ -2487,7 +2746,7 @@
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
-                  test-serialize-special test-big-document test-pdf-export
+                  test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

@@ -33,6 +33,7 @@
   (syntax-region-last-nodes syntax_region_last_nodes (object tree int))
   (syntax-region-captures syntax_region_captures (object tree int int))
   (syntax-region-statistics syntax_region_statistics (array_int tree int))
+  (syntax-region-full-parses syntax_region_full_parses (int))
   (syntax-region-forget syntax_region_forget (void tree))
   (syntax-region-indent syntax_region_indent (int tree int int int int))
   (syntax-region-errors-with syntax_region_errors_with (int tree int int int string))
