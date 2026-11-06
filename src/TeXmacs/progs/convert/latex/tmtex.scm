@@ -2422,6 +2422,7 @@
         (list '!concat '(appendix) app)))))
 
 (define tmtex-tt-col 0) ;; the column in the current line (see the tabs)
+(define tmtex-tt-escaped? #f) ;; backslashes and braces escaped before
 
 (define (tmtex-tt-document l)
   (cond ((null? l) "")
@@ -2436,11 +2437,13 @@
 ;; source file keep their tabs, see verbatim.cpp) as spaces up to the next
 ;; stop, every 8 columns; a character of Cork (<...>) is one column, and so
 ;; are the escapes of a backslash and of the braces which the verbatim
-;; environments put before (\textbackslash , \{, \}). The column goes on from
-;; the strings before in the line (tmtex-tt-col), also across markup
+;; environments put before (\textbackslash , \{, \}: tmtex-tt-escaped?; in
+;; raw LaTeX they are the characters typed). The column goes on from the
+;; strings before in the line (tmtex-tt-col), also across markup
 (define (tmtex-expand-tabs s)
   (if (and (< (string-search-forwards "<" 0 s) 0)
-           (< (string-search-forwards "\\" 0 s) 0))
+           (or (not tmtex-tt-escaped?)
+               (< (string-search-forwards "\\" 0 s) 0)))
       (begin (set! tmtex-tt-col (+ tmtex-tt-col (string-length s))) s)
       (let loop ((i 0) (col tmtex-tt-col) (acc '()))
         (if (>= i (string-length s))
@@ -2448,9 +2451,10 @@
             (let* ((j (cond ((char=? (string-ref s i) #\<)
                              (with k (string-search-forwards ">" i s)
                                (if (< k 0) (+ i 1) (+ k 1))))
-                            ((char=? (string-ref s i) #\\)
-                             (cond ((string-starts? (substring s i (string-length s))
-                                                    "\\textbackslash ")
+                            ((and tmtex-tt-escaped? (char=? (string-ref s i) #\\))
+                             (cond ((and (<= (+ i 15) (string-length s))
+                                         (== (substring s i (+ i 15))
+                                             "\\textbackslash "))
                                     (+ i 15))
                                    ((and (< (+ i 1) (string-length s))
                                          (in? (string-ref s (+ i 1)) '(#\{ #\})))
@@ -2464,10 +2468,14 @@
                   (loop j (+ col 1) (cons c acc))))))))
 
 ;; the conversion of verbatim content from its start (the column of the
-;; tabs at 0: the content before does not count)
-(define (tmtex-tt-start x)
+;; tabs at 0: the content before does not count); escaped?: its backslashes
+;; and braces were escaped before (escape-backslashes, escape-braces)
+(define (tmtex-tt-start x . escaped?)
   (set! tmtex-tt-col 0)
-  (tmtex-tt x))
+  (set! tmtex-tt-escaped? (and (nnull? escaped?) (car escaped?)))
+  (with r (tmtex-tt x)
+    (set! tmtex-tt-escaped? #f)
+    r))
 
 (define (tmtex-tt x)
   (cond ((string? x) (tmtex-verb-string (tmtex-expand-tabs x)))
@@ -2521,7 +2529,8 @@
 
 (define (tmtex-verbatim s l)
   (if (func? (car l) 'document)
-      (list '!verbatim (tmtex-tt-start (escape-braces (escape-backslashes (car l)))))
+      (list '!verbatim (tmtex-tt-start (escape-braces (escape-backslashes (car l)))
+                                       #t))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (sharp-fix t)
@@ -2535,7 +2544,7 @@
 
 (define (tmtex-verbatim* s l)
   (if (func? (car l) 'document)
-      (list '!verbatim* (sharp-fix (tmtex-tt-start (car l))))
+      (list '!verbatim* (sharp-fix (tmtex-tt-start (car l) #t)))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (tmtex-code-inline s l)

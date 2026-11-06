@@ -696,7 +696,12 @@
                         "texmacs-tree" "latex-snippet")))
       (check-true (string-contains? tex "a\\textbackslash       b"))
       (check-true (string-contains? tex "\\{       c"))
-      (check-true (string-contains? tex "Y       Z"))))
+      (check-true (string-contains? tex "Y       Z")))
+    ;; in raw LaTeX, \{ is the two characters typed
+    (check-true (string-contains?
+                 (convert (stree->tree '(specific "latex" "\\{<#9>X"))
+                          "texmacs-tree" "latex-snippet")
+                 "\\{      X")))
   ;; a text or a source file, whose lines are verbatim content (language
   ;; verbatim): the same LaTeX as without the block (it was an empty alltt)
   (let ((old (getenv "TEXMACS_CODE_LINES"))
