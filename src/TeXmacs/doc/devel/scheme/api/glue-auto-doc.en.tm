@@ -1523,6 +1523,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(shared-lock-held? <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|shared_lock_held> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(shared-lock-release <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
