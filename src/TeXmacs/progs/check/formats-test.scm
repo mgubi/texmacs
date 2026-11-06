@@ -1413,7 +1413,9 @@
           '(document (body (document "a" "b"))
                      (initial (collection (associate "language" "verbatim")
                                           (associate "font-family" "tt")
-                                          (associate "par-first" "0cm"))))))
+                                          (associate "par-first" "0cm")
+                                          ;; (typeset as lines of code)
+                                          (associate "code-lines" "true"))))))
 
 ;; Plain text gives back the paragraphs of plain strings; the markup is
 ;; lost.

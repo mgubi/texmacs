@@ -156,6 +156,29 @@ test_contains () {
   CHECK_EQ (contains (normal, 3L), true);
 }
 
+// A list of a million cells, and the functions on it, go without a
+// recursion as deep as it is long (the destructor, N, copy, the appends,
+// the comparisons...); a shared tail stays intact
+static void
+test_long_list () {
+  list<long> shared;
+  for (long i=0; i<1000; i++) shared= list<long> (i, shared);
+  {
+    list<long> l= shared;
+    for (long i=0; i<1000000; i++) l= list<long> (i, l);
+    CHECK_EQ (N(l), 1001000);
+    list<long> c= copy (l);
+    CHECK_EQ (c == l, true);
+    c << 5L;
+    CHECK_EQ (last_item (c), 5L);
+    CHECK_EQ (contains (c, -3L), false);
+    CHECK_EQ (N(remove (c, 5L)), 1001000);
+  }
+  CHECK_EQ (N(shared), 1000);
+  CHECK_EQ (shared->item, 999L);
+  CHECK_EQ (last_item (shared), 0L);
+}
+
 int
 main () {
   RUN (test_is_nil);
@@ -169,5 +192,6 @@ main () {
   RUN (test_reverse);
   RUN (test_remove);
   RUN (test_contains);
+  RUN (test_long_list);
   return test_report ();
 }

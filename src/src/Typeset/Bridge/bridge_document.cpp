@@ -218,8 +218,33 @@ bridge_block (typesetter ttt, path ip) {
 bridge bridge_docrange (typesetter ttt, tree st, path ip, array<bridge>& brs,
 			int begin, int end, bool divide);
 
+// A document is typeset as paragraphs, or, when the environment variable
+// code-lines is true (a source file, a text: see verbatim.cpp), as lines of
+// code, by bridge_code (bridge_code.cpp), which makes no bridge, paragraph
+// or box per line. The mode is chosen when the document is typeset (the
+// variable is then an input of the bridge, see bridge.cpp): the bridges of
+// the paragraphs, one for each line, are only made in the paragraph mode
+#define DOC_UNKNOWN 0
+#define DOC_PARAGRAPHS 1
+#define DOC_CODE 2
+
+bridge bridge_code (typesetter ttt, tree st, path ip);
+
+static bool
+has_paragraphs_line (tree doc) {
+  // a line which holds paragraphs (a document, a with of a document...):
+  // as a line of code, it would be typeset by the concater, its paragraphs
+  // as lines which do not wrap; the document is then typeset as paragraphs
+  // (a line of a source file is a string: the test is quick)
+  for (int i=0; i<N(doc); i++)
+    if (!is_atomic (doc[i]) && is_multi_paragraph (doc[i])) return true;
+  return false;
+}
+
 class bridge_document_rep: public bridge_rep {
 protected:
+  int    mode; // DOC_UNKNOWN before the first typesetting
+  bridge code; // the bridge of the lines of code (DOC_CODE)
   array<bridge> brs;
   bridge acc; // binary splitting acceleration for long documents
   hashmap<int,bridge> blocks; // by the number of their first paragraph
@@ -231,22 +256,53 @@ public:
   bridge_document_rep (typesetter ttt, tree st, path ip);
   void initialize ();
   void initialize_acc ();
+  void set_mode (int m);
+  int  wanted_mode ();
 
   void notify_assign (path p, tree u);
   void notify_insert (path p, tree u);
   void notify_remove (path p, int nr);
+  void notify_split  (path p);
+  void notify_join   (path p);
   bool notify_macro  (int type, string var, int l, path p, tree u);
   void notify_change ();
 
   void my_exec_until (path p);
   bool my_typeset_will_be_complete ();
   void my_typeset (int desired_status);
+  void my_typeset_paragraphs (int desired_status);
 };
 
 bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip), big_body (false)
-{
-  initialize ();
+  bridge_rep (ttt, st, ip), mode (DOC_UNKNOWN), big_body (false) {}
+
+int
+bridge_document_rep::wanted_mode () {
+  // the mode of the document in the environment where it is typeset (only
+  // my_typeset is in it: exec_until and my_typeset_will_be_complete are
+  // called in others, and use the mode which my_typeset chose): lines of
+  // code when code-lines is true, unless it has no lines or a line of
+  // paragraphs
+  return env->read ("code-lines") == "true" && N(st) > 0 &&
+         !has_paragraphs_line (st)? DOC_CODE: DOC_PARAGRAPHS;
+}
+
+void
+bridge_document_rep::set_mode (int m) {
+  // the bridges of the mode m (those of the other mode are dropped)
+  if (mode == m) return;
+  mode= m;
+  if (m == DOC_CODE) {
+    brs= array<bridge> ();
+    blocks= hashmap<int,bridge> ();
+    acc= bridge ();
+    code= bridge_code (ttt, st, ip);
+  }
+  else {
+    code= bridge ();
+    initialize ();
+  }
+  status= CORRUPTED;
 }
 
 void
@@ -278,6 +334,10 @@ bridge_document_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
   ASSERT (!is_nil (p) || is_func (u, DOCUMENT) || is_func (u, PARA) || L(u) == L(st),
 	  "nil path");
+  if (mode == DOC_CODE) {
+    code->notify_assign (p, u); st= code->st; status= CORRUPTED; return; }
+  if (is_nil (p) && mode == DOC_UNKNOWN) { st= u; status= CORRUPTED; return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_nil (p)) { st= u; initialize (); }
   else {
     if (is_atom (p)) {
@@ -297,6 +357,9 @@ void
 bridge_document_rep::notify_insert (path p, tree u) {
   //cout << "Insert " << p << ", " << u << " in " << st << "\n";
   ASSERT (!is_nil (p), "nil path");
+  if (mode == DOC_CODE) {
+    code->notify_insert (p, u); st= code->st; status= CORRUPTED; return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_atom (p)) {
     int i, j, n= N(brs), pos= p->item, nr= N(u);
     array<bridge> brs2 (n+nr);
@@ -325,6 +388,9 @@ void
 bridge_document_rep::notify_remove (path p, int nr) {
   // cout << "Remove " << p << ", " << nr << " in " << st << "\n";
   ASSERT (!is_nil (p), "nil path");
+  if (mode == DOC_CODE) {
+    code->notify_remove (p, nr); st= code->st; status= CORRUPTED; return; }
+  set_mode (DOC_PARAGRAPHS);
   if (is_atom (p)) {
     int i, n= N(brs), pos= p->item;
     array<bridge> brs2 (n-nr);
@@ -358,8 +424,27 @@ bridge_document_rep::notify_remove (path p, int nr) {
   status= CORRUPTED;
 }
 
+void
+bridge_document_rep::notify_split (path p) {
+  if (mode == DOC_CODE) {
+    code->notify_split (p); st= code->st; status= CORRUPTED; return; }
+  bridge_rep::notify_split (p);
+}
+
+void
+bridge_document_rep::notify_join (path p) {
+  if (mode == DOC_CODE) {
+    code->notify_join (p); st= code->st; status= CORRUPTED; return; }
+  bridge_rep::notify_join (p);
+}
+
 bool
 bridge_document_rep::notify_macro (int tp, string var, int l, path p, tree u) {
+  if (mode == DOC_CODE) {
+    bool flag= code->notify_macro (tp, var, l, p, u);
+    if (flag) status= CORRUPTED;
+    return flag;
+  }
   bool flag= false;
   int i, n= N(brs);
   for (i=0; i<n; i++)
@@ -374,6 +459,7 @@ bridge_document_rep::notify_macro (int tp, string var, int l, path p, tree u) {
 void
 bridge_document_rep::notify_change () {
   status= CORRUPTED;
+  if (mode == DOC_CODE) { code->notify_change (); return; }
   if (!is_nil (acc)) acc->notify_change ();
   if (N(brs)>0) brs[0]->notify_change ();
   if (N(brs)>1) brs[N(brs)-1]->notify_change ();
@@ -385,6 +471,12 @@ bridge_document_rep::notify_change () {
 
 void
 bridge_document_rep::my_exec_until (path p) {
+  // (the mode of the last typesetting; exec_until comes after it)
+  if (mode == DOC_CODE) { code->my_exec_until (p); return; }
+  set_mode (DOC_PARAGRAPHS);
+  // (the paragraphs are typeset with code-lines false: see my_typeset)
+  if (env->read ("code-lines") == "true")
+    env->write_update ("code-lines", "false");
   if (is_nil (acc)) {
     int i;
     for (i=0; i<p->item; i++)
@@ -396,6 +488,10 @@ bridge_document_rep::my_exec_until (path p) {
 
 bool
 bridge_document_rep::my_typeset_will_be_complete () {
+  // (the mode of the last typesetting: the environment here is not the one
+  // of the document, see wanted_mode; not typeset yet: all will be made)
+  if (mode == DOC_UNKNOWN) return true;
+  if (mode == DOC_CODE) return code->my_typeset_will_be_complete ();
   if (is_nil (acc)) {
     int i, n= N(brs);
     for (i=0; i<n; i++)
@@ -432,6 +528,27 @@ bridge_document_rep::typeset_one (int i, int n, int desired_status,
 void
 bridge_document_rep::my_typeset (int desired_status) {
   //cout << INDENT;
+  // (lines of code, or paragraphs: see above)
+  // (a document without lines is typeset as paragraphs: the code bridge
+  // would have a line which is not in the tree; so is a document with a
+  // line of paragraphs, see has_paragraphs_line)
+  bool code_lines= (env->read ("code-lines") == "true");
+  set_mode (wanted_mode ());
+  if (mode == DOC_CODE) {
+    code->typeset (desired_status);
+    st= code->st;
+    return;
+  }
+  // (code-lines is the mode of this document only: the documents inside
+  // its paragraphs are typeset as paragraphs)
+  tree old_mode;
+  if (code_lines) old_mode= env->local_begin ("code-lines", "false");
+  my_typeset_paragraphs (desired_status);
+  if (code_lines) env->local_end ("code-lines", old_mode);
+}
+
+void
+bridge_document_rep::my_typeset_paragraphs (int desired_status) {
   if (is_nil (acc)) {
     int i, n= N(st);
     array<line_item> a= ttt->a;

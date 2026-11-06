@@ -2005,7 +2005,7 @@
     (list 'Cref key)))
 
 (define (tmtex-specific l)
-  (cond ((== (car l) "latex") (tmtex-tt (cadr l)))
+  (cond ((== (car l) "latex") (tmtex-tt-start (cadr l)))
         ((== (car l) "image") (tmtex-eps (cadr l)))
         ((== (car l) "printer") (tmtex (cadr l)))
         ((== (car l) "odd") `(ifthispageodd ,(tmtex (cadr l)) ""))
@@ -2539,15 +2539,82 @@
         (set! tmtex-appendices? #t)
         (list '!concat '(appendix) app)))))
 
+(define tmtex-tt-col 0) ;; the column in the current line (see the tabs)
+(define tmtex-tt-escaped? #f) ;; backslashes and braces escaped before
+
 (define (tmtex-tt-document l)
   (cond ((null? l) "")
-        ((null? (cdr l)) (tmtex-tt (car l)))
-        (else (string-append (tmtex-tt (car l)) "\n"
-                             (tmtex-tt-document (cdr l))))))
+        (else
+          (set! tmtex-tt-col 0)
+          ;; (the line before the next ones: the column goes in order)
+          (let ((h (tmtex-tt (car l))))
+            (if (null? (cdr l)) h
+                (string-append h "\n" (tmtex-tt-document (cdr l))))))))
+
+;; the tabs of a line of verbatim content (<#9>: the lines of a text or a
+;; source file keep their tabs, see verbatim.cpp) as spaces up to the next
+;; stop, every 8 columns; a character of Cork (<...>) is one column, and so
+;; are the escapes of a backslash and of the braces which the verbatim
+;; environments put before (\textbackslash , \{, \}: tmtex-tt-escaped?; in
+;; raw LaTeX they are the characters typed). The column goes on from the
+;; strings before in the line (tmtex-tt-col), also across markup
+(define (tmtex-char-end s i n)
+  ;; the end of the character at i: a character of Cork (<...>, which holds
+  ;; no other <), an escape of verbatim content, or one byte; a scan in
+  ;; Scheme (string-search-forwards converts the whole string at each call)
+  (let ((c (string-ref s i)))
+    (cond ((char=? c #\<)
+           (let loop ((k (+ i 1)))
+             (cond ((>= k n) (+ i 1))
+                   ((char=? (string-ref s k) #\>) (+ k 1))
+                   ((char=? (string-ref s k) #\<) (+ i 1))
+                   (else (loop (+ k 1))))))
+          ((and tmtex-tt-escaped? (char=? c #\\))
+           (cond ((and (<= (+ i 15) n)
+                       (== (substring s i (+ i 15)) "\\textbackslash "))
+                  (+ i 15))
+                 ((and (< (+ i 1) n) (in? (string-ref s (+ i 1)) '(#\{ #\})))
+                  (+ i 2))
+                 (else (+ i 1))))
+          (else (+ i 1)))))
+
+(define (tmtex-expand-tabs s)
+  (let ((n (string-length s)))
+    (cond ((and (< (string-search-forwards "<" 0 s) 0)
+                (or (not tmtex-tt-escaped?)
+                    (< (string-search-forwards "\\" 0 s) 0)))
+           (set! tmtex-tt-col (+ tmtex-tt-col n))
+           s)
+          ((< (string-search-forwards "<#9>" 0 s) 0)
+           ;; (no tab: only the columns)
+           (let loop ((i 0) (col tmtex-tt-col))
+             (if (>= i n) (begin (set! tmtex-tt-col col) s)
+                 (loop (tmtex-char-end s i n) (+ col 1)))))
+          (else
+            (let loop ((i 0) (col tmtex-tt-col) (acc '()))
+              (if (>= i n)
+                  (begin (set! tmtex-tt-col col)
+                         (apply string-append (reverse acc)))
+                  (let* ((j (tmtex-char-end s i n))
+                         (c (substring s i j)))
+                    (if (== c "<#9>")
+                        (with w (- 8 (modulo col 8))
+                          (loop j (+ col w) (cons (make-string w #\space) acc)))
+                        (loop j (+ col 1) (cons c acc))))))))))
+
+;; the conversion of verbatim content from its start (the column of the
+;; tabs at 0: the content before does not count); escaped?: its backslashes
+;; and braces were escaped before (escape-backslashes, escape-braces)
+(define (tmtex-tt-start x . escaped?)
+  (set! tmtex-tt-col 0)
+  (set! tmtex-tt-escaped? (and (nnull? escaped?) (car escaped?)))
+  (with r (tmtex-tt x)
+    (set! tmtex-tt-escaped? #f)
+    r))
 
 (define (tmtex-tt x)
-  (cond ((string? x) (tmtex-verb-string x))
-        ((== x '(next-line)) "\n")
+  (cond ((string? x) (tmtex-verb-string (tmtex-expand-tabs x)))
+        ((== x '(next-line)) (set! tmtex-tt-col 0) "\n")
         ((func? x 'document) (tmtex-tt-document (cdr x)))
         ((func? x 'para) (tmtex-tt-document (cdr x)))
         ((func? x 'concat)
@@ -2597,7 +2664,8 @@
 
 (define (tmtex-verbatim s l)
   (if (func? (car l) 'document)
-      (list '!verbatim (tmtex-tt (escape-braces (escape-backslashes (car l)))))
+      (list '!verbatim (tmtex-tt-start (escape-braces (escape-backslashes (car l)))
+                                       #t))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (sharp-fix t)
@@ -2611,7 +2679,7 @@
 
 (define (tmtex-verbatim* s l)
   (if (func? (car l) 'document)
-      (list '!verbatim* (sharp-fix (tmtex-tt (car l))))
+      (list '!verbatim* (sharp-fix (tmtex-tt-start (car l) #t)))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (tmtex-code-inline s l)
@@ -2635,7 +2703,7 @@
   ;; (set! l (unescape-angles l))
   ;; NOTE: instead, we now unescape in tmtex-verb-string
   (tmtex-env-set "mode" "text")
-  (with src (list '!verbatim* (tmtex-tt (cadr l)))
+  (with src (list '!verbatim* (tmtex-tt-start (cadr l)))
     (tmtex-add-preview-packages src)
     (tmtex-env-reset "mode")
     (list '!unindent src)))
@@ -3328,7 +3396,7 @@
         (else (map escape-hyperref-url l))))
 
 (define (tmtex-hyperref u)
-  (tmtex-tt (escape-hyperref-url u)))
+  (tmtex-tt-start (escape-hyperref-url u)))
 
 (define (tmtex-hlink s l)
   (let* ((h (cadr l))

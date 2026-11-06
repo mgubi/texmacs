@@ -158,6 +158,9 @@
   ;; its own, source-indent: prog-edit.scm)
   ("editor:code tab width" "8" notify-code-tab-width)
   ("editor:code indent" "spaces" noop)
+  ;; the source files and the texts typeset as lines of code (code-lines:
+  ;; verbatim.cpp, when they are opened)
+  ("code lines" "on" noop)
   ("look and feel" "default" notify-look-and-feel)
   ("case sensitive shortcuts" "default" noop)
   ("detailed menus" "detailed" noop)

@@ -507,8 +507,8 @@ concat_box_rep::find_any_child (SI x, SI y, SI delta, SI& delta_out) {
     i += n-1;
     if (i+1 == N(bs)) flag=true;
     else {
-      int ex1= x- sx2(i);
-      int ex2= sx1(i+1)- x;
+      SI ex1= x- sx2(i);
+      SI ex2= sx1(i+1)- x;
       flag= ((ex2>ex1+1) || ((ex2>=ex1) && (delta<0)));
     }
     if (flag) return i;

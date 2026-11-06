@@ -40,6 +40,22 @@ have the details, and the problems go to the
 
 ## 4 November 2026
 
+- **Source files and texts open as a block of lines**: a source or text
+  file is typeset as one block of monospaced rows, not as a paragraph per
+  line, so that large files open and edit quickly (a key in a C file of
+  200000 lines takes 14 ms instead of 50 ms, and Return 16 ms instead of
+  150 ms; in paper mode a key 270 ms instead of 360 ms).
+  Tree-sitter colours, the language servers, folds and markup in a line
+  work as before. Tabs and control characters are kept and saved as they
+  were; Format > Source code shows the invisible characters and can shrink
+  formulas or images to the height of a line. Format > Source code > Lines
+  of code switches a document between lines and paragraphs, and Preferences
+  > Convert > Verbatim can open files with a paragraph per line. LaTeX
+  exports the tabs of source files as spaces.
+  Files saved as TeXmacs documents open in other versions as ordinary
+  paragraphs (#710, #797).
+- **Up and Down in very long documents** (more than about 1300 pages) no
+  longer jump to a wrong line.
 - **Typing in a long file which tree-sitter cannot cut into parts** (for
   example indented statements at the top level of a C file, none of which
   starts a line) no longer parses the whole file again at each key, and

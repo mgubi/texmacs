@@ -367,10 +367,71 @@
   ("Vertical" (make 'vgroup)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The lines of source code (the document typeset as lines of code, the
+;; variable code-lines, or as paragraphs): the spaces, the tabs, the
+;; ends of the lines and the other control characters can be shown, and the
+;; objects taller than a line shrunk to it (settings of the document; the
+;; tabs stop every prog-tab-width characters, the preference "editor:code
+;; tab width")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (code-lines?)
+  (== (get-init "code-lines") "true"))
+
+(tm-define (toggle-code-lines)
+  (:synopsis "Typeset the document as lines of code, or as paragraphs")
+  (:check-mark "v" code-lines?)
+  ;; (a source file or a text does not keep the setting when it is saved:
+  ;; it is not modified by it, as by the width of the tabs, tm-server.scm)
+  (let* ((u (current-buffer))
+         (modified? (buffer-modified? u)))
+    (init-env "code-lines" (if (code-lines?) "false" "true"))
+    (when (and (not modified?) (!= (url-format u) "texmacs"))
+      (buffer-pretend-saved u))))
+
+(tm-define (code-invisibles?)
+  (== (get-init "code-invisibles") "true"))
+
+(tm-define (toggle-code-invisibles)
+  (:synopsis "Show or hide the spaces, the tabs and the ends of the lines")
+  (:check-mark "v" code-invisibles?)
+  (init-env "code-invisibles" (if (code-invisibles?) "false" "true")))
+
+(tm-define (code-shrink-tall?)
+  (== (get-init "code-tall-objects") "shrink"))
+
+(tm-define (toggle-code-shrink-tall)
+  (:synopsis "Scale the formulas, images... down to the height of a line")
+  (:check-mark "v" code-shrink-tall?)
+  (init-env "code-tall-objects" (if (code-shrink-tall?) "natural" "shrink")))
+
+(menu-bind code-lines-menu
+  ("Lines of code" (toggle-code-lines))
+  ("Show invisible characters" (toggle-code-invisibles))
+  ("Shrink tall objects to a line" (toggle-code-shrink-tall)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main Format menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (code-lines-document?)
+  ;; a document which may be typeset as lines of code (code-lines, which is
+  ;; a setting of the whole document): a source file, a text, or a document
+  ;; which is typeset so; not a code block of another document, where
+  ;; the program code also is (in-prog?)
+  (or (code-lines?)
+      (== (get-style-list) '("code"))
+      (== (get-init "language") "verbatim")))
+
+(tm-define (code-lines-text?)
+  ;; a text (not a program), which may be typeset as lines of code (the
+  ;; program code has the menu in prog-format-menu)
+  (and (not (in-prog?)) (code-lines-document?)))
 
 (menu-bind format-menu
   (if (or (in-text?) (in-source?)) (link text-format-menu))
   (if (in-math?) (link math-format-menu))
-  (if (in-prog?) (link prog-format-menu)))
+  (if (in-prog?) (link prog-format-menu))
+  (if (code-lines-text?)
+      ---
+      (-> "Source code" (link code-lines-menu))))

@@ -724,7 +724,12 @@
       (enum (set-pretty-preference "editor:code indent" answer)
             '("Spaces" "Tabs")
             (get-pretty-preference "editor:code indent")
-            "12em"))))
+            "12em")))
+  ===
+  (aligned
+    (meti (hlist // (text "Open source files and texts as lines of code"))
+      (toggle (set-boolean-preference "code lines" answer)
+              (get-boolean-preference "code lines")))))
 
 ;; Pdf ----------
 (define-preference-names-and-validate "texmacs->pdf:version"

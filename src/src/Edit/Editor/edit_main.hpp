@@ -100,6 +100,7 @@ public:
   void show_path ();
   void show_cursor ();
   void show_selection ();
+  array<int> get_selection_rectangles ();
   void show_meminfo ();
   void edit_special ();
   void edit_test ();

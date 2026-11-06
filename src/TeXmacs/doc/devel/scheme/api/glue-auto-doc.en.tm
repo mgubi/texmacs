@@ -43,6 +43,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(typeset-code-rows-made)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_code_rows_made> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(typeset-code-records-made)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_code_records_made> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(typeset-code-rich-made)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_code_rich_made> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(texmacs-version-release <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -10656,6 +10680,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|show_selection> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(selection-rectangles)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_selection_rectangles> which returns
+    <scm|array_int>.
   </explain>
 
   <\explain>

@@ -144,6 +144,15 @@ struct language_rep: rep<language> {
   virtual array<string> get_members (string s);
   virtual void highlight (tree t);
   virtual string get_color (tree t, int start, int end);
+  // The colours of the tokens of a line, given the state which the lines
+  // before it left (a comment of several lines...): the runs [starts[k],
+  // ends[k]) and their colours (as get_color), and the state after the line,
+  // in one pass over the line. Languages whose colours depend on the lines
+  // before have line states; the others (the default) ask get_color for
+  // each token, and the state is 0
+  virtual bool has_line_states ();
+  virtual int  colour_line (tree t, int state, array<int>& starts,
+                            array<int>& ends, array<string>& cols);
 };
 
 array<string> get_supported_languages ();

@@ -378,6 +378,7 @@
   (show-path show_path (void))
   (show-cursor show_cursor (void))
   (show-selection show_selection (void))
+  (selection-rectangles get_selection_rectangles (array_int))
   (show-meminfo show_meminfo (void))
   (edit-special edit_special (void))
   (edit-test edit_test (void)))

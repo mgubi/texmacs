@@ -16,6 +16,7 @@
 #include "vars.hpp"
 #include "drd_std.hpp"
 #include "analyze.hpp"
+#include "scheme.hpp"
 
 /******************************************************************************
 * TeXmacs to verbatim
@@ -397,14 +398,33 @@ verbatim_to_tree (string s, bool wrap, string enc) {
   return verbatim_to_tree (s, enc);
 }
 
+// Is a verbatim document (a text, a source file) typeset as a block of lines
+// (the environment variable code-lines)?
+// The preference "code lines" ("on" unless "off"), unless TEXMACS_CODE_LINES
+// is 0 or 1
+static bool
+code_lines_wanted () {
+  const char* cl= getenv ("TEXMACS_CODE_LINES");
+  if (cl != NULL && string (cl) == "0") return false;
+  if (cl != NULL && string (cl) == "1") return true;
+  return get_preference ("code lines", "on") != "off";
+}
+
 tree
 verbatim_document_to_tree (string s, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
-  tree t    = verbatim_to_tree (s, wrap, enc);
+  // (a text is typeset as a block of lines, the variable code-lines, see
+  // bridge_code.cpp, #710; its lines are those of verbatim_to_tree, whose
+  // tabs are spaces: a text is not a program, whose tabs a block shows at
+  // their stops, and the other typesetting of a text, a line with markup
+  // or the paragraphs, would show a tab <#9> as an error)
+  bool block= code_lines_wanted () && !wrap;
+  tree t= verbatim_to_tree (s, wrap, enc);
   tree init = tree (COLLECTION,
                     tree (ASSOCIATE, LANGUAGE, "verbatim"),
                     tree (ASSOCIATE, FONT_FAMILY, "tt"),
                     tree (ASSOCIATE, PAR_FIRST, "0cm"));
+  if (block) init << tree (ASSOCIATE, "code-lines", "true");
   return tree (DOCUMENT, compound ("body", t), compound ("initial", init));
 }
 
@@ -509,6 +529,11 @@ source_document_to_tree (string s) {
                     tree (ASSOCIATE, "source-encoding", enc),
                     tree (ASSOCIATE, "source-line-ends", ends),
                     tree (ASSOCIATE, "source-indent", indent));
+  // (the lines typeset as a block of lines: the variable code-lines, see
+  // code_lines_wanted and bridge_code.cpp; also for a file of one line or
+  // none, which the editor makes a document of, and which may grow)
+  if (code_lines_wanted ())
+    init << tree (ASSOCIATE, "code-lines", "true");
   return tree (DOCUMENT, compound ("body", body), compound ("initial", init));
 }
 
