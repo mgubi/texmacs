@@ -10787,6 +10787,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(syntax-region-full-parses)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|syntax_region_full_parses> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(syntax-region-forget <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>

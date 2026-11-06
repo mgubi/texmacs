@@ -238,30 +238,46 @@ treesit_language_rep::highlight (tree t) {
   }
   array<int> recoloured;
   bool all= false;
-  array<array<int> > cols=
+  array<array<array<int> > > parts=
     syntax_region_highlight (region, h->language, h->query, h->colors,
                              h->injections, resolve_injection, highlight_epoch,
                              &recoloured, &all);
+  // (the first line of each part)
+  array<int> firsts (N(parts));
+  int total= 0;
+  for (int k= 0; k < N(parts); k++) { firsts[k]= total; total += N(parts[k]); }
   if (is_atomic (region)) {
-    if (N(cols) == 1) set_line_colors (region, hl_lan, cols[0], false);
+    if (total == 1) set_line_colors (region, hl_lan, parts[0][0], false);
     return;
   }
-  if (N(cols) != N(region)) return;
+  if (total != N(region)) return;
+  auto cols_of= [&] (int i) -> array<int> {
+    int lo= 0, hi= N(firsts) - 1;
+    while (lo < hi) {
+      int mid= (lo + hi + 1) >> 1;
+      if (firsts[mid] <= i) lo= mid; else hi= mid - 1;
+    }
+    return parts[lo][i - firsts[lo]];
+  };
   if (all) {
     // the first time (the region coloured all its lines): all the lines.
     // (Not a highlight of the document of the lines, which an edit of one
     // of them removes: each keystroke would then give all the lines their
     // colours again.)
-    for (int i= 0; i < N(region); i++)
-      set_line_colors (region[i], hl_lan, cols[i], i != row);
+    for (int k= 0; k < N(parts); k++)
+      for (int j= 0; j < N(parts[k]); j++) {
+        int i= firsts[k] + j;
+        set_line_colors (region[i], hl_lan, parts[k][j], i != row);
+      }
   }
   else {
     // the lines coloured again, and the line asked for (a line without
     // colours of its own, as after an undo, gets them when it is typeset)
     for (int k= 0; k < N(recoloured); k++)
       if (recoloured[k] != row)
-        set_line_colors (region[recoloured[k]], hl_lan, cols[recoloured[k]], true);
-    if (row >= 0) set_line_colors (region[row], hl_lan, cols[row], false);
+        set_line_colors (region[recoloured[k]], hl_lan,
+                         cols_of (recoloured[k]), true);
+    if (row >= 0) set_line_colors (region[row], hl_lan, cols_of (row), false);
   }
   // (the document of the lines is coloured, until one of them changes)
   if (!has_highlight (region, hl_lan)) attach_highlight (region, hl_lan, 0, 0, 1);

@@ -429,7 +429,11 @@ the unit and takes its colours away (lsp).
       in 100000 lines of C). A region of more than 6000 lines is cut into
       parts of about 2000 lines at nodes of the top level
       (syntax_group_rep, syntax_region.cpp), each a region of its own;
-      the colouring after a key: 11.4 to 2.65 ms for 100000 lines.
+      the colouring after a key: 11.4 to 2.65 ms for 100000 lines. A
+      region without such a node which starts a line (e.g. indented
+      statements at the top level of a C file) stays one part however long
+      it is: a key parses it incrementally (about 0.25-0.4 s for 200000
+      lines), and it is parsed once when it is first coloured.
     With both: 40 letters 1947 to 975 ms, typesetting per key 31 to 15 ms.
     The rest which grows with the file: the comparison of the lines of the
     region at each request, the reuse checks of the bridges, the changed
