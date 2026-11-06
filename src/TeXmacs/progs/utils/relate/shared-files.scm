@@ -885,7 +885,8 @@
                     (translate "Shared with") " " (shared-agent-short (car agents))
                     (if (> (length agents) 1)
                         (string-append " " (translate "and") " "
-                                       (number->string (- (length agents) 1)) " " (translate "others"))
+                                       (number->string (- (length agents) 1)) " "
+                                       (translate (if (== (length agents) 2) "other" "others")))
                         "")
                     " (" (translate (symbol->string (or (shared-agent-mode name) 'propose))) ")"
                     (if (> np 0)
@@ -1198,13 +1199,22 @@
                 (and entry
                      (if (lock-free? key)
                          (abandoned! name key entry)
-                         (with r (join-host name key entry)
+                         (with r (join-host* name key entry)
                            (cond ((== r #t) #t)
                                  ((== r 'busy) (note-unshared! name) #f)
                                  ((pair? r) (note-unshared! name r) #f)
                                  (else (abandoned! name key entry)))))))))))
 
 ;; (join-host with a buffer which exists, read from the file, replaces it)
+(define (join-host* name key entry)
+  ;; join-host, with one more try after a short while when the host did not
+  ;; answer in time (it may have been busy at that moment)
+  (with r (join-host name key entry)
+    (if (== r 'busy)
+        (with e2 (or (read-entry key) entry)
+          (join-host name key e2))
+        r)))
+
 (define (join-host name key entry)
   ;; gives #t (joined), 'busy (the lock is held, but the host does not
   ;; answer: it may be busy or stopped) or #f (nobody holds the lock: the
@@ -1263,8 +1273,19 @@
            (when (not (ahash-ref sf-table key))
              (host-start name key 0))))))
 
+(define (lock-acquire-retry key)
+  ;; (the probe of another process holds a shared lock for a moment: when the
+  ;; lock is refused and nobody holds it, it is asked again)
+  (let loop ((n 0))
+    (or (lock-acquire key)
+        (and (< n 3)
+             (not (shared-lock-held? (lock-file-name key)))
+             (begin
+               (let ((end (+ (texmacs-time) 5))) (let spin () (when (< (texmacs-time) end) (spin))))
+               (loop (+ n 1)))))))
+
 (define (host-start name key tries)
-  (let ((port (local-listen)) (h (lock-acquire key)))
+  (let ((port (local-listen)) (h (lock-acquire-retry key)))
     (cond ((not (> port 0)) (when h (shared-lock-release h)))
           (h
             (let* ((token (shared-random-token))
@@ -1286,7 +1307,7 @@
                   (begin                         ; (it is starting: wait)
                     (pending-join! name key 2000 #f)
                     (pending-start! name))
-                  (with r (join-host name key e)
+                  (with r (join-host* name key e)
                     (cond ((== r #t) #t)
                           ((== r 'busy) (note-unshared! name))
                           ((pair? r) (note-unshared! name r))
@@ -2831,13 +2852,13 @@
   (cond ((and (== (ahash-size sf-table) 0) (== (ahash-size sf-pending) 0))
          (set! sf-tick-running? #f)
          #t)
-        ;; a host that nobody has joined polls for a join four times a second
+        ;; a host that nobody has joined polls for a join ten times a second
         ;; (a joiner waits for the welcome 500 ms); with a participant or a
         ;; peer it polls every 20 ms
         ((and (== (ahash-size sf-pending) 0) (null? sf-incoming)
               (list-and (map (lambda (e) (and (sf-host? (cdr e)) (null? (sf-get (cdr e) 'peers))))
                              (ahash-table->list sf-table))))
-         250)
+         100)
         (else 20)))
 
 (define (shared-ensure-tick!)

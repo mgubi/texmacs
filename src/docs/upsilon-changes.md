@@ -15,13 +15,16 @@ have the details, and the problems go to the
 ## 5 November 2026
 
 - **Shared files show that they are shared.** The footer of a window says so as long as
-  the file is shared ("Shared: hosting, 2 windows", "Shared: joined", "Shared with agent 1234
-  (propose), 1 proposal"), and a file open in another TeXmacs that this one could not join says
-  "Not shared". In the window that hosts a file with an agent the focus bar has a group: the
-  agent and its connection (connected, not answering for N s, disconnected, from a ping the host
-  sends its agents every two seconds, `ping`/`pong` on the local link), the mode (the same actions
-  as Tools > Agents), the number of pending proposals with previous, next, accept and reject, and
-  Check connection. Nothing is computed for a file that is not shared. Test `tests/mcp`
+  the file is shared with something ("Shared: hosting, 2 windows", "Shared: joined", "Shared with
+  agent 1234 (propose), 1 proposal"; nothing for a file hosted alone), and a file open in another
+  TeXmacs that this one could not join says "Not shared". In the window that hosts a file with an
+  agent the focus bar has a compact group: the agent (with "busy or not answering for N s" or
+  "disconnected" when it is not fine; the host pings its agents every two seconds, `ping`/`pong`
+  on the local link, and silence is shown only for a peer that has answered a ping), the mode (the
+  same actions as Tools > Agents), the number of pending proposals with previous and next, and a
+  `...` menu (accept or reject the proposal here, all, Check connection). It fits in 800 px.
+  Nothing is computed for a file that is not shared; a host nobody has joined polls every 100 ms
+  instead of 20. Test `tests/mcp`
   `gui-host`. See [shared-files.md](shared-files.md).
 - **Agents on a shared file: modes, proposals, the host's filter** (desktop
   applications; step 4, stage A, of the MCP server design). When the person's

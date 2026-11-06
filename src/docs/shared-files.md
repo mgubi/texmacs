@@ -349,11 +349,16 @@ process hosts, or only headless ones), the agent edits directly, as before.
   (the `footer-hook` in `init-texmacs.scm`; cheap: nothing is done while
   `shared-files-in-use?` is false). In the host's window, when an agent has the file, the
   focus bar (`texmacs-focus-icons` in `generic/generic-menu.scm`, `shared-agents-focus?`)
-  shows the agent and its connection, the mode, the pending proposals (previous, next,
-  accept and reject here, all) and Check connection. The host pings its agents every two
-  seconds when it has a person (`(ping T)`, answered `(pong T)` at the participant's next
-  tick); any message counts as heard, `shared-agent-connection` says connected, silent
-  for more than five seconds, or gone. Tested by `tests/mcp` `gui-host`.
+  shows the agent (with "busy or not answering for N s" or "disconnected" when it is not
+  fine), the mode, the number of pending proposals with previous and next, and a `...` menu
+  (accept or reject the proposal here, all, Check connection). Nothing is shown for a file
+  hosted alone. The host pings its agents every two seconds when it has a person (`(ping T)`,
+  answered `(pong T)` at the participant's next tick); any message counts as heard, and
+  `shared-agent-connection` says silent (more than five seconds) only for a peer that has
+  answered a ping once, else connected; gone when the link is closed. The environment variable
+  `TEXMACS_SHARED_NOPONG` makes a participant ignore pings (a test of an older program). A host
+  nobody has joined polls every 100 ms, with a peer every 20 ms; a joiner that gets no welcome
+  tries once more before it settles on not joined. Tested by `tests/mcp` `gui-host`.
 - **The filter.** In every mode the host runs the content rules of the MCP server
   (`mcp-host-check` in `agents/mcp-server.scm`, see mcp-server.md) on the patch: the
   patch is applied to the body as a pure function (`patch-apply`, which shares the

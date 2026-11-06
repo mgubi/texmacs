@@ -211,8 +211,9 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
   when an agent joins ("an agent joined this document (Tools > Agents)") and one in the
   joining window; a lasting footer text while the buffer is shared (hosting, joined,
   shared with an agent, its mode and proposals); in the host's window a group in the
-  focus bar (the agent and its connection, the mode, the proposals with previous, next,
-  accept and reject, Check connection; the host pings its agents every two seconds).
+  focus bar (the agent, "busy or not answering" or "disconnected" when it is not fine, the mode,
+  the proposals with previous and next, a `...` menu with accept, reject, all and Check
+  connection; the host pings its agents every two seconds; a file hosted alone shows nothing).
   The welcome of a host holds the initial environment of the document; a saved file has
   an empty `(collection)` there, which the arity check now accepts (it made every join
   fail, so that the file was loaded alone with `agent_mode` `direct`).

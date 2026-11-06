@@ -75,9 +75,9 @@
   In the window that hosts the file the focus bar also has a group for the
   agent, when there is one: its name (with a remark when it is busy or does
   not answer for some seconds, or has left), the mode, the number of
-  proposals with buttons to go to the previous and the next one and to accept
-  or reject the one at the cursor, and a <em|...> menu with <em|Accept all>,
-  <em|Reject all> and <em|Check connection>, which asks the agent's program
+  proposals with buttons to go to the previous and the next one, and a
+  <em|...> menu with <em|Accept the proposal here>, <em|Reject the proposal
+  here>, <em|Accept all>, <em|Reject all> and <em|Check connection>, which asks the agent's program
   and says in the footer whether it answers.
 
   When a window joins a file, or an agent joins yours, a message in the
