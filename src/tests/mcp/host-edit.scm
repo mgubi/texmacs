@@ -14,6 +14,9 @@
 ;;   accept ID / reject ID   resolve the proposal ID of an agent
 ;;   proposals          write (id status index owner) of the proposals to the sync file proposals
 ;;   save               save the buffer
+;;   eval EXPR         write the value of the Scheme expression EXPR, in the buffer, to the sync file eval
+;;   snapshot DIR      write the windows as PNG files in DIR (a GUI host, offscreen); the count to snapshot
+;;   agents-here      write #t when Tools > Agents has an agent (agents-here?)
 ;;   gate               write the count and the time (ms) the host spent checking agents' patches
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
@@ -44,6 +47,19 @@
           ((== name "reject") (shared-proposal-resolve! (the-name) arg 'old))
           ((== name "proposals")
            (sync-write! "proposals" (object->string (shared-proposals (the-name)))))
+          ((== name "eval")
+           ;; evaluate a Scheme expression in the buffer, write its value to the sync file eval
+           (sync-write! "eval" (object->string (with-buffer (the-name) (eval (string->object arg))))))
+          ((== name "snapshot")
+           ;; the visible windows as PNG files in the folder ARG (offscreen)
+           (update-menus)
+           (sync-write! "snapshot" (number->string (gui-test-snapshot arg))))
+          ((== name "agents-here")
+           (sync-write! "agents-here"
+                        (object->string
+                         (with-buffer (the-name)
+                           (and (shared-file? (current-buffer))
+                                (nnull? (shared-file-agents (current-buffer))))))))
           ((== name "save") (save-buffer-main (the-name)))
           ((== name "gate")
            (sync-write! "gate" (object->string (shared-file-gate-stats (the-name)))))
@@ -71,4 +87,4 @@
         (act "load" (load-buffer FILE))
         (act "host" (check "the other TeXmacs hosts" (== (role-of) 'host)))
         (act "go" (sync-set! "h-loaded")))
-  (command-steps 60)))
+  (command-steps 200)))

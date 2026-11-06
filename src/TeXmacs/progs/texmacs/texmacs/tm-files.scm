@@ -312,7 +312,7 @@
 ;; of read, and only the host of a shared file writes it. The module is loaded
 ;; when a file is first shared; until then these hooks cost nothing.
 (define-preferences
-  ("share-open-files" "off" noop))
+  ("share-open-files" "on" noop))
 
 (define (shared-participant? name)
   (and (shared-files-in-use?) (shared-file-participant? name)))
@@ -414,6 +414,9 @@
     (cond ((and (shared-files-in-use?) (shared-file-save-request name))
            ;; another process hosts the file: it writes it
            (noop))
+          ((shared-file-save-guard name)
+           ;; a live TeXmacs holds the file and this buffer is not its participant
+           (noop))
           (else (save-buffer-check-permissions name opts)))))
 
 (tm-define (save-buffer . l)
@@ -455,6 +458,8 @@
   ;;(display* "save-buffer-as-check-permissions " new-name ", " name "\n")
   (cond ((os-android?)
          (save-buffer-as-check-other new-name name opts))
+        ((shared-file-save-guard new-name)
+         (noop))
         ((cannot-write? new-name "Save file")
          (noop))
         ((and (url-test? new-name "f") (nin? :overwrite opts))
@@ -520,7 +525,9 @@
 
 (define (export-buffer-check-permissions name to fm opts)
   ;;(display* "export-buffer-check-permissions " name ", " to ", " fm "\n")
-  (cond ((cannot-write? to "Export file")
+  (cond ((shared-file-save-guard to)
+         (noop))
+        ((cannot-write? to "Export file")
          (noop))
         ((and (url-test? to "f") (nin? :overwrite opts))
          (user-confirm "File already exists. Really overwrite?" #f
@@ -815,7 +822,7 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
-  (when (shared-files-wanted?) (shared-file-opened name))
+  (when (shared-files-wanted? opts) (shared-file-opened name))
   (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
@@ -857,13 +864,16 @@
 
 (define (load-buffer-check-autosave name opts)
   ;;(display* "load-buffer-check-autosave " name ", " opts "\n")
-  (cond ((and (shared-files-wanted?) (shared-file-try-join name))
+  (cond ((and (shared-files-wanted? opts) (shared-file-try-join name))
          ;; another process has the file open: its document, not the file
          (load-buffer-open name opts))
         (else (load-buffer-check-autosave* name opts))))
 
-(define (shared-files-wanted?)
-  (== (get-preference "share-open-files") "on"))
+;; (:strict is the load of a batch conversion, texmacs -c: it converts the file
+;; on the disk and neither hosts nor joins)
+(define (shared-files-wanted? opts)
+  (and (== (get-preference "share-open-files") "on")
+       (nin? :strict opts)))
 
 (define (load-buffer-check-autosave* name opts)
   (if (and (autosave-propose name) (nin? :strict opts))

@@ -16,7 +16,7 @@ TOP = os.path.abspath(os.path.join(HERE, "..", ".."))
 BIN = os.path.join(TOP, "TeXmacs", "bin", "texmacs.bin")
 LAUNCHER = os.path.join(TOP, "TeXmacs", "bin", "texmacs")
 RSS_CAP = int(os.environ.get("TM_TEST_RSS_KB", "2000000"))
-TIMEOUT = int(os.environ.get("TM_TEST_TIMEOUT", "120"))
+TIMEOUT = int(os.environ.get("TM_TEST_TIMEOUT", "240"))
 
 results = []
 SCEN = ""
@@ -186,16 +186,18 @@ def make_env(w, name, share="off"):
     return env, home
 
 
-def start_other(w, env, script, file, extra=None):
-    """the other TeXmacs (a headless process with a script of tests/mcp)"""
+def start_other(w, env, script, file, extra=None, gui=False, role="B"):
+    """the other TeXmacs (a headless process with a script of tests/mcp; with
+    gui=True a process with the Qt interface, offscreen, as the person's)"""
     sync = os.path.join(w, "sync")
     e = dict(env)
     if extra:
         e.update(extra)
-    e.update(SH_ROLE="B", SH_SYNC=sync, SH_FILE=file, SH_OUT=os.path.join(w, "out-B"),
+    e.update(SH_ROLE=role, SH_SYNC=sync, SH_FILE=file, SH_OUT=os.path.join(w, "out-" + role),
              SH_DIR=os.path.join(TOP, "tests", "shared"))
-    log = open(os.path.join(w, "log-B"), "wb")
-    p = subprocess.Popen([BIN, "-headless", "-X", "-x",
+    e["QT_QPA_PLATFORM"] = "offscreen"
+    log = open(os.path.join(w, "log-" + role), "wb")
+    p = subprocess.Popen([BIN] + ([] if gui else ["-headless"]) + ["-X", "-x",
                           '(load "%s")' % os.path.join(HERE, script)],
                          env=e, stdout=log, stderr=subprocess.STDOUT)
     procs.append(p)
@@ -2462,10 +2464,345 @@ def s_static(w):
     check("exit 0", m.close() == 0)
 
 
+def s_not_joined(w):
+    """a file a live TeXmacs holds but the server could not join (the host sends a
+    document the checks refuse; the host is stopped): the agent is told, the mode is
+    read-only, edits and save are refused, the file on disk is not written"""
+    import signal
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    f = os.path.join(w, "refused.tm")
+    write_small(f)
+    with open(f, "a") as fh:
+        fh.write("\n<\\initial>\n  <\\collection>\n  </collection>\n</initial>\n")
+    with open(f) as fh:
+        txt = fh.read().replace("  Second paragraph.", "  Second paragraph.\n\n  <hlink|only one>")
+    with open(f, "w") as fh:
+        fh.write(txt)
+    f = os.path.realpath(f)
+    before = open(f).read()
+    other = start_other(w, envB, "host-wait.scm", f)
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    def probe(tag):
+        e, v = m.tool("open_document", path=f)
+        check(tag + ": open_document is answered", not e and v.get("shared") is None)
+        d = v.get("document", "d1")
+        check(tag + ": it has a note that says why", not e and "not joined" in v.get("note", ""))
+        check(tag + ": agent_mode is read-only", not e and v.get("agent_mode") == "read-only")
+        e, r = m.tool("insert", document=d, where="last", content="Changed", format="texmacs")
+        check(tag + ": an insert is refused", e and "read-only" in str(r))
+        e, r = m.tool("save_document", document=d)
+        check(tag + ": the save is refused", e and "read-only" in str(r))
+        check(tag + ": the file is as it was", open(f).read() == before)
+        e, r = m.tool("read", document=d, format="text")
+        check(tag + ": the document can be read", not e)
+        probe_d[0] = d
+        return d
+    probe_d = [None]
+    d = probe("refused welcome")
+    m.tool("close_document", document=d, discard=True)
+    os.kill(other.pid, signal.SIGSTOP)
+    try:
+        probe("busy host")
+    finally:
+        os.kill(other.pid, signal.SIGCONT)
+    d2 = probe_d[0]
+    # the host quits: the lock is free and the copy is stale, but the buffer stays read-only
+    sync_set(w, "c-done")
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+    time.sleep(0.5)
+    e, r = m.tool("insert", document=d2, where="last", content="Changed", format="texmacs")
+    check("host gone: the buffer is still read-only and says to reopen it", e and "read-only" in str(r) and "open it again" in str(r))
+    e, r = m.tool("read", document=d2, format="text")
+    check("host gone: a note says the copy may be out of date", not e and "out of date" in r.get("note", ""))
+    e, r = m.tool("save_document", document=d2)
+    check("host gone: the save is refused", e and "read-only" in str(r))
+    check("host gone: the file is as it was", open(f).read() == before)
+    # another process takes the file: the buffer is still not its participant
+    # (the new host has a document that can be shared: the file is rewritten without the bad link)
+    write_small(f)
+    before = open(f).read()
+    w2 = os.path.join(w, "two")
+    os.makedirs(os.path.join(w2, "sync"), exist_ok=True)
+    other2 = start_other(w2, envB, "host-wait.scm", f)
+    check("a new host has loaded the file", wait_file(os.path.join(w2, "sync", "h-loaded")))
+    e, r = m.tool("insert", document=d2, where="last", content="Changed", format="texmacs")
+    check("a new host: an insert is refused", e and "read-only" in str(r))
+    e, r = m.tool("save_document", document=d2)
+    check("a new host: the save is refused", e and "read-only" in str(r))
+    check("a new host: the file is as it was", open(f).read() == before)
+    m.tool("close_document", document=d2, discard=True)
+    e, v = m.tool("open_document", path=f)
+    check("closed and opened again, the document joins the new host", not e and v.get("shared") is not None and v["shared"]["role"] == "participant")
+    check("exit 0", m.close() == 0)
+    sync_set(w2, "c-done")
+    try:
+        other2.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other2.kill()
+    # a server which does not share (the preference is off) does not write a file a live host holds
+    w3 = os.path.join(w, "three")
+    os.makedirs(os.path.join(w3, "sync"), exist_ok=True)
+    envD, homeD = make_env(w, "D", "off")
+    f3 = os.path.join(w, "live3.tm")
+    write_small(f3)
+    f3 = os.path.realpath(f3)
+    before3 = open(f3).read()
+    other3 = start_other(w3, envB, "host-wait.scm", f3)
+    check("a host has loaded the file for the server which does not share", wait_file(os.path.join(w3, "sync", "h-loaded")))
+    m3 = Mcp(envD)
+    m3.initialize()
+    e, v = m3.tool("open_document", path=f3)
+    d3 = v.get("document", "d1") if not e else "d1"
+    check("not sharing: open_document says the file is held, read-only", not e and v.get("agent_mode") == "read-only" and "not joined" in v.get("note", ""))
+    e, r = m3.tool("insert", document=d3, where="last", content="Changed", format="texmacs")
+    check("not sharing: an insert is refused", e and "read-only" in str(r))
+    e, r = m3.tool("save_document", document=d3)
+    check("not sharing: the save is refused", e and "read-only" in str(r))
+    check("not sharing: the file is as it was", open(f3).read() == before3)
+    check("exit 0 (not sharing)", m3.close() == 0)
+    sync_set(w3, "c-done")
+    try:
+        other3.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other3.kill()
+
+
+def host_eval(w, st, expr, wait=10):
+    """evaluate a Scheme expression in the buffer of the other TeXmacs (host-edit.scm)"""
+    sync = os.path.join(w, "sync")
+    try:
+        os.remove(os.path.join(sync, "eval"))
+    except OSError:
+        pass
+    hostcmd(w, st, "eval " + expr)
+    wait_file(os.path.join(sync, "eval"), wait)
+    time.sleep(0.1)
+    p = os.path.join(sync, "eval")
+    return open(p).read() if os.path.exists(p) else ""
+
+
+def s_save_guard(w):
+    """the guard of the saves: an error of the lock folder is not a host; nothing is
+    made in the folder with sharing off; the window of a process that did not join
+    says that the other TeXmacs closed the file"""
+    import glob
+    import signal
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    # 1. the folder of the locks can not be written (the lock can not be made): the save works
+    ro = os.path.join(w, "tmp-ro")
+    os.makedirs(os.path.join(ro, "texmacs-%d" % os.getuid(), "shared"), exist_ok=True)
+    os.chmod(os.path.join(ro, "texmacs-%d" % os.getuid(), "shared"), 0o500)
+    envF, homeF = make_env(w, "F", "on")
+    envF["TEXMACS_SHARED_DIR"] = ro
+    f = os.path.join(w, "ro.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    m = Mcp(envF)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("unwritable lock folder: the document opens and is not held", not e and v.get("agent_mode") == "direct")
+    e, r = m.tool("insert", document="d1", where="last", content="Added", format="texmacs")
+    check("unwritable lock folder: an edit works", not e)
+    e, r = m.tool("save_document", document="d1")
+    check("unwritable lock folder: the save works", not e and r.get("status") == "saved" and "Added" in open(f).read())
+    check("exit 0", m.close() == 0)
+    os.chmod(os.path.join(ro, "texmacs-%d" % os.getuid(), "shared"), 0o700)
+    # 2. sharing off: a save makes nothing in the folder
+    fresh = os.path.join(w, "tmp-fresh")
+    os.makedirs(fresh, exist_ok=True)
+    envG, homeG = make_env(w, "G", "off")
+    envG["TEXMACS_SHARED_DIR"] = fresh
+    g = os.path.join(w, "off.tm")
+    write_small(g)
+    g = os.path.realpath(g)
+    m = Mcp(envG)
+    m.initialize()
+    e, v = m.tool("open_document", path=g)
+    e, r = m.tool("insert", document="d1", where="last", content="Added", format="texmacs")
+    e, r = m.tool("save_document", document="d1")
+    check("sharing off: the save works", not e and r.get("status") == "saved" and "Added" in open(g).read())
+    check("sharing off: no lock file is left by the saves", glob.glob(os.path.join(fresh, "texmacs-*", "shared", "*.lock")) == [])
+    check("exit 0", m.close() == 0)
+    # 3. a window that did not join, once the other TeXmacs has gone, says so
+    envA, homeA = make_env(w, "A", "on")
+    envP, homeP = make_env(w, "P", "on")
+    h = os.path.join(w, "stale.tm")
+    write_small(h)
+    h = os.path.realpath(h)
+    before = open(h).read()
+    w4 = os.path.join(w, "four")
+    w5 = os.path.join(w, "five")
+    for d in (w4, w5):
+        os.makedirs(os.path.join(d, "sync"), exist_ok=True)
+    host = start_other(w4, envA, "host-wait.scm", h)
+    check("the host has loaded the file", wait_file(os.path.join(w4, "sync", "h-loaded")))
+    os.kill(host.pid, signal.SIGSTOP)
+    try:
+        person = start_other(w5, envP, "host-edit.scm", h, {"SH_STEP_TIMEOUT": "120000"})
+        check("the person's process has loaded the file", wait_file(os.path.join(w5, "sync", "h-loaded"), 60))
+        st = [0]
+        t = host_eval(w5, st, "(shared-file-footer-text (current-buffer))")
+        check("not joined: the footer says that the file is open in another TeXmacs", "Not shared: open in another TeXmacs" in t)
+    finally:
+        os.kill(host.pid, signal.SIGCONT)
+    sync_set(w4, "c-done")
+    try:
+        host.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        host.kill()
+    time.sleep(0.5)
+    t = host_eval(w5, st, "(shared-file-footer-text (current-buffer))")
+    check("stale: the footer says that the other TeXmacs closed the file", "closed this file; close it and open it again" in t)
+    check("stale: a Save is a refusal", host_eval(w5, st, "(shared-file-save-request (current-buffer))") == "#t")
+    check("stale: the file is as it was", open(h).read() == before)
+    sync_set(w5, "c-done")
+    try:
+        person.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        person.kill()
+
+
+def s_gui_host(w):
+    """a TeXmacs with its window (Qt, offscreen: the person's, not headless) hosts a
+    file whose initial environment is an empty collection, as a saved file has;
+    the MCP server joins it (agent_mode propose, an insert becomes a proposal,
+    Tools > Agents shows the agent), and a second window of another process joins too"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "gui.tm")
+    write_small(f)
+    with open(f, "a") as fh:
+        fh.write("\n<\\initial>\n  <\\collection>\n  </collection>\n</initial>\n")
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    envC, homeC = make_env(w, "C", "on")
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_STEP_TIMEOUT": "180000"}, gui=True)
+    sync = os.path.join(w, "sync")
+    check("the GUI host has loaded the file", wait_file(os.path.join(sync, "h-loaded"), 60))
+    st = [0]
+    def ev(expr, wait=10):
+        try:
+            os.remove(os.path.join(sync, "eval"))
+        except OSError:
+            pass
+        hostcmd(w, st, "eval " + expr)
+        wait_file(os.path.join(sync, "eval"), wait)
+        time.sleep(0.1)
+        return open(os.path.join(sync, "eval")).read() if os.path.exists(os.path.join(sync, "eval")) else ""
+    check("footer: nothing is said of a file hosted alone", ev("(shared-file-footer-text (current-buffer))") == "#f")
+    # a second window (another process, with its interface) joins the host
+    third = start_other(w, envC, "host-join.scm", f, {"SH_STEP_TIMEOUT": "180000"}, gui=True, role="C")
+    sync_set(w, "c-opened")
+    check("the second window edited", wait_file(os.path.join(sync, "h-edited"), 60))
+    time.sleep(0.5)
+    hb = host_body(w, st)
+    check("the host has the edit of the second window", "FROMB-" in hb)
+    check("footer: hosting with a second window", "Shared: hosting, 2 windows" in ev("(shared-file-footer-text (current-buffer))"))
+    check("the focus bar group is not shown without an agent", ev("(shared-agents-focus?)") == "#f")
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins the window of a GUI host", not e and v["shared"] is not None and v["shared"]["role"] == "participant")
+    check("agent_mode is propose", not e and v.get("agent_mode") == "propose")
+    e, t = m.tool("read", document="d1", format="text")
+    first = t["children"][0]
+    e, r = m.tool("insert", document="d1", anchor=first["handle"], where="before", content="Inserted by the agent", format="texmacs")
+    check("an insert becomes a proposal", not e and r.get("status") == "proposed")
+    hb = host_body(w, st)
+    check("the proposal is in the document of the host", "version-both" in hb and "Inserted by the agent" in hb)
+    hostcmd(w, st, "agents-here")
+    check("(agents-here?) is true in the host", wait_file(os.path.join(sync, "agents-here"), 10)
+          and open(os.path.join(sync, "agents-here")).read() == "#t")
+    # the footer and the focus bar of the host
+    check("footer: shared with the agent, its mode and the proposal",
+          all(x in ev("(shared-file-footer-text (current-buffer))") for x in ("Shared with agent", "(propose)", "1 proposal")))
+    check("footer: the footer hook adds it to the left footer",
+          "Shared with agent" in ev("(tree->stree (footer-hook (stree->tree \"x\")))"))
+    check("focus bar: the group is shown", ev("(shared-agents-focus?)") == "#t")
+    check("focus bar: the focus icons build with the group",
+          ev("(and (make-menu-widget (list (quote horizontal) (list (quote link) (quote texmacs-focus-icons))) 0) #t)") == "#t")
+    txt = ev("(shared-agents-focus-text (current-buffer))")
+    check("focus bar: the agent is named, with no remark when it is connected", "agent" in txt and ":" not in txt)
+    check("focus bar: one proposal pending", ev("(shared-file-pending-count (current-buffer))") == "1")
+    ev("(go-to (list 1 0))")
+    check("focus bar: no proposal at the cursor away from it", ev("(shared-proposal-at-cursor (current-buffer))") == "#f")
+    check("focus bar: next proposal goes to it", ev("(shared-proposal-go! (current-buffer) 1)") == '"p1"')
+    check("focus bar: the proposal at the cursor", ev("(shared-proposal-at-cursor (current-buffer))") == '"p1"')
+    shots = os.path.join(w, "shots")
+    os.makedirs(shots, exist_ok=True)
+    try:
+        os.remove(os.path.join(sync, "snapshot"))
+    except OSError:
+        pass
+    ev("(begin (update-menus) #t)")
+    time.sleep(1.0)
+    hostcmd(w, st, "snapshot " + shots)
+    check("a snapshot of the host window was taken", wait_file(os.path.join(sync, "snapshot"), 20)
+          and os.path.exists(os.path.join(shots, "window-0.png")))
+    ev("(shared-set-agent-mode! (current-buffer) (quote read-only))")
+    check("focus bar: the mode dropdown's action sets the mode", ev("(shared-agent-mode (current-buffer))") == "read-only")
+    e, v = m.tool("list_documents")
+    check("the agent sees the mode", not e and v["documents"][0].get("agent_mode") == "read-only")
+    ev("(shared-set-agent-mode! (current-buffer) (quote propose))")
+    check("focus bar: the footer follows the mode", "(propose)" in ev("(shared-file-footer-text (current-buffer))"))
+    ids = ev("(shared-file-agents (current-buffer))")
+    aid = ids.strip("()\"").split(" ")[0].strip('"')
+    # an older program never answers a ping: it is not shown as not answering
+    envE, homeE = make_env(w, "E", "on")
+    envE["TEXMACS_SHARED_NOPONG"] = "1"
+    m2 = Mcp(envE)
+    m2.initialize()
+    e, v = m2.tool("open_document", path=f)
+    check("a second agent joins", not e and v["shared"] is not None)
+    ids2 = ev("(shared-file-agents (current-buffer))")
+    others = [x.strip('"') for x in ids2.strip("()").split(" ") if x.strip('"') != aid]
+    time.sleep(8)
+    check("an agent that never answers a ping is shown as connected",
+          len(others) == 1 and ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + others[0] + '"')) == '"connected"')
+    check("exit 0 (second agent)", m2.close() == 0)
+    # the agent is stopped: not answering after five seconds
+    import signal
+    os.kill(m.p.pid, signal.SIGSTOP)
+    try:
+        got = poll(lambda: "not answering" in ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + aid + '"')), 20)
+        check("connection: a stopped agent is not answering", bool(got))
+        ev("(shared-agent-check-connection (current-buffer))")
+        time.sleep(1.6)
+        check("check connection: a stopped agent does not answer", "does not answer" in ev("(shared-agent-last-check (current-buffer))"))
+    finally:
+        os.kill(m.p.pid, signal.SIGCONT)
+    got = poll(lambda: ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + aid + '"')) == '"connected"', 20)
+    check("connection: connected again when it goes on", bool(got))
+    ev("(shared-agent-check-connection (current-buffer))")
+    time.sleep(1.6)
+    check("check connection: the agent answers", "answers" in ev("(shared-agent-last-check (current-buffer))"))
+    check("exit 0", m.close() == 0)
+    got = poll(lambda: ev("(shared-agent-connection-text (current-buffer) %s)" % ('"' + aid + '"')) == '"disconnected"', 20)
+    check("connection: disconnected when the agent leaves", bool(got))
+    check("focus bar: the group is gone with the agent", ev("(shared-agents-focus?)") == "#f")
+    sync_set(w, "c-done")
+    for p in (other, third):
+        try:
+            p.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            p.kill()
+    out = open(os.path.join(w, "out-C")).read() if os.path.exists(os.path.join(w, "out-C")) else ""
+    check("the second window passed its checks", out == "ok")
+
+
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host, "not-joined": s_not_joined, "save-guard": s_save_guard,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

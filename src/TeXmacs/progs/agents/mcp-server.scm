@@ -410,14 +410,24 @@
              "participants" (num (+ 1 (caddr i))))
         jnull)))
 
+(define (doc-not-joined d)
+  ;; why the file is open in the person's TeXmacs and this server has not
+  ;; joined it (then it is read-only), or #f
+  (let ((u (doc-url d)))
+    (or (shared-file-not-joined u)
+        ;; (this process does not share, or never joined, but a live TeXmacs holds the file)
+        (and (shared-file-held-elsewhere? u)
+             "open in the person's TeXmacs but not joined: this server does not share the file (share-open-files is off in its home)"))))
+
 (define (doc-agent-mode d)
   ;; what the host of the file does with this agent's edits: propose (they
   ;; become proposals of the person to accept), direct, read-only; direct
   ;; when nobody else has the file
   (let ((u (doc-url d)))
-    (if (shared-file-participant? u)
-        (let ((m (shared-agent-mode u))) (if m (symbol->string m) "unknown"))
-        "direct")))
+    (cond ((shared-file-participant? u)
+           (let ((m (shared-agent-mode u))) (if m (symbol->string m) "unknown")))
+          ((doc-not-joined d) "read-only")
+          (else "direct"))))
 
 (define (doc-info d)
   (let ((u (doc-url d)))
@@ -434,6 +444,14 @@
          "agent_mode" (doc-agent-mode d)
          "blocks" (num (tree-arity (doc-body d)))
          "hash" (hash-short (doc-body d)))))
+
+(define (stale-note d)
+  ;; the person's TeXmacs has closed the file this buffer was not joined to
+  (and (shared-file-not-joined-stale? (doc-url d))
+       "The person's TeXmacs has closed this file since: this copy may be out of date and is read-only; close the document and open it again."))
+
+(define (not-joined-note d)
+  (let ((w (doc-not-joined d))) (and w (string-append w "; read-only"))))
 
 (define (hash-short t)
   (utf8-prefix (tree-hash t) 12))
@@ -673,7 +691,8 @@
       (tool-error "the path must be absolute"))
     (let ((d (open-doc! path)))
       (doc-refresh! d)
-      (doc-info d))))
+      (let ((i (doc-info d)) (n (not-joined-note d)))
+        (if (and n (func? i 'attr)) (append i (list "note" n)) i)))))
 
 (define default-list-limit 300)
 
@@ -1331,6 +1350,9 @@
         ((and (memq (car st) '(with cwith twith tformat)) (attribute-problem st)) #f)
         (else
           (and (or (eq? (car st) 'document)
+                   ;; (an empty collection is the initial environment of a file that
+                   ;; has none set: every file the editor saves has one)
+                   (eq? (car st) 'collection)
                    (not (known-primitive? (car st)))
                    (tag-possible-arity? (car st) (length (cdr st))))
                (let loop ((l (cdr st)))
@@ -3323,10 +3345,13 @@
 
 ;;; The nodes
 
-(define (editing-context args)
+(define (editing-context args . keep)
   (require-writable)
   (let ((d (require-doc (opt-string args "document" #f))))
     (doc-refresh! d)
+    (when (and (null? keep) (doc-not-joined d))
+      (tool-error (string-append "read-only: " (doc-not-joined d)
+                                 ". Nothing is edited or saved while the person's TeXmacs holds the file")))
     d))
 
 (define (body-root? d t) (tree-eq? t (doc-body d)))
@@ -3786,7 +3811,7 @@
        (if mcp-save-refused-reason (list "reason" (u8 mcp-save-refused-reason)) '())))))
 
 (define (tool-close-document args)
-  (let* ((d (editing-context args)) (u (doc-url d))
+  (let* ((d (editing-context args #t)) (u (doc-url d))
          (discard (jbool (jref args "discard") #f)))
     (when (and (buffer-modified? u) (not discard))
       (tool-error "the document has unsaved changes: save_document first, or close it with discard=true"))
@@ -4073,7 +4098,7 @@
             (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
                    (d (and dref (find-doc dref)))
                    (note (and d (begin (doc-refresh! d)
-                                       (let ((a (change-note d)) (b (proposal-note d)))
+                                       (let ((a (or (stale-note d) (change-note d))) (b (proposal-note d)))
                                          (cond ((and a b) (string-append a " " b))
                                                (else (or a b)))))))
                    (r ((list-ref tool 4) args)))

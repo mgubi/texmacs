@@ -49,6 +49,7 @@ bool   shared_create_file (string path, string s); // fails if it exists
 bool   shared_replace_file (string path, string s);// atomically (tmp + rename)
 string shared_random_token ();
 int    shared_lock_acquire (string path); // a handle; -1 if held, -2 on error
+bool   shared_lock_held (string name);     // does a process hold the lock file @name of the folder? (creates nothing)
 void   shared_lock_release (int id);
 bool   shared_lock_valid (int id, string path);  // still the file at path?
 int    shared_lock_renew (int id, string path);  // 1 made and locked, 0 held by another, -1 error

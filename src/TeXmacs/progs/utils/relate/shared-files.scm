@@ -816,6 +816,20 @@
        ;; (the browser and Windows have no folder of entries: nothing is shared)
        (!= (shared-user-dir) "")))
 
+(define (shareable-key-peek name)
+  ;; as shareable-key, but the per-user folder is not made
+  (and (url? name)
+       (not (url-scratch? name))
+       (not (url-rooted-web? name))
+       (not (url-rooted-tmfs? name))
+       (url-test? name "f")
+       (== (url-format name) "texmacs")
+       (with key (shared-real-path (url->system name))
+         (and (!= key "") key))))
+
+(define (lock-file-name key)
+  (string-append "f-" (tree-hash (tm->tree key)) ".lock"))
+
 (define (shareable-key name)
   ;; the canonical path of the file @name when it can be shared, else #f:
   ;; a plain file of the system, in TeXmacs format, which exists
@@ -827,6 +841,185 @@
        (== (url-format name) "texmacs")
        (with key (shared-real-path (url->system name))
          (and (!= key "") (!= (shared-user-dir) "") key))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; What the footer and the focus bar show
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (shared-agent-short id)
+  (:synopsis "A short name of the participant @id: agent 1234, program name")
+  (let ((l (string-tokenize-by-char id #\.)))
+    (if (and (pair? l) (pair? (cdr l)) (== (car l) "agent"))
+        (string-append "agent " (cadr l))
+        (if (and (pair? l) (pair? (cdr l))) (string-append "program " (car l)) id))))
+
+(define (count-text n one many)
+  (string-append (number->string n) " " (if (== n 1) one many)))
+
+(tm-define (shared-file-pending-count name)
+  (:synopsis "The number of proposals of agents waiting for the person on @name")
+  (with l (or (shared-proposals name) '())
+    (length (list-filter l (lambda (e) (== (cadr e) "pending"))))))
+
+(tm-define (shared-file-footer-text name)
+  (:synopsis "The text the footer shows for the shared file @name, or #f (nothing for a file hosted alone)")
+  ;; (cheap: tables and counts, no message)
+  (let ((sf (sf-by-name name)))
+    (cond
+      ((not sf)
+       (and (shared-file-not-joined name)
+            (if (shared-file-not-joined-stale? name)
+                (translate "Not shared: the other TeXmacs closed this file; close it and open it again")
+                (translate "Not shared: open in another TeXmacs"))))
+      ((sf-host? sf)
+       (let* ((agents (shared-file-agents name))
+              (n (length (sf-get sf 'peers)))
+              (windows (+ 1 (- n (length agents)))))
+         (cond ((== n 0) #f)
+               ((null? agents)
+                (string-append (translate "Shared: hosting") ", "
+                               (number->string windows) " " (translate "windows")))
+               (else
+                 (let ((np (shared-file-pending-count name)))
+                   (string-append
+                    (translate "Shared with") " " (shared-agent-short (car agents))
+                    (if (> (length agents) 1)
+                        (string-append " " (translate "and") " "
+                                       (number->string (- (length agents) 1)) " "
+                                       (translate (if (== (length agents) 2) "other" "others")))
+                        "")
+                    " (" (translate (symbol->string (or (shared-agent-mode name) 'propose))) ")"
+                    (if (> np 0)
+                        (string-append ", " (number->string np) " "
+                                       (translate (if (== np 1) "proposal" "proposals")))
+                        "")))))))
+      (else (translate "Shared: joined")))))
+
+(tm-define (shared-agents-focus?)
+  (:synopsis "Does the current buffer have an agent, here, as host (then the focus bar shows the agent)?")
+  (and (shared-files-in-use?)
+       (nnull? (shared-file-agents (current-buffer)))))
+
+(tm-define (shared-agent-connection name id)
+  (:synopsis "The agent @id of the host @name: connected, (silent SECONDS) or gone")
+  ;; (silence is shown only for a peer that has answered a ping once: an
+  ;; older program that never answers is taken to be connected)
+  (let ((sf (sf-by-name name)))
+    (with p (and sf (sf-host? sf) (find-peer sf id))
+      (cond ((not p) 'gone)
+            ((not (local-alive? (peer-link p))) 'gone)
+            ((not (ahash-ref sf-ponged (heard-key sf id))) 'connected)
+            (else
+              (let* ((t (ahash-ref sf-heard (heard-key sf id)))
+                     (dt (if t (- (texmacs-time) t) 0)))
+                (if (> dt 5000)
+                    (list 'silent (quotient dt 1000))
+                    'connected)))))))
+
+(tm-define (shared-agent-connection-text name id)
+  (:synopsis "The connection of the agent @id as a short text")
+  (with c (shared-agent-connection name id)
+    (cond ((== c 'connected) (translate "connected"))
+          ((== c 'gone) (translate "disconnected"))
+          (else (string-append (translate "busy or not answering for") " "
+                               (number->string (cadr c)) " s")))))
+
+(tm-define (shared-agents-focus-text name)
+  (:synopsis "The agent of the focus bar: its name, and its connection when it is not as it should be")
+  (let ((l (shared-file-agents name)))
+    (if (null? l) ""
+        (with c (shared-agent-connection name (car l))
+          (if (== c 'connected)
+              (shared-agent-short (car l))
+              (string-append (shared-agent-short (car l)) ": "
+                             (shared-agent-connection-text name (car l))))))))
+
+(define sf-check-result (make-ahash-table))   ; name -> text
+
+(tm-define (shared-agent-check-connection name)
+  (:synopsis "Ping the agents of @name; the answer is shown in the footer a second later")
+  (and-with sf (sf-by-name name)
+    (and (sf-host? sf)
+         (let ((agents (shared-file-agents name)) (now (texmacs-time)))
+           (for (id agents)
+             (with p (find-peer sf id)
+               (when p (msg-send (peer-link p) (list 'ping now)))))
+           (ahash-set! sf-check-result (url->string name) #f)
+           (set-message "Shared file: checking the connection to the agent..." "Shared file")
+           (delayed (:pause 1000)
+             (shared-agent-check-report name now))
+           #t))))
+
+(tm-define (shared-agent-check-report name since)
+  (:synopsis "Say how the agents of @name answered the ping sent at @since")
+  (and-with sf (sf-by-name name)
+    (let* ((agents (shared-file-agents name))
+           (txt (if (null? agents)
+                    "Shared file: no agent is connected"
+                    (string-recompose
+                     (map (lambda (id)
+                            (let ((t (ahash-ref sf-heard (heard-key sf id))))
+                              (string-append
+                               (shared-agent-short id) ": "
+                               (if (and t (>= t since)) "answers"
+                                   (if (== (shared-agent-connection name id) 'gone)
+                                       "disconnected" "does not answer")))))
+                          agents)
+                     ", "))))
+      (ahash-set! sf-check-result (url->string name) txt)
+      (set-message (if (string-starts? txt "Shared") txt (string-append "Shared file: " txt))
+                   "Shared file")
+      txt)))
+
+(tm-define (shared-agent-last-check name)
+  (:synopsis "For the tests: the text of the last connection check")
+  (ahash-ref sf-check-result (url->string name)))
+
+;; The proposals of the focus bar: the pending ones, in the order of the
+;; document, and the one at the cursor (the block with the cursor)
+(define (pending-by-index name)
+  (list-sort (list-filter (or (shared-proposals name) '())
+                          (lambda (e) (== (cadr e) "pending")))
+             (lambda (a b) (< (caddr a) (caddr b)))))
+
+(define (cursor-block-index)
+  ;; the index of the block of the body with the cursor, or #f (the path of the
+  ;; cursor starts with that of the body)
+  (let* ((cp (cursor-path)) (bp (tree->path (buffer-get-body (current-buffer)))))
+    (and (list? cp) (list? bp) (> (length cp) (length bp))
+         (== (list-head cp (length bp)) bp)
+         (integer? (list-ref cp (length bp)))
+         (list-ref cp (length bp)))))
+
+(tm-define (shared-proposal-at-cursor name)
+  (:synopsis "The id of the pending proposal in the block with the cursor, or #f")
+  (let* ((i (cursor-block-index)))
+    (and i
+         (let ((l (list-filter (pending-by-index name) (lambda (e) (== (caddr e) i)))))
+           (and (nnull? l) (car (car l)))))))
+
+(tm-define (shared-proposal-go! name dir)
+  (:synopsis "Go to the next (dir 1) or previous (-1) pending proposal; its id or #f")
+  (let* ((l (pending-by-index name))
+         (i (or (cursor-block-index) -1)))
+    (and (nnull? l)
+         (let* ((cands (if (> dir 0)
+                           (list-filter l (lambda (e) (> (caddr e) i)))
+                           (reverse (list-filter l (lambda (e) (< (caddr e) i))))))
+                (e (if (nnull? cands) (car cands)
+                       (if (> dir 0) (car l) (car (reverse l))))))
+           (tree-go-to (tree-ref (buffer-get-body (current-buffer)) (caddr e)) :start)
+           (car e)))))
+
+(tm-define (shared-proposal-resolve-all! name which)
+  (:synopsis "Accept (new) or reject (old) all pending proposals of @name")
+  (for (e (pending-by-index name))
+    (shared-proposal-resolve! name (car e) which)))
+
+(tm-define (shared-proposal-resolve-here! name which)
+  (:synopsis "Accept or reject the proposal at the cursor")
+  (with id (shared-proposal-at-cursor name)
+    (and id (shared-proposal-resolve! name id which))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Joining
@@ -895,26 +1088,96 @@
                       (pending-done! name)
                       (with r (join-host name key e)
                         (cond ((== r #t) #t)
-                              ((== r 'busy) (tell-unshared name))
+                              ((== r 'busy) (mark-not-joined! name r) (tell-unshared name))
+                              ((pair? r) (mark-not-joined! name r) (tell-unshared name r))
                               (else (host-start name key 0)))))
                      ((> now deadline)
                       (pending-done! name)
+                      (mark-not-joined! name 'busy)
                       (tell-unshared name)))))
             ((> now deadline)
              ;; nobody took the file: from the disk
              (pending-done! name)
              (host-start name key 0))))))))
 
-(define (tell-unshared name)
-  (set-message "Shared file: the process which has this file open does not answer; it is opened from the file, without sharing"
-               "Shared file"))
+(define sf-not-joined (make-ahash-table))  ; (url->string name) -> why it was not joined
 
-(define (note-unshared! name)
+(define (unshared-why r)
+  ;; r: 'busy or (refused . tag)
+  (if (pair? r)
+      (string-append "its content cannot be shared: the document has a malformed "
+                     (cdr r) " (a wrong number of arguments, or a structure the editor does not accept)")
+      "its process does not answer"))
+
+(define (tell-unshared name . r)
+  (set-message
+   (string-append "Shared file: this file is open in another TeXmacs, but "
+                  (unshared-why (if (null? r) 'busy (car r)))
+                  "; it is opened from the file, without sharing, and not saved")
+   "Shared file"))
+
+(define (mark-not-joined! name r)
+  ;; the file is open in a live host and this buffer is not its participant:
+  ;; read-only for the life of the buffer (until it is closed and opened again)
+  (set-shared-files-in-use! #t)
+  (ahash-set! sf-not-joined (url->string name)
+              (string-append "open in the person's TeXmacs but not joined: " (unshared-why r))))
+
+(tm-define (shared-file-not-joined name)
+  (:synopsis "Why the buffer @name is not joined to the live TeXmacs that holds its file, or #f")
+  ;; (kept as long as the buffer lives: when the host has gone the copy is stale,
+  ;; and when another host has come the buffer is still not its participant)
+  (and (not (sf-by-name name))
+       (with why (ahash-ref sf-not-joined (url->string name))
+         (and why
+              (if (shared-file-not-joined-stale? name)
+                  (string-append why "; the person's TeXmacs has closed the file since, so this copy may be out of date: close the document and open it again")
+                  why)))))
+
+(tm-define (shared-file-not-joined-stale? name)
+  (:synopsis "Is the file of the not joined buffer @name no longer held by a live host?")
+  (and (ahash-ref sf-not-joined (url->string name))
+       (with key (shareable-key-peek name)
+         (and key (not (shared-lock-held? (lock-file-name key)))))))
+
+(tm-define (shared-file-held-elsewhere? name)
+  (:synopsis "Does a live TeXmacs hold the file @name (its lock), while this process is not its host or participant?")
+  ;; (the lock is there whatever the preference: a process that does not share
+  ;; must not write a file that a live host holds)
+  (and (url? name)
+       (with key (shareable-key-peek name)
+         (and key (not (ahash-ref sf-table key))
+              (shared-lock-held? (lock-file-name key))))))
+
+(define (stale-save-message)
+  "Shared file: the other TeXmacs closed this file; close it and open it again (or use Save as)")
+
+(tm-define (shared-file-save-guard name)
+  (:synopsis "A save, or an export, to @name: refuse it (message, #t) while a live host holds the file")
+  (let ((u (if (url? name) name (system->url name))))
+    (and (shared-file-held-elsewhere? u)
+         (begin
+           (set-message (translate "Shared file: not saved: this file is open in another TeXmacs which holds it (use Save as for a copy under another name)")
+                        "Save file")
+           #t))))
+
+(define (arity-bad-tag st)
+  ;; the tag of the innermost subtree the arity check refuses
+  (if (not (pair? st))
+      "?"
+      (let loop ((l (cdr st)))
+        (cond ((null? l) (if (symbol? (car st)) (symbol->string (car st)) "?"))
+              ((and (pair? (car l)) (not (mcp-stree-arity-ok? (car l))))
+               (arity-bad-tag (car l)))
+              (else (loop (cdr l)))))))
+
+(define (note-unshared! name . r)
   ;; another process holds the lock of the file (it hosts it) but does not
   ;; answer: the file is read as usual, not shared. It is never hosted
   ;; meanwhile: the lock is what makes a host, and a stalled host keeps it.
   (ahash-set! sf-unshared (url->string name) (texmacs-time))
-  (tell-unshared name))
+  (mark-not-joined! name (if (null? r) 'busy (car r)))
+  (tell-unshared name (if (null? r) 'busy (car r))))
 
 (define (abandoned! name key entry)
   ;; the lock of the file is free but its entry is there: the host is gone
@@ -936,12 +1199,22 @@
                 (and entry
                      (if (lock-free? key)
                          (abandoned! name key entry)
-                         (with r (join-host name key entry)
+                         (with r (join-host* name key entry)
                            (cond ((== r #t) #t)
                                  ((== r 'busy) (note-unshared! name) #f)
+                                 ((pair? r) (note-unshared! name r) #f)
                                  (else (abandoned! name key entry)))))))))))
 
 ;; (join-host with a buffer which exists, read from the file, replaces it)
+(define (join-host* name key entry)
+  ;; join-host, with one more try after a short while when the host did not
+  ;; answer in time (it may have been busy at that moment)
+  (with r (join-host name key entry)
+    (if (== r 'busy)
+        (with e2 (or (read-entry key) entry)
+          (join-host name key e2))
+        r)))
+
 (define (join-host name key entry)
   ;; gives #t (joined), 'busy (the lock is held, but the host does not
   ;; answer: it may be busy or stopped) or #f (nobody holds the lock: the
@@ -952,7 +1225,7 @@
     (cond ((and m (func? m 'welcome) (== (length m) 7)
                 (not (mcp-stree-arity-ok? (caddr m))))
            (local-close c)
-           'busy)
+           (cons 'refused (arity-bad-tag (caddr m))))
           ((and m (func? m 'welcome) (== (length m) 7))
            (with (tag state doc modified roster host-id meta) m
              (buffer-set name (stree->tree doc))
@@ -970,6 +1243,10 @@
                    (buffer-pretend-modified name)
                    (buffer-pretend-saved name))
                (sf-debug "joined " key " state " state "\n")
+               (when inter
+                 (set-message (translate "Shared file: shared with another TeXmacs window; edits are kept in sync")
+                              "Shared file"))
+               (refresh-shared-ui! sf)
                #t)))
           (else
             (when (>= c 0) (local-close c))
@@ -986,6 +1263,8 @@
   (cond ((ahash-ref sf-pending (url->string name))
          (pending-start! name))
         ((let ((t (ahash-ref sf-unshared (url->string name))))
+           (when (not (and t (< (- (texmacs-time) t) 10000)))
+             (ahash-remove! sf-not-joined (url->string name)))
            (ahash-remove! sf-unshared (url->string name))
            (and t (< (- (texmacs-time) t) 10000)))
          (noop))
@@ -994,8 +1273,19 @@
            (when (not (ahash-ref sf-table key))
              (host-start name key 0))))))
 
+(define (lock-acquire-retry key)
+  ;; (the probe of another process holds a shared lock for a moment: when the
+  ;; lock is refused and nobody holds it, it is asked again)
+  (let loop ((n 0))
+    (or (lock-acquire key)
+        (and (< n 3)
+             (not (shared-lock-held? (lock-file-name key)))
+             (begin
+               (let ((end (+ (texmacs-time) 5))) (let spin () (when (< (texmacs-time) end) (spin))))
+               (loop (+ n 1)))))))
+
 (define (host-start name key tries)
-  (let ((port (local-listen)) (h (lock-acquire key)))
+  (let ((port (local-listen)) (h (lock-acquire-retry key)))
     (cond ((not (> port 0)) (when h (shared-lock-release h)))
           (h
             (let* ((token (shared-random-token))
@@ -1007,6 +1297,9 @@
               (host-write-entry! sf)
               (sf-put! sf 'touch-at (+ (texmacs-time) 3600000))
               (sf-debug "hosting " key " on " port "\n")))
+          ;; (the lock could not be made, and nobody holds it: no folder to write,
+          ;; no room: the file is not shared)
+          ((not (shared-lock-held? (lock-file-name key))) (noop))
           (else
             ;; someone holds the lock: it hosts the file
             (let ((e (read-entry key)))
@@ -1014,9 +1307,10 @@
                   (begin                         ; (it is starting: wait)
                     (pending-join! name key 2000 #f)
                     (pending-start! name))
-                  (with r (join-host name key e)
+                  (with r (join-host* name key e)
                     (cond ((== r #t) #t)
                           ((== r 'busy) (note-unshared! name))
+                          ((pair? r) (note-unshared! name r))
                           ((< tries 3) (host-start name key (+ tries 1)))
                           (else (note-unshared! name))))))))))
 
@@ -1057,10 +1351,13 @@
   (ahash-set! sf-host-persons (sf-key sf)
               (list-filter (or (ahash-ref sf-host-persons (sf-key sf)) '())
                            (lambda (x) (!= x (peer-id p)))))
+  (ahash-remove! sf-heard (heard-key sf (peer-id p)))
+  (ahash-remove! sf-ponged (heard-key sf (peer-id p)))
   (local-close (peer-link p))
   (sf-put! sf 'peers (list-filter (sf-get sf 'peers)
                                   (lambda (q) (!= (peer-id q) (peer-id p)))))
-  (send-roster sf))
+  (send-roster sf)
+  (refresh-shared-ui! sf))
 
 (define (priority-less? a b)
   ;; entries (id interactive seq pid): interactive first, then the earlier
@@ -1640,16 +1937,21 @@
              (append (list-filter (sf-get sf 'peers)
                                   (lambda (p) (!= (peer-id p) id)))
                      (list (list id link interactive seq pid))))
+    (heard! sf id)
     (host-send-welcome sf link base id interactive pid inflight)
     (when (agent-peer? sf (list id link interactive seq pid))
       (msg-send link (list 'mode (shared-agent-mode (sf-buffer sf))))
       (when (sf-get sf 'prop-sent) (ahash-remove! (sf-get sf 'prop-sent) id)))
-    (when (and (sf-get sf 'interactive) (agent-peer? sf (list id link interactive seq pid))
-               (not (shared-agent-id? id)))
-      (stat! 'unmarked-joined)
-      (set-message "Shared file: a program that is not marked as an agent joined; it is treated as an agent (Tools > Agents)"
-                   "Shared file"))
+    (when (and (sf-get sf 'interactive) (agent-peer? sf (list id link interactive seq pid)))
+      (if (shared-agent-id? id)
+          (set-message (translate "Shared file: an agent joined this document (Tools > Agents)")
+                       "Shared file")
+          (begin
+            (stat! 'unmarked-joined)
+            (set-message "Shared file: a program that is not marked as an agent joined; it is treated as an agent (Tools > Agents)"
+                         "Shared file"))))
     (send-roster sf)
+    (refresh-shared-ui! sf)
     ;; an interactive process hosts rather than a headless one: it is
     ;; offered the file
     (when interactive (host-offer-handover! sf))))
@@ -1691,6 +1993,7 @@
          (with pr (proposal-find sf (cadr msg))
            (when (and pr (proposal-pending? pr) (== (prop-get pr 'owner) (peer-id peer)))
              (proposal-resolve! sf pr 'old "withdrawn"))))
+        ((func? msg 'pong) (ahash-set! sf-ponged (heard-key sf (peer-id peer)) #t))
         ((func? msg 'resync)
          (host-flush! sf)
          (msg-send (peer-link peer)
@@ -1706,6 +2009,7 @@
     (let loop ()
       (with m (msg-receive (peer-link p))
         (when m
+          (heard! sf (peer-id p))
           (host-handle-message sf p m)
           (when (find-peer sf (peer-id p)) (loop)))))
     (when (and (find-peer sf (peer-id p)) (not (local-alive? (peer-link p))))
@@ -1713,11 +2017,42 @@
       (drop-peer! sf p)))
   (host-check-lock! sf)
   (proposals-sync! sf)
+  (host-ping-agents! sf)
   ;; a headless host retries to give the file to an interactive participant
   (let ((now (texmacs-time)))
     (when (> now (or (sf-get sf 'offer-at) 0))
       (sf-put! sf 'offer-at (+ now 5000))
       (host-offer-handover! sf))))
+
+;; Is an agent there? A host with a person pings its agents every two seconds
+;; (ping T), which the participants answer with (pong T) at their next tick; any
+;; message also counts as heard. The focus bar shows when it was.
+(define sf-heard (make-ahash-table))   ; "key|id" -> time of the last message
+(define sf-ponged (make-ahash-table))  ; "key|id" -> #t once it has answered a ping
+
+(define (heard-key sf id) (string-append (sf-key sf) "|" id))
+(define (heard! sf id) (ahash-set! sf-heard (heard-key sf id) (texmacs-time)))
+
+(define (refresh-shared-ui! sf)
+  ;; the footer and the focus bar are drawn again (the window of the file is
+  ;; the current one: else they are drawn when it becomes current)
+  (when (and (not (headless?)) (== (url->string (current-buffer)) (url->string (sf-buffer sf))))
+    (catch #t (lambda () (notify-change 259)) (lambda args #f))))
+
+(define (host-ping-agents! sf)
+  (when (sf-get sf 'interactive)
+    (let ((now (texmacs-time)))
+      (when (> now (or (sf-get sf 'ping-at) 0))
+        (sf-put! sf 'ping-at (+ now 2000))
+        ;; (what the person sees changed: the connection, the proposals)
+        (with ui (list (shared-file-footer-text (sf-buffer sf))
+                       (shared-agents-focus-text (sf-buffer sf)))
+          (when (!= ui (sf-get sf 'ui-last))
+            (sf-put! sf 'ui-last ui)
+            (refresh-shared-ui! sf)))
+        (for (p (sf-get sf 'peers))
+          (when (agent-peer? sf p)
+            (msg-send (peer-link p) (list 'ping now))))))))
 
 (define (host-check-lock! sf)
   ;; The lock is a file: if it has been removed (or replaced) another process
@@ -1794,6 +2129,13 @@
 
 (tm-define (shared-file-save-request name)
   (:synopsis "A Save of the buffer @name: handled here when another process hosts it")
+  (if (and (not (sf-by-name name)) (shared-file-not-joined name))
+      (begin
+        (set-message (if (shared-file-not-joined-stale? name)
+                         (translate (stale-save-message))
+                         (translate "Shared file: not saved: this file is open in another TeXmacs which holds it (use Save as for a copy under another name)"))
+                     "Save file")
+        #t)
   (and-with sf (sf-by-name name)
     (and (== (sf-get sf 'role) 'participant)
          (begin
@@ -1808,7 +2150,7 @@
                             "Save asked to the host of the file"
                             "Save queued: the host of the file is not reachable now; it is saved when it answers")
                         "Save file")
-           #t))))
+           #t)))))
 
 (tm-define (shared-file-saved name)
   (:synopsis "Called after the buffer @name has been saved to its file")
@@ -2022,7 +2364,12 @@
 (define (participant-reset! sf state doc modified)
   (if (mcp-stree-arity-ok? (caddr doc))
       (participant-reset!* sf state doc modified)
-      (stat! 'bad-remote)))
+      (begin
+        (stat! 'bad-remote)
+        (set-message
+         (string-append "Shared file: the host sent a document which cannot be shared ("
+                        (arity-bad-tag (caddr doc)) "); it is not applied")
+         "Shared file"))))
 
 (define (participant-reset!* sf state doc modified)
   ;; the document of the host replaces everything, pending changes included
@@ -2108,7 +2455,12 @@
 
 (define (participant-handle-message sf msg)
   (let ((key (sf-key sf)))
-    (cond ((func? msg 'applied)
+    (cond ((func? msg 'ping)
+           (when (and (== (length msg) 2) (sf-get sf 'conn)
+                      ;; (the variable: for the test of an older program that never answers)
+                      (not (getenv "TEXMACS_SHARED_NOPONG")))
+             (msg-send (sf-get sf 'conn) (list 'pong (cadr msg)))))
+          ((func? msg 'applied)
            (with (tag from to author id psexp) msg
              (seen! sf id)
              (cond ((or (!= from (live-current-state key))
@@ -2497,9 +2849,17 @@
     (for (sf (map cdr (ahash-table->list sf-table)))
       (when (ahash-ref sf-table (sf-key sf))
         (sf-tick sf))))
-  (if (and (== (ahash-size sf-table) 0) (== (ahash-size sf-pending) 0))
-      (begin (set! sf-tick-running? #f) #t)
-      20))
+  (cond ((and (== (ahash-size sf-table) 0) (== (ahash-size sf-pending) 0))
+         (set! sf-tick-running? #f)
+         #t)
+        ;; a host that nobody has joined polls for a join ten times a second
+        ;; (a joiner waits for the welcome 500 ms); with a participant or a
+        ;; peer it polls every 20 ms
+        ((and (== (ahash-size sf-pending) 0) (null? sf-incoming)
+              (list-and (map (lambda (e) (and (sf-host? (cdr e)) (null? (sf-get (cdr e) 'peers))))
+                             (ahash-table->list sf-table))))
+         100)
+        (else 20)))
 
 (define (shared-ensure-tick!)
   (when (not sf-tick-running?)
@@ -2516,5 +2876,6 @@
 (tm-define (notify-buffer-closed name)
   (former name)
   (ahash-remove! sf-unshared name)
+  (ahash-remove! sf-not-joined name)
   (when (shared-files-in-use?)
     (shared-file-leave (string->url name))))

@@ -17,7 +17,7 @@
 #   death       the host is killed: the participant takes over its changes
 #   takeover    an interactive process joins a headless host and takes over
 #   takeover-window  the same with a window (offscreen) for B
-#   off         the preference off (the default): nothing is shared
+#   off         the preference off: nothing is shared
 #   stale       an entry of a dead process; a wrong token; garbage
 #   meta        style and initial environment shared as the body is
 #   conflict    edits at once: merged, or the person's text saved when lost

@@ -1,6 +1,6 @@
 # `texmacs --mcp`: TeXmacs as an MCP server
 
-Steps 2 (reading) and 3 (editing, direct mode) of the [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design)
+Steps 2 (reading), 3 (editing, direct mode) and 4, stage A (modes and proposals) of the [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design)
 (sections 4.1, 4.3, 5, 6, 8). An agent (Claude Code, Claude Desktop, any MCP
 client) starts `texmacs --mcp` as its MCP server over stdio and reads TeXmacs
 documents through it, and edits them.
@@ -24,21 +24,24 @@ app:
     {
       "mcpServers": {
         "texmacs": {
-          "command": "/Applications/TeXmacs Upsilon.app/Contents/MacOS/texmacs",
+          "command": "/Applications/TeXmacs Upsilon.app/Contents/MacOS/TeXmacs",
           "args": ["--mcp"],
           "env": { "TEXMACS_MCP_ROOTS": "/Users/you/papers" }
         }
       }
     }
 
-The path is that of the binary of the application (on macOS the launcher script is
-`Contents/Resources/bin/texmacs` or the executable in `Contents/MacOS`: use the one
-which exists in your installation; it must be the launcher or `texmacs.bin`
-with `--mcp`). Nothing is typed on the terminal: the app starts the process and talks
+The path is that of the binary of the application: on macOS the executable
+`Contents/MacOS/TeXmacs` (a copy of `texmacs.bin`; `Contents/Resources/bin` of the
+bundle is empty, there is no launcher script in it, and the executable takes `--mcp`
+as it is). On Linux it is the launcher `texmacs` of an installation (an AppImage
+cannot be used: `AppRun` closes the standard input). Nothing is typed on the terminal: the app starts the process and talks
 to it over its standard input and output. `env` is optional.
 
-To work on a file together with a person who has it open in TeXmacs, turn on the
-preference `share-open-files` in both (TeXmacs and the home the server uses).
+To work on a file together with a person who has it open in TeXmacs, the preference
+`share-open-files` must be on in both (TeXmacs and the home the server uses): it is on
+by default since 5 November 2026 (Edit > Preferences > Other > "Share files open in
+several TeXmacs windows"; `texmacs -c` never shares).
 
 Not yet: `check`, `render`, `export` and resource
 notifications (steps 5 and 6 of the design; step 4, modes and proposals, is below). The interface has no tool
@@ -76,7 +79,7 @@ standard input and output, and ends when the input ends.
   the binary with standard input from `/dev/null`; for `--mcp` it keeps the input.
   `claude mcp add texmacs -- texmacs --mcp` thus works with the launcher.
 - **Reading is polled on the main thread**, by a delayed command every 10 ms
-  while messages come, every 50 ms after 2 s of silence (idle cost under 1% of
+  while messages come, every 50 ms after 2 s of silence (idle cost about 1.5% of
   a CPU), like the shared files (`mcp_stdin_read` is a non-blocking `poll` +
   `read`). The pieces of a line are kept in a list and only the new piece is
   searched for the newline.
@@ -136,8 +139,8 @@ a string nor a number, or a missing or non-string method, is -32600.
   At most 40000 handles are kept (the older half goes).
 - A file is opened as TeXmacs opens one: **joined** when another process of the
   user hosts it (the person's TeXmacs, or a headless one) and
-  `share-open-files` is on in both, **alone** otherwise (the default of the
-  preference is off). Before each tool call the links of the shared files are
+  `share-open-files` is on in both, **alone** otherwise (the preference is on by
+  default). Before each tool call the links of the shared files are
   served (`shared-poll`), so that what the host has sent is in. The `shared`
   field tells: `{role: host|participant, state, participants}` or `null`.
   When the MCP process is the only one, it hosts the file, and when the person
@@ -184,14 +187,42 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
   person: `SH_INTERACTIVE`, commands `mode`, `accept`, `reject`, `save`...), and
   `tests/shared/check.sh agent agentplain` for the host with a hand-written agent.
 - The host does not trust the id: a headless participant is an agent whatever its id, until the person marks it. The local link is not a security boundary against a process of the same user (see shared-files.md).
-- Deferred (stage B): trusted agents, the person's dialog and MCP elicitation for
-  edits that break a rule.
+- Stage B (trusted agents, the person's dialog and MCP elicitation for edits that
+  break a rule): built, audited, and reverted on 5 November 2026 (`e00d757d2f`); see
+  the wiki page [MCP-security](https://github.com/mgubi/texmacs/wiki/MCP-security),
+  section 7.
+- **A file the server could not join** (`3607a65db5`, `7d5e406a06`). When another
+  TeXmacs holds the file (a live host) and the server cannot join it (the welcome is
+  refused, the host does not answer, the document cannot be shared, or this process
+  does not share), the file is opened from the disk alone and the document is
+  **not joined**, for the life of the buffer: `list_documents` and `open_document` give
+  `shared: null` and `agent_mode: read-only`, `open_document` has a `note` with the
+  reason, the edit tools answer `refused` (rule `read-only`) and `save_document` answers
+  `refused`. It stays so until the agent closes the document and opens it again; when
+  the host has closed the file meanwhile, the next answer says the copy may be out of
+  date (`stale-note`) and asks to close and reopen. The window of the person that did
+  not join is read-only for saving too: its Save is refused with a message (Save as
+  writes a copy), and export and Save as to the same path are guarded as well; the
+  guard (`shared-file-save-guard`) checks the lock of the file whatever the
+  preference. The footer says what happened ("Shared file: this file is open in
+  another TeXmacs, but ...; it is opened from the file, without sharing, and not
+  saved"), also which tag is malformed when the document cannot be shared.
+- **Feedback in the person's TeXmacs** (`cc072d7b6a`, `3619304bec`): a footer message
+  when an agent joins ("an agent joined this document (Tools > Agents)") and one in the
+  joining window; a lasting footer text while the buffer is shared (hosting, joined,
+  shared with an agent, its mode and proposals); in the host's window a group in the
+  focus bar (the agent, "busy or not answering" or "disconnected" when it is not fine, the mode,
+  the proposals with previous and next, a `...` menu with accept, reject, all and Check
+  connection; the host pings its agents every two seconds; a file hosted alone shows nothing).
+  The welcome of a host holds the initial environment of the document; a saved file has
+  an empty `(collection)` there, which the arity check now accepts (it made every join
+  fail, so that the file was loaded alone with `agent_mode` `direct`).
 
 ## The tools
 
 | Tool | Arguments | Result |
 |---|---|---|
-| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its process exists (`kill(pid, 0)`; a stopped one is alive) and its port does not refuse a connection (a non-blocking connect, at most 100 ms; a port that does not answer counts as a busy host; the port of a reused process id or of a zombie is closed). No lock is taken, and each verdict is kept for 5 s so that listing again and again does not fill the queue of a stopped host |
+| `list_documents` | | `documents`: this session's (`document`, `path`, `file`, `title`, `style`, `modified`, `shared`, `agent_mode`, `blocks`, `hash`, `opened_by`); `open_elsewhere`: files another process hosts and this one has not open (`path`, `person` = that host is interactive, `pid`); a host is taken to be alive when its process exists (`kill(pid, 0)`; a stopped one is alive) and its port does not refuse a connection (a non-blocking connect, at most 100 ms; a port that does not answer counts as a busy host; the port of a reused process id or of a zombie is closed). No lock is taken, and each verdict is kept for 5 s so that listing again and again does not fill the queue of a stopped host |
 | `open_document` | `path` (absolute) | the same facts for the document (the same id when it is open already) |
 | `get_outline` | `document`, `limit?` (300), `start?` | `title`, `hash`, `blocks`, `sections`: `handle`, `tag`, `level` (part 0, chapter 1, section 2... subparagraph 6), `title`, `labels`, `index` (position among the top-level blocks), `chars` (size to the next section), `hash`; also `total`, `next_start` (continue with `start`). Sections are found also in a concatenation (`<section|A><label|x>` and the LaTeX importer make `(concat (section ..) (label ..))`) |
 | `read` | `document`, `node?` (a handle), `format?` (`text` default, `texmacs`, `stree`, `latex`, `markdown`), `max_size?` (characters, default 12000, 200 to 400000), `start?` | `content`, `hash`, `tag`, `truncated`, and for a document or a `document` node `start`, `end`, `blocks`, `next_start` (continue with `start`) and `children` (handle, index, tag, hash, preview, at most 200); for another node the first 50 children |
@@ -209,7 +240,7 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
 | `undo_agent` | `document`, `steps?` (1) | the same, with `undone` |
 | `list_proposals` | `document` | `proposals` (`id`, `status`, `where`), `agent_mode` |
 | `withdraw_proposal` | `document`, `id` | `status` (`withdrawn`, or the status it had), `proposal` |
-| `save_document` | `document` | `saved` (or `pending`), `path`, `shared` |
+| `save_document` | `document` | `status` (`saved`, `pending` = a participant waits for the host, or `refused` with `reason`), `document`, `path`, `shared`, `hash` |
 | `close_document` | `document`, `discard?` | `closed`; refused with unsaved changes unless `discard` |
 | `create_document` | `path` (absolute, `.tm`, new, in an existing folder), `style?` (`generic`), `content?`, `format?` | the facts of the new document, opened |
 
@@ -629,7 +660,7 @@ The editing tools (not listed when `TEXMACS_MCP_READONLY` is set):
   rollback made them unsafe to undo); or `pending` after 10 s (the host is busy: the
   change is kept and sent when it answers). For an agent no file is written in the
   `recovered` folder when its patch is lost: the refusal is its report. Propose
-  mode and the menu of the person are step 4: direct mode only.
+  mode and the menu of the person are described under "Modes and proposals".
 - **`undo_agent`** does not use the undo of the editor, which undoes the
   changes of the person that do not commute with the step. Each step keeps what it
   made (tree pointers and hashes) and the old content; a step is undone only if
@@ -696,7 +727,7 @@ the work folder).
 | `tools` | all tools on a generated paper: outline, every format, cutting and continuing, handles, find in all its forms, references, errors |
 | `shared` | a second headless TeXmacs hosts the file (`host-live.scm`, using `tests/shared/lib.scm`); the MCP server lists it as open elsewhere, joins it, reads the host's live edit through the handle it had, then a deletion; the handle of the deleted block is an error |
 | `mcp-host` | the MCP server hosts the file; another TeXmacs joins (`host-join.scm`) and edits; the MCP server reads the edit |
-| `unshared` | the preference off (the default): not shared, nothing listed |
+| `unshared` | the preference off (it was the default until 5 November 2026): not shared, nothing listed |
 | `launcher` | the same through `TeXmacs/bin/texmacs` |
 | `undo` | the undo of the editor in a headless process, single process (`undo-probe.scm`): the own steps, the step of another author skipped when it commutes, the undo back to the saved state (it crashed: `QApplication::beep` without an application) |
 | `filter` | every name of the lists of refused content is a tag of the DRD |
@@ -722,8 +753,7 @@ the work folder).
 - **The agent's TeXmacs uses the person's home** by default
   (`~/.TeXmacs_Upsilon`), so its preferences (`share-open-files`) apply to both; a
   client can set `TEXMACS_HOME_PATH` in the environment of the server.
-- Not done: cursors/presence of the agent, resources and notifications, propose
-  mode and the menu (step 4), `check`, `render`, `export` (step 5), `get_changes`
+- Not done: cursors/presence of the agent, resources and notifications, `check`, `render`, `export` (step 5), `get_changes`
   (step 6), rebasing across a split or join of a paragraph far from the edit
   (the host refuses these; planned), Windows, and a typesetter-based
   `get_references`. Also not investigated: a report that `go-to-path` called from a

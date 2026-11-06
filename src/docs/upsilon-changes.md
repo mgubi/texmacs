@@ -22,6 +22,18 @@ have the details, and the problems go to the
   and no web fonts. Long formulas wrap, links in formulas work, the search of
   the browser finds formulas by their LaTeX and a copy gives them as `$...$`,
   and a page read back into TeXmacs gives the formulas again (#770).
+- **Shared files show that they are shared.** The footer of a window says so as long as
+  the file is shared with something ("Shared: hosting, 2 windows", "Shared: joined", "Shared with
+  agent 1234 (propose), 1 proposal"; nothing for a file hosted alone), and a file open in another
+  TeXmacs that this one could not join says "Not shared". In the window that hosts a file with an
+  agent the focus bar has a compact group: the agent (with "busy or not answering for N s" or
+  "disconnected" when it is not fine; the host pings its agents every two seconds, `ping`/`pong`
+  on the local link, and silence is shown only for a peer that has answered a ping), the mode (the
+  same actions as Tools > Agents), the number of pending proposals with previous and next, and a
+  `...` menu (accept or reject the proposal here, all, Check connection). It fits in 800 px.
+  Nothing is computed for a file that is not shared; a host nobody has joined polls every 100 ms
+  instead of 20. Test `tests/mcp`
+  `gui-host`. See [shared-files.md](shared-files.md).
 - **Agents on a shared file: modes, proposals, the host's filter** (desktop
   applications; step 4, stage A, of the MCP server design). When the person's
   TeXmacs hosts a file that an agent (`texmacs --mcp`) edits, the person decides what
@@ -37,6 +49,31 @@ have the details, and the problems go to the
   document of more than 40 blocks was cut when it was sent to a participant. See
   [mcp-server.md](mcp-server.md) and [shared-files.md](shared-files.md); tests
   `tests/shared` (`agent`, `agentplain`, `malformed`, `agentmode`) and `tests/mcp` (`propose`). Hardening: a patch with a malformed path no longer kills the host (shape check, and `is_applicable` answers false in C++), inverses sent by participants are recomputed, a headless participant is treated as an agent until the person marks it, an agent's Save is refused outside the direct mode, and the mode chosen is kept when the file is handed over. Integer overflows in the applicability tests of modifications (C++) no longer kill the host, a participant checks what its host sends, and a fuzz scenario runs random patches through the patch functions. Messages nested more than 1500 levels are dropped before they are read, a patch with a cursor change from another process is refused, and the editor no longer crashes on cursor data that is a string. A patch that leaves a tag with a number of children it cannot have (an `ornament` with none) is refused, and the typesetter and the cursor correction no longer crash on such trees (found by a fuzz of patches applied to a real buffer). Tables with a string for a row, empty tables and curves whose points differ in dimension no longer crash the typesetter, and a patch that changes a compound into a string label is refused.
+
+- **A file that could not be joined is read only** (desktop applications). When another
+  TeXmacs holds a file and the server (or a window) cannot join it (it does not answer,
+  refuses the welcome, or the document cannot be shared), the file is opened from the disk
+  without sharing and stays so for the life of the buffer: an agent in it is read only
+  (`agent_mode` `read-only`, a note in `open_document`, edits and `save_document` refused;
+  it must close and reopen the document), and a Save in a window of the person that did not
+  join is refused with a message, so that it never overwrites the file of the window that
+  holds it. Every save, export and Save as checks the lock of the file, whatever the
+  preference. Before, such a file was opened with `agent_mode` `direct` and its save
+  replaced the person's file. See [shared-files.md](shared-files.md) and
+  [mcp-server.md](mcp-server.md).
+- **An agent can join a file saved by the person's TeXmacs, with messages.** A saved file
+  has an empty initial environment in the welcome of its host, which the arity check
+  refused, so every join failed and the agent got the file alone in `direct` mode. Now
+  it joins; a message in the footer of the joining window and one in the host's window
+  say that an agent joined (Tools > Agents).
+- **Shared files are on by default** (desktop applications): a file open in
+  several TeXmacs windows or processes of the user stays in sync. To turn it off:
+  Edit > Preferences > Other > "Share files open in several TeXmacs windows"
+  (it applies to the files loaded afterwards). Batch conversions
+  (`texmacs -c`) never share.
+- **Help > AI agents (MCP server)**: new help pages on installing and using
+  `texmacs --mcp` (connecting Claude Code and Claude Desktop, the tools, working
+  with the agent on an open file, the content rules, troubleshooting).
 
 ## 4 November 2026
 
@@ -94,7 +131,7 @@ have the details, and the problems go to the
 
 ## 3 November 2026
 
-- **Shared files** (desktop applications, off by default): with the
+- **Shared files** (desktop applications, off by default; on by default since 5 November 2026): with the
   preference `share-open-files` set to `on`, several TeXmacs processes of the
   same user which open the same `.tm` file stay in sync, with no server. The
   process which opens the file first hosts it and writes it; the others join it
@@ -105,8 +142,8 @@ have the details, and the problems go to the
   [shared-files.md](shared-files.md). First part of the shared files of the
   [MCP server design](https://github.com/mgubi/texmacs/wiki/MCP-server-design);
   the style and the initial environment (packages, page setup, language,
-  fonts) are shared with the text; there is no menu for the preference yet,
-  nor cursors of the other participants.
+  fonts) are shared with the text; there was no menu for the preference (a toggle in
+  Edit > Preferences > Other was added on 5 November 2026), and there are no cursors of the other participants.
 
 - **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,
   so `TeXmacs -headless -x ...` showed its windows and its icon in the Dock

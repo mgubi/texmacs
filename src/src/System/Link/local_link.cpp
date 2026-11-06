@@ -42,6 +42,7 @@ bool   shared_lexists (string) { return false; }
 bool   shared_replace_file (string, string) { return false; }
 string shared_random_token () { return "00000000000000000000000000000000"; }
 int    shared_lock_acquire (string) { return -2; }
+bool   shared_lock_held (string) { return false; }
 void   shared_lock_release (int) {}
 bool   shared_lock_valid (int, string) { return false; }
 int    shared_lock_renew (int, string) { return -1; }
@@ -735,6 +736,32 @@ shared_lock_acquire (string path) {
 #else
   (void) path;
   return -2;
+#endif
+}
+
+// Does another process hold the lock file @name of the folder? Nothing is
+// made: if the folder or the file is not there, nobody holds it, and an error
+// is no sign that somebody does. (A shared lock conflicts with the exclusive
+// lock of a host, and not with another probe.)
+bool
+shared_lock_held (string name) {
+#ifndef OS_MINGW
+  string base= shared_env ("TEXMACS_SHARED_DIR");
+  if (base == "") base= "/tmp";
+  base= shared_real_path (base);
+  if (base == "") return false;
+  while (N(base) > 1 && base[N(base)-1] == '/') base= base (0, N(base)-1);
+  string path= base * "/texmacs-" * as_string ((int) getuid ()) * "/shared/" * name;
+  c_string p (path);
+  int fd= open ((char*) p, O_RDONLY);
+  if (fd < 0) return false;
+  bool held= false;
+  if (flock (fd, LOCK_SH | LOCK_NB) != 0) held= (errno == EWOULDBLOCK);
+  ::close (fd);
+  return held;
+#else
+  (void) name;
+  return false;
 #endif
 }
 
