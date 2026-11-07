@@ -43,6 +43,19 @@
 (define tmtex-auto-consume 0)
 (define tmtex-image-root-url (unix->url "image"))
 (define tmtex-image-root-string "image")
+;; whether converted images have a place: next to the .tex file which is
+;; saved (without one, a conversion to a string, they would go into the
+;; current directory of TeXmacs, which the LaTeX does not know)
+(define tmtex-image-dir? #f)
+;; the first bibliography of the document in a CSL style, (NAME FILE KEYS):
+;; its citations and its bibliography are then those of the LaTeX package
+;; citation-style-language (see "Citations in a CSL style" below); global,
+;; as tmtex-packages, for the predicate of the mode csl-package% (Guile)
+(tm-define tmtex-csl #f)
+(define tmtex-csl-resource "")
+(define tmtex-csl-file? #f)
+(define tmtex-csl-names* 'unknown)
+(define tmtex-image-loose? #t)
 (define tmtex-appendices? #f)
 (define tmtex-indirect-bib? #f)
 (define tmtex-mathjax? #f)
@@ -104,7 +117,8 @@
 
   ;; Other styles
   (beamer-style%        (in? tmtex-style '("beamer" "old-beamer")))
-  (natbib-package%      (in? "cite-author-year" tmtex-packages)))
+  (natbib-package%      (in? "cite-author-year" tmtex-packages))
+  (csl-package%         tmtex-csl))
 
 (tm-define (tmtex-style-init body)
   (noop))
@@ -128,6 +142,12 @@
 ;; Initialization from options
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmtex-image-target? opts)
+  ;; the images go next to the file which is written, if it is in LaTeX, which
+  ;; is not the case of the formulas for MathJax in an HTML file
+  (and (not (url-none? current-save-target))
+       (!= (assoc-ref opts "texmacs->latex:mathjax") "on")))
+
 (define (tmtex-initialize opts)
   (set! tmtex-ref-cnt 1)
   (set! tmtex-env (make-ahash-table))
@@ -137,14 +157,12 @@
   (set! tmtex-auto-produce 0)
   (set! tmtex-auto-consume 0)
   (set! tmtex-mathjax? #f)
-  (if (== (url-suffix current-save-target) "tex")
+  (set! tmtex-image-loose? (not (tmtex-image-target? opts)))
+  (set! tmtex-image-dir? (tmtex-image-target? opts))
+  (if tmtex-image-dir?
       (begin
-        (set! tmtex-image-root-url (url-unglue current-save-target 4))
-        (with suf (url-suffix tmtex-image-root-url)
-          (when (!= suf "")
-            (set! tmtex-image-root-url
-                  (url-unglue tmtex-image-root-url
-                              (+ (string-length suf) 1)))))
+        (set! tmtex-image-root-url
+              (url-drop-suffix (url-drop-suffix current-save-target)))
         (set! tmtex-image-root-string
               (url->unix (url-tail tmtex-image-root-url))))
       (begin
@@ -434,11 +452,18 @@
   (and (>= (string-length s) (string-length r))
        (== (substring s 0 (string-length r)) r)))
 
+;; <#4E2D>: the token is # and hexadecimal digits, nothing else reaches \char
+(define (tmtex-hex-token? s)
+  (and (> (string-length s) 1)
+       (null? (filter (lambda (c) (not (string-index "0123456789abcdefABCDEF" c)))
+                      (string->list (substring s 1 (string-length s)))))))
+
 (define (tmtex-modified-token op s i)
   (tex-math-apply op
     (if (= (string-length s) (+ i 1))
         (substring s i (string-length s))
-        (tex-apply (string->symbol (substring s i (string-length s)))))))
+        (tex-apply (string->symbol
+                    (tmtex-keep-chars (substring s i (string-length s)) '()))))))
 
 (logic-table latex-special-symbols%
   ("less"          #\<)
@@ -485,11 +510,15 @@
         ((string-starts? s "b-") (tmtex-modified-token 'tmmathbf s 2))
         ((and (not (tmtex-math-mode?)) (logic-ref latex-text-symbols% s))
          (list '!group (list (logic-ref latex-text-symbols% s))))
-        ((and (string-starts? s "#") (not tmtex-use-catcodes?))
+        ((and (string-starts? s "emoji-")
+              (!= (string-convert (string-append "<" s ">") "Cork" "UTF-8")
+                  (string-append "<" s ">")))
+         (tmtex-emoji (string-append "<" s ">")))
+        ((and (string-starts? s "#") (tmtex-hex-token? s) (not tmtex-use-catcodes?))
          (let* ((qs (string-append "<" s ">"))
                 (cv (string-convert qs "Cork" "UTF-8")))
            (list '!widechar (string->symbol cv))))
-        ((and (string-starts? s "#") tmtex-use-catcodes?)
+        ((and (string-starts? s "#") (tmtex-hex-token? s) tmtex-use-catcodes?)
          (let* ((qs (string-append "<" s ">"))
                 (us (string-convert qs "Cork" "UTF-8"))
                 (cv (string-convert us "UTF-8" "LaTeX")))
@@ -501,7 +530,8 @@
                          (list '!symbol (list sy))))
                       ((not (logic-in? (car ss) latex-symbol%))
                        (display* "TeXmacs] non converted symbol: " s "\n")
-                       (list '!symbol (list 'nonconverted s2)))
+                       (list '!symbol
+                             (list 'nonconverted (tmtex-keep-chars s2 '(#\*)))))
                       (group? (list '!group ss))
                       (else (list '!symbol ss)))))))
 
@@ -511,6 +541,91 @@
            (q (if (null? p2) '() (cdr p2)))
            (r (routine q)))
       (cons (tmtex-token-sub s group?) r))))
+
+;; The emoji. One which the LaTeX package emoji has is \emoji{name}, by its
+;; name there; one which it has not (a newer one) its characters, in
+;; \tmemojichar, which shows them with LuaLaTeX and XeLaTeX and their code
+;; points with pdfLaTeX (which stops on them). The preamble defines both
+;; for each engine (latex-texmacs-preamble, latex-define.scm). In a
+;; formula, in a \text.
+
+(define (tmtex-emoji-wrap e)
+  (if (tmtex-math-mode?) (list 'text e) (list '!group e)))
+
+(define (tmtex-emoji-chars name)
+  ;; \tmemojichar{characters}{U+... of its code points}{its first code
+  ;; point, in decimal, for \iffontchar}
+  (let* ((us (string-convert name "Cork" "UTF-8"))
+         (cv (if tmtex-use-catcodes? (string-convert us "UTF-8" "LaTeX") us))
+         (cps (string-decompose
+               (string-replace (string-replace (emoji-to-code-points name)
+                                               "<#" "") ">" " ") " "))
+         (cps* (list-filter cps (lambda (x) (!= x ""))))
+         (u (apply string-append
+                   (list-intersperse (map (lambda (x) (string-append "U+" x))
+                                          cps*) " "))))
+    (tmtex-emoji-wrap (list 'tmemojichar (list '!widechar (string->symbol cv))
+                            u (number->string
+                               (or (and (pair? cps*)
+                                        (string->number (car cps*) 16))
+                                   0))))))
+
+(define (tmtex-emoji name)
+  ;; name: <emoji-...>, an emoji of ours
+  (with ln (emoji-latex-name name)
+    (if (!= ln "")
+        (tmtex-emoji-wrap (list 'emoji ln))
+        (tmtex-emoji-chars name))))
+
+(define (tmtex-emoji-text t)
+  ;; the text of the argument of an (emoji ...) tag (an older import made
+  ;; (concat "white" (rsub "c") ...) of white_check_mark)
+  (cond ((string? t) t)
+        ((func? t 'concat) (apply string-append (map tmtex-emoji-text (cdr t))))
+        ((func? t 'rsub 1) (string-append "_" (tmtex-emoji-text (cadr t))))
+        ((func? t 'rsup 1) (string-append "^" (tmtex-emoji-text (cadr t))))
+        ((and (pair? t) (pair? (cdr t)))
+         (apply string-append (map tmtex-emoji-text (cdr t))))
+        (else "")))
+
+(define (tmtex-emoji-tag s l)
+  ;; (emoji "name"), a \emoji{name} of an import which had not that emoji:
+  ;; the emoji if the name is one of the package, else the name as a
+  ;; shortcode, as text (not \emoji, which the package would stop on)
+  (let* ((x (if (pair? l) (tmtex-emoji-text (car l)) ""))
+         (e0 (emoji-from-latex (locase-all x)))
+         ;; (the shortcodes of GitHub have _ where the package has -)
+         (e (if (!= e0 "") e0
+                (emoji-from-latex (string-replace (locase-all x) "_" "-")))))
+    (if (!= e "") (tmtex-emoji e)
+        (tmtex-emoji-wrap
+         (list 'texttt (string-append ":" (tmtex-emoji-escape x) ":"))))))
+
+(define (tmtex-emoji-escape x)
+  ;; the characters of x which are special for TeX, written as characters
+  (apply string-append
+         (map (lambda (c)
+                (cond ((string-index "#$%&_{}" c) (string #\\ c))
+                      ((== c #\~) "\\textasciitilde{}")
+                      ((== c #\^) "\\textasciicircum{}")
+                      ((== c #\\) "\\textbackslash{}")
+                      ((< (char->integer c) 32) "")
+                      (else (string c))))
+              (string->list x))))
+
+(define (tmtex-emoji-clean s)
+  ;; the selectors and the joiners after an emoji by its name (what is
+  ;; left of a sequence which is not one emoji of the table) are left out:
+  ;; the emoji has them, and pdfLaTeX would stop on them
+  (let loop ((l (tmstring->list s)) (prev #f) (acc '()))
+    (if (null? l) (apply string-append (reverse acc))
+        (let* ((c (car l))
+               (named? (lambda (x) (and x (string-starts? x "<emoji-")))))
+          (cond ((and (in? c '("<#FE0F>" "<#FE0E>")) (named? prev))
+                 (loop (cdr l) prev acc))
+                ((and (== c "<#200D>") (named? prev))
+                 (loop (cdr l) prev acc))
+                (else (loop (cdr l) c (cons c acc))))))))
 
 (define (tmtex-text-sub head l)
   (if (string? head)
@@ -528,6 +643,16 @@
         ((== (car l) #\space)
          (cons (list (string->symbol " ")) (tmtex-text-list-space (cdr l))))
         (else (tmtex-text-list l))))
+
+;; the UTF-8 characters of the Cork character c. Cork and UTF-8 coincide on the
+;; printable ASCII characters, except the backquote (a left quote in Cork):
+;; they need no conversion, which the text and math exports did for every
+;; character (a call of string-convert per character)
+(define (tmtex-cork-char->utf8 c)
+  (let ((i (char->integer c)))
+    (if (and (>= i 32) (< i 127) (!= i 96))
+        (list c)
+        (string->list (string-convert (char->string c) "Cork" "UTF-8")))))
 
 (define (tmtex-text-list l)
   (if (null? l) l
@@ -566,8 +691,7 @@
               (else
                 (append
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (tmtex-text-list (cdr l))))))))
 
@@ -602,8 +726,7 @@
               (else
                 (with c
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (append c (tmtex-math-list (cdr l)))))))))
 
@@ -634,6 +757,11 @@
                     (tmtex-string-produce (cdr l)))))))
 
 (define (tmtex-string s)
+  ;; the emoji in code points of the documents written before their names
+  ;; (<#1F600>, <#1F468><#200D>...) are exported by their names
+  (when (string-index s #\<)
+    (set! s (emoji-names s))
+    (when (string-contains? s "<emoji-") (set! s (tmtex-emoji-clean s))))
   (if (> (string-length s) 1000)
     `(!concat ,@(map tmtex (tmstring-split s)))
     (let* ((l (string->list s))
@@ -952,9 +1080,21 @@
 (define (tmtex-new-line l)
   (if (tmtex-math-mode?) (tmtex-next-line l) (tex-apply '!newline)))
 
+;; The value of a length, a language or a column format is written as it is
+;; in \hspace{...}, \foreignlanguage{...}...: only the characters which such
+;; a value can have are kept, so that it cannot end its argument.
+(define (tmtex-keep-chars s allowed)
+  (list->string
+   (filter (lambda (c) (or (char-alphabetic? c) (char-numeric? c)
+                           (in? c allowed)))
+           (string->list s))))
+
+(define (tmtex-safe-length s)
+  (tmtex-keep-chars s '(#\. #\+ #\- #\* #\/ #\space)))
+
 (tm-define (tmtex-decode-length len)
   ;; FIXME: should be completed
-  (with s (force-string len)
+  (with s (tmtex-safe-length (force-string len))
     (cond ((string-ends? s "fn")   (string-replace s "fn"   "em"))
           ((string-ends? s "tab")  (string-replace s "tab"  "em"))
           ((string-ends? s "spc")  (string-replace s "spc"  "em"))
@@ -1010,8 +1150,13 @@
                         (lambda (x) `(para ,@(cdr x)))))
   t)
 
+(define (tmtex-float-position pos)
+  ;; the placement of a float: h t b p ! H only
+  (list->string (filter (lambda (c) (in? c '(#\h #\t #\b #\p #\! #\H)))
+                        (string->list pos))))
+
 (define (tmtex-float-make wide? size type position x capt)
-  (let* ((pos (string-replace position "f" ""))
+  (let* ((pos (tmtex-float-position (string-replace position "f" "")))
          (type* (if wide? (string-append type "*") type))
          (body (tmtex x))
          (caption (tmtex (into-single-paragraph capt)))
@@ -1133,14 +1278,22 @@
 (define (tmtex-big-around l)
   (convert-around (cons 'big-around l)))
 
+(define (tmtex-large-name s)
+  ;; the name of a delimiter, in \left<name>: letters only, else a dot
+  (with r (list->string (filter (lambda (c) (and (char-alphabetic? c)
+                                                 (< (char->integer c) 128)))
+                                (string->list s)))
+    (if (== r "") "." (string-append "\\" r))))
+
 (define (tmtex-large-decode s)
   (cond ((nstring? s) ".")
         ((in? s '("(" ")" "[" "]" "|" "/" ".")) s)
         ((in? s '("||" "<||>")) "\\|")
         ((== s "\\") "\\backslash")
+        ((in? s '("{" "}")) (string-append "\\" s))
         ((and (string-starts? s "<") (string-ends? s ">"))
-         (string-append "\\" (substring s 1 (- (string-length s) 1))))
-        (else (string-append "\\" s))))
+         (tmtex-large-name (substring s 1 (- (string-length s) 1))))
+        (else (tmtex-large-name s))))
 
 (define (tmtex-large-decode-text s)
   (cond ((nstring? s) "")
@@ -1192,7 +1345,8 @@
         ((== s "amalg") "coprod")
         ((== s "pluscup") "uplus")
         ((== s ".") "bignone")
-        (else (string-append "big" s))))
+        ((== s (tmtex-keep-chars s '())) (string-append "big" s))
+        (else "bignone")))
 
 (define (tmtex-big l)
   (list (string->symbol (tmtex-big-decode (car l)))))
@@ -1482,10 +1636,22 @@
                 (cons (car ha) (tmtex-table-args-assemble
                                 (cdr lb) (cdr rb) (cdr ha)))))))
 
+;; The format of a column: a letter, perhaps with a width, as p{12cm}
+(define (tmtex-halign-safe h)
+  (let ((n (string-length h)))
+    (cond ((== h "@{}X@{}") h)
+          ((and (= n 1) (string-index "lcrLCRXPpmb" (string-ref h 0))) h)
+          ((and (> n 3) (string-index "pmbX" (string-ref h 0))
+                (== (string-ref h 1) #\{) (== (string-ref h (- n 1)) #\})
+                (== (tmtex-safe-length (substring h 2 (- n 1)))
+                    (substring h 2 (- n 1))))
+           h)
+          (else "l"))))
+
 (define (tmtex-table-args p)
   (let ((lb (p 'cols 'lborder))
         (rb (p 'cols 'rborder))
-        (l (p 'cols 'halign)))
+        (l (map tmtex-halign-safe (p 'cols 'halign))))
     (apply string-append
            (tmtex-table-args-assemble lb (cons (car lb) rb) l))))
 
@@ -1570,7 +1736,8 @@
   (set! x (tmlength->texlength x))
   (list (list '!begin "tmparsep" x) arg))
 
-(define (tmtex-make-lang val arg)
+(define (tmtex-make-lang val* arg)
+  (define val (if (string? val*) (tmtex-keep-chars val* '(#\_ #\-)) val*))
   (if (== val "verbatim")
     `(tt ,arg)
     (begin
@@ -1586,12 +1753,15 @@
            (tmtex-decode-color (get-hex-color s) force-html))
           ((and (== cm "HTML") (nnull? force-html))
            `((!option "HTML") ,(html-color->latex-xcolor s)))
-          ((== cm "texmacs")
+          ((or (== cm "texmacs") (== cm "HTML"))
+           ;; (without force-html, the color is used by its name, as in
+           ;; \colorbox or the options of mdframed: a color #rrggbb is
+           ;; defined under the name tmhexRRGGBB)
            (when (nin? s tmtex-colors)
              (set! tmtex-colors (append (list s) tmtex-colors)))
-           (string-replace s " " ""))
+           (latex-color-name s))
           ((in? cm (list "x11names"))
-           (tmtex-decode-color (get-hex-color s) #t))
+           (apply tmtex-decode-color (cons (get-hex-color s) force-html)))
           (else
             (when (and (nin? cm tmtex-colormaps)
                        (!= cm "xcolor") (!= cm "none"))
@@ -1755,43 +1925,109 @@
       (list 'custombinding (force-string (cAr l)))
       ""))
 
+;; Keys of labels, references, citations and bibliography items, which
+;; LaTeX reads as arguments of \label, \ref, \cite, \bibitem...: a key
+;; with a brace, a backslash, a comma, a percent sign, a hash, a space or
+;; another special character would end the argument and let the rest of the
+;; key be read as LaTeX (\input{...}).  Only the characters which end or
+;; change an argument are written in another way: \ { } % # ^ ~ , & " [ ]
+;; = and the control characters become =XX, with XX the hexadecimal code
+;; (= is one of them, so that two keys which differ give two keys which
+;; differ), and the <#hex> notation of a Cork character becomes =uXXXXXX
+;; (it holds a #).  Everything else stays as it is, such as the letters, the
+;; digits, : - . _ / + @ ' ( ) ; $ and the characters beyond ASCII, so that
+;; the keys of a BibTeX file used with \bibliography still match.  All keys go through this one function, so
+;; that a reference still finds its label, a citation its \bibitem.
+
+(define (tmtex-ref-key-char-ok? c)
+  (let ((n (char->integer c)))
+    (and (> n 31) (!= n 127)
+         (not (in? c '(#\\ #\{ #\} #\% #\# #\^ #\~ #\, #\& #\"
+                       #\[ #\] #\=))))))
+
+(define (tmtex-ref-key-hex2 n)
+  (let ((h "0123456789ABCDEF"))
+    (string (string-ref h (quotient n 16)) (string-ref h (remainder n 16)))))
+
+(define (tmtex-ref-key-notation-end s i n)
+  ;; the end of a <name> or <#hex> notation which starts at i, or #f
+  (let loop ((j (+ i 1)))
+    (cond ((>= j n) #f)
+          ((== (string-ref s j) #\>) (and (> j (+ i 1)) j))
+          ((or (char-alphabetic? (string-ref s j))
+               (char-numeric? (string-ref s j))
+               (in? (string-ref s j) '(#\# #\-)))
+           (loop (+ j 1)))
+          (else #f))))
+
+(define (tmtex-ref-key-notation n)
+  ;; <#hex> holds a #: =u and six hexadecimal digits; <name> stays
+  (let ((h (substring n 2 (- (string-length n) 1))))
+    (if (and (string-starts? n "<#") (> (string-length h) 0)
+             (<= (string-length h) 6)
+             (null? (filter (lambda (c) (not (string-index "0123456789abcdefABCDEF" c)))
+                            (string->list h))))
+        (string-append "=u" (make-string (- 6 (string-length h)) #\0) h)
+        n)))
+
+(define (tmtex-ref-key x)
+  (let* ((s (force-string x))
+         (n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (if (>= i n)
+          (apply string-append (reverse acc))
+          (let* ((c (string-ref s i))
+                 (j (and (== c #\<) (tmtex-ref-key-notation-end s i n))))
+            (cond (j (loop (+ j 1) (cons (tmtex-ref-key-notation
+                                           (substring s i (+ j 1))) acc)))
+                  ((and (< (char->integer c) 128)
+                        (or (not (tmtex-ref-key-char-ok? c)) (== c #\=)))
+                   (loop (+ i 1)
+                         (cons (string-append
+                                "=" (tmtex-ref-key-hex2 (char->integer c))) acc)))
+                  (else (loop (+ i 1) (cons (string c) acc)))))))))
+
 (define (tmtex-label l)
-  (list 'label (force-string (car l))))
+  (list 'label (tmtex-ref-key (car l))))
 
 (define (tmtex-reference l)
-  (list 'ref (force-string (car l))))
+  (list 'ref (tmtex-ref-key (car l))))
 
 (define (tmtex-pageref l)
-  (list 'pageref (force-string (car l))))
+  (list 'pageref (tmtex-ref-key (car l))))
 
 (define (tmtex-eqref s l)
-  (list 'eqref (force-string (car l))))
+  (list 'eqref (tmtex-ref-key (car l))))
 
 (define (tmtex-smart-ref s l)
-  (let* ((ss (map force-string l))
+  (let* ((ss (map tmtex-ref-key l))
          (key (string-recompose ss ",")))
     (list 'Cref key)))
 
 (define (tmtex-specific l)
-  (cond ((== (car l) "latex") (tmtex-tt (cadr l)))
+  (cond ((== (car l) "latex") (tmtex-tt-start (cadr l)))
         ((== (car l) "image") (tmtex-eps (cadr l)))
         ((== (car l) "printer") (tmtex (cadr l)))
         ((== (car l) "odd") `(ifthispageodd ,(tmtex (cadr l)) ""))
         ((== (car l) "even") `(ifthispageodd "" ,(tmtex (cadr l))))
         (else "")))
 
-(define (tmtex-eps-names)
+(define (tmtex-eps-names key)
   (set! tmtex-serial (+ tmtex-serial 1))
   (let* ((suffix (if (get-boolean-preference "native pdf") ".pdf" ".eps"))
          (postfix (string-append "-" (number->string tmtex-serial) suffix))
          (name-url (url-glue tmtex-image-root-url postfix))
          (name-string (string-append tmtex-image-root-string postfix)))
-    (values name-url name-string)))
+    (if tmtex-image-loose?
+        (loose-image-names key suffix)
+        (values name-url name-string))))
 
 (define (tmtex-eps x)
   (if (tmtex-math-mode?) (set! x `(with "mode" "math" ,x)))
-  (receive (name-url name-string) (tmtex-eps-names)
-    (let* ((extents (print-snippet name-url x #t))
+  (receive (name-url name-string) (tmtex-eps-names x)
+    (let* ((cleared? (image-target-clear name-url))
+           (extents (print-snippet name-url x #t))
+           (written (image-target-written name-url cleared?))
            (unit (* (/ 1.0 60984.0) (/ 600.0 (tenth extents))))
            (x3 (* unit (first extents)))
            (y3 (* unit (second extents)))
@@ -1808,7 +2044,7 @@
            (opt `(!option ,(string-append "width=" ww ",height=" hh)))
            (rat (/ y3 (- y4 y3)))
            (dy `(!concat ,(number->string rat) (height)))
-           (rb `(raisebox ,dy (includegraphics ,opt ,name-string))))
+           (rb `(raisebox ,dy (includegraphics ,opt (!file-name ,name-string)))))
       ;; TODO: top and bottom margins
       ;;(display* name-url ": " x1 ", " y1 "; " x2 ", " y2 "\n")
       ;;(display* name-url ": " x3 ", " y3 "; " x4 ", " y4 "\n")
@@ -1821,22 +2057,44 @@
 (define (tmtex-graphics l)
   (tmtex-eps (cons 'graphics l)))
 
+;; A file name with a backslash, a brace or a hash cannot be written in
+;; \includegraphics{...}: the image is then converted into a file with a
+;; name of our own, as one which is not next to the target.
+(tm-define (tmtex-file-name-safe? name)
+  (null? (filter (lambda (c) (or (in? c '(#\\ #\{ #\} #\# #\^))
+                                 (< (char->integer c) 32)))
+                 (string->list name))))
+
 (define (tmtex-as-eps name)
-  (let* ((u (url-relative current-save-target (unix->url name)))
+  (let* ((u (url-relative (save-target-url) (unix->url name)))
          (suffix (url-suffix u))
          (fm (string-append (format-from-suffix suffix) "-file")))
-    (if (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg")))
+    ;; used as it is when LaTeX reads it, or when there is no .tex file
+    ;; next to which a converted image could be written
+    (if (or (not tmtex-image-dir?)
+            (and (url-exists? u) (in? suffix (list "eps" "pdf" "png" "jpg"))
+                 (tmtex-file-name-safe? name)))
         (with p (url->string "$TEXMACS_PATH")
           (set! name (string-replace name "$TEXMACS_PATH" p))
           (set! name (string-replace name "file://" ""))
-          (list 'includegraphics name))
-        (receive (name-url name-string) (tmtex-eps-names)
-          (when (string-starts? name "..")
-            (set! u (url-relative current-save-source (unix->url name))))
-          (with nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
-                        "postscript-file")
-            (convert-to-file u fm nfm name-url))
-          (list 'includegraphics name-string)))))
+          ;; on Windows a document holds /D/a/x.png (url->delta-unix), which
+          ;; LaTeX reads as a path from the root of the drive: D:/a/x.png
+          (when (and (os-mingw?) (>= (string-length name) 3)
+                     (== (string-ref name 0) #\/)
+                     (char-alphabetic? (string-ref name 1))
+                     (== (string-ref name 2) #\/))
+            (set! name (image-name-for-program (unix->url name))))
+          (list 'includegraphics (list '!file-name name)))
+        (receive (name-url name-string) (tmtex-eps-names name)
+          ;; an image which is not next to the target is next to the document
+          (when (or (string-starts? name "..") (not (url-exists? u)))
+            (set! u (url-relative (save-source-url) (unix->url name))))
+          (let ((nfm (if (== (url-suffix name-url) "pdf") "pdf-file"
+                         "postscript-file"))
+                (cleared? (image-target-clear name-url)))
+            (convert-to-file u fm nfm name-url)
+            (image-target-written name-url cleared?))
+          (list 'includegraphics (list '!file-name name-string))))))
 
 (define (tmtex-image-length len)
   (let* ((s (force-string len))
@@ -2196,6 +2454,44 @@
                 (tmtex `(concat (strong ,key) " " ,(cadr l)))))))
 (define (tmtex-md-nothing s l) "")
 
+;; The macros of the style office (styles/office.ts): what they display,
+;; without what they keep of the Word or OpenDocument file
+(define (tmtex-office-last s l) (if (null? l) "" (tmtex (cAr l))))
+(define (tmtex-office-font s l)
+  (if (< (length l) 3) (tmtex-office-last s l)
+      (tmtex `(with "font-family" ,(cadr l) ,(caddr l)))))
+(define (tmtex-office-underline s l)
+  (cond ((< (length l) 2) (tmtex-office-last s l))
+        ((== (car l) "double") (tmtex `(underline (underline ,(cadr l)))))
+        (else (tmtex `(underline ,(cadr l))))))
+(define (tmtex-office-strike s l)
+  (if (null? l) "" (tmtex `(strike-through ,(cAr l)))))
+(define (tmtex-office-columns s l)
+  (if (< (length l) 2) (tmtex-office-last s l)
+      (tmtex `(with "par-columns" ,(car l) ,(cAr l)))))
+(define (tmtex-office-inline t)
+  ;; the paragraphs of a comment or a change, in one line
+  (if (tm-func? t 'document)
+      `(concat ,@(list-intersperse (tm-children t) " "))
+      t))
+(define (tmtex-office-comment s l)
+  (if (< (length l) 3) ""
+      (tmtex `(with "color" "dark magenta"
+                (concat (rsup (math "<ast>"))
+                        (with "font-size" "0.71"
+                          (concat "[" (strong ,(car l)) ": "
+                                  ,(tmtex-office-inline (caddr l)) "]")))))))
+(define (tmtex-office-commented s l)
+  (if (< (length l) 4) (tmtex-office-last s l)
+      (tmtex `(concat ,(car l) (office-comment ,@(cdr l))))))
+(define (tmtex-office-change s l)
+  (cond ((< (length l) 3) "")
+        ((== s "office-ins")
+         (tmtex `(with "color" "dark green" (underline ,(tmtex-office-inline (caddr l))))))
+        (else
+         (tmtex `(with "color" "dark red" (strike-through ,(tmtex-office-inline (caddr l))))))))
+;; (strike-through and marked: tmtex-strike-through and tmtex-marked below)
+
 (define (filter-enunciation-due-to l)
   (cond ((func? l 'dueto) (list l))
         ((nlist>0? l) '())
@@ -2243,15 +2539,82 @@
         (set! tmtex-appendices? #t)
         (list '!concat '(appendix) app)))))
 
+(define tmtex-tt-col 0) ;; the column in the current line (see the tabs)
+(define tmtex-tt-escaped? #f) ;; backslashes and braces escaped before
+
 (define (tmtex-tt-document l)
   (cond ((null? l) "")
-        ((null? (cdr l)) (tmtex-tt (car l)))
-        (else (string-append (tmtex-tt (car l)) "\n"
-                             (tmtex-tt-document (cdr l))))))
+        (else
+          (set! tmtex-tt-col 0)
+          ;; (the line before the next ones: the column goes in order)
+          (let ((h (tmtex-tt (car l))))
+            (if (null? (cdr l)) h
+                (string-append h "\n" (tmtex-tt-document (cdr l))))))))
+
+;; the tabs of a line of verbatim content (<#9>: the lines of a text or a
+;; source file keep their tabs, see verbatim.cpp) as spaces up to the next
+;; stop, every 8 columns; a character of Cork (<...>) is one column, and so
+;; are the escapes of a backslash and of the braces which the verbatim
+;; environments put before (\textbackslash , \{, \}: tmtex-tt-escaped?; in
+;; raw LaTeX they are the characters typed). The column goes on from the
+;; strings before in the line (tmtex-tt-col), also across markup
+(define (tmtex-char-end s i n)
+  ;; the end of the character at i: a character of Cork (<...>, which holds
+  ;; no other <), an escape of verbatim content, or one byte; a scan in
+  ;; Scheme (string-search-forwards converts the whole string at each call)
+  (let ((c (string-ref s i)))
+    (cond ((char=? c #\<)
+           (let loop ((k (+ i 1)))
+             (cond ((>= k n) (+ i 1))
+                   ((char=? (string-ref s k) #\>) (+ k 1))
+                   ((char=? (string-ref s k) #\<) (+ i 1))
+                   (else (loop (+ k 1))))))
+          ((and tmtex-tt-escaped? (char=? c #\\))
+           (cond ((and (<= (+ i 15) n)
+                       (== (substring s i (+ i 15)) "\\textbackslash "))
+                  (+ i 15))
+                 ((and (< (+ i 1) n) (in? (string-ref s (+ i 1)) '(#\{ #\})))
+                  (+ i 2))
+                 (else (+ i 1))))
+          (else (+ i 1)))))
+
+(define (tmtex-expand-tabs s)
+  (let ((n (string-length s)))
+    (cond ((and (< (string-search-forwards "<" 0 s) 0)
+                (or (not tmtex-tt-escaped?)
+                    (< (string-search-forwards "\\" 0 s) 0)))
+           (set! tmtex-tt-col (+ tmtex-tt-col n))
+           s)
+          ((< (string-search-forwards "<#9>" 0 s) 0)
+           ;; (no tab: only the columns)
+           (let loop ((i 0) (col tmtex-tt-col))
+             (if (>= i n) (begin (set! tmtex-tt-col col) s)
+                 (loop (tmtex-char-end s i n) (+ col 1)))))
+          (else
+            (let loop ((i 0) (col tmtex-tt-col) (acc '()))
+              (if (>= i n)
+                  (begin (set! tmtex-tt-col col)
+                         (apply string-append (reverse acc)))
+                  (let* ((j (tmtex-char-end s i n))
+                         (c (substring s i j)))
+                    (if (== c "<#9>")
+                        (with w (- 8 (modulo col 8))
+                          (loop j (+ col w) (cons (make-string w #\space) acc)))
+                        (loop j (+ col 1) (cons c acc))))))))))
+
+;; the conversion of verbatim content from its start (the column of the
+;; tabs at 0: the content before does not count); escaped?: its backslashes
+;; and braces were escaped before (escape-backslashes, escape-braces)
+(define (tmtex-tt-start x . escaped?)
+  (set! tmtex-tt-col 0)
+  (set! tmtex-tt-escaped? (and (nnull? escaped?) (car escaped?)))
+  (with r (tmtex-tt x)
+    (set! tmtex-tt-escaped? #f)
+    r))
 
 (define (tmtex-tt x)
-  (cond ((string? x) (tmtex-verb-string x))
-        ((== x '(next-line)) "\n")
+  (cond ((string? x) (tmtex-verb-string (tmtex-expand-tabs x)))
+        ((== x '(next-line)) (set! tmtex-tt-col 0) "\n")
         ((func? x 'document) (tmtex-tt-document (cdr x)))
         ((func? x 'para) (tmtex-tt-document (cdr x)))
         ((func? x 'concat)
@@ -2297,11 +2660,12 @@
     (ahash-set! tmtex-dynamic (string->symbol (car l)) 'environment)
     (ahash-set! tmtex-dynamic (string->symbol var) 'environment)
     (if (and (logic-in? var latex-texmacs-theorem-environment%)) ""
-        `(newtheorem ,var (,@(cdr l))))))
+        `(newtheorem ,var ,(tmtex (cadr l))))))
 
 (define (tmtex-verbatim s l)
   (if (func? (car l) 'document)
-      (list '!verbatim (tmtex-tt (escape-braces (escape-backslashes (car l)))))
+      (list '!verbatim (tmtex-tt-start (escape-braces (escape-backslashes (car l)))
+                                       #t))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (sharp-fix t)
@@ -2315,7 +2679,7 @@
 
 (define (tmtex-verbatim* s l)
   (if (func? (car l) 'document)
-      (list '!verbatim* (sharp-fix (tmtex-tt (car l))))
+      (list '!verbatim* (sharp-fix (tmtex-tt-start (car l) #t)))
       (list 'tmverbatim (tmtex (car l)))))
 
 (define (tmtex-code-inline s l)
@@ -2339,7 +2703,7 @@
   ;; (set! l (unescape-angles l))
   ;; NOTE: instead, we now unescape in tmtex-verb-string
   (tmtex-env-set "mode" "text")
-  (with src (list '!verbatim* (tmtex-tt (cadr l)))
+  (with src (list '!verbatim* (tmtex-tt-start (cadr l)))
     (tmtex-add-preview-packages src)
     (tmtex-env-reset "mode")
     (list '!unindent src)))
@@ -2401,6 +2765,192 @@
 
 (define (tmtex-fcolorbox s l)
   `(fcolorbox ,@(map tmtex-decode-color (cDr l)) ,(tmtex (cAr l))))
+
+;; Struck and highlighted text are drawn by ulem, whose lines break with
+;; the text, but not inside a group or the argument of a command, which
+;; ulem sets as one box. So the line goes inside: around each run of text
+;; of the argument (with its spaces, special characters, inline formulas
+;; and other commands), within its groups, font commands, colors, links and
+;; centered blocks, and through paragraphs, lists and tables. A footnote, a
+;; label, a list item, a verbatim block or a line break is left without
+;; the line (ulem does not accept them). Struck text inside highlighted
+;; text keeps its line, but not the reverse, as the inner line of ulem is
+;; drawn over the outer one. In a formula, the formula goes in
+;; \text{...$...$}, as ulem draws its lines in text mode only; a displayed
+;; formula is struck or highlighted so, piece by piece (its cells, the
+;; parts between its labels), in display style.
+(define tmtex-ulem-structure
+  '(!append !group !document !paragraph !table !row))
+
+(define tmtex-ulem-text-commands
+  '(textbf textit textsl textsc texttt textsf textrm textup textmd emph
+    tmem tmstrong tmtt tmname tmsamp tmabbr tmdfn tmkbd tmvar tmperson
+    tmcolor textcolor href foreignlanguage underline tmmarked center))
+
+(define tmtex-ulem-without
+  '(footnote label index item !nextline !newline !linefeed
+    !verb !verbatim !verbatim* !unindent
+    color fontsize selectfont fontfamily fontseries fontshape))
+
+;; special characters, which go with the text around them
+(define tmtex-ulem-characters
+  '(!nbsp !nbhyph ldots dots textbackslash textbar textasciitilde
+    textasciicircum textless textgreater textbullet textquotedbl
+    textquoteleft textquoteright textendash textemdash textdegree
+    textregistered texttrademark copyright S P dag ddag pounds euro
+    ss ae AE oe OE aa AA o O l L i j guillemotleft guillemotright
+    quotedblbase TeX LaTeX))
+
+;; the \tmtext... macros are boxes (\text): their declarations instead
+(define tmtex-ulem-declarations
+  '((tmtextrm . rmfamily) (tmtextsf . sffamily) (tmtexttt . ttfamily)
+    (tmtextmd . mdseries) (tmtextbf . bfseries) (tmtextup . upshape)
+    (tmtextsl . slshape) (tmtextit . itshape) (tmtextsc . scshape)))
+
+(define tmtex-ulem-math-environments
+  '("equation" "equation*" "align" "align*" "flalign" "flalign*"
+    "alignat" "alignat*" "gather" "gather*" "multline" "multline*"
+    "eqnarray" "eqnarray*" "leqnarray*"))
+
+(define tmtex-ulem-align-environments
+  '("align" "align*" "flalign" "flalign*" "alignat" "alignat*"))
+
+(define tmtex-ulem-math-without
+  '(label nonumber notag tag tag* !nextline !newline !linefeed))
+
+(define (tmtex-ulem-whitespace? x)
+  (and (string? x) (list-and (map char-whitespace? (string->list x)))))
+
+(define (tmtex-ulem-character? x)
+  (and (symbol? (car x)) (null? (cdr x))
+       (with s (symbol->string (car x))
+         (or (and (== (string-length s) 1)
+                  (not (char-alphabetic? (string-ref s 0))))
+             (in? (car x) tmtex-ulem-characters)))))
+
+(define (tmtex-ulem-kind x)
+  ;; how a piece is drawn: 'atom (in a run of text with the line), 'space,
+  ;; 'inside (the line goes inside) or 'without
+  (cond ((tmtex-ulem-whitespace? x) 'space)
+        ((string? x) 'atom)
+        ((npair? x) 'without)
+        ((pair? (car x)) (if (in? (caar x) '(!begin !begin*)) 'inside 'atom))
+        ((nsymbol? (car x)) 'atom)
+        ((in? (car x) '(!concat !eqn)) 'inside)
+        ((in? (car x) tmtex-ulem-structure) 'inside)
+        ((in? (car x) tmtex-ulem-without) 'without)
+        ((tmtex-ulem-character? x) 'atom)
+        ((null? (cdr x)) 'without)
+        ((and (assoc (car x) tmtex-ulem-declarations) (null? (cddr x))) 'inside)
+        ((in? (car x) tmtex-ulem-text-commands) 'inside)
+        (else 'atom)))
+
+(define (tmtex-ulem-group x)
+  ;; ulem reads its argument token by token, and stops at the & of a
+  ;; matrix or a table in a formula: a formula goes in a group, one box
+  (if (func? x '!math) `(!group ,x) x))
+
+(define (tmtex-ulem-runs cmd args l k)
+  ;; the consecutive atoms of a concatenation get one line
+  (cond ((null? l) l)
+        ((== (car k) 'atom)
+         (receive (r rest)
+             (list-break (map cons l k) (lambda (p) (!= (cdr p) 'atom)))
+           (cons (if (null? (cdr r)) `(,cmd ,@args ,(tmtex-ulem-group (caar r)))
+                     `(,cmd ,@args (!concat ,@(map tmtex-ulem-group
+                                                   (map car r)))))
+                 (tmtex-ulem-runs cmd args (map car rest) (map cdr rest)))))
+        (else (cons (tmtex-ulem-sink cmd args (car l))
+                    (tmtex-ulem-runs cmd args (cdr l) (cdr k))))))
+
+(define (tmtex-ulem-concat cmd args l)
+  ;; a space gets the line when the pieces on both sides have it
+  (if (null? l) l
+      (let* ((k (map tmtex-ulem-kind l))
+             (p (cons 'without (cDr k)))
+             (n (append (cdr k) (list 'without)))
+             (ok? (lambda (x) (in? x '(atom inside))))
+             (k* (map (lambda (k p n)
+                        (if (and (== k 'space) (ok? p) (ok? n)) 'atom k))
+                      k p n)))
+        (tmtex-ulem-runs cmd args l k*))))
+
+(define (tmtex-ulem-math-run cmd args pre l)
+  (if (list-and (map tmtex-ulem-whitespace? l)) l
+      (with l* (list-drop-right-while
+                (list-drop-while l tmtex-ulem-whitespace?)
+                tmtex-ulem-whitespace?)
+        (list `(text (,cmd ,@args
+                           (!group
+                            (!math (!concat (displaystyle) " " ,@pre ,@l*)))))))))
+
+(define (tmtex-ulem-math-concat cmd args pre l)
+  (receive (r rest)
+      (list-break l (lambda (y) (and (pair? y)
+                                     (in? (car y) tmtex-ulem-math-without))))
+    (append (tmtex-ulem-math-run cmd args pre r)
+            (if (null? rest) rest
+                (cons (car rest)
+                      (tmtex-ulem-math-concat cmd args '() (cdr rest)))))))
+
+(define (tmtex-ulem-math cmd args env x)
+  ;; a displayed formula, in the environment env
+  (cond ((tmtex-ulem-whitespace? x) x)
+        ((and (pair? x) (in? (car x) tmtex-ulem-math-without)) x)
+        ((or (func? x '!document) (func? x '!table))
+         (cons (car x) (map (cut tmtex-ulem-math cmd args env <>) (cdr x))))
+        ((func? x '!row)
+         ;; the right-hand cells of align start with a relation: {}
+         (cons '!row
+               (map (lambda (c i)
+                      (with pre (if (and (odd? i)
+                                         (in? env tmtex-ulem-align-environments))
+                                    '((!group "")) '())
+                        (cons '!concat
+                              (tmtex-ulem-math-concat cmd args pre
+                                                      (if (func? c '!concat)
+                                                          (cdr c) (list c))))))
+                    (cdr x) (iota (length (cdr x))))))
+        ((func? x '!concat)
+         (cons '!concat (tmtex-ulem-math-concat cmd args '() (cdr x))))
+        (else (cons '!concat (tmtex-ulem-math-concat cmd args '() (list x))))))
+
+(define (tmtex-ulem-sink cmd args x)
+  (with k (tmtex-ulem-kind x)
+    (cond ((== k 'atom) `(,cmd ,@args ,(tmtex-ulem-group x)))
+          ((!= k 'inside) x)
+          ((func? x '!concat)
+           (cons '!concat (tmtex-ulem-concat cmd args (cdr x))))
+          ((func? x '!eqn)
+           (list '!eqn (tmtex-ulem-math cmd args "" (cadr x))))
+          ((pair? (car x))
+           (with env (cadar x)
+             (cons (car x)
+                   (map (if (and (== (caar x) '!begin)
+                                 (in? env tmtex-ulem-math-environments))
+                            (cut tmtex-ulem-math cmd args env <>)
+                            (cut tmtex-ulem-sink cmd args <>))
+                        (cdr x)))))
+          ((in? (car x) tmtex-ulem-structure)
+           (cons (car x) (map (cut tmtex-ulem-sink cmd args <>) (cdr x))))
+          ((assoc (car x) tmtex-ulem-declarations)
+           `(!group (!append (,(cdr (assoc (car x) tmtex-ulem-declarations)))
+                             " " ,(tmtex-ulem-sink cmd args (cadr x)))))
+          (else `(,@(cDr x) ,(tmtex-ulem-sink cmd args (cAr x)))))))
+
+(define (tmtex-text-mode cmd . args)
+  (with x (cAr args)
+    (if (tmtex-math-mode?)
+        `(text (,cmd ,@(cDr args) (!group (!math ,x))))
+        (tmtex-ulem-sink cmd (cDr args) x))))
+
+(define (tmtex-strike-through s l)
+  (tmtex-text-mode 'sout (tmtex (car l))))
+
+(define (tmtex-marked s l)
+  (let* ((c (or (tmtex-env-get "marked-color") "yellow"))
+         (col (tmtex-decode-color (force-string c))))
+    (tmtex-text-mode 'tmmarked col (tmtex (car l)))))
 
 (define (tmtex-rotate s l)
   (let* ((body (tmtex (cadr l)))
@@ -2520,6 +3070,25 @@
     (tmtex-env-reset "mode")
     r))
 
+(define (tmtex-aligned-columns? ha)
+  (or (null? ha)
+      (and (== (car ha) "r") (nnull? (cdr ha)) (== (cadr ha) "l")
+           (tmtex-aligned-columns? (cddr ha)))))
+
+(define (tmtex-equations-base s l)
+  ;; The Html export expands the arrays (aligned, align*, eqnarray*...)
+  ;; into equations-base, which reaches here inside MathJax formulas (#611):
+  ;; an aligned for columns aligned right and left in turn, else an array
+  (tmtex-env-set "mode" "math")
+  (let* ((p (tmtable-parser (car l)))
+         (ha (map tmtex-halign-safe (p 'cols 'halign)))
+         (env (if (tmtex-aligned-columns? ha)
+                  '(!begin "aligned")
+                  `(!begin "array" ,(apply string-append ha))))
+         (r (list env (tmtex-table-make p))))
+    (tmtex-env-reset "mode")
+    r))
+
 (define (tmtex-math s l)
   (cond ((tm-in? (car l) '(equation equation* eqnarray eqnarray*))
          (tmtex (car l)))
@@ -2604,10 +3173,22 @@
                      (s2 (tmtex-bib-max (cdr l))))
                 (if (< (string-length s1) (string-length s2)) s2 s1)))))
 
+;; the names of the styles and of the BibTeX files, in \bibliographystyle{...}
+;; and \bibliography{...}: a character which ends the argument or is read as
+;; LaTeX becomes an underscore
+(tm-define (tmtex-safe-file-names s)
+  (list->string
+   (map (lambda (c) (if (or (in? c '(#\\ #\{ #\} #\% #\# #\^ #\~ #\"))
+                            (< (char->integer c) 32) (== (char->integer c) 127))
+                        #\_ c))
+        (string->list s))))
+
 (tm-define (tmtex-biblio s l titled?)
   (if tmtex-indirect-bib?
-      (tex-concat (list (list 'bibliographystyle (force-string (cadr l)))
-                        (list 'bibliography (force-string (caddr l)))))
+      (tex-concat (list (list 'bibliographystyle
+                              (tmtex-safe-file-names (force-string (cadr l))))
+                        (list 'bibliography
+                              (tmtex-safe-file-names (force-string (caddr l))))))
       (let* ((doc (tmtex-bib-sub (cadddr l)))
              (max (tmtex-textual (tmtex-bib-max doc)))
              (tls tmtex-languages)
@@ -2626,9 +3207,9 @@
 
 (define (tmtex-bibitem*-std s l)
   (cond ((= (length l) 1)
-         `(bibitem ,(car l)))
+         `(bibitem ,(tmtex-ref-key (car l))))
         ((= (length l) 2)
-         `(bibitem (!option ,(tmtex (car l))) ,(cadr l)))
+         `(bibitem (!option ,(tmtex (car l))) ,(tmtex-ref-key (cadr l))))
         (else
           (begin
             (display* "TeXmacs] non converted bibitem content: "
@@ -2782,9 +3363,32 @@
       (set! lst `(!indent (!paragraph ,@(cdr lst)))))
     `(!document (,tag ,arg ,lan ,lst))))
 
+;; The address of \href: # and % are written \# and \%, as hyperref wants;
+;; a backslash, a brace and ^ would be read as LaTeX, and end the argument
+;; or start a command, so they become the percent codes of a URL (\%5C...),
+;; which is what they are in an address.
+(define (tmtex-url-code c)
+  (string-append "%" (tmtex-ref-key-hex2 (char->integer c))))
+
+(define (tmtex-url-encode s)
+  ;; \ { } ^ and the characters which are not printable, in percent codes
+  (apply string-append
+         (map (lambda (c)
+                (if (or (in? c '(#\\ #\{ #\} #\^))
+                        (< (char->integer c) 32) (== (char->integer c) 127))
+                    (tmtex-url-code c)
+                    (string c)))
+              (string->list s))))
+
+(define (tmtex-url-escape s)
+  ;; for \url, which keeps the underscore as it is
+  (with r (string-replace (tmtex-url-encode s) "%" "\\%")
+    (string-replace r "#" "\\#")))
+
 (define (escape-hyperref-url l)
   (cond ((string? l)
-         (let* ((r1 (string-replace l "\\" "\\\\"))
+         (let* ((r0 (tmtex-url-encode l))
+                (r1 (string-replace r0 "%" "\\%"))
                 (r2 (string-replace r1 "#" "\\#"))
                 (r3 (string-replace r2 "_" "\\_")))
            r3))
@@ -2792,17 +3396,18 @@
         (else (map escape-hyperref-url l))))
 
 (define (tmtex-hyperref u)
-  (tmtex-tt (escape-hyperref-url u)))
+  (tmtex-tt-start (escape-hyperref-url u)))
 
 (define (tmtex-hlink s l)
   (let* ((h (cadr l))
          (d (tmtex (car l))))
     (if (and (string? h) (string-starts? h "#"))
-        (list 'hyperref `(!option ,(string-drop h 1)) d)
+        (list 'hyperref `(!option ,(tmtex-ref-key (string-drop h 1))) d)
         (list 'href (tmtex-hyperref h) d))))
 
 (define (tmtex-href s l)
-  (list 'url (tmtex-verb-string (car l))))
+  (with r (tmtex-verb-string (car l))
+    (list 'url (if (string? r) (tmtex-url-escape r) r))))
 
 (define (tmtex-action s l)
   (list 'tmaction (tmtex (car l)) (tmtex (cadr l))))
@@ -2845,8 +3450,9 @@
         ((nstring? (car l))
          (display* "TeXmacs] non converted citation: " (car l) "\n")
          (tmtex-cite-list (cdr l)))
-        ((null? (cdr l)) (car l))
-        (else (string-append (car l) "," (tmtex-cite-list (cdr l))))))
+        ((null? (cdr l)) (tmtex-ref-key (car l)))
+        (else (string-append (tmtex-ref-key (car l)) ","
+                             (tmtex-cite-list (cdr l))))))
 
 (tm-define (tmtex-cite s l)
   (tex-apply 'cite (tmtex-cite-list l)))
@@ -2883,32 +3489,212 @@
 (define (tmtex-cite-raw* s l)
   (tex-apply 'citealp* (tmtex-cite-list l)))
 
-(define (tmtex-cite-textual s l)
+(tm-define (tmtex-cite-textual s l)
   (tex-apply 'citet (tmtex-cite-list l)))
 
-(define (tmtex-cite-textual* s l)
+(tm-define (tmtex-cite-textual* s l)
   (tex-apply 'citet* (tmtex-cite-list l)))
 
-(define (tmtex-cite-parenthesized s l)
+(tm-define (tmtex-cite-parenthesized s l)
   (tex-apply 'citep (tmtex-cite-list l)))
 
-(define (tmtex-cite-parenthesized* s l)
+(tm-define (tmtex-cite-parenthesized* s l)
   (tex-apply 'citep* (tmtex-cite-list l)))
 
 (define (tmtex-render-cite s l)
   (tex-apply 'citetext (tmtex (car l))))
 
-(define (tmtex-cite-author s l)
-  (tex-apply 'citeauthor (tmtex (car l))))
+(tm-define (tmtex-cite-author s l)
+  (tex-apply 'citeauthor (tmtex-ref-key (car l))))
 
-(define (tmtex-cite-author* s l)
-  (tex-apply 'citeauthor* (tmtex (car l))))
+(tm-define (tmtex-cite-author* s l)
+  (tex-apply 'citeauthor* (tmtex-ref-key (car l))))
 
-(define (tmtex-cite-year s l)
-  (tex-apply 'citeyear (tmtex (car l))))
+(tm-define (tmtex-cite-year s l)
+  (tex-apply 'citeyear (tmtex-ref-key (car l))))
 
 (define (tmtex-natbib-triple s l)
   `(protect (citeauthoryear ,@(map tmtex l))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Citations in a CSL style
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A document whose bibliography has a style csl-NAME is exported for the
+;; package citation-style-language (citeproc-lua, run by LuaLaTeX): the
+;; citations stay commands, \printbibliography replaces the rendered
+;; bibliography, and next to the .tex file go the cited entries as BibTeX
+;; (BASE-refs.bib) and the style NAME.csl, so that LaTeX formats them as
+;; TeXmacs does.
+
+(define tmtex-csl-cite-tags
+  '(cite nocite cite-textual cite-textual* cite-parenthesized
+    cite-parenthesized* cite-author cite-author* cite-year))
+
+(define (tmtex-csl-keys t)
+  ;; the keys of the entries of @t: the labels bib-KEY of a rendered
+  ;; bibliography, and the keys of the citations
+  (cond ((npair? t) '())
+        ((and (func? t 'label 1) (string? (cadr t))
+              (string-starts? (cadr t) "bib-"))
+         (list (string-drop (cadr t) 4)))
+        ((in? (car t) tmtex-csl-cite-tags) (list-filter (cdr t) string?))
+        ((and (func? t 'cite-detail 2) (string? (cadr t))) (list (cadr t)))
+        (else (append-map tmtex-csl-keys (cdr t)))))
+
+(define (tmtex-csl-bibliography t)
+  ;; the first bibliography of @t in a CSL style
+  (cond ((npair? t) #f)
+        ((and (func? t 'bibliography 4) (string? (caddr t))
+              (string-starts? (caddr t) "csl-")
+              (> (string-length (caddr t)) 4))
+         t)
+        (else (let loop ((l (cdr t)))
+                (and (pair? l)
+                     (or (tmtex-csl-bibliography (car l)) (loop (cdr l))))))))
+
+(define (tmtex-find-csl body)
+  (and-with b (tmtex-csl-bibliography body)
+    (list (string-drop (caddr b) 4)
+          (if (string? (cadddr b)) (cadddr b) "")
+          (list-remove-duplicates (tmtex-csl-keys body)))))
+
+(define (tmtex-csl-default-resource file)
+  ;; without a .tex file, the .bib file of the bibliography
+  (cond ((== file "") "references.bib")
+        ((string-ends? file ".bib") file)
+        (else (string-append file ".bib"))))
+
+(define (tmtex-csl-style-source name)
+  ;; as csl-bib-process finds it: next to the document first
+  (let* ((dir (and (url-rooted? (current-buffer)) (url-head (current-buffer))))
+         (u (and dir (url-append dir (string-append name ".csl")))))
+    (if (and u (url-exists? u)) u (csl-style-file name))))
+
+(define (tmtex-csl-write-files)
+  ;; next to the .tex file: the cited entries, and the style unless a file
+  ;; of its name is there already
+  (when tmtex-image-dir?
+    (let* ((name (car tmtex-csl))
+           (bib (url-glue tmtex-image-root-url "-refs.bib"))
+           (csl (url-append (url-head tmtex-image-root-url)
+                            (string-append name ".csl")))
+           (src (tmtex-csl-style-source name)))
+      (string-save (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl)) bib)
+      (set! tmtex-csl-resource (url->string (url-tail bib)))
+      (when (and src (not (url-exists? csl)))
+        (string-save (string-load src) csl)))))
+
+(tm-define (tmtex-biblio s l titled?)
+  (:mode csl-package?)
+  (tmtex-csl-write-files)
+  (list 'printbibliography))
+
+(tm-define (latex-extra-preamble)
+  (:mode csl-package?)
+  (let* ((lan (if (pair? tmtex-languages) (car tmtex-languages) "english"))
+         (loc (if (== lan "english") ""
+                  (string-append ", locale = " (csl-language->locale lan)))))
+    (string-append
+     (former)
+     "% the citations and the bibliography are made by the package\n"
+     "% citation-style-language: compile with LuaLaTeX\n"
+     "\\cslsetup{style = " (car tmtex-csl) loc "}\n"
+     ;; TeXmacs does not abbreviate the names of the journals
+     "\\addbibresource[journal-abbreviation=false]{" tmtex-csl-resource "}\n")))
+
+(tm-define (tmtex-cite s l)
+  (:mode csl-package?)
+  (tex-apply 'cite (tmtex-cite-list l)))
+
+(define (tmtex-csl-option key val)
+  ;; key={val}, in one piece (the serializer puts spaces between pieces)
+  (if (string? val) (string-append key "={" (string-trim-both val) "}")
+      `(!concat ,(string-append key "={") ,val "}")))
+
+(tm-define (tmtex-cite-detail s l)
+  (:mode csl-package?)
+  ;; a locator when the details read as one ("pp. 12-14"), else a suffix
+  (let* ((c (tmtex-cite-list (list (car l))))
+         (d (cadr l))
+         (p (and (string? d) (csl-cite-details d)))
+         (opt (cond ((null? p) #f)
+                    ((and p (assoc-ref p 'locator))
+                     (tmtex-csl-option (assoc-ref p 'label)
+                                       (tmtex (assoc-ref p 'locator))))
+                    ((and p (string? (assoc-ref p 'suffix)))
+                     (tmtex-csl-option "suffix" (tmtex (assoc-ref p 'suffix))))
+                    (else (tmtex-csl-option "suffix"
+                                            `(!concat ", " ,(tmtex d)))))))
+    (if opt (tex-apply 'cite `(!option ,opt) c) (tex-apply 'cite c))))
+
+(define (tmtex-csl-names)
+  ;; for a style whose citations show no names ([1], [Knu84]), ((KEY .
+  ;; NAMES) ...) with the names of the entries as TeXmacs shows them in a
+  ;; textual citation:
+  ;; \textcite and \citeauthor of citation-style-language only know the
+  ;; styles whose citations show the names
+  (when (== tmtex-csl-names* 'unknown)
+    (set! tmtex-csl-names*
+          (csl-textual-authors
+           (string-append "csl-" (car tmtex-csl))
+           (bib-entries-as-bibtex (caddr tmtex-csl) (cadr tmtex-csl))
+           (caddr tmtex-csl))))
+  tmtex-csl-names*)
+
+(define (tmtex-csl-numeric-textual names keys)
+  ;; Knuth [1, 2], Lamport [3]: the consecutive works of the same names
+  ;; share their citation
+  (let loop ((l keys) (groups '()))
+    (cond ((pair? l)
+           (with n (or (assoc-ref names (car l)) (car l))
+             (if (and (pair? groups) (== (caar groups) n))
+                 (loop (cdr l) (cons (append (car groups) (list (car l)))
+                                     (cdr groups)))
+                 (loop (cdr l) (cons (list n (car l)) groups)))))
+          (else
+           (tex-concat
+            (list-intersperse
+             (map (lambda (g)
+                    `(!concat ,(tmtex (car g)) " "
+                              ,(tex-apply 'cite (tmtex-cite-list (cdr g)))))
+                  (reverse groups))
+             ", "))))))
+
+(tm-define (tmtex-cite-textual s l)
+  (:mode csl-package?)
+  (with names (tmtex-csl-names)
+    (if names (tmtex-csl-numeric-textual names (list-filter l string?))
+        (tex-apply 'textcite (tmtex-cite-list l)))))
+
+(tm-define (tmtex-cite-textual* s l)
+  (:mode csl-package?)
+  (tmtex-cite-textual s l))
+
+(tm-define (tmtex-cite-author s l)
+  (:mode csl-package?)
+  (with names (and (string? (car l)) (tmtex-csl-names))
+    (if names (tmtex (or (assoc-ref names (car l)) (car l)))
+        (tex-apply 'citeauthor (tmtex (car l))))))
+
+(tm-define (tmtex-cite-year s l)
+  (:mode csl-package?)
+  ;; when the citations show no names, the citation itself, [2], as TeXmacs
+  (if (tmtex-csl-names)
+      (tex-apply 'citeyearpar (tmtex (car l)))
+      (tex-apply 'citeyear (tmtex (car l)))))
+
+(tm-define (tmtex-cite-parenthesized s l)
+  (:mode csl-package?)
+  (tex-apply 'parencite (tmtex-cite-list l)))
+
+(tm-define (tmtex-cite-parenthesized* s l)
+  (:mode csl-package?)
+  (tex-apply 'parencite (tmtex-cite-list l)))
+
+(tm-define (tmtex-cite-author* s l)
+  (:mode csl-package?)
+  (tmtex-cite-author s l))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Glossaries
@@ -3164,6 +3950,7 @@
   (show-part (,tmtex-show-part -1))
   ((:or doc-title-options author-data) (,tmtex-default -1))
   (appendix (,tmtex-appendix 1))
+  (emoji (,tmtex-emoji-tag 1))
   (appendix* (,tmtex-appendix* 1))
   ((:or theorem proposition lemma corollary proof axiom definition
         notation conjecture remark note example convention warning
@@ -3196,6 +3983,16 @@
   (md-footnote-text (,tmtex-md-nothing -1))
   (md-meta (,tmtex-md-meta -1))
   (md-h6 (,tmtex-md-h6 -1))
+  ((:or office-par office-span office-plain office-letters office-capitalize
+        office-float office-box office-shape office-field)
+   (,tmtex-office-last -1))
+  (office-font (,tmtex-office-font -1))
+  (office-underline (,tmtex-office-underline -1))
+  (office-strike (,tmtex-office-strike -1))
+  ((:or office-columns office-columns*) (,tmtex-office-columns -1))
+  (office-comment (,tmtex-office-comment -1))
+  (office-commented (,tmtex-office-commented -1))
+  ((:or office-ins office-del) (,tmtex-office-change -1))
   (footnotemark (,tmtex-default 0))
   (footnotemark* (,tmtex-footnotemark 1))
   ((:or description description-compact description-aligned
@@ -3278,6 +4075,7 @@
   ((:or eqnarray eqnarray* leqnarray*
         gather multline gather* multline* align
         flalign alignat align* flalign* alignat*) (,tmtex-eqnarray 1))
+  (equations-base (,tmtex-equations-base 1))
 
   (eq-number (,tmtex-default -1))
   (separating-space (,tmtex-hspace* 1))
@@ -3291,6 +4089,8 @@
   (boxed (,tmtex-boxed 1))
   (colored-frame (,tmtex-colored-frame 2))
   (fcolorbox (,tmtex-fcolorbox 3))
+  (strike-through (,tmtex-strike-through 1))
+  (marked (,tmtex-marked 1))
   (rotate (,tmtex-rotate 2))
   (condensed (,tmtex-style-first 1))
   (translate (,tmtex-translate 3))
@@ -3604,17 +4404,25 @@
         (set! tmtex-style (car style))
         (set! tmtex-packages (cdr style))
         (set! tmtex-languages (list lan))
+        (set! tmtex-csl (tmtex-find-csl body))
+        (set! tmtex-csl-names* 'unknown)
+        (set! tmtex-csl-resource
+              (if tmtex-csl (tmtex-csl-default-resource (cadr tmtex-csl)) ""))
         (set! tmtex-colors '())
         (set! tmtex-colormaps '())
         (import-tmtex-styles)
         (tmtex-style-init body)
         (set! doc (tmtex-style-preprocess doc))
-        (with result (tmtex-postprocess (texmacs->latex doc opts))
+        (with result (with-global tmtex-csl-file? #t
+                       (tmtex-postprocess (texmacs->latex doc opts)))
+          ;; tmtex-csl stays for the preamble, made after the conversion
           (set! tmtex-style "generic")
           (set! tmtex-packages '())
           result))
       (let* ((x2 (tree->stree (tmtm-eqnumber->nonumber (stree->tree x))))
              (x3 (tmtm-match-brackets x2)))
+        ;; a snippet has no bibliography of its own
+        (when (not tmtex-csl-file?) (set! tmtex-csl #f))
         (tmtex-initialize opts)
         (with r (tmtex (tmpre-produce x3))
           (if tmtex-mathjax?

@@ -81,7 +81,8 @@ load_user_preferences () {
     p= block_to_scheme_tree (s);
   // a list of the pairs in a list of its own (an older format); a file with
   // a single preference is a list of that pair, which is not unwrapped
-  while (is_func (p, TUPLE, 1) && !is_preference_pair (p[0])) p= p[0];
+  while (is_func (p, TUPLE, 1) && is_compound (p[0]) &&
+         !is_preference_pair (p[0])) p= p[0];
   if (is_preference_pair (p)) p= tree (TUPLE, p);
   for (int i=0; i<N(p); i++)
     if (is_preference_pair (p[i])) {

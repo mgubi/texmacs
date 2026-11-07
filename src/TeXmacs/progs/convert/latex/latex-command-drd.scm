@@ -64,7 +64,7 @@
 (logic-group latex-command-1%
   part* chapter* section* subsection* subsubsection* paragraph* subparagraph*
   nextbib geometry
-  footnote overline underline <sub> <sup> not left middle right
+  footnote overline underline sout <sub> <sup> not left middle right
   big Big bigg Bigg bigl Bigl biggl Biggl
   bigm Bigm biggm Biggm bigr Bigr biggr Biggr
   bar Bar hat Hat tilde Tilde widehat widetilde vec Vec bm ring

@@ -317,7 +317,7 @@ edit_env_rep::get_page_width (bool deco) {
   SI w= page_user_width + page_odd_margin + page_right_margin;
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) != "none" &&
-      deco) w += 20 * pixel;
+      deco) w += 20 * get_pixel ();
   return w;
 }
 
@@ -327,11 +327,11 @@ edit_env_rep::get_pages_width (bool deco) {
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) != "attached" &&
       get_string (PAGE_BORDER) != "none" &&
-      deco) w += 20 * pixel;
+      deco) w += 20 * get_pixel ();
   w= w * page_packet;
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) == "attached" &&
-      deco) w += 20 * pixel;
+      deco) w += 20 * get_pixel ();
   return w;
 }
 
@@ -340,7 +340,7 @@ edit_env_rep::get_page_height (bool deco) {
   SI h= page_user_height + page_top_margin + page_bottom_margin;
   if (get_string (PAGE_MEDIUM) == "paper" &&
       get_string (PAGE_BORDER) != "none" &&
-      deco) h += 20 * pixel;
+      deco) h += 20 * get_pixel ();
   return h;
 }
 
@@ -548,6 +548,20 @@ edit_env_rep::get_script_size (int sz, int level) {
 * Updating the environment from the variables
 ******************************************************************************/
 
+static string
+text_font_for_language (string fam, string lan) {
+  // The CJK characters which the text font lacks come from the font of the
+  // language of the text, so that the Han characters of a Japanese text
+  // (kanji) or of a Korean text (hanja) are not taken from the Chinese
+  // font of the fallback, next to kana or Hangul from another font
+  if (lan != "japanese" && lan != "korean") return fam;
+  if (starts (fam, "sys-") || occurs ("cjk=", fam)) return fam;
+  string lfam= (lan == "japanese"? default_japanese_font_name ():
+                                   default_korean_font_name ());
+  if (lfam == "" || lfam == "roman" || lfam == fam) return fam;
+  return fam * ",cjk=" * lfam;
+}
+
 font
 edit_env_rep::make_current_font (int sz) {
   switch (mode) {
@@ -566,7 +580,9 @@ edit_env_rep::make_current_font (int sz) {
                        get_string (FONT_SERIES), get_string (FONT_SHAPE),
                        sz, (int) (magn*dpi));
   default:
-    return smart_font (get_string (FONT), get_string (FONT_FAMILY),
+    return smart_font (text_font_for_language (get_string (FONT),
+                                               get_string (LANGUAGE)),
+                       get_string (FONT_FAMILY),
                        get_string (FONT_SERIES), get_string (FONT_SHAPE),
                        sz, (int) (magn*dpi));
   }
@@ -637,15 +653,15 @@ edit_env_rep::update_pattern_mode () {
   no_patterns= (get_string (NO_PATTERNS) == "true");
   if (no_patterns) {
     tree c= env[COLOR];
-    if (is_func (c, _PATTERN, 4)) env (COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (COLOR)= exec (c);
     c= env[BG_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (BG_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (BG_COLOR)= exec (c);
     c= env[FILL_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (FILL_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (FILL_COLOR)= exec (c);
     c= env[ORNAMENT_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (ORNAMENT_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (ORNAMENT_COLOR)= exec (c);
     c= env[ORNAMENT_EXTRA_COLOR];
-    if (is_func (c, _PATTERN, 4)) env (ORNAMENT_EXTRA_COLOR)= exec (c);
+    if ((is_func (c, _PATTERN, 4) || is_func (c, _PATTERN, 5))) env (ORNAMENT_EXTRA_COLOR)= exec (c);
     update_color ();
   }
 }
@@ -948,10 +964,18 @@ edit_env_rep::update_line_arrows () {
 }
 
 void
+edit_env_rep::update_zoom () {
+  // (not a read of the zoom factor: what depends on it reads it with
+  // get_pixel, and the zoom factor is not part of the derived state)
+  tree z= env.value (ZOOM_FACTOR);
+  zoomf= normal_zoom (is_atomic (z)? as_double (z->label): 1.0);
+  zoom_pixel= (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
+}
+
+void
 edit_env_rep::update () {
   struct deriving { deriving () { env_deriving++; } ~deriving () { env_deriving--; } } d;
-  zoomf          = normal_zoom (get_double (ZOOM_FACTOR));
-  pixel          = (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
+  update_zoom ();
   magn           = get_double (MAGNIFICATION);
   magn_len       = (get_string (LENGTH_MODE) == "fixed"? 1.0: magn);
   index_level    = get_int (MATH_LEVEL);
@@ -1011,8 +1035,7 @@ edit_env_rep::update (string s) {
   case Env_Fixed:
     break;
   case Env_Zoom:
-    zoomf= normal_zoom (get_double (ZOOM_FACTOR));
-    pixel= (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
+    update_zoom ();
     break;
   case Env_Magnification:
     magn= get_double (MAGNIFICATION);
@@ -1029,6 +1052,7 @@ edit_env_rep::update (string s) {
     break;
   case Env_Language:
     update_language ();
+    if (s == LANGUAGE) update_font ();
     break;
   case Env_Mode:
     update_mode ();

@@ -272,15 +272,13 @@ tm_reader::read (bool skip_flag) {
       }
       else if (last[N(last)-1] == '#') {
         string r;
-        while ((buf[pos] != '>') && (pos+2<N(buf))) {
+        while ((pos+2<N(buf)) && (buf[pos] != '>')) {
           r << ((char) from_hexadecimal (buf (pos, pos+2)));
           pos += 2;
         }
-        if (buf[pos] == '>') pos++;
+        if ((pos<N(buf)) && (buf[pos] == '>')) pos++;
         flush (D, C, S, spc_flag, ret_flag);
         C << tree (RAW_DATA, r);
-        last= read_next ();
-        break;
       }
       else {
         flush (D, C, S, spc_flag, ret_flag);

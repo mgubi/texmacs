@@ -24,10 +24,10 @@ char*  alloc_mem_bottom=(char*)((unsigned long long)-1);
 #endif
 size_t alloc_remains=0;
 int    allocated=0;
-int    fast_chunks=0;
-int    large_uses=0;
+long long fast_chunks=0;
+long long large_uses=0;
 int    MEM_DEBUG=0;
-int    mem_used ();
+long long mem_used ();
 
 /*****************************************************************************/
 // General purpose fast allocation routines
@@ -226,27 +226,27 @@ compute_free (void* ptr) {
   return i;
 }
 
-int
+long long
 mem_used () {
-  int free_bytes= alloc_remains;
-  int chunks_use= BLOCK_SIZE*fast_chunks;
+  long long free_bytes= alloc_remains;
+  long long chunks_use= ((long long) BLOCK_SIZE)*fast_chunks;
   int i;
   for (i=WORD_LENGTH; i<MAX_FAST; i+=WORD_LENGTH)
-    free_bytes += i*compute_free (alloc_table+i);
-  int small_uses= chunks_use- free_bytes;
+    free_bytes += ((long long) i)*compute_free (alloc_table+i);
+  long long small_uses= chunks_use- free_bytes;
   return small_uses+ large_uses;
 }
 
 void
 mem_info () {
   cout << "\n---------------- memory statistics ----------------\n";
-  int free_bytes= alloc_remains;
-  int chunks_use= BLOCK_SIZE*fast_chunks;
+  long long free_bytes= alloc_remains;
+  long long chunks_use= ((long long) BLOCK_SIZE)*fast_chunks;
   int i;
   for (i=WORD_LENGTH; i<MAX_FAST; i+=WORD_LENGTH)
-    free_bytes += i*compute_free (alloc_table+i);
-  int small_uses= chunks_use- free_bytes;
-  int total_uses= small_uses+ large_uses;
+    free_bytes += ((long long) i)*compute_free (alloc_table+i);
+  long long small_uses= chunks_use- free_bytes;
+  long long total_uses= small_uses+ large_uses;
   // cout << "Fast chunks   : " << chunks_use << " bytes\n";
   // cout << "Free on chunks: " << alloc_remains << " bytes\n";
   cout << "User          : " << total_uses << " bytes\n";

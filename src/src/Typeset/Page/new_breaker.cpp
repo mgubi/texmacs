@@ -56,7 +56,10 @@ breaker_fast_level () {
   static int level= -1;
   if (level < 0) {
     string s= get_env ("TEXMACS_PAGE_BREAK_FAST");
-    level= (is_int (s) && as_int (s) >= 0 && as_int (s) <= 4) ? as_int (s) : 4;
+    if (s == "off") level= 0;
+    else if (is_int (s) && as_int (s) >= 0 && as_int (s) <= 4)
+      level= as_int (s);
+    else level= 4;
   }
   return level;
 }
@@ -66,7 +69,10 @@ breaker_fast_level () {
 // they are after this. new_break_pages does it before it looks for a
 // skeleton it kept, so that the pager gets the same items when the
 // search is skipped, and so that the items are compared as the search
-// sees them. Doing it again changes nothing.
+// sees them. Doing it again changes nothing. An item is copied before it
+// is changed, as the items are those of the bridges, which use them again
+// and compare them in the check mode (and the pager gets its own array:
+// typesetter_rep::typeset)
 void
 breaker_prepare_items (array<page_item>& l) {
   // HACK: migrate double column footnotes in single column text
@@ -93,7 +99,11 @@ breaker_prepare_items (array<page_item>& l) {
     }
   // END HACK
   for (int i=0; i<N(l); i++)
-    if ((i==N(l)-1) || (l[i]->nr_cols!=l[i+1]->nr_cols)) l[i]->penalty=0;
+    if ((i==N(l)-1) || (l[i]->nr_cols!=l[i+1]->nr_cols))
+      if (l[i]->penalty != 0) {
+        l[i]= copy (l[i]);
+        l[i]->penalty= 0;
+      }
 }
 
 new_breaker_rep::new_breaker_rep (
@@ -548,10 +558,6 @@ new_breaker_rep::find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen) {
     if (c.flags & 4) { k++; break; }
   }
   if (keep) cand_cnt[s]= k;
-  else if (fast_level >= 4) {
-    cands.resize (first);
-    cand_cnt[s]= 0;
-  }
 }
 
 void

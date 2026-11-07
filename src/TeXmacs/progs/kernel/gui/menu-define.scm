@@ -213,6 +213,10 @@
   (require-format x '(division :%1 :*))
   `($division ,(cadr x) ,@(map gui-make (cddr x))))
 
+(define (gui-make-named x)
+  (require-format x '(named :%1 :*))
+  `($named ,(cadr x) ,@(map gui-make (cddr x))))
+
 (define (gui-make-class x)
   (require-format x '(class :%1 :*))
   `($class ,(cadr x) ,@(map gui-make (cddr x))))
@@ -386,8 +390,10 @@
   `($ink ,(cadr x)))
 
 (define (gui-make-form x)
+  ;; the name of the form is an expression, as the kind of a refreshable:
+  ;; one form per dialog (a file chooser, utils/misc/file-chooser.scm)
   (require-format x '(form :%1 :*))
-  `($form ,@(map gui-make (cdr x))))
+  `($form ,(cadr x) ,@(map gui-make (cddr x))))
 
 (define (gui-make-form-input x)
   (require-format x '(form-input :%4))
@@ -461,6 +467,7 @@
   (vlist ,gui-make-vlist)
   (division ,gui-make-division)
   (class ,gui-make-class)
+  (named ,gui-make-named)
   (aligned ,gui-make-aligned)
   (item ,gui-make-item)
   (meti ,gui-make-meti)
@@ -634,7 +641,7 @@
 ;;
 ;; The sets are defined with define-typographic-palette, or computed from a
 ;; colour per column with define-typographic-palette-from-colors; a user
-;; adds or replaces sets in the same way, from ~/.TeXmacs/progs/
+;; adds or replaces sets in the same way, from ~/.TeXmacs_Upsilon/progs/
 ;; my-init-texmacs.scm (see src/docs/typographic-palettes.md).
 
 (define typographic-palettes (list)) ; (name ink deep medium soft tint)

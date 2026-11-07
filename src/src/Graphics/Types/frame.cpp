@@ -207,7 +207,9 @@ linear_bound_2D (matrix<double> m, double eps) {
 
 struct linear_2D_rep: public frame_rep {
   matrix<double> m, u;
-  linear_2D_rep (matrix<double> m2): m (m2), u (invert (m)) {
+  linear_2D_rep (matrix<double> m2): m (m2), u (0.0, 2, 2) {
+    // a matrix without an inverse sends every point back to the origin
+    if (m (0, 0) * m (1, 1) - m (0, 1) * m (1, 0) != 0.0) u= invert (m);
     linear= true; }
   operator tree () {
     return tuple ("linear_2D", as_tree (m)); }
@@ -253,14 +255,13 @@ struct affine_2D_rep: public frame_rep {
     q= m * q;
     return point (q[0], q[1]); }
   point inverse_transform (point p) {
-    FAILED ("not yet implemented");
-    return p; }
+    if (!invertible) return p;
+    return u * point (p[0] - m (0, 2), p[1] - m (1, 2)); }
   point jacobian (point p, point v, bool &error) {
     (void) p; error= false; return j * v; }
   point jacobian_of_inverse (point p, point v, bool &error) {
-    (void) p; (void) v; (void) error;
-    FAILED ("not yet implemented");
-    return p;}
+    (void) p; error= !invertible;
+    return invertible? u * v: v; }
   double direct_bound (point p, double eps) {
     (void) p; return linear_bound_2D (j, eps); }
   double inverse_bound (point p, double eps) {
@@ -285,14 +286,14 @@ struct bend_frame_rep: public frame_rep {
     return point (p[0], p[1] + fun (p[0])); }
   point inverse_transform (point p) {
     return point (p[0], p[1] - fun (p[0])); }
+  double slope (double x) {
+    // the derivative of fun, by a central difference
+    double h= 1.0e-6 * max (1.0, fabs (x));
+    return (fun (x + h) - fun (x - h)) / (2.0 * h); }
   point jacobian (point p, point v, bool &error) {
-    (void) p; (void) v; (void) error;
-    FAILED ("not yet implemented");
-    return p; }
+    error= false; return point (v[0], v[1] + slope (p[0]) * v[0]); }
   point jacobian_of_inverse (point p, point v, bool &error) {
-    (void) p; (void) v; (void) error;
-    FAILED ("not yet implemented");
-    return p; }
+    error= false; return point (v[0], v[1] - slope (p[0]) * v[0]); }
   double direct_bound (point p, double eps) { (void) p; return eps; }
   double inverse_bound (point p, double eps) { (void) p; return eps; }
 };
@@ -329,9 +330,11 @@ struct compound_frame_rep: public frame_rep {
     return w1;
   }
   point jacobian_of_inverse (point p, point v, bool &error) {
-    (void) p; (void) v; (void) error;
-    FAILED ("not yet implemented");
-    return p;
+    bool error1;
+    point w1= f1->jacobian_of_inverse (p, v, error1);
+    point w2= f2->jacobian_of_inverse (f1 [p], w1, error);
+    error |= error1;
+    return w2;
   }
   double direct_bound (point p, double eps) {
     return f1->direct_bound (f2(p), f2->direct_bound (p, eps)); }

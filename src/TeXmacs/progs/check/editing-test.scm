@@ -169,6 +169,232 @@
     (when (buffer-exists? old) (switch-to-buffer old))
     (check= (current-buffer) old)))
 
+;; A buffer which has a view can be renamed to a relative name, and to a
+;; name such as "/dir/doc.tm" (relative on Windows): its views still belong
+;; to it and edit it. On Windows, the name in the url of a view decoded a
+;; relative name as an absolute one, so that the views of the renamed
+;; buffer were lost and the rename overflowed the stack (#432: decode_url
+;; of new_view.cpp).
+(define (test-rename-relative)
+  (check-group "renaming to a relative name")
+  (for (name (list (url-append "tm-editing-test-relative" "doc.tm")
+                   (system->url "/tm-editing-test-relative/doc.tm")))
+    (with-buffer-body '(document "a")
+      (lambda ()
+        (let* ((u (current-buffer))
+               (n (length (buffer->views u))))
+          (check-true (> n 0))
+          (buffer-rename u name)
+          (check-true (buffer-exists? name))
+          (check= (current-buffer) name)
+          (check= (length (buffer->views name)) n)
+          (for (v (buffer->views name))
+            (check= (view->buffer v) name))
+          (edit (go-end) (insert "b"))
+          (check= (tree->stree (buffer-get-body name)) '(document "ab"))
+          (with v (view-new name)
+            (check= (view->buffer v) name)
+            (check= (length (buffer->views name)) (+ n 1))
+            (view-delete v))
+          (check= (length (buffer->views name)) n)
+          (buffer-pretend-saved name))))))
+
+;; Deleting a view of a buffer removes it from the views of the buffer and
+;; leaves the others, which still show and edit the buffer. delete_view
+;; went on reading the views after removing one, one past the end of the
+;; shortened array when the view was not the last one (#547: new_view.cpp);
+;; the read is caught only under ASan (with NO_FAST_ALLOC).
+(define (test-delete-view)
+  (check-group "deleting a view")
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (v0 (current-view-url))
+             (v1 (view-new u))
+             (v2 (view-new u)))
+        (check= (buffer->views u) (list v0 v1 v2))
+        ;; the window shows v1, so that the first view is not in a window
+        (place-set-view (current-place) v1 #t)
+        (check= (current-view-url) v1)
+        (check-true (url-none? (view->place-url v0)))
+        (view-delete v0)
+        (check= (buffer->views u) (list v1 v2))
+        (check-false (in? v0 (view-list)))
+        (check= (view->buffer v1) u)
+        (check= (view->buffer v2) u)
+        ;; both views edit the buffer
+        (edit (go-end) (insert "b"))
+        (check= (body) '(document "ab"))
+        (place-set-view (current-place) v2 #t)
+        (check= (current-view-url) v2)
+        (check= (current-buffer) u)
+        (check= (body) '(document "ab"))
+        (edit (go-end) (insert "c"))
+        (check= (tree->stree (buffer-get-body u)) '(document "abc"))
+        (check= (buffer->views u) (list v1 v2))
+        ;; deleting the current view, which the window shows: the window
+        ;; shows another view of the buffer, which becomes the current one;
+        ;; before, both kept the deleted view (#559: delete_view of new_view.cpp)
+        (with win (current-place)
+          (view-delete v2)
+          (check= (buffer->views u) (list v1))
+          (check= (current-view-url) v1)
+          (check= (place->view win) v1)
+          (check= (view->place-url v1) win)
+          (check= (current-place) win))
+        (edit (go-end) (insert "d"))
+        (check= (body) '(document "abcd"))
+        ;; also with a view which was never in a window
+        (with v3 (view-new u)
+          (view-delete v1)
+          (check= (buffer->views u) (list v3))
+          (check= (current-view-url) v3)
+          (check= (place->view (current-place)) v3))
+        (edit (go-end) (insert "e"))
+        (check= (body) '(document "abcde")))))
+  ;; the views of a renamed buffer keep their numbers, and a new view does
+  ;; not take one of them, nor the number of a view deleted after the
+  ;; rename (#560: two views had the same url, and Clone window after Save
+  ;; as aborted)
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((u (current-buffer))
+             (new-name (tmp-file "renamed-views.tm")))
+        (view-new u)
+        (buffer-rename u new-name)
+        (let ((gone (car (list-filter (buffer->views new-name)
+                                      (lambda (v)
+                                        (url-none? (view->place-url v)))))))
+          (view-delete gone)
+          (let* ((vs (buffer->views new-name))
+                 (v2 (view-new new-name))
+                 (vs* (buffer->views new-name)))
+            (check= (length vs*) (+ (length vs) 1))
+            (check-false (in? v2 vs))
+            (check-false (== v2 gone))
+            (check= (view->buffer v2) new-name)
+            (view-delete v2)
+            (check= (buffer->views new-name) vs)))))))
+
+;; A tree pointer or a position which is collected while it is still
+;; attached to a tree (a process whose callback was never called, a
+;; position-new without position-delete after an error) is held by the
+;; list of the observers of the tree alone; when the tree is detached, by
+;; replacing the body of its buffer or closing it, the observer moves to
+;; the closest tree, and it was freed while it did so (#537: set_tree of
+;; tree_pointer.cpp and tree_addendum.cpp, set_position of
+;; tree_position.cpp). A use of freed memory does not always crash: on the
+;; Guile/Qt build of macOS these checks aborted without the fix, but they
+;; are reliable only under ASan (with NO_FAST_ALLOC).
+(define (attach-forgotten-pointer)
+  ;; (in a function of its own, so that nothing on the stack keeps it)
+  (tree->tree-pointer (tree-ref (buffer-tree) 0))
+  #t)
+
+(define (attach-forgotten-position)
+  (position-new-path (append (buffer-path) '(0 0 1)))
+  #t)
+
+(define (forgotten-observers-collected)
+  (do ((i 0 (+ i 1))) ((= i 20000)) (make-vector 50 i))
+  (gc)
+  #t)
+
+(define (test-tree-pointers)
+  (check-group "tree pointers")
+  ;; replacing the body
+  (with-buffer-body '(document (concat "a " (em "b")) "c")
+    (lambda ()
+      (attach-forgotten-pointer)
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "d")))
+      (check= (tree->stree (buffer-tree)) '(document "d"))))
+  ;; closing the buffer (with-buffer-body closes it)
+  (with-buffer-body '(document (concat "e " (em "f")))
+    (lambda ()
+      (attach-forgotten-pointer)
+      (forgotten-observers-collected)
+      (check= (tree->stree (buffer-tree)) '(document (concat "e " (em "f"))))))
+  (forgotten-observers-collected)
+  ;; a position, the body replaced twice, then the buffer closed
+  (with-buffer-body '(document (concat "ab " (em "b")) "c")
+    (lambda ()
+      (attach-forgotten-position)
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "d")))
+      (forgotten-observers-collected)
+      (buffer-set-body (current-buffer) (stree->tree '(document "e" "f")))
+      (check= (tree->stree (buffer-tree)) '(document "e" "f"))))
+  (forgotten-observers-collected)
+  ;; a pointer which is detached is still fine
+  (with-buffer-body '(document "g" "h")
+    (lambda ()
+      (with tp (tree->tree-pointer (tree-ref (buffer-tree) 1))
+        (check= (tree->stree (tree-pointer->tree tp)) "h")
+        (tree-pointer-detach tp)))))
+
+;; The buffer of an embedded TeXmacs widget (texmacs-input) is embedded in an
+;; alternative window when the widget is made while that window is being
+;; built, between alt-window-handle and alt-window-create, as the dialogues
+;; do: alt-window-search then finds the window to close. A widget made at
+;; another time, as those of the side tools of a main window, is in no
+;; alternative window, whatever windows are open. (The widgets are not put
+;; into the windows here: the window of an embedded widget is only freed in
+;; the event loop.)
+(define (test-embedded)
+  (check-group "embedded buffers")
+  (let* ((old (current-buffer))
+         (w1 (alt-window-handle))
+         (wid1 (make-menu-widget '(vertical (text "x")) 0))
+         (u1 (string->url "tmfs://aux/editing-test-embedded-1"))
+         (u2 (string->url "tmfs://aux/editing-test-embedded-2")))
+    (alt-window-create-plain w1 wid1 "editing-test-1")
+    (with in1 (widget-texmacs-input '(document "a") '(style "generic") u1)
+      (check-true (buffer-exists? u1))
+      (check-false (buffer-embedded? u1))
+      (check= (alt-window-search u1) '())
+      (let* ((w2 (alt-window-handle))
+             (in2 (widget-texmacs-input '(document "b") '(style "generic") u2))
+             (wid2 (make-menu-widget '(vertical (text "y")) 0)))
+        ;; (the window does not exist yet)
+        (check-false (buffer-embedded? u2))
+        (alt-window-create-plain w2 wid2 "editing-test-2")
+        (check-true (buffer-embedded? u2))
+        (check= (alt-window-search u2) (list w2))
+        (check-false (buffer-embedded? u1))
+        (alt-windows-delete (alt-window-search u2))
+        (check-false (buffer-embedded? u2))
+        (check= (alt-window-search u2) '())))
+    (alt-window-delete w1)
+    (buffer-close u1)
+    (buffer-close u2)
+    (check-false (buffer-exists? u1))
+    (check-false (buffer-exists? u2))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
+
+;; Closing an embedded TeXmacs widget (the console, a dialog with a
+;; texmacs-input) deletes its buffer and so its view, which is shown in the
+;; window of the widget. That window is not in the window table: deleting
+;; the view tried to detach it from that window when no other view was free,
+;; and aborted with "widget should be attached" when its widget was out of
+;; any window, as in the Cocoa port when the dialog closes (#619). Here the
+;; widget is put in no window, and the free views are deleted first.
+(define (test-embedded-close)
+  (check-group "closing an embedded buffer")
+  (let* ((old (current-buffer))
+         (u (string->url "tmfs://aux/editing-test-embedded-close")))
+    (widget-texmacs-input '(document "a") '(style "generic") u)
+    (check-true (buffer-exists? u))
+    (for (v (view-list))
+      (when (url-none? (view->place-url v)) (view-delete v)))
+    (check-false (list-find (view-list)
+                            (lambda (v) (url-none? (view->place-url v)))))
+    (buffer-close u)
+    (check-false (buffer-exists? u))
+    (check= (current-buffer) old)
+    (check= (view->buffer (place->view (current-place))) old)))
+
 ;; A document written to a .tm file and loaded: the body, the style and the
 ;; initial environment of the file are those of the buffer, which is not
 ;; modified by loading.
@@ -205,6 +431,155 @@
     (check= (cursor) '(0 0 0))
     (buffer-close f)
     (check-false (buffer-exists? f))
+    (when (buffer-exists? old) (switch-to-buffer old)))
+  ;; a long document: loading it does not go through all its subtrees (the
+  ;; test for an encrypted document, in load-buffer-open, overflowed the
+  ;; Guile stack from a few thousand paragraphs on, #418)
+  (let ((f (tmp-file* "load-long.tm"))
+        (old (current-buffer))
+        (n 20000))
+    (string-save
+     (apply string-append
+            "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+            (append
+             (map (lambda (i)
+                    (string-append "  Paragraph " (number->string i)
+                                   " with <hlink|a link|https://example.org/"
+                                   (number->string i) ">.\n\n"))
+                  (iota n))
+             (list "</body>\n")))
+     (url->system f))
+    (load-buffer f)
+    (check= (current-buffer) f)
+    (check= (tree-arity (buffer-get-body f)) n)
+    (check= (tree->stree (tree-ref (buffer-get-body f) (- n 1)))
+            `(concat ,(string-append "Paragraph " (number->string (- n 1))
+                                     " with ")
+                     (hlink "a link" ,(string-append "https://example.org/"
+                                                     (number->string (- n 1))))
+                     "."))
+    (check-false (buffer-modified? f))
+    (buffer-close f)
+    (check-false (buffer-exists? f))
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;; The question before a large source file (#710): a source-code or
+;; plain-text file of 5 MB or more. The predicate is tested at the threshold
+;; and for the formats; a call with :confirm-large from a script (no window,
+;; headless) loads a small file at once, without any question.
+(define (test-load-large)
+  (check-group "load-large")
+  (let ((n large-source-file-size))
+    (check= n (* 5 1024 1024))
+    (check-false (large-source-file? 0 "cpp"))
+    (check-false (large-source-file? (- n 1) "cpp"))
+    (check-true (large-source-file? n "cpp"))
+    (check-true (large-source-file? (+ n 1) "cpp"))
+    (check-true (large-source-file? (* 20 n) "cpp"))
+    (check-false (large-source-file? (- n 1) "generic"))
+    (check-true (large-source-file? n "generic"))
+    (check-true (large-source-file? (+ n 1) "verbatim"))
+    (check-true (large-source-file? n "python"))
+    (check-true (large-source-file? n "scheme"))
+    ;; not the converted formats, nor the documents
+    (check-false (large-source-file? (* 100 n) "texmacs"))
+    (check-false (large-source-file? (* 100 n) "latex"))
+    (check-false (large-source-file? (* 100 n) "html"))
+    (check-false (large-source-file? (* 100 n) "pdf"))
+    (check-false (large-source-file? (* 100 n) "stm"))
+    (check-false (large-source-file? #f "cpp"))
+    ;; the formats of the files by their suffix
+    (for-each
+     (lambda (name)
+       (check-true (large-source-file? n (url-format (string->url name)))))
+     '("a.c" "a.h" "a.cpp" "a.hpp" "a.txt" "a.py" "a.scm" "a.js" "a.java"
+       "a.json" "a.csv" "a.rs" "a.go" "a.sh" "a.yaml" "a.hs" "a.ml" "a.lua"
+       "a.css" "Makefile" "a"))
+    (check-false (large-source-file? n (url-format (string->url "a.tm"))))
+    (check-false (large-source-file? n (url-format (string->url "a.tex"))))
+    (check-false (large-source-file? n (url-format (string->url "a.pdf")))))
+  ;; a sparse file of 3 GiB: file_size saturates instead of wrapping around
+  (let ((f (tmp-file* "sparse.c")))
+    (when (and (not (os-mingw?)) (not (os-win32?)))
+      (system (string-append "truncate -s 3G " (raw-quote (url->system f))))
+      (when (url-exists? f)
+        (check= (url-size f) 2147483647)
+        (check-true (large-source-file? (url-size f) (url-format f)))
+        (system-remove f))))
+  (let ((f (tmp-file* "load-large.c"))
+        (old (current-buffer)))
+    (string-save "int main () { return 0; }\n" (url->system f))
+    (load-buffer f :confirm-large)
+    (check= (current-buffer) f)
+    (check-true (buffer-exists? f))
+    (buffer-close f)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;; The files of the system (load-buffer-from-system) ask before the startup
+;; buffer is taken or a window is made, with the question stubbed to keep its
+;; continuation (a footer prompt, or Vue, answers later): no changes nothing
+;; (the startup buffer is still free for the next file), yes goes on.
+(define (test-load-from-system-large)
+  (check-group "load-from-system-large")
+  (let* ((f (tmp-file* "sys-large.c"))
+         (g (tmp-file* "sys-small.c"))
+         (old (current-buffer))
+         (u (new-buffer))
+         (calls '())
+         (pending #f)
+         (asked 0)
+         (line (apply string-append (make-list 40 "int x = 1111111111111111;   "))))
+    (string-save (apply string-append
+                        (map (lambda (i) (string-append line "\n"))
+                             (iota (+ 1 (quotient large-source-file-size
+                                                  (string-length line))))))
+                 (url->system f))
+    (string-save "int x;\n" (url->system g))
+    (switch-to-buffer* u)
+    (set-large-load-test-interactive!
+     (lambda (prompt default cont)
+       (set! asked (+ asked 1))
+       (set! pending cont)))
+    (begin
+      (with-global load-buffer
+          (lambda (name . opts) (set! calls (rcons calls (list 'current name))))
+        (with-global load-buffer-in-new-place
+            (lambda (name . opts) (set! calls (rcons calls (list 'new name))))
+          ;; the startup buffer, no: nothing happens, it stays free
+          (startup-buffer-release)
+          (load-buffer-from-system f)
+          (check= asked 1)
+          (check= calls '())
+          (pending #f)
+          (check= calls '())
+          (check-true (startup-buffer?))
+          (load-buffer-from-system g)
+          (check= asked 1)
+          (check= calls (list (list 'current g)))
+          ;; the startup buffer, yes (after the question, not before)
+          (set! calls '())
+          (startup-buffer-release)
+          (load-buffer-from-system f)
+          (check= calls '())
+          (check= (pending #t) (noop))
+          (check= asked 2)
+          (check= calls (list (list 'current f)))
+          ;; another buffer than the startup one: a window of its own
+          (set! calls '())
+          (startup-buffer-release)
+          (buffer-pretend-modified u)
+          (load-buffer-from-system f)
+          (check= asked 3)
+          (pending #f)
+          (check= calls '())
+          (load-buffer-from-system f)
+          (check= calls '())
+          (pending #t)
+          (check= asked 4)
+          (check= calls (list (list 'new f))))))
+    (set-large-load-test-interactive! #f)
+    (buffer-pretend-saved u)
+    (startup-buffer-release)
     (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -318,6 +693,577 @@
       ;; move (see the head of the file)
       (edit (go-right))
       (check= (cursor) '(0 3)))))
+
+;; The cursor goes up and down in a document taller than 2^31 units (some
+;; 350m, 1300 pages of A4): the distances to the boxes are not cut to 32 bits
+;; (box_rep::distance), and the start and the end of the document are not
+;; taken in its middle (go_up, go_down)
+(define (test-far-cursor)
+  (check-group "cursor in a very tall document")
+  ;; (400 lines 100cm apart: a gap is not larger than the steps of the
+  ;; search of cursor_move_sub, DELTA)
+  (with-buffer-body
+    (cons 'document
+          (map (lambda (i) `(concat ,(number->string i) (vspace "100cm")))
+               (.. 0 400)))
+    (lambda ()
+      (let ((step (lambda (thunk)
+                    (thunk) (update-forced) (apply-changes)))
+            (from (lambda (i move)
+                    (go-to (at i 0)) (update-forced) (apply-changes)
+                    (move) (update-forced) (apply-changes)
+                    (car (cursor)))))
+        ;; (pages of 20m: the pages are chosen by their distances)
+        (init-env "page-medium" "paper")
+        (init-env "page-type" "user")
+        (init-env "page-width" "21cm")
+        (init-env "page-height" "2000cm")
+        (step (lambda () #t))
+        (check-true (> (get-page-count) 15))
+        (check= (from 0 kbd-down) 1)
+        (check= (from 10 kbd-down) 11)
+        (check= (from 250 kbd-down) 251)
+        (check= (from 250 kbd-up) 249)
+        ;; at the end, down does not move; at the start, up does not
+        (check= (from 399 kbd-down) 399)
+        (check= (from 399 kbd-up) 398)
+        (check= (from 0 kbd-up) 0)))))
+
+;; Clicks and a drag (mouse-any, as the events of the window) at the left
+;; or at the right of the lines. Outside paper mode, the lines of a
+;; document are merged by chunks (chunk_lines in Typeset/Bridge/bridge.cpp)
+;; when it has 512 paragraphs or more, or when a line carries a footnote, a
+;; float or several columns; each chunk is a group box with the path of the
+;; whole document, and a point out of its extents put the cursor at the
+;; start or at the end of the document (#584, #585). The cursor position in
+;; pixels needs apply-changes (see the head of the file). The events need
+;; increasing times: mouse_any drops those older than the last one.
+(define mouse-time 1000.0)
+
+(define (mouse key x y mods)
+  (set! mouse-time (+ mouse-time 100.0))
+  (mouse-any key x y mods mouse-time '()))
+
+(define (mouse-point-at . p)
+  ;; the position on the screen of the cursor at @p
+  (edit (go-to (apply at p)))
+  (apply-changes)
+  (list (get-cursor-x) (get-cursor-y)))
+
+(define (mouse-update)
+  (update-forced)
+  (apply-changes))
+
+(define (mouse-click x y)
+  (mouse "press-left" x y 1)
+  (mouse "release-left" x y 0)
+  (mouse-update)
+  (cursor))
+
+(define (mouse-drag x0 y0 x y)
+  ;; the selection made by a drag from (@x0, @y0) to (@x, @y)
+  (mouse "press-left" x0 y0 1)
+  (mouse "start-drag-left" x0 y0 1)
+  (mouse "dragging-left" x y 1)
+  (mouse "end-drag-left" x y 0)
+  (mouse-update)
+  (list (rel (selection-get-start)) (rel (selection-get-end))))
+
+;; A cursor path which is not in the document (go-to from a script with a
+;; wrong path: below a string, a negative or out of range index, more
+;; children than a tag has) used to be kept as the cursor: the report of
+;; the error raised when the changes were applied shifted it and looped
+;; (#592), and the next insert crashed TeXmacs (#599). go-to now corrects
+;; such a path to the closest cursor inside the document. The insert is
+;; only done when the cursor is in the document, and the buffer is closed
+;; with a sane cursor, so that a regression fails these checks instead of
+;; crashing the whole suite.
+(define (path-in-stree? t p)
+  ;; whether @p is a cursor position inside the stree @t (as is_inside of
+  ;; tree_cursor.cpp, without the Cork characters)
+  (cond ((null? p) #f)
+        ((string? t)
+         (and (null? (cdr p)) (>= (car p) 0) (<= (car p) (string-length t))))
+        ((null? (cdr p)) (in? (car p) '(0 1)))
+        (else (and (>= (car p) 0) (< (car p) (length (cdr t)))
+                   (path-in-stree? (list-ref (cdr t) (car p)) (cdr p))))))
+
+(define (check-bad-go-to doc bad expected after)
+  ;; go to the path @bad of @doc, which is not in it: the cursor goes to
+  ;; @expected, and an insert there gives the body @after
+  (with-buffer-body doc
+    (lambda ()
+      (edit (go-to (apply at bad)))
+      (check= (cursor) expected)
+      (check= (rel (cursor-path*)) expected)
+      (if (not (path-in-stree? (body) (cursor)))
+          (begin
+            (check-report #f "insert after (go-to bad path)"
+                          "the cursor is not in the document")
+            ;; closing the buffer with that cursor crashes as well
+            (edit (go-start)))
+          (begin
+            (edit (insert "X"))
+            (check= (body) after)
+            (check-true (path-in-stree? (body) (cursor))))))))
+
+(define (test-bad-cursor)
+  (check-group "a cursor path outside the document")
+  (let* ((table '(document (tabular (table (row (cell "a") (cell "b"))))))
+         (table-x (lambda (a b)
+                    `(document (tabular (table (row (cell ,a) (cell ,b))))))))
+    ;; below a string
+    (check-bad-go-to '(document "abc") '(0 0 0) '(0 0) '(document "Xabc"))
+    (check-bad-go-to '(document "abc") '(0 2 5 1) '(0 2) '(document "abXc"))
+    ;; below the string of a table cell (a bus error)
+    (check-bad-go-to table '(0 0 0 1 0 0 0) '(0 0 0 1 0 0)
+                     (table-x "a" "Xb"))
+    ;; a negative index
+    (check-bad-go-to table '(0 0 -1 0) '(0 0 0 0 0 0) (table-x "Xa" "b"))
+    (check-bad-go-to '(document "abc") '(0 -2) '(0 0) '(document "Xabc"))
+    ;; out of range: a paragraph, a position in a string
+    (check-bad-go-to '(document "abc") '(5 0) '(0 3) '(document "abcX"))
+    (check-bad-go-to '(document "abc") '(0 9) '(0 3) '(document "abcX"))
+    ;; more children than the tag has (a row of a one-row table)
+    (check-bad-go-to table '(0 0 7 0 0) '(0 0 0 1 0 1) (table-x "a" "bX"))
+    ;; the path of the buffer itself, the node of the document
+    (check-bad-go-to '(document "abc") '() '(0 0) '(document "Xabc")))
+  ;; the empty path is not in the buffer: go-to ignores it
+  (with-buffer-body '(document "abc")
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (edit (go-to '()))
+      (check= (cursor) '(0 2))
+      (edit (insert "X"))
+      (check= (body) '(document "abXc"))))
+  ;; a path in the document is kept
+  (with-buffer-body '(document "abc" (frac "x" "y"))
+    (lambda ()
+      (edit (go-to (at 0 2)))
+      (check= (cursor) '(0 2))
+      (edit (go-to (at 1 1 1)))
+      (check= (cursor) '(1 1 1))
+      (edit (insert "X"))
+      (check= (body) '(document "abc" (frac "x" "yX"))))))
+
+(define (test-mouse-long)
+  (check-group "mouse in a long document")
+  (with-buffer-body
+      `(document ,@(map (lambda (i) (string-append "line " (number->string i)))
+                        (.. 0 600)))
+    (lambda ()
+      (edit (init-env "page-medium" "papyrus"))
+      (with (x y) (mouse-point-at 300 8)
+        (check= (mouse-click x y) '(300 8))
+        ;; at the right of the line: its end, not the end of the document
+        (check= (mouse-click (+ x 300000) y) '(300 8))
+        ;; a drag upwards to the left of line 290 (#585): from its start,
+        ;; not from the start of the document
+        (with (x1 y1) (mouse-point-at 290 0)
+          (check= (mouse-drag x y (- x1 20000) y1) '((290 0) (300 8)))))
+      (with (x y) (mouse-point-at 300 0)
+        ;; at its left: its start, not the start of the document
+        (check= (mouse-click (- x 20000) y) '(300 0)))))
+  ;; a footnote makes chunks in a short document too
+  (with-buffer-body
+      `(document ,@(map (lambda (i)
+                          (if (== i 5) '(concat "f" (footnote "a note"))
+                              (string-append "line " (number->string i))))
+                        (.. 0 40)))
+    (lambda ()
+      (edit (init-env "page-medium" "papyrus"))
+      (with (x y) (mouse-point-at 20 0)
+        (check= (mouse-click x y) '(20 0)))
+      (with (x y) (mouse-point-at 1 0)
+        (check= (mouse-click (+ x 150000) y) '(1 6))))))
+
+;; Several paragraphs inserted at the border of a tag which has no cursor
+;; position there (an inner border, as hidden): the editor corrected the
+;; cursor into the tag while it made the new paragraph, then refused, and
+;; the paragraphs were lost; Return did nothing either (#675)
+(define (test-insert-paragraphs)
+  (check-group "insert paragraphs")
+  (let* ((by '(document "P" "Q"))
+         (check-at
+          (lambda (how doc p res)
+            (with-buffer-body doc
+              (lambda ()
+                (edit (go-to (apply at p)))
+                (edit (how))
+                (check= (body) res)
+                ;; (nothing changed: nothing to undo)
+                (when (!= res doc)
+                  (edit (undo 0))
+                  (check= (body) doc)))))))
+    (for-each
+      (lambda (how)
+        (for-each
+          (lambda (tag)
+            (check-at how `(document "u" ,tag "v") '(1 0)
+                      `(document "u" "P" (concat "Q" ,tag) "v"))
+            (check-at how `(document "u" ,tag "v") '(1 1)
+                      `(document "u" (concat ,tag "P") "Q" "v"))
+            (check-at how `(document (concat ,tag "z")) '(0 0 0)
+                      `(document "P" (concat "Q" ,tag "z")))
+            (check-at how `(document (concat "z" ,tag)) '(0 1 1)
+                      `(document (concat "z" ,tag "P") "Q")))
+          '((hidden "b") (freeze "b") (hidden (document "b" "c")) (strong "b")))
+        ;; no place for paragraphs: nothing changes
+        (for-each
+          (lambda (x)
+            (check-at how `(document ,(car x)) (cdr x) `(document ,(car x))))
+          '(((concat "t " (strong "ab")) 0 1 0 1)
+            ((concat "t " (math "ab")) 0 1 0 1)
+            ((tabular (tformat (table (row (cell "ab")))))
+             0 0 0 0 0 0 1))))
+      (list (lambda () (insert by))
+            (lambda ()
+              (clipboard-set "editing-test" (stree->tree by))
+              (clipboard-paste "editing-test"))))
+    (clipboard-clear "editing-test")
+    ;; a block goes before or after the tag, not into it
+    (let* ((block '(quotation (document "P" "Q"))))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document "u" ,tag "v") '(1 0)
+                    `(document "u" ,block ,tag "v"))
+          (check-at (lambda () (insert block))
+                    `(document "u" ,tag "v") '(1 1)
+                    `(document "u" ,tag ,block "v")))
+        '((hidden "b") (hidden (document "b" "c")) (strong "b"))))
+    ;; Return
+    (for-each
+      (lambda (tag)
+        (check-at kbd-return `(document "u" ,tag "v") '(1 0)
+                  `(document "u" "" ,tag "v"))
+        (check-at kbd-return `(document "u" ,tag "v") '(1 1)
+                  `(document "u" ,tag "" "v")))
+      '((hidden "b") (hidden (document "b" "c")) (strong "b")))
+    ;; a refused insertion does not remove the selection
+    (with-buffer-body '(document (concat "t " (strong "abc")))
+      (lambda ()
+        (edit (selection-set (at 0 1 0 1) (at 0 1 0 2)))
+        (edit (insert by))
+        (check= (body) '(document (concat "t " (strong "abc"))))
+        (check-true (selection-active-any?))
+        (edit (selection-cancel))))
+    ;; where it is possible, a selection is replaced
+    (with-buffer-body '(document "abc")
+      (lambda ()
+        (edit (selection-set (at 0 1) (at 0 2)))
+        (edit (insert by))
+        (check= (body) '(document "aP" "Qc"))))
+    ;; a selection cut up to a tag with an inner border (it starts right
+    ;; after the tag, or ends right before it): the cut leaves the cursor in
+    ;; the tag, the paragraphs go at the border of the tag (#711)
+    (let* ((block '(quotation (document "P" "Q")))
+           (try (lambda (how doc a b res)
+                  (with-buffer-body doc
+                    (lambda ()
+                      (clipboard-set "editing-test" (stree->tree by))
+                      (edit (selection-set (apply at a) (apply at b)))
+                      (edit (how))
+                      (check= (body) res)
+                      (edit (undo 0))
+                      (check= (body) doc))))))
+      (for-each
+        (lambda (tag)
+          (for-each
+            (lambda (how)
+              (try how `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 3)
+                   `(document (concat "z" ,tag "P") "Q"))
+              (try how `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 2)
+                   `(document (concat "z" ,tag "P") "Qc"))
+              (try how `(document (concat "abc" ,tag "z")) '(0 0 0) '(0 0 3)
+                   `(document "P" (concat "Q" ,tag "z")))
+              (try how `(document (concat "z" ,tag "abc")) '(0 0 0) '(0 0 1)
+                   `(document "P" (concat "Q" ,tag "abc"))))
+            (list (lambda () (insert by))
+                  (lambda () (clipboard-paste "editing-test"))))
+          (try (lambda () (insert block))
+               `(document (concat "z" ,tag "abc")) '(0 2 0) '(0 2 3)
+               `(document (concat "z" ,tag) ,block))
+          (try (lambda () (insert block))
+               `(document (concat "abc" ,tag "z")) '(0 0 0) '(0 0 3)
+               `(document ,block (concat ,tag "z"))))
+        '((hidden "b") (freeze "b") (unfreeze "b") (ignore "b") (shown "b")
+          (table (row (cell "b"))) (expand* "foo" "b"))))
+    ;; a selection of cells: the cut empties the cells, which then have no
+    ;; place for paragraphs; nothing changes, and the selection is kept
+    (let* ((cells '(document (tabular (tformat (table (row
+                      (cell (document "ef" "gh")) (cell (strong "ij"))))))))
+           (a '(0 0 0 0 0 0 0 0)) (b '(0 0 0 0 1 0 0 2)))
+      (for-each
+        (lambda (how)
+          (with-buffer-body cells
+            (lambda ()
+              (buffer-pretend-saved (current-buffer))
+              (clipboard-set "editing-test" (stree->tree by))
+              (let ((n (undo-possibilities)))
+                (edit (selection-set (apply at a) (apply at b)))
+                (edit (how))
+                (check= (body) cells)
+                (check-true (selection-active-any?))
+                ;; (no undo entry, and not modified)
+                (check= (undo-possibilities) n)
+                (check-false (buffer-modified? (current-buffer))))
+              (edit (selection-cancel)))))
+        (list (lambda () (insert by))
+              (lambda () (insert '(quotation (document "P" "Q"))))
+              (lambda () (clipboard-paste "editing-test"))))
+      ;; text still replaces the cells
+      (with-buffer-body cells
+        (lambda ()
+          (edit (selection-set (apply at a) (apply at b)))
+          (edit (insert "xx"))
+          (check= (body) '(document (tabular (tformat (table (row
+                                       (cell "xx"))))))))))
+    ;; the refusal cancels the cut only: changes made earlier in the same
+    ;; editing step, here and in another buffer, stay and can be undone;
+    ;; the redo list is kept
+    (let* ((doc '(document "hello" (tabular (tformat (table (row
+                   (cell (document "ef" "gh")) (cell (strong "ij"))))))))
+           (typed (cons 'document (cons "helloXY" (cddr doc))))
+           (ca '(1 0 0 0 0 0 0 0)) (cb '(1 0 0 0 1 0 0 2)))
+      (for-each
+        (lambda (how)
+          (with-buffer-body doc
+            (lambda ()
+              (clipboard-set "editing-test" (stree->tree by))
+              (edit (go-to (at 0 5))
+                    (insert "XY")
+                    (selection-set (apply at ca) (apply at cb))
+                    (how))
+              (check= (body) typed)
+              (check-true (selection-active-table?))
+              (edit (selection-cancel))
+              (edit (undo 0))
+              (check= (body) doc))))
+        (list (lambda () (insert by))
+              (lambda () (insert '(quotation (document "P" "Q"))))
+              (lambda () (clipboard-paste "editing-test"))))
+      (with-buffer-body doc
+        (lambda ()
+          (let* ((a (current-buffer)) (b (new-buffer)))
+            (switch-to-buffer* b)
+            (buffer-set-body b (stree->tree '(document "bee")))
+            (go-start)
+            (update-forced)
+            (switch-to-buffer* a)
+            (update-forced)
+            (clipboard-set "editing-test" (stree->tree by))
+            (edit (switch-to-buffer* b)
+                  (go-to (append (buffer-path) '(0 3)))
+                  (insert "ZZ")
+                  (switch-to-buffer* a)
+                  (selection-set (apply at ca) (apply at cb))
+                  (insert by))
+            (check= (body) doc)
+            (switch-to-buffer* b)
+            (check= (body) '(document "beeZZ"))
+            (switch-to-buffer* a)
+            (edit (selection-cancel)))))
+      ;; no earlier change: nothing to undo, redo kept, a saved buffer stays
+      ;; saved and the selection is the same
+      (with-buffer-body doc
+        (lambda ()
+          (clipboard-set "editing-test" (stree->tree by))
+          (edit (go-to (at 0 5)) (insert "XY"))
+          (edit (undo 0))
+          (buffer-pretend-saved (current-buffer))
+          (let ((n (undo-possibilities)) (r (redo-possibilities)))
+            (edit (selection-set (apply at ca) (apply at cb)))
+            (let ((s (list (selection-get-start) (selection-get-end))))
+              (edit (insert by))
+              (check= (body) doc)
+              (check= (undo-possibilities) n)
+              (check= (redo-possibilities) r)
+              (check-false (buffer-modified? (current-buffer)))
+              (check= (list (selection-get-start) (selection-get-end)) s))
+            (edit (selection-cancel))))))
+    ;; block cells (hyphenated cells, wide-tabular): the cleared first cell
+    ;; holds paragraphs again, so they go in when it was a document; with a
+    ;; plain first cell nothing changes
+    (let* ((rows (lambda (c1) `(table (row (cell ,c1) (cell "cd"))
+                                      (row (cell "ef") (cell "gh")))))
+           ;; (all the cells are made documents)
+           (done (lambda (c1) `(table (row (cell ,c1) (cell (document "")))
+                                      (row (cell (document "ef"))
+                                           (cell (document "gh"))))))
+           (hy (lambda (m c1) `(document (tabular (tformat
+                  (cwith "1" "-1" "1" "-1" "cell-hyphen" ,m) ,c1)))))
+           (wide (lambda (c1) `(document (wide-tabular (tformat ,c1)))))
+           (tried (lambda (doc a b how res)
+                    (with-buffer-body doc
+                      (lambda ()
+                        (clipboard-set "editing-test" (stree->tree by))
+                        (let ((before (body)))
+                          (edit (selection-set (apply at a) (apply at b)))
+                          (edit (how))
+                          (check= (body) (or res before))
+                          (when res
+                            (edit (undo 0))
+                            (check= (body) before))
+                          (when (not res)
+                            (check-true (selection-active-any?)))
+                          (edit (selection-cancel))))))))
+      (for-each
+        (lambda (how)
+          (for-each
+            (lambda (m)
+              (tried (hy m (rows '(document "ab" "a2"))) '(0 0 1 0 0 0 0 0)
+                     '(0 0 1 0 1 0 1) how
+                     (hy m (done '(document "P" "Q"))))
+              (tried (hy m (rows "ab")) '(0 0 1 0 0 0 0) '(0 0 1 0 1 0 1)
+                     how #f))
+            '("t" "b" "c"))
+          (tried (wide (rows '(document "ab" "a2"))) '(0 0 0 0 0 0 0 0)
+                 '(0 0 0 0 1 0 1) how (wide (done '(document "P" "Q"))))
+          (tried (wide (rows "ab")) '(0 0 0 0 0 0 0) '(0 0 0 0 1 0 1)
+                 how #f))
+        (list (lambda () (insert by))
+              (lambda () (clipboard-paste "editing-test")))))
+    (clipboard-clear "editing-test")
+    ;; a selection which starts inside a tag and ends outside it: the cut
+    ;; starts before the tag, where paragraphs can go
+    ;; (setting a clipboard cancels the selection)
+    (clipboard-set "editing-test" (stree->tree by))
+    (for-each
+      (lambda (x)
+        (let* ((how (car x)) (res (cdr x)))
+          (with-buffer-body '(document (concat "some " (strong "bold")
+                                               " text after"))
+            (lambda ()
+              (edit (selection-set (at 0 1 0 1) (at 0 2 4)))
+              (edit (how))
+              (check= (body) (car res))))
+          (with-buffer-body '(document (concat "some " (strong "bold") " t")
+                                       "next")
+            (lambda ()
+              (edit (selection-set (at 0 1 0 1) (at 1 2)))
+              (edit (how))
+              (check= (body) (cadr res))))))
+      (list (list (lambda () (clipboard-paste "editing-test"))
+                  '(document "some P" "Qt after")
+                  '(document "some P" "Qxt"))
+            (list (lambda () (insert '(quotation (document "P" "Q"))))
+                  '(document "some " (quotation (document "P" "Q")) "t after")
+                  '(document "some " (quotation (document "P" "Q")) "xt"))))
+    (clipboard-clear "editing-test")
+    ;; a block after text, before a tag which holds paragraphs: not in the tag
+    (let* ((block '(quotation (document "P" "Q"))))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document (concat "w" ,tag)) '(0 0 1)
+                    `(document "w" ,block ,tag)))
+        '((hidden (document "b" "c")) (ignore (document "b" "c"))
+          (freeze (document "b" "c")) (shown (document "b" "c"))
+          (hidden "b") (strong "b")))
+      (for-each
+        (lambda (tag)
+          (check-at (lambda () (insert block))
+                    `(document (concat "w" ,tag "z")) '(0 0 1)
+                    `(document "w" ,block (concat ,tag "z"))))
+        '((hidden (document "b" "c")) (freeze (document "b" "c")) (strong "b"))))
+    ;; before the table format of a tabular, a position of scripts only:
+    ;; nothing there, and no stray concat
+    (check-at (lambda () (insert by))
+              '(document (tabular (tformat (table (row (cell "a")))))) '(0 0 0)
+              '(document (tabular (tformat (table (row (cell "a")))))))
+    (check-at kbd-return
+              '(document (tabular (tformat (table (row (cell "a")))))) '(0 0 0)
+              '(document (tabular (tformat (table (row (cell "a")))))))
+    ;; can-insert-at?
+    (with-buffer-body '(document (concat "t " (strong "ab"))
+                                 (tabular (tformat (table (row (cell "c"))))))
+      (lambda ()
+        (check-true (can-insert-at? (stree->tree by) (at 0 0 1)))
+        (check-false (can-insert-at? (stree->tree by) (at 0 1 0 1)))
+        (check-false (can-insert-at? (stree->tree by) (at 1 0 0 0 0 0 1)))
+        (check-true (can-insert-at? (stree->tree "x") (at 0 1 0 1)))
+        ;; (a path which is not in the document)
+        (check-false (can-insert-at? (stree->tree by) (at 7 7)))))))
+
+;; The start of a line which begins with a tag with an inner border (hidden)
+;; is the position just after the tag, and the keyboard reaches it: go-start,
+;; go-left from the next character. Return there, and the paragraphs and
+;; blocks inserted there, aborted TeXmacs (#712): the line was split in the
+;; string, which put an empty string beside the tag, and the cursor was then
+;; corrected into the tag. A crash aborts the whole suite, so the group is
+;; run just after test-insert-paragraphs.
+(define (test-insert-line-start)
+  (check-group "insert at the start of a line")
+  (let* ((by '(document "P" "Q"))
+         (block '(quotation (document "P" "Q")))
+         ;; the action and the document it makes from the tag
+         (cases
+          (list (cons (lambda () (kbd-return))
+                      (lambda (tag) `(document ,tag "z")))
+                (cons (lambda () (insert-raw-return))
+                      (lambda (tag) `(document ,tag "z")))
+                (cons (lambda () (insert by))
+                      (lambda (tag) `(document (concat ,tag "P") "Qz")))
+                (cons (lambda () (insert block))
+                      (lambda (tag) `(document ,tag ,block "z")))
+                (cons (lambda () (make 'itemize))
+                      (lambda (tag)
+                        `(document ,tag (itemize (document "")) "z"))))))
+    (for-each
+      (lambda (tag)
+        (for-each
+          (lambda (x)
+            (with-buffer-body `(document (concat ,tag "z"))
+              (lambda ()
+                ;; the position is reached by the keyboard: applying the
+                ;; changes to the view puts the cursor of go-start there
+                (edit (go-start))
+                (apply-changes)
+                (check= (cursor) '(0 1 0))
+                (edit ((car x)))
+                (check= (body) ((cdr x) tag))
+                (edit (undo 0))
+                (check= (body) `(document (concat ,tag "z"))))))
+          cases))
+      '((hidden "b") (hidden (document "b" "c"))))))
+
+;; A selection which ends at the border of the table, in the table (a path
+;; which is the prefix of the start of the selection) made raw_cut index
+;; past the end of the path and abort TeXmacs (#712). The cut goes to the
+;; end of the table; what an insertion of paragraphs does to such a
+;; selection is the business of the check of the selected cells.
+(define (test-selection-table-border)
+  (check-group "selection ending at a table border")
+  (let* ((tab '(tabular (tformat (table (row (cell "ab") (cell "cd"))
+                                        (row (cell (document "ef" "gh"))
+                                             (cell (strong "ij")))))))
+         (cleared '(document (tabular (tformat (table
+                      (row (cell "ab") (cell "cd"))
+                      (row (cell "") (cell ""))))))))
+    (with-buffer-body `(document ,tab)
+      (lambda ()
+        (edit (selection-set (at 0 0 0 1 0 0 0 0) (at 0 0 0 1)))
+        (edit (clipboard-cut "editing-test"))
+        (check= (body) cleared)
+        (edit (undo 0))
+        (check= (body) `(document ,tab))))
+    ;; the other border: the cut starts at the start of the table
+    (with-buffer-body `(document ,tab)
+      (lambda ()
+        (edit (selection-set (at 0 0 0 0) (at 0 0 0 0 1 0 0)))
+        (edit (clipboard-cut "editing-test"))
+        (check-true (tm-func? (cadr (body)) 'tabular))
+        (edit (undo 0))
+        (check= (body) `(document ,tab))))
+    ;; an insertion of paragraphs on such a selection does not abort, and
+    ;; leaves a table
+    (with-buffer-body `(document ,tab)
+      (lambda ()
+        (edit (selection-set (at 0 0 0 1 0 0 0 0) (at 0 0 0 1)))
+        (edit (insert '(document "P" "Q")))
+        (check-true (tm-func? (cadr (body)) 'tabular))))
+    (clipboard-clear "editing-test")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection and clipboard
@@ -602,6 +1548,192 @@
         (edit (redo 0))
         (check-false (buffer-modified? f))))))
 
+;; Each view has its own author, and undo takes back the last step of the
+;; author of the view. After an edit in another buffer, the cursor which
+;; archive-state records before start-editing still belongs to the author of
+;; that buffer; the step which follows belongs to the author of the view all
+;; the same. Before, it kept the owner of the cursor: undo then took back the
+;; step before it (or, in a buffer whose body a script had set, everything).
+(define (test-undo-authors)
+  (check-group "undo after editing another buffer")
+  (with-buffer-body '(document "")
+    (lambda ()
+      (let ((a (current-buffer)))
+        (edit (insert "a"))
+        ;; the body of the new buffer is set under the author of a
+        (with-buffer-body '(document "x")
+          (lambda ()
+            (let ((b (current-buffer)))
+              (edit (go-end) (insert '(strong "S")))
+              (edit (undo 0))
+              (check= (body) '(document "x"))
+              (edit (go-end) (insert '(strong "S")))
+              (with s (body)
+                (switch-to-buffer* a)
+                (edit (insert "a"))
+                (switch-to-buffer* b)
+                (edit (go-end) (insert '(em "W")))
+                (check-true (!= (body) s))
+                (edit (undo 0))
+                (check= (body) s)
+                (edit (undo 0))
+                (check= (body) '(document "x"))))))))))
+
+;; Clearing the undo history concerns the current buffer only, and a buffer
+;; which was saved remains unmodified.
+(define (test-undo-clear)
+  (check-group "clear undo history")
+  (with-buffer-body '(document "")
+    (lambda ()
+      (let* ((b1 (current-buffer))
+             (b2 #f))
+        (edit (insert "one"))
+        (buffer-pretend-saved b1)
+        (check= (undo-possibilities) 1)
+        (set! b2 (new-buffer))
+        (switch-to-buffer* b2)
+        (edit (insert "two"))
+        (check-true (buffer-modified? b2))
+        (edit (clear-undo-history))
+        (check= (undo-possibilities) 0)
+        (check= (body) '(document "two"))
+        ;; not saved before, not saved after
+        (check-true (buffer-modified? b2))
+        (check-false (buffer-modified? b1))
+        ;; saved before, saved after, and modified by the next change
+        (edit (insert "!"))
+        (buffer-pretend-saved b2)
+        (edit (clear-undo-history))
+        (check-false (buffer-modified? b2))
+        (edit (insert "?"))
+        (check-true (buffer-modified? b2))
+        (edit (undo 0))
+        (check= (body) '(document "two!"))
+        (check-false (buffer-modified? b2))
+        ;; the history of the other buffer is still there
+        (switch-to-buffer* b1)
+        (check= (undo-possibilities) 1)
+        (edit (undo 0))
+        (check= (body) '(document ""))
+        (check-true (buffer-modified? b1))
+        (buffer-pretend-saved b1)))))
+
+;; Closing a buffer empties its place in the root tree, and that change
+;; belongs to no history: a cancel-editing in another buffer (as after an
+;; error in a key press or a menu action) leaves that place as it is,
+;; whether it is still free or already holds the body of a newer buffer,
+;; here one without a view. It used to put the closed body back there.
+(define (test-cancel-closed)
+  (check-group "cancel after closing a buffer")
+  (with-buffer-body '(document "here")
+    (lambda ()
+      (let* ((b (current-buffer))
+             (a (new-buffer))
+             (x (string->url "tmfs://aux/editing-test-cancel-closed"))
+             (i #f))
+        (switch-to-buffer* a)
+        (buffer-set-body a (stree->tree '(document "closed")))
+        (update-forced)
+        (clear-undo-history)
+        (set! i (car (buffer-path)))
+        (switch-to-buffer* b)
+        (buffer-close a)
+        (check= (tree-label (tree-ref (root-tree) i)) 'uninit)
+        (buffer-set-body x (stree->tree '(document "newer")))
+        (with before (tree->stree (tree-ref (root-tree) i))
+          (start-editing)
+          (cancel-editing)
+          (end-editing)
+          (check= (tree->stree (tree-ref (root-tree) i)) before))
+        (check= (tree->stree (buffer-get-body x)) '(document "newer"))
+        (check= (body) '(document "here"))
+        (buffer-close x)))))
+
+;; The changes between mark-start and mark-end are one step of the history;
+;; mark-cancel undoes those made since mark-start. A marker which is not in
+;; the history, or which cannot be removed, leaves the history and the
+;; document as they are.
+(define (test-undo-markers)
+  (check-group "undo markers")
+  ;; several changes between the markers, after a save
+  (with-buffer-body '(document "")
+    (lambda ()
+      (let ((b (current-buffer))
+            (m (mark-new)))
+        (edit (insert "one"))
+        (buffer-pretend-saved b)
+        (mark-start m)
+        (edit (insert "a"))
+        (edit (insert-return))
+        (edit (insert "b"))
+        (mark-end m)
+        (check= (body) '(document "onea" "b"))
+        (check= (undo-possibilities) 1)
+        (check-true (buffer-modified? b))
+        (edit (undo 0))
+        (check= (body) '(document "one"))
+        (check-false (buffer-modified? b))
+        (edit (redo 0))
+        (check= (body) '(document "onea" "b"))
+        (check-true (buffer-modified? b))
+        (edit (undo 0))
+        (check-false (buffer-modified? b))
+        (edit (undo 0))
+        (check= (body) '(document ""))
+        (check-true (buffer-modified? b))
+        (buffer-pretend-saved b))))
+  ;; mark-cancel
+  (with-buffer-body '(document "")
+    (lambda ()
+      (let ((b (current-buffer))
+            (m (mark-new)))
+        (edit (insert "one"))
+        (buffer-pretend-saved b)
+        (mark-start m)
+        (edit (insert "a"))
+        (edit (insert-return))
+        (mark-cancel m)
+        (check= (body) '(document "one"))
+        (check= (undo-possibilities) 1)
+        (check-false (buffer-modified? b)))))
+  ;; markers which are not in the history
+  (for (end (list mark-end mark-cancel))
+    (with-buffer-body '(document "")
+      (lambda ()
+        (let ((b (current-buffer)))
+          (edit (insert "one"))
+          (edit (insert-return))
+          (edit (insert "two"))
+          (buffer-pretend-saved b)
+          (with n (undo-possibilities)
+            (check-true (> n 0))
+            (end (mark-new))
+            (check= (undo-possibilities) n)
+            (check= (body) '(document "one" "two"))
+            (check-false (buffer-modified? b)))
+          (edit (undo 0))
+          (check-true (buffer-modified? b))
+          (buffer-pretend-saved b)))))
+  ;; a marker under a change which was undone cannot be removed
+  (with-buffer-body '(document "")
+    (lambda ()
+      (let ((b (current-buffer))
+            (m (mark-new)))
+        (edit (insert "one"))
+        (mark-start m)
+        (edit (insert "a"))
+        (edit (undo 0))
+        (check= (body) '(document "one"))
+        (check= (redo-possibilities) 1)
+        (mark-end m)
+        (check= (redo-possibilities) 1)
+        (edit (redo 0))
+        (check= (body) '(document "onea"))
+        (edit (undo 0))
+        (check= (body) '(document "one"))
+        (check-true (> (undo-possibilities) 0))
+        (buffer-pretend-saved b)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving and exporting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -664,6 +1796,315 @@
           (buffer-close g)
           (switch-to-buffer f))))))
 
+;; Save as gives the place of the buffer its new url, also when the file
+;; keeps its name in another folder and the title of the buffer does not
+;; change. (In Tau the page shows the names of the buffers of the places:
+;; there is no url of a window, window->file of the other ports.)
+(define (test-save-as-window)
+  (check-group "save as: the url of the place")
+  (with-buffer-body '(document "a")
+    (lambda ()
+      (let* ((sub (string-append editing-dir "/sub2"))
+             (f (tmp-file* "d.tm"))
+             (g (tmp-file* "sub2/d.tm"))
+             (h (tmp-file* "sub2/e.tm")))
+        (system-mkdir (system->url sub))
+        (edit (save-buffer-as f :overwrite))
+        (check= (current-buffer) f)
+        (check= (place->buffer (current-place)) f)
+        (with title (buffer-get-title f)
+          ;; the same file name in another folder: the same title
+          (edit (save-buffer-as g :overwrite))
+          (check= (current-buffer) g)
+          (check= (buffer-get-title g) title)
+          (check= (place->buffer (current-place)) g))
+        ;; another file name: another title
+        (edit (save-buffer-as h :overwrite))
+        (check= (current-buffer) h)
+        (check= (place->buffer (current-place)) h)
+        (for-each (lambda (u) (when (url-exists? u) (system-remove u)))
+                  (list g h))
+        (system-rmdir (system->url sub))))))
+
+;; A file given by the system (the Finder, the Dock, open) replaces the buffer
+;; of the current window only while that is the untitled, unmodified buffer
+;; of the startup; else it gets a window of its own (#739). Files given at
+;; once go one after the other: the first takes the startup buffer, the
+;; others new windows. The loaders are replaced by recorders, as opening a
+;; real window does not follow headless.
+(define (test-open-from-system)
+  (check-group "files from the system: the startup buffer or a new window")
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (u (new-buffer))
+         (a (tmp-file* "sys-a.tm"))
+         (b (tmp-file* "sys-b.tm"))
+         (c (tmp-file* "sys-c.tm"))
+         (calls '())
+         (pending '())
+         (wait? #f)
+         (in-window #f)
+         (open-all
+          (lambda (names)
+            (set! calls '())
+            (startup-buffer-release)
+            (with-global load-buffer
+                (lambda (name . opts)
+                  (set! calls (rcons calls (list 'current name)))
+                  ;; the file takes the place of the buffer, at once or
+                  ;; later (an autosave question waits for an answer)
+                  (if wait?
+                      (set! pending (rcons pending name))
+                      (begin (buffer-rename u name) (set! u name))))
+              (with-global load-buffer-in-new-place
+                  (lambda (name . opts)
+                    (set! calls (rcons calls (list 'new name))))
+                (with-global buffer->place
+                    (lambda (name) (and (== name in-window) 'win))
+                  (for-each load-buffer-from-system names)))))))
+    (switch-to-buffer* u)
+    ;; the buffer of the startup: untitled and unmodified
+    (check-true (startup-buffer?))
+    ;; modified, it is not; unmodified again, it is
+    (buffer-pretend-modified u)
+    (check-false (startup-buffer?))
+    (buffer-pretend-saved u)
+    (check-true (startup-buffer?))
+    ;; a file which is already in a window is not loaded in the startup
+    ;; buffer (load-buffer-in-new-place switches to its window)
+    (set! in-window a)
+    (open-all (list a))
+    (check= calls `((new ,a)))
+    (set! in-window #f)
+    ;; a file which is loaded but hidden (no window) takes the startup buffer
+    (open-all (list c))
+    (check= calls `((current ,c)))
+    ;; several files at once: the first takes the startup buffer, the
+    ;; others get windows
+    (buffer-close u)
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (open-all (list a b c))
+    (check= calls `((current ,a) (new ,b) (new ,c)))
+    ;; later, a file never replaces the document of the window
+    (open-all (list b))
+    (check= calls `((new ,b)))
+    (buffer-close u)
+    ;; the first file waits for an answer (autosave): the second one,
+    ;; arriving before, must not take the same buffer
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (set! wait? #t)
+    (open-all (list a b))
+    (check= calls `((current ,a) (new ,b)))
+    (set! wait? #f)
+    (buffer-close u)
+    ;; nor does it replace an untitled buffer which was modified
+    (set! u (new-buffer))
+    (switch-to-buffer* u)
+    (buffer-pretend-modified u)
+    (open-all (list a))
+    (check= calls `((new ,a)))
+    (buffer-pretend-saved u)
+    (for (x (buffer-list))
+      (when (nin? x before) (buffer-close x)))
+    (startup-buffer-release)
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;; The initial environment belongs to the buffer (#528): a change made in
+;; one view of it (init-env, init-default) is in its other views, in
+;; buffer-get and in the saved file, and in a view made after it; the
+;; buffer stays modified until it is saved. The variables of the window
+;; (zoom-factor, page-screen-width) stay those of each view.
+(define (initial-value doc var)
+  ;; the value of @var in the initial environment of @doc (a document read
+  ;; from a file, as an stree), or #f
+  (with init (doc-part doc 'initial)
+    (and init (pair? (cdr init))
+         (with a (list-find (cdadr init)
+                            (lambda (x) (and (pair? x) (pair? (cdr x))
+                                             (== (cadr x) var))))
+           (and a (caddr a))))))
+
+(define (buffer-init-value u var)
+  (initial-value (tree->stree (buffer-get u)) var))
+
+(define (file-init-value u var)
+  (initial-value (tree->stree (tree-import u "texmacs")) var))
+
+(define (test-views-init)
+  (check-group "initial environment in the views of a buffer")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (f (tmp-file* "views-init.tm")))
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))
+                             (initial (collection
+                                       (associate "font-base-size" "12")))))
+                 f "texmacs")
+    (with r (check-run
+             (lambda ()
+               (load-buffer f)
+               (update-forced)
+               (let ((v1 (current-view-url))
+                     (z1 (get-init "zoom-factor"))
+                     (w1 (get-init "page-screen-width")))
+                 ;; switching to the buffer shown makes a second view, and
+                 ;; switching again goes back to the first one
+                 (switch-to-buffer f)
+                 (with v2 (current-view-url)
+                   (check= (length (buffer->views f)) 2)
+                   (check-false (== v1 v2))
+                   ;; the variables of the window stay in their view, and
+                   ;; do not modify the buffer
+                   (edit (init-env "zoom-factor" "1.7"))
+                   (edit (init-env "page-screen-width" "123tmpt"))
+                   (check= (get-init "zoom-factor") "1.7")
+                   (check-false (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-init "zoom-factor") z1)
+                   (check= (get-init "page-screen-width") w1)
+                   ;; init-env in the first view reaches the second one
+                   (edit (init-env "par-indent" "4fn"))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v2)
+                   (check= (get-init "par-indent") "4fn")
+                   (check= (buffer-init-value f "par-indent") "4fn")
+                   (check-true (buffer-modified? f))
+                   ;; and init-default in the second view the first one
+                   (edit (init-default "font-base-size"))
+                   (check= (get-init "font-base-size") "10")
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-init "font-base-size") "10")
+                   (check= (get-init "par-indent") "4fn")
+                   (check-false (buffer-init-value f "font-base-size"))
+                   (check= (buffer-init-value f "par-indent") "4fn")
+                   (check-true (buffer-modified? f))
+                   ;; a view made after the changes has them
+                   (with v3 (view-new f)
+                     (place-set-view (current-place) v3 #t)
+                     (check= (current-view-url) v3)
+                     (check= (get-init "par-indent") "4fn")
+                     (check= (get-init "font-base-size") "10"))
+                   ;; the file saved has them, and not the variables of
+                   ;; the window
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (file-init-value f "par-indent") "4fn")
+                   (check-false (file-init-value f "font-base-size"))
+                   (check-false (file-init-value f "zoom-factor"))
+                   (check-false (file-init-value f "page-screen-width"))
+                   ;; a change made after the save, in another view, is
+                   ;; saved from this one
+                   (switch-to-buffer f)
+                   (edit (init-env "par-indent" "2fn"))
+                   (switch-to-buffer f)
+                   (check= (get-init "par-indent") "2fn")
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (file-init-value f "par-indent") "2fn")
+                   ;; the source mode (preamble) is a setting of the document
+                   (edit (init-env "preamble" "true"))
+                   (switch-to-buffer f)
+                   (check= (get-init "preamble") "true")
+                   (edit (init-default "preamble"))
+                   (switch-to-buffer f)
+                   (check= (get-init "preamble") "false")))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (for (b (buffer-list))
+      (when (nin? b before)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
+;; The style belongs to the buffer too (#535): a change of the style made
+;; in one view (set-style-tree, add-style-package, remove-style-package) is
+;; in its other views, in buffer-get and in the saved file, and in a view
+;; made after it; the buffer stays modified until it is saved.
+(define (style-of doc)
+  ;; the style of @doc (a document as an stree), or #f
+  (with st (doc-part doc 'style)
+    (and st (pair? (cdr st)) (cadr st))))
+
+(define (test-views-style)
+  (check-group "style in the views of a buffer")
+  (let ((old (current-buffer))
+        (before (buffer-list))
+        (f (tmp-file* "views-style.tm")))
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 f "texmacs")
+    (with r (check-run
+             (lambda ()
+               (load-buffer f)
+               (update-forced)
+               (with v1 (current-view-url)
+                 (switch-to-buffer f)
+                 (with v2 (current-view-url)
+                   (check= (length (buffer->views f)) 2)
+                   (check-false (== v1 v2))
+                   ;; a style set in the second view reaches the first one
+                   (edit (set-style-tree (stree->tree
+                                          '(tuple "article" "number-us"))))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (tree->stree (get-style-tree))
+                           '(tuple "article" "number-us"))
+                   (check= (style-of (tree->stree (buffer-get f)))
+                           '(tuple "article" "number-us"))
+                   (check= (tree->stree (buffer-get-style f))
+                           '(tuple "article" "number-us"))
+                   ;; and the file saved from the first view has it
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (style-of (tree->stree (tree-import f "texmacs")))
+                           '(tuple "article" "number-us"))
+                   ;; a package added in the first view, after the save, is
+                   ;; in the second view and saved from it
+                   (edit (add-style-package "comment"))
+                   (check-true (buffer-modified? f))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v2)
+                   (check= (get-style-list)
+                           '("article" "number-us" "comment"))
+                   (check-true (buffer-modified? f))
+                   (buffer-save f)
+                   (check-false (buffer-modified? f))
+                   (check= (style-of (tree->stree (tree-import f "texmacs")))
+                           '(tuple "article" "number-us"
+                                   "comment"))
+                   ;; a package removed in the second view
+                   (edit (remove-style-package "number-us"))
+                   (switch-to-buffer f)
+                   (check= (current-view-url) v1)
+                   (check= (get-style-list)
+                           '("article" "comment"))
+                   ;; a view made after the changes has them
+                   (with v3 (view-new f)
+                     (place-set-view (current-place) v3 #t)
+                     (check= (current-view-url) v3)
+                     (check= (get-style-list)
+                             '("article" "comment")))
+                   (buffer-save f)
+                   (check= (style-of (tree->stree (tree-import f "texmacs")))
+                           '(tuple "article" "comment"))))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (for (b (buffer-list))
+      (when (nin? b before)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (buffer-exists? old) (switch-to-buffer old))))
+
 (define (test-export)
   (check-group "export")
   (with-buffer-body saved-doc
@@ -724,17 +2165,38 @@
   (check-suite "editing")
   (system-mkdir (system->url editing-dir))
   (test-buffers)
+  (test-rename-relative)
+  (test-delete-view)
+  (test-tree-pointers)
+  (test-embedded)
+  (test-embedded-close)
   (test-load)
+  (test-load-large)
+  (test-load-from-system-large)
   (test-insert)
+  (test-insert-paragraphs)
+  (test-insert-line-start)
+  (test-selection-table-border)
   (test-cursor)
+  (test-bad-cursor)
+  (test-mouse-long)
   (test-selection)
   (test-remove)
   (test-structure)
   (test-environment)
   (test-undo)
   (test-undo-save)
+  (test-undo-authors)
+  (test-undo-clear)
+  (test-undo-markers)
+  (test-cancel-closed)
   (test-save)
+  (test-save-as-window)
+  (test-open-from-system)
+  (test-views-init)
+  (test-views-style)
   (test-export)
   (test-copy-as-text)
+  (test-far-cursor)
   (remove-tmp-files)
   (check-end))

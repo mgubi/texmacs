@@ -25,6 +25,7 @@
 ("a modifier" "modificador A")
 ("GNU" "GNU")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Una clave de solo lectura se crea en https://www.zotero.org/settings/keys")
+("add a bibliography with a BibTeX file to %1" "Añada a %1 una bibliografía con un archivo BibTeX")
 ("add the references of Zotero to the BibTeX file" "añadir las referencias de Zotero al fichero BibTeX")
 ("added %1 reference from Zotero to %2" "Añadida %1 referencia de Zotero a %2")
 ("added %1 references from Zotero to %2" "Añadidas %1 referencias de Zotero a %2")

@@ -39,9 +39,11 @@ concater_rep::control (tree t, path ip) {
 void
 concater_rep::marker (path ip) {
   if (is_decoration (ip)) ip= path (0, ip);
-  int sz= env->get_script_size (env->fn_size, env->index_level);
-  font gfn= unicode_font ("lmroman10-regular", sz, (int) (env->magn*env->dpi));
-  box b= text_box (ip->next, ip->item, "", gfn, blue);
+  box b= text_box (ip->next, ip->item, "", env->fn, blue);
+  // (a place for the cursor, which takes its height from the current font:
+  // no extents of its own, which would change the boxes and the lines into
+  // which it is put, at the boundaries of a macro argument)
+  b->y1= b->y2= 0;
   a << line_item (MARKER_ITEM, OP_SKIP, b, HYPH_INVALID);
 }
 
@@ -129,9 +131,14 @@ concater_rep::flag (string s, path ip, color col) {
 
 void
 concater_rep::print (space spc) {
+  // (on the last item which is not a marker: the space of an item merges
+  // with the spaces of the items around it (max), that of a marker after
+  // it would be added, after a script given by a macro argument)
   int n= N(a);
   if (n==0) return;
-  a[n-1]->spc= max (spc, a[n-1]->spc);
+  int i= n-1;
+  while (i > 0 && a[i]->type == MARKER_ITEM) i--;
+  a[i]->spc= max (spc, a[i]->spc);
 }
 
 void
@@ -932,6 +939,25 @@ typeset_marker (edit_env env, path ip) {
   return a;
 }
 
+static box
+concat_of_items (path ip, array<line_item> a) {
+  int i, n=N(a);
+  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
+  // (the spaces as in a line of a paragraph: the cursor after a macro, a
+  // macro argument or a with stays next to its content, and the space
+  // before the markers at the end does not count)
+  array<SI>  sp= carried_spaces (a);
+  array<box> items (n);
+  array<SI>  spc (n);
+  spc[0]=0;
+  for (i=0; i<n-1; i++) {
+    items[i]  = a[i]->b;
+    spc  [i+1]= sp[i];
+  }
+  items[i]= a[i]->b;
+  return concat_box (ip, items, spc);
+}
+
 box
 typeset_as_concat (edit_env env, tree t, path ip) {
   concater ccc= tm_new<concater_rep> (env, true);
@@ -940,21 +966,7 @@ typeset_as_concat (edit_env env, tree t, path ip) {
   array<line_item> a= ccc->a;
   tm_delete (ccc);
 
-  int i, n=N(a);
-  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
-  array<box> items (n);
-  array<SI>  spc (n);
-  if (n>0) {
-    spc[0]=0;
-    for (i=0; i<n-1; i++) {
-      items[i]  = a[i]->b;
-      spc  [i+1]= a[i]->spc->def;
-    }
-    items[i]= a[i]->b;
-  }
-  box b= concat_box (ip, items, spc);
-
-  return b;
+  return concat_of_items (ip, a);
 }
 
 box
@@ -965,21 +977,7 @@ typeset_as_concat (edit_env env, tree t, path ip, array<line_item>& a) {
   a= ccc->a;
   tm_delete (ccc);
 
-  int i, n=N(a);
-  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
-  array<box> items (n);
-  array<SI>  spc (n);
-  if (n>0) {
-    spc[0]=0;
-    for (i=0; i<n-1; i++) {
-      items[i]  = a[i]->b;
-      spc  [i+1]= a[i]->spc->def;
-    }
-    items[i]= a[i]->b;
-  }
-  box b= concat_box (ip, items, spc);
-
-  return b;
+  return concat_of_items (ip, a);
 }
 
 box
@@ -1068,6 +1066,46 @@ typeset_as_atomic (edit_env env, tree t, path ip) {
     }
     return concat_box (ip, items, spc, true);
   }
+}
+
+// A line which is not broken here, but cut where the line breaker could break
+// it, for something else to break it (a browser): one box when it is shorter
+// than long_width, else boxes of at least min_width. gaps gets the space
+// to leave after each of them.
+array<box>
+typeset_as_segments (edit_env env, tree t, path ip,
+                     SI long_width, SI min_width, array<SI>& gaps) {
+  // rigid as in typeset_as_concat: it draws the decorations of atoms
+  concater ccc= tm_new<concater_rep> (env, true);
+  ccc->typeset (t, ip);
+  ccc->finish ();
+  array<line_item> a= ccc->a;
+  tm_delete (ccc);
+  array<SI> sp= carried_spaces (a);
+  array<box> r;
+  gaps= array<SI> ();
+  int i, n= N(a), start= 0;
+  SI total= 0, w= 0;
+  for (i=0; i<n; i++) total += a[i]->b->w () + sp[i];
+  bool cut= total >= long_width;
+  for (i=0; i<n; i++) {
+    w += a[i]->b->w () + sp[i];
+    total -= a[i]->b->w () + sp[i];
+    if (i == n-1 || (cut && w >= min_width && total >= min_width &&
+                     a[i]->penalty < HYPH_PANIC)) {
+      array<box> items (i + 1 - start);
+      array<SI>  spc (i + 1 - start);
+      for (int j=start; j<=i; j++) {
+        items[j-start]= a[j]->b;
+        spc  [j-start]= j == start? 0: sp[j-1];
+      }
+      r << concat_box (ip, items, spc);
+      gaps << sp[i];
+      start= i + 1;
+      w= 0;
+    }
+  }
+  return r;
 }
 
 tree

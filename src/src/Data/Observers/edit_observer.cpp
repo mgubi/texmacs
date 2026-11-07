@@ -33,6 +33,7 @@ public:
   void notify_assign      (tree& ref, tree t);
   void notify_var_split   (tree& ref, tree t1, tree t2);
   void notify_var_join    (tree& ref, tree t, int offset);
+  void notify_insert_node (tree& ref, int pos);
   void notify_remove_node (tree& ref, int pos);
   void notify_detach      (tree& ref, tree closest, bool right);
 };
@@ -69,8 +70,9 @@ edit_observer_rep::touched (tree& ref, path p) {
 void
 edit_observer_rep::reattach (tree& ref, tree t) {
   if (ref.rep != t.rep) {
-    remove_observer (ref->obs, observer (this));
-    insert_observer (t->obs, observer (this));
+    observer self (this); // (the list may hold the last reference)
+    remove_observer (ref->obs, self);
+    insert_observer (t->obs, self);
   }
 }
 
@@ -89,6 +91,12 @@ void
 edit_observer_rep::notify_var_join (tree& ref, tree t, int offset) {
   (void) ref; (void) offset;
   reattach (ref, t);
+}
+
+void
+edit_observer_rep::notify_insert_node (tree& ref, int pos) {
+  // the observed tree became child pos of the new tree ref
+  reattach (ref[pos], ref);
 }
 
 void

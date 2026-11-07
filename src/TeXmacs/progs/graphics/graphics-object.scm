@@ -613,6 +613,10 @@
             (graphics-remove (tree->path o) 'memoize-layer)
             (if (or (tree->path o) (tree->path (enhanced-tree->radical o)))
                 (set-car! c (tree-copy o)))))))
+  ;; in the group modes, the current path may be the one of an object
+  ;; which was just removed, or which has moved
+  (if (graphics-group-mode? (graphics-mode))
+      (set! current-path #f))
   (set! sticky-point #t)
   (set! graphics-undo-enabled #f)
   (graphics-decorations-update))

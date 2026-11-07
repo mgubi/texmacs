@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeXmacs Upsilon features</title>
+<meta name="description" content="Screenshots of what TeXmacs Upsilon adds to GNU TeXmacs: OpenType mathematics, font design, program code with tree-sitter and language servers, Git, CSL bibliographies, AI sessions and the browser version.">
+<!-- The screenshots are those of misc/upsilon/screenshots (also shown by
+     src/docs/upsilon-screenshots.md on GitHub); the page and the images are
+     copied into the site by misc/wasm/Makefile -->
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="texmacs-vue-32.png">
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1f; --muted: #5d5d63;
+    --line: #dcdcd8; --accent: #0b5cad; --accent-bg: #e8f0fa; --shadow: rgba(0,0,0,.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #18181a; --card: #222225; --text: #ececee; --muted: #a2a2aa;
+      --line: #38383d; --accent: #7db4ff; --accent-bg: #1f2c3d; --shadow: rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #18181a; --card: #222225; --text: #ececee; --muted: #a2a2aa;
+    --line: #38383d; --accent: #7db4ff; --accent-bg: #1f2c3d; --shadow: rgba(0,0,0,.45);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+  header img { width: 56px; height: 56px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0; }
+  h2 { font-size: 21px; line-height: 1.3; margin: 0 0 6px; }
+  p { margin: 8px 0; }
+  a { color: var(--accent); }
+  .lead { color: var(--muted); }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 8px; }
+  .button { display: inline-block; padding: 8px 14px; border-radius: 8px; white-space: nowrap;
+            background: var(--accent-bg); color: var(--accent); text-decoration: none; font-weight: 600; }
+  .button:hover { text-decoration: underline; }
+  figure { margin: 56px 0 0; }
+  figure { scroll-margin-top: 16px; }
+  .numbers { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  .numbers table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  .numbers th, .numbers td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  .numbers th:first-child, .numbers td:first-child { text-align: left; white-space: normal; }
+  .numbers tr:last-child td { border-bottom: none; }
+  .numbers .note { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
+  .toc { margin: 20px 0 0; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .toc ol { margin: 0; padding-left: 22px; columns: 2 260px; column-gap: 32px; }
+  .toc li { margin: 0 0 6px; break-inside: avoid; }
+  figure a.shot { display: block; border-radius: 10px; overflow: hidden;
+                  border: 1px solid var(--line); box-shadow: 0 6px 24px var(--shadow); background: var(--card); }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { margin-bottom: 14px; }
+  figcaption p { color: var(--muted); }
+  footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="texmacs-vue-64.png" alt="">
+    <h1>TeXmacs Upsilon features</h1>
+  </header>
+  <p class="lead">TeXmacs Upsilon is an enhanced and bleeding-edge version of
+  <a href="https://texmacs.org">GNU TeXmacs</a> with experimental features.
+  These screenshots show some of what it adds; the
+  <a href="https://github.com/mgubi/texmacs/tree/upsilon_texmacs#readme">README</a>
+  and <em>Help &gt; Upsilon features</em> list everything. Click a picture for
+  its full size.</p>
+  <div class="links">
+    <a class="button" href="./#downloads">Download</a>
+    <a class="button" href="texmacs.html">Try it in the browser</a>
+    <a class="button" href="changes.html">Recent changes</a>
+    <a class="button" href="thanks.html">Thanks</a>
+  </div>
+
+  <nav class="toc" aria-label="Sections">
+    <ol>
+      <li><a href="#opentype-mathematics">OpenType mathematics</a></li>
+      <li><a href="#interfaces-themes-and-icons">Interfaces, themes and icons</a></li>
+      <li><a href="#cocoa">A native Cocoa interface</a></li>
+      <li><a href="#font-design">Font design</a></li>
+      <li><a href="#typesetting">Faster typesetting</a></li>
+      <li><a href="#scheme">Three Scheme interpreters</a></li>
+      <li><a href="#program-code-with-tree-sitter">Program code with tree-sitter</a></li>
+      <li><a href="#language-servers">Language servers</a></li>
+      <li><a href="#git">Git</a></li>
+      <li><a href="#citation-styles-and-zotero">Citation styles and Zotero</a></li>
+      <li><a href="#ai-sessions">AI sessions</a></li>
+      <li><a href="#in-the-browser">In the browser</a></li>
+    </ol>
+  </nav>
+
+  <figure id="opentype-mathematics">
+    <figcaption>
+      <h2>OpenType mathematics</h2>
+      <p>Formulas are laid out from the <code>MATH</code> table of any OpenType
+      math font, with the stretchable delimiters and accents of the font
+      itself. Some two dozen math fonts are paired with their text
+      companions, most of them shipped with TeXmacs; here Libertinus.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/math-libertinus.webp"><img src="screenshots/math-libertinus.webp" width="1600" height="1025" alt="A page of formulas typeset in Libertinus Math: integrals, sums, a matrix, a system of equations and a theorem"></a>
+  </figure>
+
+  <figure id="interfaces-themes-and-icons">
+    <figcaption>
+      <h2>Interfaces, themes and icons</h2>
+      <p>The same page in STIX Two, in the Vue interface with its dark theme
+      and the Lucide icons. Besides Qt, TeXmacs Upsilon can be built with Vue,
+      an interface drawn by the GPU, and with a native Cocoa interface for
+      macOS; four icon sets come along.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/math-stix-dark-lucide.webp"><img src="screenshots/math-stix-dark-lucide.webp" width="1600" height="1025" loading="lazy" alt="The same page in STIX Two, in a window with the dark theme and the Lucide icons"></a>
+  </figure>
+
+  <figure id="cocoa">
+    <figcaption>
+      <h2>A native Cocoa interface</h2>
+      <p>On macOS, TeXmacs Upsilon also comes as a native Cocoa application:
+      the menus in the menu bar of the Mac, the bars and the dialogs of
+      macOS, the documents drawn by the GPU (Metal). Here with the dark
+      theme and TeX Gyre Pagella.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/cocoa-dark.webp"><img src="screenshots/cocoa-dark.webp" width="1600" height="1169" loading="lazy" alt="TeXmacs as a native macOS application, with the dark theme, a page of formulas in TeX Gyre Pagella"></a>
+  </figure>
+
+  <figure id="font-design">
+    <figcaption>
+      <h2>Font design</h2>
+      <p>A page with a tab for each part of a document (text, mathematics,
+      sans serif, typewriter, blackboard bold, calligraphic, fraktur) shows
+      samples of the fonts, applies a choice to the document and saves named
+      choices. More fonts come along: DejaVu, Gentium Plus, the Antykwas,
+      Iwona, the weights of IBM Plex&hellip;</p>
+    </figcaption>
+    <a class="shot" href="screenshots/font-design.webp"><img src="screenshots/font-design.webp" width="1600" height="1126" loading="lazy" alt="The font design page: tabs for text, mathematics, sans serif and other parts, samples of the chosen fonts, and a list of fonts with descriptions"></a>
+  </figure>
+
+  <figure id="typesetting">
+    <figcaption>
+      <h2>Faster typesetting</h2>
+      <p>An edit in a long document costs about as much as the paragraph it
+      touches: what an edit did not change is used again (the reuse follows
+      what each part of the document read from its environment), the page
+      breaks are not searched again when the sizes stay, and the labels of
+      the table of contents and of the index no longer renumber everything
+      after them. What is typeset is the same, byte for byte. The time of
+      one edit in the middle of the user manual (Help &gt; Manual, 290
+      pages):</p>
+    </figcaption>
+    <div class="numbers">
+      <table>
+        <thead><tr><th>Edit</th><th>Standard TeXmacs</th><th>TeXmacs Upsilon</th></tr></thead>
+        <tbody>
+          <tr><td>type a letter</td><td>283 ms</td><td>17 ms</td></tr>
+          <tr><td>Return (a new paragraph)</td><td>306 ms</td><td>39 ms</td></tr>
+          <tr><td>Backspace (two paragraphs joined)</td><td>854 ms</td><td>16 ms</td></tr>
+          <tr><td>a new section</td><td>1355 ms</td><td>62 ms</td></tr>
+          <tr><td>a new numbered equation</td><td>872 ms</td><td>44 ms</td></tr>
+          <tr><td>type in the equation</td><td>317 ms</td><td>36 ms</td></tr>
+        </tbody>
+      </table>
+      <p class="note">The typesetting time of each edit, without the
+      repaint, from <code>TEXMACS_EDIT_PROFILE</code>; Qt and Guile 1.8 on
+      both sides, macOS on an Apple M4, medians of 3 runs. Standard TeXmacs
+      is the official sources with the bug fixes of this repository, which
+      do not change the typesetting. Typing 30 letters in the middle of the
+      reference of the Scheme functions takes 39 ms instead of 257. Details:
+      <a href="https://github.com/mgubi/texmacs/pull/333">pull request
+      #333</a>.</p>
+    </div>
+  </figure>
+
+  <figure id="scheme">
+    <figcaption>
+      <h2>Three Scheme interpreters</h2>
+      <p>TeXmacs is programmed in Scheme, on Guile 1.8. TeXmacs Upsilon runs
+      on <a href="https://ccrma.stanford.edu/software/snd/snd/s7.html">S7</a>
+      (the default, and the one of the browser) and on
+      <a href="https://github.com/JeffBezanson/femtolisp">femtolisp</a> too,
+      chosen when TeXmacs is built
+      (<code>./configure --with-scheme=s7|femtolisp|guile</code>); one Scheme
+      code base serves the three. Where Scheme does the work, S7 and
+      femtolisp are several times faster; in the interactive work the time
+      is that of the C++ of TeXmacs, the same with all three.</p>
+    </figcaption>
+    <div class="numbers">
+      <table>
+        <thead><tr><th></th><th>Guile 1.8</th><th>S7</th><th>femtolisp</th></tr></thead>
+        <tbody>
+          <tr><td>a bibliography of 300 references in a style of CSL, three times</td><td>6.3 s</td><td>3.6 s</td><td>1.75 s</td></tr>
+          <tr><td>a document to LaTeX</td><td>2.4&ndash;3.9 s</td><td>0.70 s</td><td>0.55 s</td></tr>
+          <tr><td>a document to Markdown</td><td>0.7&ndash;1.1 s</td><td>0.07 s</td><td>0.18 s</td></tr>
+          <tr><td>a Word document (.docx) read</td><td>0.47&ndash;0.64 s</td><td>0.19 s</td><td>0.16 s</td></tr>
+        </tbody>
+      </table>
+      <p class="note">macOS on an Apple M4, the three on the same machine
+      and the same documents. The first window is ready after about 0.7 s
+      with S7 against 1.9 s with Guile (femtolisp: about 0.1 s more than
+      S7). Details: <a href="https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/femtolisp/11-benchmarks-csl-converters.md">the
+      benchmarks of the converters and of CSL</a> and
+      <a href="https://github.com/mgubi/texmacs/blob/upsilon_texmacs/src/docs/s7/07-performance.md">S7 against Guile</a>.</p>
+    </div>
+  </figure>
+
+  <figure id="program-code-with-tree-sitter">
+    <figcaption>
+      <h2>Program code with tree-sitter</h2>
+      <p>The syntax of 22 languages, by tree-sitter, in source files, in the
+      code blocks of documents and in the inputs of sessions: colours, folds,
+      an outline, selection and moves by structure, brackets, indentation and
+      comments. Source files are saved exactly as they were loaded.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/tree-sitter-python.webp"><img src="screenshots/tree-sitter-python.webp" width="1600" height="1025" loading="lazy" alt="A Python source file coloured by its syntax"></a>
+  </figure>
+
+  <figure id="language-servers">
+    <figcaption>
+      <h2>Language servers</h2>
+      <p>Source files are followed by the language server of their language
+      when it is installed, here clangd for C: diagnostics, completion,
+      information on hover, references, renaming, fixes and formatting; a
+      code block of a document is a document of its server too.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/language-server-clangd.webp"><img src="screenshots/language-server-clangd.webp" width="1600" height="1025" loading="lazy" alt="A C file with a misspelled variable underlined as an error, the names of parameters shown in grey, and clangd 1 error in the bar"></a>
+  </figure>
+
+  <figure id="git">
+    <figcaption>
+      <h2>Git</h2>
+      <p>The Version menu works with Git: a side panel, commits, the history,
+      branches, the synchronization with a remote, and the comparison with
+      any revision, marked in the typeset document. Merges of TeXmacs
+      documents follow their structure.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/git-compare.webp"><img src="screenshots/git-compare.webp" width="1600" height="1025" loading="lazy" alt="A document compared with its last commit: the changed words marked in the typeset text, the Git panel at the right and the review bar at the bottom"></a>
+  </figure>
+
+  <figure id="citation-styles-and-zotero">
+    <figcaption>
+      <h2>Citation styles and Zotero</h2>
+      <p>The styles of the Citation Style Language (those of Zotero, Mendeley
+      and Pandoc) are processed by TeXmacs itself: here APA, for the
+      citations and the bibliography. References can also come from the
+      Zotero application.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/csl-apa-bibliography.webp"><img src="screenshots/csl-apa-bibliography.webp" width="1600" height="1025" loading="lazy" alt="A text with citations and a bibliography in APA style"></a>
+  </figure>
+
+  <figure id="ai-sessions">
+    <figcaption>
+      <h2>AI sessions</h2>
+      <p>Chats with ChatGPT, Claude, Gemini, Mistral, OpenRouter, Albert or a
+      model on your computer (Ollama, here gemma4) inside a document: the
+      answers are streamed and typeset as they come, files can be attached,
+      and the keys are kept in an encrypted wallet.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/ai-session-ollama.webp"><img src="screenshots/ai-session-ollama.webp" width="1600" height="1025" loading="lazy" alt="An AI session in a document: a question and the answer of a local model with typeset formulas"></a>
+  </figure>
+
+  <figure id="in-the-browser">
+    <figcaption>
+      <h2>In the browser</h2>
+      <p>The same TeXmacs, compiled to WebAssembly, runs in a web page with
+      nothing to install; documents stay in the browser, and Python, R, TikZ
+      and Asymptote run in the page too.
+      <a href="texmacs.html">Open it</a>.</p>
+    </figcaption>
+    <a class="shot" href="screenshots/browser.webp"><img src="screenshots/browser.webp" width="1600" height="1000" loading="lazy" alt="TeXmacs in a web browser, with a panel of open documents at the left"></a>
+  </figure>
+
+  <footer>
+    The sources are the branch
+    <a href="https://github.com/mgubi/texmacs/tree/upsilon_texmacs"><code>upsilon_texmacs</code></a>;
+    the latest builds are on the <a href="./#downloads">main page</a>.
+  </footer>
+</main>
+</body>
+</html>

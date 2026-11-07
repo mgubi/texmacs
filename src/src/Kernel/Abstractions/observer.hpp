@@ -152,6 +152,7 @@ void remove_observer (observer& o, observer what);
 void attach_observer (tree& ref, observer o);
 void detach_observer (tree& ref, observer o);
 void clean_observers (tree& ref);
+void simplify_observers (tree& ref);
 
 path obtain_ip (tree& ref);
 void attach_ip (tree& ref, path ip);
@@ -160,6 +161,7 @@ bool ip_attached (path ip);
 
 tree obtain_tree (observer o);
 observer tree_pointer_new (tree t);
+observer tree_pointer_cb_new (tree t, string cb); // calls the Scheme function cb
 void tree_pointer_delete (observer o);
 
 path obtain_position (observer o);

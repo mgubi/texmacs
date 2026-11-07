@@ -22,6 +22,10 @@ SCHEME   ?= s7
 TM       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 S        := $(TM)/src
 W        := $(TM)/misc/wasm
+# the screenshots of the features of TeXmacs Upsilon (features.html, and
+# src/docs/upsilon-screenshots.md on GitHub)
+SHOTS    := $(TM)/misc/upsilon/screenshots
+SCREENSHOTS  = $(patsubst $(SHOTS)/%,$(OUT)/web/screenshots/%,$(wildcard $(SHOTS)/*.webp))
 MUPDF    ?= $(CURDIR)/mupdf-1.28.5-source
 # the slim build of MuPDF (misc/wasm/build-mupdf.sh): no fonts of its own
 # but the standard 14, no document formats but PDF, SVG and the images
@@ -91,7 +95,9 @@ override THORVG :=
 endif
 THORVG_LIB :=
 ifneq ($(THORVG),)
-CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1
+# (and its WebGPU engine: Dawn's webgpu.h for Emscripten, the port
+# emdawnwebgpu, with which the page draws by WebGPU, gpu_backend_wg.cpp)
+CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1 --use-port=emdawnwebgpu
 THORVG_LIB := $(THORVG)/lib/libthorvg-1.a
 endif
 
@@ -107,7 +113,7 @@ LDFLAGS  := $(OPT) $(EH) -sUSE_SDL=3 -sALLOW_MEMORY_GROWTH=1 \
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm
 ifneq ($(THORVG),)
 LIBS     += $(THORVG)/lib/libthorvg-1.a
-LDFLAGS  += -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2
+LDFLAGS  += -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2 --use-port=emdawnwebgpu
 endif
 # a new MuPDF (build-mupdf.sh, its patches) links the program again
 LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a $(THORVG_LIB)
@@ -123,7 +129,16 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png licenses tikzjax asymptote python r
+
+# the licenses of the components (TeXmacs/misc/licenses, also in the
+# packages of the page), as files of the site: out/web/licenses/
+licenses: $(OUT)/web/licenses/README.md
+
+$(OUT)/web/licenses/README.md: $(wildcard $(TM)/TeXmacs/misc/licenses/*) $(TM)/LICENSE
+	@mkdir -p $(OUT)/web/licenses
+	cp $(TM)/TeXmacs/misc/licenses/* $(OUT)/web/licenses/
+	cp $(TM)/LICENSE $(OUT)/web/licenses/GPL-3.0.txt
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -139,9 +154,12 @@ $(OUT)/web/tikzjax/tables.js: $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js
 $(TIKZJAX)/dist/run-tex.js:
 	sh $(W)/get-tikzjax.sh $(CURDIR)
 
-$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js $(wildcard $(W)/tikzjax-extra/*.tex)
+$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js $(wildcard $(W)/tikzjax-extra/*) $(W)/tikzjax-sources.md
 	@mkdir -p $(OUT)/web/tikzjax
 	cp $(TIKZJAX)/dist/run-tex.js $(TIKZJAX)/dist/tex.wasm.gz $(TIKZJAX)/dist/core.dump.gz $(TIKZJAX)/LICENSE $(OUT)/web/tikzjax/
+	# where their sources are, and the licenses of the libraries added
+	cp $(W)/tikzjax-sources.md $(OUT)/web/tikzjax/SOURCES.md
+	cp $(W)/tikzjax-extra/README.md $(OUT)/web/tikzjax/EXTRA.md
 	rm -rf $(OUT)/web/tikzjax/tex_files; cp -R $(TIKZJAX)/dist/tex_files $(OUT)/web/tikzjax/
 	# the libraries of pgfplots which TikZJax lacks (misc/wasm/tikzjax-extra)
 	for f in $(W)/tikzjax-extra/*.tex; do gzip -9 -n -c $$f > $(OUT)/web/tikzjax/tex_files/`basename $$f`.gz; done
@@ -165,9 +183,14 @@ $(OUT)/web/asymptote/version.js: $(ASYMPTOTE)/dist/asymptote.wasm
 	  $(ASYMPTOTE_VERSION) $(ASYMPTOTE:asymptote-web-%=%) > $@
 
 # Asymptote-web, with brotli copies of its large files for the servers
-$(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm
+# and its licenses (the LGPL, with the GPL it adds to) and where its
+# sources are (the npm package has neither)
+$(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm $(W)/asymptote-sources.md
 	@mkdir -p $(OUT)/web/asymptote
 	cd $(ASYMPTOTE)/dist && cp $(ASY_FILES) $(CURDIR)/$(OUT)/web/asymptote/
+	cp $(TM)/TeXmacs/misc/licenses/LGPL-3.0.txt $(OUT)/web/asymptote/LICENSE
+	cp $(TM)/LICENSE $(OUT)/web/asymptote/COPYING
+	cp $(W)/asymptote-sources.md $(OUT)/web/asymptote/SOURCES.md
 	-command -v brotli > /dev/null && cd $(OUT)/web/asymptote && \
 	  for f in asymptote.wasm asy.data asymptote.js; do brotli -f -q 9 -k $$f; done
 	touch $@
@@ -200,6 +223,61 @@ $(OUT)/web/favicon.ico: $(TM)/TeXmacs/misc/images/texmacs-vue.ico
 	@mkdir -p $(OUT)/web
 	cp $< $@
 
+# the main page of the site: TeXmacs Upsilon and its builds (the files of
+# the pre-release upsilon-latest, listed from the API of GitHub); TeXmacs in
+# the browser is texmacs.html. downloads.html, its old address, goes there
+$(OUT)/web/index.html: $(W)/index.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/downloads.html: $(W)/downloads.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of TeXmacs Fixes (the packages of wip_fixes, fixes-latest), with
+# the icon of the stock TeXmacs
+$(OUT)/web/fixes.html: $(W)/fixes.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/texmacs-64.png: $(TM)/TeXmacs/misc/images/texmacs-64.png
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of screenshots of the features, and its pictures
+$(OUT)/web/features.html: $(W)/features.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of the changes, and the list it shows: written once, in
+# Markdown, and shown by GitHub too
+$(OUT)/web/changes.html: $(W)/changes.html
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/changes.md: $(TM)/docs/upsilon-changes.md
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+# the page of thanks, the same page on the list of thanks, which the help
+# of TeXmacs Upsilon shows too (About > Upsilon features > Thanks)
+$(OUT)/web/thanks.html: $(W)/changes.html
+	@mkdir -p $(OUT)/web
+	sed -e 's/TeXmacs Upsilon changes/TeXmacs Upsilon thanks/' \
+	    -e 's/The recent changes and revisions of TeXmacs Upsilon/The people who reported problems in TeXmacs Upsilon or sent code/' \
+	    -e 's/the list of the changes/the list of thanks/' \
+	    -e 's|href="thanks.html">Thanks<|href="changes.html">Recent changes<|' \
+	    -e "s|^  var SOURCE = 'src/docs/upsilon-changes.md';|  var SOURCE = 'src/TeXmacs/doc/about/welcome/upsilon-thanks.md';|" \
+	    -e "s|^  var LIST = 'changes.md';|  var LIST = 'thanks.md';|" $< > $@
+
+$(OUT)/web/thanks.md: $(TM)/TeXmacs/doc/about/welcome/upsilon-thanks.md
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/screenshots/%.webp: $(SHOTS)/%.webp
+	@mkdir -p $(OUT)/web/screenshots
+	cp $< $@
+
 $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/workers.js $(W)/javascript.js $(W)/ime.js $(W)/wallet.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
 	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/progress.js --pre-js $(W)/packages.js --pre-js $(W)/web-pre.js \
@@ -207,7 +285,6 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	  $(OBJECTS) $(LIBS) -o $@
 	perl -pi -e "s/\@TM_WASM_SIZE\@/$$(wc -c < $(OUT)/web/texmacs.wasm | tr -d ' ')/" $@
 	perl -pi -e "s/\@TM_VERSION\@/$$(sed -n 's/^#define TEXMACS_VERSION \"\(.*\)\"/\1/p' $(W)/tm_configure.hpp)/" $@
-	cp $@ $(OUT)/web/index.html
 	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
 	gzip -9 -n -k -f $(OUT)/web/texmacs.wasm
 
@@ -308,6 +385,12 @@ $(OBJ)/Scheme/Femtolisp/%.o: $(S)/Scheme/Femtolisp/%.c
 	@mkdir -p $(dir $@)
 	emcc $(CPPFLAGS) -I$(S)/Scheme/Femtolisp/femtolisp/llt $(DEPFLAGS) $(CFLAGS) -c $< -o $@
 
+# the runtime of tree-sitter, vendored with its headers (as in src/makefile.in)
+$(OBJ)/Plugins/TreeSitter/%.o: $(S)/Plugins/TreeSitter/%.c
+	@mkdir -p $(dir $@)
+	emcc $(CPPFLAGS) -I$(S)/Plugins/TreeSitter/tree-sitter/include \
+	  -I$(S)/Plugins/TreeSitter/tree-sitter/src $(DEPFLAGS) $(CFLAGS) -c $< -o $@
+
 $(OBJ)/%.o: $(S)/%.c
 	@mkdir -p $(dir $@)
 	emcc $(CPPFLAGS) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
@@ -339,4 +422,4 @@ $(OBJECTS): $(FLAGS_FILE)
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote python r plugins-sync femtolisp-cache
+.PHONY: all web node clean licenses tikzjax asymptote python r plugins-sync femtolisp-cache

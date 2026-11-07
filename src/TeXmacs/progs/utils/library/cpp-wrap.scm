@@ -90,7 +90,7 @@
 (tm-define (make-rprime s) (cpp-make-rprime s))
 (tm-define (make-below) (cpp-make-below))
 (tm-define (make-above) (cpp-make-above))
-(tm-define (make-script r? sup?) (cpp-make-script r? sup?))
+(tm-define (make-script sup? r?) (cpp-make-script sup? r?))
 (tm-define (make-fraction) (cpp-make-fraction))
 (tm-define (make-sqrt) (cpp-make-sqrt))
 (tm-define (make-var-sqrt) (cpp-make-var-sqrt))

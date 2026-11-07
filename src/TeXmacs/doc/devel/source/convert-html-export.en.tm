@@ -289,8 +289,9 @@
   (<scm|open-website-builder> in <source-link|doc/tmweb.scm|TeXmacs/progs/doc/tmweb.scm>) which calls
   <scm|tmweb-convert-dir> or <scm|tmweb-update-dir>. These functions walk
   through the source directory, convert every <verbatim|.tm> file with
-  <scm|export-buffer-main> (setting <scm|current-save-target> so that the
-  images go next to each page) and copy all other files; the update
+  <scm|export-buffer-main> (the images go next to each page, since
+  <cpp|buffer_export> sets <scm|current-save-target> during the conversion)
+  and copy all other files; the update
   variant only converts files which are newer than their target
   (<scm|needs-update?>). Pages get the suffix <verbatim|.xhtml> instead of
   <verbatim|.html> when <name|MathML> export is enabled. The variants

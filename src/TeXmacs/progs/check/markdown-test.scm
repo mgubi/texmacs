@@ -24,7 +24,7 @@
 ;; (tmmarkdown-expand.scm), is tested with one document at the end.
 
 (texmacs-module (check markdown-test)
-  (:use (check check-lib)))
+  (:use (check check-lib) (convert tools code-languages)))
 
 (define (parse s) (convert s "markdown-snippet" "markdown-stree"))
 (define (plain t)
@@ -885,11 +885,20 @@
   (check= (md-body "- a\n\n- b\n")
           '((md-loose (itemize-minus (document (concat (item) "a")
                                                (concat (item) "b"))))))
-  ;; code: the words after the fence, when the tag does not say them
-  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```rust\nx\n```\n")
+  ;; code: the words after the fence, when the tag does not say them (elixir
+  ;; is a language without a tag of its own)
+  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```elixir\nx\n```\n")
           '((python-code (document "x"))
             (md-fence "py" (python-code (document "x")))
-            (md-fence "rust" (verbatim-code (document "x")))))
+            (md-fence "elixir" (verbatim-code (document "x")))))
+  (check= (md-body "```haskell\nx\n```\n") '((haskell-code (document "x"))))
+  (check= (md-body "```rust\nx\n```\n\n```lean\ny\n```\n")
+          '((rust-code (document "x")) (lean-code (document "y"))))
+  ;; the table of the languages shared with docx/odt (code-languages.scm)
+  (check= (map code-language-tag '("golang" "c++" "unknown"))
+          '(go-code cpp-code #f))
+  (check= (map code-language-name '(lean-code verbatim-code section))
+          '("lean" "" #f))
   ;; images and footnotes
   (check= (md-body "a ![d](i.png) ![](j.png) ![d](i.png \"T\")\n")
           '((concat "a " (md-image (image "i.png" "" "" "" "") "d" "") " "
@@ -1009,9 +1018,9 @@
   ;; the words after the fence are for the language they name
   (check= (tm->md (in-style '(md-fence "c" (python-code (document "x")))))
           "```python\nx\n```\n")
-  (check= (tm->md (in-style '(md-fence "rust ignore"
+  (check= (tm->md (in-style '(md-fence "elixir ignore"
                                        (verbatim-code (document "x")))))
-          "```rust ignore\nx\n```\n")
+          "```elixir ignore\nx\n```\n")
   ;; a kept block which was moved into a heading or a cell
   (check= (tm->md (in-style '(section (concat "T " (md-block-source
                                                      (equation* (document "x"))
@@ -1033,7 +1042,11 @@
   ;; the macros in code, and in LaTeX
   (check= (tm->md (in-style '(verbatim (md-source (math "y") "$y$" (math "y")))))
           "`y`\n")
-  (with s (convert (md->tm markdown-file) "texmacs-stree" "latex-document")
+  ;; (as for a file in the temporary directory: the images of the LaTeX
+  ;; go next to it, not in the current directory)
+  (with s (with-global current-save-target
+              (url-append (url-temp-dir) "markdown-losses.tex")
+            (convert (md->tm markdown-file) "texmacs-stree" "latex-document"))
     (check= (string-search-forwards "\\md" 0 s) -1)
     (check-true (>= (string-search-forwards "\\footnote{The note.}" 0 s) 0))))
 

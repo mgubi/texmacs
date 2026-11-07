@@ -42,8 +42,10 @@ bridge_formatting_rep::bridge_formatting_rep (
 void
 bridge_formatting_rep::initialize () {
   last= N(st)-1;
-  if (is_nil(body)) body= make_bridge (ttt, st[last], descend (ip, last));
-  else replace_bridge (body, st[last], descend (ip, last));
+  // (a patch from another process can leave the tree with no child)
+  tree u= last >= 0? st[last]: tree ("");
+  if (is_nil(body)) body= make_bridge (ttt, u, descend (ip, last >= 0? last: 0));
+  else replace_bridge (body, u, descend (ip, last >= 0? last: 0));
 }
 
 bridge
@@ -58,7 +60,7 @@ bridge_formatting (typesetter ttt, tree st, path ip, string v) {
 void
 bridge_formatting_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || is_func (u, TFORMAT), "nil path");
+  ASSERT (!is_nil (p) || is_func (u, TFORMAT) || L(u) == L(st), "nil path");
   if (is_nil (p)) {
     st=u;
     initialize ();
@@ -152,8 +154,6 @@ bridge_formatting_rep::my_typeset (int desired_status) {
     if (v != CELL_FORMAT) ttt->insert_marker (st, ip);
     ttt->insert_surround (a, b);
   }
-  tree outer= bind_start (tree (TUPLE, v, new_format));
   body->typeset (desired_status);
-  bind_end (outer);
   env->local_end (v, old_format);
 }

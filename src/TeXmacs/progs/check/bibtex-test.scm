@@ -27,9 +27,10 @@
 ;; import and export) are not checked: they create a user in the database
 ;; of the TeXmacs home directory. The sorting of citations is checked by
 ;; utils/cite/cite-sort-test.scm.
+;; The external bibtex program is run when it is installed.
 ;;
-;; The checks state the intended behaviour; the bugs of issue #75 which
-;; they would reproduce are left out with a FIXME.
+;; The checks state the intended behaviour, including the fixes of the
+;; bugs of issue #75.
 
 (texmacs-module (check bibtex-test)
   (:use (check check-lib)
@@ -99,6 +100,16 @@
 (define (fmt-labels style s) (map car (fmt style s)))
 (define (fmt-keys style s) (map cadr (fmt style s)))
 
+;; the number of warnings of the BibTeX engine so far which contain @what
+(define (bib-warnings what)
+  (with l (tree->stree (get-debug-messages "Errors" 1000000))
+    (length (list-filter (cdr l)
+                         (lambda (m)
+                           (and (func? m 'tuple) (>= (length m) 3)
+                                (== (cadr m) "bibtex-warning")
+                                (string? (caddr m))
+                                (contains? (caddr m) what)))))))
+
 ;; a TeXmacs bibliography to BibTeX
 (define (bib-out t) (convert t "texmacs-stree" "bibtex-document"))
 
@@ -160,10 +171,51 @@
           '("misc" "book"))
   ;; a field without a value, an empty value
   (check= (bib-value "@misc{k, note = {}, title = {T}}" "title") "T")
-  ;; FIXME: #75 item 3, pages which do not start with a digit become
-  ;; (bib-pages "0") (bib_field_pages, bibtex_functions.cpp:824), where
-  ;; "e1002--e1010" should give (bib-pages "e1002" "e1010").
-  )
+  ;; pages which do not start with a digit are kept (#75 item 3)
+  (check= (bib-value "@misc{k, pages = {e1002--e1010}}" "pages")
+          '(bib-pages "e1002" "e1010"))
+  (check= (bib-value "@misc{k, pages = {xii}}" "pages") '(bib-pages "xii"))
+  ;; a range is split at "--", and at a single "-" only between two sides
+  ;; of the same kind
+  (check= (bib-value "@misc{k, pages = {A-1--A-10}}" "pages")
+          '(bib-pages "A-1" "A-10"))
+  (check= (bib-value "@misc{k, pages = {S-12}}" "pages") '(bib-pages "S-12"))
+  (check= (bib-value "@misc{k, pages = {e1002-e1010}}" "pages")
+          '(bib-pages "e1002" "e1010"))
+  (check= (bib-value "@misc{k, pages = {xii-xv}}" "pages")
+          '(bib-pages "xii" "xv"))
+  ;; other pages are kept as written, with an en dash for --, and an
+  ;; empty field gives no page
+  (check= (bib-value "@misc{k, pages = {12, 15--17}}" "pages")
+          `(bib-pages ,(string-append "12, 15" "\x15" "17")))
+  (check= (bib-value "@misc{k, pages = {1--2--3}}" "pages")
+          `(bib-pages ,(string-append "1" "\x15" "2" "\x15" "3")))
+  (check= (bib-value "@misc{k, pages = {}, title = {T}}" "pages") '(bib-pages))
+  (check-true (contains? (bib-out (bib-parse "@misc{k, pages = {12, 15--17}}"))
+                         "{12, 15--17}"))
+  ;; an en dash (a UTF-8 dash in the file) separates a range too
+  (check= (bib-value (string-append "@misc{k, pages = {12" "\x15" "34}}") "pages")
+          '(bib-pages "12" "34"))
+  ;; the rule is also the one of the database, through bib-field-pages
+  (check= (tree->stree (bib-field-pages (string-append "e1" "\x15" "e9")))
+          '(bib-pages "e1" "e9"))
+  (check= (tree->stree (bib-field-pages "S-12")) '(bib-pages "S-12"))
+  (check= (tree->stree (bib-field-pages "")) '(bib-pages))
+  ;; the fields which BibTeX reads verbatim are not converted from LaTeX,
+  ;; nor the keys of other entries
+  (with s (string-append "@misc{k, doi = {10.1000/a_b%20}, eprint = {a_b}, "
+                         "url = {http://x.org/a_b}, title = {a_b}, "
+                         "crossref = {smith_2020}}")
+    (check= (bib-value s "doi") "10.1000/a_b%20")
+    (check= (bib-value s "eprint") "a_b")
+    (check= (bib-value s "url") '(slink "http://x.org/a_b"))
+    (check= (bib-value s "crossref") "smith_2020")
+    (check-true (contains? (bib-out (bib-parse s)) "{smith_2020}")))
+  ;; the months, as in the standard styles of BibTeX, unless redefined
+  (check= (bib-value "@misc{k, month = jan}" "month") "January")
+  (check= (bib-value "@misc{k, month = sep # { 1}}" "month") "September 1")
+  (check= (bib-value "@string{jan = {Jan.}} @misc{k, month = jan}" "month")
+          "Jan."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: @string and #
@@ -191,18 +243,35 @@
           "Communications of the ACM")
   (check= (bib-value "@misc{k, journal = tcs # \", vol\"}" "journal")
           "Theoretical Computer Science, vol")
-  ;; an unknown abbreviation alone is kept as its name
-  (check= (bib-value "@misc{k, journal = unknown}" "journal") "unknown")
+  ;; as in BibTeX, an undefined abbreviation expands to nothing, with a
+  ;; warning
+  (with n (bib-warnings "String name 'unknown' is undefined")
+    (check= (bib-value "@misc{k, journal = unknown}" "journal") "")
+    (check= (bib-warnings "String name 'unknown' is undefined") (+ n 1)))
   ;; the @string definitions do not appear in the body
   (check= (length (cdr (bib-parse "@string{foo = \"Foo\"} @misc{k, journal = foo}")))
           1)
-  ;; FIXME: #75 item 5, an abbreviation used in a later @string is looked
-  ;; up case-sensitively (bib_strings_dict, bibtex_functions.cpp:1045):
-  ;; @string{FOO = "Foo"} @string{bar = FOO # "Y"} gives bar = "Y", not "FooY".
-  ;; FIXME: #75 item 6, an unknown abbreviation inside a # concatenation
-  ;; vanishes silently (bibtex_functions.cpp:1063): journal = unknown # " X"
-  ;; gives " X" (trimmed to "X"), where the name is kept when it is alone.
-  )
+  ;; an abbreviation used in a later @string is case-insensitive too
+  ;; (#75 item 5)
+  (check= (bib-value (string-append "@string{FOO = \"Foo\"} "
+                                    "@string{bar = FOO # \"Y\"} "
+                                    "@misc{k, journal = bar}")
+                     "journal")
+          "FooY")
+  (check= (bib-value (string-append "@string{FOO = \"Foo\"} @string{bar = FOO} "
+                                    "@misc{k, journal = bar}")
+                     "journal")
+          "Foo")
+  ;; also inside a # concatenation (#75 item 6), and in a @string
+  (check= (bib-value "@misc{k, journal = unknown # \" X\"}" "journal")
+          "X")
+  (check= (bib-value (string-append "@string{bar = unknown # \"Y\"} "
+                                    "@misc{k, journal = bar}")
+                     "journal")
+          "Y")
+  (check= (bib-value "@string{bar = unknown} @misc{k, journal = bar # \"Y\"}"
+                     "journal")
+          "Y"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: comments
@@ -222,10 +291,11 @@
             '(bib-comment bib-comment bib-entry bib-comment bib-entry)))
   (check= (map caddr (bib-entries "@comment{a, title={A}} @misc{b, title={B}}"))
           '("b"))
-  ;; FIXME: #75 item 7, the contents of @preamble are dropped (parsebib.cpp,
-  ;; bib_list: tpreamble is never added to the result), where
-  ;; @preamble{"\newcommand{\x}{y}"} should give a bib-preamble.
-  )
+  ;; @preamble is kept as a bib-preamble before the entries (#75 item 7)
+  (with b (bib-parse "@preamble{\"\\newcommand{\\x}{y}\"} @misc{k, title={T}}")
+    (check= (cadr b)
+            '(bib-preamble (document (bib-latex "\\newcommand{\\x}{y}"))))
+    (check= (map car (cdr b)) '(bib-preamble bib-entry))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser: accents
@@ -297,14 +367,36 @@
   (check= (bib-parse "") "")
   (check-true (string? (convert (bib-doc "@misc{k, title = {x}") "bibtex-stree"
                                 "bibtex-document")))
-  ;; FIXME: #75 item 4, braces are not counted inside "..." values
-  ;; (bib_within, parsebib.cpp:83-102): title = "A {"} b", year = 2000
-  ;; cuts the entry at the inner quote, and year becomes a comment.
-  ;; FIXME: #75 item 10, one field which LaTeX cannot parse disables the
-  ;; conversion of the whole file (bib_parse_fields, bibtex_functions.cpp:957):
-  ;; with note = {\begin{x}}, author = {Smith, John} stays the string
-  ;; "Smith, John" instead of (bib-names (bib-name "John" "" "Smith" "")).
-  )
+  ;; braces are counted inside "..." values, so that a quote in braces
+  ;; does not end the value (#75 item 4)
+  (with s "@misc{k, title = \"A {\"} b\", year = 2000}"
+    (check= (bib-names-of s) '("title" "year"))
+    (check= (bib-value s "year") "2000"))
+  ;; a field which LaTeX cannot parse does not keep the other fields of the
+  ;; file from being converted (#75 item 10)
+  (with s "@misc{k, note = {\\begin{x}}, author = {Smith, John}}"
+    (check= (bib-value s "author")
+            '(bib-names (bib-name "John" "" "Smith" "")))
+    ;; and the field itself keeps its LaTeX, instead of becoming empty
+    (check= (bib-value s "note") '(verbatim "\\begin{x}"))
+    (check-true (contains? (bib-out (bib-parse s)) "{\\begin{x}}"))
+    (check-true (pair? (fmt "plain" s))))
+  ;; but LaTeX which prints nothing gives an empty value, also as the last
+  ;; value of the file, and no warning
+  (with n (bib-warnings "Could not convert field")
+    (check= (bib-value "@misc{k, note = {\\relax}}" "note") "")
+    (check= (bib-value "@misc{k, note = {\\ignorespaces}}" "note") "")
+    (check= (bib-value "@misc{k, note = {{\\relax}}, year = 2000}" "note") "")
+    (with s "@misc{k, author = {Smith, John}, note = {\\relax}}"
+      (check= (bib-value s "author")
+              '(bib-names (bib-name "John" "" "Smith" "")))
+      (check= (bib-value s "note") ""))
+    (check= (bib-value "@misc{k, note = {\\relax}, title = {}}" "title") "")
+    (check= (bib-warnings "Could not convert field") n)
+    (check-false (contains? (fmt-text "plain" "@misc{k, note = {\\relax}}")
+                            "relax")))
+  ;; an environment which is not closed is kept as LaTeX, also with text
+  (check= (bib-value "@misc{k, note = {\\end{x}}}" "note") '(verbatim "\\end{x}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Built-ins of the engine
@@ -318,17 +410,19 @@
   (check= (bib-text-length "") 0)
   (check= (bib-text-length '(concat "ab" "cd")) 4)
   (check= (bib-text-length '(with "font-shape" "italic" "abc")) 3)
-  ;; FIXME: #75 item 1, bib-text-length is 0 for a concat with formatted
-  ;; parts (bib_tree_length, bibtex_functions.cpp:692 never returns its
-  ;; sum): (concat "ab" (keepcase "Cd")) should be 4.
+  ;; formatted parts and Cork characters are counted (#75 item 1)
+  (check= (bib-text-length '(concat "ab" (keepcase "Cd"))) 4)
+  (check= (bib-text-length '(concat "ab" (with "font-shape" "italic" "cd"))) 4)
+  (check= (bib-text-length "<alpha>bc") 3)
   (check= (bib-prefix "Smith" 3) "Smi")
   (check= (bib-prefix "Sm" 3) "Sm")
   (check= (bib-prefix '(concat "Sm" "ith") 3) "Smi")
   (check= (bib-prefix "others" 3) "+")
-  ;; FIXME: #75 item 2, bib-prefix does not look inside with and keepcase
-  ;; and counts bytes (bib_get_prefix, bibtex_functions.cpp:713):
-  ;; (with "font-shape" "italic" "Smith") gives "" for "Smi", and "<alpha>bc"
-  ;; gives "<" for "<alpha>".
+  ;; bib-prefix looks inside with and does not split a Cork character
+  ;; (#75 item 2)
+  (check= (bib-prefix '(with "font-shape" "italic" "Smith") 3) "Smi")
+  (check= (bib-prefix "<alpha>bc" 1) "<alpha>")
+  (check= (bib-prefix '(concat "a" (keepcase "Bc")) 2) "aB")
   (check= (bib-purify "abc") "abc")
   (check= (bib-purify '(concat "a" (with "font-shape" "italic" "b")
                                (keepcase "C")))
@@ -354,9 +448,9 @@
           '(concat "ab" "cD"))
   (check= (bib-default-preserve-case '(concat "ab" (keepcase "cD")))
           '(concat "ab" (keepcase "cD")))
-  ;; FIXME: #75 item 9, bib-upcase-first changes the letters inside
-  ;; keepcase (bib_change_first): (keepcase "iPhone") becomes
-  ;; (keepcase "IPhone") instead of staying as it is.
+  ;; the letters inside keepcase are left as they are (#75 item 9)
+  (check= (bib-upcase-first '(keepcase "iPhone")) '(keepcase "iPhone"))
+  (check= (bib-locase-first '(keepcase "IPhone")) '(keepcase "IPhone"))
   (check= (bib-abbreviate "John Paul" "." " ") '(concat "J" "." " " "P" "."))
   (check= (bib-abbreviate "Jean-Pierre" "." " ") '(concat "J" "." "-" "P" "."))
   (check= (bib-abbreviate "\xc9mile" "." " ") '(concat "\xc9" "."))
@@ -441,6 +535,25 @@
   (check= (bib-with-style "alpha" bib-sort-key (car (bib-entries sample-bib)))
           "ZB1999    ZED A. BEE B.     1999    T"))
 
+;; A style falls back on another one, which may fall back on a third: the
+;; definitions of all of them hold for it, and for no other style.
+(bib-define-style "tmtest-alpha" "alpha")
+
+(define (test-style-fallback)
+  (check-group "fallback of styles")
+  (check-true (bib-with-style "tmtest-alpha" bib-mode? "tmtest-alpha"))
+  (check-true (bib-with-style "tmtest-alpha" bib-mode? "alpha"))
+  (check-true (bib-with-style "tmtest-alpha" bib-mode? "plain"))
+  (check-true (bib-with-style "alpha" bib-mode? "plain"))
+  (check-false (bib-with-style "alpha" bib-mode? "tmtest-alpha"))
+  (check-false (bib-with-style "plain" bib-mode? "alpha"))
+  (check-false (bib-with-style "abbrv" bib-mode? "alpha"))
+  (check-true (bib-with-style "no-such-style" bib-mode? "plain"))
+  ;; the labels of the other styles are not those of alpha
+  (check= (fmt-labels "plain" sample-bib) '("1" "2" "3" "4" "5" "6" "7" "8"))
+  (check= (map car (fmt "tmtest-alpha" sample-bib))
+          (map car (fmt "alpha" sample-bib))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry types in the styles
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -520,6 +633,11 @@
   ;; an entry with a crossref cites its parent
   (check= (one "plain" "@article{ar, author={Doe, J.}, title={Crossed}, crossref={pr}, pages={7}}")
           "J. Doe. Crossed. In [pr], page 7.")
+  ;; pages kept as written are several pages, as for multi.page.check
+  (check= (one "plain" "@article{ar, author={Doe, J.}, title={Crossed}, crossref={pr}, pages={7, 9}}")
+          "J. Doe. Crossed. In [pr], pages 7, 9.")
+  (check= (one "plain" "@article{ar, author={Doe, J.}, title={Crossed}, crossref={pr}, pages={S-12}}")
+          "J. Doe. Crossed. In [pr], pages S-12.")
   (check= (fmt-labels "alpha" "@inproceedings{ip, author={Doe, J.}, title={T}, booktitle={B}, year=2000}\n@proceedings{pr, editor={Ed, E. and Fd, F.}, title={Proc}, year=2008}")
           '("Doe00" "EF08")))
 
@@ -578,11 +696,25 @@
                                        (document (bib-field "note" "x")))))))
   (check= (convert "@misc{k, note={x}}" "bibtex-snippet" "texmacs-stree")
           '(document (bib-entry "misc" "k" (document (bib-field "note" "x")))))
-  ;; FIXME: #75 item 8, plain string values are written unescaped
-  ;; (bibtex-arg, bibtexout.scm:133): note = {50\%} is saved as {50%},
-  ;; which LaTeX reads as a comment, and an accented letter as a raw Cork
-  ;; byte, where {50\%} and {\'e} are expected.
-  )
+  ;; plain string values are written escaped (#75 item 8)
+  (with out (bib-out (bib-parse "@misc{k, note = {50\\% caf\\'e}}"))
+    (check-true (contains? out "{50\\% caf{\\'e}}"))
+    (check= (bib-value out "note") "50% caf\xe9"))
+  ;; also the strings next to an abbreviation in a field, while @string
+  ;; values are raw LaTeX
+  (with out (bib-out '(document
+                        (bib-string (document (bib-assign "foo" (concat (bib-var "bar") "\\% x"))))
+                        (bib-entry "misc" "k"
+                          (document
+                            (bib-field "note" (concat (bib-var "foo") "50% off"))))))
+    (check-true (contains? out "foo = bar # {\\% x}"))
+    (check-true (contains? out "foo # {50\\% off}")))
+  ;; the verbatim fields are written as they are
+  (with out (bib-out (bib-parse (string-append
+                                  "@misc{k, doi = {10.1000/a_b%20}, "
+                                  "url = {http://x.org/a_b}}")))
+    (check-true (contains? out "{10.1000/a_b%20}"))
+    (check-true (contains? out "{http://x.org/a_b}"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The bibliography of a document
@@ -655,7 +787,51 @@
             "  <cite|knuth>\n\n  <\\bibliography|bib|plain|only>\n  </bibliography>\n")
     (check= (bib-items b) '(("1" "knuth") ("Lam86" "lamport")))
     (check= (flat (first-of 'concat (first-of 'bib-list b)))
-            "D. Knuth. The art.")))
+            "D. Knuth. The art."))
+  ;; without bibtex, a style of BibTeX is replaced by its tm- version, as
+  ;; abstract by tm-abstract, whose labels are the keys
+  (set-bibtex-command "tm-no-such-bibtex")
+  (with b (generated-bibliography "abstract.tm"
+            "  <cite|knuth>\n\n  <\\bibliography|bib|abstract|refs>\n  </bibliography>\n")
+    (check= (bib-items b) '(("knuth" "knuth"))))
+  (set-bibtex-command (get-preference "bibtex command")))
+
+;; The external bibtex program, as for a style without the tm- prefix: each
+;; run has its own directory, removed afterwards, so that simultaneous runs
+;; do not share their temp.* files (#75 item 13), and a failed run does not
+;; give the result of the previous one (#75 item 12).
+(define (bib-run-dirs)
+  (url-read-directory (url-temp-dir) "*-bib"))
+
+(define (test-external)
+  (check-group "external bibtex")
+  (when (url-exists-in-path? "bibtex")
+    (string-save doc-bib (tmp-file "refs.bib"))
+    ;; the files left by older versions, which ran in system/bib
+    (for-each (lambda (f)
+                (with u (url-append "$TEXMACS_HOME_PATH/system/bib" f)
+                  (when (url-exists? u) (system-remove u))))
+              '("temp.aux" "temp.bbl" "temp.blg" "temp.log"))
+    (let* ((before (bib-run-dirs))
+           (r (tree->stree (bibtex-run "bib" "plain" (tmp-file "refs.bib")
+                                       '("lamport" "knuth")))))
+      (check= (bib-items r) '(("1" "knuth") ("2" "lamport")))
+      (check= (bib-run-dirs) before)
+      (check-false (url-exists? "$TEXMACS_HOME_PATH/system/bib/temp.aux"))
+      (check-false (url-exists? "$TEXMACS_HOME_PATH/system/bib/temp.bbl"))
+      (with r2 (tree->stree (bibtex-run "bib" "no-such-style-75"
+                                        (tmp-file "refs.bib") '("knuth")))
+        (check-true (string? r2))
+        (check-true (contains? r2 "Error: bibtex failed"))
+        (check-true (contains? r2 "no-such-style-75.bst")))
+      ;; bibtex writes an empty thebibliography when the .bib is missing
+      (with r3 (tree->stree (bibtex-run "bib" "plain"
+                                        (tmp-file "no-such-file-75.bib")
+                                        '("knuth")))
+        (check-true (string? r3))
+        (check-true (contains? r3 "Error: bibtex failed"))
+        (check-true (contains? r3 "no-such-file-75.bib")))
+      (check= (bib-run-dirs) before))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
@@ -672,11 +848,15 @@
   (test-builtins)
   (test-names)
   (test-sorting-labels)
+  (test-style-fallback)
   (test-entry-types)
   (test-export)
   (remove-tmp-dir)
   (system-mkdir (system->url bibtex-dir))
   (with r (check-run test-document)
+    (when (and (pair? r) (== (car r) 'error))
+      (check-report #f "the group" (object->string r))))
+  (with r (check-run test-external)
     (when (and (pair? r) (== (car r) 'error))
       (check-report #f "the group" (object->string r))))
   (remove-tmp-dir)

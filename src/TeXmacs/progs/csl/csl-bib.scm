@@ -117,6 +117,11 @@
           ((page-numbers? t) (list (cons 'locator t) (cons 'label "page")))
           (else (list (cons 'suffix (string-append ", " t)))))))
 
+(tm-define (csl-cite-details s)
+  (:synopsis "The locator or the suffix of a citation whose details are @s")
+  ;; ((locator . "3-5") (label . "page")), ((suffix . ", text")) or ()
+  (parse-details s))
+
 (define (entry->cite e)
   (cond ((string? e) (list (cons 'id e)))
         ((and (func? e 'tuple 2) (string? (cadr e)))
@@ -326,6 +331,29 @@
            (label ,(string-append prefix "-" label))
            ,@bindings
            ,(csl->texmacs body locale)))
+
+(tm-define (csl-textual-authors style bib keys)
+  (:synopsis "The names of the entries @keys of the BibTeX string @bib")
+  ;; as a textual citation in the CSL style @style shows them, when its
+  ;; citations show no names ([1], [Knu84]): ((key . "Knuth") ...); #f for
+  ;; the other styles
+  ;; (the LaTeX export uses \textcite then; in a note style the names
+  ;; depend on the citations before, which only the document knows)
+  (let* ((st (document-style (string-drop style 4)))
+         (d (and st (!= st 'invalid)
+                 (convert bib "bibtex-document" "bibtex-stree")))
+         (b (and (pair? d) (pair? (cdr d)) (pair? (cadr d))
+                 (assoc 'body (cdadr d)))))
+    (and b
+         (let* ((lang (or (csl-style-ref st 'default-locale)
+                          (csl-language->locale (get-document-language))))
+                (items (in-order (csl-bib->items (cadr b)) keys))
+                (proc (csl-make-processor st lang items)))
+           (and (not (csl-citation-shows-names? st))
+                (map (lambda (k)
+                       (with p (csl-textual-parts proc (list (entry->cite k)))
+                         (cons k (if (pair? p) (rt->string (caar p)) k))))
+                     keys))))))
 
 (tm-define (csl-bib-process prefix style t . opt)
   (:synopsis "The bibliography of the BibTeX entries @t in the CSL style")

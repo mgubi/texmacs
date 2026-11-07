@@ -18,6 +18,10 @@
 #include "dictionary.hpp"
 #include "new_document.hpp"
 #include "merge_sort.hpp"
+#include "scheme.hpp"
+#include "iterator.hpp"
+#include "archiver.hpp"
+#include <time.h>
 
 array<tm_buffer> bufs;
 
@@ -73,8 +77,11 @@ remove_buffer (tm_buffer buf) {
   int nr, n= N(bufs);
   for (nr=0; nr<n; nr++)
     if (bufs[nr] == buf) {
-      for (int i=0; i<N(buf->vws); i++)
-        delete_view (abstract_view (buf->vws[i]));
+      // (the programs which follow the buffer: language servers)
+      call ("notify-buffer-closed", object (as_string (buf->buf->name)));
+      array<tm_view> vws= copy (buf->vws);
+      for (int i=0; i<N(vws); i++)
+        delete_view (abstract_view (vws[i]));
       if (n == 1 && number_of_servers () == 0)
         get_server () -> quit ();
       for (int i=nr; i<n-1; i++)
@@ -153,6 +160,7 @@ rename_buffer (url name, url new_name) {
   kill_buffer (new_name);
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return;
+  call ("notify-buffer-closed", object (as_string (name)));
   notify_rename_before (name);
   buf->buf->name= new_name;
   buf->buf->master= new_name;
@@ -162,6 +170,8 @@ rename_buffer (url name, url new_name) {
   notify_rename_after (new_name);
   tree doc= subtree (the_et, buf->rp);
   string title= propose_title (buf->buf->title, new_name, doc);
+  // (the page shows the names and the titles of the buffers, also when the
+  // title stays the same: Tau/tau_gui.cpp)
   set_title_buffer (new_name, title);
 }
 
@@ -279,7 +289,97 @@ get_buffer_tree (url name) {
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return "";
   tree body= subtree (the_et, buf->rp);
-  return attach_data (body, buf->data, true);
+  if (N(buf->vws) == 0) return attach_data (body, buf->data, true);
+  // the editor keeps its own copies of the style and initial environment
+  tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return attach_data (body, buf->data, true);
+  new_data data;
+  data->project= buf->data->project;
+  vw->ed->get_data (data);
+  return attach_data (body, data, true);
+}
+
+tree
+get_buffer_style (url name) {
+  // the style of the buffer, in its most recent view (each editor keeps a
+  // copy of its own, which change_style gives all the views: #535)
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return "";
+  if (N(buf->vws) == 0) return copy (buf->data->style);
+  tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return copy (buf->data->style);
+  return copy (vw->ed->get_style ());
+}
+
+// The style and the initial environment of a buffer, as the shared files
+// (utils relate shared-files) take them: (meta style initial), the initial
+// environment as in the file (without the variables of the window), from the
+// editor of the buffer which was used last (the editors keep their own copies).
+tree
+get_buffer_meta (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return "";
+  new_data data;
+  tm_view vw= N(buf->vws) == 0? NULL: concrete_view (get_recent_view (name));
+  if (vw == NULL) {
+    data->style= copy (buf->data->style);
+    data->init = copy (buf->data->init);
+  }
+  else vw->ed->get_data (data);
+  hashmap<string,tree> init= copy (data->init);
+  iterator<string> it= iterate (data->init);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (is_view_init_variable (var)) init->reset (var);
+  }
+  return compound ("meta", data->style, make_collection (init));
+}
+
+// A number which changes when the style or the initial environment of
+// get_buffer_meta do (the sum over the variables, so that the order of the
+// table does not matter): the shared files compare it at each tick, before
+// they build and compare the trees.
+int
+get_buffer_meta_hash (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return 0;
+  tm_view vw= N(buf->vws) == 0? NULL: concrete_view (get_recent_view (name));
+  if (vw != NULL) return vw->ed->get_meta_hash ();
+  unsigned int h= 7 * (unsigned int) hash (buf->data->style) + 1;
+  iterator<string> it= iterate (buf->data->init);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (is_view_init_variable (var)) continue;
+    h += (1000003u * (unsigned int) hash (var)) ^ (unsigned int) hash (buf->data->init [var]);
+  }
+  return (int) (h & 0x7fffffff);
+}
+
+void
+set_buffer_init (url name, string var, tree val) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf) || is_view_init_variable (var)) return;
+  if (N(buf->vws) == 0) buf->data->init (var)= copy (val);
+  else buf->vws[0]->ed->init_env (var, copy (val));
+}
+
+void
+reset_buffer_init (url name, string var) {
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf) || is_view_init_variable (var)) return;
+  if (N(buf->vws) == 0) buf->data->init->reset (var);
+  else buf->vws[0]->ed->init_default (var);
+}
+
+void
+set_buffer_style (url name, tree style) {
+  // the style of the buffer, in its data and in all its views (the first
+  // change_style gives it to all of them: #535)
+  tm_buffer buf= concrete_buffer (name);
+  if (is_nil (buf)) return;
+  buf->data->style= copy (style);
+  for (int i=0; i<N(buf->vws); i++)
+    buf->vws[i]->ed->change_style (style);
 }
 
 void
@@ -342,6 +442,17 @@ get_last_save_buffer (url name) {
   return (int) buf->buf->last_save;
 }
 
+void
+buffer_forget_history (url name) {
+  // A generated page which is made again (an outline at each edit...): its
+  // former contents have no meaning any more, and their copies in the history
+  // of its views would stay for ever (35 MB per edit for an outline of 12800
+  // definitions). NOT in set_buffer_tree: the editors in widgets are made
+  // again with it, and what was typed there can be undone
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) global_forget_document (buf->rp);
+}
+
 bool
 is_aux_buffer (url name) {
   tm_buffer buf= concrete_buffer (name);
@@ -361,6 +472,23 @@ buffer_modified (url name) {
   tm_buffer buf= concrete_buffer (name);
   if (is_nil (buf)) return false;
   return buf->needs_to_be_saved ();
+}
+
+// A read-only buffer can be read, searched, selected and copied, but what
+// one does in its editor does not change it: the changes made by a key, a
+// mouse action, a drop or a menu command are cancelled at the end of the
+// event (edit_modify_rep::end_editing), and there is no undo. The program
+// still changes it (the messages of the console, debug-widgets.scm)
+void
+set_buffer_read_only (url name, bool flag) {
+  tm_buffer buf= concrete_buffer (name);
+  if (!is_nil (buf)) buf->buf->read_only= flag;
+}
+
+bool
+is_buffer_read_only (url name) {
+  tm_buffer buf= concrete_buffer (name);
+  return !is_nil (buf) && buf->buf->read_only;
 }
 
 bool
@@ -426,6 +554,10 @@ attach_subformat (tree t, url u, string fm) {
   hashmap<string,tree> h (UNINIT, extract (t, "initial"));
   h (MODE)= "prog";
   h (PROG_LANGUAGE)= fm;
+  // the font of source files, a preference (tm-server.scm)
+  h (PROG_FONT)= get_preference ("editor:code font", "Inconsolatazi4");
+  // the columns between the tab stops of source files (a preference)
+  h (PROG_TAB_WIDTH)= get_preference ("editor:code tab width", "8");
   tree t2= change_doc_attr (t, "initial", make_collection (h));
   return change_doc_attr (t2, "style", tree ("code"));
 }
@@ -539,22 +671,38 @@ export_tree (tree doc, url u, string fm) {
       }
   // END hook
   if (fm == "generic") fm= "verbatim";
-  string s= tree_to_generic (aux, fm * "-document");
-  if (s == "* error: unknown format *") return true;
+  // The converters write the images of the document next to their target
+  bool has_target= (fm != "texmacs" && fm != "stm");
+  object old_target;
+  if (has_target) {
+    // A converter passes the target on to programs, which need its full name
+    url target= is_rooted_name (u)? u: resolve (u, "");
+    old_target= call ("save-target-swap", object (target));
+  }
+  // A converter which fails (an error, or no conversion) writes no file;
+  // an error inside a conversion made in C++ (LaTeX) is caught there and
+  // gives an empty text, which is then no conversion either
+  int errors= scheme_caught_errors ();
+  object r= call ("texmacs->generic", aux, fm * "-document");
+  if (has_target) call ("save-target-swap", old_target);
+  if (!is_string (r)) return true;
+  string s= as_string (r);
+  if (s == "* error: unknown format *" ||
+      s == "Error: bad format or data") return true;
+  if (s == "" && scheme_caught_errors () > errors) return true;
   return save_string (u, s);
 }
 
 bool
 buffer_export (url name, url dest, string fm) {
+  if (is_nil (concrete_buffer (name))) return true;
   tm_view vw= concrete_view (get_recent_view (name));
   ASSERT (vw != NULL, "view expected");
 
-  if (fm == "postscript" || fm == "pdf") {
-    int old_stamp= last_modified (dest, false);
-    vw->ed->print_to_file (dest);
-    int new_stamp= last_modified (dest, false);
-    return new_stamp <= old_stamp;
-  }
+  if (fm == "postscript" || fm == "pdf")
+    // by what the printer says: a time stamp in seconds does not change
+    // when the same file is written twice in a second (#705)
+    return !vw->ed->print_doc (dest, false, 1, 1000000);
 
   tree body= subtree (the_et, vw->buf->rp);
   if (fm == "verbatim")
@@ -579,8 +727,14 @@ buffer_export (url name, url dest, string fm) {
   tree links= as_tree (call ("get-link-locations", arg1, arg2));
   if (N (links) != 0)
     doc << compound ("links", links);
-  
-  return export_tree (doc, dest, fm);
+
+  // The converters find the images linked by the document next to its source
+  bool has_source= (fm != "texmacs" && fm != "stm");
+  object old_source;
+  if (has_source) old_source= call ("save-source-swap", object (name));
+  bool r= export_tree (doc, dest, fm);
+  if (has_source) call ("save-source-swap", old_source);
+  return r;
 }
 
 // The macros of a document are expanded by the editor of a view on it; a
@@ -609,6 +763,7 @@ buffer_save (url name) {
   if (fm == "generic") fm= "verbatim";
   bool r= buffer_export (name, name, fm);
   if (!r) {
+    reset_inclusion (name);
     pretend_buffer_saved (name);
   }
   return r;
@@ -619,16 +774,84 @@ buffer_save (url name) {
 ******************************************************************************/
 
 static hashmap<string,tree> document_inclusions ("");
+static hashmap<string,int> inclusions_busy (0);
+// (changed with the cache: the typesetter looks the inclusions up again
+// then, see same_lookups in Typeset/Bridge/bridge.cpp)
+static unsigned long long inclusions_version= 1;
+// when and how the file of an entry was read (time of the file, its identity,
+// and the time of the reading), so that a file which was not touched since
+// need not be read and parsed again (refresh_inclusions)
+static hashmap<string,tree> inclusion_stats ("");
+
+static tree
+stat_tuple (url name) {
+  int rd= (int) time (NULL);
+  return tuple (as_string (last_modified (name, false)),
+                file_identity (name), as_string (rd));
+}
+
+unsigned long long
+inclusions_stamp () {
+  return inclusions_version;
+}
 
 void
 reset_inclusions () {
   document_inclusions = hashmap<string,tree> ("");
+  inclusion_stats = hashmap<string,tree> ("");
+  inclusions_version++;
 }
 
 void
 reset_inclusion (url name) {
   string name_s= as_string (name);
   document_inclusions -> reset (name_s);
+  inclusion_stats -> reset (name_s);
+  inclusions_version++;
+}
+
+// The inclusions are read again (Tools > Update > Inclusions, Update All):
+// the entries whose file has the same contents keep their tree (the
+// typesetter compares the included documents by pointer, see same_lookups
+// in Typeset/Bridge/bridge.cpp: the layout of an include is kept when its
+// file did not change), the others get the new tree, and a file which
+// cannot be read any more is dropped. Tells whether something changed.
+bool
+refresh_inclusions () {
+  bool changed= false;
+  array<string> names;
+  iterator<string> it= iterate (document_inclusions);
+  while (it->busy ()) names << it->next ();
+  for (int i=0; i<N(names); i++) {
+    string name_s= names[i];
+    tree old_doc= document_inclusions [name_s];
+    // (a file whose time, size, change time and inode are those of the reading, which is more
+    // than two seconds later than the time of the file, is the same)
+    url file= url_system (name_s);
+    if (inclusion_stats->contains (name_s)) {
+      tree st= inclusion_stats [name_s];
+      int mt= last_modified (file, false);
+      string id= file_identity (file);
+      if (as_int (st[0]) == mt && N(id) > 0 && as_string (st[1]) == id &&
+          as_int (st[2]) > mt + 2 && mt > 0)
+        continue;
+    }
+    tree doc= extract_document (import_tree (url_system (name_s), "generic"));
+    if (is_func (doc, _ERROR)) {
+      document_inclusions -> reset (name_s);
+      inclusion_stats -> reset (name_s);
+      changed= true;
+    }
+    else {
+      inclusion_stats (name_s)= stat_tuple (file);
+      if (doc != old_doc) {
+        document_inclusions (name_s)= doc;
+        changed= true;
+      }
+    }
+  }
+  if (changed) inclusions_version++;
+  return changed;
 }
 
 tree
@@ -638,6 +861,35 @@ load_inclusion (url name) {
   if (document_inclusions->contains (name_s))
     return document_inclusions [name_s];
   tree doc= extract_document (import_tree (name, "generic"));
-  if (!is_func (doc, _ERROR)) document_inclusions (name_s)= doc;
+  if (!is_func (doc, _ERROR)) {
+    document_inclusions (name_s)= doc;
+    inclusion_stats (name_s)= stat_tuple (name);
+    inclusions_version++;
+  }
   return doc;
+}
+
+tree
+inclusion_value (string name_s) {
+  if (document_inclusions->contains (name_s))
+    return document_inclusions [name_s];
+  return load_inclusion (url_system (name_s));
+}
+
+bool
+inclusion_busy (url name) {
+  // Is the inclusion of name currently being processed (cycle detection)?
+  return inclusions_busy [as_string (name)] > 0;
+}
+
+void
+inclusion_enter (url name) {
+  inclusions_busy (as_string (name)) ++;
+}
+
+void
+inclusion_leave (url name) {
+  string name_s= as_string (name);
+  if (inclusions_busy [name_s] <= 1) inclusions_busy->reset (name_s);
+  else inclusions_busy (name_s) --;
 }

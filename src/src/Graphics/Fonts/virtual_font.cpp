@@ -50,6 +50,7 @@ struct virtual_font_rep: font_rep {
   void   get_metric (scheme_tree t, metric& ex);
   tree   get_tree (string s);
   void   draw_tree (renderer ren, scheme_tree t, SI x, SI y);
+  bool   is_sliced (scheme_tree t);
   void   draw_clipped (renderer ren, scheme_tree t, SI x, SI y,
                        SI x1, SI y1, SI x2, SI y2);
   void   draw_transformed (renderer ren, scheme_tree t, SI x, SI y, frame f);
@@ -1957,11 +1958,35 @@ virtual_font_rep::get_xpositions (string s, SI* xpos, SI xk) {
     xpos[i]= (xpos[0] + xpos[N(s)]) >> 1;
 }
 
+bool
+virtual_font_rep::is_sliced (scheme_tree t) {
+  // is it drawn as slices of glyphs under clips? (see draw_clipped)
+  if (is_atomic (t)) {
+    // a name may stand for a symbol of the font: see draw_tree
+    string r= t->label;
+    if (r == "#28") r= "(";
+    if (r == "#29") r= ")";
+    if (N(r)>1) r= "<" * r * ">";
+    if (!extend || base_fn->supports (r) || !virt->dict->contains (r))
+      return false;
+    return is_sliced (virt->virt_def [virt->dict [r]]);
+  }
+  if (is_tuple (t, "hor-extend") || is_tuple (t, "ver-extend") ||
+      is_tuple (t, "ver-take") || is_tuple (t, "clip") || is_tuple (t, "part"))
+    return true;
+  // the head of a tuple is the name of an operation, not a symbol
+  if (N(t) > 0 && is_compound (t[0]) && is_sliced (t[0])) return true;
+  for (int i=1; i<N(t); i++)
+    if (is_sliced (t[i])) return true;
+  return false;
+}
+
 void
 virtual_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   if (extend && base_fn->supports (s))
     base_fn->draw_fixed (ren, s, x, y);
-  else if (ren->is_screen || !supported (s, true)) {
+  else if (ren->is_screen || !supported (s, true) ||
+           (ren->compiled_extensions () && is_sliced (get_tree (s)))) {
     font_metric cfnm;
     font_glyphs cfng;
     int c= get_char (s, cfnm, cfng);

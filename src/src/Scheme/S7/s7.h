@@ -447,6 +447,7 @@ s7_pointer s7_outlet(s7_scheme *sc, s7_pointer e);                          /* (
 s7_pointer s7_sublet(s7_scheme *sc, s7_pointer env, s7_pointer bindings);   /* (sublet e ...) */
 s7_pointer s7_inlet(s7_scheme *sc, s7_pointer bindings);                    /* (inlet ...) */
 s7_pointer s7_varlet(s7_scheme *sc, s7_pointer env, s7_pointer symbol, s7_pointer value); /* (varlet env symbol value) */
+bool s7_unshadow_global(s7_scheme *sc, s7_pointer env, s7_pointer symbol); /* TeXmacs: see s7.c */
 s7_pointer s7_let_to_list(s7_scheme *sc, s7_pointer env);                   /* (let->list env) */
 bool s7_is_let(s7_pointer e);                                               /* (let? e) */
 s7_pointer s7_let_ref(s7_scheme *sc, s7_pointer env, s7_pointer sym);       /* (let-ref e sym) */

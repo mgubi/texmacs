@@ -124,7 +124,9 @@
   
   (color     "xcolor")
   (fcolorbox "xcolor")
+  (colorbox "xcolor")
   (textcolor "xcolor")
+  (sout ("normalem" "ulem"))
 
   (euro "eurosym")
 
@@ -133,6 +135,7 @@
 
   (omicron "pslatex")
   (multicols "multicol")
+  (begin-multicols "multicol")
   (bundle "epic")
   (chunk "epic")
   (bundle "ecltree")
@@ -157,6 +160,13 @@
   (citeauthor "natbib")
   (citeauthor* "natbib")
   (citeyear "natbib")
+
+  ;; the CSL styles (tmtex, csl-package%): \cite, \citeauthor and
+  ;; \citeyear come from this package then, not from natbib
+  (textcite "citation-style-language")
+  (parencite "citation-style-language")
+  (printbibliography "citation-style-language")
+  (citeyearpar "citation-style-language")
 
   (index "makeidx")
   (printindex "makeidx")

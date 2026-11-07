@@ -27,17 +27,23 @@ done < <(find "$out/Contents" -type f)
 sign="${SIGN_IDENTITY:--}"
 [ "$sign" = - ] && ts="" || ts="--timestamp"
 find "$out/Contents/Resources/lib" -name "*.dylib" -exec codesign --force $ts -s "$sign" {} \; 2> /dev/null || true
+# the program gs of the package (Ghostscript, #662), in Resources, where --deep
+# does not sign it: lipo has made its signature invalid
+gs="$out/Contents/Resources/share/TeXmacs/bin/gs"
+[ -f "$gs" ] && codesign --force $ts -s "$sign" "$gs"
 codesign --force $ts --deep -s "$sign" "$out"
 
-"$here/check-app.sh" "$out"
+"$here/check-app.sh" --sdk-newer-than-min "$out"
 echo "== $out is ready"
 
 if [ -n "$dmg" ]; then
+  # ULMO (lzma) and not UDZO (zlib): about 115 MB instead of 170 for the
+  # universal app, and it opens on macOS 10.15 and later
   # NOTE: again when it fails: on the runners of GitHub, hdiutil sometimes
   # finds the files busy ("Resource busy"), being scanned
   for i in 1 2 3 4 5; do
     rm -f "$dmg"
-    hdiutil create -volname TeXmacs -srcfolder "$out" -format UDZO "$dmg" && break
+    hdiutil create -volname "$(basename "$out" .app)" -srcfolder "$out" -format ULMO "$dmg" && break
     [ $i = 5 ] && exit 1
     echo "== hdiutil failed, again in $((i * 10)) seconds"
     sleep $((i * 10))

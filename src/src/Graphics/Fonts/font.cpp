@@ -746,6 +746,48 @@ default_chinese_font_name () {
   return "roman";
 }
 
+array<string>
+windows_cjk_font_candidates (string lang) {
+  // The fonts of Windows for a language, by preference: pairs of a file
+  // name without its suffix, for tt_font_exists, and of the family of the
+  // font database (TeXmacs/fonts/font-database.scm) which this file has.
+  // MS Mincho, Yu Mincho and Meiryo are supplemental fonts (installed on
+  // Japanese Windows), Yu Gothic and MS Gothic are on every Windows 10 or
+  // later. The suite fonts checks that each family is in the database.
+  array<string> r;
+  if (lang == "japanese")
+    r << string ("msmincho") << string ("MS PMincho")
+      << string ("yumin")    << string ("Yu Mincho")
+      << string ("YuGothR")  << string ("Yu Gothic")
+      << string ("meiryo")   << string ("Meiryo")
+      << string ("msgothic") << string ("MS PGothic");
+  return r;
+}
+
+string
+windows_cjk_font (string lang) {
+  // the first font of windows_cjk_font_candidates which is installed and
+  // known to the font database (an older local database may lack it),
+  // computed again when the database changes
+  static hashmap<string,string> cache ("?");
+  static int cache_generation= -1;
+  font_database_load ();
+  if (cache_generation != font_database_generation) {
+    cache= hashmap<string,string> ("?");
+    cache_generation= font_database_generation;
+  }
+  if (cache->contains (lang)) return cache[lang];
+  string r;
+  array<string> a= windows_cjk_font_candidates (lang);
+  for (int i=0; i+1 < N(a); i+=2)
+    if (tt_font_exists (a[i]) && N (font_database_styles (a[i+1])) > 0) {
+      r= a[i+1];
+      break;
+    }
+  cache (lang)= r;
+  return r;
+}
+
 string
 default_japanese_font_name () {
   if (has_user_preference("default japanese font name")) {
@@ -759,7 +801,8 @@ default_japanese_font_name () {
 #endif
 
 #ifdef OS_MINGW
-  if (tt_font_exists ("msmincho")) return "MS PMincho";
+  string name= windows_cjk_font ("japanese");
+  if (name != "") return name;
 #endif
 
   if (tt_font_exists ("ipam")) return (new_fonts? "IPAMincho": "modern");

@@ -25,6 +25,7 @@
 ("a series" "")
 ("abbreviation" "省略表現")
 ("about" "以下について")
+("add a bibliography with a BibTeX file to %1" "%1 に BibTeX ファイル付きの参考文献を追加してください")
 ("add the references of Zotero to the BibTeX file" "ZoteroのBibTeXファイルに文献を追加")
 ("added %1 reference from Zotero to %2" "Zotero から %2 に文献を %1 件追加しました")
 ("added %1 references from Zotero to %2" "Zotero から %2 に文献を %1 件追加しました")

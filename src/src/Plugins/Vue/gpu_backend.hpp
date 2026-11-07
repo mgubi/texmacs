@@ -89,6 +89,9 @@ public:
   // make the window the one which is drawn (true when it can be); show
   // what was drawn into it
   virtual unsigned long long window_flags () = 0;
+  // when TeXmacs starts: begin what takes time (Metal: the shaders are
+  // compiled in the background), which prepare waits for
+  virtual void warm_up () {}
   virtual bool prepare () = 0;
   virtual bool attach (SDL_Window* w) = 0;
   // the same for a layer which the GUI made (a CAMetalLayer of the Cocoa
@@ -101,6 +104,12 @@ public:
   // waiting for the screen (false: the compositor still holds the frames
   // presented before, and the window is better drawn a little later)
   virtual bool ready_to_present () { return true; }
+  // true when the backend wakes the loop up (with an event) once a window
+  // which was not ready to present is: the loop then waits for that rather
+  // than coming back after a short pause
+  virtual bool wakes_when_ready () { return false; }
+  // the window is about to be destroyed: forget what is kept for it
+  virtual void detach (SDL_Window* w) { (void) w; }
 
   // textures: data has rows from the top, without padding (or is NULL: zeros)
   virtual gpu_texture new_texture (int w, int h, gpu_format f, bool linear,
@@ -111,6 +120,9 @@ public:
   // a target: an RGBA8 texture which can be drawn into, opaque white or
   // transparent
   virtual gpu_texture new_target (int w, int h, bool transparent= false) = 0;
+  // the largest side of a texture or a target: larger ones are not made
+  // (new_texture and new_target return NULL)
+  virtual int max_texture_side () = 0;
   // the texture of a target has its first row (v = 0) at the bottom (GL)
   virtual bool targets_flipped () = 0;
 
@@ -135,11 +147,16 @@ public:
   // RGBA, rows from the top
   virtual bool read (gpu_texture src, int sw, int sh,
                      int x, int y, int w, int h, unsigned char* rgba) = 0;
+  // a frame of a window which is not presented (the same as the last one,
+  // vue_gpu_skip): a backend whose screen lives for one frame (WebGPU in
+  // the browser) lets it go
+  virtual void skip_frame () {}
   virtual void flush () = 0;    // what was drawn goes to the GPU
   virtual void finish () = 0;   // and is done
 };
 
 gpu_backend* gpu_gl_backend ();     // NULL when not compiled (USE_THORVG)
 gpu_backend* gpu_metal_backend ();  // NULL when not compiled (USE_METAL)
+gpu_backend* gpu_webgpu_backend (); // the browser only (gpu_backend_wg.cpp)
 
 #endif // defined GPU_BACKEND_HPP

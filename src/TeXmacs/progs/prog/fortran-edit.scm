@@ -42,7 +42,7 @@
                  (string-prefix? "for " tr)
                  (string-prefix? "contains" tr)
                  (string-prefix? "module" tr))
-           (+ i (get-tabstop)) i))))
+           (+ i (program-indent-step)) i))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -58,6 +58,8 @@
 (tm-define (notify-cursor-moved status)
   (:require prog-highlight-brackets?)
   (:mode in-prog-fortran?)
+  ;; (the other hooks run too: language servers)
+  (former status)
   (select-brackets-after-movement "([" ")]" "\\"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

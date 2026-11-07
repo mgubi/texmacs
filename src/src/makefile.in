@@ -133,13 +133,14 @@ data_src     := $(call findsrc,Data)
 graphics_src := $(call findsrc,Graphics)
 plugins_src  := $(call findsrc_in,Plugins,Bibtex Cairo Imlib2 Sqlite3 \
                                           Ispell Metafont Openssl Updater \
-                                          LaTeX_Preview Database)
+                                          LaTeX_Preview Database \
+                                          @CONFIG_TREE_SITTER@)
 x11_src      := $(call findsrc_in,Plugins,@CONFIG_X11@)
 cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
 # the GPU renderer of the Vue port, which draws the canvases of the Cocoa
 # port with Metal (when USE_METAL)
-cocoa_gpu_src    := $(if $(strip @CONFIG_COCOA@),vue_gpu.cpp gpu_backend_gl.cpp,)
+cocoa_gpu_src    := $(if $(strip @CONFIG_COCOA@),vue_gpu.cpp gpu_backend_gl.cpp gpu_backend_wg.cpp,)
 cocoa_gpu_mm_src := $(if $(strip @CONFIG_COCOA@),gpu_backend_metal.mm,)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
 ifeq "@CONFIG_QT@" "Qtwk Widkit"
@@ -148,7 +149,7 @@ ifeq "@CONFIG_QT@" "Qtwk Widkit"
 QT_SRC_DIR   := Qt
 qtwk_src     := $(call findsrc_in,Plugins,Qtwk Widkit)
 qt_src       := qt_font.cpp qt_picture.cpp qt_pipe_link.cpp qt_renderer.cpp qt_utilities.cpp \
-                QTMPipeLink.cpp QTMSockets.cpp qt_http.cpp
+                QTMPipeLink.cpp QTMSockets.cpp qt_http.cpp qt_cmdline_link.cpp
 else
 QT_SRC_DIR   := $(QT_PLUGIN_DIR)
 qtwk_src     :=
@@ -165,6 +166,7 @@ scheme_c_src := $(call findc_in,Scheme,Scheme @SCHEME_DIR@)
 pdf_src      := $(call findsrc_in,Plugins,@CONFIG_PDF@)
 pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
+html_math_src := $(call findsrc_in,Plugins,Html_math)
 gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
 mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
 mupdf_c_src  := $(call findc_in,Plugins,@CONFIG_MUPDF@)
@@ -177,6 +179,11 @@ vue_c_src    := $(if $(strip @CONFIG_VUE@),clay.c,)
 make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
 
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
+# the runtime of tree-sitter (vendored in Plugins/TreeSitter/tree-sitter, one
+# unit) and the languages made from the tables of progs/treesit
+# (with tree-sitter only, see misc/m4/tm_code.m4)
+treesitter_c_deps := $(if $(strip @CONFIG_TREE_SITTER@),\
+  Objects/tree_sitter_lib.o Objects/ts_dynamic.o Objects/ts_xz.o,)
 texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
 # all dependency files; the "deps" target below and the include of the
 # dependency files rely on this variable
@@ -292,6 +299,22 @@ deps:
 
 .PHONY: deps
 
+# The git commit of the sources (#753), for -v, (texmacs-version-release
+# "revision") and the About page. The header is made at each run of make and
+# rewritten only if the commit changed (misc/scripts/git-revision.sh), so
+# that a new commit rebuilds only System/Boot/build_revision.cpp (and
+# relinks) and no other file: config.h is not involved. Without git, or in
+# a tarball, the header is empty and TEXMACS_REVISION ("Custom ...") stays.
+Objects/git_revision.hpp: FORCE
+	@mkdir -p Objects
+	@tr -d '\r' < $(tmsrc)/../misc/scripts/git-revision.sh | sh -s -- --header $@ $(tmsrc)/..
+
+Objects/build_revision.o: Objects/git_revision.hpp
+Objects/build_revision.o: CPPFLAGS += -IObjects
+
+FORCE:
+.PHONY: FORCE
+
 ###############################################################################
 # Object files
 ###############################################################################
@@ -327,6 +350,7 @@ typeset_obj  := $(call makeobj,$(typeset_src))
 style_obj    := $(call makeobj,$(style_src))
 pdf_obj      := $(call makeobj,$(pdf_src))
 freetype_obj := $(call makeobj,$(freetype_src))
+html_math_obj := $(call makeobj,$(html_math_src))
 gnutls_obj   := $(call makeobj,$(gnutls_src))
 mupdf_obj    := $(call makeobj,$(mupdf_src))
 mupdf_c_obj  := $(call makeobj_c,$(mupdf_c_src))
@@ -430,10 +454,14 @@ $(vue_mm_obj): Objects/%.o: %.mm
 	$(call objcxx_incl,-std=c++20 -fobjc-arc $(vue_incl) $(CXXMUPDF) $(CXXVUE))
 $(vue_c_obj): Objects/%.o: %.c
 	$(call cc_flags,$(vue_incl) $(CXXMUPDF) $(CXXVUE))
+$(html_math_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
 $(gnutls_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gnutls_incl) $(CXXGNUTLS) $(CXXQT))
 $(texmacs_c_deps):   Objects/%.o: %.c
 	$(call cc_flags, $(CFLAGS))
+$(treesitter_c_deps): Objects/%.o: %.c
+	$(call cc_flags, $(CFLAGS) $(CXXOPTIMIZE) -IPlugins/TreeSitter/tree-sitter/include -IPlugins/TreeSitter/tree-sitter/src)
 
 ###############################################################################
 # Make editor
@@ -493,7 +521,7 @@ uses_edit     := $(edit_obj)
 uses_scheme   := $(scheme_obj) $(scheme_c_obj)
 uses_texmacs  := $(texmacs_obj)
 uses_pdf      := $(pdf_obj)
-uses_freetype := $(freetype_obj)
+uses_freetype := $(freetype_obj) $(html_math_obj)
 uses_gnutls   := $(gnutls_obj)
 uses_mupdf    := $(mupdf_obj) $(mupdf_c_obj)
 uses_sdl      := $(sdl_obj)
@@ -504,7 +532,7 @@ uses_vue      := $(vue_obj) $(vue_mm_obj) $(vue_c_obj)
 
 TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
  plugins x11 os qt qtwk gs resvg cocoa style typeset edit scheme texmacs pdf\
- freetype gnutls mupdf sdl vue windowsres)) $(texmacs_c_deps)
+ freetype gnutls mupdf sdl vue windowsres)) $(texmacs_c_deps) $(treesitter_c_deps)
 
 TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o \
 	$(filter-out Objects/windows64_entrypoint.o Objects/Plugins/Windows64/windows64_entrypoint.o,$(TEXMACS_objects))
@@ -555,14 +583,17 @@ gluesrc = Scheme/Glue
 Objects/s7-run: Scheme/Glue/s7-run.c Scheme/S7/s7.c Scheme/S7/s7.h
 	$(CC) -O1 -DWITH_C_LOADER=0 -IScheme/S7 Scheme/Glue/s7-run.c Scheme/S7/s7.c -lm -o $@
 
-GLUE: $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp
+GLUE: $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp \
+      $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp
 	$(RM) Objects/glue.o
 
-.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp
+.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue.scm
 $(gluesrc)/glue_editor.cpp: $(gluesrc)/build-glue.scm 
 $(gluesrc)/glue_server.cpp: $(gluesrc)/build-glue.scm
+$(gluesrc)/glue_treesit.cpp: $(gluesrc)/build-glue.scm
+$(gluesrc)/glue_lsp.cpp: $(gluesrc)/build-glue.scm
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue-basic.scm $(GLUE_DEPS)
 	$(GLUE) build-glue-basic.scm glue_basic.cpp "$(GLUE_BIN)"
@@ -572,6 +603,12 @@ $(gluesrc)/glue_editor.cpp: $(gluesrc)/build-glue-editor.scm $(GLUE_DEPS)
 
 $(gluesrc)/glue_server.cpp: $(gluesrc)/build-glue-server.scm $(GLUE_DEPS)
 	$(GLUE) build-glue-server.scm glue_server.cpp "$(GLUE_BIN)"
+
+$(gluesrc)/glue_treesit.cpp: $(gluesrc)/build-glue-treesit.scm $(GLUE_DEPS)
+	$(GLUE) build-glue-treesit.scm glue_treesit.cpp "$(GLUE_BIN)"
+
+$(gluesrc)/glue_lsp.cpp: $(gluesrc)/build-glue-lsp.scm $(GLUE_DEPS)
+	$(GLUE) build-glue-lsp.scm glue_lsp.cpp "$(GLUE_BIN)"
 
 ###############################################################################
 # Cleaning and backup

@@ -20,6 +20,13 @@
   update a bibliography; when it is not, <TeXmacs> says so in the footer,
   and uses the references which it obtained before.
 
+  <TeXmacs> only asks Zotero on its own (to complete keys, in the search
+  window of the database, when it makes a bibliography) once Zotero has
+  answered it on this computer: for instance after
+  <menu|Document|Bibliography|Update from Zotero>, or the test of the
+  connection in <menu|Document|Bibliography|Zotero settings...>. Until then,
+  Zotero costs nothing to those who do not use it.
+
   <with|font-series|bold|With zotero.org.> When your library is
   synchronized with <verbatim|zotero.org>, <TeXmacs> can read it there,
   without the application: create a key on

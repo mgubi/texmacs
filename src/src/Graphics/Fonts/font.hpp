@@ -232,6 +232,9 @@ struct font_rep: rep<font> {
 
 string default_chinese_font_name ();
 string default_japanese_font_name ();
+array<string> windows_cjk_font_candidates (string lang);
+string windows_cjk_font (string lang);
+extern int font_database_generation;
 string default_korean_font_name ();
 
 font error_font (font fn);
@@ -291,6 +294,7 @@ font smart_font (string family, string variant, string series, string shape,
 font smart_font (string family, string variant, string series, string shape,
                  string tf, string tv, string tw, string ts, int sz, int dpi);
 font apply_effects (font fn, string effects);
+font get_emoji_font (int sz, int dpi);
 
 int  script (int sz, int level);
 

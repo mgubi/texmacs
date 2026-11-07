@@ -4,6 +4,7 @@
 *              (OpenGL 3.3 core, 4.1 on macOS, WebGL2 in the browser), with
 *              ThorVG's GL engine for the vector shapes
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
+*              Slug shaders adapted from E. Lengyel, (C) 2017, MIT (see below)
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -46,6 +47,7 @@ gpu_backend* gpu_gl_backend () { return NULL; }
 #else
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
+#include <OpenGL/OpenGL.h>  // CGLEnable
 #else
 // the prototypes of OpenGL 3 (Linux, Windows), for the types below
 #define GL_GLEXT_PROTOTYPES 1
@@ -89,6 +91,7 @@ gpu_backend* gpu_gl_backend () { return NULL; }
   X(glGenFramebuffers) \
   X(glGenTextures) \
   X(glGenVertexArrays) \
+  X(glGetIntegerv) \
   X(glGetProgramiv) \
   X(glGetShaderInfoLog) \
   X(glGetShaderiv) \
@@ -152,6 +155,7 @@ vue_gl_load () {
 #define glGenFramebuffers vue_glGenFramebuffers
 #define glGenTextures vue_glGenTextures
 #define glGenVertexArrays vue_glGenVertexArrays
+#define glGetIntegerv vue_glGetIntegerv
 #define glGetProgramiv vue_glGetProgramiv
 #define glGetShaderInfoLog vue_glGetShaderInfoLog
 #define glGetShaderiv vue_glGetShaderiv
@@ -222,6 +226,14 @@ static const char* fragment_src= GLSL_HEADER
   "  else o_col= texture (u_atlas, v_uv).r * v_col;\n"
   "}\n";
 
+// The Slug shaders below are adapted from the reference shaders of Eric
+// Lengyel (https://github.com/EricLengyel/Slug, SlugPixelShader.hlsl), the
+// algorithm of "GPU-Centered Font Rendering Directly from Glyph Outlines"
+// (JCGT 6 (2), 2017); rewritten for TeXmacs, with its own layout of the
+// curves and the bands. Copyright (c) 2017 Eric Lengyel, MIT License (see
+// TeXmacs/misc/licenses/Slug-MIT.txt): "The above copyright notice and this
+// permission notice shall be included in all copies or substantial portions
+// of the Software."
 static const char* slug_vertex_src= GLSL_HEADER
   "layout(location=0) in vec3 i_org;\n"   // origin (pixels), pixels a em
   "layout(location=1) in vec4 i_box;\n"   // the box (em)
@@ -350,6 +362,7 @@ class gl_backend: public gpu_backend {
   GLuint prog= 0, vao= 0, vbo= 0;
   GLint u_size= -1, u_mode= -1, u_tex= -1, u_atlas= -1, u_porig= -1, u_ptile= -1;
   GLuint blank= 0;  // 1x1, at the unit of u_tex when a draw has no texture
+  int max_side= 0;  // GL_MAX_TEXTURE_SIZE
   GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0;
   GLint su_size= -1, su_curves= -1, su_bands= -1, su_bold= -1;
   // ThorVG: canvases drawing into scratch targets. A pass ends by copying
@@ -395,6 +408,7 @@ public:
   void update_texture (gpu_texture t, int x, int y, int w, int h, const void* data);
   void delete_texture (gpu_texture t);
   gpu_texture new_target (int w, int h, bool transparent= false);
+  int max_texture_side () { return max_side; }
   bool targets_flipped () { return true; }
 
   void draw_quads (const gpu_pass& p, const gpu_quads& q);
@@ -469,6 +483,9 @@ bool
 gl_backend::init () {
   prog= link_program (vertex_src, fragment_src);
   if (prog == 0) { cout << "TeXmacs] GPU: the program does not link" << LF; return false; }
+  GLint m= 0;
+  glGetIntegerv (GL_MAX_TEXTURE_SIZE, &m);
+  max_side= (int) m;
   u_size = glGetUniformLocation (prog, "u_size");
   u_mode = glGetUniformLocation (prog, "u_mode");
   u_tex  = glGetUniformLocation (prog, "u_tex");
@@ -555,6 +572,14 @@ gl_backend::attach (SDL_Window* w) {
     }
 #endif
     SDL_GL_SetSwapInterval (0); // several windows: each would wait a frame
+#ifdef __APPLE__
+    // the multithreaded engine: the commands run on a thread of their own,
+    // and SDL_GL_SwapWindow no longer blocks the loop. Without it a swap
+    // took 2.3 ms (1 to 5) at every present, whatever the size of the
+    // window and the rate of the frames (not a wait for the screen), and a
+    // frame of a scroll 9.6 ms instead of 6.4 ms
+    CGLEnable (CGLGetCurrentContext (), kCGLCEMPEngine);
+#endif
     if (!init ()) { failed= true; return false; }
     return true;
   }
@@ -583,10 +608,26 @@ formats (gpu_format f, GLenum& ifmt, GLenum& fmt, GLenum& type, int& bpp) {
   }
 }
 
+// The largest side of a texture is that of the GL (often 16384, 4096 or
+// 8192 in a browser): a larger one is not made, and OpenGL says nothing
+// (GL_INVALID_VALUE), so that it was drawn black or not at all. What would
+// be drawn with it is left out (the callers check)
+static bool
+too_large (int w, int h, int max_side) {
+  if (max_side <= 0 || (w <= max_side && h <= max_side)) return false;
+  static bool warned= false;
+  if (!warned) {
+    warned= true;
+    cout << "TeXmacs] GPU: a texture of " << w << "x" << h
+         << " is larger than " << max_side << ", not drawn" << LF;
+  }
+  return true;
+}
+
 gpu_texture
 gl_backend::new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                          const void* data) {
-  if (ctx == NULL || w <= 0 || h <= 0) return NULL;
+  if (ctx == NULL || w <= 0 || h <= 0 || too_large (w, h, max_side)) return NULL;
   GLenum ifmt, fmt, type; int bpp;
   formats (f, ifmt, fmt, type, bpp);
   gpu_texture t= tm_new<gpu_texture_rep> ();
@@ -650,7 +691,7 @@ gl_backend::free_target (gpu_texture_rep& t) {
 
 gpu_texture
 gl_backend::new_target (int w, int h, bool transparent) {
-  if (ctx == NULL || w <= 0 || h <= 0) return NULL;
+  if (ctx == NULL || w <= 0 || h <= 0 || too_large (w, h, max_side)) return NULL;
   gpu_texture t= tm_new<gpu_texture_rep> ();
   if (!make_target (*t, w, h)) { free_target (*t); tm_delete (t); return NULL; }
   // opaque white, as native_opaque_picture, or transparent

@@ -13,9 +13,15 @@
 #   --thorvg PREFIX       ThorVG, for the GPU renderer of vue (default: the
 #                         --deps PREFIX, when it has it)
 #   --deps PREFIX         the libraries made by build-deps.sh in PREFIX (with
-#                         the part vue for vue, guile for guile),
+#                         the part vue for vue, guile for guile, and tls
+#                         for the connections to the servers: GnuTLS),
 #                         instead of the ones of the system (Homebrew): the
 #                         application then runs on older versions of macOS
+#   --gs PREFIX           the Ghostscript made by packages/build-gs.sh in PREFIX
+#                         (for the same architecture and version of macOS):
+#                         its gs goes into the application (bin of the
+#                         TeXmacs folder), which runs it before the one of
+#                         the system, and its license with it (#662)
 #   --arch ARCH           arm64 or x86_64 (default: the one of the machine;
 #                         x86_64 on Apple silicon is built under Rosetta)
 #   --min-macos VERSION   the oldest version of macOS, with --deps (the
@@ -38,6 +44,7 @@ scheme=guile
 mupdf=""
 thorvg=""
 deps=""
+gs=""
 arch=$(uname -m)
 min=12.0
 sign=""
@@ -54,6 +61,7 @@ while [ $# -gt 0 ]; do
     --mupdf) mupdf="$2"; shift 2;;
     --thorvg) thorvg="$2"; shift 2;;
     --deps) deps="$2"; shift 2;;
+    --gs) gs="$2"; shift 2;;
     --arch) arch="$2"; shift 2;;
     --min-macos) min="$2"; shift 2;;
     --sign) sign="$2"; shift 2;;
@@ -103,6 +111,14 @@ if [ $configure = yes ]; then
     [ -n "$thorvg" ] && args="$args --with-thorvg=$thorvg"
   fi
   [ -n "$deps" ] && args="$args --with-freetype=$deps/bin --with-osx=$min"
+  # the connections to the TeXmacs servers (cloud.texmacs.org): GnuTLS of
+  # the --deps PREFIX when it has it (build-deps.sh, part tls), or of the
+  # system (Homebrew)
+  if [ -n "$deps" ]; then
+    [ -f "$deps/lib/pkgconfig/gnutls.pc" ] && args="$args --with-gnutls"
+  elif pkg-config --exists gnutls 2> /dev/null; then
+    args="$args --with-gnutls"
+  fi
   # the headers and the libraries of the dependencies for the other tests
   # (png.h and libpng for the PDF renderer, PDFHummus)
   [ -n "$deps" ] && args="$args CPPFLAGS=-I$deps/include LDFLAGS=-L$deps/lib"
@@ -115,10 +131,21 @@ echo "== building TeXmacs"
 make -j "$jobs"
 
 echo "== making the application"
-make MACOS_BUNDLE
+if [ -n "$gs" ]; then
+  gs=$(cd "$gs" && pwd)
+  [ -x "$gs/bin/gs" ] || { echo "error: no $gs/bin/gs (packages/build-gs.sh)" >&2; exit 1; }
+  make MACOS_BUNDLE GS_BUNDLE="$gs/bin/gs" GS_LICENSES="$gs/share/licenses/ghostscript"
+else
+  make MACOS_BUNDLE
+fi
 
 app=../distr/TeXmacs.app
-packages/macos/check-app.sh "$app"
+# with --deps, the application is made for an older macOS
+if [ -n "$deps" ]; then
+  packages/macos/check-app.sh --sdk-newer-than-min "$app"
+else
+  packages/macos/check-app.sh "$app"
+fi
 echo "== $app is ready"
 
 if [ $dmg = yes ]; then
@@ -129,6 +156,6 @@ if [ $dmg = yes ]; then
   mkdir -p ../distr/macos
   dmg=../distr/macos/TeXmacs-$version.dmg
   rm -f "$dmg"
-  hdiutil create -volname TeXmacs -srcfolder "$app" -format UDZO "$dmg"
+  hdiutil create -volname TeXmacs -srcfolder "$app" -format ULMO "$dmg"
   ls "$dmg"
 fi

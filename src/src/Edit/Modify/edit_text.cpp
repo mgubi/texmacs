@@ -12,13 +12,15 @@
 #include "edit_text.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
+#include "converter.hpp" // join_emoji
 #include "scheme.hpp"
+#include "patch.hpp"
 
 /******************************************************************************
 * Constructors and destructors
 ******************************************************************************/
 
-edit_text_rep::edit_text_rep () {}
+edit_text_rep::edit_text_rep (): return_depth (-1) {}
 edit_text_rep::~edit_text_rep () {}
 
 /******************************************************************************
@@ -126,20 +128,40 @@ edit_text_rep::accepts_return (path p) {
 
 bool
 edit_text_rep::insert_return () {
-  if (accepts_return (path_up (tp)))
-    insert_node (path_up (tp) * 0, CONCAT);
-  path p= path_up (tp, 2);
-  if (!is_concat (subtree (et, p))) return true;
-  if (!accepts_return (p)) return true;
-  if (!is_document (subtree (et, path_up (p)))) {
-    insert_node (p * 0, DOCUMENT);
-    p= path_up (tp, 2);
+  // return_depth: the length of the path of the new paragraph, the head of
+  // tp (the cursor may be inside a tag at the start of that paragraph)
+  return_depth= -1;
+  if (!accepts_paragraphs (tp)) return true;
+  if (accepts_return (path_up (tp))) {
+    // At the border of a tag which has no cursor position there (an inner
+    // border, as hidden), the change corrects the cursor into the tag: the
+    // tag would be split, not its paragraph
+    path q= path_up (tp);
+    int  l= last_item (tp);
+    insert_node (q * 0, CONCAT);
+    go_to (q * path (0, l));
   }
+  path p= path_up (tp, 2);
+  if (!is_document (subtree (et, path_up (p)))) {
+    int l= last_item (tp);
+    path q= path_up (tp);
+    insert_node (p * 0, DOCUMENT);
+    p= p * 0;
+    go_to (p * path (last_item (q), l));
+  }
+  return_depth= N (p);
 
-  if (is_atomic (subtree (et, path_up (tp)))) split (tp);
-  if (last_item (tp)==right_index (subtree (et, path_up (tp))))
-    split (path_inc (path_up (tp)));
-  else split (path_up (tp));
+  // (where to split the line, found before the string is split: splitting
+  // it at its start or end puts an empty string beside a tag with an inner
+  // border, as hidden, and the change then corrects the cursor into that tag)
+  path q= path_up (tp);
+  if (is_atomic (subtree (et, q))) {
+    split (tp);
+    split (path_inc (q));
+  }
+  else if (last_item (tp)==right_index (subtree (et, q)))
+    split (path_inc (q));
+  else split (q);
   go_to (correct_cursor (et, path_inc (p) * 0));
   correct_concat (p);
   correct_concat (path_inc (p));
@@ -162,6 +184,32 @@ edit_text_rep::remove_return (path p) {
 /******************************************************************************
 * Inserting a simple formula or tree
 ******************************************************************************/
+
+bool
+edit_text_rep::accepts_paragraphs (path p) {
+  // can insert_return make a new paragraph at the cursor position p?
+  // (not around the table format of a tabular: a position of scripts only)
+  if (is_func (subtree (et, path_up (p)), TFORMAT)) return false;
+  if (accepts_return (path_up (p))) return true;
+  path q= path_up (p, 2);
+  return is_concat (subtree (et, q)) && accepts_return (q);
+}
+
+bool
+edit_text_rep::can_insert_at (tree t, path p) {
+  // can t be inserted at the cursor position p? Not paragraphs inside a
+  // line: in a tag of a line, a cell of a table without paragraphs, a formula
+  if (!(rp < p) || !is_inside (et, p)) return false;
+  if (is_document (t)) return accepts_paragraphs (p);
+  if (!is_multi_paragraph (t)) return true;
+  // (see make_return_after: a block goes before its paragraph)
+  path q= p;
+  while (!is_document (subtree (et, path_up (q)))) {
+    q= path_up (q);
+    if (!(rp < q)) return true;
+  }
+  return correct_cursor (et, p) == start (et, q) || accepts_paragraphs (p);
+}
 
 path
 edit_text_rep::prepare_for_insert () {
@@ -201,18 +249,110 @@ edit_text_rep::prepare_for_insert () {
 }
 
 void
+edit_text_rep::join_emoji () {
+  // the emoji before the cursor by the name of its whole sequence: an
+  // emoji typed one code point after the other (the people and the joiners
+  // of a family one by one, a skin tone after a hand, the second regional
+  // indicator of a flag) or next to the code points of an older document.
+  // Only what is before the cursor is renamed (not what the insertion
+  // joins after it), and the cursor stays right after the insertion
+  path p= path_up (tp);
+  tree st= subtree (et, p);
+  if (!is_atomic (st)) return;
+  string s= st->label;
+  int l= last_item (tp);
+  if (l <= 0 || l > N(s)) return;
+  int a= tm_grapheme_start (s, l);
+  string g= s (a, l);
+  if (!has_emoji (g)) return;
+  string c= emoji_names (g);
+  if (c == g) return;
+  remove (p * a, l - a);
+  insert (p * a, c);
+  go_to (p * (a + N(c)));
+}
+
+void
 edit_text_rep::insert_tree (tree t, path p_in_t) {
-  if (!as_bool (call ("like-emacs?"))) selection_cut ("none");
+  bool cut= !as_bool (call ("like-emacs?"));
+  bool tested= false;   // the paragraphs were tested for the cut selection
+  bool cells = false;   // the selection is a selection of cells
+  path old_tp= tp;
+  range_set old_sel;
+  bool old_selecting= false, old_shift= false;
+  path old_mid;
+  // The cut of cells may leave no place for the paragraphs: it is made
+  // between marks of the history of this buffer, to be cancelled alone
+  struct cut_mark_rep {
+    edit_text_rep* ed; double m; bool on;
+    cut_mark_rep (): ed (NULL), m (0), on (false) {}
+    ~cut_mark_rep () { if (on) ed->mark_end (m); }
+  } cut_mark;
+  if (is_multi_paragraph (t)) {
+    // (where selection_cut will leave the cursor: it corrects the range)
+    path ip= tp;
+    if (cut && selection_active_any ()) {
+      if (selection_active_table ()) {
+        // (the cut empties the cells: see below)
+        ip  = selection_get_start ();
+        selection_get_state (old_sel, old_selecting, old_shift, old_mid);
+        cells= true;
+      }
+      else {
+        ip    = selection_var_get_start ();
+        tested= true;
+      }
+    }
+    if (!can_insert_at (t, ip)) {
+      // (nothing changes: the selection is not cut for nothing)
+      set_message ("Several paragraphs cannot be inserted here", "insert");
+      return;
+    }
+  }
+  if (cells) {
+    cut_mark.ed= this; cut_mark.m= new_marker (); cut_mark.on= true;
+    mark_start (cut_mark.m);
+  }
+  if (cut) selection_cut ("none");
+  if (cells && !can_insert_at (t, tp)) {
+    // The cut left no place for paragraphs (the cells are not block cells,
+    // or they lost their format): the cut is undone, the cells are not
+    // cleared for nothing (only the changes since the mark)
+    cut_mark.on= false;
+    mark_cancel (cut_mark.m);
+    go_to (old_tp);
+    selection_set_state (old_sel, old_selecting, old_shift, old_mid);
+    set_message ("Several paragraphs cannot replace cells", "insert");
+    return;
+  }
+  if (tested && !can_insert_at (t, tp)) {
+    // The cut leaves the cursor in the tag next to the range when it removes
+    // the text up to the tag (a tag with an inner border, as hidden): the
+    // paragraphs go at the border of that tag, where the range began
+    for (path u= path_up (tp); rp < u; u= path_up (u))
+      if (is_compound (subtree (et, u))) {
+        path q;
+        if (tp == end (et, u)) q= u * 1;
+        else if (tp == start (et, u)) q= u * 0;
+        else continue;
+        if (can_insert_at (t, q)) {
+          go_to (q);
+          break;
+        }
+      }
+  }
   if (is_atomic (t) && (p_in_t == end (t)) &&
-      is_atomic (subtree (et, path_up (tp))))
+      is_atomic (subtree (et, path_up (tp)))) {
     insert (tp, t);
+    join_emoji ();
+  }
   else if (is_document (t)) {
     if (subtree (et, path_up (tp)) == "" &&
         accepts_return (path_up (tp)) &&
         !is_func (subtree (et, path_up (tp, 2)), DOCUMENT))
       insert_node (path_up (tp) * 0, DOCUMENT);
     if (insert_return ()) return;
-    path p= search_parent_upwards (DOCUMENT);
+    path p= head (tp, return_depth);
     bool empty= (subtree (et, p) == "");
     if (empty) remove (p, 1);
     insert (p, t);
@@ -226,8 +366,10 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
         accepts_return (path_up (tp)) &&
         !is_func (subtree (et, path_up (tp, 2)), DOCUMENT))
       insert_node (path_up (tp) * 0, DOCUMENT);
+    return_depth= -1;
     if (make_return_after ()) return;
-    path p= search_parent_upwards (DOCUMENT);
+    path p= (return_depth >= 0? head (tp, return_depth):
+                                search_parent_upwards (DOCUMENT));
     if (subtree (et, p) == "") remove (p, 1);
     insert (p, tree (DOCUMENT, t));
     go_to (correct_cursor (et, p * p_in_t));

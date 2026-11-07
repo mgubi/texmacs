@@ -1,6 +1,6 @@
 # 9. In the browser (branch `maxs_femto`)
 
-`maxs_femto` is `maxs_texmacs` (Vue, the browser build) with the femtolisp
+`maxs_femto` is `upsilon_texmacs` (Vue, the browser build) with the femtolisp
 commits, lazy function bodies included.
 
 ## 9.1 Build

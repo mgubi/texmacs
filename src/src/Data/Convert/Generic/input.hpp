@@ -20,6 +20,7 @@ struct texmacs_input_rep: concrete_struct {
   string buf;                   // input buffer
   string format;                // current input format
   int    mode;                  // corresponding input mode
+  string chat;                  // session of a command line or request link
   string channel;               // current output channel
   tree   stack;                 // stack for nested blocks
   bool   ignore_verb;           // hack to enable completion with some plugins

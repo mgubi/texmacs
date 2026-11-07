@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "concater.hpp"
 
 /******************************************************************************
@@ -105,6 +106,14 @@ concater_rep::typeset_compound (tree t, path ip) {
     f= env->read (var);
   }
 
+  // (a macro that calls itself: an error box when the stack is nearly full,
+  // not a crash)
+  if (is_applicable (f) && stack_nearly_full ()) {
+    // (not typeset_error: it shows the macro call, which would nest again)
+    typeset (tree ("[macro nesting too deep]"), ip);
+    return;
+  }
+
   if (is_applicable (f)) {
     int i, n=N(f)-1, m=N(t)-d;
     env->macro_arg= list<hashmap<string,tree> > (
@@ -164,11 +173,18 @@ concater_rep::typeset_include (tree t, path ip) {
   if (N(t) != 1) { typeset_error (t, ip); return; }
   url file_name= url_unix (env->exec_string (t[0]));
   url incl_file= relative (env->base_file_name, file_name);
+  if (inclusion_busy (incl_file)) {
+    typeset_dynamic (tree (_ERROR, "inclusion cycle"), ip);
+    return;
+  }
   tree incl= load_inclusion (incl_file);
   url save_name= env->cur_file_name;
   env->cur_file_name= incl_file;
   env->secure= is_secure (env->cur_file_name);
-  typeset_dynamic (incl, ip);
+  {
+    inclusion_guard guard (incl_file);
+    typeset_dynamic (incl, ip);
+  }
   env->cur_file_name= save_name;
   env->secure= is_secure (env->cur_file_name);
 }

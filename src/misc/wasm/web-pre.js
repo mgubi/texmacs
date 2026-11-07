@@ -51,38 +51,84 @@ Module['preRun'].push(function () {
   // the windows of TeXmacs are the tabs of the page (vue_gui.cpp, where
   // this is always so in the browser): for Scheme (tm-view.scm)
   ENV['TEXMACS_VUE_SINGLE_WINDOW'] = '1';
-  // ?env=NAME=VALUE (several may be given): a variable of the environment
-  // of TeXmacs, for debugging (TEXMACS_FL_TRACE=catch, say)
-  for (const e of tmAddress.getAll ('env')) {
-    const i = e.indexOf ('=');
-    if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
-  }
   // the look and feel of TeXmacs follows the platform of the browser, whose
   // shortcuts are Cmd+... on a Mac (src/Kernel/Abstractions/basic.cpp)
   var platform = (typeof navigator === 'undefined') ? '' :
     (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
   ENV['TEXMACS_WEB_PLATFORM'] = /mac|iphone|ipad/i.test (platform) ? 'macos' :
                                 /win/i.test (platform) ? 'windows' : 'other';
+  // ?env=NAME=VALUE (several may be given): a variable of the environment
+  // of TeXmacs, for debugging (TEXMACS_FL_TRACE=catch, or
+  // TEXMACS_WEB_PLATFORM=other for the behaviour of the page on Linux)
+  for (const e of tmAddress.getAll ('env')) {
+    const i = e.indexOf ('=');
+    if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
+  }
   // texmacs.html?profile=<n>: the profile of the loop, every n frames, in
   // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
   var prof = /^\d+$/.exec (tmAddress.get ('profile') || '');
   if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[0];
-  // drawn by WebGL2 (vue_gpu.cpp) in a build with ThorVG, unless the
-  // address says texmacs.html?gpu=0 or the browser has no WebGL2 (the window
-  // of SDL would then have no surface for MuPDF to draw on)
-  if (tmAddress.get ('gpu') !== '0') {
-    var webgl2 = false;
+  // How the page draws: with WebGPU (gpu_backend_wg.cpp, ThorVG's WebGPU
+  // engine), WebGL2 (gpu_backend_gl.cpp) or MuPDF on a 2D canvas.
+  //   ?gpu=webgpu  WebGPU (WebGL2 when the browser gives no device)
+  //   ?gpu=webgl   WebGL2
+  //   ?gpu=0       MuPDF
+  //   (nothing)    WebGPU in the browsers of Chromium (Chrome, Edge...),
+  //                where it was tested (docs/wasm/README.md), WebGL2 in the
+  //                others for now; WebGL2 without a device of WebGPU
+  // Without WebGL2, MuPDF (the window of SDL would then have no surface for
+  // MuPDF to draw on if TeXmacs tried the GPU)
+  var gpu = tmAddress.get ('gpu');
+  var webgl2 = false;
+  if (gpu !== '0') {
     try {
       var probe = document.createElement ('canvas');
       webgl2 = !!(probe.getContext && probe.getContext ('webgl2'));
     } catch (e) {}
-    if (webgl2) ENV['TEXMACS_VUE_GPU'] = '1';
-    else console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
   }
-  // ?bars=top: the main and mode icon bars above the document, rather than
-  // in a column at its left (TEXMACS_VUE_BARS, see in_side_bar in
-  // vue_widget.cpp)
-  if (tmAddress.get ('bars') === 'top') ENV['TEXMACS_VUE_BARS'] = 'top';
+  var chromium = typeof navigator !== 'undefined' && !!navigator.userAgentData &&
+    navigator.userAgentData.brands.some (function (b) { return b.brand === 'Chromium'; });
+  var wantWebGPU = gpu === 'webgpu' || (gpu === null && chromium);
+  // WebGPU: the device comes asynchronously and TeXmacs cannot wait for it
+  // (no ASYNCIFY): it is asked for here, TeXmacs starting once it has come
+  // (a dependency of the run), and taken by the program from
+  // Module.preinitializedWebGPUDevice
+  if (wantWebGPU && typeof navigator !== 'undefined' && navigator.gpu) {
+    // (WebGL2, or MuPDF, if WebGPU fails)
+    ENV['TEXMACS_VUE_GPU'] = webgl2 ? '1' : '0';
+    addRunDependency ('tm-webgpu');
+    navigator.gpu.requestAdapter ()
+      .then (function (a) { return a ? a.requestDevice () : null; })
+      .then (function (d) {
+        if (!d) {
+          console.warn ('TeXmacs: no WebGPU device, drawing with ' + (webgl2 ? 'WebGL2' : 'MuPDF'));
+          return;
+        }
+        Module['preinitializedWebGPUDevice'] = d;
+        ENV['TEXMACS_VUE_GPU'] = 'webgpu';
+        window.tmWebGPU = true;
+        // (the errors kept too, for the tests: Safari's WebDriver does not
+        // show the console)
+        window.tmWebGPUErrors = [];
+        d.addEventListener ('uncapturederror', function (e) {
+          if (window.tmWebGPUErrors.length < 50) window.tmWebGPUErrors.push (e.error.message);
+          console.warn ('TeXmacs: WebGPU: ' + e.error.message); });
+      })
+      .catch (function (e) { console.warn ('TeXmacs: WebGPU: ' + e); })
+      .finally (function () { removeRunDependency ('tm-webgpu'); });
+  }
+  // (said, not left unset: unset, TeXmacs draws with the GPU, its default
+  // since the GPU renderer is on by default on the desktop)
+  else if (gpu !== '0' && webgl2) ENV['TEXMACS_VUE_GPU'] = '1';
+  else {
+    if (gpu !== '0') console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
+    ENV['TEXMACS_VUE_GPU'] = '0';
+  }
+  // ?bars=top or ?bars=right: the main and mode icon bars above the
+  // document, or in a column at its right, rather than at its left
+  // (TEXMACS_VUE_BARS, see in_side_bar in vue_widget.cpp)
+  if (/^(top|left|right)$/.test (tmAddress.get ('bars') || ''))
+    ENV['TEXMACS_VUE_BARS'] = tmAddress.get ('bars');
   // ?slug=1: the glyphs drawn from their outlines (vue_gpu.cpp, Slug)
   if (tmAddress.get ('slug') === '1') ENV['TEXMACS_VUE_SLUG'] = '1';
   // ?glyphs=freetype|texmacs|mupdf: the glyphs of the atlas, whatever the
@@ -295,6 +341,9 @@ var tmHome = (function () {
         busy = false;
         var docs = paths.filter (function (p) { return !inPrefs (p); });
         if (channel && docs.length > 0) channel.postMessage ({ type: 'wrote', paths: docs });
+        // (the first file saved asks the browser to keep the files: files.js)
+        if (docs.length > 0 && typeof tmFiles !== 'undefined' && tmFiles.wrote)
+          try { tmFiles.wrote (docs); } catch (e) {}
         if (again) { again = false; flush (); }
         if (done) done ();
       };
@@ -404,7 +453,7 @@ var tmHome = (function () {
       setTimeout (function () {
         watching = false;
         if (claims !== seen) { watchOwner (); return; }
-        say ('TeXmacs Vue is no longer open in another tab. Reload this page to use it ' +
+        say ('TeXmacs Upsilon is no longer open in another tab. Reload this page to use it ' +
              'here with your saved files (the changes made in this tab are not kept).',
              [['Reload', function () { location.reload (); }]]);
       }, 5000);
@@ -432,7 +481,7 @@ var tmHome = (function () {
       if (e.data.type !== 'takeover' || readOnly || !release) return;
       flush (function () {
         var r = release; release = null;
-        becomeReadOnly ('TeXmacs Vue is now used in another tab of this browser: the ' +
+        becomeReadOnly ('TeXmacs Upsilon is now used in another tab of this browser: the ' +
                         'documents you save here are kept, your preferences are not.', true);
         r ();
       });
@@ -447,7 +496,7 @@ var tmHome = (function () {
     navigator.locks.request (LOCK, opts, function (lock) {
       decided = true;
       if (!lock) {
-        becomeReadOnly ('TeXmacs Vue is also open in another tab of this browser: the ' +
+        becomeReadOnly ('TeXmacs Upsilon is also open in another tab of this browser: the ' +
                         'documents you save here are kept, your preferences are not.');
         cont ();
         return;
@@ -458,7 +507,7 @@ var tmHome = (function () {
     }).catch (function (e) {
       // the tab which had TeXmacs did not let go in time
       if (decided) return;
-      becomeReadOnly ('TeXmacs Vue is still open in another tab of this browser: the ' +
+      becomeReadOnly ('TeXmacs Upsilon is still open in another tab of this browser: the ' +
                       'documents you save here are kept, your preferences are not.');
       cont ();
     });

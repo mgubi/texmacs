@@ -1047,9 +1047,14 @@
          (deep (parse-xml (string-append (rep 3000 "<a>") "x" (rep 3000 "</a>")))))
     (check-true (<= (depth deep) 1001))
     ;; (the text is still there; searched in the tree, as the printer of
-    ;; s7 shortens long lists)
-    (check-true (let find ((t deep))
-                  (or (== t "x") (and (pair? t) (list-or (map find t))))))
+    ;; s7 shortens long lists, with a list of the subtrees still to search,
+    ;; as a recursion 1000 levels deep overflows the stack of femtolisp)
+    (check-true (let find ((todo (list deep)))
+                  (and (pair? todo)
+                       (let ((t (car todo)))
+                         (or (== t "x")
+                             (find (if (pair? t) (append t (cdr todo))
+                                       (cdr todo))))))))
     ;; ten levels of entities of ten each: 10^10 characters
     (let* ((names '("a" "b" "c" "d" "e" "f" "g" "h" "i" "j"))
            (decl (apply string-append
@@ -1204,8 +1209,10 @@
   (check= (docx (wp (wr "x" "<w:b w:val='0'/>"))) '((p "x")))
   (check= (docx (wp (wr "x" "<w:rStyle w:val='Accent'/>")))
           '((p (span (@ (style "Accent")) "x"))))
+  ;; (upright by hand in a style of italics: em, which changes italics
+  ;; into upright text)
   (check= (docx (wp (wr "x" "<w:rStyle w:val='Accent'/><w:i w:val='0'/>")))
-          (quote ((p (span (@ (style "Accent")) "x")))))
+          (quote ((p (span (@ (style "Accent")) (em "x"))))))
   (check= (docx (wp (wr "f()" "<w:rFonts w:ascii='Courier New'/>")))
           '((p (code "f()"))))
   (check= (docx (wp (wr "H") (wr "2" "<w:vertAlign w:val='subscript'/>") (wr "O")))
@@ -1269,7 +1276,7 @@
   (check= (docx (wp "<w:pPr><w:outlineLvl w:val='2'/></w:pPr>" (wr "Deep")))
           '((p (@ (role "heading") (level "3") (numbered "no")) "Deep")))
   (check= (docx (wp (wstyle "Titre") (wr "T")))
-          '((p (@ (role "title") (align "center")) "T")))
+          '((p (@ (role "title") (style "Titre") (align "center")) "T")))
   (check= (docx (wp (wstyle "Citation") (wr "q"))) '((p (@ (role "quote")) "q")))
   (check= (docx (wp (wstyle "Code") (wr "x=1"))) '((p (@ (role "code")) "x=1")))
   (check= (docx (wp "<w:pPr><w:jc w:val='right'/></w:pPr>" (wr "r")))
@@ -1551,7 +1558,7 @@
   (check= (odt "<text:h text:outline-level='2'>Sub</text:h>")
           '((p (@ (role "heading") (level "2") (numbered "no")) "Sub")))
   (check= (odt "<text:p text:style-name='Title'>T</text:p>")
-          '((p (@ (role "title") (align "center")) "T")))
+          '((p (@ (role "title") (align "center") (style "Title")) "T")))
   ;; an automatic style is what its parent is
   (check= (odt "<text:p text:style-name='P1'>q</text:p>")
           '((p (@ (role "quote") (align "right")) "q")))
@@ -1682,14 +1689,16 @@
   (check= (docx (wp (wr "a") (wr "hidden" "<w:vanish/>"))) '((p "a")))
   (check= (docx (wp (wr "x" "<w:rtl/><w:b/><w:iCs/>") (wr "y" "<w:bCs/>")))
           '((p (em "x") "y")))
-  ;; a field which ends in a later paragraph loses nothing
+  ;; a field which ends in a later paragraph loses nothing (the text
+  ;; before its start and after its end are paragraphs of their own)
   (check= (docx (string-append
                   (wp (wr "Before ") "<w:r><w:fldChar w:fldCharType='begin'/></w:r>"
                       "<w:r><w:instrText> ADDIN ZOTERO_BIBL </w:instrText></w:r>"
                       "<w:r><w:fldChar w:fldCharType='separate'/></w:r>" (wr "One."))
                   (wp (wr "Two.") "<w:r><w:fldChar w:fldCharType='end'/></w:r>"
                       (wr " After"))))
-          '((p "Before One.") (p "Two. After")))
+          '((p "Before") (field-blocks (@ (code " ADDIN ZOTERO_BIBL ")) (p "One.") (p "Two."))
+            (p "After")))
   (check= (docx (string-append
                   (wp (wr "a ") "<w:r><w:fldChar w:fldCharType='begin'/></w:r>"
                       "<w:r><w:instrText> HYPERLINK \"http://a.b\" </w:instrText></w:r>"
@@ -2124,14 +2133,16 @@
                    "</draw:text-box></draw:frame>"))
           '((p "a" (box (@ (shape "rect") (fill "none") (line "none"))
                        (table (row (cell (@ (borders "none")) (p "in")))) (p "b")))))
-  ;; an image which is not in the archive is not one to fetch: a link to
-  ;; its address on the web, the text of another address
+  ;; an image which is not in the archive is not one to fetch: as the
+  ;; Word reader says it, an image of its address on the web, and else
+  ;; one which is linked, whose address is text
   (check= (odt (tp "<draw:frame><draw:image xlink:href='http://a.b/p.png'/>"
                    "<svg:title>A picture</svg:title></draw:frame>"))
-          '((p (link (@ (href "http://a.b/p.png")) "A picture"))))
-  (check= (odt (tp "x <draw:frame><draw:image xlink:href='file:///etc/passwd'/>"
+          '((p (image (@ (name "http://a.b/p.png") (alt "A picture"))))))
+  (with b (odt (tp "x <draw:frame><draw:image xlink:href='file:///etc/passwd'/>"
                    "</draw:frame>"))
-          '((p "x file:///etc/passwd")))
+    (check= b '((p "x " (image (@ (name "file:///etc/passwd") (linked "true"))))))
+    (check= (in-tm b) '("x file:///etc/passwd")))
   ;; (an image of the office tree with an address on the web, as Word
   ;; links to one, is an image of this address, which is not fetched)
   (check= (in-tm '((p (image (@ (name "http://a.b/p.png"))))))
@@ -2579,6 +2590,252 @@
       (check= (and styles (ox-attr (list-find (cdr styles) (lambda (y) (== (ox-attr y 'name) "K")))
                                    'keep-with-next))
               "true"))))
+
+;; Import: the fixes of the third audit of the readers
+
+(define (test-import-audit-3)
+  (check-group "import audit 3")
+  (let* ((disp (lambda (s) (string-append "<m:oMathPara><m:oMath>" (mr s)
+                                          "</m:oMath></m:oMathPara>")))
+         (fc (lambda (type)
+               (string-append "<w:r><w:fldChar w:fldCharType='" type "'/></w:r>")))
+         (instr (lambda (s)
+                  (string-append "<w:r><w:instrText xml:space='preserve'>" s
+                                 "</w:instrText></w:r>")))
+         (fld (lambda (code res) (string-append (fc "begin") (instr code) (fc "separate")
+                                                (wr res) (fc "end"))))
+         (tab "<w:r><w:tab/></w:r>")
+         (seq (fld " SEQ Equation " "1"))
+         (code " ADDIN ZOTERO_BIBL {} CSL_BIBLIOGRAPHY ")
+         (start (string-append (fc "begin") (instr code) (fc "separate")))
+         (zotero (lambda (x) `(field-blocks (@ (code ,code)) ,@x)))
+         (item (lambda l (apply wp (cons "<w:pPr><w:numPr><w:ilvl w:val='0'/><w:numId w:val='1'/></w:numPr></w:pPr>" l))))
+         (ins (lambda l (string-append "<w:ins w:id='9' w:author='a'>" (apply string-append l)
+                                       "</w:ins>"))))
+    ;; 1. the closing bracket of a number with more text after it
+    (check= (in-tm (docx (wp (wr "Text ") (disp "x") tab (wr "(") seq (wr ") and more"))))
+            '("Text" (equation (document "x")) "and more"))
+    (check= (in-tm (docx (wp (wr "Text ") (disp "x") (wr " (see above) holds"))))
+            '("Text" (equation* (document "x")) "(see above) holds"))
+    ;; 2. the text after the end of a field in an item, in a heading: a
+    ;; plain paragraph, the field is one
+    (check= (docx (string-append (item start (wr "Doe")) (item (wr "Roe") (fc "end") (wr " After"))))
+            (list (zotero '((list (@ (kind "bullet")) (item (p "Doe")) (item (p "Roe")))))
+                  '(p "After")))
+    (check= (docx (string-append (wp start (wr "A"))
+                                 "<w:p><w:pPr><w:outlineLvl w:val='0'/></w:pPr>"
+                                 (wr "B") (fc "end") (wr "Title") "</w:p>"))
+            (list (zotero '((p "A") (p (@ (role "heading") (level "1") (numbered "no")) "B")))
+                  '(p "Title")))
+    ;; (and the text before its start)
+    (check= (docx (string-append (wp (wr "Intro ") start (wr "Doe")) (wp (wr "Roe") (fc "end"))))
+            (list '(p "Intro") (zotero '((p "Doe") (p "Roe")))))
+    ;; 3. its end in a change which is tracked
+    (check= (docx (string-append (wp start (wr "Doe"))
+                                 (wp (wr "Roe") (ins (fc "end") (wr " After")))))
+            (list (zotero '((p "Doe") (p "Roe"))) '(p (ins (@ (author "a")) "After"))))
+    (check= (docx (string-append (wp start (wr "Doe"))
+                                 (wp (ins (wr "Roe") (fc "end")) (wr " After"))))
+            (list (zotero '((p "Doe") (p (ins (@ (author "a")) "Roe")))) '(p "After")))
+    ;; 4. a field which starts where another one ends
+    (check= (docx (string-append (wp start (wr "A")) (wp (wr "B") (fc "end") start (wr "C"))
+                                 (wp (wr "D") (fc "end"))))
+            (list (zotero '((p "A") (p "B"))) (zotero '((p "C") (p "D")))))
+    ;; 5. a decimal point after a formula is not its punctuation
+    (check= (in-tm (docx (wp (wr "Thus") (disp "x") (wr ".5 is small"))))
+            '("Thus" (equation* (document "x")) ".5 is small"))
+    ;; 6. the punctuation after a bookmark, in a node of formatting
+    (check= (in-tm (docx (wp (wr "Text") (disp "x")
+                             "<w:bookmarkStart w:id='3' w:name='b3'/><w:bookmarkEnd w:id='3'/>"
+                             (wr ". after"))))
+            '("Text" (equation* (document (concat "x." (label "b3")))) "after"))
+    (check= (in-tm (docx (wp (wr "Sum") (disp "x") (wr "." "<w:i/>") (wr " Next"))))
+            '("Sum" (equation* (document "x.")) "Next"))
+    ;; 7. what a named style says is not said again by hand
+    (check= (docx (wp "<w:r><w:rPr><w:rStyle w:val='Accent'/><w:i/></w:rPr><w:t>e</w:t></w:r>"))
+            '((p (span (@ (style "Accent")) "e"))))
+    (let* ((ovl "<style:text-properties style:text-overline-style='solid'/>")
+           (doc (odt-file (tp "a " (tspan "T1" "b"))
+                          (string-append "<office:styles><style:style style:name='O' style:family='text'>"
+                                         ovl "</style:style></office:styles>")
+                          (string-append "<style:style style:name='T1' style:family='text'"
+                                         " style:parent-style-name='O'>" ovl "</style:style>"))))
+      (check= (in-tm (cdr (parse-odt-document doc))) '((concat "a " (overline "b")))))
+    ;; 8. a formula with the number of its chapter
+    (check= (in-tm (docx (wp (disp "x") tab (wr "(") (fld " STYLEREF 1 \\s " "2") (wr ".")
+                             seq (wr ")"))))
+            '((equation (document "x"))))
+    (check= (in-tm (docx (wp (wr "Text") (disp "x") tab (wr "(") (fld " STYLEREF 1 \\s " "2")
+                             (wr "-") seq (wr ")"))))
+            '("Text" (equation (document "x"))))
+    ;; 9. a field with a break of page, an empty paragraph
+    (check= (docx (string-append (wp start (wr "A"))
+                                 "<w:p><w:pPr><w:pageBreakBefore/></w:pPr>" (wr "B") "</w:p>"
+                                 (wp (wr "C") (fc "end"))))
+            (list (zotero '((p "A") (pagebreak) (p "B") (p "C")))))
+    (with b (docx (string-append (wp start (wr "A")) (wp) (wp (wr "B") (fc "end"))))
+      (check= b (list (zotero '((p "A") (p) (p "B")))))
+      (check= (in-tm b) '("A" "" "B")))
+    ;; a picture of an OpenDocument text which is linked: its address
+    ;; (on the web, an image)
+    (let* ((frame (lambda (href)
+                    (string-append "<text:p><draw:frame svg:width='2cm' svg:height='1cm'>"
+                                   "<draw:image xlink:href='" href "'/></draw:frame></text:p>")))
+           (b (bare (cdr (parse-odt-document
+                           (odt-file (string-append (frame "../pics/my pic.png")
+                                                    (frame "https://ex.org/a.png"))
+                                     "" ""))))))
+      (check= (list-filter b (lambda (y) (func? y 'p)))
+              '((p (image (@ (name "../pics/my pic.png") (width "2cm") (height "1cm")
+                             (linked "true"))))
+                (p (image (@ (name "https://ex.org/a.png") (width "2cm") (height "1cm"))))))
+      (check= (in-tm b) '("../pics/my pic.png" (image "https://ex.org/a.png" "2cm" "1cm" "" ""))))
+    ;; a size in percents in the default style
+    (with st (list-find (cdr (parse-odt-document
+                               (odt-file "<text:p text:style-name='S'>x</text:p>"
+                                         (string-append
+                                           "<office:styles><style:default-style style:family='paragraph'>"
+                                           "<style:text-properties fo:font-size='150%'/></style:default-style>"
+                                           "<style:style style:name='S' style:family='paragraph'>"
+                                           "<style:paragraph-properties fo:line-height='18pt'/>"
+                                           "</style:style></office:styles>")
+                                         "")))
+                        (lambda (y) (func? y 'styles)))
+      (check= (ox-attr (list-find (cdr st) (lambda (y) (== (ox-attr y 'name) "S"))) 'line-spacing)
+              "0.83"))))
+
+(define (test-import-audit-4)
+  (check-group "import audit 4")
+  (let* ((disp (lambda (s) (string-append "<m:oMathPara><m:oMath>" (mr s)
+                                          "</m:oMath></m:oMathPara>")))
+         (fc (lambda (type)
+               (string-append "<w:r><w:fldChar w:fldCharType='" type "'/></w:r>")))
+         (instr (lambda (s)
+                  (string-append "<w:r><w:instrText xml:space='preserve'>" s
+                                 "</w:instrText></w:r>")))
+         (fld (lambda (code res) (string-append (fc "begin") (instr code) (fc "separate")
+                                                (wr res) (fc "end"))))
+         (tab "<w:r><w:tab/></w:r>")
+         (seq (fld " SEQ Equation " "1"))
+         (code " ADDIN ZOTERO_BIBL {} CSL_BIBLIOGRAPHY ")
+         (start (string-append (fc "begin") (instr code) (fc "separate")))
+         (zotero (lambda (x) `(field-blocks (@ (code ,code)) ,@x)))
+         (heading (lambda l (string-append "<w:p><w:pPr><w:outlineLvl w:val='0'/></w:pPr>"
+                                           (apply string-append l) "</w:p>")))
+         ;; (a Word document with these styles)
+         (styled (lambda (body styles)
+                   (cdr (parse-docx-document
+                          (zip-pack '("word/document.xml" "word/styles.xml")
+                                    (list (string-append "<w:document" docx-ns "><w:body>"
+                                                         body "</w:body></w:document>")
+                                          (string-append "<w:styles" docx-ns ">" styles
+                                                         "</w:styles>")))))))
+         (char-style (lambda (id rpr)
+                       (string-append "<w:style w:type='character' w:styleId='" id "'>"
+                                      "<w:name w:val='" id "'/><w:rPr>" rpr "</w:rPr></w:style>")))
+         (par-style (lambda (id rpr)
+                      (string-append "<w:style w:type='paragraph' w:styleId='" id "'>"
+                                     "<w:name w:val='" id "'/><w:rPr>" rpr "</w:rPr></w:style>")))
+         (rs (lambda (id text rpr)
+               (string-append "<w:r><w:rPr><w:rStyle w:val='" id "'/>" rpr "</w:rPr><w:t>"
+                              text "</w:t></w:r>")))
+         (pp (lambda (id . l) (string-append "<w:p>" (wstyle id) (apply string-append l) "</w:p>"))))
+    ;; 1. a paragraph which only starts with the end of a field keeps
+    ;; what it is (a heading)
+    (check= (docx (string-append (wp start (wr "Doe")) (wp (wr "Roe"))
+                                 (heading (fc "end") (wr "Appendix"))))
+            (list (zotero '((p "Doe") (p "Roe")))
+                  '(p (@ (role "heading") (level "1") (numbered "no")) "Appendix")))
+    ;; 2. the bold and italics of complex scripts are kept by a style
+    (check= (bare (styled (wp (rs "R" "e" "<w:rtl/><w:bCs/><w:iCs/>")) (char-style "R" "<w:rtl/>")))
+            '((p (span (@ (style "R")) (strong (em "e"))))))
+    ;; 3. a span which is not bold in a bold paragraph (OpenDocument)
+    (check= (bare (cdr (parse-odt-document
+                         (odt-file (string-append "<text:p text:style-name='P1'>a "
+                                                  (tspan "T1" "b") "</text:p>")
+                                   (string-append "<office:styles><style:style style:name='N'"
+                                                  " style:family='text'><style:text-properties"
+                                                  " fo:font-weight='normal'/></style:style>"
+                                                  "</office:styles>")
+                                   (string-append "<style:style style:name='P1' style:family='paragraph'>"
+                                                  "<style:text-properties fo:font-weight='bold'/>"
+                                                  "</style:style><style:style style:name='T1'"
+                                                  " style:family='text' style:parent-style-name='N'>"
+                                                  "<style:text-properties fo:font-weight='normal'/>"
+                                                  "</style:style>")))))
+            '((p (strong "a ") (span (@ (style "N")) "b"))))
+    ;; 4. an underline of another kind than the one of the style
+    (check= (bare (styled (wp (rs "U" "e" "<w:u w:val='double'/>")) (char-style "U" "<w:u w:val='single'/>")))
+            '((p (span (@ (style "U")) (underline (@ (value "double")) "e")))))
+    ;; 5. the text before the start of a field in a heading is the heading
+    (check= (docx (string-append (heading (wr "References ") start (wr "Doe"))
+                                 (wp (wr "Roe") (fc "end"))))
+            (list '(p (@ (role "heading") (level "1") (numbered "no")) "References")
+                  (zotero '((p "Doe") (p "Roe")))))
+    ;; 6. what is no text before the start of a field goes into it
+    (check= (docx (string-append (wp tab start (wr "Doe")) (wp (wr "Roe") (fc "end"))))
+            (list (zotero '((p "Doe") (p "Roe")))))
+    (check= (docx (string-append (wp "<w:bookmarkStart w:id='1' w:name='bib'/>" start (wr "Doe"))
+                                 (wp (wr "Roe") (fc "end"))))
+            (list (zotero '((p (bookmark (@ (name "bib"))) "Doe") (p "Roe")))))
+    ;; 7. the style of the text after a field in an item is defined
+    (with b (styled (string-append (wp start (wr "Doe"))
+                                   "<w:p><w:pPr><w:pStyle w:val='MyItem'/><w:numPr><w:ilvl w:val='0'/>"
+                                   "<w:numId w:val='1'/></w:numPr></w:pPr>"
+                                   (wr "Roe") (fc "end") (wr " After") "</w:p>")
+                    (par-style "MyItem" "<w:color w:val='00FF00'/>"))
+      (check= (map (lambda (st) (ox-attr st 'name))
+                   (cdr (or (list-find b (lambda (y) (func? y 'styles))) '(styles))))
+              '("MyItem")))
+    ;; 8. the point after the number of a formula, a dash before it, the
+    ;; text of a heading
+    (check= (in-tm (docx (wp (wr "Text") (disp "x") tab (wr "(") seq (wr ")."))))
+            '("Text" (equation (document "x."))))
+    (check= (in-tm (docx (wp (disp "x") tab (wr "(") seq (wr ")") (wr "."))))
+            '((equation (document "x."))))
+    (check= (in-tm (docx (wp (disp "x") (wr " -") tab (wr "(") seq (wr ")"))))
+            '((equation* (document "x")) (concat "-" (space "2em") "(1)")))
+    (check= (in-tm (docx (wp (disp "x") tab (fld " STYLEREF \"Heading 1\" " "Intro") tab
+                             (wr "(") seq (wr ")"))))
+            '((equation* (document "x")) (concat (space "2em") "Intro" (space "2em") "(1)")))
+    ;; 9. linked pictures: only addresses of files
+    (let* ((frame (lambda (href)
+                    (string-append "<text:p><draw:frame svg:width='2cm' svg:height='1cm'>"
+                                   "<draw:image xlink:href='" href "'/></draw:frame></text:p>")))
+           (b (bare (cdr (parse-odt-document
+                           (odt-file (string-append (frame "#") (frame "javascript:x()")
+                                                    (frame "Pictures/missing.png")
+                                                    (frame (string-append "data:image/png;base64,"
+                                                                          "iVBORw0KGgo=")))
+                                     "" ""))))))
+      (check= (map (lambda (p) (ox-attr (car (ox-children p)) 'name))
+                   (list-filter b (lambda (y) (func? y 'p))))
+              '("image.png")))
+    ;; 10. the spaces after the end of a field, after deleted text
+    (check= (docx (string-append (wp start (wr "Doe"))
+                                 (wp (wr "Roe") "<w:del w:id='7' w:author='d'>" (fc "end")
+                                     "<w:r><w:delText xml:space='preserve'> Gone</w:delText></w:r>"
+                                     "</w:del>" (wr " Kept"))))
+            (list (zotero '((p "Doe") (p "Roe"))) '(p (del (@ (author "d")) "Gone") "Kept")))
+    ;; the end of a field in a change inside a link
+    (check= (docx (string-append (wp start (wr "Doe"))
+                                 (wp "<w:hyperlink w:anchor='x'>" (wr "Roe")
+                                     "<w:ins w:id='9' w:author='a'>" (fc "end") (wr " After")
+                                     "</w:ins></w:hyperlink>")))
+            (list (zotero '((p "Doe") (p (link (@ (href "#x")) "Roe"))))
+                  '(p (link (@ (href "#x")) (ins (@ (author "a")) "After")))))
+    ;; upright or not bold by hand against the style, italics of the
+    ;; paragraph and of the style which cancel each other
+    (let ((st (string-append (char-style "I" "<w:i/>") (char-style "B" "<w:b/>")
+                             (par-style "PI" "<w:i/>"))))
+      (check= (bare (styled (wp (rs "I" "e" "<w:i w:val='0'/>")) st))
+              '((p (span (@ (style "I")) (em "e")))))
+      (check= (bare (styled (wp (rs "B" "e" "<w:b w:val='0'/>")) st))
+              '((p (span (@ (style "B")) (strong (@ (value "off")) "e")))))
+      (check= (bare (styled (pp "PI" (rs "I" "e" "")) st))
+              '((setup (@ (body-style "PI"))) (p (span (@ (style "I")) (em "e")))))
+      (check= (in-tm '((p (strong (@ (value "off")) "e"))))
+              '((with "font-series" "medium" "e"))))))
 
 (define (test-import-math)
   (check-group "import math")
@@ -3845,7 +4102,7 @@
     (check= (office-odf-name "A_20__26__20_B") "A & B")
     (check= (office-odf-name "x_y_z") "x_y_z"))
   ;; 6. 7. a paragraph and a text of the same name have two styles; a name
-  ;; which Word has is its style
+  ;; which Word has is another style, which does not change Word's
   (let* ((z (serialize-docx-document
               '(office (styles (style (@ (name "N") (family "paragraph") (em "true")))
                                (style (@ (name "N") (family "text") (strong "true"))))
@@ -3857,9 +4114,10 @@
     (check-true (export-has? text "<w:pStyle w:val=\"N\"/>"))
     (check-true (export-has? text "<w:rStyle w:val=\"NChar\"/>"))
     (check-true (export-has? styles "<w:style w:type=\"character\" w:styleId=\"NChar\"><w:name w:val=\"N Char\"/>"))
-    (check-true (export-has? text "<w:pStyle w:val=\"Heading1\"/>"))
-    (check-true (export-has? text "<w:pStyle w:val=\"Normal\"/>"))
-    (check-false (export-has? styles "w:styleId=\"Heading_20_1\""))
+    (check-true (export-has? text "<w:pStyle w:val=\"Heading_20_1\"/>"))
+    (check-true (export-has? styles "<w:name w:val=\"Heading 1 Doc\"/>"))
+    (check-false (export-has? text "<w:pStyle w:val=\"Heading1\"/>"))
+    (check-true (export-has? text "<w:pStyle w:val=\"normalDoc\"/>"))
     (check-false (export-has? styles "w:styleId=\"normal\"")))
   ;; 8. 9. the address of a picture on the web, with %XX, 5cm by 3cm in
   ;; both formats; a field over paragraphs without them; one of
@@ -3902,6 +4160,693 @@
     (check-true (export-has? text "<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t xml:space=\"preserve\">i</w:t>"))
     (check-true (export-has? text ">j</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>"))
     (check= (export-count text "fldCharType=\"begin\"") 1)))
+
+;; The export, after the third audit: the styles of the document which are
+;; built-in styles keep their look, two of them are two styles, the names
+;; of the styles of TeXmacs in OpenDocument, the names to show of a
+;; paragraph and a text of one name, the addresses of linked pictures.
+
+(define (export-style s id)
+  ;; the element w:style of this id in the text s of word/styles.xml, or ""
+  (let* ((i (string-search-forwards (string-append "w:styleId=\"" id "\"") 0 s))
+         (j (if (< i 0) -1 (string-search-forwards "</w:style>" i s))))
+    (if (or (< i 0) (< j 0)) "" (substring s i j))))
+
+(define (export-odt-style s family name)
+  ;; the element style:style of this family and name in the text s, up to
+  ;; the next style, or ""
+  (let* ((i (string-search-forwards (string-append "<style:style style:name=\"" name
+                                                   "\" style:family=\"" family "\"")
+                                    0 s))
+         (j (if (< i 0) -1 (string-search-forwards "<style:style " (+ i 1) s))))
+    (cond ((< i 0) "")
+          ((< j 0) (substring s i (string-length s)))
+          (else (substring s i j)))))
+
+(define (test-export-audit-3)
+  (check-group "export audit 3")
+  ;; 1. 2. a style of the document of the name of a built-in style of Word
+  ;; is a style of its own, with its look, and the built-in style keeps
+  ;; its look; two such styles are two styles; a style used twice is one
+  ;; style
+  (let* ((tree '(office (setup (@ (body-style "normal")))
+                        (styles (style (@ (name "normal") (family "paragraph") (em "true")
+                                          (color "#0000ff")))
+                                (style (@ (name "title") (family "paragraph") (color "#ff0000")
+                                          (size "30")))
+                                (style (@ (name "heading 1") (family "paragraph")
+                                          (color "#00ff00")))
+                                (style (@ (name "Heading1") (family "paragraph")
+                                          (color "#0000ff")))
+                                (style (@ (name "Caption") (family "paragraph")
+                                          (color "#ff0000")))
+                                (style (@ (name "Q") (family "paragraph") (strong "true"))))
+                        (p "body")
+                        (p (@ (style "title")) "t")
+                        (p (@ (style "heading 1")) "h")
+                        (p (@ (style "Heading1")) "H")
+                        (p (@ (style "Caption")) "c")
+                        (p (@ (style "Q")) "q1")
+                        (p (@ (style "Q")) "q2")))
+         (z (serialize-docx-document tree))
+         (text (export-entry z "word/document.xml"))
+         (styles (export-entry z "word/styles.xml")))
+    (check-true (export-has? text "<w:pStyle w:val=\"normalDoc\"/>"))
+    (check-true (export-has? (export-style styles "normalDoc") "<w:i/>"))
+    (check-true (export-has? (export-style styles "normalDoc") "<w:color w:val=\"0000FF\"/>"))
+    (check-false (export-has? (export-style styles "Normal") "<w:i/>"))
+    (check-false (export-has? (export-style styles "Normal") "<w:color"))
+    (check-true (export-has? text "<w:pStyle w:val=\"titleDoc\"/>"))
+    (check-true (export-has? (export-style styles "titleDoc") "<w:color w:val=\"FF0000\"/>"))
+    (check-true (export-has? (export-style styles "titleDoc") "<w:sz w:val=\"60\"/>"))
+    (check-false (export-has? (export-style styles "Title") "<w:color"))
+    (check-true (export-has? (export-style styles "Title") "<w:b/>"))
+    (check-false (export-has? text "<w:pStyle w:val=\"Heading1\"/>"))
+    (check-true (export-has? text "<w:pStyle w:val=\"Heading1Doc\"/>"))
+    (check-true (export-has? (export-style styles "Heading1Doc") "<w:color w:val=\"0000FF\"/>"))
+    (check-true (export-has? styles "<w:name w:val=\"heading 1 Doc\"/>"))
+    (check-false (export-has? (export-style styles "Heading1") "<w:color"))
+    (check-true (export-has? (export-style styles "Heading1") "<w:outlineLvl w:val=\"0\"/>"))
+    (check-true (export-has? (export-style styles "CaptionDoc") "<w:color w:val=\"FF0000\"/>"))
+    (check-false (export-has? (export-style styles "Caption") "<w:color"))
+    (check= (export-count text "<w:pStyle w:val=\"Q\"/>") 2)
+    (check= (export-count styles "w:styleId=\"Q\"") 1)
+    (check-true (export-xml-ok? z)))
+  ;; 3. a style of the document of the name of a style of TeXmacs in
+  ;; OpenDocument (Standard, Caption) is another one, with its look, and the
+  ;; style of TeXmacs keeps its look; a style of text of the name of a
+  ;; style of paragraphs is a style of text; so is a style of a file of Word
+  (let* ((tree '(office (styles (style (@ (name "Standard") (family "paragraph")))
+                                (style (@ (name "Caption") (family "paragraph")
+                                          (color "#ff0000")))
+                                (style (@ (name "Caption") (family "text") (strong "true"))))
+                        (p (@ (style "Standard")) "s")
+                        (p (@ (style "Caption")) "c" (span (@ (style "Caption")) "t"))))
+         (o (serialize-odt-document tree))
+         (content (export-entry o "content.xml"))
+         (styles (export-entry o "styles.xml")))
+    (check-true (export-has? content "<text:p text:style-name=\"Standard_20_Doc\">"))
+    (check-true (export-has? content "<text:p text:style-name=\"Caption_20_Doc\">"))
+    (check-true (export-has? (export-odt-style styles "paragraph" "Caption_20_Doc") "fo:color=\"#ff0000\""))
+    (check-false (export-has? (export-odt-style styles "paragraph" "Caption") "fo:color"))
+    (check-true (export-has? (export-odt-style styles "text" "Caption") "fo:font-weight=\"bold\""))
+    (check-true (export-xml-ok? o)))
+  (let* ((z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "Standard") (wr "x")) (wp (wr "y"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='Standard'>"
+                                           "<w:name w:val='Standard'/><w:rPr><w:i/></w:rPr>"
+                                           "</w:style></w:styles>"))))
+         (t (convert z "docx-document" "texmacs-stree"))
+         (content (export-entry (convert t "texmacs-stree" "odt-document") "content.xml")))
+    (check-true (export-has? content "text:style-name=\"Standard_20_Doc\"")))
+  ;; 4. the names to show of a style of paragraphs and one of text of the
+  ;; same name in OpenDocument
+  (let* ((z (odt-file "<text:p text:style-name='N'>p<text:span text:style-name='N'>c</text:span></text:p>"
+                      (string-append "<office:styles>"
+                                     "<style:style style:name='N' style:display-name='Para N' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#00aa00'/></style:style>"
+                                     "<style:style style:name='N' style:display-name='Char N' style:family='text'>"
+                                     "<style:text-properties fo:color='#ff0000'/></style:style>"
+                                     "</office:styles>")
+                      ""))
+         (l (office-package-styles "odt" z))
+         (find (lambda (fam) (list-find l (lambda (st) (and (== (ox-attr st 'name) "N")
+                                                            (== (ox-attr st 'family) fam)))))))
+    (check= (ox-attr (find "paragraph") 'display) "Para N")
+    (check= (ox-attr (find "text") 'display) "Char N"))
+  ;; 5. the addresses of linked pictures, as Word and LibreOffice write them
+  (check= (office-link-target "https://a.b/c d.png?q=1#f" #t) "https://a.b/c%20d.png?q=1#f")
+  (check= (office-link-target "https://a.b/a%20b.png" #f) "https://a.b/a%20b.png")
+  (check= (office-link-target "C:\\pics\\a b.png" #t) "file:///C:\\pics\\a%20b.png")
+  (check= (office-link-target "C:\\pics\\a b.png" #f) "file:///C:/pics/a%20b.png")
+  (check= (office-link-target "file:///C:\\pics\\a.png" #f) "file:///C:/pics/a.png")
+  (check= (office-link-target "../pics/my pic.png" #f) "../pics/my%20pic.png")
+  (let* ((tree '(office (p (image (@ (name "C:\\pics\\a b.png") (linked "true"))))))
+         (z (serialize-docx-document tree))
+         (o (serialize-odt-document tree)))
+    (check-true (export-has? (export-entry z "word/_rels/document.xml.rels")
+                             "Target=\"file:///C:\\pics\\a%20b.png\" TargetMode=\"External\""))
+    (check-true (export-has? (export-entry o "content.xml")
+                             "xlink:href=\"file:///C:/pics/a%20b.png\""))))
+
+;; The fourth audit of the writers: the ids of the named styles do not
+;; depend on the order of the text, a name which is an id keeps it, a style
+;; of a file of Word named as a style of TeXmacs is another style in
+;; OpenDocument (never one of TeXmacs), the addresses of linked pictures.
+
+(define (test-export-audit-4)
+  (check-group "export audit 4")
+  (let* ((styles '(styles (style (@ (name "heading 1") (family "paragraph") (color "#00ff00")))
+                          (style (@ (name "Heading1") (family "paragraph") (color "#0000ff")))))
+         (ids (lambda (blocks)
+                (let* ((z (serialize-docx-document `(office ,styles ,@blocks)))
+                       (text (export-entry z "word/document.xml")))
+                  (list (export-has? text "<w:pStyle w:val=\"Heading1Doc\"/>")
+                        (export-has? text "<w:pStyle w:val=\"heading1Doc2\"/>")
+                        (export-has? text "<w:pStyle w:val=\"Heading1\"/>")))))
+         (a '((p (@ (style "heading 1")) "h") (p (@ (style "Heading1")) "H")))
+         (b '((p (@ (style "Heading1")) "H") (p (@ (style "heading 1")) "h"))))
+    (check= (ids a) '(#t #t #f))
+    (check= (ids b) '(#t #t #f)))
+  ;; (MyNote keeps its id, My Note has another one)
+  (let* ((text (export-entry (serialize-docx-document
+                               '(office (p (@ (style "My Note")) "y") (p (@ (style "MyNote")) "x")))
+                             "word/document.xml")))
+    (check-true (export-has? text "<w:pStyle w:val=\"MyNote\"/>"))
+    (check-true (export-has? text "<w:pStyle w:val=\"MyNoteDoc\"/>")))
+  ;; a style Heading of a file of Word is not Heading_20_2 of TeXmacs
+  (let* ((z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "Heading") (wr "x")) (wp (wr "y"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='Heading'>"
+                                           "<w:name w:val='Heading'/><w:rPr><w:color w:val='FF0000'/></w:rPr>"
+                                           "</w:style></w:styles>"))))
+         (o (convert (convert z "docx-document" "texmacs-stree") "texmacs-stree" "odt-document"))
+         (content (export-entry o "content.xml"))
+         (styles (export-entry o "styles.xml")))
+    (check-false (export-has? content "Heading_20_2"))
+    (check-false (export-has? (export-odt-style styles "paragraph" "Heading_20_2") "fo:color")))
+  ;; # ? and a % which is not %XX in the path of a linked picture; a path of
+  ;; a server
+  (check= (office-link-target "C:\\pics\\a#1 b.png" #t) "file:///C:\\pics\\a%231%20b.png")
+  (check= (office-link-target "C:\\pics\\a#1 b.png" #f) "file:///C:/pics/a%231%20b.png")
+  (check= (office-link-target "../p/100%.png" #f) "../p/100%25.png")
+  (check= (office-link-target "../p/a%20b.png" #f) "../p/a%20b.png")
+  (check= (office-link-target "\\\\server\\share\\a b.png" #t) "file://server/share/a%20b.png")
+  (check= (office-link-target "https://x.y/a b.png" #t) "https://x.y/a%20b.png"))
+
+;; Documents of styles of the names of those of the other format, opened in
+;; Word and LibreOffice: a caption which is not the one of a figure keeps
+;; its style, a plain paragraph is not in the style of another one of as
+;; many paragraphs, a style of the document in a link is its look in Word.
+
+(define (test-office-apps-check)
+  (check-group "office apps check")
+  (let* ((body (lambda (t) (cdadr (cadr t))))
+         (z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "Caption") (wr "c"))
+                                           (wp (wstyle "TextBody") (wr "t")) (wp (wr "p"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='Caption'>"
+                                           "<w:name w:val='Caption'/><w:rPr><w:color w:val='FF8800'/>"
+                                           "</w:rPr></w:style>"
+                                           "<w:style w:type='paragraph' w:styleId='TextBody'>"
+                                           "<w:name w:val='Text Body'/><w:rPr><w:color w:val='AA00AA'/>"
+                                           "</w:rPr></w:style></w:styles>"))))
+         (o (odt-file (string-append "<text:p text:style-name='Caption'>c</text:p>"
+                                     "<text:p text:style-name='MyNote'>m</text:p>"
+                                     "<text:p>p</text:p>")
+                      (string-append "<office:styles>"
+                                     "<style:style style:name='Caption' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#ff8800'/></style:style>"
+                                     "<style:style style:name='MyNote' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#008888'/></style:style>"
+                                     "</office:styles>")
+                      "")))
+    (check= (body (convert z "docx-document" "texmacs-stree"))
+            '((office-par "Caption" "c") (office-par "TextBody" "t") "p"))
+    (check= (body (convert o "odt-document" "texmacs-stree"))
+            '((office-par "Caption" "c") (office-par "MyNote" "m") "p"))
+    ;; (a caption of a figure is the one of the figure still)
+    (check= (tm '(p (image (@ (name "f.png"))))
+                '(p (@ (role "caption") (style "Caption")) "The figure"))
+            '((big-figure (image "f.png" "" "" "" "") "The figure"))))
+  (let* ((text (export-entry (serialize-docx-document
+                               '(office (p (link (@ (href "https://a.b"))
+                                                 (span (@ (style "Red")) "r"))
+                                           " " (link (@ (href "https://a.b")) "l"))))
+                             "word/document.xml")))
+    (check-true (export-has? text "<w:rStyle w:val=\"Red\"/>"))
+    (check= (export-count text "<w:rStyle w:val=\"Hyperlink\"/>") 1))
+  ;; a footnote of a formula follows it (a formula of Word or OpenDocument
+  ;; cannot hold it), and its point goes with the formula when it is read
+  (let ((m '(math (@ (display "true") (form "text")) "x")))
+    (check= (in-tm `((p ,m (note (p "n")) ".")))
+            '((equation* (document (concat "x." (text (footnote "n")))))))
+    (check= (in-tm `((p "see " ,m " " (note (p "n")) ". Then")))
+            '("see" (equation* (document (concat "x." (text (footnote "n"))))) "Then")))
+  (for (doc '((equation* (document (concat "x" (footnote "n") ".")))
+              (equation* (document (concat "x" (label "e") (footnote "n") ".")))
+              (concat "a " (math (concat "y" (footnote "m"))) " b")))
+    (for (fm '("docx-document" "odt-document"))
+      (let* ((d `(document (body (document ,doc)) (style "generic")))
+             (back (convert (convert d "texmacs-stree" fm) fm "texmacs-stree"))
+             (body (cadr (list-find (cdr back) (lambda (y) (func? y 'body))))))
+        (check-true (>= (string-search-forwards "(footnote" 0 (object->string body)) 0)))))
+  (let ((text (export-entry (serialize-docx-document
+                              (texmacs->office
+                                '(document (body (document (equation-lab (document (concat "x" (footnote "n"))) "1")))
+                                           (style "generic"))
+                                '()))
+                            "word/document.xml")))
+    ;; (the mark of the note just after the formula, before the tab of its
+    ;; number)
+    (check-true (export-has? text "</m:oMath><w:r><w:rPr><w:rStyle w:val=\"FootnoteReference\"/>")))
+  ;; the title keeps the look of its style in the file: doc-title is
+  ;; redefined in the initial environment
+  (let* ((title (lambda (t)
+                  (with i (list-find (cdr t) (lambda (y) (func? y 'initial)))
+                    (and i (list-find (cdadr i)
+                                      (lambda (a) (and (func? a 'associate)
+                                                       (== (cadr a) "doc-title"))))))))
+         (z (zip-pack '("word/document.xml" "word/styles.xml")
+                      (list (string-append "<w:document" docx-ns "><w:body>"
+                                           (wp (wstyle "Title") (wr "T")) (wp (wr "p"))
+                                           "</w:body></w:document>")
+                            (string-append "<w:styles" docx-ns ">"
+                                           "<w:style w:type='paragraph' w:styleId='Title'>"
+                                           "<w:name w:val='Title'/><w:pPr><w:jc w:val='right'/>"
+                                           "</w:pPr><w:rPr><w:color w:val='FF0000'/></w:rPr>"
+                                           "</w:style></w:styles>"))))
+         (o (odt-file "<text:p text:style-name='Title'>T</text:p><text:p>p</text:p>"
+                      (string-append "<office:styles>"
+                                     "<style:style style:name='Title' style:family='paragraph'>"
+                                     "<style:text-properties fo:color='#ff0000'/></style:style>"
+                                     "</office:styles>")
+                      ""))
+         (dz (convert z "docx-document" "texmacs-stree"))
+         (od (convert o "odt-document" "texmacs-stree")))
+    (check= (cadr (cadr (list-find (cdr dz) (lambda (y) (func? y 'body)))))
+            '(doc-data (doc-title "T")))
+    (check= (title dz)
+            '(associate "doc-title"
+                        (macro "x" (with "par-mode" "right"
+                                     (surround (vspace* "0.5fn") (vspace "0.5fn")
+                                               (with "color" "#ff0000" (arg "x")))))))
+    (check-true (>= (string-search-forwards "(with \"color\" \"#ff0000\" (arg \"x\"))" 0
+                                            (object->string (title od)))
+                    0))
+    ;; (a title without its style keeps the look of TeXmacs)
+    (check= (title (convert (odt-file "<text:p text:style-name='Title'>T</text:p>" "" "")
+                            "odt-document" "texmacs-stree"))
+            #f)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; LaTeX of the style office
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-latex-office)
+  (check-group "latex of office")
+  ;; the tags of the style office are what they show, in LaTeX which
+  ;; pdflatex compiles
+  (let* ((doc `(document
+                 (TeXmacs "2.1") (style "office")
+                 (body (document
+                         (office-par "Note"
+                           (concat "a " (office-span "Key" "b") " "
+                                   (office-ins "Ann" "" "new") " " (office-del "Bob" "" "old") " "
+                                   (office-comment "Ann" "" "remark") " "
+                                   (office-commented "c" "Ann" "" "r2") " "
+                                   (office-font "Liberation Serif" "rm" "f")
+                                   (office-letters "1" "l") (office-underline "double" "u")
+                                   (office-strike "double" "s") (office-field " PAGE " "3")
+                                   (office-capitalize "cap")))
+                         (office-columns "2" (document "col"))
+                         (office-float "left" "" "fl")
+                         (office-box "left" "" "3cm" "" "" (document "in box"))
+                         (with "ornament-color" "#dddddd" (ornamented "box"))
+                         (marked "m")
+                         (strike-through "gone")))))
+         (tex (convert doc "texmacs-stree" "latex-document")))
+    (check-false (export-has? tex "\\office"))
+    (check-false (export-has? tex "\\marked"))
+    (check-false (export-has? tex "\\strikethrough"))
+    (check-true (export-has? tex "\\usepackage[normalem]{ulem}"))
+    (check-true (export-has? tex "\\sout{old}"))
+    (check-true (export-has? tex "\\sout{gone}"))
+    (check-true (export-has? tex "{\\underline{{\\underline{u}}}}"))
+    (check-true (export-has? tex "remark]"))
+    (check-true (export-has? tex "in box"))
+    (check-true (export-has? tex "\\tmmarked{yellow}{m}"))
+    ;; (the package of the columns, a color #rrggbb by its name)
+    (check-true (export-has? tex "multicol}"))
+    (check-true (export-has? tex "\\begin{multicols}{2}"))
+    (check-true (export-has? tex "\\definecolor{tmhexDDDDDD}{HTML}{DDDDDD}"))
+    (check-true (export-has? tex "[backgroundcolor=tmhexDDDDDD]"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Fifth audit: what was changed in TeXmacs, the parts kept, fields, comments
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (doc-initial doc key)
+  (with init (list-find (cdr doc) (lambda (x) (func? x 'initial)))
+    (and init (with a (list-find (cdr (cadr init)) (lambda (a) (== (cadr a) key)))
+                (and a (caddr a))))))
+
+(define (doc-set-initial doc key val)
+  ;; the document doc whose initial environment has val for key
+  (map (lambda (x)
+         (if (not (func? x 'initial)) x
+             (let* ((l (cdr (cadr x)))
+                    (has? (list-find l (lambda (a) (== (cadr a) key)))))
+               `(initial (collection ,@(map (lambda (a) (if (== (cadr a) key)
+                                                             `(associate ,key ,val) a))
+                                            l)
+                                     ,@(if has? '() `((associate ,key ,val))))))))
+       doc))
+
+(define (doc-set-body doc f)
+  ;; the document doc whose blocks are those f makes of its blocks
+  (map (lambda (x) (if (func? x 'body) `(body (document ,@(f (cdr (cadr x))))) x)) doc))
+
+(define (tree-replace x old new)
+  (cond ((== x old) new)
+        ((pair? x) (map (lambda (y) (tree-replace y old new)) x))
+        (else x)))
+
+(define (archive-names* z)
+  (let loop ((l (zip-unpack z)) (acc '()))
+    (if (or (null? l) (null? (cdr l))) (reverse acc) (loop (cddr l) (cons (car l) acc)))))
+
+(define (text-before? s a b)
+  ;; a is in s, and before b
+  (let ((i (string-search-forwards a 0 s)) (j (string-search-forwards b 0 s)))
+    (and (>= i 0) (>= j 0) (< i j))))
+
+(define audit5-rel "http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+
+(define (audit5-docx body comments?)
+  ;; a Word document with a header (and its picture), a footer, a picture
+  ;; in its text, a picture which nothing uses and the picture of its first
+  ;; page, a named style
+  (zip-pack
+    (append '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+              "word/_rels/document.xml.rels" "word/styles.xml" "word/header1.xml"
+              "word/_rels/header1.xml.rels" "word/footer1.xml" "word/media/p.png"
+              "word/media/logo.png" "word/media/old.png" "docProps/thumbnail.jpeg")
+            (if comments? '("word/comments.xml") '()))
+    (append
+      (list "<Types/>"
+            (string-append
+              "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+              "<Relationship Id='rId1' Type='" audit5-rel "officeDocument' Target='word/document.xml'/>"
+              "<Relationship Id='rId2' Type='http://schemas.openxmlformats.org/package/2006/"
+              "relationships/metadata/thumbnail' Target='docProps/thumbnail.jpeg'/>"
+              "</Relationships>")
+            (string-append "<?xml version='1.0'?><w:document" docx-ns "><w:body>" body
+                           "<w:sectPr><w:headerReference w:type='default' r:id='rH'/>"
+                           "<w:footerReference w:type='default' r:id='rF'/>"
+                           "<w:pgSz w:w='11906' w:h='16838'/></w:sectPr></w:body></w:document>")
+            (string-append
+              "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+              "<Relationship Id='rH' Type='" audit5-rel "header' Target='header1.xml'/>"
+              "<Relationship Id='rF' Type='" audit5-rel "footer' Target='footer1.xml'/>"
+              "<Relationship Id='rI' Type='" audit5-rel "image' Target='media/p.png'/>"
+              "<Relationship Id='rC' Type='" audit5-rel "comments' Target='comments.xml'/>"
+              "</Relationships>")
+            (string-append
+              "<w:styles" docx-ns ">"
+              "<w:style w:type='paragraph' w:default='1' w:styleId='Normal'>"
+              "<w:name w:val='Normal'/></w:style>"
+              "<w:style w:type='paragraph' w:styleId='Warning'><w:name w:val='Warning'/>"
+              "<w:basedOn w:val='Normal'/><w:pPr><w:keepNext/><w:jc w:val='center'/></w:pPr>"
+              "<w:rPr><w:rFonts w:asciiTheme='majorHAnsi'/><w:b/><w:color w:val='C00000'/>"
+              "<w:lang w:val='fr-FR'/></w:rPr></w:style>"
+              "</w:styles>")
+            (string-append "<w:hdr" docx-ns ">" (wp (wr "Old head"))
+                           "<w:p><w:r><w:drawing><wp:inline><wp:extent cx='720000' cy='360000'/>"
+                           "<pic:blipFill><a:blip r:embed='rL'/></pic:blipFill></wp:inline>"
+                           "</w:drawing></w:r></w:p></w:hdr>")
+            (string-append
+              "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>"
+              "<Relationship Id='rL' Type='" audit5-rel "image' Target='media/logo.png'/>"
+              "</Relationships>")
+            (string-append "<w:ftr" docx-ns ">" (wp (wr "Old foot")) "</w:ftr>")
+            "PNGDATA" "LOGODATA" "OLDDATA" "JPEGDATA")
+      (if comments?
+          (list (string-append "<w:comments" docx-ns "><w:comment w:id='0' w:author='Ann'>"
+                               (wp (wr "a remark")) "</w:comment></w:comments>"))
+          '()))))
+
+(define audit5-picture
+  (string-append "<w:p><w:r><w:drawing><wp:inline><wp:extent cx='720000' cy='360000'/>"
+                 "<pic:blipFill><a:blip r:embed='rI'/></pic:blipFill></wp:inline>"
+                 "</w:drawing></w:r></w:p>"))
+
+(define (test-office-changed)
+  (check-group "office changed in TeXmacs")
+  (let* ((z (audit5-docx (string-append (wp (wstyle "Warning") (wr "careful"))
+                                        (wp (wr "plain")) audit5-picture)
+                         #f))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (orig (doc-initial doc "office-original"))
+         (export (lambda (d) (convert d "texmacs-stree" "docx-document")))
+         (z0 (export doc))
+         (names0 (archive-names* z0)))
+    ;; what was read is kept beside the file
+    (check-true (func? orig 'tuple))
+    (check= (list-find (cdr orig) (lambda (y) (== (cadr y) "page-odd-header")))
+            '(tuple "page-odd-header"
+                    (concat "Old head " (image (tuple (raw-data "LOGODATA") "logo.png")
+                                               "2cm" "1cm" "" ""))))
+    (check-true (list-find (cdr orig) (lambda (y) (== (cadr y) "office-par-Warning"))))
+    ;; unchanged: the header, the footer and the styles of the file
+    (check-true (in? "word/header1.xml" names0))
+    (check-true (in? "word/footer1.xml" names0))
+    (check-false (list-find names0 (lambda (n) (string-starts? n "word/tm-header"))))
+    (check-true (export-has? (archive-entry z0 "word/styles.xml") "w:asciiTheme=\"majorHAnsi\""))
+    (check-false (export-has? (export-style (archive-entry z0 "word/styles.xml") "Warning") "<w:i/>"))
+    ;; the parts which are kept are those which are named: the picture of
+    ;; the header, not the old picture of the text, nor the one which
+    ;; nothing used, nor the picture of the first page
+    (check-true (in? "word/media/logo.png" names0))
+    (check-false (in? "word/media/p.png" names0))
+    (check-false (in? "word/media/old.png" names0))
+    (check-false (in? "docProps/thumbnail.jpeg" names0))
+    (check-false (export-has? (archive-entry z0 "_rels/.rels") "thumbnail"))
+    (check-true (list-find names0 (lambda (n) (string-starts? n "word/media/tm-"))))
+    ;; the picture deleted in TeXmacs is in the file no more
+    (let* ((d (doc-set-body doc (lambda (l) (list-filter l (lambda (b) (not (export-has? (object->string b) "image")))))))
+           (names (archive-names* (export d))))
+      (check-false (list-find names (lambda (n) (string-starts? n "word/media/tm-"))))
+      (check-false (in? "word/media/p.png" names)))
+    ;; a header which was changed is written instead of the one of the file
+    (let* ((d (doc-set-initial doc "page-odd-header"
+                               '(concat (htab "5mm") "New head " (page-the-page) (htab "5mm"))))
+           (z1 (export d))
+           (names (archive-names* z1))
+           (h (archive-entry z1 "word/tm-header1.xml"))
+           (text (archive-entry z1 "word/document.xml"))
+           (back (convert z1 "docx-document" "texmacs-stree")))
+      (check-true (string? h))
+      (check-true (export-has? h "New head"))
+      (check-true (export-has? h "<w:jc w:val=\"center\"/>"))
+      (check-true (export-has? h " PAGE </w:instrText>"))
+      (check-true (export-has? (archive-entry z1 "[Content_Types].xml") "/word/tm-header1.xml"))
+      (check-true (export-has? text "<w:headerReference w:type=\"default\" r:id=\"rIdTm"))
+      (check-false (export-has? text "r:id=\"rH\""))
+      (check-false (in? "word/header1.xml" names))
+      (check-false (in? "word/media/logo.png" names))
+      (check-true (in? "word/footer1.xml" names))
+      (check-true (export-has? (object->string (doc-initial back "page-odd-header")) "New head"))
+      (check-true (export-has? (object->string (doc-initial back "page-odd-header")) "page-the-page"))
+      (check= (doc-initial back "page-odd-footer") "Old foot"))
+    ;; a header of the first page, a footer which was removed
+    (let* ((d (doc-set-body (doc-set-initial doc "page-odd-footer" "")
+                            (lambda (l) (cons '(set-this-page-header "First") l))))
+           (z1 (export d))
+           (text (archive-entry z1 "word/document.xml"))
+           (back (convert z1 "docx-document" "texmacs-stree")))
+      (check-true (export-has? text "<w:headerReference w:type=\"first\""))
+      (check-true (export-has? text "<w:titlePg/>"))
+      (check-false (export-has? text "<w:footerReference"))
+      (check-false (in? "word/footer1.xml" (archive-names* z1)))
+      (check-true (in? '(set-this-page-header "First") (cdr (cadr (cadr back)))))
+      (check= (doc-initial back "page-odd-footer") #f))
+    ;; a named style whose macro was changed: what was changed is written,
+    ;; the rest of the style of the file is kept
+    (let* ((m (doc-initial doc "office-par-Warning"))
+           (d (doc-set-initial doc "office-par-Warning"
+                               `(macro "body" (with "font-shape" "italic" ,(caddr m)))))
+           (st (export-style (archive-entry (export d) "word/styles.xml") "Warning")))
+      (check-true (export-has? st "<w:i/><w:iCs/>"))
+      (check-true (export-has? st "<w:b/>"))
+      (check-true (export-has? st "w:asciiTheme=\"majorHAnsi\""))
+      (check-true (export-has? st "<w:lang w:val=\"fr-FR\"/>"))
+      (check-true (export-has? st "<w:keepNext/>"))
+      (check-true (text-before? st "<w:keepNext/>" "<w:jc w:val=\"center\"/>")))
+    (let* ((m (doc-initial doc "office-par-Warning"))
+           (d (doc-set-initial doc "office-par-Warning" (tree-replace m "bold" "medium")))
+           (st (export-style (archive-entry (export d) "word/styles.xml") "Warning")))
+      (check-true (export-has? st "<w:b w:val=\"0\"/><w:bCs w:val=\"0\"/>"))
+      (check-true (export-has? st "<w:color w:val=\"C00000\"/>"))))
+  ;; OpenDocument: the header of the first page, the named styles, the
+  ;; pictures which are not used any more
+  (let* ((z (zip-pack
+              '("mimetype" "content.xml" "styles.xml" "Pictures/p.png" "Pictures/old.png"
+                "Pictures/bg.png" "manifest.rdf")
+              (list "application/vnd.oasis.opendocument.text"
+                    (string-append "<?xml version='1.0'?><office:document-content" odt-ns ">"
+                                   "<office:body><office:text>"
+                                   "<text:p text:style-name='Note'>careful</text:p>"
+                                   "<text:p><draw:frame svg:width='2cm' svg:height='1cm'>"
+                                   "<draw:image xlink:href='Pictures/p.png'/></draw:frame></text:p>"
+                                   "</office:text></office:body></office:document-content>")
+                    (string-append "<office:document-styles" odt-ns "><office:styles>"
+                                   "<style:style style:name='Note' style:family='paragraph'>"
+                                   "<style:paragraph-properties fo:margin-left='1cm'/>"
+                                   "<style:text-properties fo:font-weight='bold' fo:color='#c00000'"
+                                   " fo:language='fr'/></style:style>"
+                                   "<style:style style:name='Header' style:family='paragraph'/>"
+                                   "</office:styles><office:automatic-styles>"
+                                   "<style:page-layout style:name='pm1'>"
+                                   "<style:page-layout-properties><style:background-image"
+                                   " xlink:href='Pictures/bg.png'/></style:page-layout-properties>"
+                                   "</style:page-layout></office:automatic-styles>"
+                                   "<office:master-styles><style:master-page style:name='Standard'"
+                                   " style:page-layout-name='pm1'>"
+                                   "<style:header><text:p>Old head</text:p></style:header>"
+                                   "<style:footer><text:p>Old foot</text:p></style:footer>"
+                                   "</style:master-page></office:master-styles>"
+                                   "</office:document-styles>")
+                    "PNGDATA" "OLDDATA" "BGDATA" "<rdf/>")))
+         (doc (convert z "odt-document" "texmacs-stree"))
+         (export (lambda (d) (convert d "texmacs-stree" "odt-document")))
+         (z0 (export doc))
+         (names0 (archive-names* z0)))
+    (check-true (in? "Pictures/bg.png" names0))
+    (check-false (in? "Pictures/old.png" names0))
+    (check-false (in? "Pictures/p.png" names0))
+    (check-true (export-has? (archive-entry z0 "META-INF/manifest.xml")
+                             "manifest:full-path=\"manifest.rdf\" manifest:media-type=\"application/rdf+xml\""))
+    (check-true (export-has? (archive-entry z0 "styles.xml") "<text:p>Old head</text:p>"))
+    (let* ((d (doc-set-body (doc-set-initial doc "page-odd-header" '(concat (htab "5mm") "New head"))
+                            (lambda (l) (cons '(set-this-page-footer "First foot") l))))
+           (z1 (export d))
+           (st (archive-entry z1 "styles.xml"))
+           (back (convert z1 "odt-document" "texmacs-stree")))
+      (check-false (export-has? st "Old head"))
+      (check-true (export-has? st "New head"))
+      (check-true (export-has? st "Old foot"))
+      (check-true (export-has? st "<style:footer-first>"))
+      (check-true (text-before? st "<style:header>" "<style:footer>"))
+      (check-true (text-before? st "<style:footer>" "<style:footer-first>"))
+      ;; (its alignment is an automatic style of styles.xml)
+      (check-true (export-has? st "style:name=\"TmH1P"))
+      (check= (doc-initial back "page-odd-header") '(concat (htab "5mm") "New head"))
+      (check-true (in? '(set-this-page-footer "First foot") (cdr (cadr (cadr back))))))
+    (let* ((m (doc-initial doc "office-par-Note"))
+           (d (doc-set-initial doc "office-par-Note"
+                               `(macro "body" (with "font-shape" "italic" ,(caddr m)))))
+           (st (export-odt-style (archive-entry (export d) "styles.xml") "paragraph" "Note"))
+           (d2 (doc-set-initial doc "office-par-Note" (tree-replace m "bold" "medium")))
+           (st2 (export-odt-style (archive-entry (export d2) "styles.xml") "paragraph" "Note")))
+      (check-true (export-has? st "fo:font-style=\"italic\""))
+      (check-true (export-has? st "fo:font-weight=\"bold\""))
+      (check-true (export-has? st "fo:language=\"fr\""))
+      (check-false (export-has? (export-odt-style (archive-entry z0 "styles.xml") "paragraph" "Note")
+                                "fo:font-style=\"italic\""))
+      (check-true (export-has? st2 "fo:font-weight=\"normal\""))
+      (check-true (export-has? st2 "fo:color=\"#c00000\""))))
+  ;; a document of before office-original: nothing is taken as changed
+  (let* ((z (audit5-docx (wp (wr "plain")) #f))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (d (doc-set-initial (doc-set-initial doc "office-original" "")
+                             "page-odd-header" "New head"))
+         (z1 (convert d "texmacs-stree" "docx-document")))
+    (check-true (in? "word/header1.xml" (archive-names* z1)))
+    (check-false (export-has? (archive-entry z1 "word/document.xml") "rIdTm"))))
+
+(define (test-office-nested-fields)
+  (check-group "nested fields")
+  (let* ((b "<w:r><w:fldChar w:fldCharType='begin'/></w:r>")
+         (sep "<w:r><w:fldChar w:fldCharType='separate'/></w:r>")
+         (e "<w:r><w:fldChar w:fldCharType='end'/></w:r>")
+         (i (lambda (t) (string-append "<w:r><w:instrText xml:space='preserve'>" t
+                                       "</w:instrText></w:r>")))
+         (one (string (integer->char 1)))
+         (two (string (integer->char 2)))
+         (body (string-append
+                 (wp b (i " IF ") b (i " PAGE ") sep (wr "3") e (i " = 3 \"yes\" \"no\" ")
+                     sep (wr "yes") e)
+                 (wp b (i " = ") b (i " PAGE ") e (i " + 1 ") sep (wr "4") e)))
+         (z (docx-archive body))
+         (blocks (docx body))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml"))
+         (back (docx-blocks-of* (convert doc "texmacs-stree" "docx-document"))))
+    ;; the field inside the instruction stays there, not its result
+    (check= blocks
+            `((p (field (@ (code ,(string-append " IF " one " PAGE " two " = 3 \"yes\" \"no\" ")))
+                        "yes"))
+              (p (field (@ (code ,(string-append " = " one " PAGE " two " + 1 "))) "4"))))
+    (check= (cdr (cadr (cadr doc)))
+            '((office-field (concat " IF " (office-field " PAGE " "") " = 3 \"yes\" \"no\" ") "yes")
+              (office-field (concat " = " (office-field " PAGE " "") " + 1 ") "4")))
+    ;; written as a field inside the field, and read back the same
+    (check= (export-count text "w:fldCharType=\"begin\"") 4)
+    (check= (export-count text "w:fldCharType=\"separate\"") 2)
+    (check= (export-count text "w:fldCharType=\"end\"") 4)
+    (check-true (text-before? text "> IF </w:instrText>" "> PAGE </w:instrText>"))
+    (check-true (text-before? text "> PAGE </w:instrText>" "> = 3 \"yes\" \"no\" </w:instrText>"))
+    (check-false (export-has? text one))
+    (check= back blocks)
+    ;; (the braces of an instruction are text, as those of Zotero)
+    (check= (docx (wp b (i " ADDIN ZOTERO_ITEM {\"a\":{}} ") sep (wr "[1]") e))
+            '((p (field (@ (code " ADDIN ZOTERO_ITEM {\"a\":{}} ")) "[1]"))))
+    ;; a mark which closes nothing is not written
+    (check-false (export-has? (archive-entry (serialize-docx-document
+                                              `(office (p (field (@ (code ,(string-append " PAGE" two " ")))
+                                                                 "1"))))
+                                             "word/document.xml")
+                              two))))
+
+(define (odt-blocks-of* archive)
+  (bare (no-setup (cdr (parse-odt-document archive)))))
+
+(define (test-office-comment-ranges)
+  (check-group "comment ranges")
+  (let* ((body (string-append
+                 (wp (wr "before ") "<w:commentRangeStart w:id='0'/>" (wr "the range")
+                     "<w:commentRangeEnd w:id='0'/><w:r><w:commentReference w:id='0'/></w:r>"
+                     (wr " after"))))
+         (z (audit5-docx body #t))
+         (blocks (docx-blocks-of* z))
+         (doc (convert z "docx-document" "texmacs-stree"))
+         (text (archive-entry (convert doc "texmacs-stree" "docx-document") "word/document.xml")))
+    (check= blocks
+            '((p "before " (commented "the range" (comment (@ (author "Ann")) (p "a remark")))
+                 " after")))
+    (check= (cdr (cadr (cadr doc)))
+            '((concat "before " (office-commented "the range" "Ann" "" "a remark") " after")))
+    ;; the range around its text, then the mark of the comment
+    (check-true (text-before? text "<w:commentRangeStart w:id=\"0\"/>" "the range"))
+    (check-true (text-before? text "the range" "<w:commentRangeEnd w:id=\"0\"/>"))
+    (check-true (text-before? text "<w:commentRangeEnd w:id=\"0\"/>" "<w:commentReference"))
+    (check-true (text-before? text "<w:commentReference" " after"))
+    (check= (docx-blocks-of* (convert doc "texmacs-stree" "docx-document")) blocks)
+    ;; a mark without its other one: a comment on a point
+    (check= (docx-blocks-of* (audit5-docx (wp "<w:commentRangeStart w:id='0'/>" (wr "x")
+                                              "<w:r><w:commentReference w:id='0'/></w:r>")
+                                          #t))
+            '((p "x" (comment (@ (author "Ann")) (p "a remark")))))
+    ;; in the other format, and in OpenDocument
+    (let* ((o (convert doc "texmacs-stree" "odt-document"))
+           (c (archive-entry o "content.xml"))
+           (back (odt-blocks-of* o)))
+      (check-true (text-before? c "<office:annotation office:name=" "the range"))
+      (check-true (text-before? c "the range" "<office:annotation-end office:name="))
+      (check= (list-filter back (lambda (b) (func? b 'p))) blocks)))
+  (check= (odt-blocks-of
+            (string-append "<text:p>a <office:annotation office:name='n1'><dc:creator>Bob</dc:creator>"
+                           "<text:p>note</text:p></office:annotation>range"
+                           "<office:annotation-end office:name='n1'/> b</text:p>")
+            "" "")
+          '((p "a " (commented "range" (comment (@ (author "Bob")) (p "note"))) " b"))))
+
+(define (test-office-audit-5-misc)
+  (check-group "fifth audit, other")
+  ;; the reading of a file of the style office, by default
+  (check= (get-preference "office->texmacs:faithful") "on")
+  ;; no picture of Windows without its bytes
+  (check-false (office-metafile->png "" "a.emf")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
@@ -3967,6 +4912,8 @@
   (test-odt-more)
   (test-odt-audit)
   (test-import-audit-2)
+  (test-import-audit-3)
+  (test-import-audit-4)
   (test-import-math)
   (test-import-files)
   (test-officetm-more)
@@ -3991,5 +4938,13 @@
   (test-export-writers)
   (test-export-audit)
   (test-export-audit-2)
+  (test-export-audit-3)
+  (test-export-audit-4)
+  (test-office-apps-check)
+  (test-latex-office)
+  (test-office-changed)
+  (test-office-nested-fields)
+  (test-office-comment-ranges)
+  (test-office-audit-5-misc)
   (test-formats)
   (check-end))

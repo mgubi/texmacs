@@ -29,13 +29,14 @@ void request_callback (void *obj, void *info);
 
 struct request_link_rep: tm_link_rep {
   string name;          // name of the plugin
+  string session;       // name of the session
   int    status;        // negative= error, null= EOF, positive means data
   string outbuf;        // pending output from plugin
   string errbuf;        // pending errors from plugin
   bool   kill;          // the request can be cancelled
   
 public:
-  request_link_rep (string name);
+  request_link_rep (string name, string session);
   ~request_link_rep ();
 
   string  start ();
@@ -48,6 +49,7 @@ public:
   tree    partial ();
   string  partial_text;  // the text of the answer so far
   tree    partial_tree;  // and what is shown of it
+  ai_stream_state stream; // the output parsed so far (ai_stream_feed)
   tree    request;       // the request, asked again after a failure for a
   int     retries;       // while (too many requests): the times it was,
   double  retry_at;      // when it will be (0 when it will not be),
@@ -58,7 +60,9 @@ public:
   void    feed (int channel);
 };
 
-request_link_rep::request_link_rep (string name2): name (name2) {
+request_link_rep::request_link_rep (string name2, string session2):
+  name (name2), session (session2)
+{
   request_link_set->insert ((pointer) this);
   status = 1;
   outbuf = "";
@@ -83,8 +87,8 @@ request_link_rep::~request_link_rep () {
 }
 
 tm_link
-make_request_link (string name) {
-  return tm_new<request_link_rep> (name);
+make_request_link (string name, string session) {
+  return tm_new<request_link_rep> (name, session);
 }
 
 void
@@ -153,7 +157,7 @@ void
 request_link_rep::write (string s, int channel) {
   // cout << "Write[" << name << "] " << s << "\n";
   if (alive || (channel != LINK_IN)) return;
-  string cmd= as_string (call ("connection-request", name, "default", s));
+  string cmd= as_string (call ("connection-request", name, session, s));
   // cout << "Command[" << name << "," << s << "] = " << cmd << "\n";
   if (cmd == "") {
     status= 0; outbuf= ""; errbuf= ""; kill= false;
@@ -168,7 +172,7 @@ request_link_rep::write (string s, int channel) {
   http_async_cancel (&outbuf);
 #endif
   status= 1; outbuf= ""; errbuf= ""; kill= false;
-  partial_text= ""; partial_tree= "";
+  partial_text= ""; partial_tree= ""; ai_stream_reset (stream);
   request= t; retries= 0; retry_at= 0; retry_why= "";
   alive= !eval_request (t, status, outbuf, errbuf, kill);
 }
@@ -182,7 +186,7 @@ request_link_rep::retry_wait () {
     if (texmacs_time () < retry_at) return true;
     retry_at= 0;
     status= 1; outbuf= ""; errbuf= ""; kill= false;
-    partial_text= ""; partial_tree= "";
+    partial_text= ""; partial_tree= ""; ai_stream_reset (stream);
     if (eval_request (request, status, outbuf, errbuf, kill)) alive= false;
     return true;
   }
@@ -270,7 +274,7 @@ request_link_rep::partial () {
   }
   if (outbuf == "") return "";
   string err, reasoning;
-  string r= ai_stream_text (outbuf, name, err, reasoning);
+  string r= ai_stream_feed (stream, outbuf, name, err, reasoning);
   // (while the model thinks: the end of its reasoning)
   string key= (r == "" && reasoning != "")? "\1" * reasoning: r;
   if (key != partial_text) {

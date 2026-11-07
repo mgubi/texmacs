@@ -208,11 +208,16 @@ attach_ip (tree& ref, path ip) {
     ref->obs= list_observer (ip_observer (ip), ref->obs);
   }
   if (is_compound (ref)) {
+    // the children point to the path stored in the observer, which set_ip
+    // updates in place: compare with it, and not with its copy @ip, so that
+    // the subtrees whose position did not change are not visited
+    path rip= ip;
+    (void) ref->obs->get_ip (rip);
     int i, n= N(ref);
     for (i=0; i<n; i++) {
       path old_ip= obtain_ip (ref[i]);
-      if ((old_ip->item != i) || (!strong_equal (old_ip->next, ip))) {
-        attach_ip (ref[i], path (i, ip));
+      if ((old_ip->item != i) || (!strong_equal (old_ip->next, rip))) {
+        attach_ip (ref[i], path (i, rip));
       }
     }
   }

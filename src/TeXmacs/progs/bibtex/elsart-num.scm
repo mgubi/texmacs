@@ -73,10 +73,9 @@
     (cond
       ((or (bib-null? p) (nlist? p)) "")
       ((== (length p) 1) "")
-      ((== (length p) 2)
+      ((bib-single-page? p)
        `(concat ,(bib-translate "p.") (nbsp) ,(list-ref p 1)))
-      (else `(concat ,(bib-translate "pp.") (nbsp)
-                     ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
+      (else `(concat ,(bib-translate "pp.") (nbsp) ,(bib-page-range p))))))
 
 (tm-define (bib-format-vol-num-pages x)
   (:mode bib-elsart-num?)

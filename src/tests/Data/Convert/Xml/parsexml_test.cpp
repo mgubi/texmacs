@@ -9,28 +9,21 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
-
+#include "tm_test.hpp"
 #include "convert.hpp"
 #include "drd_std.hpp"
 
-class TestParseXML: public QObject {
-  Q_OBJECT
-
-private slots:
-  void expand_xml_default_entity();
-};
-
-
-void TestParseXML::expand_xml_default_entity () {
-  // init_std_drd ();
-  // print_tree (parse_xml ("&quot;"));
-  QVERIFY (parse_xml ("&amp;") == tuple(tree("*TOP*"), tree("\"&\"")));
-  QVERIFY (parse_xml ("&lt;") == tuple(tree("*TOP*"), tree("\"<\"")));
-  QVERIFY (parse_xml ("&gt;") == tuple(tree("*TOP*"), tree("\">\"")));
-  QVERIFY (parse_xml ("&apos;") == tuple(tree("*TOP*"), tree("\"'\"")));
-  QVERIFY (parse_xml ("&quot;") == tuple(tree("*TOP*"), tree("\"\\\"\"")));
+static void
+test_expand_xml_default_entity () {
+  CHECK (parse_xml ("&amp;") == tuple (tree ("*TOP*"), tree ("\"&\"")));
+  CHECK (parse_xml ("&lt;") == tuple (tree ("*TOP*"), tree ("\"<\"")));
+  CHECK (parse_xml ("&gt;") == tuple (tree ("*TOP*"), tree ("\">\"")));
+  CHECK (parse_xml ("&apos;") == tuple (tree ("*TOP*"), tree ("\"'\"")));
+  CHECK (parse_xml ("&quot;") == tuple (tree ("*TOP*"), tree ("\"\\\"\"")));
 }
 
-QTEST_MAIN(TestParseXML)
-#include "parsexml_test.moc"
+int
+main () {
+  RUN (test_expand_xml_default_entity);
+  return test_report ();
+}

@@ -18,6 +18,7 @@
 #include "iterator.hpp"
 #include "analyze.hpp" // contains
 #include "colors.hpp"
+#include "boot.hpp" // get_user_preference
 
 bool virtually_defined (string c, string name);
 font smart_font_bis (string f, string v, string s, string sh, int sz,
@@ -46,6 +47,7 @@ RESOURCE(smart_map);
 #define REWRITE_IGNORE         11
 #define REWRITE_MATH_ITALIC    12
 #define REWRITE_CORK           13
+#define REWRITE_EMOJI          14
 
 static string substitute_math_italic (string s);
 
@@ -361,7 +363,7 @@ get_utf8_code (string c) {
   string uc= strict_cork_to_utf8 (c);
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
-  if (pos == N(uc)) return code;
+  if (pos > 0 && pos == N(uc)) return code;
   else return -1;
 }
 
@@ -476,10 +478,17 @@ get_unicode_range (int code) {
   else if (code >= 0x380 && code <= 0x3ff) return "greek";
   else if (code >= 0x400 && code <= 0x4ff) return "cyrillic";
   else if (code >= 0x3000 && code <= 0x303f) return "cjk";
-  else if (code >= 0x4e00 && code <= 0x9fcc) return "cjk";
+  else if (code >= 0x3400 && code <= 0x4dbf) return "cjk"; // extension A
+  else if (code >= 0x4e00 && code <= 0x9fff) return "cjk";
+  else if (code >= 0xf900 && code <= 0xfaff) return "cjk"; // compatibility
   else if (code >= 0xff00 && code <= 0xffef) return "cjk";
+  else if (code >= 0x20000 && code <= 0x3134f) return "cjk"; // ext. B-G
   else if (code >= 0x3040 && code <= 0x309F) return "hiragana";
+  else if (code >= 0x30a0 && code <= 0x30ff) return "katakana";
+  else if (code >= 0x31f0 && code <= 0x31ff) return "katakana";
   else if (code >= 0xac00 && code <= 0xd7af) return "hangul";
+  else if (code >= 0x1100 && code <= 0x11ff) return "hangul"; // jamo
+  else if (code >= 0x3130 && code <= 0x318f) return "hangul";
   else if (code >= 0x2000 && code <= 0x23ff) return "mathsymbols";
   else if (code >= 0x2900 && code <= 0x2e7f) return "mathextra";
   else if (code >= 0x1d400 && code <= 0x1d7ff) return "mathletters";
@@ -505,9 +514,10 @@ in_unicode_range (string c, string range) {
   int code= decode_from_utf8 (uc, pos);
   string got= get_unicode_range (code);
   if (range == got) return range != "";
-  if (range == "cjk" && (got == "hangul" || got == "hiragana")) return true;
+  if (range == "cjk" &&
+      (got == "hangul" || got == "hiragana" || got == "katakana")) return true;
     // There are actually two ranges (cjk/hangul) for Korean characters and
-    // two ranges (cjk/hiragana) for Japanese characters
+    // three ranges (cjk/hiragana/katakana) for Japanese characters
     // For example, on macOS, `sys-korean` is expanded to `cjk=Apple SD Gothic Neo,roman`,
     // assuming that `Apple SD Gothic Neo` is the default korean font on macOS
   if (range == "mathlarge" || range == "mathbigop")
@@ -1017,6 +1027,9 @@ struct smart_font_rep: font_rep {
   int    resolve_rubber (string c, string fam, int attempt);
   int    resolve_shipped_math (string c);
   int    resolve_math_big (string c);
+  int    emoji_font ();
+  int    resolve_emoji (string c);
+  int    emoji_before_selector (string s, int pos, int end, int next);
   int    resolve (string c);
   void   initialize_font (int nr);
   int    adjusted_dpi (string fam, string var, string ser, string sh, int att);
@@ -1253,6 +1266,8 @@ rewrite (string s, int kind) {
     return substitute_math_italic (s);
   case REWRITE_CORK:
     return utf8_to_cork (strict_cork_to_utf8 (s));
+  case REWRITE_EMOJI:
+    return emoji_to_code_points (s);
   default:
     return s;
   }
@@ -1278,6 +1293,7 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
           (pos+1 == N(s) || !is_alpha (s[pos+1])))
         next= italic_nr;
       else if (chv[c] == -1) next= resolve (s (pos, pos+1));
+      next= emoji_before_selector (s, pos, pos+1, next); // keycaps
       if (count == 1 && nr != -1 && next == nr) {
         // NOTE: rewrite strings like --- character by character if necessary
         if (sm->fn_rewr[nr] == REWRITE_SPECIAL) break;
@@ -1291,7 +1307,11 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
       tm_char_forwards (s, end);
       int next= cht[s (pos, end)];
       if (next == -1) next= resolve (s (pos, end));
-      if (count == 1 && nr != -1 && next == nr) {
+      next= emoji_before_selector (s, pos, end, next);
+      if (count == 1 && nr != -1 && next == nr &&
+          !is_tuple (sm->fn_spec[nr], "shipped-emoji") &&
+          !is_tuple (sm->fn_spec[nr], "emoji-name")) {
+        // (the emoji font draws the bases of keycaps only with the rest)
         if (N(fn) <= nr || is_nil (fn[nr])) initialize_font (nr);
         if (!fn[nr]->supports (s (start, end))) break;
         pos= end;
@@ -1320,6 +1340,92 @@ is_italic_font (string master) {
 // document the same everywhere, as an emulation does.
 #define SHIPPED_MATH_FONT "STIXTwoMath-Regular"
 
+// The emoji font which comes with TeXmacs: a color font (COLR), whose emoji
+// look the same on every platform, and whose ligatures make one picture of
+// a sequence (a family, a flag, a skin tone)
+#define SHIPPED_EMOJI_FONT "TwemojiMozilla"
+
+// The emoji font: the shipped one (the preference "emoji font" at
+// "default"), the one of the system ("system": Apple Color Emoji, Segoe UI
+// Emoji, Noto Color Emoji), or a font by the name of its file; the shipped
+// one when the font asked for is not there. It is read when a font is
+// made: a change shows in the documents opened afterwards.
+static string
+emoji_font_name () {
+  string pref= get_user_preference ("emoji font", "default");
+  if (pref == "system") {
+    const char* names[]= { "Apple Color Emoji", "seguiemj",
+                           "NotoColorEmoji", "Noto Color Emoji" };
+    for (int i= 0; i < 4; i++)
+      if (tt_font_exists (names[i])) return names[i];
+  }
+  else if (pref != "default" && pref != "" && tt_font_exists (pref))
+    return pref;
+  return SHIPPED_EMOJI_FONT;
+}
+
+// The emoji font, for the texts which are not typeset by a smart font (the
+// widgets of Vue): it draws code points, not the names of the emoji
+font
+get_emoji_font (int sz, int dpi) {
+  string name= emoji_font_name ();
+  if (!tt_font_exists (name)) return font ();
+  return unicode_font (name, sz, dpi);
+}
+
+// The code point of c when it is one, -1 otherwise
+static int
+single_code (string c) {
+  if (N(c) < 4 || c[0] != '<' || c[1] != '#') return -1;
+  string uc= strict_cork_to_utf8 (c);
+  if (N(uc) == 0) return -1;
+  int pos= 0;
+  int code= decode_from_utf8 (uc, pos);
+  return (pos == N(uc))? code: -1;
+}
+
+// The characters which are emoji by default (the property
+// Emoji_Presentation of Unicode); the others (like U+2764, the heart) are
+// emoji only when followed by U+FE0F
+static bool
+is_emoji_presentation (int c) {
+  if (c < 0x231a) return false;
+  if (c >= 0x1f000) {
+    if (c >= 0x1f1e6 && c <= 0x1f1ff) return true;   // regional indicators
+    if (c >= 0x1f300 && c <= 0x1f64f) return true;   // pictographs, smileys
+    if (c >= 0x1f680 && c <= 0x1f6ff) return true;   // transport and map
+    if (c >= 0x1f7e0 && c <= 0x1f7eb) return true;   // colored circles
+    if (c >= 0x1f90c && c <= 0x1f9ff) return true;   // supplemental
+    if (c >= 0x1fa70 && c <= 0x1faff) return true;   // extended-A
+    return c == 0x1f004 || c == 0x1f0cf || c == 0x1f18e ||
+           (c >= 0x1f191 && c <= 0x1f19a) || c == 0x1f201 || c == 0x1f21a ||
+           c == 0x1f22f || (c >= 0x1f232 && c <= 0x1f236) ||
+           (c >= 0x1f238 && c <= 0x1f23a) || (c >= 0x1f250 && c <= 0x1f251);
+  }
+  if (c > 0x2b55) return false;
+  return c == 0x231a || c == 0x231b || (c >= 0x23e9 && c <= 0x23ec) ||
+         c == 0x23f0 || c == 0x23f3 || c == 0x25fd || c == 0x25fe ||
+         c == 0x2614 || c == 0x2615 || (c >= 0x2648 && c <= 0x2653) ||
+         c == 0x267f || c == 0x2693 || c == 0x26a1 || c == 0x26aa ||
+         c == 0x26ab || c == 0x26bd || c == 0x26be || c == 0x26c4 ||
+         c == 0x26c5 || c == 0x26ce || c == 0x26d4 || c == 0x26ea ||
+         c == 0x26f2 || c == 0x26f3 || c == 0x26f5 || c == 0x26fa ||
+         c == 0x26fd || c == 0x2705 || c == 0x270a || c == 0x270b ||
+         c == 0x2728 || c == 0x274c || c == 0x274e ||
+         (c >= 0x2753 && c <= 0x2755) || c == 0x2757 ||
+         (c >= 0x2795 && c <= 0x2797) || c == 0x27b0 || c == 0x27bf ||
+         c == 0x2b1b || c == 0x2b1c || c == 0x2b50 || c == 0x2b55;
+}
+
+// The characters which modify the emoji before them: the variation
+// selectors, the zero width joiner, the keycap and the tags (of the flags
+// of regions)
+static bool
+is_emoji_mark (int c) {
+  return (c >= 0xfe00 && c <= 0xfe0f) || c == 0x200d || c == 0x20e3 ||
+         (c >= 0xe0020 && c <= 0xe007f);
+}
+
 static bool
 has_math_table (font f) {
   return f->math_type == MATH_TYPE_OPENTYPE ||
@@ -1330,6 +1436,10 @@ int
 smart_font_rep::resolve (string c, string fam, int attempt) {
   //cout << "Resolve " << c << " in " << fam << ", attempt " << attempt << "\n";
   array<string> a= trimmed_tokenize (fam, "=");
+  // the variant of a font chosen for the CJK range of a family such as
+  // cjk=Hiragino Kaku Gothic ProN,roman: a CJK variant, so that its
+  // characters keep their size (see adjusted_dpi)
+  string cvar= variant;
   if (N(a) >= 2) {
     array<string> given= logical_font (family, variant, series, rshape);
     fam= a[1];
@@ -1342,7 +1452,15 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         string wanted= locase_all (v[j]);
         if (wanted == "") ok= true;
         else if (contains (wanted, given)) ok= true;
-        else if (in_unicode_range (c, wanted)) ok= true;
+        else if (in_unicode_range (c, wanted)) {
+          ok= true;
+          string r= get_unicode_range (c);
+          if (r == "hiragana" || r == "katakana") r= "cjk";
+          if (wanted == "cjk" || wanted == "hangul" ||
+              wanted == "hiragana" || wanted == "katakana")
+            if (r == "cjk" || r == "hangul")
+              cvar= (variant == "rm"? r: variant * "-" * r);
+        }
         else if (wanted == substitute_math_letter (c, 2)) ok= true;
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
@@ -1380,8 +1498,10 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   }
 
   if (N(c) == 1 && is_alpha (c[0]) && ends (fam, " Math") && shape == "italic")
-    if (starts (fam, "TeX Gyre ") || starts (fam, "Stix "))
+    if (starts (fam, "TeX Gyre ") || starts (fam, "Stix ")) {
       fam= fam (0, N(fam) - 5);
+      if (fam == "Stix Two") fam= "Stix Two Text";
+    }
   
   if (attempt == 1) {
     bool ok= true;
@@ -1397,9 +1517,9 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         return sm->add_char (tuple ("main"), c);
     }
     else {
-      font cfn= closest_font (fam, variant, series, rshape, sz, dpi, 1);
+      font cfn= closest_font (fam, cvar, series, rshape, sz, dpi, 1);
       if (cfn->supports (c)) {
-        tree key= tuple (fam, variant, series, rshape, "1");
+        tree key= tuple (fam, cvar, series, rshape, "1");
         int nr= sm->add_font (key, REWRITE_NONE);
         initialize_font (nr);
         return sm->add_char (key, c);
@@ -1488,6 +1608,23 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   if (attempt > 1) {
     string range= get_unicode_range (c);
     int a= attempt - 1;
+    if (range == "hiragana" || range == "katakana") {
+      // No font is described by its kana in the font database: kana are
+      // searched in the fonts with CJK characters, first in the Japanese
+      // font of the system, so that they do not come from a Chinese font
+      range= "cjk";
+      string jfam= default_japanese_font_name ();
+      if (a == 1 && jfam != "roman" && jfam != fam) {
+        string v= (variant == "rm"? range: variant * "-" * range);
+        font cfn= closest_font (jfam, v, series, rshape, sz, dpi, 1);
+        if (cfn->supports (c)) {
+          tree key= tuple (jfam, v, series, rshape, "1");
+          int nr= sm->add_font (key, REWRITE_NONE);
+          initialize_font (nr);
+          return sm->add_char (key, c);
+        }
+      }
+    }
     string v;
     if (range == "") v= variant;
     else if (variant == "rm") v= range;
@@ -1503,6 +1640,58 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   }
 
   return -1;
+}
+
+int
+smart_font_rep::emoji_font () {
+  if (!tt_font_exists (emoji_font_name ())) return -1;
+  // (its texts may have emoji by their names, which it draws as their code
+  // points: a family whose people come by their names and whose joiners
+  // come as code points is one ligature)
+  tree key= tuple ("shipped-emoji");
+  int nr= sm->add_font (key, REWRITE_EMOJI);
+  initialize_font (nr);
+  return nr;
+}
+
+int
+smart_font_rep::resolve_emoji (string c) {
+  int nr= emoji_font ();
+  if (nr < 0) return -1;
+  // the marks are not drawn on their own (supports says no to them): the
+  // ligatures of the font take them with the emoji before them
+  if (is_emoji_mark (single_code (c)) || fn[nr]->supports (c))
+    return sm->add_char (tuple ("shipped-emoji"), c);
+  // an emoji which the font of the system has not (the regional indicators
+  // alone, a newer emoji): from the shipped font
+  if (emoji_font_name () == SHIPPED_EMOJI_FONT ||
+      !tt_font_exists (SHIPPED_EMOJI_FONT)) return -1;
+  tree key= tuple ("shipped-emoji", "shipped");
+  int snr= sm->add_font (key, REWRITE_EMOJI);
+  initialize_font (snr);
+  if (!fn[snr]->supports (c)) return -1;
+  return sm->add_char (key, c);
+}
+
+// A character followed by U+FE0F (the variation selector which asks for an
+// emoji) goes into the emoji font, with the selector, if that font has it
+int
+smart_font_rep::emoji_before_selector (string s, int pos, int end,
+                                       int next) {
+  if (end + 7 > N(s) || s[end] != '<' || s[end+1] != '#') return next;
+  string sel= locase_all (s (end, end + 7));
+  if (sel != "<#fe0f>") return next;
+  int nr= emoji_font ();
+  if (nr < 0 || nr == next) return next;
+  string c= s (pos, end);
+  // the bases of the keycaps, which the font only draws as ligatures (and
+  // a digit followed by U+FE0F alone stays a digit of the text)
+  if (N(c) == 1)
+    return ((is_digit (c[0]) || c[0] == '#' || c[0] == '*') &&
+            locase_all (s (end + 7, min (N(s), end + 14))) == "<#20e3>")?
+           nr: next;
+  if (!fn[nr]->supports (c)) return next;
+  return nr;
 }
 
 int
@@ -1805,6 +1994,46 @@ smart_font_rep::resolve (string c) {
     }
   }
 
+  // an emoji by its name (<emoji-grinning-face>, see emoji_code_points):
+  // in the font of its first code point, as that code point would be (the
+  // emoji font, which draws the names as their code points, so that a name
+  // and the code points around it make one run and one ligature), else in
+  // the font which the code point finds, through a font which draws the
+  // name as its code points
+  if (starts (c, "<emoji-")) {
+    string u= emoji_code_points (c);
+    if (u != "") {
+      int end= 0;
+      tm_char_forwards (u, end);
+      string first= u (0, end);
+      int enr= -1;
+      if (N(first) == 1) enr= emoji_font ();   // a keycap
+      else if (is_emoji_presentation (single_code (first)) ||
+               N(u) > N(first)) enr= resolve_emoji (first);
+      if (enr >= 0 && is_tuple (sm->fn_spec[enr], "shipped-emoji"))
+        return sm->add_char (sm->fn_spec[enr], c);
+      int cnr= (N(first) == 1? -1: resolve (first));
+      if (cnr >= 0) {
+        if (sm->fn_rewr[cnr] == REWRITE_EMOJI)
+          return sm->add_char (sm->fn_spec[cnr], c);
+        tree key= tuple ("emoji-name", as_string (cnr));
+        int nr= sm->add_font (key, REWRITE_EMOJI);
+        initialize_font (nr);
+        return sm->add_char (key, c);
+      }
+    }
+  }
+
+  // the emoji, from the emoji font which comes with TeXmacs, before any
+  // other font (some text fonts have a few of them in black and white)
+  if (starts (c, "<#")) {
+    int code= single_code (c);
+    if (is_emoji_presentation (code) || is_emoji_mark (code)) {
+      int nr= resolve_emoji (c);
+      if (nr >= 0) return nr;
+    }
+  }
+
   if (math_kind != 0) {
     string upc= substitute_upright (c);
     if (upc != "" && fn[SUBFONT_MAIN]->supports (upc)) {
@@ -1932,6 +2161,12 @@ smart_font_rep::resolve (string c) {
     return sm->add_char (tuple ("virtual", virt), c);
   }
 
+  // a symbol which no other font has, like an emoji which is text by default
+  if (starts (c, "<#")) {
+    int nr= resolve_emoji (c);
+    if (nr >= 0) return nr;
+  }
+
   //cout << "Error " << c << "\n";
   return sm->add_char (tuple ("error"), c);
 }
@@ -1949,6 +2184,12 @@ smart_font_rep::initialize_font (int nr) {
     int cnr= as_int (a[1]);
     initialize_font (cnr);
     fn[nr]= fn[cnr];
+  }
+  else if (a[0] == "emoji-name") {
+    // the emoji font which draws the code points of the names
+    int enr= as_int (a[1]);
+    initialize_font (enr);
+    fn[nr]= fn[enr];
   }
   else if (a[0] == "greek")
     fn[nr]= adjust_subfont (get_greek_font (a[1], a[2], a[3], a[4]));
@@ -2053,6 +2294,9 @@ smart_font_rep::initialize_font (int nr) {
     fn[nr]= fn[SUBFONT_MAIN];
   else if (a[0] == "shipped-math")
     fn[nr]= adjust_subfont (unicode_font (SHIPPED_MATH_FONT, sz, dpi));
+  else if (a[0] == "shipped-emoji")
+    fn[nr]= adjust_subfont (unicode_font (N(a) > 1? string (SHIPPED_EMOJI_FONT):
+                                          emoji_font_name (), sz, dpi));
   else {
     int  ndpi= adjusted_dpi (a[0], a[1], a[2], a[3], as_int (a[4]));
     font cfn = closest_font (a[0], a[1], a[2], a[3], sz, ndpi, as_int (a[4]));
@@ -2077,9 +2321,19 @@ get_ex (string family, string variant, string series, string shape,
   else return as_int (ex);
 }
 
+static bool
+is_cjk_variant (string var) {
+  // the variants of the fallback fonts for CJK characters (see resolve)
+  return var == "cjk" || var == "hangul" ||
+         ends (var, "-cjk") || ends (var, "-hangul");
+}
+
 int
 smart_font_rep::adjusted_dpi (string fam, string var, string ser, string sh,
                               int attempt) {
+  // CJK characters fill the em square whatever the x-height of the Latin
+  // letters of their font: matching x-heights would shrink them (#196)
+  if (is_cjk_variant (var)) return dpi;
   int ex1= get_ex (mfam, variant, series, rshape, 1);
   int ex2= get_ex (fam, var, ser, sh, attempt);
   double zoom= 1.0;
@@ -2710,7 +2964,16 @@ smart_font (string family, string variant, string series, string shape,
             string tfam, string tvar, string tser, string tsh,
             int sz, int dpi) {
   if (!new_fonts) return find_font (family, variant, series, shape, sz, dpi);
-  if (tfam == "roman") tfam= family;
+  if (tfam == "roman") {
+    tfam= family;
+    // math-stix and the math fonts of TeX Gyre are those of the text fonts
+    // stix, bonum..., which their hand-tuned code recognizes by the names
+    // stix-..., bonum-... (#196): as when these are the text fonts too
+    if (tfam == "math-stix" || tfam == "math-bonum" ||
+        tfam == "math-pagella" || tfam == "math-schola" ||
+        tfam == "math-termes")
+      tfam= tfam (5, N(tfam));
+  }
   if (variant != "mr") {
     if (variant == "ms") tvar= "ss";
     if (variant == "mt") tvar= "tt";

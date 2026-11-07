@@ -10,174 +10,165 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
 #include "string.hpp"
-
-class TestString: public QObject {
-  Q_OBJECT
-
-private slots:
-  void equality ();
-  void compare ();
-  void slice ();
-  void concat ();
-  void append ();
-
-  void test_as_bool ();
-  void test_as_string_bool ();
-
-  void test_is_empty ();
-  void test_is_bool ();
-  void test_is_int ();
-  void test_is_quoted ();
-};
-
-
 
 /******************************************************************************
 * Tests on Common routines for strings
 ******************************************************************************/
 
-void
-TestString::equality() {
-  QCOMPARE (string("abc") == "abc", true);
-  QCOMPARE (string("abc") == "", false);
+static void
+test_equality () {
+  CHECK_EQ (string("abc") == "abc", true);
+  CHECK_EQ (string("abc") == "", false);
 
-  QCOMPARE (string("abc") != "abc", false);
-  QCOMPARE (string("abc") != "", true);
+  CHECK_EQ (string("abc") != "abc", false);
+  CHECK_EQ (string("abc") != "", true);
 
-  QCOMPARE (string("abc") == string("abc"), true);
-  QCOMPARE (string("abc") == string(), false);
-  QCOMPARE (string("abc") != string("abc"), false);
-  QCOMPARE (string("abc") != string(), true);
+  CHECK_EQ (string("abc") == string("abc"), true);
+  CHECK_EQ (string("abc") == string(), false);
+  CHECK_EQ (string("abc") != string("abc"), false);
+  CHECK_EQ (string("abc") != string(), true);
 
-  QCOMPARE (string() == string(), true);
+  CHECK_EQ (string() == string(), true);
 }
 
-void
-TestString::compare () {
-  QVERIFY (string("ab") < string("b"));
-  QVERIFY (string() < string("0"));
+static void
+test_compare () {
+  CHECK (string("ab") < string("b"));
+  CHECK (string() < string("0"));
 
-  QVERIFY (string("a") <= string("a"));
-  QVERIFY (string("ab") <= string("b"));
-  QVERIFY (string() <= string());
-  QVERIFY (string() <= string("0"));
+  CHECK (string("a") <= string("a"));
+  CHECK (string("ab") <= string("b"));
+  CHECK (string() <= string());
+  CHECK (string() <= string("0"));
 }
 
-void
-TestString::slice () {
-  QVERIFY (string("abcde")(0, 0) == string());
-  QVERIFY (string("abcde")(0, 1) == string("a"));
-  QVERIFY (string("abcde")(0, 10) == string("abcde"));
-  QVERIFY (string("abcde")(-1, 1) == string("a"));
-  QVERIFY (string("abcde")(3, 2) == string());
-  QVERIFY (string("abcde")(3, -2) == string());
-  QVERIFY (string("abcde")(10, 11) == string());
-  QVERIFY (string("abcde")(-3, -2) == string());
+static void
+test_slice () {
+  CHECK (string("abcde")(0, 0) == string());
+  CHECK (string("abcde")(0, 1) == string("a"));
+  CHECK (string("abcde")(0, 10) == string("abcde"));
+  CHECK (string("abcde")(-1, 1) == string("a"));
+  CHECK (string("abcde")(3, 2) == string());
+  CHECK (string("abcde")(3, -2) == string());
+  CHECK (string("abcde")(10, 11) == string());
+  CHECK (string("abcde")(-3, -2) == string());
 }
 
-void
-TestString::concat () {
-  QVERIFY (string("abc") * "de" == string("abcde"));
-  QVERIFY (string("abc") * string("de") == string("abcde"));
-  QVERIFY ("abc" * string("de") == string("abcde"));
+static void
+test_concat () {
+  CHECK (string("abc") * "de" == string("abcde"));
+  CHECK (string("abc") * string("de") == string("abcde"));
+  CHECK ("abc" * string("de") == string("abcde"));
 }
 
 /******************************************************************************
 * Modifications
 ******************************************************************************/
-void
-TestString::append () {
+static void
+test_append () {
   auto str = string();
   str << 'x';
-  QVERIFY (str == string("x"));
+  CHECK (str == string("x"));
   str << string("yz");
-  QVERIFY (str == string("xyz"));
+  CHECK (str == string("xyz"));
 }
 
 /******************************************************************************
 * Conversions
 ******************************************************************************/
-void
-TestString::test_as_bool () {
-  QCOMPARE (as_bool(string("true")), true);
-  QCOMPARE (as_bool(string("#t")), true);
-  QCOMPARE (as_bool(string("false")), false);
+static void
+test_as_bool () {
+  CHECK_EQ (as_bool(string("true")), true);
+  CHECK_EQ (as_bool(string("#t")), true);
+  CHECK_EQ (as_bool(string("false")), false);
 
   // implicit conversion from char*
-  QVERIFY (as_bool("true"));
-  QVERIFY (as_bool("#t"));
-  QVERIFY (!as_bool("false"));
+  CHECK (as_bool("true"));
+  CHECK (as_bool("#t"));
+  CHECK (!as_bool("false"));
 }
 
-void
-TestString::test_as_string_bool () {
-  QVERIFY (as_string_bool(true) == string("true"));
-  QVERIFY (as_string_bool(false) == string("false"));
+static void
+test_as_string_bool () {
+  CHECK (as_string_bool(true) == string("true"));
+  CHECK (as_string_bool(false) == string("false"));
 }
-
 
 /******************************************************************************
 * Predicates
 ******************************************************************************/
-void
-TestString::test_is_empty () {
-  QVERIFY (is_empty (""));
-  QVERIFY (!is_empty (" "));
-  QVERIFY (!is_empty ("nonempty"));
+static void
+test_is_empty () {
+  CHECK (is_empty (""));
+  CHECK (!is_empty (" "));
+  CHECK (!is_empty ("nonempty"));
 }
 
-void
-TestString::test_is_bool () {
-  QVERIFY (is_bool ("true"));
-  QVERIFY (is_bool ("false"));
-  QVERIFY (is_bool (string ("true")));
-  QVERIFY (is_bool (string ("false")));
+static void
+test_is_bool () {
+  CHECK (is_bool ("true"));
+  CHECK (is_bool ("false"));
+  CHECK (is_bool (string ("true")));
+  CHECK (is_bool (string ("false")));
 
-  QVERIFY (!is_bool ("100"));
-  QVERIFY (!is_bool ("nil"));
+  CHECK (!is_bool ("100"));
+  CHECK (!is_bool ("nil"));
 }
 
-void
-TestString::test_is_int () {
+static void
+test_is_int () {
   // Empty string is not an int
-  QVERIFY (!is_int (""));
+  CHECK (!is_int (""));
 
   // Only 0-9 in chars are int
   for (auto i= 0; i<256; i++) {
     char iter= (char) i;
     if (iter >= '0' && iter <= '9')
-      QVERIFY (is_int (iter));
+      CHECK (is_int (iter));
     else
-      QVERIFY (!is_int (iter));
+      CHECK (!is_int (iter));
   }
 
   // Random tests
-  QVERIFY (is_int ("-100"));
-  QVERIFY (is_int ("+100"));
-  QVERIFY (is_int ("100"));
+  CHECK (is_int ("-100"));
+  CHECK (is_int ("+100"));
+  CHECK (is_int ("100"));
 
-  QVERIFY (!is_int(".0"));
-  QVERIFY (!is_int("0x09"));
+  CHECK (!is_int(".0"));
+  CHECK (!is_int("0x09"));
 }
 
-void
-TestString::test_is_quoted () {
-  QVERIFY (is_quoted ("\"\""));
-  QVERIFY (is_quoted ("\"Hello TeXmacs\""));
+static void
+test_is_quoted () {
+  CHECK (is_quoted ("\"\""));
+  CHECK (is_quoted ("\"Hello TeXmacs\""));
   // is_quoted only checks if a string starts with a double quote
   // and ends with another double quote, regardless the validity
   // of the raw string
-  QVERIFY (is_quoted ("\"Hello\"TeXmacs\""));
+  CHECK (is_quoted ("\"Hello\"TeXmacs\""));
 
-  QVERIFY (!is_quoted ("\""));
-  QVERIFY (!is_quoted ("A"));
-  QVERIFY (!is_quoted ("9"));
-  QVERIFY (!is_quoted ("Hello TeXmacs"));
-  QVERIFY (!is_quoted ("\"Hello TeXmac\"s"));
-  QVERIFY (!is_quoted ("H\"ello TeXmacs\""));
+  CHECK (!is_quoted ("\""));
+  CHECK (!is_quoted ("A"));
+  CHECK (!is_quoted ("9"));
+  CHECK (!is_quoted ("Hello TeXmacs"));
+  CHECK (!is_quoted ("\"Hello TeXmac\"s"));
+  CHECK (!is_quoted ("H\"ello TeXmacs\""));
 }
 
-QTEST_MAIN(TestString)
-#include "string_test.moc"
+int
+main () {
+  RUN (test_equality);
+  RUN (test_compare);
+  RUN (test_slice);
+  RUN (test_concat);
+  RUN (test_append);
+  RUN (test_as_bool);
+  RUN (test_as_string_bool);
+  RUN (test_is_empty);
+  RUN (test_is_bool);
+  RUN (test_is_int);
+  RUN (test_is_quoted);
+  return test_report ();
+}

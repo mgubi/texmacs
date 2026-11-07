@@ -207,6 +207,29 @@ language_rep::highlight (tree t) {
     packrat_highlight (res_name, "Main", t);
 }
 
+bool
+language_rep::has_line_states () {
+  return false;
+}
+
+int
+language_rep::colour_line (tree t, int state, array<int>& starts,
+                           array<int>& ends, array<string>& cols) {
+  (void) state;
+  if (!is_atomic (t)) return 0;
+  string s= t->label;
+  int n= N(s), pos= 0;
+  while (pos < n) {
+    int start= pos;
+    (void) advance (t, pos);
+    if (pos > n) pos= n;
+    if (pos <= start) pos= start + 1;
+    if (pos - start == 1 && s[start] == ' ') continue;
+    starts << start; ends << pos; cols << get_color (t, start, pos);
+  }
+  return 0;
+}
+
 string
 language_rep::get_color (tree t, int start, int end) {
   (void) t; (void) start; (void) end;
@@ -524,8 +547,9 @@ spell_check (string lan, string s) {
       return r;
     }
     else {
-      spell_active= false;
-      spell_done (lan);
+      // do not end a spell session which may be active for another language
+      spell_busy->reset (lan);
+      ispell_done (lan);
       return "ok";  
     }
   }

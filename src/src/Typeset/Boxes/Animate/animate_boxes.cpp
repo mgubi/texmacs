@@ -84,6 +84,9 @@ public:
   double     cur_delay;
   int        last_index;
   double     last_delay;
+  url        video;        // the file of a <video>, or url_none ()
+  int        video_ms;     // its duration per frame
+  bool       video_repeat;
 
   anim_compose_box_rep (path ip, array<box> bs, player pl);
   ~anim_compose_box_rep ();
@@ -100,9 +103,10 @@ public:
 
   int        get_index (double t);
   void       anim_resync ();
-  double     anim_next ();
-  rectangles anim_invalid ();
+  double     anim_next (rectangle vis);
+  rectangles anim_invalid (rectangle vis);
   void       pre_display (renderer& ren);
+  void       post_display (renderer& ren);
 
   path          find_box_path (SI x, SI y, SI delta, bool force, bool& found);
   path          find_box_path (path p, bool& found);
@@ -118,7 +122,8 @@ public:
 
 anim_compose_box_rep::anim_compose_box_rep (path ip, array<box> b2, player pl):
   anim_box_rep (ip, pl, 0.0),
-  bs (b2), offsets (N(bs))
+  bs (b2), offsets (N(bs)), video (url_none ()), video_ms (0),
+  video_repeat (false)
 {
   ASSERT (N(bs) != 0, "empty animation");
 
@@ -204,9 +209,11 @@ anim_compose_box_rep::anim_resync () {
 }
 
 double
-anim_compose_box_rep::anim_next () {
+anim_compose_box_rep::anim_next (rectangle vis) {
+  if (!anim_visible (vis)) return 1.0e12;
   anim_resync ();
-  double r= bs[current]->anim_next ();
+  rectangle cvis= translate (vis, -sx (current), -sy (current));
+  double r= bs[current]->anim_next (cvis);
   if (pl->is_progressing () && current != N(bs)-1)
     return min (r, pl->get_refresh_time (offsets[current] - anim_time ()));
   if (!pl->is_progressing () && current != 0)
@@ -215,10 +222,11 @@ anim_compose_box_rep::anim_next () {
 }
 
 rectangles
-anim_compose_box_rep::anim_invalid () {
-  rectangles rs= box_rep::anim_invalid ();
+anim_compose_box_rep::anim_invalid (rectangle vis) {
+  if (!anim_visible (vis)) return rectangles ();
+  rectangles rs= box_rep::anim_invalid (vis);
   anim_resync ();
-  if (current != last_index) rs << box_rep::anim_invalid ();
+  if (current != last_index) rs << box_rep::anim_invalid (vis);
   if (current != last_index || delay != last_delay)
     rs << rectangle (min (x1, x3), min (y1, y3), max (x2, x4), max (y2, y4));
   return rs;
@@ -231,6 +239,12 @@ anim_compose_box_rep::pre_display (renderer& ren) {
   anim_resync ();
   last_index= current;
   last_delay= delay;
+}
+
+void
+anim_compose_box_rep::post_display (renderer& ren) {
+  if (!is_none (video))
+    ren->embed_video (video, video_ms, video_repeat, x1, y1, x2, y2);
 }
 
 /******************************************************************************
@@ -288,8 +302,8 @@ struct anim_repeat_box_rep: public composite_anim_box_rep {
   operator tree () { return tree (TUPLE, "anim_repeat", (tree) bs[0]); }
 
   void anim_resync ();
-  double anim_next ();
-  rectangles anim_invalid ();
+  double anim_next (rectangle vis);
+  rectangles anim_invalid (rectangle vis);
   void pre_display (renderer& ren);
 };
 
@@ -313,9 +327,10 @@ anim_repeat_box_rep::anim_resync () {
 }
 
 double
-anim_repeat_box_rep::anim_next () {
+anim_repeat_box_rep::anim_next (rectangle vis) {
+  if (!anim_visible (vis)) return 1.0e12;
   anim_resync ();
-  double r= bs[0]->anim_next ();
+  double r= bs[0]->anim_next (translate (vis, -sx (0), -sy (0)));
   double t= anim_time ();
   if (pl->is_progressing ())
     r= min (r, pl->get_refresh_time ((current_it + 1.0) * duration - t));
@@ -325,9 +340,10 @@ anim_repeat_box_rep::anim_next () {
 }
 
 rectangles
-anim_repeat_box_rep::anim_invalid () {
+anim_repeat_box_rep::anim_invalid (rectangle vis) {
+  if (!anim_visible (vis)) return rectangles ();
   anim_resync ();
-  rectangles rs= bs[0]->anim_invalid ();
+  rectangles rs= bs[0]->anim_invalid (translate (vis, -sx (0), -sy (0)));
   if (current_it != last_it)
     rs << rectangle (min (x1, x3), min (y1, y3), max (x2, x4), max (y2, y4));
   return rs;
@@ -355,8 +371,8 @@ struct anim_effect_box_rep: public composite_anim_box_rep {
   operator tree () { return tree (TUPLE, "anim_effect", (tree) b); }
 
   void anim_resync ();
-  double anim_next ();
-  rectangles anim_invalid ();
+  double anim_next (rectangle vis);
+  rectangles anim_invalid (rectangle vis);
 
   void pre_display (renderer& ren);
   void post_display (renderer& ren);
@@ -380,9 +396,11 @@ anim_effect_box_rep::anim_resync () {
 }
 
 double
-anim_effect_box_rep::anim_next () {
+anim_effect_box_rep::anim_next (rectangle vis) {
+  // (the effect may draw its child elsewhere: no culling inside)
+  if (!anim_visible (vis)) return 1.0e12;
   anim_resync ();
-  double r= bs[0]->anim_next ();
+  double r= bs[0]->anim_next (anim_everywhere ());
   if (pl->is_progressing () && 1.0 > current_x)
     r= min (r, pl->get_refresh_time (0.0));
   if (!pl->is_progressing () && 0.0 < current_x)
@@ -391,8 +409,9 @@ anim_effect_box_rep::anim_next () {
 }
 
 rectangles
-anim_effect_box_rep::anim_invalid () {
-  rectangles rs= bs[0]->anim_invalid ();
+anim_effect_box_rep::anim_invalid (rectangle vis) {
+  if (!anim_visible (vis)) return rectangles ();
+  rectangles rs= bs[0]->anim_invalid (anim_everywhere ());
   anim_resync ();
   if (current_x != last_x)
     rs << rectangle (min (x1, x3), min (y1, y3), max (x2, x4), max (y2, y4));
@@ -475,12 +494,14 @@ struct sound_box_rep: public anim_box_rep {
     if (last_played < 0.0 && t >= 1000.0) last_played= t;
     if (last_played < 30.0 && t >= 30.0) play_sound ();
     last_played= t; }
-  double anim_next () {
+  double anim_next (rectangle vis) {
+    if (!anim_visible (vis)) return 1.0e12;
     double t= anim_time ();
     if (t >= 30.0) return 1.0e12;
     return pl->get_refresh_time (30.0 - t); }
-  rectangles anim_invalid () {
+  rectangles anim_invalid (rectangle vis) {
     rectangles rs;
+    if (!anim_visible (vis)) return rs;
     double t= anim_time ();
     if (last_played < 30.0 && t >= 30.0)
       rs << rectangle (min (x1, x3), min (y1, y3), max (x2, x4), max (y2, y4));
@@ -566,7 +587,12 @@ video_box (path ip, player pl, url u,
   if (is_none (frames)) return empty_box (ip, 0, 0, w, h);
   array<box> bs;
   add_frames (bs, decorate (ip), pl, frames, w, h, alpha, ms, px);
-  box b= anim_compose_box (rep? decorate (ip): ip, bs, pl);
+  anim_compose_box_rep* c=
+    tm_new<anim_compose_box_rep> (rep? decorate (ip): ip, bs, pl);
+  c->video= u;
+  c->video_ms= ms;
+  c->video_repeat= rep;
+  box b= c;
   if (rep) return anim_repeat_box (ip, b, pl);
   else return b;
 }

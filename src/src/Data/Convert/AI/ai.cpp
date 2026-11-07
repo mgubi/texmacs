@@ -164,6 +164,28 @@ replace_tikz_by_pdf (string s) {
   return replace_tikz_by_pdf (aux);
 }
 
+// a file name given by an answer, as a name of the temporary directory: its
+// last part, without what could leave the directory
+static string
+ai_safe_file_name (string name) {
+  int i= N(name);
+  while (i > 0 && name[i-1] != '/' && name[i-1] != '\\') i--;
+  string r= name (i, N(name));
+  if (r == "" || r == "." || r == "..") r= "picture.svg";
+  return r;
+}
+
+// whether a file is in the temporary directory of TeXmacs, where the
+// pictures of an answer are written (extract_svg, the images of the image
+// models): the images of an answer are only read from there
+static bool
+ai_in_temp_dir (url u) {
+  // (with / on Windows too, as extract_svg writes the names)
+  string d= replace (as_string (url_temp_dir ()), "\\", "/");
+  string f= replace (as_string (u), "\\", "/");
+  return N(d) > 0 && starts (f, d * "/") && !occurs ("/../", f);
+}
+
 static string
 extract_svg (string s) {
   //cout << s << LF;
@@ -188,6 +210,10 @@ extract_svg (string s) {
   //cout << "file=" << file << LF;
   string name= trim_spaces (s (beg_name_pos, end_name_pos));
   //cout << "name= " << name << LF;
+  // (the name comes from the answer: only its last part, in the temporary
+  // directory, so that ../ cannot write elsewhere)
+  string given= name; // (as the answer refers to it)
+  name= ai_safe_file_name (name);
   url temp= url_temp_dir ();
   url f= temp * name;
   //cout << "f= " << as_string (f) << LF;
@@ -196,9 +222,9 @@ extract_svg (string s) {
     * s (end_file_pos + N(end_file_tag), N(s));
   ret= replace (ret, "\\includesvg", "\\includegraphics");
   string f_str= replace (as_string (f), "\\", "/");
-  ret= replace (ret, "{" * name * "}", "{" * f_str * "}");
-  if (ends (name, ".svg")) {
-    string b= name (0, N(name) - 4);
+  ret= replace (ret, "{" * given * "}", "{" * f_str * "}");
+  if (ends (given, ".svg")) {
+    string b= given (0, N(given) - 4);
     ret= replace (ret, "{" * b * "}", "{" * f_str * "}");
   }
   //cout << "---\n" << ret <<"\n---\n";
@@ -211,14 +237,23 @@ extract_svg (string s) {
 
 // By ID
 
-hashmap<string,string> ai_last_id ("");
+// A chat is that of the session of a connection (ai-cmdline, ai-request
+// and ai-result get the name and session of the connection as model and
+// chat): its key is the pair, as the per-session tables of plugin-eval.scm
+// (list lan ses), and not a string made of both, which may be ambiguous.
+tree
+ai_chat_key (string model, string chat) {
+  return tuple (model, chat);
+}
+
+hashmap<tree,string> ai_last_id ("");
 
 void
 ai_get_continuation (string& s, string model, string chat) {
   if (chat == "") return;
   //cout << "model= " << model << "\n";
   if (starts (model, "none")) {
-    string key= model * "-" * chat;
+    tree key= ai_chat_key (model, chat);
     if (ai_last_id->contains (key)) {
       string id= ai_last_id[key];
       s= "Please follow up on your last answer with ID " * id * ". " * s;
@@ -235,7 +270,7 @@ ai_set_continuation (string s, string model, string chat) {
     pos += 6;
     int end= search_forwards ("\"", pos, s);
     if (end < 0) return;
-    string key= model * "-" * chat;
+    tree key= ai_chat_key (model, chat);
     ai_last_id (key)= s (pos, end);
   }
 }
@@ -243,10 +278,10 @@ ai_set_continuation (string s, string model, string chat) {
 // For albert, by passing previous prompts and answers
 
 static const int ai_default_history_size= 3;
-static hashmap<string,string> ai_current_prompt ("");
+static hashmap<tree,string> ai_current_prompt ("");
 static list<string> null_string_list;
-static hashmap<string,list<string> > ai_last_prompts (null_string_list);
-static hashmap<string,list<string> > ai_last_answers (null_string_list);
+static hashmap<tree,list<string> > ai_last_prompts (null_string_list);
+static hashmap<tree,list<string> > ai_last_answers (null_string_list);
 
 static int
 ai_get_history_size () {
@@ -259,21 +294,21 @@ ai_get_history_size () {
 static void
 ai_set_current_prompt (string s, string model, string chat) {
   if (chat == "") return;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   ai_current_prompt(key)= s;
 }
 
 static string
 ai_get_current_prompt (string model, string chat) {
   if (chat == "") return "";
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   return ai_current_prompt[key];
 }
 
 static void
 ai_set_last_prompt (string s, string model, string chat) {
   if (chat == "") return;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   list<string> l (s, ai_last_prompts[key]);
   ai_last_prompts(key)= l;
   const int max_size= ai_get_history_size ();
@@ -284,7 +319,7 @@ ai_set_last_prompt (string s, string model, string chat) {
 static list<string>
 ai_get_last_prompts (string model, string chat) {
   if (chat == "") return null_string_list;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   const int max_size= ai_get_history_size ();
   if (N(ai_last_prompts[key]) > max_size)
     ai_last_prompts[key]= head (ai_last_prompts[key], max_size);
@@ -294,7 +329,7 @@ ai_get_last_prompts (string model, string chat) {
 static void
 ai_set_last_answer (string s, string model, string chat) {
   if (chat == "") return;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   list<string> l (s, ai_last_answers[key]);
   ai_last_answers(key)= l;
   const int max_size= ai_get_history_size ();
@@ -305,7 +340,7 @@ ai_set_last_answer (string s, string model, string chat) {
 static list<string>
 ai_get_last_answers (string model, string chat) {
   if (chat == "") return null_string_list;
-  string key= model * "-" * chat;
+  tree key= ai_chat_key (model, chat);
   const int max_size= ai_get_history_size ();
   if (N(ai_last_answers[key]) > max_size)
     ai_last_answers[key]= head (ai_last_answers[key], max_size);
@@ -334,10 +369,8 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string args= "--silent --no-buffer" * curl_proxy_option (url) *
-      " -X POST " * shell_quote (url) * " \\\n";
-    args << "  --data-binary " << shell_quote (tree_to_json (data));
-    return curl_command (args, headers);
+    // (the data in a file, as the headers: curl_post_command)
+    return curl_post_command (url, headers, tree_to_json (data));
   }
   io_error << "as_shell_command, unknown command type: "
            << http_mask_request (t) << LF;
@@ -370,6 +403,7 @@ ai_async_eval_command (tree t, object callback) {
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
   }
+  // (true: nothing was launched, and the callback will not be called)
   io_error << "ai_async_eval_command, wrong command: "
            << http_mask_request (t) << LF;
   return true;
@@ -387,10 +421,10 @@ ai_async_eval_command (tree t, object callback) {
 // a web page (CORS) but Albert; Ollama does when the page is among its
 // OLLAMA_ORIGINS.
 
-// In a web browser the answer of a session (ai_latex_request) is streamed
-// (server-sent events, see ai_stream_text): the request link shows it as it
-// comes (request_link_rep::partial). The other requests (translate,
-// correct), and those of the desktop, have the answer at once.
+// The answer of a session (ai_latex_request) is streamed, on the desktop as
+// in a web browser (server-sent events, see ai_stream_text): the request
+// link shows it as it comes (request_link_rep::partial). The other requests
+// (translate, correct) have the answer at once.
 static bool ai_stream= false;
 
 static string
@@ -470,6 +504,129 @@ ai_default_agent (string model, string agent) {
   return agent == as_string (call ("ai-default-instructions", model));
 }
 
+/******************************************************************************
+* The files attached to the questions: images and PDF files
+******************************************************************************/
+
+// The images and the PDF files of the questions of the conversation which
+// is asked, which go as parts of their messages (ai-session-attachments in
+// init-ai.scm; the text files are already in the text of the questions):
+// for the i-th question of the conversation, its files as triples (mime,
+// name, file). Read with the conversation (ai_conversation).
+static array<array<string> > ai_files;
+
+static void
+ai_read_attachments (string model, string chat) {
+  ai_files= array<array<string> > ();
+  object o= call ("ai-session-attachments", model, chat);
+  if (!is_array_string (o)) return;
+  array<string> a= as_array_string (o);
+  for (int k= 0; k < N(a); k++) {
+    // (the fields separated by a character which no file name holds,
+    // ai-attachment-separator in ai-attachments.scm)
+    array<string> f= tokenize (a[k], string ((char) 1));
+    if (N(f) != 4 || !is_int (f[0])) continue;
+    int i= as_int (f[0]);
+    while (N(ai_files) <= i) ai_files << array<string> ();
+    ai_files[i] << f[1] << f[2] << f[3];
+  }
+}
+
+static array<string>
+ai_question_files (int i) {
+  if (i < 0 || i >= N(ai_files)) return array<string> ();
+  return ai_files[i];
+}
+
+// the content of a file, in base64 without line breaks ("" if unreadable:
+// ai-attachments-problem made sure that it was there)
+static string
+ai_file_base64 (string file) {
+  string s;
+  if (load_string (url_system (file), s, false)) return "";
+  return replace (encode_base64 (s), "\n", "");
+}
+
+// a question with its files, as the APIs of OpenAI take it: images as data
+// URLs (Mistral: the URL alone, not in an object), PDF files as files
+static tree
+openai_content (string text, array<string> f, bool mistral) {
+  array<tree> v;
+  if (text != "") v << json_object ("type", "text", "text", text);
+  for (int k= 0; k+2 < N(f); k += 3) {
+    string url= "data:" * f[k] * ";base64," * ai_file_base64 (f[k+2]);
+    if (f[k] == "application/pdf") {
+      tree file= json_object ("filename", f[k+1], "file_data", url);
+      v << json_object ("type", "file", "file", file);
+    }
+    else if (mistral) v << json_object ("type", "image_url", "image_url", url);
+    else v << json_object ("type", "image_url",
+                           "image_url", json_object ("url", url));
+  }
+  return json_array (v);
+}
+
+// as Anthropic takes it: the files first, as base64 sources
+static tree
+claude_content (string text, array<string> f) {
+  array<tree> v;
+  for (int k= 0; k+2 < N(f); k += 3) {
+    array<tree> a;
+    a << tree ("type") << tree ("base64") << tree ("media_type") << tree (f[k])
+      << tree ("data") << tree (ai_file_base64 (f[k+2]));
+    tree src= json_object (a);
+    v << json_object ("type", f[k] == "application/pdf"? "document": "image",
+                      "source", src);
+  }
+  if (text != "" || N(v) == 0) v << json_object ("type", "text", "text", text);
+  return json_array (v);
+}
+
+// as Gemini takes it: parts inline, then the text
+static tree
+gemini_parts (string text, array<string> f) {
+  array<tree> v;
+  for (int k= 0; k+2 < N(f); k += 3)
+    v << json_object ("inlineData",
+                      json_object ("mimeType", f[k],
+                                   "data", ai_file_base64 (f[k+2])));
+  if (text != "" || N(v) == 0) v << json_object ("text", text);
+  return json_array (v);
+}
+
+// s as valid UTF-8: the JSON of a request must be, and a text may not be
+// (an attached file in Latin-1, a text cut by bytes): a byte which does not
+// start a character of UTF-8 is taken as a character of Latin-1
+static string
+ai_valid_utf8 (string s) {
+  int i= 0, n= N(s);
+  string r;
+  bool changed= false;
+  while (i < n) {
+    unsigned char c= (unsigned char) s[i];
+    if (c < 0x80) { r << s[i]; i++; continue; }
+    int len= (c >= 0xC2 && c <= 0xDF)? 2:
+             (c >= 0xE0 && c <= 0xEF)? 3:
+             (c >= 0xF0 && c <= 0xF4)? 4: 0;
+    bool ok= len > 0 && i + len <= n;
+    for (int k= 1; ok && k < len; k++)
+      ok= (((unsigned char) s[i+k]) & 0xC0) == 0x80;
+    if (ok) { r << s (i, i + len); i += len; }
+    else {
+      r << ((char) (0xC0 | (c >> 6))) << ((char) (0x80 | (c & 0x3F)));
+      i++;
+      changed= true;
+    }
+  }
+  return changed? r: s;
+}
+
+static array<string>
+ai_valid_utf8 (array<string> v) {
+  for (int i= 0; i < N(v); i++) v[i]= ai_valid_utf8 (v[i]);
+  return v;
+}
+
 // the conversation: (role, text) pairs, the last one the prompt. In a
 // session it is the one of the session (ai-session-context in init-ai.scm:
 // the questions and the answers of the fields above, as LaTeX), else the
@@ -477,15 +634,17 @@ ai_default_agent (string model, string agent) {
 static array<string>
 ai_conversation (string s, string model, string chat, bool history) {
   array<string> v;
+  ai_files= array<array<string> > ();
   if (history) {
     ai_set_current_prompt (s, model, chat);
     object c= call ("ai-session-context", model, chat);
     if (is_array_string (c)) {
+      ai_read_attachments (model, chat);
       array<string> a= as_array_string (c);
       for (int i= 0; i+1 < N(a); i += 2)
         v << string ("user") << a[i] << string ("assistant") << a[i+1];
       v << string ("user") << s;
-      return v;
+      return ai_valid_utf8 (v);
     }
     list<string> last_prompts= reverse (ai_get_last_prompts (model, chat));
     list<string> last_answers= reverse (ai_get_last_answers (model, chat));
@@ -497,25 +656,30 @@ ai_conversation (string s, string model, string chat, bool history) {
     }
   }
   v << string ("user") << s;
-  return v;
+  return ai_valid_utf8 (v);
 }
 
 // the messages of the APIs of OpenAI (also those of Mistral, Albert, Ollama)
 static tree
-openai_messages (string agent, array<string> conv) {
+openai_messages (string agent, array<string> conv, bool mistral) {
   array<tree> v;
   if (agent != "") v << json_object ("role", "system", "content", agent);
-  for (int i= 0; i+1 < N(conv); i += 2)
-    v << json_object ("role", conv[i], "content", conv[i+1]);
+  for (int i= 0, q= 0; i+1 < N(conv); i += 2) {
+    array<string> f;
+    if (conv[i] == "user") f= ai_question_files (q++);
+    if (N(f) == 0) v << json_object ("role", conv[i], "content", conv[i+1]);
+    else v << json_object ("role", conv[i],
+                           "content", openai_content (conv[i+1], f, mistral));
+  }
   return json_array (v);
 }
 
 static tree
 openai_style_command (string url, array<string> headers, string model_name,
                       string agent, array<string> conv, bool images= false,
-                      array<tree> extra= array<tree> ()) {
+                      array<tree> extra= array<tree> (), bool mistral= false) {
   array<tree> d (tree ("model"), tree (model_name),
-                 tree ("messages"), openai_messages (agent, conv));
+                 tree ("messages"), openai_messages (agent, conv, mistral));
   if (images) {
     array<tree> m (tree ("image"), tree ("text"));
     d << tree ("modalities") << json_array (m);
@@ -573,7 +737,7 @@ mistral_command (string s, string model, string agent,
     array<string> ("Authorization", "Bearer " * key,
                    "Content-Type", "application/json"),
     ai_model_name ("open-mistral-7b", "mistral-small-latest"), agent,
-    ai_conversation (s, model, chat, history));
+    ai_conversation (s, model, chat, history), false, array<tree> (), true);
 }
 
 tree
@@ -642,10 +806,11 @@ gemini_command (string s, string model, string agent,
   string name= ai_model_name ("gemini", "gemini-2.5-flash");
   array<string> conv= ai_conversation (s, model, chat, history);
   array<tree> contents;
-  for (int i= 0; i+1 < N(conv); i += 2) {
-    tree part= json_object ("text", conv[i+1]);
+  for (int i= 0, q= 0; i+1 < N(conv); i += 2) {
+    array<string> f;
+    if (conv[i] == "user") f= ai_question_files (q++);
     contents << json_object ("role", conv[i] == "user"? "user": "model",
-                             "parts", json_array (part));
+                             "parts", gemini_parts (conv[i+1], f));
   }
   bool image= ai_image_model (name);
   if (image && ai_default_agent (model, agent)) agent= ai_image_agent;
@@ -708,14 +873,19 @@ claude_command (string s, string model, string agent,
   string name= ai_model_name ("claude", "claude-sonnet-5-5");
   array<string> conv= ai_conversation (s, model, chat, history);
   array<tree> msgs;
-  for (int i= 0; i+1 < N(conv); i += 2)
-    msgs << json_object ("role", conv[i], "content", conv[i+1]);
+  for (int i= 0, q= 0; i+1 < N(conv); i += 2) {
+    array<string> f;
+    if (conv[i] == "user") f= ai_question_files (q++);
+    if (N(f) == 0) msgs << json_object ("role", conv[i], "content", conv[i+1]);
+    else msgs << json_object ("role", conv[i],
+                              "content", claude_content (conv[i+1], f));
+  }
   array<tree> d;
   d << tree ("model") << tree (name)
     << tree ("max_tokens")
     // (without streaming, Anthropic refuses the requests which may be long)
     << compound ("json-number", ai_stream? string ("32000"): string ("16000"));
-  string doc= ai_stream? ai_session_document (): string ("");
+  string doc= ai_stream? ai_valid_utf8 (ai_session_document ()): string ("");
   if (doc != "") {
     // the document as a second block of the system prompt, which Anthropic
     // caches: the next questions about it cost less
@@ -787,7 +957,7 @@ ai_latex_agent_description (string model) {
   string doc= ai_session_document ();
   if (doc != "" && engine != "claude")
     r << "\n\n" << ai_document_intro () << doc;
-  return r;
+  return ai_valid_utf8 (r);
 }
 
 string
@@ -1063,20 +1233,38 @@ static string       ai_last_reasoning;
 static ai_usage_rep ai_last_usage;
 
 // The cost of an answer of an engine which does not give it: from the
-// prices of its model in the list of the models of OpenRouter (public,
-// fetched once), where the models of OpenAI, Anthropic, Google and Mistral
-// have the prices which they ask directly; an estimate (the writes to the
-// cache of Claude cost more, for instance). Ollama and Albert: none.
-static bool ai_prices_fetched= false;
+// prices of its model in the list of the models of OpenRouter, where the
+// models of OpenAI, Anthropic, Google and Mistral have the prices which
+// they ask directly; an estimate (the writes to the cache of Claude cost
+// more, for instance). Ollama and Albert: none. The list is never fetched
+// here: the plug-in keeps it in the home when the list of the models of
+// OpenRouter is updated (ai-update-models, in its preferences), so that
+// only the users of OpenRouter ask it, and only when they choose to; without
+// it, no cost is shown. OpenRouter gives the cost of its own answers.
+static bool ai_prices_loaded= false;
 static tree ai_prices= "";
+
+static url
+ai_prices_file () {
+  return url ("$TEXMACS_HOME_PATH/system/ai/openrouter-models.json");
+}
+
+// the list of the models of OpenRouter (its JSON); "": read again from the
+// home when it is needed
+void
+ai_set_prices (string json) {
+  ai_prices_loaded= (json != "");
+  ai_prices= json == ""? tree (""): json_get (http_from_json (json), "data");
+}
 
 static tree
 ai_price_list () {
-  if (!ai_prices_fetched) {
-    ai_prices_fetched= true;
-    string r= http_get ("https://openrouter.ai/api/v1/models",
-                        array<string> ());
-    ai_prices= json_get (http_from_json (r), "data");
+  if (!ai_prices_loaded) {
+    ai_prices_loaded= true;
+    string s;
+    url u= ai_prices_file ();
+    if (exists (u) && !load_string (u, s, false))
+      ai_prices= json_get (http_from_json (s), "data");
   }
   return ai_prices;
 }
@@ -1177,24 +1365,27 @@ ai_is_stream (string s) {
   return test (s, i, "data:") || test (s, i, "event:");
 }
 
-static string
-ai_stream_parts (string s, string model, string& err,
-                 string& reasoning, ai_usage_rep& u) {
-  string engine= ai_engine (model);
-  string r;
-  err= "";
-  reasoning= "";
-  int i= 0, n= N(s);
+// the complete lines of s from i (the lines of the events): their text,
+// reasoning, error and usage added to r, reasoning, err and u; i becomes
+// the beginning of the line which is not complete yet. Each line is read
+// once: a stream fed piece by piece (ai_stream_feed) is parsed in a time
+// linear in its length, and an event cut between two pieces is read once
+// its line is complete.
+static void
+ai_stream_lines (string s, int& i, string engine, string& r,
+                 string& reasoning, string& err, ai_usage_rep& u) {
+  int n= N(s);
   while (i < n) {
     int e= i;
     while (e < n && s[e] != '\n') e++;
     if (e >= n) break; // an incomplete line: later
-    string line= s (i, e);
+    int b= i, f= e;
     i= e + 1;
-    if (N(line) > 0 && line[N(line)-1] == '\r') line= line (0, N(line) - 1);
-    if (!starts (line, "data:")) continue;
-    string d= line (5, N(line));
-    while (N(d) > 0 && d[0] == ' ') d= d (1, N(d));
+    if (f > b && s[f-1] == '\r') f--;
+    if (!test (s, b, "data:") || b + 5 > f) continue;
+    b += 5;
+    while (b < f && s[b] == ' ') b++;
+    string d= s (b, f);
     if (d == "" || d == "[DONE]") continue;
     tree t= http_from_json (d);
     tree er= json_get (t, "error");
@@ -1222,6 +1413,16 @@ ai_stream_parts (string s, string model, string& err,
       }
     }
   }
+}
+
+static string
+ai_stream_parts (string s, string model, string& err,
+                 string& reasoning, ai_usage_rep& u) {
+  string r;
+  err= "";
+  reasoning= "";
+  int i= 0;
+  ai_stream_lines (s, i, ai_engine (model), r, reasoning, err, u);
   return ai_split_think (r, reasoning);
 }
 
@@ -1229,6 +1430,41 @@ string
 ai_stream_text (string s, string model, string& err, string& reasoning) {
   ai_usage_rep u;
   return ai_stream_parts (s, model, err, reasoning, u);
+}
+
+// A stream read as it comes (request_link_rep::partial): the lines of the
+// output are parsed once, from where the last call stopped; an output which
+// is not the continuation of the one parsed (a new question, a question
+// asked again) is parsed from its beginning.
+ai_stream_state::ai_stream_state ():
+  pos (0), seen (""), text (""), reasoning (""), err ("") {}
+
+void
+ai_stream_reset (ai_stream_state& st) {
+  st.pos= 0; st.seen= ""; st.text= ""; st.reasoning= ""; st.err= "";
+}
+
+string
+ai_stream_feed (ai_stream_state& st, string s, string model,
+                string& err, string& reasoning) {
+  // (the output only grows while it is the same answer: what was parsed
+  // is its beginning, checked by its last parsed line)
+  if (N(s) < st.pos || s (st.pos - N(st.seen), st.pos) != st.seen)
+    ai_stream_reset (st);
+  ai_usage_rep u;
+  int start= st.pos;
+  ai_stream_lines (s, st.pos, ai_engine (model),
+                   st.text, st.reasoning, st.err, u);
+  if (st.pos > start) {
+    int b= st.pos - 1;
+    while (b > start && s[b-1] != '\n') b--;
+    st.seen= s (b, st.pos);
+  }
+  // (copies: a string of TeXmacs shares its contents, and those of the
+  // state grow in place at the next call)
+  err= copy (st.err);
+  reasoning= copy (st.reasoning);
+  return ai_split_think (copy (st.text), reasoning);
 }
 
 string
@@ -1285,27 +1521,16 @@ ai_output (string s, string model, string chat) {
   return ai_plain_spaces (r);
 }
 
+// a \n left in the text of an answer (not decoded from its JSON) as a
+// newline; a \n followed by a letter is a command of LaTeX (\nu, \ni,
+// \nexists, \nonumber, \noindent...), which stays
 string
 un_escape_cr (string s) {
   int i, n= N(s);
   string r;
   for (i=0; i<n; )
-    if (test (s, i, "\\n")) {
-      if (test (s, i, "\\nabla")) r << s[i++];
-      else if (test (s, i, "\\ncong")) r << s[i++];
-      else if (test (s, i, "\\nearrow")) r << s[i++];
-      else if (test (s, i, "\\neq")) r << s[i++];
-      else if (test (s, i, "\\new")) r << s[i++];
-      else if (test (s, i, "\\ngeq")) r << s[i++];
-      else if (test (s, i, "\\nleq")) r << s[i++];
-      else if (test (s, i, "\\nmid")) r << s[i++];
-      else if (test (s, i, "\\noindent")) r << s[i++];
-      else if (test (s, i, "\\not")) r << s[i++];
-      else if (test (s, i, "\\nsim")) r << s[i++];
-      else if (test (s, i, "\\nsub")) r << s[i++];
-      else if (test (s, i, "\\nsup")) r << s[i++];
-      else { r << '\n'; i += 2; }
-    }
+    if (test (s, i, "\\n") && (i+2 >= n || !is_alpha (s[i+2]))) {
+      r << '\n'; i += 2; }
     else r << s[i++];
   return r;
 }
@@ -1319,7 +1544,11 @@ embed_images (tree t) {
     string im_name= cork_to_utf8 (as_string (a[0]));
     url image= url_system (im_name);
     if (!exists (image)) image= url (im_name);
-    if (!exists (image)) image= url_temp_dir () * (im_name * ".svg");
+    if (!exists (image))
+      image= url_temp_dir () * (ai_safe_file_name (im_name) * ".svg");
+    // (the answer names the image: a file elsewhere, which the answer may
+    // name to have it put in the document, is not read)
+    if (!ai_in_temp_dir (image)) return t;
     string type= "", data;
     tree s (IMAGE);
     load_string (image, data, false);
@@ -1503,7 +1732,9 @@ ai_cut_picture (string code) {
 // The fold of a TikZ picture: with its picture when it was made (the
 // pictures are made as soon as they are complete, while the answer still
 // comes, and kept by their code: ai-picture in ai-batch.scm), else asked
-// for, and pending (ai-run-pending-folds fills it once it is there)
+// for, and pending (ai-run-pending-folds fills it once it is there), unless
+// it is not to be compiled (the preference "ai tikz compile", ai-tikz-policy:
+// the code comes from the model): then the fold, uncompiled
 static tree
 ai_picture_fold (string code) {
   tree fold= ai_script_fold ("tikz", code);
@@ -1512,7 +1743,8 @@ ai_picture_fold (string code) {
     fold= tree (L(fold), fold[0], fold[1], fold[2], as_tree (made));
     return compound ("script-output", A(fold));
   }
-  (void) call ("ai-picture-request", code);
+  object asked= call ("ai-picture-request", code);
+  if (is_bool (asked) && !as_bool (asked)) return fold;
   tree busy= compound ("script-output", fold[0], fold[1], fold[2],
                        compound ("script-busy"));
   return compound ("with", "ai-tikz", "pending", busy);
@@ -2133,8 +2365,35 @@ ai_post (tree t, tree u) {
   return u;
 }
 
+// the table of the compressed markup (compress.cpp): that of the chat,
+// whose later answers may refer to its codes, until ai_chat_close; without
+// a chat, a new one, freed at the end of the request
+static tree
+ai_compress_table (string model, string chat) {
+  if (chat == "") return compress_table_new ("ai");
+  tree key= ai_chat_key (model, chat);
+  compress_table_open (key);
+  return key;
+}
+
+void
+ai_chat_close (string model, string chat) {
+  // (called by connection_stop for every connection, with its name and
+  // session: nothing to do for a session which has neither a table nor a
+  // history; a session started again begins a new chat, its entries being
+  // made again by the first request)
+  if (chat == "") return;
+  tree key= ai_chat_key (model, chat);
+  compress_table_free (key);
+  ai_last_id->reset (key);
+  ai_current_prompt->reset (key);
+  ai_last_prompts->reset (key);
+  ai_last_answers->reset (key);
+}
+
 tree
 ai_correct (tree t, string lan, string model, string chat) {
+  compress_scope scope (ai_compress_table (model, chat), chat == "");
   array<string> comments;
   string s= compress_html (t);
   //cout << "s= " << s << "\n";
@@ -2173,6 +2432,7 @@ ai_translate (string s, string from, string into, string model, string chat) {
 
 tree
 ai_translate (tree t, string from, string into, string model, string chat) {
+  compress_scope scope (ai_compress_table (model, chat), chat == "");
   string s= compress_html (t);
   //cout << "s= " << s << "\n";
   string r= ai_translate (s, from, into, model, chat);

@@ -1,0 +1,4 @@
+src/grammar.json of https://github.com/latex-lsp/tree-sitter-latex.git
+(commit fa8df448fc2c0192a8c2f8cfc97de53cb2b4ecb9), with its LICENSE.
+highlights.scm is written for TeXmacs.
+tags.scm is ours.

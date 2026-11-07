@@ -85,6 +85,7 @@
     <item>Human readable names of tags and their children, which are used in
     menus and in the footer.
   </itemize>
+
   The above information is used (among others) for the following
   applications:
 

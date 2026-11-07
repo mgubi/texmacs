@@ -235,15 +235,26 @@ open_window (tree geom) {
 
 void
 clone_window () {
-  url win= place_url (new_place ());
-  window_set_view (win, get_passive_view (get_current_buffer ()), true);
+  // a second place on the current buffer, at the cursor and zoom of this one
+  tm_view old_vw= concrete_view (get_current_view_safe ());
+  int old_place= current_place ();
+  int place= new_place ();
+  url win= place_url (place);
+  if (old_place != 0) set_place_zoom (place, get_place_zoom (old_place));
+  url u= get_passive_view (get_current_buffer ());
+  window_set_view (win, u, true);
+  tm_view new_vw= concrete_view (u);
+  if (old_vw == NULL || new_vw == NULL) return;
+  new_vw->ed->go_to (old_vw->ed->the_path ());
 }
 
 void
 kill_buffer (url name) {
   array<url> vs= buffer_to_views (name);
   for (int i=0; i<N(vs); i++)
-    if (!is_none (vs[i])) {
+    // (a view in no window, as the view of an embedded widget, needs no
+    // other view: one made for it would never be shown nor deleted, #775)
+    if (!is_none (vs[i]) && !is_none (view_to_window (vs[i]))) {
       url prev= get_recent_view (name, false, true, false, true);
       if (is_none (prev)) {
         prev= get_recent_view (name, false, true, false, false);

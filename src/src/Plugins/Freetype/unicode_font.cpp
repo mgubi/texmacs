@@ -17,6 +17,8 @@
 #include "Freetype/tt_tools.hpp"
 #include "analyze.hpp"
 #include "converter.hpp"
+#include "colors.hpp"
+#include "picture.hpp"
 
 #ifdef USE_FREETYPE
 
@@ -170,12 +172,20 @@ struct unicode_font_rep: font_rep {
   unsigned int get_glyphID (string s);
   unsigned int read_unicode_char (string s, int& i);
   unsigned int ligature_replace (unsigned int c, string s, int& i);
+  unsigned int read_glyph (string s, int& i, bool ligf);
+  unsigned int color_ligature (unsigned int c, string s, int& i);
   bool   supports (string c);
   void   get_extents (string s, metric& ex);
   void   get_xpositions (string s, SI* xpos, bool ligf);
   void   get_xpositions (string s, SI* xpos);
   void   draw_fixed (renderer ren, string s, SI x, SI y, bool ligf);
   void   draw_fixed (renderer ren, string s, SI x, SI y);
+  bool   color_font; // with glyphs in several colors (COLR)
+  bool   draw_color_glyph (renderer ren, unsigned int uc, string c,
+                           SI x, SI y);
+  bool   draw_color_bitmap (renderer ren, unsigned int uc, string c,
+                            SI x, SI y);
+  int    emoji_marks_end (string s, int i);
   font   magnify (double zoomx, double zoomy);
   void   advance_glyph (string s, int& pos, bool ligf);
   glyph  get_glyph (string s);
@@ -202,12 +212,13 @@ struct unicode_font_rep: font_rep {
 unicode_font_rep::unicode_font_rep (string name,
   string family2, int size2, int hdpi2, int vdpi2):
     font_rep (name), family (family2), hdpi (hdpi2), vdpi (vdpi2), ligs (0),
-    native (0)
+    native (0), color_font (false)
 {
   type= FONT_TYPE_UNICODE;
   size= size2;
   fnm = tt_font_metric (family, size, std_dpi, (std_dpi * vdpi) / hdpi);
   fng = tt_font_glyphs (family, size, hdpi, vdpi);
+  color_font= tt_color_font (fng);
   if (fnm->bad_font_metric || fng->bad_font_glyphs) {
     fnm= std_font_metric (res_name, NULL, 0, -1);
     fng= std_font_glyphs (res_name, NULL, 0, -1);
@@ -764,6 +775,64 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
   }
 }
 
+// The glyph which starts at i, with the ligatures of the font: the usual
+// ones (fi, fl...) and, in a color font, the sequences of emoji (joined by
+// U+200D, with variation selectors, skin tones, flags, keycaps), which are
+// ligatures of its ccmp feature
+unsigned int
+unicode_font_rep::read_glyph (string s, int& i, bool ligf) {
+  int start= i;
+  unsigned int uc= read_unicode_char (s, i);
+  if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
+    return ligature_replace (uc, s, i);
+  if (color_font && i < N(s)) {
+    unsigned int lig= color_ligature (uc, s, i);
+    if (lig != uc) return lig;
+    // the fonts of Apple have their ligatures in morx, not in GSUB: the
+    // whole sequence of emoji which starts here
+    int end= tm_grapheme_end (s, start);
+    if (end > i && !is_nil (ot_face)) {
+      array<unsigned int> codes;
+      for (int j= start; j < end; ) codes << read_unicode_char (s, j);
+      int g= ot_face->morx_sequence (codes);
+      if (g > 0) { i= end; return 0xc000000 + (unsigned int) g; }
+    }
+  }
+  return uc;
+}
+
+static unsigned int
+glyph_index_of (FT_Face face, unsigned int uc) {
+  if (uc >= 0xc000000) return uc - 0xc000000;
+  return ft_get_char_index (face, uc);
+}
+
+unsigned int
+unicode_font_rep::color_ligature (unsigned int uc, string s, int& i) {
+  if (is_nil (ot_face) || ot_face->bad_face) return uc;
+  FT_Face face= ot_face->ft_face;
+  ot_gsub_ligatures& m= ot_face->gsub_ligatures ("ccmp");
+  unsigned int g= glyph_index_of (face, uc);
+  if (g == 0 || !m->contains (g)) return uc;
+  array<array<unsigned int> >& ligs= m (g);
+  for (int k= 0; k < N(ligs); k++) {
+    array<unsigned int>& lig= ligs[k];
+    int  j = i;
+    bool ok= true;
+    for (int c= 1; c < N(lig) && ok; c++) {
+      if (j >= N(s)) { ok= false; break; }
+      unsigned int u= read_unicode_char (s, j);
+      unsigned int gu= glyph_index_of (face, u);
+      // a variation selector which the ligature does not list (the keycaps
+      // of Noto, whose U+FE0F other lookups take away) is passed over
+      if (gu != lig[c] && u >= 0xfe00 && u <= 0xfe0f) { c--; continue; }
+      ok= (gu == lig[c]);
+    }
+    if (ok) { i= j; return 0xc000000 + lig[0]; }
+  }
+  return uc;
+}
+
 unsigned int
 unicode_font_rep::ligature_replace (unsigned int uc, string s, int& i) {
   int n= N(s);
@@ -798,6 +867,9 @@ unicode_font_rep::supports (string c) {
   int i= 0;
   unsigned int uc= read_unicode_char (c, i);
   if (uc == 0 || !fnm->exists (uc)) return false;
+  // a character of a color font which draws nothing alone (a regional
+  // indicator of Apple, which only its flags draw) is still the font's
+  if (color_font && uc < 0xc000000 && uc >= 0x80) return true;
   if (uc >= 0x42 && uc <= 0x5a && !fnm->exists (0x41)) return false;
   if (uc >= 0x62 && uc <= 0x7a && !fnm->exists (0x61)) return false;
   metric_struct* m= fnm->get (uc);
@@ -814,9 +886,7 @@ unicode_font_rep::get_extents (string s, metric& ex) {
   }
   else {
     int i= 0, n= N(s);
-    unsigned int uc= read_unicode_char (s, i);
-    if (ligs > 0 && (uc == 'f' || uc == 's'))
-      uc= ligature_replace (uc, s, i);
+    unsigned int uc= read_glyph (s, i, true);
     metric_struct* first= fnm->get (uc);
     ex->x1= ROUND (first->x1);
     ex->y1= ROUND (first->y1);
@@ -830,9 +900,7 @@ unicode_font_rep::get_extents (string s, metric& ex) {
 
     while (i<n) {
       unsigned int pc= uc;
-      uc= read_unicode_char (s, i);
-      if (ligs > 0 && (uc == 'f' || uc == 's'))
-        uc= ligature_replace (uc, s, i);
+      uc= read_glyph (s, i, true);
       x += ROUND (fnm->kerning (pc, uc));
       metric_struct* next= fnm->get (uc);
       ex->x1= min (ex->x1, x+ ROUND (next->x1));
@@ -860,9 +928,7 @@ unicode_font_rep::get_xpositions (string s, SI* xpos, bool ligf) {
   while (i<n) {
     int start= i;
     unsigned int pc= uc;
-    uc= read_unicode_char (s, i);
-    if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
-      uc= ligature_replace (uc, s, i);
+    uc= read_glyph (s, i, ligf);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
     metric_struct* next= fnm->get (uc);
     for (int j= start; j<i; j++) xpos[j]= x;
@@ -878,17 +944,154 @@ unicode_font_rep::get_xpositions (string s, SI* xpos) {
   get_xpositions (s, xpos, true);
 }
 
+// The characters which modify the emoji before them: the variation
+// selectors, the zero width joiner, the keycap and the tags
+static bool
+is_emoji_mark (unsigned int c) {
+  return (c >= 0xfe00 && c <= 0xfe0f) || c == 0x200d || c == 0x20e3 ||
+         (c >= 0xe0020 && c <= 0xe007f);
+}
+
+// A glyph of a font of bitmaps in color (sbix, CBDT: the emoji of Apple,
+// Noto, Android) as a picture: the bitmap of the fixed size of the font,
+// averaged down to the pixels of the renderer (cached), and drawn as the
+// renderers draw pictures, each in its own way; a PDF keeps it as an image.
+// The text of a PDF as for the layers (draw_color_glyph): the picture
+// stands for c, and the characters are invisible glyphs of the shipped
+// emoji font, which a PDF can embed (a font of bitmaps cannot be: Apple
+// Color Emoji has 190 MB).
+
+#define SHIPPED_EMOJI_FONT "TwemojiMozilla"
+
+// the bitmaps of the fixed size (FreeType decodes a PNG to give one), with
+// their sizes (w, h, left, top, advance; empty when the glyph has none),
+// and the pictures made of them at the sizes drawn; emptied when they hold
+// too many (a zoom makes pictures of new sizes)
+static hashmap<string,string>     color_bitmap_data;
+static hashmap<string,array<int> > color_bitmap_info;
+static hashmap<string,picture>    color_bitmap_pictures;
+#define COLOR_BITMAP_CACHE 4096
+
+static picture
+color_bitmap_picture (string bgra, int w, int h, int pw, int ph) {
+  picture pic= raster_picture (pw, ph, 0, 0);
+  double sx= ((double) w) / pw, sy= ((double) h) / ph;
+  for (int Y= 0; Y < ph; Y++)
+    for (int X= 0; X < pw; X++) {
+      // the mean of the pixels of the bitmap under the pixel of the
+      // picture (premultiplied, then divided again)
+      int x1= (int) (X * sx), x2= max (x1 + 1, (int) ((X + 1) * sx));
+      int y1= (int) (Y * sy), y2= max (y1 + 1, (int) ((Y + 1) * sy));
+      x2= min (x2, w); y2= min (y2, h);
+      double b= 0, g= 0, r= 0, a= 0;
+      int n= 0;
+      for (int y= y1; y < y2; y++)
+        for (int x= x1; x < x2; x++) {
+          const char* p= &bgra[4 * (y * w + x)];
+          b += (unsigned char) p[0]; g += (unsigned char) p[1];
+          r += (unsigned char) p[2]; a += (unsigned char) p[3];
+          n++;
+        }
+      // (the rows of a picture go upwards, those of the bitmap downwards)
+      int PY= ph - 1 - Y;
+      if (n == 0 || a == 0) { pic->set_pixel (X, PY, rgb_color (0, 0, 0, 0)); continue; }
+      int A= (int) (a / n + 0.5);
+      int R= min (255, (int) (255.0 * r / a + 0.5));
+      int G= min (255, (int) (255.0 * g / a + 0.5));
+      int B= min (255, (int) (255.0 * b / a + 0.5));
+      pic->set_pixel (X, PY, rgb_color (R, G, B, A));
+    }
+  return pic;
+}
+
+bool
+unicode_font_rep::draw_color_bitmap (renderer ren, unsigned int uc, string c,
+                                     SI x, SI y) {
+  string bkey= fng->res_name * "#" * as_string ((int) uc);
+  if (!color_bitmap_info->contains (bkey)) {
+    if (N(color_bitmap_info) >= COLOR_BITMAP_CACHE) {
+      color_bitmap_data= hashmap<string,string> ();
+      color_bitmap_info= hashmap<string,array<int> > ();
+    }
+    string bgra;
+    int w, h, left, top, adv;
+    array<int> info;
+    if (tt_color_bitmap (fng, uc, bgra, w, h, left, top, adv) &&
+        w > 0 && h > 0 && adv > 0) {
+      info << w << h << left << top << adv;
+      color_bitmap_data (bkey)= bgra;
+    }
+    color_bitmap_info (bkey)= info;
+  }
+  array<int> info= color_bitmap_info [bkey];
+  if (N(info) < 5) return false;
+  int w= info[0], h= info[1], left= info[2], top= info[3], adv= info[4];
+  // a pixel of the bitmap, in the units of the renderer, and in its pixels
+  SI W= ROUND (fnm->get (uc)->x2);
+  double k = ((double) W) / adv;
+  double px= k / max (ren->pixel, 1);
+  int pw= max (1, (int) (w * px + 0.5)), ph= max (1, (int) (h * px + 0.5));
+  string key= bkey * "@" * as_string (pw) * "x" * as_string (ph);
+  if (!color_bitmap_pictures->contains (key)) {
+    if (N(color_bitmap_pictures) >= COLOR_BITMAP_CACHE)
+      color_bitmap_pictures= hashmap<string,picture> ();
+    color_bitmap_pictures (key)=
+      color_bitmap_picture (color_bitmap_data [bkey], w, h, pw, ph);
+  }
+  picture pic= color_bitmap_pictures [key];
+  // the characters, as invisible glyphs of the shipped emoji font (for the
+  // text of a PDF: nothing on a screen)
+  if (ren->is_printer () && tt_font_exists (SHIPPED_EMOJI_FONT)) {
+    font_glyphs  tg= tt_font_glyphs (SHIPPED_EMOJI_FONT, size, hdpi, vdpi);
+    array<unsigned int> chars;
+    for (int i= 0; i < N(c); ) chars << read_unicode_char (c, i);
+    int n= N(chars);
+    // the advance of an emoji of the shipped font, which is one em
+    int em= tt_glyph_units_advance (tg, 0x1F600);
+    SI  E = (SI) (((double) size) * hdpi / 72.0 * PIXEL);
+    ren->begin_actual_text ("");
+    for (int j= 0; j < n && em > 0 && n > 0; j++) {
+      int a= tt_glyph_units_advance (tg, chars[j]);
+      double hscale= (a > 0)? (((double) W) / n) / (E * a / ((double) em)): 1.0;
+      ren->draw_invisible (chars[j], tg, x + (j * W) / n, y, hscale);
+    }
+    ren->end_actual_text ();
+  }
+  ren->begin_actual_text (c);
+  ren->draw_picture (pic, x + (SI) (left * k), y + (SI) ((top - h) * k));
+  ren->end_actual_text ();
+  return true;
+}
+
+// The end of the marks of emoji which follow i, which are not drawn (like
+// the U+FE0F of a heart in color): the characters of the emoji before them
+// in the text of a PDF
+int
+unicode_font_rep::emoji_marks_end (string s, int i) {
+  while (i < N(s)) {
+    int j= i;
+    if (!is_emoji_mark (read_unicode_char (s, j))) break;
+    i= j;
+  }
+  return i;
+}
+
 void
 unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, bool ligf) {
   int i= 0, n= N(s);
   unsigned int uc= 0xffffffff;
   while (i<n) {
     unsigned int pc= uc;
-    uc= read_unicode_char (s, i);
-    if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
-      uc= ligature_replace (uc, s, i);
+    int start= i;
+    uc= read_glyph (s, i, ligf);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
-    ren->draw (uc, fng, x, y);
+    if (!color_font) ren->draw (uc, fng, x, y);
+    else if (!draw_color_glyph (ren, uc, s (start, emoji_marks_end (s, i)),
+                                x, y) &&
+             !is_emoji_mark (uc))
+      // (what is left of a sequence of emoji is not drawn: the font may
+      // not even have it, and would draw the box of a missing glyph)
+      ren->draw (uc, fng, x, y);
     metric_struct* ex= fnm->get (uc);
     x += ROUND (ex->x2);
     //if (fnm->kerning (pc, uc) != 0)
@@ -899,6 +1102,62 @@ unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, bool ligf) {
 void
 unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   draw_fixed (ren, s, x, y, true);
+}
+
+// A glyph of a color font (COLR): its layers one above the other, each an
+// ordinary glyph in its own color, so that every renderer draws it as it
+// draws text, and a PDF keeps it as vectors
+bool
+unicode_font_rep::draw_color_glyph (renderer ren, unsigned int uc, string c,
+                                    SI x, SI y) {
+  if (tt_color_bitmap_scale (fng) > 0.0)
+    return draw_color_bitmap (ren, uc, c, x, y);
+  array<int> codes;
+  array<color> colors;
+  array<bool> text;
+  if (!tt_color_layers (fng, uc, codes, colors, text)) return false;
+  // The text of a PDF, c (the characters of the emoji or of its sequence),
+  // for the two kinds of readers: those which take it from the character
+  // map of the font find it in invisible glyphs of the characters (Preview),
+  // those which take the ActualText of a span find it on the first layer,
+  // since they leave out the glyphs with no ink (MuPDF). Every other glyph
+  // is in a span which stands for nothing.
+  // The invisible glyphs follow each other over the width of the emoji,
+  // each narrowed to its share: one on top of the other, they would be
+  // words of their own for a reader (spaces in the middle of a sequence).
+  array<unsigned int> chars;
+  for (int i= 0; i < N(c); ) chars << read_unicode_char (c, i);
+  int n= N(chars);
+  int w= tt_glyph_units_advance (fng, uc);
+  SI  W= ROUND (fnm->get (uc)->x2);
+  ren->begin_actual_text ("");
+  for (int k= 0; k < n; k++) {
+    int a= tt_glyph_units_advance (fng, chars[k]);
+    double hscale= (a > 0 && w > 0)? (((double) w) / n) / a: 1.0;
+    ren->draw_invisible (chars[k], fng, x + (k * W) / n, y, hscale);
+  }
+  ren->end_actual_text ();
+  pencil pen= ren->get_pencil ();
+  int fr, fg, fb, fa;
+  get_rgb_color (pen->get_color (), fr, fg, fb, fa);
+  for (int k= 0; k < N(codes); k++) {
+    if (k <= 1) {
+      if (k == 1) ren->end_actual_text ();
+      ren->begin_actual_text (k == 0? c: string (""));
+    }
+    if (text[k]) ren->set_pencil (pen);
+    else {
+      // the opacity of the text applies to the colors of the layers too
+      int r, g, b, a;
+      get_rgb_color (colors[k], r, g, b, a);
+      ren->set_pencil (pencil (rgb_color (r, g, b, (a * fa + 127) / 255),
+                               pen->get_width ()));
+    }
+    ren->draw (codes[k], fng, x, y);
+  }
+  ren->set_pencil (pen);
+  ren->end_actual_text ();
+  return true;
 }
 
 
@@ -912,18 +1171,14 @@ unicode_font_rep::magnify (double zoomx, double zoomy) {
 void
 unicode_font_rep::advance_glyph (string s, int& pos, bool ligf) {
   if (pos >= N(s)) return;
-  unsigned int uc= read_unicode_char (s, pos);
-  if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
-    uc= ligature_replace (uc, s, pos);
+  (void) read_glyph (s, pos, ligf);
 }
 
 glyph
 unicode_font_rep::get_glyph (string s) {
   int i= 0, n= N(s);
   if (n == 0) return font_rep::get_glyph (s);
-  unsigned int uc= read_unicode_char (s, i);
-  if (ligs > 0 && (uc == 'f' || uc == 's'))
-    uc= ligature_replace (uc, s, i);
+  unsigned int uc= read_glyph (s, i, true);
   if (i != n) return font_rep::get_glyph (s);
   glyph gl= fng->get (uc);
   if (is_nil (gl)) return font_rep::get_glyph (s);
@@ -934,9 +1189,7 @@ int
 unicode_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
   int i= 0, n= N(s);
   if (n == 0) return font_rep::index_glyph (s, rm, rg);
-  unsigned int uc= read_unicode_char (s, i);
-  if (ligs > 0 && (uc == 'f' || uc == 's'))
-    uc= ligature_replace (uc, s, i);
+  unsigned int uc= read_glyph (s, i, true);
   if (i != n) return font_rep::index_glyph (s, rm, rg);
   glyph gl= fng->get (uc);
   if (is_nil (gl)) return font_rep::index_glyph (s, rm, rg);
@@ -1216,12 +1469,6 @@ math_table_rubber_font (font base) {
   if (u == NULL || is_nil (u->ot_face) || is_nil (u->ot_face->math_table))
     return font ();
   return rubber_unicode_font (base, u->ot_face);
-}
-
-inline int
-decode_index (FT_Face face, int i) {
-  if (i < 0xc000000) return ft_get_char_index (face, i);
-  return i - 0xc000000;
 }
 
 inline unsigned int

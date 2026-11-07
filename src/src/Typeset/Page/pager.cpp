@@ -261,7 +261,7 @@ pager_rep::make_pages () {
   int d = env->page_offset % nx;
   int ny= ((nr_pages + nx - 1 + d) / nx);
 
-  SI pixel= env->pixel;
+  SI pixel= env->get_pixel ();
   array<box> pg= pages;
   if (env->get_string (PAGE_MEDIUM) == "paper" &&
       env->get_string (PAGE_BORDER) != "none")

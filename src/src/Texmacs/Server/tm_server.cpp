@@ -39,11 +39,15 @@ string my_init_cmds= "";
 ******************************************************************************/
 
 void reset_inclusions ();
+bool refresh_inclusions ();
 extern string printing_dpi;
 extern string printing_on;
 
 #ifdef QTTEXMACS
 void del_obj_qt_renderer(void);
+#endif
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
+void qt_forget_deferred_deletes ();
 #endif
 
 /******************************************************************************
@@ -234,10 +238,14 @@ tm_server_rep::interpose_handler () {
   process_all_pipes ();
 #else
   perform_select ();
+  reap_pipe_children ();
   exec_pending_commands ();
 #endif
   process_all_workers (); // the plugins which are Web Workers (browser)
   async_eval_pending ();
+  // (the messages of the language servers, when they are part of the build
+  // and one was started: see lsp_link.cpp)
+  process_all_link_processors ();
   http_async_pending (); // the requests made with libcurl
 #if !defined (QTTEXMACS) && !defined (AQUATEXMACS)
   // the plug-ins which make HTTP requests (request_link.cpp, the AI
@@ -315,8 +323,22 @@ tm_server_rep::get_default_zoom_factor () {
 void
 tm_server_rep::inclusions_gc (string which) {
   (void) which;
-  reset_inclusions ();
-  typeset_update_all ();
+  // the layout is kept when no included file changed, and only the
+  // includes of the files which did are typeset again (see
+  // edit_typeset_rep::typeset_invalidate_inclusions)
+  if (!refresh_inclusions ()) return;
+  array<url> vs= get_all_views ();
+  for (int i=0; i<N(vs); i++)
+    if (view_to_editor (vs[i]) != NULL)
+      view_to_editor (vs[i]) -> typeset_invalidate_inclusions ();
+}
+
+void
+tm_server_rep::typeset_update_pictures () {
+  array<url> vs= get_all_views ();
+  for (int i=0; i<N(vs); i++)
+    if (view_to_editor (vs[i]) != NULL)
+      view_to_editor (vs[i]) -> typeset_invalidate_pictures ();
 }
 
 void
@@ -349,6 +371,9 @@ quit_texmacs_internal (int code) {
   clear_pending_commands ();
 #ifdef QTTEXMACS
   del_obj_qt_renderer ();
+#endif
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
+  qt_forget_deferred_deletes ();
 #endif
 
 #ifdef __EMSCRIPTEN__

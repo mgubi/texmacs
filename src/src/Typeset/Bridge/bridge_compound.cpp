@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "bridge.hpp"
 #include "drd_std.hpp"
 
@@ -65,7 +66,9 @@ bridge_compound (typesetter ttt, tree st, path ip) {
 void
 bridge_compound_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || L(u) >= START_EXTENSIONS, "nil path");
+  // (the tree may keep its tag when children are inserted or removed, also
+  // for the primitives that this bridge handles: include, style-only, active...)
+  ASSERT (!is_nil (p) || L(u) >= START_EXTENSIONS || L(u) == L(st), "nil path");
   if (is_nil (p) || (p->item == 0) || is_nil (body)) {
     st= substitute (st, p, u);
     valid= false;
@@ -194,6 +197,11 @@ bridge_compound_rep::my_typeset (int desired_status) {
     d= 0;
   }
 
+  // A macro that calls itself would nest the bridges until the stack of the
+  // process overflows: past a depth, an error box is shown instead.
+  if (is_applicable (f) && stack_nearly_full ())
+    f= tree (_ERROR, "macro nesting too deep");
+
   if (is_applicable (f)) {
     int i, n=N(f)-1, m=N(st)-d;
     env->macro_arg= list<hashmap<string,tree> > (
@@ -219,6 +227,8 @@ bridge_compound_rep::my_typeset (int desired_status) {
     // /*IF_NON_CHILD_ENFORCING(st)*/ ttt->insert_marker (st, ip);
     if (!the_drd->is_child_enforcing (st))
       ttt->insert_marker (st, ip);
+    // (the body of an included file is a document of its own)
+    bridge_macro_scope scope (L(st) != INCLUDE);
     body->typeset (desired_status);
     env->macro_arg= env->macro_arg->next;
     env->macro_src= env->macro_src->next;
@@ -230,4 +240,9 @@ bridge_compound_rep::my_typeset (int desired_status) {
       ttt->insert_marker (st, ip);
     body->typeset (desired_status);
   }
+  // the loci of an included document are attached to the include (see
+  // build_locus), and they are made again at each typesetting of its body:
+  // the list of the observers of the include is simplified as after a
+  // modification, since it kept the empty slots of those removed (#408)
+  if (L(st) == INCLUDE) simplify_observers (st);
 }

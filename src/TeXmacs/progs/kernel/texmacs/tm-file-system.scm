@@ -398,6 +398,8 @@
 (define-public (aux-set-document aux doc)
   (with name (aux-name aux)
     (buffer-set name doc)
+    ;; (a generated page: no copies of its former contents in its history)
+    (buffer-forget-history name)
     (ahash-set! aux-buffers aux (buffer-get name))))
 
 (define-public (aux-set-master aux master)

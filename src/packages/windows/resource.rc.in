@@ -2,7 +2,8 @@
 // Compile with windres resource.rc -O coff -o resource.rc.o and link as any
 // other object file
 
-appicon ICON "TeXmacs.ico"
+// (the flat chip of TeXmacs Upsilon, not the icon of the stock TeXmacs)
+appicon ICON "TeXmacs-Upsilon.ico"
 
 #include <winver.h>
 

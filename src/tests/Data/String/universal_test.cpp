@@ -18,6 +18,11 @@
 #include "universal.hpp"
 #include "converter.hpp"
 
+// the helpers of hyphenate.cpp, which has no header for them
+string sub_str (string s, int i, int len, bool utf8);
+int str_ind (string s, int ind, bool utf8);
+int str_length (string s, bool utf8);
+
 /******************************************************************************
 * Helpers
 ******************************************************************************/
@@ -149,6 +154,68 @@ test_utf8_invalid () {
   CHECK_EQ (decode_from_utf8 ("\xed\xa0\x80", i), (unsigned int) 0xD800);
 }
 
+// at or past the end of a string there is nothing to decode: the result is 0
+// and the position does not move (the end of "abcd" is the end of its block)
+static void
+test_utf8_decode_at_end () {
+  int i= 0;
+  CHECK_EQ (decode_from_utf8 ("", i), (unsigned int) 0);
+  CHECK_EQ (i, 0);
+  const char* strs[]= { "abcd", "a\xc3\xa9", "\xe4\xb8\xad", "abcdefgh", 0 };
+  for (int k=0; strs[k] != 0; k++) {
+    string s= strs[k];
+    i= N(s);
+    CHECK_EQ (decode_from_utf8 (s, i), (unsigned int) 0);
+    CHECK_EQ (i, N(s));
+    i= N(s) + 3;
+    CHECK_EQ (decode_from_utf8 (s, i), (unsigned int) 0);
+    CHECK_EQ (i, N(s) + 3);
+  }
+}
+
+// every prefix of a sequence is decoded up to its end, always advancing, so
+// that a loop while (i < N(s)) ends on truncated input
+static void
+test_utf8_decode_truncated () {
+  const char* whole[]= {
+    "\xc3\xa9", "\xe4\xb8\xad", "\xf0\x9f\x98\x80",
+    "a\xc3\xa9", "ab\xe4\xb8\xad", "abc\xf0\x9f\x98\x80", 0 };
+  for (int k=0; whole[k] != 0; k++) {
+    string w= whole[k];
+    for (int n=0; n<=N(w); n++) {
+      string s= w (0, n);
+      int i= 0, steps= 0;
+      while (i < N(s) && steps <= N(s)) {
+        int old= i;
+        (void) decode_from_utf8 (s, i);
+        CHECK_MSG (i > old && i <= N(s),
+                   "decoding of " * bytes (s) * " from " * as_string (old) *
+                   " goes to " * as_string (i));
+        steps++;
+      }
+      CHECK_EQ (i, N(s));
+    }
+  }
+}
+
+// the characters of a word for the hyphenation (hyphenate.cpp) stop at its end
+static void
+test_utf8_hyphenation_helpers () {
+  string s= "a\xc3\xa9\xe4\xb8\xad";
+  for (int utf8=0; utf8<2; utf8++) {
+    CHECK_EQ (str_ind (s, 100, utf8), N(s));
+    CHECK_BYTES (sub_str (s, 0, 100, utf8), s);
+    CHECK_BYTES (sub_str (s, N(s), 2, utf8), "");
+    CHECK_BYTES (sub_str ("", 0, 2, utf8), "");
+    CHECK_EQ (str_ind ("", 2, utf8), 0);
+  }
+  CHECK_EQ (str_ind (s, 2, true), 3);
+  CHECK_BYTES (sub_str (s, 1, 1, true), "\xc3\xa9");
+  CHECK_EQ (str_length (s, true), 3);
+  CHECK_EQ (str_length (s, false), N(s));
+  CHECK_EQ (str_length ("\xe4\xb8", true), 2);
+}
+
 /******************************************************************************
 * UTF-8 to Cork and back
 ******************************************************************************/
@@ -176,7 +243,11 @@ test_utf8_to_cork_known () {
   CHECK_BYTES (utf8_to_cork ("\xd0\x96"), "<#416>");      // Cyrillic Zhe
   CHECK_BYTES (utf8_to_cork ("\xe4\xb8\xad"), "<#4E2D>"); // CJK
   CHECK_BYTES (utf8_to_cork ("\xe2\x82\xac"), "<#20AC>"); // euro sign
-  CHECK_BYTES (utf8_to_cork ("\xf0\x9f\x98\x80"), "<#1F600>");
+  // an emoji gets its name (#533); another character outside the BMP
+  // its code point
+  CHECK_BYTES (utf8_to_cork ("\xf0\x9f\x98\x80"), "<emoji-grinning-face>");
+  CHECK_BYTES (cork_to_utf8 ("<emoji-grinning-face>"), "\xf0\x9f\x98\x80");
+  CHECK_BYTES (utf8_to_cork ("\xf0\x90\x80\x80"), "<#10000>");
   CHECK_BYTES (utf8_to_cork ("\xf0\x9d\x90\x80"), "<b-up-A>");
   CHECK_BYTES (utf8_to_cork ("x\xce\xb1+\xe4\xb8\xad=\xc3\xa9"),
                "x<alpha>+<#4E2D>=\xe9");
@@ -292,10 +363,20 @@ test_case_cork () {
   CHECK_EQ (uni_locase_char ("Z"), string ("z"));
   CHECK_EQ (uni_upcase_char ("1"), string ("1"));
   CHECK_EQ (uni_locase_char ("<"), string ("<"));
-  for (int c=0x80; c<0xA0; c++) {
+  for (int c=0x80; c<0x9D; c++) {
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c+0x20));
     CHECK_BYTES (uni_upcase_char (cork_byte (c+0x20)), cork_byte (c));
   }
+  // the exceptions, 0x20 apart from 0xBD-0xBF (inverted marks and pound,
+  // which have no case): 0x9D is the dotted capital I, whose lower case is
+  // i; 0x9E is the lower case d with stroke (its capital is that of Eth,
+  // 0xD0); 0x9F is the section sign, without case
+  CHECK_BYTES (uni_locase_char (cork_byte (0x9D)), string ("i"));
+  CHECK_BYTES (uni_upcase_char (cork_byte (0x9E)), cork_byte (0xD0));
+  for (int c=0x9E; c<0xA0; c++)
+    CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c));
+  for (int c=0xBD; c<0xC0; c++)
+    CHECK_BYTES (uni_upcase_char (cork_byte (c)), cork_byte (c));
   for (int c=0xC0; c<0xE0; c++) {
     CHECK_BYTES (uni_locase_char (cork_byte (c)), cork_byte (c+0x20));
     CHECK_BYTES (uni_upcase_char (cork_byte (c+0x20)), cork_byte (c));
@@ -495,6 +576,9 @@ main () {
   RUN (test_utf8_boundaries);
   RUN (test_utf8_decode_sequence);
   RUN (test_utf8_invalid);
+  RUN (test_utf8_decode_at_end);
+  RUN (test_utf8_decode_truncated);
+  RUN (test_utf8_hyphenation_helpers);
   RUN (test_utf8_to_cork_known);
   RUN (test_utf8_to_cork_invalid);
   RUN (test_cork_to_utf8_known);

@@ -517,7 +517,7 @@
     synthetic keys and clicks, scripted steps
     (<verbatim|TEXMACS_NS_SNAPSHOT>, <verbatim|TEXMACS_NS_PRESS>, ...;
     <verbatim|TEXMACS_VUE_SCRIPT>, <verbatim|TEXMACS_VUE_SNAPSHOT> with the
-    scripts of <source-link|Plugins/Vue/tests|src/Plugins/Vue/tests>). <name|Vue> also runs
+    scripts of <source-link|tests/Plugins/Vue|tests/Plugins/Vue>). <name|Vue> also runs
     headless (option <verbatim|-headless>, with the <name|SDL> video driver
     <verbatim|dummy>): the windows are then virtual, but the widgets are
     built and laid out as usual, whereas the <name|Qt> port replaces every

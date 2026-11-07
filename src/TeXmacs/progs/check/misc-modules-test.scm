@@ -38,7 +38,8 @@
 ;;     edu-markup.scm;
 ;;   - tools: comments (comment-edit.scm), poster blocks and themes
 ;;     (poster-edit.scm, theme-edit.scm), the end of a spell check
-;;     (spell-edit.scm) and the serialization for AI requests (ai-batch.scm).
+;;     (spell-edit.scm), the serialization for AI requests (ai-batch.scm)
+;;     and the file of the examples of the handwriting recognizer.
 ;;     There is no word counting or statistics tool in progs/tools.
 ;;
 ;; Without a window the initial environment of a buffer is not updated
@@ -68,6 +69,7 @@
         (education edu-edit)
         (education edu-markup)
         (tools comment comment-edit)
+        (part part-shared)
         (tools poster poster-edit)
         (tools theme theme-edit)
         (tools spell spell-edit)
@@ -141,6 +143,73 @@
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
+
+(define (in-shared-window group)
+  ;; @group with the buffers in one window: with a window per buffer, a page
+  ;; such as the one of the font design opens a window which closing its
+  ;; buffer leaves, and later suites expect a single window. The preference
+  ;; is only changed in memory, nothing is saved
+  (lambda ()
+    (let* ((which "buffer management")
+           (had? (cpp-has-preference? which))
+           (old (get-preference which)))
+      (cpp-set-preference which "shared")
+      (with r (check-run group)
+        (if had?
+            (cpp-set-preference which old)
+            (cpp-reset-preference which))
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r)))))))
+
+;; A position of the cursor history whose buffer was closed is forgotten,
+;; not read
+(define (cursor-history-drain)
+  ;; the history of this window starts empty, whatever earlier groups did
+  (with-buffer-doc '(document "drain") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (let loop ((i 0))
+        (when (and (< i 1000) (cursor-has-history?))
+          (cursor-history-backward)
+          (loop (+ i 1)))))))
+
+(define (test-cursor-history)
+  (check-group "cursor history")
+  (cursor-history-drain)
+  ;; going forward over an entry of a closed buffer
+  (with-buffer-doc '(document "five" "six") '("generic")
+    (lambda ()
+      (cursor-history-add (cursor-path))
+      (go-end)
+      (cursor-history-add (cursor-path))
+      (cursor-history-backward)))
+  (with-buffer-doc '(document "seven" "eight") '("generic")
+    (lambda ()
+      (with p (cursor-path)
+        (check-true (cursor-has-future?))
+        (check= (check-run (lambda () (cursor-history-forward) 'done)) 'done)
+        (check= (cursor-path) p))))
+  (cursor-history-drain)
+  ;; adding a position after a buffer with an entry was closed
+  (with-buffer-doc '(document "one" "two") '("generic")
+    (lambda ()
+      (go-end)
+      (cursor-history-add (cursor-path))))
+  (with-buffer-doc '(document "three" "four") '("generic")
+    (lambda ()
+      (with start (cursor-path)
+        (cursor-history-add start)
+        (check-true (cursor-has-history?))
+        (go-end)
+        (with end (cursor-path)
+          (cursor-history-add end)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (check-false (cursor-has-history?))
+          (cursor-history-forward)
+          (check= (cursor-path) end))))))
 
 (define (run-group thunk)
   ;; an error in a group counts as one failure
@@ -250,6 +319,44 @@
              (help-file-title
               (url-concretize "$TEXMACS_PATH/doc/about/about.en.tm")))
             '(concat "About GNU " (TeXmacs) "-" (TeXmacs-version)))))
+
+;; The answers of url-exists-in-help? and the lists of files of the
+;; documentation search are kept for the session, and made again by
+;; help-caches-update (Tools -> Update -> Help): a page is added to the
+;; documentation of the (scratch) home, then removed.
+(define (test-help-refresh)
+  (check-group "help caches: kept for the session, updated on demand")
+  (let* ((home-doc (url-append (string->url "$TEXMACS_HOME_PATH") "doc"))
+         (dir (url-append home-doc "check-help-refresh"))
+         (page (url-append dir "new-page.en.tm"))
+         (name "check-help-refresh/new-page.en.tm")
+         (files (priv '(doc docgrep) 'docgrep-files))
+         (listed? (lambda ()
+                    (in? (url->system page)
+                         (files "$TEXMACS_DOC_PATH" "*.en.tm"))))
+         (clean (lambda ()
+                  (when (url-exists? page) (system-remove page))
+                  (when (url-exists? dir) (system-rmdir dir)))))
+    (clean)
+    (when (not (url-exists? home-doc)) (system-mkdir home-doc))
+    (help-caches-update)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    ;; a new folder with a new page: unseen until the update
+    (system-mkdir dir)
+    (string-save "<TeXmacs|2.1>\n\n<style|tmdoc>\n\n<body|x>\n" page)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    (help-caches-update)
+    (check-true (url-exists-in-help? name))
+    (check-true (listed?))
+    ;; the page is removed: still known until the update
+    (system-remove page)
+    (check-true (url-exists-in-help? name))
+    (help-caches-update)
+    (check-false (url-exists-in-help? name))
+    (check-false (listed?))
+    (clean)))
 
 ;; Every .tm file of the manual parses to a document with a TeXmacs version
 ;; and a body.
@@ -381,6 +488,71 @@
       (check= (title "normal/x" (T '(document "x"))) "tmfs://help/normal/x")
       (check-true (perm "normal/file/no/such/file.en.tm" "read"))
       (check-false (perm "normal/file/no/such/file.en.tm" "write")))))
+
+;; A book whose pages have sections of their own, links to the web and
+;; branches to files which do not exist: book.en.tm traverses chap (which
+;; has a branch to sub), gone and, continued, gone2.
+(define (make-small-book)
+  (save-tmdoc "book.en.tm"
+              '(document
+                 (tmdoc-title "Book")
+                 (traverse (document
+                             (branch "Chap" "chap.en.tm")
+                             (branch "Gone" "gone.en.tm")
+                             (continue "Gone too" "gone2.en.tm")))))
+  (save-tmdoc "chap.en.tm"
+              '(document (tmdoc-title "Chap") "intro"
+                         (section "Inner") "text"
+                         (subsection* "Deeper")
+                         (concat (section "Labelled") (label "lab2"))
+                         (hlink "site" "http://www.texmacs.org/tmweb/home")
+                         (hlink "away" "elsewhere.en.tm")
+                         (branch "Sub" "sub.en.tm")))
+  (save-tmdoc "sub.en.tm"
+              '(document (tmdoc-title "Sub") (section "Inner sub")
+                         (paragraph "Low"))))
+
+(define (test-tmdoc-books)
+  (check-group "tmdoc books")
+  (make-small-book)
+  (let* ((expand (priv '(doc tmdoc) 'tmdoc-expand))
+         (demote (priv '(doc tmdoc) 'tmdoc-demote))
+         (load (ahash-ref tmfs-handler-table (cons "help" 'load)))
+         (m (tmp-file "book.en.tm"))
+         (gone (lambda (name)
+                 `(concat "Broken link. File "
+                          (tt ,(url->unix (tmp-file name)))
+                          " does not exist"))))
+    ;; the sections of a page are below the heading which its title becomes
+    (check= (demote 'section 'chapter) 'section)
+    (check= (demote 'subsection 'chapter) 'subsection)
+    (check= (demote 'section 'section) 'subsection)
+    (check= (demote 'section* 'section) 'subsection*)
+    (check= (demote 'subsection 'subsection) 'paragraph)
+    (check= (demote 'subsection* 'subsection) 'paragraph*)
+    (check= (demote 'section 'appendix) 'section)
+    (check= (demote 'section 'tmdoc-title) 'section)
+    ;; a branch whose file is missing keeps its heading, with a message
+    (check= (expand m m 'title)
+            `(document (title "Book")
+                       (concat (chapter "Chap") (label "sec-chap"))
+                       "intro" (section "Inner") "text"
+                       (subsection* "Deeper")
+                       (concat (section "Labelled") (label "lab2"))
+                       (hlink "site" "http://www.texmacs.org/tmweb/home")
+                       (hlink "away" "elsewhere.en.tm")
+                       (concat (section "Sub") (label "sec-sub"))
+                       (subsection "Inner sub") (subparagraph "Low")
+                       (chapter "Gone") ,(gone "gone.en.tm")
+                       ,(gone "gone2.en.tm")))
+    ;; in the book, the links to the web stay, and those to pages which
+    ;; are not in the book become their text
+    (with r (load (string-append "book/" (url->tmfs-string m)))
+      (with body (cadr (assoc 'body (cdr r)))
+        (check-true (in? '(hlink "site" "http://www.texmacs.org/tmweb/home")
+                         body))
+        (check-true (in? "away" body))
+        (check-true (in? '(chapter "Gone") body))))))
 
 ;; The rewriting functions behind the expansion
 (define (test-tmdoc-rewrite)
@@ -818,28 +990,6 @@
 
 ;; A position of the cursor history whose buffer was closed is forgotten,
 ;; not read
-(define (test-cursor-history)
-  (check-group "cursor history")
-  (with-buffer-doc '(document "one" "two") '("generic")
-    (lambda ()
-      (go-end)
-      (cursor-history-add (cursor-path))))
-  (with-buffer-doc '(document "three" "four") '("generic")
-    (lambda ()
-      (with start (cursor-path)
-        (cursor-history-add start)
-        (check-true (cursor-has-history?))
-        (go-end)
-        (with end (cursor-path)
-          (cursor-history-add end)
-          (cursor-history-backward)
-          (check= (cursor-path) start)
-          (cursor-history-backward)
-          (check= (cursor-path) start)
-          (check-false (cursor-has-history?))
-          (cursor-history-forward)
-          (check= (cursor-path) end))))))
-
 (define (test-font-design-page)
   (check-group "font design: page")
   (with-buffer-doc '(document "x") '("generic")
@@ -1775,13 +1925,13 @@
 (define language-locales
   '(("british" "en_GB") ("bulgarian" "bg_BG") ("chinese" "zh_CN")
     ("croatian" "hr_HR") ("czech" "cs_CZ") ("danish" "da_DK")
-    ("dutch" "nl_NL") ("english" "en_US") ("esperanto" "eo_EO")
+    ("dutch" "nl_NL") ("english" "en_US") ("esperanto" "eo")
     ("finnish" "fi_FI") ("french" "fr_FR") ("german" "de_DE")
-    ("greek" "gr_GR") ("hungarian" "hu_HU") ("italian" "it_IT")
+    ("greek" "el_GR") ("hungarian" "hu_HU") ("italian" "it_IT")
     ("japanese" "ja_JP") ("korean" "ko_KR") ("polish" "pl_PL")
     ("portuguese" "pt_PT") ("romanian" "ro_RO") ("russian" "ru_RU")
     ("slovak" "sk_SK") ("slovene" "sl_SI") ("spanish" "es_ES")
-    ("swedish" "sv_SV") ("taiwanese" "zh_TW") ("ukrainian" "uk_UA")))
+    ("swedish" "sv_SE") ("taiwanese" "zh_TW") ("ukrainian" "uk_UA")))
 
 (define (test-language-names)
   (check-group "language names and locales")
@@ -1807,10 +1957,13 @@
   (check= (locale-to-language "zh_HK") "chinese")
   (check= (locale-to-language "xx_YY") "english")
   (check= (locale-to-language "") "english")
-  ;; FIXME: Greek has the ISO 639 code el, not gr, and Swedish is spoken in
-  ;; SE (System/Language/locale.cpp:118,150,162): (locale-to-language "el_GR")
-  ;; gives "english", expected "greek"; (language-to-locale "swedish")
-  ;; gives "sv_SV", expected "sv_SE".
+  ;; Greek has the ISO 639 code el (gr is still read), Swedish is spoken in
+  ;; SE, and Esperanto has no country
+  (check= (locale-to-language "el_GR") "greek")
+  (check= (locale-to-language "el_GR.UTF-8") "greek")
+  (check= (locale-to-language "gr_GR") "greek")
+  (check= (language-to-locale "swedish") "sv_SE")
+  (check= (locale-to-language "eo") "esperanto")
   (check-true (string? (get-locale-language)))
   (check-true (in? (get-output-language)
                    (cons "american" supported-languages))))
@@ -1883,7 +2036,11 @@
     ("slovak" "najneobhospodarovavatelnejsimi")
     ("slovene" "dezoksiribonukleinska")
     ("croatian" "prijestolonasljednikovica")
-    ("esperanto" "malsanulejestrinoj")))
+    ("esperanto" "malsanulejestrinoj")
+    ;; the languages whose patterns are in UTF-8 (make_ucs_text_language)
+    ("russian" "<#434><#43E><#441><#442><#43E><#43F><#440><#438><#43C><#435><#447><#430><#442><#435><#43B><#44C><#43D><#43E><#441><#442><#44C>")
+    ("ukrainian" "<#43F><#440><#438><#440><#43E><#434><#43E><#437><#43D><#430><#432><#441><#442><#432><#43E>")
+    ("bulgarian" "<#435><#43B><#435><#43A><#442><#440><#438><#444><#438><#43A><#430><#446><#438><#44F>")))
 
 (define (test-hyphenation)
   (check-group "hyphenation patterns")
@@ -1894,6 +2051,12 @@
                    (url-append "$TEXMACS_PATH/langs/natural/hyphen"
                                (string-append "hyphen." (cadr p)))))))
           '())
+  ;; selecting a language loads its patterns, which read past the end of
+  ;; those ending in a digit, in the languages with UTF-8 patterns (#686;
+  ;; this only shows in a build with the address sanitizer)
+  (for-each (lambda (lan)
+              (check-true (> (width `(with "language" ,lan "x")) 0)))
+            (cons* "american" "verbatim" supported-languages))
   ;; the languages whose words are broken (none is left out)
   (check= (list-filter
            long-words
@@ -2287,6 +2450,40 @@
 (define (comment lab id type by body)
   `(,lab ,id ,(string-append "m" id) ,type ,by "1" "" ,body))
 
+;; Mirrors and comments share their body through an identifier: a copy which
+;; is not in sync is put on the list of the copies to separate, and the first
+;; one schedules the separation (part-shared.scm, mirror-invalidate, whose
+;; test of an empty list lacked its 0: under Guile every copy scheduled one,
+;; under S7 it was an error at every comment)
+(define (test-mirrors)
+  (check-group "mirrors")
+  (with-buffer-doc '(document (mirror "mt-u" "mt-m" "a")
+                              (mirror "mt-v" "mt-n" "b"))
+                   '("generic")
+    (lambda ()
+      (let* ((m (resolve-module '(part part-shared)))
+             (invalidate (eval 'mirror-invalidate m))
+             (black-list (eval 'mirror-black-list m))
+             ;; copies left by earlier suites (the synchronization never
+             ;; runs headless) are set aside, so that the list starts empty
+             (left (map car (ahash-table->list black-list)))
+             (scheduled 0))
+        (for (uid left) (ahash-remove! black-list uid))
+        (with-global exec-delayed-pause
+            (lambda (c) (set! scheduled (+ scheduled 1)))
+          (check= (catch #t (lambda () (invalidate (bt 0 2)) "ok")
+                    (lambda args (car args)))
+                  "ok")
+          (check= (catch #t (lambda () (invalidate (bt 1 2)) "ok")
+                    (lambda args (car args)))
+                  "ok"))
+        (check-true (ahash-ref black-list "mt-u"))
+        (check-true (ahash-ref black-list "mt-v"))
+        (check= scheduled 1)
+        (ahash-remove! black-list "mt-u")
+        (ahash-remove! black-list "mt-v")
+        (for (uid left) (ahash-set! black-list uid #t))))))
+
 (define (test-comments)
   (check-group "comments")
   (let ((c (T (comment 'folded-comment "2" "remark" "Bob" "c2"))))
@@ -2498,6 +2695,21 @@
   (check= (ai-serialize "english" '(with "mode" "math" (frac "a" "b")))
           "$\\frac{a}{b}$"))
 
+;; The examples of the handwriting recognizer are saved in the home of
+;; TeXmacs (TEXMACS_HOME_PATH), which need not be ~/.TeXmacs. A home which
+;; already has learned glyphs is left alone.
+(define (test-handwriting)
+  (check-group "handwriting")
+  (with f (string->url "$TEXMACS_HOME_PATH/system/glyphs.scm")
+    (when (not (url-exists? f))
+      (set! last-glyph '(((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))
+      (learn-glyph "x")
+      (set! last-glyph '())
+      (check-true (url-exists? f))
+      (check= (load-object f)
+              '(("x" (((0.0 0.0) (1.0 1.0)) ((0.0 1.0) (1.0 0.0))))))
+      (system-remove f))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2508,19 +2720,21 @@
   (clear-misc-dir)
   (system-mkdir (system->url misc-dir))
   (for-each run-group
-            (list test-help-files test-doc-parse test-tmdoc-expand
+            (list test-help-files test-help-refresh test-doc-parse
+                  test-tmdoc-expand
+                  test-tmdoc-books
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
                   test-font-database test-font-design test-cursor-history
-                  test-font-design-page
+                  (in-shared-window test-font-design-page)
                   test-font-design-apply
                   test-font-variants test-font-variant-menus test-font-weights
-                  test-font-design-variants
+                  (in-shared-window test-font-design-variants)
                   test-font-custom test-font-features test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation
                   test-spelling
                   test-edu-contexts test-edu-macros test-edu-modes test-mc
-                  test-comments test-posters-themes test-spell-edit
-                  test-ai-serialize))
+                  test-mirrors test-comments test-posters-themes test-spell-edit
+                  test-ai-serialize test-handwriting))
   (clear-misc-dir)
   (check-end))

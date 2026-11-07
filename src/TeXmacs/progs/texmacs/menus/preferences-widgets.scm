@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (texmacs menus preferences-widgets)
-  (:use (texmacs menus preferences-menu)))
+  (:use (texmacs menus preferences-menu)
+        (fonts font-short-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Validation Macro
@@ -61,7 +62,11 @@
             (else #f))))
 
 (tm-define (set-retina-boolean-preference which on?)
-  (set-retina-preference which (if on? "on" "off")))
+  (set-retina-preference which (if on? "on" "off"))
+  ;; the Cocoa interface reads them when it starts (ns_gui_rep)
+  (when (ns-gui?)
+    (set-message "Restart in order to let the new setting take effect"
+                 "retina setting")))
 
 (tm-define (reset-retina-preferences)
   (reset-preference "retina-factor")
@@ -116,7 +121,8 @@
 
 (define-preference-names-and-validate "icon bars"
   ("top" "Above the document")
-  ("left" "At the left of the document"))
+  ("left" "At the left of the document")
+  ("right" "At the right of the document"))
 
 (define-preference-names-and-validate "window tabs"
   ("left" "In a column at the left")
@@ -126,6 +132,10 @@
   ("freetype" "FreeType, as dark as Qt")
   ("texmacs" "Bitmaps of TeXmacs, as Qt")
   ("mupdf" "MuPDF, lighter"))
+
+(define-preference-names-and-validate "emoji font"
+  ("default" "Twemoji, the same everywhere")
+  ("system" "Those of the system"))
 
 (define-preference-names-and-validate "gpu glyph hinting"
   ("light" "Light")
@@ -180,7 +190,10 @@
             (get-pretty-preference "buffer management")
             "18em"))
     (item (text "User interface theme:")
-      (enum (set-pretty-preference* "gui theme" answer)
+      ;; the Cocoa interface follows the theme at once, without a restart
+      (enum (if (ns-gui?)
+                (set-pretty-preference "gui theme" answer)
+                (set-pretty-preference* "gui theme" answer))
             (if qt6-or-later-gui?
                 '("Default" "Bright" "Dark" "")
                 '("Default" "Bright" "Dark" "Native" "Legacy" "")
@@ -195,7 +208,8 @@
     (assuming #t
       (item (text "Main and mode icon bars:")
         (enum (set-pretty-preference "icon bars" answer)
-              '("Above the document" "At the left of the document")
+              '("Above the document" "At the left of the document"
+                "At the right of the document")
               (get-pretty-preference "icon bars")
               "18em")))
     (assuming (defined? 'web-javascript)
@@ -215,11 +229,13 @@
             '("Top tabs" "Side tabs" "Mobile list")
             (get-pretty-preference "gui:responsive tab mode")
             "18em"))
-    (item (text "Interface scaling:")
-      (enum (set-pretty-preference "gui scaling" answer)
-            '("default" "0.25" "0.5" "1" "2" "3")
-            (get-pretty-preference "gui scaling")
-            "18em"))
+    (assuming (not (ns-gui?))
+      ;; macOS scales the native interface of Cocoa itself
+      (item (text "Interface scaling:")
+        (enum (set-pretty-preference "gui scaling" answer)
+              '("default" "0.25" "0.5" "1" "2" "3")
+              (get-pretty-preference "gui scaling")
+              "18em")))
     (assuming (or (vue-gui?) (ns-gui?))
       (item (text "Glyphs on the screen:")
         (enum (set-pretty-preference "gpu glyphs" answer)
@@ -237,11 +253,19 @@
               '("Light" "None" "Full")
               (get-pretty-preference "gpu glyph hinting")
               "18em")))
-    (assuming (qt5-gui?)
+    ;; the emoji font of smart_font.cpp (emoji_font_name), read when the
+    ;; fonts are made: the browser has no fonts of a system
+    (assuming (not (defined? 'web-javascript))
+      (item (text "Emoji (from the next start):")
+        (enum (set-pretty-preference "emoji font" answer)
+              '("Twemoji, the same everywhere" "Those of the system")
+              (get-pretty-preference "emoji font")
+              "18em")))
+    (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina fonts"))
         (toggle (set-retina-boolean-preference "retina-factor" answer)
                 (get-retina-boolean-preference "retina-factor"))))
-    (assuming (qt5-gui?)
+    (assuming (or (qt5-gui?) (ns-gui?))
       (meti (hlist // (text "Use retina icons"))
         (toggle (set-retina-boolean-preference "retina-icons" answer)
                 (get-retina-boolean-preference "retina-icons"))))))
@@ -455,26 +479,21 @@
 
 ;; Html ----------
 
-(define (export-formulas-as-mathjax on?)
-  (set-boolean-preference "texmacs->html:mathjax" on?)
-  (when on?
-    (set-boolean-preference "texmacs->html:mathml" #f)
-    (set-boolean-preference "texmacs->html:images" #f)
-    (refresh-now "texmacs to html")))
+(define html-formula-names
+  '(("static" "Static SVG")
+    ("mathjax" "MathJax")
+    ("mathml" "MathML")
+    ("images" "Images")
+    ("html" "HTML tables")))
 
-(define (export-formulas-as-mathml on?)
-  (set-boolean-preference "texmacs->html:mathml" on?)
-  (when on?
-    (set-boolean-preference "texmacs->html:mathjax" #f)
-    (set-boolean-preference "texmacs->html:images" #f)
-    (refresh-now "texmacs to html")))
+(define (html-formula-name mode)
+  (translate (cadr (assoc mode html-formula-names))))
 
-(define (export-formulas-as-images on?)
-  (set-boolean-preference "texmacs->html:images" on?)
-  (when on?
-    (set-boolean-preference "texmacs->html:mathjax" #f)
-    (set-boolean-preference "texmacs->html:mathml" #f)
-    (refresh-now "texmacs to html")))
+(define (html-formula-choose name)
+  (for-each (lambda (p)
+              (when (== (translate (cadr p)) name)
+                (html-formulas-set (car p))))
+            html-formula-names))
 
 (tm-widget (html-preferences-widget)
   ======
@@ -485,15 +504,10 @@
       (meti (hlist // (text "Use CSS for more advanced formatting"))
         (toggle (set-boolean-preference "texmacs->html:css" answer)
                 (get-boolean-preference "texmacs->html:css")))
-      (meti (hlist // (text "Export mathematical formulas as MathJax"))
-        (toggle (export-formulas-as-mathjax answer)
-                (get-boolean-preference "texmacs->html:mathjax")))
-      (meti (hlist // (text "Export mathematical formulas as MathML"))
-        (toggle (export-formulas-as-mathml answer)
-                (get-boolean-preference "texmacs->html:mathml")))
-      (meti (hlist // (text "Export mathematical formulas as images"))
-        (toggle (export-formulas-as-images answer)
-                (get-boolean-preference "texmacs->html:images"))))
+      (meti (hlist // (text "Export mathematical formulas as"))
+        (enum (html-formula-choose answer)
+              (map html-formula-name (map car html-formula-names))
+              (html-formula-name (html-formulas)) "10em")))
     ===
     (hlist
       (text "CSS stylesheet:") //
@@ -664,6 +678,10 @@
   ("iso-8859-2" "Iso-8859-2")
   ("utf-8" "Utf-8"))
 
+(define-preference-names "editor:code indent"
+  ("spaces" "Spaces")
+  ("tabs" "Tabs"))
+
 (tm-widget (verbatim-preferences-widget)
   ======
   (bold (text "TeXmacs -> Verbatim"))
@@ -692,7 +710,26 @@
       (enum (set-pretty-preference "verbatim->texmacs:encoding" answer)
             '("Automatic" "Cork" "Iso-8859-1" "Iso-8859-2" "Utf-8")
             (get-pretty-preference "verbatim->texmacs:encoding")
-            "12em"))))
+            "12em")))
+  ====== ======
+  (bold (text "Source code"))
+  ===
+  (aligned
+    (item (text "Columns between tab stops:")
+      (enum (set-preference "editor:code tab width" answer)
+            '("2" "4" "8" "")
+            (get-preference "editor:code tab width")
+            "12em"))
+    (item (text "Indent new files with:")
+      (enum (set-pretty-preference "editor:code indent" answer)
+            '("Spaces" "Tabs")
+            (get-pretty-preference "editor:code indent")
+            "12em")))
+  ===
+  (aligned
+    (meti (hlist // (text "Open source files and texts as lines of code"))
+      (toggle (set-boolean-preference "code lines" answer)
+              (get-boolean-preference "code lines")))))
 
 ;; Pdf ----------
 (define-preference-names-and-validate "texmacs->pdf:version"
@@ -752,7 +789,35 @@
    (eval `(define-preference-names "texmacs->image:format" ,@valid-image-format-list))
    (cadr (apply map list valid-image-format-list))))
 
-(define (supports-inkscape?) (url-exists-in-path? "inkscape"))
+(when (and (os-macos?)
+	   (url-exists? "/Applications/Inkscape.app/Contents/MacOS/inkscape"))
+  (system-setenv "PATH" (string-append "/Applications/Inkscape.app/Contents/MacOS/:"
+				(getenv "PATH"))))
+
+(when (os-mingw64?)
+  (with r (eval-system "reg.exe query \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\inkscape.exe\"")
+    (with l (filter (lambda (x) (string-contains? x "Path "))
+		    (string-tokenize-by-char r #\newline))
+      (with s (if (null? l) "" (string-trim-spaces-left (car l)))
+	(with pos (string-search-forwards ":" 0 s)
+	  (if (>= pos 1) (set! s (string-drop s (- pos 1))))
+	  (when (string-ends? s "\x0d") (set! s (string-drop-right s 1))))
+	(when (!= s "")
+	  (system-setenv "PATH" (string-append s ";" (getenv "PATH"))))))))
+
+(define (inkscape-version)
+  (with l (string-tokenize-by-char (eval-system "inkscape --version") #\space)
+    (and (>= (length l) 2) (cadr l))))
+
+(define (inkscape-version-ge-1.4?)
+  (and-with v (inkscape-version)
+    (and-with l (map string->number (string-tokenize-by-char v #\.))
+      (or (and (>= (length l) 1) (> (car l) 2))
+	  (and (>= (length l) 2) (>= (car l) 1) (>= (cadr l) 4))))))
+
+(define (supports-inkscape?)
+  (and (url-exists-in-path? "inkscape")
+       (inkscape-version-ge-1.4?)))
 
 (tm-widget (image-preferences-widget)
   ======
@@ -839,6 +904,17 @@
       (toggle (set-boolean-preference "texmacs->markdown:front-matter" answer)
               (get-boolean-preference "texmacs->markdown:front-matter")))))
 
+;; Word and OpenDocument ----------
+
+(tm-widget (office-preferences-widget)
+  ======
+  (bold (text "Word, OpenDocument -> TeXmacs"))
+  ===
+  (aligned
+    (meti (hlist // (text "Read a file as a document of the style office, which is written back as it was"))
+      (toggle (set-boolean-preference "office->texmacs:faithful" answer)
+              (get-boolean-preference "office->texmacs:faithful")))))
+
 ;; All converters ----------
 
 (tm-widget (conversion-preferences-widget)
@@ -857,6 +933,9 @@
       (tab (text "Markdown")
         (centered
           (dynamic (markdown-preferences-widget))))
+      (tab (text "Office")
+        (centered
+          (dynamic (office-preferences-widget))))
       (tab (text "Verbatim")
         (centered
           (dynamic (verbatim-preferences-widget))))
@@ -890,7 +969,6 @@
 
 (define-preference-names-and-validate "updater:interval"
   ("0" "Never")
-  ("0" "Unsupported")
   ("24" "Once a day")
   ("168" "Once a week")
   ("720" "Once a month"))
@@ -993,8 +1071,28 @@
       (text "Console") >>
       ("Open debug console" (open-debug-console)))))
 
+;; the fonts of source files: the TeXmacs typewriter font and the
+;; installed monospaced fonts, as (label master)
+(define (code-font-choices)
+  (cons (list "TeXmacs typewriter" "roman")
+        (map (lambda (p) (list (car p) (cadr p))) (text-font-list 'mono))))
+
+(define (code-font-label)
+  (with f (get-preference "editor:code font")
+    (with p (list-find (code-font-choices) (lambda (p) (== (cadr p) f)))
+      (if p (car p) f))))
+
+(define (set-code-font label)
+  (with p (assoc label (code-font-choices))
+    (when p (set-preference "editor:code font" (cadr p)))))
+
 (tm-widget (misc-preferences-widget)
   (aligned
+    (item (text "Font of source code:")
+      (enum (set-code-font answer)
+            (map car (code-font-choices))
+            (code-font-label)
+            "12em"))
     (item (text "Automatically save:")
       (enum (set-pretty-preference "autosave" answer)
             '("5 sec" "30 sec" "120 sec" "300 sec" "Disable")
@@ -1015,6 +1113,10 @@
             '("Once" "Twice" "Three times")
             (get-pretty-preference "document update times") 
             "12em"))
+    (assuming (!= (shared-user-dir) "")
+      (meti (hlist // (text "Share files open in several TeXmacs windows"))
+        (toggle (set-boolean-preference "share-open-files" answer)
+                (get-boolean-preference "share-open-files"))))
     (assuming (updater-supported?)
       (item (text "Check for automatic updates:")
         (enum (set-pretty-preference "updater:interval" answer)
@@ -1071,6 +1173,12 @@
         (meti (hlist // (text "Automatic program brackets"))
           (toggle (set-boolean-preference "prog:automatic brackets" answer)
                   (get-boolean-preference "prog:automatic brackets")))
+        (meti (hlist // (text "Balanced brackets in code with a syntax tree"))
+          (toggle (set-boolean-preference "prog:balanced brackets" answer)
+                  (get-boolean-preference "prog:balanced brackets")))
+        (meti (hlist // (text "Program coloring by syntax trees"))
+          (toggle (set-boolean-preference "tree-sitter highlighting" answer)
+                  (get-boolean-preference "tree-sitter highlighting")))
         (meti (hlist // (text "Program bracket selections"))
           (toggle (set-boolean-preference "prog:select brackets" answer)
                   (get-boolean-preference "prog:select brackets")))
@@ -1134,6 +1242,12 @@
     (meti (hlist // (text "Automatic program brackets"))
       (toggle (set-boolean-preference "prog:automatic brackets" answer)
               (get-boolean-preference "prog:automatic brackets")))
+    (meti (hlist // (text "Balanced brackets in code with a syntax tree"))
+      (toggle (set-boolean-preference "prog:balanced brackets" answer)
+              (get-boolean-preference "prog:balanced brackets")))
+    (meti (hlist // (text "Program coloring by syntax trees"))
+      (toggle (set-boolean-preference "tree-sitter highlighting" answer)
+              (get-boolean-preference "tree-sitter highlighting")))
     (meti (hlist // (text "Program bracket selections"))
       (toggle (set-boolean-preference "prog:select brackets" answer)
               (get-boolean-preference "prog:select brackets")))

@@ -128,6 +128,17 @@
   language of the style when it has one, and else in the language of the
   document.
 
+  A document with such a style is exported to <LaTeX> for the package
+  <verbatim|citation-style-language>, which formats the citations and the
+  bibliography with the same style when <LaTeX> runs: its citations stay
+  <verbatim|\\cite>, <verbatim|\\textcite> and <verbatim|\\citeauthor>
+  commands, and the bibliography becomes <verbatim|\\printbibliography>.
+  Next to the <verbatim|.tex> file, the export writes the cited entries, in
+  a file <verbatim|<em|name>-refs.bib>, and a copy of the style. Such a
+  file is compiled with <verbatim|lualatex>, twice; with another engine, the
+  program <verbatim|citeproc-lua> has to be run between the two compilations,
+  as <BibTeX> would be. The package is part of <TeX> Live.
+
   <subsubsection*|Editing files with bibliographic entries>
 
   <BibTeX> files can either be entered and edited using <TeXmacs> itself or

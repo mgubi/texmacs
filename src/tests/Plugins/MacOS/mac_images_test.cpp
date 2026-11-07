@@ -8,41 +8,42 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
-
+#include "tm_test.hpp"
+#include "url.hpp"
 #include "MacOS/mac_images.h"
 
-class TestMacImages: public QObject {
-  Q_OBJECT
+static url jpg_file ("$TEXMACS_PATH/misc/patterns/wall/solid.jpg");
+static const int jpg_file_width = 500;
+static const int jpg_file_height= 500;
 
-private:
-  url jpg_file= url ("$TEXMACS_PATH/misc/patterns/wall/solid.jpg");
-  int jpg_file_width= 500;
-  int jpg_file_height= 500;
-
-private slots:
-  void test_mac_supports ();
-  void test_mac_image_size ();
-};
-
-void
-TestMacImages::test_mac_supports () {
-#ifdef MACOSX_EXTENSIONS 
-  QVERIFY (!mac_supports (url ("$TEXMACS_PATH/misc/images/fancy-c.svg")));
-  QVERIFY (mac_supports (url ("$TEXMACS_PATH/misc/images/fancy-c.png")));
-  QVERIFY (mac_supports (jpg_file));
+static void
+test_mac_supports () {
+#ifdef MACOSX_EXTENSIONS
+  // a file which is no image (the SVG of the first version of this test is
+  // read by the ImageIO of recent versions of macOS)
+  CHECK (!mac_supports (url ("$TEXMACS_PATH/doc/main/links/man-bibliography.en.tm")));
+  CHECK (mac_supports (url ("$TEXMACS_PATH/misc/images/fancy-c.png")));
+  CHECK (mac_supports (jpg_file));
+#else
+  SKIP ("no macOS extensions in this build");
 #endif
 }
 
-void
-TestMacImages::test_mac_image_size () {
-#ifdef MACOSX_EXTENSIONS 
-  int w, h;
+static void
+test_mac_image_size () {
+#ifdef MACOSX_EXTENSIONS
+  int w= 0, h= 0;
   mac_image_size (jpg_file, w, h);
-  QCOMPARE (jpg_file_width, w);
-  QCOMPARE (jpg_file_height, h);
+  CHECK_EQ (w, jpg_file_width);
+  CHECK_EQ (h, jpg_file_height);
+#else
+  SKIP ("no macOS extensions in this build");
 #endif
 }
 
-QTEST_MAIN(TestMacImages)
-#include "mac_images_test.moc"
+int
+main () {
+  RUN (test_mac_supports);
+  RUN (test_mac_image_size);
+  return test_report ();
+}

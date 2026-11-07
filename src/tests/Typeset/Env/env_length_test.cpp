@@ -1,6 +1,6 @@
 
 /******************************************************************************
-* MODULE     : python_language_test.cpp
+* MODULE     : env_length_test.cpp
 * COPYRIGHT  : (C) 2019  Darcy Shen
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -8,33 +8,24 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "tm_test.hpp"
 #include "env.hpp"
-#include <QtTest/QtTest>
 
-class TestEnvLength: public QObject {
-  Q_OBJECT
-
-private slots:
-  void is_length();
-};
-
-void TestEnvLength::is_length() {
-  auto env= edit_env ();
-  auto valid_lengths= list<string>()
-    * string("1cm") * string("1mm") * string("1in") * string("1pt")
-    * string("1bp") * string("1dd") * string("1pc") * string("1cc")
-    * string("1fs") * string("1fbs") * string("1ln") * string("1sep")
-    * string("1yfrac") * string("1ex") * string("1emunit")
-    * string("1fn") * string("1fns") * string("1bls")
-    * string("1spc") * string("1xpsc")
-    * string("1w") * string("1h") * string("1l") * string("1r")
-    * string("1b") * string("1t")
-    * string("1par") * string("1pag") * string("1px") * string("1tmpt");
-
-  for (auto i=0; i<N(valid_lengths); i++) {
-    QVERIFY (env->is_length (valid_lengths[i]));
-  }
+static void
+test_is_length () {
+  edit_env env= edit_env ();
+  const char* valid_lengths[]= {
+    "1cm", "1mm", "1in", "1pt", "1bp", "1dd", "1pc", "1cc",
+    "1fs", "1fbs", "1ln", "1sep", "1yfrac", "1ex", "1emunit",
+    "1fn", "1fns", "1bls", "1spc", "1xpsc",
+    "1w", "1h", "1l", "1r", "1b", "1t",
+    "1par", "1pag", "1px", "1tmpt" };
+  for (const char* l: valid_lengths)
+    CHECK_MSG (env->is_length (string (l)), string (l) * " is a length");
 }
 
-QTEST_MAIN(TestEnvLength)
-#include "env_length_test.moc"
+int
+main () {
+  RUN (test_is_length);
+  return test_report ();
+}

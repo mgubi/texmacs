@@ -5,9 +5,19 @@
 # Shared body of TeXmacs object files
 add_library (texmacs_body OBJECT ${TeXmacs_All_SRCS})
 
+add_dependencies (texmacs_body git_revision)
+
 target_include_directories (texmacs_body PUBLIC
   ${TeXmacs_Include_Dirs}
 )
+
+# the C units of tree-sitter (see CMakeLists.txt)
+set_source_files_properties (
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree_sitter_lib.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_dynamic.c"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/ts_xz.c"
+  PROPERTIES INCLUDE_DIRECTORIES
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/include;${TEXMACS_SOURCE_DIR}/src/Plugins/TreeSitter/tree-sitter/src")
 
 target_compile_options (texmacs_body PRIVATE
   $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
@@ -154,6 +164,12 @@ elseif (APPLE AND QTTEXMACS)
     RELEASE_OUTPUT_NAME ${TeXmacs_binary_name}
     RUNTIME_OUTPUT_DIRECTORY ${TEXMACS_BINARY_DIR}
   )
+  # CFBundleVersion with the git commit, the hash (#753)
+  add_custom_command (TARGET ${TeXmacs_binary_name} POST_BUILD
+    COMMAND sh ${TEXMACS_SOURCE_DIR}/packages/macos/set-bundle-revision.sh
+      "$<TARGET_BUNDLE_CONTENT_DIR:${TeXmacs_binary_name}>/Info.plist"
+      ${TEXMACS_SOURCE_DIR}
+    VERBATIM)
 else ()
   # also the other GUIs on macOS: TeXmacs/bin/texmacs.bin, run by the
   # script TeXmacs/bin/texmacs, as on the other Unix systems

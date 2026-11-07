@@ -145,6 +145,7 @@ TM_DEBUG
 TM_OPTIMIZE
 TM_INSTALL
 TM_SIGN
+TM_CODE_FEATURES
 
 #--------------------------------------------------------------------
 # final adjustement for Texmacs compile and run

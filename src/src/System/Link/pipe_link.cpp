@@ -18,6 +18,7 @@
 #include "sys_utils.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
+#include "array.hpp"
 #include "tm_timer.hpp"
 #include "analyze.hpp"
 #include <stdio.h>
@@ -65,6 +66,9 @@ struct pipe_link_rep: tm_link_rep {
 
   string outbuf;        // pending output from plugin
   string errbuf;        // pending errors from plugin
+  bool   blocking;      // write waits until all is written (the default)
+  string inbuf;         // input not taken by the child yet (not blocking)
+  int    inpos;         // from inbuf [inpos]
 
   socket_notifier snout, snerr;
   
@@ -79,8 +83,11 @@ public:
   void    listen (int msecs);
   void    interrupt ();
   void    stop ();
+  void    set_blocking_write (bool b);
+  bool    pending_write ();
 
   void    feed (int channel);
+  void    flush_input (int msecs);
   void    close_fds ();
   void    close_pipes ();
   void    close_err ();
@@ -93,6 +100,9 @@ pipe_link_rep::pipe_link_rep (string cmd2): cmd (cmd2) {
   err    = pp_err[0]= pp_err[1]= -1;
   outbuf = "";
   errbuf = "";
+  blocking= true;
+  inbuf  = "";
+  inpos  = 0;
   alive  = false;
   pid    = -1;  // no process yet: terminate_child does nothing
 }
@@ -108,32 +118,104 @@ make_pipe_link (string cmd) {
 }
 
 #ifndef OS_MINGW
+// The children which were asked to terminate and have not ended yet: they
+// are killed when their time is up (see reap_ending_children)
+static array<int>    ending_pid;
+static array<bool>   ending_reaped;
+static array<time_t> ending_kill_at;
+
+static bool
+child_ended (int pid, bool& reaped) {
+  // The whole group is waited for, not only the child: a wrapper script
+  // often runs the program as a child of its own (without exec), and stops
+  // at once on SIGTERM while the program still cleans up
+  if (!reaped && waitpid (pid, NULL, WNOHANG) != 0) reaped= true;
+  return reaped && killpg (pid, 0) == -1;
+}
+
+static void
+kill_child (int pid, bool reaped) {
+  // (the group may have ended during the last pause: its number may then
+  // be another group's, unless the child is not reaped yet; EPERM: a
+  // member which we may not signal)
+  if (killpg (pid, 0) == 0 || errno == EPERM) killpg (pid, SIGKILL);
+  if (!reaped) waitpid (pid, NULL, 0);
+}
+
+static pid_t ending_owner= 0;  // the process of TeXmacs (not a fork of it)
+
+static void
+kill_ending_children () {
+  // at an exit which skips close_all_pipes (exit from Scheme): what is left
+  // is killed at once, without waiting until its time is up
+  if (getpid () != ending_owner) return;
+  for (int i=0; i<N(ending_pid); i++) {
+    bool reaped= ending_reaped[i];
+    if (!child_ended (ending_pid[i], reaped))
+      kill_child (ending_pid[i], reaped);
+  }
+  ending_pid    = array<int> ();
+  ending_reaped = array<bool> ();
+  ending_kill_at= array<time_t> ();
+}
+
 static void
 terminate_child (int pid) {
   // no process (fork failed, or none was made): killpg (-1, ...) fails, and
   // kill (-1, SIGKILL) below would kill every process of the user
   if (pid <= 0) return;
   // Ask the process group of the child to terminate, give it up to 2 s to
-  // do so, kill what is left of it otherwise, and reap the child. The whole
-  // group is waited for, not only the child: a wrapper script often runs
-  // the program as a child of its own (without exec), and stops at once on
-  // SIGTERM while the program still cleans up
+  // do so, and kill what is left of it otherwise. Only the first 50 ms are
+  // waited for here: a program which takes longer (or ignores SIGTERM) is
+  // killed and reaped later by reap_ending_children, so that the interface
+  // is not blocked meanwhile
   if (-1 != killpg (pid, SIGTERM)) {
     bool reaped= false;
-    for (int i=0; i<200; i++) {
-      if (!reaped && waitpid (pid, NULL, WNOHANG) != 0) reaped= true;
-      if (reaped && killpg (pid, 0) == -1) return;  // the group is gone
+    int  polls = 5;
+    for (int i=0; i<polls; i++) {
+      if (child_ended (pid, reaped)) return;
       usleep (10000);
     }
-    // (the group may have ended during the last pause: its number may then
-    // be another group's; EPERM: a member which we may not signal)
-    if (killpg (pid, 0) == 0 || errno == EPERM) killpg (pid, SIGKILL);
-    if (!reaped) waitpid (pid, NULL, 0);
+    if (ending_owner == 0) {
+      ending_owner= getpid ();
+      atexit (kill_ending_children);
+    }
+    ending_pid     << pid;
+    ending_reaped  << reaped;
+    ending_kill_at << (texmacs_time () + 2000 - 10 * polls);
   }
   else {
     kill (pid, SIGKILL);
     waitpid (pid, NULL, 0);
   }
+}
+
+static void
+reap_ending_children (bool wait) {
+  // the children of terminate_child which have ended are reaped, those whose
+  // time is up are killed; @wait: wait for them all (at the exit)
+  array<int>    pids;
+  array<bool>   reapeds;
+  array<time_t> kill_ats;
+  for (int i=0; i<N(ending_pid); i++) {
+    int  pid   = ending_pid[i];
+    bool reaped= ending_reaped[i];
+    if (wait)
+      while (!child_ended (pid, reaped) &&
+             texmacs_time () - ending_kill_at[i] < 0)
+        usleep (10000);
+    if (child_ended (pid, reaped)) continue;
+    if (wait || texmacs_time () - ending_kill_at[i] >= 0)
+      kill_child (pid, reaped);
+    else {
+      pids     << pid;
+      reapeds  << reaped;
+      kill_ats << ending_kill_at[i];
+    }
+  }
+  ending_pid    = pids;
+  ending_reaped = reapeds;
+  ending_kill_at= kill_ats;
 }
 #endif
 
@@ -174,6 +256,8 @@ close_all_pipes () {
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
     if (con->alive) {
+      // (all are asked to terminate first, then waited for together: at
+      // most about 2 s in all, not 2 s for each)
       terminate_child (con->pid);
       con->alive= false;
       remove_notifier (con->snout);
@@ -181,13 +265,22 @@ close_all_pipes () {
       con->close_fds ();
     }
   }
+  reap_ending_children (true);
 #endif
   close_all_cmdlines ();
   close_all_requests ();
 }
 
 void
+reap_pipe_children () {
+#ifndef OS_MINGW
+  if (N(ending_pid) > 0) reap_ending_children (false);
+#endif
+}
+
+void
 process_all_pipes () {
+  reap_pipe_children ();
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
@@ -205,6 +298,7 @@ process_all_pipes () {
 string
 pipe_link_rep::start () {
 #ifndef OS_MINGW
+  reap_pipe_children ();
   if (alive) return "busy";
   if (DEBUG_AUTO) debug_io << "Launching '" << cmd << "'\n";
 #ifdef __EMSCRIPTEN__
@@ -244,6 +338,10 @@ pipe_link_rep::start () {
   }
   if (pid==0) { // the child
     setsid();
+    // an interrupt is not ignored in the plugin (a TeXmacs started with
+    // SIGINT ignored, as by `sh ... &', would pass that on)
+    signal (SIGINT, SIG_DFL);
+    signal (SIGQUIT, SIG_DFL);
     close (pp_in  [OUT]);
     close (pp_out [IN ]);
     close (pp_err [IN ]);
@@ -267,6 +365,7 @@ pipe_link_rep::start () {
     pp_in[0]= pp_in[1]= pp_out[0]= pp_out[1]= pp_err[0]= pp_err[1]= -1;
 
     alive= true;
+    if (!blocking) set_blocking_write (false);
     snout = socket_notifier (out, &pipe_callback, this, NULL);
     snerr = socket_notifier (err, &pipe_callback, this, NULL);
     add_notifier (snout);
@@ -317,10 +416,85 @@ pipe_link_rep::write (string s, int channel) {
 #ifndef OS_MINGW
   if ((!alive) || (channel != LINK_IN)) return;
   if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string (s);
+  if (!blocking) {
+    // (what the child does not take at once is written at the next turns
+    // of the loop: see pending_write; a child which reads no more costs
+    // no wait at each write)
+    inbuf << s;
+    flush_input (0);
+    return;
+  }
+  // (a write may take a part only, or be interrupted by a signal)
   c_string _s (s);
-  int err= ::write (in, _s, N(s));
-  (void) err;
+  const char* p= _s;
+  int n= N(s), done= 0;
+  while (done < n) {
+    ssize_t r= ::write (in, p + done, n - done);
+    if (r > 0) done += r;
+    else if (r < 0 && errno == EINTR) continue;
+    else {
+      io_error << "Write failed for '" << cmd << "'\n";
+      break;
+    }
+  }
 #endif
+}
+
+void
+pipe_link_rep::set_blocking_write (bool b) {
+#ifndef OS_MINGW
+  blocking= b;
+  if (alive && in != -1) {
+    int fl= fcntl (in, F_GETFL);
+    fcntl (in, F_SETFL, b? (fl & ~O_NONBLOCK): (fl | O_NONBLOCK));
+  }
+#else
+  (void) b;
+#endif
+}
+
+void
+pipe_link_rep::flush_input (int msecs) {
+  // writes what the child takes of inbuf, waiting at most msecs for it to
+  // take more; its output is read meanwhile (a child which waits until it
+  // can write would otherwise never read)
+#ifndef OS_MINGW
+  time_t wait_until= texmacs_time () + msecs;
+  while (alive && inpos < N(inbuf)) {
+    ssize_t r= ::write (in, &(inbuf[inpos]), N(inbuf) - inpos);
+    if (r > 0) { inpos += r; continue; }
+    if (r < 0 && errno == EINTR) continue;
+    if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+      io_error << "Write failed for '" << cmd << "'\n";
+      inpos= N(inbuf);
+      break;
+    }
+    time_t left= wait_until - texmacs_time ();
+    if (left <= 0) break;
+    fd_set rfds, wfds;
+    FD_ZERO (&rfds);
+    FD_ZERO (&wfds);
+    FD_SET (out, &rfds);
+    if (err != -1) FD_SET (err, &rfds);
+    FD_SET (in, &wfds);
+    struct timeval tv;
+    tv.tv_sec  = left / 1000;
+    tv.tv_usec = 1000 * (left % 1000);
+    int nr= select (max (in, max (out, err)) + 1, &rfds, &wfds, NULL, &tv);
+    if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
+    if (alive && nr > 0 && err != -1 && FD_ISSET (err, &rfds))
+      feed (LINK_ERR);
+  }
+  if (inpos >= N(inbuf)) { inbuf= ""; inpos= 0; }
+  else if (inpos >= 65536) { inbuf= inbuf (inpos, N(inbuf)); inpos= 0; }
+#else
+  (void) msecs;
+#endif
+}
+
+bool
+pipe_link_rep::pending_write () {
+  return alive && inpos < N(inbuf);
 }
 
 void
@@ -388,20 +562,27 @@ pipe_link_rep::listen (int msecs) {
   (void) msecs;
 #else
   if (!alive) return;
+  if (inpos < N(inbuf)) flush_input (0);
   time_t wait_until= texmacs_time () + msecs;
   while (alive && (outbuf == "") && (errbuf == "")) {
-    fd_set rfds;
+    fd_set rfds, wfds;
     FD_ZERO (&rfds);
+    FD_ZERO (&wfds);
     FD_SET (out, &rfds);
     if (err != -1) FD_SET (err, &rfds);
+    // (the input which is left is written while waiting)
+    bool pending= (inpos < N(inbuf));
+    if (pending) FD_SET (in, &wfds);
     // NOTE: only the time which is left is waited for, and listen (0)
     // checks the pipes once (it is called by each read)
     time_t left= max ((time_t) 0, wait_until - texmacs_time ());
     struct timeval tv;
     tv.tv_sec  = left / 1000;
     tv.tv_usec = 1000 * (left % 1000);
-    int nr= select (max (out, err) + 1, &rfds, NULL, NULL, &tv);
-    if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
+    int nr= select (max (in, max (out, err)) + 1, &rfds,
+                    pending? &wfds: NULL, NULL, &tv);
+    if (nr > 0 && pending && FD_ISSET (in, &wfds)) flush_input (0);
+    if (alive && nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
     if (alive && nr > 0 && err != -1 && FD_ISSET (err, &rfds))
       feed (LINK_ERR);
     if (msecs == 0 || texmacs_time () - wait_until >= 0) break;
@@ -420,9 +601,11 @@ pipe_link_rep::interrupt () {
 void
 pipe_link_rep::stop () {
 #ifndef OS_MINGW
+  reap_pipe_children ();
   if (!alive) return;
   terminate_child (pid);
   alive= false;
+  inbuf= ""; inpos= 0;
 
   remove_notifier (snout);
   remove_notifier (snerr);

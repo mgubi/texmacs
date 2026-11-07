@@ -145,9 +145,85 @@ var tmIme = (function () {
     setTimeout (focus, 0);
   }, true);
   window.addEventListener ('resize', place);
+
+  // A tablet has no keyboard but the one of the system, which iOS opens
+  // only when an editable element takes the focus during a tap: the focus
+  // which follows a tap on the canvas comes later (above), and whether the
+  // tap was on a document is known only once TeXmacs has it. So a button of
+  // the page opens the keyboard (the text area takes the focus in its
+  // click) and closes it; a tablet is a touch screen as the main pointer.
+  // ?keyboard in the address shows the button anywhere, ?keyboard=0 nowhere.
+  var opened = false; // the keyboard was opened by the button
+  function tablet () {
+    var q = new URLSearchParams (location.search);
+    if (q.has ('keyboard')) return q.get ('keyboard') !== '0';
+    return navigator.maxTouchPoints > 0 && !!window.matchMedia &&
+           matchMedia ('(pointer: coarse)').matches;
+  }
+  function keyboardButton () {
+    if (!document.body || document.getElementById ('tm-keyboard') || !tablet ())
+      return;
+    var b = document.createElement ('button');
+    b.id = 'tm-keyboard';
+    b.type = 'button';
+    b.title = 'Keyboard';
+    b.setAttribute ('aria-label', 'Show or hide the keyboard');
+    b.innerHTML =
+      '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
+      '<rect x="2.5" y="6" width="19" height="12" rx="2"/>' +
+      '<path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01' +
+      'M7.5 12h.01M10.5 12h.01M13.5 12h.01M16.5 12h.01M8 14.8h8"/></svg>';
+    // at the right, above the footer of the window and above the keyboard
+    // once it is open (the visual viewport is then the part of the page
+    // over it)
+    b.style.cssText = 'position:fixed;right:24px;z-index:1000;width:48px;' +
+      'height:48px;padding:0;border:0;border-radius:12px;display:flex;' +
+      'align-items:center;justify-content:center;color:#fff;' +
+      'background:rgba(60,60,64,0.6);box-shadow:0 2px 8px rgba(0,0,0,0.25);' +
+      'touch-action:manipulation;-webkit-tap-highlight-color:transparent';
+    function put () {
+      var v = window.visualViewport;
+      var bottom = v ? v.offsetTop + v.height : window.innerHeight;
+      b.style.top = Math.max (0, bottom - 48 - 44) + 'px';
+      b.style.background = opened ? 'rgba(11,92,173,0.75)' : 'rgba(60,60,64,0.6)';
+    }
+    // the button does not take the focus from the text area
+    b.addEventListener ('pointerdown', function (e) { e.preventDefault (); });
+    b.addEventListener ('mousedown', function (e) { e.preventDefault (); });
+    b.addEventListener ('click', function (e) {
+      e.preventDefault ();
+      if (!make ()) return;
+      if (opened && document.activeElement === area) {
+        opened = false;
+        area.blur ();
+      }
+      else {
+        // focused again in the tap: a focus taken without one (after a tap
+        // on the canvas) opened no keyboard
+        if (document.activeElement === area) area.blur ();
+        area.focus ({ preventScroll: true });
+        opened = true;
+      }
+      log ('keyboard ' + (opened ? 'opened' : 'closed'));
+      put ();
+    });
+    make ();
+    // the keyboard closed by the system (its key which hides it)
+    if (area) area.addEventListener ('blur', function () { opened = false; put (); });
+    if (window.visualViewport) {
+      visualViewport.addEventListener ('resize', put);
+      visualViewport.addEventListener ('scroll', put);
+    }
+    window.addEventListener ('resize', put);
+    document.body.appendChild (b);
+    put ();
+  }
+
+  function start () { setTimeout (focus, 0); keyboardButton (); }
   if (document.readyState === 'loading')
-    document.addEventListener ('DOMContentLoaded', function () { setTimeout (focus, 0); });
-  else setTimeout (focus, 0);
+    document.addEventListener ('DOMContentLoaded', start);
+  else start ();
 
   return {
     focus: focus,

@@ -9,8 +9,9 @@ or launch a Scheme session and then run `(run-all-tests)`.
 ## Guide to Run Unit Tests for cpp
 
 First, compile the whole project with the tests enabled. That harness
-links `Qt5::Test` (`tests/CMakeLists.txt`), so it needs a Qt 5
-configuration; with Qt 6 use the autotools harness described below. At
+links `Qt5::Test` (`tests/CMakeLists.txt`), which the tests no longer use
+(they are plain C++ since 2026-10-18), so it needs a Qt 5 configuration;
+use the autotools harness described below otherwise. At
 present the top-level `CMakeLists.txt` neither adds the `tests` directory
 nor defines `BUILD_TESTS`, so the recipe below needs that wiring first;
 the autotools harness works as it is.
@@ -55,14 +56,14 @@ make -C tests                      # build and run all tests
 make -C tests run-path_test        # one test, with its own output
 ```
 
-The tests inherited from the CMake harness are written against QtTest, which
-is what `tests/CMakeLists.txt` expects of them. New tests are written in
-ordinary TeXmacs C++ over `tests/tm_test.hpp`, which brings `CHECK`,
-`CHECK_MSG`, `CHECK_EQ` and `SKIP`, and a `main` which lists its tests with
-`RUN` and returns `test_report ()`: a test then needs no QtTest idiom (the
-Makefile still links QtTest into every binary, with the macOS
-`-framework QtTest`). `tests/Makefile` builds both kinds, and runs `moc` only
-on the sources which declare a `Q_OBJECT`.
+The tests are written in ordinary TeXmacs C++ over `tests/tm_test.hpp`,
+which brings `CHECK`, `CHECK_MSG`, `CHECK_EQ` (any two values which `==`
+compares and a `tm_ostream` prints) and `SKIP`, and a `main` which lists its
+tests with `RUN` and returns `test_report ()`. They need no Qt, so every
+build runs all of them (Qt, Vue, Cocoa); a test of Qt code skips its checks
+in a build without Qt (`qt_utilities_test`). The tests inherited from the
+CMake harness were written against QtTest and were ported on 2026-10-18,
+with the same checks.
 
 The OpenType tests use the fonts shipped in `TeXmacs/fonts/truetype`, so a
 plain `make -C tests` runs them. `make -C tests TM_TEST_FONT_DIR=/path/to/fonts`
@@ -77,11 +78,11 @@ installed math font is an OpenType math font known to the database under the
 profile's name.
 
 The tests run with `TEXMACS_PATH` set to the source tree and a scratch
-`TEXMACS_HOME_PATH` under `tests/build`, so they never touch `~/.TeXmacs`.
+`TEXMACS_HOME_PATH` under `tests/build`, so they never touch `~/.TeXmacs_Upsilon`.
 
-Two test sources are left out of this harness: `xml_test`, which includes a
-source file that is already part of the main build, and `mac_images_test`,
-whose functions `mac_images.h` does not declare in a Qt 6 build.
+`xml_test` includes `Xml/xml.cpp`, which is also part of the main build,
+for its static `is_xml_name`: it renames the public functions of that copy
+with macros, so that they do not clash with those of the build.
 
 The renders and the pixel diffs depend on the PDF writer of the build. With
 the native (Hummus) PDF renderer the exported fonts are real subsets, and
@@ -144,7 +145,8 @@ moved.
 exits with their status:
 
 ```
-tests/scheme/check.sh                     # the regression suites
+tests/scheme/check.sh                     # the regression suites, and typeset-check
+tests/scheme/check.sh typeset-check       # the typeset suite in the check modes
 tests/scheme/check.sh integration         # the integration suites
 tests/scheme/check.sh glue tmhtml         # some suites, by name
 tests/scheme/check.sh path/to/foo-test.scm  # a suite not listed yet
@@ -155,7 +157,12 @@ regression suites, which `run-all-tests` runs, and the integration suites
 (server backup, cache, notifications and tmfs), which have side effects and
 which `run-integration-tests` runs. Both run every suite, also after one
 has failed, and return the number of failed suites; `run-regression-suite`
-runs one suite by name. `integration-test-group` adds the tests which
+runs one suite by name. `typeset-check` runs the `typeset` suite again
+with the caches of the typesetting in their check modes
+(`TEXMACS_TYPESET_READS=check`, `TEXMACS_TYPESET_CACHES=check` and the
+page switches), which make each cached result again and count the
+differences: its checks of `typeset-check-mismatches` find nothing
+otherwise. `integration-test-group` adds the tests which
 fail to `integration-failure-total`, which is how their failures are
 counted.
 
@@ -191,6 +198,14 @@ and mode, `former`, properties, modes and sub-modes, `lazy-define` and the
 module macros). What needs a buffer, the cursor or the GUI is left out;
 checks which fail because of a bug in the sources are left out with a
 `FIXME` at their place.
+
+`search-test.scm` tests the search engine of Edit > Search and Edit >
+Replace (`src/Data/Tree/tree_search.cpp`) on detached trees: text, tags
+(the examples of the manual), formulas, wildcards, select-region, patterns
+of several paragraphs, the limit on the hits and the search from a
+position, case-insensitive matching, each for the two ways of matching of
+Edit > Search and Edit > Replace, and the time of a search in a long
+formula.
 
 Three more test the document level. `latex-test.scm` converts to and from
 LaTeX (special characters, accents, structure, formulas, tables, theorems,
@@ -340,6 +355,35 @@ delimiters up to twelve rows, and big operators. It shows what happens
 when a font runs out of sizes: a wide check or breve beyond the largest
 variant is drawn by TeXmacs, a long arrow always covers its labels, and a
 slash without variants (Fira Math) keeps being stretched.
+
+## Checks of the Cocoa interface
+
+`tests/cocoa/check.sh`, run from the top of the source tree of a Cocoa
+build (`--with-gui=cocoa`), or with `BIN=` the executable of a
+`TeXmacs.app`, starts TeXmacs several times (about 15 seconds each, in
+homes of their own) and checks failures which used to be silent or to
+abort it (#621): a dialog title with accents in French (#468), closing the
+console with several tabs (#619), an idle console, which must not be
+typeset again and again (#620), the tooltips of the icon bars (#637),
+dialogs with negative sizes (one warning for each place, and the dialogs
+are shown) and an error thrown at an entry point from AppKit (reported
+once, and TeXmacs goes on, #650, #666), a document of 7*10^6 points scrolled
+to its end, the window queries of a console and a console which opens at its
+end (#661). Two more cases check the focus of
+the console: when it opens by itself on a warning, the document stays the key
+and main window and the current buffer, and gets the keys typed; a click, or
+opening it from the menu, gives it the focus; its close leaves the document
+focused (#679). Any case may take the keyboard from whoever works on the screen
+(macOS may make a process active when its parent Terminal is, and the windows
+are shown), but these two ask for it several times: they run on GitHub Actions or with
+`TM_COCOA_FOCUS=1` (`0` turns them off), and are skipped otherwise. A case in
+which TeXmacs says it is not active is skipped, except on GitHub Actions, where
+it fails; a crash always fails. It also fails on any other error
+caught at an entry point from AppKit, except known harmless messages (a
+list in the script, extended with `TM_COCOA_HARMLESS`, an extended regular
+expression). The windows are shown: Cocoa has no offscreen mode. The
+workflow `upsilon-macos.yml` runs it on the application of the Cocoa disk
+image.
 
 ## Other tools
 

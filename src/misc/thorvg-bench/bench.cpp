@@ -2,6 +2,7 @@
 * MODULE     : bench.cpp
 * DESCRIPTION: How fast can ThorVG draw a screenful of a TeXmacs document?
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
+*              Slug shaders adapted from E. Lengyel, (C) 2017, MIT (see below)
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -524,6 +525,14 @@ slug_make_glyph (unsigned gi) {
     }
 }
 
+// The Slug shaders below are adapted from the reference shaders of Eric
+// Lengyel (https://github.com/EricLengyel/Slug, SlugPixelShader.hlsl), the
+// algorithm of "GPU-Centered Font Rendering Directly from Glyph Outlines"
+// (JCGT 6 (2), 2017); rewritten for TeXmacs, with its own layout of the
+// curves and the bands. Copyright (c) 2017 Eric Lengyel, MIT License (see
+// TeXmacs/misc/licenses/Slug-MIT.txt): "The above copyright notice and this
+// permission notice shall be included in all copies or substantial portions
+// of the Software."
 static const char* slug_vs= "#version 300 es\n"
   "layout(location=0) in vec2 i_org;\n"    // the origin of the glyph (pixels)
   "layout(location=1) in vec4 i_box;\n"    // its box (em)

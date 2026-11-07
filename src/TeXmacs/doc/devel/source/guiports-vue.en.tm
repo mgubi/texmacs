@@ -224,9 +224,9 @@
   <verbatim|commit>, <verbatim|drop>, <verbatim|resize>,
   <verbatim|scheme>, <verbatim|snapshot>, <verbatim|close>, ...; see
   <cpp|script_step> in <source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>). The directory
-  <source-link|Plugins/Vue/tests|src/Plugins/Vue/tests> holds about 57 scripts, most with a
+  <source-link|tests/Plugins/Vue|tests/Plugins/Vue> holds about 57 scripts, most with a
   <scheme> file which builds the widget they drive, and
-  <source-link|run.sh|src/Plugins/Vue/tests/run.sh>, which runs one of them in a copy of the
+  <source-link|run.sh|tests/Plugins/Vue/run.sh>, which runs one of them in a copy of the
   home directory (a test must never change the preferences of the user)
   and checks what the callbacks print. The catalogue of the tests is in
   <source-link|docs/vue-testing.md|docs/vue-testing.md>.
@@ -238,7 +238,7 @@
   <name|Guile> scans the C stack, which <name|WebAssembly> does not expose).
   It lives in this tree (it was developed on the branch
   <verbatim|wip_wasm_vue> until it was merged into
-  <verbatim|maxs_texmacs>). The design notes, measurements and the state of
+  <verbatim|upsilon_texmacs>). The design notes, measurements and the state of
   the port are in <source-link|docs/wasm/README.md|docs/wasm/README.md>
   (with <source-link|tikzjax.md|docs/wasm/tikzjax.md> and
   <source-link|asymptote.md|docs/wasm/asymptote.md> for two of the plug-ins);
@@ -396,13 +396,13 @@
   <subsection|Publishing>
 
   The workflow <verbatim|.github/workflows/wasm.yml> runs on the branch
-  <verbatim|wasm_ci> only: work on <verbatim|maxs_texmacs> triggers
+  <verbatim|wasm_ci> only: work on <verbatim|upsilon_texmacs> triggers
   nothing, and a state is built, tested (the node build turns the Welcome
   document into a PDF) and published on <name|GitHub Pages> by moving
   <verbatim|wasm_ci> to it,
 
   <\verbatim>
-    git push origin maxs_texmacs:wasm_ci
+    git push origin upsilon_texmacs:wasm_ci
   </verbatim>
 
   The page of the run is also kept as an artifact

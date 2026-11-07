@@ -23,7 +23,9 @@
 (tm-define (include-list base t)
   (cond ((tree-is? t 'document)
          (apply append (map (cut include-list base <>) (tree-children t))))
-        ((and (tree-is? t 'include) (tree-atomic? (tree-ref t 0)))
+        ((tree-is? t 'with)
+         (include-list base (cAr (tree-children t))))
+        ((and (tree-in? t '(include include*)) (tree-atomic? (tree-ref t 0)))
          (list (url-relative base (tree->string (tree-ref t 0)))))
         (else (list))))
 
@@ -778,6 +780,20 @@
 ;; The main Document menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The same in the full menu and in the compressed one (complex actions
+;; through popup windows), so that Zotero is there with both settings
+(menu-bind document-bibliography-menu
+  (when (buffer-has-biblio? (current-buffer))
+    ("Local entries" (open-biblio)))
+  ("Update from Zotero" (zotero-update-bibliography))
+  (when (supports-db?)
+    ("Synchronize with Zotero" (zotero-synchronize))
+    ("Import the citations into the database" (zotero-import-citations)))
+  ("Update the citations" (zotero-update-citations))
+  ("Check against Zotero..." (open-zotero-check))
+  ---
+  ("Zotero settings..." (open-zotero-settings)))
+
 (menu-bind full-document-menu
   (-> "Style" (link document-style-menu))
   (link document-style-extra-menu)
@@ -803,17 +819,7 @@
   (-> "Paragraph" (link document-paragraph-menu))
   (-> "Page" (link document-page-menu))
   (-> "Metadata" (link document-metadata-menu))
-  (-> "Bibliography"
-      (when (buffer-has-biblio? (current-buffer))
-	("Local entries" (open-biblio)))
-      ("Update from Zotero" (zotero-update-bibliography))
-      (when (supports-db?)
-        ("Synchronize with Zotero" (zotero-synchronize))
-        ("Import the citations into the database" (zotero-import-citations)))
-      ("Update the citations" (zotero-update-citations))
-      ("Check against Zotero..." (open-zotero-check))
-      ---
-      ("Zotero settings..." (open-zotero-settings)))
+  (-> "Bibliography" (link document-bibliography-menu))
   ---
   (-> "Magnification" (link document-magnification-menu))
   (-> "Colors" (link document-colors-menu))
@@ -845,8 +851,7 @@
   ("Paragraph" (open-document-paragraph-format))
   ("Page" (open-document-page-format))
   ("Metadata" (open-document-metadata))
-  (when (buffer-has-biblio? (current-buffer))
-    ("Bibliography" (open-biblio)))
+  (-> "Bibliography" (link document-bibliography-menu))
   ;;("Colors" (open-document-colors))
   ---
   (-> "Magnification" (link document-magnification-menu))
@@ -1001,6 +1006,11 @@
   (dynamic (focus-document-menu t))
   (-> "Cite TeXmacs" (link cite-texmacs-menu))
   (dynamic (focus-document-extra-menu t))
+  ;; a source file: the focus is the buffer, and the entries of its code
+  ;; are those of a code block (progs/code/code-menu.scm)
+  (assuming (and (in-prog?) (code-cursor-lines))
+    ---
+    (dynamic (focus-extra-menu t)))
   ---
   ("Help" (focus-help)))
 

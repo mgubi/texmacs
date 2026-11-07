@@ -52,9 +52,32 @@
          (l3 (list-difference l2 (list (current-buffer)))))
     (buffer-list-menu (list-difference l1 l3))))
 
+(define (place-number win)
+  ;; the rank of @win among the places of its buffer, from 1
+  (let loop ((l (buffer->places (place->buffer win))) (i 1))
+    (cond ((null? l) 1)
+          ((== (car l) win) i)
+          (else (loop (cdr l) (+ i 1))))))
+
+(tm-menu (place-list-menu l)
+  ;; one entry per place: a buffer shown at several places has one entry
+  ;; for each of them, numbered
+  (for (win l)
+    (let* ((name (place->buffer win))
+           (abbr (buffer-get-title name))
+           (abbr* (if (== abbr "") (url->system (url-tail name)) abbr))
+           (nr (if (<= (length (buffer->places name)) 1) ""
+                   (string-append " (" (number->string (place-number win))
+                                  ")")))
+           (mod? (buffer-modified? name))
+           (short-name `(verbatim ,(string-append abbr* nr (if mod? " *" ""))))
+           (long-name `(verbatim ,(url->system name))))
+      ((check (balloon (eval short-name) (eval long-name)) "v"
+              (== (current-place) win))
+       (switch-to-place win)))))
+
 (tm-define (buffer-places-menu)
-  (let* ((l1 (map place->buffer (place-list))))
-    (buffer-list-menu l1)))
+  (place-list-menu (place-list)))
 
 (tm-define (buffer-invisible-list n)
   (let* ((l1 (list-difference (buffer-menu-list n) (linked-file-list)))
@@ -82,7 +105,9 @@
     (let* ((short-name `(verbatim ,(short-menu-name name)))
            (long-name `(verbatim ,(long-menu-name name))))
       ((balloon (eval short-name) (eval long-name))
-       (if win? (load-document name) (load-buffer name))))))
+       (if (and win? (place-per-buffer?))
+           (load-buffer-in-new-place name :confirm-large)
+           (load-buffer name :confirm-large))))))
 
 (tm-define (recent-file-list nr)
   (let* ((l1 (map cdar (learned-interactive "recent-buffer")))

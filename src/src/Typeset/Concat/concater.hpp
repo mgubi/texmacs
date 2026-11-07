@@ -50,6 +50,14 @@ class concater_rep {
   void typeset_text_string (tree t, path ip, int start, int end);
   void typeset_math_string (tree t, path ip, int start, int end);
   void typeset_prog_string (tree t, path ip, int start, int end);
+  void typeset_layered_string (tree t, path ip, int start, int end,
+                               struct code_line_layers* d);
+  void typeset_layer_hints (struct code_line_layers* d, path ip,
+                            int from, int to);
+  void typeset_layer_text (string text, path ip);
+  void typeset_prog_tab (path ip, int pos, int& col, int tw);
+  void typeset_prog_piece (string s, path ip, int start, int end,
+                           string col, int& column, int tw);
   void typeset_document (tree t, path ip);
   void typeset_paragraph (tree t, path ip);
   void typeset_surround (tree t, path ip);
@@ -209,6 +217,9 @@ public:
                                              array<line_item>& a);
   friend box              typeset_as_box (edit_env env, tree t, path ip);
   friend box              typeset_as_atomic (edit_env env, tree t, path ip);
+  friend array<box> typeset_as_segments (edit_env env, tree t, path ip,
+                                         SI long_width, SI min_width,
+                                         array<SI>& gaps);
   friend array<line_item> typeset_concat (edit_env env, tree t, path ip);
   friend array<line_item> typeset_concat_range (edit_env env, tree t, path ip,
 						int i1, int i2);

@@ -68,6 +68,9 @@ tree   scheme_document_to_tree (string s);
 string tree_to_verbatim (tree t, bool wrap= false, string enc= "default");
 tree   verbatim_to_tree (string s, bool wrap= false, string enc= "default");
 tree   verbatim_document_to_tree (string s, bool w= false, string e= "default");
+tree   source_document_to_tree (string s);
+tree   source_snippet_to_tree (string s);
+string source_text_to_cork (string s);
 
 /*** Latex ***/
 tree   parse_latex (string s, bool change= false, bool as_pic= false);
@@ -137,9 +140,29 @@ bool compressed_contains_text (tree t);
 string compressed_to_html (tree t, int mode= 0);
 string compress_html (tree t, int mode= 0);
 tree decompress_html (string s, int mode= 0);
+tree compress_table_select (tree key);
+string compress_table_new (string prefix);
+void compress_table_open (tree key);
+void compress_table_free (tree key);
+int compress_table_size (tree key);
+tree compress_table_keys ();
+struct compress_scope {
+  // the compression uses the table key until the end of the scope,
+  // after which a temporary table is freed
+  tree key; bool temp; tree prev;
+  compress_scope (tree key, bool temp);
+  compress_scope (const compress_scope&) = delete;
+  compress_scope& operator= (const compress_scope&) = delete;
+  ~compress_scope ();
+};
+tree ai_chat_key (string model, string chat);
+string ai_engine (string model);
+void ai_chat_close (string model, string chat);
 tree json_to_tree (string s, int mode= 0);
 string tree_to_json (tree t, int mode= 0);
 tree json_get (tree t, tree key, int mode= 0);
+tree json_to_typed_tree (string s);
+string typed_tree_to_json (tree t);
 string lantool_correct (string s, string out);
 tree ai_command (string s, string model, string agent,
 		 string chat= "", bool history= false);
@@ -151,11 +174,21 @@ string ai_latex_command (string s, string model, string chat= "");
 string ai_latex_request (string s, string model, string chat= "");
 string ai_stream_text (string s, string model, string& err);
 string ai_stream_text (string s, string model, string& err, string& reasoning);
+struct ai_stream_state {
+  int    pos;       // the beginning of the line which is not parsed yet
+  string seen;      // the last line parsed (the output is its continuation)
+  string text, reasoning, err; // of the lines parsed
+  ai_stream_state ();
+};
+void ai_stream_reset (ai_stream_state& st);
+string ai_stream_feed (ai_stream_state& st, string s, string model,
+                       string& err, string& reasoning);
 tree ai_reasoning_partial (string reasoning);
 int ai_retry_delay (string s, string model, int attempt, string& why);
 tree ai_latex_body_to_tree (string r);
 tree ai_latex_partial (string r);
 tree ai_latex_output (string s, string model, string chat= "");
+void ai_set_prices (string json);
 string ai_chat (string s, string model, string agent, string chat= "");
 tree ai_translate (tree t, string from, string into, string m, string c= "");
 tree ai_correct (tree t, string lan, string model, string chat= "");

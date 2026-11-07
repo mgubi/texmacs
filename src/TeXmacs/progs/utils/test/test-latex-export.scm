@@ -42,7 +42,6 @@
       (remove-style-package "termes-font")
       (set-main-style style)
       (system-mkdir style-dir)
-      (set! current-save-target tex-file)
       (display* "Export " file ", style = " style "\n")
       (export-buffer-main (current-buffer) tex-file "latex" opts)
       (with status (run-pdflatex tex-file)

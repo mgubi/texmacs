@@ -770,7 +770,12 @@
 ;; the lines are not searched again from each of them.
 (define md-no-math-end '())
 
-;; tables keyed by the identity of pairs, in Guile (hashq) and in S7
+;; tables keyed by the identity of pairs, in Guile (hashq) and in S7; the
+;; tables of femtolisp compare their keys with equal? (its collector moves
+;; the pairs), and the tails of a list of equal lines are equal for as long
+;; as the shorter one: there a tail is keyed by its length, all the tails
+;; of a table being tails of the same list
+(define (md-eq-key l) (if (femtolisp-scheme?) (length l) l))
 (define (md-eq-table)
   (if (defined? 'hashq-set!) (make-hash-table 64) (make-hash-table 64 eq?)))
 (define (md-eq-ref t key)
@@ -786,7 +791,7 @@
   (let* ((first (md-trim (car lines)))
          (close (if (md-starts? first 0 "$$") "$$" "\\]"))
          (none (assoc-ref md-no-math-end close)))
-    (and (not (and none (md-eq-ref none lines)))
+    (and (not (and none (md-eq-ref none (md-eq-key lines))))
       (let loop ((s (substring first 2 (string-length first)))
                  (l (cdr lines)) (acc '()))
         (with e (md-search s 0 close)
@@ -805,10 +810,10 @@
                              (if (== after "") l (cons after l))))))
                 ((or (null? l) (md-blank? (car l)))
                  (with t (or none (md-eq-table))
-                   (let mark ((m lines))
+                   (let mark ((m lines) (k (md-eq-key lines)))
                      (when (and (pair? m) (not (eq? m l)))
-                       (md-eq-set! t m)
-                       (mark (cdr m))))
+                       (md-eq-set! t k)
+                       (mark (cdr m) (if (pair? k) (cdr k) (- k 1)))))
                    (if (not none)
                        (set! md-no-math-end
                              (cons (cons close t) md-no-math-end))))

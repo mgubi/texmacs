@@ -1,7 +1,15 @@
 ; -*- scheme -*-
 
 (load "system.lsp")
-(load "compiler.lsp")
+; the forms of compiler.lsp are all compiled before any of them runs: the
+; compiler does not change while they are compiled (a function of the
+; compiler of the image calling a new one with other arguments)
+(let ((in (file "compiler.lsp" :read)))
+  (let next ((E (read in)) (thunks ()))
+    (if (io.eof? in)
+	(begin (io.close in)
+	       (for-each (lambda (th) (th)) (reverse! thunks)))
+	(next (read in) (cons (compile-thunk (expand E)) thunks)))))
 
 ; TeXmacs: the functions of system.lsp and compiler.lsp call each other
 ; through private names, %fl:name, so that a program may redefine a public

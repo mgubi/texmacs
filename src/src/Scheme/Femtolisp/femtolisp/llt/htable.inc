@@ -10,6 +10,12 @@
 #define max_probe(size) ((size)<=(HT_N_INLINE*2) ? (HT_N_INLINE/2) : (size)>>3)
 
 #define HTIMPL(HTNAME, HFUNC, EQFUNC)                                   \
+/* TeXmacs: a deleted entry keeps its key, with the value HT_NOTFOUND, and  \
+   an empty slot has the key HT_NOTFOUND. The insertion took the first    \
+   deleted entry even when the key was further in the chain: a duplicate, \
+   and the old entry came back after a deletion (table.keys and           \
+   table.foldl also saw it). The key is now searched to the end of its    \
+   chain, and inserted in the first deleted entry or the empty slot. */   \
 static void **HTNAME##_lookup_bp(htable_t *h, void *key)                \
 {                                                                       \
     uint_t hv;                                                          \
@@ -18,6 +24,7 @@ static void **HTNAME##_lookup_bp(htable_t *h, void *key)                \
     size_t maxprobe = max_probe(sz);                                    \
     void **tab = h->table;                                              \
     void **ol;                                                          \
+    void **deleted;                                                     \
                                                                         \
     hv = HFUNC((uptrint_t)key);                                         \
  retry_bp:                                                              \
@@ -25,14 +32,23 @@ static void **HTNAME##_lookup_bp(htable_t *h, void *key)                \
     index = (index_t)(hv & (sz-1)) * 2;                                 \
     sz *= 2;                                                            \
     orig = index;                                                       \
+    deleted = NULL;                                                     \
                                                                         \
     do {                                                                \
-        if (tab[index+1] == HT_NOTFOUND) {                              \
+        if (tab[index] == HT_NOTFOUND) {                                \
+            if (deleted != NULL) {                                      \
+                deleted[0] = key;                                       \
+                return &deleted[1];                                     \
+            }                                                           \
             tab[index] = key;                                           \
             return &tab[index+1];                                       \
         }                                                               \
                                                                         \
-        if (EQFUNC(key, tab[index]))                                    \
+        if (tab[index+1] == HT_NOTFOUND) {                              \
+            if (deleted == NULL)                                        \
+                deleted = &tab[index];                                  \
+        }                                                               \
+        else if (EQFUNC(key, tab[index]))                               \
             return &tab[index+1];                                       \
                                                                         \
         index = (index+2) & (sz-1);                                     \
@@ -40,6 +56,11 @@ static void **HTNAME##_lookup_bp(htable_t *h, void *key)                \
         if (iter > maxprobe)                                            \
             break;                                                      \
     } while (index != orig);                                            \
+                                                                        \
+    if (deleted != NULL) {                                              \
+        deleted[0] = key;                                               \
+        return &deleted[1];                                             \
+    }                                                                   \
                                                                         \
     /* table full */                                                    \
     /* quadruple size, rehash, retry the insert */                      \

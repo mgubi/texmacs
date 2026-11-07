@@ -909,6 +909,9 @@ finalize_layout (tree t) {
 
 static tree
 finalize_sections (tree t) {
+  // finalize_preamble returns the only paragraph of a document without
+  // the document around it, e.g. a string for a source which is only text
+  if (!is_document (t)) t= tree (DOCUMENT, t);
   tree r (DOCUMENT);
   for (int i=0; i<N(t); i++) {
     tree u= t[i];
@@ -1364,10 +1367,11 @@ finalize_preamble (tree t, string& style) {
 void
 handle_improper_matches (tree& r, tree t, int& pos) {
   while (pos < N(t)) {
-    if (is_func (t[pos], SET)) {
+    if (is_func (t[pos], SET) && N(t[pos]) > 0) {
       tree b= t[pos++]; r << b;
       handle_improper_matches (r, t, pos);
-      if ((pos < N(t)) && (t[pos][0] == b[0])) r << t[pos++];
+      if (pos < N(t) && is_compound (t[pos]) && N(t[pos]) > 0 &&
+          t[pos][0] == b[0]) r << t[pos++];
       else {
         r << tree (RESET, copy (b[0]));
         return;

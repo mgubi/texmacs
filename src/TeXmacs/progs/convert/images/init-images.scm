@@ -25,10 +25,16 @@
   (url-exists-in-path? "pdftocairo"))
 
 (tm-define (gs-binary)
-  (let* ((n1 "$TEXMACS_PATH\\bin\\gs.exe;c:\\Program F*\\gs\\gs*\\gswin*c.exe")
-         (n2 "$TEXMACS_PATH/bin/gs:gs")
-         (name (if (os-mingw?) n1 n2)))
-    (url->system (url-resolve-in-path name))))
+  ;; the choice of the C++ code (gs_embedded: the gs of the package, or the
+  ;; installed one for a folder the package's gs cannot name), so that the
+  ;; two always agree; without Ghostscript in the build, look in the path
+  (let ((c (gs-executable)))
+    (if (not (== c ""))
+        (url->system (url-resolve-in-path c))
+        (let* ((n1 "$TEXMACS_PATH\\bin\\gs.exe;c:\\Program F*\\gs\\gs*\\gswin*c.exe")
+               (n2 "$TEXMACS_PATH/bin/gs:gs")
+               (name (if (os-mingw?) n1 n2)))
+          (url->system (url-resolve-in-path name))))))
 
 (tm-define (has-gs?)
   (url-exists? (gs-binary)))
@@ -84,9 +90,16 @@
 (tm-define (gs-convert x opts)
   ;; many options for pdf->ps/eps see http://tex.stackexchange.com/a/20884
   ;; this one does a better rendering than pdf2ps (also based on gs):
+  ;; the arguments as a list, without shell: system-2 put a space between
+  ;; -sOutputFile= and the destination, so that gs wrote nothing (#745)
   (let* ((dest (assoc-ref opts 'dest))
 	 (gs (gs-binary)))
-    (system-2 (string-append gs " -q -dNOCACHE -dUseCropBox -dNOPAUSE -dBATCH -dSAFER -sDEVICE=eps2write -sOutputFile=") dest x))
+    (evaluate-system (list gs "-q" "-dNOCACHE" "-dUseCropBox" "-dNOPAUSE"
+                           "-dBATCH" "-dSAFER" "-sDEVICE=eps2write"
+                           (string-append "-sOutputFile="
+                                          (url-concretize dest))
+                           (url-concretize x)) '() '() '(1 2))
+    (if (url-exists? dest) dest #f))
   ;; problem: 
   ;; eps2write available starting with gs  9.14 (2014-03-26)
   ;; epswrite removed in gs 9.16 (2015-03-30)
@@ -95,13 +108,9 @@
 (tm-define (pdf-file->gs-raster x opts)
   (let* ((dest (assoc-ref opts 'dest))
          (res (get-raster-resolution opts))
-         (suf (locase-all (url-suffix dest)))
-         (dev (cond ((in? suf '("jpg" "jpeg")) "jpeg")
-                    ((in? suf '("tif" "tiff")) "tiff24nc")
-                    (else "pngalpha")))
 	 (gs (gs-binary)))
     (evaluate-system (list gs "-dBATCH" "-dNOPAUSE" "-dQUIET" "-dSAFER"
-                           "-dNOPROMPT" (string-append "-sDEVICE=" dev)
+                           "-dNOPROMPT" "-sDEVICE=pngalpha"
                            (string-append "-r" res)
                            (string-append "-sOutputFile="
                                           (url-concretize dest))
@@ -153,16 +162,16 @@
 
 (converter svg-file postscript-file
   (:require (url-exists-in-path? "inkscape"))
-  (:shell "inkscape" from "--export-type=ps" "--export-filename=" to))
+  (:shell "inkscape" "--export-overwrite" "--export-filename=" to from))
 
 (converter svg-file pdf-file
   (:require (url-exists-in-path? "inkscape"))
-  (:shell "inkscape" from "--export-type=pdf" "--export-filename=" to))
+  (:shell "inkscape" "--export-overwrite" "--export-filename=" to from))
 
 (converter svg-file png-file
   (:require (url-exists-in-path? "inkscape"))
-  (:shell "inkscape" from "--export-type=png" "--export-dpi=600"
-          "--export-filename=" to))
+  (:shell "inkscape" "-d" "600" "--export-overwrite"
+	  "--export-filename=" to from))
 
 (converter svg-file png-file
   (:require (and (url-exists-in-path? "rsvg-convert")

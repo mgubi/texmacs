@@ -64,12 +64,23 @@
 
   The pictures of an answer are shown: a <name|TikZ> picture
   (<verbatim|tikzpicture>, <verbatim|tikzcd>, <verbatim|circuitikz>)
-  becomes an executable fold of the <name|TikZ> plug-in, made at once, with
-  the libraries and packages which the answer asks for (on the desktop, it
-  is made by <LaTeX>, which must be installed; in a web browser, by
-  <name|TikZJax>, as soon as the picture is complete); an <name|SVG>
-  picture becomes an image. An answer cut in the middle of a picture says
-  so.
+  becomes an executable fold of the <name|TikZ> plug-in, with the libraries
+  and packages which the answer asks for; an <name|SVG> picture becomes an
+  image. An answer cut in the middle of a picture says so.
+
+  On the desktop, a <name|TikZ> picture is made by <LaTeX>, which must be
+  installed. Its code is written by the model, and <TeX> can read your
+  files (with <verbatim|\\input>, for instance) and show them in the
+  picture: by default, <TeXmacs> asks you, once the answer is there, whether
+  to compile its pictures. If you answer no, the folds stay uncompiled; you
+  can read their code, and compile one later by evaluating it, as any fold.
+  <with|font-series|bold|Compile the TikZ pictures> in the preferences of
+  the chatbots changes this: <with|font-series|bold|ask> (the default),
+  <with|font-series|bold|always> (at once, while the answer comes, without
+  asking), <with|font-series|bold|never> (the folds are left uncompiled,
+  without asking). In a web browser, the pictures are made by
+  <name|TikZJax> in the page, which reads no files, as soon as they are
+  complete.
 
   Images in <name|PNG> or <name|JPEG> (a painting, an artistic rendition
   of an idea) come from the models which draw: those of <name|Gemini> whose
@@ -81,6 +92,32 @@
   sent again holds only a mention of them. The other models do not make
   images (<name|Claude> among them): they draw in <name|TikZ> or
   <name|SVG>.
+
+  <subsection*|Attached files>
+
+  <with|font-series|bold|Attach> in the focus bar of a session, or of an
+  executable fold, attaches a file to the question at the cursor; so does
+  a file dropped while the cursor is in the question. The file shows as
+  its name in a frame, which is deleted as a character. A question may
+  have several. The text
+  files (LaTeX, Markdown, BibTeX, the sources of programs, plain text) are
+  sent after the text of the question, a <TeXmacs> document as LaTeX; the
+  images (PNG, JPEG, GIF, WebP) and the PDF files are sent as such, to
+  <name|ChatGPT>, <name|Claude>, <name|Gemini> and <name|OpenRouter>
+  (<name|Mistral> and <name|Ollama> take the images but not the PDF files,
+  with the models which see images, and <name|Albert> the text files only).
+  The images and the <name|PDF> files of a question and of the questions
+  above it, which go with it, may make 20 MB at most (14 MB for
+  <name|Gemini>, 23 MB for <name|Claude>, which also takes images of 5 MB
+  at most); the models of <name|ChatGPT> which draw take no file.
+
+  The document keeps the name of each file and where it is, not the file
+  itself: a file which was moved or deleted is said to be missing when a
+  question would send it. The files stay with their question: the
+  questions above the one which is asked, sent as its context, go with
+  their files, whose tokens are then counted again. A file which came with
+  a document, rather than being attached in this <TeXmacs>, is sent only
+  once allowed: the question then asks, and says where the file is.
 
   <subsection*|Reasoning, tokens and costs>
 
@@ -97,11 +134,15 @@
   Each answer is followed by its tokens: those of the question with its
   context (and the part read from the cache of the engine), those of the
   answer (and those of its reasoning), and its cost: the one which
-  <name|OpenRouter> gives, else an estimate from the prices of the model
-  (<name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>: those
-  which <name|OpenRouter> lists for them, fetched once from
-  <verbatim|openrouter.ai>), said <with|font-series|bold|about>.
-  <name|Ollama> and <name|Albert> have no cost. The menu of the model gives
+  <name|OpenRouter> gives, else an estimate from the prices of the model,
+  said <with|font-series|bold|about> (<name|ChatGPT>, <name|Claude>,
+  <name|Gemini>, <name|Mistral>: the prices which <name|OpenRouter> lists
+  for them). <TeXmacs> does not ask <verbatim|openrouter.ai> for these
+  prices by itself: they come with the list of the models of
+  <name|OpenRouter>, when you update it (<with|font-series|bold|Update the
+  list of models> in the preferences of <name|OpenRouter>), and are kept
+  for the next times; without them, no cost is shown. <name|Ollama> and
+  <name|Albert> have no cost. The menu of the model gives
   the sum for the session (<with|font-series|bold|This session>), or the
   tokens of the answer of a fold, and the sum for the answers of the
   document. <with|font-series|bold|Show the tokens and the cost> in the

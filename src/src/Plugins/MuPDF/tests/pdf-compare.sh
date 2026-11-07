@@ -24,7 +24,7 @@
 # trip of a PDF with its document embedded (embed-roundtrip.sh) and a PDF
 # with a password (encrypt-check.sh) are run as well.
 #
-# Every TeXmacs it starts has a home of its own, a copy of ~/.TeXmacs made
+# Every TeXmacs it starts has a home of its own, a copy of ~/.TeXmacs_Upsilon made
 # for it (copy on write where the file system can): a test must not change
 # the preferences, the list of recent files or anything else of the user's,
 # and the runs side by side must not share their caches.
@@ -56,6 +56,7 @@ src/Plugins/MuPDF/tests/layer.tm
 src/Plugins/MuPDF/tests/pattern.tm
 src/Plugins/MuPDF/tests/pattern-photo.tm
 src/Plugins/MuPDF/tests/ligatures.tm
+src/Plugins/MuPDF/tests/emoji.tm
 src/Plugins/MuPDF/tests/landscape.tm"
 DOCS=${*:-$DOCS_DEFAULT}
 
@@ -67,8 +68,8 @@ mkdir -p "$OUT/homes"
 # (instant on APFS), or a plain copy where that cannot be done
 new_home () { # <dir>
   rm -rf "${1:?}"
-  if [ -d "$HOME/.TeXmacs" ]; then
-    cp -Rc "$HOME/.TeXmacs" "$1" 2>/dev/null || cp -R "$HOME/.TeXmacs" "$1" || {
+  if [ -d "$HOME/.TeXmacs_Upsilon" ]; then
+    cp -Rc "$HOME/.TeXmacs_Upsilon" "$1" 2>/dev/null || cp -R "$HOME/.TeXmacs_Upsilon" "$1" || {
       echo "cannot make a home for TeXmacs in $1" >&2; exit 2; }
   else mkdir -p "$1"; fi
 }
@@ -143,6 +144,35 @@ check_doc () { # <name>: every check of one exported document
     echo "  FAIL  $lig ligature glyphs, only $span say which letters they are"
   else
     echo "  ok    ligatures: $lig drawn, $span with their letters"
+  fi
+
+  # Emoji: drawn in layers of glyphs of no character (unicode_font.cpp,
+  # draw_color_glyph), each must extract as its characters, a sequence
+  # whole. MuPDF takes them from the ActualText of the spans; the readers
+  # which take the text from the character map of the font alone (Preview)
+  # find them in invisible glyphs of the characters, whose characters
+  # beyond U+FFFF MuPDF wrote as <1f600>, which no reader takes
+  # (fix_to_unicode). Ghostscript cannot judge either: it ignores
+  # ActualText and splits the two units of UTF-16 of such a character.
+  if [ "$name" = emoji ]; then
+    readers=mutool
+    [ "$(uname)" = Darwin ] && command -v swift > /dev/null && readers="mutool PDFKit"
+    for r in $readers; do
+      if [ $r = mutool ]; then t=$(mutool draw -F txt -o - "$mu" 2>/dev/null)
+      else t=$(swift "$HERE/pdfkit-text.swift" "$mu" 2>/dev/null); fi
+      miss=$(printf '%s' "$t" | python3 -c '
+import sys
+t= sys.stdin.buffer.read ().decode ("utf-8", "replace")
+want= ["\U0001F600", "\U0001F680", "\u2764\uFE0F", "\U0001F1EE\U0001F1F9",
+       "\U0001F468\u200D\U0001F469\u200D\U0001F467",
+       "\U0001F44D\U0001F3FD", "#\uFE0F\u20E3"]
+print (" ".join (ascii (w) for w in want if w not in t))')
+      if [ -z "$miss" ]; then
+        echo "  ok    the emoji extract as their characters ($r)"
+      else
+        echo "  FAIL  emoji which do not extract whole ($r): $miss"
+      fi
+    done
   fi
 
   # PDF figures the right way up. The two readers cannot see a figure

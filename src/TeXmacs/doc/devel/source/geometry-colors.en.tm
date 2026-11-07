@@ -242,9 +242,7 @@
     which is defined, and defines the five dictionary hash tables as
     <cpp|static>, so that every file including the header gets its own
     empty copies; the accessors <cpp|x11_color>, <cpp|svg_color>, ...
-    only work inside <source-link|colors.cpp|src/Graphics/Colors/colors.cpp>. <source-link|named_colors.hpp|src/Graphics/Colors/named_colors.hpp>
-    contains conflicting stub definitions returning black and is not
-    included anywhere.
+    only work inside <source-link|colors.cpp|src/Graphics/Colors/colors.cpp>.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

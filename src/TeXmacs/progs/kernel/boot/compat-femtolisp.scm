@@ -54,6 +54,8 @@
 (define-public hashv-set! hash-set!)
 (define-public hashv-remove! hash-remove!)
 
+;; (the interface and the default bound of hash as in the reference
+;; implementation of SRFI-69, Copyright (c) 2005 Panu Kalliokoski, MIT license)
 (define *default-bound* (- (expt 2 29) 3))
 (define-public (hash obj . maybe-bound)
   (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))

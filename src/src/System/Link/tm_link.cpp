@@ -99,3 +99,22 @@ tm_link_rep::secure_client () {
   if (!success) { stop (); return; }
   secret= rsa_decode (r, rsa_my_private_key ());
 }
+
+/******************************************************************************
+* Processors of kinds of links
+******************************************************************************/
+
+static array<pointer> link_processors;
+
+void
+add_link_processor (void (*process) ()) {
+  for (int i=0; i<N(link_processors); i++)
+    if (link_processors[i] == (pointer) process) return;
+  link_processors << (pointer) process;
+}
+
+void
+process_all_link_processors () {
+  for (int i=0; i<N(link_processors); i++)
+    ((void (*) ()) link_processors[i]) ();
+}

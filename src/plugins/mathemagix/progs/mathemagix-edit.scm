@@ -15,7 +15,10 @@
   (:use (mmx-indent)))
 
 (tm-define (kbd-variant t forward?)
-  (:require (and (in-prog-mathemagix?) (not (inside? 'session))))
+  ;; (not in the field of a search: tab inserts a tab there)
+  (:require (and (in-prog-mathemagix?) (not (inside? 'session))
+                 (not (and (defined? 'inside-search-or-replace-buffer?)
+                           (inside-search-or-replace-buffer?)))))
   (mmx-indent))
 
 (tm-define (insert-return)

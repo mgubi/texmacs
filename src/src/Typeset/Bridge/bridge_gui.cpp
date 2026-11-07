@@ -49,8 +49,10 @@ bridge_ornamented_rep::bridge_ornamented_rep (
 
 void
 bridge_ornamented_rep::initialize () {
-  if (is_nil(body)) body= make_bridge (ttt, st[idx], descend (ip, idx));
-  else replace_bridge (body, st[idx], descend (ip, idx));
+  // (a patch from another process can leave the tree without its child)
+  tree u= idx < N(st)? st[idx]: tree ("");
+  if (is_nil(body)) body= make_bridge (ttt, u, descend (ip, idx));
+  else replace_bridge (body, u, descend (ip, idx));
 }
 
 /******************************************************************************
@@ -172,9 +174,7 @@ bridge_ornamented_rep::typeset_ornament (int desired_status) {
   ttt->local_start (l2, sb2);
   a2= ttt->a; b2= ttt->b;
   ttt->a= array<line_item> (); ttt->b= array<line_item> ();
-  tree outer= bind_start (with);
   body->typeset (desired_status);
-  bind_end (outer);
   ttt->a= a2; ttt->b= b2;
   ttt->local_end (l2, sb2);
   for (i-=2; i>=0; i-=2)

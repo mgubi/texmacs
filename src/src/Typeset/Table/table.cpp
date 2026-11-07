@@ -86,6 +86,9 @@ table_rep::typeset (tree t, path iq) {
 void
 table_rep::typeset_table (tree fm, tree t, path ip) {
   int i;
+  // (a table that is not a table, from a patch of another process or a file:
+  // a string is a table with one row and one cell)
+  if (is_atomic (t)) t= tree (TABLE, tree (ROW, tree (CELL, t)));
   nr_rows= N(t);
   nr_cols= 0;
   T= tm_new_array<cell*> (nr_rows);
@@ -107,6 +110,8 @@ void
 table_rep::typeset_row (int i, tree fm, tree t, path ip) {
   //ASSERT (i==0 || nr_cols == N(t), "inconsistent number of columns");
   int j;
+  // (a row that is a string: a row with one cell)
+  if (is_atomic (t)) t= tree (ROW, tree (CELL, t));
   nr_cols= (i==0? N(t): min (nr_cols, N(t)));
   T[i]= tm_new_array<cell> (nr_cols);
   STACK_NEW_ARRAY (subformat, tree, nr_cols);
@@ -247,7 +252,14 @@ table_rep::format_table (tree fm) {
     format_item (fm[i]);
 
   if (var->contains (TABLE_WIDTH)) {
-    width= env->as_length (env->exec (var[TABLE_WIDTH]));
+    // The width is kept executed: a width in par is taken again from the
+    // paragraph where the table is placed (lazy_table_rep::produce), which
+    // runs later, when the environment of the table (local variables,
+    // macro arguments) is no longer there; a width given by a value, as
+    // <value|figure-width> in the figures, is then known to be in par too.
+    tree w= env->exec (var[TABLE_WIDTH]);
+    var (TABLE_WIDTH)= w;
+    width= env->as_length (w);
     if (var->contains (TABLE_HMODE))
       hmode= as_string (env->exec (var[TABLE_HMODE]));
     else hmode= "exact";
@@ -392,6 +404,14 @@ table_rep::handle_decorations () {
   nr_cols= new_cols;
   i0     = off_i[i0] + ex_i1[i0];
   j0     = off_j[j0] + ex_j1[j0];
+
+  /*** the column widths are for the new number of columns ***/
+  if (mw != NULL) tm_delete_array (mw);
+  if (lw != NULL) tm_delete_array (lw);
+  if (rw != NULL) tm_delete_array (rw);
+  mw= tm_new_array<SI> (nr_cols);
+  lw= tm_new_array<SI> (nr_cols);
+  rw= tm_new_array<SI> (nr_cols);
 }
 
 void
@@ -401,6 +421,10 @@ table_rep::handle_span () {
     for (j=0; j<nr_cols; j++) {
       cell C= T[i][j];
       if (!is_nil (C)) {
+        // (the spans were cut when the rows were typeset, with the number of columns
+        // at that time: rows of different lengths make it smaller afterwards)
+        C->row_span= max (1, min (C->row_span, nr_rows - i));
+        C->col_span= max (1, min (C->col_span, nr_cols - j));
         for (ii=0; ii<C->row_span; ii++)
           for (jj=0; jj<C->col_span; jj++)
             if ((ii != 0) || (jj != 0))
@@ -726,6 +750,14 @@ table_rep::compute_heights (SI* mh, SI* bh, SI* th, SI xh) {
       if ((!is_nil (C)) && (C->row_span!=1)) {
         SI cmh, cbh, cth;
         C->compute_height (cmh, cbh, cth, xh);
+        if (cbh != 0 || cth != 0) {
+          // baseline aligned with the first row: the part above the
+          // baseline must fit into the first row, the rest below it
+          th[i]= max (th[i], cth);
+          mh[i]= max (mh[i], bh[i] + th[i]);
+          SI below= sum (mh+i, C->row_span) - (mh[i] - bh[i]);
+          if (cmh - cth > below) mh[i+C->row_span-1] += cmh - cth - below;
+        }
         SI tot= sum (mh+i, C->row_span);
         if (cmh > tot) mh[i] += cmh - tot;
       }
@@ -1005,7 +1037,7 @@ lazy_table_rep::produce (lazy_type request, format fm) {
   if (request == LAZY_VSTREAM) {
     if (fm->type == FORMAT_VSTREAM) {
       format_vstream fs= (format_vstream) fm;
-      string s= as_string (T->var[TABLE_WIDTH]);
+      string s= as_string (T->var[TABLE_WIDTH]);  // executed by format_table
       if (ends (s, "par"))
         T->width= max ((SI) (as_double (s (0, N(s)-3)) * fs->width), 1);
     }
@@ -1039,8 +1071,28 @@ make_lazy_table (edit_env env, tree t, path ip) {
 * User interface
 ******************************************************************************/
 
+static bool
+is_empty_table (tree t) {
+  // a table with no row or a row with no cell cannot be shown (the cursor
+  // would go to a cell that is not there): an error is shown in its place
+  // (is_func is false for a tree with no child)
+  while (is_compound (t) && L(t) == TFORMAT && N(t) > 0) t= t[N(t)-1];
+  if (is_atomic (t)) return false;
+  if (N(t) == 0) return true;
+  for (int i=0; i<N(t); i++)
+    if (is_compound (t[i]) && N(t[i]) == 0 && L(t[i]) != TMARKER) return true;   // (a row or not; a marker has no child)
+  return false;
+}
+
+static box
+empty_table_box (edit_env env, tree t, path ip) {
+  (void) t;
+  return typeset_as_concat (env, tree (_ERROR, "empty table or row"), ip);
+}
+
 box
 typeset_as_table (edit_env env, tree t, path ip) {
+  if (is_empty_table (t)) return empty_table_box (env, t, ip);
   table T (env);
   T->typeset (t, ip);
   T->handle_decorations ();
@@ -1055,6 +1107,11 @@ typeset_as_table (edit_env env, tree t, path ip) {
 
 array<box>
 typeset_as_var_table (edit_env env, tree t, path ip) {
+  if (is_empty_table (t)) {
+    array<box> bs;
+    bs << empty_table_box (env, t, ip);
+    return bs;
+  }
   table T (env);
   T->typeset (t, ip);
   T->handle_decorations ();

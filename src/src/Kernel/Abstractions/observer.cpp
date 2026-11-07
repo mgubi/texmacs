@@ -98,6 +98,11 @@ simplify (observer& obs) {
   }
 }
 
+void
+simplify_observers (tree& ref) {
+  simplify (ref->obs);
+}
+
 static void
 detach (tree& ref, tree closest, bool right) {
   if (!is_nil (ref->obs)) {
@@ -286,6 +291,11 @@ raw_insert_node (tree& ref, int pos, tree t) {
   r[pos]= ref;
   for (i=pos; i<n; i++) r[i+1]= t[i];
   ref= r;
+  // (the numbers of the automatic labels of t go to the node which is made
+  // from it: an undo puts back a removed node with them, see invert)
+  blackbox bb;
+  if (!is_nil (t->obs) && t->obs->get_contents (ADDENDUM_AUTO_ID, bb))
+    (void) tree_addendum_new (ref, ADDENDUM_AUTO_ID, bb, false);
   if (!is_nil (ref[pos]->obs)) {
     ref[pos]->obs->notify_insert_node (ref, pos);
     simplify (ref[pos]->obs);

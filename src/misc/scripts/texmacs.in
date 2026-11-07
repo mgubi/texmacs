@@ -35,4 +35,11 @@ PATH="$TEXMACS_BIN_PATH/bin:$PATH"
 @CONFIG_LIB_PATH@="$TEXMACS_BIN_PATH/lib${@CONFIG_LIB_PATH@+":$@CONFIG_LIB_PATH@"}"
 export PATH @CONFIG_LIB_PATH@
 
+# (texmacs --mcp serves the protocol on its standard input)
+for arg in "$@"; do
+  case "$arg" in
+    -mcp|--mcp) exec texmacs.bin "$@" ;;
+  esac
+done
+
 exec texmacs.bin "$@" < /dev/null

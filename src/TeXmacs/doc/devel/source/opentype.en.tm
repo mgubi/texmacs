@@ -136,18 +136,18 @@
   introduced the support, and are more detailed on its history and status:
 
   <\description-paragraphs>
-    <item*|<source-link|src/doc/OPENTYPEMATH.md|doc/OPENTYPEMATH.md>>A summary of what is
+    <item*|<source-link|src/docs/OPENTYPEMATH.md|docs/OPENTYPEMATH.md>>A summary of what is
     implemented, the build and test instructions, and a specimen of every
     profiled font.
 
-    <item*|<source-link|src/doc/opentype-math-design.md|doc/opentype-math-design.md>>The design and status
+    <item*|<source-link|src/docs/opentype-math-design.md|docs/opentype-math-design.md>>The design and status
     log: provenance, architecture, the status of each piece, the tests, the
     known defects, what is still missing, and the correspondence between the
     hand-made constructions of the typesetter and their <verbatim|MATH>
     counterparts.
 
-    <item*|<source-link|src/doc/font-system-review.md|doc/font-system-review.md>,
-    <source-link|src/doc/math-symbol-coverage.md|doc/math-symbol-coverage.md>>A review of the font system
+    <item*|<source-link|src/docs/font-system-review.md|docs/font-system-review.md>,
+    <source-link|src/docs/math-symbol-coverage.md|docs/math-symbol-coverage.md>>A review of the font system
     as a whole, and a count of the mathematical symbols which are still
     unnamed.
   </description-paragraphs>

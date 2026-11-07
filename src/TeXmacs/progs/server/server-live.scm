@@ -147,14 +147,20 @@
 ;; number of its connection: a user with two clients has two cursors.
 
 (define live-cursor-table (make-ahash-table)) ;; (lid client) -> (uid pos)
+(define live-cursor-refused (make-ahash-table)) ;; client -> #t: an old client
 
 (define (live-cursor-tell other lid client uid pos)
   (let* ((info (and uid (server-get-user-info uid)))
          (pseudo (if info (first info) "?"))
          (name (if info (second info) pseudo)))
-    ;; (a client which does not know of cursors answers with an error)
-    (server-remote-eval other `(live-cursor ,lid ,client ,pseudo ,name ,pos)
-                        ignore ignore)))
+    ;; a client which does not know of cursors (a TeXmacs without them)
+    ;; answers with an error, and is not told again
+    (when (not (ahash-ref live-cursor-refused other))
+      (server-remote-eval other `(live-cursor ,lid ,client ,pseudo ,name ,pos)
+        ignore
+        (lambda (err)
+          (when (and (string? err) (string-occurs? "invalid command" err))
+            (ahash-set! live-cursor-refused other #t)))))))
 
 (define (live-cursor-broadcast lid client uid pos)
   (if pos
@@ -178,17 +184,27 @@
   (with (client msg-id) envelope
     (let* ((uid (server-get-user envelope))
            (rid (live-find lid)))
-      (if (and uid rid (db-allow? rid uid "readable")
-               (or (not pos) (and (list? pos) (list-and (map integer? pos)))))
-          (begin
-            (live-cursor-broadcast lid client uid pos)
-            (server-return envelope #t))
-          (server-error envelope "Error: read access denied")))))
+      (cond ((not (and uid rid (db-allow? rid uid "readable")))
+             (server-error envelope "Error: read access denied"))
+            ((not (live-connected? lid client))
+             ;; only the clients which opened this very document: no
+             ;; cursor is kept for any other name or client
+             (server-error envelope "Error: live document not open"))
+            ((not (or (not pos) (live-cursor-position? pos)))
+             (server-error envelope "Error: invalid cursor position"))
+            (else
+              (live-cursor-broadcast lid client uid pos)
+              (server-return envelope #t))))))
 
 (tm-define (server-remove client)
   ;; the others no longer see the cursor of a client which leaves
   (for (lid (live-remote-connections client))
     (live-cursor-broadcast lid client #f #f))
+  ;; (and nothing of it is kept: its number is given to later clients)
+  (for (key (map car (ahash-table->list live-cursor-table)))
+    (when (== (cadr key) client)
+      (ahash-remove! live-cursor-table key)))
+  (ahash-remove! live-cursor-refused client)
   (former client)
   (for (key (map car (ahash-table->list live-waiting)))
     (when (== (cadr key) client)

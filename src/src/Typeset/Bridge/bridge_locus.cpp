@@ -56,7 +56,7 @@ bridge_locus (typesetter ttt, tree st, path ip) {
 void
 bridge_locus_rep::notify_assign (path p, tree u) {
   // cout << "Assign " << p << ", " << u << " in " << st << "\n";
-  ASSERT (!is_nil (p) || is_func (u, LOCUS), "nil path");
+  ASSERT (!is_nil (p) || is_func (u, LOCUS) || L(u) == L(st), "nil path");
   if (is_nil (p)) {
     st= u;
     initialize ();
@@ -137,6 +137,15 @@ bridge_locus_rep::my_typeset_will_be_complete () {
 void
 bridge_locus_rep::my_typeset (int desired_status) {
   extern bool build_locus (edit_env env, tree t, list<string>& ids, string& c);
+  if ((desired_status & WANTED_MASK) == WANTED_PARAGRAPH) {
+    tree xbody= env->expand (st[last], true);
+    if (!is_accessible (obtain_ip (xbody)) && !is_multi_paragraph (xbody)) {
+      // inaccessible loci (e.g. inside included files) are handled
+      // by the concater, which wraps the body into locus boxes
+      ttt->insert_paragraph (st, ip);
+      return;
+    }
+  }
   list<string> ids;
   string col;
   bool ok= build_locus (env, st, ids, col);
@@ -144,8 +153,6 @@ bridge_locus_rep::my_typeset (int desired_status) {
   tree old_col= env->read (COLOR);
   env->write_update (COLOR, col);
   ttt->insert_marker (st, ip);
-  tree outer= bind_start (tree (TUPLE, COLOR, col));
   body->typeset (desired_status);
-  bind_end (outer);
   env->write_update (COLOR, old_col);
 }

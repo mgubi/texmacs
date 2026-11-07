@@ -158,8 +158,17 @@
          (cmd (if (or (os-win32?) (os-mingw?)) (escape-shell (converter-shell-cmd l from to))
              (converter-shell-cmd l from to))))
     ;;(display* "shell: " cmd "\n")
-    (system cmd)
-    (if (url-exists? to) to #f)))
+    ;; a destination which cannot be made concrete (a relative one) would be
+    ;; left out of the command, and the tool would choose a file of its own
+    ;; (ps2pdf: one named after the source, in the current directory)
+    (if (== (url-concretize to) "")
+        (begin
+          (display* "TeXmacs] cannot convert to " (url->system to)
+                    ": not a full path\n")
+          #f)
+        (begin
+          (system cmd)
+          (if (url-exists? to) to #f)))))
 
 (define-public (converter-save s opts)
   "Helper routine for define-format macro"
@@ -268,6 +277,34 @@
          (fm (string-append (format-from-suffix suffix) "-file"))
          (s (convert name fm "postscript-document")))
     (if (string? s) s "")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The images which a conversion could not write
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A converter which writes the images of a document next to its target
+;; clears the place of each image with image-target-clear, writes it, then
+;; tells image-target-written whether it could; the export reads the images
+;; which could not be written with image-write-failures (#705).
+
+(define image-failures '())
+
+(define-public (image-write-failures-reset)
+  (set! image-failures '()))
+
+(define-public (image-write-failures)
+  (reverse image-failures))
+
+(define-public (image-target-clear u)
+  ;; removes an old file at @u, so that an image which cannot be written
+  ;; there does not pass for the new one; #f when something is in the way
+  (when (url-exists? u) (system-remove u))
+  (not (url-exists? u)))
+
+(define-public (image-target-written u cleared?)
+  ;; records @u when the image could not be written there
+  (when (not (and cleared? (url-test? u "f")))
+    (set! image-failures (cons u image-failures))))
 
 (define-public (texmacs->generic doc fm)
   (with r (convert doc "texmacs-tree" fm)

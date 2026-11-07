@@ -19,7 +19,12 @@
 
 (tm-define bib-current-prefix "bib")
 (tm-define bib-style "plain")
-(tm-define bib-default-style "plain")
+
+;; The style on which each style falls back; "plain" for the others
+(define bib-style-fallback (make-ahash-table))
+
+(tm-define (bib-set-fallback s d)
+  (ahash-set! bib-style-fallback s d))
 
 (tm-define (bib-label what)
   `(label ,(string-append bib-current-prefix "-" what)))
@@ -31,7 +36,12 @@
   "")
 
 (tm-define (bib-mode? s)
-  (or (equal? bib-style s) (equal? bib-default-style s)))
+  ;; is s the current style or one of the styles on which it falls back?
+  (let loop ((x bib-style) (n 0))
+    (or (equal? x s)
+        (and (!= x "plain") (< n 100)
+             (loop (or (ahash-ref bib-style-fallback x) "plain")
+                   (+ n 1))))))
 
 (define (format-entries n x)
   (if (and (list? x) (nnull? x))
@@ -80,11 +90,11 @@
 (tm-define-macro (bib-define-style s d)
   (if (equal? s d)
       `(begin
-	 (set! bib-default-style ,s)
+	 (bib-set-fallback ,s ,d)
 	 (texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
 			 (bib-mode? ,s))))
       `(begin
-	 (set! bib-default-style ,d)
+	 (bib-set-fallback ,s ,d)
 	 (texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
 			 (bib-mode? ,s)
 			 ,(string->symbol (string-append "bib-" d "%")))))))
@@ -173,6 +183,19 @@
 
 (tm-define (bib-translate s) `(localize ,s))
 
+(tm-define (bib-single-page? p)
+  ;; (bib-pages a) with one page, not pages kept as written ("12, 15--17"),
+  ;; as multi.page.check of BibTeX: no "-", "," or "+" in it
+  (and (== (length p) 2)
+       (or (nstring? (cadr p))
+           (list-and (map (lambda (c) (< (string-search-forwards c 0 (cadr p)) 0))
+                          (list "-" "," "+" (string (integer->char 21))))))))
+
+(tm-define (bib-page-range p)
+  ;; the text of (bib-pages a) or (bib-pages a b)
+  (if (== (length p) 2) (cadr p)
+      `(concat ,(cadr p) ,bib-range-symbol ,(caddr p))))
+
 (tm-define bib-range-symbol "")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -188,3 +211,28 @@
 	     (e (number->string (string-length s))))
 	(if (< i 0) t
 	    `(concat (range ,t "0" ,m) (name (range ,t ,m ,e)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Zotero (see bibtex/zotero.scm)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Zotero costs nothing to those who don't use it: the hooks of the
+;; bibliographies (generation, Document -> Update, completion, the search
+;; window of the database, the focus of citations) neither load the modules
+;; of Zotero nor ask Zotero, until it was used on this computer: until it
+;; answered TeXmacs once (after a command of Zotero, or the test of its
+;; settings), a key of zotero.org was given, or the database was synced
+;; with Zotero. Explicit commands of Zotero always ask it
+(define-preferences
+  ("zotero used" "off" noop))
+
+(define (zotero-value? s)
+  (and (string? s) (nin? s '("" "default"))))
+
+(tm-define (zotero-used?)
+  (:synopsis "Has Zotero been used on this computer?")
+  ;; NOTE: the other preferences are defined by the modules of Zotero, and
+  ;; are "default" while these are not loaded and the preference not set
+  (or (== (get-preference "zotero used") "on")
+      (zotero-value? (get-preference "zotero sync version"))
+      (zotero-value? (get-preference "zotero api key"))))

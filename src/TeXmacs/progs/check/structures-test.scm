@@ -246,6 +246,16 @@
   (check= (string->tmstring "") "")
   (check= (tmstring->string "a<less>b<gtr>c") "a<b>c")
   (check= (tmstring->string (string->tmstring "<x> < y >")) "<x> < y >")
+  ;; the characters written <#...> are kept, whatever their number of digits
+  (check= (tmstring->string "a<#E9>b<#2200>c<#1D54F>d")
+          "a<#E9>b<#2200>c<#1D54F>d")
+  ;; and so are the other character names, an unterminated < and a bare >
+  (check= (tmstring->string "x<alpha>y") "x<alpha>y")
+  (check= (tmstring->string "a<b") "a<b")
+  (check= (tmstring->string "a>b") "a>b")
+  (check= (tmstring->string "a<b<alpha>c") "a<b<alpha>c")
+  (for (s (list "a<b" ">" "<<>>" "<less>" "<alpha>"))
+    (check= (tmstring->string (string->tmstring s)) s))
   ;; object->tmstring writes an object as a string
   (check= (object->tmstring "x") "\"x\"")
   (check= (object->tmstring '(a "b" 1)) "(a \"b\" 1)"))
@@ -396,6 +406,15 @@
   ;; on Windows, /a is the drive a: (as in MSYS)
   (check= (us (url-unix "/a" "b")) (if win? "a:/b" "/a/b"))
   (check= (url-secure? "/a/b") #f)
+  ;; the home directory is trusted, but not its temporary files and caches
+  (with home (lambda (x) (url-append (get-texmacs-home-path) x))
+    (check= (url-secure? (url-append (get-texmacs-path) "doc/a.tm")) #t)
+    (check= (url-secure? (home "texts/scratch/a.tm")) #t)
+    (check= (url-secure? (home "styles/a.ts")) #t)
+    (check= (url-secure? (home "system/tmpx/a.tm")) #t)
+    (check= (url-secure? (home "system/tmp/a.tm")) #f)
+    (check= (url-secure? (url-append (url-temp-dir) "a.tm")) #f)
+    (check= (url-secure? (home "system/cache/a.tm")) #f))
   (check= (url-scratch? (url-scratch "a" ".tm" 3)) #t)
   (check= (us (url-tail (url-scratch "a" ".tm" 3))) "a3.tm")
   (check= (url-scratch? "/a/b.tm") #f))
@@ -790,6 +809,98 @@
   (ahash-remove! match-term :structures-test-abs)
   (check= (ahash-ref match-term :structures-test-ab) #f))
 
+;; match? compiles the simple patterns, and has to agree with match on all
+;; of them: the same result for each object, at the first and the later uses.
+(define (match-general x pat)
+  (with sols (match (list x) (list pat) '())
+    (if (null? sols) #f sols)))
+
+(define (test-match-compiled)
+  (let ((objects
+         `(a b "a" "ab" "" 1 2 #t #\a () (a) (b) (a b) (a b c) (a b c d)
+           ("a" b) (1 "x") (a (b)) (a (b c)) ((a) b) (rsub "i") (x (rsub "i"))
+           (x (rsub "i") (rsup "j")) (x (rsub "i") y)
+           ,(stree->tree '(rsub "i")) ,(stree->tree '(concat "a" "b"))
+           (a ,(stree->tree '(rsub "i"))) (a "bc") ("bc" a)))
+        (patterns
+         '(a "a" 1 () (a) (a b) (b a) (a :*) (:* a) (:*) (:%0) (:%1) (:%2)
+           (:%3) (:%1 :*) (:%2 :*) (:%0 a) (:%1 b) (a :%1) (a :%2 d) :%1 :*
+           (()) (a ()) ((a)) ((a) b) (a (b)) (a (:%1)) (a (b :*)) (a (:%1 :*))
+           (:%1 (rsub :%1) :*) (:%1 (rsub :%1) (rsup :%1) :*)
+           (rsub :%1) (:%1 (:%1)) (:%1 (#\b :*)) (:%1 (#\b #\c)) (#\a)
+           (:string?) (:string? :*) (:symbol? :%1) (:number? :*) :symbol?
+           (a (:string?)) ((:symbol?) :*)
+           ;; those which remain for match
+           ('x) ('x 'x) ('x 'y) (a 'x) (:%1 'x) ((:or a b)) ((:or a b) :*)
+           ((:and :symbol? a)) ((:not a)) ((:not a) :*) ((:repeat a))
+           ((:repeat a) b) ((:group a b)) ((:group a) :*) ((:quote a))
+           (a ('x)) ((:or (a) (b))))))
+    (define (check-all)
+      (for-each
+       (lambda (pat)
+         (for-each
+          (lambda (x)
+            (check= (cons* x pat (match? x pat))
+                    (cons* x pat (match-general x pat))))
+          objects))
+       patterns))
+    (check-all)
+    (check-all))
+  ;; a keyword may become a term of a grammar after its use as a predicate
+  (let ((pat '(:symbol? :*)))
+    (check= (match? '(a) pat) '(()))
+    (check= (match? '(a) pat) '(())) ;; (compiled at the second use)
+    (define-regexp-grammar (:symbol? b))
+    (check= (match? '(a) pat) #f)
+    (check= (match? '(b) pat) '(()))
+    (ahash-remove! match-term :symbol?)
+    (check= (match? '(a) pat) '(())))
+  ;; a wrong rule leaves those before it defined, which then count
+  (let ((pat '(:symbol? :%1)))
+    (check= (match? '(a b) pat) '(()))
+    (check= (match? '(a b) pat) '(()))
+    (check-error (define-regexp-grammar-decls '((:symbol? b) bad)) #t)
+    (check= (match? '(a b) pat) (match-general '(a b) pat))
+    (check= (match? '(a b) pat) #f)
+    (ahash-remove! match-term :symbol?))
+  ;; compiling does not fail on what match does not read
+  (with cycle (list 'a)
+    (set-car! cycle cycle)
+    (check= (match? 'a cycle) #f)
+    (check= (match? 'a cycle) #f))
+  (let* ((long (let loop ((i 0) (l '()))
+                 (if (< i 20000) (loop (+ i 1) (cons i l)) l)))
+         (deep (let loop ((i 0) (l 'a))
+                 (if (< i 20000) (loop (+ i 1) (list l)) l))))
+    (check= (match? long long) '(()))
+    (check= (match? long long) '(()))
+    (check= (match? 'a deep) #f)
+    (check= (match? 'a deep) #f))
+  ;; (S7 has no empty keyword)
+  (with empty (catch #t (lambda () (string->keyword "")) (lambda args #f))
+    (when empty
+      (let ((empty-1 (list 'b empty))
+            (empty-2 (list empty)))
+        (check= (match? 'a empty-1) #f)
+        (check= (match? 'a empty-1) #f)
+        (check= (match? 'a empty-2) #f)
+        (check= (match? 'a empty-2) #f))))
+  ;; keywords of which string->number does not like the end, not reached
+  (for-each
+   (lambda (pat)
+     (check= (match? 'a pat) #f)
+     (check= (match? 'a pat) #f)
+     (check= (match? 'a pat) #f))
+   '((b :x1/0) (b :x1e400) (b (:x1/0))))
+  ;; patterns made at each use, more of them than are kept
+  (let loop ((i 0) (ok? #t))
+    (if (< i 5000)
+        (loop (+ i 1)
+              (and ok?
+                   (== (match? (list i) (list i)) '(()))
+                   (not (match? (list i) (list (+ i 1))))))
+        (check-true ok?))))
+
 ;; tm-select gives the subtrees at the end of a path pattern, of which the
 ;; elements are child indices, tags (the children with that tag), :%n (any
 ;; n levels down), :* (any number of levels) and special patterns.
@@ -828,6 +939,22 @@
     (check-true (tree? (car l)))
     (check= (tree->stree (car l)) "a")
     (check-true (tree-eq? (car l) (tree-ref t 0 0))))
+  ;; a document of 100,000 paragraphs: the children are gone through
+  ;; without a recursion per child, which overflowed the Guile stack (#418)
+  (let* ((n 100000)
+         (t (stree->tree
+             `(document ,@(map (lambda (i)
+                                 (if (= (modulo i 1000) 999)
+                                     `(strong ,(number->string i))
+                                     (number->string i)))
+                               (iota n))))))
+    (check= (tm-select t '(:* gpg-passphrase-encrypted-buffer)) '())
+    (check= (length (tm-select t '(:%1))) n)
+    (check= (map tree->stree (tm-select t '(:* strong 0)))
+            (map (lambda (i) (number->string (+ (* 1000 i) 999))) (iota 100)))
+    (check= (length (tm-select t '((:exclude em)))) 100)
+    (check= (map tree->stree (tm-select t '((:range 99997 100005))))
+            '("99997" "99998" (strong "99999"))))
   ;; select with two arguments is tm-select
   (check= (select '(document (strong "a")) '(strong 0)) '("a"))
   (check= (tm-ref '(document (strong "a") "b") 0 0) "a")
@@ -935,11 +1062,15 @@
 (define (test-secure)
   (check= (secure? '(+ 1 2)) #t)
   (check= (secure? "text") #t)
-  (check= (secure? 'symbol) #t)
+  ;; a free variable is secure only when it is a secure symbol: its value
+  ;; might be an insecure procedure (the checker of tm-secure.scm, #87)
+  (check= (secure? 'car) #t)
+  (check= (secure? 'symbol) #f)
   (check= (secure? '(system "ls")) #f)
   (check= (secure? '(string-append "a" (system "ls"))) #f)
   (check= (secure? '(if (string? "x") (string-append "a" "b") 3)) #t)
-  (check= (secure? '(cond ((null? x) 1) (else 2))) #t)
+  (check= (secure? '(lambda (x) (cond ((null? x) 1) (else 2)))) #t)
+  (check= (secure? '(cond ((null? x) 1) (else 2))) #f)
   (check= (secure? '(lambda (x) (car x))) #t)
   (check= (secure? '(lambda (x) (system x))) #f)
   (check= (secure? '(with x 1 (+ x 1))) #t)
@@ -1025,6 +1156,7 @@
   (run-group "positions" test-positions)
   (run-group "tree pointers" test-tree-pointers)
   (run-group "pattern matching" test-match)
+  (run-group "compiled patterns" test-match-compiled)
   (run-group "selection" test-select)
   (run-group "logic programming" test-logic)
   (run-group "secure evaluation" test-secure)

@@ -269,8 +269,12 @@ json_print_string (string& r, string s, int mode) {
     case '\"': r << '\\' << s[i]; break;
     case '\\': r << '\\' << s[i]; break;
     default:
-      if (((unsigned char) s[i]) < 0x20)
-        r << "\\u00" << as_hexadecimal ((int) (unsigned char) s[i], 2);
+      // the other control characters, which JSON does not allow as such
+      if (((unsigned char) s[i]) < 0x20) {
+        static const char* hex= "0123456789abcdef";
+        r << "\\u00" << hex[((unsigned char) s[i]) >> 4]
+          << hex[((unsigned char) s[i]) & 15];
+      }
       else r << s[i];
     }
   r << "\"";
@@ -387,4 +391,20 @@ json_get (tree t, tree key, int mode) {
   for (int i=0; i+1 < N(t); i += 2)
     if (t[i] == key) return t[i+1];
   return json_null (mode);
+}
+
+/******************************************************************************
+* Typed JSON (null, booleans and numbers kept apart from the strings)
+******************************************************************************/
+
+tree
+json_to_typed_tree (string s) {
+  return json_to_tree (s, JSON_NULL | JSON_BOOLEAN | JSON_NUMBER);
+}
+
+string
+typed_tree_to_json (tree t) {
+  // on one line, as the messages of the protocols (LSP, JSON-RPC)
+  return tree_to_json (t, JSON_NULL | JSON_BOOLEAN | JSON_NUMBER |
+                          JSON_SHORT_ARRAY | JSON_SHORT_OBJECT);
 }

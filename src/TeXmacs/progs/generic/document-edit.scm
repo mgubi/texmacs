@@ -598,11 +598,27 @@
   (system-wait "Updating current buffer, " "please wait")
   (update-current-buffer))
 
+(define (zotero-update what)
+  ;; Zotero, when it is used, refreshes the references first (see
+  ;; bibtex/zotero.scm); 'wait when the update waits for zotero.org. An
+  ;; error there is reported, and does not stop the update
+  (if (not (zotero-used?)) 'done
+      (catch #t
+        (lambda () (zotero-before-update what))
+        (lambda err
+          (set-message (string-append "Zotero: " (object->string err))
+                       "Update")
+          'done))))
+
+(define (wait-update-current-buffer-keep)
+  (system-wait "Updating current buffer, " "please wait")
+  (update-current-buffer-keep))
+
 (tm-define (update-document what)
   ;; a bibliography file managed by Zotero is refreshed first; in a web
   ;; browser, the update may wait for the answers of zotero.org, and is
   ;; then made again when they come
-  (when (!= (zotero-before-update what) 'wait)
+  (when (!= (zotero-update what) 'wait)
     (for (.. 0 doc-update-times)       
       (delayed    ; allow typesetting/magic to happen before next update
         (:idle 1)
@@ -610,9 +626,13 @@
          ;; the automatic labels are first numbered in the order of the
          ;; document: the tables which are made hold their names (a
          ;; table made alone makes the others too when a name changed)
-         (cond ((== what "all") 
+         (cond ((== what "all")
+                ;; the layout is made from scratch first (the two gc), the
+                ;; labels are numbered and the tables made from that layout,
+                ;; and the end only types again what the tables changed
+                (inclusions-gc) (picture-gc)
                 (renumber-auto-labels)
-                (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
+                (generate-all-aux) (wait-update-current-buffer-keep))
                ((== what "bibliography")
                 (renumber-auto-labels)
                 (generate-all-aux) (wait-update-current-buffer))

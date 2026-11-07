@@ -180,8 +180,9 @@ bool
 can_remove (tree t, path p, int pos, int nr) {
   if (!has_subtree (t, p)) return false;
   tree st= subtree (t, p);
-  if (is_atomic (st)) return pos >= 0 && pos+nr <= N(st->label);
-  else return pos >= 0 && pos+nr <= N(st);
+  // (written so that pos+nr cannot overflow: the numbers come from other processes)
+  int n= is_atomic (st)? N(st->label): N(st);
+  return pos >= 0 && nr >= 0 && pos <= n && nr <= n - pos;
 }
 
 bool
@@ -197,7 +198,7 @@ can_join (tree t, path p, int pos) {
   if (!has_subtree (t, p)) return false;
   tree st= subtree (t, p);
   if (is_atomic (st)) return false;  // a string has no children to join
-  if (pos < 0 || pos+1 >= N(st)) return false;
+  if (pos < 0 || pos >= N(st) - 1) return false;
   if (is_atomic (st[pos]) && is_atomic (st[pos+1])) return true;
   if (is_compound (st[pos]) && is_compound (st[pos+1])) return true;
   return false;
@@ -205,7 +206,9 @@ can_join (tree t, path p, int pos) {
 
 bool
 can_assign_node (tree t, path p, tree_label op) {
-  (void) op;
+  // (the new label of a compound is not that of a string: it would become a
+  // "string" made of the pointers to its children)
+  if (op == TMSTRING || op == UNKNOWN || op == UNINIT) return false;
   return has_subtree (t, p) && is_compound (subtree (t, p));
 }
 
@@ -226,8 +229,32 @@ can_set_cursor (tree t, path p, int pos, tree data) {
   return pos >= 0 && pos <= right_index (subtree (t, p));
 }
 
+static bool
+has_valid_path (modification mod) {
+  // the accessors fail (and the process dies) on a path that is too short,
+  // as a modification made by another process may have
+  int n= N (mod->p);
+  switch (mod->k) {
+  case MOD_ASSIGN:
+  case MOD_ASSIGN_NODE:
+    return true;
+  case MOD_REMOVE:
+  case MOD_SPLIT:
+    return n >= 2;
+  case MOD_INSERT:
+  case MOD_JOIN:
+  case MOD_INSERT_NODE:
+  case MOD_REMOVE_NODE:
+  case MOD_SET_CURSOR:
+    return n >= 1;
+  default:
+    return false;
+  }
+}
+
 bool
 is_applicable (tree t, modification mod) {
+  if (!has_valid_path (mod)) return false;
   switch (mod->k) {
   case MOD_ASSIGN:
     return can_assign (t, root (mod), mod->t);

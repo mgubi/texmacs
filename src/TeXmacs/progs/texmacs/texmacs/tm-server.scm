@@ -31,7 +31,9 @@
     (reset-preference "buffer management")))
 
 (define (get-default-show-table-cells)
-  (if (qt-gui?) "on" "off"))
+  ;; (the lines between the cells of the table at the cursor: the Vue and
+  ;; Cocoa ports, the browser included, show them as Qt does)
+  (if (or (qt-gui?) (vue-gui?) (ns-gui?)) "on" "off"))
 
 (define (get-default-gui-density)
   (if (os-android?) "large" "normal"))
@@ -44,13 +46,15 @@
                "configure look and feel"))
 
 (define (notify-gui-theme var val)
-  (set-message "Restart in order to let the new theme take effect"
-               "graphical interface theme"))
+  ;; the Cocoa interface follows the theme at once (ns_follow_theme)
+  (when (not (ns-gui?))
+    (set-message "Restart in order to let the new theme take effect"
+                 "graphical interface theme")))
 
 (define (notify-icon-set var val)
-  ;; the Vue interface follows the icon set at once (vue_follow_icon_set);
-  ;; the others at their next start
-  (when (not (vue-gui?)) (notify-restart var val)))
+  ;; the Vue and Cocoa interfaces follow the icon set at once
+  ;; (vue_follow_icon_set, ns_follow_icon_set); the others at their next start
+  (when (not (or (vue-gui?) (ns-gui?))) (notify-restart var val)))
 
 (define (notify-gui-scaling var val)
   ;; the Vue interface follows the scaling at once
@@ -118,8 +122,44 @@
   (set-message "Restart in order to let the new setting take effect"
                "configure graphical interface"))
 
+;; the font of source files (programs open as code, not documents with
+;; code in them): the master of a monospaced text font (font-short-menu),
+;; or roman, the typewriter font of TeXmacs; new_buffer.cpp sets it in
+;; the initial environment of a source file which is opened, and a change
+;; reaches the open ones (which stay unmodified: their text is the same)
+(define (notify-code-font var val)
+  (with font (if (in? val '("" "default")) "Inconsolatazi4" val)
+    (for (u (buffer-list))
+      (with-buffer u
+        (when (and (== (get-style-list) '("code"))
+                   (!= (get-init "prog-font") font))
+          (with modified? (buffer-modified? u)
+            (init-env "prog-font" font)
+            (when (not modified?) (buffer-pretend-saved u))))))))
+
+(define (notify-code-tab-width var val)
+  ;; (the open source files take the new width, as the font)
+  (with w (if (string->number val) val "8")
+    (for (u (buffer-list))
+      (with-buffer u
+        (when (and (== (get-style-list) '("code"))
+                   (!= (get-init "prog-tab-width") w))
+          (with modified? (buffer-modified? u)
+            (init-env "prog-tab-width" w)
+            (when (not modified?) (buffer-pretend-saved u))))))))
+
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
+  ("editor:code font" "Inconsolatazi4" notify-code-font)
+  ;; the columns between the tab stops of source files (prog-tab-width,
+  ;; also those which are open), and the indentation of the new lines of the
+  ;; files which have none yet (a file indented by tabs or by spaces keeps
+  ;; its own, source-indent: prog-edit.scm)
+  ("editor:code tab width" "8" notify-code-tab-width)
+  ("editor:code indent" "spaces" noop)
+  ;; the source files and the texts typeset as lines of code (code-lines:
+  ;; verbatim.cpp, when they are opened)
+  ("code lines" "on" noop)
   ("look and feel" "default" notify-look-and-feel)
   ("case sensitive shortcuts" "default" noop)
   ("detailed menus" "detailed" noop)
@@ -143,6 +183,8 @@
   ("gpu glyphs" "freetype" noop)
   ("gpu glyph boldness" "0.22" noop)
   ("gpu glyph hinting" "light" noop)
+  ;; the emoji: the shipped Twemoji, or those of the system (smart_font.cpp)
+  ("emoji font" "default" noop)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
   ("interactive footer" "off" noop)
   ("typographic palette set" "Classical" noop)
@@ -229,7 +271,7 @@
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
 (validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "lucide"))
-(validate-enum-preference "icon bars" '("top" "left"))
+(validate-enum-preference "icon bars" '("top" "left" "right"))
 (validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
@@ -265,34 +307,77 @@
 ;; Killing buffers, windows and TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The buffers whose typesetting failed, and whose document was replaced by
+;; an empty one (typeset-failure-recover in tm-files.scm)
+(define typeset-failed-buffers (make-ahash-table))
+
+(tm-define (typeset-failure-flag name)
+  (ahash-set! typeset-failed-buffers (url->string name) #t))
+
+(tm-define (typeset-failure-forget name)
+  (ahash-remove! typeset-failed-buffers (url->string name)))
+
+(tm-define (typeset-failed-buffer? name)
+  (ahash-ref typeset-failed-buffers (url->string name)))
+
+;; Shared files (utils relate shared-files, see tm-files.scm): set when a
+;; file is first shared, so that the hooks cost nothing before
+(define shared-files-in-use #f)
+
+(tm-define (shared-files-in-use?)
+  shared-files-in-use)
+
+(tm-define (set-shared-files-in-use! flag)
+  (set! shared-files-in-use flag))
+
 (tm-define (buffer-close name)
+  (typeset-failure-forget name)
+  (when (shared-files-in-use?) (shared-file-leave name))
   (cpp-buffer-close name))
 
 (tm-define (buffers-modified?)
   (list-or (map buffer-modified? (buffer-list))))
 
+(tm-define (buffer-close-question buf)
+  ;; the question when closing the modified buffer @buf
+  "The document has not been saved. Really close it?")
+
 (tm-define (safely-kill-buffer)
   (cond ((buffer-embedded? (current-buffer))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((buffer-modified? (current-buffer))
-         (user-confirm "The document has not been saved. Really close it?" #f  
+         (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
 
-(define (do-kill-place)
+(define (close-buffer-if-no-place buf confirmed?)
+  ;; a buffer may be shown at several places (a file loaded or imported
+  ;; twice): close it with its last place only. A modified buffer whose
+  ;; closing was not confirmed (another place showed it, and switched to
+  ;; another buffer in the meantime) stays open, at no place
+  (when (and (null? (buffer->places buf))
+             (or confirmed? (not (buffer-modified? buf))))
+    (buffer-close buf)))
+
+(define (last-place-on-modified-buffer? buf)
+  ;; ask about unsaved changes only when the buffer will be closed
+  (and (buffer-modified? buf)
+       (<= (length (buffer->places buf)) 1)))
+
+(define (do-kill-place confirmed?)
   (with buf (current-buffer)
     (kill-place (current-place))
     (delayed
       (:idle 100)
-      (buffer-close buf))))
+      (close-buffer-if-no-place buf confirmed?))))
 
-(define (do-kill-place* u)
+(define (do-kill-place* u confirmed?)
  (with buf (place->buffer u)
    (kill-place u)
    (delayed
      (:idle 100)
-     (buffer-close buf))))
+     (close-buffer-if-no-place buf confirmed?))))
 
 (tm-define (safely-kill-place . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
@@ -301,17 +386,17 @@
          ;; Tau: the last place stays, the page has nothing else to show
          (noop))
         ((nnull? opt-name)
-         (if (buffer-modified? (place->buffer (car opt-name)))
+         (if (last-place-on-modified-buffer? (place->buffer (car opt-name)))
              (user-confirm
-                 "The document has not been saved. Really close it?" #f
+                 (buffer-close-question (place->buffer (car opt-name))) #f
                (lambda (answ)
-                 (when answ (do-kill-place* (car opt-name)))))
-             (do-kill-place* (car opt-name))))
-        ((buffer-modified? (current-buffer))
-         (user-confirm "The document has not been saved. Really close it?" #f
+                 (when answ (do-kill-place* (car opt-name) #t))))
+             (do-kill-place* (car opt-name) #f)))
+        ((last-place-on-modified-buffer? (current-buffer))
+         (user-confirm (buffer-close-question (current-buffer)) #f
            (lambda (answ)
-             (when answ (do-kill-place)))))
-        (else (do-kill-place))))
+             (when answ (do-kill-place #t)))))
+        (else (do-kill-place #f))))
 
 (tm-define (safely-quit-TeXmacs)
   (let* ((m (filter buffer-modified? (buffer-list)))

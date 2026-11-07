@@ -2,7 +2,7 @@
 
 Alternatives to the standard grid of colours of the colour menus
 (Format › Color, the backgrounds, the cells of the tables...), in the Vue
-interface: the **Palette** list above the grid offers **Classical**, the
+and Cocoa interfaces: the **Palette** list above the grid offers **Classical**, the
 standard grid (the default), then the typographic palettes. The choice
 changes the grid without closing the menu (the menu moves to stay in the
 window if it changed size), and is kept (the preference `typographic
@@ -58,5 +58,5 @@ grid has eight colours a line: the rows of a set of eight columns are its
 lines (other widths wrap).
 
 Code: `TeXmacs/progs/kernel/gui/menu-define.scm` (the sets, the menu);
-tests: `src/Plugins/Vue/tests/typographic-palette.*` (a popup) and
+tests: `tests/Plugins/Vue/typographic-palette.*` (a popup) and
 `typographic-palette-bar.*` (Format › Colour from the menu bar).

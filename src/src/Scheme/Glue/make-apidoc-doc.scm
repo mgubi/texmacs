@@ -16,7 +16,8 @@
          (map (lambda (c) (if (char=? c #\>) "\\<gtr\\>" (string c)))
               (string->list s))))
 
-(define glue-defs '("build-glue-basic.scm" "build-glue-server.scm" "build-glue-editor.scm"))
+(define glue-defs '("build-glue-basic.scm" "build-glue-server.scm" "build-glue-editor.scm"
+                    "build-glue-treesit.scm" "build-glue-lsp.scm"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Convenient output routine

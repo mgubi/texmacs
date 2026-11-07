@@ -88,19 +88,29 @@
 ;; which is where the other modules find them. use-modules sees them there,
 ;; with the same value, and does not copy them (import-bindings!). So the
 ;; other modules share one binding of each public name, and the user module
-;; stays small; lookups of public names skip the (newer) module lets and end
-;; in the rootlet. The defining module keeps its own binding, as before: a
-;; set! of a public variable there is not seen by the other modules.
+;; stays small.
+;; The binding in the defining module is then removed (unshadow-global!, a
+;; local patch of s7), unless the name has other local bindings (a
+;; parameter, a local variable, another public definition): s7 caches for
+;; each symbol the let of its latest local binding, so that while the module
+;; binds the name, the lookups from other modules scan their lets (and the
+;; hundreds of slots of the user module) on the way to the rootlet; without
+;; it they go straight there. The defining module then also uses the binding
+;; of the rootlet, so a set! of a public variable is seen by all modules.
 ;; With TM_PUBLISH_LOG set, publications which replace another value are
-;; reported (a name defined public by two modules, or an s7 builtin).
+;; reported (a name defined public by two modules, or an s7 builtin), and so
+;; are the names which keep the binding of their module.
 (define publish-log? (getenv "TM_PUBLISH_LOG"))
-(define (publish-binding! name value)
+(define (publish-binding! name value env)
   (when (and publish-log?
              (defined? name (rootlet))
              (not (eq? ((rootlet) name) value)))
     (format *stderr* "PUBLISH-REPLACES ~A in ~A~%" name
             ((*texmacs-module* '*current-module*) '*module-name*)))
-  (varlet (rootlet) name value))
+  (varlet (rootlet) name value)
+  (when (and (not (unshadow-global! env name)) publish-log?)
+    (format *stderr* "PUBLISH-KEEPS ~A in ~A~%" name
+            ((*texmacs-module* '*current-module*) '*module-name*))))
 
 (define-macro (define-public head . body)
   ;; the name is the innermost car of a curried head, ((f a) b)
@@ -108,7 +118,7 @@
     `(begin
        (define ,head ,@body)
        (export ,name)
-       ,@(if (symbol? name) `((publish-binding! ',name ,name)) '()))))
+       ,@(if (symbol? name) `((publish-binding! ',name ,name (curlet))) '()))))
 
 (define-macro (provide-public head . body)
   (if (or (and (symbol? head) (not (defined? head)))
@@ -121,7 +131,7 @@
     `(begin
        (define-macro ,head ,@body)
        (export ,name)
-       ,@(if (symbol? name) `((publish-binding! ',name ,name)) '()))))
+       ,@(if (symbol? name) `((publish-binding! ',name ,name (curlet))) '()))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Module handling

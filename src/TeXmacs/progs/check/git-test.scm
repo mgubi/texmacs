@@ -27,14 +27,17 @@
 ;; configurations of Git are ignored (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM,
 ;; with Git 2.32 or newer), so that the settings of the user
 ;; (commit.gpgsign, hooks...) do not matter. The preferences which the
-;; suite changes are put back at the end.
+;; suite changes are put back at the end, and the dialogue which explains a
+;; failure is built but not opened, since a window saves its geometry in the
+;; preferences.
 ;; The asynchronous commands (fetch, pull, push, clone) need the event loop,
-;; and are checked by doc/tests/git-gui-test.scm instead.
+;; and are checked by src/docs/tests/git-gui-test.scm instead.
 
 (texmacs-module (check git-test)
   (:use (check check-lib)
         (version version-tmfs)
         (version version-git)
+        (version git-widgets)
         (version version-merge)
         (version git-drivers)
         (version git-blame)
@@ -73,6 +76,24 @@
                              paragraphs))
                  "</body>\n"))
 
+(define (tm-doc style init . paragraphs)
+  ;; a .tm file with the style @style (a string, as in <style|...>), the
+  ;; initial environment @init (a list of (key value)) and the paragraphs
+  (string-append "<TeXmacs|2.1>\n\n<style|" style ">\n\n<\\body>\n"
+                 (apply string-append
+                        (map (lambda (p) (string-append "  " p "\n\n"))
+                             paragraphs))
+                 "</body>\n"
+                 (if (null? init) ""
+                     (string-append
+                      "\n<\\initial>\n  <\\collection>\n"
+                      (apply string-append
+                             (map (lambda (x)
+                                    (string-append "    <associate|" (car x)
+                                                   "|" (cadr x) ">\n"))
+                                  init))
+                      "  </collection>\n</initial>\n"))))
+
 (define (run-group thunk)
   ;; an error in a group counts as one failure
   (with r (check-run thunk)
@@ -98,6 +119,24 @@
         (set-preference (car x) (cdr x))
         (reset-preference (car x)))))
 
+;; The dialogues of the suite are kept here instead of being opened: for each
+;; one its name and the text of its widget, which is really built
+(define keep-dialogues? #f)
+(define dialogues '())
+
+(tm-define (dialogue-window menu-promise cmd name . opts)
+  (:require keep-dialogues?)
+  (set! dialogues (rcons dialogues (cons name (object->string
+                                               (menu-promise noop))))))
+
+(define (check-failure-dialogue explanation)
+  ;; the failure of the last command was explained in one dialogue, where
+  ;; there is a window (see git-show-failure in git-widgets.scm)
+  (when (and (not (headless?)) (current-place))
+    (check= (map car dialogues) '("Git"))
+    (check-true (and (pair? dialogues)
+                     (string-contains? (cdar dialogues) explanation))))
+  (set! dialogues '()))
 
 ;; The main repository, with a space in its name and in a subdirectory
 (define R #f)
@@ -513,7 +552,12 @@
             '("feature" "later" "main" "wt"))
     (check= (map git-branch-name (list-filter l git-branch-current?))
             '("main")))
+  (set! dialogues '())
+  ;; a name which could be an option never reaches Git
   (check-false (git-switch-branch R "-f"))
+  (check= dialogues '())
+  (check-false (git-switch-branch R "no-such-branch"))
+  (check-failure-dialogue "Git could not complete this operation.")
   (check= (git-current-branch R) "main")
   (git-create-tag R "v1" "First version")
   (check= (map git-branch-name (git-tags R)) '("v1"))
@@ -559,7 +603,9 @@
   (git-commit-staged R "c2")
   (check-false (git-merging? R))
   (check-false (git-merge-message R))
+  (set! dialogues '())
   (git-merge-branch R "c1")
+  (check-failure-dialogue "Some parts were changed on both sides.")
   (check= (git-file-state (file "c.txt")) 'conflicted)
   (check-true (git-merging? R))
   (check-true (string-starts? (car (git-merge-message R)) "Merge branch"))
@@ -695,10 +741,97 @@
                '(document "A." "B!" "C.") #f 1)
   (check-merge '(document "A." "B.") '(document "B.") '(document "B.")
                '(document "B.") 0)
+  ;; different insertions at the same place conflict
+  (check-merge '(document "f is continuous on X.")
+               '(document "f is uniformly continuous on X.")
+               '(document "f is bounded continuous on X.") #f 1)
   (check= (merge-conflicts '(document (version-both "a" "b") "c"
                                       (concat (version-old "d"))))
           2)
   (check= (merge-conflicts "plain") 0)
+  ;; the preamble: style packages as a set, the initial environment key by
+  ;; key (#676)
+  (let* ((doc (lambda (style init . body)
+                `(document (TeXmacs "2.1") (style ,style)
+                           (body (document ,@body))
+                           ,@(if (null? init) '()
+                                 `((initial (collection ,@init)))))))
+         (fbs (lambda (v) `(associate "font-base-size" ,v)))
+         (pm (lambda (v) `(associate "page-medium" ,v))))
+    (check= (merge-documents (doc "generic" '() "A." "B.")
+                             (doc "generic" '() "A!" "B.")
+                             (doc '(tuple "generic" "french")
+                                  (list (fbs "11")) "A." "B!"))
+            (list (doc '(tuple "generic" "french") (list (fbs "11"))
+                       "A!" "B!") 0 '()))
+    (check= (merge-documents (doc '(tuple "article" "number-europe")
+                                  (list (fbs "10") (pm "paper")) "A.")
+                             (doc '(tuple "article" "number-europe" "french")
+                                  (list (fbs "10")) "A.")
+                             (doc '(tuple "book" "number-europe")
+                                  (list (fbs "12") (pm "paper")) "A."))
+            (list (doc '(tuple "book" "number-europe" "french")
+                       (list (fbs "12")) "A.") 0 '()))
+    (check= (merge-documents (doc '(tuple "article" "french") '() "A.")
+                             (doc "article" '() "A.")
+                             (doc '(tuple "article" "french" "dutch") '()
+                                  "A."))
+            (list (doc '(tuple "article" "dutch") '() "A.") 0 '()))
+    ;; a change of the same key, or of the main style, on both sides keeps
+    ;; ours and is a conflict
+    (check= (merge-documents (doc "generic" (list (fbs "10")) "A.")
+                             (doc "generic" (list (fbs "11")) "A.")
+                             (doc "generic" (list (fbs "12")) "A."))
+            (list (doc "generic" (list (fbs "11")) "A.") 1
+                  '("font-base-size")))
+    (check= (merge-documents (doc "generic" '() "A.")
+                             (doc "article" '() "A.")
+                             (doc "book" '() "A."))
+            (list (doc "article" '() "A.") 1 '("style")))
+    (check= (merge-documents (doc "generic" (list (fbs "10")) "A." "B.")
+                             (doc "generic" (list (fbs "11")) "A!" "B.")
+                             (doc "generic" (list (fbs "12")) "A." "B!"))
+            (list (doc "generic" (list (fbs "11")) "A!" "B!") 1
+                  '("font-base-size")))
+    ;; a document without a style part keeps the style of the base; the
+    ;; main style never comes from the packages
+    (check= (merge-documents (doc "article" '() "A.")
+                             '(document (TeXmacs "2.1") (body (document "A.")))
+                             (doc '(tuple "book" "french") '() "A."))
+            (list '(document (TeXmacs "2.1")
+                             (style (tuple "book" "french"))
+                             (body (document "A.")))
+                  0 '()))
+    ;; packages which are not names are kept
+    (check= (merge-documents (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x") "p") '() "A."))
+            (list (doc '(tuple "g" (macro "x") "p") '() "A.") 0 '()))
+    (check= (merge-documents (doc '(tuple "g" (macro "x")) '() "A.")
+                             (doc '(tuple "g" (macro "x") "q") '() "A.")
+                             (doc "g" '() "A."))
+            (list (doc '(tuple "g" "q") '() "A.") 0 '()))
+    ;; the message of Resolve conflict names the settings where ours was
+    ;; kept
+    (check= (git-resolve-message 0 '() 0)
+            "Merged automatically; check the result, then mark as resolved")
+    (check= (git-resolve-message 1 '("font-base-size") 0)
+            '(concat "Merged automatically" "; "
+                     (replace "settings changed on both sides, where your version was kept: %1"
+                              (verbatim "font-base-size"))
+                     "; " "check the result, then mark as resolved"))
+    ;; during a rebase, Git's ours (kept) is the upstream
+    (check= (git-resolve-message 3 '("style" "font-base-size") 1)
+            '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
+                              "1")
+                     "; "
+                     (replace "settings changed on both sides, where the upstream version was kept: %1"
+                              (verbatim "style, font-base-size"))
+                     "; " "then mark as resolved"))
+    (check= (git-resolve-message 2 '() 0)
+            '(concat (replace "Conflicts to resolve: %1; keep my version or their version of each"
+                              "2")
+                     "; " "then mark as resolved")))
   (with doc '(document (TeXmacs "2.1") (style "generic") (body (document "A.")))
     (check= (document-body doc) '(document "A."))
     (check= (document-body (document-set-body doc '(document "B.")))
@@ -719,6 +852,348 @@
                  #f 1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The rules of the structured merge (#676, git-features.md, section 5a)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (numbered-paragraphs n suffix)
+  (let loop ((k (- n 1)) (acc '()))
+    (if (< k 0) acc
+        (loop (- k 1)
+              (cons (string-append "Paragraph number" (number->string k)
+                                   " with word" (number->string k) suffix)
+                    acc)))))
+
+(define (test-merge-rules)
+  (check-group "merge rules")
+  ;; the two examples of the issue
+  (check-merge '(document "A." "B." "C." "D.")
+               '(document "A." "C." "D.")
+               '(document "A." "B." "C2." "D.")
+               '(document "A." "C2." "D.") 0)
+  (check-merge '(document "A." "B." "C." "D.")
+               '(document "A." "B." "C2." "D.")
+               '(document "A." "C." "D.")
+               '(document "A." "C2." "D.") 0)
+  (check-merge '(document "A." (theorem (document "T.")) "C.")
+               '(document "A." (theorem (document "T.")) "C2.")
+               '(document "A." (theorem (document (concat (label "l") "T.")))
+                          (todo "x") "C.")
+               '(document "A." (theorem (document (concat (label "l") "T.")))
+                          (todo "x") "C2.") 0)
+  ;; touching changes inside a paragraph conflict
+  (check-merge '(document "The quick fox jumps.")
+               '(document "The slow fox jumps.")
+               '(document "The quick red fox jumps.")
+               '(document (concat "The " (version-both "slow " "quick red ")
+                                  "fox jumps.")) 1)
+  (check-merge '(document "The quick fox jumps.")
+               '(document "The quick red fox jumps.")
+               '(document "The slow fox jumps.")
+               '(document (concat "The " (version-both "quick red " "slow ")
+                                  "fox jumps.")) 1)
+  (check-merge '(document "f is continuous on X.")
+               '(document "f is uniformly continuous on X.")
+               '(document "f is bounded on X.")
+               '(document (concat "f is " (version-both "uniformly continuous "
+                                                        "bounded ")
+                                  "on X.")) 1)
+  (check-merge '(document "We take n = 3 here.")
+               '(document "We take n = 3 or 4 here.")
+               '(document "We take n = 5 here.") #f 1)
+  (check-merge '(document "The quick brown fox.")
+               '(document "The slow brown fox.")
+               '(document "The quick red fox.") #f 1)
+  (check-merge '(document "The quick brown fox.")
+               '(document "The brown fox.")
+               '(document "The quick red fox.") #f 1)
+  ;; but not with a word in between, nor next to a formula
+  (check-merge '(document "The quick brown fox jumps.")
+               '(document "The slow brown fox jumps.")
+               '(document "The quick brown cat jumps.")
+               '(document "The slow brown cat jumps.") 0)
+  ;; unrelated paragraphs are never paired: stop words do not count
+  (check-merge '(document "The map is continuous.")
+               '(document "The map is uniformly continuous.")
+               '(document "The set is open.") #f 2)
+  (check-merge '(document "Intro." "The map is continuous." "Proof omitted." "End.")
+               '(document "Intro." "The map is uniformly continuous." "Proof omitted here." "End.")
+               '(document "Intro." "The set is open." "Proof omitted." "End.")
+               #f 2)
+  (check-merge '(document "The map f is continuous and bounded.")
+               '(document "The map f is uniformly continuous and bounded.")
+               '(document "We now prove that the set is open and closed.")
+               ;; as before the rules: the differences of the two versions
+               (compare-versions
+                '(document "The map f is uniformly continuous and bounded.")
+                '(document "We now prove that the set is open and closed."))
+               1)
+  (check-merge '(document "A." "The map f is continuous." "B.")
+               '(document "A." "We now prove that the set is open." "B.")
+               '(document "A." "The map f is continuous. See [1]." "B.")
+               '(document "A." (version-both
+                                (document "We now prove that the set is open.")
+                                (document "The map f is continuous. See [1]."))
+                          "B.") 1)
+  ;; a paragraph edited on both sides is merged word by word
+  (check-merge '(document "The first theorem holds for every space.")
+               '(document "The second theorem holds for every space.")
+               '(document "The first theorem holds for every compact space.")
+               '(document "The second theorem holds for every compact space.") 0)
+  (check-merge '(document (section "Short introduction"))
+               '(document (section "Short overview introduction"))
+               '(document (section "Short introduction here")) #f 0)
+  ;; an edit next to an insertion of the other side, in all positions
+  (let* ((p "The function is continuous on the interval.")
+         (e "The function is uniformly continuous on the interval.")
+         (x "Another remark about something else.")
+         (q "Last words."))
+    (check-merge `(document ,p ,q) `(document ,e ,q) `(document ,p ,x ,q)
+                 `(document ,e ,x ,q) 0)
+    (check-merge `(document ,p ,q) `(document ,p ,x ,q) `(document ,e ,q)
+                 `(document ,e ,x ,q) 0)
+    (check-merge `(document ,q ,p) `(document ,q ,e) `(document ,q ,x ,p)
+                 `(document ,q ,x ,e) 0)
+    (check-merge `(document ,q ,p) `(document ,q ,x ,p) `(document ,q ,e)
+                 `(document ,q ,x ,e) 0)
+    ;; not next to a rewrite, a removal or two new paragraphs
+    (with r "We now consider another topic entirely."
+      (check-merge `(document ,q ,p) `(document ,q ,x ,p) `(document ,q ,r)
+                   `(document ,q (version-both (document ,x ,p) (document ,r)))
+                   1))
+    (check-merge `(document ,q ,p) `(document ,q ,x ,p) `(document ,q)
+                 #f 1)
+    (check-merge `(document ,q ,p) `(document ,q ,x ,p)
+                 `(document ,q ,x "Other words here." ,e)
+                 #f 2))
+  ;; without real words, an edit is not certain
+  (check-merge '(document "A." "B." "C.") '(document "A." "X." "B." "C.")
+               '(document "A." "B2." "C.")
+               '(document "A." (version-both (document "X." "B.")
+                                             (document "B2."))
+                          "C.") 1)
+  (check-merge '(document "A." "B." "C.") '(document "A." "B." "B2." "C.")
+               '(document "A." "D." "C.")
+               '(document "A." (version-both (document "B." "B2.")
+                                             (document "D."))
+                          "C.") 1)
+  ;; a paragraph removed and another one inserted are not a change of it
+  (check-merge '(document "S." "Third para here." "Fourth para there." "E.")
+               '(document "S." "Third para here." "Fourth para there, edited." "E.")
+               '(document "S." "Fourth para there." "Why new." "E.")
+               '(document "S." "Fourth para there, edited." "Why new." "E.") 0)
+  (check-merge '(document "S." "The third para here." "Fourth para there." "E.")
+               '(document "S." "The third para here, edited." "Fourth para there." "E.")
+               '(document "S." "Fourth para there." "The new para here." "E.")
+               #f 1)
+  (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "C2." "Y.")
+               '(document "Z." "B." "Y.") #f 1)
+  (check-merge '(document "Z." "B." "C." "Y.") '(document "Z." "C2." "Y.")
+               '(document "Z." "C." "Y.") #f 1)
+  ;; repeated paragraphs: which one has changed is not certain
+  (check-merge '(document "Z." "P." "P." "Y.") '(document "Z." "P." "Y.")
+               '(document "Z." "P2." "P." "Y.") #f 1)
+  (check-merge '(document "Z." "P." "Y.") '(document "Z." "P." "P." "Y.")
+               '(document "Z." "P!" "Y.") #f 1)
+  (check-merge '(document "A." "E." "E.") '(document "A." "S." "E.")
+               '(document "S." "E." "E.") #f 2)
+  ;; near-identical insertions come out once, as a conflict
+  (let* ((i1 "We thank the referee for helpful coments.")
+         (i2 "We thank the referee for helpful comments.")
+         (c1 "Conclusion.")
+         (c2 "Conclusion, revised."))
+    (check-merge `(document "Intro." ,c1) `(document "Intro." ,i1 ,c1)
+                 `(document "Intro." ,i2 ,c2)
+                 `(document "Intro." (concat "We thank the referee for helpful "
+                                             (version-both "coments." "comments."))
+                            (version-both (document ,c1) (document ,c2))) 2)
+    (check-merge `(document "Intro." ,c1) `(document "Intro." ,i2 ,c2)
+                 `(document "Intro." ,i1 ,c1) #f 2)
+    (check-merge `(document "Intro." ,c1) `(document "Intro, revised." ,i2 ,c1)
+                 `(document "Intro." ,i1 ,c1) #f 2)
+    ;; also in places which do not touch
+    (check-merge '(document "The one paragraph about groups." "The other paragraph about rings.")
+                 `(document ,i1 "The one paragraph about groups." "The other paragraph about rings!")
+                 `(document "The one paragraph about groups, changed." ,i2 "The other paragraph about rings.")
+                 #f 3))
+  (check-merge '(document "A.") '(document "A." "Same text added.")
+               '(document "A." "Same text added.")
+               '(document "A." "Same text added.") 0)
+  ;; replacements of several elements: a conflict stays local
+  (check-merge '(document "Intro." "Alpha beta gamma." "Delta epsilon zeta."
+                          "Eta theta iota." "End.")
+               '(document "Intro." "Alpha beta gamma, A." "Delta epsilon zeta, A."
+                          "Eta theta iota, A." "End.")
+               '(document "Intro." "Totally new text." "Delta epsilon zeta."
+                          "Eta theta iota." "End.")
+               '(document "Intro." (version-both (document "Alpha beta gamma, A.")
+                                                 (document "Totally new text."))
+                          "Delta epsilon zeta, A." "Eta theta iota, A." "End.") 1)
+  (let* ((n 200)
+         (o (numbered-paragraphs n ""))
+         (a (numbered-paragraphs n "a"))
+         (b (cons "Something new." (cdr o)))
+         (m (merge-versions (cons 'document o) (cons 'document a) (cons 'document b))))
+    (check= (merge-conflicts m) 1)
+    (check= (cddr m) (cdr a)))
+  (let* ((n 200)
+         (o (numbered-paragraphs n ""))
+         (a (numbered-paragraphs n "a"))
+         (b (numbered-paragraphs n " b"))
+         (m (merge-versions (cons 'document o) (cons 'document a) (cons 'document b))))
+    (check= (merge-conflicts m) n))
+  (let* ((n 200)
+         (o (numbered-paragraphs n ""))
+         (a (map (lambda (k) (string-append "New " k)) o))
+         (b (map (lambda (k) (string-append k " end")) o))
+         (m (merge-versions (cons 'document o) (cons 'document a) (cons 'document b))))
+    (check= (merge-conflicts m) 0)
+    (check= (cdr m) (map (lambda (k) (string-append "New " k " end")) o)))
+  ;; a swapped paragraph is not merged with its neighbour
+  (check-merge '(document "Z." "Alpha beta gamma delta." "Epsilon zeta theta iota." "Y.")
+               '(document "Z." "Epsilon zeta theta iota, A." "Alpha beta gamma delta, A." "Y.")
+               '(document "Z." "Alpha beta gamma delta, B." "Epsilon zeta theta iota, B." "Y.")
+               #f 3)
+  ;; elements of another kind
+  (check-merge '(document (section "The main results"))
+               '(document (section "The main results here"))
+               '(document "The main results") #f 1)
+  ;; each side removes a different one of two touching paragraphs: nothing
+  ;; of them would remain (audit of #715)
+  (check-merge '(document "First paragraph alpha." "Second paragraph beta.")
+               '(document "Second paragraph beta.")
+               '(document "First paragraph alpha.") #f 2)
+  (check-merge '(document "First paragraph alpha." "Second paragraph beta.")
+               '(document "First paragraph alpha.")
+               '(document "Second paragraph beta.") #f 2)
+  (check-merge '(document "Aaaa one." "Bbbb two." "Cccc three." "Dddd four."
+                          "Eeee five." "Ffff six.")
+               '(document "Aaaa one." "Cccc three." "Eeee five.")
+               '(document "Bbbb two." "Dddd four." "Ffff six.") #f 1)
+  (check-merge '(document "I." (theorem (document "Aaaa one." "Bbbb two.")) "E.")
+               '(document "I." (theorem (document "Aaaa one.")) "E.")
+               '(document "I." (theorem (document "Bbbb two.")) "E.") #f 1)
+  (let* ((p "The map f is continuous on the whole space X.")
+         (q "The map f is continuous on all of the space X.")
+         (x "We now discuss an unrelated topic instead of this."))
+    ;; variants of each other
+    (check-merge `(document "I." ,p ,q "E.") `(document "I." ,q "E.")
+                 `(document "I." ,p "E.") #f 2)
+    ;; a removal which relies on a paragraph that the other side rewrites
+    (check-merge `(document "I." ,p ,q "E.") `(document "I." ,q "E.")
+                 `(document "I." ,p ,x "E.") #f 3)
+    (check-merge `(document "I." ,p ,q "E.") `(document "I." ,p ,x "E.")
+                 `(document "I." ,q "E.") #f 3)
+    ;; a new text closer to the removed paragraph than to its own
+    (check-merge '(document "The compact operator acts on Hilbert spaces."
+                            "The bounded functional vanishes on Banach subspaces.")
+                 '(document "The compact operator acts on Hilbert spaces.")
+                 '(document "The compact operator acts, the bounded functional vanishes on Banach subspaces."
+                            "The bounded functional vanishes on Banach subspaces.")
+                 #f 3))
+  ;; decided: a removal next to an edit of the next paragraph, a removed
+  ;; theorem with an edited proof and a proof added next to a rewritten
+  ;; theorem merge; the markup does not link a proof to its theorem
+  (check-merge '(document "Let f be a continuous function on X."
+                          "Then f is bounded on X and attains its maximum.")
+               '(document "Then f is bounded on X and attains its maximum.")
+               '(document "Let f be a continuous function on X."
+                          "Then f is bounded on X and attains its minimum.")
+               '(document "Then f is bounded on X and attains its minimum.") 0)
+  (check-merge '(document (theorem (document "Every continuous function is bounded."))
+                          (proof (document "Use the covering argument.")))
+               '(document (proof (document "Use the covering argument.")))
+               '(document (theorem (document "Every continuous function is bounded."))
+                          (proof (document "Use the finite covering argument.")))
+               '(document (proof (document "Use the finite covering argument."))) 0)
+  (check-merge '(document (theorem (document "Every continuous function is bounded on compact sets.")) "End.")
+               '(document (theorem (document "Every continuous function is bounded on compact sets."))
+                          (proof (document "By compactness.")) "End.")
+               '(document (theorem (document "Not every continuous function is bounded on noncompact sets.")) "End.")
+               '(document (theorem (document "Not every continuous function is bounded on noncompact sets."))
+                          (proof (document "By compactness.")) "End.") 0)
+  ;; the same text added by both sides, through hunks of several kinds
+  (let* ((s "Note that the constant depends on the dimension.")
+         (k "Alpha beta gamma words.")
+         (l "Delta epsilon zeta words.")
+         (ls (string-append s " " l)))
+    (check-merge `(document ,k ,l) `(document "Alpha beta gamma words, edited." ,s ,l)
+                 `(document ,k ,ls) #f 3)
+    (check-merge `(document ,k ,l) `(document ,k ,ls)
+                 `(document "Alpha beta gamma words, edited." ,s ,l) #f 3)
+    (check-merge `(document ,k ,l) `(document ,k ,s ,l) `(document ,k ,ls) #f 2)
+    (check-merge `(document ,k ,l)
+                 `(document ,k "Delta epsilon zeta words, edited." ,s)
+                 `(document ,(string-append k " " s) ,l) #f 3)
+    (check-merge `(document ,k ,l) `(document ,s "Fresh words of ours here." ,l)
+                 `(document ,k ,ls) #f 3))
+  ;; neighbours rewritten into the same text by each side
+  (check-merge '(document "I." "The main theorem holds for smooth functions."
+                          "The main lemma holds for smooth functions." "E.")
+               '(document "I." "The main statement holds for smooth functions."
+                          "The main lemma holds for smooth functions." "E.")
+               '(document "I." "The main theorem holds for smooth functions."
+                          "The main statement holds for smooth functions." "E.")
+               #f 2)
+  ;; pairing by text only, and by more than one real word
+  (check-merge '(document (theorem (document (concat (label "thm-main-result") "Short old."))) "End.")
+               '(document (theorem (document (concat (label "thm-main-result") "Short old.")))
+                          (proof (document "Obvious.")) "End.")
+               '(document (theorem (document (concat (label "thm-main-result") "Unrelated claim."))) "End.")
+               #f 2)
+  (check-merge '(document (with "font-series" "bold" "Old note.") "End.")
+               '(document (with "font-series" "bold" "Old note.") "Fresh remark." "End.")
+               '(document (with "font-series" "bold" "Unrelated idea.") "End.")
+               #f 2)
+  (check-merge '(document (image "figure-one.png" "0.5par" "" "" "") "End.")
+               '(document (image "figure-one.png" "0.5par" "" "" "") "Fresh remark." "End.")
+               '(document (image "figure-one.png" "0.8par" "" "" "") "End.")
+               #f 2)
+  (check-merge '(document "See the theorem." "End words.")
+               '(document "See the theorem." "It follows from compactness." "End words.")
+               '(document "A different theorem about measure spaces has nothing to do with this."
+                          "End words.")
+               #f 1)
+  ;; another old element is closer
+  (let* ((o1 "The compact operator acts on Hilbert spaces.")
+         (o2 "The bounded functional vanishes on Banach subspaces."))
+    (check-merge `(document ,o1 ,o2) `(document ,o1 "Fresh remark here." ,o2)
+                 `(document "The compact operator acts, the bounded functional vanishes on Banach subspaces."
+                            ,o2) #f 3))
+  ;; a word replaced by markup, and several spaces, still touch
+  (check-merge '(document "The quick fox jumps.") '(document "The slow fox jumps.")
+               '(document (concat "The quick " (em "cat") " jumps.")) #f 1)
+  (check-merge '(document "The quick  fox jumps.") '(document "The slow  fox jumps.")
+               '(document "The quick  red jumps.") #f 1)
+  ;; the pairing also holds for texts below a document
+  (check-merge '(theorem "The map f is continuous on all spaces")
+               '(theorem "The map f is continuous on all sets")
+               '(theorem "This set g was open on all spaces") #f 2)
+  (check-merge '(theorem "The bounded map f is continuous on all spaces")
+               '(theorem "The bounded map f is continuous on all sets")
+               '(theorem "The nice bounded map f is continuous on all spaces")
+               '(theorem "The nice bounded map f is continuous on all sets") 0)
+  ;; inside a block with a body, the rules apply to the paragraphs
+  (check-merge '(document (theorem (document "Para one alpha beta gamma." "Para two delta epsilon zeta."
+                                             "Para three theta iota kappa." "Para four lambda sigma omega.")))
+               '(document (theorem (document "Rewritten first totally unrelated." "Rewritten second totally unrelated."
+                                             "Rewritten third totally different." "Para four lambda sigma omega.")))
+               '(document (theorem (document "Para one alpha beta gamma." "Para two delta epsilon zeta."
+                                             "Para three theta iota kappa." "Para four lambda sigma changed.")))
+               '(document (theorem (document "Rewritten first totally unrelated." "Rewritten second totally unrelated."
+                                             "Rewritten third totally different." "Para four lambda sigma changed."))) 0)
+  ;; a paragraph moved next to a change of the other side conflicts, as
+  ;; with Git
+  (check-merge '(document "Alpha beta gamma." "Delta epsilon zeta.")
+               '(document "Delta epsilon zeta." "Alpha beta gamma.")
+               '(document "Alpha beta gamma." "Delta epsilon zeta, edited.")
+               #f 2)
+  ;; further away, moves are not recognized, as with Git
+  (check-merge '(document "Keep this." "Alpha beta gamma." "Delta epsilon zeta.")
+               '(document "Delta epsilon zeta." "Keep this." "Alpha beta gamma.")
+               '(document "Keep this." "Alpha beta gamma.")
+               '(document "Delta epsilon zeta." "Keep this." "Alpha beta gamma.") 0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Merge driver
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -731,7 +1206,8 @@
       " && git checkout -q -b theirs")
   (string-save (tm "The quick brown fox leaps.") (dir "drv/paper.tm"))
   (sh (path "drv") "git commit -q -a -m theirs && git checkout -q -b conflict")
-  (string-save (tm "The fast brown fox leaps.") (dir "drv/paper.tm"))
+  (string-save (tm-doc "<tuple|generic|french>" '() "The fast brown fox leaps.")
+               (dir "drv/paper.tm"))
   (sh (path "drv") "git commit -q -a -m conflict && git checkout -q main")
   (string-save (tm "The slow brown fox jumps.") (dir "drv/paper.tm"))
   (sh (path "drv") "git commit -q -a -m ours")
@@ -755,7 +1231,36 @@
     (git-merge-branch DR "conflict")
     (check= (git-file-state DP) 'conflicted)
     (check-true (string-contains? (string-load DP) "<version-both|"))
-    (git-run DR "merge" "--abort"))
+    ;; their packages are kept by the driver (#676)
+    ;; NOTE: git-resolve-conflict is not called here, since it opens the
+    ;; review tool, which saves the geometry of the window in the preferences
+    (check-true (string-contains? (string-load DP) "<style|<tuple|generic|french>>"))
+    ;; while resolving, the menus speak of my and their versions (#676)
+    (with-document DP
+      (lambda ()
+        (with l (menu-strings '(link version-retain-menu))
+          (check-true (in? "Keep my version" l))
+          (check-true (in? "Keep their version" l))
+          (check-false (in? "Old version" l)))))
+    (check= (git-mine-version DR) 0)
+    (git-run DR "merge" "--abort")
+    (git-invalidate DR)
+    ;; during a rebase, the user's version is the new one (theirs for Git)
+    (sh (path "drv") "git checkout -q conflict && git rebase main"
+        " > /dev/null 2>&1")
+    (git-invalidate DR)
+    (check-true (git-rebasing? DR))
+    (check= (git-mine-version DR) 1)
+    (sh (path "drv") "git rebase --abort && git checkout -q main")
+    (git-invalidate DR)
+    (check-false (git-rebasing? DR))
+    (check= (git-mine-version DR) 0)
+    (with-document DP
+      (lambda ()
+        (with l (menu-strings '(link version-retain-menu))
+          (check-true (in? "Old version" l))
+          (check-false (in? "Keep my version" l)))))
+    (buffer-close DP))
   ;; the merge of files, as the driver does it
   (let ((o (dir "m-base.tm")) (a (dir "m-ours.tm")) (b (dir "m-theirs.tm")))
     (string-save (tm "A." "B.") o)
@@ -764,7 +1269,42 @@
     (check= (git-merge-files (url->system o) (url->system a) (url->system b))
             0)
     (check-true (string-contains? (string-load a) "A!"))
-    (check-true (string-contains? (string-load a) "B!")))
+    (check-true (string-contains? (string-load a) "B!"))
+    ;; the preamble of their version is merged too (#676)
+    (string-save (tm-doc "generic" '() "A." "B.") o)
+    (string-save (tm-doc "generic" '(("page-medium" "paper")) "A!" "B.") a)
+    (string-save (tm-doc "<tuple|generic|french>" '(("font-base-size" "11"))
+                         "A." "B!") b)
+    (check= (git-merge-files (url->system o) (url->system a) (url->system b))
+            0)
+    (with t (tree->stree (tree-import a "texmacs"))
+      (check= (document-body t) '(document "A!" "B!"))
+      (check= (list-find (cdr t) (cut tm-is? <> 'style))
+              '(style (tuple "generic" "french")))
+      (check= (list-find (cdr t) (cut tm-is? <> 'initial))
+              '(initial (collection (associate "page-medium" "paper")
+                                    (associate "font-base-size" "11")))))
+    ;; a conflicting change of the preamble keeps ours and is reported
+    (string-save (tm-doc "generic" '(("font-base-size" "10")) "A.") o)
+    (string-save (tm-doc "generic" '(("font-base-size" "11")) "A.") a)
+    (string-save (tm-doc "generic" '(("font-base-size" "12")) "A.") b)
+    (check= (git-merge-files (url->system o) (url->system a) (url->system b))
+            1)
+    (check-true (string-contains? (string-load a) "<associate|font-base-size|11>")))
+  ;; outside a trusted folder, nothing is installed, and this is said (#676)
+  (make-repo (path "drv-untrusted"))
+  (with DU (dir "drv-untrusted")
+    (check-false (git-trusted? DU))
+    (with r (git-install-merge-driver-now DU)
+      (check-false (car r))
+      (check-true (string-contains? (cdr r) "not trusted")))
+    (check-false (url-exists? (url-append DU ".gitattributes")))
+    (check= (sh (path "drv-untrusted")
+                "git config --get merge.texmacs.driver || echo none")
+            "none\n"))
+  (with r (git-install-merge-driver-now (dir "drv"))
+    (check-true (car r))
+    (check= (cdr r) "TeXmacs documents will be merged structurally"))
   ;; the textual merge, when the structured one is not possible
   (let ((o (dir "m-base.txt")) (a (dir "m-ours.txt")) (b (dir "m-theirs.txt")))
     (string-save "line\n" o)
@@ -1223,35 +1763,48 @@
 ;; Main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (run-groups)
+  (setup)
+  (run-group test-subroutines)
+  (run-group test-trust)
+  (run-group test-detection)
+  (run-group test-pinning)
+  (run-group test-states)
+  (run-group test-history)
+  (run-group test-pages)
+  (run-group test-branches)
+  (run-group test-conflicts)
+  (run-group test-upstream)
+  (run-group test-merge)
+  (run-group test-merge-rules)
+  (run-group test-driver)
+  (run-group test-unsaved)
+  (run-group test-safety)
+  (run-group test-restore)
+  (run-group test-signing)
+  (run-group test-project)
+  (run-group test-names)
+  (run-group test-shortcuts)
+  (run-group test-new-repositories)
+  (run-group test-robustness))
+
 (tm-define (git-test-failures)
   (check-suite "git")
-  (if (not (string-starts? (shell "git --version 2>/dev/null") "git version"))
-      (display* "  git is not available, the suite is skipped\n")
-      (begin
-        (save-preferences)
-        (setup)
-        (run-group test-subroutines)
-        (run-group test-trust)
-        (run-group test-detection)
-        (run-group test-pinning)
-        (run-group test-states)
-        (run-group test-history)
-        (run-group test-pages)
-        (run-group test-branches)
-        (run-group test-conflicts)
-        (run-group test-upstream)
-        (run-group test-merge)
-        (run-group test-driver)
-        (run-group test-unsaved)
-        (run-group test-safety)
-        (run-group test-restore)
-        (run-group test-signing)
-        (run-group test-project)
-        (run-group test-names)
-        (run-group test-shortcuts)
-        (run-group test-new-repositories)
-        (run-group test-robustness)
-        (restore-preferences)
-        (version-tool-reset)
-        (shell "rm -rf '" T "'")))
+  (cond
+    ((or (os-mingw?) (os-win32?))
+     ;; the repositories of the suite are made by command lines with the
+     ;; syntax of /bin/sh, while eval-system runs no shell on Windows (the
+     ;; Git support itself on Windows: the group git of the suite version)
+     (display* "  the suite needs a POSIX shell, it is skipped on Windows\n"))
+    ((not (string-starts? (shell "git --version 2>/dev/null") "git version"))
+     (display* "  git is not available, the suite is skipped\n"))
+    (else
+      (save-preferences)
+      (set! keep-dialogues? #t)
+      ;; an error outside the groups also comes back here
+      (run-group run-groups)
+      (set! keep-dialogues? #f)
+      (restore-preferences)
+      (version-tool-reset)
+      (shell "rm -rf '" T "'")))
   (check-end))

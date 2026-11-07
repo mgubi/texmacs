@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -19,6 +20,7 @@
 #include "typesetter.hpp"
 #include "drd_mode.hpp"
 #include "dictionary.hpp"
+#include "new_style.hpp"
 #include "blackbox.hpp"
 #include "iterator.hpp"
 
@@ -41,6 +43,22 @@ edit_env_rep::exec_string (tree t) {
 /******************************************************************************
 * Rewriting (scheme-like macro expansion)
 ******************************************************************************/
+
+static tree
+rewrite_include (edit_env_rep* env, url base_file_name, url file_rel) {
+  if (file_rel == base_file_name)
+    return tree (_ERROR, "invalid self include");
+  if (inclusion_busy (file_rel))
+    return tree (_ERROR, "inclusion cycle");
+  // the included document, from the cache of the inclusions, is looked up
+  // as a reference is ("i" and the file, see lookup_value): it is an input
+  // of the bridge of the include (bridge_rewrite), which is typeset again
+  // when the file was saved or loaded again (another tree in the cache:
+  // reset_inclusion), also when nothing else changed
+  tree doc= load_inclusion (file_rel);
+  env->record_lookup ("i" * as_string (file_rel), doc);
+  return doc;
+}
 
 // Hack to transmit the current environment back to C++
 // across the Scheme level, and to maintain reentrancy.
@@ -111,10 +129,8 @@ edit_env_rep::rewrite (tree t) {
       if (N(t) == 0) return tree (_ERROR, "invalid include");
       url file_name= url_unix (exec_string (t[0]));
       url file_rel = relative (base_file_name, file_name);
-      if (file_rel == base_file_name)
-        return tree (_ERROR, "invalid self include");
       //cout << "file_name= " << as_tree (file_name) << LF;
-      return load_inclusion (file_rel);
+      return rewrite_include (this, base_file_name, file_rel);
     }
   case WITH_PACKAGE:
     {
@@ -166,6 +182,16 @@ edit_env_rep::exec_rewrite (tree t) {
   return exec (rewrite (t));
 }
 
+tree
+edit_env_rep::exec_include (tree t) {
+  if (N(t) == 0) return exec_rewrite (t);
+  url file_name= url_unix (exec_string (t[0]));
+  url file_rel = relative (base_file_name, file_name);
+  tree r= rewrite_include (this, base_file_name, file_rel);
+  inclusion_guard guard (file_rel);
+  return exec (r);
+}
+
 bool
 edit_env_rep::exec_until_rewrite (tree t, path p, string var, int level) {
   /*
@@ -187,10 +213,40 @@ texmacs_exec (edit_env env, tree cmd) {
 * Evaluation of trees
 ******************************************************************************/
 
+// A limit on the work of the evaluator, for the programs that evaluate text
+// which does not come from the person (texmacs --mcp checks what an agent
+// writes): exec_budget_start (n) makes the evaluator give an error tree after
+// n steps (a macro that calls its argument twice, ten times nested, would take
+// a thousand years), exec_budget_end () gives what is left (negative if the
+// limit was reached). The recursion of the macros stops with an error tree when
+// the stack is nearly full (stack_guard.hpp), here and in the typesetter
+// (concat_macro.cpp, bridge_compound.cpp): a macro that calls itself would else
+// overflow the stack of the process, which then crashes.
+static bool exec_budget_on= false;
+static long exec_budget_left= 0;
+
+void
+exec_budget_start (int n) {
+  exec_budget_on  = true;
+  exec_budget_left= n;
+}
+
+int
+exec_budget_end () {
+  long left= exec_budget_left;
+  exec_budget_on= false;
+  exec_budget_left= 0;
+  if (left > 2000000000L) left= 2000000000L;
+  if (left < -2000000000L) left= -2000000000L;
+  return (int) left;
+}
+
 tree
 edit_env_rep::exec (tree t) {
   // cout << "Execute: " << t << "\n";
   if (is_atomic (t)) return t;
+  if (exec_budget_on && --exec_budget_left < 0)
+    return tree (_ERROR, "evaluation budget");
   switch (L(t)) {
   case MOVE:
   case SHIFT:
@@ -306,7 +362,17 @@ edit_env_rep::exec (tree t) {
   case EXTERN:
     return exec_rewrite (t);
   case VAR_INCLUDE:
-    return exec_rewrite (t);
+    {
+      // as in bridge_rewrite_rep::my_typeset
+      if (N(t) == 0) return exec_include (t);
+      url save_name= cur_file_name;
+      cur_file_name= relative (base_file_name, url_unix (exec_string (t[0])));
+      secure= is_secure (cur_file_name);
+      tree r= exec_include (t);
+      cur_file_name= save_name;
+      secure= is_secure (cur_file_name);
+      return r;
+    }
   case WITH_PACKAGE:
     return exec_rewrite (t);
   case USE_PACKAGE:
@@ -636,6 +702,8 @@ edit_env_rep::exec_provide (tree t) {
   return tree (ASSIGN, r, v);
 }
 
+static int keep_patterns_off= 0;
+
 tree
 edit_env_rep::exec_with (tree t) {
   int i, n= N(t), k= (n-1)>>1; // is k=0 allowed ?
@@ -649,7 +717,10 @@ edit_env_rep::exec_with (tree t) {
       string var= var_t->label;
       vars[i]= var;
       oldv[i]= read (var);
+      // (a pattern is kept by the HTML export only as a background color)
+      if (var != BG_COLOR) keep_patterns_off++;
       newv[i]= exec (t[(i<<1)+1]);
+      if (var != BG_COLOR) keep_patterns_off--;
     }
     else {
       STACK_DELETE_ARRAY(vars);
@@ -661,19 +732,78 @@ edit_env_rep::exec_with (tree t) {
 
   // for (i=0; i<k; i++) monitored_write_update (vars[i], newv[i]);
   for (i=0; i<k; i++) write_update (vars[i], newv[i]);
+  int formula= -1;
+  if (record_formulas && formula_depth == 0)
+    for (i=0; i<k; i++)
+      if ((vars[i] == MODE && newv[i] == "math" && oldv[i] != "math") ||
+          (vars[i] == "html-formula" && newv[i] == "display"))
+        formula= record_formula ();
+  if (formula >= 0) formula_depth++;
   tree r= exec (t[n-1]);
+  if (formula >= 0) formula_depth--;
   for (i=k-1; i>=0; i--) write_update (vars[i], oldv[i]);
 
-  tree u (WITH, n);
-  for (i=0; i<k; i++) {
-    u[i<<1]    = vars[i];
-    u[(i<<1)+1]= tree (QUOTE, newv[i]);
+  // a recorded formula has the number of its environment as first variable
+  int o= (formula >= 0? 2: 0);
+  tree u (WITH, n + o);
+  if (formula >= 0) {
+    u[0]= "html-formula-env";
+    u[1]= as_string (formula);
   }
-  u[n-1]= r;
+  for (i=0; i<k; i++) {
+    u[o + (i<<1)]    = vars[i];
+    u[o + (i<<1) + 1]= tree (QUOTE, newv[i]);
+  }
+  u[n-1+o]= r;
   STACK_DELETE_ARRAY(vars);
   STACK_DELETE_ARRAY(oldv);
   STACK_DELETE_ARRAY(newv);
   return u;
+}
+
+/******************************************************************************
+* The environments of the formulas of the HTML export (see exec_html)
+******************************************************************************/
+
+void
+edit_env_rep::start_recording_formulas (hashmap<string,tree> base,
+                                        int first) {
+  record_formulas= true;
+  formula_depth= 0;
+  formula_first= first;
+  formula_base= base;
+  formula_envs= array<hashmap<string,tree> > ();
+  // the variables written from now on: env_table::touch
+  env.follow= true;
+  env.touched= array<string> ();
+  env.touched_set= hashmap<string,bool> (false);
+}
+
+void
+edit_env_rep::stop_recording_formulas () {
+  record_formulas= false;
+  env.follow= false;
+  env.touched= array<string> ();
+  env.touched_set= hashmap<string,bool> (false);
+}
+
+int
+edit_env_rep::record_formula () {
+  // the variables which differ from formula_base, env_absent () for those
+  // which went; the same number as the formula before when they are the
+  // same (equal formulas elsewhere share their images, see tmhtml-png)
+  hashmap<string,tree> diff (UNINIT);
+  for (int i=0; i<N(env.touched); i++) {
+    string s= env.touched[i];
+    tree v= env.value (s);
+    tree* b= formula_base->find (s);
+    if (b == NULL? !strong_equal (v, env_absent ()): !strong_equal (v, *b))
+      diff (s)= v;
+  }
+  int n= N(formula_envs);
+  if (n > 0 && formula_envs[n-1] == diff) return formula_first + n-1;
+  formula_envs << diff;
+  return formula_first + n;
 }
 
 tree
@@ -698,6 +828,8 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
+    if (stack_nearly_full ())
+      return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);
@@ -897,7 +1029,8 @@ edit_env_rep::exec_arg (tree t) {
     return tree (_ERROR, "bad arg");
   if (is_nil (macro_arg) || (!macro_arg->item->contains (r->label)))
     return tree (_ERROR, "arg " * r->label);
-  r= macro_arg->item [r->label];
+  string name= r->label;
+  r= macro_arg->item [name];
   list<hashmap<string,tree> > old_var= macro_arg;
   list<hashmap<string,path> > old_src= macro_src;
   if (!is_nil (macro_arg)) macro_arg= macro_arg->next;
@@ -913,7 +1046,7 @@ edit_env_rep::exec_arg (tree t) {
       r= r[nr];
     }
   }
-  if (err) r= tree (_ERROR, "arg " * r->label);
+  if (err) r= tree (_ERROR, "arg " * name);
   else r= exec (r);
   macro_arg= old_var;
   macro_src= old_src;
@@ -1235,6 +1368,8 @@ edit_env_rep::exec_use_package (tree t) {
     else name= styp * (as_string (t[i]) * string (".ts"));
     name= resolve (name);
     //cout << as_string (t[i]) << " -> " << name << "\n";
+    // (for the cache of the style which is computed, see new_style.cpp)
+    if (!is_none (name)) style_note_file (name);
     string doc_s;
     if (!load_string (name, doc_s, false)) {
       tree doc= texmacs_document_to_tree (doc_s);
@@ -1245,59 +1380,12 @@ edit_env_rep::exec_use_package (tree t) {
   return "";
 }
 
-// A name in a module or a plugin, as a document gives it: what it says is
-// put into Scheme which is evaluated, so it is checked to be a name and no
-// more (a document could otherwise run any code when it was typeset)
-static bool
-module_name_char (char c) {
-  return is_alpha (c) || is_digit (c) ||
-         c == '-' || c == '_' || c == '+' || c == '*' || c == '!' ||
-         c == '?' || c == '=';
-}
-
-static bool
-is_plugin_name (string s) {
-  if (N(s) == 0) return false;
-  for (int i= 0; i < N(s); i++)
-    if (!module_name_char (s[i])) return false;
-  return true;
-}
-
-// one or more modules, "(utils misc doxygen)" or "(a b) (c d)": lists of
-// names, not nested
-static bool
-is_module_list (string s) {
-  int i= 0, n= N(s), groups= 0;
-  while (true) {
-    while (i < n && s[i] == ' ') i++;
-    if (i == n) return groups > 0;
-    if (s[i] != '(') return false;
-    i++;
-    int names= 0;
-    while (true) {
-      while (i < n && s[i] == ' ') i++;
-      if (i < n && s[i] == ')') { i++; break; }
-      int start= i;
-      while (i < n && module_name_char (s[i])) i++;
-      if (i == start) return false;
-      names++;
-    }
-    if (names == 0) return false;
-    groups++;
-  }
-}
-
 tree
 edit_env_rep::exec_use_module (tree t) {
   int i, n= N(t);
   for (i=0; i<n; i++) {
     string s= exec_string (t[i]);
-    if (starts (s, "(")) {
-      if (is_module_list (s)) eval ("(use-modules " * s * ")");
-      else std_error << "Not a module: " << s << "\n";
-    }
-    else if (is_plugin_name (s)) eval ("(plugin-initialize '" * s * ")");
-    else if (s != "") std_error << "Not a plugin: " << s << "\n";
+    if (!use_module (s)) continue;
     assign (THE_MODULES, read (THE_MODULES) * tuple (s));
   }
   return "";
@@ -2056,33 +2144,92 @@ edit_env_rep::exec_set_binding (tree t) {
   }
   //cout << t << ": " << keys << " -> " << value << "\n";
 
-  for (int i=0; i<N(keys); i++) {
-    string key= keys[i]->label;
-    tree old_value= local_ref[key];
-    string part= as_string (read ("current-part"));
-    if (is_func (old_value, TUPLE) && (N(old_value) >= 2))
-      local_ref (key)= tuple (copy (value), old_value[1]);
-    else local_ref (key)= tuple (copy (value), "?");
-    if (cur_file_name != base_file_name || N(part) != 0) {
-      string extra;
-      if (cur_file_name != base_file_name)
-	extra << as_string (delta (base_file_name, cur_file_name));
-      if (N(part) != 0)
-	extra << "#" << part (1, N(part));
-      local_ref (key) << extra;
+  string part= (N(keys) == 0? string (""): as_string (read ("current-part")));
+  string extra;
+  if (cur_file_name != base_file_name || N(part) != 0) {
+    if (cur_file_name != base_file_name)
+      extra << as_string (delta (base_file_name, cur_file_name));
+    if (N(part) != 0)
+      extra << "#" << part (1, N(part));
+  }
+  for (int i=0; i<N(keys); i++)
+    write_binding (keys[i]->label, value, extra);
+  return tree (HIDDEN_BINDING, keys, value);
+}
+
+void
+edit_env_rep::write_binding (string key, tree value, string extra) {
+  // (the record gets the value as it is in the table, so that the binding
+  // is found there by its pointer when the record is written again)
+  tree stored= store_binding (key, value, extra);
+  if (rec_bindings != NULL) (*rec_bindings) << tuple (key, stored, extra);
+}
+
+bool
+edit_env_rep::was_rewritten (string key, tree value) {
+  // whether one of the bindings of a key which the last complete pass
+  // wrote several times wrote this value
+  tree* vals= rewritten->find (key);
+  if (vals == NULL) return false;
+  for (int i=0; i<N(*vals); i++)
+    if ((*vals)[i] == value) return true;
+  return false;
+}
+
+tree
+edit_env_rep::store_binding (string key, tree value, string extra) {
+  // (not written when it is there already: see labels_stamp; the binding
+  // would be the tuple of the value, the page of the one there or "?", and
+  // the extra part: it is there when the one there has the same value and
+  // extra part, which is checked without making it, since the bridges used
+  // again write all theirs again at each pass)
+  tree* there= local_ref->find (key);
+  tree old_value= (there == NULL? tree (UNINIT): *there);
+  int n= (N(extra) != 0? 3: 2);
+  bool same= there != NULL && is_func (old_value, TUPLE, n) &&
+             old_value[0] == value &&
+             (n == 2 || (is_atomic (old_value[2]) &&
+                         old_value[2]->label == extra));
+  tree stored= (same? old_value[0]: tree ());
+  if (!same) {
+    tree now= tuple (value, (is_func (old_value, TUPLE) && N(old_value) >= 2?
+                             old_value[1]: tree ("?")));
+    if (N(extra) != 0) now << tree (extra);
+    now= copy (now);
+    local_ref (key)= now;
+    stored= now[0];
+  }
+  if (complete && touched [key]) {
+    // (the value there is the one which this pass wrote before)
+    if (!rewritten->contains (key))
+      rewritten (key)= tuple (is_tuple (old_value) && N(old_value) >= 1?
+                              old_value[0]: tree (UNINIT));
+    // (a copy: the value may be a tree of the document, which is edited)
+    rewritten (key) << copy (value);
+  }
+  touched (key)= true;
+  if (!same && is_tuple (old_value) && N(old_value) >= 1) {
+    if (!complete) {
+      // what read the old value and was not typeset again by this pass
+      // is typeset again by a complete pass (see typeset in
+      // edit_typeset.cpp); not for a key which several bindings write
+      // (a label defined twice) when the value is one which they wrote:
+      // each of them but the last one differs from the value in the
+      // table, which is the last one
+      if (old_value[0] != value && !was_rewritten (key, value))
+        rebound= true;
     }
-    touched (key)= true;
-    if (complete && is_tuple (old_value) && N(old_value) >= 1) {
+    else {
       string old_s= tree_as_string (old_value[0]);
       string new_s= tree_as_string (value);
       if (new_s != old_s && !starts (key, "auto-")) {
         redefined << tree (TUPLE, key, new_s);
-	//if (new_s == "") typeset_warning << "Redefined " << key << LF;
-	//else typeset_warning << "Redefined " << key << " as " << new_s << LF;
+        //if (new_s == "") typeset_warning << "Redefined " << key << LF;
+        //else typeset_warning << "Redefined " << key << " as " << new_s << LF;
       }
     }
   }
-  return tree (HIDDEN_BINDING, keys, value);
+  return stored;
 }
 
 tree
@@ -2091,12 +2238,15 @@ edit_env_rep::exec_get_binding (tree t) {
   string key= exec_string (t[0]);
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  tree value= lookup ((type == 1 ? "1" : "0") * key);
-  if (complete && value == tree (UNINIT))
-    if (get_bool (WARN_MISSING)) {
-      missing (key)= tree (GET_BINDING, key);
-      //typeset_warning << "Undefined reference " << key << LF;
-    }
+  // (a lookup under warn-missing false, as tmdoc's if-ref, is looked up
+  // with the keys of has-binding: a bridge used again does not tell it as
+  // missing, see replay_missing)
+  bool warn= get_bool (WARN_MISSING);
+  tree value= lookup ((warn? (type == 1 ? "1" : "0"): (type == 1 ? "3" : "2")) * key);
+  if (value == tree (UNINIT) && warn && complete) {
+    missing (key)= tree (GET_BINDING, key);
+    //typeset_warning << "Undefined reference " << key << LF;
+  }
   //cout << t << ": " << key << " -> " << value << "\n";
   return value;
 }
@@ -2107,7 +2257,8 @@ edit_env_rep::exec_has_binding (tree t) {
   string key= exec_string (t[0]);
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  tree value= lookup ((type == 1 ? "1" : "0") * key);
+  // ("2" and "3": not a reference which is to be told when missing)
+  tree value= lookup ((type == 1 ? "3" : "2") * key);
   if (value == tree (UNINIT)) return "false";
   else return "true";
 }
@@ -2137,10 +2288,21 @@ edit_env_rep::exec_has_binding (tree t) {
 * makes (in an included file...) takes the next number each time. The
 * name is auto-n, as with the counter: when the labels were numbered in
 * the order in which they are made, the names are those of the counter.
+* The parts of a document (show-part, hide-part: set-part in
+* std-automatic.ts) start the counter again, and the labels of a part
+* are named after it: each part has a sequence of its own, with its own
+* epoch, so that a tag which goes to another part takes new numbers there.
+* The addendum of the buffer holds the epoch and the next number of the
+* labels outside of the parts, then for each part its number (auto_part),
+* its epoch and its next number.
 * This is what a document gets when it is loaded, and again when it is
 * updated (typeset_renumber_labels in edit_typeset.cpp): the epoch of the
 * buffer changes, the numbers of another epoch are not used, and a
-* typesetting of the whole document numbers the labels again. Between two
+* typesetting of the whole document numbers the labels again. Each label
+* reads the variable auto-epoch, which the update changes: with the inputs
+* of the bridges (typeset_inputs_mode), the bridges which make labels are
+* typeset again, in the order of the document, and the others are used
+* again when the names of the labels did not change. Between two
 * updates the names of the labels already made stay. Outside of a
 * typesetting pass (a converter which expands the macros of a copy of the
 * document) the counter names the labels, which gives the same names in a
@@ -2151,8 +2313,9 @@ edit_env_rep::exec_has_binding (tree t) {
 * last name which was given, so that the tag which makes a label is
 * typeset again when the label before it is another one. The variable
 * auto-open holds, for the tag and for the tags around it in the document,
-* which of their labels was made last (tag.k, the tag being the number of
-* its first label): a tag may make other labels after those of a tag
+* which of their labels was made last (tag.k, the tag being the epoch of
+* its sequence and the number of its first label: e:n, since the sequences
+* of the parts all start at 1): a tag may make other labels after those of a tag
 * inside it. It is a variable, and not a count kept with the tag, because
 * the labels of a tag may be made by several bridges, of which some are
 * not typeset again.
@@ -2172,25 +2335,39 @@ auto_label_data (tree t, array<int>& a) {
   return true;
 }
 
+static int
+auto_part (string part) {
+  // (the number of a part, from 1, for the addendum of the buffer)
+  static hashmap<string,int> parts (0);
+  if (!parts->contains (part)) parts (part)= N(parts) + 1;
+  return parts [part];
+}
+
 static void
-auto_labels_numbers (tree t, int epoch, array<int>& r) {
+auto_labels_numbers (tree t, array<int>& epochs, array<int>& r) {
   array<int> a;
-  if (auto_label_data (t, a) && N(a) >= 1 && a[0] == epoch) {
+  if (auto_label_data (t, a) && N(a) >= 1 && contains (a[0], epochs)) {
     r << -1;
     for (int i=1; i<N(a); i++) r << a[i];
   }
   if (is_compound (t))
-    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epoch, r);
+    for (int i=0; i<N(t); i++) auto_labels_numbers (t[i], epochs, r);
 }
 
 array<int>
 auto_labels_numbers (tree root) {
   // the numbers of the labels of the tags, in the order of the document,
   // and the next number
-  array<int> b, r;
+  array<int> b, r, epochs;
   if (!auto_label_data (root, b) || N(b) < 2) return r;
-  auto_labels_numbers (root, b[0], r);
+  epochs << b[0];
+  for (int j=2; j+2<N(b); j+=3) epochs << b[j+1];
+  // (the tags below the root: the root holds the sequences, whose epochs
+  // change at each renumbering)
+  if (is_compound (root))
+    for (int i=0; i<N(root); i++) auto_labels_numbers (root[i], epochs, r);
   r << b[1];
+  for (int j=2; j+2<N(b); j+=3) r << b[j] << b[j+2];
   return r;
 }
 
@@ -2200,6 +2377,7 @@ auto_labels_renumber (tree root) {
   if (!auto_label_data (root, r) || N(r) < 2) return false;
   r[0]= ++auto_epoch;
   r[1]= 1;
+  for (int j=2; j+2<N(r); j+=3) { r[j+1]= ++auto_epoch; r[j+2]= 1; }
   return true;
 }
 
@@ -2245,6 +2423,10 @@ edit_env_rep::exec_auto_id (tree t) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }
+  // (the epoch of the numbering, which changes when the labels are
+  // numbered again: the bridges which make labels read it, so that only
+  // they are typeset again then)
+  if (fresh) (void) provides ("auto-epoch");
   string last= "";
   if (provides ("auto-last")) last= as_string (read ("auto-last"));
   if (!fresh) {
@@ -2259,6 +2441,16 @@ edit_env_rep::exec_auto_id (tree t) {
     (void) tree_addendum_new (auto_buffer, ADDENDUM_AUTO_ID,
                               close_box<array<int> > (r), false);
   }
+  // the sequence of the part: its epoch is r[e] and its next number r[e+1]
+  int e= 0;
+  string part= "";
+  if (provides ("current-part")) part= as_string (read ("current-part"));
+  if (N(part) != 0) {
+    int id= auto_part (part);
+    for (int j=2; j+2<N(r) && e == 0; j+=3)
+      if (r[j] == id) e= j+1;
+    if (e == 0) { e= N(r) + 1; r << id << (++auto_epoch) << 1; }
+  }
   int number;
   tree tag, root;
   path where;
@@ -2271,17 +2463,19 @@ edit_env_rep::exec_auto_id (tree t) {
       (void) tree_addendum_new (tag, ADDENDUM_AUTO_ID,
                                 close_box<array<int> > (a), false);
     }
-    if (a[0] != r[0]) { a->resize (1); a[0]= r[0]; }
-    if (N(a) == 1) a << r[1]++;
-    string key= as_string (a[1]);
+    if (a[0] != r[e]) { a->resize (1); a[0]= r[e]; }
+    if (N(a) == 1) a << r[e+1]++;
+    // (the key of a tag: the epoch of its sequence and its first number,
+    // since each part has a sequence of its own, starting at 1)
+    string key= as_string (a[0]) * ":" * as_string (a[1]);
     // the tags around this one which have labels
     array<string> around;
     tree up= root;
     for (path q= where->next; !is_nil (q) && !is_nil (q->next); q= q->next) {
       up= up[q->item];
       array<int> b;
-      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[0])
-        around << as_string (b[1]);
+      if (auto_label_data (up, b) && N(b) >= 2 && b[0] == r[e])
+        around << (as_string (b[0]) * ":" * as_string (b[1]));
     }
     // which of their labels each of them made last, and this tag
     tree open (TUPLE), now (TUPLE);
@@ -2295,12 +2489,12 @@ edit_env_rep::exec_auto_id (tree t) {
       if (base == key) k= (dot < 0 ? 1 : as_int (s (dot + 1, N(s)))) + 1;
       else if (contains (base, around)) now << open[i];
     }
-    if (N(a) - 1 < k) a << r[1]++;
+    while (N(a) - 1 < k) a << r[e+1]++;
     number= a[k];
     now << tree (key * "." * as_string (k));
     if (now != open) monitored_write ("auto-open", now);
   }
-  else number= r[1]++;
+  else number= r[e+1]++;
   string name= as_string (number);
   if (name != last) monitored_write ("auto-last", name);
   return "";
@@ -2313,19 +2507,69 @@ edit_env_rep::exec_get_attachment (tree t) {
   return lookup ("a" * key);
 }
 
+// What stands for a pattern which cannot be made (no image, bad sizes) or
+// which is off: its base color if it has a valid one, else the paper, which
+// is read from the background color without evaluating it
+static tree
+pattern_fallback (tree base, tree bg) {
+  if (base != "") return base;
+  return tree (get_paper_color (bg));
+}
+
+// Whether a pattern may be kept in the HTML export (html-keep-patterns) when
+// its image is not found, and where it is a background: the label must be a
+// plain relative or absolute file name (no scheme, no quotes, no spaces)
+static bool
+safe_pattern_label (string s) {
+  if (s == "" || starts (s, "//")) return false;
+  for (int i=0; i<N(s); i++) {
+    char c= s[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') ||
+          c == '.' || c == '_' || c == '~' || c == '/' || c == '%' ||
+          c == '-'))
+      return false;
+  }
+  return true;
+}
+
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (_ERROR, "bad pattern");
-  if (no_patterns && N(t) == 4 && is_atomic (t[3])) return exec (t[3]);
-  url im= url_system (exec_string (t[0]));
-  url image= resolve_pattern (relative (base_file_name, im));
-  if (is_none (image)) return "white";
+  // the base color, if it is a valid one (not none, not empty), is what
+  // stands for the image when patterns are off or the image is missing
+  tree base= "", arg5= "";
+  if (N(t) == 5) {
+    arg5= exec (t[4]);
+    if (is_atomic (arg5) && is_color_name (arg5->label)) base= arg5;
+  }
+  if (no_patterns && N(t) >= 4) {
+    if (base != "") return base;
+    // else a color as 4th argument, as in old documents
+    if (is_atomic (t[3]) && (N(t) == 4 || t[3] != "")) return exec (t[3]);
+  }
+  string label= exec_string (t[0]);
+  url image= pattern_file (base_file_name, label);
+  if (is_none (image)) {
+    (void) picture_lookup ('q', label, image, 0, 0);
+    // the HTML export keeps a pattern whose image is not found here (the
+    // image may be where the page is served): the page shows it or not
+    if (env.contains ("html-keep-patterns") && keep_patterns_off == 0 &&
+        N(t) >= 3 && safe_pattern_label (label)) {
+      tree r (_PATTERN, label, exec_string (t[1]), exec_string (t[2]));
+      if (N(t) >= 4) r << exec (t[3]);
+      if (N(t) == 5) r << arg5;
+      return r;
+    }
+    return pattern_fallback (base, env [BG_COLOR]);
+  }
   int imw_pt, imh_pt;
   image_size (image, imw_pt, imh_pt);
+  (void) picture_lookup ('q', label, image, imw_pt, imh_pt);
   double pt= ((double) dpi*PIXEL) / 72.0;
   SI imw= (SI) (((double) imw_pt) * pt);
   SI imh= (SI) (((double) imh_pt) * pt);
-  if (imw <= 0 || imh <= 0) return "white";
+  if (imw <= 0 || imh <= 0) return pattern_fallback (base, env [BG_COLOR]);
   if (N(t)<3) return tree (_ERROR, "bad pattern");
   string w= exec_string (t[1]);
   string h= exec_string (t[2]);
@@ -2341,13 +2585,13 @@ edit_env_rep::exec_pattern (tree t) {
     if (is_int (h)) w= as_string ((SI) ((as_double (h) * imw) / imh));
     else if (is_percentage (h))
       w= as_string (100.0 * (as_percentage (h) * imw) / imh) * "@";
-    else return "white";
+    else return pattern_fallback (base, env [BG_COLOR]);
   }
   else if (h == "" && w != "") {
     if (is_int (w)) h= as_string ((SI) ((as_double (w) * imh) / imw));
     else if (is_percentage (w))
       h= as_string (100.0 * (as_percentage (w) * imh) / imw) * "@";
-    else return "white";
+    else return pattern_fallback (base, env [BG_COLOR]);
   }
   else if (w == "" && h == "") {
     w= as_string (imw);
@@ -2355,9 +2599,10 @@ edit_env_rep::exec_pattern (tree t) {
   }
   else if ((!is_int (w) && !is_percentage (w) && !is_percentage (w, "@")) ||
 	   (!is_int (h) && !is_percentage (h) && !is_percentage (h, "@")))
-    return "white";
+    return pattern_fallback (base, env [BG_COLOR]);
   tree r (_PATTERN, as_string (image), w, h);
-  if (N(t) == 4) r << exec (t[3]);
+  if (N(t) >= 4) r << exec (t[3]);
+  if (N(t) == 5) r << arg5;
   return r;
 }
 
@@ -2865,6 +3110,12 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   case HLINK:
   case ACTION:
     return exec_until_compound (t, p, var, level);
+  case AUTO_ID:
+    // (as the macro auto-id of a style without the primitive: the counter
+    // goes on, and no number of the document is given out)
+    if (N(t) >= 1 && exec_string (t[0]) == "new")
+      (void) exec (compound ("inc-auto"));
+    return false;
   default:
     if (L(t) < START_EXTENSIONS) {
       int i, n= N(t);

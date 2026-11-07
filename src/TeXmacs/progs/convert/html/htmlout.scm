@@ -79,12 +79,42 @@
   (htmlout-text "<" (symbol->string s) ">")
   (htmlout-indent s 2))
 
+;; The value of an attribute is written between double quotes: a quote, <
+;; and > in it are written as entities, and so is an & which does not start
+;; an entity, so that the value cannot end the attribute and start another
+;; one (onmouseover=...) or a tag.
+(tm-define (htmlout-entity-end s i)
+  ;; the position of the ; of an entity &name; or &#123; which starts at i
+  (let ((n (string-length s)))
+    (let loop ((j (+ i 1)))
+      (cond ((or (>= j n) (> (- j i) 32)) #f)
+            ((== (string-ref s j) #\;) (and (> j (+ i 1)) j))
+            ((or (char-alphabetic? (string-ref s j))
+                 (char-numeric? (string-ref s j))
+                 (and (== j (+ i 1)) (== (string-ref s j) #\#)))
+             (loop (+ j 1)))
+            (else #f)))))
+
+(tm-define (htmlout-attribute-value s)
+  (if (not (string? s)) s
+      (let ((n (string-length s)))
+        (let loop ((i 0) (acc '()))
+          (if (>= i n)
+              (apply string-append (reverse acc))
+              (let ((c (string-ref s i)))
+                (cond ((== c #\") (loop (+ i 1) (cons "&quot;" acc)))
+                      ((== c #\<) (loop (+ i 1) (cons "&lt;" acc)))
+                      ((== c #\>) (loop (+ i 1) (cons "&gt;" acc)))
+                      ((and (== c #\&) (not (htmlout-entity-end s i)))
+                       (loop (+ i 1) (cons "&amp;" acc)))
+                      (else (loop (+ i 1) (cons (string c) acc))))))))))
+
 (define (htmlout-tag x)
   (if (== (cadr x) "<implicit>")
       (output-text " " (symbol->string (car x)))
       (begin
         (output-text " " (symbol->string (car x)) "=")
-        (output-verbatim "\"" (cadr x) "\""))))
+        (output-verbatim "\"" (htmlout-attribute-value (cadr x)) "\""))))
 
 (define (htmlout-attr<=? a1 a2)
   (string<=? (symbol->string (car a1)) (symbol->string (car a2))))
@@ -129,6 +159,8 @@
 (define (htmlout x)
   (cond ((string? x) (htmlout-text x))
 	((null? x) (noop))
+	((func? x '*RAW*) ; markup as it is: neither broken into lines nor scanned
+	 (apply output-verbatim (cdr x)))
 	((or (func? x '!concat) (func? x '*TOP*))
 	 (for-each htmlout (cdr x)))
 	((htmlout-p-simplify? x)

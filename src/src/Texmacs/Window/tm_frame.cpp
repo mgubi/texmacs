@@ -20,7 +20,8 @@
 ******************************************************************************/
 
 tm_frame_rep::tm_frame_rep ():
-  full_screen (false), full_screen_edit (false), dialogue_win () {}
+  full_screen (false), full_screen_edit (false),
+  saved_header (true), saved_footer (true), dialogue_win () {}
 tm_frame_rep::~tm_frame_rep () {}
 
 /******************************************************************************
@@ -264,6 +265,25 @@ tm_frame_rep::set_window_zoom_factor (double zoom) {
   if (zoom >= 25.0 ) zoom= 25.0;
   if (zoom <=  0.04) zoom=  0.04;
   zoom= normal_zoom (zoom);
+  // The coordinates of a view are those of the document times the
+  // magnification, in 32 bits: in a long document (a full manual), a
+  // large zoom made them overflow far from its start, and the view, the
+  // scrolls and the drawing went wrong. The extents of the view grow as
+  // the zoom: they stay below 2^30 (half of the limit, for the sums of
+  // two coordinates)
+  double old_zoom= get_window_zoom_factor ();
+  SI x1, y1, x2, y2;
+  ::get_extents (get_current_editor (), x1, y1, x2, y2);
+  double far= 0.0;
+  SI ext[4]= { x1, y1, x2, y2 };
+  for (int i=0; i<4; i++) {
+    double d= ext[i] < 0? -((double) ext[i]): (double) ext[i];
+    if (d > far) far= d;
+  }
+  if (old_zoom > 0.0 && far > 0.0) {
+    double most= old_zoom * 1073741824.0 / far;
+    if (zoom > most) zoom= most;
+  }
   set_place_zoom (current_place (), retina_zoom * zoom);
   ::set_zoom_factor (get_current_editor (), retina_zoom * zoom);
 }
@@ -330,13 +350,21 @@ tm_frame_rep::recall_message () {
 void
 tm_frame_rep::full_screen_mode (bool on, bool edit) {
   if (!has_current_window ()) return;
+  bool hidden= full_screen && !full_screen_edit;
   if (on && !edit) {
+    if (!hidden) {
+      // NOTE: like full_screen, the saved visibilities are stored per
+      // server, not per place; leaving presentation mode at another place
+      // than the one where it was entered restores this state there
+      saved_header= visible_header ();
+      saved_footer= visible_footer ();
+    }
     show_header (false);
     show_footer (false);
   }
-  else {
-    show_header (true);
-    show_footer (true);
+  else if (hidden) {
+    show_header (saved_header);
+    show_footer (saved_footer);
   }
   // (the page takes the whole screen, if the browser lets it)
   void tau_fullscreen (bool on);

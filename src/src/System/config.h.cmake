@@ -202,6 +202,10 @@
 #cmakedefine USE_SPARKLE 1
 #cmakedefine USE_SQLITE3 1
 
+/* The features of program code which a build may leave out */
+#cmakedefine USE_TREE_SITTER 1
+#cmakedefine USE_LSP 1
+
 /* Make the HTTP requests with libcurl */
 #cmakedefine USE_LIBCURL 1
 #cmakedefine USE_STACK_TRACE 1

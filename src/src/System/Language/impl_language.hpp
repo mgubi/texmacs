@@ -89,6 +89,10 @@ struct prog_language_rep: abstract_language_rep {
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+  string token_color (tree t, int start, int end);
+  bool has_line_states ();
+  int  colour_line (tree t, int state, array<int>& starts, array<int>& ends,
+                    array<string>& cols);
 
   void customize_keyword (keyword_parser_rep parser, tree config);
   void customize_operator (tree config);
@@ -150,6 +154,9 @@ struct cpp_language_rep: abstract_language_rep {
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+  bool has_line_states ();
+  int  colour_line (tree t, int state, array<int>& starts, array<int>& ends,
+                    array<string>& cols);
 
   void parse_preprocessing (string s, int& pos);
   string get_identifier_type (string s, int& pos);

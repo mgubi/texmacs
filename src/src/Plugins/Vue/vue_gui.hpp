@@ -97,15 +97,23 @@ struct vue_input_state {
   double wheel_vx, wheel_vy;
   time_t wheel_time;
   time_t wheel_event_time;
-  uint64_t wheel_stamp;    // SDL timestamp of the last wheel event (ns): the
+  uint64_t wheel_stamp;    // SDL timestamp of the last wheel event (ns, or ms
+                           // of the X server, see wheel_stamp_ms): the
                            // events of a frame are handled together, so the
                            // clock does not tell them apart (see wheel_event)
+  bool   wheel_stamp_ms;   // that timestamp is a time of the X server, in ms
+                           // (see wheel_interval)
+  double wheel_capture_x;  // the deltas of mouse_data as an editor which
+  double wheel_capture_y;  // captures the wheel gets them (see push_wheel)
   bool   wheel_precise;    // the stream has fractional deltas (a trackpad)
+  bool   wheel_touch;      // the stream is a finger dragged on a touch screen
   bool   wheel_ambiguous;  // the stream opened with whole deltas: a notch?
   // the distance a wheel notch has still to travel (device pixels), the
   // time of the last step of that travel, and the excess which an opening
   // notch would have scrolled if it turns out to come from a trackpad
   double wheel_pend_x, wheel_pend_y;
+  double wheel_pend_g;     // the part of that distance which an editor which
+                           // captures the wheel gets (see wheel_event)
   double wheel_over_x, wheel_over_y;
   time_t wheel_smooth_time;
   // the wheel for the Clay scroll containers, in units of Clay, applied
@@ -123,6 +131,9 @@ struct vue_input_state {
   uint32_t hover_item, hover_menu;
   time_t hover_since;
   array<uint32_t> menu_zones;
+  // the thumbs of the scroll bars in the last pass: a finger put down on
+  // one drags it at once (touch_filter in vue_gui.cpp)
+  array<uint32_t> bar_zones;
   bool swallow_mouse;
   uint32_t current_balloon;
   time_t balloon_time;
@@ -137,9 +148,11 @@ struct vue_input_state {
     : key_time (0), key_stamp (0), mouse_time (0), mouse_x (0), mouse_y (0),
       mouse_ticket (0), mouse_clicks (1),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
-      wheel_time (0), wheel_event_time (0), wheel_stamp (0),
-      wheel_precise (false),
+      wheel_time (0), wheel_event_time (0), wheel_stamp (0), wheel_stamp_ms (false),
+      wheel_capture_x (0), wheel_capture_y (0),
+      wheel_precise (false), wheel_touch (false),
       wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
+      wheel_pend_g (1.0),
       wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
       clay_wheel_x (0), clay_wheel_y (0), wheel_taken (false),
       current_popup (false), cancel_popup (false),
@@ -158,12 +171,16 @@ public:
   string the_name;         // the name TeXmacs gave the window
   string mod_name;         // the title it shows (the name and the marker)
   bool   modified;         // has the document unsaved changes?
+  string the_file;         // the file of the document (SLOT_FILE), or ""
   string orig_name;
 
   vue_widget content;
   vue_widget kbd_focus;
   vue_widget default_focus; // given the focus before the next interpose, see
                             // apply_default_focus in vue_gui.cpp
+  // shown without the keyboard focus (gui_set_next_window_without_focus):
+  // its focus widget is told it has the focus only once the window gets it
+  bool passive= false;
   hashset<string> refresh_kinds; // refresh cycle
   hashset<string> next_refresh_kinds; // refresh cycle
 
@@ -175,6 +192,12 @@ public:
   
   bool clay_debug;
   bool popup; // undecorated popup/tooltip window
+  // a tooltip (the balloons of TeXmacs, tooltip.scm): a popup which does not
+  // grab the pointer, which goes to the window under it, nor goes away when
+  // the pointer leaves it; TeXmacs closes it (#399). Outside the browser, a
+  // tooltip window of SDL, child of the window with the keyboard, which
+  // never takes the keyboard (see making_tooltip in vue_gui.cpp)
+  bool tooltip= false;
   vue_input_state input; // pending events and interaction state
   float layout_w, layout_h; // size of the layout area (pixels)
   // Pixels of the layout per point of the display this window is on
@@ -215,6 +238,11 @@ public:
   virtual void   set_name (string name) = 0;
   virtual string get_name () = 0;
   virtual void   set_modified (bool flag) = 0;
+  // the file of the document, for the title bar of macOS (proxy icon)
+  virtual void   set_file (string file) { the_file= file; }
+  // the document was saved: its file may exist now (Save as), see
+  // vue_sdl_base_window_rep::file_pending
+  virtual void   saved () {}
   virtual void   set_visibility (bool flag) = 0;
   virtual void   set_full_screen (bool flag) = 0;
   // above the other windows of TeXmacs (a tool window)
@@ -240,9 +268,11 @@ void draw_picture (void *data, picture pic);
 void get_viewport_size (void *data, int& w, int& h);
 // document: the window of an editor (vue_texmacs_widget_rep), which is a
 // tab in single-window mode (see vue_gui.cpp), brought to the front when it
-// is shown again (switch_to_window, to switch to its buffer)
+// is shown again (switch_to_window, to switch to its buffer); tooltip: a
+// balloon, a popup which leaves the pointer and the keyboard to the window
+// under it (see the field tooltip of vue_window_rep)
 vue_window plain_window (vue_widget wwid, string name, bool popup= false,
-                         bool document= false);
+                         bool document= false, bool tooltip= false);
 
 typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
 
@@ -256,8 +286,37 @@ struct styled_string_rep : public concrete_struct {
   string s;
   color c;
   font fn;
+  string* ctx; // where it is, while a script runs (vue_test_context)
   styled_string_rep (string _s, font _fn, color _c)
-  : s (_s), c (_c), fn (_fn) {};
+  : s (_s), c (_c), fn (_fn), ctx (NULL) {};
+  ~styled_string_rep () { if (ctx != NULL) tm_delete (ctx); }
+};
+
+// The scripted tests (gui_test.hpp): while a script runs, the layout notes
+// where each text and icon is, the bar and the menus it hangs from, as a
+// path "menubar > Format > Font", by which a script can name it
+// (gui_test_texts, gt-activate)
+extern bool   vue_testing;           // a script runs
+extern string vue_test_context;      // the path of what is being laid out
+extern string vue_test_label;        // the first text or icon laid out since
+                                     // it was emptied (the label of a button)
+void   vue_test_note_label (string s);
+bool   vue_is_editor_window (vue_widget content); // window main
+// the close button of a window: its quit command (see
+// vue_plain_window_widget_rep::close_request)
+void   vue_window_close_request (vue_widget content);
+// a window deleted while it is laid out (from an event of its own
+// widgets) is hidden now and deleted after its layout
+bool   vue_window_in_layout (vue_window_rep* w);
+void   vue_delete_window_later (vue_window_rep* w);
+string vue_test_icon (void* ref);    // "<path>\ticon:<name>" of a picture
+void   vue_test_forget_icons ();
+struct with_test_context {
+  string* saved; // the path outside, only while a script runs
+  with_test_context (const char* name);
+  with_test_context (const string& name);
+  ~with_test_context ();
+  void enter (const string& name);
 };
 
 class styled_string {

@@ -372,6 +372,7 @@
   (tmmathmd (ensuremath 1))
   (tmop (ensuremath (operatorname 1)))
   (tmstrong (textbf 1))
+  (tmstrike (!append "{\\leavevmode\\setbox0\\hbox{" 1 "}\\rlap{\\rule[.5ex]{\\wd0}{.4pt}}\\box0}"))
   (tmem (!group "\\em " 1 "\\/"))
   (tmtt (texttt 1))
   (tmdate (today))
@@ -672,8 +673,54 @@
     "  \\tikz[baseline=(X.base)]\n"
     "  \\node[draw=black,semithick,rectangle,inner sep=2pt,rounded corners=2pt]\n"
     "  (X) {#1};}\n"))
+  ;; highlighted text, which breaks across lines: ulem draws the color
+  ;; under the text (\protected keeps it whole in the table of contents;
+  ;; in the PDF bookmarks of hyperref, only the text is kept)
+  (tmmarked
+   (!append
+    (!ignore (sout) (textcolor))
+    "\\protected\\long\\def\\tmmarked#1#2{\\bgroup\\markoverwith{%\n"
+    "  \\textcolor{#1}{\\rule[-0.5ex]{2pt}{2.5ex}}}\\ULon{#2}}\n"
+    "\\ifdefined\\pdfstringdefDisableCommands\n"
+    "  \\pdfstringdefDisableCommands{\\def\\tmmarked#1#2{#2}}\\fi\n"))
   (nonconverted
    (!append "\\newcommand{\\nonconverted}[1]{\\mbox{}}\n"))
+  ;; the emoji (\emoji{grinning-face}): the package emoji, in color, needs
+  ;; LuaLaTeX; with another engine the name of the emoji is written as a
+  ;; shortcode (:grinning-face:, literally), so that the document still
+  ;; compiles; in the PDF bookmarks too (\tmemojibm keeps the hyphens of
+  ;; flag-congo---kinshasa from becoming a dash)
+  (emoji
+   (!append "\\usepackage{iftex}\n"
+            "\\ifLuaTeX\n"
+            "  \\usepackage{emoji}\n"
+            "\\else\n"
+            "  \\DeclareRobustCommand{\\emoji}[1]{\\texttt{:\\detokenize{#1}:}}\n"
+            "  \\def\\tmemojibm#1{\\tmemojibmx#1-\\tmemojibmend}\n"
+            "  \\def\\tmemojibmx#1-#2\\tmemojibmend{#1%\n"
+            "    \\if\\relax\\detokenize{#2}\\relax\\else-{}\\tmemojibmx#2\\tmemojibmend\\fi}\n"
+            "  \\AtBeginDocument{\\ifdefined\\pdfstringdefDisableCommands\n"
+            "    \\pdfstringdefDisableCommands{\\def\\emoji#1{:\\tmemojibm{#1}:}}\\fi}\n"
+            "\\fi\n"))
+  ;; an emoji which the package has not: its characters with LuaLaTeX and
+  ;; XeLaTeX when the font has them, else its code points (pdfLaTeX stops
+  ;; on the characters); in the PDF bookmarks, the characters or the code
+  ;; points as well
+  (tmemojichar
+   (!append "\\usepackage{iftex}\n"
+            "\\newif\\iftmunicodetex\n"
+            "\\ifLuaTeX\\tmunicodetextrue\\else"
+            "\\ifXeTeX\\tmunicodetextrue\\fi\\fi\n"
+            "\\iftmunicodetex\n"
+            "  \\DeclareRobustCommand{\\tmemojichar}[3]{%\n"
+            "    \\iffontchar\\font#3\\relax #1\\else\\texttt{[#2]}\\fi}\n"
+            "  \\AtBeginDocument{\\ifdefined\\pdfstringdefDisableCommands\n"
+            "    \\pdfstringdefDisableCommands{\\def\\tmemojichar#1#2#3{#1}}\\fi}\n"
+            "\\else\n"
+            "  \\DeclareRobustCommand{\\tmemojichar}[3]{\\texttt{[#2]}}\n"
+            "  \\AtBeginDocument{\\ifdefined\\pdfstringdefDisableCommands\n"
+            "    \\pdfstringdefDisableCommands{\\def\\tmemojichar#1#2#3{[#2]}}\\fi}\n"
+            "\\fi\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)
                         (!append (textbf (!translate "Keywords:")) " "))

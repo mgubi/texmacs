@@ -29,10 +29,12 @@ export function serve (dir, port, host = '127.0.0.1', onServed = null, rate = 0)
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
                   '.wasm': 'application/wasm', '.data': 'application/octet-stream',
                   '.png': 'image/png', '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.tm': 'text/plain',
-                  '.pack': 'application/octet-stream' };
+                  '.pack': 'application/octet-stream',
+                  '.webp': 'image/webp', '.md': 'text/markdown; charset=utf-8' };
   const server = http.createServer ((req, res) => {
     let p = decodeURIComponent (req.url.split ('?')[0]);
-    if (p === '/') p = '/texmacs.html';
+    // the main page of the site, as on GitHub Pages (TeXmacs is texmacs.html)
+    if (p === '/') p = fs.existsSync (path.join (dir, 'index.html')) ? '/index.html' : '/texmacs.html';
     const file = path.join (dir, p);
     if (!file.startsWith (dir) || !fs.existsSync (file)) { res.writeHead (404); res.end (); return; }
     const type = types[path.extname (file)] || 'application/octet-stream';

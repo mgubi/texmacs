@@ -180,9 +180,21 @@ lazy_paragraph_rep::line_print (line_item item) {
     // REPLACE item by item without lazy attachment !
   }
 
+  // (a marker after an item of the unit, at the end of a macro, a macro
+  // argument or a with, takes the space after that item: the cursor after
+  // them stays next to the item, and at the end of a line the space is left
+  // out, as without the marker; not the italic correction of the item, see
+  // carried_spaces)
+  space carried (0);
+  if (lets_space_through (item) && N(spcs) > cur_start) {
+    SI cor= max (min (last_cor, spcs[N(spcs)-1]->def), 0);
+    carried= spcs[N(spcs)-1] - space (cor);
+    spcs[N(spcs)-1]= space (cor);
+  }
   if (N(spcs)>0) cur_w = cur_w + spcs[N(spcs)-1];
   items << item->b;
-  spcs  << item->spc;
+  spcs  << (carried + item->spc);
+  last_cor= item->cor;
   item->b->x0= cur_w->def;
   item->b->y0= 0;
   cur_w =  cur_w + space (item->b->x2);
@@ -622,6 +634,7 @@ lazy_paragraph_rep::line_start () {
 
   cur_r    = 0;
   cur_start= 0;
+  last_cor = 0;
 }
 
 void
@@ -831,6 +844,19 @@ typeset_stack (edit_env env, tree t, path ip, SI width,
 }
 
 array<page_item>
+typeset_stack (edit_env env, array<line_item> a, path ip, SI width,
+               stack_border& sb)
+{
+  // (the line items typeset before, see lazy_hidden_rep)
+  lazy_paragraph par (env, ip);
+  par->a= a;
+  par->width= width;
+  par->format_paragraph ();
+  sb= par->sss->sb;
+  return par->sss->l;
+}
+
+array<page_item>
 typeset_stack (edit_env env, tree t, path ip,
 	       array<line_item> a, array<line_item> b, stack_border& sb)
 {
@@ -906,8 +932,11 @@ lazy_paragraph_rep::query (lazy_type request, format fm) {
 
     SI w= left + first;
     int i, n= N(li);
+    // (the spaces as line_print puts them: the space before the markers at
+    // the end does not count)
+    array<SI> sp= carried_spaces (li);
     for (i=0; i<n-1; i++)
-      w += li[i]->spc->def + li[i]->b->x2;
+      w += sp[i] + li[i]->b->x2;
     if (i<n) w += li[i]->b->x2;
     w= max (w, 1);  // width of a paragraph must be strictly positive for
                     // correct positioning inside tables

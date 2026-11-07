@@ -37,6 +37,7 @@
 	       account service "********"))
          (ret (evaluate-system (list "security" "-i")
                                '(0) (list cmd) '(1 2))))
+    (string-wipe! cmd) ; (the command holds the passphrase)
     (or (== (car ret) "0")
 	(system-security-error (list pcm) (cadr ret) (caddr ret)))))
 

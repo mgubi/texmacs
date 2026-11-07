@@ -2,7 +2,8 @@
 #
 # Builds the libraries of TeXmacs which do not come with macOS (libpng,
 # FreeType; GMP, libltdl and Guile 1.8 for Guile; SDL3, SDL3_ttf, MuPDF and
-# ThorVG for the Vue port) from their sources, for one architecture and an
+# ThorVG for the Vue port; GMP, Nettle and GnuTLS for the connections to
+# the TeXmacs servers) from their sources, for one architecture and an
 # old version of macOS, so that the application runs on this version and
 # later ones (the libraries of Homebrew only run on the version of macOS
 # where they were built). They are static, but for SDL3 and SDL3_ttf
@@ -13,11 +14,11 @@
 #              x86_64 on Apple silicon is built under Rosetta
 #   MIN_MACOS  the oldest version of macOS (default: 12.0)
 #   PARTS      what besides libpng and FreeType, separated by commas:
-#              guile (default), vue; "none" for neither (with S7)
+#              guile (default), vue, tls; "none" for none of them (with S7)
 #
 # Then configure TeXmacs with the same MACOSX_DEPLOYMENT_TARGET and
 #   --with-guile=PREFIX/bin/guile-config --with-freetype=PREFIX/bin
-#   [--with-sdl3 --with-mupdf=PREFIX --with-thorvg=PREFIX]
+#   [--with-sdl3 --with-mupdf=PREFIX --with-thorvg=PREFIX] [--with-gnutls]
 # (build-ns-app.sh --deps PREFIX does it). cmake, meson and ninja (for the
 # Vue part) come from a Python venv in PREFIX/tools.
 
@@ -46,6 +47,11 @@ SDL3_TTF_SHA256=63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d
 MUPDF_VERSION=1.28.5
 MUPDF_SHA256=98a5c10cda20c3992cdf76ff6b2a1149c32bd79cc796d3f703230b1185b7e934
 THORVG_VERSION=v1.1.2
+# TLS (those of Homebrew on 2026-10-16)
+NETTLE_VERSION=4.0
+NETTLE_SHA256=3addbc00da01846b232fb3bc453538ea5468da43033f21bb345cb1e9073f5094
+GNUTLS_VERSION=3.8.13
+GNUTLS_SHA256=ffed8ec1bf09c2426d4f14aae377de4753b53e537d685e604e99a8b16ca9c97e
 
 prefix="$1"
 arch="${2:-$(uname -m)}"
@@ -74,6 +80,10 @@ export MACOSX_DEPLOYMENT_TARGET="$min"
 export CC="clang -arch $arch" CXX="clang++ -arch $arch"
 export CFLAGS="-O2" CXXFLAGS="-O2"
 export CPPFLAGS="-I$prefix/include" LDFLAGS="-L$prefix/lib"
+# the pkg-config of Homebrew (GnuTLS finds Nettle with it), which only
+# looks into PREFIX (PKG_CONFIG_LIBDIR)
+pkgconfig=$(PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" command -v pkg-config || true)
+[ -n "$pkgconfig" ] && export PKG_CONFIG="$pkgconfig"
 # only the libraries built here, not the ones of Homebrew
 export PATH="$prefix/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig" PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
@@ -111,7 +121,7 @@ fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VE
 make -j"$jobs"
 make install
 
-if has guile; then
+if has guile || has tls; then
   echo "== GMP $GMP_VERSION ($arch, macOS $min)"
   fetch "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz" $GMP_SHA256
   # not tuned for the processor of the build machine: fat binaries on x86_64
@@ -120,7 +130,32 @@ if has guile; then
   ./configure $common $fat
   make -j"$jobs"
   make install
+fi
 
+if has tls; then
+  [ -n "$pkgconfig" ] || { echo "error: GnuTLS needs pkg-config (brew install pkg-config)" >&2; exit 1; }
+  echo "== Nettle $NETTLE_VERSION"
+  fetch "https://ftp.gnu.org/gnu/nettle/nettle-$NETTLE_VERSION.tar.gz" $NETTLE_SHA256
+  # with hogweed (public keys, on GMP); no documentation
+  ./configure $common --disable-documentation --libdir="$prefix/lib"
+  make -j"$jobs"
+  make install
+
+  echo "== GnuTLS $GNUTLS_VERSION"
+  fetch "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-$GNUTLS_VERSION.tar.xz" $GNUTLS_SHA256
+  # libtasn1 and libunistring of its own; no p11-kit, IDN, translations,
+  # compression libraries, tools or documentation; the certificates of the
+  # keychain of macOS (its default)
+  ./configure $common --with-included-libtasn1 --with-included-unistring \
+    --without-p11-kit --without-idn --disable-nls --without-zstd \
+    --without-brotli --without-zlib --without-tpm --without-tpm2 \
+    --disable-tools --disable-doc --disable-manpages --disable-tests \
+    --disable-cxx --disable-guile --disable-full-test-suite
+  make -j"$jobs"
+  make install
+fi
+
+if has guile; then
   echo "== libltdl (libtool $LIBTOOL_VERSION)"
   fetch "https://ftp.gnu.org/gnu/libtool/libtool-$LIBTOOL_VERSION.tar.xz" $LIBTOOL_SHA256
   ./configure $common --enable-ltdl-install
@@ -176,13 +211,17 @@ if has vue; then
   echo "== MuPDF $MUPDF_VERSION"
   fetch "https://mupdf.com/downloads/archive/mupdf-$MUPDF_VERSION-source.tar.gz" $MUPDF_SHA256
   # its own third-party libraries (libmupdf-third), but FreeType (the one
-  # of TeXmacs) and zlib (of macOS); no viewers, no OCR
+  # of TeXmacs) and zlib (of macOS); no viewers, no OCR; without the fonts
+  # which MuPDF builds in (some 30 MB of Noto, CJK, SIL, emoji...): TeXmacs
+  # typesets with its own fonts, and a PDF image whose fonts are not
+  # embedded keeps the base 14 ones (as misc/wasm/build-mupdf.sh)
+  tofu="-DTOFU -DTOFU_CJK -DTOFU_SIL -DTOFU_EMOJI -DTOFU_HISTORIC -DTOFU_SYMBOL"
   mupdf_make="prefix=$prefix build=release HAVE_X11=no HAVE_GLUT=no
     HAVE_CURL=no USE_TESSERACT=no USE_SYSTEM_LIBS=no
     USE_SYSTEM_FREETYPE=yes SYS_FREETYPE_CFLAGS=-I$prefix/include/freetype2
     SYS_FREETYPE_LIBS=-L$prefix/lib\ -lfreetype\ -lpng16\ -lz
     USE_SYSTEM_ZLIB=yes SYS_ZLIB_CFLAGS= SYS_ZLIB_LIBS=-lz
-    XCFLAGS=-arch\ $arch XLDFLAGS=-arch\ $arch shared=no verbose=yes"
+    XCFLAGS=\"-arch $arch $tofu\" XLDFLAGS=-arch\\ $arch shared=no verbose=yes"
   eval make -j"$jobs" $mupdf_make libs
   eval make $mupdf_make install-libs
   # NOTE: only the headers and the libraries (install-libs), not the tools

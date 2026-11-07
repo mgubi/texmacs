@@ -1,3 +1,8 @@
+// From Clay, renderers/SDL3/clay_renderer_SDL3.c, commit e6cc36941ab2
+// (https://github.com/nicbarker/clay), altered for TeXmacs: the changes are
+// marked "TeXmacs:". Copyright (c) 2024 Nic Barker, under the zlib/libpng
+// license (at the end of clay.h; see README.md in this folder).
+
 #include "clay.h"
 
 // TeXmacs: custom elements (editors, pictures) are drawn by the Vue widgets

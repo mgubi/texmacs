@@ -75,11 +75,14 @@ the file inside `with-module`, which makes the new environment the rootlet's
 
 ### Public definitions and imports
 
-- **`define-public` and `define-public-macro`** do three things:
+- **`define-public` and `define-public-macro`** do four things:
   1. an ordinary `define` in the module's environment;
   2. a push of the symbol onto the module's `*exports*`;
   3. a **publication of the binding in the rootlet** (`publish-binding!`).
-     That is where every other module finds it.
+     That is where every other module finds it;
+  4. the **removal of the module's binding** (`unshadow-global!`, s7 patch
+     0006), unless the name has had another local binding (a parameter, a
+     local variable, a second public definition). §2.3 explains why.
 - **`export`** only pushes onto `*exports*`. Such names are copied by
   `use-modules`.
 - **`use-modules m…`**, for each module:
@@ -100,18 +103,24 @@ the file inside `with-module`, which makes the new environment the rootlet's
 - **`import-from`** is an alias for `use-modules`.
 
 **With `TM_PUBLISH_LOG` set,** publications that replace a different
-rootlet value are reported. Today there are four:
+rootlet value are reported (`PUBLISH-REPLACES`). Today there are four:
 - `assoc-set!`, defined twice in `compat-s7.scm`;
 - `list-tail`, `string->keyword` and `help`, which TeXmacs redefines with
   meanings compatible with s7's builtins.
 
+So are the public names that keep the module's binding (`PUBLISH-KEEPS`):
+`assoc-set!` and `make-choice` (of `treesit ts-grammar`) at the time of
+writing.
+
 ### Consequences
 
-- **Every other module shares one binding per public name, but the defining
-  module keeps its own.** If the defining module later does a `set!` of a
-  public variable, only its own binding changes. Guile modules share the
-  variable instead. This matters little in practice: definitions that are
-  meant to be overridden use `tm-define`, which also lives in the rootlet.
+- **All modules share one binding per public name**, as Guile modules share
+  the variable: a `set!` of a public variable in its module is seen
+  everywhere. The few names that keep the module's binding (see
+  `PUBLISH-KEEPS` above) behave as before the removal: the defining module
+  uses its own binding, and a `set!` there is not seen by the others.
+  Definitions that are meant to be overridden use `tm-define`, which also
+  lives in the rootlet.
 - **Modules see everything.** Every module sees the rootlet and the user
   module, not only what it declared with `:use`, so missing `:use` clauses
   go unnoticed. Guile's TeXmacs modules also use `texmacs-user`, so the
@@ -135,10 +144,18 @@ rootlet value are reported. Today there are four:
 So a lookup is cheap when the lets on the way are newer than the name's
 cached binding, and costly when it has to scan large lets.
 
-**What that means for TeXmacs.** A public name like `==` is bound in its
-module (created after the user module) and in the rootlet. From another
-module, a lookup skips the frames and the module's let, which are newer. It
-must not stop in the user module, and three rules make sure of that:
+**What that means for TeXmacs.** A name bound only in the rootlet (a glue
+function, a public definition whose module binding was removed) is found
+by walking past every let without scanning. A name bound in a module is
+cheap from that module, but from another one the walk stops at the first
+let that is older than the module, and the scan begins there. That is why
+`define-public` removes the module's binding (§2.2): when the module of a
+public function was created after the caller's module (typically, when
+the caller's module loaded it), each call scanned the caller's module and
+the user module (about 250 slots, mostly macros). The Scheme scanners of
+tree-sitter, which call the public lexer functions of `ts-parse.scm` for
+each character, ran three times faster without it. The remaining rules
+keep the walk from stopping in the user module:
 
 - **`renumber-user-module!`** (`boot-s7.scm`) enters the user module once,
   right after the kernel is loaded (in `init-s7.scm`). The user module then

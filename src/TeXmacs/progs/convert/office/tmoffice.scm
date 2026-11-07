@@ -27,6 +27,7 @@
 
 (texmacs-module (convert office tmoffice)
   (:use (convert office office-tools)
+        (convert tools code-languages)
         (convert mathml tmmath)
         (convert mathml mathml-drd)))
 
@@ -42,6 +43,7 @@
 
 (define (tmof-initialize opts)
   (set! tmof-flat? #f)
+  (set! tmof-headless-said? #f)
   (set! tmof-heading-counts (make-list 7 0))
   (set! tmof-heading-first 7)
   (set! tmof-part-nr 0)
@@ -229,10 +231,17 @@
     (lambda (x)
       (cond ((func? x 'p) (append (cdr x) (list " ")))
             ((func? x '!display)
-             (list `(math (@ (display "true") (form "sxml")) ,(cadr x))))
+             (cons `(math (@ (display "true") (form "sxml")) ,(cadr x))
+                   (tmof-leading-notes (cddr x))))
             ((tmof-block? x) '())
             (else (list x))))
     l))
+
+(define (tmof-leading-notes l)
+  ;; the notes at the start of l (those of a formula, before its number)
+  (if (and (pair? l) (func? (car l) 'note))
+      (cons (car l) (tmof-leading-notes (cdr l)))
+      '()))
 
 (define (tmof-has-block? l)
   (list-or (map tmof-block? l)))
@@ -312,8 +321,9 @@
 
 (define (tmof-big-operator name)
   ;; the name of a big operator which the converter of MathML knows, or
-  ;; its character: an integral is the same with its limits under it
-  ;; (intlim) and upright (upint)
+  ;; its character, in the encoding of TeXmacs (the converter writes it in
+  ;; UTF-8): an integral is the same with its limits under it (intlim) and
+  ;; upright (upint)
   (let* ((n (string-length name))
          (s (if (and (> n 3) (string-ends? name "lim")) (substring name 0 (- n 3))
                 name))
@@ -321,13 +331,13 @@
                 (substring s 2 (string-length s))
                 s))
          (code (assoc-ref tmof-big-operators s)))
-    (if code (office-utf8 code) s)))
+    (if code (utf8->cork (office-utf8 code)) s)))
 
 (define (tmof-math-clean x)
   ;; a formula without what is not seen, and with its fractions, its
   ;; binomials and its big operators as the converter of MathML knows them
   (cond ((not (pair? x)) x)
-        ((in? (car x) '(label assign hidden-binding set-binding write)) "")
+        ((in? (car x) '(label assign hidden-binding set-binding write footnote)) "")
         ((and (in? (car x) '(binom tbinom dbinom choose)) (== (length x) 3))
          `(around* "(" ,(tmof-stack (cadr x) (caddr x)) ")"))
         ((func? x 'ontop 2) (tmof-stack (cadr x) (caddr x)))
@@ -490,12 +500,20 @@
        (with s (tmof-text x)
          (and (not (string-starts? s "<")) s))))
 
+(define (tmof-math-notes x)
+  ;; the notes of the footnotes inside the formula x, which a formula of an
+  ;; office document cannot hold: they follow it
+  (cond ((not (pair? x)) '())
+        ((func? x 'footnote 1) (tmof-footnote-add (cadr x)))
+        (else (append-map tmof-math-notes (cdr x)))))
+
 (define (tmof-math l)
   (let ((x (if (list-1? l) (car l) `(concat ,@l))))
     (if (tmof-symbol x)
         (list (tmof-symbol x))
         (with m (tmof-mathml x)
-          (if m `((math (@ (form "sxml")) ,m)) '())))))
+          (append (if m `((math (@ (form "sxml")) ,m)) '())
+                  (tmof-math-notes x))))))
 
 (define tmof-limit-operators
   ;; the big operators whose limits are under and over them in a formula on
@@ -526,6 +544,7 @@
                      (map (lambda (name) `(bookmark (@ (name ,name)))) l))))
     (if m
         `((!display ,m
+                    ,@(tmof-math-notes x)
                     ,@(apply append
                              (list-intersperse
                                (map (lambda (n)
@@ -677,6 +696,7 @@
     (lambda args #f)))
 
 (define tmof-picture-nr 0)
+(define tmof-headless-said? #f) ; the drawings left out under -headless were said
 
 (define (tmof-picture x vector)
   ;; The tree x as a picture: a drawing, or an image in a format which the
@@ -693,7 +713,16 @@
          (svg (url-glue base ".svg"))
          ;; (without a window, as texmacs -headless, there are no fonts to
          ;; typeset with: Qt would end TeXmacs)
-         (r (if (headless?) '()
+         (r (if (headless?)
+                (begin
+                  ;; (said once by conversion)
+                  (when (not tmof-headless-said?)
+                    (set! tmof-headless-said? #t)
+                    (debug-message "convert-warning"
+                                   (string-append "office export: without a window "
+                                                  "(texmacs -headless), drawings are "
+                                                  "left out\n")))
+                  '())
                 (catch #t
                   (lambda () (tmof-picture* x vector png pdf svg))
                   (lambda args '())))))
@@ -1251,10 +1280,20 @@
 (define (tmof-office-span l)
   (if (< (length l) 2) '() (tmof-attr-wrap 'span `((style ,(tmof-plain (car l)))) l)))
 
+(define (tmof-field-code t)
+  ;; the instruction of a field, with the fields inside it between the
+  ;; characters 1 and 2 (see oftm-field-code)
+  (cond ((func? t 'concat) (apply string-append (map tmof-field-code (cdr t))))
+        ((func? t 'office-field)
+         (string-append (string (integer->char 1))
+                        (if (pair? (cdr t)) (tmof-field-code (cadr t)) "")
+                        (string (integer->char 2))))
+        (else (tmof-plain t))))
+
 (define (tmof-office-field l)
   ;; a field: its instruction (or the element of OpenDocument), its result
   (if (< (length l) 2) '()
-      (let* ((code (tmof-plain (car l)))
+      (let* ((code (tmof-field-code (car l)))
              (r (tmof (cadr l))))
         (if (func? (cadr l) 'document)
             ;; (a field over several paragraphs, such as a bibliography;
@@ -1357,6 +1396,11 @@
 (define (tmof-office-comment l)
   (if (< (length l) 3) '()
       `((comment (@ ,@(tmof-who l)) ,@(tmof-blocks (tmof (caddr l)))))))
+
+(define (tmof-office-commented l)
+  ;; a comment on a range of the text: the text, then the comment
+  (if (< (length l) 4) '()
+      `((commented ,@(tmof (car l)) ,@(tmof-office-comment (cdr l))))))
 
 (define (tmof-office-columns* l)
   ;; columns with the line between them, and the space between them
@@ -1648,16 +1692,8 @@
 (define (tmof-big-figure l) (tmof-figure "Figure" l))
 (define (tmof-big-table l) (tmof-figure "Table" l))
 
-(define tmof-languages
-  '((cpp-code . "cpp") (python-code . "python") (scm-code . "scheme")
-    (shell-code . "sh") (java-code . "java") (javascript-code . "javascript")
-    (json-code . "json") (julia-code . "julia") (r-code . "r")
-    (scala-code . "scala") (fortran-code . "fortran") (octave-code . "octave")
-    (scilab-code . "scilab") (dot-code . "dot") (mmx-code . "mathemagix")
-    (verbatim-code . "") (pseudo-code . "") (render-code . "") (code . "")))
-
 (define (tmof-code-block tag l)
-  (let* ((lang (assoc-ref tmof-languages tag))
+  (let* ((lang (code-language-name tag))
          (s (apply string-append (map tmof-plain l))))
     `((pre ,@(if (== lang "") '() `((@ (lang ,lang)))) ,s))))
 
@@ -1978,7 +2014,7 @@
          '())
         ((tmof-drawing? x) (tmof-picture x #t))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
-        ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
+        ((code-language-name (car x)) (tmof-code-block (car x) (cdr x)))
         ((in? (car x) '(tabular tabular* block block* wide-tabular wide-block
                         tformat table))
          (tmof-table (car x) (cdr x)))
@@ -2079,6 +2115,7 @@
   (office-ins tmof-office-ins)
   (office-del tmof-office-del)
   (office-comment tmof-office-comment)
+  (office-commented tmof-office-commented)
   (office-columns tmof-office-columns)
   (office-columns* tmof-office-columns*)
   (office-underline tmof-office-underline)
@@ -2176,6 +2213,11 @@
             ((comment)
              (list `(comment (@ ,@(tmof-node-attrs x))
                              ,@(tmof-final-blocks (tmof-node-children x)))))
+            ((commented)
+             (with l (tmof-final-inlines (tmof-node-children x))
+               (cond ((null? l) '())
+                     ((func? (cAr l) 'comment) (list (cons 'commented l)))
+                     (else l))))
             ((a)
              (let ((l (tmof-final-inlines (tmof-node-children x)))
                    (href (with a (assoc 'href (tmof-node-attrs x))
@@ -2235,9 +2277,13 @@
             ((!role) (tmof-final-paragraph `((role ,(cadr x))) (cddr x)))
             ;; a paragraph with its attributes
             ((!para) (tmof-final-paragraph (cadr x) (cddr x)))
+            ;; (the notes of the formula, then its number after a tab)
             ((!display)
-             (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
-                       ,@(if (pair? (cddr x)) `((tab) ,@(cddr x)) '()))))
+             (let* ((notes (tmof-leading-notes (cddr x)))
+                    (rest (list-tail (cddr x) (length notes))))
+               (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
+                         ,@(tmof-final-inlines notes)
+                         ,@(if (pair? rest) `((tab) ,@rest) '())))))
             ((columns field-blocks)
              (list `(,(car x) (@ ,@(tmof-node-attrs x))
                               ,@(tmof-final-blocks (tmof-node-children x)))))
@@ -2652,11 +2698,155 @@
                   (attrs (catch #t (lambda () (tmof-style-attrs (caddr m)))
                                 (lambda args '()))))
               (if (== id "") '()
-                  (list (office-node 'style
-                                     (append `((name ,id) (family ,(if par? "paragraph" "text")))
-                                             (tmof-unique-attrs attrs))))))
+                  (let* ((attrs (tmof-unique-attrs attrs))
+                         (changed (tmof-changed-keys name m attrs)))
+                    (list (office-node 'style
+                                       (append `((name ,id) (family ,(if par? "paragraph" "text")))
+                                               attrs
+                                               (if (null? changed) '()
+                                                   `((changed ,(apply string-append
+                                                                      (list-intersperse
+                                                                        (map symbol->string changed)
+                                                                        " ")))))))))))
             '())))
     init))
+
+;; What was changed in a document of the style office since it was read:
+;; the headers, the footers and the macros of the named styles as they were
+;; read are in office-original (see oftm-original). The writers write those
+;; which were changed instead of those of the file.
+
+(define tmof-originals #f) ; (name . value) of office-original, or #f
+
+(define (tmof-original-list init)
+  (with o (assoc-ref init "office-original")
+    (and (func? o 'tuple)
+         (append-map (lambda (y)
+                       (if (and (func? y 'tuple 2) (string? (cadr y)))
+                           (list (cons (cadr y) (caddr y)))
+                           '()))
+                     (cdr o)))))
+
+(define (tmof-normal t)
+  ;; the tree t, to be compared: without nested concats nor empty strings
+  (cond ((func? t 'concat)
+         (let ((l (append-map (lambda (y)
+                                (with n (tmof-normal y)
+                                  (cond ((== n "") '())
+                                        ((func? n 'concat) (cdr n))
+                                        (else (list n)))))
+                              (cdr t))))
+           (cond ((null? l) "")
+                 ((null? (cdr l)) (car l))
+                 (else (cons 'concat l)))))
+        ((pair? t) (cons (car t) (map tmof-normal (cdr t))))
+        (else t)))
+
+(define (tmof-same? a b)
+  (== (tmof-normal (or a "")) (tmof-normal (or b ""))))
+
+(define (tmof-changed-keys name m attrs)
+  ;; the keys of the node style of the macro m of a named style whose
+  ;; values are not those of the macro which was read, attrs being those
+  ;; of m
+  (with orig (and tmof-originals (assoc-ref tmof-originals name))
+    (if (or (not (func? orig 'macro 2)) (tmof-same? orig m)) '()
+        (let* ((before (tmof-unique-attrs
+                         (catch #t (lambda () (tmof-style-attrs (caddr orig)))
+                                (lambda args '()))))
+               (keys (list-remove-duplicates (append (map car before) (map car attrs)))))
+          (list-filter keys
+                       (lambda (k)
+                         (with a (assq k attrs)
+                           (with b (assq k before)
+                             (not (and a b (== (cadr a) (cadr b))))))))))))
+
+(define (tmof-header-fix x)
+  ;; a header of TeXmacs as text: its tabs are tabs, its page number a field
+  (cond ((func? x 'htab) '(hspace "2em"))
+        ((func? x 'page-the-page) '(office-field " PAGE " "1"))
+        ((pair? x) (cons (car x) (map tmof-header-fix (cdr x))))
+        (else x)))
+
+(define (tmof-page-fields x)
+  ;; the field of the page number, for both formats
+  (cond ((and (func? x 'field) (== (ox-attr x 'code) " PAGE "))
+         `(field (@ (code " PAGE ")
+                    (xml "<text:page-number text:select-page=\"current\"/>"))
+                 ,@(ox-children x)))
+        ((pair? x) (cons (car x) (map tmof-page-fields (cdr x))))
+        (else x)))
+
+(define (tmof-header-blocks t)
+  ;; the blocks of a header or of a footer of TeXmacs: a tab at its start
+  ;; and one at its end center it, one at its start puts it on the right
+  (let* ((n (tmof-normal t))
+         (l (if (func? n 'concat) (cdr n) (list n)))
+         (lead? (and (pair? l) (func? (car l) 'htab)))
+         (l (if lead? (cdr l) l))
+         (trail? (and (pair? l) (func? (cAr l) 'htab)))
+         (l (if trail? (cDr l) l))
+         (align (cond ((and lead? trail?) "center") (lead? "right") (else #f)))
+         (body (tmof-header-fix (if (and (pair? l) (null? (cdr l))) (car l) `(concat ,@l))))
+         (blocks (tmof-final-blocks (tmof-blocks (tmof body)))))
+    (map (lambda (b)
+           (with b (tmof-page-fields b)
+             (if (and align (func? b 'p))
+                 (apply office-node
+                        (cons* 'p (cons (list 'align align)
+                                        (map (lambda (a) (list (car a) (cadr a)))
+                                             (list-filter (ox-attrs b)
+                                                          (lambda (a) (!= (car a) 'align)))))
+                               (ox-children b)))
+                 b)))
+         blocks)))
+
+(define (tmof-first-headers body)
+  ;; the headers and the footers of the first page, at the start of the body
+  (let loop ((l (if (func? body 'document) (cdr body) '())) (acc '()))
+    (cond ((null? l) acc)
+          ((func? (car l) 'set-this-page-header 1)
+           (loop (cdr l) (cons (cons "first-header" (cadar l)) acc)))
+          ((func? (car l) 'set-this-page-footer 1)
+           (loop (cdr l) (cons (cons "first-footer" (cadar l)) acc)))
+          (else acc))))
+
+(define (tmof-headers init body)
+  ;; the headers and the footers which were changed, as header nodes with
+  ;; the attribute changed (and removed when there is none any more)
+  (if (not tmof-originals) '()
+      (let* ((first (tmof-first-headers body))
+             (cur (lambda (key)
+                    (with v (if (string-starts? key "first-") (assoc-ref first key)
+                                (assoc-ref init key))
+                      (and v (not (tmof-same? v "")) v))))
+             (orig (lambda (key) (with v (assoc-ref tmof-originals key)
+                                   (and v (not (tmof-same? v "")) v))))
+             (node (lambda (place kind v)
+                     (if v
+                         (apply office-node
+                                (cons* 'header `((place ,place) (kind ,kind) (changed "true"))
+                                       (tmof-header-blocks v)))
+                         (office-node 'header `((place ,place) (kind ,kind)
+                                                (changed "true") (removed "true")))))))
+        (append-map
+          (lambda (place)
+            (let* ((odd (string-append "page-odd-" place))
+                   (even (string-append "page-even-" place))
+                   (fst (string-append "first-" place))
+                   ;; (without a header of the even pages, they have the
+                   ;; one of the odd pages)
+                   (even-before (or (orig even) (orig odd))))
+              (append
+                (if (tmof-same? (cur odd) (orig odd)) '()
+                    (list (node place "default" (cur odd))))
+                (if (or (tmof-same? (cur even) even-before)
+                        (and (not (orig even)) (tmof-same? (cur even) (cur odd))))
+                    '()
+                    (list (node place "even" (cur even))))
+                (if (tmof-same? (cur fst) (orig fst)) '()
+                    (list (node place "first" (cur fst)))))))
+          '("header" "footer")))))
 
 (define (tmof-styles init)
   ;; the node styles of the macros of the document (which may have been
@@ -2692,8 +2882,10 @@
         (or (and tmof-document?
                  (office-number (or (assoc-ref (tmof-initial x) "font-base-size") "")))
             10.0))
+  (set! tmof-originals (and tmof-document? (tmof-original-list (tmof-initial x))))
   (with body (if tmof-document? (tmfile-extract x 'body) x)
     `(office ,@(if tmof-document? (tmof-setup (tmof-initial x)) '())
              ,@(if tmof-document? (tmof-package (tmof-initial x)) '())
              ,@(if tmof-document? (tmof-styles (tmof-initial x)) '())
+             ,@(if tmof-document? (tmof-headers (tmof-initial x) body) '())
              ,@(tmof-finalize (tmof-blocks (tmof body))))))

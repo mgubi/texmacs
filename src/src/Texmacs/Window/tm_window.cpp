@@ -53,11 +53,19 @@ embedded_buffers_table () {
 #define embedded_buffers (embedded_buffers_table ())
 
 class close_embedded_command_rep: public command_rep {
-  tm_view vw;
+  // The command keeps the name of the buffer and the place of its view,
+  // not the view: the buffer may have been closed before the dialog (its
+  // view is deleted then), or be shown by an embedded view made later with
+  // the same name, which takes over its view (#775)
   url name;
+  int place;     // the place of the view in the dialog
+  url main_foc;  // the place of the view which was current at creation
 public:
-  close_embedded_command_rep (tm_view vw2, url n2): vw (vw2), name (n2) {
-    embedded_buffers (name->t)= embedded_buffers [name->t] + 1; }
+  close_embedded_command_rep (tm_view vw, url n2, int place2):
+    name (n2), place (place2), main_foc (url_none ()) {
+      if (vw->ed->mvw != NULL && vw->ed->mvw->place != 0)
+        main_foc= place_url (vw->ed->mvw->place);
+      embedded_buffers (name->t)= embedded_buffers [name->t] + 1; }
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
@@ -67,19 +75,23 @@ void
 close_embedded_command_rep::apply () {
   // the dialog is gone: the keyboard goes back to the view which opened
   // it, or to any view which is shown, and the buffer is closed
-  ASSERT (!is_nil (vw->ed), "embedded command acting on deleted editor");
-  url foc= url_none ();
-  if (vw->ed->mvw != NULL) foc= place_url (vw->ed->mvw->place);
-  if (is_none (foc)) {
-    array<url> a= windows_list ();
-    if (N(a) != 0) foc= a[0];
+  tm_view vw= NULL;
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++) {
+    tm_view v= concrete_view (vs[i]);
+    if (v != NULL && v->place == place) vw= v;
   }
-  if (!is_none (foc)) window_focus (foc);
-  int place= vw->place;
+  array<url> a= windows_list ();
+  url foc= main_foc;
+  if (is_none (foc) || !contains (foc, a))
+    foc= (N(a) == 0? url_none (): a[0]);
+  if (!is_none (foc) && foc != place_url (place)) window_focus (foc);
   embedded_buffers (name->t)= embedded_buffers [name->t] - 1;
   if (embedded_buffers [name->t] <= 0) embedded_buffers->reset (name->t);
-  detach_view (abstract_view (vw));
-  remove_buffer (vw->buf->buf->name);
+  if (vw != NULL) {
+    detach_view (abstract_view (vw));
+    remove_buffer (name);
+  }
   delete_place (place);
 }
 
@@ -157,7 +169,7 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   attach_view (place_url (place), u);
   set_current_view (temp);
   vw->ed->mvw= curvw;
-  command close_cmd= tm_new<close_embedded_command_rep> (vw, name);
+  command close_cmd= tm_new<close_embedded_command_rep> (vw, name, place);
   return wrapped_widget (vw->ed, close_cmd);
 }
 

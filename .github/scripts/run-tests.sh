@@ -66,6 +66,14 @@ if [ -f tests/scheme/check.sh ]; then
   status=$?
   kill $monpid 2> /dev/null
   echo "check.sh exited with status $status"
+  # the end of the log of each suite which failed (a crash says where only
+  # there; the logs are not kept by the runner)
+  for name in $(sed -n 's/^\([a-z0-9-]*\): FAILED.*/\1/p' tests.log); do
+    log="tests/build/scheme/$name.log"
+    [ -f "$log" ] || continue
+    echo "---- the end of $log"
+    tail -40 "$log"
+  done
   exit $status
 fi
 

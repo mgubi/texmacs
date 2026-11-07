@@ -3,6 +3,7 @@
 * DESCRIPTION: The Metal backend of the GPU renderer of the Vue port (macOS),
 *              with Core Graphics for the vector shapes
 * COPYRIGHT  : (C) 2026  Massimiliano Gubinelli
+*              Slug shaders adapted from E. Lengyel, (C) 2017, MIT (see below)
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -37,11 +38,15 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 #include <SDL3/SDL_metal.h>
 #endif
 #import <Metal/Metal.h>
-#import <QuartzCore/CAMetalLayer.h>
+#import <QuartzCore/QuartzCore.h>
+#import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 #include <unordered_map>
 #include <cmath>
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct gpu_texture_rep {
   id<MTLTexture> tex;
@@ -85,6 +90,14 @@ fragment float4 quad_fs (QOut in [[stage_in]], constant QU& u [[buffer(0)]],
 }
 
 struct SU { float2 size; float bold; };
+// The Slug shaders below are adapted from the reference shaders of Eric
+// Lengyel (https://github.com/EricLengyel/Slug, SlugPixelShader.hlsl), the
+// algorithm of "GPU-Centered Font Rendering Directly from Glyph Outlines"
+// (JCGT 6 (2), 2017); rewritten for TeXmacs, with its own layout of the
+// curves and the bands. Copyright (c) 2017 Eric Lengyel, MIT License (see
+// TeXmacs/misc/licenses/Slug-MIT.txt): "The above copyright notice and this
+// permission notice shall be included in all copies or substantial portions
+// of the Software."
 struct SOut {
   float4 position [[position]];
   float2 em;
@@ -176,6 +189,28 @@ struct quad_uniforms { float size[2]; float porig[2]; float ptile[2]; int mode; 
 * The backend
 ******************************************************************************/
 
+class metal_backend;
+static void metal_refresh (metal_backend* b, void* layer);
+
+/* The display link of the window of a layer (macOS 14): its ticks are the
+ refreshes of the screen of the window, wherever the window is. */
+@interface TMVueRefresh : NSObject
+{
+@public
+  metal_backend* backend;
+  void* layer;
+}
+- (void) tick: (id) sender;
+@end
+
+@implementation TMVueRefresh
+- (void) tick: (id) sender
+{
+  (void) sender;
+  if (backend != NULL) metal_refresh (backend, layer);
+}
+@end
+
 class metal_backend: public gpu_backend {
   id<MTLDevice> device= nil;
   id<MTLCommandQueue> queue= nil;
@@ -184,6 +219,11 @@ class metal_backend: public gpu_backend {
   id<MTLTexture> blank= nil;             // 1x1 white, for unused bindings
   bool failed= false;
   bool started= false;
+  // the shaders and the pipelines, compiled while TeXmacs starts (warm_up:
+  // some 0.3 s when Metal has not cached them, at the first start after an
+  // update); what went wrong, printed by prepare
+  dispatch_group_t compiling= nil;
+  NSMutableString* compile_log= nil;
   string device_name;
   // the windows, by their SDL id: their layers
   std::unordered_map<unsigned, CAMetalLayer*> layers;
@@ -191,15 +231,28 @@ class metal_backend: public gpu_backend {
   id<CAMetalDrawable> drawable= nil;     // of this frame, once drawn into
   // the presents into each layer: when the last one was made, and the
   // refresh period of its screen (0: not paced, as the layers of Cocoa,
-  // presented by a display link)
-  struct pacing { double last; double period; };
+  // presented by a display link of their own). The layer of a window has
+  // a display link (macOS 14): a window is presented once a refresh, at
+  // the first turn of the loop after it (refreshed), the tick waking the
+  // loop up when a window was found not ready (waiting); the link pauses
+  // when nothing was presented for two refreshes (idle). Without one, no
+  // two presents within half a period
+  struct pacing {
+    double last= 0, period= 0;
+    CADisplayLink* link= nil;      // (macOS 14), or nil
+    TMVueRefresh* target= nil;
+    bool refreshed= true, waiting= false;
+    int idle= 0;
+  };
   std::unordered_map<void*, pacing> pacings;
+  unsigned refresh_event= 0;       // the SDL event of a tick
   // the commands being encoded
   id<MTLCommandBuffer> cmd= nil;
   id<MTLCommandBuffer> last= nil;        // committed last (finish waits)
   id<MTLRenderCommandEncoder> enc= nil;
   id<MTLTexture> enc_target= nil;        // what enc draws into
 
+  void compile ();
   bool init ();
   id<MTLCommandBuffer> commands ();
   void end_encoder ();
@@ -217,6 +270,7 @@ public:
 #else
   unsigned long long window_flags () { return 0; }
 #endif
+  void warm_up ();
   bool prepare ();
   bool attach (SDL_Window* w);
   bool attach_layer (void* layer);
@@ -224,12 +278,16 @@ public:
   void begin_screen (int dw, int dh);
   void present (SDL_Window* w);
   bool ready_to_present ();
+  bool wakes_when_ready ();
+  void detach (SDL_Window* w);
+  void refresh (void* layer);
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);
   void update_texture (gpu_texture t, int x, int y, int w, int h, const void* data);
   void delete_texture (gpu_texture t);
   gpu_texture new_target (int w, int h, bool transparent= false);
+  int max_texture_side ();
   bool targets_flipped () { return false; }
 
   void draw_quads (const gpu_pass& p, const gpu_quads& q);
@@ -245,12 +303,24 @@ public:
   void finish ();
 };
 
+void
+metal_backend::warm_up () {
+  if (device != nil || compiling != nil) return;
+  device= MTLCreateSystemDefaultDevice ();
+  if (device == nil) return;
+  compiling= dispatch_group_create ();
+  metal_backend* me= this;
+  dispatch_group_async (compiling,
+                        dispatch_get_global_queue (QOS_CLASS_USER_INITIATED, 0),
+                        ^{ me->compile (); });
+}
+
 bool
 metal_backend::prepare () {
   static bool done= false;
   if (done) return !failed;
   done= true;
-  device= MTLCreateSystemDefaultDevice ();
+  if (device == nil) device= MTLCreateSystemDefaultDevice ();
   if (device == nil) {
     cout << "TeXmacs] GPU: no Metal device, drawing on the CPU" << LF;
     failed= true;
@@ -258,13 +328,18 @@ metal_backend::prepare () {
   }
   // (the pipelines before any window: the Cocoa port makes the backing
   // stores of its canvases before their layers are drawn into)
+  if (compiling != nil) dispatch_group_wait (compiling, DISPATCH_TIME_FOREVER);
+  else compile ();
+  if (compile_log != nil && [compile_log length] > 0)
+    cout << [compile_log UTF8String];
   if (!init ()) { failed= true; return false; }
   started= true;
   return true;
 }
 
 static id<MTLRenderPipelineState>
-make_pipeline (id<MTLDevice> dev, id<MTLLibrary> lib, const char* vs, const char* fs) {
+make_pipeline (id<MTLDevice> dev, id<MTLLibrary> lib, const char* vs, const char* fs,
+               NSMutableString* log) {
   MTLRenderPipelineDescriptor* d= [[MTLRenderPipelineDescriptor alloc] init];
   d.vertexFunction= [lib newFunctionWithName: [NSString stringWithUTF8String: vs]];
   d.fragmentFunction= [lib newFunctionWithName: [NSString stringWithUTF8String: fs]];
@@ -281,25 +356,33 @@ make_pipeline (id<MTLDevice> dev, id<MTLLibrary> lib, const char* vs, const char
   NSError* err= nil;
   id<MTLRenderPipelineState> p= [dev newRenderPipelineStateWithDescriptor: d error: &err];
   if (p == nil)
-    cout << "TeXmacs] GPU: Metal pipeline " << fs << ": "
-         << [[err localizedDescription] UTF8String] << LF;
+    [log appendFormat: @"TeXmacs] GPU: Metal pipeline %s: %@\n",
+                       fs, [err localizedDescription]];
   return p;
+}
+
+// the shaders and the pipelines (on any thread: nothing else is touched;
+// the messages go to compile_log)
+void
+metal_backend::compile () {
+  NSMutableString* log= [NSMutableString string];
+  NSError* err= nil;
+  id<MTLLibrary> lib= [device newLibraryWithSource: [NSString stringWithUTF8String: metal_src]
+                                           options: nil error: &err];
+  if (lib == nil)
+    [log appendFormat: @"TeXmacs] GPU: the Metal shaders do not compile: %@\n",
+                       [err localizedDescription]];
+  else {
+    quad_pipe= make_pipeline (device, lib, "quad_vs", "quad_fs", log);
+    slug_pipe= make_pipeline (device, lib, "slug_vs", "slug_fs", log);
+  }
+  compile_log= log;
 }
 
 bool
 metal_backend::init () {
-  queue= [device newCommandQueue];
-  NSError* err= nil;
-  id<MTLLibrary> lib= [device newLibraryWithSource: [NSString stringWithUTF8String: metal_src]
-                                           options: nil error: &err];
-  if (lib == nil) {
-    cout << "TeXmacs] GPU: the Metal shaders do not compile: "
-         << [[err localizedDescription] UTF8String] << LF;
-    return false;
-  }
-  quad_pipe= make_pipeline (device, lib, "quad_vs", "quad_fs");
-  slug_pipe= make_pipeline (device, lib, "slug_vs", "slug_fs");
   if (quad_pipe == nil) return false;
+  queue= [device newCommandQueue];
   for (int i= 0; i < 4; i++) {
     MTLSamplerDescriptor* s= [[MTLSamplerDescriptor alloc] init];
     s.minFilter= s.magFilter= (i & 1) ? MTLSamplerMinMagFilterLinear
@@ -365,6 +448,23 @@ metal_backend::attach (SDL_Window* w) {
     CAMetalLayer* l= (__bridge CAMetalLayer*) SDL_Metal_GetLayer (v);
     layers[id]= l;
     it= layers.find (id);
+    // (TEXMACS_VUE_DISPLAY_LINK=0: no display link, as before macOS 14)
+    static bool no_link= (getenv ("TEXMACS_VUE_DISPLAY_LINK") != NULL &&
+                          strcmp (getenv ("TEXMACS_VUE_DISPLAY_LINK"), "0") == 0);
+    if (no_link) {}
+    else if (@available (macOS 14.0, *)) {
+      // (the view is an NSView of SDL, whose display link follows the
+      // screen of its window)
+      pacing& p= pacings[(__bridge void*) l];
+      p.target= [[TMVueRefresh alloc] init];
+      p.target->backend= this;
+      p.target->layer= (__bridge void*) l;
+      NSView* view= (__bridge NSView*) v;
+      p.link= [view displayLinkWithTarget: p.target selector: @selector(tick:)];
+      [p.link addToRunLoop: [NSRunLoop mainRunLoop]
+                   forMode: NSRunLoopCommonModes];
+      if (refresh_event == 0) refresh_event= SDL_RegisterEvents (1);
+    }
   }
   if (!attach_layer ((__bridge void*) it->second)) return false;
   // the refresh period of the screen of the window (it may move)
@@ -387,6 +487,29 @@ metal_backend::begin_screen (int dw, int dh) {
   drawable= nil;  // taken when first drawn into
 }
 
+static double now_ms ();
+
+// TEXMACS_VUE_DEBUG_PRESENT: each present (PRESENT: the time since the last
+// one of its layer, the wait in nextDrawable; GPU: when the GPU was done
+// with the frame, SHOWN: when the screen showed it, both in ms after the
+// present), each window not presented yet (DEFER), and the ticks of the
+// display links which wake the loop up (WAKE) or pause the link (PAUSE)
+static bool
+debug_present () {
+  static int on= -1;
+  if (on < 0) on= (getenv ("TEXMACS_VUE_DEBUG_PRESENT") != NULL);
+  return on != 0;
+}
+static double drawable_wait= 0;
+
+// whether some of the window of the layer can be seen
+static bool
+debug_visible (CAMetalLayer* l) {
+  NSView* v= (NSView*) l.delegate;
+  if (![v isKindOfClass: [NSView class]] || v.window == nil) return true;
+  return (v.window.occlusionState & NSWindowOcclusionStateVisible) != 0;
+}
+
 static double
 now_ms () {
   struct timespec ts;
@@ -399,7 +522,34 @@ metal_backend::present (SDL_Window* w) {
   (void) w;
   end_encoder ();
   if (drawable != nil) {
-    if (layer != nil) pacings[(__bridge void*) layer].last= now_ms ();
+    if (layer != nil) {
+      double t= now_ms ();
+      pacing& p= pacings[(__bridge void*) layer];
+      if (debug_present ())
+        fprintf (stderr, "PRESENT %.3f dt %.2f wait %.2f layer %p%s\n",
+                 t, t - p.last, drawable_wait, (__bridge void*) layer,
+                 debug_visible (layer) ? "" : " occluded");
+      p.last= t;
+      p.refreshed= false;
+      p.idle= 0;
+      if (p.link != nil) [p.link setPaused: NO];
+    }
+    drawable_wait= 0;
+    if (debug_present ()) {
+      // (the times of the command buffer and of the drawable are those of
+      // CACurrentMediaTime; the command buffer of the present holds no
+      // drawing, its end is when the GPU was done with the frame)
+      double t0= now_ms ();
+      double m0= CACurrentMediaTime () * 1000.0;
+      [commands () addCompletedHandler: ^(id<MTLCommandBuffer> cb) {
+        fprintf (stderr, "GPU %.3f done +%.2f\n", t0,
+                 cb.GPUEndTime * 1000.0 - m0);
+      }];
+      [drawable addPresentedHandler: ^(id<MTLDrawable> d) {
+        fprintf (stderr, "SHOWN %.3f +%.2f\n", t0,
+                 d.presentedTime > 0 ? d.presentedTime * 1000.0 - m0 : -1.0);
+      }];
+    }
     [commands () presentDrawable: drawable];
     drawable= nil;
   }
@@ -418,11 +568,88 @@ metal_backend::ready_to_present () {
   // period skipped a turn of the loop each time (presents 15 ms apart).
   // (Counting the frames not shown yet with presented handlers did not
   // work: a frame replaced before a refresh is not reported, and the count
-  // stuck.)
+  // stuck.) With a display link (macOS 14) a window is presented once a
+  // refresh of its screen instead, the loop waiting for the tick rather
+  // than coming back every 2 ms: on an M4 at 120 Hz, the time spent in
+  // nextDrawable while scrolling was about halved, and no two presents
+  // came within a refresh (TEXMACS_VUE_DEBUG_PRESENT prints the presents;
+  // TEXMACS_VUE_DISPLAY_LINK=0 goes back to half a period). What is left
+  // of the wait is the latency of the GPU and of the compositor (a frame
+  // is shown 25 to 35 ms after it was presented), which no pacing removes.
   if (layer == nil) return true;
   auto it= pacings.find ((__bridge void*) layer);
   if (it == pacings.end () || it->second.period <= 0) return true;
-  return now_ms () - it->second.last >= 0.5 * it->second.period;
+  pacing& p= it->second;
+  bool ready;
+  if (p.link != nil)
+    // a refresh since the last present; or three periods without one (a
+    // link which does not tick, its window covered, say: drawn anyway, as
+    // the windows without a link)
+    ready= p.refreshed || now_ms () - p.last >= 3 * p.period;
+  else ready= (now_ms () - p.last >= 0.5 * p.period);
+  if (!ready) {
+    p.waiting= true;
+    if (debug_present ()) fprintf (stderr, "DEFER %.3f\n", now_ms ());
+  }
+  return ready;
+}
+
+bool
+metal_backend::wakes_when_ready () {
+  return refresh_event != 0;
+}
+
+void
+metal_backend::refresh (void* l) {
+  // a tick of the display link of the layer l
+  auto it= pacings.find (l);
+  if (it == pacings.end ()) return;
+  pacing& p= it->second;
+  p.refreshed= true;
+  if (p.waiting) {
+    // a window of this layer is waiting for this refresh: wake the loop up
+    p.waiting= false;
+    if (debug_present ()) fprintf (stderr, "WAKE %.3f\n", now_ms ());
+#ifdef VUETEXMACS
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= refresh_event;
+    SDL_PushEvent (&ev);
+#endif
+  }
+  else if (++p.idle >= 2 && p.link != nil && !p.link.paused) {
+    if (debug_present ()) fprintf (stderr, "PAUSE %.3f\n", now_ms ());
+    [p.link setPaused: YES];
+  }
+}
+
+static void
+metal_refresh (metal_backend* b, void* layer) {
+  b->refresh (layer);
+}
+
+void
+metal_backend::detach (SDL_Window* w) {
+#ifdef VUETEXMACS
+  if (w == NULL) return;
+  auto it= layers.find ((unsigned) SDL_GetWindowID (w));
+  if (it == layers.end ()) return;
+  void* l= (__bridge void*) it->second;
+  auto pit= pacings.find (l);
+  if (pit != pacings.end ()) {
+    if (pit->second.link != nil) [pit->second.link invalidate];
+    if (pit->second.target != nil) pit->second.target->backend= NULL;
+    pacings.erase (pit);
+  }
+  if (layer == it->second) {
+    end_encoder ();
+    drawable= nil;
+    layer= nil;
+  }
+  layers.erase (it);
+#else
+  (void) w;
+#endif
 }
 
 /******************************************************************************
@@ -455,7 +682,11 @@ metal_backend::finish () {
 id<MTLTexture>
 metal_backend::texture_of (gpu_texture t) {
   if (t != NULL) return t->tex;
-  if (drawable == nil && layer != nil) drawable= [layer nextDrawable];
+  if (drawable == nil && layer != nil) {
+    double t= debug_present () ? now_ms () : 0;
+    drawable= [layer nextDrawable];
+    if (debug_present ()) drawable_wait += now_ms () - t;
+  }
   return drawable == nil ? nil : drawable.texture;
 }
 
@@ -510,10 +741,33 @@ pixel_format (gpu_format f, int& bpp) {
   }
 }
 
+// The largest side of a texture: Metal stops the program (an assertion of
+// the validation of its descriptor) for a larger one, as a box of text with
+// a very long line asked for one 66162 pixels wide. Such a texture is not
+// made: what would be drawn with it is left out (the callers check)
+static const int metal_max_side= 16384;
+
+int
+metal_backend::max_texture_side () {
+  return metal_max_side;
+}
+
+static bool
+too_large (int w, int h) {
+  if (w <= metal_max_side && h <= metal_max_side) return false;
+  static bool warned= false;
+  if (!warned) {
+    warned= true;
+    cout << "TeXmacs] GPU: a texture of " << w << "x" << h
+         << " is larger than " << metal_max_side << ", not drawn" << LF;
+  }
+  return true;
+}
+
 gpu_texture
 metal_backend::new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                             const void* data) {
-  if (!started || w <= 0 || h <= 0) return NULL;
+  if (!started || w <= 0 || h <= 0 || too_large (w, h)) return NULL;
   int bpp;
   MTLPixelFormat pf= pixel_format (f, bpp);
   MTLTextureDescriptor* d=
@@ -577,7 +831,7 @@ metal_backend::delete_texture (gpu_texture t) {
 
 gpu_texture
 metal_backend::new_target (int w, int h, bool transparent) {
-  if (!started || w <= 0 || h <= 0) return NULL;
+  if (!started || w <= 0 || h <= 0 || too_large (w, h)) return NULL;
   MTLTextureDescriptor* d=
     [MTLTextureDescriptor texture2DDescriptorWithPixelFormat: MTLPixelFormatBGRA8Unorm
                                                        width: w height: h mipmapped: NO];

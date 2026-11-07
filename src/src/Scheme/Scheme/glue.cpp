@@ -10,6 +10,8 @@
 ******************************************************************************/
 
 #include "glue.hpp"
+#include "build_revision.hpp"
+#include "gui_test.hpp"
 
 // the glue type uint (see build-glue): the C library of macOS declares it,
 // that of the browser build does not (a typedef may be repeated in C++)
@@ -28,11 +30,19 @@ typedef unsigned int uint;
 #include "universal.hpp"
 #include "convert.hpp"
 #include "file.hpp"
+#ifdef USE_GS
+#include "Ghostscript/gs_utilities.hpp"
+#endif
 #include "locale.hpp"
 #include "iterator.hpp"
 #include "Freetype/tt_tools.hpp"
 #include "Database/database.hpp"
 #include "Sqlite3/sqlite3.hpp"
+#ifdef USE_TREE_SITTER
+#include "TreeSitter/tree_sitter_glue.hpp"
+#include "TreeSitter/syntax_region.hpp"
+#include "TreeSitter/ts_highlight.hpp"
+#endif
 #include "Updater/tm_updater.hpp"
 
 tmscm 
@@ -76,7 +86,7 @@ texmacs_version (string which) {
   if (which == "stable") return TM_STABLE;
   if (which == "devel-release") return TM_DEVEL_RELEASE;
   if (which == "stable-release") return TM_STABLE_RELEASE;
-  if (which == "revision") return TEXMACS_REVISION;
+  if (which == "revision") return get_build_revision ();
   return TEXMACS_VERSION;
 }
 
@@ -153,6 +163,15 @@ supports_ghostscript () {
   return true;
 #else
   return false;
+#endif
+}
+
+string
+get_gs_executable () {
+#ifdef USE_GS
+  return gs_executable ();
+#else
+  return "";
 #endif
 }
 
@@ -1286,11 +1305,19 @@ tmscm_to_list_tree (tmscm p) {
 #include "tm_window.hpp"
 #include "boot.hpp"
 #include "connect.hpp"
+#ifdef USE_LSP
+#include "lsp_link.hpp"
+#endif
+#include "local_link.hpp"
+#include "mcp_stdio.hpp"
+#include "code_lines.hpp"
+#include "code_regions.hpp"
 #include "convert.hpp"
 #include "file.hpp"
 #include "image_files.hpp"
 #include "web_files.hpp"
 #include "zip_files.hpp"
+#include "data_cache.hpp"
 #include "sys_utils.hpp"
 #include "client_server.hpp"
 #include "analyze.hpp"
@@ -1322,6 +1349,7 @@ static bool exists_in_tex (url u) { (void) u; return false; }
 
 #include "MuPDF/pdf_extract_attachment.hpp"
 #include "MuPDF/pdf_make_attachment.hpp"
+#include "Html_math/html_math.hpp"
 
 // (boxes.cpp: a picture of a symbol)
 void make_symbol_image (url dest, string sym);
@@ -1329,6 +1357,14 @@ void make_symbol_image (url dest, string sym);
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"
 #include "../Glue/glue_server.cpp"
+// (the features of program code which a build may leave out, see
+// src/docs/code-features.md and misc/m4/tm_code.m4)
+#ifdef USE_TREE_SITTER
+#include "../Glue/glue_treesit.cpp"
+#endif
+#ifdef USE_LSP
+#include "../Glue/glue_lsp.cpp"
+#endif
 
 void
 initialize_glue () {
@@ -1343,4 +1379,10 @@ initialize_glue () {
   initialize_glue_basic ();
   initialize_glue_editor ();
   initialize_glue_server ();
+#ifdef USE_TREE_SITTER
+  initialize_glue_treesit ();
+#endif
+#ifdef USE_LSP
+  initialize_glue_lsp ();
+#endif
 }

@@ -133,7 +133,8 @@
 
   <\active*>
     <\src-comment>
-      A comment, with its author and its date, after its mark; the text
+      A comment, with its author and its date, after its mark; a comment
+      on a range of the text, after the text, which is marked; the text
       which was inserted and the one which was deleted, while the changes
       are tracked.
     </src-comment>
@@ -143,11 +144,15 @@
 
   <assign|office-comment|<macro|author|date|body|<with|color|<value|office-comment-color>|<rsup|<math|\<ast\>>><with|font-size|0.71|[<with|font-series|bold|<arg|author>>: <arg|body>]>>>>
 
+  <assign|office-commented|<macro|text|author|date|body|<with|marked-color|pastel magenta|<marked|<arg|text>>><office-comment|<arg|author>|<arg|date>|<arg|body>>>>
+
   <assign|office-ins|<macro|author|date|body|<with|color|dark green|<underline|<arg|body>>>>>
 
   <assign|office-del|<macro|author|date|body|<with|color|dark red|<strike-through|<arg|body>>>>>
 
   <drd-props|office-comment|arity|3|accessible|2>
+
+  <drd-props|office-commented|arity|4|accessible|all>
 
   <drd-props|office-ins|arity|3|accessible|2>
 

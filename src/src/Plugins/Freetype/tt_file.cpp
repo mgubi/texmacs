@@ -20,6 +20,7 @@
 #include "scheme.hpp"
 
 static hashmap<string,string> tt_fonts ("no");
+static bool tt_indexed= false; // see tt_index_find
 
 url
 add_to_path (url u, url d) {
@@ -31,7 +32,13 @@ add_to_path (url u, url d) {
 }
 
 void
+tt_font_index_reset () {
+  tt_indexed= false; // (made again at the next look up, see tt_index_find)
+}
+
+void
 tt_extend_font_path (url u) {
+  tt_indexed= false; // (the index of the files of the path is made again)
   if (!is_directory (u)) u= head (u);
   string old= get_preference ("imported fonts", "");
   if (old == "") set_preference ("imported fonts", as_unix_string (u));
@@ -111,8 +118,55 @@ tt_font_path () {
 #endif
 }
 
+// The files of the directories of the font path, by name: the place of
+// the file in the first directory of the path which has it. The path and
+// its directories are walked once (the system directories and the trees of
+// TeX Live are large, and a font which is not there, as the many sizes of
+// the TeX fonts, which have no sfnt form, was looked for in each of them);
+// a directory imported meanwhile (tt_extend_font_path) makes it again
+static hashmap<string,string> tt_index ("");
+
+static void
+tt_index_add (url dirs) {
+  if (is_none (dirs)) return;
+  if (is_or (dirs)) {
+    tt_index_add (dirs[1]);
+    tt_index_add (dirs[2]);
+    return;
+  }
+  bool err= false;
+  array<string> a= read_directory (dirs, err);
+  if (err) return;
+  for (int i= 0; i < N(a); i++)
+    if (N(a[i]) > 0 && a[i][0] != '.' && !tt_index->contains (a[i]))
+      tt_index (a[i])= as_string (dirs * url (a[i]));
+}
+
 static url
-tt_locate (string name, url tt_path) {
+tt_index_find (string name) {
+  if (!tt_indexed) {
+    tt_indexed= true;
+    tt_index= hashmap<string,string> ("");
+    bench_start ("tt font index");
+    tt_index_add (tt_font_path ());
+    bench_cumul ("tt font index");
+  }
+  if (!tt_index->contains (name)) {
+    // the file systems of macOS store the names in decomposed Unicode, and
+    // find a file by any form of its name, unlike the index: the names
+    // which are not ASCII (as the Hiragino fonts asked by font.cpp) are
+    // looked for in the directories
+    for (int i= 0; i < N(name); i++)
+      if (((unsigned char) name[i]) >= 128)
+        return resolve (tt_font_path () * name);
+    return url_none ();
+  }
+  url u= url_system (tt_index[name]);
+  return exists (u)? u: url_none ();
+}
+
+static url
+tt_locate (string name) {
   if (ends (name, ".pfb")) {
     /*
     if (starts (name, "rpag")) name= "uag" * name (4, N (name) - 4) * "8a.pfb";
@@ -154,8 +208,7 @@ tt_locate (string name, url tt_path) {
 	}
     }
 
-  //cout << "Resolve " << name << " in " << tt_path << "\n";
-  return resolve (tt_path * name);
+  return tt_index_find (name);
 }
 
 url
@@ -169,17 +222,27 @@ tt_font_find_sub (string name) {
   // sign and the code of 'A' is 'a'. TeXmacs asks for characters by Unicode
   // and needs the cmap of the sfnt file. The same choice gives the PDF
   // writer real glyph indices instead of character codes.
-  // The font path is the same for the five suffixes
-  url tt_path= tt_font_path ();
-  u= tt_locate (name * ".otf", tt_path);
+  // (the font path is indexed once, see tt_index_find)
+  u= tt_locate (name * ".otf");
+  if (is_none (u)) u= tt_locate (name * ".ttf");
+  if (is_none (u)) u= tt_locate (name * ".ttc");
+  if (!is_none (u)) {
+    // Except for a font of TeX, which has a TFM of its name (cmsy10,
+    // msam10...): TeXmacs asks for its glyphs by their codes in the TFM,
+    // which its Type 1 file has. An sfnt file of the same name elsewhere,
+    // as the BaKoMa fonts of LyX in /usr/share/fonts on Linux (fonts-lyx,
+    // which matplotlib needs), puts them at other codes, and the symbols
+    // came out as boxes (#407). The families of the paragraph above have
+    // no TFM of their name.
+    if (exists_in_tex (name * ".tfm")) {
+      url p= tt_locate (name * ".pfb");
+      if (!is_none (p)) return p;
+    }
+    return u;
+  }
+  u= tt_locate (name * ".pfb");
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttf", tt_path);
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttc", tt_path);
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".pfb", tt_path);
-  if (!is_none (u)) return u;
-  u= tt_locate (name * ".dfont", tt_path);
+  u= tt_locate (name * ".dfont");
   return u;
 }
 
@@ -190,8 +253,9 @@ tt_font_find (string name) {
   // and is shared by every installation, so a cache written when Type 1
   // came first still named the .pfb file of a family whose .otf TeXmacs
   // now wants; the font then had no OpenType feature and no MATH table.
-  // Change the prefix whenever tt_font_find_sub changes its order.
-  string s= "sfnt:" * name;
+  // Change the prefix whenever tt_font_find_sub changes its order ("sfnt:"
+  // gave the fonts of TeX their TrueType files of LyX, #407).
+  string s= "sfnt-tfm:" * name;
   if (is_cached ("font_cache.scm", s)) {
     string r= cache_get ("font_cache.scm", s) -> label;
     if (r == "") return url_none ();

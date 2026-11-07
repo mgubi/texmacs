@@ -39,6 +39,7 @@ protected:
   SI            cur_r;       // the current right offset of the last line unit
   space         cur_w;       // the current width of the line unit
   int           cur_start;   // index of the start of the line unit
+  SI            last_cor;    // the italic correction in the last of spcs
 
   string        mode;        // justified, left, center or right
   double        flexibility; // threshold for switching to ragged mode
@@ -107,6 +108,9 @@ public:
   friend array<page_item>
   typeset_stack (edit_env env, tree t, path ip, SI width,
                  array<line_item> a, array<line_item> b, stack_border& sb);
+  friend array<page_item>
+  typeset_stack (edit_env env, array<line_item> a, path ip, SI width,
+                 stack_border& sb);
 };
 
 struct lazy_paragraph {

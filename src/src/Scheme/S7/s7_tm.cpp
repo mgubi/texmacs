@@ -26,6 +26,23 @@ int tmscm_builders= 0;
 s7_pointer user_env;
 static s7_pointer catch_call;
 
+static int caught_errors= 0;
+
+int
+scheme_caught_errors () {
+  // the number of errors caught so far by catch-call at the calls from C++
+  // to Scheme, which then give the error as their result: a caller can tell
+  // that an empty result comes from an error (#705)
+  return caught_errors;
+}
+
+static s7_pointer
+count_caught_error (s7_scheme* sc, s7_pointer args) {
+  (void) args;
+  caught_errors++;
+  return s7_unspecified (sc);
+}
+
 int tm_s7_argc;
 char **tm_s7_argv;
 
@@ -44,6 +61,12 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   // instead of growing it step by step, with fewer collections meanwhile
   s7_eval_c_string (tm_s7, "(set! (*s7* 'heap-size) 1024000)");
 
+  // grow the heap four times (instead of twice) only when less than half of
+  // it is free after a collection, not 2/3: with a long file (s7.c, 100000
+  // lines) about 1.5M cells live, a heap of 4M was then often quadrupled,
+  // and a heap never shrinks (16M cells, 400 MB more than 8M)
+  s7_eval_c_string (tm_s7, "(set! (*s7* 'gc-resize-heap-by-4-fraction) 0.5)");
+
   // expand each macro call once and keep its expansion, as Guile does,
   // instead of expanding it at each evaluation (local patch 0005)
   s7_eval_c_string (tm_s7, "(set! (*s7* 'cache-macro-expansions?) #t)");
@@ -58,11 +81,16 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   // an enclosing catch (the function runs in the environment of this lambda,
   // inside the user environment, where (defined? 'sym) also sees the
   // arguments: they have unlikely names)
+  s7_define (tm_s7, user_env, s7_make_symbol (tm_s7, "catch-call-count-error"),
+             s7_make_function (tm_s7, "catch-call-count-error",
+                               count_caught_error, 0, 0, false,
+                               "counts an error caught by catch-call"));
   catch_call= s7_eval_c_string_with_environment (tm_s7,
     "(lambda (catch-call-fun catch-call-args)"
     "  (#_catch #t"
     "    (lambda () (#_apply catch-call-fun catch-call-args))"
     "    (lambda (type info)"
+    "      (catch-call-count-error)"
     "      (#_format *stderr* \"Error: ~A~%\""
     "        (#_catch #t"
     "          (lambda () (#_apply #_format #f info))"
@@ -338,6 +366,12 @@ static s7_pointer g_getpid (s7_scheme *sc, s7_pointer args)
   return(s7_make_integer(sc, (s7_int)getpid()));
 }
 
+static s7_pointer g_unshadow_global (s7_scheme *sc, s7_pointer args)
+{
+  // see define-public in boot-s7.scm and s7_unshadow_global in s7.c
+  return s7_make_boolean (sc, s7_unshadow_global (sc, s7_car (args), s7_cadr (args)));
+}
+
 void
 initialize_compat () {
 
@@ -352,6 +386,10 @@ initialize_compat () {
             s7_make_typed_function(sc, "getpid", g_getpid, 0, 0,
                                    false, "int getpid(void)",
                                    s7_make_signature(sc, 2, s7_make_symbol(sc, "integer?"), s7_t(sc))));
+
+  s7_define(sc, cur_env, s7_make_symbol(sc, "unshadow-global!"),
+            s7_make_function(sc, "unshadow-global!", g_unshadow_global, 2, 0,
+                             false, "(unshadow-global! let symbol)"));
 }
 
 

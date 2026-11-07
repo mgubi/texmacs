@@ -354,9 +354,8 @@ elseif (TEXMACS_GUI STREQUAL "X11")
 endif ()
 
 ### --------------------------------------------------------------------
-### MuPDF: the pictures and the PDF of the Vue and SDL ports, and of the
-### Qt port on demand (in place of Hummus); the X11 port has pictures of
-### its own, which clash with it
+### MuPDF: the pictures and the PDF of the Vue and SDL ports; the Qt and
+### X11 ports have pictures of their own, which clash with it
 ### --------------------------------------------------------------------
 
 set (MUPDF_DIR "" CACHE PATH "Prefix of the MuPDF installation (optional)")
@@ -366,7 +365,9 @@ else ()
   set (_mupdf_default OFF)
 endif ()
 option (USE_MUPDF "Use MuPDF (required by the Vue and SDL GUIs)" ${_mupdf_default})
-if (TEXMACS_GUI STREQUAL "X11")
+# never with X11 nor Qt, also on demand: the Qt renderer took the pictures
+# of MuPDF for its own, and crashed at the first image drawn
+if (TEXMACS_GUI STREQUAL "X11" OR TEXMACS_GUI MATCHES "^Qt")
   set (USE_MUPDF OFF)
 endif ()
 if (USE_MUPDF)
@@ -526,6 +527,11 @@ if (USE_GNUTLS)
   endif ()
 endif ()
 
+# the features of program code which a build may leave out (see
+# src/docs/code-features.md and misc/m4/tm_code.m4)
+option (USE_TREE_SITTER "Use the syntax trees of tree-sitter" ON)
+option (USE_LSP "Use language servers" ON)
+
 # SQLite3
 option (USE_SQLITE3 "Use SQLite3" ON)
 if (USE_SQLITE3)
@@ -608,6 +614,17 @@ configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/System/config.h.cmake
 configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/System/tm_configure.hpp.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/src/System/tm_configure.hpp)
 
+# the git commit of the sources (#753): the header is made now and again at
+# each build (the target git_revision), rewritten only when the commit
+# changes, so that only src/System/Boot/build_revision.cpp is rebuilt
+set (TM_GIT_REVISION_CMD
+  ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+  -DOUT=${CMAKE_CURRENT_BINARY_DIR}/src/System/git_revision.hpp
+  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GitRevision.cmake)
+execute_process (COMMAND ${TM_GIT_REVISION_CMD})
+add_custom_target (git_revision ALL COMMAND ${TM_GIT_REVISION_CMD}
+  COMMENT "Reading the git revision" VERBATIM)
+
 ### --------------------------------------------------------------------
 ### Source Files
 ### --------------------------------------------------------------------
@@ -655,6 +672,7 @@ file (GLOB_RECURSE TeXmacs_Std_Plugins_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Database/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Freetype/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Gnutls/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Html_math/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Ghostscript/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Ispell/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Metafont/*.cpp"
@@ -679,6 +697,21 @@ if (USE_RESVG)
 endif ()
 file (GLOB_RECURSE TeXmacs_Sqlite_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Sqlite3/*.cpp")
 list (APPEND TeXmacs_Std_Plugins_SRCS ${TeXmacs_Sqlite_SRCS})
+# tree-sitter: the vendored runtime (one unit, tree_sitter_lib.c) and the
+# languages made from the tables of progs/treesit (as in src/makefile.in)
+set (TeXmacs_TreeSitter_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/TreeSitter")
+if (USE_TREE_SITTER)
+  list (APPEND TeXmacs_Std_Plugins_SRCS
+    "${TeXmacs_TreeSitter_DIR}/tree_sitter_glue.cpp"
+    "${TeXmacs_TreeSitter_DIR}/syntax_region.cpp"
+    "${TeXmacs_TreeSitter_DIR}/ts_highlight.cpp"
+    "${TeXmacs_TreeSitter_DIR}/ts_tables.cpp"
+    "${TeXmacs_TreeSitter_DIR}/tree_sitter_lib.c"
+    "${TeXmacs_TreeSitter_DIR}/ts_dynamic.c"
+    "${TeXmacs_TreeSitter_DIR}/ts_xz.c")
+endif ()
+# (their include directories are set in src/CMakeLists.txt, where the
+# target is)
 
 # GUI Sources
 if (QTTEXMACS)
@@ -728,6 +761,10 @@ elseif (APPLE)
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.mm")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
+  # the title bar of the Vue windows (proxy icon, edited dot), macOS only
+  if (VUETEXMACS)
+    list (APPEND TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Vue/vue_mac.mm")
+  endif ()
 else ()
   file (GLOB TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")

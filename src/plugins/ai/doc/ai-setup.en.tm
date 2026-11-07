@@ -22,7 +22,11 @@
 
   When the wallet of <TeXmacs> is on, the key is kept there, encrypted,
   rather than in the preferences, and the panel shows
-  <with|font-series|bold|(in the wallet)>. On the desktop, the wallet needs
+  <with|font-series|bold|(in the wallet)> next to an empty field: a key
+  typed there replaces it, an empty field keeps it, and
+  <with|font-series|bold|Delete entries> (<menu|Edit|Preferences|Security>, wallet on) removes
+  it. The field of the key is a password field, which never shows the key
+  in clear. On the desktop, the wallet needs
   <name|GnuPG> and the experimental feature
   <with|font-series|bold|Encryption> (<menu|Edit|Preferences|Other>); it is
   then set up in <menu|Edit|Preferences|Security>. In a web browser, which
@@ -68,8 +72,10 @@
   </description>
 
   and, for all the chatbots, <with|font-series|bold|Show the answer as it
-  came>, <with|font-series|bold|Show the reasoning> and
-  <with|font-series|bold|Show the tokens and the cost>.
+  came>, <with|font-series|bold|Show the reasoning>,
+  <with|font-series|bold|Show the tokens and the cost> and, on the desktop,
+  <with|font-series|bold|Compile the TikZ pictures> (see <hlink|Chatting
+  with a chatbot|ai-sessions.en.tm>).
 
   <subsection*|Network>
 
@@ -77,15 +83,17 @@
   the desktop (or with <name|Qt> in the versions built with <name|Qt 6>),
   by the browser itself in a web browser. Behind a proxy, the requests go
   through the one of the system: the settings of <name|macOS> (with their
-  exceptions and their automatic configuration) and <name|Windows>, the
-  variables <verbatim|https_proxy>, <verbatim|http_proxy>,
+  exceptions and their automatic configuration), those of <name|Windows> in
+  the versions built with <name|Qt 6>, the variables <verbatim|https_proxy>, <verbatim|http_proxy>,
   <verbatim|all_proxy> and <verbatim|no_proxy> of the environment elsewhere
   (and before the settings of <name|macOS>). Another one is given in
   <menu|Edit|Preferences|Convert|AI>, <with|font-series|bold|Proxy>:
   <verbatim|host:port>, <verbatim|socks5://host:port>, or
   <verbatim|direct> for none. The same tab has the
   <with|font-series|bold|Network timeout in seconds> of the versions built
-  with <name|Qt>.
+  with <name|Qt 6>: how long a request may go without receiving anything
+  (by default 5 minutes for a question, as an answer which is not streamed,
+  or a model which reasons, sends nothing for a while).
 
   <subsection*|ChatGPT>
 
@@ -239,6 +247,8 @@
   The preferences of <name|Albert> choose its model
   (<verbatim|openweight-large>, <verbatim|-medium> or <verbatim|-small>),
   the number of former questions and answers sent with a question
+  (<with|font-series|bold|Context>, as for the other chatbots), the number
+  kept for the questions asked outside a session, by all the chatbots
   (<with|font-series|bold|Chat history size>) and its agents (see
   <hlink|Correcting, translating and asking about a
   document|ai-tools.en.tm>).

@@ -577,10 +577,11 @@
     (-> "Search" (dynamic (focus-search-menu t))))
   (assuming (focus-can-search? t)
     ("Search references" (focus-open-search-tool t)))
-  (assuming (and (tree-in? t '(cite nocite cite-detail))
+  (assuming (and (tree-in? t '(cite nocite cite-detail)) (zotero-used?)
                  (zotero-citation-entry t))
     ("Show in Zotero" (zotero-show-item (zotero-citation-entry t))))
   (assuming (and (tree-in? t '(cite nocite cite-detail)) (supports-db?)
+                 (zotero-used?)
                  (zotero-can-import? (zotero-citation-entry t)))
     ("Import into the database"
      (zotero-import-entry (zotero-citation-entry t)))))
@@ -727,7 +728,7 @@
   (assuming (focus-can-search? t)
     ((balloon (icon "tm_focus_search.xpm") "Search references")
      (focus-open-search-tool t)))
-  (assuming (and (tree-in? t '(cite nocite cite-detail))
+  (assuming (and (tree-in? t '(cite nocite cite-detail)) (zotero-used?)
                  (zotero-citation-entry t))
     ((balloon "Z" "Show in Zotero")
      (zotero-show-item (zotero-citation-entry t)))))
@@ -810,6 +811,36 @@
     (dynamic (graphics-focus-icons)))
   (assuming (not (in-graphics?))
     (dynamic (standard-focus-icons (focus-tree)))))
+
+;; The agent of a shared file, in the window that hosts it (docs/mcp-server.md);
+;; nothing is computed for a file that is not shared
+(tm-menu (agent-focus-icons)
+  (with name (current-buffer)
+    (mini #t (group (eval (shared-agents-focus-text name))))
+    (mini #t
+      (=> (eval (translate (symbol->string (or (shared-agent-mode name) 'propose))))
+          ("Propose" (shared-set-agent-mode! name 'propose))
+          ("Direct" (shared-set-agent-mode! name 'direct))
+          ("Read only" (shared-set-agent-mode! name 'read-only))))
+    (when (> (shared-file-pending-count name) 0)
+      (mini #t (group (eval (number->string (shared-file-pending-count name)))))
+      ((balloon "<less>" "Previous proposal") (shared-proposal-go! name -1))
+      ((balloon "<gtr>" "Next proposal") (shared-proposal-go! name 1)))
+    (=> (balloon "..." "Agent: more")
+        (when (shared-proposal-at-cursor name)
+          ("Accept the proposal here" (shared-proposal-resolve-here! name 'new))
+          ("Reject the proposal here" (shared-proposal-resolve-here! name 'old)))
+        (when (> (shared-file-pending-count name) 0)
+          ("Accept all" (shared-proposal-resolve-all! name 'new))
+          ("Reject all" (shared-proposal-resolve-all! name 'old)))
+        ---
+        ("Check connection" (shared-agent-check-connection name)))))
+
+(tm-menu (texmacs-focus-icons)
+  (:require (shared-agents-focus?))
+  (dynamic (former))
+  //
+  (dynamic (agent-focus-icons)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menus for customizable environments

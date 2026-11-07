@@ -1,0 +1,488 @@
+# The CI of wip_fixes (the stock TeXmacs, the mirror of its SVN trunk, with
+# fixes not yet upstream), built with Qt 6 and the Guile 1.8 of the
+# repository (guile-texmacs, built by configure as the embedded Guile in
+# src/tm-guile188): on each system, the regression suites headless
+# (.github/scripts/run-tests.sh, which runs tests/scheme/check.sh) and the
+# startup checks (tests/startup/check.sh: the command line and the exit
+# after a script, #462), then the packages of TeXmacs Fixes, published in the
+# pre-release fixes-latest and on https://mgubi.github.io/texmacs/fixes.html:
+#   * linux: the suites and the startup checks on Ubuntu 24.04;
+#   * linux-appimage, appimage-check: an AppImage made on Ubuntu 22.04
+#     (.github/fixes/build-appimage.sh), run on Ubuntu 24.04 and Debian 12
+#     without packages of development; published when linux passed too;
+#   * macos: the suites (on Apple silicon) and the startup checks, then an
+#     application for Apple silicon and one for Intel, in a disk image each
+#     (signed ad hoc, not notarized), started once; each published when
+#     its leg passed;
+#   * windows: the suites and the startup checks, then an installer (Inno
+#     Setup, .github/fixes/TeXmacs-Fixes.iss), installed, run and
+#     uninstalled (.github/fixes/windows-installer.sh), and the bundle in a
+#     zip.
+# A job whose suites fail makes no package (the AppImage, built apart, is
+# then not published); the release job publishes only the packages of the
+# jobs which passed, never from a cancelled run, and only on fixes_ci (run
+# by hand on another branch, from the Actions tab or with
+#   gh workflow run fixes.yml --ref <branch>
+# the workflow tests and packages without publishing).
+# TeXmacs Fixes installs beside the stock TeXmacs and TeXmacs Upsilon: its
+# own name, bundle identifier, menu entries, installer and file type, and the
+# patch .github/fixes/identity.patch (applied here, never committed to the
+# sources: the local server of Qt, the tree of texmacs.exe); it shares the
+# home of the stock TeXmacs (~/.TeXmacs).
+# With GnuTLS (configure leaves it out unless asked), as the packages of the
+# stock TeXmacs (misc/builder: Windows, macOS Qt 6, AppImage): TLS for the
+# remote tools, and the random numbers of passwords and salts (#66).
+# A state of wip_fixes is tested, built and published by moving fixes_ci to
+# it, fast-forward (fixes_ci is only ever a former state of wip_fixes),
+#   git push origin wip_fixes:fixes_ci
+
+name: TeXmacs Fixes (wip_fixes, Qt 6, Guile 1.8)
+
+on:
+  push:
+    branches: [fixes_ci]
+  workflow_dispatch:
+
+concurrency:
+  group: fixes-${{ github.ref }}
+  cancel-in-progress: true
+
+# read only, but for the release job
+permissions:
+  contents: read
+
+jobs:
+  # the regression suites on Linux, on the sources of the packages (with
+  # the identity of TeXmacs Fixes and GnuTLS)
+  linux:
+    name: Linux suites (Ubuntu 24.04, Qt 6, Guile 1.8)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            qt6-base-dev qt6-base-dev-tools qt6-svg-dev libgl-dev \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
+            libgnutls28-dev libsqlite3-dev \
+            libgmp-dev libltdl-dev \
+            ghostscript imagemagick fig2dev librsvg2-bin \
+            gnupg
+          # (gnupg: the gpg command, which the encryption of TeXmacs runs
+          # and the crypto suite checks; without it these checks are skipped)
+          # ImageMagick of Ubuntu does not write PostScript, EPS or PDF
+          # (its policy), which TeXmacs asks of it (image_to_eps)
+          sudo sed -i -E 's/rights="none" pattern="(PS|PS2|PS3|EPS|PDF|XPS)"/rights="read|write" pattern="\1"/' \
+            /etc/ImageMagick-6/policy.xml
+
+      - name: The identity of TeXmacs Fixes
+        working-directory: .
+        run: git apply .github/fixes/identity.patch
+
+      - name: Configure
+        run: |
+          cp -R ../guile-texmacs tm-guile188
+          ./configure --with-guile=embedded18 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Run the regression suites
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+
+      # the command line and the exit after a script (a crash at the exit,
+      # #462), one TeXmacs process per case; also when a suite failed
+      - name: The startup checks
+        if: ${{ !cancelled() }}
+        env:
+          TM_TEST_TIMEOUT: 300
+        run: tests/startup/check.sh
+
+  linux-appimage:
+    name: Linux AppImage (built on Ubuntu 22.04)
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # (the container has no git: checkout needs it for a clone)
+      - name: Tools of the container
+        working-directory: /
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl file patch
+
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        # (libgmp, libltdl, texinfo: for the Guile 1.8 of the repository)
+        run: |
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            qt6-base-dev qt6-base-dev-tools libqt6svg6-dev qt6-wayland libgl-dev \
+            libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev libsqlite3-dev \
+            libgnutls28-dev libgmp-dev libltdl-dev texinfo
+
+      - name: The identity of TeXmacs Fixes
+        working-directory: .
+        run: git apply .github/fixes/identity.patch
+
+      - name: Configure
+        run: |
+          cp -R ../guile-texmacs tm-guile188
+          ./configure --with-guile=embedded18 --with-gnutls QMAKE=/usr/lib/qt6/bin/qmake
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: AppImage
+        run: |
+          export QMAKE=/usr/lib/qt6/bin/qmake
+          ../.github/fixes/build-appimage.sh texmacs-fixes-x86_64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-fixes-appimage
+          path: src/texmacs-fixes-x86_64.AppImage
+          retention-days: 14
+
+  # the AppImage where a user runs it: the libraries of a desktop, no
+  # packages of development; TeXmacs starts and runs a command
+  appimage-check:
+    name: AppImage on ${{ matrix.image }}
+    needs: linux-appimage
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:24.04', 'debian:12']
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: A desktop without packages of development
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            xvfb xauth libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 \
+            libgl1 libopengl0 libharfbuzz0b \
+            libfontconfig1 libdbus-1-3 libx11-6 libx11-xcb1 libxext6 \
+            libxrandr2 libxcursor1 libxi6 libxss1 libxtst6 libxfixes3 \
+            libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxcb-xfixes0 \
+            libwayland-client0 libwayland-egl1 libwayland-cursor0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: texmacs-fixes-appimage
+
+      - name: TeXmacs starts and runs a command
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          app="$PWD/texmacs-fixes-x86_64.AppImage"
+          chmod +x "$app"
+          home=$(mktemp -d)
+          # (all the libraries which the system must give, at once)
+          (cd "$home" && "$app" --appimage-extract > /dev/null &&
+           find squashfs-root -type f \( -name '*.so*' -o -path '*/bin/*' \) \
+             -exec ldd {} + 2> /dev/null | grep 'not found' | sort -u) || true
+          HOME="$home" timeout 300 xvfb-run -a -s "-screen 0 1600x1200x24" \
+            "$app" -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -30 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+
+  macos:
+    name: macOS (${{ matrix.arch }}, Qt 6, Guile 1.8)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        # (gnupg: the gpg command, for the checks of the crypto suite;
+        # imagemagick and ghostscript: the converters of images, which the
+        # convert-more suite checks, as on Linux)
+        # (texinfo: makeinfo, for the documentation of Guile when make
+        # thinks it out of date; keg-only, so its bin is added to the PATH)
+        run: |
+          brew install qt freetype libpng jpeg gnutls sqlite gmp libtool gnupg imagemagick ghostscript texinfo
+          echo "$(brew --prefix texinfo)/bin" >> "$GITHUB_PATH"
+
+      - name: The identity of TeXmacs Fixes
+        working-directory: .
+        run: git apply .github/fixes/identity.patch
+
+      - name: Configure
+        run: |
+          cp -R ../guile-texmacs tm-guile188
+          B=$(brew --prefix)
+          ./configure --with-guile=embedded18 --with-gnutls \
+            QMAKE="$(brew --prefix qt)/bin/qmake" \
+            CPPFLAGS="-I$(brew --prefix libpng)/include/libpng16 -I$B/include" \
+            LDFLAGS="-L$(brew --prefix libpng)/lib -L$B/lib"
+
+      - name: Build
+        run: make -j"$(sysctl -n hw.ncpu)"
+
+      # (on Apple silicon only, as in the former CI of wip_fixes: the Intel runner
+      # is slower than the timings some suites check)
+      - name: Run the regression suites
+        if: matrix.arch == 'arm64'
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+
+      # the command line and the exit of TeXmacs after a script (a crash at
+      # the exit, #462), one TeXmacs process per case, in the source tree;
+      # the first case sets up a fresh home, slower on the Intel runner;
+      # also when a suite failed (the packaging steps then do not run)
+      - name: The startup checks
+        if: ${{ !cancelled() }}
+        env:
+          TM_TEST_TIMEOUT: 300
+        run: tests/startup/check.sh
+
+      - name: Application
+        run: |
+          # the libraries, frameworks and plugins deployed with macdeployqt
+          # (bundle-libs.sh does not handle Homebrew's prefix, nor finds
+          # the Qt plugins of Homebrew: an empty QT_PLUGINS_LIST leaves them
+          # to macdeployqt)
+          make MACOS_BUNDLE QT_PLUGINS_LIST=
+          "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
+          ../.github/fixes/macos-identity.sh ../distr/TeXmacs.app
+          rm -rf "../distr/TeXmacs Fixes.app"
+          mv ../distr/TeXmacs.app "../distr/TeXmacs Fixes.app"
+          # Homebrew's libraries target macOS 15 (its Sequoia bottles, also
+          # for Intel): the minimum is 15.0, not the macOS of the runner,
+          # which configure puts there (#733); --with-osx would also change
+          # the flags of the build, the step "Minimum macOS" checks the
+          # libraries
+          plutil -replace LSMinimumSystemVersion -string 15.0 \
+            "../distr/TeXmacs Fixes.app/Contents/Info.plist"
+          codesign --force --deep -s - "../distr/TeXmacs Fixes.app"
+
+      - name: TeXmacs starts and runs a command
+        run: |
+          home=$(mktemp -d)
+          TEXMACS_HOME_PATH="$home" perl -e 'alarm 300; exec @ARGV' \
+            "../distr/TeXmacs Fixes.app/Contents/MacOS/TeXmacs" -headless \
+            -x "(begin (string-save \"ok\" \"$home/ok\") (quit-TeXmacs))" \
+            > "$home/log.txt" 2>&1 || true
+          tail -30 "$home/log.txt"
+          [ -f "$home/ok" ] || { echo "error: TeXmacs did not run the command"; exit 1; }
+
+      - name: Minimum macOS
+        run: ../.github/fixes/check-min-macos.sh "../distr/TeXmacs Fixes.app"
+
+      - name: Disk image
+        run: |
+          version=$(sed -n 's/^tm_devel_version *= *//p' Makefile | head -1)
+          stage=$(mktemp -d)
+          cp -R "../distr/TeXmacs Fixes.app" "$stage/"
+          ln -s /Applications "$stage/Applications"
+          dmg="$GITHUB_WORKSPACE/texmacs-fixes-${version:-2.1.5}-macos-${{ matrix.arch }}.dmg"
+          # NOTE: again when it fails: on the runners of GitHub, hdiutil
+          # sometimes finds the files busy ("create failed - Resource
+          # busy"), being scanned; a partial image is removed first. The
+          # failure stays when all the tries fail.
+          for i in 1 2 3 4 5; do
+            rm -f "$dmg"
+            hdiutil create -volname "TeXmacs Fixes" -srcfolder "$stage" -ov \
+              -format UDZO "$dmg" && break
+            [ $i = 5 ] && { rm -f "$dmg"; exit 1; }
+            echo "== hdiutil failed, again in $((i * 10)) seconds"
+            sleep $((i * 10))
+          done
+          ls -la "$GITHUB_WORKSPACE"/*.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-fixes-macos-${{ matrix.arch }}
+          path: texmacs-fixes-*-macos-${{ matrix.arch }}.dmg
+          retention-days: 14
+
+  windows:
+    name: Windows (MSYS2 MinGW-w64, Qt 6, Guile 1.8)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: src
+    env:
+      # qmake6 is in /mingw64/bin, but moc, uic and rcc of Qt 6 only in here
+      QT6_BIN: /mingw64/share/qt6/bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          # (git: for the git group of the version suite, #625; the native
+          # git, as Git for Windows, not the git of MSYS2, which does not
+          # take Windows paths like D:\a\b.tm as files of the repository)
+          install: >-
+            make perl rsync zip
+            mingw-w64-x86_64-git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-ntldd
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-qt6-base
+            mingw-w64-x86_64-qt6-svg
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-gnutls
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-libtool
+            mingw-w64-x86_64-gnupg
+            texinfo
+
+      # (with the git of the runner, which made the checkout)
+      - name: The identity of TeXmacs Fixes
+        working-directory: .
+        shell: bash
+        run: git apply .github/fixes/identity.patch
+
+      - name: Configure
+        run: |
+          export PATH="$QT6_BIN:$PATH"
+          cp -R ../guile-texmacs tm-guile188
+          # the Windows entry point needs Qt found with pkg-config: with
+          # qmake, Qt defines QT_NEEDS_QMAIN and replaces main; with
+          # pkg-config, Qt's flags no longer bring in Winsock (ws2_32)
+          ./configure --with-guile=embedded18 --with-qt-find-method=pkgconfig \
+            --with-gnutls QMAKE=/mingw64/bin/qmake6 LIBS=-lws2_32
+
+      - name: Build
+        run: |
+          export PATH="$QT6_BIN:$PATH"
+          make -j"$(nproc)"
+
+      - name: Run the regression suites
+        run: |
+          BIN=TeXmacs/bin/texmacs.bin
+          test -f "$BIN" || BIN=TeXmacs/bin/texmacs.bin.exe
+          ../.github/scripts/run-tests.sh "$BIN"
+
+      # the command line and the exit after a script (a crash at the exit,
+      # #462), one TeXmacs process per case; also when a suite failed (the
+      # packaging steps then do not run)
+      - name: The startup checks
+        if: ${{ !cancelled() }}
+        env:
+          TM_TEST_TIMEOUT: 300
+        run: sh tests/startup/check.sh
+
+      - name: Bundle
+        run: |
+          export PATH="$QT6_BIN:$PATH"
+          # with Qt found by pkg-config, configure does not set the plugin
+          # directory, and the bundle needs at least platforms/qwindows.dll
+          make WINDOWS_BUNDLE QT_PLUGINS_PATH=/mingw64/share/qt6/plugins
+          ls ../distr/TeXmacs-Windows/bin/platforms
+          (cd ../distr && zip -qr "$GITHUB_WORKSPACE/texmacs-fixes-windows-x86_64.zip" TeXmacs-Windows)
+
+      - name: Installer
+        run: ../.github/fixes/windows-installer.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-fixes-windows
+          path: |
+            texmacs-fixes-windows-x86_64.zip
+            texmacs-fixes-x86_64-setup.exe
+          retention-days: 14
+
+  release:
+    # the packages of the jobs which passed (build, suites, startup checks),
+    # in the pre-release fixes-latest, only from fixes_ci: each file
+    # replaces the one of the former build, with a label naming the commit
+    # (the AppImage once the suites passed on Linux and it ran on all the
+    # systems of appimage-check; each macOS disk image once its leg
+    # passed, the suites running on Apple silicon)
+    name: Publish in fixes-latest
+    needs: [linux, appimage-check, macos, windows]
+    if: ${{ !cancelled() && github.ref == 'refs/heads/fixes_ci' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        if: needs.linux.result == 'success' && needs.appimage-check.result == 'success'
+        with:
+          name: texmacs-fixes-appimage
+          path: dist
+      # each chip on its own: a leg uploads its disk image only once all
+      # its steps passed (the upload is its last step), so the images
+      # present are those of the legs which passed
+      - uses: actions/download-artifact@v4
+        if: needs.macos.result != 'skipped'
+        with:
+          pattern: texmacs-fixes-macos-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.windows.result == 'success'
+        with:
+          name: texmacs-fixes-windows
+          path: dist
+
+      - name: The packages in fixes-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=fixes-latest
+          built="commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)"
+          shopt -s nullglob
+          files=()
+          for f in dist/*; do
+            case "$(basename "$f")" in
+              texmacs-fixes-x86_64.AppImage)    l="Linux AppImage, x86_64" ;;
+              texmacs-fixes-*-macos-arm64.dmg)  l="macOS, Apple silicon" ;;
+              texmacs-fixes-*-macos-x86_64.dmg) l="macOS, Intel" ;;
+              texmacs-fixes-x86_64-setup.exe)   l="Windows installer, x86_64" ;;
+              texmacs-fixes-windows-x86_64.zip) l="Windows, zip, x86_64" ;;
+              *) continue ;;
+            esac
+            files+=("$f#$l ($built)")
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "no package passed: nothing to publish"; exit 0; }
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+              --title "TeXmacs Fixes, latest builds" \
+              --notes "The stock TeXmacs with the fixes of wip_fixes: https://mgubi.github.io/texmacs/fixes.html" ||
+              gh release view "$tag" > /dev/null ||
+              { echo "error: create the release $tag once by hand"; exit 1; }
+          fi
+          gh release upload "$tag" "${files[@]}" --clobber

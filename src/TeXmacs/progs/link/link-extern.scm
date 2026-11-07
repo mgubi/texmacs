@@ -58,7 +58,7 @@
 
 (define (registry-add id name)
   (load-registry)
-  (with l (and (registry-get id) '())
+  (with l (or (registry-get id) '())
     (registry-set id (list-remove-duplicates (cons name l)))))
 
 (tm-define (get-constellation)

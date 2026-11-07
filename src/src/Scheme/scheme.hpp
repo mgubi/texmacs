@@ -21,6 +21,7 @@ class patch;
 
 void start_scheme (int argc, char** argv, void (*call_back) (int, char**));
 void initialize_scheme ();
+int  scheme_caught_errors ();
 string scheme_init_file (); // initialization file of the Scheme backend
 
 class object_rep : concrete_struct {
@@ -129,6 +130,7 @@ object eval (const char* expr);
 object eval (string expr);
 object eval (object expr);
 object eval_secure (string expr);
+bool   use_module (string s);
 object eval_file (string name);
 bool   exec_file (url u);
 void   exec_delayed (object cmd);

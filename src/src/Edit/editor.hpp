@@ -153,6 +153,9 @@ public:
   editor_rep (server_rep* sv, tm_buffer buf);
   inline virtual ~editor_rep () {}
   bool is_current_editor ();
+  // what the event loop does after the events: applies the changes to the
+  // view (a zoom, the typesetting...), which a test may do at once
+  virtual void apply_pending_changes () = 0;
   
   /* public routines from edit_interface */
   virtual void suspend () = 0;
@@ -208,6 +211,7 @@ public:
                           array<double> d) = 0;
   virtual bool mouse_message (string message, SI x, SI y) = 0;
   virtual color mouse_clickable_color () = 0;
+  virtual path xy_to_path (SI x, SI y) = 0;
   virtual void mouse_click (SI x, SI y) = 0;
   virtual bool mouse_extra_click (SI x, SI y) = 0;
   virtual void mouse_drag (SI x, SI y) = 0;
@@ -240,6 +244,8 @@ public:
   virtual void go_page_down () = 0;
   virtual void go_to (path p) = 0;
   virtual void go_to_correct (path p) = 0;
+  virtual void go_to_after_change (path p) = 0;
+  virtual void flush_cursor_hook () = 0;
   virtual void go_to_start (path p) = 0;
   virtual void go_to_end (path p) = 0;
   virtual void go_to_border (path p, bool at_start) = 0;
@@ -340,9 +346,14 @@ public:
   virtual void     init_style () = 0;
   virtual void     init_style (string style) = 0;
   virtual void     change_style (tree style) = 0;
+  virtual void     change_style_local (tree style) = 0;
   virtual tree     get_init_all () = 0;
+  virtual int      get_meta_hash () = 0;  // style and initial environment: see get_buffer_meta_hash
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
+  virtual void     init_env_local (string var, tree by) = 0;
+  virtual void     init_default_local (string var) = 0;
+  virtual void     set_zoom (tree z) = 0;
   virtual tree     get_ref (string key) = 0;
   virtual tree     get_aux (string key) = 0;
   virtual tree     get_att (string key) = 0;
@@ -359,6 +370,10 @@ public:
   virtual void     typeset_forced () = 0;
   virtual void     typeset_invalidate (path p) = 0;
   virtual void     typeset_invalidate_all () = 0;
+  virtual void     typeset_invalidate_labels () = 0;
+  virtual void     typeset_invalidate_keep () = 0;
+  virtual void     typeset_invalidate_inclusions () = 0;
+  virtual void     typeset_invalidate_pictures () = 0;
   virtual bool     typeset_renumber_labels () = 0;
   virtual void     typeset_invalidate_players (path p, bool reattach) = 0;
 
@@ -402,6 +417,7 @@ public:
   /* public routines from edit_text */
   virtual void correct (path p) = 0;
   virtual void correct_concat (path p, int done=0) = 0;
+  virtual bool can_insert_at (tree t, path p) = 0;
   virtual bool insert_return () = 0;
   virtual void remove_return (path p) = 0;
   virtual void insert_tree (tree t, path p_in_t) = 0;
@@ -546,6 +562,8 @@ public:
   virtual tree selection_get (string key) = 0;
   virtual void selection_set (string key, tree t, bool persistant= false) = 0;
   virtual void selection_set (tree t) = 0;
+  virtual void selection_get_state (range_set& sel, bool& sg, bool& sh, path& mid) = 0;
+  virtual void selection_set_state (range_set sel, bool sg, bool sh, path mid) = 0;
   virtual void selection_set_start (path p= path()) = 0;
   virtual void selection_set_end (path p= path()) = 0;
   virtual void selection_set_paths (path start, path end) = 0;
@@ -614,13 +632,17 @@ public:
   virtual void notify_page_change () = 0;
   virtual string get_metadata (string kind) = 0;
   virtual int  nr_pages () = 0;
-  virtual void print_doc (url ps_name, bool to_file, int first, int last) = 0;
+  virtual bool print_doc (url ps_name, bool to_file, int first, int last) = 0;
   virtual void print_to_file (url ps_name,
 			      string first="1", string last="1000000") = 0;
   virtual void print_buffer (string first="1", string last="1000000") = 0;
   virtual void export_ps (url ps_name,
 			  string first="1", string last="1000000") = 0;
   virtual array<SI> print_snippet (url u, tree t, bool conserve_preamble) = 0;
+  virtual array<SI> print_snippet_in (url u, tree t, int env_nr) = 0;
+  virtual scheme_tree html_math_snippet (tree t, int env_nr, bool breakable) = 0;
+  virtual int html_snippet_id (tree t, int env_nr) = 0;
+  virtual int html_snippet_last () = 0;
   virtual bool graphics_file_to_clipboard (url output) = 0;
   virtual void footer_eval (string s) = 0;
   virtual tree the_line () = 0;
@@ -639,6 +661,7 @@ public:
   virtual void show_path () = 0;
   virtual void show_cursor () = 0;
   virtual void show_selection () = 0;
+  virtual array<int> get_selection_rectangles () = 0;
   virtual void show_meminfo () = 0;
   virtual void edit_special () = 0;
   virtual void edit_test () = 0;

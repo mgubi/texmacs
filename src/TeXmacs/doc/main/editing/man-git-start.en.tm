@@ -24,7 +24,7 @@
   agent, or a credential helper (see the documentation of your hosting
   service).
 
-  <paragraph*|The <menu|Version> menu>
+  <paragraph*|The Version menu>
 
   By default, the <menu|Version> menu is shown for all documents which
   belong to a <name|Git> or <name|Subversion> working tree. You may show it

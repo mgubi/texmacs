@@ -21,7 +21,7 @@ var tmFrame = (function () {
     return e;
   }
 
-  // the logo of TeXmacs Vue (misc/icons/vue-logo), next to the page (see
+  // the logo of TeXmacs Upsilon (misc/icons/vue-logo), next to the page (see
   // WEB_ICONS in misc/wasm/Makefile)
   function logo (cls, srcset) {
     var img = el ('img', cls);
@@ -60,6 +60,9 @@ var tmFrame = (function () {
     #tm-frame .tm-tab:hover { background:#cacaca }
     #tm-frame .tm-tab.active { background:#f6f6f6; box-shadow:inset 0 0 0 1px #b4b4b4 }
     #tm-frame .tm-tab .tm-title { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis }
+    /* the number of a window among those of its document, kept when the
+       name is cut */
+    #tm-frame .tm-tab .tm-num { flex:none; white-space:pre }
     #tm-frame .tm-tab .tm-close { flex:none; margin-left:4px; width:18px; height:18px;
       line-height:18px; text-align:center; border-radius:3px; color:#9a9a9a }
     /* the close box of every tab, lighter on the tabs which are not shown */
@@ -69,7 +72,8 @@ var tmFrame = (function () {
     #tm-frame .tm-tab .tm-dot { display:none; position:absolute; top:4px; right:4px; width:6px;
       height:6px; border-radius:3px; background:#5b7fa8 }
     #tm-frame.collapsed .tm-tab { justify-content:center; padding:0; margin:2px 6px; height:30px }
-    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-close { display:none }
+    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-num,
+    #tm-frame.collapsed .tm-tab .tm-close { display:none }
     #tm-frame.collapsed .tm-tab .tm-short { display:block }
     #tm-frame.collapsed .tm-tab.modified .tm-dot { display:block }
     #tm-frame .tm-new, #tm-frame .tm-fold { display:flex; align-items:center; flex:none; height:30px;
@@ -613,8 +617,8 @@ var tmFrame = (function () {
     if (!bar) return;
     var appButton = el ('div', 'tm-app');
     appButton.appendChild (logo ('tm-logo', 'texmacs-vue-32.png 1x, texmacs-vue-48.png 2x'));
-    appButton.appendChild (el ('span', 'tm-name', 'TeXmacs Vue'));
-    appButton.title = 'About TeXmacs Vue, an experimental port of GNU TeXmacs';
+    appButton.appendChild (el ('span', 'tm-name', 'Upsilon'));
+    appButton.title = 'About TeXmacs Upsilon, an experimental port of GNU TeXmacs';
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
     newButton = el ('div', 'tm-new');
@@ -701,13 +705,26 @@ var tmFrame = (function () {
 
   // the short name of a window in the folded column: the initials of its
   // first two words ("Help - Welcome..." gives HW, "paper.tm" gives P), or
-  // its first initial and its number ("No name [2]" gives N2)
+  // its first initial and its number ("No name [2]" gives N2); a window of
+  // a document shown in several has their number ("paper.tm (2)" gives P2)
   function initials (title) {
     title = String (title);
+    var k = windowNumber (title);
+    if (k) {
+      title = title.slice (0, title.length - k.length);
+      return (initials (title).slice (0, 2) + k.slice (2, -1)).slice (0, 3);
+    }
     var words = title.replace (/\.[a-z0-9]+$/i, '').match (/[\p{L}\p{N}]+/gu) || ['?'];
     var n = /\[(\d+)\]\s*$/.exec (title);
     if (n) return (words[0].charAt (0).toUpperCase () + n[1]).slice (0, 3);
     return words.slice (0, 2).map (function (w) { return w.charAt (0).toUpperCase (); }).join ('');
+  }
+
+  // " (2)" at the end of the title of a window, when its document is shown
+  // in several windows (update_window_names, new_view.cpp), else null
+  function windowNumber (title) {
+    var m = / \(\d+\)$/.exec (title);
+    return m ? m[0] : null;
   }
 
   // In the folded column a tab under the mouse grows to the right, over the
@@ -798,7 +815,9 @@ var tmFrame = (function () {
       var tab = el ('div', 'tm-tab' + (t.active ? ' active' : '') + (t.modified ? ' modified' : ''));
       tab.dataset.id = t.id;
       var name = (t.modified ? '• ' : '') + t.title;
-      tab.appendChild (el ('span', 'tm-title', name));
+      var k = windowNumber (t.title);
+      tab.appendChild (el ('span', 'tm-title', k ? name.slice (0, name.length - k.length) : name));
+      if (k) tab.appendChild (el ('span', 'tm-num', k));
       tab.appendChild (el ('span', 'tm-short', initials (t.title)));
       tab.appendChild (el ('span', 'tm-dot'));
       // the name in a balloon when it does not fit in the open column; in
@@ -839,8 +858,8 @@ var tmFrame = (function () {
         else if (bottom > strip.scrollTop + strip.clientHeight) strip.scrollTop = bottom - strip.clientHeight;
       }
     }
-    document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs Vue'
-                            : 'TeXmacs Vue';
+    document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs Upsilon'
+                            : 'TeXmacs Upsilon';
     chevrons ();
   }
 
@@ -915,15 +934,15 @@ var tmFrame = (function () {
     try { localStorage.clear (); sessionStorage.clear (); } catch (e) {}
     Promise.all (jobs).then (done, done);
     function done () {
-      document.title = 'TeXmacs Vue removed';
+      document.title = 'TeXmacs Upsilon removed';
       document.body.innerHTML = '';
       var box = el ('div');
       box.style.cssText = 'max-width:460px;margin:15vh auto;padding:24px;background:#f6f6f6;' +
         'border:1px solid #999;border-radius:8px;font:14px -apple-system,"Fira Sans",Helvetica,sans-serif;' +
         'color:#222;line-height:1.45';
-      box.appendChild (el ('div', null, 'TeXmacs Vue has been removed from this browser.'));
+      box.appendChild (el ('div', null, 'TeXmacs Upsilon has been removed from this browser.'));
       var p = el ('div', null, 'Your files and preferences and the files of TeXmacs are no longer ' +
-                               'kept here. Reload the page to start TeXmacs Vue again.');
+                               'kept here. Reload the page to start TeXmacs Upsilon again.');
       p.style.marginTop = '8px'; p.style.color = '#555';
       box.appendChild (p);
       var b = el ('button', null, 'Reload');
@@ -955,24 +974,34 @@ var tmFrame = (function () {
       'Printing opens the document as a PDF in a new tab, to print from there.']],
     ['Limitations', [
       'Your files are kept in the storage of this browser, for this site only: clearing ' +
-      'the data of the site deletes them, and Safari deletes the data of a site which was ' +
-      'not visited for seven days. Save a copy of the files you want to keep.',
-      'No plugins and no sessions (Maxima, Python, R...): a page cannot run other ' +
-      'programs. For the same reason, the converters and tools which need an external ' +
-      'program (LaTeX, Ghostscript, ImageMagick, the spell checker, Git) are missing.',
+      'the data of the site (or the history of Safari) deletes them. At the first save, ' +
+      'TeXmacs asks the browser to keep them (persistent storage): Firefox asks you, ' +
+      'Chrome decides by itself, Safari grants it mostly to a web app of the Home Screen. ' +
+      'Without it, the browser may delete them when it needs space, and Safari deletes ' +
+      'the data of a site after seven days of its use without a visit to the site. The ' +
+      'Files panel says which, with the date of your last backup; a reminder comes when ' +
+      'there was none for seven days. Save a backup now and then.',
+      'A page cannot run other programs: the sessions are those whose program runs in ' +
+      'the page (Python, R, JavaScript, TikZ, Asymptote) and those of the chatbots; there ' +
+      'are no sessions of Maxima and the like, no language servers, and the tools which ' +
+      'need an external program (LaTeX, Ghostscript, ImageMagick, Git) are missing. ' +
+      'Spell checking works (Hunspell, in the page).',
       'Only the fonts which come with TeXmacs: the page cannot see the fonts of the system.',
-      'The remote tools (the Remote menu) connect over WebSocket to a server run by ' +
-      'TeXmacs Vue. To a server on another machine the connection is encrypted (wss), ' +
-      'which needs a certificate there that the browser trusts.',
-      'TeXmacs Vue keeps your files from one tab of the browser at a time: in another ' +
+      'The remote tools (the Remote menu) connect over WebSocket to a server of this ' +
+      'version of TeXmacs (Vue or Qt), at the port after its usual one; the servers of ' +
+      'other versions need a bridge (see the help page). To a server on another machine ' +
+      'the connection is encrypted (wss), which needs a certificate there that the ' +
+      'browser trusts.',
+      'TeXmacs Upsilon keeps your files from one tab of the browser at a time: in another ' +
       'tab it shows them, but does not keep its changes, until you move TeXmacs there ' +
       '("Use TeXmacs here").',
-      'It is slower than the desktop program. Its first visit loads some 9 MB before it ' +
-      'starts and 8 MB more in the background; the fonts come when a document first uses them.']]
+      'Its Scheme is slower than in the desktop program. Its first visit loads about 11 MB ' +
+      'before it starts and about 9 MB more in the background; the other fonts come when a ' +
+      'document first uses them.']]
   ];
 
   function showAbout () {
-    dialog ('TeXmacs Vue: more info and limitations', function (box) {
+    dialog ('TeXmacs Upsilon: more info and limitations', function (box) {
       about.forEach (function (sec) {
         box.appendChild (el ('h3', null, sec[0]));
         var ul = el ('ul');
@@ -1108,7 +1137,7 @@ var tmFrame = (function () {
         '(the lines to copy below are).'));
       box.appendChild (el ('h3', null, 'A link to open a document'));
       box.appendChild (rich ('p', 'The address of a document (.tm, .tex, .html, .md...), ' +
-        'and the link with **open** which opens it in TeXmacs Vue:'));
+        'and the link with **open** which opens it in TeXmacs Upsilon:'));
       var input = el ('input');
       input.type = 'url';
       input.placeholder = 'https://example.org/paper.tm';
@@ -1201,8 +1230,11 @@ var tmFrame = (function () {
   // failed at the start, in which case the canvas is a 2D one)
   function drawnBy () {
     var c = document.getElementById ('canvas'), gl = null;
-    try { if (c && typeof runtimeInitialized !== 'undefined' && runtimeInitialized)
-            gl = c.getContext ('webgl2'); } catch (e) {}
+    var ready = c && typeof runtimeInitialized !== 'undefined' && runtimeInitialized;
+    // (WebGPU: ?gpu=webgpu, the device given by web-pre.js)
+    try { if (ready && window.tmWebGPU && c.getContext ('webgpu'))
+            return 'Drawn by the GPU (WebGPU and ThorVG).'; } catch (e) {}
+    try { if (ready) gl = c.getContext ('webgl2'); } catch (e) {}
     if (gl) return 'Drawn by the GPU (WebGL2 and ThorVG).';
     var why = !app.thorvg ? 'this build has no ThorVG'
             : (typeof tmAddress !== 'undefined' && tmAddress.get ('gpu') === '0') ? 'the address says ?gpu=0'
@@ -1226,7 +1258,7 @@ var tmFrame = (function () {
     }
     var h = el ('div', 'tm-head');
     h.appendChild (logo ('tm-logo', 'texmacs-vue-64.png 1x, texmacs-vue-128.png 2x'));
-    h.appendChild (document.createTextNode ('TeXmacs Vue'));
+    h.appendChild (document.createTextNode ('Upsilon'));
     h.appendChild (el ('span', 'tm-badge', 'experimental'));
     menu.appendChild (h);
     // a paragraph of texts and links ([text, url], or [text, function])
@@ -1252,8 +1284,8 @@ var tmFrame = (function () {
            'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
            'mathematics included. Expect rough edges: ',
            ['more info and limitations', showAbout], '. ',
-           ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/maxs_texmacs'],
-           '.']);
+           ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/upsilon_texmacs'],
+           '; ', ['Upsilon for macOS, Linux and Windows', './'], '.']);
     para (['A link to this page can open a document from the web, and pass options and ' +
            'Scheme commands to TeXmacs: see ', ['the options of the address', showAddressOptions],
            '.']);
@@ -1315,7 +1347,7 @@ var tmFrame = (function () {
       Promise.all (jobs).then (function () { location.reload (); });
     });
     item ('Remove from this browser…', function () {
-      if (!window.confirm ('Remove TeXmacs Vue from this browser?\n\n' +
+      if (!window.confirm ('Remove TeXmacs Upsilon from this browser?\n\n' +
                            'This deletes everything this page keeps in the browser: ' +
                            'your files and preferences (save a copy of the ones you want ' +
                            'to keep first, from Files in this browser) and the files of TeXmacs. ' +

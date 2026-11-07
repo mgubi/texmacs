@@ -12,7 +12,7 @@ The earlier measurements (other branches, Qt builds) are in
   to be compared.
 - **Native:** the Vue build of this branch with femtolisp
   (`--with-gui=vue --with-scheme=femtolisp`), and the S7 build of
-  `maxs_texmacs`, both run with `-headless` on the `TeXmacs/` directory of
+  `upsilon_texmacs`, both run with `-headless` on the `TeXmacs/` directory of
   this branch, each with its own home, warmed by a first run.
 - **Browser:** the pages `build-wasm/out-femtolisp/web` and `build-wasm/out/web`
   (S7), built from this tree, in headless Firefox

@@ -66,10 +66,25 @@ load_string (url u, string& s, bool fatal, bool lock) {
     string cache_type= doc_flag? string ("doc_cache"): string ("file_cache");
     if (doc_flag) cache_load ("doc_cache");
     bool currently_cached= is_cached (cache_type, name);
+    // The cached content is that of the file as long as its directory is
+    // unchanged (is_up_to_date) and the file itself too: a file edited in
+    // place leaves the time of its directory as it was, and its old
+    // content was given until the cache was cleared (the time of the file
+    // is kept with its content, under the name followed by "#time")
+    string time_key= name * "#time";
+    int file_time= 0;
     if (currently_cached && is_up_to_date (url_parent (r))) {
-      s= cache_get (cache_type, name) -> label;
-      return false;
+      file_time= last_modified (r, false);
+      if (is_cached (cache_type, time_key) &&
+          cache_get (cache_type, time_key)->label == as_string (file_time)) {
+        s= cache_get (cache_type, name) -> label;
+        return false;
+      }
     }
+    // (the time before the file is read: a change while it is read is seen
+    // at the next load)
+    if ((file_flag || doc_flag) && file_time == 0)
+      file_time= last_modified (r, false);
     // End caching
 
     bench_start ("load file");
@@ -104,8 +119,10 @@ load_string (url u, string& s, bool fatal, bool lock) {
 
     // Cache file contents
     if (!err && (N(s) <= 10000 || currently_cached))
-      if (file_flag || doc_flag)
+      if (file_flag || doc_flag) {
         cache_set (cache_type, name, s);
+        cache_set (cache_type, time_key, as_string (file_time));
+      }
     // End caching
   }
   if (err) {
@@ -160,8 +177,12 @@ save_string (url u, string s, bool fatal) {
     bool doc_flag= do_cache_doc (name);
     string cache_type= doc_flag? string ("doc_cache"): string ("file_cache");
     if (!err && N(s) <= 10000)
-      if (file_flag || doc_flag)
+      if (file_flag || doc_flag) {
         cache_set (cache_type, name, s);
+        // (the time of the file with its content, see load_string)
+        cache_set (cache_type, name * "#time",
+                   as_string (last_modified (r, false)));
+      }
     declare_out_of_date (url_parent (r));
     // End caching
   }
@@ -381,7 +402,10 @@ file_size (url u) {
   if (is_rooted_tmfs (u)) return -1;
   struct_stat u_stat;
   if (get_attributes (u, &u_stat, true)) return -1;
-  return u_stat.st_size;
+  // st_size is 64 bits: saturate instead of wrapping around for 2 GiB or more
+  // (-1 stays "no file")
+  if ((long long) u_stat.st_size > (long long) 0x7fffffff) return 0x7fffffff;
+  return (int) u_stat.st_size;
 }
 
 int
@@ -394,6 +418,25 @@ last_modified (url u, bool cache_flag) {
   if (get_attributes (u, &u_stat, true, cache_flag))
     return - (int) (((unsigned int) (-1)) >> 1);
   return u_stat.st_mtime;
+}
+
+string
+file_identity (url u) {
+  if (is_rooted_web (u) || is_rooted_tmfs (u)) return "";
+  struct_stat u_stat;
+  if (get_attributes (u, &u_stat, true, false)) return "";
+  if (u_stat.st_ino == 0) return "";
+  return as_string ((int) u_stat.st_size) * ":" *
+         as_string ((int) u_stat.st_mtime) * ":" *
+         as_string ((int) u_stat.st_ctime) * ":" *
+#if defined(__APPLE__)
+         as_string ((int) u_stat.st_ctimespec.tv_nsec) * ":" *
+         as_string ((int) u_stat.st_mtimespec.tv_nsec) * ":" *
+#elif defined(__linux__)
+         as_string ((int) u_stat.st_ctim.tv_nsec) * ":" *
+         as_string ((int) u_stat.st_mtim.tv_nsec) * ":" *
+#endif
+         as_string ((double) u_stat.st_ino);
 }
 
 bool
@@ -573,9 +616,25 @@ append_to (url what, url to) {
     std_warning << "Append failed for " << to << LF;
 }
 
+static void
+rmdir_sub (url u) {
+  if (is_none (u)) return;
+  if (is_or (u)) {
+    rmdir_sub (u[1]);
+    rmdir_sub (u[2]);
+    return;
+  }
+  // remove () of the C library does not remove a folder on Windows
+  string _u = concretize (u);
+  if (!texmacs_rmdir (_u) && DEBUG_AUTO) {
+    std_warning << "Remove failed: " << strerror (errno) << LF;
+    std_warning << "Folder was: " << u << LF;
+  }
+}
+
 void
 rmdir (url u) {
-  remove_sub (expand (complete (u, "dr")));
+  rmdir_sub (expand (complete (u, "dr")));
 }
 
 void
@@ -860,7 +919,7 @@ search_sub_dirs (url& all, url root) {
     if (!err) {
       for (int i=N(a)-1; i>=0; i--)
         if (N(a[i])>0 && a[i][0] != '.')
-          search_sub_dirs (all, root * a[i]);
+          search_sub_dirs (all, root * url_entry (a[i]));
     }
     all= root | all;
   }
@@ -920,7 +979,7 @@ search_file_in (url u, string name) {
 
   array<string> d= dir_contents [u->t];
   for (int i=0; i<N(d); i++) {
-    url f= search_file_in (u * d[i], name);
+    url f= search_file_in (u * url_entry (d[i]), name);
     if (!is_none (f)) return f;
   }
   return url_none ();

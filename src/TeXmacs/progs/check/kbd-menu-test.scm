@@ -25,6 +25,10 @@
 ;; and opens all the submenus. It checks that each button has an action
 ;; which can be called without arguments, but never runs it. Each error,
 ;; with the path of submenus which leads to it, is written to the log.
+;;
+;; The last groups are about preferences of the interface, which are set in
+;; memory for the time of a check and never saved, and about closing the
+;; window.
 
 (texmacs-module (check kbd-menu-test)
   (:use (check check-lib)))
@@ -498,7 +502,10 @@
   (check= (typed-prog "- - -") "---")
   (check= (typed-prog "' '") "''")
   (check= (typed-prog "` `") "``")
-  (check= (typed-prog "\"") "\"")
+  ;; (in code with a syntax tree, the brackets and quotes stay balanced: a
+  ;; build may leave out tree-sitter, see src/docs/code-features.md)
+  (check= (typed-prog "\"")
+          (if (defined? 'tree-sitter-program-language) "\"\"" "\""))
   (check= (typed-prog "< <") "<less><less>")
   (check= (typed-prog "( x )") "(x)")
   (check= (typed-prog "space var") "    ")
@@ -527,6 +534,7 @@
 ;; The bindings of the suite are on A-F12, which TeXmacs does not use;
 ;; the last ones apply only while kbd-test-on? holds.
 (define kbd-test-on? #f)
+(define (kbd-test-condition?) kbd-test-on?)
 
 (define (test-kbd-map)
   (check-group "kbd-map")
@@ -556,27 +564,38 @@
   ;; the modeless reverse binding, as the documentation shows it
   (check= (kbd-find-rev-binding "(insert \"bee\")") "A-F12 A-F12 b")
   ;; removing them
-  ;; FIXME: kbd-unmap does not rewrite the keys as kbd-map does
-  ;; (kbd-define.scm:248-249, no kbd-pre-rewrite): (kbd-map ("A-F12 n var"
-  ;; "y")) (kbd-unmap "A-F12 n var") leaves (kbd-find-key-binding
-  ;; "A-F12 n tab") at ("y" ""), expected #f; the same for "S-C-F12".
-  ;; The suite removes "A-F12 A-F12 b var" by its rewritten key.
   (kbd-unmap
     (:mode in-text?)
-    "A-F12 A-F12 a" "A-F12 A-F12 b" "A-F12 A-F12 b tab")
+    "A-F12 A-F12 a" "A-F12 A-F12 b" "A-F12 A-F12 b var")
   (check-false (text-binding "A-F12 A-F12 a"))
   (check-false (text-binding "A-F12 A-F12 b"))
   (check-false (text-binding "A-F12 A-F12 b var"))
-  ;; FIXME: removing or redefining the binding of a key forgets all the
-  ;; reverse bindings of its command, also those of other keys:
-  ;; kbd-delete-key-binding2 removes the key from (kbd-get-inv cmd)
-  ;; instead of (kbd-get-rev cmd) (kbd-define.scm:132). After
-  ;; (kbd-map ("A-F12 u" (insert "uu")) ("A-F12 v" (insert "uu")))
-  ;; (kbd-map ("A-F12 v" (insert "vv"))), (kbd-find-rev-binding
-  ;; "(insert \"uu\")") gives #f, expected "A-F12 u".
   (in-buffer '(document "") '(0 0)
     (lambda ()
       (check= (kbd-find-inv-binding '(insert "bee")) "")))
+  (check-false (kbd-find-rev-binding "(insert \"bee\")"))
+  ;; kbd-unmap rewrites the keys as kbd-map does
+  (kbd-map ("A-F12 n var" "y") ("S-C-F12 n" "w"))
+  (check= (text-binding "A-F12 n var") "y")
+  (check= (text-binding "S-C-F12 n") "w")
+  (kbd-unmap "A-F12 n var" "S-C-F12 n")
+  (check-false (text-binding "A-F12 n var"))
+  (check-false (text-binding "S-C-F12 n"))
+  ;; redefining or removing the binding of a key keeps the reverse
+  ;; bindings of the other keys of its command
+  (kbd-map ("A-F12 u" (insert "uu")) ("A-F12 v" (insert "uu")))
+  (kbd-map ("A-F12 v" (insert "vv")))
+  (check= (kbd-find-rev-binding "(insert \"uu\")") "A-F12 u")
+  (check= (kbd-find-rev-binding "(insert \"vv\")") "A-F12 v")
+  (kbd-unmap "A-F12 v")
+  (check= (kbd-find-rev-binding "(insert \"uu\")") "A-F12 u")
+  (check-false (kbd-find-rev-binding "(insert \"vv\")"))
+  (kbd-unmap "A-F12 u")
+  (check-false (kbd-find-rev-binding "(insert \"uu\")"))
+  (kbd-map ("A-F12 w" "ww"))
+  (check= (kbd-find-rev-binding "ww") "A-F12 w")
+  (kbd-unmap "A-F12 w")
+  (check-false (kbd-find-rev-binding "ww"))
   ;; bindings under a condition
   (kbd-map
     (:require kbd-test-on?)
@@ -587,15 +606,23 @@
   (check= (text-binding "A-F12 A-F12 c") "<gamma>")
   (check= (math-binding "A-F12 A-F12 c") "<gamma>")
   (check= (typed "A-F12 A-F12 c") "<gamma>")
-  ;; FIXME: the conditions of a kbd-map block with :require are made of a
-  ;; new closure for each binding (kbd-define.scm:219-220, 230-231), which
-  ;; ctx-find never finds again: kbd-unmap with the same :require removes
-  ;; nothing, and a binding "k var" after "k" in the same block replaces
-  ;; the binding of "k" by the prefix "k".
-  ;; (kbd-map (:require on?) ("A-F12 k" "x")) (kbd-unmap (:require on?)
-  ;; "A-F12 k") leaves (kbd-find-key-binding "A-F12 k") at ("x" ""),
-  ;; expected #f; (kbd-map (:require on?) ("A-F12 j" "y") ("A-F12 j var"
-  ;; "z")) gives ("A-F12j" "") for "A-F12 j", expected ("y" "").
+  ;; kbd-unmap with the same condition removes them
+  (kbd-map (:require kbd-test-on?) ("A-F12 k" "x"))
+  (check= (text-binding "A-F12 k") "x")
+  (kbd-unmap (:require kbd-test-on?) "A-F12 k")
+  (check-false (text-binding "A-F12 k"))
+  ;; a binding "j var" after "j" in the same block keeps that of "j"
+  (kbd-map (:require kbd-test-on?) ("A-F12 j" "y") ("A-F12 j var" "z"))
+  (check= (text-binding "A-F12 j") "y")
+  (check= (text-binding "A-F12 j var") "z")
+  (kbd-unmap (:require kbd-test-on?) "A-F12 j var" "A-F12 j")
+  (check-false (text-binding "A-F12 j"))
+  (check-false (text-binding "A-F12 j var"))
+  ;; a bare predicate is a condition, for kbd-unmap as for kbd-map
+  (kbd-map kbd-test-condition? ("A-F12 m" "m1"))
+  (check= (text-binding "A-F12 m") "m1")
+  (kbd-unmap kbd-test-condition? "A-F12 m")
+  (check-false (text-binding "A-F12 m"))
   (set! kbd-test-on? #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -991,17 +1018,17 @@
   (in-buffer graphics-doc '(0 1)
     (lambda ()
       (check-true (in-graphics?))
-      ;; FIXME: the lazy-menu of (graphics graphics-menu) declares neither
-      ;; graphics-insert-menu nor graphics-focus-menu (init-texmacs.scm:323),
-      ;; which texmacs-menu links in graphics (main-menu.scm:42-44), and
-      ;; edit-menu.scm:57 calls graphics-selection-active? of (graphics
-      ;; graphics-group), which nothing declares either: until the lazy
-      ;; menus are loaded when TeXmacs is idle (never without a window),
-      ;; expanding texmacs-menu in graphics gives the errors "Unbound
-      ;; variable: graphics-selection-active?", "graphics-insert-menu" and
-      ;; "graphics-focus-menu". The suite loads the module as the idle
-      ;; loading does.
-      (module-provide '(graphics graphics-menu))
+      ;; the menus of graphics work before the lazy menus are loaded
+      ;; (when TeXmacs is idle, never without a window): texmacs-menu
+      ;; links graphics-insert-menu and graphics-focus-menu of (graphics
+      ;; graphics-menu), and the edit menu calls graphics-selection-active?
+      ;; of (graphics graphics-group)
+      (check-true (lazy-declared? '(graphics graphics-menu)
+                                  'graphics-insert-menu))
+      (check-true (lazy-declared? '(graphics graphics-menu)
+                                  'graphics-focus-menu))
+      (check-true (lazy-declared? '(graphics graphics-group)
+                                  'graphics-selection-active?))
       (with l (visible-labels (texmacs-menu))
         (check-true (in? "Insert" l))
         (check-true (in? "Focus" l))
@@ -1032,6 +1059,13 @@
                           (lambda (x) (and (pair? x) (== (car x) kind)
                                            (pair? (cdr x))))))))
 
+(define (lazy-declared? module name)
+  ;; is name declared by lazy-menu or lazy-define of module?
+  (with decls (append (lazy-declarations 'lazy-menu)
+                      (lazy-declarations 'lazy-define))
+    (list-or (map (lambda (d) (and (== (car d) module) (in? name (cdr d))))
+                  decls))))
+
 (define (lazy-stub? f)
   ;; a function of lazy-define which the module did not replace
   (and (procedure? f)
@@ -1051,18 +1085,6 @@
   (with f (catch #t (lambda () (eval name)) (lambda args #f))
     (and (procedure? f) (not (lazy-stub? f)))))
 
-;; FIXME: these menus are declared by lazy-menu in init-texmacs.scm, but
-;; their modules do not define them: graphics-menu (init-texmacs.scm:323,
-;; (graphics graphics-menu)), prog-menu (init-texmacs.scm:283, (prog
-;; prog-menu)), plugin-eval-menu, plugin-eval-toggle-menu and
-;; plugin-plot-menu (init-texmacs.scm:363, (dynamic scripts-menu)). Once
-;; the module is loaded, the stub of lazy-define finds itself in the public
-;; interface and calls itself for ever: (prog-menu) hangs TeXmacs,
-;; expected the menu, or an error. Nothing calls them in TeXmacs itself.
-(define stale-lazy-menus
-  '(graphics-menu prog-menu plugin-eval-menu plugin-eval-toggle-menu
-    plugin-plot-menu))
-
 ;; Each menu which init-texmacs.scm declares with lazy-menu is a function
 ;; which loads its module and is then replaced by the function of the
 ;; module. The GUI loads these modules when it is idle (and the suite does
@@ -1077,8 +1099,7 @@
         (let* ((module (car decl))
                (names (cdr decl))
                (loaded (check-run (lambda () (module-provide module) #t)))
-               (names* (list-difference names stale-lazy-menus))
-               (missing (list-filter names*
+               (missing (list-filter names
                                      (lambda (n) (not (defined-by-module? n))))))
           (check-report (and (== loaded #t) (null? missing))
                         (string-append "the menus of " (object->string module)
@@ -1128,8 +1149,7 @@
         (lambda (decl)
           (let* ((names (list-filter (cdr decl)
                           (lambda (n)
-                            (and (nin? n stale-lazy-menus)
-                                 (menu-name? n)
+                            (and (menu-name? n)
                                  (defined-by-module? n)
                                  (arity-ok? (eval n) 0)))))
                  (menus (lambda ()
@@ -1152,6 +1172,527 @@
                                          (object->string (car decl)))
                           menus))))
         (lazy-declarations 'lazy-menu)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Preferences of the interface and closing windows
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (with-preference-value which val thunk)
+  ;; run thunk with the preference set in memory only: nothing is saved
+  (let* ((had? (cpp-has-preference? which))
+         (old (get-preference which)))
+    (cpp-set-preference which val)
+    (with r (check-run thunk)
+      (if had?
+          (cpp-set-preference which old)
+          (cpp-reset-preference which))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))))
+
+(define (test-preferences)
+  (check-group "preferences")
+  ;; the two modes of the buffer management follow the preference
+  (with-preference-value "buffer management" "shared"
+    (lambda ()
+      (check-true (buffers-share-window?))
+      (check-false (place-per-buffer?))))
+  (with-preference-value "buffer management" "separate"
+    (lambda ()
+      (check-false (buffers-share-window?))
+      (check-true (place-per-buffer?))))
+  ;; the name of a value in the preferences widget is the one which sets
+  ;; this value
+  (module-provide '(texmacs menus preferences-widgets))
+  (check-true (> (ahash-size preference-decode-table) 50))
+  (for (e (ahash-table->list preference-decode-table))
+    (let* ((which (caar e))
+           (name (cdar e))
+           (val (cdr e)))
+      (check= (list which val
+                    (ahash-ref preference-encode-table (cons which val)))
+              (list which val name))))
+  (with-preference-value "updater:interval" "0"
+    (lambda ()
+      (check= (get-pretty-preference "updater:interval") "Never"))))
+
+(define kbd-menu-test-closing? #f)
+(define kbd-menu-test-closed '())
+
+(tm-define (safely-quit-TeXmacs)
+  (:require kbd-menu-test-closing?)
+  (set! kbd-menu-test-closed (rcons kbd-menu-test-closed 'quit)))
+
+;; Closing the only window of documents is quitting TeXmacs, which asks
+;; about all the documents which are not saved, also when dialogs are open:
+;; places-number counts their windows too. No dialog is opened and nothing
+;; is closed here: places-number and kill-place are replaced for the time
+;; of the check. (With S7 the replacement does not reach safely-kill-place,
+;; which was read before it and keeps calling the glue functions: the check
+;; then only sees that the only window quits, through safely-quit-TeXmacs
+;; above. These glue functions have no Scheme wrapper to redefine instead.)
+(define (test-close-window)
+  (check-group "closing windows")
+  (in-buffer '(document "text") '(0 0)
+    (lambda ()
+      (let* ((kill kill-place)
+             (number places-number))
+        (check= (length (place-list)) 1)
+        (set! kbd-menu-test-closed '())
+        (set! kbd-menu-test-closing? #t)
+        (set! places-number (lambda () 2))
+        (set! kill-place
+              (lambda (win)
+                (set! kbd-menu-test-closed
+                      (rcons kbd-menu-test-closed 'kill))))
+        (with r (check-run safely-kill-place)
+          (set! kill-place kill)
+          (set! places-number number)
+          (set! kbd-menu-test-closing? #f)
+          (check-true (not (and (pair? r) (== (car r) 'error)))))
+        (check= kbd-menu-test-closed '(quit))))))
+
+;; A document shown in several windows (#463): closing one of them leaves the
+;; document in the other, without asking about its changes; the document is
+;; closed with its last window. The closing of the buffer is delayed until
+;; TeXmacs is idle, which never happens headless: the delayed command is
+;; caught and run here. Loading the document goes to one of its windows
+;; (#464). (With S7 the replacements may not reach tm-server,
+;; as above; the checks after the delay are then left out.)
+(define (test-close-shared-window)
+  (check-group "closing one of several windows of a document")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (b (new-buffer))
+         (before (place-list))
+         (asked 0)
+         (cmds '())
+         (kill (lambda (w)
+                 (set! cmds '())
+                 (with-global user-confirm
+                     (lambda (prompt default cont) (set! asked (+ asked 1)))
+                   (with-global exec-delayed-pause
+                       (lambda (c) (set! cmds (rcons cmds c)))
+                     (safely-kill-place w)))
+                 (with-global idle-time (lambda () 1000000)
+                   (for (c cmds) (c)))
+                 (nnull? cmds))))
+    (switch-to-buffer old)
+    (for (i (.. 0 3))
+      (open-buffer-in-place b (buffer-get b) ""))
+    (with l (list-difference (place-list) before)
+      (check= (length l) 3)
+      (when (== (length l) 3)
+        ;; loading a document which is open goes to its window (#464);
+        ;; headless, the current window does not follow (no focus events),
+        ;; and with S7 the replacement does not reach tm-files
+        (with to #f
+          (with-global switch-to-place (lambda (w) (set! to w))
+            (load-buffer-in-new-place b))
+          (when (or to (string-starts? (scheme-dialect) "guile"))
+            (check-true (in? to l))))
+        ;; the other windows keep the document
+        (when (kill (caddr l))
+          (check-true (buffer-exists? b))
+          (check= (place->buffer (car l)) b))
+        ;; and nothing is asked about its changes
+        (when (buffer-exists? b)
+          (buffer-pretend-modified b)
+          (with delayed? (kill (cadr l))
+            (check= asked 0)
+            (check= (buffer->places b) (list (car l)))
+            (when delayed?
+              (check-true (buffer-exists? b))))
+          ;; the last window asks, and is kept without an answer (not with
+          ;; S7, where the real question would be asked)
+          (when (string-starts? (scheme-dialect) "guile")
+            (kill (car l))
+            (check= asked 1)
+            (check= (buffer->places b) (list (car l))))
+          ;; and closes it
+          (buffer-pretend-saved b)
+          (when (kill (car l))
+            (check-false (buffer-exists? b))))))
+    (switch-to-place win)
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
+;; Clone window (#464): a second window on the document, at the cursor of
+;; the first one; the Windows list of the Go menu has one entry for each
+;; window of the document, numbered, as their titles. Headless, the current
+;; window follows place-focus only (no focus events).
+(define (balloon-labels x)
+  ;; the short names of the items (balloon short long) in a menu expansion
+  (cond ((and (pair? x) (== (car x) 'balloon) (pair? (cdr x)))
+         (list (cadr x)))
+        ((pair? x) (append (balloon-labels (car x)) (balloon-labels (cdr x))))
+        (else '())))
+
+(define (window-menu-has? label)
+  (in? `(verbatim ,label)
+       (balloon-labels (menu-expand '(link buffer-places-menu)))))
+
+(define (test-clone-window)
+  (check-group "clone window")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (b (new-buffer))
+         (before (place-list)))
+    (switch-to-buffer old)
+    (open-buffer-in-place b (buffer-get b) "")
+    (with l (list-difference (place-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (place-focus (car l))
+        (check= (current-buffer) b)
+        (buffer-set-body b '(document "one" "two three"))
+        (go-to (append (buffer-path) '(1 3)))
+        (with p (cursor-path)
+          (check= p (append (buffer-path) '(1 3)))
+          (clone-place)
+          (with ws (buffer->places b)
+            (check= (length ws) 2)
+            (check= (current-place) (cadr ws))
+            (check= (cursor-path) p)
+            (let* ((t (buffer-get-title b))
+                   (name (if (== t "") (url->system (url-tail b)) t)))
+              (check-true (window-menu-has? (string-append name " (1)")))
+              (check-true (window-menu-has? (string-append name " (2)")))
+              (place-focus (car ws))
+              (kill-place (cadr ws))
+              (check= (buffer->places b) (list (car ws)))
+              (check-true (window-menu-has? name))
+              (check-false (window-menu-has? (string-append name " (1)"))))
+            (kill-place (car ws))))))
+    (place-focus win)
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
+;; Clone window after a Save as (a rename of the buffer): the view of the
+;; clone took the number, and so the url, of the view of the window, and
+;; TeXmacs aborted with "view attached to other window" (#560). The buffer
+;; is loaded from a file of its own, so that its only view is number 1
+;; (a new-buffer may reuse a name whose views already have high numbers).
+(define (test-clone-window-renamed)
+  (check-group "clone window after a rename")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (src (url-append dir "clone-renamed-src.tm"))
+         (f (url-append dir "clone-renamed.tm"))
+         (before (place-list)))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 src "texmacs")
+    (load-buffer src)
+    (switch-to-buffer old)
+    (open-buffer-in-place src (buffer-get src) "")
+    (with l (list-difference (place-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (place-focus (car l))
+        (check= (current-buffer) src)
+        ;; the view of the window only: Clone window makes a new one
+        (for (v (buffer->views src))
+          (when (!= v (current-view-url)) (view-delete v)))
+        (check= (buffer->views src) (list (current-view-url)))
+        (buffer-rename src f)
+        (check= (current-buffer) f)
+        (clone-place)
+        (with ws (buffer->places f)
+          (check= (length ws) 2)
+          (check= (length (buffer->views f)) 2)
+          (check= (length (list-remove-duplicates (buffer->views f))) 2)
+          (for (w (reverse ws)) (kill-place w)))))
+    (place-focus win)
+    (for (b (list f src))
+      (when (buffer-exists? b)
+        (buffer-pretend-saved b)
+        (buffer-close b)))
+    (when (url-exists? src) (system-remove src))
+    (when (url-exists? dir) (system-rmdir dir))
+    (check= (current-buffer) old)))
+
+;; Deleting the only view of a window, when no view is free anywhere: the
+;; window shows a new view of the most recent other buffer, instead of
+;; staying empty (#559). The free views of the other buffers are deleted
+;; first (switching to a buffer makes a new one).
+(define (test-delete-window-view)
+  (check-group "deleting the view of a window")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (b (new-buffer))
+         (before (place-list)))
+    (switch-to-buffer old)
+    (open-buffer-in-place b (buffer-get b) "")
+    (with l (list-difference (place-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (place-focus (car l))
+        (check= (buffer->views b) (list (current-view-url)))
+        (for (v (view-list))
+          (when (url-none? (view->place-url v)) (view-delete v)))
+        (let ((vs (view-list)))
+          (check-false (list-find vs (lambda (v)
+                                       (url-none? (view->place-url v)))))
+          (view-delete (current-view-url))
+          (check= (buffer->views b) '())
+          (with v (place->view (car l))
+            (check-false (url-none? v))
+            (check-false (in? v vs))
+            (check= (current-view-url) v)
+            (check-false (== (view->buffer v) b))))
+        (kill-place (car l))))
+    (place-focus win)
+    (when (buffer-exists? b) (buffer-close b))
+    (check= (current-buffer) old)))
+
+;; A change of the initial environment made in the clone is in the window
+;; it was cloned from, which saves it (#528): the file has it and the
+;; buffer is no longer modified.
+(define (initial-of doc)
+  ;; the initial environment of @doc (an stree) as an association list
+  (with init (list-find (cdr doc)
+                        (lambda (x) (and (pair? x) (== (car x) 'initial))))
+    (if (not init) '()
+        (map (lambda (x) (cons (cadr x) (caddr x))) (cdadr init)))))
+
+(define (test-clone-window-init)
+  (check-group "clone window: initial environment")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (f (url-append dir "clone-init.tm"))
+         (before (place-list)))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 f "texmacs")
+    (load-buffer f)
+    (switch-to-buffer old)
+    (open-buffer-in-place f (buffer-get f) "")
+    (with l (list-difference (place-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (place-focus (car l))
+        (check= (current-buffer) f)
+        (clone-place)
+        (with ws (buffer->places f)
+          (check= (length ws) 2)
+          (when (== (length ws) 2)
+            (check= (current-place) (cadr ws))
+            (edit-step (lambda () (init-env "par-indent" "4fn")))
+            (check= (get-init "par-indent") "4fn")
+            (check-true (buffer-modified? f))
+            (place-focus (car ws))
+            (check= (current-place) (car ws))
+            (check= (get-init "par-indent") "4fn")
+            (buffer-save f)
+            (check= (assoc-ref (initial-of (tree->stree
+                                            (tree-import f "texmacs")))
+                               "par-indent")
+                    "4fn")
+            (check-false (buffer-modified? f))
+            (place-focus (cadr ws))
+            (check= (get-init "par-indent") "4fn")
+            (place-focus (car ws))
+            (buffer-pretend-saved f)
+            (kill-place (cadr ws)))
+          (buffer-pretend-saved f)
+          (kill-place (car ws)))))
+    (place-focus win)
+    (when (buffer-exists? f)
+      (buffer-pretend-saved f)
+      (buffer-close f))
+    (when (url-exists? f) (system-remove f))
+    (when (url-exists? dir) (system-rmdir dir))
+    (check= (current-buffer) old)))
+
+;; A change of the style made in the clone is in the window it was cloned
+;; from, which saves it (#535): the file has it and the buffer is no longer
+;; modified.
+(define (style-of doc)
+  ;; the style of @doc (an stree), or #f
+  (with st (list-find (cdr doc)
+                      (lambda (x) (and (pair? x) (== (car x) 'style))))
+    (and st (cadr st))))
+
+(define (test-clone-window-style)
+  (check-group "clone window: style")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (f (url-append dir "clone-style.tm"))
+         (before (place-list)))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))))
+                 f "texmacs")
+    (load-buffer f)
+    (switch-to-buffer old)
+    (open-buffer-in-place f (buffer-get f) "")
+    (with l (list-difference (place-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (place-focus (car l))
+        (check= (current-buffer) f)
+        (clone-place)
+        (with ws (buffer->places f)
+          (check= (length ws) 2)
+          (when (== (length ws) 2)
+            (check= (current-place) (cadr ws))
+            (edit-step (lambda () (add-style-package "comment")))
+            (check= (get-style-list) '("generic" "comment"))
+            (check-true (buffer-modified? f))
+            (place-focus (car ws))
+            (check= (current-place) (car ws))
+            (check= (get-style-list) '("generic" "comment"))
+            (buffer-save f)
+            (check= (style-of (tree->stree (tree-import f "texmacs")))
+                    '(tuple "generic" "comment"))
+            (check-false (buffer-modified? f))
+            (edit-step (lambda () (remove-style-package "comment")))
+            (place-focus (cadr ws))
+            (check= (get-style-list) '("generic"))
+            (buffer-save f)
+            ;; (a style of one name is saved as a string)
+            (check= (style-of (tree->stree (tree-import f "texmacs")))
+                    "generic")
+            (place-focus (car ws))
+            (buffer-pretend-saved f)
+            (kill-place (cadr ws)))
+          (buffer-pretend-saved f)
+          (kill-place (car ws)))))
+    (place-focus win)
+    (when (buffer-exists? f)
+      (buffer-pretend-saved f)
+      (buffer-close f))
+    (when (url-exists? f) (system-remove f))
+    (when (url-exists? dir) (system-rmdir dir))
+    (check= (current-buffer) old)))
+
+;; Presentation mode in one of two windows of a buffer (#549): the
+;; informative flags are hidden in that window only, by the typesetter
+;; (get-env), while info-flag, the document's setting, is not changed: the
+;; other window keeps it, the buffer is not modified, the saved file has it.
+;; The delayed fit-to-screen of toggle-full-screen-mode is dropped (with one
+;; window left, change-zoom-factor would write the zoom preference).
+
+(define (refresh-view)
+  ;; as the event loop would: a change of the environment is typeset again
+  (apply-changes)
+  (update-forced))
+
+(define (toggle-presentation)
+  (with-global exec-delayed-pause (lambda (c) (noop))
+    (toggle-full-screen-mode))
+  (refresh-view))
+
+(define (test-full-screen-info-flag)
+  (check-group "presentation mode: informative flags of one window")
+  (let* ((win (current-place))
+         (old (current-buffer))
+         (dir (system->url (string-append (url->system (url-temp-dir))
+                                          "/kbd-menu-test")))
+         (f (url-append dir "full-screen-flags.tm"))
+         (before (place-list))
+         (saved-info (lambda ()
+                       (assoc-ref (initial-of (tree->stree
+                                               (tree-import f "texmacs")))
+                                  "info-flag"))))
+    (system-mkdir dir)
+    (tree-export (stree->tree
+                  '(document (TeXmacs "2.1") (style (tuple "generic"))
+                             (body (document "one"))
+                             (initial (collection
+                                       (associate "info-flag" "detailed")))))
+                 f "texmacs")
+    (load-buffer f)
+    (switch-to-buffer old)
+    (open-buffer-in-place f (buffer-get f) "")
+    (with l (list-difference (place-list) before)
+      (check= (length l) 1)
+      (when (== (length l) 1)
+        (place-focus (car l))
+        (check= (current-buffer) f)
+        (clone-place)
+        (with ws (buffer->places f)
+          (check= (length ws) 2)
+          (when (== (length ws) 2)
+            (place-focus (car ws))
+            (check= (get-init "info-flag") "detailed")
+            (check-false (full-screen?))
+            (catch #t
+              (lambda ()
+                (toggle-presentation)
+                (check-true (full-screen?))
+                ;; the full screen window: flags hidden, setting unchanged
+                (check= (get-env "info-flag") "none")
+                (check= (get-init "info-flag") "detailed")
+                (check-true (init-has? "info-flag"))
+                (check-false (buffer-modified? f))
+                ;; the other window keeps the flags
+                (place-focus (cadr ws))
+                (refresh-view)
+                (check= (get-init "info-flag") "detailed")
+                (check= (get-env "info-flag") "detailed")
+                (place-focus (car ws))
+                (refresh-view)
+                ;; a save during the presentation keeps the setting
+                (edit-step (lambda () (insert "x")))
+                (check-true (buffer-modified? f))
+                (buffer-save f)
+                (check= (saved-info) "detailed")
+                (check-false (buffer-modified? f))
+                (toggle-presentation)
+                (check-false (full-screen?))
+                (check= (get-env "info-flag") "detailed")
+                (check= (get-init "info-flag") "detailed")
+                (check-false (buffer-modified? f))
+                ;; the default setting (no info-flag in the document)
+                (edit-step (lambda () (init-default "info-flag")))
+                (refresh-view)
+                (buffer-save f)
+                (with dflt (get-env "info-flag")
+                  (check= dflt (get-init "info-flag"))
+                  (check-true (!= dflt "none"))
+                  (toggle-presentation)
+                  (check= (get-env "info-flag") "none")
+                  (check= (get-init "info-flag") dflt)
+                  (check-false (init-has? "info-flag"))
+                  (check-false (buffer-modified? f))
+                  (place-focus (cadr ws))
+                  (refresh-view)
+                  (check= (get-env "info-flag") dflt)
+                  (check-false (init-has? "info-flag"))
+                  (place-focus (car ws))
+                  (refresh-view)
+                  (toggle-presentation)
+                  (check= (get-env "info-flag") dflt)
+                  (check-false (init-has? "info-flag"))
+                  (check-false (buffer-modified? f))
+                  (check= (saved-info) #f)))
+              (lambda args
+                (check-true (begin (display* "error: " args "\n") #f))))
+            (place-focus (car ws))
+            (when (full-screen?) (toggle-presentation))
+            (buffer-pretend-saved f)
+            (kill-place (cadr ws)))
+          (buffer-pretend-saved f)
+          (kill-place (car ws)))))
+    (place-focus win)
+    (when (buffer-exists? f)
+      (buffer-pretend-saved f)
+      (buffer-close f))
+    (when (url-exists? f) (system-remove f))
+    (when (url-exists? dir) (system-rmdir dir))
+    (check= (current-buffer) old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining menus
@@ -1271,6 +1812,15 @@
   (test-menus-prog)
   (test-menus-graphics)
   (test-lazy-menus)
+  (test-preferences)
+  (test-close-window)
+  (test-close-shared-window)
+  (test-clone-window)
+  (test-clone-window-renamed)
+  (test-delete-window-view)
+  (test-clone-window-init)
+  (test-clone-window-style)
+  (test-full-screen-info-flag)
   (check-group "menu items")
   ;; all the menus above, each time they were expanded
   (check-true (> menu-buttons 10000))

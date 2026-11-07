@@ -17,6 +17,7 @@
 #include "scheme.hpp"
 
 void web_cache_invalidate (url u);
+void web_cache_refresh ();
 
 url get_from_web (url u);
 url get_from_server (url u);
@@ -30,6 +31,7 @@ array<string> http_mask_headers (array<string> headers_attr);
 tree http_mask_request (tree t);
 string shell_quote (string s);
 string curl_command (string args, array<string> headers_attr);
+string curl_post_command (string address, array<string> headers_attr, string data);
 
 // HTTP requests
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
@@ -51,6 +53,7 @@ bool qt_async_http_post (string url, array<string> headers_attr,
 bool qt_async_http_post (string url, array<string> headers_attr, tree data,
 			 int& status, string& outbuf, string& errbuf,
 			 bool& kill);
+void qt_http_async_cancel (string* outbuf);
 
 inline tree
 http_from_json (string s) {

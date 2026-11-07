@@ -88,6 +88,7 @@ lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl,
   SI sep_lo= fn->sep + fn->yshift;
   SI sep_hi= fn->sep + (fn->yshift >> 1);
   SI X, Y;
+  SI lo_lc= 0, lo_rc= 0, hi_lc= 0, hi_rc= 0, ref_lc, ref_rc;
   insert (ref, 0, 0);
   type= 0;
   bool use_opentype= fn->math_type == MATH_TYPE_OPENTYPE && fn->ot_math &&
@@ -115,7 +116,7 @@ lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl,
       }
     }
     insert (lo, X- (lo->x2 >> 1), Y-top);
-    italic_correct (lo);
+    italic_correct (lo, lo_lc, lo_rc);
   }
   if (!is_nil (hi)) {
     SI bot= min (hi->y1, fn->y1 * script (fn->size, 1) / fn->size) - sep_hi;
@@ -132,13 +133,13 @@ lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl,
       }
     }
     insert (hi, X- (hi->x2 >> 1), Y-bot);
-    italic_correct (hi);
+    italic_correct (hi, hi_lc, hi_rc);
   }
-  italic_correct (ref);
+  italic_correct (ref, ref_lc, ref_rc);
   position ();
-  italic_restore (ref);
-  if (!is_nil (lo)) italic_restore (lo);
-  if (!is_nil (hi)) italic_restore (hi);
+  italic_restore (ref, ref_lc, ref_rc);
+  if (!is_nil (lo)) italic_restore (lo, lo_lc, lo_rc);
+  if (!is_nil (hi)) italic_restore (hi, hi_lc, hi_rc);
   left_justify ();
   finalize ();
 }
@@ -230,6 +231,7 @@ dummy_script_box_rep::dummy_script_box_rep (path ip, box b1, box b2, font fn2):
   SI lo_y = fn->ysub_lo_base;
   SI hi_y = fn->ysup_lo_base;
   SI miny2= (fn->y2 - fn->yshift) * script (fn->size, 1) / fn->size;
+  SI b1_lc= 0, b1_rc= 0, b2_lc= 0, b2_rc= 0;
 
   type= 0;
   if (!is_nil (b1)) type += 1;
@@ -245,15 +247,15 @@ dummy_script_box_rep::dummy_script_box_rep (path ip, box b1, box b2, font fn2):
   }
   if (!is_nil (b1)) {
     insert (b1, 0, lo_y);
-    italic_correct (b1);
+    italic_correct (b1, b1_lc, b1_rc);
   }
   if (!is_nil (b2)) {
     insert (b2, 0, hi_y);
-    italic_correct (b2);
+    italic_correct (b2, b2_lc, b2_rc);
   }
   position ();
-  if (!is_nil (b1)) italic_restore (b1);
-  if (!is_nil (b2)) italic_restore (b2);
+  if (!is_nil (b1)) italic_restore (b1, b1_lc, b1_rc);
+  if (!is_nil (b2)) italic_restore (b2, b2_lc, b2_rc);
   left_justify ();
   y1= min (y1, fn->ysub_lo_base);
   y2= max (y2, fn->ysup_lo_base + fn->yx);

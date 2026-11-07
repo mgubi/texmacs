@@ -23,6 +23,16 @@
 
 static hashmap<tree,tree> make_cache;
 
+static url
+local_artwork (url u) {
+  // the copy in the home directory of a file of tmfs://artwork, if any
+  string name= as_string (u);
+  if (!starts (name, "tmfs://artwork/")) return url_none ();
+  url local ("$TEXMACS_HOME_PATH/misc/" * name (15, N(name)));
+  if (exists (local)) return local;
+  return url_none ();
+}
+
 url
 make_file (int cmd, tree data, array<url> args) {
   // check whether result has been cached
@@ -53,16 +63,26 @@ make_file (int cmd, tree data, array<url> args) {
   make_cache (key)= as_tree (make_target);
 
   // check whether the result has been cached on disk
+  // A remote file has no time: the result is made again the first time
+  // it is needed in a session (afterwards make_cache gives it), and after
+  // remote_files_refresh. When the remote file cannot be fetched (offline),
+  // the result of before is kept.
   tree check= copy (key);
+  bool remote= false;
   for (int i=0; i<N(args); i++) {
-    if (is_rooted_web (args[i]) || is_rooted_tmfs (args[i]))
+    url arg= args[i];
+    if (is_rooted_tmfs (arg) && !is_none (local_artwork (arg)))
+      arg= local_artwork (arg);
+    if (is_rooted_web (arg) || is_rooted_tmfs (arg)) {
       check << "#f";
-    else if (exists (args[i]))
-      check << as_string (last_modified (args[i]));
+      remote= true;
+    }
+    else if (exists (arg))
+      check << as_string (last_modified (arg));
     else
       check << "#f";
   }
-  if (exists (make_target) && exists (make_check)) {
+  if (!remote && exists (make_target) && exists (make_check)) {
     string s;
     if (!load_string (make_check, s, false)) {
       tree old_check= scheme_to_tree (s);
@@ -84,11 +104,8 @@ make_file (int cmd, tree data, array<url> args) {
       if (is_rooted_web (args[i]))
         bis << make_file (CMD_GET_FROM_WEB, "", range (args, i, i+1));
       else if (is_rooted_tmfs (args[i])) {
-        string name= as_string (args[i]);
-        if (starts (name, "tmfs://artwork/")) {
-          url local ("$TEXMACS_HOME_PATH/misc/" * name (15, N(name)));
-          if (exists (local)) { bis << local; continue; }
-        }
+        url local= local_artwork (args[i]);
+        if (!is_none (local)) { bis << local; continue; }
         bis << make_file (CMD_GET_FROM_SERVER, "", range (args, i, i+1));
       }
       else bis << args[i];
@@ -125,4 +142,13 @@ make_file (int cmd, tree data, array<url> args) {
     }
   }
   return make_target;
+}
+
+void
+remote_files_refresh () {
+  // fetch the remote files again (Tools > Update > Pictures): the results
+  // of make_file are checked again, and the files of the web cache are
+  // downloaded again when they are next needed
+  make_cache= hashmap<tree,tree> ();
+  web_cache_refresh ();
 }

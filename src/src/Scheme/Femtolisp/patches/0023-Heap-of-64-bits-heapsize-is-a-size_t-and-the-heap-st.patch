@@ -1,0 +1,44 @@
+From 027d26b82ba3ae0da67e2ea663941e38005c69e1 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Sat, 17 Oct 2026 03:40:52 +0100
+Subject: [PATCH] Heap of 64 bits: heapsize is a size_t and the heap stops
+ growing at 8 Gb
+
+The limit of 0012 (1 Gb) stopped programs with a few Gb of data, such as
+the generation of the tables of tree-sitter-cpp.
+---
+ flisp.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/flisp.c b/flisp.c
+index 230a6b0..573e18d 100644
+--- a/flisp.c
++++ b/flisp.c
+@@ -122,7 +122,7 @@ static unsigned char *fromspace;
+ static unsigned char *tospace;
+ static unsigned char *curheap;
+ static unsigned char *lim;
+-static uint32_t heapsize;//bytes
++static size_t heapsize;//bytes
+ static uint32_t *consflags;
+ 
+ // error utilities ------------------------------------------------------------
+@@ -592,11 +592,10 @@ void gc(int mustgrow)
+     // if we're using > 80% of the space, resize tospace so we have
+     // more space to fill next time. if we grew tospace last time,
+     // grow the other half of the heap this time to catch up.
+-    if (grew || ((lim-curheap) < (int)(heapsize/5)) || mustgrow) {
+-        // TeXmacs: heapsize has 32 bits; an out of memory error rather than
+-        // a new growth past 512 Mb (the heap then becomes 1 Gb), which would
+-        // overflow
+-        if (!grew && heapsize >= (1U << 29)) {
++    if (grew || ((int64_t)(lim-curheap) < (int64_t)(heapsize/5)) || mustgrow) {
++        // TeXmacs: an out of memory error rather than a new growth past
++        // 4 Gb (each half of the heap then has 8 Gb)
++        if (!grew && heapsize >= ((size_t) 1 << 32)) {
+             if (fl_out_of_memory_hook) fl_out_of_memory_hook();
+             fl_raise(memory_exception_value);
+         }
+-- 
+2.50.1 (Apple Git-155)
+

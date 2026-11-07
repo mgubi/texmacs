@@ -25,6 +25,18 @@
     \<#D55C\>\<#AD6D\>\<#C5B4\> \<#BB38\>\<#C7A5\>\<#C785\>\<#B2C8\>\<#B2E4\>.
   </with>
 
+  Japanese text in the default font: the kana come from the Japanese font
+  of the system found by the font fallback (on macOS, Hiragino), and the
+  Korean syllables have the size of the text:
+
+  <\with|language|japanese>
+    \<#3072\>\<#3089\>\<#304C\>\<#306A\>\<#3068\>\<#30AB\>\<#30BF\>\<#30AB\>\<#30CA\>\<#3092\>\<#66F8\>\<#304D\>\<#307E\>\<#3059\>\<#3002\>
+  </with>
+
+  <\with|language|korean>
+    \<#D55C\>\<#AD6D\>\<#C5B4\> \<#BB38\>\<#C7A5\>\<#C785\>\<#B2C8\>\<#B2E4\>.
+  </with>
+
   Ideographs may also occur in a Latin paragraph, as in
   \<#4E2D\>\<#6587\> (Chinese) and \<#65E5\>\<#672C\> (Japan).
 </body>

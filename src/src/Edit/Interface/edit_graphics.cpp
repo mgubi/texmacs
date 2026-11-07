@@ -240,7 +240,7 @@ edit_graphics_rep::get_y () {
 double
 edit_graphics_rep::get_pixel () {
   edit_env env= get_typesetter ()->env;
-  return env->fr->inverse_scalar (env->pixel);
+  return env->fr->inverse_scalar (env->get_pixel ());
 }
 
 frame

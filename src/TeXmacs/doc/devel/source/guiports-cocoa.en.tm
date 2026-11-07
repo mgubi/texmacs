@@ -22,8 +22,7 @@
   removed.
 
   The status of the port, its test aids and its packaging are described in
-  <verbatim|doc/ns-port.md> at the top of the repository (outside the
-  <verbatim|src> directory); this page summarizes it.
+  <source-link|src/docs/ns-port.md|docs/ns-port.md>; this page summarizes it.
 
   <section|Building>
 
@@ -45,14 +44,16 @@
   signs it. <source-link|build-deps.sh|packages/macos/build-deps.sh> builds these libraries
   statically for an older <name|macOS> and either architecture,
   <source-link|merge-universal.sh|packages/macos/merge-universal.sh> merges two applications into a
-  universal one, and <source-link|check-app.sh|packages/macos/check-app.sh> checks the signature and
-  that only system libraries and those of the bundle are used. The
-  continuous integration workflow <verbatim|.github/workflows/macos-maxs.yml>
-  does all this on the branch <verbatim|maxs_ci>, for the <name|Cocoa> and
+  universal one, and <source-link|check-app.sh|packages/macos/check-app.sh> checks the signature,
+  that only system libraries and those of the bundle are used, and, for an
+  application made for an older <name|macOS>, that the main program is linked
+  against an <abbr|SDK> newer than its minimal version. The
+  continuous integration workflow <verbatim|.github/workflows/upsilon-macos.yml>
+  does all this on the branch <verbatim|upsilon_ci>, for the <name|Cocoa> and
   the <name|Vue> ports and both architectures, and publishes the two disk
-  images as the pre-release <verbatim|maxs-latest>; a state of
-  <verbatim|maxs_texmacs> is built by moving <verbatim|maxs_ci> to it
-  (<verbatim|git push -f origin maxs_texmacs:maxs_ci>). The older workflow
+  images as the pre-release <verbatim|upsilon-latest>; a state of
+  <verbatim|upsilon_texmacs> is built by moving <verbatim|upsilon_ci> to it
+  (<verbatim|git push -f origin upsilon_texmacs:upsilon_ci>). The older workflow
   <verbatim|macos-ns.yml>, for the branch <verbatim|ns_ci>, has been
   removed from this branch (it is kept on <verbatim|wip_other_guis>).
 
@@ -156,6 +157,12 @@
   <verbatim|Prohibited> in <cpp|gui_open>, <source-link|ns_gui.mm|src/Plugins/NS/ns_gui.mm>), the
   windows are made but never ordered front
   (<source-link|ns_widget.mm|src/Plugins/NS/ns_widget.mm>), and the wait window is not shown.
+  The option is read in <cpp|immediate_options> of
+  <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>, as for the Qt
+  and Vue interfaces, and <TeXmacs> quits after the commands given with
+  <verbatim|-x> or <verbatim|-c>. The modal dialogs (file choosers,
+  questions, lists of fields, the color picker, the print panel) are
+  answered as cancelled, since nobody could answer them.
 
   <section|The renderer>
 
@@ -173,7 +180,7 @@
   <section|Test aids>
 
   Other programs may not capture or drive the windows of <TeXmacs>, so the
-  port reads environment variables (see <verbatim|doc/ns-port.md> and
+  port reads environment variables (see <source-link|src/docs/ns-port.md|docs/ns-port.md> and
   <source-link|ns_gui.mm|src/Plugins/NS/ns_gui.mm>). With them, <TeXmacs> becomes the active
   application.
 

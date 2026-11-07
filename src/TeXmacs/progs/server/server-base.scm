@@ -826,8 +826,10 @@
     (server-log-write `notice
       (format #f
           "user ~A: ~A failed logins, ~A last failure, suspended: ~A\n"
-          ;; NOTE: strftime and localtime are not available with S7
-          uid n (pretty-date t "iso8601") (server-user-suspended? uid)))
+          ;; NOTE: strftime and localtime are not available with S7;
+          ;; pretty-date takes a Qt pattern, "iso8601" was printed as is
+          uid n (if (== t 0) "none" (pretty-time t))
+          (server-user-suspended? uid)))
     (and (not (server-user-deleted? uid))
          (not (server-user-suspended? uid))
 	 (or (< n (server-get-failed-login-limit))

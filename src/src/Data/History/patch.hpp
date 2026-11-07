@@ -112,6 +112,8 @@ bool is_applicable (patch p, tree t);
 tree clean_apply (patch p, tree t);
 void apply (patch p, tree& t);
 
+tree copy_for_undo (tree t);
+modification copy_for_undo (modification m);
 modification invert (modification m, tree t);
 bool commute (modification m1, modification m2);
 bool swap (modification& m1, modification& m2);
@@ -127,7 +129,7 @@ bool can_pull (patch p1, patch p2);
 patch pull (patch p1, patch p2);
 patch co_pull (patch p1, patch p2);
 bool join (patch& p1, patch p2, tree t);
-patch remove_set_cursor (patch p);
+patch remove_set_cursor (patch p, bool copy_flag= true);
 bool does_modify (patch p);
 
 #endif // defined PATCH_H

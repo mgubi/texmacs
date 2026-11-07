@@ -4,6 +4,17 @@
 #include <setjmp.h>
 #include <stdint.h>
 
+// the jumps of the errors save and restore no signal mask (a system call
+// each on macOS, where setjmp saves it; glibc's does not): they never leave
+// a signal handler
+#ifdef __APPLE__
+#define fl_setjmp(b) _setjmp(b)
+#define fl_longjmp(b, v) _longjmp(b, v)
+#else
+#define fl_setjmp(b) setjmp(b)
+#define fl_longjmp(b, v) longjmp(b, v)
+#endif
+
 typedef uptrint_t value_t;
 typedef int_t fixnum_t;
 #ifdef BITS64
@@ -26,10 +37,10 @@ typedef struct _symbol_t {
     // below fields are private
     struct _symbol_t *left;
     struct _symbol_t *right;
-    union {
-        char name[1];
-        void *_pad;    // ensure field aligned to pointer size
-    };
+    // TeXmacs, from Julia's femtolisp: a flexible array, as the name is
+    // longer than the field (strcpy into char name[1] aborts with
+    // _FORTIFY_SOURCE)
+    char name[] __attribute__((aligned(sizeof(void*))));
 } symbol_t;
 
 typedef struct {
@@ -52,7 +63,8 @@ typedef struct {
 #define tag(x) ((x)&0x7)
 #define ptr(x) ((void*)((x)&(~(value_t)0x7)))
 #define tagptr(p,t) (((value_t)(p)) | (t))
-#define fixnum(x) ((value_t)(((fixnum_t)(x))<<2))
+// TeXmacs: shifted unsigned (a left shift of a negative value is undefined)
+#define fixnum(x) ((value_t)(((uptrint_t)(x))<<2))
 #define numval(x)  (((fixnum_t)(x))>>2)
 #ifdef BITS64
 #define fits_fixnum(x) (((x)>>61) == 0 || (~((x)>>61)) == 0)
@@ -183,7 +195,7 @@ extern value_t fl_lasterror;
 #define FL_TRY_EXTERN                                                   \
   fl_exception_context_t _ctx; int l__tr, l__ca;                        \
   fl_savestate(&_ctx); fl_ctx = &_ctx;                                  \
-  if (!setjmp(_ctx.buf))                                                \
+  if (!fl_setjmp(_ctx.buf))                                             \
     for (l__tr=1; l__tr; l__tr=0, (void)(fl_ctx=fl_ctx->prev))
 
 #define FL_CATCH_EXTERN \
@@ -343,6 +355,7 @@ extern fltype_t *stringtype, *wcstringtype;
 extern fltype_t *builtintype;
 
 value_t cvalue(fltype_t *type, size_t sz);
+value_t cvalue_no_finalizer(fltype_t *type, size_t sz);
 void add_finalizer(cvalue_t *cv);
 void cv_autorelease(cvalue_t *cv);
 void cv_pin(cvalue_t *cv);

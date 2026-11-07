@@ -14,6 +14,17 @@
 #include "convert.hpp"
 #include "merge_sort.hpp"
 #include "vars.hpp"
+#include "iterator.hpp"
+
+// The variables of the initial environment which depend on the window of
+// a view (its size, zoom and full screen mode): each view of a buffer has
+// its own values, which are not saved (#528). The zoom is saved when the
+// document asks for it (no-zoom), but it stays a variable of each view.
+bool
+is_view_init_variable (string var) {
+  return var == PAGE_SCREEN_WIDTH || var == PAGE_SCREEN_HEIGHT ||
+         var == ZOOM_FACTOR || var == "full-screen-mode";
+}
 
 tree
 attach_data (tree body, new_data data, bool no_aux) {
@@ -27,10 +38,13 @@ attach_data (tree body, new_data data, bool no_aux) {
     doc << compound ("body", body);
   if (N (data->init) != 0) {
     hashmap<string,tree> init= copy (data->init);
-    init->reset (PAGE_SCREEN_WIDTH);
-    init->reset (PAGE_SCREEN_HEIGHT);
-    if (!init->contains ("no-zoom")) init->reset (ZOOM_FACTOR);
-    init->reset ("full-screen-mode");
+    bool keep_zoom= init->contains ("no-zoom");
+    iterator<string> it= iterate (data->init);
+    while (it->busy ()) {
+      string var= it->next ();
+      if (is_view_init_variable (var) && !(keep_zoom && var == ZOOM_FACTOR))
+        init->reset (var);
+    }
     doc << compound ("initial", make_collection (init));
   }
   if (N (data->fin) != 0)

@@ -113,8 +113,14 @@
 
 (tm-define (link-item-id item) (car item))
 (tm-define (link-item-type item) (cadr item))
-(tm-define (link-item-attributes item) (caddr item))
-(tm-define (link-item-vertices item) (cdddr item))
+(define (link-item-has-attributes? item)
+  (and (pair? (cddr item)) (link-attributes? (caddr item))))
+
+(tm-define (link-item-attributes item)
+  (if (link-item-has-attributes? item) (caddr item) '()))
+
+(tm-define (link-item-vertices item)
+  (if (link-item-has-attributes? item) (cdddr item) (cddr item)))
 
 (define (id->link-list id)
   (let* ((lns (vertex->links `(id ,id)))
@@ -299,7 +305,7 @@
   (let* ((inverse? (string-ends? xtype "*"))
          (type (if inverse? (string-drop-right xtype 1) xtype))
          (fl (navigation-list-filter l type (if inverse? 0 1) #t)))
-    (and (nnull? fl) (navigation-type fl))))
+    (and (nnull? fl) (car fl))))
 
 (define (resolve-navigation-list l fun)
   (if (null? l) (fun)
@@ -475,15 +481,29 @@
   ; TODO: jump to anchors in HTML
   (noop))
 
+;; The checks of the links suite stub the current buffer and the load, to
+;; follow a link from a buffer of the web without fetching anything.
+(define link-test-buffer #f)
+(define link-test-loader #f)
+(tm-define (set-link-test-hooks! buffer loader)
+  (set! link-test-buffer buffer)
+  (set! link-test-loader loader))
+
+(define (link-current-buffer)
+  (if link-test-buffer (link-test-buffer) (current-buffer)))
+
+(define (link-load-browse-buffer u)
+  (if link-test-loader (link-test-loader u) (load-browse-buffer u)))
+
 (define (default-root-handler u)
   (cond ((and (url-rooted-protocol? u "default")
-              (url-rooted-web? (current-buffer)))
-         (default-root-handler (url-relative (current-buffer) u)))
+              (url-rooted-web? (link-current-buffer)))
+         (default-root-handler (url-relative (link-current-buffer) u)))
         ((url-or? (url-expand u))
          (default-root-disambiguator (url-expand u)))
         (else (with (base qry) (process-url u)
                 (if (!= "" (url->system base))
-                    (load-browse-buffer base))))))
+                    (link-load-browse-buffer base))))))
 
 (define (tmfs-root-handler u)
   (load-browse-buffer u))
@@ -491,14 +511,46 @@
 (define (http-root-handler u)
   (load-browse-buffer u))
 
+;; What the handlers of @u load when it is a link to a file: the pair of the
+;; absolute file and of @u with that file in place of its (maybe relative)
+;; name, the query kept, or #f when they do something else (a web page, an
+;; external viewer, several candidates). The name is resolved here, once: the
+;; question may be answered after the current buffer has changed.
+(define (url-query-suffix s)
+  (let* ((m (string-length s))
+         (h (or (string-index s #\#) m))
+         (a (or (string-index s #\?) m)))
+    (substring s (min h a) m)))
+
+(define (url-load-plan u)
+  (with root (or (and (url-rooted? u) (url-root u)) "default")
+    (and (in? root '("default" "file"))
+         (not (url-rooted-protocol? u "mailto"))
+         (not (url-or? (url-expand u)))
+         (let* ((s (url->system u))
+                (suffix (url-query-suffix s))
+                (base (car (process-url u)))
+                (b (if (string? base) (system->url base) base)))
+           (and (not (url-none? b))
+                (!= "" (url->system b))
+                (not (url-rooted-web? b))
+                (not (buffer-external? b))
+                (let ((abs (load-buffer-resolve-name b)))
+                  (cons abs
+                        (if (== suffix "") u
+                            (system->url
+                             (string-append (url->system abs) suffix))))))))))
+
 (define (url-handlers u)
   (with root (or (and (url-rooted? u) (url-root u)) "default")
     (cond ((== root "default") 
            (list default-root-handler default-post-handler))
           ((== root "tmfs") 
            (list tmfs-root-handler (lambda (x) (noop))))
-          ((== root "file") ;; TODO: to be refined
-           (list http-root-handler http-post-handler))
+          ((== root "file")
+           ;; a file: url is a file, loaded, with the query or the anchor
+           ;; applied after the load, as the url of the system (#772)
+           (list default-root-handler default-post-handler))
           ((or (== root "http") (== root "https") (== root "doi"))
            (list http-root-handler http-post-handler))
           ((== root "mailto")
@@ -522,14 +574,87 @@
         (and (resolve-id id)
              (delayed (:idle 25) (apply go-to-id (cons id opt-from)))))))
 
+;; A wildcard in the target of a link (reproW*.scm) is not a file name: the
+;; files which it matches are the candidates of the link, treated as the
+;; candidates of an or'ed url: none gives the message "Not found", one is
+;; followed as if the link named it (with its query, and the question for a
+;; large file), several give the page of disambiguation (without the query,
+;; which an or'ed url cannot carry). It used to be loaded as the name of a
+;; buffer, which threw from url-glue (the autosave names), an exception
+;; which aborts TeXmacs (#771).
+(define (link-wildcard? u)
+  ;; a pattern (not the plain name of a file with a star in it), in any root:
+  ;; url-complete knows only the wildcards of files, and the others gave
+  ;; "wildcards only implemented for files" (#790)
+  (and (not (url-or? u))
+       (url-wildcard? u)))
+
+(define (urls->or l)
+  (if (null? (cdr l)) (car l) (url-or (car l) (urls->or (cdr l)))))
+
+(define (file-root? u)
+  (in? (or (and (url-rooted? u) (url-root u)) "default") '("default" "file")))
+
+(tm-define (link-wildcard-candidates u . opt-keep-query)
+  (:synopsis "The urls which the wildcard of @u matches")
+  ;; also used by load-buffer-main (tm-files.scm), through lazy-define. The
+  ;; root is tested before anything is resolved: url-exists? and url-complete
+  ;; throw for a wildcard which is not one of files (an abort), also when the
+  ;; name is relative to a buffer of tmfs or of the web.
+  (let* ((suffix (url-query-suffix (url->system u)))
+         (keep? (or (null? opt-keep-query) (car opt-keep-query)))
+         (here (and (not (url-rooted? u)) (current-buffer)))
+         (file? (and (file-root? u) (or (not here) (file-root? here)))))
+    (if (not file?)
+        '()
+        (let* ((base (load-buffer-resolve-name (car (process-url u))))
+               (all (if (file-root? base)
+                        (url->list (url-expand (url-complete base "fr")))
+                        '()))
+               (l (list-filter all (lambda (x) (not (url-none? x))))))
+          (if (and keep? (pair? l) (null? (cdr l)) (!= suffix ""))
+              (list (system->url (string-append (url->system (car l)) suffix)))
+              l)))))
+
+;; A file: url names a file as the plain name of the file does, and the buffer
+;; of a link to it must be the same buffer, with the same url (default-rooted):
+;; the file-rooted url of the link was the name of a second buffer for the
+;; same file, and on Windows a malformed one (the handlers go through the
+;; string of the url, #789). From a buffer of the web it stays a file: url,
+;; local: a default-rooted url would be relative to the web page.
+(define (link-canonical-url u)
+  (if (and (url-rooted-protocol? u "file")
+           (not (url-rooted-web? (link-current-buffer))))
+      (url-concretize* u)
+      u))
+
 (tm-define (go-to-url u . opt-from)
   (:synopsis "Jump to the url @u")
   (:argument opt-from "Optional path for the cursor history")
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
   (if (string? u) (set! u (system->url u)))
-  (with (action post) (url-handlers u) 
-    (action u) (post u))
-  (if (nnull? opt-from) (cursor-history-add (cursor-path))))
+  (set! u (link-canonical-url u))
+  (if (not (link-wildcard? u))
+      (go-to-url* u opt-from)
+      (with l (link-wildcard-candidates u)
+        (cond ((null? l)
+               (set-message (replace "No file matches %1" (url->system u))
+                            "Not found"))
+              ((null? (cdr l)) (go-to-url* (car l) opt-from))
+              (else (default-root-disambiguator (urls->or l)))))))
+
+(define (go-to-url* u opt-from)
+  ;; a link to a large source file asks first; what follows the load (the
+  ;; line and the word of the link, the history) waits for the answer
+  (with (action post) (url-handlers u)
+    (let* ((plan (url-load-plan u))
+           ;; the resolved name only when a question is asked
+           (ask? (and plan (large-load-question? (car plan))))
+           (u* (if ask? (cdr plan) u)))
+      (confirm-large-load (and ask? (car plan))
+        (lambda ()
+          (action u*) (post u*)
+          (if (nnull? opt-from) (cursor-history-add (cursor-path))))))))
 
 (define (execute-at cmd opt-location)
   (if (null? opt-location) (exec-delayed cmd)
@@ -538,10 +663,10 @@
 (tm-define (old-execute-script s secure-origin? opt-location)
   ;; NOTE: this code is deprecated; we should remove the old support
   ;; when we will be sure that nobody uses it anymore.
-  (let* ((secure-s (string-append "(secure? '" s ")"))
-         (ok? (or secure-origin? (eval (string->object secure-s))))
-         (cmd-s (string-append "(lambda () " s ")"))
-         (cmd (eval (string->object cmd-s))))
+  (let* ((cmd-s (string-append "(lambda () " s ")"))
+         (cmd-o (string->object cmd-s))
+         (ok? (or secure-origin? (secure? cmd-o)))
+         (cmd (eval cmd-o)))
     (cond ((or ok? (== (get-preference "security") "accept all scripts"))
            (execute-at cmd opt-location))
           ((== (get-preference "security") "prompt on scripts")

@@ -8343,7 +8343,10 @@ static void resize_heap_to(s7_scheme *sc, s7_int size)
 	    __func__, func, line, old_free, old_size, size, sc->gc_resize_heap_fraction, (s7_int)(floor(sc->heap_size * sc->gc_resize_heap_fraction)));
 #endif
 
-  if (size == 0)
+  if (size < 0)
+    sc->heap_size += 32 * ((-size + 31) / 32);  /* TeXmacs: grow by that many cells (see try_to_call_gc), rounded up to a multiple
+                                                 *   of 32: the loop below fills 32 cells per iteration (Loop_8 of 4) */
+  else if (size == 0)
     {
       if ((old_free < old_size * sc->gc_resize_heap_by_4_fraction) &&
 	  (sc->max_heap_size > (sc->heap_size * 4)))
@@ -8455,7 +8458,11 @@ static void try_to_call_gc(s7_scheme *sc)
 #if s7_Debugging
       fprintf(stderr, "%s[%d]: forced resize from %s[%d]\n", __func__, __LINE__, func, line);
 #endif
-      resize_heap(sc);
+      /* TeXmacs: the collector is off (tmscm_builder) and the free cells are used up. What the builder still needs
+       *   is not known, but is small, and a heap never shrinks: by 4, a heap of 8M cells (0.9 GB of memory) became
+       *   32M (2.5 GB) when the free list ran out at the wrong moment. Grow by an eighth instead.
+       */
+      resize_heap_to(sc, -((sc->heap_size / 8) > 64000 ? (sc->heap_size / 8) : 64000));
     }
   else
     {
@@ -10661,6 +10668,31 @@ static s7_pointer g_cutlet(s7_scheme *sc, s7_pointer args)
 			break;
 		      }}}}}
   return(let);
+}
+
+/* TeXmacs: the public definitions of the module system are bound in their module and in the
+ *   rootlet. The symbol then caches the id of the module, and the lookups from the other modules
+ *   scan the lets on their way to the rootlet (the user module has hundreds of slots). When these
+ *   two are the only bindings the symbol ever had, this removes the one in let and makes the
+ *   symbol global again, as if it had only been defined in the rootlet: the lookups go straight
+ *   there. With another binding (a parameter, a local variable, a second definition), a let might
+ *   still hold it, so nothing changes (false is returned).
+ */
+bool s7_unshadow_global(s7_scheme *sc, s7_pointer let, s7_pointer symbol)
+{
+  s7_pointer slot, last_slot = NULL;
+  if ((!is_let(let)) || (let == sc->rootlet) || (!is_symbol(symbol)) || (is_keyword(symbol)) ||
+      (symbol_ctr(symbol) != 2) || (!is_slot(global_slot(symbol))))
+    return(false);
+  for (slot = let_slots(let); is_slot_checked(slot); last_slot = slot, slot = next_slot(slot))
+    if (slot_symbol(slot) == symbol) break;
+  if ((!is_slot_checked(slot)) || (is_immutable_slot(slot)) || (local_slot(symbol) != slot))
+    return(false);
+  if (last_slot) slot_set_next(last_slot, next_slot(slot));
+  else let_set_slots(let, next_slot(slot));
+  set_local_slot(symbol, global_slot(symbol));
+  symbol_set_id_unchecked(symbol, 0);  /* is_global */
+  return(true);
 }
 
 
@@ -32106,11 +32138,14 @@ static s7_pointer g_read_string(s7_scheme *sc, s7_pointer args)
       LongJmp(*(Sc->Goto_Start), Error_Jump);	\
   } while (0)
 
+/* TeXmacs: no signal mask saved (savemask 0): these jumps never leave a
+ *   signal handler, and saving the mask is a system call at each s7_call
+ */
 #define set_jump_info(Sc, Tag)			\
   do {						\
     Sc->longjmp_ok = true;			\
     Sc->setjmp_loc = Tag;			\
-    jump_loc = (jump_loc_t)SetJmp(new_goto_start, 1);	\
+    jump_loc = (jump_loc_t)SetJmp(new_goto_start, 0);	\
     Sc->Goto_Start = &new_goto_start;		\
   } while (0)
 
@@ -84062,7 +84097,7 @@ static bool macro_cache_hit_1(s7_scheme *sc) /* sc->code: the macro, sc->args: t
     {
       const bool old_gc_off = sc->gc_off;
       /* room for the copy first (one pair for each pair of the set), above the trigger of new_cell: with the
-       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow, by 4, and a heap never shrinks
+       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow (by an eighth since patch 0008), and a heap never shrinks
        */
       check_free_heap_size(sc, hash_table_entries(cddr(entry)) + Gc_Trigger_Size + 8);
       sc->gc_off = true;                    /* the pieces of the copy are not yet protected */

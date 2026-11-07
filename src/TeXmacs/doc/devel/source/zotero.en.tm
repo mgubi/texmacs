@@ -33,8 +33,7 @@
   Zotero|../../main/links/man-zotero.en.tm>; the bibliography machinery
   which this chapter extends in <hlink|Bibliographies|database-bibliography.en.tm>.
   The design, with the situations which it handles and the decisions
-  taken, is in <verbatim|doc/zotero-design.md> at the root of the
-  repository.
+  taken, is in <source-link|src/docs/zotero-design.md|docs/zotero-design.md>.
 
   <section|Modules>
 

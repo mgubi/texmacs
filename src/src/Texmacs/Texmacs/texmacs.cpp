@@ -24,12 +24,14 @@
 
 #include "tm_ostream.hpp"
 #include "boot.hpp"
+#include "build_revision.hpp"
 #include "file.hpp"
 #include "server.hpp"
 #include "tm_timer.hpp"
 #include "data_cache.hpp"
 #include "tm_window.hpp"
 #include "client_server.hpp"
+#include "mcp_stdio.hpp"
 
 #if defined(QTWKTEXMACS)
 #include "Qtwk/QTWKApplication.hpp"
@@ -72,6 +74,7 @@ string open_mode_url;
 bool tls_no_verify= false;
 string extra_init_cmd;
 bool exec_exit= true;
+bool quit_at_end= false;
 void server_start ();
 
 #ifdef QTTEXMACS
@@ -139,6 +142,45 @@ void TeXmacs_init_font() {
 #endif
 }
 
+#if defined(AQUATEXMACS) || defined(Q_OS_MAC) || \
+    (defined(X11TEXMACS) && defined (MACOSX_EXTENSIONS)) || \
+    (defined(OS_MACOS) && (defined(VUETEXMACS) || defined(SDLTEXMACS)))
+static string
+macos_login_shell_path () {
+  // The PATH of a login shell of the user ($SHELL -l), or "". Only the
+  // last line of the output counts, so that the banners which a
+  // .zprofile may print come before it and are dropped; errors go to
+  // /dev/null, the shell reads no input, and the shell and what it started
+  // are killed after 5 seconds, so that a login script which hangs does
+  // not block the start of TeXmacs. printenv gives the PATH with colons
+  // also for shells, like fish, whose own PATH is a list.
+  string shell= get_env ("SHELL");
+  if (shell == "" || !exists (url_system (shell))) return "";
+  string login= "\"$SHELL\" -l -c '/usr/bin/printenv PATH'";
+  string cmd;
+  if (exists (url_system ("/usr/bin/perl")))
+    cmd= "PATH='' /usr/bin/perl -e '"
+         "$p= fork (); "
+         "if (!defined $p) { exit 1; } "
+         "if ($p == 0) { setpgrp (0, 0); exec @ARGV; exit 127; } "
+         "$SIG{ALRM}= sub { kill (\"KILL\", -$p); exit 1; }; "
+         "alarm 5; waitpid ($p, 0);' " * login;
+  else cmd= "PATH='' " * login;
+  string out= eval_system (cmd * " 2>/dev/null </dev/null");
+  array<string> lines= tokenize (out, "\n");
+  string r;
+  for (int i= N(lines)-1; i >= 0; i--) {
+    r= trim_spaces (replace (lines[i], "\r", ""));
+    if (r != "") break;
+  }
+  // a PATH: absolute directories, separated by colons (a list separated
+  // by spaces, or any other text, is not used)
+  if (!starts (r, "/")) return "";
+  if (occurs (" ", r) && !occurs (":", r)) return "";
+  return r;
+}
+#endif
+
 void
 TeXmacs_init_paths (int& argc, char** argv) {
   (void) argc; (void) argv;
@@ -182,23 +224,27 @@ TeXmacs_init_paths (int& argc, char** argv) {
   }
 #endif
 
-#if defined(AQUATEXMACS) || defined(Q_OS_MAC) || (defined(X11TEXMACS) && defined (MACOSX_EXTENSIONS))
+#if defined(AQUATEXMACS) || defined(Q_OS_MAC) || \
+    (defined(X11TEXMACS) && defined (MACOSX_EXTENSIONS)) || \
+    (defined(OS_MACOS) && (defined(VUETEXMACS) || defined(SDLTEXMACS)))
   // Mac bundle environment initialization
   // We set some environment variables when the executable
   // is in a .app bundle on MacOSX
+  // An application started from the Finder or the Dock only has the PATH
+  // of launchd (/usr/bin:/bin:/usr/sbin:/sbin), without /usr/local/bin,
+  // /opt/homebrew/bin or /Library/TeX/texbin: the PATH of a login shell is
+  // added, so that Ghostscript, LaTeX and the programs of the plugins are
+  // found. The Vue and SDL interfaces need it as much as Qt and Cocoa:
+  // without it, File > Preview of a Vue build, which goes through
+  // Ghostscript (no PDF renderer), made no PDF and showed nothing (#546).
   if (is_empty (current_texmacs_path))
     set_env ("TEXMACS_PATH", as_string(exedir * "../Resources/share/TeXmacs"));
   //cout << get_env("PATH") * ":" * as_string(url("$PWD") * argv[0]
   // * "../../Resources/share/TeXmacs/bin") << LF;
-  string shell= get_env ("SHELL");
-  if (shell != "" && exists(shell)) {
-    string shell_env = var_eval_system ("PATH='' $SHELL -l -c 'echo $PATH'");
-    set_env ("PATH", get_env("PATH") * ":" * shell_env * ":" *
-             as_string (exedir * "../Resources/share/TeXmacs/bin"));
-  } else {
-    set_env ("PATH", get_env("PATH") * ":" *
-             as_string (exedir * "../Resources/share/TeXmacs/bin"));
-  }
+  string shell_env= macos_login_shell_path ();
+  if (shell_env != "") shell_env= shell_env * ":";
+  set_env ("PATH", get_env("PATH") * ":" * shell_env *
+           as_string (exedir * "../Resources/share/TeXmacs/bin"));
   // system("set");
 #endif
 
@@ -209,7 +255,16 @@ TeXmacs_init_paths (int& argc, char** argv) {
   // PWD is set to HOME
   // if PWD is lacking, then the path resolution machinery may not work
   
-  if (is_empty (current_texmacs_path))
+  // An executable in a TeXmacs tree (TeXmacs/bin, as in a bundle, an
+  // installation or a build) uses that tree, even when TEXMACS_PATH is set:
+  // the installer of the stock TeXmacs writes it into the environment of
+  // the user, and TeXmacs Upsilon, installed beside it, then ran with the
+  // files of the stock one. TEXMACS_PATH still counts for an executable
+  // which is not in a tree.
+  url own_tree= exedir * "..";
+  if (exists (own_tree * "progs/init-texmacs.scm"))
+    set_env ("TEXMACS_PATH", as_string (own_tree));
+  else if (is_empty (current_texmacs_path))
     set_env ("TEXMACS_PATH", as_string (exedir * ".."));
   // if (get_env ("HOME") == "") //now set in immediate_options otherwise --setup option fails
   //   set_env ("HOME", get_env("USERPROFILE"));
@@ -338,7 +393,7 @@ set_global_options  (int argc, char** argv)  {
       else if ((s == "-v") || (s == "-version")) {
         cout << "\n";
         cout << "TeXmacs version " << TEXMACS_VERSION << "\n";
-        cout << "SVN version " << TEXMACS_REVISION << "\n";
+        cout << "Revision " << get_build_revision () << "\n";
         cout << TEXMACS_COPYRIGHT << "\n";
         cout << "\n";
         exit (0);
@@ -356,7 +411,7 @@ set_global_options  (int argc, char** argv)  {
         exit (0);
       }
       else if ((s == "-q") || (s == "-quit"))
-        my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
+        quit_at_end= true;
       else if ((s == "-r") || (s == "-reverse"))
         set_reverse_colors (true);
 #if QT_VERSION < 0x060000
@@ -406,6 +461,12 @@ set_global_options  (int argc, char** argv)  {
       else if ((s == "-X")) {
         exec_exit= false;
       }
+      else if (s == "-mcp") {
+        // a headless TeXmacs which serves MCP on its standard input and
+        // output (progs/agents/mcp-server.scm); it ends with its input
+        exec_exit= false;
+        my_init_cmds= my_init_cmds * " (mcp-server-start)";
+      }
       else if (s == "-server") set_server ();
       else if (s == "-port") {
         i++;
@@ -444,19 +505,23 @@ set_global_options  (int argc, char** argv)  {
 	       (s == "-headless") || (s == "-H") || s == "-open");
       else if (s == "-tls-no-verify") tls_no_verify= true;
       else if (s == "-build-manual") {
+        // the manual and the test suites quit when they are done
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
                          << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (s == "-reference-suite") {
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(build-ref-suite "
                          << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (s == "-test-suite") {
+        if (i+1<argc) exec_exit= false;
         if ((++i)<argc)
           extra_init_cmd << "(run-test-suite "
-                         << scm_quote (argv[i]) << "delayed-quit)";
+                         << scm_quote (argv[i]) << " delayed-quit)";
       }
       else if (starts (s, "-psn"));
       else {
@@ -470,8 +535,9 @@ set_global_options  (int argc, char** argv)  {
         cout << "  -h         Display this help message\n";
         cout << "  -H         Run TeXmacs in headless mode\n";
         cout << "  -i [file]  Specify scheme initialization file\n";
+        cout << "  --mcp      Serve the Model Context Protocol on stdin and stdout\n";
         cout << "  -p         Get the TeXmacs path\n";
-        cout << "  -q         Shortcut for -x \"(quit-TeXmacs)\"\n";
+        cout << "  -q         Quit after the commands and the files\n";
         cout << "  -r         Reverse video mode\n";
         cout << "  -s         Suppress information messages\n";
         cout << "  -S         Rerun TeXmacs setup program before starting\n";
@@ -494,14 +560,15 @@ set_global_options  (int argc, char** argv)  {
       string b= scm_quote (as_string (u));
       string cmd= "(load-buffer " * b * " " * where * ")";
       where= " :new-window";
-      extra_init_cmd << cmd;
+      // with the commands of -x and -c, in the order of the command line
+      my_init_cmds= my_init_cmds * " " * cmd;
     }
   } // for (int i...)
   if (flag) debug (DEBUG_FLAG_AUTO, true);
   // End parse command line options
 
   // in headless mode quit after processing of the command line
-  if (headless_mode && exec_exit && !is_server ()) my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
+  if (headless_mode && exec_exit && !is_server ()) quit_at_end= true;
 
   // Further options via environment variables
 #if QT_VERSION < 0x060000
@@ -586,7 +653,8 @@ TeXmacs_main (int argc, char** argv) {
     // it: no welcome message over a document which was asked for
     if (argc > 1) install_status= 0;
 #endif
-    if (install_status == 1) {
+    if (quit_at_end); // no messages before quitting
+    else if (install_status == 1) {
       if (DEBUG_STD) debug_boot << "Loading welcome message...\n";
       string cmd= "(load-help-article \"about/welcome/new-welcome\")";
       // FIXME: force to load welcome message into new window
@@ -634,6 +702,8 @@ TeXmacs_main (int argc, char** argv) {
     
     // inject scheme commands 
     if (N(extra_init_cmd) > 0) exec_delayed (scheme_cmd (extra_init_cmd));
+    // quit after the commands and the files of the command line
+    if (quit_at_end) exec_delayed (scheme_cmd ("(quit-TeXmacs)"));
     gui_start_loop ();
   
     if (DEBUG_STD) debug_boot << "Stopping server...\n";
@@ -690,17 +760,20 @@ boot_hacks () {
 
 void
 immediate_options (int argc, char** argv) {
+  // TeXmacs Upsilon has a home of its own (TeXmacs_Upsilon), so that it
+  // neither loads what another TeXmacs keeps in ~/.TeXmacs (plugins,
+  // progs) nor changes its preferences and caches
   if (get_env ("TEXMACS_HOME_PATH") == "")
 #ifdef OS_MINGW
   {
     if (get_env ("HOME") == "")
         set_env ("HOME", get_env("USERPROFILE"));
-    set_env ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "\\TeXmacs");
+    set_env ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "\\TeXmacs_Upsilon");
 	}
 #elif defined(OS_HAIKU)
-    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/config/settings/TeXmacs");
+    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/config/settings/TeXmacs_Upsilon");
 #else
-    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/.TeXmacs");
+    set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/.TeXmacs_Upsilon");
 #endif
   if (get_env ("TEXMACS_HOME_PATH") == "") return;
   if (get_env ("TEXMACS_SERVER_CERT_DIR") == "")
@@ -758,12 +831,20 @@ immediate_options (int argc, char** argv) {
 #endif
     }
 
-#if defined (QTTEXMACS) || (defined(VUETEXMACS) || defined(TAUTEXMACS))
+#if defined (QTTEXMACS) || defined (VUETEXMACS) || defined (TAUTEXMACS)
     else if (s == "-headless" || s == "-H" || s == "-C" ||
 	     s == "-build-website" || s == "-W" ||
 	     s == "-update-website" || s == "-U")
       headless_mode= true;
 #endif
+    else if (s == "-mcp") {
+      headless_mode= true;
+      string home= get_env ("TEXMACS_HOME_PATH");
+      string sys = home * "/system";
+      mkdir (url_system (home));
+      mkdir (url_system (sys));
+      mcp_stdio_setup (sys * "/mcp.log");
+    }
     else if (s == "-log-file" && i + 1 < argc) {
       i++;
       char* log_file = argv[i];
@@ -854,7 +935,7 @@ texmacs_entrypoint (int argc, char** argv) {
     c_string _exe (concretize (exe));
 #  if defined(QTTEXMACS)
     string cmd= string ("(load-buffer \"") * open_mode_url
-                * string ("\")");
+                * string ("\" :confirm-large)");
     if (!send_to_single_instance (cmd))
 #  endif
     {
@@ -870,10 +951,11 @@ texmacs_entrypoint (int argc, char** argv) {
   if (!headless_mode) {
 #  if QT_VERSION >= 0x060000
 #    ifndef OS_MACOS
-    tmapp()->set_window_icon("/misc/images/texmacs.svg");
+    // (the flat icon of TeXmacs Upsilon, not the chip of the stock TeXmacs)
+    tmapp()->set_window_icon("/misc/images/texmacs-vue.svg");
 #    endif
 #  else
-    tmapp()->set_window_icon("/misc/images/texmacs-512.png");
+    tmapp()->set_window_icon("/misc/images/texmacs-vue-512.png");
 #  endif
   }
 #endif

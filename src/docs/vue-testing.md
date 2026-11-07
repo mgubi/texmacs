@@ -18,14 +18,24 @@ target window as `<dir>/<name>.png`.
 
 ## Scripted events
 
-`TEXMACS_VUE_SCRIPT=<file>`: the event loop replays the file line by line
-(`script_step` in `vue_gui.cpp`), one command per iteration and only when no
-SDL event is pending, by pushing synthetic SDL events. Coordinates are window
-*points* relative to the content area of the target window.
+`TEXMACS_VUE_SCRIPT=<file>`: the event loop replays the file line by line,
+one command per iteration and only when no SDL event is pending, by pushing
+synthetic SDL events. The driver is the one of every port, in Scheme
+(`check/gui-driver.scm` and `check/gui-script.scm`, see
+[gui-scripting.md](gui-scripting.md)), and Vue runs the commands of its own
+(`script_exec` in `vue_gui.cpp`). Coordinates are window *points* relative to
+the content area of the target window.
 
 ```
 # comment
 wait <ms>
+idle                        wait until no event came for a few turns of the loop
+activate <selector>         click a text or an icon of the window, by the bars
+                            and menus it is in ("Format > Font", "footer >
+                            equation*", "mainbar > icon:tm_save"; see
+                            gui-scripting.md)
+expect <text>               a line which the output must have (run.sh checks it)
+exit                        quit at the end, with the status of the checks
 window <substring of title> | window #<id>    (default: the last created window;
                             prints its position and size on the screen)
 move x y
@@ -49,6 +59,8 @@ commit <text>               an input method commits a text (one key per characte
 drop x y <path>|text:<text> a drag and drop of one item at that position
 focus                       pretend the target window got the keyboard focus
 snapshot <name>             save the next redraw of the target window
+clipboard <text>            the text on the clipboard of the script, which is
+                            not the system's while a script runs
 close                       close request on the target window
 ```
 
@@ -63,7 +75,8 @@ need `-debug-events` on the command line.
 
 `TEXMACS_VUE_TAB_MODE=top|side|mobile|grid` stands for the preference
 "gui:responsive tab mode" (test `responsive-tabs`), so that no test has to
-set it.
+set it, and `TEXMACS_VUE_FOOTER=plain|interactive` for the preference
+"interactive footer" (test `footer-emoji`).
 
 `TEXMACS_VUE_THEME=light|dark` forces the theme of the interface. The
 `theme` and `icons` tests each render one window under whichever theme is
@@ -76,19 +89,26 @@ tests after a change to the sizing of the widgets.
 
 ## Running the tests
 
-`src/Plugins/Vue/tests/` holds Scheme files building test widgets (loaded with
+`tests/Plugins/Vue/` holds Scheme files building test widgets (loaded with
 `-x`) and the scripts driving them (`README` there). Run one with
 `run.sh`, from the top of the source tree:
 
 ```sh
-sh src/Plugins/Vue/tests/run.sh widgets 25        # widgets.scm + widgets.script
+sh tests/Plugins/Vue/run.sh widgets 25        # widgets.scm + widgets.script
 SCM=wheel-travel.scm SCRIPT=scroll-shift.script \
-  sh src/Plugins/Vue/tests/run.sh scroll-shift 28  # a script with another .scm
+  sh tests/Plugins/Vue/run.sh scroll-shift 28  # a script with another .scm
 ```
 
 It prints what the test prints (`choice:`, `got:`...), the errors and the
-end of the script, and leaves the snapshots in `/tmp/vue-tests/<test>`.
-**TeXmacs runs with a home of its own**, a copy of `~/.TeXmacs` made for
+end of the script, and leaves the snapshots in `/tmp/vue-tests/<test>`. Its
+last line is `PASS <test>` or `FAIL <test>: <why>`, and so is its status: a
+crash, a script which did not end, a failed check (`FAILED`), an exit status
+other than 0, or a line asked for by an `expect` of the script which is
+missing from the output. With `expect` lines the run stops as soon as the
+script ended and they all showed. A test may also be steps of the driver
+in its `.scm` alone, without a script, which quit by themselves with
+`gt-exit` (`footer-activate.scm`).
+**TeXmacs runs with a home of its own**, a copy of `~/.TeXmacs_Upsilon` made for
 the run (`cp -Rc`, copy on write, instant on APFS) and removed afterwards:
 a test must never change the user's settings, and it did when it ran in
 the real home -- `change-zoom-factor` saves the zoom as a preference,
@@ -139,6 +159,7 @@ callback output.
 | `input-mouse` | `input-edit.scm` under `input-mouse.script`: the mouse in a text input. A double click selects a word (cut), a triple click the whole field, the context menu of a right click pastes over it (`got: Smith / 42`) |
 | `input-edit` | editing in a text input: select all and replace, word selection, cut and paste (`got: Bob Smith / 42`) |
 | `math-backspace` | typed symbols are keys named without their brackets, as in the Qt port: `x<y` and `$a<=` then two Backspaces; F12 prints the tree, `(math "a<leqslant>")`, `(math "a")`, `(math "")`. `<` was the key `<less>`, inserted as `<<less>>`, and a Backspace then crashed (`bad path`) |
+| `math-cursor` | the cursor in a formula with primes, wide accents and negations, which the OpenType math fonts box (C5 of `src/docs/opentype-audit.md`): Right through it in the TeX font and in STIX Two Math gives the same 23 paths (`same-steps-as-roman #t`), and a click at the position of each step gives back its path, except at the 4 positions which two paths share (the end of an accent and after it, the end of the formula), reported as `click N ... gave` and the same in both fonts. `math-cursor.py` makes the script |
 | `pre-edit` | the composition of an input method in the editor: a dead key then a letter, shown in a pre-edit box and replaced by the committed text |
 | `pre-edit-input` | the same inside a dialog field |
 | `focus-windows` | the keyboard focus moves from a prompt to the editor and back (`got: BobBy / 42`) |
@@ -185,8 +206,13 @@ callback output.
 | `responsive-tabs` | run with `TEXMACS_VUE_TAB_MODE=side`, `mobile`, `grid`: the column of tabs, the list with its pages and Back, the grid of pages |
 | `wheel-graphics` | in a graphics with `wheel-capture?`, the wheel goes to the editor and does not scroll |
 | `enums` | an editable enum (typed and picked values), an enum as wide as its widest value, a long list near the bottom opening above and scrolling, a choice list which scrolls |
-| `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu. Give it 40 s under load |
+| `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu; with a menu open, the pointer on a plain button of the bar closes it (d12) and going back over the titles opens none (d13). Give it 40 s under load |
 | `sockets` | the TeXmacs server and an anonymous legacy client in the same instance (see below) |
+| `footer-menus` | the interactive footer: the menu of a theorem from inside a strong makes it a lemma, the letter typed then lands in the strong; the Document menu (`got: (lemma strong) (0 0 0 0 1 0 2)`) |
+| `footer-variants` | the menu of a displayed formula in the footer makes it inline while the cursor is in an inline formula inside it, and the cursor goes back there (`got: (math text math) ...`) |
+| `named` | `(named "name" ...)` in the menus: two buttons with the same label told apart by the names of their groups (`#second`, `#first > Same`); steps of the driver in its `.scm`, without a script |
+| `footer-activate` | `footer-variants` written as steps of the driver in its `.scm`, without a script: the menus are found by their texts (`gt-activate`), the result is checked (`gt-check`) and TeXmacs quits with the status |
+| `footer-emoji` | the footer says which emoji is before the cursor: a sequence (a family, a flag, a keycap) whole, as a text of its own drawn with the emoji font, then its name (`(emoji-family-man-woman-girl)`); an emoji typed comes into the document by its name (`<emoji-rocket>`), a family typed code point after code point by the name of the family. Run it with `TEXMACS_VUE_FOOTER=plain` and with `TEXMACS_VUE_FOOTER=interactive` (the footer of the editor, the interactive footer) |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange
 over TLS and is run by hand:
@@ -194,7 +220,7 @@ over TLS and is run by hand:
 ```sh
 TEXMACS_SERVER_CERT_DIR=<scratch dir> \
   TeXmacs/bin/texmacs.bin -tls-no-verify \
-  -x '(load "src/Plugins/Vue/tests/sockets-tls.scm")'
+  -x '(load "tests/Plugins/Vue/sockets-tls.scm")'
 ```
 
 It generates a self-signed certificate there and expects `SOCKETS-TLS

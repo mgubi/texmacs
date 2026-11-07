@@ -79,52 +79,54 @@
   (ai-fold-ask-again t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The folds which ask: queued until their request is made (ai-request,
-;; init-ai.scm), in the order of the requests of the engine
+;; The fold of a request: the evaluation of a fold gives it to the request
+;; among its options (:ai-fold and a pointer to the fold), which the
+;; plug-in keeps with its pending request (silent-feed, plugin-eval.scm),
+;; so that the request which is made, and the answer which comes, find
+;; their fold there: the pending requests are those of the engine and the
+;; session, and an interrupted one is removed with them. (Queues of the
+;; folds of an engine got out of step when a request was interrupted, or
+;; when two sessions of an engine asked at once: a fold was then asked with
+;; the model and the files of another, and given its answer.)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define ai-fold-queue (make-ahash-table)) ; engine -> pointers to the folds
 
 (tm-define (script-feed lan ses in out opts)
   (:require (in? lan (ai-models)))
   (with f (and (tree? out) (tree-up out))
-    (when (ai-fold? f)
-      (ai-tree-set-var! f "ai-asked" (ai-question-sign f)))
-    (ahash-set! ai-fold-queue lan
-                (append (or (ahash-ref ai-fold-queue lan) '())
-                        (list (and (ai-fold? f) (tree->tree-pointer f))))))
-  (former lan ses in out opts))
+    (if (ai-fold? f)
+        (begin
+          (ai-tree-set-var! f "ai-asked" (ai-question-sign f))
+          (former lan ses in out
+                  (cons (list :ai-fold (tree->tree-pointer f)) opts)))
+        (former lan ses in out opts))))
 
-;; the fold of the next request of the engine, #f if it is not in a fold
-(define (ai-queue-pop table name)
-  (with l (or (ahash-ref table name) '())
-    (and (nnull? l)
-         (begin
-           (ahash-set! table name (cdr l))
-           (and (car l)
-                (with f (catch #t (lambda () (tree-pointer->tree (car l)))
-                          (lambda args #f))
-                  (tree-pointer-detach (car l))
-                  (and (ai-fold? f) f)))))))
+;; the entry :ai-fold of the options of the request of the engine and the
+;; session which is made (the first pending one), #f if it is not a fold's
+(define (ai-pending-fold-entry name chat)
+  (let* ((l (pending-ref name chat))
+         (item (and (pair? l) (car l)))
+         ;; (cb in out err return opts, see silent-encode)
+         (opts (and (list? item) (>= (length item) 6) (list-ref item 5))))
+    (and (list? opts)
+         (list-find opts (lambda (o) (and (pair? o) (== (car o) :ai-fold)))))))
 
-(tm-define (ai-fold-pop name)
-  (ai-queue-pop ai-fold-queue name))
+(define (ai-entry-fold e)
+  (and e
+       (with f (catch #t (lambda () (tree-pointer->tree (cadr e)))
+                 (lambda args #f))
+         (and (ai-fold? f) f))))
 
-;; the fold whose answer is awaited (#f for a request which is not in a
-;; fold): the answer is put there with its tokens (ai-result-filter,
-;; init-ai.scm). An engine answers one request at a time: one per engine,
-;; replaced by the next request (the result of a request which was stopped
-;; before its answer does not come)
-(define ai-fold-results (make-ahash-table)) ; engine -> (pointer to a fold)
+;; the fold of the request which is made, #f if it is not in a fold
+(tm-define (ai-fold-pop name chat)
+  (ai-entry-fold (ai-pending-fold-entry name chat)))
 
-(tm-define (ai-fold-result-push name f)
-  (with old (ahash-ref ai-fold-results name)
-    (when (and (pair? old) (car old)) (tree-pointer-detach (car old))))
-  (ahash-set! ai-fold-results name
-              (list (and (ai-fold? f) (tree->tree-pointer f)))))
-
-(tm-define (ai-fold-result-pop name)
-  (ai-queue-pop ai-fold-results name))
+;; the fold whose answer comes, where the answer is put with its tokens
+;; (ai-result-filter, init-ai.scm): the pointer is let go then
+(tm-define (ai-fold-result-pop name chat)
+  (let* ((e (ai-pending-fold-entry name chat))
+         (f (ai-entry-fold e)))
+    (when e (tree-pointer-detach (cadr e)))
+    f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The focus bar of a fold: its model, the reasoning, Ask again

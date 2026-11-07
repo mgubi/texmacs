@@ -494,6 +494,21 @@ tmg_make_return_after () {
 }
 
 tmscm
+tmg_can_insert_atP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "can-insert-at?");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "can-insert-at?");
+
+  content in1= tmscm_to_content (arg1);
+  path in2= tmscm_to_path (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->can_insert_at (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_temp_proof_fix () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->temp_proof_fix ();
@@ -1864,6 +1879,21 @@ tmg_get_mouse_position () {
 }
 
 tmscm
+tmg_xy_2path (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "xy->path");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "xy->path");
+
+  int in1= tmscm_to_int (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  path out= get_current_editor()->xy_to_path (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return path_to_tmscm (out);
+}
+
+tmscm
 tmg_set_mouse_pointer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-mouse-pointer");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-mouse-pointer");
@@ -3231,6 +3261,15 @@ tmg_update_forced () {
 }
 
 tmscm
+tmg_apply_changes () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->apply_pending_changes ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_update_path (tmscm arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-path");
 
@@ -3247,6 +3286,15 @@ tmscm
 tmg_update_current_buffer () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->typeset_invalidate_all ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_update_current_buffer_keep () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->typeset_invalidate_keep ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -3424,6 +3472,64 @@ tmg_print_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
   // TMSCM_ALLOW_INTS;
 
   return array_SI_to_tmscm (out);
+}
+
+tmscm
+tmg_print_snippet_in (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "print-snippet-in");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "print-snippet-in");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "print-snippet-in");
+
+  url in1= tmscm_to_url (arg1);
+  content in2= tmscm_to_content (arg2);
+  int in3= tmscm_to_int (arg3);
+
+  // TMSCM_DEFER_INTS;
+  array_SI out= get_current_editor()->print_snippet_in (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return array_SI_to_tmscm (out);
+}
+
+tmscm
+tmg_html_math_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "html-math-snippet");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "html-math-snippet");
+  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "html-math-snippet");
+
+  content in1= tmscm_to_content (arg1);
+  int in2= tmscm_to_int (arg2);
+  bool in3= tmscm_to_bool (arg3);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= get_current_editor()->html_math_snippet (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_html_snippet_id (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "html-snippet-id");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "html-snippet-id");
+
+  content in1= tmscm_to_content (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->html_snippet_id (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_html_snippet_last () {
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->html_snippet_last ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -3712,6 +3818,15 @@ tmg_show_selection () {
 }
 
 tmscm
+tmg_selection_rectangles () {
+  // TMSCM_DEFER_INTS;
+  array_int out= get_current_editor()->get_selection_rectangles ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
+}
+
+tmscm
 tmg_show_meminfo () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_meminfo ();
@@ -3780,6 +3895,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("activate-symbol",  tmg_activate_symbol, 0, 0, 0);
   tmscm_install_procedure ("make-return-before",  tmg_make_return_before, 0, 0, 0);
   tmscm_install_procedure ("make-return-after",  tmg_make_return_after, 0, 0, 0);
+  tmscm_install_procedure ("can-insert-at?",  tmg_can_insert_atP, 2, 0, 0);
   tmscm_install_procedure ("temp-proof-fix",  tmg_temp_proof_fix, 0, 0, 0);
   tmscm_install_procedure ("get-full-env",  tmg_get_full_env, 0, 0, 0);
   tmscm_install_procedure ("get-all-inits",  tmg_get_all_inits, 0, 0, 0);
@@ -3890,6 +4006,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("key-press-complete",  tmg_key_press_complete, 1, 0, 0);
   tmscm_install_procedure ("mouse-any",  tmg_mouse_any, 6, 0, 0);
   tmscm_install_procedure ("get-mouse-position",  tmg_get_mouse_position, 0, 0, 0);
+  tmscm_install_procedure ("xy->path",  tmg_xy_2path, 2, 0, 0);
   tmscm_install_procedure ("set-mouse-pointer",  tmg_set_mouse_pointer, 2, 0, 0);
   tmscm_install_procedure ("set-predef-mouse-pointer",  tmg_set_predef_mouse_pointer, 1, 0, 0);
   tmscm_install_procedure ("go-to-path",  tmg_go_to_path, 1, 0, 0);
@@ -4017,8 +4134,10 @@ initialize_glue_editor () {
   tmscm_install_procedure ("clear-local-info",  tmg_clear_local_info, 0, 0, 0);
   tmscm_install_procedure ("refresh-view",  tmg_refresh_view, 0, 0, 0);
   tmscm_install_procedure ("update-forced",  tmg_update_forced, 0, 0, 0);
+  tmscm_install_procedure ("apply-changes",  tmg_apply_changes, 0, 0, 0);
   tmscm_install_procedure ("update-path",  tmg_update_path, 1, 0, 0);
   tmscm_install_procedure ("update-current-buffer",  tmg_update_current_buffer, 0, 0, 0);
+  tmscm_install_procedure ("update-current-buffer-keep",  tmg_update_current_buffer_keep, 0, 0, 0);
   tmscm_install_procedure ("renumber-auto-labels",  tmg_renumber_auto_labels, 0, 0, 0);
   tmscm_install_procedure ("update-players",  tmg_update_players, 2, 0, 0);
   tmscm_install_procedure ("generate-all-aux",  tmg_generate_all_aux, 0, 0, 0);
@@ -4033,6 +4152,10 @@ initialize_glue_editor () {
   tmscm_install_procedure ("print",  tmg_print, 0, 0, 0);
   tmscm_install_procedure ("print-pages",  tmg_print_pages, 2, 0, 0);
   tmscm_install_procedure ("print-snippet",  tmg_print_snippet, 3, 0, 0);
+  tmscm_install_procedure ("print-snippet-in",  tmg_print_snippet_in, 3, 0, 0);
+  tmscm_install_procedure ("html-math-snippet",  tmg_html_math_snippet, 3, 0, 0);
+  tmscm_install_procedure ("html-snippet-id",  tmg_html_snippet_id, 2, 0, 0);
+  tmscm_install_procedure ("html-snippet-last",  tmg_html_snippet_last, 0, 0, 0);
   tmscm_install_procedure ("graphics-file-to-clipboard",  tmg_graphics_file_to_clipboard, 1, 0, 0);
   tmscm_install_procedure ("export-postscript",  tmg_export_postscript, 1, 0, 0);
   tmscm_install_procedure ("export-pages-postscript",  tmg_export_pages_postscript, 3, 0, 0);
@@ -4058,6 +4181,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("show-path",  tmg_show_path, 0, 0, 0);
   tmscm_install_procedure ("show-cursor",  tmg_show_cursor, 0, 0, 0);
   tmscm_install_procedure ("show-selection",  tmg_show_selection, 0, 0, 0);
+  tmscm_install_procedure ("selection-rectangles",  tmg_selection_rectangles, 0, 0, 0);
   tmscm_install_procedure ("show-meminfo",  tmg_show_meminfo, 0, 0, 0);
   tmscm_install_procedure ("edit-special",  tmg_edit_special, 0, 0, 0);
   tmscm_install_procedure ("edit-test",  tmg_edit_test, 0, 0, 0);

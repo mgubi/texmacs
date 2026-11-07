@@ -151,6 +151,104 @@
 (tm-define current-save-source (url-none))
 (tm-define current-save-target (url-none))
 
+;; The document which is being converted and the file which is being written:
+;; set by buffer_export and export_tree in C++ for the time of the conversion,
+;; none otherwise (a conversion for the clipboard writes no file)
+
+(tm-define (save-source-swap u)
+  (with old current-save-source
+    (set! current-save-source u)
+    old))
+
+(tm-define (save-target-swap u)
+  (with old current-save-target
+    (set! current-save-target u)
+    old))
+
+(tm-define (save-source-url)
+  (if (url-none? current-save-source) (current-buffer) current-save-source))
+
+(tm-define (save-target-url)
+  (if (url-none? current-save-target) (save-source-url) current-save-target))
+
+(tm-define (url-drop-suffix u)
+  (with suf (url-suffix u)
+    (if (== suf "") u (url-unglue u (+ (string-length suf) 1)))))
+
+;; The images of a conversion which writes no file are not for the user (the
+;; text for an AI, the MathJax of a formula, a label): they go to the temporary
+;; folder, under the absolute name. Only a copy to the clipboard keeps them, for
+;; the pasted text: next to the document, when it is a file in a folder of the
+;; user which can be written, where the bare name will do, otherwise in a folder
+;; of the home, which remains after TeXmacs as the pasted text does. The name
+;; comes from the document and the content, so that the same copy uses the same
+;; file instead of leaving a new one each time.
+
+(tm-define copying-to-clipboard? #f)
+
+(tm-define (copying-to-clipboard-swap flag)
+  (with old copying-to-clipboard?
+    (set! copying-to-clipboard? flag)
+    old))
+
+(tm-define (folder-writable? dir)
+  ;; really writing: (url-test? dir "w") only looks at the permission bits,
+  ;; which it finds on /etc as well
+  (with u (url-append dir (string-append ".texmacs-write-test-"
+                                         (number->string (texmacs-time))))
+    (string-save "" u)
+    (and (url-exists? u)
+         (begin (system-remove u) #t))))
+
+(define (document-folder)
+  (let* ((b (current-buffer))
+         (dir (url-head b)))
+    (and (not (url-none? b))
+         (not (url-scratch? b))
+         (not (url-rooted-web? b))
+         (not (url-rooted-tmfs? b))
+         (url-exists? b)
+         (not (url-descends? dir (get-texmacs-path)))
+         (folder-writable? dir)
+         dir)))
+
+(tm-define (slashes-of-name s)
+  (string-replace s "\\" "/"))
+
+(tm-define (image-name-for-program u)
+  ;; the absolute name of @u for LaTeX (and HTML), with slashes on Windows too;
+  ;; url->unix would drop the colon of the drive (/D/a/b)
+  (slashes-of-name (url->system u)))
+
+(define (clipboard-image-names key suffix)
+  (let* ((dir (document-folder))
+         (folder (or dir (string->url "$TEXMACS_HOME_PATH/system/images")))
+         (id (list 'tuple (url->string (current-buffer)) key))
+         (name (string-append "image-" (tree-hash (tm->tree id)) suffix))
+         (u (url-append folder name))
+         (s (if dir name (image-name-for-program u))))
+    (when (not (url-exists? folder)) (system-mkdir folder))
+    (set-message `(concat "Image of the copy: " (verbatim ,(url->system u)))
+                 "Copy")
+    (values u s)))
+
+(define loose-image-serial 0)
+
+(tm-define (loose-image-names key suffix)
+  ;; the url and the name in the text of an image with the given @suffix, for
+  ;; a conversion without target; @key identifies the content
+  (if copying-to-clipboard?
+      (clipboard-image-names key suffix)
+      (begin
+        (set! loose-image-serial (+ loose-image-serial 1))
+        (with u (url-append (url-temp-dir)
+                            (string-append "image-"
+                                           (number->string loose-image-serial)
+                                           suffix))
+          (if (url-exists? u)
+              (loose-image-names key suffix)
+              (values u (image-name-for-program u)))))))
+
 (define (buffer-notify-recent name)
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))
 
@@ -171,6 +269,10 @@
 
 (define (save-buffer-save name opts)
   ;;(display* "save-buffer-save " name "\n")
+  (save-buffer-save* name opts)
+  (when (shared-files-in-use?) (shared-file-saved name)))
+
+(define (save-buffer-save* name opts)
   (with vname `(verbatim ,(utf8->cork (url->system name)))
     (if (buffer-save name)
         (begin
@@ -178,6 +280,7 @@
           (set-message `(concat "Could not save " ,vname) "Save file"))
         (begin
           (if (== (url-suffix name) "ts") (style-clear-cache))
+          (typeset-failure-forget name)
           (autosave-remove name)
           (buffer-notify-recent name)
           (set-message `(concat "Saved " ,vname) "Save file")
@@ -205,10 +308,72 @@
            #t)
           (else #f))))
 
+;; Shared files (utils relate shared-files): when the preference "share-open-files"
+;; is on, a file open in another TeXmacs process of the user is joined instead
+;; of read, and only the host of a shared file writes it. The module is loaded
+;; when a file is first shared; until then these hooks cost nothing.
+(define-preferences
+  ("share-open-files" "on" noop))
+
+(define (shared-participant? name)
+  (and (shared-files-in-use?) (shared-file-participant? name)))
+
+;; The typesetting of a buffer which failed (edit_typeset_rep::typeset_sub):
+;; the document was replaced by an empty one, and a copy of it saved in
+;; $TEXMACS_HOME_PATH/system/recovered (a copy is never overwritten). Saving
+;; the buffer over its file would replace the file by what is left, so that
+;; it is asked first (the flag, see typeset-failed-buffer? in tm-server.scm).
+
+(define (recovered-file-name dir tail)
+  ;; names of ASCII letters and digits only (a name of the buffer with
+  ;; accents is a string of bytes, of which some are letters and some not),
+  ;; of at most 80 characters for the buffer
+  (let* ((ok? (lambda (c)
+                (and (< (char->integer c) 128)
+                     (or (char-alphabetic? c) (char-numeric? c)
+                         (in? c '(#\. #\-))))))
+         (clean (lambda (str)
+                  (list->string
+                   (map (lambda (c) (if (ok? c) c #\_))
+                        (string->list str)))))
+         (short (lambda (str)
+                  (if (> (string-length str) 80) (substring str 0 80) str)))
+         (base (string-append (clean (pretty-time (current-time))) "-"
+                              (let* ((t (short (clean tail))))
+                                (if (== t "") "buffer" t))))
+         (base (if (== (url-suffix base) "tm") base (string-append base ".tm"))))
+    (let try ((k 1))
+      (let* ((name (if (== k 1) base
+                       (string-append (substring base 0 (- (string-length base) 3))
+                                      "-" (number->string k) ".tm")))
+             (file (url-append dir name)))
+        (if (url-exists? file) (try (+ k 1)) file)))))
+
+(tm-define (typeset-failure-recover name msg)
+  (:synopsis "Save the document of a buffer whose typesetting failed")
+  (typeset-failure-flag name)
+  (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
+         (export (lambda (tail)
+                   (with file (recovered-file-name dir tail)
+                     (and (catch #t
+                            (lambda ()
+                              (system-mkdir dir)
+                              (not (buffer-export name file "texmacs")))
+                            (lambda args #f))
+                          file))))
+         ;; (if the name of the buffer is not accepted, a plain one)
+         (file (or (export (url->string (url-tail name))) (export "buffer"))))
+    (set-message
+     `(concat "The document could not be typeset (" ,msg "), and was "
+              "replaced by an empty one. "
+              ,(if file
+                   `(concat "A copy was saved in " (verbatim ,(url->system file)) ".")
+                   "Its copy could not be saved: close it without saving."))
+     "Typesetting failure")
+    (and file (url->system file))))
+
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
-  (set! current-save-source name)
-  (set! current-save-target name)
   (with vname `(verbatim ,(url->system name))
     (cond ((url-scratch? name)
            (choose-file
@@ -224,6 +389,13 @@
            (save-buffer-post name opts))
           ((cannot-write? name "Save file")
            (noop))
+          ((and (typeset-failed-buffer? name) (nin? :typeset-failed opts))
+           (user-confirm "The document could not be typeset and was replaced by an empty one. Really save it over the file?" #f
+             (lambda (answ)
+               (when answ
+                 ;; (the flag is cleared by the save)
+                 (save-buffer-check-permissions
+                  name (cons :typeset-failed opts))))))
           ((and (url-test? name "fr")
                 (and-with mod-t (url-last-modified name)
                   (and-with save-t (buffer-last-save name)
@@ -236,9 +408,17 @@
 
 (tm-define (save-buffer-main . args)
   ;;(display* "save-buffer-main\n")
-  (if (or (null? args) (not (url? (car args))))
-      (save-buffer-check-permissions (current-buffer) args)
-      (save-buffer-check-permissions (car args) (cdr args))))
+  (let* ((name (if (or (null? args) (not (url? (car args))))
+                   (current-buffer)
+                   (car args)))
+         (opts (if (or (null? args) (not (url? (car args)))) args (cdr args))))
+    (cond ((and (shared-files-in-use?) (shared-file-save-request name))
+           ;; another process hosts the file: it writes it
+           (noop))
+          ((shared-file-save-guard name)
+           ;; a live TeXmacs holds the file and this buffer is not its participant
+           (noop))
+          (else (save-buffer-check-permissions name opts)))))
 
 (tm-define (save-buffer . l)
   (apply save-buffer-main l))
@@ -249,6 +429,7 @@
 
 (define (save-buffer-as-save new-name name opts)
   ;;(display* "save-buffer-as-save " new-name ", " name "\n")
+  (when (shared-files-in-use?) (shared-file-leave name))
   (if (and (url-scratch? name) (url-exists? name)) (system-remove name))
   (buffer-rename name new-name)
   (buffer-pretend-modified new-name)
@@ -278,6 +459,8 @@
   ;;(display* "save-buffer-as-check-permissions " new-name ", " name "\n")
   (cond ((os-android?)
          (save-buffer-as-check-other new-name name opts))
+        ((shared-file-save-guard new-name)
+         (noop))
         ((cannot-write? new-name "Save file")
          (noop))
         ((and (url-test? new-name "f") (nin? :overwrite opts))
@@ -286,11 +469,28 @@
              (when answ (save-buffer-as-check-other new-name name opts)))))
         (else (save-buffer-as-check-other new-name name opts))))
 
+(define (save-name-with-suffix new-name name)
+  ;; a document of TeXmacs saved under a name without a suffix is given .tm:
+  ;; it was saved as plain text, the format which a name without a suffix
+  ;; has (#400); a source file keeps the name it is given (a Makefile)
+  (let ((u (if (url? new-name) new-name (system->url new-name))))
+    (if (and (== (url-suffix u) "") (== (url-format name) "texmacs")
+             (not (url-directory? u)))
+        (url-glue u ".tm")
+        new-name)))
+
+(define (save-as-check-suffixed new-name name opts)
+  ;; the file dialog asked about replacing the file it gave (:overwrite),
+  ;; not the one with the suffix added: that one is asked about here
+  (with u (save-name-with-suffix new-name name)
+    (save-buffer-as-check-permissions
+     u name (if (== u new-name) opts (list-difference opts (list :overwrite))))))
+
 (tm-define (save-buffer-as-main new-name . args)
   ;;(display* "save-buffer-as-main " new-name "\n")
   (if (or (null? args) (not (url? (car args))))
-      (save-buffer-as-check-permissions new-name (current-buffer) args)
-      (save-buffer-as-check-permissions new-name (car args) (cdr args))))
+      (save-as-check-suffixed new-name (current-buffer) args)
+      (save-as-check-suffixed new-name (car args) (cdr args))))
 
 (tm-define (save-buffer-as new-name . args)
   (:argument new-name texmacs-file "Save as")
@@ -308,13 +508,27 @@
 (define (export-buffer-export name to fm opts)
   ;;(display* "export-buffer-export " name ", " to ", " fm "\n")
   (with vto `(verbatim ,(url->system to))
-    (if (buffer-export name to fm)
-        (set-message `(concat "Could not save " ,vto) "Export file")
-        (set-message `(concat "Exported to " ,vto) "Export file"))))
+    (image-write-failures-reset)
+    (let* ((failed? (buffer-export name to fm))
+           (images (image-write-failures)))
+      (image-write-failures-reset)
+      (cond (failed?
+             (set-message `(concat "Could not save " ,vto) "Export file"))
+            ((nnull? images)
+             ;; the text is there, but it names images which are not (#705)
+             (with vim `(verbatim ,(url->system (car images)))
+               (set-message `(concat "Exported to " ,vto
+                                     ", but an image could not be written: "
+                                     ,vim)
+                            "Export file")))
+            (else
+             (set-message `(concat "Exported to " ,vto) "Export file"))))))
 
 (define (export-buffer-check-permissions name to fm opts)
   ;;(display* "export-buffer-check-permissions " name ", " to ", " fm "\n")
-  (cond ((cannot-write? to "Export file")
+  (cond ((shared-file-save-guard to)
+         (noop))
+        ((cannot-write? to "Export file")
          (noop))
         ((and (url-test? to "f") (nin? :overwrite opts))
          (user-confirm "File already exists. Really overwrite?" #f
@@ -328,8 +542,6 @@
     (set! to (string-replace to ":" "-"))
     (set! to (string-replace to ";" "-"))
     (set! to (url-relative (buffer-get-master name) to)))
-  (if (url? name) (set! current-save-source name))
-  (if (url? to) (set! current-save-target to))
   (export-buffer-check-permissions name to fm opts))
 
 (tm-define (export-buffer to)
@@ -388,6 +600,8 @@
 (tm-define (autosave-buffer name)
   ;;(display* "autosave-buffer " name "\n")
   (when (and (buffer-modified-since-autosave? name)
+             (not (shared-participant? name))
+             (not (typeset-failed-buffer? name))
              (url-autosave name "~"))
     ;;(display* "Autosave " name "\n")
     ;; FIXME: incorrectly autosaves after cursor movements only
@@ -464,7 +678,7 @@
                                           (url-unroot u)))
            (load-external u*)))
         ((defined? 'web-open-external)
-         ;; in the browser (TeXmacs Vue): a page of the web or a mail
+         ;; in the browser (TeXmacs Upsilon): a page of the web or a mail
          ;; address in the browser, a file of the page in its viewer
          (if (or (url-rooted-web? u) (url-rooted-protocol? u "mailto"))
              (web-open-external (url->string u) #f "")
@@ -486,6 +700,121 @@
 ;; Loading buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (encrypted-buffer-body? b)
+  (:synopsis "Is @b the body of a document encrypted with a passphrase?")
+  ;; the body is (document (gpg-passphrase-encrypted-buffer enc)), see
+  ;; tree-export-encrypted and encrypted-buffer? in security/gpg/gpg-edit.scm
+  ;; (a lazy module, not loaded here). Only the first child is tested: a
+  ;; search of the whole document took seconds on long documents, and its
+  ;; recursion overflowed the Guile stack (#418).
+  (and (tree? b)
+       (== (tree-label b) 'document)
+       (> (tree-arity b) 0)
+       (== (tree-label (tree-ref b 0)) 'gpg-passphrase-encrypted-buffer)))
+
+;; Large source files (#710). Opening a source-code or plain-text file costs
+;; about 7 KB of memory per line and a long first display: measured on
+;; Linux, Qt 5 offscreen, s7, upsilon with tree-sitter, the 19.8 MB parser.c
+;; (677,603 lines) peaks at 4.45 GB and takes 122 s to be displayed; the same
+;; text as .txt peaks at 3.2 GB and takes 72 s; a 1.5 MB minified JavaScript
+;; file takes 830 MB. From 5 MB the user is asked before the file is read.
+(tm-define large-source-file-size (* 5 1024 1024))
+
+;; The formats loaded as text: plain text ("generic" is also what a file with
+;; an unknown suffix gets) and source code. These are the formats of
+;; prog/prog-format.scm, of the plugins code, python, mathemagix, caas,
+;; octave and scilab (see the lazy-format lines of init-texmacs.scm), those
+;; which a branch does not have are ignored. A new source-code format must be
+;; added here. Not texmacs, latex, html, pdf, images... which are converted,
+;; and whose cost is not that of the lines of a text.
+(define large-source-formats
+  '("generic" "verbatim" "code" "scheme" "python" "mathemagix" "caas"
+    "octave" "scilab" "c" "cpp" "julia" "scala" "java" "javascript" "dot"
+    "json" "csv" "go" "lean" "lua" "rust" "typescript" "css" "toml" "yaml"
+    "ocaml" "haskell" "shell"))
+
+(tm-define (large-source-file? size fm)
+  (:synopsis "Is a file of @size bytes in the format @fm a large source file?")
+  (and (integer? size) (string? fm)
+       (>= size large-source-file-size)
+       (in? fm large-source-formats)))
+
+;; Set while the thunk of an answered question runs, so that the loads inside
+;; it do not ask again
+(define large-load-confirmed? #f)
+
+;; Set by the tests, which run without a window, to be asked as if there
+;; was one: #t, or the procedure (prompt default cont) which asks in place of
+;; user-confirm. (A first version stubbed user-confirm itself with with-global
+;; in the editing checks; on the Vue/s7 binary that run hung in the group, the
+;; stub apparently not reached; the hook does not depend on that.)
+(tm-define large-load-test-interactive? #f)
+(tm-define (set-large-load-test-interactive! flag)
+  (set! large-load-test-interactive? flag))
+
+(define (load-buffer-ask-large? name opts)
+  ;; only for the calls which ask for it (:confirm-large, from the menus,
+  ;; the dialog of File > Open, the links and the files opened by the
+  ;; system), never in a script, with -x, -c, in headless mode or when there
+  ;; is no window to ask in
+  (and (in? :confirm-large opts)
+       (not large-load-confirmed?)
+       (or large-load-test-interactive?
+           (and (not (headless?)) (> (places-number) 0)))
+       (not (url-rooted-web? name))
+       (not (url-rooted-tmfs? name))
+       (not (buffer-exists? name))
+       (url-test? name "f")
+       (large-source-file? (url-size name) (url-format name))))
+
+(tm-define (load-buffer-resolve-name name)
+  (if (and (not (url-exists? name))
+           (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
+      (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
+  (if (not (url-rooted? name))
+      (if (current-buffer)
+          (set! name (url-relative (current-buffer) name))
+          (set! name (url-append (url-pwd) name))))
+  name)
+
+(tm-define (large-load-question? name)
+  (:synopsis "Is the question of a large source file asked for @name?")
+  (and name (load-buffer-ask-large? (load-buffer-resolve-name name)
+                                    '(:confirm-large))))
+
+(tm-define (confirm-large-load name thunk)
+  (:synopsis "Call @thunk, after the question for a large source file @name")
+  ;; thunk runs at once when no question is needed (@name is not a large
+  ;; source file, or #f, or the call is not interactive), otherwise only in
+  ;; the answer yes: the question may be answered later (a footer prompt),
+  ;; so what has to follow the load belongs in the thunk. The loads in the
+  ;; thunk do not ask again.
+  (if (and name (load-buffer-ask-large? (load-buffer-resolve-name name)
+                                        '(:confirm-large)))
+      (let* ((name (load-buffer-resolve-name name))
+             (mb (quotient (+ (url-size name) 524288) 1048576))
+             (msg (replace "The file %1 is large (%2 MB). Opening it may take a long time and a lot of memory. Open it anyway?"
+                           (url->system name) (number->string mb))))
+        ;; answering no (or escape) leaves everything as it was
+        ((if (procedure? large-load-test-interactive?)
+             large-load-test-interactive?
+             user-confirm)
+         msg #f
+          (lambda (answ)
+            (when answ
+              (dynamic-wind
+                (lambda () (set! large-load-confirmed? #t))
+                thunk
+                (lambda () (set! large-load-confirmed? #f))))
+            ;; no value: the footer prints what the continuation returns
+            (noop))))
+      (thunk)))
+
+(define (load-buffer-confirm-large name opts k)
+  (if (in? :confirm-large opts)
+      (confirm-large-load name k)
+      (k)))
+
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
@@ -494,8 +823,8 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
-  (when (nnull? (select (buffer-get name)
-                        '(:* gpg-passphrase-encrypted-buffer)))
+  (when (shared-files-wanted? opts) (shared-file-opened name))
+  (when (encrypted-buffer-body? (buffer-get-body name))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
     (when (!= master name)
@@ -510,7 +839,9 @@
           ((url-exists? name)
            (if (buffer-load name)
                (set-message `(concat "Could not load " ,vname) "Load file")
-               (load-buffer-open name opts)))
+               (begin
+                 (typeset-failure-forget name)
+                 (load-buffer-open name opts))))
           (else
             (with uname (if (string? name) (string->url name) name)
               (buffer-set-body name '(document ""))
@@ -534,6 +865,18 @@
 
 (define (load-buffer-check-autosave name opts)
   ;;(display* "load-buffer-check-autosave " name ", " opts "\n")
+  (cond ((and (shared-files-wanted? opts) (shared-file-try-join name))
+         ;; another process has the file open: its document, not the file
+         (load-buffer-open name opts))
+        (else (load-buffer-check-autosave* name opts))))
+
+;; (:strict is the load of a batch conversion, texmacs -c: it converts the file
+;; on the disk and neither hosts nor joins)
+(define (shared-files-wanted? opts)
+  (and (== (get-preference "share-open-files") "on")
+       (nin? :strict opts)))
+
+(define (load-buffer-check-autosave* name opts)
   (if (and (autosave-propose name) (nin? :strict opts))
       (with question (if (autosave-rescue? name)
                          "Rescue file from crash?"
@@ -550,16 +893,44 @@
                 (load-buffer-check-permissions name opts)))))
       (load-buffer-check-permissions name opts)))
 
+(define (stree-wildcard? t)
+  (and (pair? t)
+       (or (== (car t) 'wildcard)
+           (list-or (map stree-wildcard? (cdr t))))))
+
+(tm-define (url-wildcard? u)
+  (:synopsis "Does the url @u contain a wildcard, a pattern like in a*.scm?")
+  ;; a name with a star which comes from a directory is a plain name, not
+  ;; a wildcard: a file a*b.scm can be loaded
+  (stree-wildcard? (url->stree (if (string? u) (string->url u) u))))
+
+(define (load-buffer-wildcard name opts)
+  ;; A wildcard is not the name of a buffer (url-glue, for the names of the
+  ;; autosave files, can't glue to it, #790): the files which it matches are
+  ;; the candidates. None, or several, give a message and load nothing (a
+  ;; script which calls load-buffer can't answer a page of disambiguation);
+  ;; one is loaded as if it had been named. Nothing is resolved before: the
+  ;; wildcards of the other roots (tmfs, web) are never completed.
+  (with l (link-wildcard-candidates name #f)
+    (cond ((null? l)
+           (set-message (replace "No file matches %1" (url->system name))
+                        "Load file"))
+          ((null? (cdr l))
+           (apply load-buffer-main (cons (car l) opts)))
+          (else
+            (set-message (replace "%1 files match %2, none is loaded"
+                                  (number->string (length l))
+                                  (url->system name))
+                         "Load file")))))
+
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
-  (if (and (not (url-exists? name))
-           (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
-      (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))
-  (if (not (url-rooted? name))
-      (if (current-buffer)
-          (set! name (url-relative (current-buffer) name))
-          (set! name (url-append (url-pwd) name))))
-  (load-buffer-check-autosave name opts))
+  (if (url-wildcard? name)
+      (load-buffer-wildcard name opts)
+      (begin
+        (set! name (load-buffer-resolve-name name))
+        (load-buffer-confirm-large name opts
+          (lambda () (load-buffer-check-autosave name opts))))))
 
 (tm-define (load-buffer name . opts)
   (:argument name smart-file "File name")
@@ -574,17 +945,55 @@
       (noop) ;;(place-focus (buffer->place name))
       (apply load-buffer-main (cons name (cons :new-place opts)))))
 
+;; The startup buffer which a file of the system is being loaded into: the
+;; load may wait for an answer (the autosave question, load-buffer-check-
+;; autosave), and a second file arriving meanwhile must not take the same
+;; buffer: the first would lose its window (#739).
+(define startup-reserved #f)
+
+;; only for the tests, which make many untitled buffers
+(define-public (startup-buffer-release)
+  (set! startup-reserved #f))
+
+(tm-define (startup-buffer? . l)
+  (:synopsis "Is the buffer still the untitled, unmodified one of the startup?")
+  (with b (if (null? l) (current-buffer) (car l))
+    (and b (buffer-exists? b)
+         (not (buffer-has-name? b))
+         (not (buffer-modified? b)))))
+
+(tm-define (load-buffer-from-system name)
+  (:synopsis "Load a file given by the system (the Finder, the Dock, open)")
+  ;; a large source file asks first (#710), before the startup buffer is
+  ;; taken or a window is made: no is the end, with nothing changed
+  (confirm-large-load name (lambda () (load-buffer-from-system* name))))
+
+(define (load-buffer-from-system* name)
+  ;; the untitled, unmodified buffer of the startup is replaced by the first
+  ;; file, as the user did not touch it; any other file gets a window of its
+  ;; own, not the one the user is working in (#739). The test is made when
+  ;; the command runs, so several files given at once go one after the other:
+  ;; the first takes the startup buffer, which it reserves for the rest
+  ;; of the session (even if its load fails), the others get new windows.
+  (with b (current-buffer)
+    (if (and (startup-buffer?) (!= b startup-reserved)
+             (not (buffer->place name)))
+        (begin
+          (set! startup-reserved b)
+          (load-buffer name))
+        (load-buffer-in-new-place name))))
+
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
   (cond ((url-rooted-protocol? name "mailto") (load-external name))
         ((buffer-exists? name) (switch-to-buffer name))
         ((buffer-external? name) (load-external name))
-        ((url-rooted-web? (current-buffer)) (load-buffer name))
-        (else (load-buffer name))))
+        ((url-rooted-web? (current-buffer)) (load-buffer name :confirm-large))
+        (else (load-buffer name :confirm-large))))
 
 (tm-define (open-buffer)
   (:synopsis "Open a new file")
-  (choose-file load-buffer "Load file" ""))
+  (choose-file (lambda (u) (load-buffer u :confirm-large)) "Load file" ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reverting buffers
@@ -601,7 +1010,9 @@
           (with t (tree-import name (url-format name))
             (if (== t (tm->tree "error"))
                 (set-message "Error: file not found" "Revert buffer")
-                (buffer-set name t)))))))
+                (begin
+                  (typeset-failure-forget name)
+                  (buffer-set name t))))))))
 
 (tm-define (revert-buffer . l)
   (with name (if (null? l) (current-buffer) (car l))
@@ -654,7 +1065,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (open-in-place)
-  (choose-file load-buffer-in-new-place "Load file" ""))
+  (choose-file (lambda (u) (load-buffer-in-new-place u :confirm-large))
+               "Load file" ""))
 
 (tm-define (open-document)
   (if (place-per-buffer?) (open-in-place) (open-buffer)))

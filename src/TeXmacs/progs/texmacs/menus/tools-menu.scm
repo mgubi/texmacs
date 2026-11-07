@@ -40,6 +40,66 @@
               (reinit-plugin-cache))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Agents on a shared file (docs/mcp-server.md)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (agents-here?)
+  (and (shared-file? (current-buffer))
+       (nnull? (shared-file-agents (current-buffer)))))
+
+(define (pending-proposals)
+  (list-filter (or (shared-proposals (current-buffer)) '())
+               (lambda (e) (== (cadr e) "pending"))))
+
+(define (short-agent id)
+  ;; "agent.1234.xxxx.1" -> "agent 1234"
+  (let ((l (string-tokenize-by-char id #\.)))
+    (if (and (pair? l) (pair? (cdr l)) (== (car l) "agent"))
+        (string-append "agent " (cadr l))
+        (if (and (pair? l) (pair? (cdr l))) (string-append "program " (car l)) id))))
+
+(define (agent-label id)
+  ;; the id does not say much: add the process id and its command line
+  (let ((i (shared-file-agent-info (current-buffer) id)))
+    (if i
+        (string-append (short-agent id) " (pid " (number->string (car i))
+                       (if (cadr i) (string-append ": " (cadr i)) "") ")")
+        (short-agent id))))
+
+(define (unmarked-agents)
+  ;; the participants taken for agents although they do not say so
+  (list-filter (shared-file-agents (current-buffer))
+               (lambda (id) (not (shared-agent-id? id)))))
+
+(tm-menu (agents-menu)
+  ((check "Propose edits (I accept or reject them)" "v"
+          (== (shared-agent-mode (current-buffer)) 'propose))
+   (shared-set-agent-mode! (current-buffer) 'propose))
+  ((check "Let them edit directly" "v"
+          (== (shared-agent-mode (current-buffer)) 'direct))
+   (shared-set-agent-mode! (current-buffer) 'direct))
+  ((check "Read only (refuse their edits)" "v"
+          (== (shared-agent-mode (current-buffer)) 'read-only))
+   (shared-set-agent-mode! (current-buffer) 'read-only))
+  ---
+  (for (id (unmarked-agents))
+    (when #t
+      ((eval (string-append "Treat " (agent-label id) " as a person"))
+       (shared-treat-as-person! (current-buffer) id #t))))
+  ---
+  (for (e (pending-proposals))
+    (-> (eval (string-append "Proposal " (car e) " (" (short-agent (cadddr e)) "): " (list-ref e 4)))
+        ("Accept" (shared-proposal-resolve! (current-buffer) (car e) 'new))
+        ("Reject" (shared-proposal-resolve! (current-buffer) (car e) 'old))))
+  (when (nnull? (pending-proposals))
+    ("Accept all"
+     (for-each (lambda (e) (shared-proposal-resolve! (current-buffer) (car e) 'new))
+               (pending-proposals)))
+    ("Reject all"
+     (for-each (lambda (e) (shared-proposal-resolve! (current-buffer) (car e) 'old))
+               (pending-proposals)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Tools menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -55,6 +115,7 @@
       ("French" (set-preference "speech" "french")))
   ---
   (-> "Update"
+      ("Help" (help-caches-update))
       ("Inclusions" (inclusions-gc))
       ("Pictures" (picture-gc))
       ("Plugins" (reinit-plugin-cache))
@@ -64,6 +125,9 @@
           (link tmtex-menu)))
   (-> "References"
       (link ref-menu))
+  (if (defined? 'lsp-start)
+      (-> "Language servers"
+          (link lsp-menu)))
   (if supports-email?
       (-> "Email"
           ("Open mailbox" (email-open-mailbox))
@@ -72,6 +136,9 @@
           ("Pop server settings" (interactive email-settings))))
   (-> "Project"
       (link project-manage-menu))
+  (if (agents-here?)
+      (-> "Agents"
+          (link agents-menu)))
   (-> "Statistics"
       ("Count characters" (show-character-count))
       ("Count words" (show-word-count))

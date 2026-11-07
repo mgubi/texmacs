@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeXmacs Upsilon</title>
+<!-- the downloads are now the main page of the site, index.html: the old
+     address goes there, with its #section -->
+<meta http-equiv="refresh" content="0; url=./#downloads">
+<script>location.replace ('./' + (location.hash || '#downloads'));</script>
+<style>
+  :root { --bg: #f6f6f4; --text: #1d1d1f; --accent: #0b5cad; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #18181a; --text: #ececee; --accent: #7db4ff; } }
+  :root[data-theme="dark"] { --bg: #18181a; --text: #ececee; --accent: #7db4ff; }
+  body { margin: 0; padding: 32px 16px; background: var(--bg); color: var(--text);
+         font: 16px/1.5 -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<p>The downloads are on the <a href="./#downloads">main page of TeXmacs Upsilon</a>.</p>
+</body>
+</html>

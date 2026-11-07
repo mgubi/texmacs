@@ -68,7 +68,9 @@ copy_bst_file (url base, string style) {
   string bst= style * ".bst";
   url u1= url ("$TEXMACS_HOME_PATH/system/bib", bst);
   url u2= relative (base, bst);
-  if (!exists (u1) && exists (u2)) copy (u2, u1);
+  if (exists (u2) &&
+      (!exists (u1) || last_modified (u2, false) > last_modified (u1, false)))
+    copy (u2, u1);
 }
 
 url
@@ -178,6 +180,7 @@ edit_process_rep::generate_bibliography (
       if (bib_t[i] == "*") star= true;
     if (!bibtex_present () && !starts (style, "tm-") && !csl) {
       if (style == "abbrv") style= "tm-abbrv";
+      else if (style == "abstract") style= "tm-abstract";
       else if (style == "acm") style= "tm-acm";
       else if (style == "alpha") style= "tm-alpha";
       else if (style == "elsart-num") style= "tm-elsart-num";
@@ -230,7 +233,9 @@ edit_process_rep::generate_bibliography (
     if (supports_db ())
       (void) call (string ("bib-attach"), bib, bib_t, bib_file, xbib_file);
     if (uses_natbib (t) && !defined_at_init ("cite-author-year-package")) {
-      tree st= get_style ();
+      // (a copy: << appends in place, and change_style would then find the
+      // style unchanged and give it to no other view, #535)
+      tree st= copy (get_style ());
       if (is_atomic (st)) st= tuple (st);
       bool missing= true;
       for (int i=0; i<N(st); i++)
@@ -498,7 +503,8 @@ edit_process_rep::generate_index (string idx) {
     locale_less_eq_operator::le= get_std_locale (get_init_string ("language"));
 #else
     locale_less_eq_operator::locale_name = language_to_locale (get_init_string ("language"));
-    locale_less_eq_operator::locale_name[2] = '-';
+    if (N (locale_less_eq_operator::locale_name) > 2)
+      locale_less_eq_operator::locale_name[2] = '-';
 #endif
     merge_sort_leq<string,locale_less_eq_operator> (entry);
 #else

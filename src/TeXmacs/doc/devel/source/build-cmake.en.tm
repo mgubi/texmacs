@@ -227,10 +227,6 @@
     <verbatim|config.h> is the <name|CMake> one. Remove the generated files
     from <source-link|src/System|src/System> (or use a separate checkout) before
     switching build systems.
-
-    <item>The helper files <source-link|cmake/CreateBundle.sh.in|cmake/CreateBundle.sh.in> and
-    <source-link|cmake/CompleteBundle.cmake.in|cmake/CompleteBundle.cmake.in> are not referenced by any
-    <name|CMake> file; they are leftovers of an older bundle procedure.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

@@ -30,6 +30,7 @@
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Ключ только для чтения создаётся на https://www.zotero.org/settings/keys")
 ("abbreviation" "сокращение")
 ("about" "о")
+("add a bibliography with a BibTeX file to %1" "Добавьте в %1 библиографию с файлом BibTeX")
 ("add the references of Zotero to the BibTeX file" "добавлять ссылки из Zotero в файл BibTeX")
 ("added %1 reference from Zotero to %2" "Добавлена ссылка из Zotero в %2 (%1)")
 ("added %1 references from Zotero to %2" "Добавлено ссылок из Zotero в %2: %1")

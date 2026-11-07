@@ -46,6 +46,12 @@ protected:
   double        magf;          // the current magnification factor
   SI            pixel;         // current size of a pixel on the screen
   SI            zpixel;        // pixel multiplied by zoom factor
+  time_t        zoom_time;     // when the zoom last changed (0: at start)
+  bool          zoom_waiting;  // the layout still has the previous zoom
+  double        zoom_shown;    // the zoom the waiting layout is drawn at
+  path          zoom_anchor;   // the text in the middle of the view, which
+  SI            zoom_anchor_dx;// stays there when the layout of the zoom
+  SI            zoom_anchor_dy;// comes (its offset from the middle)
   rectangles    copy_always;   // for wiping out cursor
   int           input_mode;    // INPUT_NORMAL, INPUT_SEARCH, INPUT_REPLACE
 
@@ -66,7 +72,12 @@ protected:
   array<path>       user_cursor_paths;
   array<string>     user_cursor_colors;
   array<string>     user_cursor_names;
+  array<rectangle>  user_cursor_rects; // where each was drawn last, if it was
   array<rectangles> spell_error_rects;
+  // the diagnostics of program code (alt selections code-errors...),
+  // underlined in their colors
+  array<rectangles> diagnostic_rects;
+  array<color>      diagnostic_colors;
   rectangle     last_visible;
   rectangle     last_extents;
   rectangles    env_rects;
@@ -102,6 +113,7 @@ public:
 
   /* routines for dealing with shrinked coordinates */
   int  get_pixel_size ();
+  rectangle visible_part ();
   SI   get_visible_width ();
   SI   get_visible_height ();
   SI   get_window_width ();
@@ -129,6 +141,9 @@ public:
   void draw_context (renderer ren, rectangle r);
   void draw_env (renderer ren);
   void draw_cursor (renderer ren);
+  bool user_cursor_shape (int i, font& fn, string& name, SI& x1, SI& y1,
+                          SI& x2, SI& y2, SI& fw, SI& fh);
+  void invalidate_user_cursor (int i);
   void draw_user_cursors (renderer ren);
   void set_user_cursor (string id, path p, string col, string name);
   void cancel_user_cursor (string id);
@@ -148,7 +163,9 @@ public:
   int  change_time ();
   void update_menus ();
   int  find_alt_selection_index (range_set alt_sel, SI y, int b, int e);
+  void update_diagnostic_rects (rectangle new_visible);
   void apply_changes ();
+  void apply_pending_changes ();
   void animate ();
 
   /* miscellaneous */
@@ -190,6 +207,7 @@ public:
   void mouse_any (string s, SI x, SI y, int m, time_t t, array<double> d);
   bool mouse_message (string message, SI x, SI y);
   color mouse_clickable_color ();
+  path  xy_to_path (SI x, SI y);
   void mouse_click (SI x, SI y);
   bool mouse_extra_click (SI x, SI y);
   void mouse_drag (SI x, SI y);
@@ -229,6 +247,9 @@ public:
   void handle_keyboard_focus (bool has_focus, time_t t);
   void handle_mouse (string k, SI x, SI y, int m, time_t t, array<double> d);
   void handle_set_zoom_factor (double zoomf);
+  bool zoom_defers ();
+  void zoom_anchor_take ();
+  void zoom_anchor_keep ();
   void handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2);
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2);
 

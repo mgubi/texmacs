@@ -20,7 +20,20 @@
 
 ;(display "Booting utilities\n")
 (use-modules (utils library cpp-wrap))
-(lazy-define (utils library cursor) notify-cursor-moved)
+(lazy-define (utils library cursor) notify-cursor-moved notify-undo-redo)
+(lazy-define (treesit ts-highlight)
+             treesit-highlighter-request treesit-schedule-updates)
+(lazy-define (utils library cursor) notify-buffer-changed)
+;; the features of program code (src/docs/code-features.md): the folds
+(lazy-define (code code-fold) code-cursor-in-fold code-fold code-unfold
+             code-fold-all code-unfold-all code-folds code-fold-lines
+             code-unfold-lines code-hidden? code-can-fold? code-cursor-lines)
+(lazy-define (code code-navigate) code-go-to-definition code-outline
+             code-outline-entries code-go-to)
+(lazy-menu (code code-navigate) code-definitions-menu)
+(lazy-define (code code-diagnostics) code-next-diagnostic code-set-diagnostics
+             code-clear-diagnostics code-diagnostics code-check-syntax)
+(lazy-define (utils library cursor) notify-buffer-closed)
 (lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
@@ -35,6 +48,7 @@
 (lazy-tmfs-handler (utils automate auto-tmfs) automate)
 (lazy-define (utils automate auto-tmfs) auto-load-help)
 (lazy-define (utils misc gui-keyboard) get-keyboard)
+(lazy-define (utils misc file-chooser) open-file-chooser)
 (lazy-keyboard (utils automate auto-kbd) in-auto?)
 (define supports-email? (url-exists-in-path? "mmail"))
 (if supports-email? (use-modules (utils email email-tmfs)))
@@ -46,7 +60,8 @@
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
 (lazy-define (csl csl-bib) csl-style-name? csl-available-styles
-             csl-bib-process)
+             csl-bib-process csl-cite-details csl-textual-authors)
+(lazy-define (csl csl-style) csl-style-file csl-language->locale)
 (lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
              zotero-before-update zotero-managed-file?
              zotero-completion-suffixes zotero-citation-entry
@@ -192,15 +207,22 @@
 
 ;(display "Booting programming modes\n")
 (lazy-format (prog prog-format) scheme)
-(lazy-format (code-format) cpp julia scala java javascript dot json csv)
+(lazy-format (code-format) c cpp julia scala java javascript dot json csv
+             go lean lua rust typescript css toml yaml ocaml haskell shell)
 (lazy-format (mathemagix-format) mathemagix)
 (lazy-format (caas-format) caas)
 (lazy-format (python-format) python)
 (lazy-format (octave-format) octave)
 (lazy-format (scilab-format) scilab)
 (lazy-keyboard (prog prog-kbd) in-prog?)
-(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
-	   prog-menu prog-icons)
+;; the language servers follow the source files (preference "lsp"), when
+;; they are part of the build (their glue)
+(when (defined? 'lsp-start)
+  (lazy-keyboard (lsp lsp-kbd) in-prog?)
+  (lazy-menu (lsp lsp-kbd) lsp-menu)
+  (when (!= (get-preference "lsp") "off")
+    (delayed (:idle 1000) (module-provide '(lsp lsp-kbd)))))
+(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -244,6 +266,8 @@
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)
+(lazy-menu (graphics graphics-menu) graphics-insert-menu graphics-focus-menu)
+(lazy-define (graphics graphics-group) graphics-selection-active?)
 (lazy-define (graphics graphics-utils) make-graphics)
 (lazy-define (graphics graphics-edit)
              graphics-busy?
@@ -279,8 +303,7 @@
            graphics-overlays-menu graphics-screens-menu
            graphics-focus-overlays-menu graphics-focus-overlays-icons)
 (lazy-menu (dynamic session-menu) insert-session-menu session-help-icons)
-(lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu
-           plugin-eval-menu plugin-eval-toggle-menu plugin-plot-menu)
+(lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu)
 (lazy-menu (dynamic calc-menu) calc-table-menu calc-insert-menu
            calc-icourse-menu)
 (lazy-menu (dynamic animate-menu) insert-animation-menu animate-toolbar)
@@ -310,6 +333,7 @@
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src
              docgrep-in-texts docgrep-in-recent)
+(lazy-define (doc help-funcs) help-caches-update)
 (lazy-define (doc tmdoc-search) tmdoc-search-style tmdoc-search-tag
              tmdoc-search-parameter tmdoc-search-scheme)
 (lazy-define (doc tmweb) youtube-select
@@ -356,6 +380,15 @@
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
+;(display "Booting shared files\n")
+(lazy-define (utils relate shared-files) shared-file-try-join shared-file-opened
+             shared-file-leave shared-file-participant? shared-file-save-request
+             shared-file-saved shared-file? shared-file-info shared-files-list
+             shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use shared-set-agent! shared-agent? shared-agent-id? shared-file-stat shared-collect-mark shared-collect-restore!
+             shared-agent-mode shared-set-agent-mode! shared-file-agents shared-proposals shared-proposal-resolve! shared-file-send-withdraw shared-file-verdict shared-changed-blocks shared-file-gate-stats shared-treat-as-person! shared-file-save-refused shared-file-not-joined shared-file-not-joined-stale? shared-file-held-elsewhere? shared-file-save-guard shared-file-footer-text shared-agents-focus? shared-agent-short shared-agent-connection shared-agent-connection-text shared-agents-focus-text shared-agent-check-connection shared-agent-check-report shared-agent-last-check shared-file-pending-count shared-proposal-at-cursor shared-proposal-go! shared-proposal-resolve-all! shared-proposal-resolve-here! shared-file-agent-info shared-sanitize-patch shared-test-send-peers! shared-body-patch shared-patch-acceptable?)
+(lazy-define (version version-compare) compare-versions version-normalize)
+;(display "Booting the MCP server\n")
+(lazy-define (agents mcp-server) mcp-server-start mcp-handle-line mcp-filter-unknown-names mcp-host-check mcp-stree-arity-ok?)
 ;(display "Booting partial document facilities\n")
 (lazy-define (part part-shared) buffer-initialize buffer-notify)
 (lazy-menu (part part-menu) document-master-menu)
@@ -369,7 +402,8 @@
 (lazy-define (database db-convert) db-url?)
 (lazy-define (database bib-db) zealous-bib-import zealous-bib-export)
 (lazy-define (database bib-manage)
-             bib-import-bibtex bib-compile bib-attach open-bib-chooser)
+             bib-import-bibtex bib-compile bib-attach open-bib-chooser
+             bib-entries-as-bibtex)
 (lazy-define (database bib-local) open-biblio)
 (lazy-define (database ai-agents-db) ai-agents-get-corrector
 	     ai-agents-get-interlocutor ai-agents-get-translator
@@ -378,6 +412,7 @@
 (lazy-define (database ai-agents-menu) open-ai-agents in-ai-agents?)
 (lazy-menu (database db-menu) db-menu db-toolbar)
 (lazy-tmfs-handler (database db-tmfs) db)
+(lazy-tmfs-handler (database bib-local) biblio)
 (lazy-keyboard (database bib-kbd) in-bib?)
 (tm-property (open-biblio) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -422,7 +457,7 @@
 (lazy-keyboard (link link-kbd) with-linking-tool?)
 (lazy-define (link link-edit) create-unique-id)
 (lazy-define (link link-navigate) link-active-upwards link-active-ids
-             link-follow-ids link-mouse-ids)
+             link-follow-ids link-mouse-ids link-wildcard-candidates)
 (lazy-define (link link-extern) get-constellation
              get-link-locations register-link-locations)
 (lazy-menu (link ref-menu) ref-menu)
@@ -454,6 +489,18 @@
                                                (current-buffer)) ".git")))
                 (git-footer t*)
                 t*)))))
+;; The footer says that the file is shared (nothing is computed while no file
+;; is: shared-files-in-use? is a flag)
+(with previous footer-hook
+  (set! footer-hook
+        (lambda (t)
+          (with t* (previous t)
+            (if (shared-files-in-use?)
+                (with s (shared-file-footer-text (current-buffer))
+                  (if s
+                      (stree->tree `(concat ,(tree->stree t*) "     " ,s))
+                      t*))
+                t*)))))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -475,8 +522,10 @@
 (lazy-define (tools spell spell-lantool) lantool-server supports-lantool?
 	     lantool-check)
 (lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
+(define-secure-symbols update-correct-widget)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
+(lazy-define (tools ai ai-compress) with-compress-table compress-table-callback)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

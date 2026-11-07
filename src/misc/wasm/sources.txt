@@ -148,6 +148,7 @@ Graphics/Fonts/superposed_font.cpp
 Graphics/Fonts/translator.cpp
 Graphics/Fonts/virtual_enhance.cpp
 Graphics/Fonts/virtual_font.cpp
+Graphics/Gui/gui_test.cpp
 Graphics/Gui/widget.cpp
 Graphics/Handwriting/learn_handwriting.cpp
 Graphics/Handwriting/poly_line.cpp
@@ -225,6 +226,7 @@ Plugins/Freetype/tt_font.cpp
 Plugins/Freetype/tt_tools.cpp
 Plugins/Freetype/unicode_font.cpp
 Plugins/Freetype/unicode_math_font.cpp
+Plugins/Html_math/html_math.cpp
 Plugins/Ghostscript/ghostscript.cpp
 Plugins/Ghostscript/gs_utilities.cpp
 Plugins/Gnutls/gnutls.cpp
@@ -250,6 +252,13 @@ Plugins/MuPDF/mupdf_writet1.c
 Plugins/Openssl/openssl.cpp
 Plugins/Resvg/resvg.cpp
 Plugins/Sqlite3/sqlite3.cpp
+Plugins/TreeSitter/syntax_region.cpp
+Plugins/TreeSitter/tree_sitter_glue.cpp
+Plugins/TreeSitter/tree_sitter_lib.c
+Plugins/TreeSitter/ts_dynamic.c
+Plugins/TreeSitter/ts_highlight.cpp
+Plugins/TreeSitter/ts_tables.cpp
+Plugins/TreeSitter/ts_xz.c
 Plugins/Unix/unix_entrypoint.cpp
 Plugins/Unix/unix_server_log.cpp
 Plugins/Unix/unix_stacktrace.cpp
@@ -259,6 +268,7 @@ Plugins/Updater/tm_updater.cpp
 Plugins/Updater/tm_winsparkle.cpp
 Plugins/Vue/clay.c
 Plugins/Vue/gpu_backend_gl.cpp
+Plugins/Vue/gpu_backend_wg.cpp
 Plugins/Vue/vue_gpu.cpp
 Plugins/Vue/vue_gui.cpp
 Plugins/Vue/vue_widget.cpp
@@ -266,6 +276,7 @@ Scheme/S7/s7.c
 Scheme/S7/s7_tm.cpp
 Scheme/Scheme/glue.cpp
 Scheme/Scheme/object.cpp
+System/Boot/build_revision.cpp
 System/Boot/init_texmacs.cpp
 System/Boot/init_upgrade.cpp
 System/Boot/preferences.cpp
@@ -298,6 +309,11 @@ System/Language/verb_language.cpp
 System/Link/cmdline_link.cpp
 System/Link/connection.cpp
 System/Link/dyn_link.cpp
+System/Link/local_link.cpp
+System/Link/mcp_stdio.cpp
+System/Link/lsp_link.cpp
+System/Language/code_lines.cpp
+System/Language/code_regions.cpp
 System/Link/pipe_link.cpp
 System/Link/request_link.cpp
 System/Link/socket_contact.cpp
@@ -307,11 +323,13 @@ System/Link/texmacs_server.cpp
 System/Link/tm_link.cpp
 System/Link/tm_sockets.cpp
 System/Link/websocket_contact.cpp
+System/Link/windows_process.cpp
 System/Link/worker_link.cpp
 System/Misc/data_cache.cpp
 System/Misc/fakedlopen.c
 System/Misc/fast_alloc.cpp
 System/Misc/persistent.cpp
+System/Misc/stack_guard.cpp
 System/Misc/sys_utils.cpp
 Texmacs/Data/new_buffer.cpp
 Texmacs/Data/new_project.cpp

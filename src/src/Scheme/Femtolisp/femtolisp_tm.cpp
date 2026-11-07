@@ -94,11 +94,21 @@ eval_scheme_file (string file) {
   return call_scheme (load, string_to_tmscm (file));
 }
 
+static int caught_errors= 0;
+
+int
+scheme_caught_errors () {
+  // the number of errors caught so far by fltm_apply and fltm_eval_string,
+  // which then give the error as their result: a caller can tell that an
+  // empty result comes from an error (#705)
+  return caught_errors;
+}
+
 tmscm
 eval_scheme (string s) {
   tmscm r;
   c_string _s (s);
-  fltm_eval_string (_s, N(s), &r.v);
+  if (fltm_eval_string (_s, N(s), &r.v)) caught_errors++;
   return r;
 }
 
@@ -109,7 +119,7 @@ eval_scheme (string s) {
 static tmscm
 apply_scheme (tmscm fun, tmscm args) {
   tmscm r;
-  fltm_apply (fun.v, args.v, &r.v);
+  if (fltm_apply (fun.v, args.v, &r.v)) caught_errors++;
   return r;
 }
 

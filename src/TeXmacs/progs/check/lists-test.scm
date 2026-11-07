@@ -501,12 +501,17 @@
     (check= (begin (save-object u v) (load-object u)) v)
     (check= (begin (save-object u '()) (load-object u)) '())
     (check= (begin (save-object u 7) (load-object u)) 7)
-    ;; FIXME (#307): on Windows the file of save-object stays open and
-    ;; cannot be removed (closing it breaks the next start)
-    (when (not (or (os-mingw?) (os-win32?)))
-      (system-remove u)
-      (check-false (url-exists? u))
-      (check= (load-object u) '()))))
+    ;; both close their file: TeXmacs keeps no descriptor of it
+    (when (and (not (or (os-mingw?) (os-win32?)))
+               (url-exists-in-path? "lsof"))
+      (check= (tm-string-trim-both
+               (eval-system
+                (string-append "lsof -a -p $PPID -d 0-999 2>/dev/null"
+                               " | grep -c " (url->system (url-tail u)))))
+              "0"))
+    (system-remove u)
+    (check-false (url-exists? u))
+    (check= (load-object u) '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Abbreviations: programming constructs

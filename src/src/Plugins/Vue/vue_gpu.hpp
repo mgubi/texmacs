@@ -29,6 +29,9 @@ bool vue_gpu_windows ();
 // the glyphs as the preferences say ("gpu glyphs"...): true when they
 // changed, and everything must be drawn again
 bool vue_gpu_follow_glyph_settings ();
+// when the GUI starts: the backend begins what takes time (the shaders of
+// Metal), while TeXmacs boots
+void vue_gpu_warm_up ();
 // before the first window is created: the attributes of its GL context
 void vue_gpu_prepare ();
 // draw into the window from now on (the backend makes the one, shared GL
@@ -38,16 +41,24 @@ bool vue_gpu_attach (SDL_Window* w);
 // a WebGL context of its own); false when it cannot
 bool vue_gpu_start ();
 void vue_gpu_present (SDL_Window* w);
+void vue_gpu_skip (SDL_Window* w);    // a frame drawn and not presented
 // attached, and presenting into the window would not wait for the screen
 // (Metal: the compositor does not hold too many of its frames); else the
 // window is drawn at a later turn of the loop
 bool vue_gpu_ready (SDL_Window* w);
+// whether a window found not ready is drawn when an event wakes the loop
+// up (Metal: the next refresh of its screen), rather than after a pause
+bool vue_gpu_wakes_when_ready ();
+// the window is about to be destroyed
+void vue_gpu_detach (SDL_Window* w);
 
 // the backing store of an editor: an opaque texture, white at first
 // (transparent: the canvases of Cocoa, transparent where not painted, as
 // their bitmaps were; the editors of Vue are opaque white)
 picture  gpu_backing_picture (int w, int h, bool transparent= false);
 bool     is_gpu_picture (picture p);
+// whether its texture is there (false: the GPU could not make it, too large)
+bool     gpu_picture_ready (picture p);
 renderer gpu_picture_renderer (picture p, double zoom);
 // shift the content of a backing store by (dpx, dpy) pixels (y down)
 void     gpu_translate_picture (picture p, int dpx, int dpy);

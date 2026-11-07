@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (doc tmweb)
-  (:use (texmacs texmacs tm-files)))
+  (:use (texmacs texmacs tm-files)
+        (convert html html-formulas)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selecting a video
@@ -58,7 +59,6 @@
 
 (define (tmweb-convert-file tm-file html-file)
   (with-aux tm-file
-    (if (url? html-file) (set! current-save-target html-file))
     (export-buffer-main (current-buffer) html-file "html" (list :overwrite))))
 
 (define (needs-update? src dest update?)
@@ -67,7 +67,7 @@
       (url-newer? src dest)))
 
 (define (tmweb-convert-file-dir file tm-dir html-dir update?)
-  (let* ((m? (== (get-preference "texmacs->html:mathml") "on"))
+  (let* ((m? (== (html-formulas) "mathml"))
 	 (u1 (url-delta (url-append tm-dir "dummy") file))
 	 (u2 (url-glue (url-unglue u1 2) (if m? "xhtml" "html")))
 	 (u3 (url-append html-dir u2))

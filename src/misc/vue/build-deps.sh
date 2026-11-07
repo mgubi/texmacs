@@ -57,6 +57,13 @@ cmake_common="-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$prefix
 
 if has sdl; then
   echo "== SDL3 $SDL3_VERSION"
+  # on Linux, SDL shows the file dialogs of the desktop portal through
+  # D-Bus, which it uses only when built with its headers (libdbus-1-dev):
+  # without them only zenity was left (#456)
+  if [ "$(uname -s)" = Linux ] && ! pkg-config --exists dbus-1; then
+    echo "error: SDL3 needs the headers of D-Bus (libdbus-1-dev) on Linux" >&2
+    exit 1
+  fi
   fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL3_VERSION/SDL3-$SDL3_VERSION.tar.gz" $SDL3_SHA256
   cmake -S . -B build $cmake_common -DSDL_SHARED=ON -DSDL_STATIC=OFF \
     -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
@@ -78,7 +85,10 @@ if has mupdf; then
   echo "== MuPDF $MUPDF_VERSION"
   # NOTE: with MinGW, MuPDF takes SSE for granted (_M_AMD64), and its SSE
   # 4.1 code needs the option (which Windows 11 has, SSE 4.2 even)
-  xcflags=-fPIC
+  # without the fonts which MuPDF builds in (some 30 MB of Noto, CJK, SIL,
+  # emoji...): TeXmacs typesets with its own fonts, and a PDF image whose
+  # fonts are not embedded keeps the base 14 ones (as misc/wasm/build-mupdf.sh)
+  xcflags="-fPIC -DTOFU -DTOFU_CJK -DTOFU_SIL -DTOFU_EMOJI -DTOFU_HISTORIC -DTOFU_SYMBOL"
   case "$(uname -s)" in MINGW*|MSYS*) xcflags="$xcflags -msse4.1";; esac
   fetch "https://mupdf.com/downloads/archive/mupdf-$MUPDF_VERSION-source.tar.gz" $MUPDF_SHA256
   # its own third-party libraries (libmupdf-third), but FreeType and zlib

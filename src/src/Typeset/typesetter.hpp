@@ -43,8 +43,8 @@ struct edit_profile_data {
   double bridges, pages, changes;  // ms: the bridges, the pager, the change log
   int    passes;                   // typesetting passes of this edit
   int    cached, redone;           // bridges whose result was reused or not
-  int    unread;                   // of the reused: with other variables changed
-  int    lines, moved;             // lines (and remembered boxes) logged, changed
+  int    checked;                  // of the redone: typeset again by the check
+  int    lines;                    // lines (and remembered boxes) logged
   int    rects;                    // rectangles in the change log
   int    breaks_reused;            // searches of page breaks avoided
   double search;                   // ms: the search of the page breaks
@@ -54,14 +54,39 @@ struct edit_profile_data {
 };
 extern edit_profile_data edit_profile;
 // the differences found by the check modes (TEXMACS_TYPESET_READS,
-// TEXMACS_PAGE_BREAK_CACHE, TEXMACS_PAGE_BREAK_FAST, TEXMACS_PAGE_REUSE
-// set to "check") since the start: a test fails when there are any
+// TEXMACS_PAGE_BREAK_CACHE, TEXMACS_PAGE_BREAK_FAST, TEXMACS_PAGE_REUSE,
+// TEXMACS_TYPESET_CACHES set to "check") since the start: a test fails
+// when there are any
 extern int typeset_check_mismatches;
+// passes of the typesetter and bridges typeset again (not used again) since
+// the start, counted also without TEXMACS_EDIT_PROFILE: tests check them
+extern int typeset_passes_total;
+extern int typeset_redone_total;
+int get_typeset_passes ();
+int get_typeset_redone ();
+// the rows of code-lines made in paper mode since the start (and not used
+// again: see bridge_code.cpp), for the tests
+int get_code_rows_made ();
+// and the records of their lines (without the check mode)
+int get_code_records_made ();
+// and the lines typeset by the concater (with markup or layers)
+int get_code_rich_made ();
+// (the one place where bridges typeset again are counted: for both counters)
+void typeset_count_redone (int n);
 int get_typeset_check_mismatches ();
+// the switch of the caches of the typesetter which are not described by
+// one of the variables above (block replay, chunks of lines, shoves, the
+// prepared environment), TEXMACS_TYPESET_CACHES:
+// 0 ("off"): nothing is used again, 1: used again, 2 ("check"): made
+// again and compared, a difference counting in typeset_check_mismatches
+int typeset_caches_mode ();
+void typeset_cache_mismatch (string what); // (counts and reports it)
 double edit_profile_now ();        // ms, from an arbitrary origin
 
 box        typeset_as_concat (edit_env env, tree t, path ip);
 box        typeset_as_box (edit_env env, tree t, path ip);
+array<box> typeset_as_segments (edit_env env, tree t, path ip,
+                                SI long_width, SI min_width, array<SI>& gaps);
 box        typeset_as_atomic (edit_env env, tree t, path ip);
 box        typeset_as_stack (edit_env env, tree t, path ip);
 box        typeset_as_table (edit_env env, tree t, path ip);

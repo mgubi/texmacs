@@ -69,8 +69,12 @@ register_link (soft_link ln) {
   int i, n= N(ln->t);
   if (is_atomic (ln->t[0]))
     type_count (ln->t[0]->label) ++;
+  // the attributes of a link are not vertices: the typesetter gives every
+  // hyperlink an attribute (secure false), which was one vertex shared by
+  // all the hyperlinks of all the buffers, removed from one by one
   for (i=1; i<n; i++)
-    register_vertex (ln->t[i], ln);
+    if (!is_func (ln->t[i], ATTR))
+      register_vertex (ln->t[i], ln);
 }
 
 void
@@ -83,14 +87,15 @@ unregister_link (soft_link ln) {
       type_count->reset (ln->t[0]->label);
   }
   for (i=1; i<n; i++)
-    unregister_vertex (ln->t[i], ln);
+    if (!is_func (ln->t[i], ATTR))
+      unregister_vertex (ln->t[i], ln);
 }
 
 /******************************************************************************
 * Link repositories
 ******************************************************************************/
 
-link_repository_rep::link_repository_rep () {}
+link_repository_rep::link_repository_rep (): record (true) {}
 
 link_repository_rep::~link_repository_rep () {
   while (!is_nil (loci)) {
@@ -108,6 +113,7 @@ link_repository_rep::~link_repository_rep () {
 
 void
 link_repository_rep::insert_locus (string id, tree t) {
+  if (!record) return;
   observer obs= tree_pointer (t, true);
   register_pointer (id, obs);
   attach_observer (t, obs);
@@ -117,6 +123,7 @@ link_repository_rep::insert_locus (string id, tree t) {
 
 void
 link_repository_rep::insert_locus (string id, tree t, string cb) {
+  if (!record) return;
   observer obs= scheme_observer (t, cb);
   register_pointer (id, obs);
   attach_observer (t, obs);
@@ -126,6 +133,7 @@ link_repository_rep::insert_locus (string id, tree t, string cb) {
 
 void
 link_repository_rep::insert_link (soft_link ln) {
+  if (!record) return;
   register_link (ln);
   links= list<soft_link> (ln, links);
 }

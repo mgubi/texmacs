@@ -1,4 +1,4 @@
-# TeXmacs in the browser (branch `maxs_texmacs`)
+# TeXmacs in the browser (branch `upsilon_texmacs`)
 
 Goal: a WebAssembly build of TeXmacs which runs in a web page, on the Vue GUI
 (Clay for the layout, MuPDF for the pixels) and SDL3, with the S7 Scheme
@@ -152,20 +152,28 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
 
 The CI of GitHub (`.github/workflows/wasm.yml`, at the top of the
 repository) runs on the branch `wasm_ci` only: the work goes on in
-`maxs_texmacs` (until 7 October 2026 in `wip_wasm_vue`, now retired), which
+`upsilon_texmacs` (until 7 October 2026 in `wip_wasm_vue`, now retired), which
 triggers nothing, and a state is built, tested and published by moving
 `wasm_ci` to it,
 
-    git push origin maxs_texmacs:wasm_ci
+    git push origin upsilon_texmacs:wasm_ci
 
 (or by hand, from the Actions tab). It builds with Emscripten 6.0.10
 (`emsdk`) the slim MuPDF with its patches (cached), the page and the node
 build, runs a smoke test (the node build turns the Welcome document into a
 PDF), keeps the page as an artifact of the run (`texmacs-wasm-web`: unzip
 it and serve it with `node misc/wasm/serve.mjs <dir>`), and publishes it at
-https://mgubi.github.io/texmacs/ (GitHub Pages, source "GitHub Actions";
+https://mgubi.github.io/texmacs/texmacs.html (GitHub Pages, source "GitHub Actions";
 the environment `github-pages` allows the branch `wasm_ci`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
+
+The site has other pages around the page of TeXmacs: its main page,
+`index.html`, is TeXmacs Upsilon and its builds (`misc/wasm/index.html`;
+an address with options, `?open=` and the others, goes on to `texmacs.html`,
+which was the main page until 19 October 2026, and `downloads.html`, its old
+address, comes back to it), `features.html` (the screenshots of
+`misc/upsilon/screenshots`) and `changes.html` (which shows
+`src/docs/upsilon-changes.md`).
 
 Pages has no brotli: the build also writes gzip copies of `texmacs.wasm`
 and of the packages, which the page decompresses itself
@@ -314,6 +322,51 @@ from bitmaps (Slug, see *The GPU renderer*): on the same benchmark the
 repaints at zoom 2, where the bitmaps of the glyphs are made, cost 0.4 ms
 of CPU a frame instead of 1.2 ms, and the other phases are the same or a
 little faster.
+WebGPU (2026-10-18): the page draws with WebGPU instead of WebGL2 by
+default in the browsers of Chromium (Chrome, Edge...), where it was tested,
+and with WebGL2 in the others for now; `?gpu=webgpu` asks for WebGPU in any
+browser, `?gpu=webgl` for WebGL2, `?gpu=0` for MuPDF (`web-pre.js`). Safari
+26 has WebGPU only on macOS Tahoe 26 (and iOS 26), not on macOS 15, where
+it was tried (`misc/wasm/test/safari-webgpu.mjs`, through its WebDriver:
+the fallback to WebGL2, menus and typing). The renderer: the backend
+`src/Plugins/Vue/gpu_backend_wg.cpp` (the shaders of the GL backend in
+WGSL), ThorVG's WebGPU engine for the shapes (ThorVG is built with both
+engines, `build-thorvg.sh`), and Dawn's `webgpu.h` for Emscripten (the port
+emdawnwebgpu, `--use-port=emdawnwebgpu`). It came from the experiment of
+branch `wip_wasix`. The device of WebGPU comes asynchronously and the
+program cannot wait (no ASYNCIFY): `web-pre.js` asks for it before TeXmacs
+starts (a dependency of the run) and gives it in
+`Module.preinitializedWebGPUDevice`, which the backend takes
+(`emscripten_webgpu_get_device`); without WebGPU the page draws with
+WebGL2. The canvas and the targets are BGRA8, the format the browsers
+prefer (another costs them a copy at each frame). Nothing is read back from
+the GPU (asynchronous in WebGPU). Tested in headless Chrome 154
+(`browser-run.mjs --browser <Chrome> --query '?gpu=webgpu'`): menus,
+editing, no error of WebGPU. Firefox (157, headless) has `navigator.gpu`
+but gives no adapter: the page draws with WebGL2, as it should.
+
+`misc/wasm/test/gpu-bench.mjs` compares the three renderers on a long
+document (`bench-paper.tm`: 564 KB, 180 formulas; each run a fresh browser,
+the times of TeXmacs from `?profile=1`, the CPU, not the GPU, which WebGPU
+cannot wait for). Headless Chrome 154, Apple M4 (WebGL2 and WebGPU both on
+Metal), 1280x800 at scale 2, medians of 3 runs, the time of the frames in
+ms (repaint of the editor, redraw of the window in parentheses):
+
+| | WebGPU | WebGL2 | MuPDF |
+|---|---|---|---|
+| 20 full repaints | 76 (40, 10) | 68 (35, 14) | 1863 (1752, 99) |
+| 60 pages scrolled | 337 (94, 21) | 330 (70, 30) | 5510 (5032, 321) |
+| 12 zooms | 142 (43, 42) | 344 (34, 240) | 1251 (733, 488) |
+
+The two GPU renderers keep the pace of the display (the same wall time,
+paced by the frames of the page), MuPDF takes 1.4 to 2.3 times longer. The
+repaints cost WebGPU a little more CPU (the bind groups and uniforms of
+each draw), the zooms much less: the redraws which make the glyphs at a
+new size take 42 ms against 240 with WebGL2.
+
+`?gpu=0` drew with WebGL2 since the GPU renderer became the default of the
+desktop (an unset `TEXMACS_VUE_GPU` means the GPU): `web-pre.js` now says
+`0` when the page draws with MuPDF (`?gpu=0`, no WebGL2).
 
 ## Optimization
 
@@ -814,7 +867,7 @@ preference gives another port; the message of a login when nothing
 answers at the port; and the bridge (`ws-bridge.mjs` in front of the port
 of the test server, with `NODE_TLS_REJECT_UNAUTHORIZED=0` for its
 self-signed certificate), from `client.mjs` and from the page. In
-maxs_texmacs the Qt port was only compiled.
+upsilon_texmacs the Qt port was only compiled.
 
 The remote tools as a whole (2026-10-08): `remote-check.scm`, loaded by a
 desktop client (`-tls-no-verify -x`) or by the page (written to its file

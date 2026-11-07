@@ -55,13 +55,13 @@
   ("ollama-text-input" "on" noop)
   ("chatgpt-text-input" "on" noop)
   ("gemini-text-input" "on" noop)
-  ("gemini model" "gemini-2.0-flash" noop)
   ("open-mistral-7b-text-input" "on" noop)
   ("claude-text-input" "on" noop)
   ("openrouter-text-input" "on" noop)
   ("ai raw answer" "on" noop)
   ("ai show reasoning" "on" noop)
   ("ai show usage" "on" noop)
+  ("ai tikz compile" "ask" noop)
   ("chatgpt model" "gpt-5-mini" noop)
   ("gemini model" "gemini-2.5-flash" noop)
   ("open-mistral-7b model" "mistral-small-latest" noop)
@@ -111,6 +111,48 @@
   (if (ai-wallet-key engine) ai-in-wallet
       (or (ai-preference-key engine) "")))
 
+;; the field of a key: a password field, the key is never shown in clear.
+;; A key in the wallet is said so next to the field, which stays empty: an
+;; empty answer keeps it (Delete entries of the wallet removes it)
+(tm-define (ai-api-key-typed engine key)
+  (cond ((not (string? key)) (noop))
+        ((ai-wallet-key engine)
+         (when (!= key "")
+           (ai-set-api-key engine key)
+           (ai-key-status-set engine "saved")))
+        ((!= key (or (ai-preference-key engine) ""))
+         (ai-set-api-key engine key)
+         (ai-key-status-set engine (if (== key "") "removed" "saved")))
+        ((!= key "") (ai-key-status-set engine "saved"))))
+
+;; what became of the key last typed, next to its field: a key is saved as
+;; soon as it is typed (Return, or leaving the field), which nothing else
+;; shows, the window staying as it was (#455). (The table outlives the
+;; loads of this file, as ai-wallet-hook-added? below: a key given loads it
+;; again)
+(define ai-key-status
+  (if (defined? 'ai-key-status) ai-key-status (make-ahash-table)))
+
+(define (ai-key-status-set engine status)
+  (ahash-set! ai-key-status engine status)
+  (refresh-now "ai-key-status"))
+
+(tm-widget (ai-api-key-input engine width)
+  (hlist
+    (input (ai-api-key-typed engine answer)
+           "password"
+           (list (if (ai-wallet-key engine) ""
+                     (or (ai-preference-key engine) "")))
+           width)
+    (assuming (ai-wallet-key engine)
+      // (text ai-in-wallet))
+    ;; (if, not assuming: only if is evaluated again at a refresh)
+    (refreshable "ai-key-status"
+      (if (== (ahash-ref ai-key-status engine) "saved")
+          // (text "saved"))
+      (if (== (ahash-ref ai-key-status engine) "removed")
+          // (text "removed")))))
+
 (define (ai-store-api-key engine key)
   (if (and (supports-wallet?) (wallet-on?))
       (begin
@@ -138,7 +180,13 @@
            (ai-store-api-key engine key)))
         (ai-store-api-key engine key))))
 
-(when (supports-wallet?)
+;; (once: this file is loaded again when a key is given or the wallet is
+;; turned on, and each load added a hook, which loads it again, so that the
+;; hooks doubled each time; the flag outlives the loads)
+(define ai-wallet-hook-added?
+  (and (defined? 'ai-wallet-hook-added?) ai-wallet-hook-added?))
+(when (and (supports-wallet?) (not ai-wallet-hook-added?))
+  (set! ai-wallet-hook-added? #t)
   (wallet-add-on-hook (lambda () (reinit-plugin-single "ai"))))
 
 (tm-define (ai-models)
@@ -282,6 +330,17 @@
     (if (or (not (string? s)) (== s "") (== s "default")) (list)
         (string-decompose s " "))))
 
+;; The list of the models of OpenRouter has their prices, also those of the
+;; models of OpenAI, Anthropic, Google and Mistral: it is kept in the home,
+;; where ai.cpp finds it to estimate the cost of the answers of the engines
+;; which do not give it (ai_estimate_cost). It is asked only here, when the
+;; list of the models of OpenRouter is updated.
+(define (ai-keep-prices ans)
+  (with dir (string->url "$TEXMACS_HOME_PATH/system/ai")
+    (when (not (url-exists? dir)) (system-mkdir dir))
+    (string-save ans (url-append dir "openrouter-models.json"))
+    (cpp-ai-set-prices ans)))
+
 ;; asks the engine its models, keeps them in the preferences; the number of
 ;; models, or a text which says why there are none
 (tm-define (ai-update-models name)
@@ -298,6 +357,7 @@
           (cond ((nnull? l)
                  (set-preference (string-append name " models")
                                  (string-recompose l " "))
+                 (when (== name "openrouter") (ai-keep-prices ans))
                  (length l))
                 ((== ans "") "no answer (network, key, or the site refuses the page)")
                 ((and t (json-ref t "error"))
@@ -506,6 +566,10 @@
                       (lambda args #f))))
            (and (tree? out) (tree-up out))))))
 
+;; The fold which asks (ai-request-prepare), #f for a field of a session:
+;; the files attached to its question go with it
+(define ai-fold-of-request #f)
+
 ;; The model of a request: that of the session of the field which is
 ;; evaluated (ai-request sets it while ai.cpp makes the request, and
 ;; ai_model_name asks it), else the one of the preferences
@@ -523,15 +587,15 @@
          (s (and doc (tree-up doc)))
          (s (if field
                 (and s (tree-is? s 'session) s)
-                (and (defined? 'ai-fold-pop) (ai-fold-pop name)))))
-    (when (and (not field) (defined? 'ai-fold-result-push))
-      (ai-fold-result-push name s))
+                (and (defined? 'ai-fold-pop) (ai-fold-pop name chat)))))
+    (set! ai-fold-of-request (and (not field) s))
     (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
     (set! ai-document-of-request
           (if (and s (== (ai-session-var s "ai-document") "true"))
               (ai-document-latex s) ""))))
 
 (tm-define (ai-request-done)
+  (set! ai-fold-of-request #f)
   (set! ai-model-of-request "")
   (set! ai-document-of-request ""))
 
@@ -584,31 +648,106 @@
                          "The questions are sent with the document")
                      (session-name lan))))))
 
+;; the fields above the one which is evaluated whose question and answer
+;; go with it (the last ones, ai-context-size), as (field question answer);
+;; #f when the field is not in a document, '() for a fold
+(define (ai-context-fields name chat field)
+  (with doc (and field (tree-up field))
+    (cond ((not field) '())
+          ((not (and doc (tm-func? doc 'document))) #f)
+          (else
+           (let* ((i (tree-index field))
+                  (l (append-map
+                      (lambda (j)
+                        (with f (tree-ref doc j)
+                          (if (not (tree-in? f ai-io-tags)) (list)
+                              (let ((q (ai-field-text name (tree-ref f 1)))
+                                    (a (ai-field-text name (tree-ref f 2))))
+                                (if (or (== q "") (== a "")
+                                        (string-starts? a "Error:"))
+                                    (list)
+                                    (list (list f q a)))))))
+                      (.. 0 i)))
+                  (n (ai-context-size name)))
+             (if (> (length l) n) (list-tail l (- (length l) n)) l))))))
+
 (tm-define (ai-session-context name chat)
+  (with l (ai-context-fields name chat (ai-pending-field name chat))
+    (and l (append-map cdr l))))
+
+;; the files of the questions (attachments, tools/ai/ai-attachments.scm)
+;; which ai.cpp sends as parts of their messages: "i<tab>mime<tab>name<tab>
+;; file", i the question (0 the first of the context, the last the one
+;; which is asked)
+(define (ai-question-files q)
+  (ai-stree-attachments (tree->stree q)))
+
+;; the question which is asked: the input of the field of the session, or
+;; the question of the fold (ai-fold-of-request)
+(define (ai-asked-question name chat)
+  (with field (ai-pending-field name chat)
+    (cond (field (tree-ref field 1))
+          ((and ai-fold-of-request (tree? ai-fold-of-request))
+           (tree-ref ai-fold-of-request 2))
+          (else #f))))
+
+(tm-define (ai-session-attachments name chat)
   (let* ((field (ai-pending-field name chat))
-         (doc (and field (tree-up field))))
-    ;; (a fold: its question alone)
-    (if (not field) '()
-        (let ()
-          (if (not (and doc (tm-func? doc 'document))) #f
-              (let* ((i (tree-index field))
-                     (pairs
-                      (append-map
-                       (lambda (j)
-                         (with f (tree-ref doc j)
-                           (if (not (tree-in? f ai-io-tags)) (list)
-                               (let ((q (ai-field-text name (tree-ref f 1)))
-                                     (a (ai-field-text name (tree-ref f 2))))
-                                 (if (or (== q "") (== a "")
-                                         (string-starts? a "Error:"))
-                                     (list)
-                                     (list (list q a)))))))
-                       (.. 0 i)))
-                     (n (ai-context-size name))
-                     (kept (if (> (length pairs) n)
-                               (list-tail pairs (- (length pairs) n))
-                               pairs)))
-                (apply append kept)))))))
+         (l (or (ai-context-fields name chat field) '()))
+         (qs (append (map (lambda (x) (tree-ref (car x) 1)) l)
+                     (with q (ai-asked-question name chat)
+                       (if q (list q) '())))))
+    (append-map (lambda (i)
+                  (map (lambda (a) (string-append (number->string i)
+                                                  (ai-attachment-separator) a))
+                       (ai-binary-attachments
+                        (ai-question-files (list-ref qs i)))))
+                (.. 0 (length qs)))))
+
+;; the files which a question would send: those of the questions of its
+;; context, and its own
+(define (ai-sent-files name chat)
+  (let* ((field (ai-pending-field name chat))
+         (l (or (ai-context-fields name chat field) '()))
+         (q (ai-asked-question name chat)))
+    (append (append-map (lambda (x) (ai-question-files (tree-ref (car x) 1))) l)
+            (if q (ai-question-files q) '()))))
+
+(define (ai-file-list l)
+  (string-recompose
+   (map (lambda (a) (string-append (car a) " (" (cadr a) ")")) l) ", "))
+
+;; why the files of the question cannot be sent, or #f (ai-request): files
+;; which came with the document and were not allowed yet (a dialog asks),
+;; else what keeps the files of the request (those of the question and of
+;; its context) from being sent
+(tm-define (ai-request-attachment-problem name chat)
+  (let* ((new (ai-files-not-allowed (ai-sent-files name chat))))
+    (cond ((nnull? new)
+           (delayed
+             (:idle 10)
+             (user-confirm
+              (string-append "Send these files, which came with the document, "
+                             "to " (session-name name) "? "
+                             (utf8->cork (ai-file-list new)))
+              #f
+              (lambda (yes?)
+                (when yes?
+                  (ai-allow-files new)
+                  (set-message "The files are allowed: ask the question again"
+                               (session-name name))))))
+           (string-append
+            "The question would send files which came with the document, "
+            "not attached here: " (ai-file-list new)
+            ". Allow them in the dialog, then ask again."))
+          (else
+           ;; (the files of the questions of the context are sent again:
+           ;; checked as those of the question)
+           (let* ((model (if (!= ai-model-of-request "") ai-model-of-request
+                             (get-preference (string-append name " model"))))
+                  (p (ai-attachments-problem name (ai-sent-files name chat)
+                                             (if (string? model) model ""))))
+             (and p (string-append (upcase-first p) ".")))))))
 
 ;; the first line of a session: the engine and its model
 (define (ai-banner lan)
@@ -691,9 +830,7 @@
     (with model (string-append name " model")
       (aligned
         (item (text "API key")
-          (enum (ai-set-api-key name answer)
-                (list (ai-api-key-shown name) "")
-                (ai-api-key-shown name) "16em"))
+          (dynamic (ai-api-key-input name "16em")))
         (item (text "Model")
           (refreshable "ai-model-list"
             (enum (set-preference model answer)
@@ -733,6 +870,10 @@
         (explicit-buttons
           ("Update the list of models"
            (ai-update-models-message "ollama"))))
+      (item (text "Context")
+        (enum (set-preference "ollama context size" answer)
+              '("10" "5" "20" "50" "0" "")
+              (number->string (ai-context-size "ollama")) "5em"))
       (item (text "Reasoning")
         (enum (set-preference (ai-reasoning-pref "ollama") answer)
               ai-reasoning-levels (ai-reasoning "ollama") "8em"))
@@ -749,9 +890,7 @@
             (text "from ALBERT_API_KEY")))
         (assuming (not (albert-env-key?))
           (item (text "API key")
-            (enum (ai-set-api-key "albert" answer)
-                  (list (ai-api-key-shown "albert") "")
-                  (ai-api-key-shown "albert") "11em")))
+            (dynamic (ai-api-key-input "albert" "11em"))))
         (item (text model)
           (enum (set-preference model answer)
 		(albert-variants)
@@ -771,6 +910,10 @@
 	    (enum (set-preference "albert ai-agents translator" answer)
 		  (cons "default" (ai-agents-translators))
 		  (get-preference "albert ai-agents translator") "11em")))
+        (item (text "Context")
+          (enum (set-preference "albert context size" answer)
+                '("10" "5" "20" "50" "0" "")
+                (number->string (ai-context-size "albert")) "6em"))
 	(item (text "Chat history size")
 	  (enum (set-preference "albert chat history size" answer)
 		'("10" "5" "4" "3" "2" "1" "0" "")
@@ -793,7 +936,15 @@
 		(get-boolean-preference "ai show reasoning")))
       (meti (hlist // (text "Show the tokens and the cost"))
 	(toggle (set-boolean-preference "ai show usage" answer)
-		(get-boolean-preference "ai show usage"))))))
+		(get-boolean-preference "ai show usage")))))
+  ;; (the code of a picture comes from the model: ai-tikz-policy)
+  (assuming (not (defined? 'web-javascript))
+    ===
+    (aligned
+      (item (text "Compile the TikZ pictures")
+        (enum (set-preference "ai tikz compile" answer)
+              '("ask" "always" "never")
+              (get-preference "ai tikz compile") "8em")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ChatGPT
@@ -1096,6 +1247,9 @@
         (=> (balloon (eval (ai-reasoning-label lan))
                      "How much the model reasons before it answers")
             (dynamic (focus-ai-reasoning-menu lan))))
+    //
+    ((balloon "Attach" "Attach a file to the question: a text, an image or a PDF file")
+     (ai-attach-file))
     (if (ai-answer-field lan)
         //
         ((balloon "Insert answer" "Insert the answer after the session")
@@ -1221,8 +1375,8 @@
     (when s (ai-set-session-var s "ai-document" "true"))))
 
 ;; the answer in a fold: the answer alone, its tokens on the status bar and
-;; around the fold (ai-usage); the fold of the answer is the one which
-;; ai-request-prepare gave to tools/ai/ai-folds.scm (ai-fold-result-push)
+;; around the fold (ai-usage); the fold of the answer is the one of the
+;; pending request (ai-fold-result-pop, tools/ai/ai-folds.scm)
 
 (define (ai-usage-fields x)
   ;; the data of the line of the tokens (ai_usage_line in ai.cpp)
@@ -1239,7 +1393,7 @@
              ;; (the plug-in may give an empty result first)
              (f (and (not (in? x '("" (document) (document ""))))
                      (defined? 'ai-fold-result-pop)
-                     (ai-fold-result-pop name))))
+                     (ai-fold-result-pop name chat))))
         (when (nnull? u)
           (set-message (car u) (session-name name)))
         (when (and f (nnull? data))
@@ -1262,6 +1416,9 @@
     //
     (=> (balloon (eval (ai-session-model lan)) "Model of the fold")
         (dynamic (focus-ai-model-menu lan)))
+    //
+    ((balloon "Attach" "Attach a file to the question: a text, an image or a PDF file")
+     (ai-attach-file))
     (if (in? lan ai-reasoning-engines)
         //
         (=> (balloon (eval (ai-reasoning-label lan))

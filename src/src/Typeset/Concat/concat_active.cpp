@@ -153,7 +153,11 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
         string cb= cork_to_utf8 (as_string (arg[1]));
         if (accessible) {
           if (env->secure ||
-              as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
+              as_bool (call ("secure?",
+                             cons (symbol_object (cb),
+                                   list_object (object (false),
+                                                object (false),
+                                                object (false))))))
             env->link_env->insert_locus (id, body, cb);
         }
         ids= list<string> (id, ids);
@@ -242,9 +246,10 @@ concater_rep::typeset_locus (tree t, path ip) {
             a[i]->op_type != a[i+1]->op_type) {
           path sip= (N(tmp_a)==1? a[i]->b->ip: dip);
           box cc= produce_concat (dip, tmp_a);
-          box lb= locus_box (sip, cc, ids, env->pixel, ref, anchor);
+          box lb= locus_box (sip, cc, ids, ref, anchor);
           line_item item (STD_ITEM, a[i]->op_type, lb, a[i]->penalty);
           item->spc= a[i]->spc;
+          item->cor= a[i]->cor;
           new_a << item;
           tmp_a= array<line_item> ();
         }
@@ -280,8 +285,15 @@ concater_rep::typeset_set_binding (tree t, path ip) {
 
 static tree
 remove_labels (tree t) {
+  // what is written to an auxiliary part (a table of contents, an index)
+  // is the evaluated text; its labels, and the assignments and writes which
+  // the evaluation has already done (those of an index entry in a section
+  // title: <assign|auto-nr|N>, <write|idx|...>), must not be done again
+  // where the part is typeset: auto-nr would jump and the auto-N labels of
+  // the document would never settle
   if (is_atomic (t)) return copy (t);
-  else if (is_func (t, LABEL)) return "";
+  else if (is_func (t, LABEL) || is_func (t, ASSIGN) || is_func (t, WRITE))
+    return "";
   else if (is_func (t, CONCAT)) {
     tree r (CONCAT);
     for (int i=0; i<N(t); i++)
@@ -304,11 +316,7 @@ concater_rep::typeset_write (tree t, path ip) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   string s= env->exec_string (t[0]);
   tree   r= remove_labels (env->exec (t[1]));
-  if (env->complete) {
-    if (!env->local_aux->contains (s))
-      env->local_aux (s)= tree (DOCUMENT);
-    env->local_aux (s) << r;
-  } 
+  env->write_aux (s, r);
   control ("write", ip);
 }
 
@@ -429,16 +437,12 @@ concater_rep::typeset_image (tree t, path ip) {
   if (N(t) != 5) error_image ("parameters");
   tree image_tree= env->exec (t[0]);
   url image= url_none ();
+  bool file_image= false;
   if (is_atomic (image_tree)) {
     if (N (image_tree->label) == 0)
       error_image (tree (WITH, "color", "red", "no image"));
-    url im= cork_to_utf8( image_tree->label);
-    image= resolve (relative (env->base_file_name, im));
-    if (is_none (image) && suffix (im) == "")
-      image= resolve (relative (env->base_file_name, ::glue (im, ".eps")));
-    if (is_none (image) && suffix (im) == "")
-      image= resolve (relative (env->base_file_name, ::glue (im, ".pdf")));
-    if (is_none (image)) image= "$TEXMACS_PATH/misc/pixmaps/unknown.ps";
+    image= env->image_file (env->base_file_name, image_tree->label);
+    file_image= true;
   }
   else if (is_func (image_tree, TUPLE, 2) &&
 	     is_func (image_tree[0], RAW_DATA, 1) &&
@@ -451,6 +455,10 @@ concater_rep::typeset_image (tree t, path ip) {
   // determine the original size of the image
   int iw, ih;
   image_size (image, iw, ih);
+  // (the file and its size are inputs of the bridge: the layout is not
+  // kept when the pictures were loaded again and these changed)
+  if (file_image)
+    env->picture_lookup ('p', image_tree->label, image, iw, ih);
   double pt= ((double) env->dpi*PIXEL) / 72.0;
   SI w= (SI) (((double) iw) * pt);
   SI h= (SI) (((double) ih) * pt);
@@ -478,8 +486,10 @@ concater_rep::typeset_image (tree t, path ip) {
   env->local_end ("w-length", old_w);
   env->local_end ("h-length", old_h);
   
-  // print the box
-  box imb= image_box (ip, image, imw, imh, env->alpha, env->pixel);
+  // print the box (the size of a pixel only says where the picture is
+  // cached, and the box takes that of the renderer when it is drawn: it
+  // is not an input of what is typeset, which a zoom does not change)
+  box imb= image_box (ip, image, imw, imh, env->alpha, env->zoom_pixel);
   print (move_box (ip, imb, imx, imy, true));
 }
 

@@ -148,20 +148,17 @@
   (with val (not (has-markup-gui?))
     (set-boolean-preference "markup gui" val)))
 
-(define saved-informative-flags "default")
-
 (tm-define (toggle-full-screen-mode)
   (:synopsis "Toggle full screen mode")
   (:check-mark "v" full-screen?)
+  ;; the informative flags are hidden in the full screen view only, by the
+  ;; typesetter (full-screen-mode of the view), not by info-flag (#549)
   (if (full-screen?)
       (begin
-        (init-env "info-flag" saved-informative-flags)
         (full-screen-mode #f #f)
 	(restore-zoom (get-init-page-rendering)))
       (begin
 	(save-zoom (get-init-page-rendering))
-        (set! saved-informative-flags (get-init "info-flag"))
-        (init-env "info-flag" "none")
         (full-screen-mode #t #f)
         (delayed (:idle 100) (fit-to-screen)))))
 

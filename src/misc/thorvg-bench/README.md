@@ -78,7 +78,9 @@ drawing.
 ## Slug (2026-10-05)
 
 `gl-slug` follows E. Lengyel, "GPU-Centered Font Rendering Directly from
-Glyph Outlines" (JCGT 6 (2), 2017). The outline of a glyph is a list of
+Glyph Outlines" (JCGT 6 (2), 2017); its shader is adapted from his
+reference shaders (https://github.com/EricLengyel/Slug, Copyright (c) 2017
+Eric Lengyel, MIT License, `TeXmacs/misc/licenses/Slug-MIT.txt`). The outline of a glyph is a list of
 quadratic curves in em units (the cubic curves of a CFF font split into
 quadratics, an error of at most 1/2048 em), in a texture of curves; its
 box is cut into up to 8 horizontal and 8 vertical bands, each listing the

@@ -52,23 +52,18 @@ url get_texmacs_home_path ();
 array<string> evaluate_system (array<string> arg,
 			       array<int> fd_in, array<string> in,
 			       array<int> fd_out);
+void secure_wipe (string s);
 
 class object;
 bool async_eval_system (string cmd, object call_back);
+bool async_eval_system_full (string cmd, object call_back);
 bool async_eval_system (string cmd, int& status, string& outbuf,
 			string& errbuf, bool& kill);
 int  async_evaluate_system (array<string> arg, string in, object call_back);
 void async_evaluate_cancel (int id);
 void async_eval_pending ();
+void async_eval_cancel (string* outbuf);
 
-// driving the graphical interface from scripts, for testing
-int gui_test_snapshot (string dir);
-array<string> gui_test_buttons ();
-bool gui_test_click (string label);
-bool gui_test_menu (string path);
-array<string> gui_test_menu_entries (string path);
-void gui_test_type (string text);
-void gui_test_click_later (int ms, string dir, string label);
 
 string get_printing_default ();
 bool has_printing_cmd (void);

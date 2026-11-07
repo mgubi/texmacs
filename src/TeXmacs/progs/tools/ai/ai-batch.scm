@@ -12,6 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (tools ai ai-batch)
+  (:use (tools ai ai-attachments))
   (version version-compare))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -24,23 +25,47 @@
   (if (tm-atomic? t)
       (with s (tm->string t)
         (cork->sourcecode s))
-      (with s (convert (tm->stree t) "texmacs-stree" "latex-snippet"
-                       (cons "texmacs->latex:encoding" "utf-8"))
+      ;; (the files attached to the question: the text files after it, the
+      ;; others sent by ai.cpp, ai-attachments.scm)
+      (let* ((x (tm->stree t))
+             (files (ai-stree-attachments x))
+             (x (if (null? files) x (ai-strip-attachments x)))
+             (s (if (and (string? x) (not (null? files)))
+                    (cork->sourcecode x)
+                    (convert x "texmacs-stree" "latex-snippet"
+                             (cons "texmacs->latex:encoding" "utf-8")))))
         ;;(display* "s = " s "\n")
-        s)))
+        ;; (a question which is only files has a text, else it would be left
+        ;; out of the context of the next ones, with its files)
+        (when (and (nnull? files) (== (tm-string-trim-both s) ""))
+          (set! s "(see the attached files)"))
+        (string-append s (ai-attachments-text files)))))
 
 (tm-define (ai-cmdline name chat cmd)
   (cpp-ai-latex-command cmd name chat))
 
 (tm-define (ai-request name chat cmd)
-  ;; (the model of the session or the fold which asks, init-ai.scm)
-  (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
-  (with missing (and (defined? (quote ai-key-missing)) (ai-key-missing name))
-    (with r (if missing
-                (object->string `(error ,missing)) ; no request (request_link)
-                (cpp-ai-latex-request cmd name chat))
-      (when (defined? 'ai-request-done) (ai-request-done))
-      r)))
+  ;; (the model of the session or the fold which asks, init-ai.scm; its
+  ;; globals are reset whatever happens, an error is the answer: they
+  ;; were left to the next requests, of any engine, when the making of the
+  ;; request failed)
+  (with r (catch #t
+            (lambda ()
+              (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
+              (with missing (or (and (defined? (quote ai-key-missing))
+                                     (ai-key-missing name))
+                                ;; (a file of the question which cannot be sent)
+                                (and (defined? 'ai-request-attachment-problem)
+                                     (ai-request-attachment-problem name chat)))
+                (if missing
+                    (object->string `(error ,missing)) ; no request (request_link)
+                    (cpp-ai-latex-request cmd name chat))))
+            (lambda args
+              (object->string
+               `(error ,(string-append "Error: the request could not be made ("
+                                       (object->string args) ")")))))
+    (when (defined? 'ai-request-done) (ai-request-done))
+    r))
 
 (tm-define (ai-result name chat res)
   (with t (cpp-ai-latex-output res name chat)
@@ -51,6 +76,12 @@
       (delayed
         (:idle 100)
         (ai-run-pending-folds)))
+    (when (and (== (ai-tikz-policy) "ask") (nnull? (ai-pictures-awaiting))
+               (not ai-asking-pictures?))
+      (set! ai-asking-pictures? #t)
+      (delayed
+        (:idle 100)
+        (ai-ask-compile-pictures)))
     t))
 
 ;; The TikZ pictures of an answer are folds of the TikZ plug-in (ai.cpp).
@@ -63,6 +94,61 @@
 
 (define ai-pictures (make-ahash-table))   ; code -> output of the plug-in
 (define ai-pictures-busy (make-ahash-table)) ; code -> folds which wait
+
+;; The code of a picture is written by a remote model, and LaTeX runs it:
+;; TeX can read the files of the user (\input), and show them in the
+;; picture. The preference "ai tikz compile" says whether the pictures of
+;; an answer are compiled: "ask" (the default) asks it once the answer is
+;; there, "always" compiles them at once, "never" leaves their folds
+;; uncompiled. An uncompiled picture is a fold of the TikZ plug-in, which its
+;; usual evaluation compiles later. In a web browser the pictures are made by
+;; TikZJax, in the page, which reads no files: they are always made.
+(tm-define (ai-tikz-policy)
+  (with p (get-preference "ai tikz compile")
+    (cond ((defined? 'web-javascript) "always")
+          ((in? p '("always" "never")) p)
+          (else "ask"))))
+
+(define ai-pictures-waiting (make-ahash-table)) ; code -> #t: to be asked
+(define ai-asking-pictures? #f)
+
+;; the codes of the pictures which are not compiled yet, the user to be asked
+(tm-define (ai-pictures-awaiting)
+  (map car (ahash-table->list ai-pictures-waiting)))
+
+(tm-define (ai-pictures-awaiting-clear)
+  (set! ai-pictures-waiting (make-ahash-table)))
+
+(define (ai-tikz-fold-code t)
+  (and (tree-is? t 'script-input) (== (tree-arity t) 4)
+       (tm-equal? (tree-ref t 0) "tikz")
+       (ai-picture-code (tree->stree (tree-ref t 2)))))
+
+;; the uncompiled folds of the pictures of codes, in the document: compiled
+(define (ai-compile-pictures codes)
+  (with l (select (buffer-tree) '(:* script-input))
+    (for (t l)
+      (with code (ai-tikz-fold-code t)
+        (when (and code (in? code codes))
+          (tree-set! t `(with "ai-tikz" "pending"
+                          (script-output ,(tree->stree (tree-ref t 0))
+                                         ,(tree->stree (tree-ref t 1))
+                                         ,(tree->stree (tree-ref t 2))
+                                         (script-busy)))))))
+    (ai-run-pending-folds)))
+
+(tm-define (ai-ask-compile-pictures)
+  (with codes (ai-pictures-awaiting)
+    (ai-pictures-awaiting-clear)
+    (set! ai-asking-pictures? #f)
+    (when (nnull? codes)
+      (user-confirm
+       (string-append "Compile the TikZ pictures of the answer with LaTeX? "
+                      "Their code comes from the model, and could read "
+                      "your files.")
+       #f
+       (lambda (answ)
+         (when answ (ai-compile-pictures codes)))))))
 
 ;; (cork->sourcecode as the code of a fold is sent: cork->utf8 would make the
 ;; ... of \foreach an ellipsis)
@@ -83,7 +169,7 @@
     (and r (stree->tree r))))
 
 ;; the picture of the code is made, unless it is or is being made
-(tm-define (ai-picture-request code)
+(define (ai-picture-make code)
   (when (and (not (ahash-ref ai-pictures code))
              (not (ahash-ref ai-pictures-busy code)))
     (ahash-set! ai-pictures-busy code (list))
@@ -91,8 +177,19 @@
       (add-style-package "tikz"))
     (silent-feed* "tikz" "default" (ai-picture-input code)
                   (lambda (r) (ai-picture-made code r))
-                  '(:math-input :simplify-output)))
-  "")
+                  '(:math-input :simplify-output))))
+
+;; asked by ai.cpp for a complete picture of an answer: #t if it is made,
+;; or being made (its fold waits for it), #f if it is not compiled (its fold
+;; stays uncompiled; with "ask", the user is asked once the answer is there)
+(tm-define (ai-picture-request code)
+  (with policy (ai-tikz-policy)
+    (cond ((or (ahash-ref ai-pictures code) (ahash-ref ai-pictures-busy code))
+           #t)
+          ((== policy "always") (ai-picture-make code) #t)
+          (else
+            (when (== policy "ask") (ahash-set! ai-pictures-waiting code #t))
+            #f))))
 
 (define (ai-fill-fold p r)
   (with t (tree-pointer->tree p)
@@ -126,7 +223,7 @@
                      (r (ahash-ref ai-pictures code)))
                 (if r (tree-set! t 3 r)
                     (begin
-                      (ai-picture-request code)
+                      (ai-picture-make code)
                       (ahash-set! ai-pictures-busy code
                                   (cons (tree->tree-pointer t)
                                         (or (ahash-ref ai-pictures-busy code)
@@ -213,9 +310,16 @@
 ;; Copy and paste while compressing non natural language text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the codes of the chat outside TeXmacs, which may paste back the answer to
+;; any earlier copy: their table lasts as long as TeXmacs
+(define ai-clipboard-table "ai-clipboard")
+
 (tm-define (ai-copy)
   (when (selection-active-any?)
-    (clipboard-set "primary" (compress-html (selection-tree) 1))))
+    (compress-table-open ai-clipboard-table)
+    (with-compress-table ai-clipboard-table
+      (lambda ()
+        (clipboard-set "primary" (compress-html (selection-tree) 1))))))
 
 (tm-define (ai-cut)
   (when (selection-active-any?)
@@ -233,5 +337,6 @@
           (else t))))
 
 (tm-define (ai-paste)
-  (with t (decompress-html (clipboard-get* "extern") 1)
+  (with t (with-compress-table ai-clipboard-table
+            (lambda () (decompress-html (clipboard-get* "extern") 1)))
     (insert t)))

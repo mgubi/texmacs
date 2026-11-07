@@ -149,6 +149,28 @@
                                         identity)))
               (loop (append (cdr nodes) bodies) (append new seen)))))))
 
+(define (node-shows-names? node)
+  ;; is there a cs:names below @node?
+  (or (== (csl-name node) 'names)
+      (list-or (map (lambda (c) (and (pair? c) (node-shows-names? c)))
+                    (csl-children node)))))
+
+(tm-define (csl-citation-shows-names? style)
+  (:synopsis "Do the citations of @style show names, as (Knuth, 1984)?")
+  ;; not [1] nor [Knu84]; through the macros which the citation calls
+  (let loop ((nodes (list (csl-style-ref style 'citation))) (seen '()))
+    (cond ((null? nodes) #f)
+          ((not (car nodes)) (loop (cdr nodes) seen))
+          ((node-shows-names? (car nodes)) #t)
+          (else
+            (let* ((new (list-filter
+                         (list-remove-duplicates (macro-calls (car nodes)))
+                         (lambda (m) (nin? m seen))))
+                   (bodies (list-filter (map (cut csl-style-macro style <>)
+                                             new)
+                                        identity)))
+              (loop (append (cdr nodes) bodies) (append new seen)))))))
+
 (define (distinct-items items)
   ;; the first of the items with the same identifier
   (let loop ((l items) (seen (make-ahash-table)) (r '()))

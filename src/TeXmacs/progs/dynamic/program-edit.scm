@@ -17,7 +17,8 @@
 	(utils plugins plugin-cmd)
 	(dynamic program-drd)
 	(dynamic program-menu)
-	(dynamic fold-edit)))
+	(dynamic fold-edit)
+	(code code-syntax)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Switches
@@ -390,22 +391,6 @@
   (:require (== l "program"))
   (prog-field-parameters "program"))
 
-(tm-define (standard-parameters l)
-  (:require (== l "input"))
-  (prog-field-parameters "input"))
-
-(tm-define (standard-parameters l)
-  (:require (== l "output"))
-  (prog-field-parameters "output"))
-
-(tm-define (standard-parameters l)
-  (:require (== l "errput"))
-  (prog-field-parameters "errput"))
-
-(tm-define (standard-parameters l)
-  (:require (== l "textput"))
-  (prog-field-parameters "textput"))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -598,6 +583,9 @@
 (tm-define (kbd-enter t shift?)
   (:require (prog-field-input-context? t))
   (cond ((xor (program-multiline-input?) shift?)
+         (insert-return))
+        ((syntax-input-incomplete? (tree-ref t 1))
+         ;; an open bracket or block (by the syntax tree, see ts-edit.scm)
          (insert-return))
         ((program-supports-input-done?)
          (let* ((lan (get-env "prog-language"))

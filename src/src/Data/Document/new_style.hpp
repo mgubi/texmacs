@@ -19,6 +19,7 @@ tree preprocess_style (tree st, url name);
 void style_invalidate_cache ();
 void style_set_cache (tree style, hashmap<string,tree> H, tree t);
 void style_get_cache (tree style, hashmap<string,tree>& H, tree& t, bool& f);
+void style_note_file (url u);
 
 bool compute_env_and_drd (tree style);
 hashmap<string,tree> get_style_env (tree style);

@@ -287,6 +287,12 @@
 /* Use axel library */
 #undef USE_AXEL
 
+/* Use language servers */
+#undef USE_LSP
+
+/* Use the syntax trees of tree-sitter */
+#undef USE_TREE_SITTER
+
 /* Use cairo library */
 #undef USE_CAIRO
 

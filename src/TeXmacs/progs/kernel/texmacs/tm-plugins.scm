@@ -425,8 +425,7 @@
 
 (define-public reconfigure-flag? #t)
 
-;; Other modules should use these accessors: in S7 a public variable which its
-;; module changes with set! keeps its first value in the other modules.
+;; Other modules read and set the flag with these accessors.
 (define-public (plugin-reconfigure?) reconfigure-flag?)
 (define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
 
@@ -713,6 +712,9 @@
   (when (ahash-ref plugin-initialize-todo name*)
     (let* ((name (symbol->string name*))
            (file (string-append "plugins/" name "/progs/init-" name ".scm"))
+           ;; (the directories in which plugin-list finds the plugins; in
+           ;; TeXmacs Upsilon not /etc/TeXmacs and /usr/share/TeXmacs, which
+           ;; hold the plugins of an official TeXmacs: see plugin_path)
            (u (url-unix "$TEXMACS_HOME_PATH:$TEXMACS_PATH" file)))
       (ahash-remove! plugin-initialize-todo name*)
       (if (url-exists? u)

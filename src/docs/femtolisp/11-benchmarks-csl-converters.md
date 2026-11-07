@@ -17,10 +17,10 @@ needed a change to run on femtolisp.
   run.
   - CSL (11.2): `maxs_femto` (dae21f624e) with the CSL work of `wip_csl`
     (e57f86e833) applied as a patch. This tree is two days older than
-    `maxs_texmacs`: its `compat-s7.scm` lacks `string-trim-both`, so the S7
+    `upsilon_texmacs`: its `compat-s7.scm` lacks `string-trim-both`, so the S7
     build got the file of `wip_csl` (two more functions).
   - Converters (11.3): the merge of `wip_csl` and `maxs_femto` (no
-    conflict), which has the converters of `maxs_texmacs` of 2026-10-09.
+    conflict), which has the converters of `upsilon_texmacs` of 2026-10-09.
 - The scripts are in [bench](bench): the workloads `csl`, `csl-suites`,
   `converters` and `converter-suites` of `run.sh`.
 
@@ -226,7 +226,7 @@ code which allocates and calls closures (`cons` 40 against 68, a call of a
   257–296), `>=` and `<=` 77 (125–164), `max` 66 (123), `char-numeric?` 81
   (348), `char-alphabetic?` 106 (751), `char-upcase` 108 (425).
 - The Markdown converters (branch `markdown-faster-loops`, from
-  `maxs_texmacs`): the serializer and the tokenizer of the parser pass the
+  `upsilon_texmacs`): the serializer and the tokenizer of the parser pass the
   ordinary characters with one look at a table and copy the text between
   two special characters in one piece; the lines are found by searching
   the ends of lines; the predicates on characters of the parser compare

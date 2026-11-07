@@ -16,7 +16,8 @@
 	(utils library cursor)
 	(utils plugins plugin-cmd)
 	(dynamic session-drd)
-	(dynamic fold-edit)))
+	(dynamic fold-edit)
+	(code code-syntax)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where to find plug-in binaries
@@ -34,12 +35,12 @@
       (when (cpp-has-preference? "manual path")
         (with cur (getenv "PATH")
           (when (string-starts? cur (string-append old ":"))
-            (setenv "PATH" (string-drop cur (+ (string-length old) 1))))))
+            (system-setenv "PATH" (string-drop cur (+ (string-length old) 1))))))
       (if (== p "")
           (reset-preference "manual path")
           (begin
             (set-preference "manual path" p)
-            (setenv "PATH" (string-append p ":" (getenv "PATH")))))
+            (system-setenv "PATH" (string-append p ":" (getenv "PATH")))))
       (reinit-plugin-cache))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -49,7 +50,7 @@
 (tm-define (set-manual-key k v)
   (:synopsis "Set API key to remote plug-in")
   (:argument k "Key name")
-  (:argument v "Key value")
+  (:argument v "password" "Key value")
   (set-preference (string-append k " api key") v)
   (reinit-plugin-cache))
 
@@ -624,6 +625,9 @@
 (tm-define (kbd-enter t shift?)
   (:require (field-input-context? t))
   (cond ((xor (session-multiline-input?) shift?)
+         (insert-return))
+        ((syntax-input-incomplete? (tree-ref t 1))
+         ;; an open bracket or block (by the syntax tree, see ts-edit.scm)
          (insert-return))
         ((session-supports-input-done?)
          (let* ((lan (get-env "prog-language"))

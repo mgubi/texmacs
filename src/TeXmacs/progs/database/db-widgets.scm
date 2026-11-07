@@ -136,9 +136,10 @@
 	     (l (map db-get-result-cached ids))
 	     (r (db-pretty-cached l kind :pretty))
              ;; the references of Zotero, after those of the database, when
-             ;; the preference asks for them; each one says its source
-             ;; (with a line while they are awaited)
-             (zs (if (and (== kind "bib") (zotero-in-database-search?))
+             ;; Zotero is used and the preference asks for them; each one
+             ;; says its source (with a line while they are awaited)
+             (zotero? (and (== kind "bib") (zotero-used?)))
+             (zs (if (and zotero? (zotero-in-database-search?))
                      (zotero-with-retry
                       (db-search-again db kind query)
                       (lambda ()
@@ -147,8 +148,8 @@
                      (cons '() '())))
              (zl (car zs))
              (z (if (null? zl) '() (db-pretty zl kind :pretty)))
-             (r* (if (== kind "bib") (zotero-mark-results r l #f) r))
-             (z* (zotero-mark-results z zl #t))
+             (r* (if zotero? (zotero-mark-results r l #f) r))
+             (z* (if (null? z) '() (zotero-mark-results z zl #t)))
              (s* (cdr zs)))
 	(cond ((and (null? r) (null? z) (nnull? s*)) s*)
               ((and (null? r) (null? z)) (list "No matching items"))
@@ -188,7 +189,7 @@
   (padded
     (let* ((dummy (set! db-quit-search quit))
 	   (query ""))
-      (assuming (== kind "bib")
+      (assuming (and (== kind "bib") (or (== db :bib-file) (zotero-used?)))
         ;; the sources of the references (see bibtex/zotero-db.scm)
         ;; NOTE: a promise, so that the line is made again when refreshed
         (refreshable "db-search-sources"
@@ -214,7 +215,7 @@
                     (tool-close :any 'db-search-tool noop win)))
            (dummy (set! db-quit-search quit*))
 	   (query ""))
-      (assuming (== kind "bib")
+      (assuming (and (== kind "bib") (or (== db :bib-file) (zotero-used?)))
         ;; the sources of the references (see bibtex/zotero-db.scm)
         ;; NOTE: a promise, so that the line is made again when refreshed
         (refreshable "db-search-sources"

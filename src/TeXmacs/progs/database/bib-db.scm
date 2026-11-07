@@ -247,16 +247,14 @@
         `(bib-names ,@r))))
 
 (define (db-bib-pages t)
+  ;; the pages as the parser of BibTeX reads them (bib_field_pages)
   (if (not (tm-atomic? t)) t
-      (let* ((t* (string-replace t "" "-"))
-             (l (string-decompose t* "-"))
-             (fl (list-filter l (lambda (s) (!= s "")))))
-        (if (<= (length l) 1) `(bib-pages ,t) `(bib-pages ,@fl)))))
+      (tree->stree (bib-field-pages (tm->string t)))))
 
 (define (db-bib-sub-sub type var val)
   (cond ((and (== var "title")
               (in? type '("article" "booklet" "incollection" "inproceedings"
-                          "masterthesis" "misc" "phd-thesis" "techreport"
+                          "mastersthesis" "misc" "phdthesis" "techreport"
                           "unpublished")))
          (db-bib-protect val #t))
         ((or (== var "type") (== var "mtype"))
@@ -363,7 +361,7 @@
 (define (bib-db-sub-sub type var val)
   (cond ((and (== var "title")
               (in? type '("article" "booklet" "incollection" "inproceedings"
-                          "masterthesis" "misc" "phd-thesis" "techreport"
+                          "mastersthesis" "misc" "phdthesis" "techreport"
                           "unpublished")))
          (bib-db-locase val #t))
         ((or (== var "type") (== var "mtype"))
@@ -379,7 +377,7 @@
 
 (define (db-get-origin)
   (if db-bib-origin
-      (list `(fb-field "origin" ,db-bib-origin))
+      (list `(db-field "origin" ,db-bib-origin))
       (list)))
 
 (tm-define (bib->db t)

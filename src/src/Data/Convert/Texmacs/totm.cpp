@@ -261,6 +261,12 @@ tm_writer::write (tree t) {
   int i, n= N(t);
   switch (L(t)) {
   case RAW_DATA:
+    if (n == 0 || !is_atomic (t[0])) {
+      // only a hand-written or damaged file has this, and <#...> holds bytes:
+      // as an ordinary tag, it loads back the same
+      apply (as_string (L(t)), A(t));
+      break;
+    }
     {
       write ("<#", false);
       string s= as_string (t[0]);

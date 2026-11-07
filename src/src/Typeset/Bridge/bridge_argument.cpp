@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "bridge.hpp"
+#include "modification.hpp"
 
 class bridge_argument_rep: public bridge_rep {
 protected:
@@ -83,18 +84,42 @@ bridge_argument_rep::notify_macro (int tp, string var, int l, path p, tree u) {
       int n= N(prefix);
       if ((var == name) && (N(p) >= n) && (head (p, n) == prefix)) {
 	p= tail (p, n);
-	switch (tp) {
-	case MACRO_ASSIGN:
-	  if (is_nil (p)) replace_bridge (body, u, body->ip);
-	  else body->notify_assign (p, u);
-	  break;
-	case MACRO_INSERT:
-	  body->notify_insert (p, u);
-	  break;
-	case MACRO_REMOVE:
-	  body->notify_remove (p, as_int (u->label));
-	  break;
+	// The place of the change need not be in the body that this bridge
+	// has (an `arg' with an index that is out of range gives a body that is
+	// an error): the change is then left to the next typesetting, which makes
+	// the body again (initialize compares it with the argument).
+	// (it is asked of the modification code itself whether the change applies to the body:
+	// nothing that reaches insert_at, remove_at and the like can then throw)
+	bool here= true;
+	if (is_nil (p)) here= (tp == MACRO_ASSIGN);
+	else {
+	  path q  = path_up (p);
+	  int  pos= last_item (p);
+	  switch (tp) {
+	  case MACRO_ASSIGN: here= is_applicable (body->st, mod_assign (p, u)); break;
+	  case MACRO_INSERT: here= is_applicable (body->st, mod_insert (q, pos, u)); break;
+	  case MACRO_REMOVE: {
+	    int nr= is_atomic (u)? as_int (u->label): -1;
+	    here= nr >= 0 && is_applicable (body->st, mod_remove (q, pos, nr));
+	    break;
+	  }
+	  default: here= false; break;
+	  }
 	}
+	if (here)
+	  switch (tp) {
+	  case MACRO_ASSIGN:
+	    if (is_nil (p)) replace_bridge (body, u, body->ip);
+	    else body->notify_assign (p, u);
+	    break;
+	  case MACRO_INSERT:
+	    body->notify_insert (p, u);
+	    break;
+	  case MACRO_REMOVE:
+	    body->notify_remove (p, as_int (u->label));
+	    break;
+	  }
+	else valid= false;
       }
       else flag= false;
     }
@@ -178,6 +203,7 @@ bridge_argument_rep::my_typeset (int desired_status) {
   list<hashmap<string,path> > old_src= env->macro_src;
   if (!is_nil (env->macro_arg)) env->macro_arg= env->macro_arg->next;
   if (!is_nil (env->macro_src)) env->macro_src= env->macro_src->next;
+  bridge_macro_scope scope (false);
   body->typeset (desired_status);
   env->macro_arg= old_var;
   env->macro_src= old_src;
