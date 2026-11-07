@@ -868,5 +868,14 @@ check "a side tool closed before its texmacs-input was typeset (#825)" \
 survived" \
       -x '(load "startup-early-close.scm")'
 
+# the case reached the canvas which is gone: without it, it would pass
+# without the crash of #825, if the editor were typeset before the close
+if ! grep -q "cannot set scroll position" "$out/$total.out"; then
+  echo "  FAILED a side tool closed before its texmacs-input was typeset (#825):"
+  echo "         the scroll position was not sent to the closed tool"
+  failed=$((failed + 1))
+  status=1
+fi
+
 echo "Total: $total checks, $failed failed"
 exit $status
