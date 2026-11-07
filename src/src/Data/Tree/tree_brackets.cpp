@@ -410,52 +410,58 @@ upgrade_above_below (tree t) {
 * Master routine for upgrading brackets
 ******************************************************************************/
 
+// One step of upgrade_brackets: when the result is to be upgraded again at
+// the same level, it is returned with again set. The steps are repeated by
+// a loop, not by a recursive call: a formula with n nested brackets needs n
+// steps, and each frame of a recursive call takes about 1 KB of the stack
+// of the program (#551).
 static array<tree>
-upgrade_brackets (array<tree> a, int level) {
+upgrade_brackets_step (array<tree> a, int level, bool& again) {
+  again= false;
   array<int> tp= symbol_types (a);
   //cout << "Upgrade " << a << ", " << tp << "\n";
   if (admits_brackets (tp)) {
     //cout << "  Downgrade dubious\n";
     array<tree> r= simplify_matching (a, downgrade_dubious (tp), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Detect french\n";
     r= simplify_matching (a, detect_french_interval (a, tp), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Detect absolute 1\n";
     r= simplify_matching (a, detect_absolute (a, tp, false), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Detect absolute 2\n";
     r= simplify_matching (a, detect_absolute (a, tp, true), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Detect probable\n";
     r= simplify_matching (a, detect_probable (a, tp), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Detect dummy substitution\n";
     if (replace_dummies (a) != a) {
       array<tree> a2= replace_dummies (a);
       array<int> tp2= symbol_types (a2);
       r= simplify_matching (a2, detect_probable (a2, tp2), level);
-      if (r != a2) return upgrade_brackets (r, level);
+      if (r != a2) { again= true; return r; }
     }
     //cout << "  Confirm all\n";
     r= simplify_matching (a, confirm_all (tp), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Missing left\n";
     if (get_preference ("automatic brackets") != "off")
       r= add_missing_left (a, tp);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     //cout << "  Missing right\n";
     if (get_preference ("automatic brackets") != "off")
       r= add_missing_right (a, tp);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
   }
   if (admits_bigops (tp)) {
     array<tree> r= prefix_split (a, tp, level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     r= infix_split (a, tp, symbol_priorities (a), level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     r= postfix_split (a, tp, level);
-    if (r != a) return upgrade_brackets (r, level);
+    if (r != a) { again= true; return r; }
     ASSERT (tp[0] == SYMBOL_OPEN_BIG, "invalid situation");
     r= upgrade_brackets (range (a, 1, N(a)), level + 1);
     tree body= concat_recompose (r);
@@ -463,6 +469,13 @@ upgrade_brackets (array<tree> a, int level) {
     r << make_around (a[0], body);
     return r;
   }
+  return a;
+}
+
+static array<tree>
+upgrade_brackets (array<tree> a, int level) {
+  bool again= true;
+  while (again) a= upgrade_brackets_step (a, level, again);
   return a;
 }
 

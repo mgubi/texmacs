@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "stack_guard.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
@@ -671,6 +672,8 @@ edit_env_rep::exec_provide (tree t) {
   return tree (ASSIGN, r, v);
 }
 
+static int keep_patterns_off= 0;
+
 tree
 edit_env_rep::exec_with (tree t) {
   int i, n= N(t), k= (n-1)>>1; // is k=0 allowed ?
@@ -684,7 +687,10 @@ edit_env_rep::exec_with (tree t) {
       string var= var_t->label;
       vars[i]= var;
       oldv[i]= read (var);
+      // (a pattern is kept by the HTML export only as a background color)
+      if (var != BG_COLOR) keep_patterns_off++;
       newv[i]= exec (t[(i<<1)+1]);
+      if (var != BG_COLOR) keep_patterns_off--;
     }
     else {
       STACK_DELETE_ARRAY(vars);
@@ -733,6 +739,9 @@ edit_env_rep::exec_compound (tree t) {
   }
 
   if (is_applicable (f)) {
+    // (a macro that calls itself: an error tree, not a stack overflow)
+    if (stack_nearly_full ())
+      return tree (_ERROR, "macro nesting too deep");
     int i, n=N(f)-1, m=N(t)-d;
     macro_arg= list<hashmap<string,tree> > (
       hashmap<string,tree> (UNINIT), macro_arg);
@@ -2419,6 +2428,23 @@ pattern_fallback (tree base, tree bg) {
   return tree (get_paper_color (bg));
 }
 
+// Whether a pattern may be kept in the HTML export (html-keep-patterns) when
+// its image is not found, and where it is a background: the label must be a
+// plain relative or absolute file name (no scheme, no quotes, no spaces)
+static bool
+safe_pattern_label (string s) {
+  if (s == "" || starts (s, "//")) return false;
+  for (int i=0; i<N(s); i++) {
+    char c= s[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') ||
+          c == '.' || c == '_' || c == '~' || c == '/' || c == '%' ||
+          c == '-'))
+      return false;
+  }
+  return true;
+}
+
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (_ERROR, "bad pattern");
@@ -2438,6 +2464,15 @@ edit_env_rep::exec_pattern (tree t) {
   url image= pattern_file (base_file_name, label);
   if (is_none (image)) {
     (void) picture_lookup ('q', label, image, 0, 0);
+    // the HTML export keeps a pattern whose image is not found here (the
+    // image may be where the page is served): the page shows it or not
+    if (env.contains ("html-keep-patterns") && keep_patterns_off == 0 &&
+        N(t) >= 3 && safe_pattern_label (label)) {
+      tree r (_PATTERN, label, exec_string (t[1]), exec_string (t[2]));
+      if (N(t) >= 4) r << exec (t[3]);
+      if (N(t) == 5) r << arg5;
+      return r;
+    }
     return pattern_fallback (base, env [BG_COLOR]);
   }
   int imw_pt, imh_pt;
