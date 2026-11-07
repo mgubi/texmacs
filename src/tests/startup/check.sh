@@ -370,8 +370,10 @@ reused buffer closed #f" \
 # texmacs-input without a name left a buffer, a view and an editor behind
 # (#776). The steps run from the event loop, which closes the buffers;
 # after the last one, only the buffer of the present widget is left. A
-# named buffer stays when its tool is closed: the code which named it may
-# use it further (the search toolbar after the search tool).
+# texmacs-input with a name reuses its buffer, whose undo history kept each
+# document it replaced; a named buffer stays when its tool is closed, with
+# a passive view: the code which named it may use it further (the search
+# toolbar after the search tool), and a new texmacs-input takes it over.
 cat > "$out/startup-side-tools.scm" <<'EOF'
 (define round 0)
 (tm-tool (startup-side-tool win)
@@ -410,15 +412,30 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
 ;; a named buffer is left to the code which named it: the search toolbar
 ;; goes on with the buffer of the search tool which it replaces
 (define named (string->url "tmfs://aux/startup-side-named"))
+(define named-round 0)
+(define (in-named thunk)
+  ;; as with-buffer (which is not loaded yet)
+  (let ((old (current-buffer)))
+    (buffer-focus named)
+    (let ((r (thunk)))
+      (buffer-focus old)
+      r)))
 (tm-tool (startup-named-tool win)
   (:name "startup named tool")
-  (texmacs-input '(document "named") '(style "generic") named))
+  (text (number->string named-round))
+  (texmacs-input `(document ,(number->string named-round))
+                 '(style "generic") named))
 (define (named-start)
+  (set! named-round (+ named-round 1))
   (tool-select :right 'startup-named-tool)
   (update-menus)
   (later named-shown))
 (define (named-shown)
   (update-forced)
+  (if (< named-round 4) (later named-start) (later named-close)))
+(define (named-close)
+  ;; a new content is not an edit that can be undone
+  (display* "CHECK named undo " (in-named undo-possibilities) "\n")
   (set-window-tools (current-window) :right '())
   (update-menus)
   (later (named-wait 20)))
@@ -429,13 +446,25 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
         (later (named-wait (- n 1)))
         (begin
           (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
-          (set! done #t)))))
+          ;; as the search toolbar does with the buffer of the search tool
+          (in-named (lambda () (init-env "bg-color" "#fff0f0")))
+          (named-again)))))
+(define (named-again)
+  (tool-select :right 'startup-named-tool)
+  (update-menus)
+  (later named-again-shown))
+(define (named-again-shown)
+  (update-forced)
+  (display* "CHECK named views " (length (buffer->views named)) "\n")
+  (set! done #t))
 (later step)
 EOF
 
 check "side tools made again close the buffers of their texmacs-input (#776)" \
       "buffers left 1
-named buffer kept #t" \
+named undo 0
+named buffer kept #t
+named views 1" \
       -x '(load "startup-side-tools.scm")'
 
 # A link whose target has a wildcard: the pattern was loaded as the name of

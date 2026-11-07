@@ -232,27 +232,28 @@ public:
         main_win= abstract_window (vw->ed->mvw->win);
       if (win_id != 0)
         window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
-  void close (bool dropped);
-  void apply () { close (false); }
+  void close (bool dropped, bool keep_buffer);
+  void apply () { close (false, false); }
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
 };
 
 class drop_embedded_command_rep: public command_rep {
   // the same, when the widget is let go without being destroyed by its
-  // window (side tools made again, #776)
+  // window (side tools made again, #776); a named buffer is kept
   command keep;
   close_embedded_command_rep* cmd;
+  bool keep_buffer;
 public:
-  drop_embedded_command_rep (command c):
-    keep (c), cmd ((close_embedded_command_rep*) c.rep) {}
-  void apply () { cmd->close (true); }
+  drop_embedded_command_rep (command c, bool kb):
+    keep (c), cmd ((close_embedded_command_rep*) c.rep), keep_buffer (kb) {}
+  void apply () { cmd->close (true, keep_buffer); }
   tm_ostream& print (tm_ostream& out) {
     return out << "<command drop_embedded>"; }
 };
 
 void
-close_embedded_command_rep::close (bool dropped) {
+close_embedded_command_rep::close (bool dropped, bool keep_buffer) {
   // the view of the buffer which is still shown by this widget, if any
   tm_view vw= NULL;
   array<url> vs= buffer_to_views (name);
@@ -272,8 +273,18 @@ close_embedded_command_rep::close (bool dropped) {
   }
   window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
   if (vw != NULL) {
-    ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
-    remove_buffer (name);
+    if (dropped && keep_buffer) {
+      // a named buffer is left to the Scheme code which named it, which may
+      // use it further (the search toolbar after the search tool): its view
+      // becomes passive again, as one of get_passive_view, and is taken
+      // over by the next texmacs-input with that name (#776)
+      vw->win= NULL;
+      vw->ed->cvw= NULL;
+    }
+    else {
+      ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
+      remove_buffer (name);
+    }
   }
   tm_delete (win);
 }
@@ -353,7 +364,17 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   url       base = get_master_buffer (get_current_buffer ());
   tm_view   curvw= concrete_view (get_current_view ());
   url       name = embedded_name (wname);
-  if (contains (name, get_all_buffers ())) set_buffer_tree (name, doc);
+  if (contains (name, get_all_buffers ())) {
+    // a new content is not an edit: the undo history would keep each
+    // document it replaces (a named texmacs-input made again, #776)
+    tree before= get_buffer_body (name);
+    set_buffer_tree (name, doc);
+    if (get_buffer_body (name) != before) {
+      array<url> vs= buffer_to_views (name);
+      for (int i=0; i<N(vs); i++)
+        view_to_editor (vs[i]) -> clear_undo_history ();
+    }
+  }
   else create_buffer (name, doc);
   tm_view   vw   = concrete_view (get_passive_view (name));
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
@@ -367,12 +388,10 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   // the widgets of the side tools of a main window are in none
   command close_cmd= close_embedded_command (vw, name, pending_window_handle);
   // When the widget is let go without being destroyed by its window (side
-  // tools made again), a buffer without a name is closed too: nothing else
-  // can use it. A named buffer is left to the Scheme code which named it,
-  // which may use it further (the buffer of the search toolbar), #776
-  command drop_cmd= (is_none (wname)?
-                     command (tm_new<drop_embedded_command_rep> (close_cmd)):
-                     command ());
+  // tools made again), its window is deleted, and a buffer without a name
+  // is closed too: nothing else can use it (#776)
+  command drop_cmd=
+    tm_new<drop_embedded_command_rep> (close_cmd, !is_none (wname));
   return wrapped_widget (win->wid, close_cmd, drop_cmd);
 }
 
