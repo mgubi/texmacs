@@ -223,12 +223,18 @@ qt_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord2>(val, s);
       coord2  p = open_box<coord2> (val);
+      // the canvas may be gone while the editor is still attached to its
+      // window: an embedded editor whose side tool was closed before it
+      // was typeset (#825)
+      if (!canvas() || !scrollarea()) {
+        cout << "qt_simple_widget_rep::send: cannot set scroll position, canvas() or scrollarea() is null" << LF;
+        break;
+      }
       QPoint qp = to_qpoint (p);
       QSize  sz = canvas()->surface()->size();
       qp -= QPoint (sz.width() / 2, sz.height() / 2);
         // NOTE: adjust because child is centered
-      if (scrollarea()) scrollarea()->setOrigin (qp);
-      else cout << "qt_simple_widget_rep::send: cannot set scroll position, scrollarea() is null" << LF;
+      scrollarea()->setOrigin (qp);
     }
       break;
       

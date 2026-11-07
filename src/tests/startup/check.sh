@@ -663,5 +663,56 @@ quit ()" \
   ;;
 esac
 
+# A side tool closed before the editor of its texmacs-input was typeset:
+# the editor stays attached to its window, whose canvas is gone, and when
+# its changes are applied, qt_simple_widget_rep::send (SLOT_SCROLL_POSITION)
+# used the canvas without checking it, as the other slots do (#825). The
+# search tool of the side tools is made as open-search makes it there,
+# without the preferences which select the side tools.
+cat > "$out/startup-early-close.scm" <<'EOF'
+(use-modules (generic search-widgets))
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define tries 0)
+(define (step1)
+  ;; the search tool in the side tools, as open-search makes it there
+  (let* ((u (current-buffer))
+         (aux (search-buffer))
+         (tool (list 'search-tool u (embedded-style-list "macro-editor")
+                     (list) aux)))
+    (buffer-set-master aux u)
+    (tool-select :bottom-right tool))
+  (later step2))
+(define (step2)
+  (update-menus)
+  (set! tries (+ tries 1))
+  (if (and (null? (buffer->views (search-buffer))) (< tries 40))
+      (later step2)
+      (begin
+        (display* "CHECK shown " (length (buffer->views (search-buffer))) "\n")
+        ;; closed before its editor was typeset
+        (set-window-tools (current-window) :bottom-right '())
+        (update-menus)
+        (later (wait 10)))))
+(define (wait n)
+  (lambda ()
+    (if (> n 0)
+        (later (wait (- n 1)))
+        (begin
+          (display* "CHECK survived\n")
+          (set! done #t)))))
+(later step1)
+EOF
+
+check "a side tool closed before its texmacs-input was typeset (#825)" \
+      "shown 1
+survived" \
+      -x '(load "startup-early-close.scm")'
+
 echo "Total: $total checks, $failed failed"
 exit $status
