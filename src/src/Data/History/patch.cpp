@@ -32,18 +32,22 @@ class compound_patch_rep: public patch_rep {
   array<patch> a;
 public:
   compound_patch_rep (array<patch> a2): a (a2) {}
+  ~compound_patch_rep ();
   int get_type () { return PATCH_COMPOUND; }
   int get_arity () { return N(a); }
   patch get_child (int i) { return a[i]; }
+  friend void release_patches (array<patch>& todo);
 };
 
 class branch_patch_rep: public patch_rep {
   array<patch> a;
 public:
   branch_patch_rep (array<patch> a2): a (a2) {}
+  ~branch_patch_rep ();
   int get_type () { return PATCH_BRANCH; }
   int get_arity () { return N(a); }
   patch get_child (int i) { return a[i]; }
+  friend void release_patches (array<patch>& todo);
 };
 
 class birth_patch_rep: public patch_rep {
@@ -61,13 +65,78 @@ class author_patch_rep: public patch_rep {
   patch p;
 public:
   author_patch_rep (double a2, patch p2): author (a2), p (p2) {}
+  ~author_patch_rep ();
   int get_type () { return PATCH_AUTHOR; }
   int get_arity () { return 1; }
   patch get_child (int i) {
     ASSERT (i == 0, "out of range");
     return p; }
   double get_author () { return author; }
+  friend void release_patches (array<patch>& todo);
 };
+
+// The archiver nests each change of an editing step in the changes before
+// it (patch (q, current)), and each step of the history in the steps
+// before it (compound and branch patches): a step of thousands of changes
+// (a Replace All), or a history of thousands of steps, is as deep. The
+// patches which only they hold are freed in a loop, not by a recursion as
+// deep (which overflowed the stack of the worker of Tau)
+void
+release_patches (array<patch>& todo) {
+  while (N(todo) > 0) {
+    patch q= todo[N(todo)-1];
+    todo[N(todo)-1]= patch (); // (resize may keep what it drops)
+    todo->resize (N(todo) - 1);
+    patch_rep* r= q.operator -> ();
+    if (r == NULL || r->ref_count != 1) continue;
+    // q holds the last reference: its children are taken out of it, so
+    // that it is freed without them, and they are released here
+    switch (r->get_type ()) {
+    case PATCH_COMPOUND:
+      {
+        compound_patch_rep* c= (compound_patch_rep*) r;
+        for (int i=0; i<N(c->a); i++) todo << c->a[i];
+        c->a= array<patch> ();
+        break;
+      }
+    case PATCH_BRANCH:
+      {
+        branch_patch_rep* c= (branch_patch_rep*) r;
+        for (int i=0; i<N(c->a); i++) todo << c->a[i];
+        c->a= array<patch> ();
+        break;
+      }
+    case PATCH_AUTHOR:
+      {
+        author_patch_rep* c= (author_patch_rep*) r;
+        todo << c->p;
+        c->p= patch ();
+        break;
+      }
+    }
+  }
+}
+
+compound_patch_rep::~compound_patch_rep () {
+  array<patch> todo; // (a copy: the array of a patch may be shared)
+  for (int i=0; i<N(a); i++) todo << a[i];
+  a= array<patch> ();
+  release_patches (todo);
+}
+
+branch_patch_rep::~branch_patch_rep () {
+  array<patch> todo;
+  for (int i=0; i<N(a); i++) todo << a[i];
+  a= array<patch> ();
+  release_patches (todo);
+}
+
+author_patch_rep::~author_patch_rep () {
+  array<patch> todo;
+  todo << p;
+  p= patch ();
+  release_patches (todo);
+}
 
 patch::patch (modification mod, modification inv):
   rep (tm_new<modification_patch_rep> (mod, inv)) { rep->ref_count= 1; }
@@ -621,21 +690,30 @@ join (patch& p1, patch p2, tree t) {
 
 void
 insert (array<patch>& a, patch p) {
-  if (get_type (p) == PATCH_COMPOUND) {
-    int i, n= N(p);
-    for (i=0; i<n; i++)
-      insert (a, p[i]);
-  }
-  else if (get_type (p) == PATCH_MODIFICATION &&
-           N(a) > 0 &&
-           get_type (a[N(a)-1]) == PATCH_MODIFICATION &&
-           (get_inverse (a[N(a)-1]) == get_modification (p) &&
-            get_modification (a[N(a)-1]) == get_inverse (p)))
-    {
-      // cout << "Cancel " << a[N(a)-1] << " against " << p << "\n";
-      a->resize (N(a) - 1);
+  // (a loop, not a recursion as deep as the nesting of the compound
+  // patches: the archiver nests each change of an editing step in the
+  // changes before it, patch (q, current), and a Replace All of thousands
+  // of hits overflowed the stack of the worker of Tau)
+  array<patch> todo;
+  todo << p;
+  while (N(todo) > 0) {
+    patch q= todo[N(todo)-1];
+    todo->resize (N(todo) - 1);
+    if (get_type (q) == PATCH_COMPOUND) {
+      for (int i= N(q) - 1; i >= 0; i--)
+        todo << q[i];
     }
-  else a << p;
+    else if (get_type (q) == PATCH_MODIFICATION &&
+             N(a) > 0 &&
+             get_type (a[N(a)-1]) == PATCH_MODIFICATION &&
+             (get_inverse (a[N(a)-1]) == get_modification (q) &&
+              get_modification (a[N(a)-1]) == get_inverse (q)))
+      {
+        // cout << "Cancel " << a[N(a)-1] << " against " << q << "\n";
+        a->resize (N(a) - 1);
+      }
+    else a << q;
+  }
 }
 
 patch

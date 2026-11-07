@@ -21,12 +21,17 @@
 * Definition of the list_observer_rep class
 ******************************************************************************/
 
+static int observer_size (observer o);
+
 class list_observer_rep: public observer_rep {
   observer o1;
   observer o2;
 
 public:
-  list_observer_rep (observer o1b, observer o2b): o1 (o1b), o2 (o2b) {}
+  int size; // the number of observers when it was made (see insert_observer)
+
+  list_observer_rep (observer o1b, observer o2b):
+    o1 (o1b), o2 (o2b), size (observer_size (o1b) + observer_size (o2b)) {}
   int get_type () { return OBSERVER_LIST; }
   tm_ostream& print (tm_ostream& out) {
     if (!is_nil (o1)) o1->print (out);
@@ -237,9 +242,42 @@ list_observer (observer o1, observer o2) {
   return tm_new<list_observer_rep> (o1, o2);
 }
 
+static int
+observer_size (observer o) {
+  if (is_nil (o)) return 0;
+  if (o->get_type () != OBSERVER_LIST) return 1;
+  return ((list_observer_rep*) o.operator -> ())->size;
+}
+
+static void
+insert_balanced (observer& o, observer what) {
+  // what is added at the right of the list o, which stays balanced as a
+  // binary counter: a list whose left part has more observers than its
+  // right part takes what in its right part, else it becomes the left part
+  // of a new list. The functions of the observers call themselves on the
+  // two parts of a list: a list which leaned to the left, as long as its
+  // observers were many (a few thousand: the hits of a search), overflowed
+  // the stack of the worker of Tau. It is as deep as the logarithm now
+  // (the sizes are those at the creation of the lists: after a removal
+  // they may be larger than they are, which unbalances, but no more).
+  // The lists are changed in place, never made again: an observer may be
+  // added while the list is told of a change (it is in the middle of it)
+  if (!is_nil (o) && o->get_type () == OBSERVER_LIST) {
+    list_observer_rep* rep= (list_observer_rep*) o.operator -> ();
+    observer& l= o->get_child (0);
+    observer& r= o->get_child (1);
+    if (observer_size (l) > observer_size (r)) {
+      insert_balanced (r, what);
+      rep->size++;
+      return;
+    }
+  }
+  o= list_observer (o, what);
+}
+
 void
 insert_observer (observer& o, observer what) {
-  o= list_observer (o, what);
+  insert_balanced (o, what);
 }
 
 void
