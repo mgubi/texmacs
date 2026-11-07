@@ -135,18 +135,20 @@ switch_widget_rep::handle (event ev) {
 
 class wrapped_widget_rep: public composite_widget_rep {
   command quit;
+  command drop;  // instead of quit, when let go before destroy (#776)
 public:
-  wrapped_widget_rep (wk_widget w, command quit);
+  wrapped_widget_rep (wk_widget w, command quit, command drop);
   ~wrapped_widget_rep ();
   void handle_destroy (destroy_event ev);
   operator tree ();
 };
 
-wrapped_widget_rep::wrapped_widget_rep (wk_widget w, command q):
-  composite_widget_rep (1), quit (q) { a[0]= w; }
+wrapped_widget_rep::wrapped_widget_rep (wk_widget w, command q, command d):
+  composite_widget_rep (1), quit (q), drop (d) { a[0]= w; }
 
 wrapped_widget_rep::~wrapped_widget_rep () {
-  if (!is_nil (quit)) quit (); }
+  // (Widkit has no queue of C++ commands: the drop runs at once)
+  if (!is_nil (quit)) (is_nil (drop)? quit: drop) (); }
 
 void
 wrapped_widget_rep::handle_destroy (destroy_event ev) {
@@ -176,6 +178,6 @@ optional_widget (wk_widget w, bool on) {
 }
 
 wk_widget
-wrapped_widget (wk_widget w, command cmd) {
-  return tm_new<wrapped_widget_rep> (w, cmd);
+wrapped_widget (wk_widget w, command cmd, command drop) {
+  return tm_new<wrapped_widget_rep> (w, cmd, drop);
 }
