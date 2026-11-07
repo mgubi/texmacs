@@ -18,13 +18,13 @@ gui_test_eval_later (string cmd) {
   exec_delayed (scheme_cmd (cmd));
 }
 
-#ifdef OS_MACOS
+#if defined(OS_MACOS) && !defined(TAU_SHELL) // (no Plugins/MacOS in Tau)
 void mac_test_panel_init (); // MacOS/mac_test_panel.mm
 #endif
 
 void
 gui_test_start () {
-#ifdef OS_MACOS
+#if defined(OS_MACOS) && !defined(TAU_SHELL) // (no Plugins/MacOS in Tau)
   // a test (TEXMACS_TEST=1, from tests/Plugins/Vue/run.sh) gets the file
   // panels of the process, which its events reach
   if (get_env ("TEXMACS_TEST") == "1") mac_test_panel_init ();
@@ -54,7 +54,7 @@ array<string> gui_test_windows () { return array<string> (); }
 void gui_test_pump (bool on) { (void) on; }
 #endif
 
-#ifndef OS_MACOS
+#if !defined(OS_MACOS) || defined(TAU_SHELL)
 array<string> gui_test_file_dialog () { return array<string> (); }
 int gui_test_file_dialog_do (string line) { (void) line; return 2; }
 #endif
