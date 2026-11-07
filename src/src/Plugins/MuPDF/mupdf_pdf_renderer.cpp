@@ -28,6 +28,8 @@
 ******************************************************************************/
 
 #include "mupdf_pdf_renderer.hpp"
+#include <stdio.h>
+#include <sys/stat.h>
 #include "mupdf_renderer.hpp"
 #include "mupdf_picture.hpp"
 #include "analyze.hpp"
@@ -258,6 +260,7 @@ public:
                           string page_type, bool landscape,
                           double paper_w, double paper_h);
   ~mupdf_pdf_renderer_rep ();
+  void finish ();
 
   bool is_printer ();
   bool is_started ();
@@ -328,6 +331,24 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
 {
   width = default_dpi * paper_w / 2.54;
   height= default_dpi * paper_h / 2.54;
+  // A file which cannot be written (in a folder which does not exist, or
+  // a folder itself) is not begun: MuPDF would fail to write it at the
+  // end, and in WebAssembly the memory was damaged after it failed (a
+  // document with an image could not be dropped, convert-more-test.scm)
+  url target= pdf_file_name;
+  if (!is_rooted_name (target)) target= resolve (target, "");
+  {
+    c_string cname (concretize (target));
+    struct stat st;
+    bool existed= stat (cname, &st) == 0;
+    FILE* f= existed && S_ISDIR (st.st_mode)? NULL: fopen (cname, "ab");
+    if (f == NULL) {
+      convert_error << "MuPDF cannot write " << pdf_file_name << LF;
+      return;
+    }
+    fclose (f);
+    if (!existed) ::remove (cname);
+  }
   fz_try (ctx) {
     doc= pdf_create_document (ctx);
     // one resource dictionary for the whole document: the pages share
@@ -402,7 +423,15 @@ pdf_encryption (pdf_write_options& opts) {
 }
 
 mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
-  if (!started) return;
+  if (started) finish ();
+}
+
+// (apart from the destructor: with the exceptions of WebAssembly, which
+// longjmp uses too, the error of MuPDF which a fz_catch of a destructor
+// takes ended the program, as an exception out of a noexcept function; a
+// PDF in a folder which does not exist, convert-more-test.scm)
+void
+mupdf_pdf_renderer_rep::finish () {
   end_page ();
   // each of these catches its own errors (see put): an error in one part
   // loses that part, as a warning, and not the document
