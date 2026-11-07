@@ -227,17 +227,8 @@ tt_font_find_sub (string name) {
   if (is_none (u)) u= tt_locate (name * ".ttf");
   if (is_none (u)) u= tt_locate (name * ".ttc");
   if (!is_none (u)) {
-    // Except for a font of TeX, which has a TFM of its name (cmsy10,
-    // msam10...): TeXmacs asks for its glyphs by their codes in the TFM,
-    // which its Type 1 file has. An sfnt file of the same name elsewhere,
-    // as the BaKoMa fonts of LyX in /usr/share/fonts on Linux (fonts-lyx,
-    // which matplotlib needs), puts them at other codes, and the symbols
-    // came out as boxes (#407). The families of the paragraph above have
-    // no TFM of their name.
-    if (exists_in_tex (name * ".tfm")) {
-      url p= tt_locate (name * ".pfb");
-      if (!is_none (p)) return p;
-    }
+    // (Tau has no TFM fonts: a font of TeX of the same name (cmsy10...)
+    // is not looked for in Type 1, #407 of the other ports)
     return u;
   }
   u= tt_locate (name * ".pfb");

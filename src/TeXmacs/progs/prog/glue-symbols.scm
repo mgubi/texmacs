@@ -100,7 +100,6 @@
 "plugin-list"
 "set-fast-environments"
 "font-exists-in-tt?"
-"tex-font-found?"
 "eval-system"
 "var-eval-system"
 "evaluate-system"
