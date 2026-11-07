@@ -467,6 +467,52 @@ named buffer kept #t
 named views 1" \
       -x '(load "startup-side-tools.scm")'
 
+# A dialog whose refreshable makes a named texmacs-input again: the newer
+# widget takes the buffer over without being registered for the dialog, so
+# the former one, let go later, must leave the registration of the dialog,
+# or Close buffer in the field closes the buffer instead of the dialog
+# (#776, a regression found by the audit of the named drop).
+cat > "$out/startup-dialog-refresh.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define name (string->url "tmfs://aux/startup-dialog-refresh"))
+(define cnt 0)
+(tm-widget ((startup-dialog) quit)
+  (refreshable "startup-dialog-refresh"
+    (resize "300px" "100px"
+      (texmacs-input `(document ,(number->string cnt))
+                     '(style "generic") name))))
+(define (step1)
+  (dialogue-window (startup-dialog) noop "Startup dialog")
+  (later step2))
+(define (step2)
+  (display* "CHECK embedded " (buffer-embedded? name) "\n")
+  (set! cnt 1)
+  (refresh-now "startup-dialog-refresh")
+  (later (wait 20)))
+(define (wait n)
+  ;; the former widget is let go at a garbage collection
+  (lambda ()
+    (gc)
+    (if (> n 0)
+        (later (wait (- n 1)))
+        (begin
+          (display* "CHECK embedded after refresh "
+                    (buffer-embedded? name) "\n")
+          (set! done #t)))))
+(later step1)
+EOF
+
+check "a dialog keeps its named texmacs-input made again by a refresh (#776)" \
+      "embedded #t
+embedded after refresh #t" \
+      -x '(load "startup-dialog-refresh.scm")'
+
 # A link whose target has a wildcard: the pattern was loaded as the name of
 # a buffer, and url-glue (the autosave names) threw a C++ exception which
 # nothing catches under -x, so that TeXmacs aborted (#771). The check is
