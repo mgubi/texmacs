@@ -164,8 +164,7 @@ wrapped_widget (widget w, command cmd) {
 
 widget
 wrapped_widget (widget w, command cmd, command drop) {
-  (void) drop;
-  return abstract (wrapped_widget (concrete (w), cmd));
+  return abstract (wrapped_widget (concrete (w), cmd, drop));
 }
 
 widget

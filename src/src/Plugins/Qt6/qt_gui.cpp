@@ -687,7 +687,8 @@ void
 gui_close () {
     // cleanly close the gui
   ASSERT (the_gui != NULL, "gui not yet open");
-  // (the widgets let go while it is deleted see no gui, #776)
+  // widgets let go while the gui is deleted must not queue commands in
+  // it (#776)
   qt_gui_rep* gui= the_gui;
   the_gui = NULL;
   tm_delete (gui);

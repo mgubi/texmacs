@@ -221,39 +221,44 @@ class close_embedded_command_rep: public command_rep {
   // not the view: the buffer may have been closed before the widget (its
   // view is deleted then), or be shown by an embedded widget made later
   // with the same name, which takes over its view (#775)
+  // A widget has two such commands, of which at most one runs: one for its
+  // destruction by its window, one for when it is let go without that
+  // (dropped: side tools made again, #776), which keeps a named buffer.
   tm_window win;
   url name;
   int win_id;
   url main_win;  // the window of the view which was current at creation
+  bool dropped;
+  bool keep_buffer;
 public:
-  close_embedded_command_rep (tm_view vw, url n2, int win2):
-    win (vw->win), name (n2), win_id (win2), main_win (url_none ()) {
+  close_embedded_command_rep (tm_view vw, url n2, int win2, bool d, bool k):
+    win (vw->win), name (n2), win_id (win2), main_win (url_none ()),
+    dropped (d), keep_buffer (k) {
       if (vw->ed->mvw != NULL && vw->ed->mvw->win != NULL)
         main_win= abstract_window (vw->ed->mvw->win);
-      if (win_id != 0)
+      if (win_id != 0 && !dropped)
         window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
-  void close (bool dropped, bool keep_buffer);
-  void apply () { close (false, false); }
+  void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
 };
 
-class drop_embedded_command_rep: public command_rep {
-  // the same, when the widget is let go without being destroyed by its
-  // window (side tools made again, #776); a named buffer is kept
-  command keep;
-  close_embedded_command_rep* cmd;
-  bool keep_buffer;
-public:
-  drop_embedded_command_rep (command c, bool kb):
-    keep (c), cmd ((close_embedded_command_rep*) c.rep), keep_buffer (kb) {}
-  void apply () { cmd->close (true, keep_buffer); }
-  tm_ostream& print (tm_ostream& out) {
-    return out << "<command drop_embedded>"; }
-};
+static void
+attach_embedded_view (tm_view vw, tm_window win) {
+  vw->win= win;
+  set_scrollable (win->wid, vw->ed);
+  vw->ed->cvw= win->wid.rep;
+}
+
+static void
+detach_embedded_view (tm_view vw) {
+  // the view becomes passive again, as one of get_passive_view
+  vw->win= NULL;
+  vw->ed->cvw= NULL;
+}
 
 void
-close_embedded_command_rep::close (bool dropped, bool keep_buffer) {
+close_embedded_command_rep::apply () {
   // the view of the buffer which is still shown by this widget, if any
   tm_view vw= NULL;
   array<url> vs= buffer_to_views (name);
@@ -271,20 +276,17 @@ close_embedded_command_rep::close (bool dropped, bool keep_buffer) {
       foc= (N(a) == 0? url_none (): a[0]);
     if (!is_none (foc)) window_focus (foc);
   }
-  // the window stays registered for the buffer when a newer widget took
-  // the buffer over: when that widget is in the same dialog (a refreshable
-  // made it again), it was not registered itself; the former widget of a
-  // named texmacs-input is let go after the newer one took over (#776)
+  // unregister the window only when it still shows the buffer, or the
+  // buffer is gone: a newer widget of the same dialog (made again by a
+  // refreshable) may have taken the buffer over without registering (#776)
   if (vw != NULL || !contains (name, get_all_buffers ()))
     window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
   if (vw != NULL) {
     if (dropped && keep_buffer) {
       // a named buffer is left to the Scheme code which named it, which may
-      // use it further (the search toolbar after the search tool): its view
-      // becomes passive again, as one of get_passive_view, and is taken
-      // over by the next texmacs-input with that name (#776)
-      vw->win= NULL;
-      vw->ed->cvw= NULL;
+      // use it further (the search toolbar after the search tool); the next
+      // texmacs-input with that name takes its view over (#776)
+      detach_embedded_view (vw);
     }
     else {
       ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
@@ -294,9 +296,9 @@ close_embedded_command_rep::close (bool dropped, bool keep_buffer) {
   tm_delete (win);
 }
 
-command
-close_embedded_command (tm_view vw, url name, int win) {
-  return tm_new<close_embedded_command_rep> (vw, name, win);
+static command
+close_embedded_command (tm_view vw, url name, int win, bool d, bool k) {
+  return tm_new<close_embedded_command_rep> (vw, name, win, d, k);
 }
 
 static path
@@ -384,19 +386,18 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   tm_view   vw   = concrete_view (get_passive_view (name));
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
   set_master_buffer (name, base);
-  vw->win= win;
-  set_scrollable (win->wid, vw->ed);
-  vw->ed->cvw= win->wid.rep;
+  attach_embedded_view (vw, win);
   vw->ed->mvw= curvw;
   // NOTE: the widget is in an alternative window only when it is made while
   // that window is being built (between window_handle and window_create);
   // the widgets of the side tools of a main window are in none
-  command close_cmd= close_embedded_command (vw, name, pending_window_handle);
-  // When the widget is let go without being destroyed by its window (side
-  // tools made again), its window is deleted, and a buffer without a name
-  // is closed too: nothing else can use it (#776)
-  command drop_cmd=
-    tm_new<drop_embedded_command_rep> (close_cmd, !is_none (wname));
+  int     id       = pending_window_handle;
+  command close_cmd= close_embedded_command (vw, name, id, false, false);
+  // when the widget is let go without being destroyed by its window (side
+  // tools made again), a buffer without a name is closed too: nothing else
+  // can use it (#776)
+  command drop_cmd = close_embedded_command (vw, name, id, true,
+                                             !is_none (wname));
   return wrapped_widget (win->wid, close_cmd, drop_cmd);
 }
 
@@ -478,9 +479,9 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   object umenu= eval ("'" * menu);
   if (which == 10 || which == 11) w= make_menu_widget (umenu, 400, 1000);
   else w= make_menu_widget (umenu);
-  // (the cache is only read for the menus and the icon bars, which < 10:
+  // the cache is only read for the menus and the icon bars (which < 10):
   // the widgets of the side and bottom tools were kept for nothing, with
-  // the buffers of their texmacs-input, #776)
+  // the buffers of their texmacs-input (#776)
   if (menu_caching && which < 10)
     if (as_bool (call ("cache-menu?", xmenu))) {
       //if (which == 10) cout << which << " -> cached" << LF;

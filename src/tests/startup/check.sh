@@ -368,18 +368,14 @@ reused buffer closed #f" \
 # an embedded editor (texmacs-input) closes its buffer only when its widget
 # is destroyed by its window. So each new content of a side tool with a
 # texmacs-input without a name left a buffer, a view and an editor behind
-# (#776). The steps run from the event loop, which closes the buffers;
-# after the last one, only the buffer of the present widget is left. A
-# texmacs-input with a name reuses its buffer, whose undo history kept each
-# document it replaced; a named buffer stays when its tool is closed, with
-# a passive view: the code which named it may use it further (the search
-# toolbar after the search tool), and a new texmacs-input takes it over.
+# (#776). The former widgets are let go at garbage collections, then close
+# their buffers from the event queue: the steps wait for that, with a
+# bound. A texmacs-input with a name reuses its buffer, whose undo history
+# kept each document it replaced; a named buffer stays when its tool is
+# closed, with a passive view: the code which named it may use it further
+# (the search toolbar after the search tool), and a new texmacs-input takes
+# it over. An unnamed input next to it shows when the tool was let go.
 cat > "$out/startup-side-tools.scm" <<'EOF'
-(define round 0)
-(tm-tool (startup-side-tool win)
-  (:name "startup side tool")
-  (text (number->string round))
-  (texmacs-input `(document ,(number->string round)) '(style "generic") #f))
 (define done #f)
 (define (later f)
   (exec-delayed
@@ -388,10 +384,21 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
         (lambda args (display* "CHECK error " args "\n") (set! done #t)))
       (when done (exit 0)))))
 (define (inputs)
-  ;; the number of buffers of texmacs-input
-  (length (list-filter (buffer-list)
-                       (lambda (u) (string-starts? (url->string u)
-                                                   "tmfs://aux/TeXmacs-input-")))))
+  ;; the number of buffers of texmacs-input without a name
+  (with prefix "tmfs://aux/TeXmacs-input-"
+    (length (list-filter (buffer-list)
+                         (lambda (u)
+                           (string-starts? (url->string u) prefix))))))
+(define (wait-until ok? n next)
+  ;; garbage collections from the event loop until (ok?), at most n
+  (lambda ()
+    (gc)
+    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
+(define round 0)
+(tm-tool (startup-side-tool win)
+  (:name "startup side tool")
+  (text (number->string round))
+  (texmacs-input `(document ,(number->string round)) '(style "generic") #f))
 (define (step)
   (set! round (+ round 1))
   (tool-select :right 'startup-side-tool)
@@ -399,18 +406,12 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (later step2))
 (define (step2)
   (update-forced)
-  (if (< round 6) (later step) (later (wait 20))))
-(define (wait n)
-  ;; the former widgets close their buffers from the event queue
-  (lambda ()
-    (gc)
-    (if (> n 0)
-        (later (wait (- n 1)))
-        (begin
-          (display* "CHECK buffers left " (inputs) "\n")
-          (named-start)))))
-;; a named buffer is left to the code which named it: the search toolbar
-;; goes on with the buffer of the search tool which it replaces
+  (if (< round 6)
+      (later step)
+      (later (wait-until (lambda () (= (inputs) 1)) 100 step3))))
+(define (step3)
+  (display* "CHECK buffers left " (inputs) "\n")
+  (named-start))
 (define named (string->url "tmfs://aux/startup-side-named"))
 (define named-round 0)
 (define (in-named thunk)
@@ -424,7 +425,8 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (:name "startup named tool")
   (text (number->string named-round))
   (texmacs-input `(document ,(number->string named-round))
-                 '(style "generic") named))
+                 '(style "generic") named)
+  (texmacs-input '(document "sentinel") '(style "generic") #f))
 (define (named-start)
   (set! named-round (+ named-round 1))
   (tool-select :right 'startup-named-tool)
@@ -438,22 +440,16 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (display* "CHECK named undo " (in-named undo-possibilities) "\n")
   (set-window-tools (current-window) :right '())
   (update-menus)
-  (later (named-wait 20)))
-(define (named-wait n)
-  (lambda ()
-    (gc)
-    (if (> n 0)
-        (later (named-wait (- n 1)))
-        (begin
-          (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
-          ;; as the search toolbar does with the buffer of the search tool
-          (in-named (lambda () (init-env "bg-color" "#fff0f0")))
-          (named-again)))))
-(define (named-again)
+  (later (wait-until (lambda () (= (inputs) 0)) 100 named-closed)))
+(define (named-closed)
+  (display* "CHECK sentinels left " (inputs) "\n")
+  (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
+  ;; as the search toolbar does with the buffer of the search tool
+  (in-named (lambda () (init-env "bg-color" "#fff0f0")))
   (tool-select :right 'startup-named-tool)
   (update-menus)
-  (later named-again-shown))
-(define (named-again-shown)
+  (later named-again))
+(define (named-again)
   (update-forced)
   (display* "CHECK named views " (length (buffer->views named)) "\n")
   (set! done #t))
@@ -463,6 +459,7 @@ EOF
 check "side tools made again close the buffers of their texmacs-input (#776)" \
       "buffers left 1
 named undo 0
+sentinels left 0
 named buffer kept #t
 named views 1" \
       -x '(load "startup-side-tools.scm")'
@@ -471,7 +468,7 @@ named views 1" \
 # widget takes the buffer over without being registered for the dialog, so
 # the former one, let go later, must leave the registration of the dialog,
 # or Close buffer in the field closes the buffer instead of the dialog
-# (#776, a regression found by the audit of the named drop).
+# (#776). An unnamed input next to it shows when the former was let go.
 cat > "$out/startup-dialog-refresh.scm" <<'EOF'
 (define done #f)
 (define (later f)
@@ -480,13 +477,25 @@ cat > "$out/startup-dialog-refresh.scm" <<'EOF'
       (catch #t f
         (lambda args (display* "CHECK error " args "\n") (set! done #t)))
       (when done (exit 0)))))
+(define (inputs)
+  ;; the number of buffers of texmacs-input without a name
+  (with prefix "tmfs://aux/TeXmacs-input-"
+    (length (list-filter (buffer-list)
+                         (lambda (u)
+                           (string-starts? (url->string u) prefix))))))
+(define (wait-until ok? n next)
+  ;; garbage collections from the event loop until (ok?), at most n
+  (lambda ()
+    (gc)
+    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
 (define name (string->url "tmfs://aux/startup-dialog-refresh"))
 (define cnt 0)
 (tm-widget ((startup-dialog) quit)
   (refreshable "startup-dialog-refresh"
     (resize "300px" "100px"
       (texmacs-input `(document ,(number->string cnt))
-                     '(style "generic") name))))
+                     '(style "generic") name))
+    (texmacs-input '(document "sentinel") '(style "generic") #f)))
 (define (step1)
   (dialogue-window (startup-dialog) noop "Startup dialog")
   (later step2))
@@ -494,22 +503,17 @@ cat > "$out/startup-dialog-refresh.scm" <<'EOF'
   (display* "CHECK embedded " (buffer-embedded? name) "\n")
   (set! cnt 1)
   (refresh-now "startup-dialog-refresh")
-  (later (wait 20)))
-(define (wait n)
-  ;; the former widget is let go at a garbage collection
-  (lambda ()
-    (gc)
-    (if (> n 0)
-        (later (wait (- n 1)))
-        (begin
-          (display* "CHECK embedded after refresh "
-                    (buffer-embedded? name) "\n")
-          (set! done #t)))))
+  (later (wait-until (lambda () (= (inputs) 1)) 100 step3)))
+(define (step3)
+  (display* "CHECK sentinels left " (inputs) "\n")
+  (display* "CHECK embedded after refresh " (buffer-embedded? name) "\n")
+  (set! done #t))
 (later step1)
 EOF
 
 check "a dialog keeps its named texmacs-input made again by a refresh (#776)" \
       "embedded #t
+sentinels left 1
 embedded after refresh #t" \
       -x '(load "startup-dialog-refresh.scm")'
 
