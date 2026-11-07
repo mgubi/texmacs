@@ -863,6 +863,7 @@ cat > "$out/startup-early-close.scm" <<'EOF'
 (later step1)
 EOF
 
+before=$failed
 check "a side tool closed before its texmacs-input was typeset (#825)" \
       "shown 1
 survived" \
@@ -870,7 +871,9 @@ survived" \
 
 # the case reached the canvas which is gone: without it, it would pass
 # without the crash of #825, if the editor were typeset before the close
-if ! grep -q "cannot set scroll position" "$out/$total.out"; then
+# (checked only when the case passed, so that a failure counts once)
+if [ $failed -eq $before ] &&
+   ! grep -aq "cannot set scroll position" "$out/$total.out"; then
   echo "  FAILED a side tool closed before its texmacs-input was typeset (#825):"
   echo "         the scroll position was not sent to the closed tool"
   failed=$((failed + 1))
