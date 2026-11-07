@@ -17,7 +17,18 @@
 #  include <emscripten/stack.h>
 long
 stack_remaining () {
-  return (long) emscripten_stack_get_free ();
+  // The stack of the program in its memory (16 MB for Tau) is not the one
+  // which overflows first: each call of WebAssembly takes a frame of the
+  // stack of the engine too, about 1 MB in node and in the workers of the
+  // browsers, and a macro which calls itself overflowed it ("Maximum call
+  // stack size exceeded") with 2 MB of the stack of the program used by the
+  // evaluator, 4.4 MB by the typesetter (node 26), less when Scheme had
+  // taken some of it (the suites). The recursions of macros stop once
+  // 512 KB of it is used: a macro which ends after 100 levels is typeset
+  long used= (long) (emscripten_stack_get_base () - emscripten_stack_get_current ());
+  long free= (long) emscripten_stack_get_free ();
+  long engine= STACK_MARGIN + 512L * 1024L - used;
+  return engine < free ? engine : free;
 }
 #elif defined (OS_MINGW)
 #  include <windows.h>
