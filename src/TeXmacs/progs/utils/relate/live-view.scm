@@ -49,6 +49,19 @@
     (ahash-set! live-views lid (make-ahash-table)))
   (ahash-ref live-views lid))
 
+;; A view is typeset by each editor of its buffer: a buffer with two views
+;; (one of them hidden, as load-buffer makes it) has two observers on the
+;; same tree, which id->trees then gives twice, and which are both told of
+;; each change (#796). The views of an identifier are its trees, each once.
+
+(tm-define (live-view-trees vid)
+  (:synopsis "The trees of the view @vid of a live document, each once")
+  (with r (list)
+    (for (t (id->trees vid))
+      (when (not (list-find r (lambda (u) (tree-eq? t u))))
+        (set! r (cons t r))))
+    (reverse r)))
+
 (tm-define (live-exists? lid)
   (with t (ahash-ref live-views lid)
     (and t (!= (ahash-size t) 0))))
@@ -74,7 +87,7 @@
 (tm-define (live-view-clean lid)
   (with t (live-view-table lid)
     (for (vid (map car (ahash-table->list t)))
-      (when (null? (id->trees vid))
+      (when (null? (live-view-trees vid))
         (live-view-remove lid vid)))))
 
 (tm-define (live-states-in-use lid)
@@ -98,7 +111,7 @@
              (new-state (live-current-state lid))
              (p (live-get-inverse-patch lid old-state))
              (cur (live-current-document lid))
-             (vts (id->trees vid)))
+             (vts (live-view-trees vid)))
         (when (!= new-state old-state)
           (for (vt vts)
             (if (and p (patch-applicable? p vt))
@@ -129,7 +142,7 @@
   (with-author live-author
     (with-global live-updating? #t
       (let* ((cur (live-current-document lid))
-             (vts (id->trees vid)))
+             (vts (live-view-trees vid)))
         (for (vt vts)
           (when (debug-get "live")
             (display* "]] Restore view " (tm->stree cur) "\n"))
@@ -152,7 +165,7 @@
   (with-author live-author
     (with-global live-updating? #t
       (let* ((old-state (live-view-get-state lid vid))
-             (vts (id->trees vid)))
+             (vts (live-view-trees vid)))
         (when (!= new-state old-state)
           (for (vt vts)
             (if (and p (patch-applicable? p vt))
@@ -192,7 +205,7 @@
 (tm-define (live-view-separate lid vid)
   (with-author live-author
     (with-global live-updating? #t
-      (with vts (id->trees vid)
+      (with vts (live-view-trees vid)
         (when (>= (length vts) 2)
           (for (vt (cdr vts))
             (tree-set (tree-ref vt :up 0) (create-unique-id))))))))
@@ -207,7 +220,7 @@
       (if (live-exists? lid)
           (delayed (:idle 1) (live-view-restore lid vid))
           (live-retrieve (tree-up t))))
-    (when (>= (length (id->trees vid)) 2)
+    (when (>= (length (live-view-trees vid)) 2)
       (delayed (:idle 1) (live-view-separate lid vid))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -216,22 +229,28 @@
 
 (define live-pending (make-ahash-table))
 
+(define live-announced (make-ahash-table)) ;; vid -> #t, until done
+
 (tm-define (live-treat-pending lid)
-  (when (ahash-ref live-pending lid)
-    (let* ((pend (ahash-ref live-pending lid))
-	   (vids (map car (ahash-table->list pend)))
+  (and-with pend (ahash-ref live-pending lid)
+    ;; the changes are taken first: an error below must not leave them to
+    ;; be applied once more with the next change
+    (ahash-remove! live-pending lid)
+    ;; (and a change whose end was not seen does not hide the next ones)
+    (for (vid (map car (ahash-table->list pend)))
+      (ahash-remove! live-announced vid))
+    (let* ((vids (map car (ahash-table->list pend)))
 	   (vid (car vids))
 	   (l (ahash-ref pend vid))
 	   (p (patch-compound (reverse l)))
 	   (new-state (live-apply-patch lid p))
-	   (ts (id->trees vid)))
+	   (ts (live-view-trees vid)))
       (if (and new-state (== (length ts) 1))
 	  (live-view-set-state lid vid new-state)
 	  (live-view-restore lid vid))
       (for (vid* (cdr vids))
 	(live-view-restore lid vid*)))
-    (live-update-views lid)
-    (ahash-remove! live-pending lid)))
+    (live-update-views lid)))
 
 (define (live-notify-patch lid vid p)
   (when (not (ahash-ref live-pending lid))
@@ -243,15 +262,23 @@
 
 (tm-define (live-notify event t mod)
   (:secure #t)
+  ;; A change of a view is announced to each observer of its tree, all
+  ;; before the change is made, and then done to each: when the view has
+  ;; several observers (one for each editor of its buffer, #796), only the
+  ;; first announcement is kept, until the change is done.
+  (when (and (== event 'done) (live-view-context? t))
+    (ahash-remove! live-announced (live-view-id t)))
   (when (and (not live-updating?)
              (== event 'announce)
              (!= (modification-type mod) 'set-cursor)
              (live-view-context? t))
     (let* ((lid (live-id t))
            (vid (live-view-id t)))
-      (when (live-view-get-state lid vid)
+      (when (and (live-view-get-state lid vid)
+                 (not (ahash-ref live-announced vid)))
         ;;(display* event ", " (tree->path t) ", "
         ;;(modification->scheme mod) "\n")
+        (ahash-set! live-announced vid #t)
         (set! mod (modification-copy mod))
         (with p (patch-pair mod (modification-invert mod t))
-          (live-notify-patch (live-id t) (live-view-id t) p))))))
+          (live-notify-patch lid vid p))))))

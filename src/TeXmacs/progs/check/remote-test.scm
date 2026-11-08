@@ -1591,6 +1591,69 @@
     (check-false (with-db (live-load "tmfs://live/srvhost/rt-none"))))
   (set! loop-blocked '()))
 
+;; A view of a live document is typeset by each editor of its buffer, and
+;; each of them puts an observer on its tree: with two views of the buffer
+;; (load-buffer makes a hidden one, a window shows another), id->trees gives
+;; the tree twice and each change is announced twice (#796). The live
+;; document is a local one (its name is no tmfs url: no server), with the
+;; client side loaded.
+
+(define (test-live-views)
+  (check-group "views of a live document in a buffer with two views")
+  (let* ((u (tmp "rt-live-view.tm"))
+         (vid "rt-live-view")
+         (llid "rt-local-live")
+         (old (current-buffer))
+         (buffers (buffer-list))
+         (view (lambda () (car (live-view-trees vid))))
+         (text (lambda () (tree->stree (tree-ref (view) 0))))
+         (ldoc (lambda () (tm->stree (live-current-document llid)))))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (buffer-set u `(document (TeXmacs ,(texmacs-version))
+                                 (style (tuple "generic" "live-document"))
+                                 (body (document (live-io* ,vid ,llid
+                                                           (document "abc"))))))
+        (switch-to-buffer u)
+        (update-forced)
+        (check-false (live-find-server llid))
+        (check= (ldoc) '(document "abc"))
+        (check= (length (id->trees vid)) 1)
+        ;; a second view of the buffer, typeset in the window
+        (window-set-view (current-window) (view-new u) #t)
+        (update-forced)
+        (check= (length (buffer->views u)) 2)
+        (check= (length (id->trees vid)) 2)
+        (check= (length (live-view-trees vid)) 1)
+        ;; a character typed in the view is in the live document once
+        (go-to (append (tree->path (tree-ref (view) 0)) '(3)))
+        (insert "x")
+        (live-treat-pending llid)
+        (check= (text) "abcx")
+        (check= (ldoc) '(document "abcx"))
+        (check= (live-view-get-state llid vid) (live-current-state llid))
+        ;; two changes which are the same, made one after the other, are
+        ;; both kept: only the announcements of one change to several
+        ;; observers are the same change
+        (tree-remove! (tree-ref (view) 0) 0 1)
+        (tree-remove! (tree-ref (view) 0) 0 1)
+        (live-treat-pending llid)
+        (check= (text) "cx")
+        (check= (ldoc) '(document "cx"))
+        ;; it is one view, not two to separate: it keeps its identifier
+        (live-view-separate llid vid)
+        (check= (tree->string (tree-ref (tree-up (view)) 0)) vid)
+        (check= (length (id->trees vid)) 2))
+      (lambda ()
+        (switch-to-buffer old)
+        (when (buffer-exists? u) (buffer-close u))
+        (live-view-remove llid vid)
+        (for (table '(live-documents live-states live-changes))
+          (ahash-remove! (priv '(utils relate live-document) table) llid))))
+    (check-false (buffer-exists? u))
+    (check= (buffer-list) buffers)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Synchronization of directories
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2248,6 +2311,7 @@
         (run-group test-db-services)
         (run-group test-chat)
         (run-group test-live)
+        (run-group test-live-views)
         (run-group test-sync-status)
         (run-group test-sync)
         (run-group test-db-sync)
