@@ -223,6 +223,10 @@ have the details, and the problems go to the
   commit is read from git at each `make` (and each CMake build) and only the
   file `System/Boot/build_revision.cpp` depends on it; with no git or in a
   source tarball nothing changes (`Custom ...`).
+- **The revision in Help > About > Summary in every language** (#791): the
+  German, Spanish, French and Italian pages of the summary now have the
+  Revision row too (Revision, Revisión, Révision, Revisione), after the
+  version, as the English and Chinese ones since #753.
 - **Cocoa: the menus which macOS computes by itself** (desktop, Cocoa
   interface): when macOS computes all the menus without opening them
   (Spotlight, Apple Intelligence), the error of a menu, such as the

@@ -6,7 +6,7 @@
   <tmdoc-title|Sommario>
 
   <big-table|<descriptive-table|<tformat|<cwith|1|1|1|1|cell-row-span|1>|<cwith|1|1|1|1|cell-col-span|2>|<cwith|1|1|1|1|cell-halign|c>|<table|<row|<cell|GNU
-  <TeXmacs>>|<cell|>>|<row|<cell|<localize|Version>>|<cell|<TeXmacs-version>>>|<row|<cell|Sistemi
+  <TeXmacs>>|<cell|>>|<row|<cell|<localize|Version>>|<cell|<TeXmacs-version>>>|<row|<cell|Revisione>|<cell|<TeXmacs-version-release|revision>>>|<row|<cell|Sistemi
   supportati>|<cell|Principalmente sistemi
   GNU/<name|Linux>>>|<row|<cell|Copyright>|<cell|<copyright> 1998\U2024 by
   Joris van der Hoeven >>|<row|<cell|Licenza>|<cell|<hlink|GNU General Public
