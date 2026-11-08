@@ -181,7 +181,9 @@
   ;; the glyphs drawn by the GPU renderer of the Vue interface, which
   ;; follows them at once (vue_gpu_follow_glyph_settings)
   ("gpu glyphs" "freetype" noop)
-  ("gpu glyph boldness" "0.22" noop)
+  ;; (0 in Tau, whose core draws its glyphs made bolder much slower: see
+  ;; mupdf_renderer.cpp, GLYPH_BOLD_DEFAULT)
+  ("gpu glyph boldness" (if (== (gui-version) "tau") "0" "0.22") noop)
   ("gpu glyph hinting" "light" noop)
   ;; the emoji: the shipped Twemoji, or those of the system (smart_font.cpp)
   ("emoji font" "default" noop)

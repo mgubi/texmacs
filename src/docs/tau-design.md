@@ -1361,7 +1361,10 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   once a glyph: 58 pixels differ from the pixels of the core on a table of
   the documentation, at the cursor, instead of 62883 with the glyphs not
   made bolder). With the commands drawn by the GPU, the bolder glyphs cost
-  nothing: their coverage is made once.
+  nothing: their coverage is made once. The preferences of Tau have the boldness
+  (2026-11-08, "Boldness of the glyphs", 0 by default there): the core
+  follows it at each turn and draws its views again, and a glyph said as
+  commands has a number for each boldness.
 - **The renderer in C++** (2026-10-16). The plan: the core in the worker
   draws its own commands with the renderer of the shell (`vue_gpu.cpp`,
   protocol 3 replayed as `tau_shell.cpp` does), on a WebGL 2 context of the

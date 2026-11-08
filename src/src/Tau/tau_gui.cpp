@@ -556,6 +556,15 @@ tau_follow_fonts () {
   }
 }
 
+// A change of the boldness of the glyphs ("gpu glyph boldness", set in the
+// preferences) shows at once: the views are drawn again
+static void
+tau_follow_glyphs () {
+  if (!mupdf_follow_glyph_settings ()) return;
+  iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
+  while (it->busy ()) ((simple_widget_rep*) it->next ())->invalid_all= true;
+}
+
 static void tau_turn_now ();
 
 // A turn which fails is said and the next one is made as usual: an error
@@ -581,6 +590,7 @@ tau_turn_now () {
   double t0= prof ? tau_now () : 0, t1= t0, t2= t0, t3= t0;
   double draw_ms= 0, draw_px= 0;
   tau_follow_fonts ();
+  tau_follow_glyphs ();
   array<simple_widget_rep*> views;
   iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
   while (it->busy ()) views << (simple_widget_rep*) it->next ();

@@ -1308,6 +1308,43 @@ test("a balloon of the document", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("the boldness of the glyphs", async p => {
+	await p.open();
+	await p.newDocument();
+	await p.scheme('(begin (do ((i 0 (+ i 1))) ((= i 12)) (insert "The quick brown fox jumps over the lazy dog.") (insert-return)))');
+	await sleep(1500);
+	// the ink of the text of the view, from a picture of the page
+	const ink = async () => {
+		const c = await p.page.$eval(".tau-pane .tau-canvas", c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, width: r.width, height: r.height }; });
+		const png = await p.page.screenshot({ clip: c, encoding: "base64" });
+		return p.page.evaluate(async png => {
+			const b = await createImageBitmap(await (await fetch("data:image/png;base64," + png)).blob());
+			const cv = new OffscreenCanvas(b.width, b.height), g = cv.getContext("2d");
+			g.drawImage(b, 0, 0);
+			const d = g.getImageData(0, 0, b.width, b.height).data;
+			// (the text only: the grey around the page is lighter)
+			let sum = 0;
+			for (let i = 0; i < d.length; i += 4) { const v = (d[i] + d[i + 1] + d[i + 2]) / 3; if (v < 128) sum += 255 - v; }
+			return sum / (d.length / 4);
+		}, png);
+	};
+	const before = await ink();
+	await p.forget();
+	await p.scheme('(set-preference "gpu glyph boldness" "0.5")');
+	await p.until("the view is drawn again", async () => (await p.got("paint")).length > 0 || (await p.got("batch")).length > 0);
+	await sleep(800);
+	const bolder = await ink();
+	check("the glyphs are bolder at once", bolder > before * 1.08, [before, bolder]);
+	await p.scheme('(set-preference "gpu glyph boldness" "0")');
+	await sleep(1500);
+	const back = await ink();
+	check("and as before again", Math.abs(back - before) < before * 0.03, [before, back]);
+	// the entry of the preferences
+	await p.scheme("(open-preferences)");
+	await p.until("the entry of the boldness", () => p.page.evaluate(() => document.body.innerText.includes("Boldness of the glyphs")), 15000);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("the preview of a reference", async p => {
 	await p.open();
 	await p.newDocument();

@@ -2738,7 +2738,10 @@ mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em) {
 void
 mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   if (mupdf_record) {
+    // (a glyph of another boldness is another glyph: the page keeps each
+    // coverage by its number, and a change of the preference shows at once)
     string key= fng->res_name * "/" * as_string (c);
+    if (glyph_bold () > 0.0) key << "/" << as_string (glyph_bold ());
     int id= record_glyph_id [key];
     if (id == 0) {
       // the glyph as MuPDF renders it, else the bitmap of TeXmacs
