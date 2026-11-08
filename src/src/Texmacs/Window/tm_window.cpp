@@ -159,7 +159,19 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   url       name = embedded_name (wname);
   if (contains (name, get_all_buffers ())) set_buffer_tree (name, doc);
   else create_buffer (name, doc);
-  url       u    = get_passive_view (name);
+  // the view of a widget made before with the same name (a texmacs-input
+  // made again: an editor in a tool which is refreshed) is taken over, so
+  // that its editor keeps its history, as the other ports do (there, the
+  // view of an embedded editor is in no window, and get_passive_view gives
+  // it); its former place goes with the former widget (close_embedded)
+  url u= url_none ();
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs) && is_none (u); i++) {
+    tm_view v= concrete_view (vs[i]);
+    if (v != NULL && v->place < 0) u= vs[i];
+  }
+  if (is_none (u)) u= get_passive_view (name);
+  else detach_view (u);
   tm_view   vw   = concrete_view (u);
   int       place= new_place (true);
   double    zoom = retina_zoom * get_doc_zoom_factor (doc);
