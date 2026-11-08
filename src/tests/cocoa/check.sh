@@ -422,6 +422,8 @@ verdict queries "the window queries of the View menu answer false in every windo
 # each
 errdefs='(tm-define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
 debug_menu=1
+# (13 steps, one a second from the fourth: more than the 14 s of the quit)
+quit_after=22000
 run menus "" "eval:(cocoa-check-errors 'before);scan;scan;scan:close;scan:close;begin-tracking;scan;scan;end-tracking;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
     "(open-error-messages)" "$errdefs"
 debug_menu=

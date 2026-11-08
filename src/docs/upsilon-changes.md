@@ -32,8 +32,9 @@ have the details, and the problems go to the
   Miscellaneous > Provoke menu error) was shown in the Error messages
   window each time, though no menu was opened. It is now only logged, and
   shown when the user really opens that menu. And an error caught in a
-  menu is again one message with its backtrace, not one message for each
-  line of the backtrace (#792).
+  menu is again 2 messages (the "caught in a menu" line, then the
+  exception with its report), not one message for each line of the
+  backtrace (#792).
 
 ## 5 November 2026
 

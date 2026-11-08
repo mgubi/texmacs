@@ -197,22 +197,31 @@ int ns_menu_stats[4]= {0, 0, 0, 0};
   // On macOS 15 it calls menuNeedsUpdate: and menuWillOpen: one after the
   // other, in the same call, and not menuDidClose: (#720); on macOS 26 the
   // scan of Spotlight showed the error, so it presumably also gives a
-  // tracking notification or menuDidClose: (#792, not measured). So none of these tells a real opening: what does is that the
-  // menu stays open while the run loop turns in the tracking of the menus
-  // (NSEventTrackingRunLoopMode), as the user looks at it. A scan does all
-  // its calls in one go, without a turn of the run loop. The error is
-  // shown at the first turn of the run loop after the opening, if the
-  // menu is still open (no menuDidClose: yet), a menu is tracked
-  // (NSMenuDidBeginTrackingNotification without its end) and the run loop
-  // is in that mode; otherwise it stays logged only, and the menu shows
-  // "Error in menu". The request is made in the common modes (default,
-  // tracking, modal panels), so that it comes at the next turn of the run
-  // loop in any of them: none stays pending for a later tracking. NOTE: if a scan of macOS kept a menu
-  // open in a tracking of the menus over a turn of the run loop, its
-  // error would be shown (ns_report_again damps the repeats)
+  // tracking notification or menuDidClose: (#792, not measured). None of
+  // these tells a real opening. The mode of the run loop does: the scan of
+  // macOS 26 runs from a block of the run loop (CFRunLoopPerformBlock) in
+  // the default mode, while the tracking of the menus by AppKit (the menu
+  // bar by the mouse and by Ctrl-F2, the submenus, the pop-ups and the
+  // context menus) runs in NSEventTrackingRunLoopMode (startMonitoringEvents:
+  // uses the mode of the session, or that one; only the pop-ups set a mode,
+  // and they set the same). So the error is shown by a request made here
+  // for the next turn of the run loop, in the common modes (default,
+  // tracking, modal panels; none stays pending for a later tracking),
+  // which reports it only if the run loop is then in
+  // NSEventTrackingRunLoopMode, the menu is still open (no menuDidClose:
+  // yet) and a menu is tracked (NSMenuDidBeginTrackingNotification
+  // without its end). Otherwise the error stays logged only, and the menu
+  // shows "Error in menu". NOTE: a scan made during a real tracking (the
+  // search of the Help menu) still shows the error, as with #761: on
+  // macOS 15 such a scan never sends menuDidClose:, so the menu counts as
+  // open (ns_report_again damps the repeats). The one known real opening
+  // whose error would only reach stdout is the remote tracking of AppKit
+  // (beginRemoteTrackingWithEvent:), if it runs in another mode.
   (void) menu;
   ns_menu_stats[2]++;
   opened= YES;
+  // (the cancel releases the retain of a pending request: keep self alive)
+  [[self retain] autorelease];
   [NSObject cancelPreviousPerformRequestsWithTarget: self
     selector: @selector(reportIfShown) object: nil];
   if (N (failure) > 0)
