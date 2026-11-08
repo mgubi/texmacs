@@ -196,8 +196,8 @@ int ns_menu_stats[4]= {0, 0, 0, 0};
   // (-[NSMenu _simulateOpening:], with Spotlight or Apple Intelligence).
   // On macOS 15 it calls menuNeedsUpdate: and menuWillOpen: one after the
   // other, in the same call, and not menuDidClose: (#720); on macOS 26 the
-  // scan of Spotlight also gave a tracking notification or menuDidClose:
-  // (#792). So none of these tells a real opening: what does is that the
+  // scan of Spotlight showed the error, so it presumably also gives a
+  // tracking notification or menuDidClose: (#792, not measured). So none of these tells a real opening: what does is that the
   // menu stays open while the run loop turns in the tracking of the menus
   // (NSEventTrackingRunLoopMode), as the user looks at it. A scan does all
   // its calls in one go, without a turn of the run loop. The error is
@@ -205,9 +205,9 @@ int ns_menu_stats[4]= {0, 0, 0, 0};
   // menu is still open (no menuDidClose: yet), a menu is tracked
   // (NSMenuDidBeginTrackingNotification without its end) and the run loop
   // is in that mode; otherwise it stays logged only, and the menu shows
-  // "Error in menu". The request is made in the common modes, so that it
-  // comes at the next turn of the run loop whatever its mode: none stays
-  // pending for a later tracking. NOTE: if a scan of macOS kept a menu
+  // "Error in menu". The request is made in the common modes (default,
+  // tracking, modal panels), so that it comes at the next turn of the run
+  // loop in any of them: none stays pending for a later tracking. NOTE: if a scan of macOS kept a menu
   // open in a tracking of the menus over a turn of the run loop, its
   // error would be shown (ns_report_again damps the repeats)
   (void) menu;

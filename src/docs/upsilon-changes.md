@@ -30,10 +30,10 @@ have the details, and the problems go to the
   Cocoa interface): on macOS 26, each opening of Spotlight computes the
   menus of TeXmacs, and the error of a menu (such as Debug >
   Miscellaneous > Provoke menu error) was shown in the Error messages
-  window each time, though no menu was opened. It is now only logged, and shown when the user
-  really opens that menu. And an error caught in a menu is again one
-  message with its backtrace, not one message for each line of the
-  backtrace (#792).
+  window each time, though no menu was opened. It is now only logged, and
+  shown when the user really opens that menu. And an error caught in a
+  menu is again one message with its backtrace, not one message for each
+  line of the backtrace (#792).
 
 ## 5 November 2026
 

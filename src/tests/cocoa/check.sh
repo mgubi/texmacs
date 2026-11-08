@@ -56,7 +56,8 @@
 #   menus    the menus computed by macOS without opening them (-[NSMenu
 #            _simulateOpening:], Spotlight and Apple Intelligence; also
 #            with a tracking notification and a menuDidClose: for each
-#            menu, as macOS 26 may do, #792) do not fill the console with
+#            menu, or within a tracking which has not ended, as macOS 26
+#            may do, #792) do not fill the console with
 #            their errors (Debug > Miscellaneous > Provoke menu error), and
 #            that menu, really opened (a tracking), shows its error in the
 #            console, as one error, not one for each line of its backtrace
@@ -415,12 +416,13 @@ queries_ok () {
 verdict queries "the window queries of the View menu answer false in every window (#720)" queries_ok
 
 # (menus) a scan of the menus by macOS (two times, then two times with a
-# tracking and a close for each menu), then the menu of the deliberate error
-# really opened. The number of the messages of the console is printed after
+# tracking and a close for each menu, then two times while a tracking began
+# and has not ended yet), then the menu of the deliberate error really
+# opened. The number of the messages of the console is printed after
 # each
 errdefs='(tm-define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
 debug_menu=1
-run menus "" "eval:(cocoa-check-errors 'before);scan;scan;scan:close;scan:close;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
+run menus "" "eval:(cocoa-check-errors 'before);scan;scan;scan:close;scan:close;begin-tracking;scan;scan;end-tracking;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
     "(open-error-messages)" "$errdefs"
 debug_menu=
 menus_ok () {
