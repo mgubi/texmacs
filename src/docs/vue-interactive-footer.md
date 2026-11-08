@@ -43,6 +43,10 @@ It is off by default: **View › Interactive status bar** (Vue and Cocoa,
 `(or (vue-gui?) (ns-gui?))`, shown while the status bar is), the preference `interactive footer` (`on` or
 `off`).
 
+Tau has it too, in its page and on its desktop (`(gui-version)` is
+`"tau"`): the core describes the two menus as parts of the interface, which
+the page draws in HTML (`docs/tau-design.md`, "The interactive status bar").
+
 The test `tests/Plugins/Vue/footer-menus` opens the menu of a theorem from
 inside a strong, makes it a lemma, types a letter, which must land in the
 strong, and opens the Document menu. `tests/Plugins/Vue/footer-variants`

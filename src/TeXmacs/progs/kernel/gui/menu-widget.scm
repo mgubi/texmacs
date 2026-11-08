@@ -123,6 +123,11 @@
 (tm-define (menu-wrap-commands wrap)
   (set! menu-command-wrapper wrap))
 
+;; (for the descriptions of Tau, menu-serial.scm, which keep it as the
+;; widgets do)
+(tm-define (menu-commands-wrapper)
+  menu-command-wrapper)
+
 (define (delay-command cmd)
   (object->command (lambda () (exec-delayed cmd))))
 

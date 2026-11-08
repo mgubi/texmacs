@@ -306,6 +306,24 @@ body.tau-busy .tau-canvas { cursor: progress; }
 #tau-footer-left, #status { overflow: hidden; text-overflow: ellipsis; }
 #tau-footer-right { margin-left: auto; color: var(--dim); }
 #status { color: var(--dim); }
+/* the interactive footer (chrome.mjs): the properties at the cursor as menus
+   at the left, the tags around it at the right, in the place of the texts */
+#tau-footer-env, #tau-footer-path { display: none; }
+.tau-footer-menus #tau-footer { align-items: center; padding-top: 1px; padding-bottom: 1px; }
+.tau-footer-menus #tau-footer-left, .tau-footer-menus #tau-footer-right { display: none; }
+.tau-footer-menus #tau-footer-env { display: flex; flex: 0 1 auto; min-width: 0; }
+.tau-footer-menus #tau-footer-path { display: flex; flex: 1 1 0; min-width: 30%; justify-content: flex-end; overflow: hidden; }
+.tau-footer-menus #status:empty { display: none; }
+.tau-footer-menus #status { flex: 0 100 auto; min-width: 0; }
+#tau-footer .tau-footer-bar { background: none; border: 0; padding: 0; }
+#tau-footer .tau-entry { padding: 1px 4px; gap: 3px; }
+#tau-footer .tau-text { padding: 0 2px; color: var(--dim); }
+#tau-footer-path > .tau-text:last-child { color: var(--text); }
+#tau-footer .tau-swatch { display: inline-flex; align-items: center; padding: 0 1px 0 4px; flex: none; }
+#tau-footer .tau-swatch .tau-color { width: 10px; height: 10px; }
+#tau-footer .tau-space { flex: none; }
+#tau-footer .tau-chevron { background: var(--bar); }
+.tau-bold { font-weight: 600; }
 </style>
 </head>
 <body class="tau-bars-left">
@@ -326,7 +344,7 @@ body.tau-busy .tau-canvas { cursor: progress; }
 </div>
 </div>
 <div id="tau-busy-bar" hidden></div>
-<div id="tau-footer"><span id="tau-working" role="status" aria-live="polite" hidden>Working…</span><span id="tau-footer-left"></span><span id="status" role="status" aria-live="polite"></span><span id="tau-footer-right"></span></div>
+<div id="tau-footer"><span id="tau-working" role="status" aria-live="polite" hidden>Working…</span><span id="tau-footer-left"></span><div id="tau-footer-env" class="tau-bar tau-footer-bar" role="toolbar" aria-label="Properties at the cursor"></div><span id="status" role="status" aria-live="polite"></span><span id="tau-footer-right"></span><div id="tau-footer-path" class="tau-bar tau-footer-bar" role="toolbar" aria-label="Tags around the cursor"></div></div>
 <script type="module" src="tau.mjs"></script>
 </body>
 </html>

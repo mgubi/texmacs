@@ -349,6 +349,25 @@
          (entry-attrs (cadr label) action (caddr label) opt-check))
         (else (values label action opt-key opt-check))))
 
+(define (serial-bold style)
+  (if (!= (logand style widget-style-bold) 0) '((bold . #t)) '()))
+
+;; The commands of the items of a promise may go through a procedure which
+;; it sets (menu-wrap-commands, menu-widget.scm): the menus of the tags of
+;; the footer run them with the cursor in the tag. It is kept for the
+;; entries, and for the submenus, whose contents are described later.
+(define (serial-wrapped action)
+  (with wrap (menu-commands-wrapper)
+    (if (not wrap) action
+        (lambda () (wrap action)))))
+
+(define (serial-with-wrapper wrap thunk)
+  (with outer (menu-commands-wrapper)
+    (dynamic-wind
+      (lambda () (menu-wrap-commands wrap))
+      thunk
+      (lambda () (menu-wrap-commands outer)))))
+
 (define (serial-entry p style)
   "The node of the entry @p: its label and its action."
   (receive (label action opt-key opt-check)
@@ -363,8 +382,9 @@
         (check . ,(entry-check opt-check action))
         (enabled . ,enabled?)
         ,@(if (!= (logand style widget-style-button) 0) '((button . #t)) '())
+        ,@(serial-bold style)
         ,@(if help `((help . ,help)) '())
-        (action . ,(serial-keep-action action))))))
+        (action . ,(serial-keep-action (serial-wrapped action)))))))
 
 ;; In the page a symbol of a palette is a picture which the core makes: the
 ;; fonts of the browser do not have all the symbols of TeXmacs (<jmath>,
@@ -432,9 +452,13 @@
     `((kind . submenu)
       (pull . ,(if (== tag '=>) "down" "right"))
       ,@(serial-label label style)
+      ,@(serial-bold style)
       (enabled . ,(active? style))
-      (contents . ,(serial-keep-contents
-                    (lambda () (serial-items-list items style #f)))))))
+      (contents . ,(with wrap (menu-commands-wrapper)
+                     (serial-keep-contents
+                      (lambda ()
+                        (serial-with-wrapper wrap
+                          (lambda () (serial-items-list items style #f))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Items
@@ -644,7 +668,8 @@
           ((== tag 'group)
            (list `((kind . group) ,@(serial-label (cadr p) style))))
           ((== tag 'text)
-           (list `((kind . text) ,@(serial-label (cadr p) style))))
+           (list `((kind . text) ,@(serial-label (cadr p) style)
+                   ,@(serial-bold style))))
           ((== tag 'glue)
            (list `((kind . glue) (hext . ,(second p)) (vext . ,(third p))
                    (width . ,(fourth p)) (height . ,(fifth p)))))
@@ -689,10 +714,14 @@
            (with dyn (eval (cadr p))
              (if dyn (serial-items dyn style bar?) '())))
           ((== tag 'promise)
-           (with value ((cadr p))
-             (if (match? value ':menu-item)
-                 (serial-items value style bar?)
-                 '())))
+           ;; (the promise may set the wrapper of the commands of its
+           ;; items, for them only)
+           (serial-with-wrapper (menu-commands-wrapper)
+             (lambda ()
+               (with value ((cadr p))
+                 (if (match? value ':menu-item)
+                     (serial-items value style bar?)
+                     '())))))
           ((== tag 'refreshable)
            (serial-refreshable
             ((cadr p))

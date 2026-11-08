@@ -1670,6 +1670,121 @@ test("a menu which changed", async p => {
 	await p.until("the footer says so", async () => (await p.page.$eval("#tau-footer-left", e => e.textContent)).includes("menu had changed"));
 });
 
+// The interactive footer (docs/vue-interactive-footer.md): the preference
+// is set in the page, which keeps nothing (no home: "nohome")
+const footerOn = p => p.page.evaluate(() => document.body.classList.contains("tau-footer-menus"));
+const footerTags = p => p.page.$$eval("#tau-footer-path .tau-submenu", l => l.map(b => ({
+	name: b.querySelector(".tau-label") ? b.querySelector(".tau-label").textContent : b.textContent,
+	bold: b.classList.contains("tau-bold") })));
+const footerLast = p => p.page.$eval("#tau-footer-path", e => e.lastElementChild ? e.lastElementChild.textContent : "");
+const footerText = p => p.page.$eval("#tau-footer-left", e => e.textContent);
+async function footerSetup(p, width, height) {
+	await p.open("", width, height);
+	await p.newDocument();
+	check("the footer is text at first", !(await footerOn(p)));
+	await p.choose("View", "Interactive status bar");
+	await p.until("the menus in the footer", () => footerOn(p));
+	// (the messages of the start are text: they go)
+	await p.scheme('(begin (make (quote theorem)) (insert "Let ") (make (quote strong)) (insert "x") (set-message "" ""))');
+	await p.until("the tags around the cursor", async () => (await footerTags(p)).some(t => t.name === "strong"));
+}
+// the entry of the open menu (the last one) whose text starts with one
+async function popupEntry(p, name) {
+	let entry = null;
+	await p.until("the entry " + name, async () => {
+		const popups = await p.page.$$(".tau-popup");
+		if (!popups.length) return false;
+		for (const h of await popups[popups.length - 1].$$(".tau-entry"))
+			if ((await h.evaluate(e => e.textContent)).trim().replace(/^[✓●]/, "").startsWith(name)) { entry = h; return true; }
+		return false;
+	});
+	return entry;
+}
+
+test("the interactive footer", async p => {
+	await footerSetup(p);
+	check("the texts are hidden", await p.page.$eval("#tau-footer-left", e => getComputedStyle(e).display === "none"));
+	const tags = await footerTags(p);
+	check("the tags, the innermost in bold", JSON.stringify(tags.slice(-2)) ===
+		'[{"name":"theorem","bold":false},{"name":"strong","bold":true}]', tags);
+	check("the character before the cursor", (await footerLast(p)) === "x", await footerLast(p));
+	const left = await p.page.$$eval("#tau-footer-env .tau-submenu", l => l.map(b => b.textContent));
+	check("the Document menu and the properties at the left", left.length > 2 && left[0].startsWith("Document"), left);
+	// the menu of the theorem, from inside the strong: it opens upwards
+	const thm = await p.find("#tau-footer-path .tau-submenu", "theorem");
+	await thm.click();
+	await p.until("its menu", () => p.count(".tau-popup .tau-entry").then(n => n > 2));
+	await sleep(300);
+	const r = await p.page.evaluate(() => {
+		const m = document.querySelector(".tau-popup").getBoundingClientRect();
+		const b = document.querySelector("#tau-footer-path .tau-open").getBoundingClientRect();
+		return { top: m.top, bottom: m.bottom, button: b.top, right: m.right, w: innerWidth };
+	});
+	check("the menu opens upwards, inside the window", r.bottom <= r.button + 1 && r.top >= 0 && r.right <= r.w, r);
+	check("Select first", (await p.page.$eval(".tau-popup .tau-entry", e => e.textContent)).includes("Select"));
+	// make it a lemma, where it is
+	await (await popupEntry(p, "Theorem")).hover();
+	await p.until("the variants", () => p.count(".tau-popup").then(n => n >= 2));
+	await (await popupEntry(p, "Lemma")).click();
+	await p.until("the theorem is a lemma", async () => (await footerTags(p)).some(t => t.name === "lemma"));
+	check("the cursor is still in the strong", (await footerTags(p)).slice(-1)[0].name === "strong", await footerTags(p));
+	// a letter goes into the strong, after the x
+	await p.type("y");
+	await p.until("the letter is before the cursor", async () => (await footerLast(p)) === "y");
+	await p.scheme('(set-message (string-append "GOT[" (tree->string (cursor-tree)) "]") "")');
+	await p.until("the letter is in the strong", async () => (await footerText(p)).includes("GOT[xy]"));
+	// a message makes the footer text again
+	check("a message is text", !(await footerOn(p)) && await p.page.$eval("#tau-footer-left", e => getComputedStyle(e).display !== "none"));
+	await p.scheme('(set-message "" "")');
+	await p.until("the menus come back", () => footerOn(p));
+	// the Document menu
+	await (await p.find("#tau-footer-env .tau-submenu", "Document")).click();
+	await p.until("the Document menu", () => p.count(".tau-popup .tau-entry").then(n => n > 3));
+	await sleep(300);
+	const doc = await p.page.$eval(".tau-popup", e => ({ text: e.textContent, top: e.getBoundingClientRect().top, bottom: e.getBoundingClientRect().bottom,
+		footer: document.getElementById("tau-footer").getBoundingClientRect().top }));
+	check("the Document menu has the style", /[Ss]tyle/.test(doc.text), doc.text.slice(0, 200));
+	check("above the footer, inside the window", doc.bottom <= doc.footer + 1 && doc.top >= 0, doc);
+	await p.key("Escape");
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
+test("the interactive footer, a right click on a tag", async p => {
+	await footerSetup(p);
+	const thm = await p.find("#tau-footer-path .tau-submenu", "theorem");
+	await p.forget();
+	await thm.click({ button: "right" });
+	await p.until("the menu of the view", async () => (await p.got("popup")).length > 0);
+	await p.until("it is shown", () => p.count(".tau-popup .tau-entry").then(n => n > 2));
+	await p.key("Escape");
+	await p.scheme('(set-message (string-append "SEL[" (if (selection-active-any?) (symbol->string (tree-label (selection-tree))) "") "]") "")');
+	await p.until("the theorem is selected", async () => (await footerText(p)).includes("SEL[theorem]"));
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
+test("the interactive footer in a narrow window", async p => {
+	await footerSetup(p, 560, 600);
+	await p.scheme('(begin (make (quote em)) (make (quote underline)) (make (quote overline)) (make (quote samp)) (insert "z") (set-message "" ""))');
+	await p.until("the tags around the cursor", async () => (await footerTags(p)).some(t => t.name === "samp"));
+	check("the outer tags fold", (await footerTags(p))[0].name === "…", await footerTags(p));
+	const tags = await footerTags(p);
+	check("the innermost tag stays in view", tags[tags.length - 1].name === "samp" && tags[tags.length - 1].bold, tags);
+	check("the room was told", (await p.sent("footer-budget")).length > 0);
+	const fits = await p.page.evaluate(() => {
+		const path = document.getElementById("tau-footer-path").getBoundingClientRect();
+		const last = document.querySelector("#tau-footer-path").lastElementChild.getBoundingClientRect();
+		return { right: last.right, path: path.right, w: innerWidth };
+	});
+	check("the end of the path is in view", fits.right <= fits.path + 1 && fits.path <= fits.w, fits);
+	// the folded tags are a menu, which opens upwards too
+	await (await p.find("#tau-footer-path .tau-submenu", "…")).click();
+	await p.until("the menu of the folded tags", () => p.count(".tau-popup .tau-entry").then(n => n >= 1));
+	const folded = await p.page.$eval(".tau-popup", e => e.textContent);
+	check("it has the theorem", folded.includes("theorem"), folded);
+	await p.key("Escape");
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 let failed = 0, ran = 0;

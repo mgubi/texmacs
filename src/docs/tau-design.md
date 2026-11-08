@@ -121,6 +121,7 @@ transferred buffers. Each has a type `t`; those which concern a view have
 | `close` | a view or a dialog was closed by the user |
 | `paste`, `drop` | the data, as text, HTML or files |
 | `file` | a file of the user, with its bytes, to open |
+| `footer-budget`, `context` | the room of the tags of the interactive footer, in characters; the menu of a view asked from a tag of the footer |
 
 **From the core**
 
@@ -1776,6 +1777,63 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   too (`basic.hpp`), although its pointers are of 32: a document taller
   than 2^31 units (about 1300 pages of A4) wrapped around; it costs about
   10% more memory for a long document.
+
+### The interactive status bar (2026-11-08)
+
+The interactive footer of upsilon (`docs/vue-interactive-footer.md`) is in
+the page too: with View › Interactive status bar (the preference
+`interactive footer`, offered when `(gui-version)` is `"tau"`, so in the
+page and on the desktop) the footer shows on the left the Document menu
+and the properties at the cursor as menus, on the right the tags around
+the cursor, from the outermost to the innermost (in bold), each a menu
+(Select, then its Focus menu, run in that tag without moving the cursor),
+the outer tags which do not fit folded into a `…` menu, then the
+character before the cursor. Messages stay text.
+
+- **The core** describes the two menus as the parts `footer-env` and
+  `footer-path` and says `footer-menus {on}` after the texts of the
+  footer, for the page as for the desktop (it did so only with
+  `TAU_DESKTOP`): `tau_footer_menus` in `tau_gui.cpp`. A part is described
+  again when its expansion changed or when `(footer-menu-key)` did (the
+  buffer and the paths of the tags: the menu of a tag holds its tree, and
+  two theorems at different places have the same expansion: the menu of
+  the tag of before would have stayed).
+- **The serialiser** keeps what `menu-widget.scm` does for these menus: a
+  promise may set a wrapper of the commands of its items
+  (`menu-wrap-commands`, read with `menu-commands-wrapper`), which the
+  entries and the submenus inside it keep (`serial-wrapped`,
+  `serial-with-wrapper`): the commands of the menu of a tag run in the
+  tag (`footer-run-in`). It had been dropped, and "Lemma" from inside a
+  strong acted on the innermost tag of its kind from the cursor. A node
+  in bold says `bold` (entries, submenus, texts).
+- **The page** (`chrome.mjs`, `index.html`) draws the two parts in
+  `#tau-footer-env` and `#tau-footer-path` in place of the texts while
+  `footer-menus` is on (`body.tau-footer-menus`). The menus open upwards,
+  above the footer, kept in the window (`place`, `"up"`); the pull-downs
+  have a small chevron; a colour is a patch; the properties scroll with
+  the chevrons of the bars when they do not fit, the path is clipped on
+  its left (it is right-aligned in a box which hides what overflows).
+  The room of the path is told to the core in characters of 7 pixels
+  (`footer-budget`, `tau_footer_budget`, which calls `footer-set-budget`
+  and describes the path again), each time the box of the path changes
+  size (a `ResizeObserver`) and when the menus come back. A right click
+  on a tag asks for the contents of its menu, runs its first entry
+  (Select) and asks for the menu of the view (`context`,
+  `tau_context_menu`, which was only for the desktop).
+- Tests (`browser-test.mjs`): the menus come with the preference; the
+  menu of a theorem, from inside a strong, opens upwards in the window,
+  makes the theorem a lemma, and a letter then lands in the strong; a
+  message is text, the menus come back; the Document menu opens above the
+  footer; a right click on a tag selects it and opens the menu of the
+  view; in a narrow window the outer tags fold into `…`, the innermost
+  one and the character stay in view. The page keeps nothing in the tests
+  (`?nohome`): the preference does not stay.
+- Not done: the page has no dark mode to follow; the budget is the
+  estimate of upsilon (measuring the names would be exact); the desktop
+  shell does not draw the bold of the innermost tag (Vue's widgets of a
+  description have no bold yet), and still sets the budget by a command
+  of Scheme, after which the path is described again only at the next
+  change of the footer.
 
 ## Order of the work
 

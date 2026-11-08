@@ -5,10 +5,10 @@
 //                { t: "text", view, text }, { t: "invoke" | "expand", number }, { t: "file", path },
 //                { t: "answer", number, args }, { t: "close", id },
 //                { t: "buffer", what, window, name }, { t: "paste", view, text, html },
-//                { t: "open", ticket, name, bytes }
+//                { t: "open", ticket, name, bytes }, { t: "footer-budget", n }, { t: "context", view }
 //                { t: "forget-home" }, { t: "fs", id, op, ... }, { t: "ping", id }
 // To the page:   { t: "ready" | "view" | "paint" | "log" | "status" | "failed", ... },
-//                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
+//                { t: "chrome" | "visible" | "footer" | "footer-menus" | "contents" | "file", part, ... },
 //                { t: "dialog" | "close" | "refresh", part, ... },
 //                { t: "buffers" | "clipboard" | "paste-request" | "pick" | "download", ... },
 //                { t: "quit", failed }, { t: "stopped", text }, { t: "progress", what, loaded, total },
@@ -222,6 +222,14 @@ function handle(m) {
 		break;
 	case "expand":
 		core._tau_expand(m.number);
+		break;
+	case "footer-budget":
+		// the room of the tags of the interactive footer, in characters
+		core._tau_footer_budget(m.n | 0);
+		break;
+	case "context":
+		// the menu of a view, asked from outside it (a tag of the footer)
+		core._tau_context_menu(m.view | 0);
 		break;
 	case "file": {
 		// a file of the core for the page (an icon): its bytes, or none

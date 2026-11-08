@@ -40,6 +40,7 @@ export function init(options) {
 		if (event.button === 2) contextAt = { x: event.clientX, y: event.clientY };
 	}, true);
 	initDialogs();
+	initFooter();
 }
 
 // The messages of the core which concern the interface
@@ -60,10 +61,23 @@ export function handle(m) {
 		if (popups.length && bar.contains(popups[0].button)) closePopups(0);
 		// the tools at the sides and under the views are laid out as dialogs
 		const tool = bar.classList.contains("tau-tool");
-		bar.replaceChildren(...renderItems(m.items, tool ? { dialog: true, row: false } : { bar: true }));
-		if (!tool) fit(bar);
+		// (the menus of the footer: their menus open upwards; the tags are
+		// clipped on their left, never scrolled)
+		const footer = bar.classList.contains("tau-footer-bar");
+		bar.replaceChildren(...renderItems(m.items, tool ? { dialog: true, row: false } : { bar: true, footer }));
+		if (!tool && m.part !== "footer-path") fit(bar);
 		return true;
 	}
+	case "footer-menus":
+		// the interactive footer (docs/vue-interactive-footer.md): its menus
+		// in the place of its texts, or the texts again (a message)
+		if (!m.on && popups.length && popups[0].button.closest("#tau-footer")) closePopups(0);
+		// (the room is told again each time they come back: the core may
+		// be another one, started again)
+		if (m.on && !document.body.classList.contains("tau-footer-menus")) footerBudget = 0;
+		document.body.classList.toggle("tau-footer-menus", !!m.on);
+		footerRoom();
+		return true;
 	case "visible": {
 		const bar = document.getElementById("tau-" + m.part);
 		if (bar) bar.hidden = !m.visible;
@@ -271,12 +285,27 @@ function renderItems(items, context) {
 			break;
 		case "glue":
 			if (context.bar && node.hext) out.push(el("span", "tau-glue"));
+			// (a space of a given width: the one before the character at the
+			// cursor in the footer)
+			else if (context.footer && node.width) {
+				const g = el("span", "tau-space");
+				g.style.width = Math.round(node.width * 0.75) + "px";
+				out.push(g);
+			}
+			break;
+		case "color":
+			// a patch of a colour (the colour of the text, in the footer)
+			{
+				const c = el("span", "tau-swatch");
+				c.append(...label(node, context));
+				out.push(c);
+			}
 			break;
 		case "group":
 			out.push(el(context.bar ? "span" : "div", "tau-group", node.label || ""));
 			break;
 		case "text":
-			out.push(el(context.bar ? "span" : "div", "tau-text", node.label || ""));
+			out.push(el(context.bar ? "span" : "div", "tau-text" + (node.bold ? " tau-bold" : ""), node.label || ""));
 			break;
 		case "entry": out.push(renderEntry(node, context)); break;
 		case "submenu": out.push(renderSubmenu(node, context)); break;
@@ -289,6 +318,7 @@ function renderEntry(node, context) {
 	const b = el("button", node.button && context.dialog ? "tau-button" : "tau-entry");
 	b.type = "button";
 	b.disabled = !node.enabled;
+	if (node.bold) b.classList.add("tau-bold");
 	if (context.bar || context.tile || context.dialog) {
 		b.append(...label(node, context));
 		if (node.check) b.classList.add("tau-pressed");
@@ -308,9 +338,12 @@ function renderSubmenu(node, context) {
 	const b = el("button", "tau-entry tau-submenu");
 	b.type = "button";
 	b.disabled = !node.enabled;
+	if (node.bold) b.classList.add("tau-bold");
 	if (context.bar || context.tile || context.dialog) {
 		b.append(...label(node, context));
-		if (node.icon || context.dialog) b.append(el("span", "tau-arrow", "▾"));
+		// (the menus of the footer open upwards)
+		if (context.footer) b.append(el("span", "tau-arrow", "▴"));
+		else if (node.icon || context.dialog) b.append(el("span", "tau-arrow", "▾"));
 		const tip = tooltip(node);
 		if (tip) b.title = tip;
 	} else {
@@ -320,8 +353,22 @@ function renderSubmenu(node, context) {
 	// the menu of a bar opens under its button, or at its right when the bar
 	// is a column (the icon bars at the left)
 	const column = () => document.body.classList.contains("tau-bars-left") && !!b.closest("#tau-icons-0, #tau-icons-1");
-	const open = () => openPopup(b, node, depth, (context.bar || context.dialog) && !column());
+	const open = () => openPopup(b, node, depth, context.footer ? "up" : (context.bar || context.dialog) && !column());
 	b.tauOpen = open; // (for the keyboard: menuKey)
+	// a right click on a tag of the footer selects it (the first entry of
+	// its menu, Select), then opens the menu of the view, as a right click
+	// in the document does
+	if (context.footer) b.addEventListener("contextmenu", event => {
+		event.preventDefault();
+		if (b.disabled) return;
+		closePopups(0);
+		expand(node.contents).then(items => {
+			const select = (items || []).find(n => n.kind === "entry");
+			if (!select || !select.enabled) return;
+			send({ t: "invoke", number: select.action });
+			send({ t: "context", view: window.tau && window.tau.active ? window.tau.active.view : 0 });
+		});
+	});
 	b.addEventListener("click", () => {
 		if (b.classList.contains("tau-open")) closePopups(depth); else open();
 	});
@@ -470,10 +517,21 @@ function keepInWindow(popup) {
 	if (r.bottom > window.innerHeight - 4) popup.style.top = Math.max(4, window.innerHeight - 4 - r.height) + "px";
 }
 
-// a menu under its button (in a bar) or at its right (in a menu), kept in
-// the window
+// a menu under its button (in a bar), above it (below is "up": in the
+// footer, under which there is no room) or at its right (in a menu), kept
+// in the window
 function place(popup, button, below) {
 	const r = button.getBoundingClientRect();
+	if (below === "up") {
+		// (above the bar of the button, not only above the button)
+		const bar = button.closest("#tau-footer") || button;
+		const top = Math.min(r.top, bar.getBoundingClientRect().top);
+		popup.style.maxHeight = Math.max(60, top - 8) + "px";
+		const w = popup.offsetWidth, h = popup.offsetHeight;
+		popup.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 4 - w)) + "px";
+		popup.style.top = Math.max(4, top - h) + "px";
+		return;
+	}
 	let x = below ? r.left : r.right - 2, y = below ? r.bottom : r.top - 4;
 	popup.style.maxHeight = (window.innerHeight - 8) + "px";
 	const w = popup.offsetWidth, h = popup.offsetHeight;
@@ -481,6 +539,34 @@ function place(popup, button, below) {
 	if (y + h > window.innerHeight - 4) y = Math.max(4, window.innerHeight - 4 - h);
 	popup.style.left = x + "px";
 	popup.style.top = y + "px";
+}
+
+// ---------------------------------------------------------------------------
+// The interactive footer
+// ---------------------------------------------------------------------------
+
+// The core folds the outer tags of the path which do not fit in the room of
+// the path (footer-split-path), counted in characters of some 7 pixels as
+// it counts them (a name, and 3 for its separator and its chevron); the
+// room is told again when it changes. What is still too wide is clipped
+// on its left (the tags near the cursor stay in view).
+const FOOTER_CHAR = 7;
+let footerBudget = 0;
+
+function footerRoom() {
+	const path = document.getElementById("tau-footer-path");
+	if (!path || !document.body.classList.contains("tau-footer-menus")) return;
+	const room = path.clientWidth;
+	if (room <= 0) return;
+	const n = Math.max(12, Math.floor(room / FOOTER_CHAR));
+	if (n === footerBudget) return;
+	footerBudget = n;
+	send({ t: "footer-budget", n });
+}
+
+function initFooter() {
+	const path = document.getElementById("tau-footer-path");
+	if (path) new ResizeObserver(() => footerRoom()).observe(path);
 }
 
 // ---------------------------------------------------------------------------
