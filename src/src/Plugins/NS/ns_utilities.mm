@@ -305,7 +305,12 @@ static const int    ns_report_keys  = 200;
 // the addresses and offsets)
 static string
 ns_report_key (string msg, string report) {
-  string key= msg;
+  // NOTE: a copy: the strings of TeXmacs share their representation, and
+  // << appends in place; with key= msg, the frames went into the message
+  // too, and so into the_exception when it is the same string (the error
+  // of a menu, see -[TMLazyMenu reportFailure]): each frame became a
+  // line of its own in the console (#792)
+  string key= copy (msg);
   int i= search_forwards ("Backtrace of C++ stack:", report);
   if (i < 0) return key;
   int n= N(report), frames= 0;
