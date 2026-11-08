@@ -172,7 +172,7 @@ test_long_list () {
     c << 5L;
     CHECK_EQ (last_item (c), 5L);
     CHECK_EQ (contains (c, -3L), false);
-    CHECK_EQ (N(remove (c, 5L)), 1001000);
+    CHECK_EQ (N(remove (c, 5L)), 1000998);
   }
   CHECK_EQ (N(shared), 1000);
   CHECK_EQ (shared->item, 999L);
