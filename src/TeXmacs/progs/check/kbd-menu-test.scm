@@ -504,6 +504,13 @@
           '(rsup "x"))
   (check= (typed-math-raw (list "pre-edit:1:^" "^" "x" "pre-edit:"))
           '(rsup "x"))
+  ;; accents committed under a name (Option+E, Option+U on macOS)
+  (check= (typed-math-raw (list (string-append "pre-edit:1:" (cork 1))
+                                "pre-edit:" "acute" "x"))
+          '(concat (rprime "'") "x"))
+  (check= (typed-math-raw (list (string-append "pre-edit:1:" (cork 1))
+                                "acute" "x" "pre-edit:"))
+          '(concat (rprime "'") "x"))
   ;; in text, the pre-edit is shown and replaced by the commit
   (in-buffer '(document "") '(0 0)
     (lambda ()

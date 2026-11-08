@@ -200,6 +200,18 @@ handle_speech (string s) {
   last_uttering= texmacs_time ();
 }
 
+static string
+accent_key (string key) {
+  // the accent typed by key, as std_accent gives it for a pre-edit (the
+  // interfaces name some committed accents, see QTMKeyboardEvent.cpp)
+  if (key == "grave") return "`";
+  if (key == "acute") return "'";
+  if (key == "hat") return "^";
+  if (key == "tilde") return "~";
+  if (key == "umlaut") return "\"";
+  return std_accent (key);
+}
+
 void
 edit_interface_rep::key_press (string gkey) {
   string zero= "a"; zero[0]= '\0';
@@ -276,7 +288,7 @@ edit_interface_rep::key_press (string gkey) {
     }
   }
   else if (pre_edit_skip) {
-    bool is_acc= (pre_edit_acc != "" && std_accent (key) == pre_edit_acc);
+    bool is_acc= (pre_edit_acc != "" && accent_key (key) == pre_edit_acc);
     pre_edit_acc= "";
     if (is_acc) return;
     string u= cork_to_utf8 (key);
@@ -286,7 +298,7 @@ edit_interface_rep::key_press (string gkey) {
   }
   else if (pre_edit_acc != "") {
     // the first key after the end of the pre-edit of an accent
-    bool is_acc= (std_accent (key) == pre_edit_acc);
+    bool is_acc= (accent_key (key) == pre_edit_acc);
     pre_edit_acc= "";
     if (is_acc) return;
     string u= cork_to_utf8 (key);
