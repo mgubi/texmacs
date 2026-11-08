@@ -75,5 +75,7 @@ if (process.argv[1] && process.argv[1].endsWith ('serve.mjs')) {
   const port = Number (process.argv[3] || 8080);
   const rate = 1000 * Number (process.argv[4] || 0); // [KB/s]
   await serve (dir, port, '127.0.0.1', null, rate);
-  console.log (`TeXmacs: http://localhost:${port}/texmacs.html`);
+  // the page of Tau is index.html, that of the browser build texmacs.html
+  const page = fs.existsSync (path.join (dir, 'index.html')) ? '' : 'texmacs.html';
+  console.log (`TeXmacs: http://localhost:${port}/${page}`);
 }
