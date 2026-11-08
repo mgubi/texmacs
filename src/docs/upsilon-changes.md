@@ -12,6 +12,27 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 9 November 2026
+
+- **A tilde in a formula is typed once** (desktop): in math mode, the dead
+  key of the tilde (Option-N on macOS) followed by another key, by Escape
+  or by a click gave a second tilde, stacked on the first (the sign
+  approx) or beside it. The editor now drops the accent which the system
+  sends again at the end of the composition, whatever the interface
+  (Cocoa, Vue, Qt) (#795).
+- **Live documents: typed text is no longer doubled** (desktop): in a live
+  document shown in a window, every other typed character was doubled and
+  the next one lost, and the window went apart from the live document of
+  the server. The two views of the document announced each change twice;
+  it is now kept once (#796).
+- **Side tools no longer keep their former contents** (desktop): each new
+  content of a side tool kept the former widgets, and a text field without
+  a name in it left a whole buffer behind (several MB each time). The
+  former contents are now let go and their buffers closed (#776; in the
+  Cocoa and Vue interfaces the buffers of such fields are still kept). And a side
+  tool closed before its text field was typeset no longer crashes the Qt
+  interface (#825).
+
 ## 8 November 2026
 
 - **Source files: a space is as wide as the other characters.** In a source

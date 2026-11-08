@@ -858,6 +858,13 @@ widget wrapped_widget (widget w, command cmd) {
   return tm_new<ns_wrapped_widget_rep> (w, cmd);
 }
 
+widget wrapped_widget (widget w, command cmd, command drop) {
+  // FIXME: the drop command of #776 (a widget let go without being
+  // destroyed by its window) is not run by the Cocoa interface yet
+  (void) drop;
+  return tm_new<ns_wrapped_widget_rep> (w, cmd);
+}
+
 widget tile_menu (array<widget> a, int cols) {
   ns_widget wid = ns_ui_element_rep::create (ns_widget_rep::tile_menu, a, cols);
   wid->add_children (a);

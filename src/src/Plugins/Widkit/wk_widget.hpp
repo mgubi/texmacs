@@ -102,7 +102,7 @@ wk_widget icon_tabs_widget (array<url> us, array<wk_widget> tabs,
                             array<wk_widget> bodies);
 wk_widget switch_widget (array<wk_widget> a, array<string> name, int init= 0);
 wk_widget optional_widget (wk_widget w, bool on= true);
-wk_widget wrapped_widget (wk_widget w, command cmd);
+wk_widget wrapped_widget (wk_widget w, command cmd, command drop= command ());
 wk_widget glue_wk_widget (bool hx=true, bool vx=true, SI w=0, SI h=0);
 wk_widget glue_wk_widget (tree c, bool hx=true, bool vx=true, SI w=0, SI h=0);
 wk_widget separator_wk_widget (SI pre=0, SI post=0, bool vert=false);

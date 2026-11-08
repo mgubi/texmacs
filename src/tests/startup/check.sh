@@ -448,6 +448,160 @@ reused buffer kept #t
 reused buffer closed #f" \
       -x '(load "startup-embedded.scm")'
 
+# Side tools made again let their former widgets go: the cache of the
+# window kept every widget of the side tools, without ever using them, and
+# an embedded editor (texmacs-input) closes its buffer only when its widget
+# is destroyed by its window. So each new content of a side tool with a
+# texmacs-input without a name left a buffer, a view and an editor behind
+# (#776). The former widgets are let go at garbage collections, then close
+# their buffers from the event queue: the steps wait for that, with a
+# bound. A texmacs-input with a name reuses its buffer, whose undo history
+# kept each document it replaced; a named buffer stays when its tool is
+# closed, with a passive view: the code which named it may use it further
+# (the search toolbar after the search tool), and a new texmacs-input takes
+# it over. An unnamed input next to it shows when the tool was let go.
+cat > "$out/startup-side-tools.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (inputs)
+  ;; the number of buffers of texmacs-input without a name
+  (with prefix "tmfs://aux/TeXmacs-input-"
+    (length (list-filter (buffer-list)
+                         (lambda (u)
+                           (string-starts? (url->string u) prefix))))))
+(define (wait-until ok? n next)
+  ;; garbage collections from the event loop until (ok?), at most n
+  (lambda ()
+    (gc)
+    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
+(define round 0)
+(tm-tool (startup-side-tool win)
+  (:name "startup side tool")
+  (text (number->string round))
+  (texmacs-input `(document ,(number->string round)) '(style "generic") #f))
+(define (step)
+  (set! round (+ round 1))
+  (tool-select :right 'startup-side-tool)
+  (update-menus)
+  (later step2))
+(define (step2)
+  (update-forced)
+  (if (< round 6)
+      (later step)
+      (later (wait-until (lambda () (= (inputs) 1)) 100 step3))))
+(define (step3)
+  (display* "CHECK buffers left " (inputs) "\n")
+  (named-start))
+(define named (string->url "tmfs://aux/startup-side-named"))
+(define named-round 0)
+(define (in-named thunk)
+  ;; as with-buffer (which is not loaded yet)
+  (let ((old (current-buffer)))
+    (buffer-focus named)
+    (let ((r (thunk)))
+      (buffer-focus old)
+      r)))
+(tm-tool (startup-named-tool win)
+  (:name "startup named tool")
+  (text (number->string named-round))
+  (texmacs-input `(document ,(number->string named-round))
+                 '(style "generic") named)
+  (texmacs-input '(document "sentinel") '(style "generic") #f))
+(define (named-start)
+  (set! named-round (+ named-round 1))
+  (tool-select :right 'startup-named-tool)
+  (update-menus)
+  (later named-shown))
+(define (named-shown)
+  (update-forced)
+  (if (< named-round 4) (later named-start) (later named-close)))
+(define (named-close)
+  ;; a new content is not an edit that can be undone
+  (display* "CHECK named undo " (in-named undo-possibilities) "\n")
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (later (wait-until (lambda () (= (inputs) 0)) 100 named-closed)))
+(define (named-closed)
+  (display* "CHECK sentinels left " (inputs) "\n")
+  (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
+  ;; as the search toolbar does with the buffer of the search tool
+  (in-named (lambda () (init-env "bg-color" "#fff0f0")))
+  (tool-select :right 'startup-named-tool)
+  (update-menus)
+  (later named-again))
+(define (named-again)
+  (update-forced)
+  (display* "CHECK named views " (length (buffer->views named)) "\n")
+  (set! done #t))
+(later step)
+EOF
+
+check "side tools made again close the buffers of their texmacs-input (#776)" \
+      "buffers left 1
+named undo 0
+sentinels left 0
+named buffer kept #t
+named views 1" \
+      -x '(load "startup-side-tools.scm")'
+
+# A dialog whose refreshable makes a named texmacs-input again: the newer
+# widget takes the buffer over without being registered for the dialog, so
+# the former one, let go later, must leave the registration of the dialog,
+# or Close buffer in the field closes the buffer instead of the dialog
+# (#776). An unnamed input next to it shows when the former was let go.
+cat > "$out/startup-dialog-refresh.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (inputs)
+  ;; the number of buffers of texmacs-input without a name
+  (with prefix "tmfs://aux/TeXmacs-input-"
+    (length (list-filter (buffer-list)
+                         (lambda (u)
+                           (string-starts? (url->string u) prefix))))))
+(define (wait-until ok? n next)
+  ;; garbage collections from the event loop until (ok?), at most n
+  (lambda ()
+    (gc)
+    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
+(define name (string->url "tmfs://aux/startup-dialog-refresh"))
+(define cnt 0)
+(tm-widget ((startup-dialog) quit)
+  (refreshable "startup-dialog-refresh"
+    (resize "300px" "100px"
+      (texmacs-input `(document ,(number->string cnt))
+                     '(style "generic") name))
+    (texmacs-input '(document "sentinel") '(style "generic") #f)))
+(define (step1)
+  (dialogue-window (startup-dialog) noop "Startup dialog")
+  (later step2))
+(define (step2)
+  (display* "CHECK embedded " (buffer-embedded? name) "\n")
+  (set! cnt 1)
+  (refresh-now "startup-dialog-refresh")
+  (later (wait-until (lambda () (= (inputs) 1)) 100 step3)))
+(define (step3)
+  (display* "CHECK sentinels left " (inputs) "\n")
+  (display* "CHECK embedded after refresh " (buffer-embedded? name) "\n")
+  (set! done #t))
+(later step1)
+EOF
+
+check "a dialog keeps its named texmacs-input made again by a refresh (#776)" \
+      "embedded #t
+sentinels left 1
+embedded after refresh #t" \
+      -x '(load "startup-dialog-refresh.scm")'
+
 # A link whose target has a wildcard: the pattern was loaded as the name of
 # a buffer, and url-glue (the autosave names) threw a C++ exception which
 # nothing catches under -x, so that TeXmacs aborted (#771). The check is
@@ -747,6 +901,69 @@ quit ()" \
       -headless -x "$atquit" -x '(load "startup-star-both.scm")'
   ;;
 esac
+
+# A side tool closed before the editor of its texmacs-input was typeset:
+# the editor stays attached to its window, whose canvas is gone, and when
+# its changes are applied, qt_simple_widget_rep::send (SLOT_SCROLL_POSITION)
+# used the canvas without checking it, as the other slots do (#825). The
+# search tool of the side tools is made as open-search makes it there,
+# without the preferences which select the side tools.
+cat > "$out/startup-early-close.scm" <<'EOF'
+(use-modules (generic search-widgets))
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define tries 0)
+(define (step1)
+  ;; the search tool in the side tools, as open-search makes it there
+  (let* ((u (current-buffer))
+         (aux (search-buffer))
+         (tool (list 'search-tool u (embedded-style-list "macro-editor")
+                     (list) aux)))
+    (buffer-set-master aux u)
+    (tool-select :bottom-right tool))
+  (later step2))
+(define (step2)
+  (update-menus)
+  (set! tries (+ tries 1))
+  (if (and (null? (buffer->views (search-buffer))) (< tries 40))
+      (later step2)
+      (begin
+        (display* "CHECK shown " (length (buffer->views (search-buffer))) "\n")
+        ;; closed before its editor was typeset
+        (set-window-tools (current-window) :bottom-right '())
+        (update-menus)
+        (later (wait 10)))))
+(define (wait n)
+  (lambda ()
+    (if (> n 0)
+        (later (wait (- n 1)))
+        (begin
+          (display* "CHECK survived\n")
+          (set! done #t)))))
+(later step1)
+EOF
+
+before=$failed
+check "a side tool closed before its texmacs-input was typeset (#825)" \
+      "shown 1
+survived" \
+      -x '(load "startup-early-close.scm")'
+
+# the case reached the canvas which is gone: without it, it would pass
+# without the crash of #825, if the editor were typeset before the close
+# (checked only when the case passed, so that a failure counts once)
+if [ $failed -eq $before ] &&
+   ! grep -aq "cannot set scroll position" "$out/$total.out"; then
+  echo "  FAILED a side tool closed before its texmacs-input was typeset (#825):"
+  echo "         the scroll position was not sent to the closed tool"
+  failed=$((failed + 1))
+  status=1
+fi
 
 echo "Total: $total checks, $failed failed"
 exit $status

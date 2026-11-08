@@ -1169,6 +1169,12 @@ VUE_WIDGET(icon_tabs_widget, array<url>, us, array<widget>, ss, array<widget>, b
 VUE_WIDGET(wrapped_widget, widget, w, command, quit);
   // copy of w, but with a separate reference counter,
   // and with a command to be called upon destruction
+widget wrapped_widget (widget w, command quit, command drop) {
+  // FIXME: the drop command of #776 (a widget let go without being
+  // destroyed by its window) is not run by the Vue interface yet
+  (void) drop;
+  return wrapped_widget (w, quit);
+}
 VUE_WIDGET(user_canvas_widget, widget, wid, int, style);
   // a widget whose contents can be scrolled
   // if the size of the inner contents exceed the specified size

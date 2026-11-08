@@ -228,6 +228,9 @@ widget responsive_icon_tabs_widget (array<url> us, array<widget> ss, array<widge
 widget wrapped_widget (widget w, command quit);
   // copy of w, but with a separate reference counter,
   // and with a command to be called upon destruction
+widget wrapped_widget (widget w, command quit, command drop);
+  // the same, with a command called instead of quit when the widget is let
+  // go without having been destroyed by its window (#776)
 widget user_canvas_widget (widget wid, int style= 0);
   // a widget whose contents can be scrolled
   // if the size of the inner contents exceed the specified size
