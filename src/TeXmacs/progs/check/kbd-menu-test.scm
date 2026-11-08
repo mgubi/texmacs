@@ -1249,9 +1249,7 @@
           (set! places-number number)
           (set! kbd-menu-test-closing? #f)
           (check-true (not (and (pair? r) (== (car r) 'error)))))
-        ;; (Tau: the last place stays, the page has nothing else to show,
-        ;; and closing it neither kills it nor quits, tm-server.scm)
-        (check= kbd-menu-test-closed '())))))
+        (check= kbd-menu-test-closed '(quit))))))
 
 ;; A document shown in several windows (#463): closing one of them leaves the
 ;; document in the other, without asking about its changes; the document is

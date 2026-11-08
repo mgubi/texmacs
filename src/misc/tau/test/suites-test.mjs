@@ -28,7 +28,11 @@ for (const line of fs.readFileSync(path.join(here, "suites-expected.txt"), "utf8
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "tau-suites-"));
 const code = '(begin (use-modules (check check-master)) (display* "RESULT " (run-all-tests) "\\n") (quit-TeXmacs))';
-const run = spawnSync(process.execPath, [core, "-headless", "-x", code], {
+// (not -headless: the core of Tau has its places and its views without a
+// window system, and the checks of upsilon need the changes applied to the
+// view, apply-changes, which a headless TeXmacs skips: the cursor by the
+// keyboard, the mouse, presentation mode...)
+const run = spawnSync(process.execPath, [core, "-x", code], {
 	env: { ...process.env, TEXMACS_PATH: texmacs, TEXMACS_HOME_PATH: path.join(home, ".TeXmacs"), HOME: home },
 	encoding: "utf8", maxBuffer: 1 << 28, timeout: 15 * 60 * 1000
 });

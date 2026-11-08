@@ -10,16 +10,17 @@ version: one width expected of the TeX fonts (25755 for 25754)
 parse: two Julia declarations are read back from the glyphs of an EPS file, which Tau writes with OpenType fonts (the check passes in maxs_texmacs, native and WebAssembly)
 
 # Since the merge of upsilon_texmacs (2026-11-07): suites of upsilon, or new
-# checks in them, which do not pass in Tau
+# checks in them, which do not pass in Tau. The suites run without -headless
+# (suites-test.mjs): apply-changes then typesets as in a window, which the
+# checks of the cursor, the mouse and presentation mode need
 latex: the export of struck and highlighted text is checked with pdflatex; there are no processes in WebAssembly
 formats: the static formulas of the HTML export are checked with the names of the TeX fonts (cmmi10...); "roman" is Latin Modern in Tau
-office: the images of office documents (style office, tmoffice drawings, the media of a document changed in TeXmacs); failed before the merge already
 web-files: the server of the checks is python3; there are no processes in WebAssembly
 print: the preview of a document is a PDF opened by a program of the system
 fonts: ideographs and hangul of the fonts of the system, which Tau does not see
 read-only: a console is closed by the program (alt-window-delete), which in Tau takes its dialog away without its quit command (only the page closing it calls it)
-editing: the alternative windows of embedded editors (Tau has none: a buffer in a dialog is embedded at once), and the mouse and the cursor in long documents and at the start of a line, which need a typeset view of a window (to be looked at)
-code: the menu Focus of source files and the history of an editor in a widget, which need the widgets that make-menu-widget does not make in Tau (to be looked at)
-code-lines: the widths, the soft line breaks and the cursor of lines of code differ (to be looked at)
-links: the files of the parts which are made not writable are written all the same under node (to be looked at)
-kbd-menu: the informative flags in presentation mode stay those of the document in the view which is full screen (to be looked at)
+links: the checks make files not writable with (system "chmod a-w ..."), which does nothing without processes (the file stays writable: checked); the other failures of the part views (the style of the master, "changed on disk") follow from the save which was not refused
+editing: embedded buffers: Tau has no alternative windows (alt-window-create-* do nothing, tm_window.cpp) and a buffer in a dialog is embedded as soon as its view has a place (alt-window-search gives (1)); cursor in a very tall document: SI is 32 bits in WebAssembly (basic.hpp, SI_32 with pointers of 4 bytes), and the 400 m of paper of the check are beyond 2^31 units (upsilon's fix, b59f35e68f, is for SI of 64 bits); structure: as math-edit
+code-lines: the ink of a tab (the arrow of typeset_prog_tab, taller than the letters in Latin Modern, which the code lines leave out) and the rows of a shrunk fraction (Latin Modern Math) differ from those of the TeX fonts (cmtt, cmsy) which upsilon's checks get under "roman"
+kbd-menu: closing the only window quits in upsilon, while Tau keeps its last place (safely-kill-place, tm-server.scm); the menus in math and the entering of math fail as math-edit
+math-edit: after a source file was visited (the code suite before it), the bracket highlighting of programs (prog-highlight-brackets?, a hook of notify-cursor-moved) reads the mode at the cursor in the middle of an edit, before it is typeset; the editor keeps that environment (cur, typeset_exec_until) until apply_changes, which the checks do not call, and (make 'math) then gives get-env "mode" = "text" (passes alone; why upsilon is not affected is not known yet)

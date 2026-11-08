@@ -1764,9 +1764,12 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   recursion of macros counts with the engine's stack; a PDF which cannot be
   written ended the core (an error now). The node core for the tests has
   4 GB of memory (the suites, all in one process, took more than 2).
-  Twelve suites of upsilon, or new checks in them, do not pass in Tau:
-  they are in `misc/tau/test/suites-expected.txt` with their reasons,
-  five of them still to be looked at.
+  The suites run without `-headless` (a headless TeXmacs skips
+  apply-changes, which the checks of the cursor, the mouse and the
+  presentation mode need). Eleven suites of upsilon, or new checks in
+  them, do not pass in Tau: they are in `misc/tau/test/suites-expected.txt`
+  with their causes (no processes, no TeX fonts, no alternative windows,
+  SI of 32 bits in WebAssembly...); math-edit's is still to be understood.
 
 ## Order of the work
 
