@@ -499,7 +499,7 @@
     ;; a composed letter is typed as the accent and the letter
     (check= (typed-math-raw (list acc (cork #xe3) "pre-edit:")) "<sim>a")
     (check= (typed-math-raw (list acc "pre-edit:" (cork #xe3))) "<sim>a"))
-  ;; another accent
+  ;; another accent ("^ ^" is no shortcut: these only guard the drop)
   (check= (typed-math-raw (list "pre-edit:1:^" "pre-edit:" "^" "x"))
           '(rsup "x"))
   (check= (typed-math-raw (list "pre-edit:1:^" "^" "x" "pre-edit:"))
