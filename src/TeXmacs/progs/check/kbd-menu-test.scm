@@ -462,6 +462,62 @@
   (check= (typed-math "[") '(around* "[" "" "]"))
   (check= (typed-math "{") '(around* "{" "" "}")))
 
+(define (typed-math-raw keys)
+  ;; the formula obtained by sending the list of keys, as the GUI sends
+  ;; them (pre-edits of the input methods included), in an empty formula
+  (with r #f
+    (in-buffer '(document (math "")) '(0 0 0)
+      (lambda ()
+        (for-each (lambda (k) (edit-step (lambda () (keyboard-press k 0))))
+                  keys)
+        (with m (cadr (body))
+          (set! r (if (func? m 'math 1) (cadr m) (list 'not-math m))))))
+    r))
+
+(define (test-dead-accents-math)
+  ;; A dead key (Option+N on macOS for ~) makes the input method show the
+  ;; accent as a pre-edit; in math, TeXmacs inserts it at once instead.
+  ;; When the input method then commits the accent itself (the dead key is
+  ;; followed by a key which it does not compose with, by Escape, by a
+  ;; click), it must not be inserted a second time (#795): "~ ~" is the
+  ;; shortcut of <approx>. Qt commits before ending the pre-edit, Cocoa
+  ;; and SDL end the pre-edit first.
+  (check-group "dead accents in math")
+  (with acc "pre-edit:1:~"
+    ;; Qt: the commit, then the end of the pre-edit
+    (check= (typed-math-raw (list acc "~" "pre-edit:")) "<sim>")
+    (check= (typed-math-raw (list acc "~" "x" "pre-edit:")) "<sim>x")
+    ;; Cocoa, SDL: the end of the pre-edit, then the commit
+    (check= (typed-math-raw (list acc "pre-edit:" "~")) "<sim>")
+    (check= (typed-math-raw (list acc "pre-edit:" "~" "x")) "<sim>x")
+    ;; a tilde typed afterwards is inserted
+    (check= (typed-math-raw (list acc "pre-edit:" "~" "x" "~")) "<sim>x<sim>")
+    (check= (typed-math-raw (list acc "~" "pre-edit:" "x" "~")) "<sim>x<sim>")
+    ;; the pre-edit ended without a commit: the next key is not lost
+    (check= (typed-math-raw (list acc "pre-edit:" "x")) "<sim>x")
+    (check= (typed-math-raw (list acc "pre-edit:" "backspace")) "")
+    ;; a composed letter is typed as the accent and the letter
+    (check= (typed-math-raw (list acc (cork #xe3) "pre-edit:")) "<sim>a")
+    (check= (typed-math-raw (list acc "pre-edit:" (cork #xe3))) "<sim>a"))
+  ;; another accent ("^ ^" is no shortcut: these only guard the drop)
+  (check= (typed-math-raw (list "pre-edit:1:^" "pre-edit:" "^" "x"))
+          '(rsup "x"))
+  (check= (typed-math-raw (list "pre-edit:1:^" "^" "x" "pre-edit:"))
+          '(rsup "x"))
+  ;; accents committed under a name (Option+E, Option+U on macOS)
+  (check= (typed-math-raw (list (string-append "pre-edit:1:" (cork 1))
+                                "pre-edit:" "acute" "x"))
+          '(concat (rprime "'") "x"))
+  (check= (typed-math-raw (list (string-append "pre-edit:1:" (cork 1))
+                                "acute" "x" "pre-edit:"))
+          '(concat (rprime "'") "x"))
+  ;; in text, the pre-edit is shown and replaced by the commit
+  (in-buffer '(document "") '(0 0)
+    (lambda ()
+      (for-each (lambda (k) (edit-step (lambda () (keyboard-press k 0))))
+                (list "pre-edit:1:~" "pre-edit:" "~"))
+      (check= (body) '(document "~")))))
+
 ;; Without a window, the environment at the cursor (get-env, in-math?)
 ;; is the one of the last typesetting. Once the keyboard maps of programs
 ;; are loaded (by a key lookup in a program), the first key after $ in
@@ -1796,6 +1852,7 @@
   (test-bindings-math)
   (test-typing-text)
   (test-typing-math)
+  (test-dead-accents-math)
   (test-typing-math-mode)
   (test-typing-table)
   (test-kbd-map)

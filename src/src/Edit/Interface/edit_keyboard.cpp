@@ -200,6 +200,18 @@ handle_speech (string s) {
   last_uttering= texmacs_time ();
 }
 
+static string
+accent_key (string key) {
+  // the accent typed by key, as std_accent gives it for a pre-edit (the
+  // interfaces name some committed accents, see QTMKeyboardEvent.cpp)
+  if (key == "grave") return "`";
+  if (key == "acute") return "'";
+  if (key == "hat") return "^";
+  if (key == "tilde") return "~";
+  if (key == "umlaut") return "\"";
+  return std_accent (key);
+}
+
 void
 edit_interface_rep::key_press (string gkey) {
   string zero= "a"; zero[0]= '\0';
@@ -237,17 +249,27 @@ edit_interface_rep::key_press (string gkey) {
           tm_char_forwards (s, pos);
         break;
       }
+    // NOTE: the pre-edit of a dead accent (e.g. "~" in math mode) is not
+    // shown, the accent is inserted at once and pre_edit_acc remembers it.
+    // When the input method commits the accent itself (dead key followed
+    // by a key it does not compose with, by a click...), it was already
+    // inserted and is dropped.  Qt commits it before ending the pre-edit,
+    // Cocoa and SDL end the pre-edit first: pre_edit_acc then stays set
+    // for the next key only.
     if (as_bool (call ("disable-pre-edit?", std_accent (s)))) {
       pre_edit_skip= false;
+      pre_edit_acc= "";
       if (s == "") return;
       pre_edit_skip= true;
       key= std_accent (s);
+      pre_edit_acc= key;
     }
     else if (pre_edit_skip) {
       if (s == "") pre_edit_skip= false;
       return;
     }
     else {
+      pre_edit_acc= "";
       if (s == "") return;
       interrupt_shortcut ();
       pre_edit_s= s;
@@ -266,10 +288,23 @@ edit_interface_rep::key_press (string gkey) {
     }
   }
   else if (pre_edit_skip) {
+    bool is_acc= (pre_edit_acc != "" && accent_key (key) == pre_edit_acc);
+    pre_edit_acc= "";
+    if (is_acc) return;
     string u= cork_to_utf8 (key);
     string r= as_string (call ("downgrade-pre-edit", u));
     if (r == "") return;
     else key= r;
+  }
+  else if (pre_edit_acc != "") {
+    // the first key after the end of the pre-edit of an accent
+    bool is_acc= (accent_key (key) == pre_edit_acc);
+    pre_edit_acc= "";
+    if (is_acc) return;
+    string u= cork_to_utf8 (key);
+    string r= as_string (call ("downgrade-pre-edit", u));
+    // unlike during the pre-edit, a key which is not downgraded is kept
+    if (r != "") key= r;
   }
   
   string new_sh= N(sh_s)==0? key: sh_s * " " * key;
@@ -438,6 +473,8 @@ edit_interface_rep::handle_keyboard_focus (bool has_focus, time_t t) {
     drag_right_reset ();
   }
   got_focus= has_focus; (void) t;
+  // a pre-edit which ended with the loss of the focus was not committed
+  if (!has_focus) pre_edit_acc= "";
   notify_change (THE_FREEZE);
   notify_change (THE_FOCUS);
   if (got_focus) {

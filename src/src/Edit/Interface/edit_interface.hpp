@@ -35,6 +35,7 @@ protected:
   string        sh_s;          // current string for shortcuts
   double        sh_mark;       // 0 or mark for undoing shortcut
   bool          pre_edit_skip; // temporarily disabled pre-edit mechanism
+  string        pre_edit_acc;  // accent inserted for a disabled pre-edit
   string        pre_edit_s;    // pre-edit string
   double        pre_edit_mark; // 0 or mark for undoing pre-edit
   widget        popup_win;     // the current popup window
