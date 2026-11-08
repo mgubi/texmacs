@@ -301,6 +301,18 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|8 November 2026>
+
+  <\itemize>
+    <item>Very tall documents (more than about 1300 pages of A4) are placed
+    and drawn as on the desktop, and the arrow keys no longer send the cursor
+    far away in them.
+
+    <item>In a source file, a space is as wide as the other characters, as
+    in a document: the cursor, the line breaks and the tabs are in their
+    places.
+  </itemize>
+
   <paragraph|31 October 2026>
 
   <\itemize>

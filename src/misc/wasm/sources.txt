@@ -346,6 +346,7 @@ Texmacs/Window/tm_window.cpp
 Typeset/Boxes/Animate/animate_boxes.cpp
 Typeset/Boxes/Basic/basic_boxes.cpp
 Typeset/Boxes/Basic/boxes.cpp
+Typeset/Boxes/Basic/code_boxes.cpp
 Typeset/Boxes/Basic/font_debug_boxes.cpp
 Typeset/Boxes/Basic/rubber_boxes.cpp
 Typeset/Boxes/Basic/stretch_boxes.cpp
@@ -368,6 +369,7 @@ Typeset/Boxes/Modifier/modifier_boxes.cpp
 Typeset/Bridge/bridge.cpp
 Typeset/Bridge/bridge_argument.cpp
 Typeset/Bridge/bridge_auto.cpp
+Typeset/Bridge/bridge_code.cpp
 Typeset/Bridge/bridge_compound.cpp
 Typeset/Bridge/bridge_default.cpp
 Typeset/Bridge/bridge_docrange.cpp

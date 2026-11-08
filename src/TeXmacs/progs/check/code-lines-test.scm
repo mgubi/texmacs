@@ -117,6 +117,57 @@
     (check= (length code) 7)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The spaces, in the font of source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The checks above get cmtt under "tt", whose space glyph is a cell. Source
+;; files are in Inconsolata (the preference "editor:code font"), a smart font
+;; made of an OpenType font, whose space glyph is not a cell (2363 units for
+;; cells of 2151 here, at 10pt) where a paragraph puts a space of the font
+;; (fn->spc), a cell: code_xpos (code_boxes.cpp) advances a space by fn->spc
+;; as well. Without it, "int a;" was 13115 units wide instead of 12903.
+
+(define code-font "Inconsolatazi4")
+
+(define (font-doc code? l)
+  (with body `(document ,@l)
+    `(document (with "font" ,code-font "language" "verbatim"
+                 ,(if code? `(with "code-lines" "true" ,body) body)))))
+
+(define (line-width code? i)
+  (with r (tree-bounding-rectangle
+           (path->tree (apply at (line-path code? i))))
+    (- (caddr r) (car r))))
+
+(define (test-code-font-spaces)
+  (check-group "a space is as wide as in a paragraph, in the font of sources")
+  (let ((plain #f) (code #f) (plain-moves #f) (code-moves #f))
+    (with-body (font-doc #f lines)
+      (lambda () (set! plain (rects #f)) (set! plain-moves (moves #f))))
+    (with-body (font-doc #t lines)
+      (lambda () (set! code (rects #t)) (set! code-moves (moves #t))))
+    (check-true (list? plain))
+    (check= code plain)
+    (check= code-moves plain-moves))
+  ;; the font is monospaced: a line is as wide with its spaces as with
+  ;; letters in their places, in a paragraph and in the lines of code
+  (let* ((sp "  b = 2;  c")
+         (xs "xxbx=x2;xxc")
+         (widths (lambda (code?)
+                   (with r #f
+                     (with-body (font-doc code? (list sp xs))
+                       (lambda ()
+                         (set! r (list (line-width code? 0)
+                                       (line-width code? 1)))))
+                     r))))
+    (with plain (widths #f)
+      (check-true (list? plain))
+      (check= (car plain) (cadr plain)))
+    (with code (widths #t)
+      (check-true (list? code))
+      (check= (car code) (cadr code)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Editing and export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1532,6 +1583,7 @@
   (set! mismatches (typeset-check-mismatches))
   (test-places)
   (test-cursor)
+  (test-code-font-spaces)
   (test-editing)
   (test-odd-contents)
   (test-paper-edits)
