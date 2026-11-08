@@ -35,10 +35,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (live-find-server lid)
-  (let* ((s1 (url->unix (url-unroot lid)))
-         (s2 (if (== (tmfs-car s1) "live") (tmfs-cdr s1) s1))
-         (sname (tmfs-car s2)))
-    (client-find-server sname)))
+  ;; (#f for a live document of this TeXmacs, whose name is no tmfs url)
+  (and (url-rooted-tmfs? lid)
+       (let* ((s1 (url->unix (url-unroot lid)))
+              (s2 (if (== (tmfs-car s1) "live") (tmfs-cdr s1) s1))
+              (sname (tmfs-car s2)))
+         (client-find-server sname))))
 
 (tm-define (live-get-name lid)
   (let* ((s1 (url->unix (url-unroot lid)))
@@ -132,7 +134,7 @@
   ;; the views of lid in a buffer which is shown: (vid path buffer)
   (with l (list)
     (for (vid (live-view-ids lid))
-      (for (vt (id->trees vid))
+      (for (vt (live-view-trees vid))
         (and-let* ((vp (tree->path vt))
                    (buf (path-to-buffer vp))
                    (shown? (nnull? (buffer->views buf))))
