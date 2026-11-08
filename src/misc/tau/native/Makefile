@@ -58,6 +58,10 @@ tau_core: $(OBJECTS)
 tau_trial: $(N)/tau_trial.cpp
 	$(CXX) $(OPT) -std=c++17 -I$(PREFIX)/include $< -L$(PREFIX)/lib -lSDL3 -o $@
 
+# the runtime of tree-sitter, vendored with its headers (as in src/makefile.in)
+$(OBJ)/Plugins/TreeSitter/%.o: CPPFLAGS += -I$(S)/Plugins/TreeSitter/tree-sitter/include \
+  -I$(S)/Plugins/TreeSitter/tree-sitter/src
+
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@

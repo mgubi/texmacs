@@ -31,7 +31,7 @@ N        := $(W)/shell
 PREFIX   ?= /opt/homebrew
 OBJ      := obj
 
-SOURCES  := $(filter-out Tau/%,$(shell grep -v "^\#" $(W)/sources.txt)) Plugins/Vue/vue_gui.cpp Plugins/Vue/vue_widget.cpp Plugins/Vue/vue_gpu.cpp Plugins/Vue/gpu_backend_gl.cpp Plugins/Vue/clay.c Plugins/Vue/vue_mac.mm Tau/tau_shell.cpp
+SOURCES  := $(filter-out Tau/% Plugins/TreeSitter/%,$(shell grep -v "^\#" $(W)/sources.txt)) Plugins/Vue/vue_gui.cpp Plugins/Vue/vue_widget.cpp Plugins/Vue/vue_gpu.cpp Plugins/Vue/gpu_backend_gl.cpp Plugins/Vue/clay.c Plugins/Vue/vue_mac.mm Tau/tau_shell.cpp
 OBJECTS   = $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
 
 INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \

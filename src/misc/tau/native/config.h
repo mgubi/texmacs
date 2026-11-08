@@ -46,6 +46,9 @@
 #define USE_ICONV 1
 #define USE_MUPDF 1
 #define USE_S7 1
+/* the syntax trees of tree-sitter (src/docs/code-features.md); the
+   language servers, which are programs that TeXmacs starts, are left out */
+#define USE_TREE_SITTER 1
 
 #define TAUTEXMACS 1
 #define WORD_LENGTH 8

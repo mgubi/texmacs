@@ -204,6 +204,10 @@ serve: web
 	$(NODE) $(TM)/misc/wasm/serve.mjs $(OUT)/web $(PORT)
 PORT ?= 8080
 
+# the runtime of tree-sitter, vendored with its headers (as in src/makefile.in)
+$(OBJ)/Plugins/TreeSitter/%.o: CPPFLAGS += -I$(S)/Plugins/TreeSitter/tree-sitter/include \
+  -I$(S)/Plugins/TreeSitter/tree-sitter/src
+
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
 	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
