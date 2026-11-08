@@ -237,17 +237,27 @@ edit_interface_rep::key_press (string gkey) {
           tm_char_forwards (s, pos);
         break;
       }
+    // NOTE: the pre-edit of a dead accent (e.g. "~" in math mode) is not
+    // shown, the accent is inserted at once and pre_edit_acc remembers it.
+    // When the input method commits the accent itself (dead key followed
+    // by a key it does not compose with, by a click...), it was already
+    // inserted and is dropped.  Qt commits it before ending the pre-edit,
+    // Cocoa and SDL end the pre-edit first: pre_edit_acc then stays set
+    // for the next key only.
     if (as_bool (call ("disable-pre-edit?", std_accent (s)))) {
       pre_edit_skip= false;
+      pre_edit_acc= "";
       if (s == "") return;
       pre_edit_skip= true;
       key= std_accent (s);
+      pre_edit_acc= key;
     }
     else if (pre_edit_skip) {
       if (s == "") pre_edit_skip= false;
       return;
     }
     else {
+      pre_edit_acc= "";
       if (s == "") return;
       interrupt_shortcut ();
       pre_edit_s= s;
@@ -266,10 +276,22 @@ edit_interface_rep::key_press (string gkey) {
     }
   }
   else if (pre_edit_skip) {
+    bool is_acc= (pre_edit_acc != "" && std_accent (key) == pre_edit_acc);
+    pre_edit_acc= "";
+    if (is_acc) return;
     string u= cork_to_utf8 (key);
     string r= as_string (call ("downgrade-pre-edit", u));
     if (r == "") return;
     else key= r;
+  }
+  else if (pre_edit_acc != "") {
+    // the first key after the end of the pre-edit of an accent
+    bool is_acc= (std_accent (key) == pre_edit_acc);
+    pre_edit_acc= "";
+    if (is_acc) return;
+    string u= cork_to_utf8 (key);
+    string r= as_string (call ("downgrade-pre-edit", u));
+    if (r != "") key= r;
   }
   
   string new_sh= N(sh_s)==0? key: sh_s * " " * key;
