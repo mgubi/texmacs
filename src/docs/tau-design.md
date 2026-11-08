@@ -1747,6 +1747,26 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   had not come). **Palettes**: a color is a patch, a symbol is typeset
   with the smart fonts (`set_new_fonts`). **Input methods**: the cursor
   comes with each paint and is told to Vue, the candidates open there.
+- **The merge of `upsilon_texmacs`** (2026-11-07, 1845 commits: tree-sitter,
+  the language servers, shared files, MCP, code blocks, the fixes of
+  `wip_fixes`). Tau keeps what it cut (the GUI plugins, Metafont,
+  Ghostscript, PDF Hummus, the TeX fonts) and its places: upsilon's fixes
+  of windows are taken where they mean something for a place (the zoom
+  capped in long documents, the bars around the presentation mode, the
+  close of an embedded editor which keeps the name of its buffer, #775, a
+  deleted view replaced at its place, a buffer closed with its last place),
+  the url of a window (`window->file`) is left out. Tree-sitter is in the
+  core (`USE_TREE_SITTER`, as in the browser of upsilon); the language
+  servers are not (programs which TeXmacs starts). Upsilon's test suites
+  showed what a worker's stack does not take: a step of the history of a
+  Replace All of thousands of hits and the list of their observers were as
+  deep as they were long (now loops, and a balanced list); the guard of the
+  recursion of macros counts with the engine's stack; a PDF which cannot be
+  written ended the core (an error now). The node core for the tests has
+  4 GB of memory (the suites, all in one process, took more than 2).
+  Twelve suites of upsilon, or new checks in them, do not pass in Tau:
+  they are in `misc/tau/test/suites-expected.txt` with their reasons,
+  five of them still to be looked at.
 
 ## Order of the work
 

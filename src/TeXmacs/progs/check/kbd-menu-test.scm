@@ -1194,11 +1194,11 @@
   ;; the two modes of the buffer management follow the preference
   (with-preference-value "buffer management" "shared"
     (lambda ()
-      (check-true (buffers-share-window?))
+      (check-true (buffers-share-place?))
       (check-false (place-per-buffer?))))
   (with-preference-value "buffer management" "separate"
     (lambda ()
-      (check-false (buffers-share-window?))
+      (check-false (buffers-share-place?))
       (check-true (place-per-buffer?))))
   ;; the name of a value in the preferences widget is the one which sets
   ;; this value
@@ -1249,7 +1249,9 @@
           (set! places-number number)
           (set! kbd-menu-test-closing? #f)
           (check-true (not (and (pair? r) (== (car r) 'error)))))
-        (check= kbd-menu-test-closed '(quit))))))
+        ;; (Tau: the last place stays, the page has nothing else to show,
+        ;; and closing it neither kills it nor quits, tm-server.scm)
+        (check= kbd-menu-test-closed '())))))
 
 ;; A document shown in several windows (#463): closing one of them leaves the
 ;; document in the other, without asking about its changes; the document is

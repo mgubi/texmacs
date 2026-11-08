@@ -8,3 +8,18 @@ convert-more: converts EPS to PDF with Ghostscript, which Tau has not
 typeset: expects the line breaks of the TeX fonts; "roman" is Latin Modern in Tau
 version: one width expected of the TeX fonts (25755 for 25754)
 parse: two Julia declarations are read back from the glyphs of an EPS file, which Tau writes with OpenType fonts (the check passes in maxs_texmacs, native and WebAssembly)
+
+# Since the merge of upsilon_texmacs (2026-11-07): suites of upsilon, or new
+# checks in them, which do not pass in Tau
+latex: the export of struck and highlighted text is checked with pdflatex; there are no processes in WebAssembly
+formats: the static formulas of the HTML export are checked with the names of the TeX fonts (cmmi10...); "roman" is Latin Modern in Tau
+office: the images of office documents (style office, tmoffice drawings, the media of a document changed in TeXmacs); failed before the merge already
+web-files: the server of the checks is python3; there are no processes in WebAssembly
+print: the preview of a document is a PDF opened by a program of the system
+fonts: ideographs and hangul of the fonts of the system, which Tau does not see
+read-only: a console is closed by the program (alt-window-delete), which in Tau takes its dialog away without its quit command (only the page closing it calls it)
+editing: the alternative windows of embedded editors (Tau has none: a buffer in a dialog is embedded at once), and the mouse and the cursor in long documents and at the start of a line, which need a typeset view of a window (to be looked at)
+code: the menu Focus of source files and the history of an editor in a widget, which need the widgets that make-menu-widget does not make in Tau (to be looked at)
+code-lines: the widths, the soft line breaks and the cursor of lines of code differ (to be looked at)
+links: the files of the parts which are made not writable are written all the same under node (to be looked at)
+kbd-menu: the informative flags in presentation mode stay those of the document in the view which is full screen (to be looked at)

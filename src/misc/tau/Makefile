@@ -85,7 +85,9 @@ endif
 all: node
 
 # for node, which sees the host file system as it is (NODERAWFS) and takes
-# its environment: the core alone, for the tests
+# its environment: the core alone, for the tests (with 4 GB of memory: the
+# test suites, all in one process, need more than the 2 GB of a page since
+# those of upsilon_texmacs came)
 node: $(OUT)/node/tau.js $(TM)/TeXmacs/SVNREV plugins-sync
 
 # the version TeXmacs checks its files against (test_texmacs_path): made by
@@ -104,7 +106,7 @@ plugins-sync: FORCE
 
 $(OUT)/node/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/node-pre.js $(W)/sources.txt
 	@mkdir -p $(OUT)/node
-	em++ $(LDFLAGS) -sNODERAWFS=1 -sENVIRONMENT=node --pre-js $(TM)/misc/wasm/node-pre.js \
+	em++ $(LDFLAGS) -sMAXIMUM_MEMORY=4GB -sNODERAWFS=1 -sENVIRONMENT=node --pre-js $(TM)/misc/wasm/node-pre.js \
 	  $(OBJECTS) $(LIBS) -o $@
 
 # for the page: the core for a worker (tau.js, tau.wasm), the files of
