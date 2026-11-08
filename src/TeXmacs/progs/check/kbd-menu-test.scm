@@ -498,7 +498,18 @@
     (check= (typed-math-raw (list acc "pre-edit:" "backspace")) "")
     ;; a composed letter is typed as the accent and the letter
     (check= (typed-math-raw (list acc (cork #xe3) "pre-edit:")) "<sim>a")
-    (check= (typed-math-raw (list acc "pre-edit:" (cork #xe3))) "<sim>a")))
+    (check= (typed-math-raw (list acc "pre-edit:" (cork #xe3))) "<sim>a"))
+  ;; another accent
+  (check= (typed-math-raw (list "pre-edit:1:^" "pre-edit:" "^" "x"))
+          '(rsup "x"))
+  (check= (typed-math-raw (list "pre-edit:1:^" "^" "x" "pre-edit:"))
+          '(rsup "x"))
+  ;; in text, the pre-edit is shown and replaced by the commit
+  (in-buffer '(document "") '(0 0)
+    (lambda ()
+      (for-each (lambda (k) (edit-step (lambda () (keyboard-press k 0))))
+                (list "pre-edit:1:~" "pre-edit:" "~"))
+      (check= (body) '(document "~")))))
 
 ;; Without a window, the environment at the cursor (get-env, in-math?)
 ;; is the one of the last typesetting. Once the keyboard maps of programs

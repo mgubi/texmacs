@@ -291,6 +291,7 @@ edit_interface_rep::key_press (string gkey) {
     if (is_acc) return;
     string u= cork_to_utf8 (key);
     string r= as_string (call ("downgrade-pre-edit", u));
+    // unlike during the pre-edit, a key which is not downgraded is kept
     if (r != "") key= r;
   }
   
@@ -460,6 +461,8 @@ edit_interface_rep::handle_keyboard_focus (bool has_focus, time_t t) {
     drag_right_reset ();
   }
   got_focus= has_focus; (void) t;
+  // a pre-edit which ended with the loss of the focus was not committed
+  if (!has_focus) pre_edit_acc= "";
   notify_change (THE_FREEZE);
   notify_change (THE_FOCUS);
   if (got_focus) {
