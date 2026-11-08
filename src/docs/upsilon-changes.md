@@ -19,13 +19,13 @@ have the details, and the problems go to the
   monospaced font), a space was as wide as the space glyph of the font, which
   is not a cell of the font: the lines were not as wide as the same text in a
   document, and the cursor, the soft line breaks, the tabs and the columns
-  went elsewhere. A space is now a cell, as in a paragraph (from `wip_tau`).
+  went elsewhere. A space is now a cell, as in a paragraph.
 - **Very tall documents in the browser** (browser version): the positions
   are of 64 bits, as in the desktop applications. A document taller than
   about 1300 pages of A4 wrapped around: its last lines were drawn and
-  placed elsewhere, and the arrow keys sent the cursor far away (from
-  `wip_tau`). The browser build also builds again: the lines of source
-  code (`code_boxes.cpp`, `bridge_code.cpp`) were missing from its sources.
+  placed elsewhere, and the arrow keys sent the cursor far away. The
+  browser build also builds again: the lines of source code
+  (`code_boxes.cpp`, `bridge_code.cpp`) were missing from its sources.
 
 ## 5 November 2026
 

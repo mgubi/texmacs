@@ -163,10 +163,10 @@ code_xpos (string s, int upto, font fn, SI cell, int tabw, array<SI>& xpos,
     int c= code_control (t, i, j);
     if (c < 0 && t[i] == ' ') {
       // a space is as wide as in a paragraph, where it is a box of its own
-      // (the space of the font, fn->spc): the glyph of a space may be
-      // narrower, as in the smart fonts made of OpenType fonts, whose space
-      // is that of the text (a third of an em in Latin Modern Mono and
-      // Inconsolata, for cells of half an em)
+      // (the space of the font, fn->spc): the glyph of a space may be wider
+      // or narrower, as in the smart fonts made of OpenType fonts, whose
+      // space is that of the text (0.55 em for Inconsolata, whose cells are
+      // 0.5 em; a third of an em in Latin Modern Mono)
       xpos[i+1]= xpos[i] + pend + fn->spc->def;
       shift= xpos[i+1] - raw[i+1];
       i++;
