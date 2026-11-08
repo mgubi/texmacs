@@ -234,6 +234,7 @@ int ns_menu_stats[4]= {0, 0, 0, 0};
   (void) menu;
   ns_menu_stats[3]++;
   opened= NO;
+  // (the cancel may release self: nothing of self after it)
   [NSObject cancelPreviousPerformRequestsWithTarget: self
     selector: @selector(reportIfShown) object: nil];
 }
