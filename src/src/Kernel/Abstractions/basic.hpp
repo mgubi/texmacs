@@ -42,7 +42,10 @@ typedef unsigned int color;
 #define MAX_INT ((int) 0x7fffffff)
 #define MIN_INT ((int) 0x80000000)
 
-#if SIZEOF_VOID_P == 8
+// the browser (WebAssembly) has pointers of 32 bits, but its positions are
+// of 64 bits as on the desktop: a document of more than 2^31 units (about
+// 1300 pages of A4) otherwise wraps around (the cursor in a tall document)
+#if SIZEOF_VOID_P == 8 || defined (__EMSCRIPTEN__)
   #define SI_64 1
 #elif SIZEOF_VOID_P == 4
   #define SI_32 1

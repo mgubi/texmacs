@@ -1768,8 +1768,11 @@ from 16 to 1024 pixels. As in the page of TeXmacs Vue
   apply-changes, which the checks of the cursor, the mouse and the
   presentation mode need). Eleven suites of upsilon, or new checks in
   them, do not pass in Tau: they are in `misc/tau/test/suites-expected.txt`
-  with their causes (no processes, no TeX fonts, no alternative windows,
-  SI of 32 bits in WebAssembly...); math-edit's is still to be understood.
+  with their causes (no processes, no TeX fonts, no alternative windows...);
+  math-edit's is still to be understood. SI is of 64 bits in WebAssembly
+  too (`basic.hpp`), although its pointers are of 32: a document taller
+  than 2^31 units (about 1300 pages of A4) wrapped around; it costs about
+  10% more memory for a long document.
 
 ## Order of the work
 
