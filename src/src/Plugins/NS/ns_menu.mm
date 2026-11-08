@@ -136,8 +136,8 @@ int ns_menu_stats[4]= {0, 0, 0, 0};
   // disabled item which says so. The error is not shown yet: macOS also
   // computes the menus without opening them (-[NSMenu _simulateOpening:]),
   // and the errors would fill the window of the error messages while one
-  // does nothing with the menus (#720). It is kept, logged, and shown by
-  // menuWillOpen: if the menu is really opened.
+  // does nothing with the menus (#720, #792). It is kept, logged, and
+  // shown if the menu is really opened (see menuWillOpen:).
   bool failed= false;
   failure= ""; failure_report= "";
   try {
@@ -193,27 +193,59 @@ int ns_menu_stats[4]= {0, 0, 0, 0};
 - (void)menuWillOpen:(NSMenu *)menu
 {
   // macOS also computes the menus without showing them
-  // (-[NSMenu _simulateOpening:], with Spotlight or Apple Intelligence),
-  // and for these it calls menuNeedsUpdate: and menuWillOpen: one after
-  // the other, in the same call, and not menuDidClose: (checked on macOS
-  // 15.7). So these two do not tell a real opening. The tracking of the
-  // menus does: NSMenuDidBeginTrackingNotification comes before the menu
-  // is computed, whatever opens it (the menu bar, a key, a pop-up). The
-  // error is shown at once when the menu opens in a tracking, and in any
-  // case when it closes (menuDidClose:), which a real opening always ends
-  // with: it is never lost. A scan neither tracks nor closes, so nothing
-  // is shown (#720). If a scan did one of them, the error would be shown:
-  // a repeated message rather than a hidden one.
+  // (-[NSMenu _simulateOpening:], with Spotlight or Apple Intelligence).
+  // On macOS 15 it calls menuNeedsUpdate: and menuWillOpen: one after the
+  // other, in the same call, and not menuDidClose: (#720); on macOS 26 the
+  // scan of Spotlight showed the error, so it presumably also gives a
+  // tracking notification or menuDidClose: (#792, not measured). None of
+  // these tells a real opening. The mode of the run loop does: the scan of
+  // macOS 26 runs from a block of the run loop (CFRunLoopPerformBlock) in
+  // the default mode, while the tracking of the menus by AppKit (the menu
+  // bar by the mouse and by Ctrl-F2, the submenus, the pop-ups and the
+  // context menus) runs in NSEventTrackingRunLoopMode (startMonitoringEvents:
+  // uses the mode of the session, or that one; only the pop-ups set a mode,
+  // and they set the same). So the error is shown by a request made here
+  // for the next turn of the run loop, in the common modes (default,
+  // tracking, modal panels; none stays pending for a later tracking),
+  // which reports it only if the run loop is then in
+  // NSEventTrackingRunLoopMode, the menu is still open (no menuDidClose:
+  // yet) and a menu is tracked (NSMenuDidBeginTrackingNotification
+  // without its end). Otherwise the error stays logged only, and the menu
+  // shows "Error in menu". NOTE: a scan made during a real tracking (the
+  // search of the Help menu) still shows the error, as with #761: on
+  // macOS 15 such a scan never sends menuDidClose:, so the menu counts as
+  // open (ns_report_again damps the repeats). The one known real opening
+  // whose error would only reach stdout is the remote tracking of AppKit
+  // (beginRemoteTrackingWithEvent:), if it runs in another mode.
   (void) menu;
   ns_menu_stats[2]++;
-  if (N (failure) > 0 && ns_menu_tracking) [self reportFailure];
+  opened= YES;
+  // (the cancel releases the retain of a pending request: keep self alive)
+  [[self retain] autorelease];
+  [NSObject cancelPreviousPerformRequestsWithTarget: self
+    selector: @selector(reportIfShown) object: nil];
+  if (N (failure) > 0)
+    [self performSelector: @selector(reportIfShown) withObject: nil
+               afterDelay: 0 inModes: @[NSRunLoopCommonModes]];
 }
 
 - (void)menuDidClose:(NSMenu *)menu
 {
   (void) menu;
   ns_menu_stats[3]++;
-  [self reportFailure];
+  opened= NO;
+  // (the cancel may release self: nothing of self after it)
+  [NSObject cancelPreviousPerformRequestsWithTarget: self
+    selector: @selector(reportIfShown) object: nil];
+}
+
+- (void)reportIfShown
+{
+  // (see menuWillOpen:)
+  NSString* mode= [[NSRunLoop currentRunLoop] currentMode];
+  if (opened && ns_menu_tracking && mode &&
+      [mode isEqualToString: NSEventTrackingRunLoopMode])
+    [self reportFailure];
 }
 
 - (void)reportFailure

@@ -26,6 +26,15 @@ have the details, and the problems go to the
   placed elsewhere, and the arrow keys sent the cursor far away. The
   browser build also builds again: the lines of source code
   (`code_boxes.cpp`, `bridge_code.cpp`) were missing from its sources.
+- **Cocoa: Spotlight no longer shows the errors of the menus** (desktop,
+  Cocoa interface): on macOS 26, each opening of Spotlight computes the
+  menus of TeXmacs, and the error of a menu (such as Debug >
+  Miscellaneous > Provoke menu error) was shown in the Error messages
+  window each time, though no menu was opened. It is now only logged, and
+  shown when the user really opens that menu. And an error caught in a
+  menu is again 2 messages (the "caught in a menu" line, then the
+  exception with its report), not one message for each line of the
+  backtrace (#792).
 
 ## 5 November 2026
 

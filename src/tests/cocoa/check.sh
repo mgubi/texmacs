@@ -54,10 +54,14 @@
 #            console, and of the other windows: false, not a "type
 #            mismatch" (#720)
 #   menus    the menus computed by macOS without opening them (-[NSMenu
-#            _simulateOpening:], Spotlight and Apple Intelligence) do not
-#            fill the console with their errors (Debug > Miscellaneous >
-#            Provoke menu error), and that menu, really opened (a tracking),
-#            shows its error in the console (#720)
+#            _simulateOpening:], Spotlight and Apple Intelligence; also
+#            with a tracking notification and a menuDidClose: for each
+#            menu, or within a tracking which has not ended, as macOS 26
+#            may do, #792) do not fill the console with
+#            their errors (Debug > Miscellaneous > Provoke menu error), and
+#            that menu, really opened (a tracking), shows its error in the
+#            console, as one error, not one for each line of its backtrace
+#            (#720, #792)
 #   console  the console opens at its end (a race before the fix: the end
 #            waited for an editor with the keyboard focus, so that this one
 #            failed now and then only) (#661)
@@ -411,12 +415,16 @@ queries_ok () {
 }
 verdict queries "the window queries of the View menu answer false in every window (#720)" queries_ok
 
-# (menus) a scan of the menus by macOS (two times), then the menu of the
-# deliberate error really opened. The number of the messages of the console
-# is printed after each
+# (menus) a scan of the menus by macOS (two times, then two times with a
+# tracking and a close for each menu, then two times while a tracking began
+# and has not ended yet), then the menu of the deliberate error really
+# opened. The number of the messages of the console is printed after
+# each
 errdefs='(tm-define (cocoa-check-errors tag) (display* "CHECK errors " tag " " (length (cdr (tree->stree (get-debug-messages "Error messages" 100)))) "\n"))'
 debug_menu=1
-run menus "" "eval:(cocoa-check-errors 'before);scan;scan;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
+# (12 steps, one a second from the fourth: more than the 14 s of the quit)
+quit_after=22000
+run menus "" "eval:(cocoa-check-errors 'before);scan;scan;scan:close;scan:close;begin-tracking;scan;scan;end-tracking;eval:(cocoa-check-errors 'scanned);track:Debug/Miscellaneous/Provoke menu error;eval:(cocoa-check-errors 'opened)" \
     "(open-error-messages)" "$errdefs"
 debug_menu=
 menus_ok () {
@@ -437,12 +445,18 @@ menus_ok () {
   [ "$scanned" = "$before" ] || return 1
   fail="the menu really opened did not show its error: $scanned after the scan, $opened after"
   [ "$opened" -gt "$scanned" ] || return 1
+  # (the error, and the exception with its report: not one message for
+  # each line of the backtrace, #792)
+  fail="the error of the menu opened is more than 3 messages: $scanned after the scan, $opened after"
+  [ "$opened" -le $((scanned + 3)) ] || return 1
+  fail="a line of the backtrace is a message: $(grep -a 'failed-error, get_crash_report' "$out/menus.log" | head -1)"
+  ! grep -aq 'failed-error, .*get_crash_report' "$out/menus.log" || return 1
   n=$(grep -ac 'caught while a menu was computed' "$out/menus.log")
   fail="a scan logs without bound: $n lines"
   [ "$n" -le 6 ]
 }
 expected='Throwing |caught while a menu was computed|caught in a menu|widget expected'
-verdict menus "the errors of menus computed by macOS are not shown, those of menus opened are (#720)" menus_ok
+verdict menus "the errors of menus computed by macOS are not shown, those of menus opened are, as one error (#720, #792)" menus_ok
 
 # (console)
 lines='(for-each (lambda (i) (debug-message "std-warning" (string-append "line " (number->string i) "\n"))) (iota 80))'

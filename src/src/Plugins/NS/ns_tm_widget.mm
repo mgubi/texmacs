@@ -1200,6 +1200,10 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *                     opening them (-[NSMenu _simulateOpening:] when AppKit
  *                     has it, else menuNeedsUpdate: then menuWillOpen:)
  *                     (#720)
+ *   scan:close        the same, as a scan of macOS 26 may do (#792):
+ *                     each menu also in a tracking of its own
+ *                     (NSMenuDidBeginTrackingNotification, then the end)
+ *                     and closed (menuDidClose:) after it was computed
  *   track:<a/b/c>     opens the menu of this path in the menu bar for about
  *                     a second, in a tracking of the menu (as a pop-up),
  *                     then closes it (#720)
@@ -1232,11 +1236,14 @@ ns_test_stats (const char* label) {
 }
 
 static void
-ns_test_scan_menu (NSMenu* m, int depth) {
+ns_test_scan_menu (NSMenu* m, int depth, bool close) {
   // (the menus of TeXmacs are made when they are computed)
   if (!m || depth > 6) return;
   SEL sim= NSSelectorFromString (@"_simulateOpening:");
   id d= [m delegate];
+  NSNotificationCenter* c= [NSNotificationCenter defaultCenter];
+  if (depth > 0 && close)
+    [c postNotificationName: NSMenuDidBeginTrackingNotification object: m];
   if (depth == 0) ; // (the main menu refuses: "Population ... unnecessary")
   else if ([m respondsToSelector: sim]) [m performSelector: sim withObject: nil];
   else if (d) {
@@ -1245,8 +1252,13 @@ ns_test_scan_menu (NSMenu* m, int depth) {
     if ([d respondsToSelector: @selector(menuWillOpen:)])
       [d menuWillOpen: m];
   }
+  if (depth > 0 && close) {
+    if (d && [d respondsToSelector: @selector(menuDidClose:)])
+      [d menuDidClose: m];
+    [c postNotificationName: NSMenuDidEndTrackingNotification object: m];
+  }
   for (NSMenuItem* mi in [m itemArray])
-    ns_test_scan_menu ([mi submenu], depth + 1);
+    ns_test_scan_menu ([mi submenu], depth + 1, close);
 }
 
 @interface TMTestCancel : NSObject
@@ -1552,7 +1564,7 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
   else if ([st isEqualToString: @"queries"]) ns_test_queries (arg);
   else if ([st isEqualToString: @"scan"]) {
     ns_test_stats ("before scan");
-    ns_test_scan_menu ([NSApp mainMenu], 0);
+    ns_test_scan_menu ([NSApp mainMenu], 0, [arg isEqualToString: @"close"]);
     ns_test_stats ("after scan");
     fprintf (stderr, "NSTEST scan done\n");
   }

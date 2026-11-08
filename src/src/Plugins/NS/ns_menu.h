@@ -41,10 +41,12 @@ extern int ns_menu_stats[4]; // begin, end, willOpen, didClose
   promise_rep<widget> *pm;
   string failure;         //!< the error of the last computation, if any
   string failure_report;  //!< and its report (see menuWillOpen:)
+  BOOL opened;            //!< between menuWillOpen: and menuDidClose:
 }
 - (void)setPromise:(promise_rep<widget> *)p;
 - (promise_rep<widget> *)promise;
 - (void)reportFailure;
+- (void)reportIfShown;
 @end
 
 /*! A menu rendered as a table of icons (tile_menu). */
