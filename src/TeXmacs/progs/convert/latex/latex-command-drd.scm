@@ -80,7 +80,7 @@
   mathord mathbin mathopen mathpunct mathop mathrel mathclose mathalpha
   mathinner
   arabic alph Alph roman Roman fnsymbol displaylines cases underbrace overbrace
-  phantom hphantom vphantom smash date terms
+  phantom hphantom vphantom date terms
   newcounter stepcounter refstepcounter value
   citealt citealt* citealp*
   citetext citeauthor citeauthor* citeyear onlinecite citeN
@@ -145,6 +145,7 @@
   xleftarrow xrightarrow xleftrightarrow xminus
   xLeftarrow xRightarrow xLeftrightarrow xequal
   xmapsto xmapsfrom citealp citet citep citet* citep*
+  smash
   Begin ELSIF FORALL FOR IF WHILE tcp tcp* tcc tcc*
   hyperref)
 
@@ -256,7 +257,8 @@
   textnormalfont
   textrm texttt textsf textmd textbf textup textit textsl textsc emph
   mathrm mathtt mathsf mathmd mathbf mathup mathit mathsl mathnormal
-  mathcal mathfrak mathbb mathbbm mathscr operatorname boldsymbol
+  mathcal mathfrak mathbb mathbbm mathscr operatorname operatorname*
+  boldsymbol
   lowercase MakeLowercase uppercase MakeUppercase selectlanguage)
 
 (logic-group latex-modifier-1*%

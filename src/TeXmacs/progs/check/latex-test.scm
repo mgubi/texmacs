@@ -897,6 +897,32 @@
 
 ;; groups and arguments nested very deep: the parser recursed once per
 ;; level and overflowed the stack (#658); the levels beyond 128 are skipped
+;; commands of the examples of MathJax (#780)
+(define (test-import-mathjax-commands)
+  (check-group "import: commands of the MathJax examples")
+  ;; \operatorname* is \operatorname (no star as an operator)
+  (check= (lt "$\\operatorname*{argmax}_x f$")
+          '(math (concat (math-up "argmax") (rsub "x") "f")))
+  ;; \smash[t] and \smash[b]: the optional argument is not text
+  (check= (lt "$\\smash[b]{x}$") '(math (smash-bottom "x")))
+  (check= (lt "$\\smash[t]{x}$") '(math (smash-top "x")))
+  (check= (lt "$\\smash{x}$") '(math (smash "x")))
+  ;; the name of a color is not a product in a formula
+  (check= (lt "$\\textcolor{green}{x}$") '(math (with "color" "green" "x")))
+  (check= (lt "$a\\textcolor{red}{b}c$")
+          '(math (concat "a" (with "color" "red" "b") "c")))
+  ;; the multiple integrals of amsmath are big operators
+  (check= (lt "$\\iint \\iiint \\idotsint \\oiint$")
+          '(math (concat (big "iint") (big "iiint") (big "idotsint")
+                         (big "oiint"))))
+  ;; \xleftarrow[below]{above}: above first, as the export writes it
+  (check= (lt "$\\xleftarrow[u]{o}$")
+          '(math (long-arrow "<rubber-leftarrow>" "o" "u")))
+  (check= (lt "$\\xrightarrow[u]{}$")
+          '(math (long-arrow "<rubber-rightarrow>" "" "u")))
+  (check= (lt (tl '(math (long-arrow "<rubber-rightarrow>" "a" "b"))))
+          '(math (long-arrow "<rubber-rightarrow>" "a" "b"))))
+
 (define (test-import-deep-nesting)
   (check-group "import: deep nesting")
   (let ((b (make-string 100 #\{)) (e (make-string 100 #\})))
@@ -1511,6 +1537,7 @@
   (test-import-recursive-macros)
   (test-import-string)
   (test-import-deep-nesting)
+  (test-import-mathjax-commands)
   (test-import-unknown)
   (test-import-parse)
   (test-import-documents)

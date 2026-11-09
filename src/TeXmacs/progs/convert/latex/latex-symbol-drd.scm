@@ -82,6 +82,7 @@
   bigvee bigwedge bigsqcup bigcup bigcap bigpluscup
   bigtriangledown bigtriangleup
   int bigiint bigiiint bigiiiint bigidotsint oint bigoiint bigoiiint
+  iint iiint iiiint idotsint oiint oiiint
   bigintwl bigiintwl bigiiintwl bigiiiintwl bigidotsintwl
   bigointwl bigoiintwl bigoiiintwl
   bigupint bigupiint bigupiiint bigupoint bigupoiint bigupoiiint

@@ -2147,9 +2147,14 @@ latex_command_to_tree (tree t) {
     return concat (tree (SET, COLOR, val), l2e (t[3]), tree (RESET, COLOR));
   }
 
-  if (is_tuple (t, "\\textcolor", 2) || is_tuple (t, "\\tmcolor", 2))
-    return concat (tree (SET, COLOR, latex_color_arg (l2e (t[1]))),
+  if (is_tuple (t, "\\textcolor", 2) || is_tuple (t, "\\tmcolor", 2)) {
+    // (the name of the color as a string, as for \color: in a formula
+    // l2e would make a product of its letters, #780)
+    string name= string_arg (t[1]);
+    tree col= (name != ""? tree (name): l2e (t[1]));
+    return concat (tree (SET, COLOR, latex_color_arg (col)),
                    l2e (t[2]), tree (RESET, COLOR));
+  }
 
   if (is_tuple (t, "\\key", 1)) return compound ("key", latex_key_arg (t[1]));
   if (is_tuple (t, "\\textnormalfont", 1)) return m2e (m2e (m2e (t,
@@ -2196,8 +2201,16 @@ latex_command_to_tree (tree t) {
   if (is_tuple (t, "\\tmtextsl", 1)) return m2e (t, FONT_SHAPE, "slanted");
   if (is_tuple (t, "\\tmtextsc", 1)) return m2e (t, FONT_SHAPE, "small-caps");
   if (is_tuple (t, "\\emph", 1))   return compound ("em", l2e (t[1]));
-  if (is_tuple (t, "\\operatorname", 1))
+  if (is_tuple (t, "\\operatorname", 1) ||
+      is_tuple (t, "\\operatorname*", 1))
     return var_m2e (t, MATH_FONT_FAMILY, "rm");
+  if (is_tuple (t, "\\smash*", 2)) {
+    // \smash[t] keeps the depth, \smash[b] the height
+    string where= string_arg (t[1]);
+    if (where == "t") return compound ("smash-top", l2e (t[2]));
+    if (where == "b") return compound ("smash-bottom", l2e (t[2]));
+    return compound ("smash", l2e (t[2]));
+  }
   if (is_tuple (t, "\\boldsymbol", 1))
     return var_m2e (t, MATH_FONT_SERIES, "bold");
   if (is_tuple (t, "\\mathnormal", 1)) return m2e (t, MATH_FONT_FAMILY, "mr");
@@ -2803,27 +2816,27 @@ latex_command_to_tree (tree t) {
   if (is_tuple (t, "\\xLeftrightarrow", 1))
     return tree (LONG_ARROW, "<rubber-Leftrightarrow>", l2e (t[1]));
   if (is_tuple (t, "\\xminus*", 2))
-    return tree (LONG_ARROW, "<rubber-minus>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-minus>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xleftarrow*", 2))
-    return tree (LONG_ARROW, "<rubber-leftarrow>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-leftarrow>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xrightarrow*", 2))
-    return tree (LONG_ARROW, "<rubber-rightarrow>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-rightarrow>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xleftrightarrow*", 2))
     return tree (LONG_ARROW, "<rubber-leftrightarrow>",
-                 l2e (t[1]), l2e (t[2]));
+                 l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xmapsto*", 2))
-    return tree (LONG_ARROW, "<rubber-mapsto>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-mapsto>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xmapsfrom*", 2))
-    return tree (LONG_ARROW, "<rubber-mapsfrom>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-mapsfrom>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xequal*", 2))
-    return tree (LONG_ARROW, "<rubber-equal>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-equal>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xLeftarrow*", 2))
-    return tree (LONG_ARROW, "<rubber-Leftarrow>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-Leftarrow>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xRightarrow*", 2))
-    return tree (LONG_ARROW, "<rubber-Rightarrow>", l2e (t[1]), l2e (t[2]));
+    return tree (LONG_ARROW, "<rubber-Rightarrow>", l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\xLeftrightarrow*", 2))
     return tree (LONG_ARROW, "<rubber-Leftrightarrow>",
-                 l2e (t[1]), l2e (t[2]));
+                 l2e (t[2]), l2e (t[1]));
 
   // Start TeXmacs specific markup
   if (is_func (t, SET) || is_func (t, RESET)) return t;
