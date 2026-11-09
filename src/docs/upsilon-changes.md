@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 9 November 2026
 
+- **The option `-X` is documented** (desktop): a headless TeXmacs
+  (`-headless`) quits after the commands of `-x` and `-c` and the files of
+  the command line, so that what they delay (`delayed`, a server, a client
+  which connects later) never runs; `-X` keeps it running, until
+  `(quit-TeXmacs)`. The option is now in `TeXmacs -h`, in the man page, in
+  the guide of the command-line options and in the page of the Cocoa
+  interface (#841).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
@@ -208,7 +215,9 @@ have the details, and the problems go to the
 - **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,
   so `TeXmacs -headless -x ...` showed its windows and its icon in the Dock
   and quit only on `(quit-TeXmacs)`; it now runs without a window, as the Qt
-  and Vue builds do, and quits after the commands given with `-x` or `-c`;
+  and Vue builds do, and quits after the commands given with `-x` or `-c`
+  (use `-X` to keep TeXmacs running, for instance for a script with
+  delayed actions or a server, #841);
   a dialog or the print panel asked for by a headless script is answered as
   cancelled instead of waiting.
 - **Closing a program file** gives back the memory of its colours and its
