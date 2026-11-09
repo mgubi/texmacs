@@ -15,7 +15,6 @@
 #include "language.hpp"
 #include "converter.hpp"
 #include "hashmap.hpp"
-#include "hashset.hpp"
 #include "tree-sitter/include/tree_sitter/api.h"
 #include <stdlib.h>
 #include <string.h>
@@ -120,6 +119,8 @@ struct syntax_region_rep {
   std::string text;            // the lines with their newlines, when
   int text_version;            // it is that of this version (else -1)
   int first;                   // the first line of the root (a part)
+  array<int> unmatched;        // the brackets painted as errors (sorted
+  int unmatched_version;       // starts), when for this version (else -1)
 };
 
 // the tree of a part of a region in another language (an injection), kept
@@ -371,6 +372,7 @@ update_lines (syntax_region_rep* r, int a, int b, array<string> mid) {
   e.start_point= point_of (r->offsets, start);
   e.old_end_point= point_of (r->offsets, old_end);
   bool text_ok= r->text_version == r->version && old_end <= (int) r->text.size ();
+  bool unmatched_ok= r->unmatched_version == r->version;
   string mid_text= ns (p, N(ns) - s);
   if (n1 == n0) {
     int delta= N(ns) - N(os);
@@ -439,23 +441,32 @@ update_lines (syntax_region_rep* r, int a, int b, array<string> mid) {
     // the lines of the brackets which became unmatched or matched again:
     // a closing bracket which becomes MISSING after an edit below (an
     // unclosed string) leaves the line of the opening one out of the
-    // changed ranges (#815). (The old tree was edited: its bytes are those
-    // of the new text.)
-    array<int> u0= unmatched_brackets (old_tree);
+    // changed ranges (#815). Those of the previous parse are kept, moved
+    // by the edit (else taken from the old tree, which was edited: its
+    // bytes are those of the new text), so that one tree is walked per
+    // key, and only its nodes with errors.
+    array<int> u0;
+    if (unmatched_ok) {
+      int d= new_end - old_end;
+      for (int i= 0; i < N(r->unmatched); i++) {
+        int x= r->unmatched[i];
+        if (x < start) u0 << x;
+        else if (x >= old_end) u0 << x + d;
+      }
+    }
+    else u0= unmatched_brackets (old_tree);
     array<int> u1= unmatched_brackets (r->ts_tree);
-    if (N(u0) + N(u1) > 0) {
-      hashset<int> s0, s1;
-      for (int i= 0; i < N(u0); i++) s0->insert (u0[i]);
-      for (int i= 0; i < N(u1); i++) s1->insert (u1[i]);
-      int size= r->offsets[n1];
-      for (int k= 0; k < 2; k++) {
-        array<int>& u= (k == 0? u0: u1);
-        hashset<int>& other= (k == 0? s1: s0);
-        for (int i= 0; i < N(u); i++)
-          if (!other->contains (u[i]) && u[i] >= 0 && u[i] < size) {
-            int row= (int) point_of (r->offsets, u[i]).row;
-            if (row >= 0 && row < n1) dirty[row]= true;
-          }
+    r->unmatched= u1;
+    r->unmatched_version= r->version;
+    int size= r->offsets[n1], i0= 0, i1= 0;
+    while (i0 < N(u0) || i1 < N(u1)) {
+      int x;
+      if (i1 >= N(u1) || (i0 < N(u0) && u0[i0] < u1[i1])) x= u0[i0++];
+      else if (i0 >= N(u0) || u1[i1] < u0[i0]) x= u1[i1++];
+      else { i0++; i1++; continue; }
+      if (x >= 0 && x < size) {
+        int row= (int) point_of (r->offsets, x).row;
+        if (row >= 0 && row < n1) dirty[row]= true;
       }
     }
   }
@@ -566,6 +577,7 @@ new_region (tree root, int language, array<string> lines, int first) {
   r->hl_injections= -1;
   r->hl_epoch= -1;
   r->text_version= -1;
+  r->unmatched_version= -1;
   ts_parser_set_language (r->parser, lang);
   region_parse (r, NULL);
   return r;
@@ -1175,10 +1187,11 @@ opening_bracket (char c) {
 }
 
 static void
-paint_node (TSNode n, array<int>& paint, int from, int to, int code) {
-  // (a negative code: the start of the node is appended to paint instead,
-  // see unmatched_brackets)
-  if (code < 0) { paint << (int) ts_node_start_byte (n); return; }
+paint_node (TSNode n, array<int>& paint, int from, int to, int code,
+            array<int>* starts) {
+  // (with starts, the start of the node is appended to it instead, see
+  // unmatched_brackets)
+  if (starts != NULL) { (*starts) << (int) ts_node_start_byte (n); return; }
   int a= max ((int) ts_node_start_byte (n), from);
   int b= min ((int) ts_node_end_byte (n), to);
   for (int i= a; i < b; i++) paint[i - from]= code;
@@ -1186,18 +1199,19 @@ paint_node (TSNode n, array<int>& paint, int from, int to, int code) {
 
 static void
 paint_missing (TSNode ch, TSNode* open, array<int>& paint, int from, int to,
-               int code) {
+               int code, array<int>* starts) {
   // ch is a MISSING closing bracket: the opening one before it is painted
   // (open: the last opening bracket of each kind seen, ( [ {)
   const char* type= ts_node_type (ch);
   char o= opening_bracket (type[0]);
   int k= (o == '(')? 0: (o == '['? 1: 2);
   if (o != '\0' && !ts_node_is_null (open[k]))
-    paint_node (open[k], paint, from, to, code);
+    paint_node (open[k], paint, from, to, code, starts);
 }
 
 static void
-paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
+paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code,
+                 array<int>* starts= NULL) {
   // paint in the colour code the brackets which error recovery left
   // unmatched: those directly in an ERROR node, and the opening bracket of
   // a node where a closing one is MISSING (only the nodes with errors are
@@ -1224,10 +1238,10 @@ paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
         if (!ts_node_is_missing (ch)) open[k]= ch;
       }
       if (ts_node_is_missing (ch) && bracket_type (type))
-        paint_missing (ch, open, paint, from, to, code);
+        paint_missing (ch, open, paint, from, to, code, starts);
       else if (err && !ts_node_is_named (ch) && bracket_type (type))
-        paint_node (ch, paint, from, to, code);
-      else paint_unmatched (ch, paint, from, to, code);
+        paint_node (ch, paint, from, to, code, starts);
+      else paint_unmatched (ch, paint, from, to, code, starts);
     } while (ts_tree_cursor_goto_next_sibling (&c));
   ts_tree_cursor_delete (&c);
   // (the walk stopped after the bytes: a MISSING closing bracket is the last
@@ -1237,7 +1251,7 @@ paint_unmatched (TSNode n, array<int>& paint, int from, int to, int code) {
     if (k > 0) {
       TSNode last= ts_node_child (n, k - 1);
       if (ts_node_is_missing (last) && bracket_type (ts_node_type (last)))
-        paint_missing (last, open, paint, from, to, code);
+        paint_missing (last, open, paint, from, to, code, starts);
     }
   }
 }
@@ -1246,10 +1260,18 @@ static array<int>
 unmatched_brackets (TSTree* t) {
   // the starts of the brackets which paint_unmatched paints in the colour
   // of errors, in the whole tree
-  array<int> l;
+  // (sorted, without repetitions)
+  array<int> l, none;
   TSNode top= ts_tree_root_node (t);
   if (ts_node_has_error (top))
-    paint_unmatched (top, l, 0, (int) ts_node_end_byte (top) + 1, -1);
+    paint_unmatched (top, none, 0, (int) ts_node_end_byte (top) + 1, 0, &l);
+  if (N(l) > 1) {
+    std::sort (&l[0], &l[0] + N(l));
+    int k= 1;
+    for (int i= 1; i < N(l); i++)
+      if (l[i] != l[k-1]) l[k++]= l[i];
+    l->resize (k);
+  }
   return l;
 }
 
