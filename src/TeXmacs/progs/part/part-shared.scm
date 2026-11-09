@@ -151,8 +151,12 @@
 
 (define mirror-idle? #t)
 (define mirror-pending (make-ahash-table))
+(define mirror-announced (make-ahash-table)) ;; unique id -> #t, until done
 
 (define (mirror-treat-pending)
+  ;; (a change whose end was not seen does not hide the next ones, as in
+  ;; live-treat-pending)
+  (set! mirror-announced (make-ahash-table))
   (with-author mirror-author
     (with-global mirror-idle? #f
       (for (key-im (ahash-table->list mirror-pending))
@@ -181,8 +185,6 @@
         (with old (or (ahash-ref mirror-pending uid) (list))
           (ahash-set! mirror-pending uid
                       (cons (modification-copy mod) old)))))))
-
-(define mirror-announced (make-ahash-table)) ;; unique id -> #t, until done
 
 (tm-define (mirror-notify event t mod)
   (:secure #t)
