@@ -370,11 +370,14 @@ reused buffer closed #f" \
 # texmacs-input without a name left a buffer, a view and an editor behind
 # (#776). The former widgets are let go at garbage collections, then close
 # their buffers from the event queue: the steps wait for that, with a
-# bound. A texmacs-input with a name reuses its buffer, whose undo history
-# kept each document it replaced; a named buffer stays when its tool is
-# closed, with a passive view: the code which named it may use it further
-# (the search toolbar after the search tool), and a new texmacs-input takes
-# it over. An unnamed input next to it shows when the tool was let go.
+# bound. A texmacs-input with a name has one editor per opening: made
+# again while it is shown, it keeps its view, so what was typed can be
+# undone; a named buffer stays when its tool is closed, with a passive view:
+# the code which named it may use it further (the search toolbar after the
+# search tool). The tool opened again gets a new view, with an empty
+# history, in place of the passive one: the views and the histories do not
+# pile up over the reopenings. An unnamed input next to it shows when the
+# tool was let go.
 cat > "$out/startup-side-tools.scm" <<'EOF'
 (define done #f)
 (define (later f)
@@ -414,6 +417,7 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (named-start))
 (define named (string->url "tmfs://aux/startup-side-named"))
 (define named-round 0)
+(define named-keep #f)
 (define (in-named thunk)
   ;; as with-buffer (which is not loaded yet)
   (let ((old (current-buffer)))
@@ -424,7 +428,8 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
 (tm-tool (startup-named-tool win)
   (:name "startup named tool")
   (text (number->string named-round))
-  (texmacs-input `(document ,(number->string named-round))
+  (texmacs-input (if named-keep (tree->stree (buffer-get-body named))
+                     `(document ,(number->string named-round)))
                  '(style "generic") named)
   (texmacs-input '(document "sentinel") '(style "generic") #f))
 (define (named-start)
@@ -432,12 +437,18 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (tool-select :right 'startup-named-tool)
   (update-menus)
   (later named-shown))
+(define (typed s)
+  ;; text typed in the named input, as one action
+  (in-named (lambda ()
+              (archive-state) (start-editing) (insert s) (end-editing))))
 (define (named-shown)
   (update-forced)
+  (when (= named-round 1) (typed "typed "))
   (if (< named-round 4) (later named-start) (later named-close)))
 (define (named-close)
-  ;; a new content is not an edit that can be undone
-  (display* "CHECK named undo " (in-named undo-possibilities) "\n")
+  ;; one editor per opening (#776): made again while it is shown, the
+  ;; input keeps its history, and a new content can be undone
+  (display* "CHECK named undo kept " (> (in-named undo-possibilities) 0) "\n")
   (set-window-tools (current-window) :right '())
   (update-menus)
   (later (wait-until (lambda () (= (inputs) 0)) 100 named-closed)))
@@ -446,22 +457,46 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
   ;; as the search toolbar does with the buffer of the search tool
   (in-named (lambda () (init-env "bg-color" "#fff0f0")))
+  ;; from now on, the tool shows what was typed (a former content which
+  ;; differs from the new one would hide the history which is kept)
+  (set! named-keep #t)
   (tool-select :right 'startup-named-tool)
   (update-menus)
   (later named-again))
+(define reopened 0)
+(define reopen-ok #t)
 (define (named-again)
+  ;; opened anew: a new editor, without the history of the former one
   (update-forced)
-  (display* "CHECK named views " (length (buffer->views named)) "\n")
-  (set! done #t))
+  (when (or (!= (length (buffer->views named)) 1)
+            (!= (in-named undo-possibilities) 0))
+    (display* "CHECK reopened " reopened ": views "
+              (length (buffer->views named)) ", undo "
+              (in-named undo-possibilities) "\n")
+    (set! reopen-ok #f))
+  (set! reopened (+ reopened 1))
+  (if (< reopened 6)
+      (begin
+        (typed "again ")
+        (set-window-tools (current-window) :right '())
+        (update-menus)
+        (later (wait-until (lambda () (= (inputs) 0)) 100 named-reopen)))
+      (begin
+        (display* "CHECK named reopened " reopened " times " reopen-ok "\n")
+        (set! done #t))))
+(define (named-reopen)
+  (tool-select :right 'startup-named-tool)
+  (update-menus)
+  (later named-again))
 (later step)
 EOF
 
 check "side tools made again close the buffers of their texmacs-input (#776)" \
       "buffers left 1
-named undo 0
+named undo kept #t
 sentinels left 0
 named buffer kept #t
-named views 1" \
+named reopened 6 times #t" \
       -x '(load "startup-side-tools.scm")'
 
 # A dialog whose refreshable makes a named texmacs-input again: the newer
@@ -516,6 +551,55 @@ check "a dialog keeps its named texmacs-input made again by a refresh (#776)" \
 sentinels left 1
 embedded after refresh #t" \
       -x '(load "startup-dialog-refresh.scm")'
+
+# A dialog with a named texmacs-input, closed and opened again: one editor
+# per opening, so what was typed in the former dialog cannot be undone in
+# the new one, and the views do not pile up (#776).
+cat > "$out/startup-dialog-reopen.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (wait n next)
+  (lambda () (gc) (if (= n 0) (next) (later (wait (- n 1) next)))))
+(define name (string->url "tmfs://aux/startup-dialog-reopen"))
+(define (in-name thunk)
+  ;; as with-buffer (which is not loaded yet)
+  (let ((old (current-buffer)))
+    (buffer-focus name)
+    (let ((r (thunk)))
+      (buffer-focus old)
+      r)))
+(define close-dialog #f)
+(define opened 0)
+(tm-widget ((startup-reopen) quit)
+  (resize "300px" "100px"
+    (texmacs-input (begin (set! close-dialog quit) '(document "x"))
+                   '(style "generic") name)))
+(define (open-it)
+  (dialogue-window (startup-reopen) noop "Startup dialog")
+  (set! opened (+ opened 1))
+  (later shown))
+(define (shown)
+  (update-forced)
+  (display* "CHECK opening " opened ": views "
+            (length (buffer->views name)) ", undo "
+            (in-name undo-possibilities) "\n")
+  (in-name (lambda ()
+             (archive-state) (start-editing) (insert "typed") (end-editing)))
+  (close-dialog)
+  (if (< opened 3) (later (wait 5 open-it)) (set! done #t)))
+(later open-it)
+EOF
+
+check "a dialog opened again starts with an empty history (#776)" \
+      "opening 1: views 1, undo 0
+opening 2: views 1, undo 0
+opening 3: views 1, undo 0" \
+      -x '(load "startup-dialog-reopen.scm")'
 
 # A link whose target has a wildcard: the pattern was loaded as the name of
 # a buffer, and url-glue (the autosave names) threw a C++ exception which

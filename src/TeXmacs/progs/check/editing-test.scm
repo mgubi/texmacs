@@ -48,7 +48,7 @@
 ;; ones, never "primary", which is the clipboard of the system.
 
 (texmacs-module (check editing-test)
-  (:use (check check-lib)))
+  (:use (check check-lib) (utils library cursor)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -394,6 +394,78 @@
     (check-false (buffer-exists? u))
     (check= (current-buffer) old)
     (check= (view->buffer (window->view (current-window))) old)))
+
+;; One editor per opening of a named texmacs-input (#776): while a widget
+;; still shows the field, a new widget with that name is the same field made
+;; again (a refresh, side tools made again, as a macro editor when the search
+;; tool opens). It keeps the view of the field, with its editor and its undo
+;; history, and a new content is an edit which can be undone. (Here the
+;; former widgets are not let go: that only happens in the event loop, see
+;; tests/startup/check.sh for a field opened anew.)
+(define (test-embedded-history)
+  (check-group "the history of a named texmacs-input made again")
+  (let* ((w (string->url "tmfs://aux/editing-test-embedded-history"))
+         (build (lambda (doc)
+                  (widget-texmacs-input doc '(style "generic") w)))
+         (build-other (lambda (u)
+                        ;; with what was typed (a different content would
+                        ;; hide a history which is kept)
+                        (widget-texmacs-input (tree->stree (buffer-get-body u))
+                                              '(style "generic") u)))
+         (old (current-buffer))
+         (original '(document "original")))
+    (with r (check-run
+              (lambda ()
+                (build original)
+                (with-buffer w
+                  (go-to (list (car (cursor-path)) 0 0))
+                  (edit (insert "typed "))
+                  (check-true (> (undo-possibilities) 0)))
+                ;; made again with its former content: what was typed is
+                ;; kept, and can be undone
+                (build original)
+                (check= (length (buffer->views w)) 1)
+                (with-buffer w
+                  (check-true (> (undo-possibilities) 0))
+                  (edit (undo 0))
+                  (check= (tree->stree (buffer-get-body w))
+                          '(document "typed original")))
+                ;; made again with the content it has: no new step, only
+                ;; the typing is left to undo (the steps are counted by
+                ;; undoing them: undo-possibilities is at most 1)
+                (build (tree->stree (buffer-get-body w)))
+                (with-buffer w
+                  (archive-state) (start-editing) (end-editing)
+                  (let loop ((n 0))
+                    (if (> (undo-possibilities) 0)
+                        (begin (edit (undo 0)) (loop (+ n 1)))
+                        (check= n 1)))
+                  (check= (tree->stree (buffer-get-body w))
+                          '(document "original")))
+                ;; opened anew while no widget shows it: the view left
+                ;; passive is replaced by a new one, with an empty history,
+                ;; which becomes current if the former one was
+                (with p (string->url "tmfs://aux/editing-test-embedded-new")
+                  (buffer-set-body p (stree->tree '(document "p")))
+                  (view-passive p)
+                  (buffer-focus p)
+                  (check= (current-buffer) p)
+                  (edit (insert "typed "))
+                  (check-true (> (undo-possibilities) 0))
+                  (build-other p)
+                  (check= (current-buffer) p)
+                  (check= (length (buffer->views p)) 1)
+                  (check= (undo-possibilities) 0)
+                  (buffer-focus old)
+                  (check= (current-buffer) old)
+                  (buffer-close p)
+                  (check-false (buffer-exists? p)))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (buffer-close w)
+    (check-false (buffer-exists? w))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
 
 ;; A document written to a .tm file and loaded: the body, the style and the
 ;; initial environment of the file are those of the buffer, which is not
@@ -2170,6 +2242,7 @@
   (test-tree-pointers)
   (test-embedded)
   (test-embedded-close)
+  (test-embedded-history)
   (test-load)
   (test-load-large)
   (test-load-from-system-large)

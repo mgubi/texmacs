@@ -365,25 +365,65 @@ enrich_embedded_document (tree body, tree style) {
   return doc;
 }
 
+static tm_view
+live_embedded_view (url name) {
+  // the view of the buffer which a widget still shows, if any: the windows
+  // of embedded widgets have no identifier, unlike the windows of TeXmacs
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++) {
+    tm_view v= concrete_view (vs[i]);
+    if (v != NULL && v->win != NULL && is_none (v->win->id)) return v;
+  }
+  return NULL;
+}
+
+static bool
+forget_passive_views (url name) {
+  // the views which no window shows any more, left by the former widgets of
+  // a named texmacs-input (a tool closed): they are deleted with their
+  // editors and their histories; true when the current view was one of them
+  bool current= false;
+  url cur= get_current_view_safe ();
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++) {
+    tm_view v= concrete_view (vs[i]);
+    if (v == NULL || v->win != NULL) continue;
+    if (vs[i] == cur) current= true;
+    delete_view (vs[i]);
+  }
+  return current;
+}
+
 widget
 texmacs_input_widget (tree doc, tree style, url wname) {
   doc= enrich_embedded_document (doc, style);
   url       base = get_master_buffer (get_current_buffer ());
   tm_view   curvw= concrete_view (get_current_view ());
   url       name = embedded_name (wname);
+  // One editor per opening of a named texmacs-input (#776). While a widget
+  // still shows the buffer, the new widget is the same field made again (a
+  // refresh, side tools made again): it takes the view over, with its
+  // editor and its undo history, and a new content is an edit which can be
+  // undone. Otherwise the field is opened anew (its dialog was closed, its
+  // tool dropped): a new view, whose editor starts with an empty history.
+  // NOTE: a dropped widget lets its view go only when its drop command
+  // runs, after the widget is collected; until then, a new widget counts as
+  // made again. Two widgets shown at once with one name (the same tool in
+  // two windows) share one view, as get_passive_view already gave them.
+  tm_view   vw   = NULL;
+  bool      cur  = false;
   if (contains (name, get_all_buffers ())) {
-    // a new content is not an edit: the undo history would keep each
-    // document it replaces (a named texmacs-input made again, #776)
-    tree before= get_buffer_body (name);
+    vw= live_embedded_view (name);
+    if (vw == NULL) cur= forget_passive_views (name);
     set_buffer_tree (name, doc);
-    if (get_buffer_body (name) != before) {
-      array<url> vs= buffer_to_views (name);
-      for (int i=0; i<N(vs); i++)
-        view_to_editor (vs[i]) -> clear_undo_history ();
-    }
   }
   else create_buffer (name, doc);
-  tm_view   vw   = concrete_view (get_passive_view (name));
+  if (vw == NULL) vw= concrete_view (get_passive_view (name));
+  if (cur) {
+    // the deleted view was the current one
+    set_current_view (abstract_view (vw));
+    curvw= NULL;
+  }
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
   set_master_buffer (name, base);
   attach_embedded_view (vw, win);
