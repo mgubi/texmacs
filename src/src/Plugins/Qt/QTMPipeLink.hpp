@@ -47,6 +47,11 @@ public:
   time_t kill_at= 0;
   qint64 ending_pg= 0;
   void finishKill ();
+  // the process group of the program (its number is that of the program),
+  // kept after the program has ended while members of it are left: once Qt
+  // has seen the end, processId () is 0, and the group could not be reached
+  qint64 group= 0;
+  void forgetEndedGroup ();
 
 #if !defined (OS_MINGW) && !defined (OS_ANDROID) && QT_VERSION < 0x060000
 protected:

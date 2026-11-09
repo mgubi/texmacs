@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 9 November 2026
 
+- **The programs started by a session plugin end with it** (desktop, Qt):
+  when a plugin such as a shell session ended by itself or after an
+  interrupt, the programs which its script had started in the background
+  kept running, because the end was noticed before the stop and the group
+  of the plugin was no longer known. Its process group is now kept until
+  nothing is left of it, and is ended at once (#769).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
