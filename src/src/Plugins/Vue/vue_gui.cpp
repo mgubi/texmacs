@@ -5439,6 +5439,7 @@ get_window_from_ID (Uint32 ID) {
 *   compose <text>                  composition of an input method (empty: end it)
 *   focus                           pretend the target window got the keyboard focus
 *   drop x y <path>|text:<text>     drag and drop of one item at that position
+*   open <path>                     a file given by the system (the Finder, open -a)
 *   repaint                         invalidate every editor (repaint from scratch)
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
@@ -5574,6 +5575,34 @@ script_exec (string line) {
     // the system gives it converted from plain text)
     script_clipboard (line (min (N(line), N(cmd)+1), N(line)));
     return 1;
+  }
+  if (cmd == "open" && N(a) > 1) {
+    // "open <path>": a file given by the system (the Finder, open -a), as
+    // SDL's delegate of the application sends it on macOS: a drop with no
+    // window (#768). A relative path is taken from the current directory
+    static char obuf[1024];
+    string path= line (N(cmd) + 1, N(line)); // (as the system gives it)
+    if (N(path) > 0 && path[0] != '/')
+      path= concretize (url_pwd ()) * "/" * path;
+    c_string cpath (path);
+    int n= min ((int) strlen (cpath), 1023);
+    for (int i= 0; i < n; i++) obuf[i]= ((char*) cpath)[i];
+    obuf[n]= 0;
+    SDL_Event ev;
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_BEGIN;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    SDL_PushEvent (&ev);
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_FILE;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    ev.drop.data= obuf;
+    SDL_PushEvent (&ev);
+    SDL_zero (ev);
+    ev.type= SDL_EVENT_DROP_COMPLETE;
+    ev.drop.timestamp= SDL_GetTicksNS ();
+    SDL_PushEvent (&ev);
+    return 0;
   }
   if (win == NULL) {
     // after a "window" which matched nothing: skipped, until one matches
@@ -6089,6 +6118,26 @@ drop_add_file (string item) {
     drop_doc << tree (IMAGE, as_string (u), iw, ih, "", "");
   }
   else drop_doc << as_string (u);
+}
+
+// The files given by the system, outside of any window: on macOS, SDL's
+// delegate of the application turns the files of the Finder, the Dock and
+// "open" (application:openFile:, and the URLs of kAEGetURL) into a drop
+// with no window (windowID 0). They are opened as by the Cocoa and Qt
+// ports, by load-buffer-from-system (tm-files.scm, #739), which reuses the
+// untouched startup buffer, and otherwise opens a new window (#768)
+static array<string> system_files;
+
+static void
+system_files_deliver () {
+  for (int i= 0; i < N(system_files); i++) {
+    if (DEBUG_VUE_EVENTS)
+      debug_events << "file given by the system: " << system_files[i] << LF;
+    exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer-from-system"),
+                                           object (url_system (system_files[i])))));
+  }
+  system_files= array<string> ();
+  gui_needs_update= true;
 }
 
 // the items of the drop, at (x, y) of win (points), to the editor there
@@ -6758,8 +6807,11 @@ process_event (SDL_Event *event) {
     // handed to the editor as a "drop" mouse action carrying a ticket; the
     // editor reads the payload back (call_drop_event in edit_mouse.cpp) and
     // calls mouse-drop-event.
+    // A drop with no window (windowID 0) is a file given by the system,
+    // to open (see system_files above).
     case SDL_EVENT_DROP_BEGIN:
-      drop_doc= tree (CONCAT);
+      if (event->drop.windowID == 0) system_files= array<string> ();
+      else drop_doc= tree (CONCAT);
       break;
     case SDL_EVENT_DROP_FILE:
     case SDL_EVENT_DROP_TEXT:
@@ -6767,13 +6819,15 @@ process_event (SDL_Event *event) {
       if (event->drop.data == NULL) break;
       string item= utf8_to_cork (string (event->drop.data,
                                          (int) strlen (event->drop.data)));
-      if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
+      if (event->drop.windowID == 0) system_files << item;
+      else if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
       else drop_add_file (item);
       break;
     }
     case SDL_EVENT_DROP_COMPLETE:
-      drop_deliver (get_window_from_ID (event->drop.windowID),
-                    event->drop.x, event->drop.y);
+      if (event->drop.windowID == 0) system_files_deliver ();
+      else drop_deliver (get_window_from_ID (event->drop.windowID),
+                         event->drop.x, event->drop.y);
       break;
     case SDL_EVENT_TEXT_EDITING:
     {
