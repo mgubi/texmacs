@@ -480,7 +480,36 @@
   (check= (tl '(verbatim (document "a" "b")))
           "\\begin{alltt}\na\nb\n\\end{alltt}")
   (check= (tl '(code (document "x")))
-          "\\begin{tmcode}\nx\n\\end{tmcode}"))
+          "\\begin{tmcode}\nx\n\\end{tmcode}")
+  ;; the characters with no Cork byte are kept (#824): in UTF-8 with the
+  ;; ascii and utf-8 encodings, as Cork letters are, and as their LaTeX
+  ;; command with the cork encoding; <less> stays <
+  (check= (tl '(verbatim (document "<#430>x")))
+          "\\begin{alltt}\n\xd0\xb0x\n\\end{alltt}")
+  (check= (tl '(verbatim (document "<#430>x"))
+              '("texmacs->latex:encoding" . "utf-8"))
+          "\\begin{alltt}\n\xd0\xb0x\n\\end{alltt}")
+  (check= (tl '(verbatim (document "<#430>x"))
+              '("texmacs->latex:encoding" . "cork"))
+          "\\begin{alltt}\n{\\cyra}x\n\\end{alltt}")
+  (check= (tl '(verbatim (document "a<less>b<#4E2D>")))
+          "\\begin{alltt}\na<b\xe4\xb8\xad\n\\end{alltt}")
+  (check= (tl '(cpp-code (document "// <#430>")))
+          "\\begin{tmcode}[cpp]\n// \xd0\xb0\n\\end{tmcode}")
+  ;; with cork, a character with no LaTeX command is left out (its UTF-8
+  ;; bytes would be other letters in a Cork file)
+  (check= (tl '(verbatim (document "<alpha>x"))
+              '("texmacs->latex:encoding" . "cork"))
+          "\\begin{alltt}\nx\n\\end{alltt}")
+  ;; the characters of an address are in UTF-8 percent codes, in every
+  ;; encoding: a LaTeX command would break it
+  (for (enc '("ascii" "cork" "utf-8"))
+    (check= (tl '(href "http://e.org/<#430>_a<less>")
+                (cons "texmacs->latex:encoding" enc))
+            "\\url{http://e.org/\\%D0\\%B0_a\\%3C}")
+    (check= (tl '(hlink "x" "http://e.org/<#430>#c")
+                (cons "texmacs->latex:encoding" enc))
+            "\\href{http://e.org/\\%D0\\%B0\\#c}{x}")))
 
 ;; user macros are exported as \newcommand
 (define (test-export-macros)
