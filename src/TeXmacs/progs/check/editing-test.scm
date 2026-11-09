@@ -407,6 +407,11 @@
   (let* ((w (string->url "tmfs://aux/editing-test-embedded-history"))
          (build (lambda (doc)
                   (widget-texmacs-input doc '(style "generic") w)))
+         (build-other (lambda (u)
+                        ;; with what was typed (a different content would
+                        ;; hide a history which is kept)
+                        (widget-texmacs-input (tree->stree (buffer-get-body u))
+                                              '(style "generic") u)))
          (old (current-buffer))
          (original '(document "original")))
     (with r (check-run
@@ -436,7 +441,25 @@
                         (begin (edit (undo 0)) (loop (+ n 1)))
                         (check= n 1)))
                   (check= (tree->stree (buffer-get-body w))
-                          '(document "original")))))
+                          '(document "original")))
+                ;; opened anew while no widget shows it: the view left
+                ;; passive is replaced by a new one, with an empty history,
+                ;; which becomes current if the former one was
+                (with p (string->url "tmfs://aux/editing-test-embedded-new")
+                  (buffer-set-body p (stree->tree '(document "p")))
+                  (view-passive p)
+                  (buffer-focus p)
+                  (check= (current-buffer) p)
+                  (edit (insert "typed "))
+                  (check-true (> (undo-possibilities) 0))
+                  (build-other p)
+                  (check= (current-buffer) p)
+                  (check= (length (buffer->views p)) 1)
+                  (check= (undo-possibilities) 0)
+                  (buffer-focus old)
+                  (check= (current-buffer) old)
+                  (buffer-close p)
+                  (check-false (buffer-exists? p)))))
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))
     (buffer-close w)
