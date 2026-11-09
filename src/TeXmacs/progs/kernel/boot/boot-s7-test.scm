@@ -492,10 +492,20 @@
    (test "object->string gives a long list in full"
          (string->object (object->string (iota 500))) (iota 500))
    (test "display gives a long list in full"
-         (string-length
-          (call-with-output-string (lambda (port) (display (iota 100) port))))
-         (string-length
-          (call-with-output-string (lambda (port) (write (iota 100) port)))))
+         (with-input-from-string
+             (call-with-output-string (lambda (port) (display (iota 100) port)))
+           read)
+         (iota 100))
+   ;; (s7 adds to print-length when it quotes a form in a syntax error: a
+   ;; print-length near the largest fixnum overflowed and quoted "(let")
+   (test "a syntax error quotes the whole form"
+         (with r (catch #t
+                   (lambda () (eval '(let ((x 1 2) (y 3) (z 4)) x)) "no error")
+                   (lambda args (object->string args)))
+           (and (string? r)
+                (string-contains? r "(let ((x 1 2) (y 3) (z 4)) x)")
+                #t))
+         #t)
    (test "the stree of a document of 64 paragraphs is written in full"
          (with t (stree->tree `(document ,@(map number->string (iota 64))))
            (length (cdr (write-read-back (tree->stree t)))))
