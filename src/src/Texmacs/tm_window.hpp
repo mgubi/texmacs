@@ -117,7 +117,7 @@ void windows_delayed_refresh (int ms);
 void windows_refresh (string kind= "auto");
 path window_search (url name);
 int  embedded_opening ();
-void embedded_opening_set (int op);
+bool embedded_opening_set (int op);
 int  embedded_tool_opening (string tool);
 
 #endif // defined TM_WINDOW_H

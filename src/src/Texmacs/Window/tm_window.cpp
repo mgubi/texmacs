@@ -244,6 +244,7 @@ static hashmap<string,tree> field_body;   // the body at the last build
 static hashmap<string,url> field_main (url_none ()); // window of the focus
 static hashmap<string,bool> field_named (false);
 static hashmap<string,int> field_owner (0);  // name -> its latest opening
+static hashset<int> ended_openings;     // of dialogs and tools
 static tm_window_rep* tool_build_win= NULL;  // tool slot being made
 static int tool_build_which= -1;
 static hashset<string> tool_build_seen;
@@ -263,9 +264,12 @@ embedded_opening () {
   return current_opening;
 }
 
-void
+bool
 embedded_opening_set (int op) {
+  // false for an opening which has ended: a refreshable of a dialog which
+  // is closed, but not yet let go, makes nothing more
   current_opening= op;
+  return !ended_openings->contains (op);
 }
 
 int
@@ -326,6 +330,7 @@ end_field (int op, url name, bool remove_named) {
 
 static void
 end_opening (int op) {
+  ended_openings->insert (op);
   if (!opening_fields->contains (op)) return;
   array<url> a= copy (opening_fields [op]);
   for (int i=0; i<N(a); i++) end_field (op, a[i], false);
@@ -511,6 +516,7 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   // view, with its editor and its undo history; in a new opening, it gets a
   // new view, whose editor starts with an empty history
   int op= current_opening;
+  if (ended_openings->contains (op)) op= new_opening ();
   if (op == 0) {
     // made outside a dialog or a tool: in the live opening of its name if
     // any (a menu made again), else in a new one

@@ -6663,7 +6663,7 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|embedded_opening_set> which returns
-    <scm|void>.
+    <scm|bool>.
   </explain>
 
   <\explain>

@@ -935,7 +935,7 @@
   (alt-window-set-position window_set_position (void int int int))
   (alt-window-search window_search (path url))
   (embedded-opening embedded_opening (int))
-  (embedded-opening-set embedded_opening_set (void int))
+  (embedded-opening-set embedded_opening_set (bool int))
   (embedded-tool-opening embedded_tool_opening (int string))
 
   ;; routines for BibTeX

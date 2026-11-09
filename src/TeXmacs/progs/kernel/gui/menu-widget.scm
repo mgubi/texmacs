@@ -765,6 +765,12 @@
   (with (tag s kind) p
     (list (widget-refresh (if (string? s) s (symbol->string s)) kind))))
 
+(define (embedded-opening-live? op)
+  (let* ((old (embedded-opening))
+         (live? (embedded-opening-set op)))
+    (embedded-opening-set old)
+    live?))
+
 (define (in-opening op thunk)
   ;; run @thunk with @op as the opening of the texmacs-input it makes, and
   ;; restore the former opening afterwards (#776)
@@ -778,14 +784,18 @@
 (define (make-refreshable p style bar?)
   "Make @(refreshable :%1 :menu-item-list) menu items."
   ;; the content is made again in the opening of the dialog or tool in
-  ;; which the refreshable was made: its texmacs-input keep their editors
+  ;; which the refreshable was made: its texmacs-input keep their editors;
+  ;; once that opening has ended (a dialog closed, but its widgets not yet
+  ;; let go), it is made empty
   (with (tag kind . items) p
     (let ((op (embedded-opening)))
       (list (widget-refreshable
               (lambda ()
                 (in-opening op
                   (lambda ()
-                    (widget-vmenu (make-menu-items-list items style bar?)))))
+                    (if (embedded-opening-live? op)
+                        (widget-vmenu (make-menu-items-list items style bar?))
+                        (widget-vmenu '())))))
               (kind))))))
 
 (define (make-opening p style bar?)

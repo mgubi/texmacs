@@ -11368,10 +11368,10 @@ tmg_embedded_opening_set (tmscm arg1) {
   int in1= tmscm_to_int (arg1);
 
   // TMSCM_DEFER_INTS;
-  embedded_opening_set (in1);
+  bool out= embedded_opening_set (in1);
   // TMSCM_ALLOW_INTS;
 
-  return TMSCM_UNSPECIFIED;
+  return bool_to_tmscm (out);
 }
 
 tmscm

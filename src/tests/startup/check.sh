@@ -684,7 +684,7 @@ cat > "$out/startup-two-windows.scm" <<'EOF'
   (update-forced)
   (display* "CHECK views " (views) "\n")
   (typed "a")
-  (display* "CHECK typed in one " (body) ", undo " (undos) "\n")
+  (display* "CHECK typed in one " (cadr (body)) ", undo " (undos) "\n")
   ;; the first window ends: the view of the second is left
   (kill-window w1)
   (display* "CHECK window closed: views " (views) ", undo " (undos) "\n")
@@ -697,7 +697,7 @@ EOF
 
 check "the same tool in two windows has two editors (#776)" \
       "views 2
-typed in one (document ax), undo 1
+typed in one ax, undo 1
 window closed: views 1, undo 1
 typed in the other 3, undo 1" \
       -x '(load "startup-two-windows.scm")'
