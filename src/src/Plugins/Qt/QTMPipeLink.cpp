@@ -62,6 +62,10 @@ QTMPipeLink::~QTMPipeLink () {
 
 bool
 QTMPipeLink::launchCmd () {
+  // what is left of a program stopped or ended before, which is still to
+  // be killed (reap_ending_pipe_links), is killed now: later, finishKill
+  // would wait for and kill the new program (#769)
+  if (kill_at != 0) finishKill ();
   // (also what is left of the group of a program which has ended)
   if (state () != QProcess::NotRunning || group > 0) killProcess (1000);
 

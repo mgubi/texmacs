@@ -139,6 +139,12 @@
   (:launch "sh -c \"sleep 613 & sleep 614; cat\"")
   (:serializer ,raw-serialize))
 
+;; ends by itself after a line, leaving a program which ignores SIGTERM: what
+;; is left of its group is killed 2 s after its end (argument 617)
+(plugin-configure tmtestleft
+  (:launch "sh -c \"(trap '' TERM; exec sleep 617) & read x; exit 0\"")
+  (:serializer ,raw-serialize))
+
 ;; cleans up when it is asked to terminate: it writes a file a little later
 ;; (the test finds its process by the argument 615)
 (define grace-file
@@ -1351,6 +1357,30 @@
                                              "plugins-test-group3") 0))))
   (check-true (wait-until (lambda () (== (sleepers "613") 0)) 3000))
   (connection-stop "tmtestgroup" "plugins-test-group3")
+  ;; a session started again within the 2 s given to what is left of the
+  ;; group of its former program goes on: only that rest is killed (the new
+  ;; program was killed with it, when the rest ignored SIGTERM)
+  (check= (start* "tmtestleft" "plugins-test-left") "ok")
+  (check-true (wait-until (lambda () (== (sleepers "617") 1)) 5000))
+  (connection-write-string "tmtestleft" "plugins-test-left" "go\n")
+  (check-true (poll "tmtestleft" "plugins-test-left"
+                    (lambda ()
+                      (== (connection-status "tmtestleft"
+                                             "plugins-test-left") 0))))
+  (check= (start* "tmtestleft" "plugins-test-left") "ok")
+  (check-true (wait-until (lambda () (== (sleepers "617") 1)) 5000))
+  (pause "2.5")
+  ;; (a start reaps the programs whose time is up)
+  (check= (start* "tmtestecho" "plugins-test-left-other") "ok")
+  (connection-interrupt "tmtestleft" "plugins-test-left")
+  (check-true (!= (connection-status "tmtestleft" "plugins-test-left") 0))
+  (connection-stop "tmtestecho" "plugins-test-left-other")
+  (connection-stop "tmtestleft" "plugins-test-left")
+  ;; (what is left of it ignores SIGTERM: killed by a start 2 s later)
+  (pause "2.5")
+  (check= (start* "tmtestecho" "plugins-test-left-reap") "ok")
+  (connection-stop "tmtestecho" "plugins-test-left-reap")
+  (check-true (wait-until (lambda () (== (sleepers "617") 0)) 3000))
 
   (check-group "processes: a plugin which cleans up when stopped")
   ;; SIGTERM, then SIGKILL only 2 s later: the plugin has time to clean up
