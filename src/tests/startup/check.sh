@@ -312,10 +312,12 @@ freed #t" \
 
 # The command which closes an embedded editor (texmacs-input) when its
 # window is deleted kept the view of its buffer: when the buffer had been
-# closed before, it read the deleted view and crashed (#775). A widget made
-# again with the same name takes over the buffer and its view: deleting the
+# closed before, it read the deleted view and crashed (#775). A second
+# window with an input of the same name shows the same buffer: deleting the
 # window of the former widget must not close the buffer which the new one
-# shows. The steps run from the event loop, which deletes the windows.
+# shows. Since #776, each window has a view of its own, deleted with it,
+# and a named buffer stays when the last one is deleted. The steps run
+# from the event loop, which deletes the windows.
 cat > "$out/startup-embedded.scm" <<'EOF'
 (define done #f)
 (define (later f)
@@ -352,7 +354,8 @@ cat > "$out/startup-embedded.scm" <<'EOF'
   (alt-window-delete w2)
   (display* "CHECK reused buffer kept " (buffer-exists? u2) "\n")
   (alt-window-delete w3)
-  (display* "CHECK reused buffer closed " (buffer-exists? u2) "\n")
+  (display* "CHECK reused buffer left without views "
+            (and (buffer-exists? u2) (null? (buffer->views u2))) "\n")
   (set! done #t))
 (later step1)
 EOF
@@ -360,7 +363,7 @@ EOF
 check "an embedded buffer closed before its window, and one made again (#775)" \
       "buffer closed #f
 reused buffer kept #t
-reused buffer closed #f" \
+reused buffer left without views #t" \
       -x '(load "startup-embedded.scm")'
 
 # Side tools made again let their former widgets go: the cache of the
@@ -455,9 +458,18 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
          ;; the new content can be undone
          (display* "CHECK named undo kept " (> (named-undo) 0) "\n")))
   (if (< named-round 8) (later named-start) (later named-close)))
+(define (named-steps)
+  ;; the steps of the history, counted by undoing them
+  (in-named (lambda ()
+              (archive-state) (start-editing) (end-editing)
+              (let loop ((n 0))
+                (if (> (undo-possibilities) 0)
+                    (begin (undo 0) (loop (+ n 1)))
+                    n)))))
 (define (named-close)
-  ;; 6 new contents while nothing was typed: they are not kept
-  (display* "CHECK named undo after 6 results " (named-undo) "\n")
+  ;; 6 new contents while nothing was typed: they add no step, so that the
+  ;; typing and the first new content are left
+  (display* "CHECK named steps after 6 results " (named-steps) "\n")
   (display* "CHECK named views " (named-views) "\n")
   (set-window-tools (current-window) :right '())
   (update-menus)
@@ -502,7 +514,7 @@ EOF
 check "side tools made again close the buffers of their texmacs-input (#776)" \
       "buffers left 1
 named undo kept #t
-named undo after 6 results 0
+named steps after 6 results 2
 named views 1
 closed: views 0, sentinels 0, named buffer kept #t
 named buffer usable #t
@@ -565,8 +577,10 @@ embedded after refresh #t" \
 # A dialog with a named texmacs-input in a refreshable: one editor per
 # opening of the dialog (#776). A refresh keeps the editor, so what was
 # typed can be undone; when the dialog is closed, the views of its fields
-# are deleted at once; opened again at once, without a garbage collection,
-# the field starts with an empty history, and the views do not pile up.
+# are deleted at once, and the named buffer stays; opened again at once,
+# without a garbage collection, the field starts with an empty history, and
+# the views do not pile up. A field with that name made by hand while the
+# dialog is open gets a view of its own, which the dialog leaves alone.
 cat > "$out/startup-dialog-reopen.scm" <<'EOF'
 (define done #f)
 (define (later f)
@@ -611,11 +625,17 @@ cat > "$out/startup-dialog-reopen.scm" <<'EOF'
   (set! content (string-append "x" (number->string opened)))
   (refresh-now "startup-dialog-reopen")
   (later refreshed))
+(define by-hand #f)
 (define (refreshed)
   (display* "CHECK refreshed " opened ": views " (views) ", undo kept "
             (> (undos) 0) "\n")
+  (when (= opened 3)
+    (set! by-hand (widget-texmacs-input '(document "h") '(style "generic")
+                                        name))
+    (display* "CHECK by hand: views " (views) "\n"))
   (close-dialog)
-  (display* "CHECK closed " opened ": views " (views) "\n")
+  (display* "CHECK closed " opened ": views " (views) ", buffer kept "
+            (buffer-exists? name) "\n")
   (if (< opened 3) (open-it) (set! done #t)))
 (later open-it)
 EOF
@@ -623,13 +643,14 @@ EOF
 check "a dialog opened again starts with an empty history (#776)" \
       "opening 1: views 1, undo 0
 refreshed 1: views 1, undo kept #t
-closed 1: views 0
+closed 1: views 0, buffer kept #t
 opening 2: views 1, undo 0
 refreshed 2: views 1, undo kept #t
-closed 2: views 0
+closed 2: views 0, buffer kept #t
 opening 3: views 1, undo 0
 refreshed 3: views 1, undo kept #t
-closed 3: views 0" \
+by hand: views 2
+closed 3: views 1, buffer kept #t" \
       -x '(load "startup-dialog-reopen.scm")'
 
 # The same tool with a named texmacs-input in two windows: two openings,

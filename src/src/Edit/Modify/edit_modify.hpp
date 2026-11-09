@@ -39,6 +39,8 @@ public:
   void post_notify        (path p);
 
   void clear_undo_history ();
+  void confirm_changes ();
+  bool retract_change ();
   void archive_state ();
   void start_editing ();
   void end_editing ();

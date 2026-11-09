@@ -377,6 +377,8 @@ public:
   virtual void notify_set_cursor (path p, tree data) = 0;
   virtual void post_notify (path p) = 0;
   virtual void clear_undo_history () = 0;
+  virtual void confirm_changes () = 0;   // the pending changes as a step
+  virtual bool retract_change () = 0;    // the last step pending again
   virtual double this_author () = 0;
   virtual void archive_state () = 0;
   virtual void start_editing () = 0;
