@@ -64,6 +64,50 @@
           (else (url-last-modified base)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Files changed on disk by another program (#818)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (buffer-changed-on-disk? u)
+  (:synopsis "Was the file of the buffer @u changed on disk since it was read?")
+  ;; the same test as the save (save-buffer-check-permissions): the file
+  ;; is newer than the last load, save or revert of the buffer, which our
+  ;; own saves keep up to date
+  (and (url? u)
+       (not (url-rooted-tmfs? u))
+       (buffer-exists? u)
+       (url-test? u "fr")
+       (and-with mod-t (url-last-modified u)
+         (and-with save-t (buffer-last-save u)
+           (> mod-t save-t)))))
+
+;; the last check, kept for a second: the footer asks at each update, and a
+;; file is looked at (stat) at most once a second
+(define disk-check-buffer #f)
+(define disk-check-time 0)
+(define disk-check-result #f)
+
+(tm-define (current-buffer-changed-on-disk?)
+  (with u (current-buffer)
+    (when (or (!= u disk-check-buffer)
+              (> (- (texmacs-time) disk-check-time) 1000))
+      (set! disk-check-buffer u)
+      (set! disk-check-time (texmacs-time))
+      (set! disk-check-result (and u (buffer-changed-on-disk? u))))
+    disk-check-result))
+
+(tm-define (disk-change-footer-text)
+  ;; what the footer says while the file of the current buffer is newer on
+  ;; disk than the buffer, or #f
+  (and (current-buffer-changed-on-disk?)
+       (if (buffer-modified? (current-buffer))
+           "changed on disk (and here): File > Revert takes the disk's version"
+           "changed on disk: File > Revert reloads it")))
+
+(tm-define (disk-check-forget)
+  ;; the next footer looks at the file again
+  (set! disk-check-buffer #f))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Miscellaneous subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1011,7 +1055,10 @@
                 (set-message "Error: file not found" "Revert buffer")
                 (begin
                   (typeset-failure-forget name)
-                  (buffer-set name t))))))))
+                  (buffer-set name t)
+                  ;; (buffer-set marks it saved at the date of the file:
+                  ;; the footer looks at the file again, #818)
+                  (disk-check-forget))))))))
 
 (tm-define (revert-buffer . l)
   (with name (if (null? l) (current-buffer) (car l))

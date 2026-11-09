@@ -8579,6 +8579,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(get-page-overflow)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_page_overflow> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(get-total-width <scm-arg|bool>)>
 <explain-synopsis|no synopsis>
   <|explain>

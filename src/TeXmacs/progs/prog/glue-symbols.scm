@@ -1097,6 +1097,7 @@
 "get-page-width"
 "get-pages-width"
 "get-page-height"
+"get-page-overflow"
 "get-total-width"
 "get-total-height"
 "get-reference"

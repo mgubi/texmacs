@@ -120,6 +120,7 @@ public:
   language get_env_language ();
   int      get_page_count ();
   SI       get_page_width (bool deco);
+  SI       get_page_overflow ();
   SI       get_pages_width (bool deco);
   SI       get_page_height (bool deco);
   SI       get_total_width (bool deco);

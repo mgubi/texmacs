@@ -449,6 +449,11 @@ public:
   SI           page_right_margin;
   SI           page_top_margin;
   SI           page_bottom_margin;
+  // what the page made last by the pager of this environment has beyond the
+  // screen (page medium beamer: the content of a slide which is taller than
+  // the screen, which makes a taller page), 0 when it fits (#819); written
+  // by pager_rep::papyrus_make and pages_make, read by the editor
+  SI           page_overflow;
 
 private:
   tree exec_formatting (tree t, string v);
