@@ -3442,6 +3442,75 @@
   ;; the evaluations take the environment of a fresh generic buffer
   (with-typeset-body '(document "") thunk))
 
+;; A slide whose content is taller than the screen (page medium beamer): the
+;; page is made taller (make_pages.cpp, papyrus_make), and by how much is
+;; kept for the editor (get-page-overflow) and said in the footer (#819)
+(define overflow-dir
+  (string-append (url->system (url-temp-dir)) "/typeset-overflow"))
+
+(define (overflow-file name)
+  (system->url (string-append overflow-dir "/" name)))
+
+(define (overflow-clear-dir)
+  (with d (system->url overflow-dir)
+    (when (url-exists? d)
+      (for (u (url-read-directory d "*"))
+        (system-remove u))
+      (system-rmdir d))))
+
+(define (overflow-write name medium space)
+  (tree-export
+   (stree->tree `(document (TeXmacs "2.1")
+                           (style (tuple "beamer"))
+                           (body (document
+                                  (screens (shown (document "first"
+                                                            (vspace ,space)
+                                                            "last")))))
+                           (initial (collection
+                                     (associate "page-medium" ,medium)))))
+   (overflow-file name) "texmacs"))
+
+(define (overflow-of name)
+  ;; the overflow of the document, in cm, and the text of the footer
+  (let* ((old (current-buffer))
+         (u (overflow-file name)))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (load-buffer u)
+        (switch-to-buffer* u)
+        (update-forced)
+        (list (/ (get-page-overflow) (length-decode "1cm"))
+              (beamer-overflow-footer-text)))
+      (lambda ()
+        (when (buffer-exists? u) (buffer-close u))
+        (switch-to-buffer* old)))))
+
+(define (test-beamer-overflow)
+  (check-group "the overflow of a slide")
+  (overflow-clear-dir)
+  (system-mkdir (system->url overflow-dir))
+  (overflow-write "fits.tm" "beamer" "1cm")
+  (overflow-write "tall.tm" "beamer" "20cm")
+  (overflow-write "taller.tm" "beamer" "25cm")
+  (overflow-write "paper.tm" "paper" "40cm")
+  (let ((fits (overflow-of "fits.tm"))
+        (tall (overflow-of "tall.tm"))
+        (taller (overflow-of "taller.tm"))
+        (paper (overflow-of "paper.tm")))
+    (check= (car fits) 0)
+    (check-false (cadr fits))
+    (check-true (> (car tall) 1.0))
+    ;; 5 cm more of content is 5 cm more beyond the screen
+    (check-true (< (abs (- (car taller) (car tall) 5.0)) 0.1))
+    (check-true (string? (cadr tall)))
+    (check-true (and (string? (cadr tall))
+                     (string-contains? (cadr tall) "overflows the screen")))
+    ;; on paper, the content goes on the next pages
+    (check= (car paper) 0)
+    (check-false (cadr paper)))
+  (overflow-clear-dir))
+
 (tm-define (typeset-test-failures)
   (:synopsis "Run the tests of the typesetter and return the number of failures")
   (check-suite "typeset")
@@ -3498,4 +3567,5 @@
   (test-zoom)
   (test-included-files)
   (test-runaway-macro-recursion)
+  (test-beamer-overflow)
   (check-end))
