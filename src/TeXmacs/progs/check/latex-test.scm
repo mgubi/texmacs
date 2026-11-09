@@ -480,7 +480,22 @@
   (check= (tl '(verbatim (document "a" "b")))
           "\\begin{alltt}\na\nb\n\\end{alltt}")
   (check= (tl '(code (document "x")))
-          "\\begin{tmcode}\nx\n\\end{tmcode}"))
+          "\\begin{tmcode}\nx\n\\end{tmcode}")
+  ;; the characters with no Cork byte are kept (#824): in UTF-8 with the
+  ;; ascii and utf-8 encodings, as Cork letters are, and as their LaTeX
+  ;; command with the cork encoding; <less> stays <
+  (check= (tl '(verbatim (document "<#430>x")))
+          "\\begin{alltt}\n\xd0\xb0x\n\\end{alltt}")
+  (check= (tl '(verbatim (document "<#430>x"))
+              '("texmacs->latex:encoding" . "utf-8"))
+          "\\begin{alltt}\n\xd0\xb0x\n\\end{alltt}")
+  (check= (tl '(verbatim (document "<#430>x"))
+              '("texmacs->latex:encoding" . "cork"))
+          "\\begin{alltt}\n{\\cyra}x\n\\end{alltt}")
+  (check= (tl '(verbatim (document "a<less>b<#4E2D>")))
+          "\\begin{alltt}\na<b\xe4\xb8\xad\n\\end{alltt}")
+  (check= (tl '(cpp-code (document "// <#430>")))
+          "\\begin{tmcode}[cpp]\n// \xd0\xb0\n\\end{tmcode}"))
 
 ;; user macros are exported as \newcommand
 (define (test-export-macros)

@@ -627,11 +627,22 @@
                   (append c (tmtex-math-list (cdr l)))))))))
 
 (define (tmtex-verb-list l)
+  ;; a token <name> of verbatim content is kept if it is an ASCII character
+  ;; (<less>, <gtr>...) or if it has a Unicode character (<#430>, <alpha>):
+  ;; the latter as (!verb-utf8 "..."), which tmtex-verb-string writes
   (if (null? l) l
       (let ((c (car l)))
         (if (== c #\<)
-            (let ((r (tmtex-token l tmtex-verb-list #t)))
-              (if (char? (car r)) r (cdr r)))
+            (receive (p1 p2) (list-break (cdr l) (lambda (x) (== x #\>)))
+              (let* ((s (list->string p1))
+                     (q (if (null? p2) '() (cdr p2)))
+                     (r (tmtex-verb-list q))
+                     (x (tmtex-token-sub s #t)))
+                (if (char? x) (cons x r)
+                    (let* ((tok (string-append "<" s ">"))
+                           (u (string-convert tok "Cork" "UTF-8")))
+                      (if (== u tok) r
+                          (cons (list '!verb-utf8 u) r))))))
             (cons c (tmtex-verb-list (cdr l)))))))
 
 (define (tmtex-string-break? x start)
@@ -677,10 +688,19 @@
          (t (tmtex-verb-list l))
          (r (tmtex-string-produce t)))
     (tmtex-env-reset "mode")
-    (if (or tmtex-use-unicode? tmtex-use-ascii?)
-        (set! r (map (lambda (x) (string-convert* x "Cork" "UTF-8")) r))
-        (set! r (map unescape-angles r)))
-    (tex-concat r)))
+    (apply string-append (map tmtex-verb-produce r))))
+
+(define (tmtex-verb-produce x)
+  ;; the Cork characters of verbatim content are written in UTF-8 with the
+  ;; ascii and utf-8 encodings, as they are with the cork encoding; a
+  ;; character which has no Cork byte (!verb-utf8 of tmtex-verb-list) is
+  ;; then written as LaTeX writes it outside verbatim (\cyra...)
+  (cond ((func? x '!verb-utf8 1)
+         (if (or tmtex-use-unicode? tmtex-use-ascii?) (cadr x)
+             (string-convert (cadr x) "UTF-8" "LaTeX")))
+        ((or tmtex-use-unicode? tmtex-use-ascii?)
+         (string-convert* x "Cork" "UTF-8"))
+        (else (unescape-angles x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entire files
