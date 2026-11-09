@@ -511,6 +511,16 @@
               (if s
                   (stree->tree `(concat ,(tree->stree t*) "     " ,s))
                   t*))))))
+;; The footer says that the file of the document was changed on disk by
+;; another program, as long as it is (#818)
+(with previous footer-hook
+  (set! footer-hook
+        (lambda (t)
+          (with t* (previous t)
+            (with s (disk-change-footer-text)
+              (if s
+                  (stree->tree `(concat ,(tree->stree t*) "     " ,s))
+                  t*))))))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

@@ -22,6 +22,13 @@ have the details, and the problems go to the
   the page is made, for the step of the slide which is shown; a mark of the
   screen's limit on the page and a list of the slides which overflow are
   to follow.
+- **The footer says when the file was changed on disk** (#818, first step):
+  when another program (an editor, `git checkout`, a sync client) changes
+  the file of the document, TeXmacs used to notice only when saving. The
+  footer now says "changed on disk: File > Revert reloads it" (or that
+  there are changes on both sides) as long as the file is newer than the
+  document, looking at it at most once a second. After File > Revert, the
+  document is the file again: it is no longer marked as modified.
 
 ## 9 November 2026
 

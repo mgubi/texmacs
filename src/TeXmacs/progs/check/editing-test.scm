@@ -1831,6 +1831,55 @@
           (buffer-close g)
           (switch-to-buffer f))))))
 
+;; A file changed on disk by another program after it was saved (#818): the
+;; buffer knows it (buffer-changed-on-disk?, the same test as the save), the
+;; footer says it, with or without changes in the buffer, and a revert takes
+;; the version of the disk, after which the buffer is that file again.
+(define (rewrite-later f doc)
+  ;; write @doc into @f until its date is later than the last save of the
+  ;; buffer (the dates of files are in seconds), at most 3 s
+  (let ((start (texmacs-time))
+        (t (stree->tree `(document (TeXmacs "2.1")
+                                   (style (tuple "generic"))
+                                   (body ,doc)))))
+    (let loop ()
+      (tree-export t f "texmacs")
+      (when (and (<= (url-last-modified f) (buffer-last-save f))
+                 (< (- (texmacs-time) start) 3000))
+        (let wait ((t0 (texmacs-time)))
+          (when (< (- (texmacs-time) t0) 200) (wait t0)))
+        (loop)))))
+
+(define (test-disk-change)
+  (check-group "a file changed on disk")
+  (with-buffer-body '(document "mine")
+    (lambda ()
+      (let ((f (tmp-file* "disk.tm")))
+        (edit (save-buffer-as f :overwrite))
+        (disk-check-forget)
+        (check-false (buffer-changed-on-disk? f))
+        (check-false (disk-change-footer-text))
+        (rewrite-later f '(document "theirs"))
+        (check-true (buffer-changed-on-disk? f))
+        (disk-check-forget)
+        (with s (disk-change-footer-text)
+          (check-true (and (string? s) (string-contains? s "changed on disk"))))
+        ;; with changes in the buffer too
+        (edit (go-end) (insert " more"))
+        (disk-check-forget)
+        (with s (disk-change-footer-text)
+          (check-true (and (string? s) (string-contains? s "and here"))))
+        ;; a revert: the version of the disk, not modified, not changed
+        (revert-buffer-revert f)
+        (update-forced)
+        (check= (body) '(document "theirs"))
+        (check-false (buffer-modified? f))
+        (check-false (buffer-changed-on-disk? f))
+        (disk-check-forget)
+        (check-false (disk-change-footer-text))
+        ;; a buffer without a file, and one which is not open
+        (check-false (buffer-changed-on-disk? (tmp-file "none.tm")))))))
+
 ;; Save as tells the window of the buffer its new url (its file in the
 ;; title bar, the proxy icon of macOS), also when the file keeps its name in
 ;; another folder and the title of the buffer does not change: the url was
@@ -2228,6 +2277,7 @@
   (test-cancel-closed)
   (test-save)
   (test-save-as-window)
+  (test-disk-change)
   (test-open-from-system)
   (test-views-init)
   (test-views-style)
