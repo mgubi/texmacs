@@ -5,6 +5,10 @@
 #
 # usage: tests/startup/check.sh
 #
+# TM_STARTUP_CASES=<text> runs only the cases whose name contains that text
+# (for instance "(#776)"); the others are not counted. A text which selects
+# no case fails.
+#
 # TeXmacs is run without a window (-headless, or the offscreen platform of
 # Qt), with TEXMACS_PATH set to the source tree and a scratch
 # TEXMACS_HOME_PATH (tests/build/startup/home, or TM_TEST_HOME). Each case
@@ -38,6 +42,18 @@ export QT_QPA_PLATFORM=offscreen
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 timeout=${TM_TEST_TIMEOUT:-60}
 
+# A fresh home opens the Welcome in a second window at the first start with
+# a window (install_status 1, texmacs.cpp), and the current window then
+# goes from one to the other while a case runs: the side tools of #776 were
+# set in both windows, whose present texmacs-input both stayed. The first
+# cases, headless, set the home up; when only some cases run, a headless
+# start sets it up first.
+if [ -n "${TM_STARTUP_CASES:-}" ] &&
+   [ ! -f "$TEXMACS_HOME_PATH/system/settings.scm" ]; then
+  (cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" \
+     -headless -x '(display "")' > "$out/setup.out" 2>&1)
+fi
+
 cat > "$out/startup-a.tm" <<'EOF'
 <TeXmacs|2.1.4>
 
@@ -61,6 +77,10 @@ failed=0
 # check <name> <expected lines> <arguments of TeXmacs...>
 check () {
   name=$1; expected=$2; shift 2
+  case "$name" in
+    *"${TM_STARTUP_CASES:-}"*) ;;
+    *) return 0 ;;
+  esac
   total=$((total + 1))
   (cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" "$@" \
      > "$out/$total.out" 2> "$out/$total.err")
@@ -475,10 +495,15 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
                          (lambda (u)
                            (string-starts? (url->string u) prefix))))))
 (define (wait-until ok? n next)
-  ;; garbage collections from the event loop until (ok?), at most n
-  (lambda ()
-    (gc)
-    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
+  ;; garbage collections from the event loop until (ok?), for at most n
+  ;; rounds of 100 ms: Vue lets a dropped widget go only at its next
+  ;; layout, which a loaded machine may not reach within n quick rounds
+  (with end (+ (texmacs-time) (* 100 n))
+    (letrec ((tick (lambda ()
+                      (gc)
+                      (if (or (ok?) (> (texmacs-time) end)) (next)
+                          (later tick)))))
+      tick)))
 (define round 0)
 (tm-tool (startup-side-tool win)
   (:name "startup side tool")
@@ -569,10 +594,15 @@ cat > "$out/startup-dialog-refresh.scm" <<'EOF'
                          (lambda (u)
                            (string-starts? (url->string u) prefix))))))
 (define (wait-until ok? n next)
-  ;; garbage collections from the event loop until (ok?), at most n
-  (lambda ()
-    (gc)
-    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
+  ;; garbage collections from the event loop until (ok?), for at most n
+  ;; rounds of 100 ms: Vue lets a dropped widget go only at its next
+  ;; layout, which a loaded machine may not reach within n quick rounds
+  (with end (+ (texmacs-time) (* 100 n))
+    (letrec ((tick (lambda ()
+                      (gc)
+                      (if (or (ok?) (> (texmacs-time) end)) (next)
+                          (later tick)))))
+      tick)))
 (define name (string->url "tmfs://aux/startup-dialog-refresh"))
 (define cnt 0)
 (tm-widget ((startup-dialog) quit)
@@ -949,6 +979,7 @@ cat > "$out/startup-early-close.scm" <<'EOF'
 EOF
 
 before=$failed
+before_total=$total
 check "a side tool closed before its texmacs-input was typeset (#825)" \
       "shown 1
 survived" \
@@ -957,7 +988,7 @@ survived" \
 # the case reached the canvas which is gone: without it, it would pass
 # without the crash of #825, if the editor were typeset before the close
 # (checked only when the case passed, so that a failure counts once)
-if [ $failed -eq $before ] &&
+if [ $total -gt $before_total ] && [ $failed -eq $before ] &&
    ! grep -aq "cannot set scroll position" "$out/$total.out"; then
   echo "  FAILED a side tool closed before its texmacs-input was typeset (#825):"
   echo "         the scroll position was not sent to the closed tool"
@@ -966,4 +997,8 @@ if [ $failed -eq $before ] &&
 fi
 
 echo "Total: $total checks, $failed failed"
+if [ $total -eq 0 ]; then
+  echo "no case was selected by TM_STARTUP_CASES='${TM_STARTUP_CASES:-}'"
+  exit 1
+fi
 exit $status

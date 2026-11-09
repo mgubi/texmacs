@@ -196,7 +196,7 @@ static void script_clipboard (string txt);
 extern bool debug_clay;
 
 // list of commands
-extern list<command> cmd_list;
+extern list<command>& cmd_list;
 
 extern vue_window current_window; // used during layout to propagate information
 
@@ -3913,8 +3913,12 @@ void gui_open (int& argc, char** argv) {
   initialize_keyboard ();
 }
 
+extern bool vue_commands_open;
+
 void gui_close () {
-  // cleanly close the gui
+  // cleanly close the gui; the widgets let go from now on queue no command
+  // in cmd_list (their drop commands, #776), which is not run again
+  vue_commands_open= false;
   retire_windows (true);
   if (!is_headless ()) SDL_Quit();
 }

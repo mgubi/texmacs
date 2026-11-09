@@ -150,6 +150,7 @@ public:
   command quit;
   
   ns_tm_embedded_widget_rep (command _quit);
+  ~ns_tm_embedded_widget_rep ();
   
   virtual void      send (slot s, blackbox val);
   virtual blackbox query (slot s, int type_id);

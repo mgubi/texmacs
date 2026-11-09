@@ -27,6 +27,7 @@
 #include "sys_utils.hpp"
 
 #import "TMView.h"
+#import <objc/runtime.h>
 #import "TMButtonsController.h"
 
 widget make_menu_widget (object wid); // Texmacs/Window/tm_window.cpp
@@ -937,6 +938,45 @@ ns_tm_widget_rep::window_full_screen (bool flag) {
 
 
 
+/*! Keeps a widget alive as long as a view which was made from it. */
+@interface TMWidgetKeeper : NSObject
+{
+  widget_rep* wid;
+}
+- (id) initWithWidget: (widget) w;
+@end
+
+@implementation TMWidgetKeeper
+- (id) initWithWidget: (widget) w
+{
+  self= [super init];
+  if (self) { wid= w.rep; INC_COUNT_NULL (wid); }
+  return self;
+}
+- (void) dealloc
+{
+  DEC_COUNT_NULL (wid);
+  wid= NULL;
+  [super dealloc];
+}
+@end
+
+static void
+keep_former_tools (NSView* old, widget former) {
+  // the former tools widget lives as long as the views made from it, which
+  // may still use it (a TMRefreshView keeps a plain pointer to its widget,
+  // and the views removed below live until the autorelease pool is
+  // drained): it is no longer kept in the menu cache of the window, and the
+  // texmacs-input inside close their buffers when it is let go (#776).
+  // NOTE: a view retained by the widget itself (the container of an
+  // embedded editor) would make a cycle; the tools are lists (vertical
+  // menus), whose views are made afresh and not retained by their widget
+  if (is_nil (former) || old == nil) return;
+  TMWidgetKeeper* k=
+    [[[TMWidgetKeeper alloc] initWithWidget: former] autorelease];
+  objc_setAssociatedObject (old, "TMFormerTools", k, OBJC_ASSOCIATION_RETAIN);
+}
+
 void
 ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
   switch (s) {
@@ -948,6 +988,7 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
       check_type_void (index, s);
       int i= (s == SLOT_SIDE_TOOLS? 0: s == SLOT_LEFT_TOOLS? 1:
               s == SLOT_BOTTOM_TOOLS? 2: 3);
+      widget former= tool_widgets[i];
       tool_widgets[i]= w;
       NSView* v= is_nil (w)? nil: concrete (w)->as_nsview ();
       // NOTE: the scroll view of the side tools is kept, with its position,
@@ -958,14 +999,19 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
         for (NSView* old in [tool_views[i] subviews])
           if ([old isKindOfClass: [NSScrollView class]]) sc= (NSScrollView*) old;
       for (NSView* old in [[[tool_views[i] subviews] copy] autorelease])
-        if (old != sc) [old removeFromSuperview];
+        if (old != sc) {
+          keep_former_tools (old, former);
+          [old removeFromSuperview];
+        }
       if (v && i < 2) {
         // the side tools can be scrolled (as the QScrollArea of Qt)
         NSView* doc;
         if (sc) {
           doc= [sc documentView];
-          for (NSView* old in [[[doc subviews] copy] autorelease])
+          for (NSView* old in [[[doc subviews] copy] autorelease]) {
+            keep_former_tools (old, former);
             [old removeFromSuperview];
+          }
         }
         else {
           sc= [[[NSScrollView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];

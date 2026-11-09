@@ -65,6 +65,10 @@
 #   console  the console opens at its end (a race before the fix: the end
 #            waited for an editor with the keyboard focus, so that this one
 #            failed now and then only) (#661)
+#   tools    side tools made again let their former contents go: the
+#            buffers of their texmacs-input without a name are closed (only
+#            the present one is left), a named one stays when its tool is
+#            closed (the drop command of the wrapped widgets, #776)
 #   quiet    a warning from a delayed command opens the console, without
 #            the focus: the document stays the key and main window and the
 #            current buffer, and gets the keys typed. A click gives the
@@ -108,6 +112,7 @@ mkdir -p "$out"
 
 total=0
 failed=0
+skipped=0
 
 # the errors which do not fail a case (extended regular expressions, one
 # per line): known harmless messages, none so far
@@ -118,10 +123,23 @@ $TM_COCOA_HARMLESS"
 # the errors which the next case provokes (set before its verdict)
 expected=''
 
+# TM_COCOA_CASES="<case> <case>...": only those cases are run and counted
+# (the runs and the verdicts of the others are skipped; the two -headless
+# cases, colors and headless, still run, without a window). The names are
+# those of the list above, except canvas, which is three cases:
+# canvas-dark, canvas-light and canvas-live. A list which selects no case
+# fails.
+selected () {
+  [ -z "${TM_COCOA_CASES:-}" ] && return 0
+  case " $TM_COCOA_CASES " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
 # run <case> <language> <window test steps> <scheme expression> [<scheme
 # definitions>]: TeXmacs in a fresh home, the definitions at the start, the
 # expression after 2.5 s, the quit after 14 s (or quit_after ms, for this run)
 run () {
+  selected "$1" || { quit_after=; return 0; }
   name=$1; lang=$2; steps=$3; x=$4; defs=${5:-}
   home="$homes/$name-home"
   rm -rf "${homes:?}/$name-home"
@@ -145,6 +163,7 @@ run () {
 
 # verdict <case> <description> <condition (a command)>
 verdict () {
+  selected "$1" || { expected=''; return 0; }
   total=$((total + 1))
   log="$out/$1.log"
   why=""
@@ -309,7 +328,7 @@ columns_ok () {
   [ "$(echo "$low" | sed 's/.*pane \([0-9]*\)x.*/\1/')" -gt "$(echo "$high" | sed 's/.*pane \([0-9]*\)x.*/\1/')" ]
 }
 verdict columns "the scroller of the icon bars in columns is beside them (#683)" columns_ok
-grep -a 'NSTEST \(side-bars\|columns of\)' "$out/columns.log" | sed 's/^/         /'
+selected columns && grep -a 'NSTEST \(side-bars\|columns of\)' "$out/columns.log" | sed 's/^/         /'
 
 # (canvas) the colour around the pages, in the scroll views of the main
 # window too (the test aid "canvas" prints it): dark in the dark theme, mid
@@ -341,7 +360,7 @@ canvas_live_ok () {
 verdict canvas-dark "the surround of the pages is dark in the dark theme" canvas_dark_ok
 verdict canvas-light "the surround of the pages is mid grey in the light theme" canvas_light_ok
 verdict canvas-live "the surround of the pages follows a change of the theme while running" canvas_live_ok
-grep -ah 'NSTEST canvas' "$out"/canvas-*.log | sed 's/^/         /'
+{ selected canvas-dark || selected canvas-light || selected canvas-live; } && grep -ah 'NSTEST canvas' "$out"/canvas-*.log | sed 's/^/         /'
 
 # (raise) a command of the interface which throws a C++ error (cpp-error),
 # run by the update which -[TMDocView scrolled:] forces: the error is
@@ -469,6 +488,68 @@ console_ok () {
 }
 verdict console "the console opens at its end (#661)" console_ok
 
+# (tools) as the case of tests/startup/check.sh for #776: the former
+# widgets are let go at garbage collections, then close their buffers from
+# the event queue (the drop command of ns_wrapped_widget_rep); the steps
+# wait for that, with a bound
+cat > "$out/tools.scm" <<'EOF'
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f (lambda args (display* "CHECK error " args "\n"))))))
+(define (inputs)
+  (with prefix "tmfs://aux/TeXmacs-input-"
+    (length (list-filter (buffer-list)
+                         (lambda (u)
+                           (string-starts? (url->string u) prefix))))))
+(define (wait-until ok? n next)
+  (lambda ()
+    (gc)
+    (if (or (ok?) (= n 0)) (next) (later (wait-until ok? (- n 1) next)))))
+(define round 0)
+(tm-tool (cocoa-side-tool win)
+  (:name "cocoa side tool")
+  (text (number->string round))
+  (texmacs-input `(document ,(number->string round)) '(style "generic") #f))
+(define named (string->url "tmfs://aux/cocoa-side-named"))
+(tm-tool (cocoa-named-tool win)
+  (:name "cocoa named tool")
+  (texmacs-input '(document "named") '(style "generic") named)
+  (texmacs-input '(document "sentinel") '(style "generic") #f))
+(define (step)
+  (set! round (+ round 1))
+  (tool-select :right 'cocoa-side-tool)
+  (update-menus)
+  (later step2))
+(define (step2)
+  (update-forced)
+  (if (< round 6)
+      (later step)
+      (later (wait-until (lambda () (= (inputs) 1)) 100 step3))))
+(define (step3)
+  (display* "CHECK buffers left " (inputs) "\n")
+  (tool-select :right 'cocoa-named-tool)
+  (update-menus)
+  (later named-shown))
+(define (named-shown)
+  (update-forced)
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (later (wait-until (lambda () (= (inputs) 0)) 100 named-closed)))
+(define (named-closed)
+  (display* "CHECK sentinels left " (inputs) "\n")
+  (display* "CHECK named buffer kept " (buffer-exists? named) "\n"))
+(later step)
+EOF
+quit_after=30000
+run tools "" "" "(load \"$out/tools.scm\")"
+tools_ok () {
+  got=$(grep -a '^CHECK \(buffers\|sentinels\|named\|error\)' "$out/tools.log" | tr '\n' ' ')
+  fail="got: $got"
+  [ "$got" = "CHECK buffers left 1 CHECK sentinels left 0 CHECK named buffer kept #t " ]
+}
+verdict tools "side tools made again close the buffers of their texmacs-input (#776)" tools_ok
+
 # (quiet, focused) the document comes a few seconds after the start, in the
 # window of the welcome message of a fresh home, and the console when TeXmacs
 # has the focus (an editor without the focus has no idle time, which a console
@@ -502,9 +583,11 @@ esac
 # have been active each time the case looked (the step after the close of the
 # console is judged by the condition)
 focus_verdict () {
+  selected "$1" || return 0
   log="$out/$1.log"
   if [ -z "$focus_cases" ]; then
     echo "  skip   $2: set TM_COCOA_FOCUS=1"
+    skipped=$((skipped + 1))
   elif grep -aq '^CHECK alive' "$log" && grep -aq '^exit status 0$' "$log" &&
        sed '/NSTEST step close:/,/NSTEST step activate/d' "$log" |
          grep -aq '^NSTEST active no$'; then
@@ -514,6 +597,7 @@ focus_verdict () {
       echo "  FAILED $2: TeXmacs did not become the active application on this runner"
     else
       echo "  skip   $2: TeXmacs is not the active application"
+      skipped=$((skipped + 1))
     fi
   else
     verdict "$@"
@@ -580,4 +664,12 @@ focused_ok () {
 focus_verdict focused "a console opened by the user takes the focus (#679)" focused_ok
 
 echo "$failed of $total failed"
+if [ "$total" = 0 ]; then
+  if [ "$skipped" -gt 0 ]; then
+    echo "the cases selected by TM_COCOA_CASES='${TM_COCOA_CASES:-}' were all skipped"
+    exit 0
+  fi
+  echo "no case was selected by TM_COCOA_CASES='${TM_COCOA_CASES:-}'"
+  exit 1
+fi
 [ "$failed" = 0 ]

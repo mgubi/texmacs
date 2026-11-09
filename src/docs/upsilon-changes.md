@@ -33,13 +33,12 @@ have the details, and the problems go to the
   the next one lost, and the window went apart from the live document of
   the server. The two views of the document announced each change twice;
   it is now kept once (#796).
-- **Side tools no longer keep their former contents** (desktop): each new
-  content of a side tool kept the former widgets, and a text field without
-  a name in it left a whole buffer behind (several MB each time). The
-  former contents are now let go and their buffers closed (#776; in the
-  Cocoa and Vue interfaces the buffers of such fields are still kept). And a side
-  tool closed before its text field was typeset no longer crashes the Qt
-  interface (#825).
+- **Side tools no longer keep their former contents**: each new content of
+  a side tool kept the former widgets, and a text field without a name in
+  it left a whole buffer behind (several MB each time). The former contents
+  are now let go and their buffers closed, in every interface (Qt, Cocoa,
+  Vue, also in the browser) (#776). And a side tool closed before its text
+  field was typeset no longer crashes the Qt interface (#825).
 
 ## 8 November 2026
 
