@@ -153,6 +153,11 @@ have the details, and the problems go to the
   their small thumbnails were shown, with a warning at each load. The site
   now has a copy of them, next to the page (`artwork/`), which the browser
   version reads; the desktop is unchanged (#322).
+- **Gnuplot without cairo** (desktop): without Ghostscript, the gnuplot
+  sessions make PNG plots with the `pngcairo` terminal; a gnuplot built
+  without cairo showed only the error "unknown or ambiguous terminal
+  type". The session now asks gnuplot for its terminals and uses `png`
+  (libgd) instead, else SVG, and its greeting says which (#709).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
