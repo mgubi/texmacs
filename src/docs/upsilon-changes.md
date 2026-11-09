@@ -27,8 +27,7 @@ have the details, and the problems go to the
   the file of the document, TeXmacs used to notice only when saving. The
   footer now says "changed on disk: File > Revert reloads it" (or that
   there are changes on both sides) as long as the file is newer than the
-  document, looking at it at most once a second. After File > Revert, the
-  document is the file again: it is no longer marked as modified.
+  document, looking at it at most once a second.
 
 ## 9 November 2026
 
