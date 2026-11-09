@@ -47,6 +47,9 @@
 #define THE_FREEZE ((int) 512)
 #define THE_TOOLTIP ((int) 1024)
 #define THE_SPELL_ERRORS ((int) 2048)
+// the cursor was moved to another place (go_to): the next update brings it
+// into view, even if a THE_FREEZE came in between (#816)
+#define THE_MOVED ((int) 4096)
 
 class tm_buffer_rep;
 class tm_view_rep;
