@@ -5579,8 +5579,12 @@ script_exec (string line) {
   if (cmd == "open" && N(a) > 1) {
     // "open <path>": a file given by the system (the Finder, open -a), as
     // SDL's delegate of the application sends it on macOS: a drop with no
-    // window (#768). A relative path is taken from the current directory
-    static char obuf[1024];
+    // window (#768). A relative path is taken from the current directory.
+    // SDL keeps the pointer of the pushed event: one buffer for each of the
+    // last 8 commands, so that several "open" in a row keep their paths
+    static char obufs[8][1024];
+    static int  onext= 0;
+    char* obuf= obufs[onext]; onext= (onext + 1) % 8;
     string path= line (N(cmd) + 1, N(line)); // (as the system gives it)
     if (N(path) > 0 && path[0] != '/')
       path= concretize (url_pwd ()) * "/" * path;
@@ -5763,6 +5767,11 @@ script_exec (string line) {
     buf[n]= 0;
     float dx= as_double (a[1]), dy= as_double (a[2]);
     Uint32 wid= script_window_id (win, dx, dy);
+    if (wid == 0) {
+      // (a window 0 would be a file given by the system, see "open")
+      cout << "vue script: no SDL window for the drop, skipped" << LF;
+      return 0;
+    }
     SDL_Event ev;
     SDL_zero (ev);
     ev.type= SDL_EVENT_DROP_BEGIN;
@@ -6118,6 +6127,26 @@ drop_add_file (string item) {
     drop_doc << tree (IMAGE, as_string (u), iw, ih, "", "");
   }
   else drop_doc << as_string (u);
+}
+
+// A file URL of the system as a path ("file:///a%20b" gives "/a b"); other
+// URLs (tmfs://...) are left as they are. SDL gives the URLs of kAEGetURL
+// (handleURLEvent:) as they come, and the files of application:openFile:
+// as paths
+static string
+system_file_path (string s) {
+  if (!starts (s, "file://")) return s;
+  s= s (7, N(s));
+  if (starts (s, "localhost/")) s= s (9, N(s));
+  string r;
+  for (int i= 0; i < N(s); i++)
+    if (s[i] == '%' && i + 2 < N(s) && is_hex_digit (s[i+1]) &&
+        is_hex_digit (s[i+2])) {
+      r << (char) from_hexadecimal (s (i+1, i+3));
+      i += 2;
+    }
+    else r << s[i];
+  return r;
 }
 
 // The files given by the system, outside of any window: on macOS, SDL's
@@ -6817,10 +6846,13 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_DROP_TEXT:
     {
       if (event->drop.data == NULL) break;
-      string item= utf8_to_cork (string (event->drop.data,
-                                         (int) strlen (event->drop.data)));
-      if (event->drop.windowID == 0) system_files << item;
-      else if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
+      string raw (event->drop.data, (int) strlen (event->drop.data));
+      if (event->drop.windowID == 0) {
+        system_files << utf8_to_cork (system_file_path (raw));
+        break;
+      }
+      string item= utf8_to_cork (raw);
+      if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
       else drop_add_file (item);
       break;
     }
