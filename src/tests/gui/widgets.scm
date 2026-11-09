@@ -1,5 +1,6 @@
 ;; The widgets of the dialogs: a choice list, an enum (its list), a
-;; filtered choice and a tree; the choices made come back to the callbacks.
+;; filtered choice and a tree; the choices made come back to the callbacks
+;; (the tree with the strings of its command and user roles).
 ;; The two lists have the same items: they are told apart by names
 ;; (named ...). Runs on every port with the hooks of the tests
 ;; (docs/gui-scripting.md):
@@ -28,9 +29,20 @@
                        "cherry" ""))
     ===
     (resize "400px" "160px"
-      (tree-view (lambda x (gt-record "tree"))
-                 (stree->tree '(root (item "one") (item "two")))
-                 (stree->tree '(tuple (item "DisplayRole")))))))
+      ;; the callback gets the mouse buttons (-1 for the keyboard), the
+      ;; string of the command role (else the subtree), then those of the
+      ;; user roles, UserRole:1 first (QTMTreeView::callOnChange)
+      (tree-view (lambda x
+                   (gt-record "tree"
+                              (if (and (>= (length x) 3)
+                                       (string? (cadr x))
+                                       (string? (caddr x)))
+                                  (string-append ": " (cadr x) " " (caddr x))
+                                  "")))
+                 (stree->tree '(root (item "one" "cmd-one" "user-one")
+                                     (item "two" "cmd-two" "user-two")))
+                 (stree->tree '(tuple (item "DisplayRole" "CommandRole"
+                                            "UserRole:1")))))))
 (define (got? s) (in? s (gt-recorded)))
 (define before-tree 0) ; what was recorded before the click on the tree
 (gui-test-run
@@ -53,6 +65,7 @@
        (gt-eval (lambda () (set! before-tree (length (gt-recorded)))))
        (gt-activate "two")
        (gt-idle)
-       (gt-check "the tree"
-                 (lambda () (in? "tree" (list-tail (gt-recorded) before-tree))))
+       (gt-check "the tree, with its command and user roles (#393)"
+                 (lambda () (in? "tree: cmd-two user-two"
+                                 (list-tail (gt-recorded) before-tree))))
        (gt-exit)))

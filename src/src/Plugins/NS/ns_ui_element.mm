@@ -958,16 +958,38 @@ node_roles (tree roles, tree t) {
   return "";
 }
 
+static int
+user_role_number (string role) {
+  // n for "UserRole:n", from 1 to 10 as QTMTreeModel::parse_roles, else 0
+  if (!starts (role, "UserRole:")) return 0;
+  return max (1, min (10, as_int (role (9, N(role)))));
+}
+
+static tree
+node_role (tree roles, tree t, string role) {
+  // the child of t which the roles give for role ("DisplayRole",
+  // "CommandRole", "UserRole:n"), if it is a string, else "" (not a
+  // string: no such child). As QTMTreeModel, the last declaration of a role
+  // counts (QTMTreeModel::parse_roles, #393)
+  tree r= node_roles (roles, t);
+  if (!is_compound (r) || !is_compound (t)) return tree (UNINIT);
+  int user= user_role_number (role), pos= -1;
+  for (int j=0; j<N(r); j++)
+    if (is_atomic (r[j]) &&
+        (r[j]->label == role ||
+         (user > 0 && user_role_number (r[j]->label) == user)))
+      pos= j;
+  if (pos < 0 || pos >= N(t) || !is_atomic (t[pos])) return tree (UNINIT);
+  return t[pos];
+}
+
 @implementation TMTreeNode
 - (void) dealloc { [kids release]; [super dealloc]; }
 - (NSString*) label
 {
   if (is_atomic (t)) return to_label (t->label);
-  tree r= node_roles (roles, t);
-  if (is_compound (r))
-    for (int j=0; j<N(r) && j<N(t); j++)
-      if (is_atomic (r[j]) && r[j]->label == "DisplayRole" && is_atomic (t[j]))
-        return to_label (t[j]->label);
+  tree d= node_role (roles, t, "DisplayRole");
+  if (is_atomic (d)) return to_label (d->label);
   return to_label (as_string (L(t)));
 }
 - (NSArray*) children
@@ -1023,13 +1045,25 @@ node_roles (tree roles, tree t) {
 - (void) outlineViewSelectionDidChange: (NSNotification*) n
 {
   NS_ENTRY_BEGIN
-  // the command gets the subtree and -1 (Qt gives the command and user
-  // roles when the tree declares them, QTMTreeView::callOnChange)
+  // as QTMTreeView::callOnChange: the command gets the string of the
+  // CommandRole of the item, when the roles declare one, else the subtree;
+  // and in front of it the strings of UserRole:1, UserRole:2... as long as
+  // they are declared (the last one first), and -1 at the end (#393)
   (void) n;
   id item= [view itemAtRow: [view selectedRow]];
   if (!cmd || !item) return;
-  command c (cmd);
-  c (list_object (object (((TMTreeNode*) item)->t), object (-1)));
+  TMTreeNode* node= (TMTreeNode*) item;
+  object args= list_object (object (-1));
+  tree c= node_role (node->roles, node->t, "CommandRole");
+  if (is_atomic (c)) args= cons (object (c->label), args);
+  else args= cons (object (node->t), args);
+  for (int k=1; k<=10; k++) {
+    tree u= node_role (node->roles, node->t, "UserRole:" * as_string (k));
+    if (!is_atomic (u)) break;
+    args= cons (object (u->label), args);
+  }
+  command cb (cmd);
+  cb (args);
   NS_ENTRY_END ("-[TMTreeList outlineViewSelectionDidChange:]")
 }
 @end
