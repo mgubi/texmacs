@@ -239,6 +239,20 @@
   (check= (tl '(href "http://a/b%c#d_e~f"))
           "\\url{http://a/b\\%c\\#d_e~f}")
   (check= (tl '(href "http://x")) "\\url{http://x}")
+  ;; in a formula, an address is written as in the text, not cut at its
+  ;; operators as a formula (#821)
+  (check= (tl '(with "mode" "math"
+                 (concat "x+" (hlink "y" "https://example.org/a_b") "+z")))
+          "$x + \\href{https://example.org/a\\_b}{y} + z$")
+  (check= (tl '(math (hlink "y" "http://a/b-c?d=1,e(2)#f")))
+          "$\\href{http://a/b-c?d=1,e(2)\\#f}{y}$")
+  (check= (tl '(math (hlink "y" "#sec:a-b")))
+          "$\\hyperref[sec:a-b]{y}$")
+  (check= (tl '(math (concat "x+" (href "https://example.org/a_b-2"))))
+          "$x + \\url{https://example.org/a_b-2}$")
+  (check= (tl '(math (hlink "y" "https://example.org/a_b"))
+              '("texmacs->latex:mathjax" . "on"))
+          "\\href{https://example.org/a\\_b}{y}")
   ;; lengths, languages, names and files
   (with evil "x}\\input{/etc/hostname}\\y{"
     (check= (tls `(hspace ,evil)) "{\\hspace{xinput/etc/hostnamey}}")
