@@ -26,19 +26,43 @@
 (tmfs-format-handler (artwork name)
   (url-format name))
 
+(define (artwork-page-site)
+  ;; in the browser: the folder artwork next to the page, where the site
+  ;; has a copy of the artwork (misc/wasm/Makefile): texmacs.org does not
+  ;; let a page read its pictures (CORS, #322); "" elsewhere (and in the
+  ;; build for node, which has no page and fetches with the programs)
+  (if (not (defined? 'web-javascript)) ""
+      (with r (web-javascript
+               (string-append
+                "typeof location !== 'undefined' && "
+                "/^https?:$/.test (location.protocol) ? "
+                "new URL ('artwork', location.href).href : ''"))
+        (if (string-starts? r "http") r ""))))
+
 (tmfs-load-handler (artwork name)
   (let* ((s (string-append "thumbnail-" (url->string (url-tail name))))
 	 (t (url-append (url-head name) s))
 	 (thumbnail (url-append "$TEXMACS_PATH/misc" t))
-	 (src (url-append "https://www.texmacs.org/artwork" name))
+         (site (artwork-page-site))
+	 (src (if (== site "")
+                  (url-append "https://www.texmacs.org/artwork" name)
+                  (url-append site name)))
 	 (dest (url-append "$TEXMACS_HOME_PATH/misc" name)))
-    (if (url-exists? dest)
-	(string-load dest)
-	(with tmp (url-concretize* src)
-	  (cond ((not (url-none? tmp))
-                 (system-mkdir (url-head dest))
-		 (system-move tmp dest)
-		 (string-load dest))
-		((url-exists? thumbnail)
-		 (string-load thumbnail))
-		(else ""))))))
+    (cond ((url-exists? dest)
+           (string-load dest))
+          ((!= site "")
+           ;; (not kept in the home directory, which the browser stores and
+           ;; backs up: the browser keeps the picture in its cache)
+           (with tmp (url-concretize* src)
+             (cond ((not (url-none? tmp)) (string-load tmp))
+                   ((url-exists? thumbnail) (string-load thumbnail))
+                   (else ""))))
+          (else
+           (with tmp (url-concretize* src)
+             (cond ((not (url-none? tmp))
+                    (system-mkdir (url-head dest))
+                    (system-move tmp dest)
+                    (string-load dest))
+                   ((url-exists? thumbnail)
+                    (string-load thumbnail))
+                   (else "")))))))

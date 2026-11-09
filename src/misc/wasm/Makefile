@@ -129,7 +129,27 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png licenses tikzjax asymptote python r
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png licenses tikzjax asymptote python r artwork
+
+# the artwork of the styles (tmfs://artwork/..., progs/utils/misc/artwork.scm:
+# the shadows, frames and textures of the themes), as files of the site:
+# out/web/artwork/, copied from https://www.texmacs.org/artwork, which does
+# not let a page read them (CORS, #322). The pictures are those whose
+# thumbnails TeXmacs ships (TeXmacs/misc/.../thumbnail-<name>); one which
+# cannot be fetched is left out (curl -f writes nothing then), and the page
+# shows its thumbnail instead
+ARTWORK_THUMBS := $(shell cd $(TM)/TeXmacs/misc && find pictures textures -name 'thumbnail-*' 2>/dev/null)
+ARTWORK := $(foreach t,$(ARTWORK_THUMBS),$(dir $(t))$(patsubst thumbnail-%,%,$(notdir $(t))))
+
+artwork: $(OUT)/web/artwork/.fetched
+
+$(OUT)/web/artwork/.fetched:
+	@for f in $(ARTWORK); do \
+	  d=$(OUT)/web/artwork/$$f; [ -s $$d ] && continue; mkdir -p $$(dirname $$d); \
+	  curl -fsSL --retry 2 -o $$d https://www.texmacs.org/artwork/$$f || \
+	    echo "artwork: $$f not fetched"; \
+	done
+	@touch $@
 
 # the licenses of the components (TeXmacs/misc/licenses, also in the
 # packages of the page), as files of the site: out/web/licenses/
@@ -422,4 +442,4 @@ $(OBJECTS): $(FLAGS_FILE)
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean licenses tikzjax asymptote python r plugins-sync femtolisp-cache
+.PHONY: all web node clean licenses tikzjax asymptote python r artwork plugins-sync femtolisp-cache
