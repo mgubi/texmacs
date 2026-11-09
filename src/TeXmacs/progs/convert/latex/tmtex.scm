@@ -694,10 +694,20 @@
   ;; the Cork characters of verbatim content are written in UTF-8 with the
   ;; ascii and utf-8 encodings, as they are with the cork encoding; a
   ;; character which has no Cork byte (!verb-utf8 of tmtex-verb-list) is
-  ;; then written as LaTeX writes it outside verbatim (\cyra...)
+  ;; then written as LaTeX writes it outside verbatim (\cyra...), or left
+  ;; out with the cork encoding when LaTeX has no command for it (its UTF-8
+  ;; bytes would be other letters in a Cork file).
+  ;; NOTE: pdflatex typesets such a character only with the packages of
+  ;; its script (T2A for Cyrillic...), which the export does not load for
+  ;; verbatim content; xelatex and lualatex typeset it (#824)
   (cond ((func? x '!verb-utf8 1)
-         (if (or tmtex-use-unicode? tmtex-use-ascii?) (cadr x)
-             (string-convert (cadr x) "UTF-8" "LaTeX")))
+         (cond ((or tmtex-use-unicode? tmtex-use-ascii?) (cadr x))
+               ((!= (string-convert (cadr x) "UTF-8" "LaTeX") (cadr x))
+                (string-convert (cadr x) "UTF-8" "LaTeX"))
+               (else
+                 (display* "TeXmacs] non converted verbatim character: "
+                           (cadr x) "\n")
+                 "")))
         ((or tmtex-use-unicode? tmtex-use-ascii?)
          (string-convert* x "Cork" "UTF-8"))
         (else (unescape-angles x))))
@@ -3171,6 +3181,17 @@
                     (string c)))
               (string->list s))))
 
+(define (tmtex-url-utf8 s)
+  ;; an address of TeXmacs (Cork, <#430>, <less>...) in ASCII: its
+  ;; characters in UTF-8, the bytes which are not ASCII and < > in percent
+  ;; codes, as in an URI; LaTeX commands would break the address (#824)
+  (apply string-append
+         (map (lambda (c)
+                (if (or (>= (char->integer c) 128) (in? c '(#\< #\>)))
+                    (tmtex-url-code c)
+                    (string c)))
+              (string->list (string-convert s "Cork" "UTF-8")))))
+
 (define (tmtex-url-escape s)
   ;; for \url, which keeps the underscore as it is
   (with r (string-replace (tmtex-url-encode s) "%" "\\%")
@@ -3178,7 +3199,7 @@
 
 (define (escape-hyperref-url l)
   (cond ((string? l)
-         (let* ((r0 (tmtex-url-encode l))
+         (let* ((r0 (tmtex-url-encode (tmtex-url-utf8 l)))
                 (r1 (string-replace r0 "%" "\\%"))
                 (r2 (string-replace r1 "#" "\\#"))
                 (r3 (string-replace r2 "_" "\\_")))
@@ -3197,7 +3218,8 @@
         (list 'href (tmtex-hyperref h) d))))
 
 (define (tmtex-href s l)
-  (with r (tmtex-verb-string (car l))
+  (with r (if (string? (car l)) (tmtex-url-utf8 (car l))
+              (tmtex-verb-string (car l)))
     (list 'url (if (string? r) (tmtex-url-escape r) r))))
 
 (define (tmtex-action s l)
