@@ -3093,6 +3093,65 @@
               (check= (car r) exp)
               (check= (cadr r) doc))))))))
 
+;; In the text which starts a paragraph, before any tag, Replace with a
+;; filter does not look for the start of the hit which the search shows (a
+;; search of the whole paragraph at each step, #618): such a hit starts in
+;; the same string as the reference, which the filter judges as the
+;; reference. The replacements are those made when it looks for it
+(define (with-leading-text-off thunk)
+  ;; thunk with Replace looking for the start of each hit, as before
+  (let* ((old (widget 'in-leading-text?)))
+    (dynamic-wind
+      (lambda () (widget '(set! in-leading-text? (lambda args #f))))
+      thunk
+      (lambda () (eval `(set! in-leading-text? ,old) widgets)))))
+
+(define (test-replace-leading-text)
+  (check-group "replace in the text which starts a paragraph")
+  (let* ((lead? (lambda (doc cur what)
+                  ((widget 'in-leading-text?) (stree->tree doc) '() cur
+                   (stree->tree what))))
+         (star-b '(concat (wildcard "w") "b"))
+         (by-b '(concat "<" (wildcard "w") ">"))
+         (mixed '(document (concat "xbxb" (math "xbzb") "xb" (math "b"))
+                           "xb xb"
+                           (concat (strong "bb") "b")))
+         (cases
+           `(((document "xb xb xb") ,star-b ,by-b)
+             ((document "aaaa") "a" "b")
+             ((document "aaaa") "a" "aa")
+             ((document (concat "aaa" (math "aa") "aa")) "a" "b")
+             ((document (concat "aaa" (math "aa") "aa")) "a" "")
+             (,mixed ,star-b ,by-b)
+             (,mixed "b" "bb")
+             (,mixed (concat (wildcard "w") "b" (wildcard "v"))
+                     (concat "[" (wildcard "w") "|" (wildcard "v") "]"))))
+         (all (lambda (c) (replace-all-in-buffer (car c) (cadr c) (caddr c))))
+         (filters '((attr "mode" "text") (attr "mode" "math"))))
+    (check= (map (lambda (cur) (lead? '(document "ab" (concat "c" (math "d") "e"))
+                                      cur "a"))
+                 '((0 0) (0 2) (1 0 1) (1 1 0 0) (1 1 0) (1 2 0)))
+            '(#t #t #t #f #f #f))
+    (check= (lead? '(document "ab") '(0 1) '(document "a" "b")) #f)
+    (with-search-mode 'replace
+      (lambda ()
+        (with-test-filter '(attr "mode" "text")
+          (lambda ()
+            (check= (map (lambda (c) (car (all c))) (list-head cases 4))
+                    '((document "<x>< x>< x>")
+                      (document "bbbb")
+                      (document "aaaaaaaa")
+                      (document (concat "bbb" (math "aa") "bb"))))))
+        (with-test-filter '(attr "mode" "math")
+          (lambda ()
+            (check= (car (all (cadr cases))) '(document "aaaa"))))
+        (for (filter filters)
+          (with-test-filter filter
+            (lambda ()
+              (with fast (map all cases)
+                (check= (with-leading-text-off (lambda () (map all cases)))
+                        fast)))))))))
+
 ;; A pattern of several paragraphs next to a block (#687): the cut of the
 ;; paragraph break between a paragraph and a theorem joins them, and the
 ;; editor makes a paragraph of the theorem again. The document was as before,
@@ -3271,6 +3330,7 @@
   (test-lone-wildcard)
   (test-replace-region-wildcards)
   (test-replace-followups)
+  (test-replace-leading-text)
   (test-replace-next-to-blocks)
   (test-replace-random)
   (check-end))
