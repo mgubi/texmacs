@@ -17,6 +17,7 @@
 #include "dictionary.hpp"
 #include "sys_utils.hpp"
 #include "convert.hpp"
+#include <time.h>
 
 /******************************************************************************
 * debugging
@@ -201,14 +202,80 @@ string the_exception;
 string the_report;
 string get_crash_report (const char* msg);
 
+string
+crash_report_key (string msg, string report) {
+  // the message and the names of the functions of the backtrace of a report
+  // of get_crash_report, without what changes from one time to the next
+  // (the date, the system information, the status of the editor, the
+  // addresses and offsets): the same error at the same place.
+  // NOTE: a copy: the strings of TeXmacs share their representation, and
+  // << appends in place; with key= msg, the frames went into the message
+  // too, and so into the_exception when it is the same string (the error
+  // of a menu in the Cocoa port): each frame became a line of its own in
+  // the console (#792)
+  string key= copy (msg);
+  int i= search_forwards ("Backtrace of C++ stack:", report);
+  if (i < 0) return key;
+  int n= N(report), frames= 0;
+  i= search_forwards ("\n", i, report);
+  while (i >= 0 && i < n && frames < 24) {
+    int j= search_forwards ("\n", i + 1, report);
+    if (j < 0) j= n;
+    string line= report (i + 1, j);
+    int a= search_forwards (" : ", line);
+    if (a >= 0) {
+      int b= search_backwards (" + ", line);
+      key << "\n" << line (a + 3, b > a? b: N(line));
+      frames++;
+    }
+    i= j;
+  }
+  return key;
+}
+
+// An error which comes again (at each update of the screen, for instance)
+// within throw_repeat_window seconds of its last time prints its report on
+// the terminal the first time only, and then one line at the 10th, 100th...
+// time (#660); the_report keeps the full report each time, for the console.
+// At most throw_repeat_keys errors are remembered.
+static const time_t throw_repeat_window= 10; // seconds
+static const int    throw_repeat_keys  = 200;
+
+static int
+throw_count (string key) {
+  // the number of the times the error came in a row (1 the first time)
+  static hashmap<string,int>    seen (0);
+  static hashmap<string,time_t> last (0);
+  if (!seen->contains (key) && N(seen) >= throw_repeat_keys) {
+    seen= hashmap<string,int> (0);
+    last= hashmap<string,time_t> (0);
+  }
+  time_t now= time (NULL);
+  int nr= seen[key] + 1;
+  if (nr > 1 && now - last[key] > throw_repeat_window) nr= 1;
+  seen (key)= nr;
+  last (key)= now;
+  return nr;
+}
+
 void
 tm_throw (const char* msg) {
   the_exception= msg;
   the_report   = get_crash_report (msg);
-  cout << "Throwing " << msg << LF;
-  cout << "-------------------------------------------------\n";
-  cout << the_report << LF;
-  cout << "-------------------------------------------------\n";
+  int nr= throw_count (crash_report_key (string (msg), the_report));
+  if (nr == 1) {
+    cout << "Throwing " << msg << LF;
+    cout << "-------------------------------------------------\n";
+    cout << the_report << LF;
+    cout << "-------------------------------------------------\n";
+  }
+  else {
+    int p= 10;
+    while (p < nr && p < 1000000000) p *= 10;
+    if (nr == p)
+      cout << "Throwing " << msg << " again (" << nr
+           << " times, see the report above)" << LF;
+  }
   throw string (msg);
 }
 

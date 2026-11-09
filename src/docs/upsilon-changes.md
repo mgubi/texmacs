@@ -93,6 +93,15 @@ have the details, and the problems go to the
   nothing in the Vue build of Windows, whose pipes were not written. They
   now run their program with pipes, as the command lines do; an interrupt
   does nothing there, as with Qt (#446).
+- **An error which comes again no longer floods the terminal** (desktop):
+  each repeat of the same error printed its whole report, with the
+  backtrace, on the terminal, also when the console showed it once only;
+  an error raised at every update gave pages of output. The report is now
+  printed the first time, then one line at the 10th, 100th... time while
+  it keeps coming within 10 seconds. With Cocoa, an error in the size of a
+  canvas moved to another window no longer keeps it from the focus
+  notifications of that window, and a bad position no longer hides a later
+  bad size in the warnings (#660).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
