@@ -143,11 +143,9 @@ qt_forget_deferred_deletes () {
   // on Windows _exit runs the shutdown of the DLLs, where Qt delivers the
   // pending deferred deletes and ~QWidget crashes; calling it twice, here
   // and by the exit handler, is harmless. The deferred deletes posted after
-  // this are dropped by QTMApplication::notify: an exit by the exit of C
-  // (Scheme's exit) runs the static destructors after this handler, and
-  // the window table of TeXmacs then lets go the widget of a dialog still
-  // open, whose window is deleted later, which Windows did during the
-  // shutdown of the DLLs: a crash at the exit, #776)
+  // this, as by the static destructors which the exit of C runs after this
+  // handler (the window of a dialog still open, #776), are dropped by
+  // QTMApplication::notify)
   qt_exit_begun= true;
   if (QCoreApplication::instance () != NULL)
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);

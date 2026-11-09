@@ -521,14 +521,16 @@ embedded after refresh #t" \
 # open: the static destructors, which run after the exit handlers, let go
 # the widget of the dialog in the window table, whose window is deleted
 # later; on Windows, Qt delivered that deferred delete during the shutdown
-# of the DLLs and crashed (status 139, the case above, #776). Without a
-# texmacs-input: any dialog.
+# of the DLLs and crashed (status 139, as the case above, #776). Without a
+# refresh; with a texmacs-input, without which the Windows runs of CI did
+# not crash (0 of 5 runs, 5 of 5 with it).
 cat > "$out/startup-dialog-exit.scm" <<'EOF'
-(tm-widget ((startup-plain-dialog) quit)
-  (text "A dialog left open at the exit"))
+(tm-widget ((startup-input-dialog) quit)
+  (resize "300px" "100px"
+    (texmacs-input '(document "input") '(style "generic") #f)))
 (exec-delayed
   (lambda ()
-    (dialogue-window (startup-plain-dialog) noop "Startup dialog")
+    (dialogue-window (startup-input-dialog) noop "Startup dialog")
     (exec-delayed
       (lambda ()
         (display* "CHECK dialog open\n")
