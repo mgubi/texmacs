@@ -575,6 +575,22 @@
       (check= (errors (tree-sitter-line-colors "c" (tree-ref d 0))) '((12 13 "error")))
       (tree-insert! (tree-ref d 0) 6 "x")
       (check= (errors (tree-sitter-line-colors "c" (tree-ref d 0))) '((13 14 "error"))))
+    ;; an opening bracket on a line which is not edited takes the colour of
+    ;; errors when an edit below makes its closing one MISSING (an unclosed
+    ;; string before it), and loses it when the edit is undone (#815)
+    (buffer-set-body u (stree->tree '(document "int a;" "int f (int x) {"
+                                               "  return x;" "}" "int g;")))
+    (switch-to-buffer u)
+    (let ((d (buffer-get-body u))
+          (errors (lambda (l) (list-filter l (lambda (r) (== (caddr r) "error"))))))
+      (for (i (iota 5)) (tree-sitter-line-colors "c" (tree-ref d i)))
+      (check= (errors (tree-sitter-line-colors "c" (tree-ref d 1))) '())
+      (tree-insert! (tree-ref d 3) 0 "\"")
+      (tree-sitter-line-colors "c" (tree-ref d 3))
+      (check= (errors (tree-sitter-line-colors "c" (tree-ref d 1))) '((14 15 "error")))
+      (tree-remove! (tree-ref d 3) 0 1)
+      (tree-sitter-line-colors "c" (tree-ref d 3))
+      (check= (errors (tree-sitter-line-colors "c" (tree-ref d 1))) '()))
     (buffer-close u)
     (when (buffer-exists? old) (switch-to-buffer old))))
 

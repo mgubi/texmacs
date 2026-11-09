@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 9 November 2026
 
+- **Program code: an opening bracket left without its match is shown at
+  once**: when an edit below made the closing bracket of a line disappear
+  for the parser (an unclosed string before a `}`), the `{` kept its normal
+  colour until its own line was edited; it now takes the colour of errors
+  at once, and loses it when the edit is undone (#815).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
