@@ -301,7 +301,10 @@ poll_pipe_links () {
     if (!con->alive || !con->proc.wait (0)) continue;
     int nout= N(con->outbuf), nerr= N(con->errbuf);
     con->feed (LINK_OUT);
-    bool news= N(con->outbuf) != nout || N(con->errbuf) != nerr;
+    // (the end of the child is news too, without data: the connection
+    // then sees that the link is dead, as after pipe_callback on Unix)
+    bool news= N(con->outbuf) != nout || N(con->errbuf) != nerr ||
+               !con->alive;
     if (news && !is_nil (con->feed_cmd)) con->feed_cmd->apply ();
   }
 }
