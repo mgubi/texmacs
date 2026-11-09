@@ -27,6 +27,7 @@ widget make_menu_widget (object menu, int w, int h);
 void refresh_size (widget wid, bool exact);
 
 static int pending_window_handle= 0; // window under construction, 0 if none
+static void end_tool_openings (string prefix, bool all);
 static hashmap<int,widget> window_table (NULL);
 static hashmap<tree,path> window_by_name;
 static time_t refresh_time= 0;
@@ -170,6 +171,8 @@ tm_window_rep::tm_window_rep (tree doc, command quit):
 }
 
 tm_window_rep::~tm_window_rep () {
+  // the tools of a window end with it (#776)
+  if (!is_none (id)) end_tool_openings (as_string (id) * "|", true);
   if (!is_none (id)) destroy_window_id (id);
 }
 
@@ -213,29 +216,164 @@ texmacs_window_widget (widget wid, tree geom) {
 }
 
 /******************************************************************************
+* Openings of embedded TeXmacs widgets (#776)
+*
+* A named texmacs-input has one editor per opening of the dialog or the tool
+* which shows it. An opening is a number, never reused, taken:
+* - by a dialog when its window is made (window_handle): every refresh of
+*   the dialog is in that opening;
+* - by a tool of a tool slot of a window (side, left, bottom, extra) when it
+*   is shown at a build of the slot while it was not before; a tool still
+*   shown keeps its opening; a tool no longer shown ends it;
+* - elsewhere (a menu, a widget made by hand), by the field itself: a field
+*   whose name is in a live opening is made again in that opening, else in a
+*   new one, which ends when its widget is let go.
+* The refreshables keep the opening in which they were made. A field made
+* again in its opening keeps its view, and so its editor and its history;
+* a field in a new opening gets a new view. When an opening ends, the views
+* of its fields are deleted, and the buffers of unnamed fields closed.
+******************************************************************************/
+
+static int current_opening= 0;  // the opening whose widgets are being made
+static int opening_next= 1;
+static hashmap<int,int> dialog_opening (0);  // alternative window -> opening
+static hashmap<string,int> tool_opening (0); // "window|slot|tool" -> opening
+static hashmap<int,array<url> > opening_fields; // the names of its fields
+static hashmap<string,url> field_view (url_none ()); // "opening|name" ->
+static hashmap<string,tree> field_body;   // the body at the last build
+static hashmap<string,url> field_main (url_none ()); // window of the focus
+static hashmap<string,bool> field_named (false);
+static hashmap<string,int> field_owner (0);  // name -> its latest opening
+static tm_window_rep* tool_build_win= NULL;  // tool slot being made
+static int tool_build_which= -1;
+static hashset<string> tool_build_seen;
+
+static int
+new_opening () {
+  return opening_next++;
+}
+
+static string
+field_key (int op, url name) {
+  return as_string (op) * "|" * as_string (name);
+}
+
+int
+embedded_opening () {
+  return current_opening;
+}
+
+void
+embedded_opening_set (int op) {
+  current_opening= op;
+}
+
+int
+embedded_tool_opening (string tool) {
+  // the opening of a tool of the tool slot being made, which becomes the
+  // current one; returns the former current opening
+  int old= current_opening;
+  if (tool_build_win == NULL) return old;
+  string key= as_string (tool_build_win->id) * "|" *
+              as_string (tool_build_which) * "|" * tool;
+  if (!tool_opening->contains (key)) tool_opening (key)= new_opening ();
+  tool_build_seen->insert (key);
+  current_opening= tool_opening [key];
+  return old;
+}
+
+static void
+end_field (int op, url name, bool remove_named) {
+  // the end of a field of an opening: its view is deleted, with its editor
+  // and its history; the buffer of an unnamed field is closed, a named one
+  // stays (the search toolbar after the search tool), unless remove_named
+  // and it has no other view
+  string key = field_key (op, name);
+  tm_view v  = concrete_view (field_view [key]);
+  url  mainw = field_main [key];
+  bool named = field_named [key];
+  field_view->reset (key);
+  field_body->reset (key);
+  field_main->reset (key);
+  field_named->reset (key);
+  if (field_owner [as_string (name)] == op)
+    field_owner->reset (as_string (name));
+  if (opening_fields->contains (op)) {
+    array<url> a= opening_fields [op], b;
+    for (int i=0; i<N(a); i++)
+      if (a[i] != name) b << a[i];
+    opening_fields (op)= b;
+  }
+  if (v == NULL) return;
+  url u= abstract_view (v);
+  v->win= NULL;
+  v->ed->cvw= NULL;
+  if (u == get_current_view_safe ()) {
+    // the focus goes to the window of the field
+    url nv= url_none ();
+    if (!is_none (mainw)) nv= window_to_view (mainw);
+    if (is_none (nv) || nv == u) {
+      array<url> h= get_all_views ();
+      for (int i=0; i<N(h) && is_none (nv); i++)
+        if (h[i] != u && concrete_view (h[i]) != NULL) nv= h[i];
+    }
+    if (!is_none (nv)) set_current_view (nv);
+  }
+  if (N (buffer_to_views (name)) == 1 && (!named || remove_named))
+    remove_buffer (name);
+  else delete_view (u);
+}
+
+static void
+end_opening (int op) {
+  if (!opening_fields->contains (op)) return;
+  array<url> a= copy (opening_fields [op]);
+  for (int i=0; i<N(a); i++) end_field (op, a[i], false);
+  opening_fields->reset (op);
+}
+
+static void
+end_tool_openings (string prefix, bool all) {
+  // the tools of a slot no longer shown at its build, or all the tools of
+  // a window which is deleted
+  array<string> gone;
+  iterator<string> it= iterate (tool_opening);
+  while (it->busy ()) {
+    string key= it->next ();
+    if (starts (key, prefix) && (all || !tool_build_seen->contains (key)))
+      gone << key;
+  }
+  for (int i=0; i<N(gone); i++) {
+    int op= tool_opening [gone[i]];
+    tool_opening->reset (gone[i]);
+    end_opening (op);
+  }
+}
+
+/******************************************************************************
 * Closing embedded TeXmacs widgets
 ******************************************************************************/
 
 class close_embedded_command_rep: public command_rep {
   // The command keeps the name of the buffer and the window of the widget,
   // not the view: the buffer may have been closed before the widget (its
-  // view is deleted then), or be shown by an embedded widget made later
-  // with the same name, which takes over its view (#775)
+  // view is deleted then), the opening of the widget may have ended, or the
+  // field be shown by a newer widget of its opening, which takes over its
+  // view (#775, #776)
   // A widget has two such commands, of which at most one runs: one for its
   // destruction by its window, one for when it is let go without that
   // (dropped: side tools made again, #776), which keeps a named buffer.
   tm_window win;
   url name;
   int win_id;
-  url main_win;  // the window of the view which was current at creation
+  url main_win;  // the window of the focus when the field was made
+  int op;        // the opening of the field
   bool dropped;
-  bool keep_buffer;
 public:
-  close_embedded_command_rep (tm_view vw, url n2, int win2, bool d, bool k):
-    win (vw->win), name (n2), win_id (win2), main_win (url_none ()),
-    dropped (d), keep_buffer (k) {
-      if (vw->ed->mvw != NULL && vw->ed->mvw->win != NULL)
-        main_win= abstract_window (vw->ed->mvw->win);
+  close_embedded_command_rep (tm_window w2, url n2, int win2, url m2,
+                              int op2, bool d):
+    win (w2), name (n2), win_id (win2), main_win (m2), op (op2),
+    dropped (d) {
       if (win_id != 0 && !dropped)
         window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
   void apply ();
@@ -248,13 +386,6 @@ attach_embedded_view (tm_view vw, tm_window win) {
   vw->win= win;
   set_scrollable (win->wid, vw->ed);
   vw->ed->cvw= win->wid.rep;
-}
-
-static void
-detach_embedded_view (tm_view vw) {
-  // the view becomes passive again, as one of get_passive_view
-  vw->win= NULL;
-  vw->ed->cvw= NULL;
 }
 
 void
@@ -282,23 +413,27 @@ close_embedded_command_rep::apply () {
   if (vw != NULL || !contains (name, get_all_buffers ()))
     window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
   if (vw != NULL) {
-    if (dropped && keep_buffer) {
-      // a named buffer is left to the Scheme code which named it, which may
-      // use it further (the search toolbar after the search tool); the next
-      // texmacs-input with that name takes its view over (#776)
-      detach_embedded_view (vw);
-    }
+    // the widget still shows its field: the field ends with it (its dialog
+    // is closed, or it is let go otherwise than at the end of its opening);
+    // a dialog which is closed closes a named buffer too, as before
+    if (field_view [field_key (op, name)] == abstract_view (vw))
+      end_field (op, name, !dropped);
     else {
-      ASSERT (N (vs) == 1, "invalid cloned embedded TeXmacs widget");
-      remove_buffer (name);
+      // not a field of this opening (should not happen)
+      vw->win= NULL;
+      vw->ed->cvw= NULL;
+      if (N (vs) == 1 && !(dropped && field_named [field_key (op, name)]))
+        remove_buffer (name);
+      else delete_view (abstract_view (vw));
     }
   }
   tm_delete (win);
 }
 
 static command
-close_embedded_command (tm_view vw, url name, int win, bool d, bool k) {
-  return tm_new<close_embedded_command_rep> (vw, name, win, d, k);
+close_embedded_command (tm_window win, url name, int id, url mainw,
+                        int op, bool d) {
+  return tm_new<close_embedded_command_rep> (win, name, id, mainw, op, d);
 }
 
 static path
@@ -365,79 +500,70 @@ enrich_embedded_document (tree body, tree style) {
   return doc;
 }
 
-static tm_view
-live_embedded_view (url name) {
-  // the view of the buffer which a widget still shows, if any: the windows
-  // of embedded widgets have no identifier, unlike the windows of TeXmacs
-  array<url> vs= buffer_to_views (name);
-  for (int i=0; i<N(vs); i++) {
-    tm_view v= concrete_view (vs[i]);
-    if (v != NULL && v->win != NULL && is_none (v->win->id)) return v;
-  }
-  return NULL;
-}
-
-static bool
-forget_passive_views (url name) {
-  // the views which no window shows any more, left by the former widgets of
-  // a named texmacs-input (a tool closed): they are deleted with their
-  // editors and their histories; true when the current view was one of them
-  bool current= false;
-  url cur= get_current_view_safe ();
-  array<url> vs= buffer_to_views (name);
-  for (int i=0; i<N(vs); i++) {
-    tm_view v= concrete_view (vs[i]);
-    if (v == NULL || v->win != NULL) continue;
-    if (vs[i] == cur) current= true;
-    delete_view (vs[i]);
-  }
-  return current;
-}
-
 widget
 texmacs_input_widget (tree doc, tree style, url wname) {
   doc= enrich_embedded_document (doc, style);
   url       base = get_master_buffer (get_current_buffer ());
   tm_view   curvw= concrete_view (get_current_view ());
   url       name = embedded_name (wname);
-  // One editor per opening of a named texmacs-input (#776). While a widget
-  // still shows the buffer, the new widget is the same field made again (a
-  // refresh, side tools made again): it takes the view over, with its
-  // editor and its undo history, and a new content is an edit which can be
-  // undone. Otherwise the field is opened anew (its dialog was closed, its
-  // tool dropped): a new view, whose editor starts with an empty history.
-  // NOTE: a dropped widget lets its view go only when its drop command
-  // runs, after the widget is collected; until then, a new widget counts as
-  // made again. Two widgets shown at once with one name (the same tool in
-  // two windows) share one view, as get_passive_view already gave them.
-  tm_view   vw   = NULL;
-  bool      cur  = false;
-  if (contains (name, get_all_buffers ())) {
-    vw= live_embedded_view (name);
-    if (vw == NULL) cur= forget_passive_views (name);
+  // One editor per opening of a named texmacs-input (#776): made again in
+  // its opening (a refresh, side tools made again), the field keeps its
+  // view, with its editor and its undo history; in a new opening, it gets a
+  // new view, whose editor starts with an empty history
+  int op= current_opening;
+  if (op == 0) {
+    // made outside a dialog or a tool: in the live opening of its name if
+    // any (a menu made again), else in a new one
+    int own= field_owner [as_string (name)];
+    if (own != 0 && concrete_view (field_view [field_key (own, name)]) != NULL)
+      op= own;
+    else op= new_opening ();
+  }
+  string  key   = field_key (op, name);
+  tm_view vw    = concrete_view (field_view [key]);
+  bool    exists= contains (name, get_all_buffers ());
+  if (vw != NULL && exists) {
+    // a new content is an edit which can be undone, unless nothing was
+    // typed since the former one (a field which shows results): then the
+    // history would only pile up the former contents
+    tree before= copy (get_buffer_body (name));
+    bool typed = (before != field_body [key]);
     set_buffer_tree (name, doc);
+    if (!typed && get_buffer_body (name) != before)
+      vw->ed->clear_undo_history ();
   }
-  else create_buffer (name, doc);
-  if (vw == NULL) vw= concrete_view (get_passive_view (name));
-  if (cur) {
-    // the deleted view was the current one
-    set_current_view (abstract_view (vw));
-    curvw= NULL;
+  else {
+    if (exists) set_buffer_tree (name, doc);
+    else create_buffer (name, doc);
+    vw= concrete_view (get_new_view (name));
+    field_view  (key)= abstract_view (vw);
+    field_named (key)= !is_none (wname);
+    if (!contains (name, opening_fields [op])) opening_fields (op) << name;
   }
+  field_owner (as_string (name))= op;
+  field_body  (key)= copy (get_buffer_body (name));
+  // the window to which the focus returns: the one of the focus when the
+  // field was first made outside of it, else the window of its tool
+  bool  real = (curvw != NULL && curvw->win != NULL &&
+                !is_none (curvw->win->id));
+  url   mainw= url_none ();
+  if (real) mainw= abstract_window (curvw->win);
+  else if (!is_none (field_main [key])) mainw= field_main [key];
+  else if (tool_build_win != NULL) mainw= tool_build_win->id;
+  field_main (key)= mainw;
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
   set_master_buffer (name, base);
   attach_embedded_view (vw, win);
-  vw->ed->mvw= curvw;
+  vw->ed->mvw= (real? curvw: NULL);
   // NOTE: the widget is in an alternative window only when it is made while
   // that window is being built (between window_handle and window_create);
   // the widgets of the side tools of a main window are in none
   int     id       = pending_window_handle;
-  command close_cmd= close_embedded_command (vw, name, id, false, false);
-  // when the widget is let go without being destroyed by its window (side
-  // tools made again), a buffer without a name is closed too: nothing else
-  // can use it (#776)
-  command drop_cmd = close_embedded_command (vw, name, id, true,
-                                             !is_none (wname));
+  command close_cmd= close_embedded_command (win, name, id, mainw, op, false);
+  // when the widget is let go without being destroyed by its window, and
+  // without the end of its opening, a buffer without a name is closed too:
+  // nothing else can use it (#776)
+  command drop_cmd = close_embedded_command (win, name, id, mainw, op, true);
   return wrapped_widget (win->wid, close_cmd, drop_cmd);
 }
 
@@ -517,8 +643,25 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   menu_current (which)= xmenu;
   //cout << "Compute " << menu << "\n";
   object umenu= eval ("'" * menu);
+  // the tools of a tool slot: a tool already shown keeps its opening, a new
+  // one takes one, and the openings of the tools no longer shown end (#776)
+  bool tools= (which >= 10);
+  int  old_op= current_opening;
+  if (tools) {
+    tool_build_win  = this;
+    tool_build_which= which;
+    tool_build_seen = hashset<string> ();
+    current_opening = 0;
+  }
   if (which == 10 || which == 11) w= make_menu_widget (umenu, 400, 1000);
   else w= make_menu_widget (umenu);
+  if (tools) {
+    current_opening= old_op;
+    end_tool_openings (as_string (id) * "|" * as_string (which) * "|", false);
+    tool_build_win  = NULL;
+    tool_build_which= -1;
+    tool_build_seen = hashset<string> ();
+  }
   // the cache is only read for the menus and the icon bars (which < 10):
   // the widgets of the side and bottom tools were kept for nothing, with
   // the buffers of their texmacs-input (#776)
@@ -747,6 +890,9 @@ int
 window_handle () {
   static int window_next= 1;
   pending_window_handle= window_next;
+  // the widgets of the window are made in its opening (#776)
+  dialog_opening (window_next)= new_opening ();
+  current_opening= dialog_opening [window_next];
   return window_next++;
 }
 
@@ -754,6 +900,8 @@ static void
 window_register (int win, widget pww) {
   window_table (win)= pww;
   if (win == pending_window_handle) pending_window_handle= 0;
+  if (current_opening != 0 && current_opening == dialog_opening [win])
+    current_opening= 0;
 }
 
 void
@@ -811,6 +959,12 @@ window_delete (int win) {
   window_table->reset (win);
   send_destroy (pww);
   destroy_window_widget (pww);
+  // the fields of the window end with it (#776)
+  if (dialog_opening->contains (win)) {
+    int op= dialog_opening [win];
+    dialog_opening->reset (win);
+    end_opening (op);
+  }
   busy (win)= false;
 }
 
