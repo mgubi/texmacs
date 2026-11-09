@@ -112,6 +112,7 @@ mkdir -p "$out"
 
 total=0
 failed=0
+skipped=0
 
 # the errors which do not fail a case (extended regular expressions, one
 # per line): known harmless messages, none so far
@@ -586,6 +587,7 @@ focus_verdict () {
   log="$out/$1.log"
   if [ -z "$focus_cases" ]; then
     echo "  skip   $2: set TM_COCOA_FOCUS=1"
+    skipped=$((skipped + 1))
   elif grep -aq '^CHECK alive' "$log" && grep -aq '^exit status 0$' "$log" &&
        sed '/NSTEST step close:/,/NSTEST step activate/d' "$log" |
          grep -aq '^NSTEST active no$'; then
@@ -595,6 +597,7 @@ focus_verdict () {
       echo "  FAILED $2: TeXmacs did not become the active application on this runner"
     else
       echo "  skip   $2: TeXmacs is not the active application"
+      skipped=$((skipped + 1))
     fi
   else
     verdict "$@"
@@ -662,6 +665,10 @@ focus_verdict focused "a console opened by the user takes the focus (#679)" focu
 
 echo "$failed of $total failed"
 if [ "$total" = 0 ]; then
+  if [ "$skipped" -gt 0 ]; then
+    echo "the cases selected by TM_COCOA_CASES='${TM_COCOA_CASES:-}' were all skipped"
+    exit 0
+  fi
   echo "no case was selected by TM_COCOA_CASES='${TM_COCOA_CASES:-}'"
   exit 1
 fi

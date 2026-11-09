@@ -115,8 +115,8 @@ public:
     switch (s) {
       case SLOT_DESTROY:
         if (! is_nil (quit)) {
-          // cleared first: the drop command must not run too, should the
-          // quit command let this widget go (#776)
+          // cleared first, so that the destructor of this wrapper never
+          // runs the drop command after the quit command (#776)
           command q= quit;
           quit= command ();
           q ();
