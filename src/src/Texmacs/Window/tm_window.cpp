@@ -406,6 +406,10 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   // editor and its undo history, and a new content is an edit which can be
   // undone. Otherwise the field is opened anew (its dialog was closed, its
   // tool dropped): a new view, whose editor starts with an empty history.
+  // NOTE: a dropped widget lets its view go only when its drop command
+  // runs, after the widget is collected; until then, a new widget counts as
+  // made again. Two widgets shown at once with one name (the same tool in
+  // two windows) share one view, as get_passive_view already gave them.
   tm_view   vw   = NULL;
   bool      cur  = false;
   if (contains (name, get_all_buffers ())) {
