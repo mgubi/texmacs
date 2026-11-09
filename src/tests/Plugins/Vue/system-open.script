@@ -1,0 +1,16 @@
+# needs system-open.scm: files given by the system (the Finder, the Dock,
+# open -a) open in TeXmacs (#768); "open" sends what SDL sends on macOS, a
+# drop with no window. The second file gets a window of its own
+wait 6000
+window main
+scheme (system-open-report "start")
+open tests/Plugins/Vue/system-open-1.tm
+wait 1500
+scheme (system-open-report "first")
+open tests/Plugins/Vue/system-open-2.tm
+wait 2000
+scheme (system-open-report "second")
+wait 500
+expect OPENED first system-open-1.tm shown
+expect OPENED second system-open-2.tm shown new window
+exit

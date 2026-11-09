@@ -252,6 +252,7 @@ key [S-][C-][A-][M-]<name> [text]   (Return, Escape, Down, Keypad_1...)
 text <string>    commit <string>    compose [<text>]
 focus    repaint    resize w h    close    tab <id>
 drop x y <path> | drop x y text:<text>
+open <path>                         a file given by the system (Finder, open -a)
 snapshot <name>                     (in TEXMACS_VUE_SNAPSHOT)
 clipboard <text>                    the text on the clipboard of the script
 ```
