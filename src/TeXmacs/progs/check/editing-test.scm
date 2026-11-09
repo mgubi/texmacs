@@ -425,11 +425,18 @@
                   (edit (undo 0))
                   (check= (tree->stree (buffer-get-body w))
                           '(document "typed original")))
-                ;; made again with the content it has: no new step
+                ;; made again with the content it has: no new step, only
+                ;; the typing is left to undo (the steps are counted by
+                ;; undoing them: undo-possibilities is at most 1)
+                (build (tree->stree (buffer-get-body w)))
                 (with-buffer w
-                  (let ((n (undo-possibilities)))
-                    (build (tree->stree (buffer-get-body w)))
-                    (check= (undo-possibilities) n)))))
+                  (archive-state) (start-editing) (end-editing)
+                  (let loop ((n 0))
+                    (if (> (undo-possibilities) 0)
+                        (begin (edit (undo 0)) (loop (+ n 1)))
+                        (check= n 1)))
+                  (check= (tree->stree (buffer-get-body w))
+                          '(document "original")))))
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))
     (buffer-close w)
