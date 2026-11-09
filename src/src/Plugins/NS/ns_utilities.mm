@@ -293,42 +293,15 @@ extern string the_report; // (basic.cpp)
 // the exceptions which come again (at each update): reported the first
 // time, and then only counted, at the 10th, 100th... time, while they come
 // again within ns_report_window; the key is the place, the message and the
-// functions of the backtrace (see ns_report_key), so that distinct errors
+// functions of the backtrace (see crash_report_key), so that distinct errors
 // with the same generic message (such as "widget expected") are reported
 // each. At most ns_report_keys keys are kept.
 static const time_t ns_report_window= 10000; // ms
 static const int    ns_report_keys  = 200;
 
-// the message and the names of the functions of the backtrace of a report
-// of tm_throw (get_crash_report), without what changes from one time to
-// the next (the date, the system information, the status of the editor,
-// the addresses and offsets)
-static string
-ns_report_key (string msg, string report) {
-  // NOTE: a copy: the strings of TeXmacs share their representation, and
-  // << appends in place; with key= msg, the frames went into the message
-  // too, and so into the_exception when it is the same string (the error
-  // of a menu, see -[TMLazyMenu reportFailure]): each frame became a
-  // line of its own in the console (#792)
-  string key= copy (msg);
-  int i= search_forwards ("Backtrace of C++ stack:", report);
-  if (i < 0) return key;
-  int n= N(report), frames= 0;
-  i= search_forwards ("\n", i, report);
-  while (i >= 0 && i < n && frames < 24) {
-    int j= search_forwards ("\n", i + 1, report);
-    if (j < 0) j= n;
-    string line= report (i + 1, j);
-    int a= search_forwards (" : ", line);
-    if (a >= 0) {
-      int b= search_backwards (" + ", line);
-      key << "\n" << line (a + 3, b > a? b: N(line));
-      frames++;
-    }
-    i= j;
-  }
-  return key;
-}
+// (the message and the names of the functions of the backtrace of a report
+// of tm_throw, basic.cpp)
+string crash_report_key (string msg, string report);
 
 static bool
 ns_report_again (const char* where, string what) {
@@ -380,7 +353,7 @@ ns_report_exception (const char* where, string msg) {
   // string thrown otherwise is the message)
   try {
     if (N (the_exception) == 0) the_exception= msg;
-    if (!ns_report_again (where, ns_report_key (msg, the_report))) {
+    if (!ns_report_again (where, crash_report_key (msg, the_report))) {
       the_exception= ""; the_report= "";
       return;
     }
@@ -409,10 +382,12 @@ ns_check_size (NSSize size, const char* where) {
 
 
 static bool
-ns_first_time (const char* where) {
-  // (a bound on the places: they are those of the source)
+ns_first_time (const char* where, const char* what) {
+  // (a bound on the places: they are those of the source). The kind of the
+  // value is part of the key: a bad position does not hide a later bad size
+  // at the same place (ns_safe_rect, #660)
   static hashset<string> seen;
-  string key (where);
+  string key= string (where) * " " * string (what);
   if (seen->contains (key) || N(seen) > 1000) return false;
   seen->insert (key);
   return true;
@@ -444,7 +419,7 @@ ns_fix_size (NSSize& s, const char* where, double bound) {
     return false;
   NSSize r= NSMakeSize (ns_good_length (s.width, bound),
                         ns_good_length (s.height, bound));
-  bool first= ns_first_time (where);
+  bool first= ns_first_time (where, "size");
   if (first)
     debug_aqua << where << ": a bad size for AppKit (" << (double) s.width
                << ", " << (double) s.height << "), replaced by ("
@@ -459,7 +434,7 @@ ns_fix_point (NSPoint& p, const char* where, double bound) {
     return false;
   NSPoint r= NSMakePoint (ns_good_coordinate (p.x, bound),
                           ns_good_coordinate (p.y, bound));
-  bool first= ns_first_time (where);
+  bool first= ns_first_time (where, "position");
   if (first)
     debug_aqua << where << ": a bad position for AppKit (" << (double) p.x
                << ", " << (double) p.y << "), replaced by ("
@@ -491,7 +466,7 @@ CGFloat
 ns_safe_length (CGFloat x, const char* where, double bound) {
   if (!ns_bad_length (x, bound)) return x;
   CGFloat r= ns_good_length (x, bound);
-  if (ns_first_time (where))
+  if (ns_first_time (where, "length"))
     debug_aqua << where << ": a bad length for AppKit (" << (double) x
                << "), replaced by " << (double) r << "\n";
   return r;

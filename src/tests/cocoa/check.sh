@@ -27,6 +27,9 @@
 #            set, #656)
 #   headless -headless is parsed by the Cocoa build: (headless?) is true and
 #            TeXmacs quits by itself after the command line
+#   repeats  without a window (-headless -X): an error which comes again and
+#            again prints its report on the terminal once, then one line at
+#            its 10th time, and is shown once in the console (#660)
 #   sizes    two dialogs with a glue and a resize of negative sizes: the
 #            sizes given to AppKit are replaced, with one warning on
 #            debug-aqua for each place in all, and the dialogs are shown
@@ -124,8 +127,8 @@ $TM_COCOA_HARMLESS"
 expected=''
 
 # TM_COCOA_CASES="<case> <case>...": only those cases are run and counted
-# (the runs and the verdicts of the others are skipped; the two -headless
-# cases, colors and headless, still run, without a window). The names are
+# (the runs and the verdicts of the others are skipped; the -headless
+# cases, colors, headless and repeats, still run, without a window). The names are
 # those of the list above, except canvas, which is three cases:
 # canvas-dark, canvas-light and canvas-live. A list which selects no case
 # fails.
@@ -284,6 +287,34 @@ headless_ok () {
   grep -aq '^exit status 0$' "$out/headless.log"
 }
 verdict headless "-headless: TeXmacs runs without a window and quits after the command line" headless_ok
+
+# (repeats) the same error 12 times, from 12 commands: the report (with its
+# backtrace) is printed on the terminal the first time only, then one line
+# at the 10th time; the console has it once (ns_report_again). Before #660,
+# each time printed the whole report
+home="$homes/repeats-home"
+rm -rf "${homes:?}/repeats-home"
+mkdir -p "$home"
+HOME="$home" CFFIXED_USER_HOME="$home" TEXMACS_HOME_PATH="$home" \
+  perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -headless -X -x \
+  "(begin (for-each (lambda (i) (exec-delayed (lambda () (cpp-error)))) (iota 12)) (delayed (:pause 3000) (display \"CHECK alive\\n\") (quit-TeXmacs)))" \
+  > "$out/repeats.log" 2>&1
+echo "exit status $?" >> "$out/repeats.log"
+expected='Throwing an error occurred
+Cocoa: an error was caught in a delayed command'
+repeats_ok () {
+  log="$out/repeats.log"
+  n=$(grep -ac '^Throwing an error occurred$' "$log")
+  r=$(grep -ac '^Backtrace of C++ stack' "$log")
+  fail="the report was printed $n times ($r backtraces), not once"
+  [ "$n" = 1 ] && [ "$r" = 1 ] || return 1
+  fail="no line for the 10th time: $(grep -a '^Throwing' "$log" | tail -1)"
+  grep -aq '^Throwing an error occurred again (10 times' "$log" || return 1
+  m=$(grep -ac 'failed-error, Exception, an error occurred' "$log")
+  fail="the error is $m times in the console, not once"
+  [ "$m" = 1 ]
+}
+verdict repeats "an error which comes again prints its report on the terminal once (#660)" repeats_ok
 
 # (sizes) the glue and the resize of two dialogs have negative sizes: the
 # lengths are replaced by 0 for AppKit, with one warning for each place
