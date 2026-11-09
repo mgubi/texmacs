@@ -168,6 +168,7 @@ runs them all (or those named) and counts the failures:
 | `widgets` | a choice list, an enum, a filtered choice and a tree, two lists with the same items told apart by `named` |
 | `save-dialog` | Save as in the file dialog of the system: a name without a suffix is saved as a `.tm` beside a file of that name, with no question about that file (#400); the alert to replace an existing `.tm`, its Cancel and its Replace |
 | `open-dialog` | Load in the file dialog of the system: Cancel loads nothing; a document chosen in the list by its name, then Open, is loaded |
+| `link-label` | a link to a label of another document opens it with the label in view, as going to the label again does (#816) |
 
 They replace nothing: the tests of Vue with the same names check the
 drawing too, by their snapshots.
