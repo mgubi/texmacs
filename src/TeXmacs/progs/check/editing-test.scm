@@ -468,7 +468,28 @@
                   (check= (length (buffer->views g)) 1)
                   (check= (tree->stree (buffer-get-body g)) '(document "5"))
                   (buffer-close g)
-                  (check-false (buffer-exists? g)))))
+                  (check-false (buffer-exists? g)))
+                ;; typed, then two new contents: the second one, with
+                ;; nothing typed since the first, adds no step, and what
+                ;; was typed can still be undone
+                (with t (string->url "tmfs://aux/editing-test-embedded-typed")
+                  (build-other t '(document "o"))
+                  (with-buffer t
+                    (go-to (list (car (cursor-path)) 0 0))
+                    (edit (insert "T")))
+                  (build-other t '(document "y"))
+                  (build-other t '(document "z"))
+                  (with-buffer t
+                    (archive-state) (start-editing) (end-editing)
+                    (edit (undo 0))
+                    (check= (tree->stree (buffer-get-body t))
+                            '(document "To"))
+                    (edit (undo 0))
+                    (check= (tree->stree (buffer-get-body t))
+                            '(document "o"))
+                    (check= (undo-possibilities) 0))
+                  (buffer-close t)
+                  (check-false (buffer-exists? t)))))
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))
     (buffer-close w)

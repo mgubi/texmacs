@@ -271,6 +271,16 @@ edit_modify_rep::clear_undo_history () {
   arch->clear ();
 }
 
+void
+edit_modify_rep::confirm_changes () {
+  arch->confirm ();
+}
+
+bool
+edit_modify_rep::retract_change () {
+  return arch->retract ();
+}
+
 double
 edit_modify_rep::this_author () {
   return author;
