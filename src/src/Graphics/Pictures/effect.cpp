@@ -54,12 +54,16 @@ effect_rep::get_logical_extents (array<rectangle> rs) {
 
 class argument_effect_rep: public effect_rep {
   int nr;
+  // (an argument which the effect does not have, as in <gr-effect|a|2>,
+  // with one argument, 0: read beyond the arguments, #817, is the last one)
+  int which (int n) { return (nr >= 0 && nr < n)? nr: n - 1; }
 public:
   argument_effect_rep (int nr2): nr (nr2) {}
-  rectangle get_logical_extents (array<rectangle> rs) { return rs[nr]; }
-  rectangle get_extents (array<rectangle> rs) { return rs[nr]; }
+  rectangle get_logical_extents (array<rectangle> rs) {
+    return rs[which (N(rs))]; }
+  rectangle get_extents (array<rectangle> rs) { return rs[which (N(rs))]; }
   picture apply (array<picture> pics, SI pixel) {
-    (void) pixel; return pics[nr]; }
+    (void) pixel; return pics[which (N(pics))]; }
 };
 
 effect argument_effect (int nr) {

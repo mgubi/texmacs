@@ -1257,6 +1257,42 @@
 ;; The text is not lost silently (#704): a copy of the document is saved
 ;; in the system folder of the home, and saving the buffer over its file
 ;; is asked first.
+;; Primitives of graphics with malformed children (text where a point, a
+;; matrix, an object, a tuple or a rubber arrow is expected, an effect on an
+;; argument which it does not have, a group without items, a 3D
+;; transformation which is not a matrix) are typeset as errors or as best
+;; they can, and the document is kept and can be edited: they crashed the
+;; typesetter or reset the document (#817)
+(define (test-malformed-graphics)
+  (check-group "malformed graphics")
+  (for (ex '((light-3d "k" "k")
+             (transform-3d "k" "k")
+             (transform-3d (object-3d) "k")
+             (gr-effect "1" "2")
+             (gr-effect "1" "2" "3")
+             (concat "a" (gr-effect "1" "2" "3"))
+             (gr-effect "1" "-1")
+             (calligraphy "k" "k" "k" "k")
+             (penscript "k" "k" "k" "k")
+             (calligraphy (point "0" "0") (point "1" "1") "k" (tuple "k"))
+             (long-arrow "k" "k")
+             (with "mode" "math" (long-arrow "<rubber-rightarrow>" "x"))
+             (gr-group)
+             (gr-group "k")
+             (with "gr-transformation" "k"
+               (triangle-3d (point "0" "0" "0") (point "1" "0" "0")
+                            (point "0" "1" "0") "red"))))
+    (let ((doc `(document "p" ,ex "q")))
+      (with-typeset-body doc
+        (lambda ()
+          (check= (tree->stree (buffer-tree)) doc)
+          (check-false (typeset-failed-buffer? (current-buffer)))
+          (go-to (append (tree->path (buffer-tree)) '(0 1)))
+          (insert "z")
+          (update-forced)
+          (check= (tree->stree (buffer-tree))
+                  `(document "pz" ,ex "q")))))))
+
 (define (test-typesetting-failure)
   (check-group "typesetting failure")
   (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
@@ -3474,6 +3510,7 @@
   (test-pages-kept)
   (test-long-document-without-pages)
   (test-typesetting-failure)
+  (test-malformed-graphics)
   (test-hidden-documents)
   (test-derived-state)
   (test-renumbering-labels)
