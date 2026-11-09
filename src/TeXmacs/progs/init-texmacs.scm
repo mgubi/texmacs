@@ -493,6 +493,24 @@
                       (stree->tree `(concat ,(tree->stree t*) "     " ,s))
                       t*))
                 t*)))))
+;; The footer says that the content of a slide is taller than the screen (page
+;; medium beamer), which the editor shows as a taller page and a presentation
+;; hides (#819): by how much, at the last typesetting
+(define (beamer-overflow-footer-text)
+  (and (== (get-init "page-medium") "beamer")
+       (with over (get-page-overflow)
+         (and (> over 0)
+              (with cm (/ (round (* 10.0 (/ over (length-decode "1cm")))) 10.0)
+                (string-append "the slide overflows the screen by "
+                               (number->string cm) " cm"))))))
+(with previous footer-hook
+  (set! footer-hook
+        (lambda (t)
+          (with t* (previous t)
+            (with s (beamer-overflow-footer-text)
+              (if s
+                  (stree->tree `(concat ,(tree->stree t*) "     " ,s))
+                  t*))))))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

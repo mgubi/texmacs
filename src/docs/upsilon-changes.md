@@ -12,6 +12,17 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 10 November 2026
+
+- **Presentations: the footer says when a slide is too tall** (#819, first
+  step): when the content of a slide (page medium beamer) is taller than
+  the screen, the editor showed a slightly longer page and the full-screen
+  presentation hid the rest. The footer now says "the slide overflows the
+  screen by 3.2 cm" while that slide is shown. The amount is measured when
+  the page is made, for the step of the slide which is shown; a mark of the
+  screen's limit on the page and a list of the slides which overflow are
+  to follow.
+
 ## 9 November 2026
 
 - **A link to a label of another document shows the label** (desktop,

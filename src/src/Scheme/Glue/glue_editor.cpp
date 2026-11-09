@@ -768,6 +768,15 @@ tmg_get_page_height (tmscm arg1) {
 }
 
 tmscm
+tmg_get_page_overflow () {
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->get_page_overflow ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_get_total_width (tmscm arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-total-width");
 
@@ -3917,6 +3926,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("get-page-width",  tmg_get_page_width, 1, 0, 0);
   tmscm_install_procedure ("get-pages-width",  tmg_get_pages_width, 1, 0, 0);
   tmscm_install_procedure ("get-page-height",  tmg_get_page_height, 1, 0, 0);
+  tmscm_install_procedure ("get-page-overflow",  tmg_get_page_overflow, 0, 0, 0);
   tmscm_install_procedure ("get-total-width",  tmg_get_total_width, 1, 0, 0);
   tmscm_install_procedure ("get-total-height",  tmg_get_total_height, 1, 0, 0);
   tmscm_install_procedure ("get-reference",  tmg_get_reference, 1, 0, 0);

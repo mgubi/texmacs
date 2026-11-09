@@ -88,6 +88,7 @@
   (get-page-width get_page_width (int bool))
   (get-pages-width get_pages_width (int bool))
   (get-page-height get_page_height (int bool))
+  (get-page-overflow get_page_overflow (int))
   (get-total-width get_total_width (int bool))
   (get-total-height get_total_height (int bool))
   (get-reference get_ref (tree string))

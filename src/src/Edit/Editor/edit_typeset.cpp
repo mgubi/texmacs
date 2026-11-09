@@ -756,6 +756,13 @@ edit_typeset_rep::get_page_height (bool deco) {
 }
 
 SI
+edit_typeset_rep::get_page_overflow () {
+  // by how much the content of the page (a slide, page medium beamer) is
+  // taller than the screen at the last typesetting, 0 when it fits (#819)
+  return env->page_overflow;
+}
+
+SI
 edit_typeset_rep::get_total_width (bool deco) {
   SI w= eb->w();
   if (!deco) {
