@@ -581,6 +581,28 @@
 (define (replace-continues? cur)
   (and replace-last (== (car replace-last) (replace-state cur))))
 
+(define (in-leading-text? t p cur what)
+  ;; is the position cur of the document t (at p) in the text which starts
+  ;; its paragraph, before any tag: in the paragraph, a string, or in its
+  ;; first child, a string? Then a hit of the paragraph which starts at cur
+  ;; or before it starts in that string, as cur, and the filter, which
+  ;; judges the string or the tag which holds the start of a hit (see
+  ;; accept-search-result?), judges it as cur: Replace need not look for
+  ;; the start of the hit which the search shows, a search of the whole
+  ;; paragraph at each step (#618). Not for a pattern of several
+  ;; paragraphs, whose hits start in the paragraphs before
+  (and (tree-is? t 'document)
+       (not (tm-func? what 'document))
+       (with q (list-tail cur (length p))
+         (and (pair? q) (>= (car q) 0) (< (car q) (tree-arity t))
+              (with u (tree-ref t (car q))
+                (cond ((tree-atomic? u) (== (length q) 2))
+                      ((tree-is? u 'concat)
+                       (and (== (length q) 3) (== (cadr q) 0)
+                            (> (tree-arity u) 0)
+                            (tree-atomic? (tree-ref u 0))))
+                      (else #f)))))))
+
 (define (next-hit cur what)
   ;; the hit from which Replace goes on, from cur: the first one which the
   ;; search finds in the text of the document after cur, now (nothing found
@@ -588,7 +610,8 @@
   ;; accepts: the search goes on after the hits which it rejects. The filter
   ;; judges the start of the whole hit, as for the hits which the search
   ;; shows, not that of the match in it (#596); without a filter, nothing
-  ;; judges it, and it is not looked for (#618)
+  ;; judges it, and it is not looked for (#618); nor in the text which
+  ;; starts a paragraph (see in-leading-text?)
   (let* ((t (buffer-tree))
          (p (tree->path t))
          (filtered? (not (search-filter-accepts-all?))))
@@ -599,11 +622,18 @@
                     (empty? (and (replace-continues? cur)
                                  (cadr replace-last))))
            ;; (one hit: its match, and the start of the whole hit)
-           (with l (with-search-access-mode
-                     (lambda ()
-                       (tree-search-from t what p from 1 empty? filtered?)))
+           (let* ((lead? (and filtered? (in-leading-text? t p from what)))
+                  (l (with-search-access-mode
+                       (lambda ()
+                         (tree-search-from t what p from 1 empty?
+                                           (and filtered? (not lead?))))))
+                  ;; (in the leading text, a hit which starts at from or
+                  ;; before it is judged as from)
+                  (start (and (>= (length l) 3)
+                              (if (and lead? (not (path-less? from (caddr l))))
+                                  from (caddr l)))))
              (cond ((< (length l) 3) #f)
-                   ((accept-search-result? (caddr l)) (list (car l) (cadr l)))
+                   ((accept-search-result? start) (list (car l) (cadr l)))
                    ;; (no empty hit at from: tree-search-from leaves it out)
                    ((path-less? from (cadr l)) (loop (cadr l) #f))
                    (else #f)))))))
