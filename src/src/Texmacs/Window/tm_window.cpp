@@ -29,6 +29,7 @@ void refresh_size (widget wid, bool exact);
 
 static int pending_window_handle= 0; // window under construction, 0 if none
 static void end_tool_openings (string prefix, bool all);
+static bool is_named_field (url name);
 static hashmap<int,widget> window_table (NULL);
 static hashmap<tree,path> window_by_name;
 static time_t refresh_time= 0;
@@ -244,9 +245,6 @@ static hashmap<int,int> dialog_previous (0); // the opening before its build
 static hashmap<string,int> tool_opening (0); // "window|slot|tool" -> opening
 static hashmap<int,array<url> > opening_fields; // the names of its fields
 static hashmap<string,url> field_view (url_none ()); // "opening|name" ->
-static hashmap<string,tree> field_body;   // the body at the last build
-static hashmap<string,url> field_main (url_none ()); // window of the focus
-static hashmap<string,bool> field_named (false);
 static hashmap<string,int> field_owner (0);  // name -> its latest opening
 static tm_window_rep* tool_build_win= NULL;  // tool slot being made
 static int tool_build_which= -1;
@@ -324,12 +322,7 @@ end_field (int op, url name, bool detach) {
   // shows its editor
   string key = field_key (op, name);
   tm_view v  = concrete_view (field_view [key]);
-  url  mainw = field_main [key];
-  bool named = field_named [key];
   field_view->reset (key);
-  field_body->reset (key);
-  field_main->reset (key);
-  field_named->reset (key);
   if (field_owner [as_string (name)] == op)
     field_owner->reset (as_string (name));
   if (opening_fields->contains (op)) {
@@ -348,15 +341,15 @@ end_field (int op, url name, bool detach) {
   v->win= NULL;
   v->ed->cvw= NULL;
   if (u == get_current_view_safe ()) {
-    // the focus goes to the window of the field, else to a window
+    // the focus goes to the first window of TeXmacs
     url nv= url_none ();
-    if (!is_none (mainw)) nv= window_to_view (mainw);
     array<url> ws= windows_list ();
     for (int i=0; i<N(ws) && (is_none (nv) || nv == u); i++)
       nv= window_to_view (ws[i]);
     if (!is_none (nv) && nv != u) set_current_view (nv);
   }
-  if (!named && N (buffer_to_views (name)) == 1) remove_buffer (name);
+  if (!is_named_field (name) && N (buffer_to_views (name)) == 1)
+    remove_buffer (name);
   else delete_view (u);
 }
 
@@ -403,7 +396,7 @@ class close_embedded_command_rep: public command_rep {
   tm_window win;
   url name;
   int win_id;
-  url main_win;  // the window of the focus when the field was made
+  url main_win;  // the window of the focus when the widget was made
   int op;        // the opening of the field
   bool dropped;
 public:
@@ -458,7 +451,7 @@ close_embedded_command_rep::apply () {
       // not a field of this opening (should not happen)
       vw->win= NULL;
       vw->ed->cvw= NULL;
-      if (N (vs) == 1 && !(dropped && field_named [field_key (op, name)]))
+      if (N (vs) == 1 && !(dropped && is_named_field (name)))
         remove_buffer (name);
       else delete_view (abstract_view (vw));
     }
@@ -494,12 +487,21 @@ is_embedded_buffer (url name) {
 * Embedded TeXmacs widgets
 ******************************************************************************/
 
+static string embedded_prefix= "tmfs://aux/TeXmacs-input-";
+
 url
 embedded_name (url name) {
   static int nr= 0;
   if (!is_none (name)) return name;
   nr++;
-  return url (string ("tmfs://aux/TeXmacs-input-" * as_string (nr)));
+  return url (embedded_prefix * as_string (nr));
+}
+
+static bool
+is_named_field (url name) {
+  // the name of a texmacs-input which was given one, not made by
+  // embedded_name
+  return !starts (as_string (name), embedded_prefix);
 }
 
 tree
@@ -566,10 +568,12 @@ texmacs_input_widget (tree doc, tree style, url wname) {
     // a new content is an edit which can be undone; when nothing was typed
     // since the former content (a field which shows results), it joins the
     // step of the former content instead of adding one, so that the
-    // history does not pile up the contents
-    tree   before= copy (get_buffer_body (name));
-    bool   typed = (before != field_body [key]);
+    // history does not pile up the contents. Each build leaves the field
+    // saved (set_buffer_tree, a new editor): nothing was typed since when
+    // it still is
     editor ed    = vw->ed;
+    ed->confirm_changes ();
+    bool   typed = ed->need_save ();
     double author= get_author ();
     set_author (ed->this_author ());
     if (typed) set_buffer_tree (name, doc);
@@ -589,24 +593,17 @@ texmacs_input_widget (tree doc, tree style, url wname) {
     else create_buffer (name, doc);
     vw= concrete_view (get_new_view (name));
     field_view  (key)= abstract_view (vw);
-    field_named (key)= !is_none (wname);
     if (!contains (name, opening_fields [op])) opening_fields (op) << name;
   }
   field_owner (as_string (name))= op;
-  field_body  (key)= copy (get_buffer_body (name));
-  // the window to which the focus returns: the one of the focus when the
-  // field was first made outside of it, else the window of its tool
-  bool  real = (curvw != NULL && curvw->win != NULL &&
-                !is_none (curvw->win->id));
-  url   mainw= url_none ();
-  if (real) mainw= abstract_window (curvw->win);
-  else if (!is_none (field_main [key])) mainw= field_main [key];
-  else if (tool_build_win != NULL) mainw= tool_build_win->id;
-  field_main (key)= mainw;
+  // the window to which the focus returns when the widget is closed: the
+  // one which has the focus, if it is a window of TeXmacs (not a field)
+  url mainw= url_none ();
+  if (curvw != NULL && curvw->win != NULL && !is_none (curvw->win->id))
+    mainw= abstract_window (curvw->win);
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
   set_master_buffer (name, base);
   attach_embedded_view (vw, win);
-  vw->ed->mvw= (real? curvw: NULL);
   // NOTE: the widget is in an alternative window only when it is made while
   // that window is being built (between window_handle and window_create);
   // the widgets of the side tools of a main window are in none
