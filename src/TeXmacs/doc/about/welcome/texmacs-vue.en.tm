@@ -307,6 +307,11 @@
     <item>The side tools no longer keep their former contents: a text field
     in a side tool which is made again (as it is after most clicks in it)
     left its whole document behind each time.
+
+    <item>The pictures of the themes (the shadows, frames, papers and
+    textures, as in the remote file browser and the chat rooms) are shown
+    whole: the site now has a copy of them, which the page may read, and no
+    longer only their small previews.
   </itemize>
 
   <paragraph|8 November 2026>
