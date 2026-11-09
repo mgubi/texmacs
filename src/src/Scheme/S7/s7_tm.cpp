@@ -71,6 +71,15 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   // instead of expanding it at each evaluation (local patch 0005)
   s7_eval_c_string (tm_s7, "(set! (*s7* 'cache-macro-expansions?) #t)");
 
+  // write and display lists and vectors in full, as Guile does: s7 prints
+  // only their first 40 elements and then "..." (#840), which truncated
+  // without error the data written to files (e.g. a tree->stree dump).
+  // (Not the largest fixnum: s7 adds to print-length, e.g. len + 2 in
+  // object_to_string_truncated for the forms quoted in syntax errors,
+  // which then overflowed and quoted only "(let"; 2^40 is more than any
+  // string s7 makes, max-string-length being 2^30)
+  s7_eval_c_string (tm_s7, "(set! (*s7* 'print-length) (ash 1 40))");
+
   // make a new user environment (used in evaluation)
   user_env = s7_inlet (tm_s7, s7_nil (tm_s7));
   s7_gc_protect (tm_s7, user_env);

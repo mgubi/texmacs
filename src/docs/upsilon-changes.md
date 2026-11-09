@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 9 November 2026
 
+- **Long lists are written in full**: `write`, `display` and
+  `object->string` gave only the first 40 elements of a list or a vector
+  and then `...`, as s7 does by default, so that the dump of a document
+  with `(write (tree->stree t) port)` lost its paragraphs after the 40th
+  without an error. They are now written in full, as in the Guile build of
+  TeXmacs (#840).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at

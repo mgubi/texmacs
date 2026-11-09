@@ -38,7 +38,7 @@
 (define-public (object->tmstring s)
   (if (s7-scheme?)
       ;; s7 truncates long vectors when printing, unless print-length is raised
-      (let-temporarily (((*s7* 'print-length) 9223372036854775807))
+      (let-temporarily (((*s7* 'print-length) (ash 1 40)))
         (unescape-guile (object->string s)))
       (unescape-guile (object->string s))))
  
