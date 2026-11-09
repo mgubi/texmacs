@@ -1808,8 +1808,11 @@ void gui_close ()
 {
   ASSERT (the_gui != NULL, "gui not yet open");
   [pool release];
-  tm_delete (the_gui);
+  // widgets let go while the gui is deleted must not queue commands in it
+  // (#776)
+  ns_gui_rep* gui= the_gui;
   the_gui = NULL;
+  tm_delete (gui);
 }
 
 void

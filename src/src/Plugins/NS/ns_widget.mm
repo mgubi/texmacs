@@ -854,15 +854,20 @@ widget icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs) {
   return abstract (wid);
 }
 
+ns_wrapped_widget_rep::~ns_wrapped_widget_rep () {
+  // A widget which is let go without SLOT_DESTROY (the side tools which are
+  // made again, #776) runs its drop command, if it has one: later, from the
+  // event queue, not in the middle of the update of the menus (as in Qt)
+  if (!is_nil (quit) && !is_nil (drop) && the_gui != NULL)
+    the_gui->process_command (drop);
+}
+
 widget wrapped_widget (widget w, command cmd) {
   return tm_new<ns_wrapped_widget_rep> (w, cmd);
 }
 
 widget wrapped_widget (widget w, command cmd, command drop) {
-  // FIXME: the drop command of #776 (a widget let go without being
-  // destroyed by its window) is not run by the Cocoa interface yet
-  (void) drop;
-  return tm_new<ns_wrapped_widget_rep> (w, cmd);
+  return tm_new<ns_wrapped_widget_rep> (w, cmd, drop);
 }
 
 widget tile_menu (array<widget> a, int cols) {

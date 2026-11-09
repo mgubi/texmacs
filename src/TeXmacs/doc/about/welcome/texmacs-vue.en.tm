@@ -301,6 +301,14 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|9 November 2026>
+
+  <\itemize>
+    <item>The side tools no longer keep their former contents: a text field
+    in a side tool which is made again (as it is after most clicks in it)
+    left its whole document behind each time.
+  </itemize>
+
   <paragraph|8 November 2026>
 
   <\itemize>

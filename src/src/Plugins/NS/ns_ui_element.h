@@ -94,16 +94,20 @@ public:
   virtual NSView*     as_nsview ();
 };
 
-/*! A wrapper widget executing a quit command upon SLOT_DESTROY. */
+/*! A wrapper widget executing a quit command upon SLOT_DESTROY, or its
+ drop command when it is let go without SLOT_DESTROY (#776). */
 class ns_wrapped_widget_rep : public ns_widget_rep {
   widget tmwid;
   command quit;
+  command drop;  // when it is let go before SLOT_DESTROY
   
 public:
-  ns_wrapped_widget_rep (widget _tmwid, command _quit)
-  : tmwid (_tmwid), quit (_quit) {
+  ns_wrapped_widget_rep (widget _tmwid, command _quit,
+                         command _drop= command ())
+  : tmwid (_tmwid), quit (_quit), drop (_drop) {
     add_child (tmwid);
   }
+  ~ns_wrapped_widget_rep ();
   
   NSView* as_nsview () { return concrete(tmwid)->as_nsview(); }
   

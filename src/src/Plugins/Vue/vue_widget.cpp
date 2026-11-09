@@ -953,7 +953,7 @@ public:
   blackbox data;
   
   vue_ui_rep (string _type, blackbox _data= NULL);
-  virtual ~vue_ui_rep () {};
+  virtual ~vue_ui_rep ();
   
   void send (slot s, blackbox val);
   void do_layout ();
@@ -1166,14 +1166,13 @@ VUE_WIDGET(tabs_widget, array<widget>, tabs, array<widget>, bodies);
   // a tab bar where one and only of the bodies can be selected
 VUE_WIDGET(icon_tabs_widget, array<url>, us, array<widget>, ss, array<widget>, bs);
   // a variant of tabs_widget with named icon tabs
-VUE_WIDGET(wrapped_widget, widget, w, command, quit);
+VUE_WIDGET(wrapped_widget, widget, w, command, quit, command, drop);
   // copy of w, but with a separate reference counter,
-  // and with a command to be called upon destruction
-widget wrapped_widget (widget w, command quit, command drop) {
-  // FIXME: the drop command of #776 (a widget let go without being
-  // destroyed by its window) is not run by the Vue interface yet
-  (void) drop;
-  return wrapped_widget (w, quit);
+  // and with a command to be called upon destruction (quit, on
+  // SLOT_DESTROY), or when it is let go without that (drop: the side tools
+  // made again, #776; see ~vue_ui_rep)
+widget wrapped_widget (widget w, command quit) {
+  return wrapped_widget (w, quit, command ());
 }
 VUE_WIDGET(user_canvas_widget, widget, wid, int, style);
   // a widget whose contents can be scrolled
@@ -1919,6 +1918,21 @@ make_enum_input (command cb, array<string> vals, string val, int st, string w) {
                             def, st, w);
 }
 
+
+// false once the gui is closed: a widget let go then queues no command
+bool vue_commands_open= true;
+
+vue_ui_rep::~vue_ui_rep () {
+  if (type == "wrapped_widget" && !is_nil (data)) {
+    // A widget which is let go without SLOT_DESTROY (the side tools which
+    // are made again, #776) runs its drop command, if it has one: later,
+    // from the commands of the event loop, not in the middle of the update
+    // of the menus (as in Qt). SLOT_DESTROY clears quit (vue_ui_rep::send).
+    vue_wrapped_widget d= open_box<vue_wrapped_widget> (data);
+    if (!is_nil (d.quit) && !is_nil (d.drop) && vue_commands_open)
+      cmd_list= list<command> (d.drop, cmd_list);
+  }
+}
 
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)

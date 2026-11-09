@@ -5,6 +5,9 @@
 #
 # usage: tests/startup/check.sh
 #
+# TM_STARTUP_CASES=<text> runs only the cases whose name contains that text
+# (for instance "(#776)"); the others are not counted.
+#
 # TeXmacs is run without a window (-headless, or the offscreen platform of
 # Qt), with TEXMACS_PATH set to the source tree and a scratch
 # TEXMACS_HOME_PATH (tests/build/startup/home, or TM_TEST_HOME). Each case
@@ -61,6 +64,10 @@ failed=0
 # check <name> <expected lines> <arguments of TeXmacs...>
 check () {
   name=$1; expected=$2; shift 2
+  case "$name" in
+    *"${TM_STARTUP_CASES:-}"*) ;;
+    *) return 0 ;;
+  esac
   total=$((total + 1))
   (cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" "$@" \
      > "$out/$total.out" 2> "$out/$total.err")
@@ -949,6 +956,7 @@ cat > "$out/startup-early-close.scm" <<'EOF'
 EOF
 
 before=$failed
+before_total=$total
 check "a side tool closed before its texmacs-input was typeset (#825)" \
       "shown 1
 survived" \
@@ -957,7 +965,7 @@ survived" \
 # the case reached the canvas which is gone: without it, it would pass
 # without the crash of #825, if the editor were typeset before the close
 # (checked only when the case passed, so that a failure counts once)
-if [ $failed -eq $before ] &&
+if [ $total -gt $before_total ] && [ $failed -eq $before ] &&
    ! grep -aq "cannot set scroll position" "$out/$total.out"; then
   echo "  FAILED a side tool closed before its texmacs-input was typeset (#825):"
   echo "         the scroll position was not sent to the closed tool"
