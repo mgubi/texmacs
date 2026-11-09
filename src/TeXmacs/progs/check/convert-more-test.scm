@@ -335,6 +335,18 @@
         (set! current-save-target target)
         (if (url-exists? html) (string-load html) "")))))
 
+;; a macro which calls itself is stopped by the evaluator after hundreds of
+;; levels: the conversion of the expansion overflowed the stack of Scheme,
+;; and no HTML was written; it is now cut, with an error there (#813)
+(define (test-html-deep-recursion)
+  (check-group "html export: a macro which calls itself")
+  (for (def '((assign "wm" (macro "x" (with "color" "red" (wm (arg "x")))))
+              (assign "wm" (macro "x" (tabular (tformat (table (row (cell (wm (arg "x")))))))))))
+    (with s (html-export-of-buffer `(document ,def "before" (wm "a") "after"))
+      (check-true (string-occurs? "before" s))
+      (check-true (string-occurs? "after" s))
+      (check-true (string-occurs? "nesting too" s)))))
+
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
   (list
@@ -2649,6 +2661,7 @@
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
                   test-html-mathjax-formulas test-html-pattern-background
+                  test-html-deep-recursion
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
