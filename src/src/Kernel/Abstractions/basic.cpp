@@ -204,10 +204,10 @@ string get_crash_report (const char* msg);
 
 static string
 crash_report_key (string msg, string report, int& frames) {
-  // the message and the names of the functions of the backtrace of a report
-  // of get_crash_report, without what changes from one time to the next
-  // (the date, the system information, the status of the editor, the
-  // addresses and offsets): the same error at the same place. frames is the
+  // the message and the frames of the backtrace of a report of
+  // get_crash_report (the functions and the offsets in them), without the
+  // date, the system information and the status of the editor: the same
+  // error at the same place. An empty stack has no frame. frames is the
   // number of frames found: 0 where the backtrace has another form or is
   // not supported (Windows, the browser), and then the key is the message
   // alone, which does not tell the places apart (#853).
@@ -231,12 +231,14 @@ crash_report_key (string msg, string report, int& frames) {
     string line= report (i + 1, j);
     int a= search_forwards (" : ", line);
     if (a >= 0) {
-      int b= search_backwards (" + ", line);
-      string name= line (a + 3, b > a? b: N(line));
-      if (N(name) == 0 || name == "()") name= line;
+      // the function and the offset in it: two throws in one function
+      // are two places (the offset is the same for the whole session)
+      string name= line (a + 3, N(line));
+      if (N(name) == 0 || name == "()" || starts (name, "() ")) name= line;
       key << "\n" << name;
       frames++;
     }
+    else if (occurs ("<empty, possibly corrupt>", line)) break;
     else if (N(line) > 2 && starts (line, "  ")) {
       key << "\n" << line;
       frames++;
