@@ -30,6 +30,8 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
+#else
+#include "windows_process.hpp"
 #endif
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
 #include <malloc.h>
@@ -71,6 +73,13 @@ struct pipe_link_rep: tm_link_rep {
   int    inpos;         // from inbuf [inpos]
 
   socket_notifier snout, snerr;
+#ifdef OS_MINGW
+  // On Windows (the builds without Qt), the child is a windows_process,
+  // as for cmdline_link: its output and errors are read by threads in the
+  // background, which the main loop polls (poll_pipe_links), there being
+  // no notifiers for pipes
+  windows_process proc;
+#endif
   
 public:
   pipe_link_rep (string cmd);
@@ -266,15 +275,48 @@ close_all_pipes () {
     }
   }
   reap_ending_children (true);
+#else
+  iterator<pointer> it= iterate (pipe_link_set);
+  while (it->busy()) {
+    pipe_link_rep* con= (pipe_link_rep*) it->next();
+    if (con->alive) {
+      con->proc.terminate (0);
+      con->alive= false;
+    }
+  }
 #endif
   close_all_cmdlines ();
   close_all_requests ();
 }
 
+#ifdef OS_MINGW
+static void
+poll_pipe_links () {
+  // what the threads of the live children have read, as pipe_callback does
+  // on Unix when perform_select finds a pipe readable: it is taken, and
+  // the data processor of the link is called
+  iterator<pointer> it= iterate (pipe_link_set);
+  while (it->busy()) {
+    pipe_link_rep* con= (pipe_link_rep*) it->next();
+    if (!con->alive || !con->proc.wait (0)) continue;
+    int nout= N(con->outbuf), nerr= N(con->errbuf);
+    con->feed (LINK_OUT);
+    // (the end of the child is news too, without data: the connection
+    // then sees that the link is dead, as after pipe_callback on Unix)
+    bool news= N(con->outbuf) != nout || N(con->errbuf) != nerr ||
+               !con->alive;
+    if (news && !is_nil (con->feed_cmd)) con->feed_cmd->apply ();
+  }
+}
+#endif
+
 void
 reap_pipe_children () {
+  // (called at each turn of the main loop of the builds without Qt)
 #ifndef OS_MINGW
   if (N(ending_pid) > 0) reap_ending_children (false);
+#else
+  poll_pipe_links ();
 #endif
 }
 
@@ -389,11 +431,23 @@ pipe_link_rep::start () {
   }
 #endif
 #else
-  return "Error: pipes not implemented";
+  if (alive) return "busy";
+  if (DEBUG_AUTO) debug_io << "Launching '" << cmd << "'\n";
+  // the command is that of a program and its arguments, in the conventions
+  // of Windows, as the Qt pipes (QTMPipeLink::launchCmd) take it; the
+  // process and all it starts are in a job of their own, which stop ends
+  if (!proc.start (std::string (&cmd[0], N(cmd)), false, true)) {
+    if (DEBUG_IO)
+      debug_io << "Error: cannot start '" << cmd << "': "
+               << string (proc.error ().c_str ()) << "\n";
+    return "Error: cannot start application";
+  }
+  outbuf= ""; errbuf= ""; inbuf= ""; inpos= 0;
+  alive= true;
+  return "ok";
 #endif
 }
 
-#ifndef OS_MINGW
 static string
 debug_io_string (string s) {
   int i, n= N(s);
@@ -409,7 +463,6 @@ debug_io_string (string s) {
   }
   return r;
 }
-#endif
 
 void
 pipe_link_rep::write (string s, int channel) {
@@ -437,6 +490,13 @@ pipe_link_rep::write (string s, int channel) {
       break;
     }
   }
+#else
+  if ((!alive) || (channel != LINK_IN)) return;
+  if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string (s);
+  // (blocks while the pipe is full, until the child reads: the writes
+  // which do not block are not done on Windows, see set_blocking_write)
+  if (N(s) > 0 && !proc.write (std::string (&s[0], N(s))))
+    io_error << "Write failed for '" << cmd << "'\n";
 #endif
 }
 
@@ -525,6 +585,25 @@ pipe_link_rep::feed (int channel) {
     if (channel == LINK_OUT) outbuf << string (tempout, r);
     else errbuf << string (tempout, r);
   }
+#else
+  // what the threads of proc have read, from both pipes; the end is that
+  // of the output (the child then ends: it is given 2 s, as after SIGTERM
+  // on Unix, and what is left of it and of its children is ended)
+  (void) channel;
+  if (!alive) return;
+  std::string o, e;
+  bool end= proc.take (o, e);
+  if (o.size () > 0) {
+    string t (o.data (), (int) o.size ());
+    if (DEBUG_IO) debug_io << debug_io_string (t);
+    outbuf << t;
+  }
+  if (e.size () > 0) errbuf << string (e.data (), (int) e.size ());
+  if (end) {
+    proc.terminate (2000);
+    alive= false;
+    inbuf= ""; inpos= 0;
+  }
 #endif
 }
 
@@ -558,8 +637,16 @@ pipe_link_rep::read (int channel) {
 void
 pipe_link_rep::listen (int msecs) {
 #ifdef OS_MINGW
-  // NOTE: no pipes (start), and select only waits for sockets on Windows
-  (void) msecs;
+  // the pipes are read by the threads of proc: wait for news of them, at
+  // most msecs, and take them (listen (0) only looks)
+  if (!alive) return;
+  time_t wait_until= texmacs_time () + msecs;
+  while (alive && (outbuf == "") && (errbuf == "")) {
+    time_t left= wait_until - texmacs_time ();
+    if (left < 0) left= 0;
+    if (proc.wait ((int) left)) feed (LINK_OUT);
+    if (msecs == 0 || texmacs_time () - wait_until >= 0) break;
+  }
 #else
   if (!alive) return;
   if (inpos < N(inbuf)) flush_input (0);
@@ -595,6 +682,11 @@ pipe_link_rep::interrupt () {
 #ifndef OS_MINGW
   if (!alive) return;
   killpg (pid, SIGINT);
+#else
+  // Windows has no SIGINT for a process without a console, and ending it
+  // (as cmdline_link does) would end the session: nothing is done, as with
+  // the Qt pipes (qt_pipe_link_rep::interrupt)
+  if (alive) io_error << "Interrupt not implemented on Windows\n";
 #endif
 }
 
@@ -610,6 +702,13 @@ pipe_link_rep::stop () {
   remove_notifier (snout);
   remove_notifier (snerr);
   close_fds ();
+#else
+  if (!alive) return;
+  // a program of the console cannot be asked to end: the process and all
+  // it started (its job) are ended at once, as cmdline_link does
+  proc.terminate (0);
+  alive= false;
+  inbuf= ""; inpos= 0;
 #endif
 }
 
