@@ -134,22 +134,27 @@ web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/w
 # the artwork of the styles (tmfs://artwork/..., progs/utils/misc/artwork.scm:
 # the shadows, frames and textures of the themes), as files of the site:
 # out/web/artwork/, copied from https://www.texmacs.org/artwork, which does
-# not let a page read them (CORS, #322). The pictures are those whose
-# thumbnails TeXmacs ships (TeXmacs/misc/.../thumbnail-<name>); one which
-# cannot be fetched is left out (curl -f writes nothing then), and the page
-# shows its thumbnail instead
+# not let a page read them (CORS, #322). The pictures are those which the
+# packages of TeXmacs use (about 10 MB: the shadows, frames, blackboard,
+# paper and wood of the themes); the others, offered by the pattern selector
+# only, are shown as their thumbnails (TeXmacs/misc/.../thumbnail-<name>).
+# ARTWORK_SET=all copies all those whose thumbnails TeXmacs ships (75 MB).
+# A picture is fetched into a .part file, renamed once complete: one which
+# cannot be fetched (no network, a time limit) is left out and tried again
+# at the next build, and the page shows its thumbnail meanwhile
+ARTWORK_USED := $(shell cd $(TM)/TeXmacs/packages && grep -rhoE 'tmfs://artwork/[A-Za-z0-9_./-]+[.](png|jpg)' . 2>/dev/null | sed 's|tmfs://artwork/||' | sort -u)
 ARTWORK_THUMBS := $(shell cd $(TM)/TeXmacs/misc && find pictures textures -name 'thumbnail-*' 2>/dev/null)
-ARTWORK := $(foreach t,$(ARTWORK_THUMBS),$(dir $(t))$(patsubst thumbnail-%,%,$(notdir $(t))))
+ARTWORK_ALL := $(foreach t,$(ARTWORK_THUMBS),$(dir $(t))$(patsubst thumbnail-%,%,$(notdir $(t))))
+ARTWORK := $(if $(filter all,$(ARTWORK_SET)),$(ARTWORK_ALL),$(ARTWORK_USED))
 
-artwork: $(OUT)/web/artwork/.fetched
-
-$(OUT)/web/artwork/.fetched:
+artwork:
 	@for f in $(ARTWORK); do \
 	  d=$(OUT)/web/artwork/$$f; [ -s $$d ] && continue; mkdir -p $$(dirname $$d); \
-	  curl -fsSL --retry 2 -o $$d https://www.texmacs.org/artwork/$$f || \
-	    echo "artwork: $$f not fetched"; \
+	  if curl -fsSL --connect-timeout 20 --max-time 300 --retry 2 \
+	       -o $$d.part https://www.texmacs.org/artwork/$$f; \
+	  then mv $$d.part $$d; \
+	  else rm -f $$d.part; echo "artwork: $$f not fetched"; fi; \
 	done
-	@touch $@
 
 # the licenses of the components (TeXmacs/misc/licenses, also in the
 # packages of the page), as files of the site: out/web/licenses/
