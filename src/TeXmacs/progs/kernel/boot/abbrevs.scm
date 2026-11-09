@@ -74,7 +74,7 @@
     (define-public (save-object file value)
       (call-with-output-file (url-materialize file "")
         (lambda (port)
-          (let-temporarily (((*s7* 'print-length) 9223372036854775807))
+          (let-temporarily (((*s7* 'print-length) (ash 1 40)))
             (write value port)))))
     (define-public (save-object file value)
       (call-with-output-file (url-materialize file "")

@@ -326,7 +326,7 @@
   ;; s7 prints at most 40 elements of a list unless print-length is raised: a
   ;; document of more than 40 blocks was cut when it was sent
   (if (s7-scheme?)
-      (let-temporarily (((*s7* 'print-length) 9223372036854775807))
+      (let-temporarily (((*s7* 'print-length) (ash 1 40)))
         (object->string msg))
       (object->string msg)))
 
