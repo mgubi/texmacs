@@ -371,6 +371,28 @@
                  (* 1.2 (width (math-only "stix" "x+y"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Type 1 fonts embedded in PostScript (#441)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-type1-embedding)
+  ;; the Type 1 fonts of the document (.pfb) go into the PostScript as
+  ;; fonts, converted by pfb_to_pfa (printer.cpp), on every system
+  (check-group "Type 1 fonts embedded in PostScript")
+  (let* ((dir (url-append (url-temp-dir) "fonts"))
+         (ps (url-append dir "type1.ps")))
+    (when (url-exists? dir) (system-remove dir))
+    (system-mkdir dir)
+    (buffer-set-body (current-buffer)
+                     (stree->tree '(document "Type 1" (math "x+y"))))
+    (update-forced)
+    (print-to-file ps)
+    (with s (if (url-exists? ps) (string-load ps) "")
+      (check-true (string-contains? s "%%BeginFont: cmr10"))
+      (check-true (string-contains? s "/FontName /CMR10 def"))
+      (check-true (string-contains? s "%%BeginFont: cmmi10")))
+    (system-remove dir)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; All
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -385,5 +407,6 @@
      (test-language-han)
      (test-windows-fonts)
      (test-stix-two)
-     (test-math-fonts)))
+     (test-math-fonts)
+     (test-type1-embedding)))
   (check-end))
