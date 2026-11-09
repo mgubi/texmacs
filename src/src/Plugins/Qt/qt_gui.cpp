@@ -143,8 +143,9 @@ qt_forget_deferred_deletes () {
   // on Windows _exit runs the shutdown of the DLLs, where Qt delivers the
   // pending deferred deletes and ~QWidget crashes; calling it twice, here
   // and by the exit handler, is harmless. The deferred deletes posted after
-  // this, as by the static destructors which the exit of C runs after this
-  // handler (the window of a dialog still open, #776), are dropped by
+  // this, as by the static destructors registered before this handler, which
+  // the exit of C runs after it (the window of a dialog still open, #776),
+  // are dropped by
   // QTMApplication::notify)
   qt_exit_begun= true;
   if (QCoreApplication::instance () != NULL)

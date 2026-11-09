@@ -518,8 +518,9 @@ embedded after refresh #t" \
       -x '(load "startup-dialog-refresh.scm")'
 
 # A script which exits (exit of Scheme, the exit of C) with a dialog still
-# open: the static destructors, which run after the exit handlers, let go
-# the widget of the dialog in the window table, whose window is deleted
+# open: the static destructors, registered before the exit handler of Qt
+# and so run after it, let go the widget of the dialog in the window
+# table, whose window is deleted
 # later; on Windows, Qt delivered that deferred delete during the shutdown
 # of the DLLs and crashed (status 139, as the case above, #776). Without a
 # refresh; with a texmacs-input, without which the Windows runs of CI did
