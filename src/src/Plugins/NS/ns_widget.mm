@@ -585,7 +585,12 @@ ns_window_widget_rep::write (slot s, blackbox index, widget w) {
   [self stopMonitoring];
   [self orderOut: nil];
   NS_ENTRY_BEGIN
-    if (wid && !is_nil (wid->quit)) wid->quit ();
+    if (wid && !is_nil (wid->quit)) {
+      // a copy: the command may delete the widget, and wid->quit with it
+      // (#660)
+      command q= wid->quit;
+      q ();
+    }
   NS_ENTRY_END ("-[TMPopupPanel dismiss]")
 }
 
