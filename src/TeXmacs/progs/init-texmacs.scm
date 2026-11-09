@@ -501,8 +501,8 @@
        (with over (get-page-overflow)
          (and (> over 0)
               (with cm (/ (round (* 10.0 (/ over (length-decode "1cm")))) 10.0)
-                (string-append "the slide overflows the screen by "
-                               (number->string cm) " cm"))))))
+                (string-append (translate "the slide overflows the screen by")
+                               " " (number->string cm) " cm"))))))
 (with previous footer-hook
   (set! footer-hook
         (lambda (t)
