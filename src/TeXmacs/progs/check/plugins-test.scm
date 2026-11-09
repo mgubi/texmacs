@@ -1336,6 +1336,21 @@
   (check-true (wait-until (lambda () (== (sleepers "614") 0)) 3000))
   (connection-stop "tmtestgroup" "plugins-test-group2")
   (check-true (wait-until (lambda () (== (sleepers "613") 0)) 3000))
+  ;; the same, once the link has read the end of the shell before the stop
+  ;; (which then does nothing: the link is dead): what is left of the group
+  ;; ends all the same. With Qt pipes it was left running, and the check
+  ;; above failed whenever the interrupt read that end itself (#769)
+  (check= (start* "tmtestgroup" "plugins-test-group3") "ok")
+  (check-true (wait-until (lambda () (and (== (sleepers "613") 1)
+                                          (== (sleepers "614") 1)))
+                          5000))
+  (connection-interrupt "tmtestgroup" "plugins-test-group3")
+  (check-true (poll "tmtestgroup" "plugins-test-group3"
+                    (lambda ()
+                      (== (connection-status "tmtestgroup"
+                                             "plugins-test-group3") 0))))
+  (check-true (wait-until (lambda () (== (sleepers "613") 0)) 3000))
+  (connection-stop "tmtestgroup" "plugins-test-group3")
 
   (check-group "processes: a plugin which cleans up when stopped")
   ;; SIGTERM, then SIGKILL only 2 s later: the plugin has time to clean up

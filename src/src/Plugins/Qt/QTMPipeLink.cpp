@@ -62,7 +62,8 @@ QTMPipeLink::~QTMPipeLink () {
 
 bool
 QTMPipeLink::launchCmd () {
-  if (state () != QProcess::NotRunning) killProcess (1000);
+  // (also what is left of the group of a program which has ended)
+  if (state () != QProcess::NotRunning || group > 0) killProcess (1000);
 
   QString raw = utf8_to_qstring(cmd);
   QString program;
@@ -110,6 +111,9 @@ QTMPipeLink::launchCmd () {
 
   bool ok = waitForStarted();
   if (ok) {
+#if !defined (OS_MINGW) && !defined (OS_ANDROID)
+    group= processId ();  // (the program leads its group: setsid)
+#endif
     // NOTE: unique, since a process which exited by itself is started
     // again without disconnecting (see killProcess)
     connect(this, SIGNAL(readyReadStandardOutput()), SLOT(readErrOut()),
@@ -235,7 +239,12 @@ QTMPipeLink::killProcess (int msecs) {
   // the interface is not blocked meanwhile
   if (kill_at != 0) { finishKill (); return; }  // (stopped before)
   int limit= (msecs > 0? msecs: 2000);
-  qint64 pid= processId ();
+  // the group, also when the program has ended (by itself, or by an
+  // interrupt) and Qt has seen it: processId () is then 0, and what is
+  // left of the group (programs in the background) was left running (#769)
+  qint64 pid= group;
+  group= 0;
+  if (pid <= 0) pid= processId ();
   if (pid > 0 && ::killpg ((pid_t) pid, SIGTERM) == 0) {
     // The group is waited for before any wait of Qt: once Qt sees that
     // the program has finished, it closes the pipes, and what is left of
@@ -263,6 +272,17 @@ QTMPipeLink::killProcess (int msecs) {
     // QProcess is told of the end by a pidfd (Linux), not by SIGCHLD (macOS)
     waitForFinished (1000);
   }
+#endif
+}
+
+void
+QTMPipeLink::forgetEndedGroup () {
+  // the group of a program which has ended, once nothing is left of it
+  // (its number may then be that of another group)
+#if !defined (OS_MINGW) && !defined (OS_ANDROID)
+  if (group > 0 && state () == QProcess::NotRunning &&
+      ::killpg ((pid_t) group, 0) == -1 && errno != EPERM)
+    group= 0;
 #endif
 }
 
