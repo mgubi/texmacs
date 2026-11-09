@@ -1593,8 +1593,8 @@
 
 ;; A view of a live document is typeset by each editor of its buffer, and
 ;; each of them puts an observer on its tree: with two views of the buffer
-;; (load-buffer makes a hidden one, a window shows another), id->trees gives
-;; the tree twice and each change is announced twice (#796). The live
+;; (load-buffer makes a hidden one, a window shows another): each change is
+;; announced twice (#796); id->trees gives each tree once (#833). The live
 ;; document is a local one (its name is no tmfs url: no server), with the
 ;; client side loaded.
 
@@ -1624,7 +1624,8 @@
         (window-set-view (current-window) (view-new u) #t)
         (update-forced)
         (check= (length (buffer->views u)) 2)
-        (check= (length (id->trees vid)) 2)
+        (check= (length (id->trees vid)) 1)
+        (check= (sort (tree->ids (view)) string<?) (list vid llid))
         (check= (length (live-view-trees vid)) 1)
         ;; a character typed in the view is in the live document once
         (go-to (append (tree->path (tree-ref (view) 0)) '(3)))
@@ -1644,7 +1645,7 @@
         ;; it is one view, not two to separate: it keeps its identifier
         (live-view-separate llid vid)
         (check= (tree->string (tree-ref (tree-up (view)) 0)) vid)
-        (check= (length (id->trees vid)) 2))
+        (check= (length (id->trees vid)) 1))
       (lambda ()
         (switch-to-buffer old)
         (when (buffer-exists? u) (buffer-close u))

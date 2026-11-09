@@ -145,22 +145,32 @@ get_ids (list<observer> l) {
   return pointer_resolve [l->item] * get_ids (l->next);
 }
 
+// A tree is typeset by each editor of its buffer, and each of them puts its
+// own observers on the loci: with two views of a buffer, a locus has two
+// observers with the same identifier on the same tree (#796, #833). The
+// identifiers of a tree and the trees of an identifier are given once each.
+
 list<string>
 get_ids (tree t) {
   if (is_nil (t->obs)) return list<string> ();
-  list<observer> l= t->obs->get_tree_pointers ();
-  return reverse (get_ids (l));
-}
-
-list<tree>
-as_trees (list<observer> l) {
-  if (is_nil (l)) return list<tree> ();
-  else return list<tree> (obtain_tree (l->item), as_trees (l->next));
+  list<string> l= reverse (get_ids (t->obs->get_tree_pointers ()));
+  list<string> r;
+  for (; !is_nil (l); l= l->next)
+    if (!contains (r, l->item)) r= list<string> (l->item, r);
+  return reverse (r);
 }
 
 list<tree>
 get_trees (string id) {
-  return reverse (as_trees (id_resolve [id]));
+  list<observer> l= reverse (id_resolve [id]);
+  list<tree> r;
+  for (; !is_nil (l); l= l->next) {
+    tree t= obtain_tree (l->item);
+    list<tree> u= r;
+    while (!is_nil (u) && !strong_equal (u->item, t)) u= u->next;
+    if (is_nil (u)) r= list<tree> (t, r);
+  }
+  return reverse (r);
 }
 
 list<tree>
