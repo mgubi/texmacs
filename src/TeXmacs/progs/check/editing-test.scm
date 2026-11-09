@@ -877,6 +877,41 @@
       (with (x y) (mouse-point-at 1 0)
         (check= (mouse-click (+ x 150000) y) '(1 6))))))
 
+;; The arrow keys over a line ending in an incomplete Cork character (a "<#"
+;; without its ">", which a .tm file or a Scheme edit can make). The text
+;; box stepped over "<..." up to the ">" and one byte further, past the end
+;; of the string when the ">" is missing, so that the cursor went to (0 4)
+;; in "a<#" and correcting it threw "bad path" (#823, find_box_path in
+;; Typeset/Boxes/Basic/text_boxes.cpp). The unterminated "<#" is one
+;; character, as for tm_char_forwards. The box movements need the changes
+;; applied (see the head of the file).
+(define (arrow-key key)
+  (edit (key))
+  (apply-changes)
+  (cursor))
+
+(define (test-incomplete-cork)
+  (check-group "arrow keys over an incomplete Cork character")
+  (with-buffer-body '(document "a<#" "b")
+    (lambda ()
+      (edit (go-to (at 0 0)))
+      (apply-changes)
+      (check= (arrow-key kbd-right) '(0 1))
+      (check= (arrow-key kbd-right) '(0 3))
+      (check= (arrow-key kbd-right) '(1 0))
+      (check= (arrow-key kbd-left) '(0 3))
+      (check= (arrow-key kbd-left) '(0 1))
+      (check= (arrow-key kbd-left) '(0 0))
+      (check= (body) '(document "a<#" "b"))))
+  ;; in the middle of a line, the rest of the line is the character
+  (with-buffer-body '(document "x" "a<#b")
+    (lambda ()
+      (edit (go-to (at 1 0)))
+      (apply-changes)
+      (check= (arrow-key kbd-right) '(1 1))
+      (check= (arrow-key kbd-right) '(1 4))
+      (check= (arrow-key kbd-left) '(1 1)))))
+
 ;; Several paragraphs inserted at the border of a tag which has no cursor
 ;; position there (an inner border, as hidden): the editor corrected the
 ;; cursor into the tag while it made the new paragraph, then refused, and
@@ -2180,6 +2215,7 @@
   (test-cursor)
   (test-bad-cursor)
   (test-mouse-long)
+  (test-incomplete-cork)
   (test-selection)
   (test-remove)
   (test-structure)

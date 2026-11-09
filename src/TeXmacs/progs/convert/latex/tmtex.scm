@@ -777,11 +777,15 @@
            (map (lambda (x) (string-convert (char->string x) from to)) c))))
 
 (define (tmtex-verb-string s)
+  ;; verbatim content (addresses, code, raw LaTeX) is written as it is, also
+  ;; in a formula: it is not cut at the operators as a string of the formula
   (when (nstring? s)
     (set! s (texmacs->verbatim (tm->tree s))))
+  (tmtex-env-set "mode" "text")
   (let* ((l (string->list s))
          (t (tmtex-verb-list l))
          (r (tmtex-string-produce t)))
+    (tmtex-env-reset "mode")
     (if (or tmtex-use-unicode? tmtex-use-ascii?)
         (set! r (map (lambda (x) (string-convert* x "Cork" "UTF-8")) r))
         (set! r (map unescape-angles r)))
