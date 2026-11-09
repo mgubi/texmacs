@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 9 November 2026
 
+- **The file dialogs of Linux open inside their folder** (desktop, Vue,
+  Linux): the Open dialog (zenity, or the desktop portal) started in the
+  folder above, with the folder of the document or the home selected,
+  because SDL takes the last part of a location without a final slash for
+  a file name; the location now ends with a slash (#665, item 3).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at

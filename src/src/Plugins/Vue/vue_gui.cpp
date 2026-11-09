@@ -8052,6 +8052,17 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
     proposed= "untitled.tm";
   if (N(proposed) > 0 && sdl_type == SDL_FILEDIALOG_SAVEFILE)
     location= as_string (url_system (directory) * url_system (proposed));
+  // An open dialog starts inside its folder: SDL (zenity's --filename, the
+  // current_folder and current_name of the desktop portal) cuts the location
+  // at its last slash, so that /home/user opened /home with "user"
+  // selected (#665, item 3); only its folder dialogs add the final slash
+  bool folder_slash= false;
+#if !defined(OS_MACOS) && !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+  folder_slash= true;
+#endif
+  if (folder_slash && sdl_type != SDL_FILEDIALOG_SAVEFILE &&
+      N(location) > 0 && location[N(location) - 1] != '/')
+    location << "/";
   c_string tmp3 (location);
   if (N(location) > 0)
     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, tmp3);
