@@ -124,7 +124,10 @@ concater_rep::typeset_gr_group (tree t, path ip) {
 BEGIN_MAGNIFY
   array<box> bs;
   typeset_graphical (bs, t, ip);
-  print (graphics_group_box (ip, bs));
+  // (a group without a graphical item, e.g. with no child: a composite box
+  // with no child, which reset the document, #817)
+  if (N(bs) == 0) typeset_error (t, ip);
+  else print (graphics_group_box (ip, bs));
 END_MAGNIFY
 }
 
@@ -962,9 +965,14 @@ BEGIN_MAGNIFY
   vt (3, 3)= 1.0;
   vt (0, 3)= o[0];
   vt (1, 3)= o[1];
-  vt= vt * as_matrix<double> (env->read (GR_TRANSFORMATION));
-  tree u= env->exec (t);
-  spacial obj= as_spacial (u);
+  // (a transformation which is not a 4 x 4 matrix, as with gr-transformation
+  // set to text, failed in as_matrix and reset the document, #817)
+  tree tr= env->read (GR_TRANSFORMATION);
+  spacial obj;
+  if (is_matrix_3d (tr)) {
+    vt= vt * as_matrix<double> (tr);
+    obj= as_spacial (env->exec (t));
+  }
   if (is_nil (obj))
     typeset_dynamic (tree (_ERROR, "bad spacial object"), ip);
   else

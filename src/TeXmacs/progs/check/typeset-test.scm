@@ -1258,9 +1258,11 @@
 ;; in the system folder of the home, and saving the buffer over its file
 ;; is asked first.
 ;; Primitives of graphics with malformed children (text where a point, a
-;; matrix, an object or a tuple is expected, an effect on an argument which
-;; it does not have) are typeset as errors or as best they can, and the
-;; document is kept and can be edited: they crashed the typesetter (#817)
+;; matrix, an object, a tuple or a rubber arrow is expected, an effect on an
+;; argument which it does not have, a group without items, a 3D
+;; transformation which is not a matrix) are typeset as errors or as best
+;; they can, and the document is kept and can be edited: they crashed the
+;; typesetter or reset the document (#817)
 (define (test-malformed-graphics)
   (check-group "malformed graphics")
   (for (ex '((light-3d "k" "k")
@@ -1272,7 +1274,14 @@
              (gr-effect "1" "-1")
              (calligraphy "k" "k" "k" "k")
              (penscript "k" "k" "k" "k")
-             (calligraphy (point "0" "0") (point "1" "1") "k" (tuple "k"))))
+             (calligraphy (point "0" "0") (point "1" "1") "k" (tuple "k"))
+             (long-arrow "k" "k")
+             (with "mode" "math" (long-arrow "<rubber-rightarrow>" "x"))
+             (gr-group)
+             (gr-group "k")
+             (with "gr-transformation" "k"
+               (triangle-3d (point "0" "0" "0") (point "1" "0" "0")
+                            (point "0" "1" "0") "red"))))
     (let ((doc `(document "p" ,ex "q")))
       (with-typeset-body doc
         (lambda ()
