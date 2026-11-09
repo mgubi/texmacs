@@ -11353,6 +11353,41 @@ tmg_alt_window_search (tmscm arg1) {
 }
 
 tmscm
+tmg_embedded_opening () {
+  // TMSCM_DEFER_INTS;
+  int out= embedded_opening ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_embedded_opening_set (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "embedded-opening-set");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  embedded_opening_set (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_embedded_tool_opening (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "embedded-tool-opening");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= embedded_tool_opening (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_supports_bibtexP () {
   // TMSCM_DEFER_INTS;
   bool out= bibtex_present ();
@@ -12491,6 +12526,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("alt-window-get-position",  tmg_alt_window_get_position, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-position",  tmg_alt_window_set_position, 3, 0, 0);
   tmscm_install_procedure ("alt-window-search",  tmg_alt_window_search, 1, 0, 0);
+  tmscm_install_procedure ("embedded-opening",  tmg_embedded_opening, 0, 0, 0);
+  tmscm_install_procedure ("embedded-opening-set",  tmg_embedded_opening_set, 1, 0, 0);
+  tmscm_install_procedure ("embedded-tool-opening",  tmg_embedded_tool_opening, 1, 0, 0);
   tmscm_install_procedure ("supports-bibtex?",  tmg_supports_bibtexP, 0, 0, 0);
   tmscm_install_procedure ("bibtex-run",  tmg_bibtex_run, 4, 0, 0);
   tmscm_install_procedure ("bib-add-period",  tmg_bib_add_period, 1, 0, 0);

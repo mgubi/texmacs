@@ -395,23 +395,21 @@
     (check= (current-buffer) old)
     (check= (view->buffer (window->view (current-window))) old)))
 
-;; One editor per opening of a named texmacs-input (#776): while a widget
-;; still shows the field, a new widget with that name is the same field made
-;; again (a refresh, side tools made again, as a macro editor when the search
-;; tool opens). It keeps the view of the field, with its editor and its undo
-;; history, and a new content is an edit which can be undone. (Here the
-;; former widgets are not let go: that only happens in the event loop, see
-;; tests/startup/check.sh for a field opened anew.)
+;; One editor per opening of a named texmacs-input (#776). A field made
+;; outside a dialog or a tool, as here, is made again in the live opening of
+;; its name (a menu made again): it keeps its view, with its editor and its
+;; undo history, and a new content is an edit which can be undone, unless
+;; nothing was typed since the former content (a field which shows
+;; results). The views made by Scheme are not those of a field: they are
+;; left alone. (The dialogs and the tools, whose openings begin and end in
+;; the event loop, are checked in tests/startup/check.sh.)
 (define (test-embedded-history)
   (check-group "the history of a named texmacs-input made again")
   (let* ((w (string->url "tmfs://aux/editing-test-embedded-history"))
          (build (lambda (doc)
                   (widget-texmacs-input doc '(style "generic") w)))
-         (build-other (lambda (u)
-                        ;; with what was typed (a different content would
-                        ;; hide a history which is kept)
-                        (widget-texmacs-input (tree->stree (buffer-get-body u))
-                                              '(style "generic") u)))
+         (build-other (lambda (u doc)
+                        (widget-texmacs-input doc '(style "generic") u)))
          (old (current-buffer))
          (original '(document "original")))
     (with r (check-run
@@ -442,24 +440,35 @@
                         (check= n 1)))
                   (check= (tree->stree (buffer-get-body w))
                           '(document "original")))
-                ;; opened anew while no widget shows it: the view left
-                ;; passive is replaced by a new one, with an empty history,
-                ;; which becomes current if the former one was
+                ;; a field with the name of a buffer which has a view made
+                ;; by Scheme: that view keeps its history
                 (with p (string->url "tmfs://aux/editing-test-embedded-new")
                   (buffer-set-body p (stree->tree '(document "p")))
                   (view-passive p)
                   (buffer-focus p)
                   (check= (current-buffer) p)
                   (edit (insert "typed "))
-                  (check-true (> (undo-possibilities) 0))
-                  (build-other p)
+                  (check= (undo-possibilities) 1)
+                  (build-other p '(document "typed p"))
                   (check= (current-buffer) p)
-                  (check= (length (buffer->views p)) 1)
-                  (check= (undo-possibilities) 0)
+                  (check= (length (buffer->views p)) 2)
+                  (check= (undo-possibilities) 1)
                   (buffer-focus old)
                   (check= (current-buffer) old)
                   (buffer-close p)
-                  (check-false (buffer-exists? p)))))
+                  (check-false (buffer-exists? p)))
+                ;; a field which shows results: its contents do not pile up
+                ;; in its history while nothing is typed in it
+                (with g (string->url "tmfs://aux/editing-test-embedded-results")
+                  (for (k (.. 0 6))
+                    (build-other g `(document ,(number->string k)))
+                    (with-buffer g
+                      (archive-state) (start-editing) (end-editing)
+                      (check= (undo-possibilities) 0)))
+                  (check= (length (buffer->views g)) 1)
+                  (check= (tree->stree (buffer-get-body g)) '(document "5"))
+                  (buffer-close g)
+                  (check-false (buffer-exists? g)))))
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r))))
     (buffer-close w)

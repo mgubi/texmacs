@@ -89,6 +89,7 @@
     (vsplit :menu-item :menu-item)
     (refresh :%1 :string?)
     (refreshable :%1 :menu-item-list)
+    (opening :%1 :menu-item-list)
     (cached :%1 :%1 :menu-item-list)
     (if :%1 :menu-item-list)
     (when :%1 :menu-item-list)
@@ -764,12 +765,39 @@
   (with (tag s kind) p
     (list (widget-refresh (if (string? s) s (symbol->string s)) kind))))
 
+(define (in-opening op thunk)
+  ;; run @thunk with @op as the opening of the texmacs-input it makes, and
+  ;; restore the former opening afterwards (#776)
+  (let ((old (embedded-opening)))
+    (embedded-opening-set op)
+    (with r (catch #t thunk
+              (lambda args (embedded-opening-set old) (apply throw args)))
+      (embedded-opening-set old)
+      r)))
+
 (define (make-refreshable p style bar?)
   "Make @(refreshable :%1 :menu-item-list) menu items."
+  ;; the content is made again in the opening of the dialog or tool in
+  ;; which the refreshable was made: its texmacs-input keep their editors
   (with (tag kind . items) p
-    (list (widget-refreshable
-            (lambda () (widget-vmenu (make-menu-items-list items style bar?)))
-            (kind)))))
+    (let ((op (embedded-opening)))
+      (list (widget-refreshable
+              (lambda ()
+                (in-opening op
+                  (lambda ()
+                    (widget-vmenu (make-menu-items-list items style bar?)))))
+              (kind))))))
+
+(define (make-opening p style bar?)
+  "Make @(opening :%1 :menu-item-list) menu items."
+  ;; a tool of a tool slot, whose texmacs-input are in the opening of the
+  ;; tool: the same as long as the tool is shown (#776)
+  (with (tag tool . items) p
+    (let ((old (embedded-tool-opening tool)))
+      (with op (embedded-opening)
+        (embedded-opening-set old)
+        (in-opening op
+          (lambda () (make-menu-items-list items style bar?)))))))
 
 (define cached-widgets (make-ahash-table))
 
@@ -934,6 +962,8 @@
            ,(lambda (p style bar?) (make-refresh p style bar?)))
   (refreshable (:%1 :*)
                ,(lambda (p style bar?) (make-refreshable p style bar?)))
+  (opening (:%1 :*)
+           ,(lambda (p style bar?) (make-opening p style bar?)))
   (cached (:%1 :%1 :*)
                ,(lambda (p style bar?) (make-cached p style bar?))))
 
@@ -1169,6 +1199,7 @@
   (promise ,menu-expand-promise)
   (refresh ,replace-procedures)
   (refreshable ,replace-procedures)
+  (opening ,(lambda (p) `(opening ,(cadr p) ,@(menu-expand-list (cddr p)))))
   (cached ,replace-procedures))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1465,6 +1496,11 @@
   (with win (if (null? opt-win) (current-window) (car opt-win))
     (and-with l (window->tools win pos)
       (in? tool l))))
+
+(tm-define (tool-opening tool items)
+  (:synopsis "The menu @items of @tool, in the opening of the tool (#776)")
+  ;; (a list of menu items, as the widgets of tm-widget give)
+  (list `(opening ,(symbol->string (car tool)) ,@items)))
 
 (tm-define (tool-select pos tool . opt-win)
   (:check-mark "v" tool-active?)
