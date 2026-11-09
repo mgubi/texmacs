@@ -57,6 +57,10 @@ scheme <expression>         run a Scheme command, as -x does (at the next turn o
 compose <text>              composition of an input method (no text: ends it)
 commit <text>               an input method commits a text (one key per character)
 drop x y <path>|text:<text> a drag and drop of one item at that position
+open <path>                 a file given by the system (the Finder, the Dock,
+                            open -a), as SDL sends it on macOS: a drop with
+                            no window; a relative path is from the current
+                            directory
 focus                       pretend the target window got the keyboard focus
 snapshot <name>             save the next redraw of the target window
 clipboard <text>            the text on the clipboard of the script, which is
@@ -183,6 +187,7 @@ callback output.
 | `tool-replace` | replacing the font tool, whose sample text is an editor, must not crash the redraw |
 | `debug-view` | the Clay debug view of F1 over a window with a tool; hover and click while it is shown. Needs `TEXMACS_VUE_CLAY_DEBUG=1`: without it F1 goes to TeXmacs |
 | `drop` | a dropped file name and a dropped piece of text reach `mouse-drop-event` and are inserted |
+| `system-open` | files given by the system (`open`, a drop without a window, as SDL sends the files of the Finder on macOS) are opened, the second in a new window (#768) |
 | `entrypoints` | the wait indicator appears over the window and is popped by the empty message; the help balloon appears and a pointer motion dismisses it |
 | `figures` | PDF figures drawn by MuPDF as drawing (a form XObject), upright and turned by `/Rotate 90`, one at half opacity (where its squares overlap: pale blue, never purple), at a size where pixels would show, and an EPS figure made a PDF once (`-debug-convert` shows one `image_to_pdf` and no `image_to_png`); the figures are those of `Plugins/MuPDF/tests` |
 | `pattern-zoom` | a pattern fill and pattern glyphs at zoom 1 and zoom 2: the stripes of the fill must double with the glyphs'. The zoom is set with `set-window-zoom-factor`: `change-zoom-factor` saves it as the user's preference, which a test must never do |
