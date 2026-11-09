@@ -931,6 +931,17 @@ tm_window_rep::interactive_return () {
 int
 window_handle () {
   static int window_next= 1;
+  // a window whose build failed before window_create: its opening ends,
+  // and the opening which was current before it is current again (#776)
+  int failed= pending_window_handle;
+  if (failed != 0 && !window_table->contains (failed) &&
+      dialog_opening->contains (failed)) {
+    int op= dialog_opening [failed];
+    if (current_opening == op) current_opening= dialog_previous [failed];
+    dialog_opening->reset (failed);
+    dialog_previous->reset (failed);
+    end_opening (op, false);
+  }
   pending_window_handle= window_next;
   // the widgets of the window are made in its opening (#776)
   dialog_previous (window_next)= current_opening;
