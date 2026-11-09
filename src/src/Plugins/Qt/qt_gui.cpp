@@ -124,6 +124,10 @@ tm_sleep () {
 * Constructor and geometry
 ******************************************************************************/
 
+bool qt_exit_begun= false;
+  // set by qt_forget_deferred_deletes: the process ends, deferred deletes
+  // are no longer delivered (QTMApplication::notify)
+
 void
 qt_forget_deferred_deletes () {
   // (an exit of a script, (exit), from the event loop: the widgets which
@@ -138,7 +142,13 @@ qt_forget_deferred_deletes () {
   // the first one deleted. The quit of TeXmacs calls this too, before _exit:
   // on Windows _exit runs the shutdown of the DLLs, where Qt delivers the
   // pending deferred deletes and ~QWidget crashes; calling it twice, here
-  // and by the exit handler, is harmless)
+  // and by the exit handler, is harmless. The deferred deletes posted after
+  // this are dropped by QTMApplication::notify: an exit by the exit of C
+  // (Scheme's exit) runs the static destructors after this handler, and
+  // the window table of TeXmacs then lets go the widget of a dialog still
+  // open, whose window is deleted later, which Windows did during the
+  // shutdown of the DLLs: a crash at the exit, #776)
+  qt_exit_begun= true;
   if (QCoreApplication::instance () != NULL)
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }

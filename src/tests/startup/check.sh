@@ -517,6 +517,28 @@ sentinels left 1
 embedded after refresh #t" \
       -x '(load "startup-dialog-refresh.scm")'
 
+# A script which exits (exit of Scheme, the exit of C) with a dialog still
+# open: the static destructors, which run after the exit handlers, let go
+# the widget of the dialog in the window table, whose window is deleted
+# later; on Windows, Qt delivered that deferred delete during the shutdown
+# of the DLLs and crashed (status 139, the case above, #776). Without a
+# texmacs-input: any dialog.
+cat > "$out/startup-dialog-exit.scm" <<'EOF'
+(tm-widget ((startup-plain-dialog) quit)
+  (text "A dialog left open at the exit"))
+(exec-delayed
+  (lambda ()
+    (dialogue-window (startup-plain-dialog) noop "Startup dialog")
+    (exec-delayed
+      (lambda ()
+        (display* "CHECK dialog open\n")
+        (exit 0)))))
+EOF
+
+check "a script which exits with a dialog open (#776)" \
+      "dialog open" \
+      -x '(load "startup-dialog-exit.scm")'
+
 # A link whose target has a wildcard: the pattern was loaded as the name of
 # a buffer, and url-glue (the autosave names) threw a C++ exception which
 # nothing catches under -x, so that TeXmacs aborted (#771). The check is
