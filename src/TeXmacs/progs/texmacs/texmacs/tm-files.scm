@@ -1085,11 +1085,8 @@
                   (buffer-set name t)
                   (buffer-nesting-update
                    name (> (texmacs-skipped-nestings) skipped))
-                  ;; the buffer of a file is now that file: not modified,
-                  ;; and not changed on disk any more (#818)
-                  (when (and (not (url-rooted-tmfs? name))
-                             (url-test? name "fr"))
-                    (buffer-pretend-saved name))
+                  ;; (buffer-set marks it saved at the date of the file:
+                  ;; the footer looks at the file again, #818)
                   (disk-check-forget))))))))
 
 (tm-define (revert-buffer . l)
