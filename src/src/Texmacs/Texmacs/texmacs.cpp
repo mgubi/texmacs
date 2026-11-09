@@ -467,7 +467,8 @@ set_global_options  (int argc, char** argv)  {
         cout << "  -fn [font] Set the default TeX font\n";
         cout << "  -g [geom]  Set geometry of window in pixels\n";
         cout << "  -h         Display this help message\n";
-        cout << "  -H         Run TeXmacs in headless mode\n";
+        cout << "  -H         Run TeXmacs in headless mode (also -headless): it quits\n";
+        cout << "             after the commands and the files, unless -X is given\n";
         cout << "  -i [file]  Specify scheme initialization file\n";
         cout << "  -p         Get the TeXmacs path\n";
         cout << "  -q         Quit after the commands and the files\n";
@@ -478,6 +479,8 @@ set_global_options  (int argc, char** argv)  {
         cout << "  -V         Show some informative messages\n";
         cout << "  -W [i] [o] Recursively convert directory into website\n";
         cout << "  -x [cmd]   Execute scheme command\n";
+        cout << "  -X         Do not quit after the commands and the files (headless mode),\n";
+        cout << "             e.g. for a script with delayed actions or a server\n";
         cout << "  --tls-no-verify  Skip TLS certificate verification\n";
         cout << "  -Oc        TeX characters bitmap clipping off\n";
         cout << "  +Oc        TeX characters bitmap clipping on (default)\n";
