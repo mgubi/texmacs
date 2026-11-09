@@ -359,7 +359,7 @@ canvas_live_ok () {
 verdict canvas-dark "the surround of the pages is dark in the dark theme" canvas_dark_ok
 verdict canvas-light "the surround of the pages is mid grey in the light theme" canvas_light_ok
 verdict canvas-live "the surround of the pages follows a change of the theme while running" canvas_live_ok
-selected canvas-dark && grep -ah 'NSTEST canvas' "$out"/canvas-*.log | sed 's/^/         /'
+{ selected canvas-dark || selected canvas-light || selected canvas-live; } && grep -ah 'NSTEST canvas' "$out"/canvas-*.log | sed 's/^/         /'
 
 # (raise) a command of the interface which throws a C++ error (cpp-error),
 # run by the update which -[TMDocView scrolled:] forces: the error is

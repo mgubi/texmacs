@@ -967,7 +967,10 @@ keep_former_tools (NSView* old, widget former) {
   // may still use it (a TMRefreshView keeps a plain pointer to its widget,
   // and the views removed below live until the autorelease pool is
   // drained): it is no longer kept in the menu cache of the window, and the
-  // texmacs-input inside close their buffers when it is let go (#776)
+  // texmacs-input inside close their buffers when it is let go (#776).
+  // NOTE: a view retained by the widget itself (the container of an
+  // embedded editor) would make a cycle; the tools are lists (vertical
+  // menus), whose views are made afresh and not retained by their widget
   if (is_nil (former) || old == nil) return;
   TMWidgetKeeper* k=
     [[[TMWidgetKeeper alloc] initWithWidget: former] autorelease];
