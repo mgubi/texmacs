@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 9 November 2026
 
+- **The artwork of the themes in the browser** (browser): the shadows,
+  frames, papers and textures of the styles (`tmfs://artwork/...`, used by
+  the remote file browser and the chat rooms, and by the themes) were asked
+  of www.texmacs.org, which does not let a page read them (CORS): only
+  their small thumbnails were shown, with a warning at each load. The site
+  now has a copy of them, next to the page (`artwork/`), which the browser
+  version reads; the desktop is unchanged (#322).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
