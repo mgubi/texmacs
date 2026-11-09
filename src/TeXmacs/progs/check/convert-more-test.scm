@@ -335,6 +335,37 @@
         (set! current-save-target target)
         (if (url-exists? html) (string-load html) "")))))
 
+;; a file included from another directory is expanded where it is, as it
+;; is typeset: its heading and its theorem are numbered with the rest (#781);
+;; a nested include resolves against the main document, as for the
+;; typesetter (base_file_name)
+(define (test-html-include)
+  (check-group "html export: included files")
+  (let* ((dir (url-append (temp-dir) "inc781"))
+         (save (lambda (u body)
+                 (string-save
+                  (serialize-texmacs
+                   (stree->tree `(document (TeXmacs ,(texmacs-version))
+                                           (style "article") (body ,body))))
+                  u))))
+    (system-mkdir dir)
+    (save (url-append dir "part.tm")
+          '(document (section "Included part")
+                     (theorem (document "Included theorem."))
+                     (include "nested781.tm")))
+    (save (url-append (temp-dir) "nested781.tm")
+          '(document "Nested in the main directory."))
+    (with s (html-export-of-buffer
+             '(document (section "First")
+                        (include "inc781/part.tm")
+                        (section "Last")
+                        (theorem (document "Last theorem."))))
+      (check-true (string-occurs? "2<span style=\"margin-left: 1em\"></span>Included part" s))
+      (check-true (string-occurs? "Theorem <class style=\"font-style: normal\">1</class>. </strong><i>Included" s))
+      (check-true (string-occurs? "3<span style=\"margin-left: 1em\"></span>Last" s))
+      (check-true (string-occurs? "Theorem <class style=\"font-style: normal\">2</class>" s))
+      (check-true (string-occurs? "Nested in the main directory." s)))))
+
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
   (list
@@ -2649,6 +2680,7 @@
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
                   test-html-mathjax-formulas test-html-pattern-background
+                  test-html-include
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
