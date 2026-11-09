@@ -521,7 +521,7 @@ edit_cursor_rep::go_to (path p) {
       }
     }
     if (must_move)
-      notify_change (THE_CURSOR, THE_FREEZE);
+      notify_change (THE_CURSOR + THE_MOVED, THE_FREEZE);
     else
       notify_change (THE_CURSOR);
     unfold_at_cursor ((pointer) this, et, tp);

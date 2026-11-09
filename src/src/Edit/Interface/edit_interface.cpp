@@ -1307,8 +1307,13 @@ edit_interface_rep::apply_changes () {
                        THE_CURSOR+THE_SELECTION+THE_FOCUS)) != 0 &&
         !zoom_layout)
       if (!inside_active_graphics ())
+        // a freeze (a resize, the focus, the mouse over a link) keeps the
+        // view where it is, but not when the cursor was moved since the
+        // last update: following a link to a label of another document,
+        // the canvas of the new document is resized and gets the focus
+        // before its first update (#816)
         if ((env_change & THE_FREEZE) == 0 ||
-            (env_change & THE_SELECTION) != 0)
+            (env_change & (THE_SELECTION + THE_MOVED)) != 0)
           cursor_visible ();
 
     SI dw= 0;
@@ -1674,15 +1679,7 @@ void
 edit_interface_rep::handle_notify_resize (SI w, SI h) {
   (void) w; (void) h;
   if (is_nil (buf)) return;
-  // A resize lays the document out again without scrolling to the cursor,
-  // but not when the cursor moved since the last update: that scroll is
-  // still to be made (#816: a link to a label of another document went to
-  // the label, then the canvas of the new document was shown, and the
-  // resize which this queued in Cocoa, handled before the update, left the
-  // label out of view)
-  if ((env_change & THE_CURSOR) != 0 && (env_change & THE_FREEZE) == 0)
-    notify_change (THE_TREE);
-  else notify_change (THE_TREE+THE_FREEZE);
+  notify_change (THE_TREE+THE_FREEZE);
 }
 
 void

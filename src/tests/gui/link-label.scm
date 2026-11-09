@@ -4,7 +4,7 @@
 ;;   SCM=$PWD/tests/gui/link-label.scm sh tests/Plugins/Vue/run.sh link-label 40
 ;; The jump was made in the event which loaded the document, before it was
 ;; first typeset and shown; in Cocoa the scroll to the cursor was then lost
-;; (most of the times), the cursor at the label but out of view. The view
+;; (most of the time), the cursor at the label but out of view. The view
 ;; after the link must be the one which going to the label again gives.
 (use-modules (check gui-driver))
 

@@ -16,11 +16,12 @@ have the details, and the problems go to the
 
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
-  with the cursor at the label, but most of the times the window stayed at
-  the start of the document. The new document was shown in between, and
-  the resize of its canvas, which keeps the view where it is, also
-  cancelled the scroll to the cursor which was still to be made. A resize
-  now lets a moved cursor be brought into view (#816).
+  with the cursor at the label, but most of the time the window stayed at
+  the start of the document. Before its first update, the canvas of the new
+  document was resized and got the focus, which keep the view where it is,
+  and this also cancelled the scroll to the cursor which was still to be
+  made. A cursor moved to another place is now always brought into view at
+  the next update (#816).
 - **A tilde in a formula is typed once** (desktop): in math mode, the dead
   key of the tilde (Option-N on macOS) followed by another key, by Escape
   or by a click gave a second tilde, stacked on the first (the sign
