@@ -124,7 +124,10 @@ expected=''
 
 # TM_COCOA_CASES="<case> <case>...": only those cases are run and counted
 # (the runs and the verdicts of the others are skipped; the two -headless
-# cases, colors and headless, still run, without a window)
+# cases, colors and headless, still run, without a window). The names are
+# those of the list above, except canvas, which is three cases:
+# canvas-dark, canvas-light and canvas-live. A list which selects no case
+# fails.
 selected () {
   [ -z "${TM_COCOA_CASES:-}" ] && return 0
   case " $TM_COCOA_CASES " in *" $1 "*) return 0 ;; esac
@@ -658,4 +661,8 @@ focused_ok () {
 focus_verdict focused "a console opened by the user takes the focus (#679)" focused_ok
 
 echo "$failed of $total failed"
+if [ "$total" = 0 ]; then
+  echo "no case was selected by TM_COCOA_CASES='${TM_COCOA_CASES:-}'"
+  exit 1
+fi
 [ "$failed" = 0 ]

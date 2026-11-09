@@ -605,7 +605,9 @@ time_t balloon_time;
 static unsigned int balloon_presses= 0; // mouse_presses when it was hovered
 
 // list of commands
-list<command> cmd_list;
+// (never destroyed, as layout_widgets: a widget let go at the exit may
+// still queue its drop command in it, see ~vue_ui_rep)
+list<command>& cmd_list= *tm_new<list<command> > ();
 
 vue_window current_window; // used during layout to propagate information
 bool window_autosizing= false; // the window is being sized to its contents

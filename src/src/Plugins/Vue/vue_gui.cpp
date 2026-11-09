@@ -196,7 +196,7 @@ static void script_clipboard (string txt);
 extern bool debug_clay;
 
 // list of commands
-extern list<command> cmd_list;
+extern list<command>& cmd_list;
 
 extern vue_window current_window; // used during layout to propagate information
 

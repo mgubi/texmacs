@@ -114,8 +114,13 @@ public:
   void send (slot s, blackbox val) {
     switch (s) {
       case SLOT_DESTROY:
-        if (! is_nil (quit)) quit ();
-        quit = command();
+        if (! is_nil (quit)) {
+          // cleared first: the drop command must not run too, should the
+          // quit command let this widget go (#776)
+          command q= quit;
+          quit= command ();
+          q ();
+        }
         break;
       default:
         return;

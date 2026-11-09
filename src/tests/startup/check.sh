@@ -6,7 +6,8 @@
 # usage: tests/startup/check.sh
 #
 # TM_STARTUP_CASES=<text> runs only the cases whose name contains that text
-# (for instance "(#776)"); the others are not counted.
+# (for instance "(#776)"); the others are not counted. A text which selects
+# no case fails.
 #
 # TeXmacs is run without a window (-headless, or the offscreen platform of
 # Qt), with TEXMACS_PATH set to the source tree and a scratch
@@ -974,4 +975,8 @@ if [ $total -gt $before_total ] && [ $failed -eq $before ] &&
 fi
 
 echo "Total: $total checks, $failed failed"
+if [ $total -eq 0 ]; then
+  echo "no case was selected by TM_STARTUP_CASES='${TM_STARTUP_CASES:-}'"
+  exit 1
+fi
 exit $status

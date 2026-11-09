@@ -705,6 +705,14 @@ ns_input_text_widget_rep::commit (bool flag) {
 ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
   ns_widget_rep (embedded_tm_widget), container (nil), quit (_quit) {}
 
+ns_tm_embedded_widget_rep::~ns_tm_embedded_widget_rep () {
+  // the container (made by as_nsview) was never released: each embedded
+  // editor deleted (side tools made again, dialogs closed) left it, with
+  // its scroll view and its canvas (#776)
+  [container release];
+  container= nil;
+}
+
 /*! The container of an embedded editor: its default size (dw, dh) gives
  the first size of the window, after which it is dropped, so that the
  window can be resized either way (the editor follows it) */
