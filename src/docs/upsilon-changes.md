@@ -22,6 +22,14 @@ have the details, and the problems go to the
   and this also cancelled the scroll to the cursor which was still to be
   made. A cursor moved to another place is now always brought into view at
   the next update (#816).
+- **No crash on an incomplete character at the end of a line**: moving the
+  cursor to the right over a line ending in `<#` or `<` without its `>`
+  (from a file or a script) stopped TeXmacs with `bad path`; the
+  unfinished character is now one character (#823).
+- **LaTeX export: link addresses in formulas**: the address of a link, a
+  `\url` or raw LaTeX inside a formula were split like math, so that a link
+  pointed to `https : / / example.org`; they are now written as in the text
+  (#821).
 - **A tilde in a formula is typed once** (desktop): in math mode, the dead
   key of the tilde (Option-N on macOS) followed by another key, by Escape
   or by a click gave a second tilde, stacked on the first (the sign
