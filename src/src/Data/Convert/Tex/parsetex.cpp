@@ -69,7 +69,9 @@ struct latex_parser {
   // expanded counts from 0: expansions nest at most MAX_EXPAND_DEPTH deep)
   int nesting;
   int total_depth; // the same, counted through the expansions
+  int env_depth;   // the environments open (\begin{...} without its \end)
   bool too_deep_reported;
+  bool env_too_deep_reported;
   // Definitions and arguments being parsed: TeX has read their text and
   // counted its braces, also one after \string. A group which TeX executes
   // is not counted: there \string makes a brace a mere character.
@@ -77,8 +79,9 @@ struct latex_parser {
   bool group_next; // the next parse is that of an executed group
   latex_parser (bool unicode2):
     level (0), unicode (unicode2), expanding (0), expand_depth (0),
-    expansion_skipped (false), nesting (0), total_depth (0),
-    too_deep_reported (false), counted_braces (0), group_next (false) {}
+    expansion_skipped (false), nesting (0), total_depth (0), env_depth (0),
+    too_deep_reported (false), env_too_deep_reported (false),
+    counted_braces (0), group_next (false) {}
   void latex_error (string s, int i, string message);
 
   bool is_opening_option (char c);
@@ -103,6 +106,7 @@ struct latex_parser {
   tree parse_char_code   (string s, int& i);
   tree parse_string_token (string s, int& i);
   tree parse_too_deep    (string s, int& i, string stop);
+  void skip_environment  (string s, int& i, string name);
 
   tree parse             (string s, int change);
 };
@@ -623,8 +627,19 @@ latex_parser::parse_backslash (string s, int& i, int change) {
     }
     i++; start= i;
     while ((i<n) && (s[i]!='}')) i++;
-    r = r * "-" * s (start, i);
+    string name= s (start, i);
+    r = r * "-" * name;
     if (i<n) i++;
+    // environments nested deeper than groups may be are skipped too: the
+    // conversion after the parser nests them by recursion (#803)
+    if (r == "\\begin-" * name) {
+      if (env_depth >= MAX_PARSE_DEPTH) {
+        skip_environment (s, i, name);
+        return "";
+      }
+      env_depth++;
+    }
+    else if (env_depth > 0) env_depth--;
   }
   return parse_command (s, i, r, change);
 }
@@ -1473,6 +1488,45 @@ latex_parser::parse_too_deep (string s, int& i, string stop) {
                     << " deep skipped" << LF;
   }
   return "";
+}
+
+void
+latex_parser::skip_environment (string s, int& i, string name) {
+  // skip an environment nested too deep, up to its \end{name}: the
+  // environments of the same name in it are counted
+  int n= N(s), depth= 1;
+  string b= "\\begin{" * name * "}", e= "\\end{" * name * "}";
+  while (i < n) {
+    char c= s[i];
+    if (c == '%') {
+      while (i < n && s[i] != '\n') i++;
+      continue;
+    }
+    if (c == '\\') {
+      if (test (s, i, b)) { depth++; i+= N(b); continue; }
+      if (test (s, i, e)) {
+        depth--; i+= N(e);
+        if (depth == 0) break;
+        continue;
+      }
+      if (test (s, i, "\\verb") && i+5 < n && !is_tex_alpha (s[i+5])) {
+        i+= 5;
+        if (i+1 < n && s[i] == '*') i++;
+        char delim= s[i++];
+        while (i < n && s[i] != delim) i++;
+        i++;
+      }
+      else i+= 2;
+      continue;
+    }
+    i++;
+  }
+  if (i > n) i= n;
+  if (!env_too_deep_reported) {
+    env_too_deep_reported= true;
+    convert_warning << "LaTeX import: environments nested more than "
+                    << MAX_PARSE_DEPTH << " deep skipped" << LF;
+  }
 }
 
 tree
