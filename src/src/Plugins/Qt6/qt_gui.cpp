@@ -671,6 +671,10 @@ gui_start_loop () {
   the_gui->event_loop ();
 }
 
+bool qt_exit_begun= false;
+  // set by qt_forget_deferred_deletes: the process ends, deferred deletes
+  // are no longer delivered (QTMApplication::notify)
+
 void
 qt_forget_deferred_deletes () {
   // (called when TeXmacs quits, before _exit: the widgets given to
@@ -678,7 +682,13 @@ qt_forget_deferred_deletes () {
   // _exit runs the shutdown of the DLLs, where Qt delivers the pending
   // deferred deletes, and ~QWidget crashes (gdb on the Windows CI:
   // ~QTMWidget under ntdll!LdrShutdownProcess). A script given by -x runs
-  // before the event loop gets to delete them. Harmless to call twice)
+  // before the event loop gets to delete them. Harmless to call twice. Also
+  // the exit handler of QTMScrollView. The deferred deletes posted after
+  // this, as by the static destructors registered before this handler, which
+  // the exit of C runs after it (the window of a dialog still open, #776),
+  // are dropped by
+  // QTMApplication::notify)
+  qt_exit_begun= true;
   if (QCoreApplication::instance () != NULL)
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
