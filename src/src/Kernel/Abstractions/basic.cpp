@@ -202,21 +202,28 @@ string the_exception;
 string the_report;
 string get_crash_report (const char* msg);
 
-string
-crash_report_key (string msg, string report) {
+static string
+crash_report_key (string msg, string report, int& frames) {
   // the message and the names of the functions of the backtrace of a report
   // of get_crash_report, without what changes from one time to the next
   // (the date, the system information, the status of the editor, the
-  // addresses and offsets): the same error at the same place.
+  // addresses and offsets): the same error at the same place. frames is the
+  // number of frames found: 0 where the backtrace has another form or is
+  // not supported (Windows, the browser), and then the key is the message
+  // alone, which does not tell the places apart (#853).
+  // A frame without a name (a static function on Linux, "()") or which the
+  // stack trace could not parse is kept whole: its address or offset in the
+  // module tells it apart, and is the same for the whole session.
   // NOTE: a copy: the strings of TeXmacs share their representation, and
   // << appends in place; with key= msg, the frames went into the message
   // too, and so into the_exception when it is the same string (the error
   // of a menu in the Cocoa port): each frame became a line of its own in
   // the console (#792)
   string key= copy (msg);
+  frames= 0;
   int i= search_forwards ("Backtrace of C++ stack:", report);
   if (i < 0) return key;
-  int n= N(report), frames= 0;
+  int n= N(report);
   i= search_forwards ("\n", i, report);
   while (i >= 0 && i < n && frames < 24) {
     int j= search_forwards ("\n", i + 1, report);
@@ -225,7 +232,13 @@ crash_report_key (string msg, string report) {
     int a= search_forwards (" : ", line);
     if (a >= 0) {
       int b= search_backwards (" + ", line);
-      key << "\n" << line (a + 3, b > a? b: N(line));
+      string name= line (a + 3, b > a? b: N(line));
+      if (N(name) == 0 || name == "()") name= line;
+      key << "\n" << name;
+      frames++;
+    }
+    else if (N(line) > 2 && starts (line, "  ")) {
+      key << "\n" << line;
       frames++;
     }
     i= j;
@@ -233,11 +246,20 @@ crash_report_key (string msg, string report) {
   return key;
 }
 
+string
+crash_report_key (string msg, string report) {
+  int frames;
+  return crash_report_key (msg, report, frames);
+}
+
 // An error which comes again (at each update of the screen, for instance)
-// within throw_repeat_window seconds of its last time prints its report on
-// the terminal the first time only, and then one line at the 10th, 100th...
-// time (#660); the_report keeps the full report each time, for the console.
-// At most throw_repeat_keys errors are remembered.
+// within throw_repeat_window seconds of its last time (at the resolution
+// of time ()) prints its report on the terminal the first time only, and
+// then one line at the 10th, 100th... time (#660); the_report keeps the
+// full report each time, for the console. Only an error whose backtrace
+// gives its place (crash_report_key): without it, two errors with the same
+// message at different places would look the same, and every report is
+// printed. At most throw_repeat_keys errors are remembered.
 static const time_t throw_repeat_window= 10; // seconds
 static const int    throw_repeat_keys  = 200;
 
@@ -252,7 +274,7 @@ throw_count (string key) {
   }
   time_t now= time (NULL);
   int nr= seen[key] + 1;
-  if (nr > 1 && now - last[key] > throw_repeat_window) nr= 1;
+  if (nr > 1 && now - last[key] >= throw_repeat_window) nr= 1;
   seen (key)= nr;
   last (key)= now;
   return nr;
@@ -262,7 +284,9 @@ void
 tm_throw (const char* msg) {
   the_exception= msg;
   the_report   = get_crash_report (msg);
-  int nr= throw_count (crash_report_key (string (msg), the_report));
+  int frames;
+  string key= crash_report_key (string (msg), the_report, frames);
+  int nr= (frames == 0? 1: throw_count (key));
   if (nr == 1) {
     cout << "Throwing " << msg << LF;
     cout << "-------------------------------------------------\n";
