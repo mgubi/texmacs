@@ -36,8 +36,15 @@ def gnuplot_terminals(name):
     try:
         p = Popen([name, "-e", "print GPVAL_TERMINALS"],
                   stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        out, err = p.communicate()
     except OSError:
+        return None
+    try:
+        # (a gnuplot which waits at its start must not block the session)
+        out, err = p.communicate(timeout = 10)
+    except TypeError: # Python 2: no timeout
+        out, err = p.communicate()
+    except Exception:
+        p.kill()
         return None
     terms = (out + err).decode("utf-8", "replace").split()
     if p.returncode != 0 or len(terms) == 0:
