@@ -217,6 +217,13 @@ tree
 edit_env_rep::exec (tree t) {
   // cout << "Execute: " << t << "\n";
   if (is_atomic (t)) return t;
+  // (a very deep tree, or a value which refers to itself, as <vs> with
+  // <assign|vs|<value|vs>>: an error tree, not a stack overflow, #813; the
+  // guard of exec_compound only sees the applications of macros, and comes
+  // first for them, with the larger margin)
+  long left= stack_remaining ();
+  if (left >= 0 && left < STACK_MARGIN / 2)
+    return tree (_ERROR, "nesting too deep");
   switch (L(t)) {
   case MOVE:
   case SHIFT:

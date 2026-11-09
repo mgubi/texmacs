@@ -3435,6 +3435,63 @@
                      "done"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Very deep nesting without a macro
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The evaluator and the reader of .tm files recurse on the tree itself: a
+;; tree nested very deep, or a value which refers to itself, crashed them
+;; (#813, items 1, 2 and 5); the guard of stack_guard.hpp gives an error tree
+;; "nesting too deep" there too.
+
+(define (deep-leaf t)
+  ;; the last leaf of @t, without recursion
+  (if (or (tree-atomic? t) (== (tree-arity t) 0)) t
+      (deep-leaf (tree-ref t (- (tree-arity t) 1)))))
+
+(define (deep-with n)
+  (let loop ((i 0) (t "x"))
+    (if (= i n) t (loop (+ i 1) `(with "color" "red" ,t)))))
+
+(define (repeat-string s n)
+  (apply string-append (make-list n s)))
+
+(define (test-deep-nesting)
+  (check-group "deep nesting without a macro")
+  ;; a value which refers to itself, expanded for LaTeX (the macros
+  ;; expanded, as by the export, a preference set in memory only)
+  (with-typeset-body '(document (assign "vs" (value "vs")) (vs))
+    (lambda ()
+      (let* ((key "texmacs->latex:expand-macros")
+             (had? (cpp-has-preference? key))
+             (old (get-preference key)))
+        (cpp-set-preference key "on")
+        (with r (tree->stree (latex-expand (buffer-tree)))
+          (if had? (cpp-set-preference key old) (cpp-reset-preference key))
+          (check= (cAr r) '(error "nesting too deep"))))))
+  ;; 20000 nested with: an error at the bottom, not a crash
+  (in-buffer
+    (lambda ()
+      (check= (tree->stree (deep-leaf (texmacs-expand
+                                       (stree->tree (deep-with 20000)))))
+              "nesting too deep")))
+  ;; a .tm file nested 100000 levels deep, inline and as blocks: what is
+  ;; too deep is an error, and the reader goes on after it
+  (let* ((n 100000)
+         (head "<TeXmacs|2.1.5>\n\n<\\body>\n  before\n\n  ")
+         (tail "\n\n  after\n</body>\n")
+         (inline (string-append head (repeat-string "<with|color|red|" n) "x"
+                                (repeat-string ">" n) tail))
+         (block (string-append head (repeat-string "<\\with|color|red>\n" n)
+                               "x\n" (repeat-string "</with>\n" n) tail)))
+    (for (s (list inline block))
+      (let* ((t (convert s "texmacs-document" "texmacs-tree"))
+             (b (tree-ref t 1 0)))
+        (check= (tree->stree (tree-ref b 0)) "before")
+        (check= (tree->stree (tree-ref b 2)) "after")
+        (check= (tree->stree (deep-leaf (tree-ref b 1)))
+                "nesting too deep")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3498,4 +3555,5 @@
   (test-zoom)
   (test-included-files)
   (test-runaway-macro-recursion)
+  (test-deep-nesting)
   (check-end))
