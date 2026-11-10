@@ -118,16 +118,20 @@ path_less (path p1, path p2) {
 
 bool
 path_less_eq (path p1, path p2) {
-  if (is_nil (p1) || is_nil (p2)) return p1 == p2;
-  if (is_atom (p1) || is_atom (p2)) {
-    if (is_atom (p1) && is_atom (p2)) return p1->item <= p2->item;
-    if ((p1->item == 0) && is_nil (p1->next)) return true;
-    if ((p2->item == 1) && is_nil (p2->next)) return true;
-    return false;
+  // (a loop: the paths in a very deep tree are long, #813)
+  while (true) {
+    if (is_nil (p1) || is_nil (p2)) return p1 == p2;
+    if (is_atom (p1) || is_atom (p2)) {
+      if (is_atom (p1) && is_atom (p2)) return p1->item <= p2->item;
+      if ((p1->item == 0) && is_nil (p1->next)) return true;
+      if ((p2->item == 1) && is_nil (p2->next)) return true;
+      return false;
+    }
+    if (p1->item<p2->item) return true;
+    if (p1->item>p2->item) return false;
+    p1= p1->next;
+    p2= p2->next;
   }
-  if (p1->item<p2->item) return true;
-  if (p1->item>p2->item) return false;
-  return path_less_eq (p1->next, p2->next);
 }
 
 path

@@ -139,6 +139,7 @@
   (debug-message debug_message (void string string))
   (get-debug-messages get_debug_messages (tree string int))
   (clear-debug-messages clear_debug_messages (void))
+  (texmacs-skipped-nestings texmacs_skipped_nestings (int))
   (cout-buffer cout_buffer (void))
   (cout-unbuffer cout_unbuffer (string))
   (mark-new new_marker (double))

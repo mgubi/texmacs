@@ -3435,6 +3435,127 @@
                      "done"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Very deep nesting without a macro
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The evaluator and the reader of .tm files recurse on the tree itself: a
+;; tree nested very deep, or a value which refers to itself, crashed them
+;; (#813, items 1, 2 and 5); the guard of stack_guard.hpp gives an error tree
+;; "nesting too deep" there too.
+
+(define (deep-leaf t)
+  ;; the last leaf of @t, without recursion
+  (if (or (tree-atomic? t) (== (tree-arity t) 0)) t
+      (deep-leaf (tree-ref t (- (tree-arity t) 1)))))
+
+(define (deep-with n)
+  (let loop ((i 0) (t "x"))
+    (if (= i n) t (loop (+ i 1) `(with "color" "red" ,t)))))
+
+(define (repeat-string s n)
+  (apply string-append (make-list n s)))
+
+(define (test-deep-nesting)
+  (check-group "deep nesting without a macro")
+  ;; a value which refers to itself, expanded for LaTeX (the macros
+  ;; expanded, as by the export, a preference set in memory only)
+  (with-typeset-body '(document (assign "vs" (value "vs")) (vs))
+    (lambda ()
+      (let* ((key "texmacs->latex:expand-macros")
+             (had? (cpp-has-preference? key))
+             (old (get-preference key)))
+        (cpp-set-preference key "on")
+        (with r (tree->stree (latex-expand (buffer-tree)))
+          (if had? (cpp-set-preference key old) (cpp-reset-preference key))
+          (check= (cAr r) '(error "nesting too deep"))))))
+  ;; 20000 nested with: an error at the bottom, not a crash
+  (in-buffer
+    (lambda ()
+      (check= (tree->stree (deep-leaf (texmacs-expand
+                                       (stree->tree (deep-with 20000)))))
+              "nesting too deep")))
+  ;; a .tm file nested 100000 levels deep, inline and as blocks: what is
+  ;; too deep is an error, and the reader goes on after it
+  (let* ((n 100000)
+         (head "<TeXmacs|2.1.5>\n\n<\\body>\n  before\n\n  ")
+         (tail "\n\n  after\n</body>\n")
+         (inline (string-append head (repeat-string "<with|color|red|" n) "x"
+                                (repeat-string ">" n) tail))
+         (block (string-append head (repeat-string "<\\with|color|red>\n" n)
+                               "x\n" (repeat-string "</with>\n" n) tail)))
+    (for (s (list inline block))
+      (let* ((t (convert s "texmacs-document" "texmacs-tree"))
+             (b (tree-ref t 1 0)))
+        (check= (tree->stree (tree-ref b 0)) "before")
+        (check= (tree->stree (tree-ref b 2)) "after")
+        (check= (tree->stree (deep-leaf (tree-ref b 1)))
+                "nesting too deep")))
+    ;; such a file loaded in a buffer: the buffer is marked, so that a save
+    ;; asks first (save-buffer-check-nesting), and a file which is not too
+    ;; deep is not
+    (let* ((dir (url-append (url-temp-dir) "typeset-deep"))
+           (deep (url-append dir "deep.tm"))
+           (flat (url-append dir "flat.tm"))
+           (old (current-buffer)))
+      (when (url-exists? dir) (system-rmdir-recursive dir))
+      (system-mkdir dir)
+      (string-save inline deep)
+      (string-save (string-append head "x" tail) flat)
+      (for (u (list deep flat))
+        (load-buffer u)
+        (check= (and (buffer-nesting-skipped? u) #t) (== u deep))
+        (buffer-pretend-saved u)
+        (buffer-close u))
+      ;; Save and Save as of the marked buffer ask first (here the question
+      ;; is answered no: nothing is written); those of a plain buffer do not
+      (let* ((copy-deep (url-append dir "copy-deep.tm"))
+             (copy-flat (url-append dir "copy-flat.tm"))
+             (asked 0)
+             (no (lambda (prompt default cont)
+                   (set! asked (+ asked 1))
+                   (cont #f))))
+        (with-global user-confirm no
+          (load-buffer deep)
+          (save-buffer-as copy-deep deep)
+          (check= asked 1)
+          (check-false (url-exists? copy-deep))
+          (check-true (buffer-exists? deep))
+          (buffer-pretend-modified deep)
+          (save-buffer deep)
+          (check= asked 2)
+          (check= (string-length (string-load deep))
+                  (string-length inline))
+          (buffer-pretend-saved deep)
+          (buffer-close deep)
+          (load-buffer flat)
+          (save-buffer-as copy-flat flat)
+          (check= asked 2)
+          (check-true (url-exists? copy-flat)))
+        (for (u (list flat copy-flat))
+          (when (buffer-exists? u)
+            (buffer-pretend-saved u)
+            (buffer-close u))))
+      ;; the mark goes with the buffer: closed, then the file loaded again
+      ;; once it is flat; and a revert sets it or clears it
+      (load-buffer deep)
+      (buffer-pretend-saved deep)
+      (buffer-close deep)
+      (check-false (buffer-nesting-skipped? deep))
+      (string-save (string-append head "x" tail) deep)
+      (load-buffer deep)
+      (check-false (buffer-nesting-skipped? deep))
+      (string-save inline deep)
+      (revert-buffer-revert deep)
+      (check-true (buffer-nesting-skipped? deep))
+      (string-save (string-append head "x" tail) deep)
+      (revert-buffer-revert deep)
+      (check-false (buffer-nesting-skipped? deep))
+      (buffer-pretend-saved deep)
+      (buffer-close deep)
+      (when (buffer-exists? old) (switch-to-buffer old))
+      (system-rmdir-recursive dir))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3498,4 +3619,5 @@
   (test-zoom)
   (test-included-files)
   (test-runaway-macro-recursion)
+  (test-deep-nesting)
   (check-end))

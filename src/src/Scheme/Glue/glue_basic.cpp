@@ -1415,6 +1415,15 @@ tmg_clear_debug_messages () {
 }
 
 tmscm
+tmg_texmacs_skipped_nestings () {
+  // TMSCM_DEFER_INTS;
+  int out= texmacs_skipped_nestings ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_cout_buffer () {
   // TMSCM_DEFER_INTS;
   cout_buffer ();
@@ -11781,6 +11790,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("debug-message",  tmg_debug_message, 2, 0, 0);
   tmscm_install_procedure ("get-debug-messages",  tmg_get_debug_messages, 2, 0, 0);
   tmscm_install_procedure ("clear-debug-messages",  tmg_clear_debug_messages, 0, 0, 0);
+  tmscm_install_procedure ("texmacs-skipped-nestings",  tmg_texmacs_skipped_nestings, 0, 0, 0);
   tmscm_install_procedure ("cout-buffer",  tmg_cout_buffer, 0, 0, 0);
   tmscm_install_procedure ("cout-unbuffer",  tmg_cout_unbuffer, 0, 0, 0);
   tmscm_install_procedure ("mark-new",  tmg_mark_new, 0, 0, 0);
