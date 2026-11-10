@@ -30,6 +30,35 @@ def has_ghostscript():
     # the usual installation on Windows
     return len(glob("C:\\Program Files*\\gs\\gs*\\bin\\gswin*c.exe")) > 0
 
+def gnuplot_terminals(name):
+    """The terminals of this gnuplot (GPVAL_TERMINALS, which print writes
+    to stderr), or None when they cannot be read"""
+    try:
+        p = Popen([name, "-e", "print GPVAL_TERMINALS"],
+                  stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    except OSError:
+        return None
+    try:
+        # (a gnuplot which waits at its start must not block the session)
+        out, err = p.communicate(timeout = 10)
+    except TypeError: # Python 2: no timeout
+        out, err = p.communicate()
+    except Exception:
+        p.kill()
+        p.communicate() # (reaped, no zombie)
+        return None
+    terms = (out + err).decode("utf-8", "replace").split()
+    if p.returncode != 0 or len(terms) == 0:
+        return None
+    return terms
+
+# PNG with cairo, else with libgd: gnuplot can be built without either (#709)
+PNG_TERMINALS = [
+    ("pngcairo", "set terminal pngcairo enhanced size 1280,960 "
+                 "fontscale 2 linewidth 2"),
+    ("png",      "set terminal png enhanced size 1280,960 "
+                 "fontscale 2 linewidth 2")]
+
 class Gnuplot(Graph):
     def __init__(self, name = "gnuplot"):
         super(Gnuplot, self).__init__()
@@ -37,8 +66,26 @@ class Gnuplot(Graph):
         # EPS (vector) plots need Ghostscript in TeXmacs, else a plot
         # would show as "?": PNG then (#662)
         self.has_gs = has_ghostscript()
-        self.default_output = "eps" if self.has_gs else "png"
+        self.terminals = gnuplot_terminals(name)
+        self.png_terminal = self.find_png_terminal()
+        if self.has_gs:
+            self.default_output = "eps"
+        elif self.png_terminal is not None or not self.has_terminal("svg"):
+            self.default_output = "png"
+        else:
+            # no PNG terminal: SVG, which gnuplot always has (#709)
+            self.default_output = "svg"
         self.default_width = "0.8par"
+
+    def has_terminal(self, term):
+        # when the list cannot be read, trust that the terminal is there
+        return self.terminals is None or term in self.terminals
+
+    def find_png_terminal(self):
+        for term, line in PNG_TERMINALS:
+            if self.has_terminal(term):
+                return line
+        return None
 
     def greet(self):
         if len(self.message) == 0:
@@ -51,9 +98,10 @@ class Gnuplot(Graph):
             except OSError:
                 pass
             if not self.has_gs:
+                kind = self.default_output.upper()
                 self.message += ("Ghostscript (gs) was not found: the plots "
-                                 "are PNG images. Install Ghostscript for "
-                                 "vector (EPS) plots.\n")
+                                 "are " + kind + " images. Install "
+                                 "Ghostscript for vector (EPS) plots.\n")
         super(Gnuplot, self).greet()
 
     def evaluate(self, code):
@@ -67,15 +115,19 @@ set output '%s'
 set size 1,1
 set autoscale
 """ % (self.get_eps_path())
+        elif self.output == "png" and self.png_terminal is None:
+            flush_verbatim("This gnuplot has no PNG terminal (pngcairo or "
+                           "png): use the output eps or svg.")
+            return
         elif self.output == "png":
             image = self.get_png()
             self.pre_code = """
 reset
-set terminal pngcairo enhanced size 1280,960 fontscale 2 linewidth 2
+%s
 set output 
 set output '%s'
 set size 1,1
-""" % (self.get_png_path())
+""" % (self.png_terminal, self.get_png_path())
         elif self.output == "svg":
             image = self.get_svg()
             self.pre_code = """
