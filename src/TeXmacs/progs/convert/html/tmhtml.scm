@@ -2327,7 +2327,7 @@
                     (map (lambda (y) (tmhtml-prune y (- depth 1)))
                          (cdr x))))))
 
-(define (texmacs->html* x opts)
+(define (tmhtml-convert x opts)
   (tmhtml-initialize opts)
   ((if (func? x '!file)
        tmhtml-finalize-document
@@ -2351,7 +2351,7 @@
       (let retry ((depth #f))
         (catch 'stack-overflow
           (lambda ()
-            (texmacs->html* (if depth (tmhtml-prune x depth) x) opts))
+            (tmhtml-convert (if depth (tmhtml-prune x depth) x) opts))
           (lambda args
             (with next (if depth (quotient depth 2) tmhtml-max-depth)
               (if (< next 16) (apply throw args)
