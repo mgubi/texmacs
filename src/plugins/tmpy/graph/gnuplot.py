@@ -45,6 +45,7 @@ def gnuplot_terminals(name):
         out, err = p.communicate()
     except Exception:
         p.kill()
+        p.communicate() # (reaped, no zombie)
         return None
     terms = (out + err).decode("utf-8", "replace").split()
     if p.returncode != 0 or len(terms) == 0:
