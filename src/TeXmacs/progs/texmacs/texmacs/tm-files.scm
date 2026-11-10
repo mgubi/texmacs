@@ -277,14 +277,30 @@
           (set-message `(concat "Saved " ,vname) "Save file")
           (save-buffer-post name opts)))))
 
+;; The buffers whose file nested too deep: the reader left parts of it out
+;; (an error "nesting too deep" in their place, #813), which a save loses
+(define nesting-skipped-buffers (make-ahash-table))
+
+(tm-define (buffer-nesting-skipped? name)
+  (ahash-ref nesting-skipped-buffers name))
+
+(define (save-buffer-check-nesting name thunk)
+  (if (not (buffer-nesting-skipped? name)) (thunk)
+      (user-confirm (string-append "Parts of this document were nested too "
+                                   "deep to be loaded; saving loses them. "
+                                   "Really proceed?") #f
+        (lambda (answ) (when answ (thunk))))))
+
 (define (save-buffer-check-faithful name opts)
   ;;(display* "save-buffer-check-faithful " name "\n")
-  (if (has-faithful-format? name)
-      (save-buffer-save name opts)
-      (user-confirm "Save requires data conversion. Really proceed?" #f
-        (lambda (answ)
-          (when answ
-            (save-buffer-save name opts))))))
+  (save-buffer-check-nesting name
+    (lambda ()
+      (if (has-faithful-format? name)
+          (save-buffer-save name opts)
+          (user-confirm "Save requires data conversion. Really proceed?" #f
+            (lambda (answ)
+              (when answ
+                (save-buffer-save name opts))))))))
 
 (define (cannot-write? name action)
   (with vname `(verbatim ,(url->system name))
@@ -403,18 +419,23 @@
   ;;(display* "save-buffer-as-save " new-name ", " name "\n")
   (if (and (url-scratch? name) (url-exists? name)) (system-remove name))
   (buffer-rename name new-name)
+  (when (buffer-nesting-skipped? name)
+    (ahash-remove! nesting-skipped-buffers name)
+    (ahash-set! nesting-skipped-buffers new-name #t))
   (buffer-pretend-modified new-name)
   (save-buffer-save new-name opts))
 
 (define (save-buffer-as-check-faithful new-name name opts)
   ;;(display* "save-check-as-check-faithful " new-name ", " name "\n")
-  (if (or (== (url-suffix new-name) (url-suffix name))
-          (has-faithful-format? new-name))
-      (save-buffer-as-save new-name name opts)
-      (user-confirm "Save requires data conversion. Really proceed?" #f
-        (lambda (answ)
-          (when answ
-            (save-buffer-as-save new-name name opts))))))
+  (save-buffer-check-nesting name
+    (lambda ()
+      (if (or (== (url-suffix new-name) (url-suffix name))
+              (has-faithful-format? new-name))
+          (save-buffer-as-save new-name name opts)
+          (user-confirm "Save requires data conversion. Really proceed?" #f
+            (lambda (answ)
+              (when answ
+                (save-buffer-as-save new-name name opts))))))))
 
 (define (save-buffer-as-check-other new-name name opts)
   ;;(display* "save-buffer-as-check-other " new-name ", " name "\n")
@@ -778,11 +799,17 @@
     (cond ((buffer-exists? name)
            (load-buffer-open name opts))
           ((url-exists? name)
-           (if (buffer-load name)
-               (set-message `(concat "Could not load " ,vname) "Load file")
-               (begin
-                 (typeset-failure-forget name)
-                 (load-buffer-open name opts))))
+           (with skipped (texmacs-skipped-nestings)
+             (if (buffer-load name)
+                 (set-message `(concat "Could not load " ,vname) "Load file")
+                 (begin
+                   (typeset-failure-forget name)
+                   (load-buffer-open name opts)
+                   (when (> (texmacs-skipped-nestings) skipped)
+                     (ahash-set! nesting-skipped-buffers name #t)
+                     (set-message `(concat "Parts of " ,vname " are nested "
+                                           "too deep and were not loaded")
+                                  "Load file"))))))
           (else
             (with uname (if (string? name) (string->url name) name)
               (buffer-set-body name '(document ""))

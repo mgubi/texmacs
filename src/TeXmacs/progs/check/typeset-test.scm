@@ -3489,7 +3489,25 @@
         (check= (tree->stree (tree-ref b 0)) "before")
         (check= (tree->stree (tree-ref b 2)) "after")
         (check= (tree->stree (deep-leaf (tree-ref b 1)))
-                "nesting too deep")))))
+                "nesting too deep")))
+    ;; such a file loaded in a buffer: the buffer is marked, so that a save
+    ;; asks first (save-buffer-check-nesting), and a file which is not too
+    ;; deep is not
+    (let* ((dir (url-append (url-temp-dir) "typeset-deep"))
+           (deep (url-append dir "deep.tm"))
+           (flat (url-append dir "flat.tm"))
+           (old (current-buffer)))
+      (when (url-exists? dir) (system-rmdir-recursive dir))
+      (system-mkdir dir)
+      (string-save inline deep)
+      (string-save (string-append head "x" tail) flat)
+      (for (u (list deep flat))
+        (load-buffer u)
+        (check= (and (buffer-nesting-skipped? u) #t) (== u deep))
+        (buffer-pretend-saved u)
+        (buffer-close u))
+      (when (buffer-exists? old) (switch-to-buffer old))
+      (system-rmdir-recursive dir))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite

@@ -187,6 +187,16 @@ get_collection (tree& u, tree t) {
   else if (is_compound (t)) u << t;
 }
 
+// the number of applies skipped by the readers so far, nested too deep:
+// the load of a buffer compares it before and after (load-buffer-load), to
+// say so and to ask before a save which would lose them (#813)
+static int skipped_nestings= 0;
+
+int
+texmacs_skipped_nestings () {
+  return skipped_nestings;
+}
+
 void
 tm_reader::skip_apply (bool skip_flag) {
   // the rest of an apply nested too deep, up to its end, skipped without
@@ -230,6 +240,9 @@ tm_reader::read_apply (string name, bool skip_flag) {
   // cout << "Read apply " << name << INDENT << LF;
   // (a file which nests too deep: an error tree, not a stack overflow, #813)
   if (stack_nearly_full ()) {
+    if (skipped_nestings++ == 0 || DEBUG_IO)
+      convert_warning << "TeXmacs file: content nested too deep skipped"
+                      << LF;
     skip_apply (skip_flag);
     return tree (_ERROR, "nesting too deep");
   }
