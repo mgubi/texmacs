@@ -1852,6 +1852,17 @@
 
 (define (test-disk-change)
   (check-group "a file changed on disk")
+  ;; a new document without a name, written by its autosave: no notice
+  (new-buffer)
+  (let ((u (current-buffer)))
+    (insert "hello")
+    (buffer-pretend-modified u)
+    (autosave-buffer u)
+    (disk-check-forget)
+    (check-false (buffer-changed-on-disk? u))
+    (check-false (disk-change-footer-text))
+    (buffer-pretend-saved u)
+    (buffer-close u))
   (with-buffer-body '(document "mine")
     (lambda ()
       (let ((f (tmp-file* "disk.tm")))

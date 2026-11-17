@@ -86,7 +86,11 @@
   ;; Revert would read the file and send it to everybody. The host, which
   ;; writes the file and whose saves are its own, says it alone.
   ;; (no stat for a web address: url-test? could download it again)
+  ;; A new document without a name has no file of its own: its autosave
+  ;; writes one (autosave-buffer) without making it a save, so that the
+  ;; date of the last save would never match it.
   (and (url? u)
+       (not (url-scratch? u))
        (not (url-rooted-tmfs? u))
        (not (url-rooted-web? u))
        (buffer-exists? u)
