@@ -1514,6 +1514,61 @@
         (ahash-remove! black-list "mt-v")
         (for (uid left) (ahash-set! black-list uid #t))))))
 
+;; A buffer with two views is typeset by two editors, each with its observer
+;; on each mirror (#833, as #796 for live documents): id->trees gave each
+;; mirror twice, so that every mirror looked like a copy to separate (on the
+;; black list, its changes no longer passed to the others), and a change was
+;; announced twice, to be applied twice to the other mirrors.
+(define (test-mirror-views)
+  (check-group "mirrors in a buffer with two views")
+  (let* ((u (string->url "tmfs://aux/misc-mirror-views"))
+         (old (current-buffer))
+         (buffers (buffer-list))
+         (m (resolve-module '(part part-shared)))
+         (treat (eval 'mirror-treat-pending m))
+         (black-list (eval 'mirror-black-list m))
+         (pending (eval 'mirror-pending m))
+         (left (map car (ahash-table->list black-list)))
+         (body (lambda () (tree->stree (buffer-get-body u)))))
+    (for (uid left) (ahash-remove! black-list uid))
+    (dynamic-wind
+      (lambda () (noop))
+      (lambda ()
+        (buffer-set u `(document (TeXmacs ,(texmacs-version))
+                                 (style (tuple "generic" "relate"))
+                                 (body (document
+                                        (mirror "mv-u" "mv-c" (document "abc"))
+                                        (mirror "mv-v" "mv-c" (document "abc"))))))
+        (switch-to-buffer u)
+        (update-forced)
+        (window-set-view (current-window) (view-new u) #t)
+        (update-forced)
+        (check= (length (buffer->views u)) 2)
+        (check= (length (id->trees "mv-c")) 2)
+        (check= (length (id->trees "mv-u")) 1)
+        (check= (sort (tree->ids (car (id->trees "mv-u"))) string<?)
+                '("mv-c" "mv-u"))
+        (check-false (ahash-ref black-list "mv-u"))
+        (check-false (ahash-ref black-list "mv-v"))
+        ;; a character typed in one mirror reaches the other once
+        (with-global exec-delayed-pause (lambda (c) (noop))
+          (go-to (append (tree->path (buffer-get-body u)) '(0 2 0 3)))
+          (insert "x")
+          (check= (map (lambda (x) (length (cdr x))) (ahash-table->list pending))
+                  '(1))
+          (treat))
+        (check= (body) '(document (mirror "mv-u" "mv-c" (document "abcx"))
+                                  (mirror "mv-v" "mv-c" (document "abcx")))))
+      (lambda ()
+        (ahash-remove! black-list "mv-u")
+        (ahash-remove! black-list "mv-v")
+        (for (uid left) (ahash-set! black-list uid #t))
+        (when (buffer-exists? u)
+          (buffer-pretend-saved u)
+          (buffer-close u))
+        (when (buffer-exists? old) (switch-to-buffer old))))
+    (check= (buffer-list) buffers)))
+
 (define (test-comments)
   (check-group "comments")
   (let ((c (T (comment 'folded-comment "2" "remark" "Bob" "c2"))))
@@ -1760,7 +1815,7 @@
                   test-language-names test-translations test-hyphenation
                   test-spelling
                   test-edu-contexts test-edu-macros test-edu-modes test-mc
-                  test-mirrors test-comments test-posters-themes test-spell-edit
+                  test-mirrors test-mirror-views test-comments test-posters-themes test-spell-edit
                   test-ai-serialize test-handwriting))
   (clear-misc-dir)
   (check-end))
