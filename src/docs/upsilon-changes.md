@@ -88,6 +88,11 @@ have the details, and the problems go to the
   a window, which was thrown away. They now open as in the Cocoa and Qt
   versions: in the window of the untouched document of the start, else in
   a new window (#768).
+- **Sessions on Windows without Qt** (desktop, Vue, Windows): the session
+  plugins started by a program (Maxima, Python, a shell...) started
+  nothing in the Vue build of Windows, whose pipes were not written. They
+  now run their program with pipes, as the command lines do; an interrupt
+  does nothing there, as with Qt (#446).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
