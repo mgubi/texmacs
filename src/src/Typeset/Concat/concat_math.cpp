@@ -241,6 +241,12 @@ concater_rep::typeset_long_arrow (tree t, path ip) {
   env->local_end (MATH_DISPLAY, old_ds);
 
   string s= env->exec_string (t[0]);
+  // (the arrow is a rubber character, <name>: other text failed in
+  // get_wide, "invalid rubber character", and reset the document, #817)
+  if (N(s) < 2 || s[0] != '<' || s[N(s)-1] != '>') {
+    typeset_error (t, ip);
+    return;
+  }
   SI w= sup_b->w();
   if (N(t) == 3) w= max (w, sub_b->w());
   w += env->fn->wquad;

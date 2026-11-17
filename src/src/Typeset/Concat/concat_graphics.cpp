@@ -124,7 +124,10 @@ concater_rep::typeset_gr_group (tree t, path ip) {
 BEGIN_MAGNIFY
   array<box> bs;
   typeset_graphical (bs, t, ip);
-  print (graphics_group_box (ip, bs));
+  // (a group without a graphical item, e.g. with no child: a composite box
+  // with no child, which reset the document, #817)
+  if (N(bs) == 0) typeset_error (t, ip);
+  else print (graphics_group_box (ip, bs));
 END_MAGNIFY
 }
 
@@ -569,18 +572,32 @@ project2 (array<point> a) {
 void
 concater_rep::typeset_calligraphy (tree t, path ip) {
 BEGIN_MAGNIFY
-  if (N(t) < 4 || N(t[N(t)-1]) < 1) typeset_error (t, ip);
+  // (the last argument is the tuple of the points of the pen; the end
+  // points and the points of the pen have two coordinates or more: text
+  // there gave points without coordinates, read beyond their end, #817)
+  if (N(t) < 4 || !is_compound (t[N(t)-1]) || N(t[N(t)-1]) < 1)
+    typeset_error (t, ip);
   else {
     int i, n= N(t), k=N(t[n-1]);
+    bool ok= true;
     array<point> a(2);
-    for (i=0; i<=1; i++)
+    for (i=0; i<=1; i++) {
       a[i]= env->as_point (env->exec (t[i]));
+      ok= ok && N(a[i]) >= 2;
+    }
     array<path> ipa(2);
     for (i=0; i<=1; i++)
       ipa[i]= descend (ip, i);
     array<point> b(k);
-    for (i=0; i<k; i++)
+    for (i=0; i<k; i++) {
       b[i]= env->as_point (env->exec (t[n-1][i]));
+      ok= ok && N(b[i]) >= 2;
+    }
+    if (!ok) {
+      typeset_error (t, ip);
+      END_MAGNIFY
+      return;
+    }
     array<path> ipb(k);
     for (i=0; i<k; i++)
       ipb[i]= descend (descend (ip, n-1), i);
@@ -884,15 +901,28 @@ as_triangle_3d (tree t, color& col) {
   else return triangle ();
 }
 
+static bool
+is_matrix_3d (tree t) {
+  // a 4 x 4 matrix of the homogeneous coordinates, as a tuple of tuples
+  if (!is_tuple (t) || N(t) != 4) return false;
+  for (int i=0; i<4; i++)
+    if (!is_tuple (t[i]) || N(t[i]) != 4) return false;
+  return true;
+}
+
 static spacial
 as_spacial (tree t) {
+  // (a malformed object or matrix gives a nil object, which the caller
+  // shows as an error, #817)
   if (is_func (t, TRANSFORM_3D, 2)) {
     spacial obj= as_spacial (t[0]);
+    if (is_nil (obj) || !is_matrix_3d (t[1])) return spacial ();
     matrix<double> m= as_matrix<double> (t[1]);
     return transformed (obj, m);
   }
   else if (is_func (t, LIGHT_3D, 2)) {
     spacial obj= as_spacial (t[0]);
+    if (is_nil (obj)) return spacial ();
     return enlightened (obj, t[1]);
   }
   else if (is_func (t, OBJECT_3D)) {
@@ -935,9 +965,14 @@ BEGIN_MAGNIFY
   vt (3, 3)= 1.0;
   vt (0, 3)= o[0];
   vt (1, 3)= o[1];
-  vt= vt * as_matrix<double> (env->read (GR_TRANSFORMATION));
-  tree u= env->exec (t);
-  spacial obj= as_spacial (u);
+  // (a transformation which is not a 4 x 4 matrix, as with gr-transformation
+  // set to text, failed in as_matrix and reset the document, #817)
+  tree tr= env->read (GR_TRANSFORMATION);
+  spacial obj;
+  if (is_matrix_3d (tr)) {
+    vt= vt * as_matrix<double> (tr);
+    obj= as_spacial (env->exec (t));
+  }
   if (is_nil (obj))
     typeset_dynamic (tree (_ERROR, "bad spacial object"), ip);
   else
