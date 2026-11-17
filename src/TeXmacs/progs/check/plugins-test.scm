@@ -140,9 +140,12 @@
   (:serializer ,raw-serialize))
 
 ;; ends by itself after a line, leaving a program which ignores SIGTERM: what
-;; is left of its group is killed 2 s after its end (argument 617)
+;; is left of its group is killed 2 s after its end (argument 617). It ignores
+;; SIGINT, as the other test plugins, so that connection-interrupt only reads
+;; it: else the interrupt ended the shell, and whether the status said so
+;; depended on when Qt saw that end (#874)
 (plugin-configure tmtestleft
-  (:launch "sh -c \"(trap '' TERM; exec sleep 617) & read x; exit 0\"")
+  (:launch "sh -c \"trap '' INT; (trap '' TERM; exec sleep 617) & read x; exit 0\"")
   (:serializer ,raw-serialize))
 
 ;; cleans up when it is asked to terminate: it writes a file a little later
@@ -1372,6 +1375,9 @@
   (pause "2.5")
   ;; (a start reaps the programs whose time is up)
   (check= (start* "tmtestecho" "plugins-test-left-other") "ok")
+  ;; (read twice, the second time 0.3 s later: also an end which Qt sees late)
+  (connection-interrupt "tmtestleft" "plugins-test-left")
+  (pause "0.3")
   (connection-interrupt "tmtestleft" "plugins-test-left")
   (check-true (!= (connection-status "tmtestleft" "plugins-test-left") 0))
   (connection-stop "tmtestecho" "plugins-test-left-other")
