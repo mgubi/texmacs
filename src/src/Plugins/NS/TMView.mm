@@ -273,18 +273,23 @@ initkeymap () {
 - (void) viewWillMoveToWindow: (NSWindow *)newWindow
 {
   // NOTE: also when the window is released, after the events (#621)
+  // query widget preferred size (each part on its own: an error there must
+  // not keep the canvas from the notifications of its new window, #660)
   NS_ENTRY_BEGIN
-  // query widget preferred size
   if (wid) {
     SI w = 0, h = 0;
     wid->handle_get_size_hint (w, h);
     [self setFrameSize: ns_safe_size (to_nssize (w, h),
                                       "-[TMView viewWillMoveToWindow:]")];
   }
+  NS_ENTRY_END ("-[TMView viewWillMoveToWindow:] (size hint)")
 
   // the canvas which leaves its window loses the focus
+  NS_ENTRY_BEGIN
   if (newWindow != [self window]) [self focusOut];
+  NS_ENTRY_END ("-[TMView viewWillMoveToWindow:] (focus)")
 
+  NS_ENTRY_BEGIN
   // register to receive the focus in/out notifications of the new window
   // (the only notifications which the canvas observes)
   NSNotificationCenter* nc= [NSNotificationCenter defaultCenter];
