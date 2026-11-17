@@ -971,6 +971,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(texmacs-skipped-nestings)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|texmacs_skipped_nestings> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(cout-buffer)>
 <explain-synopsis|no synopsis>
   <|explain>

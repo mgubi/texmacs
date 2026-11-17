@@ -238,8 +238,23 @@
 (tm-define (typeset-failed-buffer? name)
   (ahash-ref typeset-failed-buffers (url->string name)))
 
+;; The buffers whose file nested too deep: the reader left parts of it out
+;; (an error "nesting too deep" in their place, #813), which a save loses.
+;; Set or cleared at each load, revert or rescue of the buffer
+;; (buffer-nesting-update), cleared when it is closed.
+(define nesting-skipped-buffers (make-ahash-table))
+
+(tm-define (buffer-nesting-skipped? name)
+  (ahash-ref nesting-skipped-buffers (url->string name)))
+
+(tm-define (buffer-nesting-update name skipped?)
+  (if skipped?
+      (ahash-set! nesting-skipped-buffers (url->string name) #t)
+      (ahash-remove! nesting-skipped-buffers (url->string name))))
+
 (tm-define (buffer-close name)
   (typeset-failure-forget name)
+  (buffer-nesting-update name #f)
   (cpp-buffer-close name))
 
 (tm-define (buffers-modified?)
