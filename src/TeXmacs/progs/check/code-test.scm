@@ -212,6 +212,12 @@
          (original '(document "original")))
     (build original)
     (check-true (buffer-aux? w))
+    ;; nothing typed: a new content is not an undo step (#776)
+    (build '(document "other"))
+    (build original)
+    (with-buffer w
+      (check= (undo-possibilities) 0))
+    ;; something typed: the content made again can be undone (#875)
     (with-buffer w
       (go-to (list (car (cursor-path)) 0 0))
       (archive-state) (start-editing) (insert "typed ") (end-editing)

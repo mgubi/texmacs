@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 17 November 2026
 
+- **What is typed in a macro editor can be undone again after the side
+  tools are rebuilt**: a named editor in a widget (macro and shortcut
+  editors, fields of the side tools) which was made again, as when the
+  search tool opens, forgot its undo history, so that the text typed there
+  was lost for good. The history is now kept when something was typed
+  since the editor was last made; a new content which replaces a field
+  where nothing was typed is still not an undo step (#875).
 - **Very deep documents no longer crash TeXmacs**: a document nested too
   deep for the stack (tens of thousands of levels, or a value which refers
   to itself, as `<assign|vs|<value|vs>>`) gave a segmentation fault when it

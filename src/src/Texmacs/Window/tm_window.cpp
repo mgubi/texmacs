@@ -373,10 +373,15 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   url       name = embedded_name (wname);
   if (contains (name, get_all_buffers ())) {
     // a new content is not an edit: the undo history would keep each
-    // document it replaces (a named texmacs-input made again, #776)
+    // document it replaces (a named texmacs-input made again, #776).
+    // But when something was typed since the last build (the field is
+    // modified: set_buffer_tree marks it saved), the history is kept and
+    // the replacement can be undone, so that what was typed is not lost
+    // for good (a macro editor made again when the search tool opens, #875)
     tree before= get_buffer_body (name);
+    bool typed = buffer_modified (name);
     set_buffer_tree (name, doc);
-    if (get_buffer_body (name) != before) {
+    if (!typed && get_buffer_body (name) != before) {
       array<url> vs= buffer_to_views (name);
       for (int i=0; i<N(vs); i++)
         view_to_editor (vs[i]) -> clear_undo_history ();
