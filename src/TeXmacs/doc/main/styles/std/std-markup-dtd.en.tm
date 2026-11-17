@@ -278,6 +278,14 @@
     lines.
   </explain>
 
+  <\explain|<explain-macro|hlink*|content|url|title>>
+    A hyperlink as <markup|hlink>, with a <src-arg|title>: a short text
+    about the destination of the link, which <TeXmacs> does not display. It
+    is the title of a link in <name|Html> and in <name|Markdown>, which a
+    browser shows when the mouse is over the link, and the converters for
+    these formats read and write it.
+  </explain>
+
   <\explain|<explain-macro|folded|summary|body>>
     The <src-arg|summary> is displayed and the <src-arg|body> ignored: the
     macro corresponds to the folded presentation of a piece of content
