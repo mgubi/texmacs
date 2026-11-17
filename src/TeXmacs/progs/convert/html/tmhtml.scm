@@ -2304,6 +2304,36 @@
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define tmhtml-max-depth 512)
+
+(define tmhtml-prune-error '(with "color" "red" "nesting too deep"))
+
+(define (tmhtml-prune x depth)
+  ;; @x with what is deeper than @depth replaced by an error; the recursion
+  ;; goes no deeper than @depth, and the structure of a table is kept (the
+  ;; error goes in a cell)
+  (cond ((npair? x) x)
+        ((and (<= depth 0) (in? (car x) '(tformat table row cell)))
+         (cons (car x)
+               (map (lambda (y)
+                      (cond ((== (car x) 'cell) tmhtml-prune-error)
+                            ((and (pair? y)
+                                  (in? (car y) '(tformat table row cell)))
+                             (tmhtml-prune y depth))
+                            (else y)))
+                    (cdr x))))
+        ((<= depth 0) tmhtml-prune-error)
+        (else (cons (car x)
+                    (map (lambda (y) (tmhtml-prune y (- depth 1)))
+                         (cdr x))))))
+
+(define (tmhtml-convert x opts)
+  (tmhtml-initialize opts)
+  ((if (func? x '!file)
+       tmhtml-finalize-document
+       tmhtml-finalize-selection)
+   (tmhtml-root x)))
+
 (tm-define (texmacs->html x opts)
   (if (tmfile? x)
       (let* ((body (tmfile-extract x 'body))
@@ -2313,9 +2343,19 @@
 	     (doc (list '!file body style lan
                         (url->string (get-texmacs-path)))))
 	(texmacs->html doc opts))
-      (begin
-	(tmhtml-initialize opts)
-	((if (func? x '!file)
-	     tmhtml-finalize-document
-	     tmhtml-finalize-selection)
-	 (tmhtml-root x)))))
+      ;; a tree nested too deep for the recursions of the conversion (a
+      ;; macro which calls itself, stopped by the evaluator after hundreds
+      ;; of levels) overflows the stack of Scheme: it is converted again,
+      ;; cut at a depth which the conversion takes, and the HTML is written
+      ;; with an error there (#813)
+      (let retry ((depth #f))
+        (catch 'stack-overflow
+          (lambda ()
+            (tmhtml-convert (if depth (tmhtml-prune x depth) x) opts))
+          (lambda args
+            (with next (if depth (quotient depth 2) tmhtml-max-depth)
+              (if (< next 16) (apply throw args)
+                  (begin
+                    (display* "TeXmacs] HTML export: the document nests "
+                              "too deep, cut at depth " next "\n")
+                    (retry next)))))))))
