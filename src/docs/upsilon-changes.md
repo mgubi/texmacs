@@ -84,11 +84,15 @@ have the details, and the problems go to the
   when another program (an editor, `git checkout`, a sync client) changes
   the file of the document, TeXmacs used to notice only when saving. The
   footer now says "changed on disk: File > Revert reloads it" (or that
-  there are changes on both sides) as long as the file is newer than the
-  document, looking at it at most once a second. For a file shared by
-  several TeXmacs windows, only the window that holds the file (the one
-  that writes it) says it; its saves, and the saves the others ask it for,
-  are not changes on disk.
+  there are changes on both sides) as long as the date of the file is not
+  that of the document, looking at it at most once a second. A file put in
+  its place with an older date (a backup, `cp -p`) now counts too, also for
+  the question "The file has changed on disk. Really save?". For a file
+  shared by several TeXmacs windows, only the window that holds the file
+  (the one that writes it) says it; its saves, and the saves the others ask
+  it for, are not changes on disk, and its File > Revert updates the
+  others as a save does. When the file is held by a TeXmacs without a
+  window (an agent, a script), the others are not told.
 
 ## 9 November 2026
 

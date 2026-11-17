@@ -67,24 +67,32 @@
 ;; Files changed on disk by another program (#818)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (file-changed-since-save? u)
+  ;; the date of the file of the buffer @u is not that of its last load,
+  ;; save or revert (buffer-last-save, which is always a date of the file):
+  ;; another program wrote it, also with an older date (cp -p, a backup)
+  (and-with mod-t (url-last-modified u)
+    (and-with save-t (buffer-last-save u)
+      (!= mod-t save-t))))
+
 (tm-define (buffer-changed-on-disk? u)
   (:synopsis "Was the file of the buffer @u changed on disk since it was read?")
-  ;; the same test as the save (save-buffer-check-permissions): the file
-  ;; is newer than the last load, save or revert of the buffer, which our
-  ;; own saves keep up to date.
+  ;; the same test as the save (save-buffer-check-permissions): the date of
+  ;; the file is not that of the last load, save or revert of the buffer,
+  ;; which our own saves keep up to date.
   ;; A participant of a shared file (docs/shared-files.md) never reads nor
   ;; writes the file and never makes this test at its save (the host does):
   ;; the host's saves reach it only later, by the message (saved), and its
   ;; Revert would read the file and send it to everybody. The host, which
   ;; writes the file and whose saves are its own, says it alone.
+  ;; (no stat for a web address: url-test? could download it again)
   (and (url? u)
        (not (url-rooted-tmfs? u))
+       (not (url-rooted-web? u))
        (buffer-exists? u)
        (not (shared-participant? u))
        (url-test? u "fr")
-       (and-with mod-t (url-last-modified u)
-         (and-with save-t (buffer-last-save u)
-           (> mod-t save-t)))))
+       (file-changed-since-save? u)))
 
 ;; the last check, kept for a second: the footer asks at each update, and a
 ;; file is looked at (stat) at most once a second
@@ -102,12 +110,13 @@
     disk-check-result))
 
 (tm-define (disk-change-footer-text)
-  ;; what the footer says while the file of the current buffer is newer on
-  ;; disk than the buffer, or #f
+  ;; what the footer says while the file of the current buffer was changed
+  ;; on disk since the buffer read or wrote it, or #f
   (and (current-buffer-changed-on-disk?)
-       (if (buffer-modified? (current-buffer))
-           "changed on disk (and here): File > Revert takes the disk's version"
-           "changed on disk: File > Revert reloads it")))
+       (translate
+        (if (buffer-modified? (current-buffer))
+            "changed on disk (and here): File > Revert takes the disk's version"
+            "changed on disk: File > Revert reloads it"))))
 
 (tm-define (disk-check-forget)
   ;; the next footer looks at the file again
@@ -320,6 +329,8 @@
 (define (save-buffer-save name opts)
   ;;(display* "save-buffer-save " name "\n")
   (save-buffer-save* name opts)
+  ;; (the footer looks at the file again: it is ours now, #818)
+  (disk-check-forget)
   (when (shared-files-in-use?) (shared-file-saved name)))
 
 (define (save-buffer-save* name opts)
@@ -456,9 +467,7 @@
                  (save-buffer-check-permissions
                   name (cons :typeset-failed opts))))))
           ((and (url-test? name "fr")
-                (and-with mod-t (url-last-modified name)
-                  (and-with save-t (buffer-last-save name)
-                    (> mod-t save-t))))
+                (file-changed-since-save? name))
            (user-confirm "The file has changed on disk. Really save?" #f
              (lambda (answ)
                (when answ
@@ -1093,7 +1102,11 @@
                    name (> (texmacs-skipped-nestings) skipped))
                   ;; (buffer-set marks it saved at the date of the file:
                   ;; the footer looks at the file again, #818)
-                  (disk-check-forget))))))))
+                  (disk-check-forget)
+                  ;; in the host of a shared file, the participants get the
+                  ;; date of the file, as after a save (docs/shared-files.md)
+                  (when (shared-files-in-use?)
+                    (shared-file-reverted name)))))))))
 
 (tm-define (revert-buffer . l)
   (with name (if (null? l) (current-buffer) (car l))

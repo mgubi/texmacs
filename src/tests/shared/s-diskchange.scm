@@ -3,7 +3,9 @@
 ;; (saved) gives the participant the date of the file); a write by another
 ;; program is said by the host only (a participant never reads the file, and
 ;; its Revert would send the file to everybody); a Revert in the host reaches
-;; the participant.
+;; the participant, and gives it the date of the file, as a save does: when
+;; the host then closes the file, the participant, which becomes the host,
+;; says nothing and its Save does not ask "The file has changed on disk".
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (file-date) (url-last-modified (the-name)))
@@ -48,6 +50,9 @@
         (check "the host has the disk's version" (== (para-text 0) "Outside text."))
         (check "no change on disk after the revert" (not (buffer-changed-on-disk? (the-name))))
         (sync-set! "a-reverted"))
+   (wait-sync "b-reverted")
+   ;; the host leaves: B becomes the host of a file it did not read
+   (act "close" (buffer-close (the-name)) (sync-set! "a-closed"))
    (wait-sync "b-done")))
 
 (define (B-steps)
@@ -74,6 +79,25 @@
         (sync-set! "b-checked"))
    (wait-sync "a-reverted")
    (step "B gets the host's revert" (== (para-text 0) "Outside text."))
-   (act "done" (sync-set! "b-done"))))
+   ;; the revert, like a save, gives B the date of the file
+   (step "B hears of the revert" (in-sync?))
+   (act "check"
+        (check "B is not modified after the host's revert"
+               (not (buffer-modified? (the-name))))
+        (sync-set! "b-reverted"))
+   (wait-sync "a-closed")
+   (step "B is the host" (== (role-of) 'host))
+   (act "check"
+        (check "the new host: no change on disk" (not (buffer-changed-on-disk? (the-name))))
+        (disk-check-forget)
+        (check "the new host: no notice" (not (disk-change-footer-text))))
+   (act "edit and save" (insert-text! 0 7 "BB")
+        (buffer-pretend-modified (the-name))
+        (save-buffer-main (the-name)))
+   (act "saved"
+        ;; (a question "Really save?" would have left the file as it was)
+        (check "the new host saves without asking"
+               (string-contains? (string-load (the-name)) "OutsideBB text."))
+        (sync-set! "b-done"))))
 
 (run-steps (if (== ROLE "A") (A-steps) (B-steps)))

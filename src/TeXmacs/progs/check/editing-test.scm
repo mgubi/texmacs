@@ -1877,6 +1877,40 @@
         (check-false (buffer-changed-on-disk? f))
         (disk-check-forget)
         (check-false (disk-change-footer-text))
+        ;; our own save, "Really save?" answered yes: the footer at once
+        ;; forgets the notice it had
+        (rewrite-later f '(document "theirs again"))
+        (disk-check-forget)
+        (check-true (string? (disk-change-footer-text)))
+        (edit (go-end) (insert " ours"))
+        (let* ((asked 0)
+               (yes (lambda (prompt default cont)
+                      (set! asked (+ asked 1))
+                      (cont #t))))
+          (with-global user-confirm yes
+            (save-buffer-main f))
+          (check= asked 1))
+        (check-false (buffer-modified? f))
+        (check-false (buffer-changed-on-disk? f))
+        (check-false (disk-change-footer-text))
+        ;; a file replaced by one with an older date (cp -p, a backup) is a
+        ;; change too
+        (when (and (not (os-mingw?)) (not (os-win32?)))
+         (let ((old (tmp-file* "older.tm")))
+          (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                               (style (tuple "generic"))
+                                               (body (document "older"))))
+                       old "texmacs")
+          (eval-system (string-append "touch -t 202001010000 "
+                                      (raw-quote (url->system old))
+                                      " && mv " (raw-quote (url->system old))
+                                      " " (raw-quote (url->system f))))
+          (check-true (< (url-last-modified f) (buffer-last-save f)))
+          (check-true (buffer-changed-on-disk? f))
+          (revert-buffer-revert f)
+          (update-forced)
+          (check= (body) '(document "older"))
+          (check-false (buffer-changed-on-disk? f))))
         ;; a buffer without a file, and one which is not open
         (check-false (buffer-changed-on-disk? (tmp-file "none.tm")))))))
 

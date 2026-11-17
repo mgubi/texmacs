@@ -2160,6 +2160,19 @@
       (sf-put! sf 'dirty #f)
       (send-peers sf (list 'saved (live-current-state (sf-key sf)))))))
 
+(tm-define (shared-file-reverted name)
+  (:synopsis "Called after the buffer @name has been read again from its file")
+  ;; In the host, the document is now that of the file, as after a save: the
+  ;; participants get it as patches, then (saved), on which they take the
+  ;; date of the file and stay modified only with changes the host has not
+  ;; got. Without it, a participant which becomes host would say that the
+  ;; file changed on disk, and its Save would ask "Really save?" (#818).
+  (and-with sf (sf-by-name name)
+    (when (sf-host? sf)
+      (host-flush! sf)
+      (sf-put! sf 'dirty #f)
+      (send-peers sf (list 'saved (live-current-state (sf-key sf)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The participant: its changes, the messages of the host
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
