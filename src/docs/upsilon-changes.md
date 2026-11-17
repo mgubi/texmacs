@@ -37,9 +37,9 @@ have the details, and the problems go to the
   so that the headings, equations and theorems of the others were missing
   and the later numbers shifted (#781).
 - **The option `-X`** is now in `texmacs -h`, in the manual page and in
-  the user documentation: in headless mode it keeps TeXmacs running after
-  the commands of `-x` and the files, for scripts with delayed actions or
-  a server (#841).
+  the user documentation and the page of the Cocoa interface: in headless
+  mode it keeps TeXmacs running after the commands of `-x` and the files,
+  for scripts with delayed actions or a server (#841).
 - **Windows: no crash at exit** (desktop, Qt): a window deleted while
   TeXmacs was already exiting could make it end with a crash instead of
   its exit status (#776).
@@ -240,7 +240,9 @@ have the details, and the problems go to the
 - **Cocoa: `-headless` works** (desktop): the Cocoa build ignored the option,
   so `TeXmacs -headless -x ...` showed its windows and its icon in the Dock
   and quit only on `(quit-TeXmacs)`; it now runs without a window, as the Qt
-  and Vue builds do, and quits after the commands given with `-x` or `-c`;
+  and Vue builds do, and quits after the commands given with `-x` or `-c`
+  (use `-X` to keep TeXmacs running, for instance for a script with
+  delayed actions or a server, #841);
   a dialog or the print panel asked for by a headless script is answered as
   cancelled instead of waiting.
 - **Closing a program file** gives back the memory of its colours and its
