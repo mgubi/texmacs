@@ -17,11 +17,13 @@
 #include "convert.hpp"
 #include "connect.hpp"
 #include "typesetter.hpp"
+#include "Html_math/html_math.hpp"
 #include "drd_std.hpp"
 #include "message.hpp"
 #include <setjmp.h>
 #include "image_files.hpp"
 #include "iterator.hpp"
+#include "Bridge/bridge.hpp"
 
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
@@ -413,6 +415,176 @@ edit_main_rep::export_ps (url name, string first, string last) {
                  "export postscript");
 }
 
+static bool
+display_style (tree t, bool display) {
+  // in t, which starts with its with
+  while (is_func (t, WITH) && N(t) >= 1) {
+    for (int i=0; i+1 < N(t)-1; i+=2)
+      if (t[i] == MATH_DISPLAY) display= (t[i+1] == "true");
+    t= t[N(t)-1];
+  }
+  return display;
+}
+
+/******************************************************************************
+* Snippets typeset apart, in the environment of the formulas of the HTML export
+******************************************************************************/
+
+static editor_rep*
+recording_editor (int env_nr) {
+  // the editor of the buffer whose expansion recorded environment env_nr
+  array<edit_typeset_rep*> a= edit_typeset_rep::html_recorders;
+  for (int i=0; i<N(a); i++)
+    if (env_nr >= a[i]->html_first &&
+        env_nr < a[i]->html_first + N(a[i]->html_envs))
+      return a[i];
+  return NULL;
+}
+
+void
+edit_main_rep::snippet_env_begin (int env_nr) {
+  // the prepared environment, or the one recorded by exec_html for a formula,
+  // at the resolution of printing
+  typeset_prepare ();
+  if (recording_editor (env_nr) == (editor_rep*) this) {
+    env->patch_env (html_base);
+    env->patch_env (html_envs[env_nr - html_first]);
+    // the tags which the export keeps for itself (tmhtml-expand.scm)
+    env->write ("html-display",
+                tree (MACRO, "x", compound ("equation*", tree (ARG, "x"))));
+    env->write ("html-equations-base",
+                tree (MACRO, "x", compound ("equations-base",
+                                            tree (ARG, "x"))));
+    env->write ("html-equation-lab",
+                tree (MACRO, "x", "n",
+                      compound ("equation-lab", tree (ARG, "x"),
+                                tree (ARG, "n"))));
+  }
+  tree old_info_flag= env->read (INFO_FLAG);
+  env->write (DPI, printing_dpi);
+  if (is_compound (old_info_flag) || !ends (old_info_flag->label, "paper"))
+    env->write (INFO_FLAG, "none");
+  env->style_init_env ();
+  env->update ();
+}
+
+void
+edit_main_rep::snippet_env_end () {
+  typeset_prepare ();
+  env->style_init_env ();
+  env->update ();
+}
+
+// What the typesetting of a snippet reads, from its environment, recorded
+// as for a bridge (bridge_rep::typeset), and kept by snippet_record
+struct snippet_inputs {
+  unsigned long long state;
+  tree zoom_at;
+  env_id_set reads;
+  array<string> keys;
+  array<tree> values;
+  array<int> vars;
+  unsigned long long vals;
+  edit_env_rep::read_record rec;
+  snippet_inputs (edit_env env):
+    state (env->derived_state ()), zoom_at (env->zoom_value ()), vals (0),
+    rec (env.operator-> (), &reads, &keys, &values, &vars, &vals) {}
+};
+
+void
+edit_main_rep::snippet_record (tree t, snippet_inputs& in) {
+  // a snippet whose inputs are all known gets a number (html_snippet_made)
+  bool known= in.rec.complete () && N(in.vars) <= INPUTS_MAX &&
+              N(in.keys) <= LOOKUPS_MAX;
+  in.rec.stop ();
+  html_snippet_made= -1;
+  if (!known) return;
+  html_snippet s;
+  s.id= html_snippet_count++;
+  s.state= in.state;
+  s.vars= in.vars;
+  s.vals= in.vals;
+  s.keys= in.keys;
+  s.values= in.values;
+  s.zoom= in.rec.zoom;
+  s.zoom_at= in.zoom_at;
+  // (a new array: that of the default value is shared by the others)
+  if (!html_snippets->contains (t))
+    html_snippets (t)= array<html_snippet> ();
+  html_snippets (t) << s;
+  html_snippet_made= s.id;
+}
+
+int
+edit_main_rep::html_snippet_id (tree t, int env_nr) {
+  // the number of a snippet typeset before from t, whose inputs have the
+  // values which they have in environment env_nr, or -1
+  editor_rep* ed= recording_editor (env_nr);
+  if (ed != NULL && ed != (editor_rep*) this)
+    return ed->html_snippet_id (t, env_nr);
+  if (!html_snippets->contains (t)) return -1;
+  array<html_snippet> a= html_snippets[t];
+  snippet_env_begin (env_nr);
+  unsigned long long state= env->derived_state ();
+  int r= -1;
+  for (int i=N(a)-1; i>=0 && r < 0; i--)  // (the last ones first)
+    if (a[i].state == state && env->inputs_hash (a[i].vars, false) == a[i].vals
+        && (!a[i].zoom || env->zoom_value () == a[i].zoom_at)) {
+      unsigned long long stamp= 0;
+      if (same_lookups (env, a[i].keys, a[i].values, stamp)) r= a[i].id;
+    }
+  snippet_env_end ();
+  return r;
+}
+
+int
+edit_main_rep::html_snippet_last () {
+  return html_snippet_made;
+}
+
+scheme_tree
+edit_main_rep::html_math_snippet (tree t, int env_nr, bool breakable) {
+  // by the editor of the exported buffer, which need not be the current one
+  editor_rep* ed= recording_editor (env_nr);
+  if (ed != NULL && ed != (editor_rep*) this)
+    return ed->html_math_snippet (t, env_nr, breakable);
+  snippet_env_begin (env_nr);
+  snippet_inputs in (env);
+  int dpi= as_int (printing_dpi);
+  SI  em = (SI) (env->get_int (FONT_BASE_SIZE) * (dpi / 72.0) * PIXEL);
+  color inherit= env->pen->get_color ();
+  // a displayed formula is not broken
+  if (display_style (t, env->get_bool (MATH_DISPLAY))) breakable= false;
+  // the targets of links are only asked with a repository, which keeps nothing:
+  // the formula is not in the document, and its trees do not last
+  link_repository old_link_env= env->link_env;
+  link_repository link_env (true);
+  link_env->record= false;
+  env->link_env= link_env;
+  array<box> bs;
+  array<SI>  gaps;
+  if (breakable) bs= typeset_as_segments (env, t, path (), 12*em, 4*em, gaps);
+  else {
+    bs << typeset_as_box (env, t, path ());
+    gaps << ((SI) 0);
+  }
+  snippet_record (t, in);
+  env->link_env= old_link_env;
+  snippet_env_end ();
+  scheme_tree r (TUPLE);
+  for (int i=0; i<N(bs); i++) {
+    box b= bs[i];
+    renderer ren= html_math_renderer (em, inherit);
+    rectangles rs;
+    b->redraw (ren, path (0), rs);
+    scheme_tree s= html_math_svg (ren, b->x1, b->y1, b->x2 + gaps[i], b->y2);
+    tm_delete (ren);
+    if (!is_atomic (s)) return tree (TUPLE);
+    r << s;
+  }
+  return N(r) == 1? r[0]: r;
+}
+
 array<SI>
 edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   tree buft= subtree (et, rp);
@@ -420,17 +592,7 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
     if (is_document (buft) && is_compound (buft[0], "hide-preamble"))
       t= tree (SURROUND, buft[0], "", t);
 
-  string s= suffix (name);
-  bool bitmap=
-    (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
-#ifndef QTTEXMACS
-  bitmap= false;
-#endif
-  bool ps= (s == "ps" || s == "eps");
-  if (use_pdf ()) ps= (ps || s == "pdf");
-
   typeset_prepare ();
-  int dpi= as_int (printing_dpi);
   tree old_dpi= env->read (DPI);
   tree old_info_flag= env->read (INFO_FLAG);
   env->write (DPI, printing_dpi);
@@ -443,7 +605,36 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   env->write (INFO_FLAG, old_info_flag);
   env->style_init_env ();
   env->update ();
-  
+  return print_snippet_box (name, b, env->get_int (FONT_BASE_SIZE));
+}
+
+array<SI>
+edit_main_rep::print_snippet_in (url name, tree t, int env_nr) {
+  // a formula of the HTML export, in its environment (see html_math_snippet)
+  editor_rep* ed= recording_editor (env_nr);
+  if (ed != NULL && ed != (editor_rep*) this)
+    return ed->print_snippet_in (name, t, env_nr);
+  snippet_env_begin (env_nr);
+  snippet_inputs in (env);
+  box b= typeset_as_box (env, t, path ());
+  int base_size= env->get_int (FONT_BASE_SIZE);
+  snippet_record (t, in);
+  snippet_env_end ();
+  return print_snippet_box (name, b, base_size);
+}
+
+array<SI>
+edit_main_rep::print_snippet_box (url name, box b, int base_size) {
+  // b, to the image name, and its extents, in the units of base_size
+  string s= suffix (name);
+  bool bitmap=
+    (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
+#ifndef QTTEXMACS
+  bitmap= false;
+#endif
+  bool ps= (s == "ps" || s == "eps");
+  if (use_pdf ()) ps= (ps || s == "pdf");
+  int dpi= as_int (printing_dpi);
   if (b->x4 - b->x3 >= 5*PIXEL && b->y4 - b->y3 >= 5*PIXEL) {
     if (bitmap) make_raster_image (name, b, 5.0);
     else if (ps) make_eps (name, b, dpi);
@@ -462,7 +653,7 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   }
   array<SI> a;
   a << b->x3 << b->y3 << b->x4 << b->y4 << b->x1 << b->y1 << b->x2 << b->y2;
-  a << ((SI) env->get_int (FONT_BASE_SIZE)) << ((SI) dpi);
+  a << ((SI) base_size) << ((SI) dpi);
   return a;
 }
 

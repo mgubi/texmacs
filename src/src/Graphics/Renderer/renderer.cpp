@@ -86,6 +86,13 @@ renderer_rep::get_data_handle () {
 ******************************************************************************/
 
 bool
+renderer_rep::compiled_extensions () {
+  // Does this renderer want the stretched symbols of virtual fonts as whole
+  // glyphs, not as many slices of glyphs under clips?
+  return false;
+}
+
+bool
 renderer_rep::is_printer () {
   return false;
 }

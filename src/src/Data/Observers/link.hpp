@@ -55,6 +55,7 @@ public:
   list<string> ids;
   list<observer> loci;
   list<soft_link> links;
+  bool record;  // if not, nothing is kept: only the targets of loci are asked
   link_repository_rep ();
   ~link_repository_rep ();
   void insert_locus (string id, tree t);

@@ -24,6 +24,8 @@
 #include "Replace/edit_select.hpp"
 #include "Replace/edit_replace.hpp"
 
+struct snippet_inputs;
+
 class edit_main_rep:
   public edit_interface_rep,
   public edit_cursor_rep,
@@ -71,6 +73,14 @@ public:
   void print_buffer (string first="1", string last="1000000");
   void export_ps (url ps_name, string first="1", string last="1000000");
   array<SI> print_snippet (url u, tree t, bool conserve_preamble);
+  array<SI> print_snippet_in (url u, tree t, int env_nr);
+  array<SI> print_snippet_box (url u, box b, int base_size);
+  void snippet_env_begin (int env_nr);
+  void snippet_env_end ();
+  scheme_tree html_math_snippet (tree t, int env_nr, bool breakable);
+  void snippet_record (tree t, snippet_inputs& in);
+  int html_snippet_id (tree t, int env_nr);
+  int html_snippet_last ();
   bool graphics_file_to_clipboard (url output);
   void footer_eval (string s);
   tree the_line ();
