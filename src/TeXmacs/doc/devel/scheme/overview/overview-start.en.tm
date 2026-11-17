@@ -213,6 +213,20 @@
     causes <TeXmacs> to print ``Hi there!'' when starting up. Notice that the
     <verbatim|-x> option may be used several times.
 
+    <item*|<with|font-series|medium|<verbatim|-X>>>Without a window
+    (<verbatim|-headless>), <TeXmacs> quits by itself once the commands of
+    <verbatim|-x> and <verbatim|-c> were executed and the files of the
+    command line were loaded: what these commands delay (with
+    <scm|delayed>, a server, a client which connects later) does not run.
+    The option <verbatim|-X> keeps <TeXmacs> running, until a command such
+    as <scm|(quit-TeXmacs)> quits it. For instance,
+
+    <\shell-code>
+      texmacs -headless -X -x "(delayed (:pause 5000) (display \\"done\\\\n\\") (quit-TeXmacs))"
+    </shell-code>
+
+    prints ``done'' after five seconds, and quits.
+
     <item*|<with|font-series|medium|<verbatim|-q>>>This option causes
     <TeXmacs> to quit. It is usually used after a <verbatim|-x> option. For
     instance,
