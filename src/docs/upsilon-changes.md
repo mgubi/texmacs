@@ -19,9 +19,22 @@ have the details, and the problems go to the
   to itself, as `<assign|vs|<value|vs>>`) gave a segmentation fault when it
   was typeset or read. The evaluator now shows an error "nesting too deep"
   in its place, and the reader of `.tm` files leaves out the parts which
-  nest too deep. TeXmacs then says that parts of the file were not
-  loaded, and Save and Save as ask before writing, so that they are not
-  lost without warning (#813).
+  nest too deep (beyond about 2000 levels, far more than any real
+  document; the limit follows the stack, also on Linux, where it is
+  larger, and leaves room for Scheme). TeXmacs then says that parts of the
+  file were not loaded, and Save and Save as ask before writing, so that
+  they are not lost without warning (#813).
+- **Malformed graphics no longer crash TeXmacs**: a 3D object, an effect,
+  a `calligraphy` or `penscript`, a `long-arrow`, an empty `gr-group` or a
+  `gr-transformation` with wrong children (from a file or a paste) crashed
+  the typesetter, hung it or emptied the document; they now show an error
+  box (part of #817).
+- **Mirrors in a document with two views**: with View > New view (or a
+  hidden view), a change to a mirror was not sent to the other mirrors,
+  and each tree with an identifier was listed once per view; each is now
+  listed once (#833).
+- **Replace with a filter is faster** when the occurrences are in the text
+  at the start of a paragraph (part of #618).
 - **LaTeX import of deeply nested lists**: 20000 nested `itemize` used
   over 3 GB; the paragraphs are now made without copies (4000 levels:
   144 MB instead of 2 GB), and environments nested deeper than 128 are
