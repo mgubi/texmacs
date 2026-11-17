@@ -471,6 +471,47 @@
          'error)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Printing: no abbreviation of long lists and vectors (#840)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (write-read-back x)
+  (let ((s (call-with-output-string (lambda (port) (write x port)))))
+    (with-input-from-string s read)))
+
+(define (regtest-boot-printing)
+  (regression-test-group
+   "boot-s7, printing" "printing"
+   :none :none
+   (test "write to a port gives a long list in full"
+         (write-read-back (iota 3000)) (iota 3000))
+   (test "write gives a long vector in full"
+         (write-read-back (make-vector 100 7)) (make-vector 100 7))
+   (test "write gives nested long lists in full"
+         (write-read-back (list (iota 50) (list (iota 60))))
+         (list (iota 50) (list (iota 60))))
+   (test "object->string gives a long list in full"
+         (string->object (object->string (iota 500))) (iota 500))
+   (test "display gives a long list in full"
+         (with-input-from-string
+             (call-with-output-string (lambda (port) (display (iota 100) port)))
+           read)
+         (iota 100))
+   ;; (s7 adds to print-length when it quotes a form in a syntax error: a
+   ;; print-length near the largest fixnum overflowed and quoted "(let")
+   (test "a syntax error quotes the whole form"
+         (with r (catch #t
+                   (lambda () (eval '(let ((x 1 2) (y 3) (z 4)) x)) "no error")
+                   (lambda args (object->string args)))
+           (and (string? r)
+                (string-contains? r "(let ((x 1 2) (y 3) (z 4)) x)")
+                #t))
+         #t)
+   (test "the stree of a document of 64 paragraphs is written in full"
+         (with t (stree->tree `(document ,@(map number->string (iota 64))))
+           (length (cdr (write-read-back (tree->stree t)))))
+         64)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -480,6 +521,7 @@
               (regtest-boot-macros)
               (regtest-boot-modules)
               (regtest-boot-lookup)
-              (regtest-boot-patches))))
+              (regtest-boot-patches)
+              (regtest-boot-printing))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of boot-s7: ok\n")))
