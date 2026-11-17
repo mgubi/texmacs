@@ -12,6 +12,38 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 17 November 2026
+
+- **Very deep documents no longer crash TeXmacs**: a document nested too
+  deep for the stack (tens of thousands of levels, or a value which refers
+  to itself, as `<assign|vs|<value|vs>>`) gave a segmentation fault when it
+  was typeset or read. The evaluator now shows an error "nesting too deep"
+  in its place, and the reader of `.tm` files leaves out the parts which
+  nest too deep. TeXmacs then says that parts of the file were not
+  loaded, and Save and Save as ask before writing, so that they are not
+  lost without warning (#813).
+- **LaTeX import of deeply nested lists**: 20000 nested `itemize` used
+  over 3 GB; the paragraphs are now made without copies (4000 levels:
+  144 MB instead of 2 GB), and environments nested deeper than 128 are
+  left out with a warning, as groups already are (#803).
+- **LaTeX import: more commands of formulas**: `\operatorname*` gives an
+  operator with limits, `\smash[t]` and `\smash[b]` smash only the top or
+  the bottom, the colour of `\textcolor` is read in formulas, `\iint`,
+  `\iiint`, `\oiint` and the like are big operators, and the two arguments
+  of `\xleftarrow[below]{above}` (and the other extensible arrows) are no
+  longer swapped, also in a round trip through LaTeX (part of #780).
+- **HTML export: a file included from another directory** keeps its
+  content: only the files of the directory of the document were expanded,
+  so that the headings, equations and theorems of the others were missing
+  and the later numbers shifted (#781).
+- **The option `-X`** is now in `texmacs -h`, in the manual page and in
+  the user documentation: in headless mode it keeps TeXmacs running after
+  the commands of `-x` and the files, for scripts with delayed actions or
+  a server (#841).
+- **Windows: no crash at exit** (desktop, Qt): a window deleted while
+  TeXmacs was already exiting could make it end with a crash instead of
+  its exit status (#776).
+
 ## 9 November 2026
 
 - **A link to a label of another document shows the label** (desktop,
