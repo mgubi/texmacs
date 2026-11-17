@@ -56,6 +56,12 @@ have the details, and the problems go to the
 - **Windows: no crash at exit** (desktop, Qt): a window deleted while
   TeXmacs was already exiting could make it end with a crash instead of
   its exit status (#776).
+- **LaTeX export keeps the non-ASCII characters of code**: in verbatim,
+  `alltt` and every code block, a Cyrillic, Greek or Chinese character
+  (and any other one outside ASCII) was dropped from the exported file.
+  It is now written in UTF-8, or as LaTeX writes it elsewhere with the
+  `cork` encoding (`{\cyra}`); the addresses of `\url` and `\href` keep
+  theirs in UTF-8 percent codes (#824).
 
 ## 9 November 2026
 
