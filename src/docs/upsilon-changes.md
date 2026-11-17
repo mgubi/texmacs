@@ -81,6 +81,13 @@ have the details, and the problems go to the
   folder above, with the folder of the document or the home selected,
   because SDL takes the last part of a location without a final slash for
   a file name; the location now ends with a slash (#665, item 3).
+- **Vue: documents opened from the Finder open** (desktop, macOS): a
+  double-click on a document, a document dropped on the icon of the Dock
+  or `open -a` started the Vue version, or brought it to the front, but
+  the document did not open. SDL hands these files over as a drop without
+  a window, which was thrown away. They now open as in the Cocoa and Qt
+  versions: in the window of the untouched document of the start, else in
+  a new window (#768).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
