@@ -104,6 +104,15 @@ QTMScrollView::QTMScrollView (QWidget *_parent):
 
 #if QT_VERSION >= 0x050000
   QScrollerProperties properties = QScroller::scroller(this)->scrollerProperties();
+  // (the widgets which are still to be deleted later at an exit are
+  // forgotten by an exit handler, qt_gui.cpp, registered once Qt runs, so
+  // called before Qt ends its threads, which would delete them and crash)
+  static bool exit_handler= false;
+  if (!exit_handler) {
+    extern void qt_forget_deferred_deletes ();
+    atexit (qt_forget_deferred_deletes);
+    exit_handler= true;
+  }
   properties.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
   properties.setScrollMetric(QScrollerProperties::HorizontalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
   QScroller::scroller(this)->setScrollerProperties(properties);

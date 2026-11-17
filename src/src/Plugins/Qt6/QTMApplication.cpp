@@ -79,8 +79,15 @@ void QTMApplication::set_window_icon (string icon_path) {
   }
 }
 
+extern bool qt_exit_begun;
+
 bool QTMApplication::notify (QObject* receiver, QEvent* event)
 {
+  // once the process ends (qt_forget_deferred_deletes), nothing is deleted
+  // later: on Windows, the deferred deletes posted by the static destructors
+  // were delivered during the shutdown of the DLLs, and ~QWidget crashed
+  // (#776)
+  if (qt_exit_begun && event->type () == QEvent::DeferredDelete) return true;
   try {
     return QApplication::notify (receiver, event);
   }

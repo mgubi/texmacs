@@ -286,14 +286,24 @@
           (set-message `(concat "Saved " ,vname) "Save file")
           (save-buffer-post name opts)))))
 
+(define (save-buffer-check-nesting name thunk)
+  ;; a buffer whose file nested too deep (buffer-nesting-skipped?, #813)
+  (if (not (buffer-nesting-skipped? name)) (thunk)
+      (user-confirm (string-append "Parts of this document were nested too "
+                                   "deep to be loaded; saving loses them. "
+                                   "Really proceed?") #f
+        (lambda (answ) (when answ (thunk))))))
+
 (define (save-buffer-check-faithful name opts)
   ;;(display* "save-buffer-check-faithful " name "\n")
-  (if (has-faithful-format? name)
-      (save-buffer-save name opts)
-      (user-confirm "Save requires data conversion. Really proceed?" #f
-        (lambda (answ)
-          (when answ
-            (save-buffer-save name opts))))))
+  (save-buffer-check-nesting name
+    (lambda ()
+      (if (has-faithful-format? name)
+          (save-buffer-save name opts)
+          (user-confirm "Save requires data conversion. Really proceed?" #f
+            (lambda (answ)
+              (when answ
+                (save-buffer-save name opts))))))))
 
 (define (cannot-write? name action)
   (with vname `(verbatim ,(url->system name))
@@ -431,6 +441,9 @@
   (when (shared-files-in-use?) (shared-file-leave name))
   (if (and (url-scratch? name) (url-exists? name)) (system-remove name))
   (buffer-rename name new-name)
+  (when (buffer-nesting-skipped? name)
+    (buffer-nesting-update name #f)
+    (buffer-nesting-update new-name #t))
   (buffer-pretend-modified new-name)
   (save-buffer-save new-name opts))
 
@@ -487,9 +500,12 @@
 
 (tm-define (save-buffer-as-main new-name . args)
   ;;(display* "save-buffer-as-main " new-name "\n")
-  (if (or (null? args) (not (url? (car args))))
-      (save-as-check-suffixed new-name (current-buffer) args)
-      (save-as-check-suffixed new-name (car args) (cdr args))))
+  (let ((name (if (or (null? args) (not (url? (car args))))
+                  (current-buffer) (car args)))
+        (opts (if (or (null? args) (not (url? (car args))))
+                  args (cdr args))))
+    (save-buffer-check-nesting name
+      (lambda () (save-as-check-suffixed new-name name opts)))))
 
 (tm-define (save-buffer-as new-name . args)
   (:argument new-name texmacs-file "Save as")
@@ -836,11 +852,18 @@
     (cond ((buffer-exists? name)
            (load-buffer-open name opts))
           ((url-exists? name)
-           (if (buffer-load name)
-               (set-message `(concat "Could not load " ,vname) "Load file")
-               (begin
-                 (typeset-failure-forget name)
-                 (load-buffer-open name opts))))
+           (with skipped (texmacs-skipped-nestings)
+             (if (buffer-load name)
+                 (set-message `(concat "Could not load " ,vname) "Load file")
+                 (begin
+                   (typeset-failure-forget name)
+                   (load-buffer-open name opts)
+                   (buffer-nesting-update
+                    name (> (texmacs-skipped-nestings) skipped))
+                   (when (buffer-nesting-skipped? name)
+                     (set-message `(concat "Parts of " ,vname " are nested "
+                                           "too deep and were not loaded")
+                                  "Load file"))))))
           (else
             (with uname (if (string? name) (string->url name) name)
               (buffer-set-body name '(document ""))
@@ -885,8 +908,11 @@
             (if answ
                 (let* ((autosave-name (autosave-propose name))
                        (format (url-format name))
+                       (skipped (texmacs-skipped-nestings))
                        (doc (tree-import autosave-name format)))
                   (buffer-set name doc)
+                  (buffer-nesting-update
+                   name (> (texmacs-skipped-nestings) skipped))
                   (load-buffer-open name opts)
                   (buffer-pretend-modified name))
                 (load-buffer-check-permissions name opts)))))
@@ -1006,12 +1032,15 @@
           (when (!= name (current-buffer))
             (switch-to-buffer name))
           (url-cache-invalidate name)
-          (with t (tree-import name (url-format name))
+          (let* ((skipped (texmacs-skipped-nestings))
+                 (t (tree-import name (url-format name))))
             (if (== t (tm->tree "error"))
                 (set-message "Error: file not found" "Revert buffer")
                 (begin
                   (typeset-failure-forget name)
-                  (buffer-set name t))))))))
+                  (buffer-set name t)
+                  (buffer-nesting-update
+                   name (> (texmacs-skipped-nestings) skipped)))))))))
 
 (tm-define (revert-buffer . l)
   (with name (if (null? l) (current-buffer) (car l))

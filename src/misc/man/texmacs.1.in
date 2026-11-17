@@ -91,6 +91,14 @@ like in `texmacs -g 800x600-100+100'.
 \fB\-h\fR, \fB\-\-help\fR
 Display a help message, which lists the command line options of TeXmacs.
 .TP
+\fB\-H\fR, \fB\-headless\fR
+Run TeXmacs without a window, for instance for the conversions of -c or
+the commands of -x. In this mode TeXmacs quits by itself once the commands
+of the -x and -c options were executed and the files of the command line
+were loaded, unless the option -X is given; the actions which these
+commands delay (delayed, a server, a client which connects later) do not
+run then.
+.TP
 \fB\-i [file]\fR, \fB\-\-initialize [file]\fR
 Uses [file] as a guile/scheme initialization file for TeXmacs.
 .TP
@@ -134,6 +142,13 @@ scheme commands are executed in the same order.
 The commands are executed and the files of the command line are loaded
 in the order of the command line: a command which follows a file is
 executed with this file as the current document.
+.TP
+\fB\-X\fR
+In headless mode (-headless), do not quit after the commands of the -x and
+-c options and the files of the command line: TeXmacs keeps running, for
+instance for a script with delayed actions, or a server, until a command
+quits it, such as (quit-TeXmacs). Without -headless, TeXmacs does not quit
+by itself anyway.
 .PP
 .SH AUTHOR
 Written by Joris van der Hoeven

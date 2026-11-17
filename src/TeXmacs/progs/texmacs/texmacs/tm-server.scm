@@ -329,8 +329,23 @@
 (tm-define (set-shared-files-in-use! flag)
   (set! shared-files-in-use flag))
 
+;; The buffers whose file nested too deep: the reader left parts of it out
+;; (an error "nesting too deep" in their place, #813), which a save loses.
+;; Set or cleared at each load, revert or rescue of the buffer
+;; (buffer-nesting-update), cleared when it is closed.
+(define nesting-skipped-buffers (make-ahash-table))
+
+(tm-define (buffer-nesting-skipped? name)
+  (ahash-ref nesting-skipped-buffers (url->string name)))
+
+(tm-define (buffer-nesting-update name skipped?)
+  (if skipped?
+      (ahash-set! nesting-skipped-buffers (url->string name) #t)
+      (ahash-remove! nesting-skipped-buffers (url->string name))))
+
 (tm-define (buffer-close name)
   (typeset-failure-forget name)
+  (buffer-nesting-update name #f)
   (when (shared-files-in-use?) (shared-file-leave name))
   (cpp-buffer-close name))
 

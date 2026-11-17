@@ -176,6 +176,7 @@
 "debug-message"
 "get-debug-messages"
 "clear-debug-messages"
+"texmacs-skipped-nestings"
 "cout-buffer"
 "cout-unbuffer"
 "mark-new"

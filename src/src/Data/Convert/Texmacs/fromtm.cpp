@@ -11,6 +11,7 @@
 ******************************************************************************/
 
 #include "convert.hpp"
+#include "stack_guard.hpp"
 #include "path.hpp"
 #include "vars.hpp"
 #include "drd_std.hpp"
@@ -50,6 +51,7 @@ struct tm_reader {
   string read_next ();
   string read_function_name ();
   tree   read_apply (string s, bool skip_flag);
+  void   skip_apply (bool skip_flag);
   tree   read (bool skip_flag);
 };
 
@@ -185,9 +187,65 @@ get_collection (tree& u, tree t) {
   else if (is_compound (t)) u << t;
 }
 
+// the number of applies skipped by the readers so far, nested too deep:
+// the load of a buffer compares it before and after (load-buffer-load), to
+// say so and to ask before a save which would lose them (#813)
+static int skipped_nestings= 0;
+
+int
+texmacs_skipped_nestings () {
+  return skipped_nestings;
+}
+
+void
+tm_reader::skip_apply (bool skip_flag) {
+  // the rest of an apply nested too deep, up to its end, skipped without
+  // recursion. Each apply which is open is on a stack: true when it ends at
+  // the next > (<name|...>, and a block after </name|), false for a block
+  // (<\name|...> ... </name>), for which a > ends a header <\name|...> or a
+  // separator <|name|...>
+  array<bool> open;
+  open << !skip_flag;
+  while (N(open) > 0) {
+    last= read_next ();
+    if (last == "") break;
+    else if (last == "<\\") {
+      (void) read_function_name ();
+      open << false;
+    }
+    else if (last == "<|") (void) read_function_name ();
+    else if (last == "</") {
+      (void) read_function_name ();
+      if (last == ">") {
+        open->resize (N(open) - 1);
+        last= "/>";
+      }
+      else open[N(open)-1]= true;
+    }
+    else if (last == "<#") {
+      while ((pos < N(buf)) && (buf[pos] != '>')) pos++;
+      if (pos < N(buf)) pos++;
+    }
+    else if (last == "<") {
+      string name= read_next ();
+      if ((name != ">") && (read_next () == "|")) open << true;
+    }
+    else if ((last == ">") && open[N(open)-1])
+      open->resize (N(open) - 1);
+  }
+}
+
 tree
 tm_reader::read_apply (string name, bool skip_flag) {
   // cout << "Read apply " << name << INDENT << LF;
+  // (a file which nests too deep: an error tree, not a stack overflow, #813)
+  if (stack_nearly_full ()) {
+    if (skipped_nestings++ == 0 || DEBUG_IO)
+      convert_warning << "TeXmacs file: content nested too deep skipped"
+                      << LF;
+    skip_apply (skip_flag);
+    return tree (_ERROR, "nesting too deep");
+  }
   tree t (make_tree_label (name));
   if (!with_extensions)
     t= tree (EXPAND_APPLY, name);
