@@ -13,6 +13,18 @@
 #include <stdint.h>
 #include <stddef.h>
 
+char* (*scheme_stack_low) () = NULL;
+
+static inline long
+scheme_remaining (char* here, long n) {
+  // the bytes left before the limit of the Scheme interpreter, if it is
+  // nearer than @n (or @n is unknown, -1)
+  char* s= scheme_stack_low == NULL ? (char*) NULL : scheme_stack_low ();
+  if (s == NULL) return n;
+  long m= here > s ? (long) (here - s) : 0L;
+  return (n < 0 || m < n) ? m : n;
+}
+
 #if defined (__EMSCRIPTEN__)
 #  include <emscripten/stack.h>
 long
@@ -40,8 +52,7 @@ stack_remaining () {
       low= (char*) l;
     }
   }
-  if (low == NULL) return -1;
-  return (long) (&here - low);
+  return scheme_remaining (&here, low == NULL ? -1L : (long) (&here - low));
 }
 #else
 #  include <pthread.h>
@@ -95,7 +106,6 @@ stack_remaining () {
 #  endif
     // (on other systems the depth of the stack is not known: no check)
   }
-  if (low == NULL) return -1;
-  return (long) (&here - low);
+  return scheme_remaining (&here, low == NULL ? -1L : (long) (&here - low));
 }
 #endif
