@@ -76,6 +76,11 @@ have the details, and the problems go to the
   for the parser (an unclosed string before a `}`), the `{` kept its normal
   colour until its own line was edited; it now takes the colour of errors
   at once, and loses it when the edit is undone (#815).
+- **The file dialogs of Linux open inside their folder** (desktop, Vue,
+  Linux): the Open dialog (zenity, or the desktop portal) started in the
+  folder above, with the folder of the document or the home selected,
+  because SDL takes the last part of a location without a final slash for
+  a file name; the location now ends with a slash (#665, item 3).
 - **A link to a label of another document shows the label** (desktop,
   Cocoa): following a link such as `other.tm#thm:x` opened the document
   with the cursor at the label, but most of the time the window stayed at
