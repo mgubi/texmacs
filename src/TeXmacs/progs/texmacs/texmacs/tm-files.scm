@@ -71,10 +71,16 @@
   (:synopsis "Was the file of the buffer @u changed on disk since it was read?")
   ;; the same test as the save (save-buffer-check-permissions): the file
   ;; is newer than the last load, save or revert of the buffer, which our
-  ;; own saves keep up to date
+  ;; own saves keep up to date.
+  ;; A participant of a shared file (docs/shared-files.md) never reads nor
+  ;; writes the file and never makes this test at its save (the host does):
+  ;; the host's saves reach it only later, by the message (saved), and its
+  ;; Revert would read the file and send it to everybody. The host, which
+  ;; writes the file and whose saves are its own, says it alone.
   (and (url? u)
        (not (url-rooted-tmfs? u))
        (buffer-exists? u)
+       (not (shared-participant? u))
        (url-test? u "fr")
        (and-with mod-t (url-last-modified u)
          (and-with save-t (buffer-last-save u)

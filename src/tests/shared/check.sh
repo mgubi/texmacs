@@ -42,6 +42,8 @@
 #   fuzz        random patches with hostile integers through the patch functions: no crash
 #   edfuzz      random patches applied to a real buffer (editor and typesetter): no crash
 #   malformed   patches and messages of a wrong shape are refused and the host goes on
+#   diskchange  the host's saves are not changes on disk; a write by another program
+#               is said by the host only; the host's Revert reaches the participant
 #
 # TM_SHARED_PREF=off runs them with the preference off (they must then fail,
 # except "off"). Every process is stopped above TM_TEST_RSS_KB (default 2 GB) of memory and
@@ -62,7 +64,7 @@ export QT_QPA_PLATFORM=offscreen
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentplain malformed agentmode fuzz edfuzz
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentplain malformed agentmode fuzz edfuzz diskchange
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or

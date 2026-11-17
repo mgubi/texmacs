@@ -85,7 +85,10 @@ have the details, and the problems go to the
   the file of the document, TeXmacs used to notice only when saving. The
   footer now says "changed on disk: File > Revert reloads it" (or that
   there are changes on both sides) as long as the file is newer than the
-  document, looking at it at most once a second.
+  document, looking at it at most once a second. For a file shared by
+  several TeXmacs windows, only the window that holds the file (the one
+  that writes it) says it; its saves, and the saves the others ask it for,
+  are not changes on disk.
 
 ## 9 November 2026
 
