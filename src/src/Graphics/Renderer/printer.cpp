@@ -487,7 +487,8 @@ printer_rep::generate_tex_fonts () {
     string name = tex_fonts [fn_name], ttf;
     int    pos  = search_forwards (".", fn_name);
     string root = (pos==-1? fn_name: fn_name (0, pos));
-#ifndef OS_WIN32 // we need pfbtopfa
+    // (a Type 1 font is embedded on every system: pfb_to_pfa above does
+    // what the program pfbtopfa did, and OS_WIN32 was never defined, #441)
     if ((pos!=-1) && ends (fn_name, "tt")) {
       int pos2= search_backwards (":", fn_name);
       root= fn_name (0, pos2);
@@ -495,7 +496,6 @@ printer_rep::generate_tex_fonts () {
       if (suffix (u) == "pfb")
         ttf = pfb_to_pfa (u);
     }
-#endif
 
     if (ttf != "") {
       string ttf_name= find_ps_font_name (root, ttf);
