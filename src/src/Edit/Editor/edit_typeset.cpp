@@ -879,13 +879,15 @@ search_doc_title (tree t) {
 static tree
 expand_includes (tree t) {
   // replace include by include* so that the included files are
-  // expanded in the environment of the main document.
-  // Only do this for files in the directory of the main document:
-  // the relative urls inside other included files would be resolved
-  // against the wrong directory; tmhtml-include handles those.
+  // expanded in the environment of the main document, as they are typeset:
+  // their headings, equations and theorems are numbered with the rest
+  // (#781). This holds for the files of other directories too: the
+  // typesetter resolves the relative urls of an included file (images,
+  // nested includes) against the main document (base_file_name), and so
+  // does the expansion. Includes nested in an included file are not
+  // rewritten: tmhtml-include converts them.
   if (is_atomic (t)) return t;
-  else if (is_func (t, INCLUDE, 1) && is_atomic (t[0]) &&
-           is_atomic (url_unix (t[0]->label)))
+  else if (is_func (t, INCLUDE, 1) && is_atomic (t[0]))
     return tree (VAR_INCLUDE, t[0]);
   else {
     // only copy the tree if some include was actually rewritten
