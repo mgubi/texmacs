@@ -122,7 +122,13 @@ qt_pipe_link_rep::read (int channel) {
     PipeLink.feedBuf (QProcess::StandardError);
     string& other= (channel == LINK_OUT? PipeLink.getErrbuf ():
                                          PipeLink.getOutbuf ());
-    if (other == "") alive= false;
+    if (other == "") {
+      alive= false;
+      // what is left of its process group (programs which its script
+      // started in the background) is asked to terminate, as a stop does:
+      // connection_stop does nothing for a link which is dead (#769)
+      PipeLink.killProcess (0);
+    }
   }
   if (channel == LINK_OUT) {
     string r= PipeLink.getOutbuf ();
@@ -181,7 +187,8 @@ qt_pipe_link_rep::interrupt () {
     qt_error << "Interrupt not successful, pid: " << pid << " return code: " << errno << "\n";
   }
 #else
-  uint64_t pid = PipeLink.processId ();
+  // (the group, also when its program has just ended, see killProcess)
+  uint64_t pid = PipeLink.group > 0 ? PipeLink.group : PipeLink.processId ();
   if (pid == 0) return;
   // the program has a process group of its own (QTMPipeLink::launchCmd):
   // the interrupt goes to all of it, as with the pipes without Qt
@@ -232,6 +239,7 @@ process_all_pipes () {
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     qt_pipe_link_rep* con= (qt_pipe_link_rep*) it->next();
+    con->PipeLink.forgetEndedGroup ();
     if (con->alive) con->apply_command ();
   }
   process_all_cmdlines ();
