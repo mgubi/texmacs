@@ -20,6 +20,19 @@
 * Conversion of TeXmacs strings of the present format to TeXmacs trees
 ******************************************************************************/
 
+static int
+read_max_depth () {
+  // the depth of the trees which the editor can take: the bridges, the
+  // typesetter and the paths recurse on the levels of a tree, with up to about
+  // 2 KB of stack for each (a <with> in a paragraph); 4 KB are counted, of the
+  // stack which is left (or of 8 MB, if the system does not tell). A file
+  // which nests deeper is cut there, as when the stack is nearly full (#813:
+  // read up to the full stack, it crashed the typesetter)
+  long left= stack_remaining ();
+  if (left < 0) left= 8L * 1024L * 1024L;
+  return (int) (left / 4096);
+}
+
 struct tm_reader {
   string  version;            // document was composed using this version
   hashmap<string,int> codes;  // codes for to present version
@@ -29,6 +42,8 @@ struct tm_reader {
   string  buf;                // the string being read from
   int     pos;                // the current position of the reader
   string  last;               // last read string
+  int     depth;              // the number of applies being read
+  int     max_depth;          // deeper applies are skipped
 
   tm_reader (string buf2):
     version (TEXMACS_VERSION),
@@ -36,14 +51,14 @@ struct tm_reader {
     EXPAND_APPLY (EXPAND),
     backslash_ok (true),
     with_extensions (true),
-    buf (buf2), pos (0), last ("") {}
+    buf (buf2), pos (0), last (""), depth (0), max_depth (read_max_depth ()) {}
   tm_reader (string buf2, string version2):
     version (version2),
     codes (get_codes (version)),
     EXPAND_APPLY (version_inf (version, "0.3.3.22")? APPLY: EXPAND),
     backslash_ok (version_inf (version, "1.0.1.23")? false: true),
     with_extensions (version_inf (version, "1.0.2.4")? false: true),
-    buf (buf2), pos (0), last ("") {}
+    buf (buf2), pos (0), last (""), depth (0), max_depth (read_max_depth ()) {}
 
   int    skip_blank ();
   string decode (string s);
@@ -239,10 +254,10 @@ tree
 tm_reader::read_apply (string name, bool skip_flag) {
   // cout << "Read apply " << name << INDENT << LF;
   // (a file which nests too deep: an error tree, not a stack overflow, #813)
-  if (stack_nearly_full ()) {
-    if (skipped_nestings++ == 0 || DEBUG_IO)
-      convert_warning << "TeXmacs file: content nested too deep skipped"
-                      << LF;
+  if (depth >= max_depth || stack_nearly_full ()) {
+    // (the warning is given once the reader is back at the top, by
+    // texmacs_to_tree: a message calls Scheme, which needs the stack too)
+    skipped_nestings++;
     skip_apply (skip_flag);
     return tree (_ERROR, "nesting too deep");
   }
@@ -255,6 +270,7 @@ tm_reader::read_apply (string name, bool skip_flag) {
   }
 
   bool closed= !skip_flag;
+  depth++;
   while (pos < N(buf)) {
     // cout << "last= " << last << LF;
     bool sub_flag= (skip_flag) && ((last == "") || (last[N(last)-1] != '|'));
@@ -263,6 +279,7 @@ tm_reader::read_apply (string name, bool skip_flag) {
     if ((last == "/>") || (last == "/|")) closed= true;
     if (closed && ((last == ">") || (last == "/>"))) break;
   }
+  depth--;
   // cout << "last= " << last << UNINDENT << LF;
   // cout << "Done" << LF;
 
@@ -387,16 +404,29 @@ tm_reader::read (bool skip_flag) {
   return D;
 }
 
+static void
+warn_skipped_nestings (int before) {
+  // (only the first time in the process, unless the input is debugged)
+  if (skipped_nestings > before && (before == 0 || DEBUG_IO))
+    convert_warning << "TeXmacs file: content nested too deep skipped" << LF;
+}
+
 tree
 texmacs_to_tree (string s) {
+  int before= skipped_nestings;
   tm_reader tmr (s);
-  return tmr.read (true);
+  tree t= tmr.read (true);
+  warn_skipped_nestings (before);
+  return t;
 }
 
 tree
 texmacs_to_tree (string s, string version) {
+  int before= skipped_nestings;
   tm_reader tmr (s, version);
-  return tmr.read (true);
+  tree t= tmr.read (true);
+  warn_skipped_nestings (before);
+  return t;
 }
 
 /******************************************************************************

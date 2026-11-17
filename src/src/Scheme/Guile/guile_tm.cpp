@@ -21,6 +21,7 @@
 #include "file.hpp"
 #include "../Scheme/glue.hpp"
 #include "convert.hpp" // tree_to_texmacs (should not belong here)
+#include "stack_guard.hpp"
 
 /******************************************************************************
  * Installation of guile and initialization of guile
@@ -28,11 +29,33 @@
 bool scm_busy= false;
 
 #if (defined(GUILE_C) || defined(GUILE_D))
+#if defined(GUILE_C) && defined(SCM_STACK_LIMIT) && !SCM_STACK_GROWS_UP
+// Guile 1.8 counts its option stack (in SCM_STACKITEM) from the base of the
+// stack of its thread: the guards of stack_guard.hpp leave their margin
+// before that limit too (#813)
+static char* guile_stack_base= NULL;
+static thread_local bool guile_main_thread= false;
+
+static char*
+guile_stack_low () {
+  if (!guile_main_thread) return NULL;
+  size_t limit= (size_t) SCM_STACK_LIMIT;  // 0: no check (Windows)
+  if (limit == 0) return NULL;
+  size_t bytes= limit * sizeof (SCM_STACKITEM);
+  if (bytes >= (size_t) (uintptr_t) guile_stack_base) return NULL;
+  return guile_stack_base - bytes;
+}
+#endif
+
 static void (*old_call_back) (int, char**)= NULL;
 static void
 new_call_back (void *closure, int argc, char** argv) {
   (void) closure;
-  
+#if defined(GUILE_C) && defined(SCM_STACK_LIMIT) && !SCM_STACK_GROWS_UP
+  guile_stack_base= (char*) SCM_I_CURRENT_THREAD->base;
+  guile_main_thread= true;
+  scheme_stack_low= guile_stack_low;
+#endif
   old_call_back (argc, argv);
 }
 #endif
