@@ -1222,10 +1222,13 @@ clean_paragraph_concat (tree t) {
 }
 
 static tree
-make_paragraphs (tree t, tree r) {
-  int i, n= N(t);
+make_paragraphs (tree t, tree r, int i0, int n) {
+  // the paragraphs of t[i0..n): an environment is made of paragraphs of its
+  // own, in the same tree t, not in a copy of its part of t: n nested
+  // environments made n copies, alive together, of quadratic size (#803)
+  int i;
   tree s (CONCAT);
-  for (i=0; i<n; i++) {
+  for (i=i0; i<n; i++) {
     if (is_document (r) && t[i] == tree (FORMAT, "new line")) {
       r << clean_paragraph_concat (s);
       s= tree (CONCAT);
@@ -1239,7 +1242,7 @@ make_paragraphs (tree t, tree r) {
         i++;
       }
       if (is_func (t[i-1], END) && N(t[i-1]) > 0 && name == t[i-1][0]) {
-        tree tmp= make_paragraphs (t(start+1, i-1), tree (CONCAT));
+        tree tmp= make_paragraphs (t, tree (CONCAT), start+1, i-1);
         s << t[start] << A(tmp) << t[i-1];
       }
       else
@@ -1252,6 +1255,11 @@ make_paragraphs (tree t, tree r) {
   if (s != concat ())
     r << clean_paragraph_concat (s);
   return r;
+}
+
+static tree
+make_paragraphs (tree t, tree r) {
+  return make_paragraphs (t, r, 0, N(t));
 }
 
 static tree

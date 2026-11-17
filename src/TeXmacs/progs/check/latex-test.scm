@@ -927,7 +927,26 @@
       (check= (latex-import-warnings chain)
               '("LaTeX import: groups nested more than 512 deep skipped"))))
   (with b (apply string-append (make-list 1000 "\\textbf{"))
-    (check= (lt (string-append "a" b "x" (make-string 1000 #\}) "b")) "ab")))
+    (check= (lt (string-append "a" b "x" (make-string 1000 #\}) "b")) "ab"))
+  ;; environments too (#803): 2000 nested lists took 600 MB (20000 more
+  ;; than 3 GB) and 8000 crashed; those deeper than 128 are skipped
+  (let* ((env (lambda (n)
+                (string-append
+                 "a\n\n" (apply string-append
+                               (make-list n "\\begin{itemize}\\item "))
+                 "x%\\end{itemize}\n"
+                 (apply string-append (make-list n "\\end{itemize}"))
+                 "\n\nb")))
+         (small (object->string (lt (env 100)))))
+    (check-true (string-occurs? "\"x\"" small))
+    (check-true (string-occurs? "\"b\"" small))
+    (check= (latex-import-warnings (env 100)) '())
+    (with big (env 2000)
+      (check= (latex-import-warnings big)
+              '("LaTeX import: environments nested more than 128 deep skipped"))
+      (with r (object->string (lt big))
+        (check-false (string-occurs? "\"x\"" r))
+        (check-true (string-occurs? "\"b\"" r))))))
 
 (define (all-debug-messages)
   (tree-children (get-debug-messages "Debugging console" 100000000)))
