@@ -1257,6 +1257,42 @@
 ;; The text is not lost silently (#704): a copy of the document is saved
 ;; in the system folder of the home, and saving the buffer over its file
 ;; is asked first.
+;; Primitives of graphics with malformed children (text where a point, a
+;; matrix, an object, a tuple or a rubber arrow is expected, an effect on an
+;; argument which it does not have, a group without items, a 3D
+;; transformation which is not a matrix) are typeset as errors or as best
+;; they can, and the document is kept and can be edited: they crashed the
+;; typesetter or reset the document (#817)
+(define (test-malformed-graphics)
+  (check-group "malformed graphics")
+  (for (ex '((light-3d "k" "k")
+             (transform-3d "k" "k")
+             (transform-3d (object-3d) "k")
+             (gr-effect "1" "2")
+             (gr-effect "1" "2" "3")
+             (concat "a" (gr-effect "1" "2" "3"))
+             (gr-effect "1" "-1")
+             (calligraphy "k" "k" "k" "k")
+             (penscript "k" "k" "k" "k")
+             (calligraphy (point "0" "0") (point "1" "1") "k" (tuple "k"))
+             (long-arrow "k" "k")
+             (with "mode" "math" (long-arrow "<rubber-rightarrow>" "x"))
+             (gr-group)
+             (gr-group "k")
+             (with "gr-transformation" "k"
+               (triangle-3d (point "0" "0" "0") (point "1" "0" "0")
+                            (point "0" "1" "0") "red"))))
+    (let ((doc `(document "p" ,ex "q")))
+      (with-typeset-body doc
+        (lambda ()
+          (check= (tree->stree (buffer-tree)) doc)
+          (check-false (typeset-failed-buffer? (current-buffer)))
+          (go-to (append (tree->path (buffer-tree)) '(0 1)))
+          (insert "z")
+          (update-forced)
+          (check= (tree->stree (buffer-tree))
+                  `(document "pz" ,ex "q")))))))
+
 (define (test-typesetting-failure)
   (check-group "typesetting failure")
   (let* ((dir (url->url "$TEXMACS_HOME_PATH/system/recovered"))
@@ -3448,9 +3484,26 @@
   (if (or (tree-atomic? t) (== (tree-arity t) 0)) t
       (deep-leaf (tree-ref t (- (tree-arity t) 1)))))
 
-(define (deep-with n)
-  (let loop ((i 0) (t "x"))
+(define (deep-with n . opt-leaf)
+  (let loop ((i 0) (t (if (null? opt-leaf) "x" (car opt-leaf))))
     (if (= i n) t (loop (+ i 1) `(with "color" "red" ,t)))))
+
+(tm-define (typeset-test-deep-leaf) "y")
+
+(define (expand-deep-leaf n leaf)
+  (tree->stree (deep-leaf (texmacs-expand (stree->tree (deep-with n leaf))))))
+
+(define (with-guile-stack-limit words thunk)
+  ;; Guile 1.8 stops a program with "Stack overflow" when the stack is
+  ;; deeper than its option stack (in words, from the top): set to @words
+  ;; while @thunk runs; #f without that option (other Schemes)
+  (let ((opts (and (defined? 'debug-options) (debug-options))))
+    (and (list? opts) (memq 'stack opts)
+         (let ((old (cadr (memq 'stack opts))))
+           (debug-set! stack words)
+           (with r (catch #t thunk (lambda args (list 'caught args)))
+             (debug-set! stack old)
+             r)))))
 
 (define (repeat-string s n)
   (apply string-append (make-list n s)))
@@ -3468,12 +3521,32 @@
         (with r (tree->stree (latex-expand (buffer-tree)))
           (if had? (cpp-set-preference key old) (cpp-reset-preference key))
           (check= (cAr r) '(error "nesting too deep"))))))
-  ;; 20000 nested with: an error at the bottom, not a crash
+  ;; 20000 nested with: not a crash, but the text, or an error at the
+  ;; bottom if the stack is too small for them (it is 8 MB on macOS, 16 MB
+  ;; on Linux and Windows, and the frames differ with the compiler)
   (in-buffer
     (lambda ()
-      (check= (tree->stree (deep-leaf (texmacs-expand
-                                       (stree->tree (deep-with 20000)))))
-              "nesting too deep")))
+      (check-true (in? (expand-deep-leaf 20000 "x")
+                       (list "x" "nesting too deep")))))
+  ;; the guard stops before the limit of Guile too, so that Scheme can
+  ;; still run below it: with a Guile limit of 3 MB, an extern at the
+  ;; bottom of 1000 to 6000 levels (about 1 KB each) gave "Stack overflow"
+  ;; in Guile, as the message of the reader did on Linux (#813: the stack
+  ;; is 16 MB there, the limit of Guile 8 MB); 20000 levels do not fit
+  (in-buffer
+    (lambda ()
+      (with leaf '(extern "typeset-test-deep-leaf")
+        (with r (with-guile-stack-limit 375000
+                  (lambda ()
+                    (map (lambda (n) (expand-deep-leaf n leaf))
+                         (list 10 1000 3000 6000 20000))))
+          (when r
+            (check= (car r) "y")
+            (check= (list-filter (cdr r)
+                                 (lambda (x)
+                                   (nin? x (list "y" "nesting too deep"))))
+                    '())
+            (check= (cAr r) "nesting too deep"))))))
   ;; a .tm file nested 100000 levels deep, inline and as blocks: what is
   ;; too deep is an error, and the reader goes on after it
   (let* ((n 100000)
@@ -3489,7 +3562,13 @@
         (check= (tree->stree (tree-ref b 0)) "before")
         (check= (tree->stree (tree-ref b 2)) "after")
         (check= (tree->stree (deep-leaf (tree-ref b 1)))
-                "nesting too deep")))
+                "nesting too deep")
+        ;; and what was read is typeset: the bridges, the boxes and the
+        ;; paths recurse on its levels (read up to the full stack of Linux,
+        ;; 16 MB, it crashed the bridges)
+        (with-typeset-body (tree->stree b)
+          (lambda ()
+            (check-true (> (get-page-count) 0))))))
     ;; such a file loaded in a buffer: the buffer is marked, so that a save
     ;; asks first (save-buffer-check-nesting), and a file which is not too
     ;; deep is not
@@ -3595,6 +3674,7 @@
   (test-pages-kept)
   (test-long-document-without-pages)
   (test-typesetting-failure)
+  (test-malformed-graphics)
   (test-hidden-documents)
   (test-derived-state)
   (test-renumbering-labels)

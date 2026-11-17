@@ -51,8 +51,8 @@
 
 ;; A view is typeset by each editor of its buffer: a buffer with two views
 ;; (one of them hidden, as load-buffer makes it) has two observers on the
-;; same tree, which id->trees then gives twice, and which are both told of
-;; each change (#796). The views of an identifier are its trees, each once.
+;; same tree, which are both told of each change (#796). id->trees gives
+;; each tree once since #833, and live-view-trees is kept for its callers.
 
 (tm-define (live-view-trees vid)
   (:synopsis "The trees of the view @vid of a live document, each once")

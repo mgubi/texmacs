@@ -28,4 +28,15 @@ stack_nearly_full () {
   return n >= 0 && n < STACK_MARGIN;
 }
 
+// The Scheme interpreter may have a limit of its own for the stack it shares
+// with C++ (Guile 1.8 stops with "Stack overflow" when the stack is deeper
+// than its option stack, counted from where Guile started). It then sets this
+// hook, which gives the lowest address that a frame may reach for the
+// interpreter in the calling thread, or NULL when it has no limit there:
+// stack_remaining counts up to it, if it comes first, so that the guards stop
+// a recursion of C++ while the Scheme called from it (a message, a macro of
+// Scheme) can still run (#813: on Linux the stack is 16 MB, set in main, but
+// Guile stopped at 8 MB, in the message of the reader of a deep file)
+extern char* (*scheme_stack_low) ();
+
 #endif // STACK_GUARD_H

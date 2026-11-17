@@ -151,8 +151,12 @@
 
 (define mirror-idle? #t)
 (define mirror-pending (make-ahash-table))
+(define mirror-announced (make-ahash-table)) ;; unique id -> #t, until done
 
 (define (mirror-treat-pending)
+  ;; (a change whose end was not seen does not hide the next ones, as in
+  ;; live-treat-pending)
+  (set! mirror-announced (make-ahash-table))
   (with-author mirror-author
     (with-global mirror-idle? #f
       (for (key-im (ahash-table->list mirror-pending))
@@ -184,11 +188,22 @@
 
 (tm-define (mirror-notify event t mod)
   (:secure #t)
+  ;; A change of a mirror is announced to each observer of its body, all
+  ;; before the change is made, and then done to each: when the buffer has
+  ;; several views, each editor has its observer (#833, as #796 for live
+  ;; documents), and only the first announcement is kept, until the change
+  ;; is done.
+  (when (and (== event 'done) (mirror-body? t))
+    (and-with uid (mirror-unique-id t)
+      (ahash-remove! mirror-announced uid)))
   (when (and mirror-idle?
              ;;(not (busy-versioning?))
              (== event 'announce)
              (!= (modification-type mod) 'set-cursor)
-             (mirror-body? t))
+             (mirror-body? t)
+             (not (ahash-ref mirror-announced (mirror-unique-id t))))
+    (and-with uid (mirror-unique-id t)
+      (ahash-set! mirror-announced uid #t))
     ;;(display* event ", " (tree->path t) ", "
     ;;(modification->scheme mod) "\n")
     (and-with p (tree-up t)
