@@ -94,7 +94,6 @@ have the details, and the problems go to the
   now run their program with pipes, as the command lines do; an interrupt
   does nothing there, as with Qt (#446).
 - **An error which comes again no longer floods the terminal** (desktop):
-- **An error which comes again no longer floods the terminal**:
   each repeat of the same error printed its whole report, with the
   backtrace, on the terminal, also when the console showed it once only;
   an error raised at every update gave pages of output. The report is now
