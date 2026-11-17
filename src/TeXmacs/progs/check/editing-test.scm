@@ -1868,7 +1868,7 @@
         (check-false (disk-change-footer-text))
         #f)))
     ;; (closing a buffer without a name leaves its file in texts/scratch)
-    (when u
+    (when (and u (url-scratch? u))
       (buffer-pretend-saved u)
       (when (url-exists? u) (system-remove u))
       (buffer-close u))
