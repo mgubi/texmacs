@@ -366,17 +366,101 @@
       (check-true (string-occurs? "Theorem <class style=\"font-style: normal\">2</class>" s))
       (check-true (string-occurs? "Nested in the main directory." s)))))
 
-;; a macro which calls itself is stopped by the evaluator after hundreds of
-;; levels: the conversion of the expansion overflowed the stack of Scheme,
-;; and no HTML was written; it is now cut, with an error there (#813)
+;; a macro which calls itself is stopped by the evaluator after thousands of
+;; levels, as deep as the stack of C++ allows: the conversion of the
+;; expansion overflowed the stack of Scheme, and no HTML was written (a
+;; crash on Windows, where Guile had no limit); it is now converted again,
+;; cut, with an error there (#813). Whether a tree overflows depends on the
+;; markup and on the system (the frames, the limit of Guile): the HTML is
+;; either whole, or cut with the error, and always written
+(define (deep-tree wrap n leaf)
+  ;; @leaf in @n levels of @wrap (a loop: no recursion of Scheme)
+  (do ((i 0 (+ i 1)) (t leaf (wrap t))) ((= i n) t)))
+
+(define (html-of-deep wrap n)
+  (export `(document "before" ,(deep-tree wrap n "leaf") "after")
+          "html-snippet"))
+
+(define (whole-or-cut? s leaf)
+  ;; the HTML @s has its beginning and its end, and either @leaf, the
+  ;; deepest content, or the error of the cut, not both (the HTML may break
+  ;; the line in the middle of the error)
+  (and (string-occurs? "before" s)
+       (string-occurs? "after" s)
+       (if (string-occurs? leaf s)
+           (not (string-occurs? "nesting" s))
+           (string-occurs? "nesting" s))))
+
 (define (test-html-deep-recursion)
   (check-group "html export: a macro which calls itself")
   (for (def '((assign "wm" (macro "x" (with "color" "red" (wm (arg "x")))))
-              (assign "wm" (macro "x" (tabular (tformat (table (row (cell (wm (arg "x")))))))))))
+              (assign "wm" (macro "x" (tabular (tformat (table (row (cell (wm (arg "x")))))))))
+              (assign "wm" (macro "x" (surround "a" "b"
+                                                (with "color" "red"
+                                                      (wm (arg "x"))))))
+              (assign "wm" (macro "x" (with "color" "red" "font-shape" "italic"
+                                            "font-series" "bold"
+                                            "font-family" "tt"
+                                            "font-size" "1.19"
+                                            "par-left" "1cm"
+                                            (wm (arg "x")))))))
+    ;; (the evaluator stops with an error of its own, which is not exported:
+    ;; "a" stands for the deepest content)
     (with s (html-export-of-buffer `(document ,def "before" (wm "a") "after"))
       (check-true (string-occurs? "before" s))
+      (check-true (string-occurs? "after" s))))
+  ;; a formula for MathJax, converted by texmacs->latex (audit 6 of #879)
+  (with s (html-export-of-buffer
+           `(document (assign "wm" (macro "x" (with "color" "red"
+                                                    "font-shape" "italic"
+                                                    "font-series" "bold"
+                                                    "font-family" "tt"
+                                                    "font-size" "1.19"
+                                                    "par-left" "1cm"
+                                                    "par-right" "1cm"
+                                                    "par-first" "1cm"
+                                                    "math-level" "0"
+                                                    "math-display" "true"
+                                                    (concat "x+"
+                                                            (wm (arg "x"))))))
+                      "before" (concat "a " (math (wm "a"))) "after")
+           '("texmacs->html:mathjax" . "on"))
+    (check-true (string-occurs? "before" s))
+    (check-true (string-occurs? "after" s)))
+  (check-group "html export: a tree nested too deep is cut")
+  (let ((with1 (lambda (t) `(with "color" "red" ,t)))
+        (with3 (lambda (t) `(with "color" "red" "font-shape" "italic"
+                                  "par-left" "1cm" ,t)))
+        (frac (lambda (t) `(frac "1" ,t)))
+        (tab (lambda (t) `(tformat (table (row (cell ,t))))))
+        (eq (lambda (t) `(equation* (document ,t))))
+        (sur (lambda (t) `(surround "a" "b" (with "par-left" "1cm" ,t)))))
+    ;; deep trees: whole, or cut with the error
+    (for (s (list (html-of-deep with1 3000) (html-of-deep with3 1000)
+                  (html-of-deep frac 1500) (html-of-deep tab 1000)
+                  (html-of-deep sur 3000) (html-of-deep eq 1000)
+                  (html-of-deep (lambda (t) `(equation* ,(with3 t))) 1000)
+                  ;; (a chain of <tformat>, around a table)
+                  (export `(document
+                            "before"
+                            ,(deep-tree (lambda (t)
+                                          `(tformat (cwith "1" "1" "1" "1"
+                                                           "cell-halign" "c")
+                                                    ,t))
+                                        3000 '(table (row (cell "leaf"))))
+                            "after")
+                          "html-snippet")))
+      (check-true (whole-or-cut? s "leaf")))
+    ;; a table, whole or cut, keeps its structure: a <td> in each <table>
+    (with s (html-of-deep tab 1000)
+      (check= (occurrences "<table" s) (occurrences "<td" s)))
+    ;; shallow trees are whole
+    (for (s (list (html-of-deep with1 100) (html-of-deep with3 40)
+                  (html-of-deep frac 40) (html-of-deep tab 15)
+                  (html-of-deep eq 25) (html-of-deep sur 25)))
+      (check-true (string-occurs? "leaf" s))
       (check-true (string-occurs? "after" s))
-      (check-true (string-occurs? "nesting too" s)))))
+      (check-false (string-occurs? "nesting" s)))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them

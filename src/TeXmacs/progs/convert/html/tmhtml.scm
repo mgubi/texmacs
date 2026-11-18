@@ -2308,20 +2308,39 @@
 
 (define tmhtml-prune-error '(with "color" "red" "nesting too deep"))
 
+(define (tmhtml-deeper? x depth)
+  ;; is @x deeper than @depth? the recursion goes no deeper than @depth
+  (and (pair? x)
+       (or (<= depth 0)
+           (let loop ((l (cdr x)))
+             (and (pair? l)
+                  (or (tmhtml-deeper? (car l) (- depth 1))
+                      (loop (cdr l))))))))
+
+(define (tmhtml-prune-table x)
+  ;; the error in place of the table @x, which stays a table
+  (cond ((func? x 'cell) `(cell ,tmhtml-prune-error))
+        ((func? x 'row) `(row (cell ,tmhtml-prune-error)))
+        (else `(table (row (cell ,tmhtml-prune-error))))))
+
 (define (tmhtml-prune x depth)
-  ;; @x with what is deeper than @depth replaced by an error; the recursion
-  ;; goes no deeper than @depth, and the structure of a table is kept (the
-  ;; error goes in a cell)
+  ;; @x with what is deeper than @depth replaced by an error; the structure
+  ;; of a table is kept for 16 more levels at most, then it is a table whose
+  ;; cell is the error (the error alone in place of a table is not a table:
+  ;; no HTML at all); the other children of a table (<cwith>) are kept if
+  ;; no deeper than 8 levels; the recursion goes no deeper than @depth + 24
   (cond ((npair? x) x)
         ((and (<= depth 0) (in? (car x) '(tformat table row cell)))
-         (cons (car x)
-               (map (lambda (y)
-                      (cond ((== (car x) 'cell) tmhtml-prune-error)
-                            ((and (pair? y)
-                                  (in? (car y) '(tformat table row cell)))
-                             (tmhtml-prune y depth))
-                            (else y)))
-                    (cdr x))))
+         (if (<= depth -16) (tmhtml-prune-table x)
+             (cons (car x)
+                   (map (lambda (y)
+                          (cond ((== (car x) 'cell) tmhtml-prune-error)
+                                ((and (pair? y)
+                                      (in? (car y) '(tformat table row cell)))
+                                 (tmhtml-prune y (- depth 1)))
+                                ((tmhtml-deeper? y 8) tmhtml-prune-error)
+                                (else y)))
+                        (cdr x)))))
         ((<= depth 0) tmhtml-prune-error)
         (else (cons (car x)
                     (map (lambda (y) (tmhtml-prune y (- depth 1)))
@@ -2344,10 +2363,13 @@
                         (url->string (get-texmacs-path)))))
 	(texmacs->html doc opts))
       ;; a tree nested too deep for the recursions of the conversion (a
-      ;; macro which calls itself, stopped by the evaluator after hundreds
-      ;; of levels) overflows the stack of Scheme: it is converted again,
-      ;; cut at a depth which the conversion takes, and the HTML is written
-      ;; with an error there (#813)
+      ;; macro which calls itself, stopped by the evaluator after thousands
+      ;; of levels) overflows the stack of Scheme, on every system (Guile
+      ;; has a limit on Windows too, init-texmacs.scm): it is converted
+      ;; again, cut at a depth which the conversion takes, and the HTML is
+      ;; written with an error there (#813). How deep that is depends on the
+      ;; markup and on the system; a tree which does not overflow is
+      ;; converted whole
       (let retry ((depth #f))
         (catch 'stack-overflow
           (lambda ()
