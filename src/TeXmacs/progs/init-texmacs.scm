@@ -11,8 +11,19 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The limit of the stack of Guile, in words (SCM_STACKITEM, as large as a
+;; pointer: 8 bytes on 64 bits), from the base of the stack of its thread:
+;; past it, a recursion of Scheme throws 'stack-overflow, which the caller
+;; may catch, instead of a crash. On Windows the stack of the main thread is
+;; 16 MB (-Wl,--stack=16777216, misc/m4/tm_platform.m4): 1500000 words,
+;; 11.4 MB, leave a margin for C and C++ called from Scheme beyond the limit
+;; (the garbage collector, the glue); the guards of the evaluator also stop
+;; before it (stack_guard.hpp). It was 0, no check, from 2010 (with no
+;; reason given; the stack of Windows was then the 2 MB of the linker, below
+;; the 8 MB of the other systems, and became 16 MB in 2017): a deep
+;; recursion of Scheme was a crash on Windows only (#813)
 (cond ((os-mingw?)
-       (debug-set! stack 0))
+       (debug-set! stack 1500000))
       ((os-macos?)
        (debug-set! stack 2000000))
       (else
