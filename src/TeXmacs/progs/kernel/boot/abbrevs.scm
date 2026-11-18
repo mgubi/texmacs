@@ -118,18 +118,18 @@
      ,@body))
 
 (define-public-macro (with-global var val . body)
-  ;; the variable is restored after an error too; lazy-catch rethrows from
-  ;; where the error happened, so that backtraces still point there
-  (let ((old (gensym)) (new (gensym)) (args (gensym)))
-    `(let ((,old ,var))
-       (set! ,var ,val)
-       (let ((,new (lazy-catch #t
-                          (lambda () ,@body)
-                          (lambda ,args
-                            (set! ,var ,old)
-                            (apply throw ,args)))))
-         (set! ,var ,old)
-         ,new))))
+  ;; the variable is restored after an error too. dynamic-wind restores it
+  ;; while the error unwinds, without catching it: backtraces still point at
+  ;; the error, and no handler runs where the error happened (a lazy-catch
+  ;; rethrowing from its handler took more stack at each level of
+  ;; with-global, beyond the limit of Guile after a stack overflow: a crash
+  ;; in a deep recursion, #813)
+  (let ((old (gensym)) (new (gensym)))
+    `(let* ((,old ,var) (,new ,val))
+       (dynamic-wind
+         (lambda () (set! ,var ,new))
+         (lambda () ,@body)
+         (lambda () (set! ,var ,old))))))
 
 (define-public-macro (and-with var val . body)
   `(with ,var ,val
