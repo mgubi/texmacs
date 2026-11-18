@@ -1831,6 +1831,110 @@
           (buffer-close g)
           (switch-to-buffer f))))))
 
+;; A file changed on disk by another program after it was saved (#818): the
+;; buffer knows it (buffer-changed-on-disk?, the same test as the save), the
+;; footer says it, with or without changes in the buffer, and a revert takes
+;; the version of the disk, after which the buffer is that file again.
+(define (rewrite-later f doc)
+  ;; write @doc into @f until its date is later than the last save of the
+  ;; buffer (the dates of files are in seconds), at most 3 s
+  (let ((start (texmacs-time))
+        (t (stree->tree `(document (TeXmacs "2.1")
+                                   (style (tuple "generic"))
+                                   (body ,doc)))))
+    (let loop ()
+      (tree-export t f "texmacs")
+      (when (and (<= (url-last-modified f) (buffer-last-save f))
+                 (< (- (texmacs-time) start) 3000))
+        (let wait ((t0 (texmacs-time)))
+          (when (< (- (texmacs-time) t0) 200) (wait t0)))
+        (loop)))))
+
+(define (test-disk-change)
+  (check-group "a file changed on disk")
+  ;; a new document without a name, written by its autosave: no notice
+  (let ((old (current-buffer))
+        (u #f))
+    (check-false
+     (check-run
+      (lambda ()
+        (new-buffer)
+        (set! u (current-buffer))
+        (insert "hello")
+        (buffer-pretend-modified u)
+        (autosave-buffer u)
+        (disk-check-forget)
+        (check-false (buffer-changed-on-disk? u))
+        (check-false (disk-change-footer-text))
+        #f)))
+    ;; (closing a buffer without a name leaves its file in texts/scratch)
+    (when (and u (url-scratch? u))
+      (buffer-pretend-saved u)
+      (when (url-exists? u) (system-remove u))
+      (buffer-close u))
+    (when (buffer-exists? old) (switch-to-buffer old)))
+  (with-buffer-body '(document "mine")
+    (lambda ()
+      (let ((f (tmp-file* "disk.tm")))
+        (edit (save-buffer-as f :overwrite))
+        (disk-check-forget)
+        (check-false (buffer-changed-on-disk? f))
+        (check-false (disk-change-footer-text))
+        (rewrite-later f '(document "theirs"))
+        (check-true (buffer-changed-on-disk? f))
+        (disk-check-forget)
+        (with s (disk-change-footer-text)
+          (check-true (and (string? s) (string-contains? s "changed on disk"))))
+        ;; with changes in the buffer too
+        (edit (go-end) (insert " more"))
+        (disk-check-forget)
+        (with s (disk-change-footer-text)
+          (check-true (and (string? s) (string-contains? s "and here"))))
+        ;; a revert: the version of the disk, not modified, not changed
+        (revert-buffer-revert f)
+        (update-forced)
+        (check= (body) '(document "theirs"))
+        (check-false (buffer-modified? f))
+        (check-false (buffer-changed-on-disk? f))
+        (disk-check-forget)
+        (check-false (disk-change-footer-text))
+        ;; our own save, "Really save?" answered yes: the footer at once
+        ;; forgets the notice it had
+        (rewrite-later f '(document "theirs again"))
+        (disk-check-forget)
+        (check-true (string? (disk-change-footer-text)))
+        (edit (go-end) (insert " ours"))
+        (let* ((asked 0)
+               (yes (lambda (prompt default cont)
+                      (set! asked (+ asked 1))
+                      (cont #t))))
+          (with-global user-confirm yes
+            (save-buffer-main f))
+          (check= asked 1))
+        (check-false (buffer-modified? f))
+        (check-false (buffer-changed-on-disk? f))
+        (check-false (disk-change-footer-text))
+        ;; a file replaced by one with an older date (cp -p, a backup) is a
+        ;; change too
+        (when (and (not (os-mingw?)) (not (os-win32?)))
+         (let ((old (tmp-file* "older.tm")))
+          (tree-export (stree->tree `(document (TeXmacs "2.1")
+                                               (style (tuple "generic"))
+                                               (body (document "older"))))
+                       old "texmacs")
+          (eval-system (string-append "touch -t 202001010000 "
+                                      (raw-quote (url->system old))
+                                      " && mv " (raw-quote (url->system old))
+                                      " " (raw-quote (url->system f))))
+          (check-true (< (url-last-modified f) (buffer-last-save f)))
+          (check-true (buffer-changed-on-disk? f))
+          (revert-buffer-revert f)
+          (update-forced)
+          (check= (body) '(document "older"))
+          (check-false (buffer-changed-on-disk? f))))
+        ;; a buffer without a file, and one which is not open
+        (check-false (buffer-changed-on-disk? (tmp-file "none.tm")))))))
+
 ;; Save as tells the window of the buffer its new url (its file in the
 ;; title bar, the proxy icon of macOS), also when the file keeps its name in
 ;; another folder and the title of the buffer does not change: the url was
@@ -2228,6 +2332,7 @@
   (test-cancel-closed)
   (test-save)
   (test-save-as-window)
+  (test-disk-change)
   (test-open-from-system)
   (test-views-init)
   (test-views-style)

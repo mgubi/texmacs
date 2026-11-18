@@ -375,7 +375,7 @@
 ;(display "Booting shared files\n")
 (lazy-define (utils relate shared-files) shared-file-try-join shared-file-opened
              shared-file-leave shared-file-participant? shared-file-save-request
-             shared-file-saved shared-file? shared-file-info shared-files-list
+             shared-file-saved shared-file-reverted shared-file? shared-file-info shared-files-list
              shared-set-interactive! shared-poll shared-pause! shared-stat shared-entry shared-entry-path shared-test-bad-base! shared-test-resend-last! shared-test-reset! shared-lock-path shared-files-in-use shared-set-agent! shared-agent? shared-agent-id? shared-file-stat shared-collect-mark shared-collect-restore!
              shared-agent-mode shared-set-agent-mode! shared-file-agents shared-proposals shared-proposal-resolve! shared-file-send-withdraw shared-file-verdict shared-changed-blocks shared-file-gate-stats shared-treat-as-person! shared-file-save-refused shared-file-not-joined shared-file-not-joined-stale? shared-file-held-elsewhere? shared-file-save-guard shared-file-footer-text shared-agents-focus? shared-agent-short shared-agent-connection shared-agent-connection-text shared-agents-focus-text shared-agent-check-connection shared-agent-check-report shared-agent-last-check shared-file-pending-count shared-proposal-at-cursor shared-proposal-go! shared-proposal-resolve-all! shared-proposal-resolve-here! shared-file-agent-info shared-sanitize-patch shared-test-send-peers! shared-body-patch shared-patch-acceptable?)
 (lazy-define (version version-compare) compare-versions version-normalize)
@@ -508,6 +508,16 @@
         (lambda (t)
           (with t* (previous t)
             (with s (beamer-overflow-footer-text)
+              (if s
+                  (stree->tree `(concat ,(tree->stree t*) "     " ,s))
+                  t*))))))
+;; The footer says that the file of the document was changed on disk by
+;; another program, as long as it is (#818)
+(with previous footer-hook
+  (set! footer-hook
+        (lambda (t)
+          (with t* (previous t)
+            (with s (disk-change-footer-text)
               (if s
                   (stree->tree `(concat ,(tree->stree t*) "     " ,s))
                   t*))))))
