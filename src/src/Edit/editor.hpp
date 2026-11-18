@@ -322,6 +322,7 @@ public:
   virtual language get_env_language () = 0;
   virtual int      get_page_count () = 0;
   virtual SI       get_page_width (bool deco) = 0;
+  virtual SI       get_page_overflow () = 0;
   virtual SI       get_pages_width (bool deco) = 0;
   virtual SI       get_page_height (bool deco) = 0;
   virtual SI       get_total_width (bool deco) = 0;

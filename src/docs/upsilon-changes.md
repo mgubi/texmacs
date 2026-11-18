@@ -70,6 +70,17 @@ have the details, and the problems go to the
   `cork` encoding (`{\cyra}`); the addresses of `\url` and `\href` keep
   theirs in UTF-8 percent codes (#824).
 
+## 10 November 2026
+
+- **Presentations: the footer says when a slide is too tall** (#819, first
+  step): when the content of a slide (page medium beamer) is taller than
+  the screen, the editor showed a slightly longer page and the full-screen
+  presentation hid the rest. The footer now says "the slide overflows the
+  screen by 3.2 cm" while that slide is shown. The amount is measured when
+  the page is made, for the step of the slide which is shown; a mark of the
+  screen's limit on the page and a list of the slides which overflow are
+  to follow.
+
 ## 9 November 2026
 
 - **The programs started by a session plugin end with it** (desktop, Qt):

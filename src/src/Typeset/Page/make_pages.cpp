@@ -466,6 +466,7 @@ pager_rep::pages_make () {
   int i, n= N(sk);
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
+  env->page_overflow= 0;
   if (memo != NULL) {
     // the pages which are no longer there are not kept
     if (N(memo->texts)   > n) memo->texts  = range (memo->texts, 0, n);
@@ -497,8 +498,14 @@ pager_rep::papyrus_make () {
   SI ph= b->h();
   SI left  = (odd+even) >> 1;
   SI height= top + dtop + bot + dbot + ph;
-  if (env->get_string (PAGE_MEDIUM) == "beamer")
-    height= max (height, env->page_user_height + top + bot);
+  env->page_overflow= 0;
+  if (env->get_string (PAGE_MEDIUM) == "beamer") {
+    // a content taller than the screen makes a taller page; by how much is
+    // kept, so that the editor can tell (#819)
+    SI screen= env->page_user_height + top + bot;
+    if (height > screen) env->page_overflow= height - screen;
+    height= max (height, screen);
+  }
   array<box> bs   (1); bs   [0]= b;
   array<SI>  bs_x (1); bs_x [0]= left;
   array<SI>  bs_y (1); bs_y [0]= -top - dtop;
