@@ -38,11 +38,11 @@ def check(what, got, expected):
     else:
         print("ok     %s" % what)
 
-def session(terminals, output = None):
+def session(terminals, output = None, gs = False):
     """The default output, the plot file written and what the session sent"""
     os.environ["FAKE_TERMINALS"] = terminals
     from tmpy.graph import gnuplot
-    gnuplot.has_ghostscript = lambda: False
+    gnuplot.has_ghostscript = lambda: gs
     saved = sys.stdout
     sys.stdout = io.StringIO()
     try:
@@ -68,6 +68,11 @@ with tempfile.TemporaryDirectory() as tmp:
     os.makedirs(os.path.join(tmp, "home", "system", "tmp"))
     os.environ["PATH"] = bindir + os.pathsep + os.environ.get("PATH", "")
     os.environ["TEXMACS_HOME_PATH"] = os.path.join(tmp, "home")
+
+    # SVG is not the default, although gnuplot always has it (#723, #878)
+    out, files, sent = session("svg pngcairo png postscript", gs = True)
+    check("Ghostscript: output", out, "eps")
+    check("Ghostscript: plot", files, ["gnuplot.eps", "gnuplot.txt"])
 
     out, files, sent = session("svg pngcairo png postscript")
     check("pngcairo: output", out, "png")

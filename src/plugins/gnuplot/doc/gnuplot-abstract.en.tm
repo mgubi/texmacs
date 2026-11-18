@@ -29,7 +29,8 @@
     elsewhere it is the one of the system, for instance <verbatim|brew
     install ghostscript> on <name|macOS>. When <name|Ghostscript> is not
     found, the session says so at its start and
-    makes PNG images instead. A first line <verbatim|% -output png> (or
+    makes PNG images instead (SVG images when this <name|Gnuplot> has no
+    PNG terminal). A first line <verbatim|% -output png> (or
     <verbatim|eps>, <verbatim|svg>) in an input chooses the format of its
     plot.
   </note*>

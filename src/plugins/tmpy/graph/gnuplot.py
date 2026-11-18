@@ -64,7 +64,11 @@ class Gnuplot(Graph):
         super(Gnuplot, self).__init__()
         self.name = name
         # EPS (vector) plots need Ghostscript in TeXmacs, else a plot
-        # would show as "?": PNG then (#662)
+        # would show as "?": PNG then (#662). Not SVG by default, although
+        # gnuplot always has it: without Inkscape the export to PDF makes
+        # a gnuplot SVG a 72 dpi raster through ImageMagick, or nothing
+        # (#723), and the screen renderers miss some of its features
+        # (colours of points, dashes, patterns, superscripts: #878)
         self.has_gs = has_ghostscript()
         self.terminals = gnuplot_terminals(name)
         self.png_terminal = self.find_png_terminal()
