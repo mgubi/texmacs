@@ -56,6 +56,11 @@ have the details, and the problems go to the
   content: only the files of the directory of the document were expanded,
   so that the headings, equations and theorems of the others were missing
   and the later numbers shifted (#781).
+- **HTML export of a document which nests too deep** (desktop, Guile): a
+  macro which calls itself made a tree too deep for the conversion, which
+  overflowed the stack of Scheme and wrote no file. The document is now
+  converted again, cut at a depth the conversion takes, and the HTML is
+  written with "nesting too deep" in red where it was cut (part of #813).
 - **The option `-X`** is now in `texmacs -h`, in the manual page and in
   the user documentation and the page of the Cocoa interface: in headless
   mode it keeps TeXmacs running after the commands of `-x` and the files,
