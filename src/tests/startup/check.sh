@@ -417,10 +417,12 @@ freed #t" \
 
 # The command which closes an embedded editor (texmacs-input) when its
 # window is deleted kept the view of its buffer: when the buffer had been
-# closed before, it read the deleted view and crashed (#775). A widget made
-# again with the same name takes over the buffer and its view: deleting the
+# closed before, it read the deleted view and crashed (#775). A second
+# window with an input of the same name shows the same buffer: deleting the
 # window of the former widget must not close the buffer which the new one
-# shows. The steps run from the event loop, which deletes the windows.
+# shows. Since #776, each window has a view of its own, deleted with it;
+# the buffer is closed with the last window which shows it. The steps run
+# from the event loop, which deletes the windows.
 cat > "$out/startup-embedded.scm" <<'EOF'
 (define done #f)
 (define (later f)
@@ -475,11 +477,15 @@ reused buffer closed #f" \
 # texmacs-input without a name left a buffer, a view and an editor behind
 # (#776). The former widgets are let go at garbage collections, then close
 # their buffers from the event queue: the steps wait for that, with a
-# bound. A texmacs-input with a name reuses its buffer, whose undo history
-# kept each document it replaced; a named buffer stays when its tool is
-# closed, with a passive view: the code which named it may use it further
-# (the search toolbar after the search tool), and a new texmacs-input takes
-# it over. An unnamed input next to it shows when the tool was let go.
+# bound. A texmacs-input with a name has one editor per opening of its
+# tool: made again while the tool is shown, it keeps its view, so what was
+# typed can be undone, while new contents replacing an untouched one (a
+# field which shows results) are not kept. When the tool is closed, its
+# fields end at once: their views are deleted, the buffers without a name
+# closed, the named buffer stays (the search toolbar uses the buffer of the
+# search tool). The tool opened again at once, without a garbage
+# collection, gets a new view with an empty history: the views and the
+# histories do not pile up over the reopenings.
 cat > "$out/startup-side-tools.scm" <<'EOF'
 (define done #f)
 (define (later f)
@@ -524,17 +530,24 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (named-start))
 (define named (string->url "tmfs://aux/startup-side-named"))
 (define named-round 0)
+(define named-keep #f)
 (define (in-named thunk)
   ;; as with-buffer (which is not loaded yet)
   (let ((old (current-buffer)))
-    (buffer-focus named)
-    (let ((r (thunk)))
-      (buffer-focus old)
-      r)))
+    (and (buffer-focus named)
+         (let ((r (thunk)))
+           (buffer-focus old)
+           r))))
+(define (named-views) (length (buffer->views named)))
+(define (named-undo)
+  (in-named (lambda ()
+              (archive-state) (start-editing) (end-editing)
+              (undo-possibilities))))
 (tm-tool (startup-named-tool win)
   (:name "startup named tool")
   (text (number->string named-round))
-  (texmacs-input `(document ,(number->string named-round))
+  (texmacs-input (if named-keep (tree->stree (buffer-get-body named))
+                     `(document ,(number->string named-round)))
                  '(style "generic") named)
   (texmacs-input '(document "sentinel") '(style "generic") #f))
 (define (named-start)
@@ -542,37 +555,123 @@ cat > "$out/startup-side-tools.scm" <<'EOF'
   (tool-select :right 'startup-named-tool)
   (update-menus)
   (later named-shown))
+(define (typed s)
+  ;; text typed in the named input, as one action
+  (in-named (lambda ()
+              (archive-state) (start-editing) (insert s) (end-editing))))
 (define (named-shown)
   (update-forced)
-  (if (< named-round 4) (later named-start) (later named-close)))
+  (cond ((= named-round 1) (typed "typed "))
+        ((= named-round 2)
+         ;; made again while it is shown: the input keeps its history, and
+         ;; the new content can be undone
+         (display* "CHECK named undo kept " (> (named-undo) 0) "\n")))
+  (if (< named-round 8) (later named-start) (later named-close)))
+(define (named-steps)
+  ;; the steps of the history, counted by undoing them
+  (in-named (lambda ()
+              (archive-state) (start-editing) (end-editing)
+              (let loop ((n 0))
+                (if (> (undo-possibilities) 0)
+                    (begin (undo 0) (loop (+ n 1)))
+                    n)))))
 (define (named-close)
-  ;; a new content is not an edit that can be undone
-  (display* "CHECK named undo " (in-named undo-possibilities) "\n")
+  ;; 6 new contents while nothing was typed: they add no step, so that the
+  ;; typing and the first new content are left
+  (display* "CHECK named steps after 6 results " (named-steps) "\n")
+  (display* "CHECK named views " (named-views) "\n")
   (set-window-tools (current-window) :right '())
   (update-menus)
-  (later (wait-until (lambda () (= (inputs) 0)) 100 named-closed)))
-(define (named-closed)
-  (display* "CHECK sentinels left " (inputs) "\n")
-  (display* "CHECK named buffer kept " (buffer-exists? named) "\n")
+  ;; the end of the opening of the tool: its fields end at once
+  (display* "CHECK closed: views " (named-views) ", sentinels " (inputs)
+            ", named buffer kept " (buffer-exists? named) "\n")
   ;; as the search toolbar does with the buffer of the search tool
-  (in-named (lambda () (init-env "bg-color" "#fff0f0")))
+  (buffer-set-body named (stree->tree '(document "toolbar")))
+  (display* "CHECK named buffer usable "
+            (== (tree->stree (buffer-get-body named)) '(document "toolbar"))
+            "\n")
+  ;; from now on, the tool shows what was typed (a content which differs
+  ;; from the former one would clear an untouched history)
+  (set! named-keep #t)
+  (later named-reopen))
+(define reopened 0)
+(define reopen-ok #t)
+(define (named-reopen)
+  ;; opened again at once, without a garbage collection
   (tool-select :right 'startup-named-tool)
   (update-menus)
-  (later named-again))
-(define (named-again)
   (update-forced)
-  (display* "CHECK named views " (length (buffer->views named)) "\n")
-  (set! done #t))
+  ;; opened anew: a new editor, without the history of the former one
+  (when (or (!= (named-views) 1) (!= (named-undo) 0))
+    (display* "CHECK reopened " reopened ": views " (named-views)
+              ", undo " (named-undo) "\n")
+    (set! reopen-ok #f))
+  (set! reopened (+ reopened 1))
+  (typed "again ")
+  (when (!= (named-undo) 1) (set! reopen-ok #f))
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (when (!= (named-views) 0) (set! reopen-ok #f))
+  (if (< reopened 6)
+      (later named-reopen)
+      (begin
+        (display* "CHECK named reopened " reopened " times " reopen-ok "\n")
+        (set! done #t))))
 (later step)
 EOF
 
 check "side tools made again close the buffers of their texmacs-input (#776)" \
       "buffers left 1
-named undo 0
-sentinels left 0
-named buffer kept #t
-named views 1" \
+named undo kept #t
+named steps after 6 results 2
+named views 1
+closed: views 0, sentinels 0, named buffer kept #t
+named buffer usable #t
+named reopened 6 times #t" \
       -x '(load "startup-side-tools.scm")'
+
+# A tool whose only field is a named texmacs-input, opened and closed again
+# without a garbage collection: each close ends the field at once (#776).
+# The fields of an opening were appended to the default value of the
+# table of the openings, which every new opening then started with: from
+# the second opening on, the field was not in its opening, and its views
+# piled up until a garbage collection.
+cat > "$out/startup-tool-named-only.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define name (string->url "tmfs://aux/startup-tool-named-only"))
+(define (views)
+  (if (buffer-exists? name) (length (buffer->views name)) 0))
+(tm-tool (startup-named-only-tool win)
+  (:name "startup named only tool")
+  (texmacs-input '(document "x") '(style "generic") name))
+(define opened 0)
+(define (open-it)
+  (set! opened (+ opened 1))
+  (tool-select :right 'startup-named-only-tool)
+  (update-menus)
+  (update-forced)
+  (display* "CHECK opened " opened ": views " (views) "\n")
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (display* "CHECK closed " opened ": views " (views) "\n")
+  (if (< opened 3) (later open-it) (set! done #t)))
+(later open-it)
+EOF
+
+check "a tool with only a named texmacs-input, closed again (#776)" \
+      "opened 1: views 1
+closed 1: views 0
+opened 2: views 1
+closed 2: views 0
+opened 3: views 1
+closed 3: views 0" \
+      -x '(load "startup-tool-named-only.scm")'
 
 # A dialog whose refreshable makes a named texmacs-input again: the newer
 # widget takes the buffer over without being registered for the dialog, so
@@ -656,6 +755,218 @@ EOF
 check "a script which exits with a dialog open (#776)" \
       "dialog open" \
       -x '(load "startup-dialog-exit.scm")'
+
+# A dialog with a named texmacs-input in a refreshable: one editor per
+# opening of the dialog (#776). A refresh keeps the editor, so what was
+# typed can be undone; when the dialog is closed, the views of its fields
+# are deleted at once, and the named buffer is closed, unless another view
+# shows it (as before #776: nothing else uses the buffer of the dialog, as
+# the buffer of a console or of a macro editor); opened again at once,
+# without a garbage collection, the field starts with an empty history, and
+# the views do not pile up. A field with that name made by hand while the
+# dialog is open gets a view of its own, which the dialog leaves alone.
+cat > "$out/startup-dialog-reopen.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define name (string->url "tmfs://aux/startup-dialog-reopen"))
+(define (in-name thunk)
+  ;; as with-buffer (which is not loaded yet)
+  (let ((old (current-buffer)))
+    (and (buffer-focus name)
+         (let ((r (thunk)))
+           (buffer-focus old)
+           r))))
+(define (views)
+  (if (buffer-exists? name) (length (buffer->views name)) 0))
+(define (undos)
+  (in-name (lambda ()
+             (archive-state) (start-editing) (end-editing)
+             (undo-possibilities))))
+(define close-dialog #f)
+(define opened 0)
+(define content "x")
+(tm-widget ((startup-reopen) quit)
+  (refreshable "startup-dialog-reopen"
+    (resize "300px" "100px"
+      (texmacs-input (begin (set! close-dialog quit) `(document ,content))
+                     '(style "generic") name))))
+(define (open-it)
+  (dialogue-window (startup-reopen) noop "Startup dialog")
+  (set! opened (+ opened 1))
+  (later shown))
+(define (shown)
+  (update-forced)
+  (display* "CHECK opening " opened ": views " (views) ", undo " (undos)
+            "\n")
+  (in-name (lambda ()
+             (archive-state) (start-editing) (insert "typed") (end-editing)))
+  ;; a refresh with another content: what was typed can be undone
+  (set! content (string-append "x" (number->string opened)))
+  (refresh-now "startup-dialog-reopen")
+  (later refreshed))
+(define by-hand #f)
+(define (refreshed)
+  (display* "CHECK refreshed " opened ": views " (views) ", undo kept "
+            (> (undos) 0) "\n")
+  (when (= opened 3)
+    (set! by-hand (widget-texmacs-input '(document "h") '(style "generic")
+                                        name))
+    (display* "CHECK by hand: views " (views) "\n"))
+  (close-dialog)
+  (display* "CHECK closed " opened ": views " (views) ", buffer kept "
+            (buffer-exists? name) "\n")
+  (if (< opened 3) (open-it) (set! done #t)))
+(later open-it)
+EOF
+
+check "a dialog opened again starts with an empty history (#776)" \
+      "opening 1: views 1, undo 0
+refreshed 1: views 1, undo kept #t
+closed 1: views 0, buffer kept #f
+opening 2: views 1, undo 0
+refreshed 2: views 1, undo kept #t
+closed 2: views 0, buffer kept #f
+opening 3: views 1, undo 0
+refreshed 3: views 1, undo kept #t
+by hand: views 2
+closed 3: views 1, buffer kept #t" \
+      -x '(load "startup-dialog-reopen.scm")'
+
+# The same tool with a named texmacs-input in two windows: two openings,
+# so two views of the buffer, each with its editor (#776), where one view
+# was taken over by the other before. What is typed in one is in the buffer
+# once (no change announced twice, #796). As for two windows on one
+# document, each editor records the changes of the buffer made while it
+# exists, also those typed in the other. A window which is closed ends the
+# openings of its tools at once.
+cat > "$out/startup-two-windows.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define name (string->url "tmfs://aux/startup-two-windows"))
+(define (in-name thunk)
+  ;; as with-buffer (which is not loaded yet): the first view of the buffer
+  (let ((old (current-buffer)))
+    (and (buffer-focus name)
+         (let ((r (thunk)))
+           (buffer-focus old)
+           r))))
+(define (views) (length (buffer->views name)))
+(define (undos)
+  (in-name (lambda ()
+             (archive-state) (start-editing) (end-editing)
+             (undo-possibilities))))
+(define (typed s)
+  (in-name (lambda ()
+             (archive-state) (start-editing) (insert s) (end-editing))))
+(define (body) (tree->stree (buffer-get-body name)))
+(tm-tool (startup-two-tool win)
+  (:name "startup two tool")
+  (texmacs-input '(document "x") '(style "generic") name))
+(define w1 #f)
+(define w2 #f)
+(define (step1)
+  (set! w1 (current-window))
+  (tool-select :right 'startup-two-tool)
+  (update-menus)
+  (later step2))
+(define (step2)
+  (update-forced)
+  (set! w2 (open-window))
+  (tool-select :right 'startup-two-tool w2)
+  (update-menus)
+  (later step3))
+(define (step3)
+  (update-forced)
+  (display* "CHECK views " (views) "\n")
+  (typed "a")
+  (display* "CHECK typed in one " (cadr (body)) ", undo " (undos) "\n")
+  ;; the first window ends: the view of the second is left
+  (kill-window w1)
+  (display* "CHECK window closed: views " (views) ", undo " (undos) "\n")
+  (typed "b")
+  (display* "CHECK typed in the other " (string-length (cadr (body)))
+            ", undo " (undos) "\n")
+  (set! done #t))
+(later step1)
+EOF
+
+check "the same tool in two windows has two editors (#776)" \
+      "views 2
+typed in one ax, undo 1
+window closed: views 1, undo 1
+typed in the other 3, undo 1" \
+      -x '(load "startup-two-windows.scm")'
+
+# The buffer of a named texmacs-input of a dialog is closed with the
+# dialog, unless another view shows it: #776 kept it, so that each macro
+# editor or page format dialog closed left its buffers behind (and the
+# console its buffers, which the read-only suite checks). A tool showing
+# the same buffer keeps it, and a tool closed keeps its named buffer (the
+# search toolbar uses the buffer of the search tool).
+cat > "$out/startup-dialog-buffers.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (views u) (if (buffer-exists? u) (length (buffer->views u)) -1))
+(define (window-of u) (car (alt-window-search u)))
+(define macro (string->url "tmfs://aux/edit-strong"))
+(define (step1)
+  ;; a macro editor, as a dialog without side tools
+  (open-macro-editor "strong" :global)
+  (later step2))
+(define (step2)
+  (update-forced)
+  (display* "CHECK macro editor: views " (views macro) "\n")
+  (alt-window-delete (window-of macro))
+  (display* "CHECK macro editor closed: views " (views macro) "\n")
+  (tool-select :right 'startup-shared-tool)
+  (update-menus)
+  (later step3))
+(define name (string->url "tmfs://aux/startup-dialog-buffers"))
+(tm-tool (startup-shared-tool win)
+  (:name "startup shared tool")
+  (texmacs-input '(document "tool") '(style "generic") name))
+(tm-widget ((startup-shared-dialog) quit)
+  (resize "300px" "100px"
+    (texmacs-input '(document "dialog") '(style "generic") name)))
+(define (step3)
+  (update-forced)
+  (dialogue-window (startup-shared-dialog) noop "Startup shared dialog")
+  (later step4))
+(define (step4)
+  (update-forced)
+  (display* "CHECK tool and dialog: views " (views name) "\n")
+  (alt-window-delete (window-of name))
+  (display* "CHECK dialog closed: views " (views name) "\n")
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (display* "CHECK tool closed: views " (views name) ", buffer kept "
+            (buffer-exists? name) "\n")
+  (set! done #t))
+(later step1)
+EOF
+
+check "a dialog closes the buffers of its named texmacs-input (#776)" \
+      "macro editor: views 1
+macro editor closed: views -1
+tool and dialog: views 2
+dialog closed: views 1
+tool closed: views 0, buffer kept #t" \
+      -x '(load "startup-dialog-buffers.scm")'
 
 # A link whose target has a wildcard: the pattern was loaded as the name of
 # a buffer, and url-glue (the autosave names) threw a C++ exception which
@@ -992,6 +1303,10 @@ cat > "$out/startup-early-close.scm" <<'EOF'
         ;; closed before its editor was typeset
         (set-window-tools (current-window) :bottom-right '())
         (update-menus)
+        ;; since #776, the end of the tool deletes the view of its field at
+        ;; once, so that its editor no longer reaches the canvas
+        (display* "CHECK views after the close "
+                  (length (buffer->views (search-buffer))) "\n")
         (later (wait 10)))))
 (define (wait n)
   (lambda ()
@@ -1007,13 +1322,17 @@ before=$failed
 before_total=$total
 check "a side tool closed before its texmacs-input was typeset (#825)" \
       "shown 1
+views after the close 0
 survived" \
       -x '(load "startup-early-close.scm")'
 
 # the case reached the canvas which is gone: without it, it would pass
 # without the crash of #825, if the editor were typeset before the close
-# (checked only when the case passed, so that a failure counts once)
+# (checked only when the case passed, so that a failure counts once; since
+# #776 the editor ends with its tool, so this only applies when the view
+# was left)
 if [ $total -gt $before_total ] && [ $failed -eq $before ] &&
+   ! grep -aq "views after the close 0" "$out/$total.out" &&
    ! grep -aq "cannot set scroll position" "$out/$total.out"; then
   echo "  FAILED a side tool closed before its texmacs-input was typeset (#825):"
   echo "         the scroll position was not sent to the closed tool"

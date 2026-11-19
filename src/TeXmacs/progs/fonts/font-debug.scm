@@ -213,10 +213,15 @@
                      ;; with it
                      (when (font-colours-by-origin?)
                        (toggle-font-colours-by-origin))
-                     (alt-window-delete win))))
-           (wid (make-menu-widget* (list 'vertical (font-inspector-widget))
-                                   0)))
-      (alt-window-create-quit win wid (translate "Font inspector") quit)
+                     (alt-window-delete win)))))
+      ;; built by window-build: a failed build ends the opening of the
+      ;; window at once (#776)
+      (window-build win
+        (lambda ()
+          (with wid (make-menu-widget* (list 'vertical (font-inspector-widget))
+                                       0)
+            (alt-window-create-quit win wid (translate "Font inspector")
+                                    quit))))
       (alt-window-set-on-top win #t)
       (alt-window-show win))))
 

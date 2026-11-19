@@ -48,7 +48,7 @@
 ;; ones, never "primary", which is the clipboard of the system.
 
 (texmacs-module (check editing-test)
-  (:use (check check-lib)))
+  (:use (check check-lib) (utils library cursor)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -394,6 +394,254 @@
     (check-false (buffer-exists? u))
     (check= (current-buffer) old)
     (check= (view->buffer (window->view (current-window))) old)))
+
+;; One editor per opening of a named texmacs-input (#776). A field made
+;; outside a dialog or a tool, as here, is made again in the live opening of
+;; its name (a menu made again): it keeps its view, with its editor and its
+;; undo history, and a new content is an edit which can be undone, unless
+;; nothing was typed since the former content (a field which shows
+;; results). The views made by Scheme are not those of a field: they are
+;; left alone. (The dialogs and the tools, whose openings begin and end in
+;; the event loop, are checked in tests/startup/check.sh.)
+(define (test-embedded-history)
+  (check-group "the history of a named texmacs-input made again")
+  (let* ((w (string->url "tmfs://aux/editing-test-embedded-history"))
+         (build (lambda (doc)
+                  (widget-texmacs-input doc '(style "generic") w)))
+         (build-other (lambda (u doc)
+                        (widget-texmacs-input doc '(style "generic") u)))
+         (old (current-buffer))
+         (original '(document "original")))
+    (with r (check-run
+              (lambda ()
+                (build original)
+                (with-buffer w
+                  (go-to (list (car (cursor-path)) 0 0))
+                  (edit (insert "typed "))
+                  (check-true (> (undo-possibilities) 0)))
+                ;; made again with its former content: what was typed is
+                ;; kept, and can be undone
+                (build original)
+                (check= (length (buffer->views w)) 1)
+                (with-buffer w
+                  (check-true (> (undo-possibilities) 0))
+                  (edit (undo 0))
+                  (check= (tree->stree (buffer-get-body w))
+                          '(document "typed original")))
+                ;; made again with the content it has: no new step, only
+                ;; the typing is left to undo (the steps are counted by
+                ;; undoing them: undo-possibilities is at most 1)
+                (build (tree->stree (buffer-get-body w)))
+                (with-buffer w
+                  (archive-state) (start-editing) (end-editing)
+                  (let loop ((n 0))
+                    (if (> (undo-possibilities) 0)
+                        (begin (edit (undo 0)) (loop (+ n 1)))
+                        (check= n 1)))
+                  (check= (tree->stree (buffer-get-body w))
+                          '(document "original")))
+                ;; a field with the name of a buffer which has a view made
+                ;; by Scheme: that view keeps its history
+                (with p (string->url "tmfs://aux/editing-test-embedded-new")
+                  (buffer-set-body p (stree->tree '(document "p")))
+                  (view-passive p)
+                  (buffer-focus p)
+                  (check= (current-buffer) p)
+                  (edit (insert "typed "))
+                  (check= (undo-possibilities) 1)
+                  (build-other p '(document "typed p"))
+                  (check= (current-buffer) p)
+                  (check= (length (buffer->views p)) 2)
+                  (check= (undo-possibilities) 1)
+                  (buffer-focus old)
+                  (check= (current-buffer) old)
+                  (buffer-close p)
+                  (check-false (buffer-exists? p)))
+                ;; a field which shows results: its contents do not pile up
+                ;; in its history while nothing is typed in it
+                (with g (string->url "tmfs://aux/editing-test-embedded-results")
+                  (for (k (.. 0 6))
+                    (build-other g `(document ,(number->string k)))
+                    (with-buffer g
+                      (archive-state) (start-editing) (end-editing)
+                      (check= (undo-possibilities) 0)))
+                  (check= (length (buffer->views g)) 1)
+                  (check= (tree->stree (buffer-get-body g)) '(document "5"))
+                  (buffer-close g)
+                  (check-false (buffer-exists? g)))
+                ;; typed, then two new contents: the second one, with
+                ;; nothing typed since the first, adds no step, and what
+                ;; was typed can still be undone
+                (with t (string->url "tmfs://aux/editing-test-embedded-typed")
+                  (build-other t '(document "o"))
+                  (with-buffer t
+                    (go-to (list (car (cursor-path)) 0 0))
+                    (edit (insert "T")))
+                  (build-other t '(document "y"))
+                  (build-other t '(document "z"))
+                  (with-buffer t
+                    (archive-state) (start-editing) (end-editing)
+                    (edit (undo 0))
+                    (check= (tree->stree (buffer-get-body t))
+                            '(document "To"))
+                    (edit (undo 0))
+                    (check= (tree->stree (buffer-get-body t))
+                            '(document "o"))
+                    (check= (undo-possibilities) 0))
+                  (buffer-close t)
+                  (check-false (buffer-exists? t)))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (buffer-close w)
+    (check-false (buffer-exists? w))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
+
+;; What was typed in a named texmacs-input stays reachable by undo whatever
+;; the builds which follow (#776): a build which changes nothing after a
+;; typing, or a typing after an undo, is not taken for "nothing typed since
+;; the last build", whose step the next build would take over.
+(define (test-embedded-history-typed)
+  (check-group "the typing in a named texmacs-input made again")
+  (let* ((build (lambda (u doc)
+                  (widget-texmacs-input doc '(style "generic") u)))
+         (type (lambda (u s)
+                 (with-buffer u
+                   (go-to (list (car (cursor-path)) 0 0))
+                   (edit (insert s)))))
+         (body (lambda (u) (tree->stree (buffer-get-body u))))
+         (undo1 (lambda (u)
+                  (with-buffer u
+                    (archive-state) (start-editing) (end-editing)
+                    (edit (undo 0)))))
+         (old (current-buffer))
+         (g (string->url "tmfs://aux/editing-test-typed-same"))
+         (h (string->url "tmfs://aux/editing-test-typed-branch")))
+    (with r (check-run
+              (lambda ()
+                ;; built, typed, built again with what it shows, then with
+                ;; a new content: undo gives back what was typed
+                (build g '(document "G"))
+                (type g "w")
+                (check= (body g) '(document "wG"))
+                (build g '(document "wG"))
+                (build g '(document "H"))
+                (check= (body g) '(document "H"))
+                (undo1 g)
+                (check= (body g) '(document "wG"))
+                (undo1 g)
+                (check= (body g) '(document "G"))
+                ;; typed, built, undone, typed again (a new step where the
+                ;; build's was), built: undo gives back the second typing
+                (build h '(document "a"))
+                (type h "x")
+                (build h '(document "b"))
+                (undo1 h)
+                (check= (body h) '(document "xa"))
+                (type h "y")
+                (check= (body h) '(document "yxa"))
+                (build h '(document "c"))
+                (undo1 h)
+                (check= (body h) '(document "yxa"))
+                (undo1 h)
+                (check= (body h) '(document "xa"))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (for (u (list g h))
+      (when (buffer-exists? u) (buffer-close u))
+      (check-false (buffer-exists? u)))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
+
+;; A dialog whose build fails ends its opening at once, with the
+;; texmacs-input made in it, and the window and the opening built before it
+;; are current again (#776): nothing made afterwards goes into its opening,
+;; also when it was built while another window was.
+(define (test-embedded-failed-build)
+  (check-group "a dialog whose build fails")
+  (let* ((field (lambda (u doc)
+                  (widget-texmacs-input doc '(style "generic") u)))
+         (views (lambda (u)
+                  (if (buffer-exists? u) (length (buffer->views u)) 0)))
+         (old (current-buffer))
+         (op0 (embedded-opening))
+         (d (string->url "tmfs://aux/editing-test-failed-dialog"))
+         (a (string->url "tmfs://aux/editing-test-failed-after"))
+         (o (string->url "tmfs://aux/editing-test-failed-outer"))
+         (i (string->url "tmfs://aux/editing-test-failed-inner"))
+         (l (string->url "tmfs://aux/editing-test-failed-later"))
+         (keep '()))
+    (with r (check-run
+              (lambda ()
+                ;; a dialog whose widget raises after a field was made
+                (check= (catch #t
+                          (lambda ()
+                            (dialogue-window
+                              (lambda (cmd)
+                                (set! keep (cons (field d '(document "d"))
+                                                 keep))
+                                (error "editing-test: failed build"))
+                              noop "editing-test-failed")
+                            'built)
+                          (lambda args 'failed))
+                        'failed)
+                (check= (embedded-opening) op0)
+                (check= (views d) 0)
+                ;; a field made by hand afterwards is in an opening of its
+                ;; own, which the next window leaves alone
+                (set! keep (cons (field a '(document "a")) keep))
+                (check= (views a) 1)
+                (let* ((w (alt-window-handle))
+                       (wid (make-menu-widget '(vertical (text "x")) 0)))
+                  (alt-window-create-plain w wid "editing-test-next")
+                  (check= (embedded-opening) op0)
+                  (check= (views a) 1)
+                  (alt-window-delete w))
+                (check= (views a) 1)
+                ;; a window whose build fails while another one is built
+                (let* ((w (alt-window-handle))
+                       (op (embedded-opening)))
+                  (set! keep (cons (field o '(document "o")) keep))
+                  (check= (catch #t
+                            (lambda ()
+                              (let ((w2 (alt-window-handle)))
+                                (window-build w2
+                                  (lambda ()
+                                    (set! keep (cons (field i '(document "i"))
+                                                     keep))
+                                    (error "editing-test: inner build")))))
+                            (lambda args 'failed))
+                          'failed)
+                  (check= (embedded-opening) op)
+                  (check= (views i) 0)
+                  (set! keep (cons (field l '(document "l")) keep))
+                  (alt-window-create-plain w (make-menu-widget
+                                              '(vertical (text "y")) 0)
+                                           "editing-test-outer")
+                  (check= (embedded-opening) op0)
+                  ;; the fields of the outer window are in its window and
+                  ;; its opening, and live until it is deleted
+                  (check= (alt-window-search l) (list w))
+                  (check= (views o) 1)
+                  (check= (views l) 1)
+                  (let* ((w3 (alt-window-handle))
+                         (wid3 (make-menu-widget '(vertical (text "z")) 0)))
+                    (alt-window-create-plain w3 wid3 "editing-test-third")
+                    (alt-window-delete w3))
+                  (check= (views o) 1)
+                  (check= (views l) 1)
+                  (alt-window-delete w)
+                  (check= (views o) 0)
+                  (check= (views l) 0))))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))
+    (embedded-opening-set op0)
+    (set! keep '())
+    (for (u (list d a o i l))
+      (when (buffer-exists? u) (buffer-close u))
+      (check-false (buffer-exists? u)))
+    (when (buffer-exists? old) (switch-to-buffer old))
+    (check= (current-buffer) old)))
 
 ;; A document written to a .tm file and loaded: the body, the style and the
 ;; initial environment of the file are those of the buffer, which is not
@@ -2309,6 +2557,9 @@
   (test-tree-pointers)
   (test-embedded)
   (test-embedded-close)
+  (test-embedded-history)
+  (test-embedded-history-typed)
+  (test-embedded-failed-build)
   (test-load)
   (test-load-large)
   (test-load-from-system-large)

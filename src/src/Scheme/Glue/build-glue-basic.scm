@@ -1054,6 +1054,10 @@
   (alt-window-get-position window_get_position (scheme_tree int))
   (alt-window-set-position window_set_position (void int int int))
   (alt-window-search window_search (path url))
+  (embedded-opening embedded_opening (int))
+  (embedded-opening-set embedded_opening_set (bool int))
+  (embedded-tool-opening embedded_tool_opening (int string))
+  (embedded-opening-abort embedded_opening_abort (void int))
 
   ;; routines for BibTeX
   (supports-bibtex? bibtex_present (bool))

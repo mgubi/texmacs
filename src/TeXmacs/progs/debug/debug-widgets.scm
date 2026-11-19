@@ -80,7 +80,7 @@
 ;; can be selected, copied and searched as in a document: one embedded
 ;; buffer per tab, named after the console and the category ("all" for the
 ;; tab of all messages), which lives as long as the window (the window
-;; closes it, see texmacs_input_widget). A new message is added to the
+;; closes it, see end_field in tm_window.cpp). A new message is added to the
 ;; buffers which show it, at the end, without typesetting them anew: the
 ;; selection and the scrolling position stay as they were.
 

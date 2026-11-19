@@ -90,6 +90,7 @@
     (vsplit :menu-item :menu-item)
     (refresh :%1 :string?)
     (refreshable :%1 :menu-item-list)
+    (opening :%1 :menu-item-list)
     (cached :%1 :%1 :menu-item-list)
     (if :%1 :menu-item-list)
     (when :%1 :menu-item-list)
@@ -818,12 +819,49 @@
   (with (tag s kind) p
     (list (widget-refresh (if (string? s) s (symbol->string s)) kind))))
 
+(define (embedded-opening-live? op)
+  (let* ((old (embedded-opening))
+         (live? (embedded-opening-set op)))
+    (embedded-opening-set old)
+    live?))
+
+(define (in-opening op thunk)
+  ;; run @thunk with @op as the opening of the texmacs-input it makes, and
+  ;; restore the former opening afterwards (#776)
+  (let ((old (embedded-opening)))
+    (embedded-opening-set op)
+    (with r (catch #t thunk
+              (lambda args (embedded-opening-set old) (apply throw args)))
+      (embedded-opening-set old)
+      r)))
+
 (define (make-refreshable p style bar?)
   "Make @(refreshable :%1 :menu-item-list) menu items."
+  ;; the content is made again in the opening of the dialog or tool in
+  ;; which the refreshable was made: its texmacs-input keep their editors;
+  ;; once that opening has ended (a dialog closed, but its widgets not yet
+  ;; let go), it is made empty
   (with (tag kind . items) p
-    (list (widget-refreshable
-            (lambda () (widget-vmenu (make-menu-items-list items style bar?)))
-            (kind)))))
+    (let ((op (embedded-opening)))
+      (list (widget-refreshable
+              (lambda ()
+                (in-opening op
+                  (lambda ()
+                    (if (embedded-opening-live? op)
+                        (widget-vmenu (make-menu-items-list items style bar?))
+                        (widget-vmenu '())))))
+              (kind))))))
+
+(define (make-opening p style bar?)
+  "Make @(opening :%1 :menu-item-list) menu items."
+  ;; a tool of a tool slot, whose texmacs-input are in the opening of the
+  ;; tool: the same as long as the tool is shown (#776)
+  (with (tag tool . items) p
+    (let ((old (embedded-tool-opening tool)))
+      (with op (embedded-opening)
+        (embedded-opening-set old)
+        (in-opening op
+          (lambda () (make-menu-items-list items style bar?)))))))
 
 (define cached-widgets (make-ahash-table))
 
@@ -990,6 +1028,8 @@
            ,(lambda (p style bar?) (make-refresh p style bar?)))
   (refreshable (:%1 :*)
                ,(lambda (p style bar?) (make-refreshable p style bar?)))
+  (opening (:%1 :*)
+           ,(lambda (p style bar?) (make-opening p style bar?)))
   (cached (:%1 :%1 :*)
                ,(lambda (p style bar?) (make-cached p style bar?))))
 
@@ -1226,6 +1266,7 @@
   (promise ,menu-expand-promise)
   (refresh ,replace-procedures)
   (refreshable ,replace-procedures)
+  (opening ,(lambda (p) `(opening ,(cadr p) ,@(menu-expand-list (cddr p)))))
   (cached ,replace-procedures))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1275,29 +1316,43 @@
     (for-each (lambda (buf) (ahash-set! window-deleters buf del)) bufs)
     del))
 
+(tm-define (window-build win thunk)
+  (:synopsis "Build the window @win, made by @alt-window-handle, by @thunk")
+  ;; if the build fails before alt-window-create, the opening of the window
+  ;; ends at once, with the texmacs-input made in it, and the window and the
+  ;; opening built before it are current again (#776)
+  (catch #t thunk
+    (lambda args
+      (embedded-opening-abort win)
+      (apply throw args))))
+
 (tm-define (top-window menu-promise name . opts)
   (:interactive #t)
   (with (bufs qqq) (decode-options opts)
     (let* ((win (alt-window-handle))
-           (del (make-window-deleter win bufs))
-           (qui (object->command (lambda () (qqq) (del))))
-           (men (menu-promise))
-           (scm (list 'vertical men))
-           (wid (make-menu-widget* scm 0)))
-      (alt-window-create-quit win wid (translate name) qui)
+           (del (make-window-deleter win bufs)))
+      (window-build win
+        (lambda ()
+          (let* ((qui (object->command (lambda () (qqq) (del))))
+                 (men (menu-promise))
+                 (scm (list 'vertical men))
+                 (wid (make-menu-widget* scm 0)))
+            (alt-window-create-quit win wid (translate name) qui))))
       (alt-window-show win))))
 
 (tm-define (dialogue-window menu-promise cmd name . opts)
   (:interactive #t)
   (with (bufs qqq) (decode-options opts)
     (let* ((win (alt-window-handle))
-           (del (make-window-deleter win bufs))
-           (qui (object->command (lambda () (qqq) (del))))
-           (lbd (lambda x (apply cmd x) (del)))
-           (men (menu-promise lbd))
-           (scm (list 'vertical men))
-           (wid (make-menu-widget* scm 0)))
-      (alt-window-create-quit win wid (translate name) qui)
+           (del (make-window-deleter win bufs)))
+      (window-build win
+        (lambda ()
+          (let* ((qui (object->command (lambda () (qqq) (del))))
+                 (lbd (lambda x (apply cmd x) (del)))
+                 (men (menu-promise lbd))
+                 (scm (list 'vertical men))
+                 (wid (make-menu-widget* scm 0)))
+            (alt-window-create-quit win wid (translate name) qui))))
       (alt-window-show win))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1306,11 +1361,13 @@
 
 (tm-define (interactive-window wid-promise cmd name)
   (:interactive #t)
-  (let* ((win (alt-window-handle))
-         (lbd (lambda x (apply cmd x) (alt-window-delete win)))
-         (com (object->command (menu-protect lbd)))
-         (wid (wid-promise com)))
-    (alt-window-create-plain win wid (translate name))
+  (let* ((win (alt-window-handle)))
+    (window-build win
+      (lambda ()
+        (let* ((lbd (lambda x (apply cmd x) (alt-window-delete win)))
+               (com (object->command (menu-protect lbd)))
+               (wid (wid-promise com)))
+          (alt-window-create-plain win wid (translate name)))))
     (alt-window-show win)))
 
 (tm-define (interactive-print done u)
@@ -1522,6 +1579,11 @@
   (with win (if (null? opt-win) (current-window) (car opt-win))
     (and-with l (window->tools win pos)
       (in? tool l))))
+
+(tm-define (tool-opening tool items)
+  (:synopsis "The menu @items of @tool, in the opening of the tool (#776)")
+  ;; (a list of menu items, as the widgets of tm-widget give)
+  (list `(opening ,(symbol->string (car tool)) ,@items)))
 
 (tm-define (tool-select pos tool . opt-win)
   (:check-mark "v" tool-active?)
