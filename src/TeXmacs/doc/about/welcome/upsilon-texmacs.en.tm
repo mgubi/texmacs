@@ -79,10 +79,10 @@
     <menu|Dark mode> (light grey text on a dark grey paper) and
     <menu|Programmer mode> (the same, in the monospace font <name|IBM Plex
     Mono>). The sessions and the source tags get colors chosen for the dark
-    paper, and the colors of the source code and of the flags are lightened
-    to be readable on it. As with the other themes, the theme belongs to the
-    document, and a <name|PDF> of it is as dark as the page. A color you set
-    yourself is not lightened, and text on a light cell or box background
+    paper, and the colors of the source code, of the flags and the text
+    colors you set yourself are lightened to be readable on it. As with the
+    other themes, the theme belongs to the document, and a <name|PDF> of it
+    is as dark as the page. Text on a light cell or box background
     (as the input fields of the session styles <with|font-shape|italic|Framed
     input fields> and ring sessions) is light on light.
 

@@ -22,8 +22,9 @@ have the details, and the problems go to the
   *Programmer mode* is the same in the monospace font IBM Plex Mono (text,
   code and most math symbols), shipped in `TeXmacs/fonts/truetype/plex`. The
   code of the languages whose colors are fixed (tree-sitter, Python, Java,
-  R, ...) is lightened, with its hue, until it has a contrast of 4.5 with
-  the paper, by the new environment variable
+  R, ...) and the text colors set by hand (`<with|color|blue|...>`) are
+  lightened, with their hue, until they have a contrast of 4.5 with the
+  paper, by the new environment variable
   `adapt-dark-colors` (set by these themes only: other documents, and the
   other themes, are unchanged). They are style packages saved with the
   document like the other themes; a PDF comes out dark, as with those.

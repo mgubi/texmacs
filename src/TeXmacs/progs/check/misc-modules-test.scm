@@ -172,18 +172,25 @@
 ;; initial environment has @bg as bg-color (unless it is "") and @flag (""
 ;; or an associate of adapt-dark-colors)
 (define (styled-code-colors style ornament? bg flag)
+  (let* ((code (string-append
+                "<\\python-code>\n    import os # c\n"
+                "    def f(x): return 3\n  </python-code>")))
+    (styled-body-colors style
+                        (string-append
+                         "<label|lab1>\n\n  "
+                         (if ornament?
+                             (string-append "<\\ornamented>\n  " code
+                                            "\n  </ornamented>")
+                             code))
+                        bg flag)))
+
+;; the same for a document with the body @body (a string of TeXmacs)
+(define (styled-body-colors style body bg flag)
   (let* ((f (tmp-file "dark-colors-check.tm"))
          (ps (tmp-file "dark-colors-check.ps"))
-         (code (string-append
-                "<\\python-code>\n    import os # c\n"
-                "    def f(x): return 3\n  </python-code>"))
          (doc (string-append
                "<TeXmacs|2.1.2>\n\n<style|<tuple|" style ">>\n\n"
-               "<\\body>\n  <label|lab1>\n\n  "
-               (if ornament?
-                   (string-append "<\\ornamented>\n  " code
-                                  "\n  </ornamented>")
-                   code)
+               "<\\body>\n  " body
                "\n</body>\n\n"
                "<\\initial>\n  <\\collection>\n"
                "    <associate|page-medium|paper>\n"
@@ -2838,12 +2845,15 @@
     (check-true (> (length none) 3))
     (check= off none)
     (check= (length on) (length none))
-    ;; the background, the label flag (blue) and the two colors of the
-    ;; Python highlighter (#309090, #802000)
+    ;; the background, the label flag (blue), the two colors of the
+    ;; Python highlighter (#309090, #802000) and the text (black, the color
+    ;; of the generic style)
     (check-true (in? bg none))
     (check-true (in? '(0.0 0.0 1.0) none))
     (check-false (in? '(0.0 0.0 1.0) on))
-    (check= (length changed) 3)
+    (check-true (in? '(0.0 0.0 0.0) none))
+    (check-false (in? '(0.0 0.0 0.0) on))
+    (check= (length changed) 4)
     ;; each changed color is lightened towards white with its hue, just to
     ;; a contrast of 4.5; the colors with enough contrast are kept
     (check= (list-filter changed (lambda (p) (not (rgb-lightened?
@@ -2864,6 +2874,38 @@
       (check-false (in? '(0.0 0.0 1.0) l)))
     (with l (styled-code-colors "generic" #t "#2a2a2e" "")
       (check-true (in? '(0.501 0.125 0.0) l)))
+    ;; a text color set with <with|color|..> (dark blue on the dark paper,
+    ;; unreadable before) is lightened the same way, the light text of the
+    ;; theme and a light user color are kept
+    (let* ((body (string-append "Text <with|color|blue|blue> "
+                                "<with|color|#802000|red> "
+                                "<with|color|yellow|yellow>"))
+           (l (styled-body-colors "generic|dark-mode" body "" ""))
+           (p (styled-body-colors "generic" body "" "")))
+      (check-true (in? bg l))
+      (check-true (in? '(0.831 0.831 0.847) l))
+      (check-true (in? '(1.0 1.0 0.0) l))
+      (check-false (in? '(0.0 0.0 1.0) l))
+      (check-false (in? '(0.501 0.125 0.0) l))
+      ;; the lightened blue and red keep their hue, with a contrast of 4.5
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.0 0.0 1.0) c bg))))
+              1)
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.501 0.125 0.0) c bg))))
+              1)
+      ;; on the white paper of the plain style the colors are kept
+      (check-true (in? '(0.0 0.0 1.0) p))
+      (check-true (in? '(0.501 0.125 0.0) p)))
+    ;; also when bg-color is set after the color, in the same with
+    (with l (styled-body-colors
+             "generic"
+             "<with|color|blue|adapt-dark-colors|true|bg-color|#2a2a2e|x>"
+             "" "")
+      (check-false (in? '(0.0 0.0 1.0) l))
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.0 0.0 1.0) c bg))))
+              1))
     ;; nor on a mid grey paper (luminance 0.195), where even white would
     ;; not have a contrast of 4.5
     (check= (code-block-colors "#7a7a7a"

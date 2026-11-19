@@ -942,6 +942,7 @@ public:
   font   make_current_font (int sz);
   void   update_font ();
   void   update_color ();
+  color  adapt_color (color c);
   void   update_pattern_mode ();
   void   update_zoom ();
   void   update_mode ();
