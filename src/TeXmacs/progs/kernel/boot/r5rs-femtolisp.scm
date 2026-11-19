@@ -511,8 +511,9 @@
            (list 'misc-error #f "Key error: ~S" args #f))
           ((memory-error)
            ;; a recursion through the builtins which call functions (map,
-           ;; for-each, sort...) too deep for the stack of C: Guile's key,
-           ;; which the callers catch (the HTML export cuts the tree, #813)
+           ;; for-each, sort...) too deep for the stack of C, or a stack of
+           ;; Scheme which could not grow (grow_stack, no memory): Guile's
+           ;; key, which the callers catch (the HTML export cuts the tree)
            (if (equal? args '("stack overflow"))
                (list 'stack-overflow #f "Stack overflow" #f #f)
                e))
