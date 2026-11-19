@@ -281,6 +281,11 @@ edit_modify_rep::retract_change () {
   return arch->retract ();
 }
 
+int
+edit_modify_rep::history_version () {
+  return arch->history_version ();
+}
+
 double
 edit_modify_rep::this_author () {
   return author;

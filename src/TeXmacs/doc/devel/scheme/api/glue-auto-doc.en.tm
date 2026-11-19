@@ -6683,6 +6683,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(embedded-opening-abort <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|embedded_opening_abort> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(supports-bibtex?)>
 <explain-synopsis|no synopsis>
   <|explain>

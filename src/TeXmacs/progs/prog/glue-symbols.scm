@@ -860,6 +860,7 @@
 "embedded-opening"
 "embedded-opening-set"
 "embedded-tool-opening"
+"embedded-opening-abort"
 "supports-bibtex?"
 "bibtex-run"
 "bib-add-period"

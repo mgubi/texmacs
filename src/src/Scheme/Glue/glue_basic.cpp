@@ -11397,6 +11397,19 @@ tmg_embedded_tool_opening (tmscm arg1) {
 }
 
 tmscm
+tmg_embedded_opening_abort (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "embedded-opening-abort");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  embedded_opening_abort (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_supports_bibtexP () {
   // TMSCM_DEFER_INTS;
   bool out= bibtex_present ();
@@ -12539,6 +12552,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("embedded-opening",  tmg_embedded_opening, 0, 0, 0);
   tmscm_install_procedure ("embedded-opening-set",  tmg_embedded_opening_set, 1, 0, 0);
   tmscm_install_procedure ("embedded-tool-opening",  tmg_embedded_tool_opening, 1, 0, 0);
+  tmscm_install_procedure ("embedded-opening-abort",  tmg_embedded_opening_abort, 1, 0, 0);
   tmscm_install_procedure ("supports-bibtex?",  tmg_supports_bibtexP, 0, 0, 0);
   tmscm_install_procedure ("bibtex-run",  tmg_bibtex_run, 4, 0, 0);
   tmscm_install_procedure ("bib-add-period",  tmg_bib_add_period, 1, 0, 0);

@@ -379,6 +379,7 @@ public:
   virtual void clear_undo_history () = 0;
   virtual void confirm_changes () = 0;   // the pending changes as a step
   virtual bool retract_change () = 0;    // the last step pending again
+  virtual int  history_version () = 0;   // changes with the undo history
   virtual double this_author () = 0;
   virtual void archive_state () = 0;
   virtual void start_editing () = 0;

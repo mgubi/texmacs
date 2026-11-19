@@ -938,6 +938,7 @@
   (embedded-opening embedded_opening (int))
   (embedded-opening-set embedded_opening_set (bool int))
   (embedded-tool-opening embedded_tool_opening (int string))
+  (embedded-opening-abort embedded_opening_abort (void int))
 
   ;; routines for BibTeX
   (supports-bibtex? bibtex_present (bool))

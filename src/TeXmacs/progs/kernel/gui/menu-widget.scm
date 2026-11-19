@@ -1259,29 +1259,43 @@
     (for-each (lambda (buf) (ahash-set! window-deleters buf del)) bufs)
     del))
 
+(tm-define (window-build win thunk)
+  (:synopsis "Build the window @win, made by @alt-window-handle, by @thunk")
+  ;; if the build fails before alt-window-create, the opening of the window
+  ;; ends at once, with the texmacs-input made in it, and the window and the
+  ;; opening built before it are current again (#776)
+  (catch #t thunk
+    (lambda args
+      (embedded-opening-abort win)
+      (apply throw args))))
+
 (tm-define (top-window menu-promise name . opts)
   (:interactive #t)
   (with (bufs qqq) (decode-options opts)
     (let* ((win (alt-window-handle))
-           (del (make-window-deleter win bufs))
-           (qui (object->command (lambda () (qqq) (del))))
-           (men (menu-promise))
-           (scm (list 'vertical men))
-           (wid (make-menu-widget* scm 0)))
-      (alt-window-create-quit win wid (translate name) qui)
+           (del (make-window-deleter win bufs)))
+      (window-build win
+        (lambda ()
+          (let* ((qui (object->command (lambda () (qqq) (del))))
+                 (men (menu-promise))
+                 (scm (list 'vertical men))
+                 (wid (make-menu-widget* scm 0)))
+            (alt-window-create-quit win wid (translate name) qui))))
       (alt-window-show win))))
 
 (tm-define (dialogue-window menu-promise cmd name . opts)
   (:interactive #t)
   (with (bufs qqq) (decode-options opts)
     (let* ((win (alt-window-handle))
-           (del (make-window-deleter win bufs))
-           (qui (object->command (lambda () (qqq) (del))))
-           (lbd (lambda x (apply cmd x) (del)))
-           (men (menu-promise lbd))
-           (scm (list 'vertical men))
-           (wid (make-menu-widget* scm 0)))
-      (alt-window-create-quit win wid (translate name) qui)
+           (del (make-window-deleter win bufs)))
+      (window-build win
+        (lambda ()
+          (let* ((qui (object->command (lambda () (qqq) (del))))
+                 (lbd (lambda x (apply cmd x) (del)))
+                 (men (menu-promise lbd))
+                 (scm (list 'vertical men))
+                 (wid (make-menu-widget* scm 0)))
+            (alt-window-create-quit win wid (translate name) qui))))
       (alt-window-show win))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1290,11 +1304,13 @@
 
 (tm-define (interactive-window wid-promise cmd name)
   (:interactive #t)
-  (let* ((win (alt-window-handle))
-         (lbd (lambda x (apply cmd x) (alt-window-delete win)))
-         (com (object->command (menu-protect lbd)))
-         (wid (wid-promise com)))
-    (alt-window-create-plain win wid (translate name))
+  (let* ((win (alt-window-handle)))
+    (window-build win
+      (lambda ()
+        (let* ((lbd (lambda x (apply cmd x) (alt-window-delete win)))
+               (com (object->command (menu-protect lbd)))
+               (wid (wid-promise com)))
+          (alt-window-create-plain win wid (translate name)))))
     (alt-window-show win)))
 
 (tm-define (interactive-print done u)

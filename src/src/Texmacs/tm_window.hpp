@@ -119,5 +119,6 @@ path window_search (url name);
 int  embedded_opening ();
 bool embedded_opening_set (int op);
 int  embedded_tool_opening (string tool);
+void embedded_opening_abort (int win);
 
 #endif // defined TM_WINDOW_H
