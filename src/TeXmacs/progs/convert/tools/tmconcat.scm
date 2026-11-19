@@ -101,48 +101,72 @@
 (define (tab-right? tab) (and (func? tab 'htab 2) (== (caddr tab) "first")))
 (define (tab-weak tab) `(,(car tab) ,(cadr tab) "0"))
 
-(define (has-tab? x)
-  (cond ((tab? x) #t)
-        ((func? x 'with) (has-tab? (cAr x)))
-        ((func? x 'concat) (list-or (map has-tab? (cdr x))))
+;; The tabs of a concatenation include those of its <with> and <concat>
+;; descendants, down to tabs-depth levels: a deeper tab is simplified with
+;; the tabs of its own concatenation, when the converter gets there. A
+;; converter simplifies the tabs of each concatenation of a nesting (as
+;; tmhtml-concat): without the bound, each level looked at all the levels
+;; below it, and the HTML export of a nesting 1000 deep took minutes. The
+;; depth is that of @x below the concatenation which is simplified
+(define tabs-depth 64)
+
+(define (has-tab-sub? pred? x depth)
+  ;; does @x or one of its <with> and <concat> descendants down to @depth
+  ;; levels satisfy @pred?
+  (cond ((pred? x) #t)
+        ((<= depth 0) #f)
+        ((func? x 'with) (has-tab-sub? pred? (cAr x) (- depth 1)))
+        ((func? x 'concat)
+         (list-any (lambda (y) (has-tab-sub? pred? y (- depth 1))) (cdr x)))
         (else #f)))
 
-(define (has-tab-before? x pos)
-  (cond ((null? pos) #f)
-        ((list-or (map has-tab? (sublist x 0 (car pos)))) #t)
-        (else (has-tab-before? (list-ref x (car pos)) (cdr pos)))))
+(define (has-tab? x depth)
+  (has-tab-sub? tab? x depth))
 
-(define (has-tab-after? x pos)
-  (cond ((null? pos) #f)
-        ((list-or (map has-tab? (sublist x (+ (car pos)) (length x)))) #t)
-        (else (has-tab-after? (list-ref x (car pos)) (cdr pos)))))
+(define (has-weak-tab? x depth)
+  (has-tab-sub? (lambda (y) (or (tab-left? y) (tab-right? y))) x depth))
 
-(define (simplify-tabs-sub x pos i in)
+(define (has-tab-before? x pos depth)
+  ;; @x is at @depth, its children one level below
+  (cond ((null? pos) #f)
+        ((list-any (lambda (y) (has-tab? y (- depth 1)))
+                   (sublist x 0 (car pos))) #t)
+        (else (has-tab-before? (list-ref x (car pos)) (cdr pos) (- depth 1)))))
+
+(define (has-tab-after? x pos depth)
+  (cond ((null? pos) #f)
+        ((list-any (lambda (y) (has-tab? y (- depth 1)))
+                   (sublist x (+ (car pos)) (length x))) #t)
+        (else (has-tab-after? (list-ref x (car pos)) (cdr pos) (- depth 1)))))
+
+(define (simplify-tabs-sub x pos i in depth)
   (if (null? x) x
-      (cons (simplify-tabs (car x) (rcons pos i) in)
-            (simplify-tabs-sub (cdr x) pos (+ i 1) in))))
+      (cons (simplify-tabs (car x) (rcons pos i) in depth)
+            (simplify-tabs-sub (cdr x) pos (+ i 1) in depth))))
 
-(define (simplify-tabs x pos in)
+(define (simplify-tabs x pos in depth)
   ;;(display* "Simplify " x ", " pos "\n")
   ;; FIXME: in our recursive descent, we might want to treat
   ;; other constructs besides with, such as surround
   (cond ((npair? x) x)
         ((tab-left? x)
-         (if (has-tab-after? in pos) "" (tab-weak x)))
+         (if (has-tab-after? in pos tabs-depth) "" (tab-weak x)))
         ((tab-right? x)
-         (if (has-tab-before? in pos) "" (tab-weak x)))
+         (if (has-tab-before? in pos tabs-depth) "" (tab-weak x)))
+        ((<= depth 0) x)
         ((func? x 'with)
          (with spos (rcons pos (- (length x) 1))
-           (rcons (cDr x) (simplify-tabs (cAr x) spos in))))
+           (rcons (cDr x) (simplify-tabs (cAr x) spos in (- depth 1)))))
         ((func? x 'concat)
-         (simplify-tabs-sub x pos 0 in))
+         (simplify-tabs-sub x pos 0 in (- depth 1)))
         (else x)))
 
 (tm-define (tmconcat-simplify-tabs l)
   (:type (forall T (-> (list T) (list T))))
   (:synopsis "Rewrite weak left and write tabs in concatenation @l")
   (with c (cons 'concat l)
-    (cdr (simplify-tabs c (list) c))))
+    (if (not (has-weak-tab? c tabs-depth)) l
+        (cdr (simplify-tabs c (list) c tabs-depth)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Replacing tab information by alignment information

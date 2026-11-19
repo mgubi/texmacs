@@ -462,6 +462,55 @@
       (check-true (string-occurs? "after" s))
       (check-false (string-occurs? "nesting" s)))))
 
+;; The weak tabs of a line and the vertical spaces of a paragraph are looked
+;; for in its <with> and <concat>, down to 64 levels (tmconcat.scm,
+;; tmhtml.scm): looked for at each level of a nesting, through all the
+;; levels below, they made the export of a <surround> 1000 deep take minutes
+;; (a time cubic in the depth), which the runners of CI took for a hang
+;; ("a tree nested too deep is cut" above). Inline markup around a block was
+;; exponential in its depth (exists? ran its predicate twice).
+(define (nested-line n leaf)
+  ;; @leaf in @n levels of an inline <with> in a <concat>
+  (deep-tree (lambda (t) `(with "color" "red" (concat "a" ,t))) n leaf))
+
+(define (test-html-nested-lines)
+  (check-group "html export: tabs and spaces in nested markup")
+  (for (n '(1 3 20))
+    ;; a weak tab is dropped when another tab follows (or precedes) in the
+    ;; line, however deep
+    (with s (export `(document
+                      (concat "x" (htab "5mm" "last")
+                              ,(nested-line n '(concat "l" (htab "5mm" "first")
+                                                       "r" (htab "5mm") "s"))
+                              (htab "5mm" "first") "y"))
+                    "html-snippet")
+      (check= (list n (string-occurs? "lr" s)
+                    (string-occurs? "center-tab" s)
+                    (string-occurs? "right-tab" s))
+              (list n #t #f #t)))
+    ;; the spaces of a paragraph
+    (with s (export `(document "x"
+                               ,(nested-line n '(concat (vspace* "2fn") "leaf"
+                                                        (vspace "3fn")))
+                               "y")
+                    "html-snippet")
+      (check= (list n (string-occurs? "margin-top: 2em; margin-bottom: 3em" s))
+              (list n #t))))
+  ;; deep lines around a block (a tab), in a time linear in their depth
+  (for (n '(30 1000))
+    (with s (export `(document
+                      "before"
+                      ,(nested-line n '(concat "l" (htab "5mm") "leaf"))
+                      "after")
+                    "html-snippet")
+      (check-true (whole-or-cut? s "leaf"))))
+  ;; deep blocks, nested and in <surround>
+  (for (s (list (html-of-deep (lambda (t) `(surround "a" "b" (with "par-left" "1cm" ,t)))
+                              1000)
+                (html-of-deep (lambda (t) `(with "par-left" "1cm" (with "color" "red" ,t)))
+                              2000)))
+    (check-true (whole-or-cut? s "leaf"))))
+
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
   (list
@@ -2777,7 +2826,7 @@
             (list test-mathml-export test-mathml-html test-html-formula-labels
                   test-html-mathjax-formulas test-html-pattern-background
                   test-html-include
-                  test-html-deep-recursion
+                  test-html-deep-recursion test-html-nested-lines
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
