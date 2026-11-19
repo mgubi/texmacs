@@ -346,7 +346,23 @@
     (convert-and-check (in "st*ar.md") (tmp-file "t3-out.tm") #t)
     ;; no converter, and no file: nothing is written
     (convert-and-check (in "g.pdf") (tmp-file "t4-out.tm") #f)
-    (convert-and-check (in "missing.md") (tmp-file "t5-out.tm") #f)))
+    (convert-and-check (in "missing.md") (tmp-file "t5-out.tm") #f)
+    ;; the same file twice (two -c of one source, or a file which is open):
+    ;; the second conversion finds its buffer
+    (let* ((old (current-buffer))
+           (before (buffer-list))
+           (o1 (tmp-file "t6-out.tm"))
+           (o2 (tmp-file "t6-out.html")))
+      (check-true (convert-file (in "t.md") o1))
+      (check-true (convert-file (in "t.md") o2))
+      (check-true (url-exists? o1))
+      (check-true (url-exists? o2))
+      ;; after a failure, the buffer of before is not exported in its place
+      (check-false (convert-file (in "g.pdf") (tmp-file "t7-out.tm")))
+      (check-false (url-exists? (tmp-file "t7-out.tm")))
+      (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
+                (buffer-list))
+      (when (and old (buffer-exists? old)) (switch-to-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The document types of the application on macOS

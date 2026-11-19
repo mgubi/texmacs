@@ -1150,16 +1150,27 @@
         (exec-delayed (lambda () (for-each load-buffer-from-system l)))
         (former x y obj))))
 
+(define (convert-file-source in)
+  ;; the buffer which (load-buffer in) loads, as load-buffer-main finds it:
+  ;; the one file which a wildcard matches (#790), or #f
+  (if (url-wildcard? in)
+      (with l (link-wildcard-candidates in #f)
+        (and (= (length l) 1) (load-buffer-resolve-name (car l))))
+      (load-buffer-resolve-name in)))
+
 (tm-define (convert-file in out)
   (:synopsis "Convert the file @in to @out (texmacs -c), #f if it can't")
-  ;; the load succeeded when it made the current buffer a file of the disk
-  ;; (load-buffer may load another name than @in: a wildcard, #790; and a
-  ;; file which does not exist gives a new document, which is not converted)
-  (with old (current-buffer)
+  ;; the load succeeded when the buffer of @in is current and is a file of
+  ;; the disk (it may have been loaded already, by an earlier -c of the
+  ;; same file); a file which could not be read gives no buffer, and one
+  ;; which does not exist a new document, neither of which is converted
+  (with src (convert-file-source in)
     (load-buffer in :strict)
-    (with b (current-buffer)
-      (and b (!= b old) (buffer-has-name? b) (url-exists? b)
-           (begin (export-buffer out) #t)))))
+    ;; (src may be a string, as the name given: compared as file names)
+    (and src (current-buffer)
+         (== (url->system (current-buffer)) (url->system src))
+         (buffer-exists? src) (url-exists? src)
+         (begin (export-buffer out) #t))))
 
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
