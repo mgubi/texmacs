@@ -12,6 +12,23 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 20 November 2026
+
+- **Text fields of dialogs and side tools: each opening has its own
+  editor** (the macro editor, the search field, the fields of the side
+  tools): a field keeps its undo history while its dialog or tool is
+  refreshed or made again, starts with an empty history when the dialog or
+  tool is opened again, and the same tool in two windows has an editor in
+  each, where they shared one. Which editor a field has no longer depends
+  on when memory is reclaimed. Text typed in a field stays reachable by
+  undo however often the field is made again, and a field that shows
+  results no longer piles them up in its history. A dialog whose
+  construction fails no longer leaves its fields behind, which the next
+  dialog or tooltip could take over; a closed dialog closes the named
+  buffers of its fields which nothing else shows, and the grammar dialog
+  compressed into a toolbar keeps the buffer of its corrections (#776,
+  #838, #887).
+
 ## 19 November 2026
 
 - **Dark mode and Programmer mode** (document themes, Document > Theme): two
