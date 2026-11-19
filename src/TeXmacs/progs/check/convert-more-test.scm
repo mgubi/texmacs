@@ -628,23 +628,27 @@
 ;;     in the length of a text without a space;
 ;;   - the arguments of a macro expanded by a macro of its body (!recurse)
 ;;     were expanded again at each level of a nesting of such macros
-;;     (tmmathbf, latex-tools.scm);
+;;     (tmmathbf, latex-tools.scm). The macros of a body are now all in
+;;     !recurse (latex-define.scm): an expansion is complete, also outside
+;;     a bold formula, where \longequal and the like were left undefined;
 ;;   - the brackets of each <concat> were looked for in all its descendants
 ;;     (tmtm-brackets.scm).
 ;; Each is timed on a size 10 times as large, which may take 20 times as
 ;; long as the small one, or 4 s if that is more (10 s at most). Without the
-;; fixes, on a Mac M4: 6.5, 7.6 and 5.4 s under s7, 109, 28 and 50 s under
-;; Guile; with them 0.5 s at most. (Deeper, the recursions of Guile overflow
-;; its stack: 1500 levels of tmmathbf did.)
+;; fixes, on a Mac M4 under s7: 16, 16 and 9 s (much more under Guile);
+;; with them 0.2 s under s7, 1 s under Guile. The nestings are wide rather
+;; than deep, 300 levels: the recursions of Guile overflow its stack at 629
+;; levels of tmmathbf with the limit of Linux, the smallest (init-guile.scm).
 (define (latex-wide-nesting wrap n)
-  ;; @n levels of @wrap around a <!concat> of 40 groups
-  (deep-tree (lambda (t) (wrap `(!concat ,@(make-list 40 '(!group "a")) ,t)))
+  ;; @n levels of @wrap around a <!concat> of 400 groups
+  (deep-tree (lambda (t)
+               (wrap `(!concat ,@(make-list 400 '(!group "a")) ,t)))
              n "leaf"))
 
 (define (wide-concat-nesting n leaf)
-  ;; @n levels of a <concat> of 60 <with>, and of one around the next level
+  ;; @n levels of a <concat> of 400 <with>, and of one around the next level
   (deep-tree (lambda (t)
-               `(concat ,@(make-list 60 '(with "color" "red" "a"))
+               `(concat ,@(make-list 400 '(with "color" "red" "a"))
                         (with "color" "red" ,t)))
              n leaf))
 
@@ -657,7 +661,7 @@
                         (string-length
                          (serialize-latex
                           `(!concat ,@(make-list n '(textbf "x")) "y")))))
-                    (lambda (n) (+ (* 10 n) 1)) 2000 20000 "pieces")
+                    (lambda (n) (+ (* 10 n) 1)) 3000 30000 "pieces")
   ;; the text, and the formulas which follow each other, made one
   (check= (serialize-latex `(!concat ,@(make-list 3 '(textbf "x")) "y"))
           "\\textbf{x}\\textbf{x}\\textbf{x}y")
@@ -673,7 +677,7 @@
                                  (latex-wide-nesting
                                   (lambda (t) `(tmmathbf ,t)) n))
                           (occurrences "boldsymbol" (serialize-latex r)))))
-                    (lambda (n) n) 60 600 "levels")
+                    (lambda (n) n) 30 300 "levels")
   ;; nested <concat> with brackets at the bottom
   (check-fast-sizes "brackets of nested concat"
                     (lambda (n)
@@ -683,7 +687,18 @@
                     (lambda (n)
                       (wide-concat-nesting n '(concat (left "(") "x"
                                                       (right "."))))
-                    60 600 "levels"))
+                    30 300 "levels")
+  ;; the macros which a macro uses are expanded too, also in a bold formula
+  ;; (whose arguments are no longer expanded twice)
+  (for (x '((!concat "a" (longdownequal) "b")
+            (tmmathbf (!concat "a" (longdownequal) (legeangle) "b"))
+            (skey (longhookuparrow))))
+    (with s (serialize-latex (latex-expand-macros x))
+      (check= (list s (string-occurs? "rotatebox" s)
+                    (string-occurs? "longequal" s)
+                    (string-occurs? "leangle" s)
+                    (string-occurs? "longhook" s))
+              (list s #t #f #f #f)))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them

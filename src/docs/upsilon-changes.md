@@ -62,8 +62,10 @@ have the details, and the problems go to the
   formulas or nested markup with brackets. The HTML export
   for MathJax of a formula with a macro which calls itself (1 MB of
   LaTeX, converted whole under s7) took nearly 4 minutes; it now takes
-  1.4 s. The output of LaTeX, HTML, BibTeX and the other converters which
-  break lines is the same as before (#885).
+  1.4 s. When the macros of TeXmacs are expanded (for MathJax, or with
+  the option of the LaTeX export), the symbols made of other symbols, as
+  `<longdownequal>` or `<legeangle>`, are expanded whole: `\longequal` and
+  the like were left undefined outside bold formulas (#885).
 
 ## 17 November 2026
 
