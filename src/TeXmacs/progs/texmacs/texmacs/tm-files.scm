@@ -1109,7 +1109,8 @@
 ;; give the files by their full names (TMView, QTMWidget), and a text which
 ;; is dropped as a plain string: only full names of local files count, so
 ;; that a dropped word is never taken for a file next to the document, and
-;; no web address is fetched.
+;; no web address is fetched (a dropped text which is the full name of a
+;; document opens it, as its file would).
 
 (define (dropped-file-name? s)
   ;; a full local name: /a/b, or c:/a, c:\a (Windows)

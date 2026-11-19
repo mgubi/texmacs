@@ -165,7 +165,11 @@
   (open-and-check (write-file "empty.md" "") #f)
   (open-and-check (write-file "empty.tex" "") #f)
   (open-and-check (write-file "empty.html" "") #f)
-  (open-and-check (write-file "empty.bib" "") #f))
+  (open-and-check (write-file "empty.bib" "") #f)
+  (open-and-check (write-file "empty.tm" "") #f)
+  (open-and-check (write-file "blank.tm" "  \n") #f)
+  (open-and-check (write-file "empty.stm" "") #f)
+  (open-and-check (write-file "empty.tmml" "") #f))
 
 (define (test-no-converter)
   (check-group "no converter")
