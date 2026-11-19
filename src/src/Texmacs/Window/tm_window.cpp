@@ -234,7 +234,11 @@ texmacs_window_widget (widget wid, tree geom) {
 * The refreshables keep the opening in which they were made. A field made
 * again in its opening keeps its view, and so its editor and its history;
 * a field in a new opening gets a new view. When an opening ends, the views
-* of its fields are deleted, and the buffers of unnamed fields closed.
+* of its fields are deleted, and the buffers of unnamed fields closed; the
+* end of a dialog (its window deleted, or its build failed) also closes the
+* named buffers which no other view shows, as the buffer of a console or of
+* a macro editor: a tool keeps them, for the Scheme code which may use them
+* further (the search toolbar after the search tool).
 ******************************************************************************/
 
 static int current_opening= 0;  // the opening whose widgets are being made
@@ -318,13 +322,17 @@ embedded_tool_opening (string tool) {
 }
 
 static void
-end_field (int op, url name, bool detach, url focus= url_none ()) {
+end_field (int op, url name, bool detach, bool close,
+           url focus= url_none ()) {
   // the end of a field of an opening: its view is deleted, with its editor
-  // and its history; the buffer of an unnamed field is closed, a named one
-  // stays (the search toolbar after the search tool). With detach, the
-  // widget which still shows it, and which is let go later, no longer
-  // shows its editor. If the field has the focus, it goes to the window
-  // focus (the window of a tool), else to the first window of TeXmacs
+  // and its history. The buffer of an unnamed field is closed. A named
+  // buffer is closed with close (the field ends with its dialog window, or
+  // its widget is destroyed by its window), when no other view shows it;
+  // otherwise it stays (a tool no longer shown, whose buffer the Scheme
+  // code may use further: the search toolbar after the search tool). With
+  // detach, the widget which still shows it, and which is let go later, no
+  // longer shows its editor. If the field has the focus, it goes to the
+  // window focus (the window of a tool), else to the first window
   string key = field_key (op, name);
   tm_view v  = concrete_view (field_view [key]);
   field_view->reset (key);
@@ -355,17 +363,17 @@ end_field (int op, url name, bool detach, url focus= url_none ()) {
       nv= window_to_view (ws[i]);
     if (!is_none (nv) && nv != u) set_current_view (nv);
   }
-  if (!is_named_field (name) && N (buffer_to_views (name)) == 1)
+  if ((close || !is_named_field (name)) && N (buffer_to_views (name)) == 1)
     remove_buffer (name);
   else delete_view (u);
 }
 
 static void
-end_opening (int op, bool detach, url focus= url_none ()) {
+end_opening (int op, bool detach, bool close, url focus= url_none ()) {
   live_openings->remove (op);
   if (!opening_fields->contains (op)) return;
   array<url> a= copy (opening_fields [op]);
-  for (int i=0; i<N(a); i++) end_field (op, a[i], detach, focus);
+  for (int i=0; i<N(a); i++) end_field (op, a[i], detach, close, focus);
   opening_fields->reset (op);
 }
 
@@ -387,7 +395,7 @@ end_tool_openings (string prefix, bool all) {
   for (int i=0; i<N(gone); i++) {
     int op= tool_opening [gone[i]];
     tool_opening->reset (gone[i]);
-    end_opening (op, !all, focus);
+    end_opening (op, !all, false, focus);
   }
 }
 
@@ -457,7 +465,7 @@ close_embedded_command_rep::apply () {
     // the widget still shows its field: the field ends with it (its dialog
     // is closed, or it is let go otherwise than at the end of its opening)
     if (field_view [field_key (op, name)] == abstract_view (vw))
-      end_field (op, name, false);
+      end_field (op, name, false, !dropped);
     else {
       // not a field of this opening (should not happen)
       vw->win= NULL;
@@ -1005,7 +1013,7 @@ embedded_opening_abort (int win) {
   dialog_opening->reset (win);
   // (the widgets made by the failed build may still be held by Scheme:
   // they no longer show the editors which end)
-  end_opening (op, true);
+  end_opening (op, true, true);
 }
 
 void
@@ -1067,7 +1075,7 @@ window_delete (int win) {
   if (dialog_opening->contains (win)) {
     int op= dialog_opening [win];
     dialog_opening->reset (win);
-    end_opening (op, false);
+    end_opening (op, false, true);
   }
   busy (win)= false;
 }
