@@ -2906,6 +2906,20 @@
       (check= (length (list-filter l (lambda (c) (rgb-lightened?
                                                    '(0.0 0.0 1.0) c bg))))
               1))
+    ;; and when the flag is set last
+    (with l (styled-body-colors
+             "generic"
+             "<with|color|blue|bg-color|#2a2a2e|adapt-dark-colors|true|x>"
+             "" "")
+      (check-false (in? '(0.0 0.0 1.0) l))
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.0 0.0 1.0) c bg))))
+              1))
+    ;; the escape: with adapt-dark-colors false the color is kept
+    (with l (styled-body-colors
+             "generic|dark-mode"
+             "<with|color|blue|adapt-dark-colors|false|x>" "" "")
+      (check-true (in? '(0.0 0.0 1.0) l)))
     ;; nor on a mid grey paper (luminance 0.195), where even white would
     ;; not have a contrast of 4.5
     (check= (code-block-colors "#7a7a7a"

@@ -84,7 +84,9 @@
     other themes, the theme belongs to the document, and a <name|PDF> of it
     is as dark as the page. Text on a light cell or box background
     (as the input fields of the session styles <with|font-shape|italic|Framed
-    input fields> and ring sessions) is light on light.
+    input fields> and ring sessions) is light on light, also when you set a
+    dark color for it: around such text, set <src-var|adapt-dark-colors> to
+    <verbatim|false> to keep your colors.
 
     <item>The same <TeXmacs> runs in a web browser:
     <hlink|mgubi.github.io/texmacs/texmacs.html|https://mgubi.github.io/texmacs/texmacs.html>, see

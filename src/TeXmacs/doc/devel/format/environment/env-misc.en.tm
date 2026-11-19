@@ -130,6 +130,10 @@
     does not change <src-var|bg-color>: text in a cell or box with a light
     background of its own is light on light (as in the input fields of the
     session styles <verbatim|framed-session> and <verbatim|ring-session>).
+    A color set by hand inside such a cell or box is lightened too, as are
+    the lines (not the fill) of graphics; <verbatim|\<less\>with\|adapt-dark-colors\|false\|...\<gtr\>>
+    keeps the colors as they are. The opacity of a color is not taken into
+    account.
   </explain>
 
   <\explain>
