@@ -39,7 +39,7 @@ static thread_local bool guile_main_thread= false;
 static char*
 guile_stack_low () {
   if (!guile_main_thread) return NULL;
-  size_t limit= (size_t) SCM_STACK_LIMIT;  // 0: no check (Windows)
+  size_t limit= (size_t) SCM_STACK_LIMIT;  // 0: no check
   if (limit == 0) return NULL;
   size_t bytes= limit * sizeof (SCM_STACKITEM);
   if (bytes >= (size_t) (uintptr_t) guile_stack_base) return NULL;

@@ -122,23 +122,22 @@
      ,@body))
 
 
-;; handle multiple values in a way compatible with s7 (and backcompatible with guile)
+;; dynamic-wind exists in every Scheme of TeXmacs (built in in Guile and s7,
+;; defined in r5rs-femtolisp.scm for femtolisp) and returns the values of
+;; its body, also multiple ones
 (define-public-macro (with-global var val . body)
-  ;; the variable is restored after an error too; lazy-catch rethrows from
-  ;; where the error happened, so that backtraces still point there
-  (let ((old (gensym)) (args (gensym)))
-    `(let ((,old ,var))
-       (set! ,var ,val)
-       (call-with-values
-          (lambda ()
-            (lazy-catch #t
-                        (lambda () ,@body)
-                        (lambda ,args
-                          (set! ,var ,old)
-                          (apply throw ,args))))
-          (lambda vals
-            (set! ,var ,old)
-            (apply values vals))))))
+  ;; the variable is restored after an error too. dynamic-wind restores it
+  ;; while the error unwinds, without catching it: backtraces still point at
+  ;; the error, and no handler runs where the error happened (a lazy-catch
+  ;; rethrowing from its handler took more stack at each level of
+  ;; with-global, beyond the limit of Guile after a stack overflow: a crash
+  ;; in a deep recursion, #813)
+  (let ((old (gensym)) (new (gensym)))
+    `(let* ((,old ,var) (,new ,val))
+       (dynamic-wind
+         (lambda () (set! ,var ,new))
+         (lambda () ,@body)
+         (lambda () (set! ,var ,old))))))
 
 (define-public-macro (and-with var val . body)
   `(with ,var ,val

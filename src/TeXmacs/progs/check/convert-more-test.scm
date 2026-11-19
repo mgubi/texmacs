@@ -366,20 +366,150 @@
       (check-true (string-occurs? "Theorem <class style=\"font-style: normal\">2</class>" s))
       (check-true (string-occurs? "Nested in the main directory." s)))))
 
-;; a macro which calls itself is stopped by the evaluator after hundreds of
-;; levels: the conversion of the expansion overflowed the stack of Scheme,
-;; and no HTML was written; it is now cut, with an error there (#813)
+;; a macro which calls itself is stopped by the evaluator after thousands of
+;; levels, as deep as the stack of C++ allows: the conversion of the
+;; expansion overflowed the stack of Scheme, and no HTML was written (a
+;; crash on Windows, where Guile had no limit); it is now converted again,
+;; cut, with an error there (#813). Whether a tree overflows depends on the
+;; markup and on the system (the frames, the limit of Guile): the HTML is
+;; either whole, or cut with the error, and always written
+(define (deep-tree wrap n leaf)
+  ;; @leaf in @n levels of @wrap (a loop: no recursion of Scheme)
+  (do ((i 0 (+ i 1)) (t leaf (wrap t))) ((= i n) t)))
+
+(define (html-of-deep wrap n)
+  (export `(document "before" ,(deep-tree wrap n "leaf") "after")
+          "html-snippet"))
+
+(define (whole-or-cut? s leaf)
+  ;; the HTML @s has its beginning and its end, and either @leaf, the
+  ;; deepest content, or the error of the cut, not both (the HTML may break
+  ;; the line in the middle of the error)
+  (and (string-occurs? "before" s)
+       (string-occurs? "after" s)
+       (if (string-occurs? leaf s)
+           (not (string-occurs? "nesting" s))
+           (string-occurs? "nesting" s))))
+
 (define (test-html-deep-recursion)
   (check-group "html export: a macro which calls itself")
   (for (def '((assign "wm" (macro "x" (with "color" "red" (wm (arg "x")))))
-              (assign "wm" (macro "x" (tabular (tformat (table (row (cell (wm (arg "x")))))))))))
+              (assign "wm" (macro "x" (tabular (tformat (table (row (cell (wm (arg "x")))))))))
+              (assign "wm" (macro "x" (surround "a" "b"
+                                                (with "color" "red"
+                                                      (wm (arg "x"))))))
+              (assign "wm" (macro "x" (with "color" "red" "font-shape" "italic"
+                                            "font-series" "bold"
+                                            "font-family" "tt"
+                                            "font-size" "1.19"
+                                            "par-left" "1cm"
+                                            (wm (arg "x")))))))
+    ;; (the evaluator stops with an error of its own, which is not exported:
+    ;; "a" stands for the deepest content)
     (with s (html-export-of-buffer `(document ,def "before" (wm "a") "after"))
       (check-true (string-occurs? "before" s))
+      (check-true (string-occurs? "after" s))))
+  ;; a formula for MathJax, converted by texmacs->latex (audit 6 of #879)
+  (with s (html-export-of-buffer
+           `(document (assign "wm" (macro "x" (with "color" "red"
+                                                    "font-shape" "italic"
+                                                    "font-series" "bold"
+                                                    "font-family" "tt"
+                                                    "font-size" "1.19"
+                                                    "par-left" "1cm"
+                                                    "par-right" "1cm"
+                                                    "par-first" "1cm"
+                                                    "math-level" "0"
+                                                    "math-display" "true"
+                                                    (concat "x+"
+                                                            (wm (arg "x"))))))
+                      "before" (concat "a " (math (wm "a"))) "after")
+           '("texmacs->html:mathjax" . "on"))
+    (check-true (string-occurs? "before" s))
+    (check-true (string-occurs? "after" s)))
+  (check-group "html export: a tree nested too deep is cut")
+  (let ((with1 (lambda (t) `(with "color" "red" ,t)))
+        (with3 (lambda (t) `(with "color" "red" "font-shape" "italic"
+                                  "par-left" "1cm" ,t)))
+        (frac (lambda (t) `(frac "1" ,t)))
+        (tab (lambda (t) `(tformat (table (row (cell ,t))))))
+        (eq (lambda (t) `(equation* (document ,t))))
+        (sur (lambda (t) `(surround "a" "b" (with "par-left" "1cm" ,t)))))
+    ;; deep trees: whole, or cut with the error
+    (for (s (list (html-of-deep with1 3000) (html-of-deep with3 1000)
+                  (html-of-deep frac 1500) (html-of-deep tab 1000)
+                  (html-of-deep sur 3000) (html-of-deep eq 1000)
+                  (html-of-deep (lambda (t) `(equation* ,(with3 t))) 1000)
+                  ;; (a chain of <tformat>, around a table)
+                  (export `(document
+                            "before"
+                            ,(deep-tree (lambda (t)
+                                          `(tformat (cwith "1" "1" "1" "1"
+                                                           "cell-halign" "c")
+                                                    ,t))
+                                        3000 '(table (row (cell "leaf"))))
+                            "after")
+                          "html-snippet")))
+      (check-true (whole-or-cut? s "leaf")))
+    ;; a table, whole or cut, keeps its structure: a <td> in each <table>
+    (with s (html-of-deep tab 1000)
+      (check= (occurrences "<table" s) (occurrences "<td" s)))
+    ;; shallow trees are whole
+    (for (s (list (html-of-deep with1 100) (html-of-deep with3 40)
+                  (html-of-deep frac 40) (html-of-deep tab 15)
+                  (html-of-deep eq 25) (html-of-deep sur 25)))
+      (check-true (string-occurs? "leaf" s))
       (check-true (string-occurs? "after" s))
-      ;; (s7 converts this depth without overflowing its stack: nothing is
-      ;; cut there, the document is written whole)
-      (unless (s7-scheme?)
-        (check-true (string-occurs? "nesting too" s))))))
+      (check-false (string-occurs? "nesting" s)))))
+
+;; The weak tabs of a line and the vertical spaces of a paragraph are looked
+;; for in its <with> and <concat>, down to 64 levels (tmconcat.scm,
+;; tmhtml.scm): looked for at each level of a nesting, through all the
+;; levels below, they made the export of a <surround> 1000 deep take minutes
+;; (a time cubic in the depth), which the runners of CI took for a hang
+;; ("a tree nested too deep is cut" above). Inline markup around a block was
+;; exponential in its depth (exists? ran its predicate twice).
+(define (nested-line n leaf)
+  ;; @leaf in @n levels of an inline <with> in a <concat>
+  (deep-tree (lambda (t) `(with "color" "red" (concat "a" ,t))) n leaf))
+
+(define (test-html-nested-lines)
+  (check-group "html export: tabs and spaces in nested markup")
+  (for (n '(1 3 20))
+    ;; a weak tab is dropped when another tab follows (or precedes) in the
+    ;; line, however deep
+    (with s (export `(document
+                      (concat "x" (htab "5mm" "last")
+                              ,(nested-line n '(concat "l" (htab "5mm" "first")
+                                                       "r" (htab "5mm") "s"))
+                              (htab "5mm" "first") "y"))
+                    "html-snippet")
+      (check= (list n (string-occurs? "lr" s)
+                    (string-occurs? "center-tab" s)
+                    (string-occurs? "right-tab" s))
+              (list n #t #f #t)))
+    ;; the spaces of a paragraph
+    (with s (export `(document "x"
+                               ,(nested-line n '(concat (vspace* "2fn") "leaf"
+                                                        (vspace "3fn")))
+                               "y")
+                    "html-snippet")
+      (check= (list n (string-occurs? "margin-top: 2em; margin-bottom: 3em" s))
+              (list n #t))))
+  ;; deep lines around a block (a tab), in a time linear in their depth
+  (for (n '(30 1000))
+    (with s (export `(document
+                      "before"
+                      ,(nested-line n '(concat "l" (htab "5mm") "leaf"))
+                      "after")
+                    "html-snippet")
+      (check-true (whole-or-cut? s "leaf"))))
+  ;; deep blocks, nested and in <surround>
+  (for (s (list (html-of-deep (lambda (t) `(surround "a" "b" (with "par-left" "1cm" ,t)))
+                              1000)
+                (html-of-deep (lambda (t) `(with "par-left" "1cm" (with "color" "red" ,t)))
+                              2000)))
+    (check-true (whole-or-cut? s "leaf"))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
@@ -2786,7 +2916,7 @@
             (list test-mathml-export test-mathml-html test-html-formula-labels
                   test-html-mathjax-formulas test-html-pattern-background
                   test-html-include
-                  test-html-deep-recursion
+                  test-html-deep-recursion test-html-nested-lines
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols

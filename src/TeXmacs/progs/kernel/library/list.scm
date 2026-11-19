@@ -302,9 +302,12 @@
 	(else (forall? pred? (cdr l)))))
 
 (define-public (exists? pred? l)
-  (cond ((null? l) #f)
-	((pred? (car l)) (pred? (car l)))
-	(else (exists? pred? (cdr l)))))
+  ;; the first true value of @pred? on @l; @pred? runs once on each element
+  ;; (it ran twice on the element found: a recursive @pred? took a time
+  ;; exponential in the depth, as force-block? in tmhtml.scm on nested
+  ;; inline markup around a block)
+  (and (nnull? l)
+       (or (pred? (car l)) (exists? pred? (cdr l)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search and replace
