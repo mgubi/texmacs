@@ -211,26 +211,26 @@
 
 (tm-widget (texmacs-left-tools win)
   (for (tool (window->tools win :transient-left :left))
-    (dynamic (texmacs-side-tool win tool :title)))
+    (dynamic (tool-opening tool (texmacs-side-tool win tool :title))))
   ===
   (glue #t #t 300 1)
   (for (tool (window->tools win :bottom-left))
-    (dynamic (texmacs-side-tool win tool :title))))
+    (dynamic (tool-opening tool (texmacs-side-tool win tool :title)))))
 
 (tm-widget (texmacs-side-tools win)
   (for (tool (window->tools win :transient-right :right))
-    (dynamic (texmacs-side-tool win tool :title)))
+    (dynamic (tool-opening tool (texmacs-side-tool win tool :title))))
   ===
   (glue #t #t 300 1)
   (for (tool (window->tools win :bottom-right))
-    (dynamic (texmacs-side-tool win tool :title))))
+    (dynamic (tool-opening tool (texmacs-side-tool win tool :title)))))
 
 (tm-widget (texmacs-bottom-tools win)
   (with tools (window->tools win :transient-bottom :bottom)
     (if (not (qt-gui?)) (glue #f #f 0 2))
     (link texmacs-bottom-toolbars)
     (for (tool tools)
-      (dynamic (texmacs-side-tool win tool :title)))
+      (dynamic (tool-opening tool (texmacs-side-tool win tool :title))))
     (if (with-keyboard-tool?)
         (if (or (extra-bottom-tools?) (nnull? tools)) ---)
         (dynamic (custom-keyboard-toolbar)))

@@ -35,7 +35,8 @@ archiver_rep::archiver_rep (double author, path rp2):
   the_owner (0),
   rp (rp2),
   undo_obs (undo_observer (this)),
-  versioning (false)
+  versioning (false),
+  version (0)
 {
   archs->insert ((pointer) this);
   attach_observer (subtree (the_et, rp), undo_obs);
@@ -59,6 +60,7 @@ archiver_rep::clear () {
   bool saved= conform_save ();
   bool autosaved= conform_autosave ();
   archive= make_branches (0);
+  version++;
   current= make_compound (0);
   the_owner= 0;
   depth= 0;
@@ -354,6 +356,7 @@ archiver_rep::expose (patch archive) {
 void
 archiver_rep::expose () {
   archive= expose (archive);
+  version++;
 }
 
 void
@@ -370,6 +373,7 @@ archiver_rep::normalize () {
     split (p1, re2, Re1, Re2);
     patch ar2= make_history (un2, Re1);
     archive= make_history (patch (p1, ar2), append_branches (re1, Re2));
+    version++;
     last_save= last_autosave= -1;
   }
 }
@@ -446,6 +450,7 @@ archiver_rep::confirm () {
     if (active ()) {
       //cout << "Confirm " << current << "\n";
       archive= patch (current, archive);
+      version++;
       current= make_compound (0);
       the_owner= 0;
       depth++;
@@ -476,6 +481,7 @@ archiver_rep::retract () {
   }
   if (nr_branches (nx) != 0) nx= get_undo (nx);
   archive= make_history (nx, append_branches (re, get_redo (nx)));
+  version++;
   depth--;
   //show_all ();
   return true;
@@ -519,6 +525,7 @@ archiver_rep::simplify () {
         patch un= patch (p1, cdr (get_undo (cdr (get_undo (archive)))));
         patch re= get_redo (archive);
         archive= make_history (un, re);
+        version++;
         //show_all ();
         //cout << "\n";
         if (depth == last_autosave + 1) last_autosave= -1;
@@ -531,6 +538,11 @@ archiver_rep::simplify () {
 /******************************************************************************
 * Undo and redo
 ******************************************************************************/
+
+int
+archiver_rep::history_version () {
+  return version;
+}
 
 int
 archiver_rep::undo_possibilities () {
@@ -556,6 +568,7 @@ archiver_rep::undo_one (int i) {
     patch re = append_branches (re1, re2);
     patch un = (nr_branches (nx) == 0? nx: get_undo (nx));
     archive= make_history (un, re);
+    version++;
     depth--;
     //show_all ();
     return cursor_hint (q, the_et);
@@ -582,6 +595,7 @@ archiver_rep::redo_one (int i) {
     //cout << "other= " << other << "\n";
     patch nx= make_history (un, other);
     archive= make_history (patch (q, nx), cdr (branch (re, i)));
+    version++;
     if (depth <= last_save && i != 0) last_save= -1;
     if (depth <= last_autosave && i != 0) last_autosave= -1;
     depth++;
@@ -745,6 +759,7 @@ archiver_rep::mark_end (double m) {
   // and which are compressed into a single one no longer count in the depth
   int n= nr_steps (archive);
   archive= remove_marker (archive, m);
+  version++;
   depth -= n - nr_steps (archive);
   simplify ();
   //show_all ();
@@ -760,6 +775,7 @@ archiver_rep::mark_cancel (double m) {
     if (is_marker (car (get_undo (archive)), m, false)) {
       int n= nr_steps (archive);
       archive= remove_marker (archive, m);
+      version++;
       depth -= n - nr_steps (archive);
       simplify ();
       return true;
@@ -767,6 +783,7 @@ archiver_rep::mark_cancel (double m) {
     if (get_author (car (get_undo (archive))) != the_author) {
       int n= nr_steps (archive);
       archive= remove_marker (archive, m);
+      version++;
       depth -= n - nr_steps (archive);
       return false;
     }

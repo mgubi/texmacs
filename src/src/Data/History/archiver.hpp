@@ -29,6 +29,7 @@ class archiver_rep: public concrete_struct {
   path     rp;             // root path for document
   observer undo_obs;       // observer for undoing changes
   bool     versioning;     // true during undo and redo operations
+  int      version;        // changes with each change of the archive
 
 protected:
   void apply (patch p);
@@ -58,6 +59,7 @@ public:
   void forget_cursor (); // forget cursor modifications in last history item
   void simplify ();
 
+  int  history_version ();  // changes whenever the archive changes
   int  undo_possibilities ();
   int  redo_possibilities ();
   path undo_one (int i);

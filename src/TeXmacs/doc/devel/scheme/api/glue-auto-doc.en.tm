@@ -6659,6 +6659,38 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(embedded-opening)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|embedded_opening> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(embedded-opening-set <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|embedded_opening_set> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(embedded-tool-opening <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|embedded_tool_opening> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(embedded-opening-abort <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|embedded_opening_abort> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(supports-bibtex?)>
 <explain-synopsis|no synopsis>
   <|explain>
