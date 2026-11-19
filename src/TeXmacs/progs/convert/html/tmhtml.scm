@@ -495,41 +495,63 @@
 ;; nesting of documents, the blocks of the inner paragraphs were made
 ;; blocks again at each level, and copied by append, which made the export
 ;; quadratic in the depth (cubic with the old as-blocks). The blocks of the
-;; paragraphs of a nesting are now put on one list, and as-blocks is only
-;; applied to those of a level which are not all blocks that as-block
-;; leaves as they are (as-blocks leaves such a list as it is)
+;; paragraphs of a nesting are now put on one list, once. A block is stable
+;; when it is a block which as-block leaves as it is: as-blocks leaves a
+;; list of stable blocks as it is, and applies as-block to each block of a
+;; list of blocks. So at each level, as-block is only applied to the blocks
+;; which are not stable yet (a <div> which as-block merges with the <div>
+;; in it, one level at a time), and as-blocks to all the blocks of the
+;; level only when one of them is not a block (force-block?)
 
 (define (stable-block? x)
   (and (force-block? x) (eq? (as-block x) x)))
 
-(define (reverse-onto l acc)
-  (if (null? l) acc (reverse-onto (cdr l) (cons (car l) acc))))
+(define (push-blocks l acc unstable)
+  ;; the blocks @l pushed on @acc, and the cells of @acc of those which are
+  ;; not stable added to @unstable
+  (if (null? l) (cons acc unstable)
+      (with acc2 (cons (car l) acc)
+        (push-blocks (cdr l) acc2
+                     (if (stable-block? (car l)) unstable
+                         (cons acc2 unstable))))))
 
-(define (tmhtml-pars l acc stable?)
-  ;; the blocks of the paragraphs @l, in reverse order, on @acc; with
-  ;; @stable?, the pair of these and whether all the blocks of @l are
-  ;; stable, else the blocks only
-  (let loop ((l l) (acc acc) (ok? #t))
-    (cond ((null? l) (if stable? (cons acc ok?) (cons acc #f)))
+(define (tmhtml-pars l acc nested?)
+  ;; the blocks of the paragraphs @l, in reverse order, on @acc, and (when
+  ;; @nested?) the cells of those which are not stable
+  (let loop ((l l) (acc acc) (unstable '()))
+    (cond ((null? l) (cons acc unstable))
           ((and (func? (car l) 'document) (nnull? (cdar l))
                 (not (ahash-ref tmhtml-env :math)))
            (with r (tmhtml-nested-document (car l) acc)
-             (loop (cdr l) (car r) (and ok? (cdr r)))))
+             (loop (cdr l) (car r)
+                   (if nested? (append (cdr r) unstable) '()))))
+          (nested?
+           (with r (push-blocks (tmhtml-p (car l)) acc unstable)
+             (loop (cdr l) (car r) (cdr r))))
           (else
-           (with bl (tmhtml-p (car l))
-             (loop (cdr l) (reverse-onto bl acc)
-                   (and stable? ok? (list-and (map stable-block? bl)))))))))
+           (loop (cdr l) (reverse-onto (tmhtml-p (car l)) acc) '())))))
+
+(define (reverse-onto l acc)
+  (if (null? l) acc (reverse-onto (cdr l) (cons (car l) acc))))
 
 (define (tmhtml-nested-document x acc)
   ;; the blocks of the paragraph @x, a document, as (tmhtml-p x) makes
-  ;; them, in reverse order on @acc, and whether they are stable
-  (let* ((r (tmhtml-pars (cdr x) acc #t)))
-    (if (cdr r) r
-        (let* ((mine (let loop ((l (car r)) (m '()))
-                       (if (eq? l acc) m (loop (cdr l) (cons (car l) m)))))
-               (bl (as-blocks (list `(h:p ,@mine)))))
-          (cons (reverse-onto bl acc)
-                (list-and (map stable-block? bl)))))))
+  ;; them, in reverse order on @acc, and the cells of those not stable
+  (let* ((r (tmhtml-pars (cdr x) acc #t))
+         (unstable (cdr r)))
+    (cond ((null? unstable) r)
+          ((list-and (map (lambda (c) (force-block? (car c))) unstable))
+           ;; the cells are those of this conversion (push-blocks)
+           (for-each (lambda (c) (set-car! c (as-block (car c)))) unstable)
+           (cons (car r)
+                 (list-filter unstable
+                              (lambda (c) (not (stable-block? (car c)))))))
+          (else
+           (let* ((mine (let loop ((l (car r)) (m '()))
+                          (if (eq? l acc) m
+                              (loop (cdr l) (cons (car l) m)))))
+                  (bl (as-blocks (list `(h:p ,@mine)))))
+             (push-blocks bl acc '()))))))
 
 (define (tmhtml-paragraph l)
   (let rec ((l l))

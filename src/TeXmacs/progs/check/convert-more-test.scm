@@ -550,27 +550,41 @@
 ;; nesting (tmhtml-p): the blocks of the inner levels were cut again one at
 ;; a time at each level, and the export of 2000 nested documents took 40 s
 ;; (a time cubic in the depth, 4000 levels: minutes). A nesting of
-;; documents is exported as its paragraphs, in a time linear in its depth.
+;; documents is exported in a time linear in its depth.
 (define nested-documents
-  ;; the nestings, and their paragraphs from the top: n levels of
-  ;; (document "p" t), of (document t "q"), of (document "p" t "q")
+  ;; the nestings, and their paragraphs from the top (if they are those of
+  ;; the nesting): n levels of (document "p" t), of (document t "q"), of
+  ;; (document "p" t "q")...
   (list (cons (lambda (t) `(document "p" ,t))
               (lambda (n leaf) (append (make-list n "p") (list leaf))))
         (cons (lambda (t) `(document ,t "q"))
               (lambda (n leaf) (append (list leaf) (make-list n "q"))))
         (cons (lambda (t) `(document "p" ,t "q"))
               (lambda (n leaf) (append (make-list n "p") (list leaf)
-                                       (make-list n "q"))))))
+                                       (make-list n "q"))))
+        ;; a vertical space before a block, whose <div> is merged with the
+        ;; <div> of the space at the next level (not a stable block)
+        (cons (lambda (t) `(document (concat (vspace* "1fn")
+                                             (with "par-left" "1cm"
+                                                   (document "a")))
+                                     ,t))
+              #f)
+        ;; nested blocks, <div> in <div>
+        (cons (lambda (t) `(document (with "par-left" "1cm"
+                                           (with "par-right" "1cm"
+                                                 (with "par-left" "2cm"
+                                                       (document "a"))))
+                                     ,t))
+              #f)))
 
 (define (test-html-nested-documents)
   (check-group "html export: nested documents")
-  ;; the HTML of a nesting is that of its paragraphs, also with blocks and
-  ;; vertical spaces
+  ;; for these contents, the HTML of a nesting is that of its paragraphs
   (for (leaf (list "leaf"
                    '(with "par-left" "1cm" (document "leaf" "b"))
                    '(concat (vspace* "1fn") "leaf" (vspace "2fn"))
                    '(concat "a" (htab "5mm") "leaf")))
-    (for (nest nested-documents)
+    (for (nest (list-filter nested-documents cdr))
       (for (n '(1 2 5))
         (check= (export `(document "before" ,(deep-tree (car nest) n leaf)
                                    "after")
@@ -584,13 +598,15 @@
                   "html-snippet")
     (check= (list (string-occurs? "margin-left" s) (occurrences "<p>" s))
             (list #t 4)))
-  ;; deep nestings, in a time linear in their depth (2000 levels in at most
-  ;; 20 times the time of 250, at least 4 s): whole, or cut with the error
+  ;; deep nestings, in a time linear in their depth (1000 levels in at most
+  ;; 20 times the time of 125, at least 4 s; without the fix they took 8 to
+  ;; 17 s, on the binary of CI): whole, or cut with the error
   (for (nest nested-documents)
-    (check-fast "nested documents"
-                (lambda (n)
-                  (lambda () (whole-or-cut? (html-of-deep (car nest) n) "leaf")))
-                (lambda (n) #t))))
+    (check-fast-sizes "nested documents"
+                      (lambda (n)
+                        (lambda ()
+                          (whole-or-cut? (html-of-deep (car nest) n) "leaf")))
+                      (lambda (n) #t) 125 1000)))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
@@ -2393,31 +2409,35 @@
 (define (check-fast what make expect)
   ;; the thunk (make n) of a conversion of a document of @n paragraphs gives
   ;; (expect n), and the big run takes at most (scaling-limit small-time) ms
+  (check-fast-sizes what make expect scaling-small scaling-big))
+
+(define (check-fast-sizes what make expect small big)
+  ;; check-fast with a small run of @small paragraphs and a big one of @big
   (let* ((rs (check-run (lambda ()
-                          (fastest-run (make scaling-small) 3
+                          (fastest-run (make small) 3
                                        (lambda (ms) #f)))))
          (limit (if (and (pair? rs) (integer? (cdr rs)))
                     (scaling-limit (cdr rs))
                     4000))
          (rb (check-run (lambda ()
-                          (fastest-run (make scaling-big) 3
+                          (fastest-run (make big) 3
                                        (lambda (ms) (< ms limit)))))))
     (cond ((and (pair? rs) (== (car rs) 'error))
            (check-report #f what (object->string rs)))
           ((and (pair? rb) (== (car rb) 'error))
            (check-report #f what (object->string rb)))
           (else
-           (check-report (equal? (car rs) (expect scaling-small))
+           (check-report (equal? (car rs) (expect small))
                          what "wrong result")
-           (check-report (equal? (car rb) (expect scaling-big))
+           (check-report (equal? (car rb) (expect big))
                          what "wrong result")
            (check-report (< (cdr rb) limit)
                          (string-append what " scales")
                          (string-append (number->string (cdr rb)) " ms for "
-                                        (number->string scaling-big)
+                                        (number->string big)
                                         " paragraphs, "
                                         (number->string (cdr rs)) " ms for "
-                                        (number->string scaling-small)
+                                        (number->string small)
                                         ", limit "
                                         (number->string limit)))))))
 
