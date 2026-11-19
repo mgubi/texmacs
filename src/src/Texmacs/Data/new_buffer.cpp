@@ -614,7 +614,9 @@ import_tree (url u, string fm) {
 bool
 buffer_import (url name, url src, string fm) {
   tree t= import_tree (src, fm);
-  if (t == "error") return true;
+  // (error "bad format or data"): the converter failed (generic->texmacs);
+  // the buffer would be empty, the load fails instead
+  if (t == "error" || is_func (t, _ERROR)) return true;
   set_buffer_tree (name, t);
   return false;
 }

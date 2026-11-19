@@ -909,11 +909,24 @@
       (buffer-set-master name master)))
   (noop))
 
+(define (load-buffer-openable? name)
+  ;; the files of tmfs have formats of their own (tmfs-format)
+  (or (url-rooted-tmfs? name)
+      (format-openable? (url-format name))))
+
 (define (load-buffer-load name opts)
   ;;(display* "load-buffer-load " name ", " opts "\n")
   (with vname `(verbatim ,(url->system name))
     (cond ((buffer-exists? name)
            (load-buffer-open name opts))
+          ((and (url-exists? name) (not (load-buffer-openable? name)))
+           ;; no converter to TeXmacs (an image, a pdf, a converter whose
+           ;; program is missing): a message, not an empty document
+           (set-message (replace "Could not load %1: no converter from %2 to TeXmacs"
+                                 (url->system name)
+                                 (or (format-get-name (url-format name))
+                                     (url-format name)))
+                        "Load file"))
           ((url-exists? name)
            (with skipped (texmacs-skipped-nestings)
              (if (buffer-load name)
@@ -1070,6 +1083,38 @@
           (set! startup-reserved b)
           (load-buffer name))
         (load-buffer-in-new-window name))))
+
+;; The files dropped on a document are inserted, by their names or as images
+;; (mouse-drop-event in kbd-handlers.scm); documents which TeXmacs opens
+;; (document-formats: TeXmacs, Markdown, LaTeX, Html, BibTeX, Word...) are
+;; opened instead, as when the Finder or the Dock gives them.
+(tm-define (dropped-documents x)
+  (:synopsis "The files of the drop @x when all are documents, or #f")
+  (let* ((l (cond ((string? x) (list x))
+                  ((tm-func? x 'concat) (cdr x))
+                  (else (list x))))
+         ;; (several files are separated by spaces; the names are in the
+         ;; Cork encoding, as strings of the document)
+         (l (list-filter l (lambda (y)
+                             (not (and (string? y)
+                                       (== (tm-string-trim-both y) ""))))))
+         (fms (document-formats))
+         (files (map (lambda (y)
+                       (and (string? y)
+                            (let* ((u (url-relative (current-buffer)
+                                                    (system->url (cork->utf8 y))))
+                                   (fm (url-format u)))
+                              (and (in? fm fms)
+                                   (url-exists? u) (not (url-directory? u))
+                                   u))))
+                     l)))
+    (and (nnull? files) (list-and files) files)))
+
+(tm-define (mouse-drop-event x y obj)
+  (:require (dropped-documents (tm->stree obj)))
+  ;; (after the event: the drop is handled inside the event of an editor)
+  (with l (dropped-documents (tm->stree obj))
+    (exec-delayed (lambda () (for-each load-buffer-from-system l)))))
 
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")

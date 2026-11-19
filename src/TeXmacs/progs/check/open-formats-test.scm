@@ -1,0 +1,287 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MODULE      : open-formats-test.scm
+;; DESCRIPTION : tests of the opening of the files of other formats
+;; COPYRIGHT   : (C) 2026  Massimiliano Gubinelli
+;;
+;; This software falls under the GNU general public license version 3 or later.
+;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A file is opened in the format of its suffix, whatever gives it: the Open
+;; panel, the Finder, the Dock, open -a (load-buffer-from-system), a drop on
+;; a document (dropped-documents) or the Recent menu (load-buffer):
+;;   - the formats which can be opened (format-openable?) and the documents
+;;     (document-formats, the formats of the Import menu);
+;;   - Markdown, LaTeX, Html, BibTeX, Word and OpenDocument files open in
+;;     their format, also empty ones, and go to the recent files;
+;;   - a format without a converter to TeXmacs (pdf, png), or a converter
+;;     which fails, gives a message and no buffer, not an empty document;
+;;   - the files of a drop which are all documents are opened, the others
+;;     are inserted as before;
+;;   - the document types of the application on macOS (CFBundleDocumentTypes
+;;     of packages/macos/Info.plist.in) are the suffixes of document-formats.
+
+(texmacs-module (check open-formats-test)
+  (:use (check check-lib)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (run-group thunk)
+  ;; an error in a group is one failure
+  (with r (check-run thunk)
+    (when (and (pair? r) (== (car r) 'error))
+      (check-report #f "the group" (object->string r)))))
+
+(define (tmp-dir) (url-append (url-temp-dir) "open-formats"))
+
+(define (tmp-file name) (url-append (tmp-dir) name))
+
+(define (clean-tmp-dir)
+  ;; the files of the suite are removed (the directory stays)
+  (when (url-exists? (tmp-dir))
+    (for-each (lambda (u) (when (url-test? u "f") (system-remove u)))
+              (url-read-directory (tmp-dir) "*")))
+  (when (not (url-exists? (tmp-dir))) (system-mkdir (tmp-dir))))
+
+(define (write-file name s)
+  (with u (tmp-file name)
+    (string-save s (url->system u))
+    u))
+
+(define (stree-has-string? t s)
+  ;; does a string of the stree @t contain @s?
+  (cond ((string? t) (string-occurs? s t))
+        ((pair? t) (list-or (map (lambda (x) (stree-has-string? x s)) t)))
+        (else #f)))
+
+(define (with-messages thunk)
+  ;; the messages of set-message during @thunk
+  (let* ((l '()))
+    (with-global set-message
+        (lambda (msg . rest)
+          (set! l (cons (if (string? msg) msg (object->string msg)) l)))
+      (thunk))
+    (reverse l)))
+
+(define (open-and-check u text)
+  ;; opens @u (as the Open panel does), checks that its document has @text
+  ;; and that it is a recent file, then closes it
+  (let* ((old (current-buffer)))
+    (load-buffer u)
+    (check-true (buffer-exists? u))
+    (check= (current-buffer) u)
+    (when (buffer-exists? u)
+      (when text
+        (check-true (stree-has-string? (tm->stree (buffer-get-body u)) text)))
+      (check-true (in? (url->unix u)
+                       (map cdar (learned-interactive "recent-buffer"))))
+      (buffer-close u))
+    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+
+(define (check-not-opened u)
+  ;; opening @u gives a message and no buffer
+  (let* ((old (current-buffer))
+         (msgs (with-messages (lambda () (load-buffer u)))))
+    (check-false (buffer-exists? u))
+    (check= (current-buffer) old)
+    (check-true (list-or (map (lambda (m) (string-occurs? "Could not load" m))
+                              msgs)))
+    (when (buffer-exists? u) (buffer-close u))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The formats which can be opened
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-openable)
+  (check-group "openable formats")
+  (for-each (lambda (fm) (check-true (format-openable? fm)))
+            '("texmacs" "stm" "tmml" "generic" "verbatim" "markdown" "latex"
+              "html" "tmbib" "docx" "odt" "python" "scheme"))
+  (for-each (lambda (fm) (check-false (format-openable? fm)))
+            '("pdf" "png" "postscript" "gpg" "no-such-format"))
+  (check= (url-format (string->url "a.md")) "markdown")
+  (check= (url-format (string->url "a.MD")) "markdown")
+  (check= (url-format (string->url "a.tex")) "latex")
+  (check= (url-format (string->url "a.bib")) "tmbib")
+  (check= (url-format (string->url "a.docx")) "docx")
+  (check= (url-format (string->url "a.odt")) "odt")
+  (check= (url-format (string->url "a.htm")) "html"))
+
+(define (test-document-formats)
+  (check-group "document formats")
+  (with l (document-formats)
+    (for-each (lambda (fm) (check-true (in? fm l)))
+              '("texmacs" "stm" "tmml" "markdown" "latex" "html" "tmbib"
+                "docx" "odt"))
+    ;; programs are opened, but are not documents; images and pdf are not
+    ;; opened at all
+    (for-each (lambda (fm) (check-false (in? fm l)))
+              '("python" "scheme" "cpp" "pdf" "png" "generic")))
+  (with l (document-format-suffixes)
+    (for-each (lambda (s) (check-true (in? s l)))
+              '("tm" "md" "markdown" "tex" "html" "bib" "docx" "odt"))
+    (for-each (lambda (s) (check-false (in? s l)))
+              '("py" "scm" "pdf" "png" "jpg" "zip" ""))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Opening files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (office-file name fm)
+  ;; a Word or OpenDocument file written by TeXmacs
+  (let* ((doc (stree->tree '(document (TeXmacs "2.1")
+                                      (style (tuple "generic"))
+                                      (body (document "Office paragraph")))))
+         (s (convert doc "texmacs-tree" (string-append fm "-document"))))
+    (and (string? s) (write-file name s))))
+
+(define (test-open-by-suffix)
+  (check-group "open by suffix")
+  (open-and-check (write-file "a.md" "# Title\n\nSome *Markdown* text.\n")
+                  "Markdown")
+  (open-and-check (write-file "b.tex"
+                              (string-append "\\documentclass{article}\n"
+                                             "\\begin{document}\nLaTeX text"
+                                             "\n\\end{document}\n"))
+                  "LaTeX text")
+  (open-and-check (write-file "c.html"
+                              "<html><body><p>Html text</p></body></html>\n")
+                  "Html text")
+  (open-and-check (write-file "d.bib"
+                              "@article{key, author={A. Author}, title={Bib title}, year=2000}\n")
+                  "key")
+  (with u (office-file "e.docx" "docx")
+    (check-true (url? u))
+    (when u (open-and-check u "Office paragraph")))
+  (with u (office-file "f.odt" "odt")
+    (check-true (url? u))
+    (when u (open-and-check u "Office paragraph")))
+  ;; empty files are empty documents, not failures
+  (open-and-check (write-file "empty.md" "") #f)
+  (open-and-check (write-file "empty.tex" "") #f)
+  (open-and-check (write-file "empty.html" "") #f)
+  (open-and-check (write-file "empty.bib" "") #f))
+
+(define (test-no-converter)
+  (check-group "no converter")
+  ;; no converter to TeXmacs: a message, no empty document
+  (check-not-opened (write-file "g.pdf" "%PDF-1.4\n%%EOF\n"))
+  (check-not-opened (write-file "h.png" "\x89PNG\r\n\x1a\n"))
+  ;; a converter which fails (as one whose program is missing):
+  ;; generic->texmacs gives (error "bad format or data")
+  (with u (write-file "i.md" "# Failing\n")
+    (with-global generic->texmacs
+        (lambda (s fm) (stree->tree '(error "bad format or data")))
+      (check-not-opened u)))
+  ;; a broken Word file opens with the message of the converter
+  (with u (write-file "j.docx" "not a zip archive")
+    (open-and-check u "This file is not a Word document"))
+  ;; the files of the system: the same message, nothing else changed
+  (with u (tmp-file "g.pdf")
+    (let* ((old (current-buffer))
+           (msgs (with-messages (lambda () (load-buffer-from-system u)))))
+      (check-false (buffer-exists? u))
+      (check= (current-buffer) old)
+      (check-true (list-or (map (lambda (m) (string-occurs? "no converter" m))
+                                msgs)))
+      (startup-buffer-release))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Drops
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-drops)
+  (check-group "drops")
+  (let* ((md (write-file "k.md" "Dropped\n"))
+         (tex (write-file "l.tex" "Dropped\n"))
+         (png (write-file "m.png" "\x89PNG\r\n\x1a\n"))
+         (txt (write-file "n.xyz" "Dropped\n"))
+         (py (write-file "o.py" "x = 1\n"))
+         (name (lambda (u) (utf8->cork (url->system u)))))
+    ;; the names given by the interfaces (TMView, QTMWidget)
+    (check= (dropped-documents (name md)) (list md))
+    (check= (dropped-documents `(concat ,(name md) " " ,(name tex)))
+            (list md tex))
+    ;; not all documents: the names are inserted as before
+    (check-false (dropped-documents `(concat ,(name md) " " ,(name png))))
+    (check-false (dropped-documents `(image ,(name png) "" "" "" "")))
+    (check-false (dropped-documents (name txt)))
+    (check-false (dropped-documents (name py)))
+    (check-false (dropped-documents (name (tmp-dir))))
+    (check-false (dropped-documents (name (tmp-file "missing.md"))))
+    (check-false (dropped-documents "some text"))
+    (check-false (dropped-documents '(hlink "x" "https://example.org/a.md")))
+    ;; the drop event opens them as the files of the system, after the event
+    (let* ((opened '())
+           (delayed '()))
+      (with-global exec-delayed (lambda (cmd) (set! delayed (cons cmd delayed)))
+        (with-global load-buffer-from-system
+            (lambda (u) (set! opened (rcons opened u)))
+          (mouse-drop-event 0 0 (stree->tree `(concat ,(name md) " "
+                                                      ,(name tex))))
+          (check= opened '())
+          (check= (length delayed) 1)
+          (for-each (lambda (cmd) (cmd)) delayed)
+          (check= opened (list md tex)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The document types of the application on macOS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (plist-extensions s)
+  ;; the strings of the arrays CFBundleTypeExtensions of the plist @s
+  (let loop ((lines (string-tokenize-by-char s #\newline))
+             (in? #f)
+             (r '()))
+    (if (null? lines) (reverse r)
+        (let* ((l (tm-string-trim-both (car lines))))
+          (cond ((== l "<key>CFBundleTypeExtensions</key>")
+                 (loop (cdr lines) #t r))
+                ((and in? (== l "</array>"))
+                 (loop (cdr lines) #f r))
+                ((and in? (string-starts? l "<string>")
+                      (string-ends? l "</string>"))
+                 (loop (cdr lines) #t
+                       (cons (substring l 8 (- (string-length l) 9)) r)))
+                (else (loop (cdr lines) in? r)))))))
+
+(define (test-plist)
+  (check-group "macOS document types")
+  ;; (the sources only: an installed TeXmacs has no packages folder)
+  (let* ((tp (getenv "TEXMACS_PATH"))
+         (p (and tp (string-append tp "/../packages/macos/Info.plist.in"))))
+    (when (and p (url-exists? (system->url p)))
+      (let* ((exts (plist-extensions (string-load (system->url p))))
+             (sufs (document-format-suffixes)))
+        (check-true (nnull? exts))
+        ;; each suffix once, and the same as the registry
+        (check= (length exts) (length (list-remove-duplicates exts)))
+        (check= (list-filter sufs (lambda (s) (nin? s exts))) '())
+        (check= (list-filter exts (lambda (s) (nin? s sufs))) '())))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The suite
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (open-formats-test-failures)
+  (check-suite "open-formats")
+  (clean-tmp-dir)
+  (let* ((before (buffer-list)))
+    (run-group test-openable)
+    (run-group test-document-formats)
+    (run-group test-open-by-suffix)
+    (run-group test-no-converter)
+    (run-group test-drops)
+    (run-group test-plist)
+    ;; no buffer is left open
+    (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
+              (buffer-list))
+    (check= (length (buffer-list)) (length before)))
+  (clean-tmp-dir)
+  (system-rmdir (tmp-dir))
+  (check-end))
