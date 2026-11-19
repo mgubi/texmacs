@@ -136,7 +136,7 @@
 (define (has-tab-after? x pos depth)
   (cond ((null? pos) #f)
         ((list-any (lambda (y) (has-tab? y (- depth 1)))
-                   (sublist x (+ (car pos)) (length x))) #t)
+                   (sublist x (+ (car pos) 1) (length x))) #t)
         (else (has-tab-after? (list-ref x (car pos)) (cdr pos) (- depth 1)))))
 
 (define (simplify-tabs-sub x pos i in depth)

@@ -511,6 +511,111 @@
                               2000)))
     (check-true (whole-or-cut? s "leaf"))))
 
+;; A weak tab of a line (tmconcat.scm): "last" is a tab when no tab follows
+;; it in the line, else it is dropped; "first" likewise, with the tabs before
+;; it. A "last" tab was always dropped: has-tab-after? looked for the tabs
+;; from the tab itself on (since 2012)
+(define (html-of-line . l)
+  (export `(document (concat ,@l)) "html-snippet"))
+
+(define (test-html-weak-tabs)
+  (check-group "html export: weak tabs")
+  (let ((tab '(htab "5mm"))
+        (first-tab '(htab "5mm" "first"))
+        (last-tab '(htab "5mm" "last")))
+    ;; alone in the line: a tab
+    (check= (html-of-line "x" last-tab "y") (html-of-line "x" tab "y"))
+    (check= (html-of-line "x" first-tab "y") (html-of-line "x" tab "y"))
+    (check-true (string-occurs? "right-tab" (html-of-line "x" last-tab "y")))
+    ;; after the other tabs, or before them: a tab
+    (check= (html-of-line "x" tab "y" last-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" first-tab "y" tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    ;; before another tab, or after one: dropped
+    (check= (html-of-line "x" last-tab "y" tab "z") (html-of-line "xy" tab "z"))
+    (check= (html-of-line "x" tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" last-tab "y" last-tab "z") (html-of-line "xy" tab "z"))
+    (check= (html-of-line "x" first-tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    ;; in a <with>, as a tab there
+    (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b")) "y")
+            (html-of-line "x" `(with "color" "red" (concat "a" ,tab "b")) "y"))
+    (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b"))
+                          tab "y")
+            (html-of-line "x" '(with "color" "red" "ab") tab "y"))
+    (check= (html-of-line "x" `(with "color" "red"
+                                     (concat "a" ,last-tab "b" ,tab "c")))
+            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))))
+;; A paragraph which is a document is made blocks again at each level of a
+;; nesting (tmhtml-p): the blocks of the inner levels were cut again one at
+;; a time at each level, and the export of 2000 nested documents took 40 s
+;; (a time cubic in the depth, 4000 levels: minutes). A nesting of
+;; documents is exported in a time linear in its depth.
+(define nested-documents
+  ;; the nestings: a name, the wrap of a level, and the paragraphs of n
+  ;; levels from the top, if they are those of the nesting
+  (list (list "p t" (lambda (t) `(document "p" ,t))
+              (lambda (n leaf) (append (make-list n "p") (list leaf))))
+        (list "t q" (lambda (t) `(document ,t "q"))
+              (lambda (n leaf) (append (list leaf) (make-list n "q"))))
+        (list "p t q" (lambda (t) `(document "p" ,t "q"))
+              (lambda (n leaf) (append (make-list n "p") (list leaf)
+                                       (make-list n "q"))))
+        ;; a vertical space before a block, whose <div> is merged with the
+        ;; <div> of the space at the next level (not a stable block)
+        (list "space before a block"
+              (lambda (t) `(document (concat (vspace* "1fn")
+                                             (with "par-left" "1cm"
+                                                   (document "a")))
+                                     ,t))
+              #f)
+        ;; nested blocks, <div> in <div>
+        (list "nested blocks"
+              (lambda (t) `(document (with "par-left" "1cm"
+                                           (with "par-right" "1cm"
+                                                 (with "par-left" "2cm"
+                                                       (document "a"))))
+                                     ,t))
+              #f)
+        ;; a block which is made inline by as-block at the next level (a
+        ;; <div> of a class "...-license" merged with that of the block)
+        (list "a block made inline"
+              (lambda (t) `(document (with "par-mode" "left"
+                                           (tmdoc-license "x"))
+                                     ,t))
+              #f)))
+
+(define (test-html-nested-documents)
+  (check-group "html export: nested documents")
+  ;; for these contents, the HTML of a nesting is that of its paragraphs
+  (for (leaf (list "leaf"
+                   '(with "par-left" "1cm" (document "leaf" "b"))
+                   '(concat (vspace* "1fn") "leaf" (vspace "2fn"))
+                   '(concat "a" (htab "5mm") "leaf")))
+    (for (nest (list-filter nested-documents caddr))
+      (for (n '(1 2 5))
+        (check= (export `(document "before" ,(deep-tree (cadr nest) n leaf)
+                                   "after")
+                        "html-snippet")
+                (export `(document "before" ,@((caddr nest) n leaf) "after")
+                        "html-snippet")))))
+  ;; a document of a block (blocks made blocks again)
+  (with s (export '(document "a" (document (with "par-left" "1cm"
+                                                 (document "b" "c"))
+                                           "d"))
+                  "html-snippet")
+    (check= (list (string-occurs? "margin-left" s) (occurrences "<p>" s))
+            (list #t 4)))
+  ;; deep nestings, in a time linear in their depth (1500 levels in at most
+  ;; 20 times the time of 150, at least 4 s; with the fix 0.1 to 0.6 s,
+  ;; without it 15 to 55 s, on the binary of CI): whole, or cut with the error
+  (for (nest nested-documents)
+    (check-fast-sizes (string-append "nested documents, " (car nest))
+                      (lambda (n)
+                        (lambda ()
+                          (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
+                      (lambda (n) #t) 150 1500 "levels")))
+
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
   (list
@@ -2364,31 +2469,35 @@
 (define (check-fast what make expect)
   ;; the thunk (make n) of a conversion of a document of @n paragraphs gives
   ;; (expect n), and the big run takes at most (scaling-limit small-time) ms
+  (check-fast-sizes what make expect scaling-small scaling-big "paragraphs"))
+
+(define (check-fast-sizes what make expect small big unit)
+  ;; check-fast with a small run of @small @unit and a big one of @big
   (let* ((rs (check-run (lambda ()
-                          (fastest-run (make scaling-small) 3
+                          (fastest-run (make small) 3
                                        (lambda (ms) #f)))))
          (limit (if (and (pair? rs) (integer? (cdr rs)))
                     (scaling-limit (cdr rs))
                     4000))
          (rb (check-run (lambda ()
-                          (fastest-run (make scaling-big) 3
+                          (fastest-run (make big) 3
                                        (lambda (ms) (< ms limit)))))))
     (cond ((and (pair? rs) (== (car rs) 'error))
            (check-report #f what (object->string rs)))
           ((and (pair? rb) (== (car rb) 'error))
            (check-report #f what (object->string rb)))
           (else
-           (check-report (equal? (car rs) (expect scaling-small))
+           (check-report (equal? (car rs) (expect small))
                          what "wrong result")
-           (check-report (equal? (car rb) (expect scaling-big))
+           (check-report (equal? (car rb) (expect big))
                          what "wrong result")
            (check-report (< (cdr rb) limit)
                          (string-append what " scales")
                          (string-append (number->string (cdr rb)) " ms for "
-                                        (number->string scaling-big)
-                                        " paragraphs, "
+                                        (number->string big)
+                                        " " unit ", "
                                         (number->string (cdr rs)) " ms for "
-                                        (number->string scaling-small)
+                                        (number->string small)
                                         ", limit "
                                         (number->string limit)))))))
 
@@ -2917,6 +3026,8 @@
                   test-html-mathjax-formulas test-html-pattern-background
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
+                  test-html-weak-tabs
+                  test-html-nested-documents
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
