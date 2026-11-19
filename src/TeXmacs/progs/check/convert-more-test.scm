@@ -394,6 +394,22 @@
            (not (string-occurs? "nesting" s))
            (string-occurs? "nesting" s))))
 
+(define (stree-strings x)
+  ;; the strings of the stree @x, without a recursion (@x may be deep)
+  (let loop ((todo (list x)) (acc '()))
+    (cond ((null? todo) acc)
+          ((string? (car todo)) (loop (cdr todo) (cons (car todo) acc)))
+          ((pair? (car todo))
+           (loop (cons (caar todo) (cons (cdar todo) (cdr todo))) acc))
+          (else (loop (cdr todo) acc)))))
+
+(define (stree-whole-or-cut? x leaf)
+  ;; whole-or-cut? for the stree @x of the HTML
+  (let* ((l (stree-strings x))
+         (has? (lambda (s) (exists? (lambda (y) (string-occurs? s y)) l))))
+    (and (has? "before") (has? "after")
+         (if (has? leaf) (not (has? "nesting")) (has? "nesting")))))
+
 (define (test-html-deep-recursion)
   (check-group "html export: a macro which calls itself")
   (for (def '((assign "wm" (macro "x" (with "color" "red" (wm (arg "x")))))
@@ -454,6 +470,15 @@
                             "after")
                           "html-snippet")))
       (check-true (whole-or-cut? s "leaf")))
+    ;; deeper than the stack of C, the stree converted by texmacs->html
+    ;; (export would first make a tree of it, a recursion of C++ which
+    ;; overflows the stack sooner): femtolisp raised 'memory-error, which
+    ;; the export did not catch, or its collector, which copied the nested
+    ;; lists by a recursion of C, overflowed the stack (a crash)
+    (for (n '(45000 100000))
+      (with x (texmacs->html `(document "before" ,(deep-tree with1 n "leaf")
+                                        "after") '())
+        (check-true (stree-whole-or-cut? x "leaf"))))
     ;; a table, whole or cut, keeps its structure: a <td> in each <table>
     (with s (html-of-deep tab 1000)
       (check= (occurrences "<table" s) (occurrences "<td" s)))

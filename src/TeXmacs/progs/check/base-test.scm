@@ -589,6 +589,41 @@
   (check= (ahash-ref base-test-collection 'w) #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Deep recursions and deep lists
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (deep-map-recursion n)
+  ;; @n levels of a recursion through map (a builtin of C under femtolisp)
+  (if (= n 0) 0
+      (car (map (lambda (x) (+ x (deep-map-recursion (- n 1)))) '(1)))))
+
+(define (call-return return x)
+  ;; a callback named return (LanguageTool, the AI translation...)
+  (return x))
+
+(define (test-deep-recursions)
+  (check-group "deep recursions")
+  ;; a local variable named return is called (femtolisp made it its special
+  ;; form return, which gave its argument: the callbacks were never called)
+  (check= (call-return (lambda (y) (list 'called y)) 1) '(called 1))
+  (check= (let ((return (lambda (y) (* 2 y)))) (if #t (return 3) 0)) 6)
+  ;; a recursion too deep for the stack is the error 'stack-overflow, which
+  ;; the callers catch (the HTML export then cuts the tree, #813): Guile's
+  ;; key, which femtolisp gives too (it gave 'memory-error); s7, whose stack
+  ;; is on the heap, goes to the end
+  (check-true (in? (catch #t (lambda () (deep-map-recursion 200000) 'whole)
+                     (lambda (key . args) key))
+                   '(whole stack-overflow)))
+  ;; the collector of femtolisp copied the cars of the lists by a recursion
+  ;; of C as deep as their nesting: a crash past 150000 levels
+  (when (femtolisp-scheme?)
+    (let ((x (do ((i 0 (+ i 1)) (t "leaf" (list 'f t))) ((= i 1000000) t))))
+      (gc)
+      (check= (let loop ((t x) (n 0))
+                (if (pair? t) (loop (cadr t) (+ n 1)) (list n t)))
+              '(1000000 "leaf")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -615,4 +650,5 @@
   (test-hash-operations)
   (test-hash-with)
   (test-dictionaries)
+  (test-deep-recursions)
   (check-end))

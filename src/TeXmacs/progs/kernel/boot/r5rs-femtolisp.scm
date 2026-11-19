@@ -509,6 +509,13 @@
            (list 'read-error #f "~A" args #f))
           ((key-error)
            (list 'misc-error #f "Key error: ~S" args #f))
+          ((memory-error)
+           ;; a recursion through the builtins which call functions (map,
+           ;; for-each, sort...) too deep for the stack of C: Guile's key,
+           ;; which the callers catch (the HTML export cuts the tree, #813)
+           (if (equal? args '("stack overflow"))
+               (list 'stack-overflow #f "Stack overflow" #f #f)
+               e))
           ((assert-failed)
            (list 'misc-error #f "Assertion failed: ~S" args #f))
           ((load-error)

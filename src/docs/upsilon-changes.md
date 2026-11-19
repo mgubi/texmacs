@@ -14,6 +14,18 @@ have the details, and the problems go to the
 
 ## 19 November 2026
 
+- **femtolisp: LanguageTool, the AI translation and very deep documents**
+  (builds with `--with-scheme=femtolisp`): a function parameter named
+  `return` was taken for femtolisp's special form `return`, so the
+  callbacks named so were never called: the grammar check of LanguageTool,
+  the translation of AI and the silent evaluation of plugins did nothing.
+  A recursion too deep for the stack of C (through `map`, `for-each`...)
+  is now the error `stack-overflow`, as in Guile, so the HTML export of a
+  document which nests too deep is cut and written with "nesting too
+  deep" in red (it was an error and no file); and the collector copies
+  the lists nested deep without a recursion of C past 1000 levels (it
+  overflowed the stack and crashed TeXmacs, from 45000 levels during an
+  export, from 150000 levels otherwise).
 - **Dark mode and Programmer mode** (document themes, Document > Theme): two
   new themes for a dark interface. *Dark mode* has a dark grey paper
   (`#2a2a2e`, close to the interface but distinct from it) with light grey

@@ -44,7 +44,7 @@ src/Scheme/Femtolisp/
 | 0013 | `*defer-macro-errors*` |
 | 0014 | the reader returns a datum at the very end of the input (the end of input only when nothing is left) |
 | 0015 | `[` and `]` are symbol characters, as in Guile |
-| 0016 | a local variable does not shadow a special form at the head of a form (a parameter `begin` captured the `begin` of `cond`'s expansion) |
+| 0016 | a local variable does not shadow a special form at the head of a form (a parameter `begin` captured the `begin` of `cond`'s expansion); since 0038 (README), except `return`, which a local variable shadows |
 | 0017 | `<` and `=` with any number of arguments |
 | 0018 | `*print-closures*`: with `#f`, closures written `#<procedure f>` |
 | 0019 | the unspecified value is the self-evaluating symbol `#<unspecified>` (it was `#t`) |
