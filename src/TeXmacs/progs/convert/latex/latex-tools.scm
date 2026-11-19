@@ -251,7 +251,12 @@
   (cond ((number? t) (list-ref args t))
         ((== t '---) (car args))
         ((func? t '!recurse 1)
-         (latex-expand-macros (latex-substitute (cadr t) args)))
+         ;; the macros of the body are expanded, then the arguments are put
+         ;; in: they are expanded already (latex-expand-macros expands the
+         ;; arguments of a macro before its body). Expanding them again at
+         ;; each level of a nesting of such macros (tmmathbf, a bold
+         ;; formula) made the conversion quadratic in its depth
+         (latex-substitute (latex-expand-macros (cadr t)) args))
         ((func? t '!translate 1)
          (translate-from-to (cadr t) "english" latex-language))
         ((list? t) (map (cut latex-substitute <> args) t))

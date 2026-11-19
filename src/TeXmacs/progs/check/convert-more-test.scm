@@ -47,6 +47,9 @@
         (convert mathml tmmath)
         (convert html tmhtml)
         (convert html htmlout)
+        (convert latex texout)
+        (convert latex latex-tools)
+        (convert rewrite tmtm-brackets)
         (tools spell spell-lantool)
         (tools ai ai-translate)))
 
@@ -615,6 +618,70 @@
                         (lambda ()
                           (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
                       (lambda (n) #t) 150 1500 "levels")))
+
+;; The LaTeX of a formula, also that of the formulas for MathJax in the
+;; HTML export, in a time linear in its size: the export of a macro which
+;; calls itself in a formula (a formula of 1 MB, which s7 converts whole)
+;; took minutes for MathJax.
+;;   - the text after the last space was made again with each piece added
+;;     to it, and copied again to look for a space (output.scm): quadratic
+;;     in the length of a text without a space;
+;;   - the arguments of a macro expanded by a macro of its body (!recurse)
+;;     were expanded again at each level of a nesting of such macros
+;;     (tmmathbf, latex-tools.scm);
+;;   - the brackets of each <concat> were looked for in all its descendants
+;;     (tmtm-brackets.scm).
+;; Each is timed on a size 10 times as large, which may take 20 times as
+;; long as the small one, or 4 s if that is more (10 s at most). Without the
+;; fixes, on a Mac M4 under s7: 6, 13 and 14 s; with them 0.15 s at most.
+(define (latex-wide-nesting wrap n)
+  ;; @n levels of @wrap around a <!concat> of 40 groups
+  (deep-tree (lambda (t) (wrap `(!concat ,@(make-list 40 '(!group "a")) ,t)))
+             n "leaf"))
+
+(define (wide-concat-nesting n leaf)
+  ;; @n levels of a <concat> of 60 <with>, and of one around the next level
+  (deep-tree (lambda (t)
+               `(concat ,@(make-list 60 '(with "color" "red" "a"))
+                        (with "color" "red" ,t)))
+             n leaf))
+
+(define (test-latex-linear)
+  (check-group "latex export: long and deep formulas, in linear time")
+  ;; a text without a space, of many pieces
+  (check-fast-sizes "latex output without spaces"
+                    (lambda (n)
+                      (lambda ()
+                        (string-length
+                         (serialize-latex
+                          `(!concat ,@(make-list n '(textbf "x")) "y")))))
+                    (lambda (n) (+ (* 10 n) 1)) 2000 20000 "pieces")
+  ;; the text, and the formulas which follow each other, made one
+  (check= (serialize-latex `(!concat ,@(make-list 3 '(textbf "x")) "y"))
+          "\\textbf{x}\\textbf{x}\\textbf{x}y")
+  (check= (serialize-latex '(!concat "x " (!math "a")
+                                     (!math (!concat "b" "+" "c"))
+                                     " y" (textbf "z") (!math "t")))
+          "x $a b + c$ y\\textbf{z}$t$")
+  ;; nested macros which expand their arguments again (!recurse)
+  (check-fast-sizes "nested tmmathbf"
+                    (lambda (n)
+                      (lambda ()
+                        (with r (latex-expand-macros
+                                 (latex-wide-nesting
+                                  (lambda (t) `(tmmathbf ,t)) n))
+                          (occurrences "boldsymbol" (serialize-latex r)))))
+                    (lambda (n) n) 60 600 "levels")
+  ;; nested <concat> with brackets at the bottom
+  (check-fast-sizes "brackets of nested concat"
+                    (lambda (n)
+                      (lambda ()
+                        (tmtm-match-brackets
+                         (wide-concat-nesting n '(concat (left "(") "x")))))
+                    (lambda (n)
+                      (wide-concat-nesting n '(concat (left "(") "x"
+                                                      (right "."))))
+                    60 600 "levels"))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
@@ -3027,7 +3094,7 @@
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
                   test-html-weak-tabs
-                  test-html-nested-documents
+                  test-html-nested-documents test-latex-linear
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
