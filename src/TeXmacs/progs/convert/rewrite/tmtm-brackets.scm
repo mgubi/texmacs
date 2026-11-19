@@ -42,15 +42,18 @@
 ;; Bracket matching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (contains-tags? t l)
-  (cond ((or (nlist? t) (null? t)) #f)
-        ((in? (car t) l) #t)
-        (else
-          (with found? #f
-            (for-each (lambda (x)
-                        (set! found? (or found? (contains-tags? x l))))
-                      t)
-            found?))))
+;; The brackets of a <concat> are matched among its children: a <left> or a
+;; <right> deeper in it is matched in the <concat> where it is a child, when
+;; the recursion gets there. Looking for them in all the descendants of each
+;; <concat> made the conversion of a nesting of <concat> quadratic in its
+;; depth (the formula of a macro which calls itself, which s7 converts
+;; whole: seconds for the HTML export with MathJax, which converts it to
+;; LaTeX), and changed nothing: the matching only changes the children
+
+(define (has-bracket-child? l)
+  ;; is a child of @l a <left> or a <right>
+  (list-any (lambda (x) (and (pair? x) (in? (car x) '(left right))))
+            (cdr l)))
 
 (define (tmtm-match-brackets-sub l level)
   ;; Returns (l' level') with
@@ -78,7 +81,7 @@
 
 (define (tmtm-match-brackets-bis l)
   (cond ((npair? l) l)
-	((and (== (car l) 'concat) (or (contains-tags? l '(right left))))
+	((and (== (car l) 'concat) (has-bracket-child? l))
 	 (let ((complete (tmtm-match-brackets-concat (cdr l))))
 	   (cons 'concat (map tmtm-match-brackets-bis complete))))
 	((or (func? l 'around 3) (func? l 'around* 3) (func? l 'big-around 2))
