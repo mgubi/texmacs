@@ -70,7 +70,11 @@ have the details, and the problems go to the
   for through all the levels below each level of a nesting, so that 1000
   nested `<surround>` took minutes; they are now looked for 64 levels
   down. `exists?` ran its test twice on the element found, which made
-  inline markup around a block exponential in its depth (#880).
+  inline markup around a block exponential in its depth (#880). Nested
+  documents are exported in a time linear in their depth too: 2000 levels
+  took 40 s, now 0.1 s (#882).
+- **HTML export: a weak tab `<htab|len|last>` alone in its line** is
+  exported as a tab; it was always dropped (#881).
 - **The option `-X`** is now in `texmacs -h`, in the manual page and in
   the user documentation and the page of the Cocoa interface: in headless
   mode it keeps TeXmacs running after the commands of `-x` and the files,
