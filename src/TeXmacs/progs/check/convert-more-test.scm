@@ -637,8 +637,8 @@
 ;; long as the small one, or 4 s if that is more (10 s at most). Without the
 ;; fixes, on a Mac M4 under s7: 16, 16 and 9 s (much more under Guile);
 ;; with them 0.2 s under s7, 2 s under Guile. The nestings are wide rather
-;; than deep, 300 levels: the recursions of Guile overflow its stack at 629
-;; levels of tmmathbf with the limit of Linux, the smallest (init-guile.scm).
+;; than deep, 300 levels: with the limit of Guile on Linux, the smallest
+;; (init-guile.scm), the check of tmmathbf overflows its stack at 450.
 (define (latex-wide-nesting wrap n)
   ;; @n levels of @wrap around a <!concat> of 400 groups
   (deep-tree (lambda (t)
@@ -707,17 +707,31 @@
                                    "geangle" "longhook")
                                  (cut string-occurs? <> s)))
               (list s #t '()))))
-  ;; (footnotes, line notes and numbers, environments)
+  ;; (footnotes, line notes and numbers)
   (for (x '((renderfootnote "1" "note")
             (tmlinenumber "1" "note")
-            (tmmathbf (tmlinenote "a" "b" "c"))
-            ((!begin "tmcompact") "x")
-            (tmmathbf ((!begin "tmindent") "x"))))
+            (tmmathbf (tmlinenote "a" "b" "c"))))
     (with s (serialize-latex (latex-expand-macros x))
       (check= (list s (list-filter '("tmrsup" "tmdummy" "tmlinenote"
                                      "tmparsep" "tmparmod")
                                    (cut string-occurs? <> s)))
-              (list s '())))))
+              (list s '()))))
+  ;; the environments made of other environments
+  (for (e '("tmcompact" "tmcompressed" "tmamplified"))
+    (check= (serialize-latex (latex-expand-macros `((!begin ,e) "x")))
+            (string-append "\\begingroup\\setlength{\\parskip}{"
+                           (cadr (assoc e '(("tmcompact" "0em")
+                                            ("tmcompressed" "0.25em")
+                                            ("tmamplified" "0.75em"))))
+                           "}x\\endgroup")))
+  (for (e '(("tmjumpin" "-1.5em") ("tmindent" "0pt")))
+    (with s (serialize-latex (latex-expand-macros `((!begin ,(car e)) "x")))
+      (check= (list (string-starts? s "\\begin{list}")
+                    (string-occurs? (string-append "\\setlength{\\parindent}{"
+                                                   (cadr e) "}") s)
+                    (string-occurs? "\\item[]x" s)
+                    (string-occurs? "tmparmod" s))
+              (list #t #t #t #f)))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them

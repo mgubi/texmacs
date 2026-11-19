@@ -65,7 +65,8 @@ have the details, and the problems go to the
   1.4 s. When the macros of TeXmacs are expanded (for MathJax, or with
   the option of the LaTeX export), the macros made of other macros are
   expanded whole: symbols as `<longdownequal>` or `<legeangle>` gave
-  `\longequal` and the like, undefined, outside bold formulas, and line
+  `\longequal` and the like outside bold formulas (undefined for MathJax,
+  defined in the preamble of a LaTeX document), and line
   notes and numbers, footnote marks and the compact, jump-in and indent
   environments left inner macros too (#885).
 
