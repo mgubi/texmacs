@@ -63,9 +63,11 @@ have the details, and the problems go to the
   for MathJax of a formula with a macro which calls itself (1 MB of
   LaTeX, converted whole under s7) took nearly 4 minutes; it now takes
   1.4 s. When the macros of TeXmacs are expanded (for MathJax, or with
-  the option of the LaTeX export), the symbols made of other symbols, as
-  `<longdownequal>` or `<legeangle>`, are expanded whole: `\longequal` and
-  the like were left undefined outside bold formulas (#885).
+  the option of the LaTeX export), the macros made of other macros are
+  expanded whole: symbols as `<longdownequal>` or `<legeangle>` gave
+  `\longequal` and the like, undefined, outside bold formulas, and line
+  notes and numbers, footnote marks and the compact, jump-in and indent
+  environments left inner macros too (#885).
 
 ## 17 November 2026
 

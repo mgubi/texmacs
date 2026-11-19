@@ -605,15 +605,15 @@
             ---
             (endgroup)))
   ("tmcompact"
-   ((!begin "tmparsep" "0em") ---))
+   (!recurse ((!begin "tmparsep" "0em") ---)))
   ("tmcompressed"
-   ((!begin "tmparsep" "0.25em") ---))
+   (!recurse ((!begin "tmparsep" "0.25em") ---)))
   ("tmamplified"
-   ((!begin "tmparsep" "0.75em") ---))
+   (!recurse ((!begin "tmparsep" "0.75em") ---)))
   ("tmjumpin"
-   ((!begin "tmparmod" "1.5em" "0pt" "-1.5em") ---))
+   (!recurse ((!begin "tmparmod" "1.5em" "0pt" "-1.5em") ---)))
   ("tmindent"
-   ((!begin "tmparmod" "1.5em" "0pt" "0pt") ---))
+   (!recurse ((!begin "tmparmod" "1.5em" "0pt" "0pt") ---)))
   ("tmlisting"
    ((!begin "linenumbers") (!append (resetlinenumber) ---)))
   ("elsequation" ((!begin "eqnarray") (!append --- "&&")))
