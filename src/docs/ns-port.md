@@ -57,8 +57,10 @@ application declares the documents of `document-formats` (tm-convert.scm,
 the formats of the Import menu) in the `CFBundleDocumentTypes` of
 `packages/macos/Info.plist.in`, as an alternative application (the suite
 `open-formats` checks that the plist has their suffixes; a format added to
-the Import menu gets an entry there); a document dropped on a canvas is
-opened the same way (`dropped-documents`, tm-files.scm); a quit from the
+the Import menu gets an entry there; `Info-Xcode.plist.in`, of the Xcode
+project, still declares only the TeXmacs files); a document dropped on a
+canvas is opened the same way (`dropped-documents`, tm-files.scm: full
+names of local files only, so that a dropped text is inserted); a quit from the
 Dock or at logout goes through `safely-quit-TeXmacs`; the close button of a
 window runs its quit command (`safely-kill-window` for the main windows);
 each main window has its own menu bar, installed when it becomes main (not

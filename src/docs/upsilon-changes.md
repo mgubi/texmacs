@@ -37,10 +37,11 @@ have the details, and the problems go to the
   only the TeXmacs files, so that the Finder did not offer TeXmacs in Open
   With for the other documents, and the Dock refused them. They now declare
   the documents of the formats of the Import menu (`.md`, `.tex`, `.html`,
-  `.bib`, `.docx`, `.odt`, `.ts`...), as an alternative application, never
+  `.bib`, `.docx`, `.odt`...), as an alternative application, never
   the default one; the files open in their format, as with File > Open.
-- **Documents dropped on a document are opened**: a Markdown, LaTeX,
-  Html, BibTeX, Word, OpenDocument or TeXmacs file dropped on a window now
+- **Documents dropped on a document are opened** (desktop applications):
+  a Markdown, LaTeX, Html, BibTeX, Word, OpenDocument or TeXmacs file
+  dropped from the file manager on a window now
   opens (in a window of its own, unless the window is still the untouched
   one of the start), instead of its name being inserted; images, other
   files and drops with other things in them are inserted as before.
@@ -48,7 +49,9 @@ have the details, and the problems go to the
   document**: a pdf, an image, or a file whose converter failed (as one
   whose program is missing) opened from File > Open, the Finder or the
   Recent menu gave an empty document under its name; TeXmacs now says that
-  it could not load the file and opens nothing.
+  it could not load the file and opens nothing. Revert and the recovery
+  of an autosave file no longer empty the document either, and
+  `texmacs -c` fails on such a file instead of converting an empty one.
 
 ## 17 November 2026
 
