@@ -166,27 +166,40 @@
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
 ;; the colors defined in the PostScript of a label (with its flag) and a
-;; code block on the background @bg, with the initial value @flag ("" or an
-;; associate of adapt-dark-colors), in the order of their first use: a list
-;; of (r g b), from 0 to 1
-(define (code-block-colors bg flag)
+;; code block, in the order of their first use: a list of (r g b), from 0
+;; to 1. The document has the style packages @style ("generic|dark-mode"),
+;; the code block is in an ornament when @ornament? is true, and the
+;; initial environment has @bg as bg-color (unless it is "") and @flag (""
+;; or an associate of adapt-dark-colors)
+(define (styled-code-colors style ornament? bg flag)
   (let* ((f (tmp-file "dark-colors-check.tm"))
          (ps (tmp-file "dark-colors-check.ps"))
+         (code (string-append
+                "<\\python-code>\n    import os # c\n"
+                "    def f(x): return 3\n  </python-code>"))
          (doc (string-append
-               "<TeXmacs|2.1.2>\n\n<style|generic>\n\n<\\body>\n"
-               "  <label|lab1>\n\n"
-               "  <\\python-code>\n    import os # c\n"
-               "    def f(x): return 3\n  </python-code>\n</body>\n\n"
+               "<TeXmacs|2.1.2>\n\n<style|<tuple|" style ">>\n\n"
+               "<\\body>\n  <label|lab1>\n\n  "
+               (if ornament?
+                   (string-append "<\\ornamented>\n  " code
+                                  "\n  </ornamented>")
+                   code)
+               "\n</body>\n\n"
                "<\\initial>\n  <\\collection>\n"
                "    <associate|page-medium|paper>\n"
                "    <associate|info-flag|paper>\n"
-               "    <associate|bg-color|" bg ">\n" flag
+               (if (== bg "") ""
+                   (string-append "    <associate|bg-color|" bg ">\n"))
+               flag
                "  </collection>\n</initial>\n")))
     (string-save doc f)
     (load-buffer f)
     (switch-to-buffer* f)
-    (print-to-file ps)
-    (buffer-close f)
+    ;; the buffer is closed also when printing fails
+    (with r (catch #t (lambda () (print-to-file ps) #t)
+                   (lambda args args))
+      (buffer-close f)
+      (when (!= r #t) (url-remove f) (apply throw r)))
     (let* ((all (string-split (string-load ps) #\newline))
            (r (list-filter all (lambda (l) (>= (string-search-forwards
                                                 "setrgbcolor" 0 l) 0)))))
@@ -200,6 +213,9 @@
                                     (string-replace x "{" "")))))
                (list (n (cadr w)) (n (caddr w)) (n (cadddr w)))))
            r))))
+
+(define (code-block-colors bg flag)
+  (styled-code-colors "generic" #f bg flag))
 
 (define (rgb-luminance c)
   ;; the relative luminance of WCAG of the color @c, a list (r g b)
@@ -215,14 +231,14 @@
 (define (rgb-lightened? c0 c1 bg)
   ;; @c1 is @c0 mixed with white (the same part on each channel, so the hue
   ;; is kept), just enough for a contrast of 4.5 with @bg; the PostScript
-  ;; gives 3 decimals, hence the margins
+  ;; gives 3 decimals, hence the margins (4.50 to 4.55 are measured)
   (let* ((parts (list-filter
                  (map (lambda (a b) (and (< a 0.99) (/ (- b a) (- 1 a))))
                       c0 c1)
                  (lambda (x) x)))
          (lo (apply min parts)) (hi (apply max parts))
          (k (rgb-contrast c1 bg)))
-    (and (> lo 0) (< (- hi lo) 0.02) (>= k 4.4) (< k 4.8))))
+    (and (> lo 0) (< (- hi lo) 0.02) (>= k 4.45) (< k 4.62))))
 
 (define (in-shared-window group)
   ;; @group with the buffers in one window: with a window per buffer, a page
@@ -2839,7 +2855,15 @@
     ;; no effect on a bright paper
     (check= (code-block-colors "#f0f0f0"
                                "    <associate|adapt-dark-colors|true>\n")
-            (code-block-colors "#f0f0f0" "")))
+            (code-block-colors "#f0f0f0" ""))
+    ;; with the theme, also in an ornament (whose body sets bg-color to
+    ;; ornament-color): the dark red of the comments is lightened
+    (with l (styled-code-colors "generic|dark-mode" #t "" "")
+      (check-true (in? bg l))
+      (check-false (in? '(0.501 0.125 0.0) l))
+      (check-false (in? '(0.0 0.0 1.0) l)))
+    (with l (styled-code-colors "generic" #t "#2a2a2e" "")
+      (check-true (in? '(0.501 0.125 0.0) l))))
   ;; what the dark themes set, and that the plain document is not touched
   ;; (documents loaded from files: the environment of a buffer follows its
   ;; style only after loading)

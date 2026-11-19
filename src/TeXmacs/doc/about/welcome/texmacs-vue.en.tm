@@ -307,7 +307,8 @@
     <item>Two document themes for a dark interface, in
     <menu|Document|Theme>: <menu|Dark mode> (light grey text on a dark grey
     paper) and <menu|Programmer mode> (the same in <name|IBM Plex Mono>,
-    whose files the page fetches when it first needs them). The colors of
+    which is among the fonts the page fetches when it needs them; not yet
+    tried in the browser). The colors of
     the program code and of the flags are lightened to be readable on the
     dark paper.
   </itemize>

@@ -29,9 +29,13 @@
   <\active*>
     <\src-comment>
       Ornaments: the standard borders are black, and the background of
-      titles white
+      titles white. The body gets the color of the paper (by default it has
+      none, and bg-color is empty inside, so that adapt-dark-colors would
+      not see the dark paper there)
     </src-comment>
   </active*>
+
+  <assign|dark-mode-ornament-color|#2a2a2e>
 
   <assign|dark-mode-ornament-sunny-color|#8a8a94>
 

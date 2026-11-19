@@ -108,7 +108,8 @@ concater_rep::adapt_color (color c) {
   int r, g, b, a, br, bgr, bb, ba;
   get_rgb_color (named_color (bg->label), br, bgr, bb, ba);
   double lb= relative_luminance (br, bgr, bb);
-  if (lb > 0.2) return c;
+  // (white has a contrast of 4.5 only up to a luminance of 1.05/4.5-0.05)
+  if (lb > 0.18) return c;
   get_rgb_color (c, r, g, b, a);
   if (contrast_ratio (relative_luminance (r, g, b), lb) >= 4.5) return c;
   double lo= 0.0, hi= 1.0;

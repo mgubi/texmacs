@@ -20,7 +20,7 @@ have the details, and the problems go to the
   text, and links, math, cursors, sessions, ornaments, source tags and the
   title and comment boxes of style files in colors chosen for it;
   *Programmer mode* is the same in the monospace font IBM Plex Mono (text,
-  code and math symbols), shipped in `TeXmacs/fonts/truetype/plex`. The
+  code and most math symbols), shipped in `TeXmacs/fonts/truetype/plex`. The
   code of the languages whose colors are fixed (tree-sitter, Python, Java,
   R, ...) is lightened, with its hue, until it has a contrast of 4.5 with
   the paper, by the new environment variable
