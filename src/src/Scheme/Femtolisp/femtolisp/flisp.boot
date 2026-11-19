@@ -111,19 +111,19 @@
 	%fl:compile-if #73=#fn("@000r4e0|31e0|31e1g331e2g331e3g331F6;0e4g331560e530g:]‚=0e6|}g2g;44;g:^‚=0e6|}g2g<44;e6|}^g:342e7|c8g8332e6|}g2g;342g26<0e7|c9325;0e7|c:g9332e;|g8322e6|}g2g<342e;|g942;" #(%fl:make-label
   %fl:cadr %fl:caddr %fl:cdddr %fl:cadddr %fl:void %fl:compile-in %fl:emit brf
   ret jmp %fl:mark-label) compile-if)
-	%fl:compile-in #74=#fn(">000r4g3C6<0e0|}g3]44;g3?6¯0g3`‚:0e1|c242;g3a‚:0e1|c342;g3]‚:0e1|c442;g3^‚:0e1|c542;g3_‚:0e1|c642;e7g3316<0e1|c8g343;c9g3316C0e:|}g2c;c<31L144;e1|c=g343;g3MC@17W02c>g3Me?32@16H02e@g3M31E17;02eAg3M}326=0eB|}g2g344;c>g3Me?32@16>02eCg3eD}3132g86A0e:|}g2eEg83144;g3Mg9cF‚\\0eGeHg331316A0e:|}g2eHg33144;e1|c=eHg33143;g9cI‚=0eJ|}g2g344;g9cK‚>0eL|}g2g3N44;g9cM‚;0eN|}g343;g9cO‚D0ePcQ}g3q2cR|}q242;g9cS‚>0eT|}g2g3N44;g9cU‚>0eV|}g2g3N44;g9cW‚H0eX|}eHg331cKeYg331K44;g9cZ‚K0e[|}eHg331e\\g331e]g33145;g9c^‚H0e:|}]eHg331342e1|c_42;g9c`‚E0ea|}eHg331e\\g33144;g9cb‚A0e:|}g2eEg33144;g9cc‚‚0e:|}^cO_eHg331L3342ede\\g33131660^580eecf312eg|a322e:|}^e\\g331342eg|b/322e1|cc42;eB|}g2g344;" #(%fl:compile-sym
+	%fl:compile-in #74=#fn(">000r4g3C6<0e0|}g3]44;g3?6¯0g3`‚:0e1|c242;g3a‚:0e1|c342;g3]‚:0e1|c442;g3^‚:0e1|c542;g3_‚:0e1|c642;e7g3316<0e1|c8g343;c9g3316C0e:|}g2c;c<31L144;e1|c=g343;g3MC@17W02c>g3Me?32@16H02e@g3M31E17;02eAg3M}326=0eB|}g2g344;c>g3Me?32@16J02g3McC<@16>02eDg3eE}3132g86A0e:|}g2eFg83144;g3Mg9cG‚\\0eHeIg331316A0e:|}g2eIg33144;e1|c=eIg33143;g9cJ‚=0eK|}g2g344;g9cL‚>0eM|}g2g3N44;g9cN‚;0eO|}g343;g9cP‚D0eQcR}g3q2cS|}q242;g9cT‚>0eU|}g2g3N44;g9cV‚>0eW|}g2g3N44;g9cX‚H0eY|}eIg331cLeZg331K44;g9c[‚K0e\\|}eIg331e]g331e^g33145;g9cC‚H0e:|}]eIg331342e1|c_42;g9c`‚E0ea|}eIg331e]g33144;g9cb‚A0e:|}g2eFg33144;g9cc‚‚0e:|}^cP_eIg331L3342ede]g33131660^580eecf312eg|a322e:|}^e]g331342eg|b/322e1|cc42;eB|}g2g344;" #(%fl:compile-sym
   %fl:emit load0 load1 loadt loadf loadnil %fl:fits-i8 loadi8 #fn(eof-object?)
   %fl:compile-in #fn(top-level-value) eof-object loadv #fn(memq) special-forms
-  resolve-global %fl:in-env? %fl:compile-app compile-unknown-call %fl:env-names
-  %fl:lower-define quote %fl:self-evaluating? %fl:cadr if %fl:compile-if begin
-  %fl:compile-begin prog1 %fl:compile-prog1 lambda %fl:call-with-values
-  #fn("7000r0e0~\x7f42;" #(%fl:compile-f-))
+  resolve-global %fl:in-env? %fl:compile-app return compile-unknown-call
+  %fl:env-names %fl:lower-define quote %fl:self-evaluating? %fl:cadr if
+  %fl:compile-if begin %fl:compile-begin prog1 %fl:compile-prog1 lambda
+  %fl:call-with-values #fn("7000r0e0~\x7f42;" #(%fl:compile-f-))
   #fn(":000r2e0~c1|332}‡a0e2}c3326;0e4c531540c62c7c8~\x7fq2}322e0~c9c:}3143;c6;" #(%fl:emit
   loadv %fl:length> 255 %fl:error "compile error: a function captures more than 255 variables"
   #{#<unspecified>}# #fn(for-each) #fn("9000r1e0~\x7f|^44;" #(%fl:compile-sym))
   closure #fn(length))) and %fl:compile-and or %fl:compile-or while
-  %fl:compile-while %fl:cddr for %fl:compile-for %fl:caddr %fl:cadddr return
-  ret set! %fl:compile-set! define trycatch %fl:1arg-lambda? %fl:error "trycatch: second form must be a 1-argument lambda"
+  %fl:compile-while %fl:cddr for %fl:compile-for %fl:caddr %fl:cadddr ret set!
+  %fl:compile-set! define trycatch %fl:1arg-lambda? %fl:error "trycatch: second form must be a 1-argument lambda"
   %fl:bcode:stack) compile-in)
 	%fl:compile-let #75=#fn("A000r4g3Mg3Ne0|31e1g831e2|}g933e3g;e4e5g831g;32g:33e6|g=`g:g<w342c7g=}M32}NKe8|g>g2e5g831342e9|g<y322e:g<`3216602g2@6<0e;|c<g<43;c=;" #(%fl:bcode:sp
   %fl:cadr %fl:compile-arglist %fl:vars-to-env %fl:complex-bindings %fl:caddr
@@ -676,8 +676,7 @@
 	#185# self-evaluating? #186# separate
 	#187# set-syntax! #188# simple-compare
 	#189# simple-sort #190# special-forms
-	(quote if begin prog1 lambda and or while for return set! define
-	 trycatch)
+	(quote if begin prog1 lambda and or while for set! define trycatch)
 	splice-form? #191# string.join
 	#192# string.lpad #193# string.map
 	#194# string.rep #195# string.rpad

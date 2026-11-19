@@ -18,6 +18,17 @@ With `tests/scheme/check.sh all`, 40 of 43 suites pass. The 4 failing checks:
   `*arith-fallback*`; `number?` is false for them and the other numeric
   functions do not take them.
 - `call/cc` is escape-only.
+- The stack of Scheme is on the heap and grows (a plain recursion a million
+  deep works, as in s7), but a recursion through the builtins which call
+  functions (`map`, `for-each`, `sort`...) uses the stack of C: past
+  512 KB of its end it is the error `stack-overflow`, as in Guile (patch
+  0025, `%guile-error`), which the HTML export catches to cut a document
+  nested too deep. The conversions of C++ between trees and lists (`stree->tree`,
+  the glue) are recursions of C++ too, with no check, under every Scheme:
+  past about 45000 levels (femtolisp) or 50000 (s7) they overflow the stack.
+  The collector of femtolisp bounds its recursion only for lists nested in
+  their cars (patch 0037): data nested as deep through vectors, closures or
+  the tails of improper lists still overflows the stack of C.
 - Macros are expanded when code is compiled. Code which runs at expansion time
   (macros with side effects, self-recursive expansions) behaves differently
   from Guile; late calls and deferred expansion errors cover the common cases.

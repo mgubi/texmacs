@@ -599,9 +599,11 @@
 
 ; TeXmacs: a local variable does not shadow a special form at the head of a
 ; form: the macros expand to special forms (cond to begin...), which a local
-; variable named begin would capture otherwise
+; variable named begin would capture otherwise. return is not in the list:
+; no macro expands to it, and a local variable named return (a callback, in
+; TeXmacs) is called, not the special form, which returned its argument
 (define special-forms
-  '(quote if begin prog1 lambda and or while for return set! define trycatch))
+  '(quote if begin prog1 lambda and or while for set! define trycatch))
 
 ; the hook for the calls (f ...) where f is not bound at compile time: a form
 ; to compile instead, or #f; an embedding redefines it (as resolve-global)
@@ -634,6 +636,7 @@
 	; TeXmacs: a call of a function which is not defined yet (or of a
 	; macro defined later): the hook may give another form to compile
 	((and (not (memq (car x) special-forms))
+	      (not (eq? (car x) 'return))
 	      (compile-unknown-call x (env-names env)))
 	 => (lambda (y) (compile-in g env tail? (lower-define y))))
 	(else

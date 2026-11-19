@@ -78,7 +78,9 @@
     curried definitions, <verbatim|(define ((f a) b) ...)>. 0016: a local
     variable does not hide a special form at the head of a form (a parameter
     named <verbatim|begin> captured the <verbatim|begin> which <verbatim|cond>
-    expands to). 0017: <verbatim|\<less\>> and <verbatim|=> with any number of
+    expands to); since 0038, except <verbatim|return>, which a local
+    variable hides (TeXmacs names callbacks <verbatim|return>).
+    0017: <verbatim|\<less\>> and <verbatim|=> with any number of
     arguments. 0020: <verbatim|*arith-fallback*>. 0026:
     <verbatim|\<less\>=> and <verbatim|\<gtr\>=> are false when a number is
     a NaN.
@@ -93,7 +95,9 @@
     and the traversals listed deleted keys). 0029: a closure is no longer
     written past the end of the heap. 0030: no table loses its finalizer.
     0031: undefined behaviour (names of symbols, operands of the bytecode,
-    fixnums, keywords).
+    fixnums, keywords). 0037: the collector copies the lists nested deep in
+    their cars without a recursion of C past 1000 levels (a crash past
+    150000 levels, or 45000 during an export).
 
     <item*|For speed>0024: the jumps of the errors save no signal mask on
     macOS. 0026: <verbatim|\<gtr\>>, <verbatim|\<less\>=>,

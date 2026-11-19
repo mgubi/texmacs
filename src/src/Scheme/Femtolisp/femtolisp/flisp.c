@@ -428,6 +428,59 @@ void fl_free_gc_handles(uint32_t n)
     N_GCHND -= n;
 }
 
+// TeXmacs: the cars of a list are relocated by a recursion of C, as deep as
+// the lists are nested in their cars: a tree nested 45000 deep (the stree of
+// a document) overflowed the stack of C during a collection, a crash. Past
+// RELOC_MAX_DEPTH levels, a cons is copied with its car and its cdr not yet
+// relocated, and put on a list of pending conses, whose car and cdr are
+// relocated before the end of the collection (relocate_pending), as in
+// Cheney's algorithm. Without memory for that list, the recursion goes on.
+#define RELOC_MAX_DEPTH 1000
+static uint32_t reloc_depth = 0;
+static value_t *reloc_pending = NULL;
+static size_t n_reloc_pending = 0, sz_reloc_pending = 0;
+
+static value_t relocate_car(value_t a)
+{
+    value_t nc;
+    if (reloc_depth >= RELOC_MAX_DEPTH && iscons(a) && car_(a) != TAG_FWD) {
+        if (n_reloc_pending == sz_reloc_pending) {
+            size_t nsz = sz_reloc_pending ? 2*sz_reloc_pending : 1024;
+            value_t *np = realloc(reloc_pending, nsz*sizeof(value_t));
+            if (np != NULL) {
+                reloc_pending = np;
+                sz_reloc_pending = nsz;
+            }
+        }
+        if (n_reloc_pending < sz_reloc_pending) {
+            nc = tagptr((cons_t*)curheap, TAG_CONS);
+            curheap += sizeof(cons_t);
+            car_(nc) = car_(a);
+            cdr_(nc) = cdr_(a);
+            car_(a) = TAG_FWD; cdr_(a) = nc;
+            reloc_pending[n_reloc_pending++] = nc;
+            return nc;
+        }
+    }
+    reloc_depth++;
+    nc = relocate(a);
+    reloc_depth--;
+    return nc;
+}
+
+static void relocate_pending(void)
+{
+    value_t nc, a, d;
+    while (n_reloc_pending > 0) {
+        nc = reloc_pending[--n_reloc_pending];
+        a = car_(nc);
+        d = cdr_(nc);
+        if ((tag(a)&3) != 0 && ismanaged(a))
+            car_(nc) = relocate_car(a);
+        cdr_(nc) = (d==NIL) ? NIL : relocate(d);
+    }
+}
+
 static value_t relocate(value_t v)
 {
     value_t a, d, nc, first, *pcdr;
@@ -448,7 +501,7 @@ static value_t relocate(value_t v)
             if ((tag(a)&3) == 0 || !ismanaged(a))
                 car_(nc) = a;
             else
-                car_(nc) = relocate(a);
+                car_(nc) = relocate_car(a);
             pcdr = &cdr_(nc);
             v = d;
         } while (iscons(v));
@@ -600,6 +653,7 @@ void gc(int mustgrow)
     fl_lasterror = relocate(fl_lasterror);
     memory_exception_value = relocate(memory_exception_value);
     the_empty_vector = relocate(the_empty_vector);
+    relocate_pending();
 
     sweep_finalizers();
 

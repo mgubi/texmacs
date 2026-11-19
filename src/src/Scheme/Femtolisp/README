@@ -117,6 +117,12 @@ The patches
       (0033-0036 are Julia's rewrite of 2014: 0c4abb27f3, f21780ccb0,
       d323f404c9, 5e949d7915, f522f8f139, with fixes of its handling of
       optional arguments, trycatch and default values)
+0037  the collector relocates the lists nested deep in their cars without
+      overflowing the stack of C: past 1000 levels, a cons is copied and
+      its car and cdr relocated later, from a list of pending conses
+0038  a local variable named return is called, not the special form return
+      (0016 made it the special form: the callbacks named return of
+      TeXmacs were never called); boot image regenerated
 
 fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
 and integer->char as constants to the builtins aref, aset!, length, fixnum
