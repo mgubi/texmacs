@@ -542,7 +542,7 @@
   ;; runs of cells in the list of those not stable (in the same order as
   ;; the blocks), each replaced by one of its cells. The cells are those of
   ;; this conversion (push-blocks), shared with nothing else. (tmhtml-p of
-;; a document adds no margins: tmhtml-compute-vspace of a document is #f)
+  ;; a document adds no margins: tmhtml-compute-vspace of a document is #f)
   (let* ((r (tmhtml-pars (cdr x) acc #t)))
     (let loop ((u (cdr r)) (keep '()))
       (cond ((null? u) (cons (car r) (reverse keep)))
