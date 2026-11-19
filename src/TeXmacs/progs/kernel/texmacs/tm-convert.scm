@@ -607,9 +607,12 @@
                format-openable?))
 
 (define-public (document-format-suffixes)
-  "The suffixes of the files of the formats of @(document-formats)"
-  (list-remove-duplicates
-   (apply append (map format-get-suffixes (document-formats)))))
+  "The suffixes of the documents of the formats of @(document-formats)"
+  ;; but the styles and packages of TeXmacs (.ts, .tp), which are not
+  ;; documents; .ts is also TypeScript and the MPEG-2 transport streams
+  (list-filter (list-remove-duplicates
+                (apply append (map format-get-suffixes (document-formats))))
+               (lambda (s) (nin? s '("ts" "tp")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Viewers

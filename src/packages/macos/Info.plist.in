@@ -27,22 +27,9 @@
         <true/>
       </dict>
       <!-- The other documents which TeXmacs opens: the suffixes of the
-           formats of (document-formats), tm-convert.scm, which the Import
-           menu lists; open-formats-test.scm checks that they are these.
+           formats of the Import menu, document-format-suffixes in
+           tm-convert.scm; open-formats-test.scm checks that they are these.
            TeXmacs is an alternative for them, not their default. -->
-      <dict>
-        <key>CFBundleTypeExtensions</key>
-        <array>
-          <string>ts</string>
-          <string>tp</string>
-        </array>
-        <key>CFBundleTypeName</key>
-        <string>TeXmacs Style</string>
-        <key>CFBundleTypeRole</key>
-        <string>Editor</string>
-        <key>LSHandlerRank</key>
-        <string>Alternate</string>
-      </dict>
       <dict>
         <key>CFBundleTypeExtensions</key>
         <array>

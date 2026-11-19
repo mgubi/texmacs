@@ -189,7 +189,64 @@
       (check= (current-buffer) old)
       (check-true (list-or (map (lambda (m) (string-occurs? "no converter" m))
                                 msgs)))
-      (startup-buffer-release))))
+      (startup-buffer-release)))
+  ;; a file which cannot be opened does not take the untouched buffer of
+  ;; the start: the next file of the system still goes there
+  (let* ((pdf (tmp-file "g.pdf"))
+         (md (write-file "p.md" "System\n"))
+         (old (current-buffer))
+         (u (new-buffer))
+         (calls '()))
+    (switch-to-buffer* u)
+    (startup-buffer-release)
+    (with-global load-buffer
+        (lambda (name . opts) (set! calls (rcons calls (list 'current name))))
+      (with-global load-buffer-in-new-window
+          (lambda (name . opts) (set! calls (rcons calls (list 'new name))))
+        (load-buffer-from-system pdf)
+        (load-buffer-from-system md)))
+    (check= calls (list (list 'new pdf) (list 'current md)))
+    (startup-buffer-release)
+    (when (buffer-exists? u) (buffer-close u))
+    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+
+(define (failing-import s fm)
+  (stree->tree '(error "bad format or data")))
+
+(define (test-failing-reloads)
+  (check-group "failing reloads")
+  ;; revert: the document stays as it was, it is not emptied (and then
+  ;; marked as saved, which a save would write over the file)
+  (let* ((u (write-file "q.md" "Revert me\n"))
+         (old (current-buffer)))
+    (load-buffer u)
+    (check-true (buffer-exists? u))
+    (when (buffer-exists? u)
+      (with-global generic->texmacs failing-import
+        (revert-buffer-revert u))
+      (check-true (stree-has-string? (tm->stree (buffer-get-body u))
+                                     "Revert me"))
+      (buffer-close u))
+    (when (and old (buffer-exists? old)) (switch-to-buffer old)))
+  ;; the autosave file of a file whose converter fails: no empty document
+  ;; in place of the autosave, a message, and the file is not loaded either
+  (let* ((u (write-file "r.md" "Autosaved\n"))
+         (a (write-file "r.md~" "Autosaved later\n"))
+         (old (current-buffer)))
+    (system (string-append "touch -t 200001010000 "
+                           (escape-shell (url->system u))))
+    (let* ((msgs
+            (with-messages
+              (lambda ()
+                (with-global user-confirm (lambda (q default k) (k #t))
+                  (with-global generic->texmacs failing-import
+                    (load-buffer u)))))))
+      (check-false (buffer-exists? u))
+      (check-true (list-or (map (lambda (m) (string-occurs? "autosave" m))
+                                msgs))))
+    (when (buffer-exists? u) (buffer-close u))
+    (system-remove a)
+    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Drops
@@ -215,6 +272,21 @@
     (check-false (dropped-documents (name (tmp-dir))))
     (check-false (dropped-documents (name (tmp-file "missing.md"))))
     (check-false (dropped-documents "some text"))
+    ;; a text is not taken for a file: a name next to the document, a
+    ;; relative name, a web address (never fetched)
+    (let* ((host (write-file "host.md" "Host\n"))
+           (old (current-buffer)))
+      (load-buffer host)
+      (check= (current-buffer) host)
+      (check-false (dropped-documents "k.md"))
+      (check-false (dropped-documents "./k.md"))
+      (when (buffer-exists? host) (buffer-close host))
+      (when (and old (buffer-exists? old)) (switch-to-buffer old)))
+    (check-false (dropped-documents "https://example.org/a.md"))
+    (check-false (dropped-documents "file:///tmp/a.md"))
+    ;; the styles and packages of TeXmacs are not documents (.ts is also
+    ;; TypeScript)
+    (check-false (dropped-documents (name (write-file "s.ts" "x\n"))))
     (check-false (dropped-documents '(hlink "x" "https://example.org/a.md")))
     ;; the drop event opens them as the files of the system, after the event
     (let* ((opened '())
@@ -271,17 +343,24 @@
 (tm-define (open-formats-test-failures)
   (check-suite "open-formats")
   (clean-tmp-dir)
-  (let* ((before (buffer-list)))
+  (let* ((before (buffer-list))
+         (recent (learned-interactive "recent-buffer")))
     (run-group test-openable)
     (run-group test-document-formats)
     (run-group test-open-by-suffix)
     (run-group test-no-converter)
+    (run-group test-failing-reloads)
     (run-group test-drops)
     (run-group test-plist)
     ;; no buffer is left open
     (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
               (buffer-list))
-    (check= (length (buffer-list)) (length before)))
+    (check= (length (buffer-list)) (length before))
+    ;; the recent files are those of before the suite
+    (forget-interactive "recent-buffer")
+    (for-each (lambda (e) (learn-interactive 'recent-buffer e))
+              (reverse recent))
+    (check= (learned-interactive "recent-buffer") recent))
   (clean-tmp-dir)
   (system-rmdir (tmp-dir))
   (check-end))
