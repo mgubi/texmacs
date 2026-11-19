@@ -50,7 +50,8 @@ have the details, and the problems go to the
   whose program is missing) opened from File > Open, the Finder or the
   Recent menu gave an empty document under its name; TeXmacs now says that
   it could not load the file and opens nothing. Revert and the recovery
-  of an autosave file no longer empty the document either, and
+  of an autosave file no longer empty the document when the file cannot be
+  converted (an empty file is still an empty document), and
   `texmacs -c` no longer writes an empty document (or the document of the
   previous `-c`) for such a file, or for a file which does not exist: it
   says that it could not load it and goes on with the next command.
