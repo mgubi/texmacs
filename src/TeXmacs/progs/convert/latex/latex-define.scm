@@ -57,13 +57,13 @@
   (downequal (!group (mbox (rotatebox (!option "origin=c") "-90"
                                       (!math "=")))))
   (longupequal (!group (mbox (rotatebox (!option "origin=c") "90"
-                                        (!math (longequal))))))
+                                        (!math (!recurse (longequal)))))))
   (longdownequal (!group (mbox (rotatebox (!option "origin=c") "-90"
-                                          (!math (longequal))))))
+                                          (!math (!recurse (longequal)))))))
   (longupminus (!group (mbox (rotatebox (!option "origin=c") "90"
-                                        (!math (longminus))))))
+                                        (!math (!recurse (longminus)))))))
   (longdownminus (!group (mbox (rotatebox (!option "origin=c") "-90"
-                                          (!math (longminus))))))
+                                          (!math (!recurse (longminus)))))))
   (longuparrow (!group (mbox (rotatebox (!option "origin=c") "90"
                                         (!math (longrightarrow))))))
   (longdownarrow (!group (mbox (rotatebox (!option "origin=c") "-90"
@@ -94,10 +94,12 @@
                                         (!math (hookrightarrow))))))
   (hookdownarrow (!group (mbox (rotatebox (!option "origin=c") "-90"
                                           (!math (hookrightarrow))))))
-  (longhookuparrow (!group (mbox (rotatebox (!option "origin=c") "90"
-                                            (!math (longhookrightarrow))))))
-  (longhookdownarrow (!group (mbox (rotatebox (!option "origin=c") "-90"
-                                              (!math (longhookrightarrow))))))
+  (longhookuparrow
+   (!group (mbox (rotatebox (!option "origin=c") "90"
+                            (!math (!recurse (longhookrightarrow)))))))
+  (longhookdownarrow
+   (!group (mbox (rotatebox (!option "origin=c") "-90"
+                            (!math (!recurse (longhookrightarrow)))))))
   (Backepsilon (!group (mbox (rotatebox (!option "origin=c") "180"
                                         "E"))))
   (Backsigma (!group (mbox (reflectbox (!math "\\Sigma")))))
@@ -259,8 +261,10 @@
   (leqangle (mathrel (!append (angle) " \\llap "
                               (!group (raisebox "-1ex" (!math "-"))))))
   (geqangle (mathrel (!group (mbox (reflectbox (!math (!recurse (leqangle))))))))
-  (legeangle (mathrel (substack (!append (leangle) "\\\\" (!recurse (anglege))))))
-  (geleangle (mathrel (substack (!append (geangle) "\\\\" (!recurse (anglele))))))
+  (legeangle (mathrel (substack (!append (!recurse (leangle)) "\\\\"
+                                          (!recurse (anglege))))))
+  (geleangle (mathrel (substack (!append (!recurse (geangle)) "\\\\"
+                                          (!recurse (anglele))))))
   (udots "{\\mathinner{\\mskip1mu\\raise1pt\\vbox{\\kern7pt\\hbox{.}}\\mskip2mu\\raise4pt\\hbox{.}\\mskip2mu\\raise7pt\\hbox{.}\\mskip1mu}}")
   (subsetsim (underset (sim) (subset)))
   (supsetsim (underset (sim) (supset)))
@@ -508,10 +512,10 @@
   (tmaction (!group (!append (color "blue") 1)))
   (ontop (genfrac "" "" "0pt" "" 1 2))
   (subindex (index (!append 1 "!" 2)))
-  (renderfootnote (footnotetext (!append (tmrsup 1) " " 2)))
-  (renderfootnotestar (footnotetext (!append (tmrsup 1) " " 3)))
+  (renderfootnote (footnotetext (!append (!recurse (tmrsup 1)) " " 2)))
+  (renderfootnotestar (footnotetext (!append (!recurse (tmrsup 1)) " " 3)))
   (tmlinenumber (!append (custombinding 1)
-                         (tmlinenote (footnotesize 1) 2 "0cm")))
+                         (!recurse (tmlinenote (footnotesize 1) 2 "0cm"))))
 
   ;; Ternary macros
   (tmsession (!group (!append (tt) 3)))
@@ -530,7 +534,7 @@
                       (mbox "") (!group (!append (color "blue!50!black") 2))
                       (item (!option "")) (mbox "") 3)))
   (tmlinenote
-   (!append (tmdummy)
+   (!append (!recurse (tmdummy))
             (marginpar (adjustbox
                         (!append "right=0cm, lap=" 2
                                  "-\\textwidth-\\marginparsep, raise=" 3)
@@ -600,15 +604,15 @@
             ---
             (endgroup)))
   ("tmcompact"
-   ((!begin "tmparsep" "0em") ---))
+   (!recurse ((!begin "tmparsep" "0em") ---)))
   ("tmcompressed"
-   ((!begin "tmparsep" "0.25em") ---))
+   (!recurse ((!begin "tmparsep" "0.25em") ---)))
   ("tmamplified"
-   ((!begin "tmparsep" "0.75em") ---))
+   (!recurse ((!begin "tmparsep" "0.75em") ---)))
   ("tmjumpin"
-   ((!begin "tmparmod" "1.5em" "0pt" "-1.5em") ---))
+   (!recurse ((!begin "tmparmod" "1.5em" "0pt" "-1.5em") ---)))
   ("tmindent"
-   ((!begin "tmparmod" "1.5em" "0pt" "0pt") ---))
+   (!recurse ((!begin "tmparmod" "1.5em" "0pt" "0pt") ---)))
   ("tmlisting"
    ((!begin "linenumbers") (!append (resetlinenumber) ---)))
   ("elsequation" ((!begin "eqnarray") (!append --- "&&")))
