@@ -430,17 +430,26 @@
            ;; such that these tags never contain block content
            (exists? force-block? (sxml-content x)))))
 
+(define (split-blocks sl)
+  ;; The items @sl of a paragraph cut at its blocks: each block, and each
+  ;; run of items between them in a paragraph of its own
+  (let loop ((sl sl) (run '()) (acc '()))
+    (cond ((null? sl)
+           (reverse (if (null? run) acc (cons `(h:p ,@(reverse run)) acc))))
+          ((force-block? (car sl))
+           (loop (cdr sl) '()
+                 (cons (car sl)
+                       (if (null? run) acc
+                           (cons `(h:p ,@(reverse run)) acc)))))
+          (else (loop (cdr sl) (cons (car sl) run) acc)))))
+
 (define (as-blocks l)
+  ;; One pass over the items of each paragraph: cutting them one block at
+  ;; a time made the export of nested documents cubic in their depth
   (cond ((null? l) l)
         ((and (func? (car l) 'h:p) (list-find (cdar l) force-block?))
-         (let* ((sl (cdar l))
-                (i  (list-find-index sl force-block?))
-                (l1 (sublist sl 0 i))
-                (x2 (list-ref sl i))
-                (l2 (sublist sl (+ i 1) (length sl)))
-                (h  (if (null? l1) (list x2) (list `(h:p ,@l1) x2)))
-                (t  (if (null? l2) (cdr l) (cons `(h:p ,@l2) (cdr l)))))
-           (append (map as-block h) (as-blocks t))))
+         (append (map as-block (split-blocks (cdar l)))
+                 (as-blocks (cdr l))))
         (else (cons (as-block (car l))
                     (as-blocks (cdr l))))))
 
@@ -479,11 +488,78 @@
 	  (list-concatenate
 	   ((cut list-intersperse <> '("\n"))
 	    (map tmhtml l)))))
-	(else
-          (with pars (map tmhtml-p l)
-            ;;(display* "===== Got  " l "\n")
-            ;;(display* "----- Post " (apply append pars) "\n\n")
-            (apply append pars)))))
+	(else (reverse (car (tmhtml-pars l '() #f))))))
+
+;; A paragraph which is a document is converted as a paragraph (tmhtml-p):
+;; the blocks of its paragraphs are made blocks again (as-blocks). In a
+;; nesting of documents, the blocks of the inner paragraphs were made
+;; blocks again at each level, and copied by append, which made the export
+;; quadratic in the depth (cubic with the old as-blocks). The blocks of the
+;; paragraphs of a nesting are now put on one list, once. A block is stable
+;; when it is a block which as-block leaves as it is: as-blocks leaves a
+;; list of stable blocks as it is, and applies as-block to each block of a
+;; list of blocks. So at each level, as-blocks only changes the blocks
+;; which are not stable yet (a <div> which as-block merges with the <div>
+;; in it, one level at a time) and the items which are not blocks
+
+(define (stable-block? x)
+  (and (force-block? x) (eq? (as-block x) x)))
+
+(define (push-blocks l acc unstable)
+  ;; the blocks @l pushed on @acc, and the cells of @acc of those which are
+  ;; not stable added to @unstable
+  (if (null? l) (cons acc unstable)
+      (with acc2 (cons (car l) acc)
+        (push-blocks (cdr l) acc2
+                     (if (stable-block? (car l)) unstable
+                         (cons acc2 unstable))))))
+
+(define (tmhtml-pars l acc nested?)
+  ;; the blocks of the paragraphs @l, in reverse order, on @acc, and (when
+  ;; @nested?) the cells of those which are not stable
+  (let loop ((l l) (acc acc) (unstable '()))
+    (cond ((null? l) (cons acc unstable))
+          ((and (func? (car l) 'document) (nnull? (cdar l))
+                (not (ahash-ref tmhtml-env :math)))
+           (with r (tmhtml-nested-document (car l) acc)
+             (loop (cdr l) (car r)
+                   (if nested? (append (cdr r) unstable) '()))))
+          (nested?
+           (with r (push-blocks (tmhtml-p (car l)) acc unstable)
+             (loop (cdr l) (car r) (cdr r))))
+          (else
+           (loop (cdr l) (reverse-onto (tmhtml-p (car l)) acc) '())))))
+
+(define (reverse-onto l acc)
+  (if (null? l) acc (reverse-onto (cdr l) (cons (car l) acc))))
+
+(define (tmhtml-nested-document x acc)
+  ;; the blocks of the paragraph @x, a document, as (tmhtml-p x) makes
+  ;; them, in reverse order on @acc, and the cells of those not stable.
+  ;; As-blocks of the blocks of @x applies as-block to each block, which
+  ;; leaves the stable ones as they are, and to the paragraph of each run of
+  ;; items which are not blocks; these items are not stable: the runs are
+  ;; runs of cells in the list of those not stable (in the same order as
+  ;; the blocks), each replaced by one of its cells. The cells are those of
+  ;; this conversion (push-blocks), shared with nothing else. (tmhtml-p of
+  ;; a document adds no margins: tmhtml-compute-vspace of a document is #f)
+  (let* ((r (tmhtml-pars (cdr x) acc #t)))
+    (let loop ((u (cdr r)) (keep '()))
+      (cond ((null? u) (cons (car r) (reverse keep)))
+            ((force-block? (caar u))
+             (set-car! (car u) (as-block (caar u)))
+             (loop (cdr u)
+                   (if (stable-block? (caar u)) keep (cons (car u) keep))))
+            (else
+             (let run ((v (cdr u)) (last (car u)) (items (list (caar u))))
+               (if (and (pair? v) (eq? (cdr last) (car v))
+                        (not (force-block? (caar v))))
+                   (run (cdr v) (car v) (cons (caar v) items))
+                   (with c (car u)
+                     (set-car! c (as-block `(h:p ,@items)))
+                     (set-cdr! c (cdr last))
+                     (loop v (if (stable-block? (car c)) keep
+                                 (cons c keep)))))))))))
 
 (define (tmhtml-paragraph l)
   (let rec ((l l))
