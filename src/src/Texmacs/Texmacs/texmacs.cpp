@@ -451,12 +451,13 @@ set_global_options  (int argc, char** argv)  {
           url out ("$PWD", argv[ i ]);
           // a file which could not be loaded (no converter from its
           // format, or a converter which failed, or no file) is not
-          // converted: the current buffer would be exported in its place
+          // converted: the current buffer would be exported in its place;
+          // the next commands still run
           my_init_cmds= my_init_cmds * " " *
             "(when (not (convert-file " * scm_quote (as_string (in)) * " " *
             scm_quote (as_string (out)) * ")) " *
             "(display* \"TeXmacs] could not load \" " *
-            scm_quote (as_string (in)) * " \"\\n\") (exit 1))";
+            scm_quote (as_string (in)) * " \"\\n\"))";
         }
       }
       else if ((s == "-x") || (s == "-execute")) {

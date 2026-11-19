@@ -58,7 +58,9 @@ the formats of the Import menu) in the `CFBundleDocumentTypes` of
 `packages/macos/Info.plist.in`, as an alternative application (the suite
 `open-formats` checks that the plist has their suffixes; a format added to
 the Import menu gets an entry there; `Info-Xcode.plist.in`, of the Xcode
-project, still declares only the TeXmacs files); a document dropped on a
+project, still declares only the TeXmacs files; `packages/macos/Info.plist`
+is made from it by configure, so that an existing build tree needs
+`./config.status packages/macos/Info.plist` after a change); a document dropped on a
 canvas is opened the same way (`dropped-documents`, tm-files.scm: full
 names of local files only, so that a dropped text is inserted); a quit from the
 Dock or at logout goes through `safely-quit-TeXmacs`; the close button of a
