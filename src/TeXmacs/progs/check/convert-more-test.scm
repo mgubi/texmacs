@@ -606,15 +606,15 @@
                   "html-snippet")
     (check= (list (string-occurs? "margin-left" s) (occurrences "<p>" s))
             (list #t 4)))
-  ;; deep nestings, in a time linear in their depth (1000 levels in at most
-  ;; 20 times the time of 125, at least 4 s; without the fix they took 5 to
-  ;; 20 s, on the binary of CI): whole, or cut with the error
+  ;; deep nestings, in a time linear in their depth (1500 levels in at most
+  ;; 20 times the time of 150, at least 4 s; with the fix 0.1 to 0.6 s,
+  ;; without it 15 to 55 s, on the binary of CI): whole, or cut with the error
   (for (nest nested-documents)
     (check-fast-sizes (string-append "nested documents, " (car nest))
                       (lambda (n)
                         (lambda ()
                           (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
-                      (lambda (n) #t) 125 1000)))
+                      (lambda (n) #t) 150 1500 "levels")))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
@@ -2417,10 +2417,10 @@
 (define (check-fast what make expect)
   ;; the thunk (make n) of a conversion of a document of @n paragraphs gives
   ;; (expect n), and the big run takes at most (scaling-limit small-time) ms
-  (check-fast-sizes what make expect scaling-small scaling-big))
+  (check-fast-sizes what make expect scaling-small scaling-big "paragraphs"))
 
-(define (check-fast-sizes what make expect small big)
-  ;; check-fast with a small run of @small paragraphs and a big one of @big
+(define (check-fast-sizes what make expect small big unit)
+  ;; check-fast with a small run of @small @unit and a big one of @big
   (let* ((rs (check-run (lambda ()
                           (fastest-run (make small) 3
                                        (lambda (ms) #f)))))
@@ -2443,7 +2443,7 @@
                          (string-append what " scales")
                          (string-append (number->string (cdr rb)) " ms for "
                                         (number->string big)
-                                        " paragraphs, "
+                                        " " unit ", "
                                         (number->string (cdr rs)) " ms for "
                                         (number->string small)
                                         ", limit "
