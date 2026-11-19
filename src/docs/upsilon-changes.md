@@ -60,7 +60,17 @@ have the details, and the problems go to the
   macro which calls itself made a tree too deep for the conversion, which
   overflowed the stack of Scheme and wrote no file. The document is now
   converted again, cut at a depth the conversion takes, and the HTML is
-  written with "nesting too deep" in red where it was cut (part of #813).
+  written with "nesting too deep" in red where it was cut: it is either
+  whole or cut, never both, and a cut table stays a table (part of #813).
+  On Windows, Guile now has a stack limit (11.4 MB of the 16 MB stack),
+  so a recursion too deep is an error, which the export catches, not a
+  crash (CI of #863, #879).
+- **HTML export of deep nesting in linear time**: the weak tabs of a line,
+  the vertical spaces of a paragraph and the body of a block were looked
+  for through all the levels below each level of a nesting, so that 1000
+  nested `<surround>` took minutes; they are now looked for 64 levels
+  down. `exists?` ran its test twice on the element found, which made
+  inline markup around a block exponential in its depth (#880).
 - **The option `-X`** is now in `texmacs -h`, in the manual page and in
   the user documentation and the page of the Cocoa interface: in headless
   mode it keeps TeXmacs running after the commands of `-x` and the files,
