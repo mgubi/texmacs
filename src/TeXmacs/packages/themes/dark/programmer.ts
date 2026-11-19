@@ -26,11 +26,13 @@
 
   <\active*>
     <\src-comment>
-      Text font: IBM Plex Mono, shipped in TeXmacs/fonts/truetype/plex
+      Text font: IBM Plex Mono, shipped in TeXmacs/fonts/truetype/plex. The
+      typewriter part is named, so that the code (prog mode asks the family
+      tt-tt) and the math symbols are in Plex Mono too, not in Fira Mono
     </src-comment>
   </active*>
 
-  <assign|font|IBM Plex>
+  <assign|font|typewriter=IBM Plex,IBM Plex>
 
   <assign|font-family|tt>
 

@@ -92,9 +92,9 @@
 
   <assign|dark-mode-scene-generic-error-color|#ff6b6b>
 
-  <assign|scheme-prompt-color|#7ad97a>
+  <assign|dark-mode-scene-scheme-prompt-color|#7ad97a>
 
-  <assign|scheme-input-color|#d4d4d8>
+  <assign|dark-mode-scene-scheme-input-color|#d4d4d8>
 
   \;
 </body>

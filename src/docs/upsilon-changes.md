@@ -17,11 +17,13 @@ have the details, and the problems go to the
 - **Dark mode and Programmer mode** (document themes, Document > Theme): two
   new themes for a dark interface. *Dark mode* has a dark grey paper
   (`#2a2a2e`, close to the interface but distinct from it) with light grey
-  text, headings, links, math, cursors, ornaments and source tags adapted;
-  *Programmer mode* is the same in the monospace font IBM Plex Mono, shipped
-  in `TeXmacs/fonts/truetype/plex`. The code of the languages whose colors
-  are fixed (tree-sitter, Python, Java, R, ...) is lightened until it has a
-  contrast of 4.5 with the paper, by the new environment variable
+  text, and links, math, cursors, sessions, ornaments, source tags and the
+  title and comment boxes of style files in colors chosen for it;
+  *Programmer mode* is the same in the monospace font IBM Plex Mono (text,
+  code and math symbols), shipped in `TeXmacs/fonts/truetype/plex`. The
+  code of the languages whose colors are fixed (tree-sitter, Python, Java,
+  R, ...) is lightened, with its hue, until it has a contrast of 4.5 with
+  the paper, by the new environment variable
   `adapt-dark-colors` (set by these themes only: other documents, and the
   other themes, are unchanged). They are style packages saved with the
   document like the other themes; a PDF comes out dark, as with those.

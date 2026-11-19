@@ -76,6 +76,31 @@
 
   <assign|src-error|<macro|body|<with|color|#ff6b6b|<arg|body>>>>
 
+  <\active*>
+    <\src-comment>
+      The title and comment boxes of style files (source.ts: dark blue on
+      pastel blue, dark grey on pastel yellow) and the short comments (dark
+      grey): the same boxes in dark tones
+    </src-comment>
+  </active*>
+
+  <assign|src-title|<\macro|x>
+    <\surround|<vspace*|1.5fn>|<vspace|1.5fn>>
+      <with|color|#c8dcff|<block|<tformat|<twith|table-width|1par>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-bsep|1.5spc>|<cwith|1|1|1|1|cell-tsep|1.5spc>|<cwith|1|1|1|1|cell-background|#2e3a50>|<cwith|1|1|1|1|cell-lborder|0.5ln>|<cwith|1|1|1|1|cell-rborder|0.5ln>|<cwith|1|1|1|1|cell-bborder|0.5ln>|<cwith|1|1|1|1|cell-tborder|0.5ln>|<cwith|1|1|1|1|cell-hpart|1>|<table|<row|<\cell>
+        <with|font-size|1|font-family|ss|color|#c8dcff|par-par-sep|0fn|<arg|x>>
+      </cell>>>>>>
+    </surround>
+  </macro>>
+
+  <assign|src-short-comment|<macro|x|<with|color|#a8a8b0|<htab|5mm>{
+  <arg|x> }>>>
+
+  <assign|src-comment|<\macro|x>
+    <surround|<vspace*|1.5fn>|<vspace|0.5fn>|<with|color|#cfcfb8|<block|<tformat|<twith|table-width|1par>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-bsep|1spc>|<cwith|1|1|1|1|cell-tsep|1spc>|<cwith|1|1|1|1|cell-background|#3a3626>|<cwith|1|1|1|1|cell-lborder|0.5ln>|<cwith|1|1|1|1|cell-rborder|0.5ln>|<cwith|1|1|1|1|cell-bborder|0.5ln>|<cwith|1|1|1|1|cell-tborder|0.5ln>|<table|<row|<\cell>
+      <with|font-size|0.84|font-shape|slanted|<arg|x>>
+    </cell>>>>>>>
+  </macro>>
+
 </body>
 
 <\initial>

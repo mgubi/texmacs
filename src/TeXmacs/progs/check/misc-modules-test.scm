@@ -148,7 +148,7 @@
 ;; ("generic|dark-mode"), then close it
 (define (with-style-file styles thunk)
   (let* ((old (current-buffer))
-         (f (url-append (url-temp-dir) "dark-theme-check.tm"))
+         (f (tmp-file "dark-theme-check.tm"))
          (doc (string-append
                "<TeXmacs|2.1.2>\n\n<style|<tuple|" styles ">>\n\n"
                "<\\body>\n  <section|S>\n\n  x\n</body>\n\n"
@@ -165,19 +165,22 @@
       (url-remove f)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
-;; the color definitions (setrgbcolor lines) of the PostScript of a code
-;; block on the background #2a2a2e, with the initial value @flag
-;; ("" or an associate of adapt-dark-colors)
-(define (code-block-colors flag)
-  (let* ((f (url-append (url-temp-dir) "dark-colors-check.tm"))
-         (ps (url-append (url-temp-dir) "dark-colors-check.ps"))
+;; the colors defined in the PostScript of a label (with its flag) and a
+;; code block on the background @bg, with the initial value @flag ("" or an
+;; associate of adapt-dark-colors), in the order of their first use: a list
+;; of (r g b), from 0 to 1
+(define (code-block-colors bg flag)
+  (let* ((f (tmp-file "dark-colors-check.tm"))
+         (ps (tmp-file "dark-colors-check.ps"))
          (doc (string-append
                "<TeXmacs|2.1.2>\n\n<style|generic>\n\n<\\body>\n"
+               "  <label|lab1>\n\n"
                "  <\\python-code>\n    import os # c\n"
                "    def f(x): return 3\n  </python-code>\n</body>\n\n"
                "<\\initial>\n  <\\collection>\n"
                "    <associate|page-medium|paper>\n"
-               "    <associate|bg-color|#2a2a2e>\n" flag
+               "    <associate|info-flag|paper>\n"
+               "    <associate|bg-color|" bg ">\n" flag
                "  </collection>\n</initial>\n")))
     (string-save doc f)
     (load-buffer f)
@@ -185,11 +188,41 @@
     (print-to-file ps)
     (buffer-close f)
     (let* ((all (string-split (string-load ps) #\newline))
-           (r (list-filter all (lambda (l) (string-search-forwards
-                                            "setrgbcolor" 0 l)))))
+           (r (list-filter all (lambda (l) (>= (string-search-forwards
+                                                "setrgbcolor" 0 l) 0)))))
       (url-remove f)
       (url-remove ps)
-      r)))
+      ;; "/C3 {0.000 0.000 1.000 setrgbcolor A255} N"
+      (map (lambda (l)
+             (let* ((w (list-filter (string-split l #\space)
+                                    (lambda (x) (!= x ""))))
+                    (n (lambda (x) (string->number
+                                    (string-replace x "{" "")))))
+               (list (n (cadr w)) (n (caddr w)) (n (cadddr w)))))
+           r))))
+
+(define (rgb-luminance c)
+  ;; the relative luminance of WCAG of the color @c, a list (r g b)
+  (let* ((lin (lambda (v) (if (<= v 0.03928) (/ v 12.92)
+                              (expt (/ (+ v 0.055) 1.055) 2.4))))
+         (l (map lin c)))
+    (+ (* 0.2126 (car l)) (* 0.7152 (cadr l)) (* 0.0722 (caddr l)))))
+
+(define (rgb-contrast c1 c2)
+  (let ((l1 (rgb-luminance c1)) (l2 (rgb-luminance c2)))
+    (/ (+ (max l1 l2) 0.05) (+ (min l1 l2) 0.05))))
+
+(define (rgb-lightened? c0 c1 bg)
+  ;; @c1 is @c0 mixed with white (the same part on each channel, so the hue
+  ;; is kept), just enough for a contrast of 4.5 with @bg; the PostScript
+  ;; gives 3 decimals, hence the margins
+  (let* ((parts (list-filter
+                 (map (lambda (a b) (and (< a 0.99) (/ (- b a) (- 1 a))))
+                      c0 c1)
+                 (lambda (x) x)))
+         (lo (apply min parts)) (hi (apply max parts))
+         (k (rgb-contrast c1 bg)))
+    (and (> lo 0) (< (- hi lo) 0.02) (>= k 4.4) (< k 4.8))))
 
 (define (in-shared-window group)
   ;; @group with the buffers in one window: with a window per buffer, a page
@@ -2777,12 +2810,36 @@
       (check-true (default-basic-theme?))))
   ;; the hook: colors of the highlighter on a dark paper are lightened only
   ;; with adapt-dark-colors
-  (let ((none (code-block-colors ""))
-        (off (code-block-colors "    <associate|adapt-dark-colors|false>\n"))
-        (on (code-block-colors "    <associate|adapt-dark-colors|true>\n")))
+  (let* ((bg '(0.164 0.164 0.180))
+         (none (code-block-colors "#2a2a2e" ""))
+         (off (code-block-colors "#2a2a2e"
+                                 "    <associate|adapt-dark-colors|false>\n"))
+         (on (code-block-colors "#2a2a2e"
+                                "    <associate|adapt-dark-colors|true>\n"))
+         (changed (list-filter (map (lambda (a b) (and (!= a b) (list a b)))
+                                    none on)
+                               (lambda (x) x))))
     (check-true (> (length none) 3))
     (check= off none)
-    (check-false (== on none)))
+    (check= (length on) (length none))
+    ;; the background, the label flag (blue) and the two colors of the
+    ;; Python highlighter (#309090, #802000)
+    (check-true (in? bg none))
+    (check-true (in? '(0.0 0.0 1.0) none))
+    (check-false (in? '(0.0 0.0 1.0) on))
+    (check= (length changed) 3)
+    ;; each changed color is lightened towards white with its hue, just to
+    ;; a contrast of 4.5; the colors with enough contrast are kept
+    (check= (list-filter changed (lambda (p) (not (rgb-lightened?
+                                                   (car p) (cadr p) bg))))
+            '())
+    (check= (list-filter changed (lambda (p) (>= (rgb-contrast (car p) bg)
+                                                 4.5)))
+            '())
+    ;; no effect on a bright paper
+    (check= (code-block-colors "#f0f0f0"
+                               "    <associate|adapt-dark-colors|true>\n")
+            (code-block-colors "#f0f0f0" "")))
   ;; what the dark themes set, and that the plain document is not touched
   ;; (documents loaded from files: the environment of a buffer follows its
   ;; style only after loading)
