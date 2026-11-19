@@ -521,6 +521,49 @@ named buffer usable #t
 named reopened 6 times #t" \
       -x '(load "startup-side-tools.scm")'
 
+# A tool whose only field is a named texmacs-input, opened and closed again
+# without a garbage collection: each close ends the field at once (#776).
+# The fields of an opening were appended to the default value of the
+# table of the openings, which every new opening then started with: from
+# the second opening on, the field was not in its opening, and its views
+# piled up until a garbage collection.
+cat > "$out/startup-tool-named-only.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define name (string->url "tmfs://aux/startup-tool-named-only"))
+(define (views)
+  (if (buffer-exists? name) (length (buffer->views name)) 0))
+(tm-tool (startup-named-only-tool win)
+  (:name "startup named only tool")
+  (texmacs-input '(document "x") '(style "generic") name))
+(define opened 0)
+(define (open-it)
+  (set! opened (+ opened 1))
+  (tool-select :right 'startup-named-only-tool)
+  (update-menus)
+  (update-forced)
+  (display* "CHECK opened " opened ": views " (views) "\n")
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (display* "CHECK closed " opened ": views " (views) "\n")
+  (if (< opened 3) (later open-it) (set! done #t)))
+(later open-it)
+EOF
+
+check "a tool with only a named texmacs-input, closed again (#776)" \
+      "opened 1: views 1
+closed 1: views 0
+opened 2: views 1
+closed 2: views 0
+opened 3: views 1
+closed 3: views 0" \
+      -x '(load "startup-tool-named-only.scm")'
+
 # A dialog whose refreshable makes a named texmacs-input again: the newer
 # widget takes the buffer over without being registered for the dialog, so
 # the former one, let go later, must leave the registration of the dialog,

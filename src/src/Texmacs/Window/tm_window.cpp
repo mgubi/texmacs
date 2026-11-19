@@ -619,7 +619,14 @@ texmacs_input_widget (tree doc, tree style, url wname) {
     vw= concrete_view (get_new_view (name));
     field_view  (key)= abstract_view (vw);
     field_built (key)= vw->ed->history_version ();
-    if (!contains (name, opening_fields [op])) opening_fields (op) << name;
+    // (a new array: the default value of the hashmap, which a missing key
+    // gets, must not be appended to)
+    array<url> fields;
+    if (opening_fields->contains (op)) fields= copy (opening_fields [op]);
+    if (!contains (name, fields)) {
+      fields << name;
+      opening_fields (op)= fields;
+    }
   }
   field_owner (as_string (name))= op;
   // the window to which the focus returns when the widget is closed: the
@@ -957,6 +964,8 @@ window_handle () {
   // the widgets of the window are made in its opening (#776); the window
   // and the opening which were being built before are built again after
   // its window_create, or after embedded_opening_abort if its build fails
+  // (the Scheme code builds windows through window-build, which calls it;
+  // a build which fails without it leaves its opening current)
   dialog_pending  (window_next)= pending_window_handle;
   dialog_previous (window_next)= current_opening;
   dialog_opening  (window_next)= new_opening (false);
@@ -994,7 +1003,9 @@ embedded_opening_abort (int win) {
   int op= dialog_opening [win];
   window_build_end (win);
   dialog_opening->reset (win);
-  end_opening (op, false);
+  // (the widgets made by the failed build may still be held by Scheme:
+  // they no longer show the editors which end)
+  end_opening (op, true);
 }
 
 void
