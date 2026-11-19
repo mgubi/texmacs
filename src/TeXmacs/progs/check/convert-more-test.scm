@@ -636,7 +636,7 @@
 ;; Each is timed on a size 10 times as large, which may take 20 times as
 ;; long as the small one, or 4 s if that is more (10 s at most). Without the
 ;; fixes, on a Mac M4 under s7: 16, 16 and 9 s (much more under Guile);
-;; with them 0.2 s under s7, 1 s under Guile. The nestings are wide rather
+;; with them 0.2 s under s7, 2 s under Guile. The nestings are wide rather
 ;; than deep, 300 levels: the recursions of Guile overflow its stack at 629
 ;; levels of tmmathbf with the limit of Linux, the smallest (init-guile.scm).
 (define (latex-wide-nesting wrap n)
@@ -651,6 +651,13 @@
                `(concat ,@(make-list 400 '(with "color" "red" "a"))
                         (with "color" "red" ,t)))
              n leaf))
+
+(define (tree-occurrences tag t)
+  ;; the number of nodes @tag in @t (occurrences of a string in its LaTeX
+  ;; would copy the whole string at each one under Guile)
+  (if (npair? t) 0
+      (apply + (if (== (car t) tag) 1 0)
+             (map (cut tree-occurrences tag <>) (cdr t)))))
 
 (define (test-latex-linear)
   (check-group "latex export: long and deep formulas, in linear time")
@@ -676,7 +683,7 @@
                         (with r (latex-expand-macros
                                  (latex-wide-nesting
                                   (lambda (t) `(tmmathbf ,t)) n))
-                          (occurrences "boldsymbol" (serialize-latex r)))))
+                          (tree-occurrences 'boldsymbol r))))
                     (lambda (n) n) 30 300 "levels")
   ;; nested <concat> with brackets at the bottom
   (check-fast-sizes "brackets of nested concat"
@@ -692,13 +699,25 @@
   ;; (whose arguments are no longer expanded twice)
   (for (x '((!concat "a" (longdownequal) "b")
             (tmmathbf (!concat "a" (longdownequal) (legeangle) "b"))
-            (skey (longhookuparrow))))
+            (skey (longhookuparrow))
+            (tmmathbf (!concat (longupminus) (geleangle)))))
     (with s (serialize-latex (latex-expand-macros x))
       (check= (list s (string-occurs? "rotatebox" s)
-                    (string-occurs? "longequal" s)
-                    (string-occurs? "leangle" s)
-                    (string-occurs? "longhook" s))
-              (list s #t #f #f #f)))))
+                    (list-filter '("longequal" "longminus" "leangle"
+                                   "geangle" "longhook")
+                                 (cut string-occurs? <> s)))
+              (list s #t '()))))
+  ;; (footnotes, line notes and numbers, environments)
+  (for (x '((renderfootnote "1" "note")
+            (tmlinenumber "1" "note")
+            (tmmathbf (tmlinenote "a" "b" "c"))
+            ((!begin "tmcompact") "x")
+            (tmmathbf ((!begin "tmindent") "x"))))
+    (with s (serialize-latex (latex-expand-macros x))
+      (check= (list s (list-filter '("tmrsup" "tmdummy" "tmlinenote"
+                                     "tmparsep" "tmparmod")
+                                   (cut string-occurs? <> s)))
+              (list s '())))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them

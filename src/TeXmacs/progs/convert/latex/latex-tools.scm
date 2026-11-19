@@ -241,8 +241,9 @@
          ;; each level of a nesting of such macros (tmmathbf, a bold
          ;; formula) made the conversion quadratic in its depth. So the
          ;; expansion of a macro must be complete: a body which uses
-         ;; another macro of latex-texmacs-macro has it in !recurse
-         ;; (latex-define.scm), else it is left as it is
+         ;; another macro or environment of latex-texmacs-macro and
+         ;; latex-texmacs-environment has it in !recurse (latex-define.scm),
+         ;; else it is left as it is
          (latex-substitute (latex-expand-macros (cadr t)) args))
         ((func? t '!translate 1)
          (translate-from-to (cadr t) "english" latex-language))
