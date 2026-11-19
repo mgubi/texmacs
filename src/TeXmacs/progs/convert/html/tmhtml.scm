@@ -498,10 +498,9 @@
 ;; paragraphs of a nesting are now put on one list, once. A block is stable
 ;; when it is a block which as-block leaves as it is: as-blocks leaves a
 ;; list of stable blocks as it is, and applies as-block to each block of a
-;; list of blocks. So at each level, as-block is only applied to the blocks
+;; list of blocks. So at each level, as-blocks only changes the blocks
 ;; which are not stable yet (a <div> which as-block merges with the <div>
-;; in it, one level at a time), and as-blocks to all the blocks of the
-;; level only when one of them is not a block (force-block?)
+;; in it, one level at a time) and the items which are not blocks
 
 (define (stable-block? x)
   (and (force-block? x) (eq? (as-block x) x)))
@@ -536,22 +535,30 @@
 
 (define (tmhtml-nested-document x acc)
   ;; the blocks of the paragraph @x, a document, as (tmhtml-p x) makes
-  ;; them, in reverse order on @acc, and the cells of those not stable
-  (let* ((r (tmhtml-pars (cdr x) acc #t))
-         (unstable (cdr r)))
-    (cond ((null? unstable) r)
-          ((list-and (map (lambda (c) (force-block? (car c))) unstable))
-           ;; the cells are those of this conversion (push-blocks)
-           (for-each (lambda (c) (set-car! c (as-block (car c)))) unstable)
-           (cons (car r)
-                 (list-filter unstable
-                              (lambda (c) (not (stable-block? (car c)))))))
-          (else
-           (let* ((mine (let loop ((l (car r)) (m '()))
-                          (if (eq? l acc) m
-                              (loop (cdr l) (cons (car l) m)))))
-                  (bl (as-blocks (list `(h:p ,@mine)))))
-             (push-blocks bl acc '()))))))
+  ;; them, in reverse order on @acc, and the cells of those not stable.
+  ;; As-blocks of the blocks of @x applies as-block to each block, which
+  ;; leaves the stable ones as they are, and to the paragraph of each run of
+  ;; items which are not blocks; these items are not stable: the runs are
+  ;; runs of cells in the list of those not stable (in the same order as
+  ;; the blocks), each replaced by one of its cells. The cells are those of
+  ;; this conversion (push-blocks), shared with nothing else
+  (let* ((r (tmhtml-pars (cdr x) acc #t)))
+    (let loop ((u (cdr r)) (keep '()))
+      (cond ((null? u) (cons (car r) (reverse keep)))
+            ((force-block? (caar u))
+             (set-car! (car u) (as-block (caar u)))
+             (loop (cdr u)
+                   (if (stable-block? (caar u)) keep (cons (car u) keep))))
+            (else
+             (let run ((v (cdr u)) (last (car u)) (items (list (caar u))))
+               (if (and (pair? v) (eq? (cdr last) (car v))
+                        (not (force-block? (caar v))))
+                   (run (cdr v) (car v) (cons (caar v) items))
+                   (with c (car u)
+                     (set-car! c (as-block `(h:p ,@items)))
+                     (set-cdr! c (cdr last))
+                     (loop v (if (stable-block? (car c)) keep
+                                 (cons c keep)))))))))))
 
 (define (tmhtml-paragraph l)
   (let rec ((l l))

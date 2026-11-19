@@ -552,28 +552,36 @@
 ;; (a time cubic in the depth, 4000 levels: minutes). A nesting of
 ;; documents is exported in a time linear in its depth.
 (define nested-documents
-  ;; the nestings, and their paragraphs from the top (if they are those of
-  ;; the nesting): n levels of (document "p" t), of (document t "q"), of
-  ;; (document "p" t "q")...
-  (list (cons (lambda (t) `(document "p" ,t))
+  ;; the nestings: a name, the wrap of a level, and the paragraphs of n
+  ;; levels from the top, if they are those of the nesting
+  (list (list "p t" (lambda (t) `(document "p" ,t))
               (lambda (n leaf) (append (make-list n "p") (list leaf))))
-        (cons (lambda (t) `(document ,t "q"))
+        (list "t q" (lambda (t) `(document ,t "q"))
               (lambda (n leaf) (append (list leaf) (make-list n "q"))))
-        (cons (lambda (t) `(document "p" ,t "q"))
+        (list "p t q" (lambda (t) `(document "p" ,t "q"))
               (lambda (n leaf) (append (make-list n "p") (list leaf)
                                        (make-list n "q"))))
         ;; a vertical space before a block, whose <div> is merged with the
         ;; <div> of the space at the next level (not a stable block)
-        (cons (lambda (t) `(document (concat (vspace* "1fn")
+        (list "space before a block"
+              (lambda (t) `(document (concat (vspace* "1fn")
                                              (with "par-left" "1cm"
                                                    (document "a")))
                                      ,t))
               #f)
         ;; nested blocks, <div> in <div>
-        (cons (lambda (t) `(document (with "par-left" "1cm"
+        (list "nested blocks"
+              (lambda (t) `(document (with "par-left" "1cm"
                                            (with "par-right" "1cm"
                                                  (with "par-left" "2cm"
                                                        (document "a"))))
+                                     ,t))
+              #f)
+        ;; a block which is made inline by as-block at the next level (a
+        ;; <div> of a class "...-license" merged with that of the block)
+        (list "a block made inline"
+              (lambda (t) `(document (with "par-mode" "left"
+                                           (tmdoc-license "x"))
                                      ,t))
               #f)))
 
@@ -584,12 +592,12 @@
                    '(with "par-left" "1cm" (document "leaf" "b"))
                    '(concat (vspace* "1fn") "leaf" (vspace "2fn"))
                    '(concat "a" (htab "5mm") "leaf")))
-    (for (nest (list-filter nested-documents cdr))
+    (for (nest (list-filter nested-documents caddr))
       (for (n '(1 2 5))
-        (check= (export `(document "before" ,(deep-tree (car nest) n leaf)
+        (check= (export `(document "before" ,(deep-tree (cadr nest) n leaf)
                                    "after")
                         "html-snippet")
-                (export `(document "before" ,@((cdr nest) n leaf) "after")
+                (export `(document "before" ,@((caddr nest) n leaf) "after")
                         "html-snippet")))))
   ;; a document of a block (blocks made blocks again)
   (with s (export '(document "a" (document (with "par-left" "1cm"
@@ -599,13 +607,13 @@
     (check= (list (string-occurs? "margin-left" s) (occurrences "<p>" s))
             (list #t 4)))
   ;; deep nestings, in a time linear in their depth (1000 levels in at most
-  ;; 20 times the time of 125, at least 4 s; without the fix they took 8 to
-  ;; 17 s, on the binary of CI): whole, or cut with the error
+  ;; 20 times the time of 125, at least 4 s; without the fix they took 5 to
+  ;; 20 s, on the binary of CI): whole, or cut with the error
   (for (nest nested-documents)
-    (check-fast-sizes "nested documents"
+    (check-fast-sizes (string-append "nested documents, " (car nest))
                       (lambda (n)
                         (lambda ()
-                          (whole-or-cut? (html-of-deep (car nest) n) "leaf")))
+                          (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
                       (lambda (n) #t) 125 1000)))
 
 (define formula-label-samples
