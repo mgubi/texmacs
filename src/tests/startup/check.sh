@@ -315,8 +315,8 @@ freed #t" \
 # closed before, it read the deleted view and crashed (#775). A second
 # window with an input of the same name shows the same buffer: deleting the
 # window of the former widget must not close the buffer which the new one
-# shows. Since #776, each window has a view of its own, deleted with it,
-# and a named buffer stays when the last one is deleted. The steps run
+# shows. Since #776, each window has a view of its own, deleted with it;
+# the buffer is closed with the last window which shows it. The steps run
 # from the event loop, which deletes the windows.
 cat > "$out/startup-embedded.scm" <<'EOF'
 (define done #f)
@@ -354,8 +354,7 @@ cat > "$out/startup-embedded.scm" <<'EOF'
   (alt-window-delete w2)
   (display* "CHECK reused buffer kept " (buffer-exists? u2) "\n")
   (alt-window-delete w3)
-  (display* "CHECK reused buffer left without views "
-            (and (buffer-exists? u2) (null? (buffer->views u2))) "\n")
+  (display* "CHECK reused buffer closed " (buffer-exists? u2) "\n")
   (set! done #t))
 (later step1)
 EOF
@@ -363,7 +362,7 @@ EOF
 check "an embedded buffer closed before its window, and one made again (#775)" \
       "buffer closed #f
 reused buffer kept #t
-reused buffer left without views #t" \
+reused buffer closed #f" \
       -x '(load "startup-embedded.scm")'
 
 # Side tools made again let their former widgets go: the cache of the
@@ -645,7 +644,9 @@ check "a script which exits with a dialog open (#776)" \
 # A dialog with a named texmacs-input in a refreshable: one editor per
 # opening of the dialog (#776). A refresh keeps the editor, so what was
 # typed can be undone; when the dialog is closed, the views of its fields
-# are deleted at once, and the named buffer stays; opened again at once,
+# are deleted at once, and the named buffer is closed, unless another view
+# shows it (as before #776: nothing else uses the buffer of the dialog, as
+# the buffer of a console or of a macro editor); opened again at once,
 # without a garbage collection, the field starts with an empty history, and
 # the views do not pile up. A field with that name made by hand while the
 # dialog is open gets a view of its own, which the dialog leaves alone.
@@ -711,10 +712,10 @@ EOF
 check "a dialog opened again starts with an empty history (#776)" \
       "opening 1: views 1, undo 0
 refreshed 1: views 1, undo kept #t
-closed 1: views 0, buffer kept #t
+closed 1: views 0, buffer kept #f
 opening 2: views 1, undo 0
 refreshed 2: views 1, undo kept #t
-closed 2: views 0, buffer kept #t
+closed 2: views 0, buffer kept #f
 opening 3: views 1, undo 0
 refreshed 3: views 1, undo kept #t
 by hand: views 2
@@ -790,6 +791,67 @@ typed in one ax, undo 1
 window closed: views 1, undo 1
 typed in the other 3, undo 1" \
       -x '(load "startup-two-windows.scm")'
+
+# The buffer of a named texmacs-input of a dialog is closed with the
+# dialog, unless another view shows it: #776 kept it, so that each macro
+# editor or page format dialog closed left its buffers behind (and the
+# console its buffers, which the read-only suite checks). A tool showing
+# the same buffer keeps it, and a tool closed keeps its named buffer (the
+# search toolbar uses the buffer of the search tool).
+cat > "$out/startup-dialog-buffers.scm" <<'EOF'
+(define done #f)
+(define (later f)
+  (exec-delayed
+    (lambda ()
+      (catch #t f
+        (lambda args (display* "CHECK error " args "\n") (set! done #t)))
+      (when done (exit 0)))))
+(define (views u) (if (buffer-exists? u) (length (buffer->views u)) -1))
+(define (window-of u) (car (alt-window-search u)))
+(define macro (string->url "tmfs://aux/edit-strong"))
+(define (step1)
+  ;; a macro editor, as a dialog without side tools
+  (open-macro-editor "strong" :global)
+  (later step2))
+(define (step2)
+  (update-forced)
+  (display* "CHECK macro editor: views " (views macro) "\n")
+  (alt-window-delete (window-of macro))
+  (display* "CHECK macro editor closed: views " (views macro) "\n")
+  (tool-select :right 'startup-shared-tool)
+  (update-menus)
+  (later step3))
+(define name (string->url "tmfs://aux/startup-dialog-buffers"))
+(tm-tool (startup-shared-tool win)
+  (:name "startup shared tool")
+  (texmacs-input '(document "tool") '(style "generic") name))
+(tm-widget ((startup-shared-dialog) quit)
+  (resize "300px" "100px"
+    (texmacs-input '(document "dialog") '(style "generic") name)))
+(define (step3)
+  (update-forced)
+  (dialogue-window (startup-shared-dialog) noop "Startup shared dialog")
+  (later step4))
+(define (step4)
+  (update-forced)
+  (display* "CHECK tool and dialog: views " (views name) "\n")
+  (alt-window-delete (window-of name))
+  (display* "CHECK dialog closed: views " (views name) "\n")
+  (set-window-tools (current-window) :right '())
+  (update-menus)
+  (display* "CHECK tool closed: views " (views name) ", buffer kept "
+            (buffer-exists? name) "\n")
+  (set! done #t))
+(later step1)
+EOF
+
+check "a dialog closes the buffers of its named texmacs-input (#776)" \
+      "macro editor: views 1
+macro editor closed: views -1
+tool and dialog: views 2
+dialog closed: views 1
+tool closed: views 0, buffer kept #t" \
+      -x '(load "startup-dialog-buffers.scm")'
 
 # A link whose target has a wildcard: the pattern was loaded as the name of
 # a buffer, and url-glue (the autosave names) threw a C++ exception which
