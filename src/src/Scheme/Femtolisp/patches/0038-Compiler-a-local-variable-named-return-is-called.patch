@@ -9,9 +9,9 @@ head of a form, return included: (define (f return) (return x)) gave x,
 as the special form return, instead of calling the callback. TeXmacs
 names callbacks return (LanguageTool, the translation of AI, the silent
 evaluation of plugins), which were never called. return is no longer in
-special-forms: no macro expands to it; a call of return which is not a
-local variable is still the special form, and is not given to
-compile-unknown-call.
+special-forms: no macro expands to it; a call of return which is
+neither a local variable nor a global function bound when it is compiled
+is still the special form, and is not given to compile-unknown-call.
 ---
  compiler.lsp |  7 +++++--
  flisp.boot   | 17 ++++++++---------

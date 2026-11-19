@@ -473,9 +473,10 @@
     ;; deeper than the stack of C, the stree converted by texmacs->html
     ;; (export would first make a tree of it, a recursion of C++ which
     ;; overflows the stack sooner): femtolisp raised 'memory-error, which
-    ;; the export did not catch, or its collector, which copied the nested
-    ;; lists by a recursion of C, overflowed the stack (a crash)
-    (for (n '(45000 100000))
+    ;; the export did not catch (60000), or its collector, which copied the
+    ;; nested lists by a recursion of C, overflowed the stack (a crash,
+    ;; 45000); s7 converts both whole (deeper costs it gigabytes)
+    (for (n '(45000 60000))
       (with x (texmacs->html `(document "before" ,(deep-tree with1 n "leaf")
                                         "after") '())
         (check-true (stree-whole-or-cut? x "leaf"))))
