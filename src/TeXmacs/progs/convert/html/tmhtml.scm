@@ -328,10 +328,22 @@
       (tmhtml (list (car x) (list 'document (cadr x))))
       (tmhtml x)))
 
-(define (tmhtml-compute-max-vspace l after?)
+;; How deep the conversion looks into the <with>, <concat> and <surround>
+;; below a paragraph or a block, for the vertical spaces of the paragraph
+;; and for the body of the block (blockify). The conversion looks at each
+;; paragraph and block of a nesting, and all the levels below each of them
+;; made the HTML export of a nesting 1000 deep take minutes. A <vspace>
+;; deeper in a block nesting is that of the inner block; deeper in inline
+;; markup, it is lost
+(define tmhtml-scan-depth 64)
+
+;; The space before (or after) a paragraph is that of the <vspace*> (or
+;; <vspace>) in its <concat> and <with> descendants
+
+(define (tmhtml-compute-max-vspace l after? depth)
   (and (nnull? l)
-    (with s1 (tmhtml-compute-vspace (car l) after?)
-      (with s2 (tmhtml-compute-max-vspace (cdr l) after?)
+    (with s1 (tmhtml-compute-vspace (car l) after? depth)
+      (with s2 (tmhtml-compute-max-vspace (cdr l) after? depth)
 	(cond ((not s1) s2)
 	      ((not s2) s1)
 	      (else
@@ -342,16 +354,18 @@
 			s1 ;; FIXME: do something more subtle here
 			)))))))))
 
-(define (tmhtml-compute-vspace x after?)
-  (cond ((and (not after?) (func? x 'vspace* 1)) (tmhtml-force-string (cadr x)))
-	((and after? (func? x 'vspace 1)) (tmhtml-force-string (cadr x)))
-	;;((and (not after?) (func? x 'document)) (tmhtml-compute-vspace (cadr x) #f))
-	;;((and after? (func? x 'document)) (tmhtml-compute-vspace (cAr x) #t))
-	((func? x 'concat) (tmhtml-compute-max-vspace (cdr x) after?))
-	((func? x 'with) (tmhtml-compute-vspace (cAr x) after?))
-	;;((func? x 'surround) (tmhtml-compute-max-vspace (cDdr x) after?))
-	;;((func? x 'surround) (tmhtml-compute-max-vspace (cdr x) after?))
-	(else #f)))
+(define (tmhtml-compute-vspace x after? . opt-depth)
+  (with depth (if (null? opt-depth) tmhtml-scan-depth (car opt-depth))
+    (cond ((and (not after?) (func? x 'vspace* 1)) (tmhtml-force-string (cadr x)))
+	  ((and after? (func? x 'vspace 1)) (tmhtml-force-string (cadr x)))
+	  ((<= depth 0) #f)
+	  ;;((and (not after?) (func? x 'document)) (tmhtml-compute-vspace (cadr x) #f))
+	  ;;((and after? (func? x 'document)) (tmhtml-compute-vspace (cAr x) #t))
+	  ((func? x 'concat) (tmhtml-compute-max-vspace (cdr x) after? (- depth 1)))
+	  ((func? x 'with) (tmhtml-compute-vspace (cAr x) after? (- depth 1)))
+	  ;;((func? x 'surround) (tmhtml-compute-max-vspace (cDdr x) after?))
+	  ;;((func? x 'surround) (tmhtml-compute-max-vspace (cdr x) after?))
+	  (else #f))))
 
 (define (tmhtml-div-merged-attrs x1 x2)
   (let* ((c1 (sxml-attr x1 'class))
@@ -543,11 +557,15 @@
 	((func? x 'with) (block-document? (cAr x)))
 	(else #f)))
 
-(define (blockify x)
-  (cond ((func? x 'document) x)
-	((or (func? x 'surround 3) (func? x 'with))
-	 (rcons (cDr x) (blockify (cAr x))))
-	(else `(document ,x))))
+(define (blockify x . opt-depth)
+  ;; @x with its body in a <document>, below its <surround> and <with>,
+  ;; down to tmhtml-scan-depth levels (a <with> of a block in a nesting is
+  ;; made a block at each level, by tmhtml-with-block)
+  (with depth (if (null? opt-depth) tmhtml-scan-depth (car opt-depth))
+    (cond ((func? x 'document) x)
+	  ((and (or (func? x 'surround 3) (func? x 'with)) (> depth 0))
+	   (rcons (cDr x) (blockify (cAr x) (- depth 1))))
+	  (else `(document ,x)))))
 
 (define (tmhtml-surround l)
   (let* ((r1 `(surround ,@l))
