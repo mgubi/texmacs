@@ -327,7 +327,8 @@ end_field (int op, url name, bool detach, bool close,
   // the end of a field of an opening: its view is deleted, with its editor
   // and its history. The buffer of an unnamed field is closed. A named
   // buffer is closed with close (the field ends with its dialog window, or
-  // its widget is destroyed by its window), when no other view shows it;
+  // its widget is destroyed by its window), when no other view shows it,
+  // also if the Scheme code made it before the dialog (as before #776);
   // otherwise it stays (a tool no longer shown, whose buffer the Scheme
   // code may use further: the search toolbar after the search tool). With
   // detach, the widget which still shows it, and which is let go later, no
