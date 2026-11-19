@@ -342,12 +342,15 @@
   (let* ((in (lambda (name) (string-append (url->system (tmp-dir)) "/" name))))
     ;; (a star in a url is a wildcard, also for string-save: the file is
     ;; written by the shell)
-    (system (string-append "echo Star > " (escape-shell (in "st*ar.md"))))
+    ;; (Windows forbids a star in a file name: that case is left out there)
+    (unless (or (os-mingw?) (os-win32?))
+      (system (string-append "echo Star > " (escape-shell (in "st*ar.md")))))
     (convert-and-check (in "t.md") (tmp-file "t-out.tm") #t)
     ;; load-buffer loads another name than the one given: a wildcard which
     ;; matches one file, and a name with a star (#790)
     (convert-and-check (in "t*.md") (tmp-file "t2-out.tm") #t)
-    (convert-and-check (in "st*ar.md") (tmp-file "t3-out.tm") #t)
+    (unless (or (os-mingw?) (os-win32?))
+      (convert-and-check (in "st*ar.md") (tmp-file "t3-out.tm") #t))
     ;; no converter, and no file: nothing is written
     (convert-and-check (in "g.pdf") (tmp-file "t4-out.tm") #f)
     (convert-and-check (in "missing.md") (tmp-file "t5-out.tm") #f)
