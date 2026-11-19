@@ -115,6 +115,28 @@
   </explain>
 
   <\explain>
+    <var-val|adapt-dark-colors|false><explain-synopsis|lighten literal
+    colors on dark paper>
+  <|explain>
+    When set to <verbatim|true>, the text color <src-var|color> (also one
+    set by the user with <markup|with>), the colors which the highlighters
+    of the programming languages give as fixed values (that is, not through
+    the variables above) and the colors of the flags of the editor are
+    lightened until they have a contrast of at least 4.5 with the value of
+    <src-var|bg-color> where they are used (the hue is kept: they are mixed
+    with white). It is set by the themes <verbatim|dark-mode> and
+    <verbatim|programmer>, and has no effect on a bright background. Limits:
+    the background of a table cell (<src-var|cell-background>) or of a box
+    does not change <src-var|bg-color>: text in a cell or box with a light
+    background of its own is light on light (as in the input fields of the
+    session styles <verbatim|framed-session> and <verbatim|ring-session>).
+    A color set by hand inside such a cell or box is lightened too, as are
+    the lines (not the fill) of graphics; <verbatim|\<less\>with\|adapt-dark-colors\|false\|...\<gtr\>>
+    keeps the colors as they are. The opacity of a color is not taken into
+    account.
+  </explain>
+
+  <\explain>
     <src-var|canvas-type>, <src-var|canvas-color>,
     <src-var|canvas-hpadding>, <src-var|canvas-vpadding>,
     <src-var|canvas-bar-width>, <src-var|canvas-bar-padding>,

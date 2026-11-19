@@ -81,8 +81,14 @@ concater_rep::ghost (string s, path ip, color col) {
                   composite_box (decorate (ip), bs), HYPH_INVALID);
 }
 
+color
+concater_rep::adapt_color (color c) {
+  return env->adapt_color (c);
+}
+
 void
 concater_rep::flag_ok (string s, path ip, color col) {
+  col= adapt_color (col);
   path dip = decorate_right (ip);
   SI h= 4*env->fn->wfn/5;
   int r, g, b, a;

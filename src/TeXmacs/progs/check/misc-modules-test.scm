@@ -144,6 +144,109 @@
       (buffer-close u)
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
+;; run @thunk in a buffer loaded from a file with the style packages @styles
+;; ("generic|dark-mode"), then close it
+(define (with-style-file styles thunk)
+  (let* ((old (current-buffer))
+         (f (tmp-file "dark-theme-check.tm"))
+         (doc (string-append
+               "<TeXmacs|2.1.2>\n\n<style|<tuple|" styles ">>\n\n"
+               "<\\body>\n  <section|S>\n\n  x\n</body>\n\n"
+               "<\\initial>\n  <\\collection>\n    <associate|page-medium|paper>\n  </collection>\n</initial>\n")))
+    (string-save doc f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    (go-end)
+    (update-forced)
+    (with r (check-run thunk)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))
+      (buffer-close f)
+      (url-remove f)
+      (when (buffer-exists? old) (switch-to-buffer old)))))
+
+;; the colors defined in the PostScript of a label (with its flag) and a
+;; code block, in the order of their first use: a list of (r g b), from 0
+;; to 1. The document has the style packages @style ("generic|dark-mode"),
+;; the code block is in an ornament when @ornament? is true, and the
+;; initial environment has @bg as bg-color (unless it is "") and @flag (""
+;; or an associate of adapt-dark-colors)
+(define (styled-code-colors style ornament? bg flag)
+  (let* ((code (string-append
+                "<\\python-code>\n    import os # c\n"
+                "    def f(x): return 3\n  </python-code>")))
+    (styled-body-colors style
+                        (string-append
+                         "<label|lab1>\n\n  "
+                         (if ornament?
+                             (string-append "<\\ornamented>\n  " code
+                                            "\n  </ornamented>")
+                             code))
+                        bg flag)))
+
+;; the same for a document with the body @body (a string of TeXmacs)
+(define (styled-body-colors style body bg flag)
+  (let* ((f (tmp-file "dark-colors-check.tm"))
+         (ps (tmp-file "dark-colors-check.ps"))
+         (doc (string-append
+               "<TeXmacs|2.1.2>\n\n<style|<tuple|" style ">>\n\n"
+               "<\\body>\n  " body
+               "\n</body>\n\n"
+               "<\\initial>\n  <\\collection>\n"
+               "    <associate|page-medium|paper>\n"
+               "    <associate|info-flag|paper>\n"
+               (if (== bg "") ""
+                   (string-append "    <associate|bg-color|" bg ">\n"))
+               flag
+               "  </collection>\n</initial>\n")))
+    (string-save doc f)
+    (load-buffer f)
+    (switch-to-buffer* f)
+    ;; the buffer is closed also when printing fails
+    (with r (catch #t (lambda () (print-to-file ps) #t)
+                   (lambda args args))
+      (buffer-close f)
+      (when (!= r #t) (url-remove f) (apply throw r)))
+    (let* ((all (string-split (string-load ps) #\newline))
+           (r (list-filter all (lambda (l) (>= (string-search-forwards
+                                                "setrgbcolor" 0 l) 0)))))
+      (url-remove f)
+      (url-remove ps)
+      ;; "/C3 {0.000 0.000 1.000 setrgbcolor A255} N"
+      (map (lambda (l)
+             (let* ((w (list-filter (string-split l #\space)
+                                    (lambda (x) (!= x ""))))
+                    (n (lambda (x) (string->number
+                                    (string-replace x "{" "")))))
+               (list (n (cadr w)) (n (caddr w)) (n (cadddr w)))))
+           r))))
+
+(define (code-block-colors bg flag)
+  (styled-code-colors "generic" #f bg flag))
+
+(define (rgb-luminance c)
+  ;; the relative luminance of WCAG of the color @c, a list (r g b)
+  (let* ((lin (lambda (v) (if (<= v 0.03928) (/ v 12.92)
+                              (expt (/ (+ v 0.055) 1.055) 2.4))))
+         (l (map lin c)))
+    (+ (* 0.2126 (car l)) (* 0.7152 (cadr l)) (* 0.0722 (caddr l)))))
+
+(define (rgb-contrast c1 c2)
+  (let ((l1 (rgb-luminance c1)) (l2 (rgb-luminance c2)))
+    (/ (+ (max l1 l2) 0.05) (+ (min l1 l2) 0.05))))
+
+(define (rgb-lightened? c0 c1 bg)
+  ;; @c1 is @c0 mixed with white (the same part on each channel, so the hue
+  ;; is kept), just enough for a contrast of 4.5 with @bg; the PostScript
+  ;; gives 3 decimals, hence the margins (4.50 to 4.55 are measured)
+  (let* ((parts (list-filter
+                 (map (lambda (a b) (and (< a 0.99) (/ (- b a) (- 1 a))))
+                      c0 c1)
+                 (lambda (x) x)))
+         (lo (apply min parts)) (hi (apply max parts))
+         (k (rgb-contrast c1 bg)))
+    (and (> lo 0) (< (- hi lo) 0.02) (>= k 4.45) (< k 4.62))))
+
 (define (in-shared-window group)
   ;; @group with the buffers in one window: with a window per buffer, a page
   ;; such as the one of the font design opens a window which closing its
@@ -2642,6 +2745,15 @@
     "ice" "manila-paper" "metal" "pale-blue" "parchment"
     "pine" "reddish" "ridged-paper" "rough-paper" "xperiment"))
 
+;; the themes of the Document > Theme menu: those, and the two for a
+;; dark interface (beamer and poster do not offer them)
+(define dark-themes '("dark-mode" "programmer"))
+(define basic-theme-list
+  '("blackboard" "bluish" "boring-white" "dark-mode" "dark-vador"
+    "granite" "ice" "manila-paper" "metal" "pale-blue" "parchment"
+    "pine" "programmer" "reddish" "ridged-paper" "rough-paper"
+    "xperiment"))
+
 ;; the files of the package of the theme @th, in a subdirectory of themes
 (define (theme-files th)
   (url->list
@@ -2654,12 +2766,19 @@
 (define (test-posters-themes)
   (check-group "posters and themes")
   (check= (poster-themes) themes)
-  (check= (basic-themes) themes)
+  (check= (basic-themes) basic-theme-list)
+  (check= (list-filter (basic-themes) (lambda (th) (not (in? th themes))))
+          dark-themes)
+  (check-false (in? "dark-mode" (beamer-themes)))
+  (check-false (in? "programmer" (poster-themes)))
+  (check= (basic-theme-name "dark-mode") "Dark mode")
+  (check= (basic-theme-name "programmer") "Programmer mode")
+  (check= (basic-theme-name "dark-vador") "Dark vador")
   (check= (poster-title-styles)
           '("plain-poster-title" "framed-poster-title"
             "topless-poster-title"))
   ;; every theme has a package
-  (check= (list-filter themes
+  (check= (list-filter (basic-themes)
                        (lambda (th)
                          (null? (theme-files th))))
           '())
@@ -2691,6 +2810,144 @@
       (edit (select-default-basic-theme))
       (check= (get-style-list) '("generic"))
       (check= (current-basic-theme) "plain")))
+  ;; the dark themes: one at a time, with their check marks
+  (with-buffer-doc '(document "x") '("generic")
+    (lambda ()
+      (edit (add-style-package "dark-mode"))
+      (check= (get-style-list) '("generic" "dark-mode"))
+      (check= (current-basic-theme) "dark-mode")
+      (check-true (has-style-package? "dark-mode"))
+      (check= (style-category "dark-mode") :basic-theme)
+      (check= (style-category "programmer") :basic-theme)
+      (edit (add-style-package "programmer"))
+      (check= (get-style-list) '("generic" "programmer"))
+      (check= (current-basic-theme) "programmer")
+      (check-false (has-style-package? "dark-mode"))
+      (edit (add-style-package "granite"))
+      (check= (get-style-list) '("generic" "granite"))
+      (edit (add-style-package "dark-mode"))
+      (check= (get-style-list) '("generic" "dark-mode"))
+      (edit (select-default-basic-theme))
+      (check= (get-style-list) '("generic"))
+      (check= (current-basic-theme) "plain")
+      (check-true (default-basic-theme?))))
+  ;; the hook: colors of the highlighter on a dark paper are lightened only
+  ;; with adapt-dark-colors
+  (let* ((bg '(0.164 0.164 0.180))
+         (none (code-block-colors "#2a2a2e" ""))
+         (off (code-block-colors "#2a2a2e"
+                                 "    <associate|adapt-dark-colors|false>\n"))
+         (on (code-block-colors "#2a2a2e"
+                                "    <associate|adapt-dark-colors|true>\n"))
+         (changed (list-filter (map (lambda (a b) (and (!= a b) (list a b)))
+                                    none on)
+                               (lambda (x) x))))
+    (check-true (> (length none) 3))
+    (check= off none)
+    (check= (length on) (length none))
+    ;; the background, the label flag (blue), the two colors of the
+    ;; Python highlighter (#309090, #802000) and the text (black, the color
+    ;; of the generic style)
+    (check-true (in? bg none))
+    (check-true (in? '(0.0 0.0 1.0) none))
+    (check-false (in? '(0.0 0.0 1.0) on))
+    (check-true (in? '(0.0 0.0 0.0) none))
+    (check-false (in? '(0.0 0.0 0.0) on))
+    (check= (length changed) 4)
+    ;; each changed color is lightened towards white with its hue, just to
+    ;; a contrast of 4.5; the colors with enough contrast are kept
+    (check= (list-filter changed (lambda (p) (not (rgb-lightened?
+                                                   (car p) (cadr p) bg))))
+            '())
+    (check= (list-filter changed (lambda (p) (>= (rgb-contrast (car p) bg)
+                                                 4.5)))
+            '())
+    ;; no effect on a bright paper
+    (check= (code-block-colors "#f0f0f0"
+                               "    <associate|adapt-dark-colors|true>\n")
+            (code-block-colors "#f0f0f0" ""))
+    ;; with the theme, also in an ornament (whose body sets bg-color to
+    ;; ornament-color): the dark red of the comments is lightened
+    (with l (styled-code-colors "generic|dark-mode" #t "" "")
+      (check-true (in? bg l))
+      (check-false (in? '(0.501 0.125 0.0) l))
+      (check-false (in? '(0.0 0.0 1.0) l)))
+    (with l (styled-code-colors "generic" #t "#2a2a2e" "")
+      (check-true (in? '(0.501 0.125 0.0) l)))
+    ;; a text color set with <with|color|..> (dark blue on the dark paper,
+    ;; unreadable before) is lightened the same way, the light text of the
+    ;; theme and a light user color are kept
+    (let* ((body (string-append "Text <with|color|blue|blue> "
+                                "<with|color|#802000|red> "
+                                "<with|color|yellow|yellow>"))
+           (l (styled-body-colors "generic|dark-mode" body "" ""))
+           (p (styled-body-colors "generic" body "" "")))
+      (check-true (in? bg l))
+      (check-true (in? '(0.831 0.831 0.847) l))
+      (check-true (in? '(1.0 1.0 0.0) l))
+      (check-false (in? '(0.0 0.0 1.0) l))
+      (check-false (in? '(0.501 0.125 0.0) l))
+      ;; the lightened blue and red keep their hue, with a contrast of 4.5
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.0 0.0 1.0) c bg))))
+              1)
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.501 0.125 0.0) c bg))))
+              1)
+      ;; on the white paper of the plain style the colors are kept
+      (check-true (in? '(0.0 0.0 1.0) p))
+      (check-true (in? '(0.501 0.125 0.0) p)))
+    ;; also when bg-color is set after the color, in the same with
+    (with l (styled-body-colors
+             "generic"
+             "<with|color|blue|adapt-dark-colors|true|bg-color|#2a2a2e|x>"
+             "" "")
+      (check-false (in? '(0.0 0.0 1.0) l))
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.0 0.0 1.0) c bg))))
+              1))
+    ;; and when the flag is set last
+    (with l (styled-body-colors
+             "generic"
+             "<with|color|blue|bg-color|#2a2a2e|adapt-dark-colors|true|x>"
+             "" "")
+      (check-false (in? '(0.0 0.0 1.0) l))
+      (check= (length (list-filter l (lambda (c) (rgb-lightened?
+                                                   '(0.0 0.0 1.0) c bg))))
+              1))
+    ;; the escape: with adapt-dark-colors false the color is kept
+    (with l (styled-body-colors
+             "generic|dark-mode"
+             "<with|color|blue|adapt-dark-colors|false|x>" "" "")
+      (check-true (in? '(0.0 0.0 1.0) l)))
+    ;; nor on a mid grey paper (luminance 0.195), where even white would
+    ;; not have a contrast of 4.5
+    (check= (code-block-colors "#7a7a7a"
+                               "    <associate|adapt-dark-colors|true>\n")
+            (code-block-colors "#7a7a7a" "")))
+  ;; what the dark themes set, and that the plain document is not touched
+  ;; (documents loaded from files: the environment of a buffer follows its
+  ;; style only after loading)
+  (with-style-file "generic"
+    (lambda ()
+      (check= (get-env "bg-color") "white")
+      (check= (get-env "adapt-dark-colors") "false")
+      (check= (get-env "font-family") "rm")
+      (check= (get-env "src-tag-color") "blue")))
+  (with-style-file "generic|dark-mode"
+    (lambda ()
+      (check= (get-env "bg-color") "#2a2a2e")
+      (check= (get-env "color") "#d4d4d8")
+      (check= (get-env "adapt-dark-colors") "true")
+      (check= (get-env "font-family") "rm")))
+  (with-style-file "generic|programmer"
+    (lambda ()
+      (check= (get-env "bg-color") "#2a2a2e")
+      (check= (get-env "adapt-dark-colors") "true")
+      (check= (get-env "font-family") "tt")
+      ;; the typewriter part named: the code (prog mode, family tt-tt) is
+      ;; in Plex Mono too, not in Fira Mono
+      (check= (get-env "font") "typewriter=IBM Plex,IBM Plex")))
   (with-buffer-doc '(document "x") '("poster")
     (lambda ()
       (check= (current-poster-theme) "boring-white")

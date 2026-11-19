@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include <math.h>
 #include "env.hpp"
 #include "page_type.hpp"
 #include "typesetter.hpp"
@@ -45,6 +46,8 @@ initialize_default_var_type () {
   var_type (MAGNIFY)            = Env_Magnify;
   var_type (COLOR)              = Env_Color;
   var_type (OPACITY)            = Env_Color;
+  var_type (BG_COLOR)           = Env_Color;
+  var_type (ADAPT_DARK_COLORS)  = Env_Color;
   var_type (NO_PATTERNS)        = Env_Pattern_Mode;
   var_type (LANGUAGE)           = Env_Language;
   var_type (SPACING_POLICY)     = Env_Spacing;
@@ -631,6 +634,49 @@ decode_alpha (string s) {
   }
 }
 
+static double
+relative_luminance (int r, int g, int b) {
+  double v[3]= { r / 255.0, g / 255.0, b / 255.0 };
+  for (int i=0; i<3; i++)
+    v[i]= (v[i] <= 0.03928? v[i] / 12.92: pow ((v[i] + 0.055) / 1.055, 2.4));
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+
+static double
+contrast_ratio (double l1, double l2) {
+  if (l1 < l2) { double t= l1; l1= l2; l2= t; }
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+color
+edit_env_rep::adapt_color (color c) {
+  // when adapt-dark-colors is set: lighten the color c, towards white,
+  // until its contrast with the background bg-color is at least 4.5
+  // (WCAG); the colors which have it, and all colors on a bright
+  // background, are kept.  Used for the literal colors of highlighters
+  // and flags, and for the text color (a color set with <with|color|..>)
+  if (!get_bool (ADAPT_DARK_COLORS)) return c;
+  tree bg= read (BG_COLOR);
+  if (!is_atomic (bg) || bg == "") return c;
+  int r, g, b, a, br, bgr, bb, ba;
+  get_rgb_color (named_color (bg->label), br, bgr, bb, ba);
+  double lb= relative_luminance (br, bgr, bb);
+  // (white has a contrast of 4.5 only up to a luminance of 1.05/4.5-0.05)
+  if (lb > 0.18) return c;
+  get_rgb_color (c, r, g, b, a);
+  if (contrast_ratio (relative_luminance (r, g, b), lb) >= 4.5) return c;
+  double lo= 0.0, hi= 1.0;
+  for (int i=0; i<12; i++) {
+    double t= (lo + hi) / 2;
+    int r2= r + (int) ((255 - r) * t), g2= g + (int) ((255 - g) * t);
+    int b2= b + (int) ((255 - b) * t);
+    if (contrast_ratio (relative_luminance (r2, g2, b2), lb) >= 4.5) hi= t;
+    else lo= t;
+  }
+  return rgb_color (r + (int) ((255 - r) * hi), g + (int) ((255 - g) * hi),
+                    b + (int) ((255 - b) * hi), a);
+}
+
 void
 edit_env_rep::update_color () {
   alpha= decode_alpha (get_string (OPACITY));
@@ -639,7 +685,11 @@ edit_env_rep::update_color () {
   if (pc == "none") pen= pencil (false);
   else {
     if (L(pc) == _PATTERN) pc= exec (pc);
-    pen= pencil (pc, alpha, get_length (LINE_WIDTH));
+    if (is_atomic (pc) && get_bool (ADAPT_DARK_COLORS))
+      // (a dark text color on the dark paper of a dark theme)
+      pen= pencil (adapt_color (named_color (pc->label, alpha)),
+                   get_length (LINE_WIDTH));
+    else pen= pencil (pc, alpha, get_length (LINE_WIDTH));
   }
   if (fc == "none") fill_brush= brush (false);
   else {

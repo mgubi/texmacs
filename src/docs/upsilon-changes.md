@@ -12,6 +12,27 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 19 November 2026
+
+- **Dark mode and Programmer mode** (document themes, Document > Theme): two
+  new themes for a dark interface. *Dark mode* has a dark grey paper
+  (`#2a2a2e`, close to the interface but distinct from it) with light grey
+  text, and links, math, cursors, sessions, ornaments, source tags and the
+  title and comment boxes of style files in colors chosen for it;
+  *Programmer mode* is the same in the monospace font IBM Plex Mono (text,
+  code and most math symbols), shipped in `TeXmacs/fonts/truetype/plex`. The
+  code of the languages whose colors are fixed (tree-sitter, Python, Java,
+  R, ...) and the text colors set by hand (`<with|color|blue|...>`) are
+  lightened, with their hue, until they have a contrast of 4.5 with the
+  paper, by the new environment variable
+  `adapt-dark-colors` (set by these themes only: other documents, and the
+  other themes, are unchanged). They are style packages saved with the
+  document like the other themes; a PDF comes out dark, as with those.
+  Beamer and poster keep their own lists of themes. A screenshot of a
+  document in Dark mode is on the features page of the site
+  (`features.html`, section *Dark documents*) and in
+  `src/docs/upsilon-screenshots.md`.
+
 ## 17 November 2026
 
 - **What is typed in a macro editor can be undone again after the side
