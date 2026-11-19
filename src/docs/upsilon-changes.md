@@ -28,7 +28,10 @@ have the details, and the problems go to the
   `adapt-dark-colors` (set by these themes only: other documents, and the
   other themes, are unchanged). They are style packages saved with the
   document like the other themes; a PDF comes out dark, as with those.
-  Beamer and poster keep their own lists of themes.
+  Beamer and poster keep their own lists of themes. A screenshot of a
+  document in Dark mode is on the features page of the site
+  (`features.html`, section *Dark documents*) and in
+  `src/docs/upsilon-screenshots.md`.
 
 ## 17 November 2026
 

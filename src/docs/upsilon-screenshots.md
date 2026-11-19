@@ -13,16 +13,17 @@ and in Firefox.
 
 1. [OpenType mathematics](#opentype-mathematics)
 2. [Interfaces, themes and icons](#interfaces-themes-and-icons)
-3. [A native Cocoa interface](#a-native-cocoa-interface)
-4. [Font design](#font-design)
-5. [Faster typesetting](#faster-typesetting)
-6. [Three Scheme interpreters](#three-scheme-interpreters)
-7. [Program code with tree-sitter](#program-code-with-tree-sitter)
-8. [Language servers](#language-servers)
-9. [Git](#git)
-10. [Citation styles and Zotero](#citation-styles-and-zotero)
-11. [AI sessions](#ai-sessions)
-12. [In the browser](#in-the-browser)
+3. [Dark documents](#dark-documents)
+4. [A native Cocoa interface](#a-native-cocoa-interface)
+5. [Font design](#font-design)
+6. [Faster typesetting](#faster-typesetting)
+7. [Three Scheme interpreters](#three-scheme-interpreters)
+8. [Program code with tree-sitter](#program-code-with-tree-sitter)
+9. [Language servers](#language-servers)
+10. [Git](#git)
+11. [Citation styles and Zotero](#citation-styles-and-zotero)
+12. [AI sessions](#ai-sessions)
+13. [In the browser](#in-the-browser)
 
 ## OpenType mathematics
 
@@ -41,6 +42,18 @@ interface drawn by the GPU, and with a native Cocoa interface for macOS;
 four icon sets come along.
 
 ![The same page in STIX Two, with the dark theme and the Lucide icons](../misc/upsilon/screenshots/math-stix-dark-lucide.webp)
+
+## Dark documents
+
+With the dark interface, the document can be dark too: Document → Theme →
+Dark mode gives it a dark grey paper with light text, and headings, links,
+formulas, theorems, sessions and source tags in colours chosen for it. The
+colours of program code and those set by hand are lightened, with their
+hue, until they are readable on the paper. Programmer mode is the same in
+IBM Plex Mono. The theme belongs to the document: its PDF is dark too.
+([Source of the document](screenshots/dark-mode-document.tm).)
+
+![An article in the Dark mode theme: a theorem, formulas, Python code and a Scheme session](../misc/upsilon/screenshots/dark-mode-document.webp)
 
 ## A native Cocoa interface
 
