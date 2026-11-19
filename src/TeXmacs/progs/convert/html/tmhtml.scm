@@ -328,12 +328,17 @@
       (tmhtml (list (car x) (list 'document (cadr x))))
       (tmhtml x)))
 
+;; How deep the conversion looks into the <with>, <concat> and <surround>
+;; below a paragraph or a block, for the vertical spaces of the paragraph
+;; and for the body of the block (blockify). The conversion looks at each
+;; paragraph and block of a nesting, and all the levels below each of them
+;; made the HTML export of a nesting 1000 deep take minutes. A <vspace>
+;; deeper in a block nesting is that of the inner block; deeper in inline
+;; markup, it is lost
+(define tmhtml-scan-depth 64)
+
 ;; The space before (or after) a paragraph is that of the <vspace*> (or
-;; <vspace>) in its <concat> and <with> descendants, down to
-;; tmhtml-vspace-depth levels: each paragraph of a nesting (a <with> of a
-;; block, a <surround>) looks for it, and all the levels below each of them
-;; made the HTML export of a nesting 1000 deep take minutes
-(define tmhtml-vspace-depth 64)
+;; <vspace>) in its <concat> and <with> descendants
 
 (define (tmhtml-compute-max-vspace l after? depth)
   (and (nnull? l)
@@ -350,7 +355,7 @@
 			)))))))))
 
 (define (tmhtml-compute-vspace x after? . opt-depth)
-  (with depth (if (null? opt-depth) tmhtml-vspace-depth (car opt-depth))
+  (with depth (if (null? opt-depth) tmhtml-scan-depth (car opt-depth))
     (cond ((and (not after?) (func? x 'vspace* 1)) (tmhtml-force-string (cadr x)))
 	  ((and after? (func? x 'vspace 1)) (tmhtml-force-string (cadr x)))
 	  ((<= depth 0) #f)
@@ -554,10 +559,9 @@
 
 (define (blockify x . opt-depth)
   ;; @x with its body in a <document>, below its <surround> and <with>,
-  ;; down to 64 levels: a <with> of a block in a nesting is made a block
-  ;; at each level (tmhtml-with-block), and all the levels below each of
-  ;; them made the export of a nesting 1000 deep quadratic
-  (with depth (if (null? opt-depth) 64 (car opt-depth))
+  ;; down to tmhtml-scan-depth levels (a <with> of a block in a nesting is
+  ;; made a block at each level, by tmhtml-with-block)
+  (with depth (if (null? opt-depth) tmhtml-scan-depth (car opt-depth))
     (cond ((func? x 'document) x)
 	  ((and (or (func? x 'surround 3) (func? x 'with)) (> depth 0))
 	   (rcons (cDr x) (blockify (cAr x) (- depth 1))))

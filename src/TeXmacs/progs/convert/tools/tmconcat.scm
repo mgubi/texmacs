@@ -163,7 +163,7 @@
 
 (tm-define (tmconcat-simplify-tabs l)
   (:type (forall T (-> (list T) (list T))))
-  (:synopsis "Rewrite weak left and write tabs in concatenation @l")
+  (:synopsis "Rewrite weak left and right tabs in concatenation @l")
   (with c (cons 'concat l)
     (if (not (has-weak-tab? c tabs-depth)) l
         (cdr (simplify-tabs c (list) c tabs-depth)))))
