@@ -129,7 +129,8 @@
     the user with <markup|with> is kept and may be dark on the dark paper.
     The background of a table cell (<src-var|cell-background>) or of a box
     does not change <src-var|bg-color>: text in a cell or box with a light
-    background of its own is light on light.
+    background of its own is light on light (as in the input fields of the
+    session styles <verbatim|framed-session> and <verbatim|ring-session>).
   </explain>
 
   <\explain>

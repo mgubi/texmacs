@@ -150,7 +150,8 @@
     <cpp|concater_rep::typeset_colored_substring> lightens each literal color
     of the other highlighters, until its contrast with <src-var|bg-color> is
     at least 4.5 (WCAG), and keeps hue and the colors which already have that
-    contrast. Other documents, also those with dark themes, are not changed.
+    contrast. Other documents, also those with the other dark themes (Dark
+    vador, Blackboard), are not changed.
   </itemize>
 
   <section|Environment variables and themes>

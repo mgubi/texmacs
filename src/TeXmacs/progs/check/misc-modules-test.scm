@@ -2863,7 +2863,12 @@
       (check-false (in? '(0.501 0.125 0.0) l))
       (check-false (in? '(0.0 0.0 1.0) l)))
     (with l (styled-code-colors "generic" #t "#2a2a2e" "")
-      (check-true (in? '(0.501 0.125 0.0) l))))
+      (check-true (in? '(0.501 0.125 0.0) l)))
+    ;; nor on a mid grey paper (luminance 0.195), where even white would
+    ;; not have a contrast of 4.5
+    (check= (code-block-colors "#7a7a7a"
+                               "    <associate|adapt-dark-colors|true>\n")
+            (code-block-colors "#7a7a7a" "")))
   ;; what the dark themes set, and that the plain document is not touched
   ;; (documents loaded from files: the environment of a buffer follows its
   ;; style only after loading)
@@ -2883,7 +2888,10 @@
     (lambda ()
       (check= (get-env "bg-color") "#2a2a2e")
       (check= (get-env "adapt-dark-colors") "true")
-      (check= (get-env "font-family") "tt")))
+      (check= (get-env "font-family") "tt")
+      ;; the typewriter part named: the code (prog mode, family tt-tt) is
+      ;; in Plex Mono too, not in Fira Mono
+      (check= (get-env "font") "typewriter=IBM Plex,IBM Plex")))
   (with-buffer-doc '(document "x") '("poster")
     (lambda ()
       (check= (current-poster-theme) "boring-white")
