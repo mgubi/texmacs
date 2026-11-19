@@ -542,7 +542,10 @@
             (html-of-line "x" `(with "color" "red" (concat "a" ,tab "b")) "y"))
     (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b"))
                           tab "y")
-            (html-of-line "x" '(with "color" "red" "ab") tab "y"))))
+            (html-of-line "x" '(with "color" "red" "ab") tab "y"))
+    (check= (html-of-line "x" `(with "color" "red"
+                                     (concat "a" ,last-tab "b" ,tab "c")))
+            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
