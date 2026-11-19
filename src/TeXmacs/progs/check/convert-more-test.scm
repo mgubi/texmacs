@@ -546,6 +546,51 @@
     (check= (html-of-line "x" `(with "color" "red"
                                      (concat "a" ,last-tab "b" ,tab "c")))
             (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))))
+;; A paragraph which is a document is made blocks again at each level of a
+;; nesting (tmhtml-p): the blocks of the inner levels were cut again one at
+;; a time at each level, and the export of 2000 nested documents took 40 s
+;; (a time cubic in the depth, 4000 levels: minutes). A nesting of
+;; documents is exported as its paragraphs, in a time linear in its depth.
+(define nested-documents
+  ;; the nestings, and their paragraphs from the top: n levels of
+  ;; (document "p" t), of (document t "q"), of (document "p" t "q")
+  (list (cons (lambda (t) `(document "p" ,t))
+              (lambda (n leaf) (append (make-list n "p") (list leaf))))
+        (cons (lambda (t) `(document ,t "q"))
+              (lambda (n leaf) (append (list leaf) (make-list n "q"))))
+        (cons (lambda (t) `(document "p" ,t "q"))
+              (lambda (n leaf) (append (make-list n "p") (list leaf)
+                                       (make-list n "q"))))))
+
+(define (test-html-nested-documents)
+  (check-group "html export: nested documents")
+  ;; the HTML of a nesting is that of its paragraphs, also with blocks and
+  ;; vertical spaces
+  (for (leaf (list "leaf"
+                   '(with "par-left" "1cm" (document "leaf" "b"))
+                   '(concat (vspace* "1fn") "leaf" (vspace "2fn"))
+                   '(concat "a" (htab "5mm") "leaf")))
+    (for (nest nested-documents)
+      (for (n '(1 2 5))
+        (check= (export `(document "before" ,(deep-tree (car nest) n leaf)
+                                   "after")
+                        "html-snippet")
+                (export `(document "before" ,@((cdr nest) n leaf) "after")
+                        "html-snippet")))))
+  ;; a document of a block (blocks made blocks again)
+  (with s (export '(document "a" (document (with "par-left" "1cm"
+                                                 (document "b" "c"))
+                                           "d"))
+                  "html-snippet")
+    (check= (list (string-occurs? "margin-left" s) (occurrences "<p>" s))
+            (list #t 4)))
+  ;; deep nestings, in a time linear in their depth (2000 levels in at most
+  ;; 20 times the time of 250, at least 4 s): whole, or cut with the error
+  (for (nest nested-documents)
+    (check-fast "nested documents"
+                (lambda (n)
+                  (lambda () (whole-or-cut? (html-of-deep (car nest) n) "leaf")))
+                (lambda (n) #t))))
 
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
@@ -2864,6 +2909,7 @@
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
                   test-html-weak-tabs
+                  test-html-nested-documents
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
