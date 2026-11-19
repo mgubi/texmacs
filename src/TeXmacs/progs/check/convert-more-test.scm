@@ -511,6 +511,42 @@
                               2000)))
     (check-true (whole-or-cut? s "leaf"))))
 
+;; A weak tab of a line (tmconcat.scm): "last" is a tab when no tab follows
+;; it in the line, else it is dropped; "first" likewise, with the tabs before
+;; it. A "last" tab was always dropped: has-tab-after? looked for the tabs
+;; from the tab itself on (since 2012)
+(define (html-of-line . l)
+  (export `(document (concat ,@l)) "html-snippet"))
+
+(define (test-html-weak-tabs)
+  (check-group "html export: weak tabs")
+  (let ((tab '(htab "5mm"))
+        (first-tab '(htab "5mm" "first"))
+        (last-tab '(htab "5mm" "last")))
+    ;; alone in the line: a tab
+    (check= (html-of-line "x" last-tab "y") (html-of-line "x" tab "y"))
+    (check= (html-of-line "x" first-tab "y") (html-of-line "x" tab "y"))
+    (check-true (string-occurs? "right-tab" (html-of-line "x" last-tab "y")))
+    ;; after the other tabs, or before them: a tab
+    (check= (html-of-line "x" tab "y" last-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" first-tab "y" tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    ;; before another tab, or after one: dropped
+    (check= (html-of-line "x" last-tab "y" tab "z") (html-of-line "xy" tab "z"))
+    (check= (html-of-line "x" tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" last-tab "y" last-tab "z") (html-of-line "xy" tab "z"))
+    (check= (html-of-line "x" first-tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    ;; in a <with>, as a tab there
+    (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b")) "y")
+            (html-of-line "x" `(with "color" "red" (concat "a" ,tab "b")) "y"))
+    (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b"))
+                          tab "y")
+            (html-of-line "x" '(with "color" "red" "ab") tab "y"))
+    (check= (html-of-line "x" `(with "color" "red"
+                                     (concat "a" ,last-tab "b" ,tab "c")))
+            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))))
+
 (define formula-label-samples
   ;; a document, the labels of its formulas, and the references to them
   (list
@@ -2827,6 +2863,7 @@
                   test-html-mathjax-formulas test-html-pattern-background
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
+                  test-html-weak-tabs
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
