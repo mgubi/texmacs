@@ -51,7 +51,8 @@ have the details, and the problems go to the
   Recent menu gave an empty document under its name; TeXmacs now says that
   it could not load the file and opens nothing. Revert and the recovery
   of an autosave file no longer empty the document either, and
-  `texmacs -c` fails on such a file instead of converting an empty one.
+  `texmacs -c` fails (exit status 1) on such a file, or on a file which
+  does not exist, instead of converting an empty document.
 
 ## 17 November 2026
 

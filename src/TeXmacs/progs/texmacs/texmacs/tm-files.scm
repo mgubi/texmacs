@@ -925,9 +925,10 @@
   (with vname `(verbatim ,(url->system name))
     (cond ((buffer-exists? name)
            (load-buffer-open name opts))
-          ((and (url-exists? name) (not (load-buffer-openable? name)))
+          ((not (load-buffer-openable? name))
            ;; no converter to TeXmacs (an image, a pdf, a converter whose
-           ;; program is missing): a message, not an empty document
+           ;; program is missing): a message, not an empty document (nor a
+           ;; new one, when the file does not exist)
            (set-message (replace "Could not load %1: no converter from %2 to TeXmacs"
                                  (url->system name)
                                  (or (format-get-name (url-format name))
@@ -1149,6 +1150,17 @@
         (exec-delayed (lambda () (for-each load-buffer-from-system l)))
         (former x y obj))))
 
+(tm-define (convert-file in out)
+  (:synopsis "Convert the file @in to @out (texmacs -c), #f if it can't")
+  ;; the load succeeded when it made the current buffer a file of the disk
+  ;; (load-buffer may load another name than @in: a wildcard, #790; and a
+  ;; file which does not exist gives a new document, which is not converted)
+  (with old (current-buffer)
+    (load-buffer in :strict)
+    (with b (current-buffer)
+      (and b (!= b old) (buffer-has-name? b) (url-exists? b)
+           (begin (export-buffer out) #t)))))
+
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
   (cond ((url-rooted-protocol? name "mailto") (load-external name))
@@ -1176,7 +1188,10 @@
           (let* ((skipped (texmacs-skipped-nestings))
                  (t (tree-import name (url-format name))))
             (if (import-failed? t)
-                (set-message "Error: file not found" "Revert buffer")
+                (set-message (if (url-exists? name)
+                                 (replace "Could not load %1" (url->system name))
+                                 "Error: file not found")
+                             "Revert buffer")
                 (begin
                   (typeset-failure-forget name)
                   (buffer-set name t)

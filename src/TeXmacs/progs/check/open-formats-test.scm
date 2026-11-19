@@ -172,6 +172,8 @@
   ;; no converter to TeXmacs: a message, no empty document
   (check-not-opened (write-file "g.pdf" "%PDF-1.4\n%%EOF\n"))
   (check-not-opened (write-file "h.png" "\x89PNG\r\n\x1a\n"))
+  ;; nor a new empty document for a missing file of such a format
+  (check-not-opened (tmp-file "missing.pdf"))
   ;; a converter which fails (as one whose program is missing):
   ;; generic->texmacs gives (error "bad format or data")
   (with u (write-file "i.md" "# Failing\n")
@@ -222,8 +224,12 @@
     (load-buffer u)
     (check-true (buffer-exists? u))
     (when (buffer-exists? u)
-      (with-global generic->texmacs failing-import
-        (revert-buffer-revert u))
+      (with msgs (with-messages
+                   (lambda ()
+                     (with-global generic->texmacs failing-import
+                       (revert-buffer-revert u))))
+        (check-true (list-or (map (lambda (m) (string-occurs? "Could not load" m))
+                                  msgs))))
       (check-true (stree-has-string? (tm->stree (buffer-get-body u))
                                      "Revert me"))
       (buffer-close u))
@@ -290,7 +296,11 @@
     (check-false (dropped-documents '(hlink "x" "https://example.org/a.md")))
     ;; the drop event opens them as the files of the system, after the event
     (let* ((opened '())
-           (delayed '()))
+           (delayed '())
+           (old (current-buffer))
+           (scratch (new-buffer)))
+      ;; (in a buffer of its own: what a broken override would insert)
+      (switch-to-buffer* scratch)
       (with-global exec-delayed (lambda (cmd) (set! delayed (cons cmd delayed)))
         (with-global load-buffer-from-system
             (lambda (u) (set! opened (rcons opened u)))
@@ -299,7 +309,44 @@
           (check= opened '())
           (check= (length delayed) 1)
           (for-each (lambda (cmd) (cmd)) delayed)
-          (check= opened (list md tex)))))))
+          (check= opened (list md tex))))
+      (check= (tm->stree (buffer-get-body scratch)) '(document ""))
+      (buffer-pretend-saved scratch)
+      (buffer-close scratch)
+      (when (and old (buffer-exists? old)) (switch-to-buffer old)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; texmacs -c
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (convert-and-check in out ok?)
+  ;; convert-file, as texmacs -c does; closes what it opened
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (r (convert-file in out)))
+    (check= r ok?)
+    (check= (url-exists? out) ok?)
+    (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
+              (buffer-list))
+    (when (url-exists? out) (system-remove out))
+    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+
+(define (test-convert-file)
+  (check-group "convert file")
+  (write-file "t.md" "# Converted\n")
+  ;; (the names as texmacs -c gives them: strings of full names)
+  (let* ((in (lambda (name) (string-append (url->system (tmp-dir)) "/" name))))
+    ;; (a star in a url is a wildcard, also for string-save: the file is
+    ;; written by the shell)
+    (system (string-append "echo Star > " (escape-shell (in "st*ar.md"))))
+    (convert-and-check (in "t.md") (tmp-file "t-out.tm") #t)
+    ;; load-buffer loads another name than the one given: a wildcard which
+    ;; matches one file, and a name with a star (#790)
+    (convert-and-check (in "t*.md") (tmp-file "t2-out.tm") #t)
+    (convert-and-check (in "st*ar.md") (tmp-file "t3-out.tm") #t)
+    ;; no converter, and no file: nothing is written
+    (convert-and-check (in "g.pdf") (tmp-file "t4-out.tm") #f)
+    (convert-and-check (in "missing.md") (tmp-file "t5-out.tm") #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The document types of the application on macOS
@@ -351,6 +398,7 @@
     (run-group test-no-converter)
     (run-group test-failing-reloads)
     (run-group test-drops)
+    (run-group test-convert-file)
     (run-group test-plist)
     ;; no buffer is left open
     (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
