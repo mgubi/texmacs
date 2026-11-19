@@ -633,7 +633,9 @@
 ;;     (tmtm-brackets.scm).
 ;; Each is timed on a size 10 times as large, which may take 20 times as
 ;; long as the small one, or 4 s if that is more (10 s at most). Without the
-;; fixes, on a Mac M4 under s7: 6, 13 and 14 s; with them 0.15 s at most.
+;; fixes, on a Mac M4: 6.5, 7.6 and 5.4 s under s7, 109, 28 and 50 s under
+;; Guile; with them 0.5 s at most. (Deeper, the recursions of Guile overflow
+;; its stack: 1500 levels of tmmathbf did.)
 (define (latex-wide-nesting wrap n)
   ;; @n levels of @wrap around a <!concat> of 40 groups
   (deep-tree (lambda (t) (wrap `(!concat ,@(make-list 40 '(!group "a")) ,t)))
