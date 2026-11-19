@@ -55,6 +55,15 @@ have the details, and the problems go to the
   `texmacs -c` no longer writes an empty document (or the document of the
   previous `-c`) for such a file, or for a file which does not exist: it
   says that it could not load it and goes on with the next command.
+- **LaTeX, and formulas for MathJax, in linear time**: the LaTeX of a
+  formula took a time quadratic in its length when it had long runs
+  without a space (`\textbf{x}\textbf{y}...`: 200 KB took nearly 2
+  minutes under Guile, now 0.5 s), and in its depth for nested bold
+  formulas or nested markup with brackets. The HTML export
+  for MathJax of a formula with a macro which calls itself (1 MB of
+  LaTeX, converted whole under s7) took nearly 4 minutes; it now takes
+  1.4 s. The output of LaTeX, HTML, BibTeX and the other converters which
+  break lines is the same as before (#885).
 
 ## 17 November 2026
 
