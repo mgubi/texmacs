@@ -582,6 +582,39 @@
     (apply convert (cons* what from to (acons 'dest dest options)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The files which TeXmacs opens as documents
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A file is opened (load-buffer) in the format of its suffix: its document
+;; (the string of the file) is converted to a TeXmacs tree. A format without
+;; such a converter (an image, a pdf, a format whose converter needs a
+;; program which is missing) cannot be opened.
+
+(define-public (format-openable? fm)
+  "Can a file of the format @fm be opened as a document?"
+  (lazy-format-force)
+  (or (== fm "generic")
+      (nnot (converter-search (string-append fm "-document")
+                              "texmacs-tree"))))
+
+(define-public (document-formats)
+  "The formats of the documents TeXmacs opens (as in the Import menu)"
+  ;; the formats which can be imported, but not the source code (its files
+  ;; are opened too, but they are programs rather than documents); the list
+  ;; of the files which macOS gives to TeXmacs, the CFBundleDocumentTypes of
+  ;; packages/macos/Info.plist.in, is this one (open-formats-test.scm)
+  (list-filter (converters-to-special "texmacs-file" "-file" #t)
+               format-openable?))
+
+(define-public (document-format-suffixes)
+  "The suffixes of the documents of the formats of @(document-formats)"
+  ;; but the styles and packages of TeXmacs (.ts, .tp), which are not
+  ;; documents; .ts is also TypeScript and the MPEG-2 transport streams
+  (list-filter (list-remove-duplicates
+                (apply append (map format-get-suffixes (document-formats))))
+               (lambda (s) (nin? s '("ts" "tp")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Viewers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

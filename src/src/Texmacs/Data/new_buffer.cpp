@@ -608,13 +608,24 @@ import_tree (url u, string fm) {
   string s;
   if (is_none (r) || load_string (r, s, false)) return "error";
   set_file_focus (r);
-  return import_loaded_tree (s, r, fm);
+  tree t= import_loaded_tree (s, r, fm);
+  // an empty (or blank) file is an empty document, also for the formats
+  // whose readers want a header (.tm, .stm), for which it is an error
+  if (is_func (t, _ERROR)) {
+    int i, n= N(s);
+    for (i=0; i<n; i++)
+      if (s[i] != ' ' && s[i] != '\t' && s[i] != '\n' && s[i] != '\r') break;
+    if (i == n) return tree (DOCUMENT, "");
+  }
+  return t;
 }
 
 bool
 buffer_import (url name, url src, string fm) {
   tree t= import_tree (src, fm);
-  if (t == "error") return true;
+  // (error "bad format or data"): the converter failed (generic->texmacs);
+  // the buffer would be empty, the load fails instead
+  if (t == "error" || is_func (t, _ERROR)) return true;
   set_buffer_tree (name, t);
   return false;
 }

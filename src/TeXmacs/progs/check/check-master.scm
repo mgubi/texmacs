@@ -49,6 +49,7 @@
         (check markdown-test)
         (check office-test)
         (check editing-test)
+        (check open-formats-test)
         (check read-only-test)
         (check typeset-test)
         (check code-lines-test)
@@ -160,6 +161,8 @@
     ("office" office-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
+    ;; opens files of other formats, and closes them
+    ("open-formats" open-formats-test-failures count)
     ;; read-only buffers, and the console of the error messages (a window)
     ("read-only" read-only-test-failures count)
     ("typeset" typeset-test-failures count)

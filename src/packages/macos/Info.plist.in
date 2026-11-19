@@ -26,6 +26,137 @@
         <key>LSIsAppleDefaultForType</key>
         <true/>
       </dict>
+      <!-- The other documents which TeXmacs opens: the suffixes of the
+           formats of the Import menu, document-format-suffixes in
+           tm-convert.scm; open-formats-test.scm checks that they are these.
+           TeXmacs is an alternative for them, not their default. -->
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>bib</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>BibTeX Bibliography</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>css</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>CSS Style Sheet</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>html</string>
+          <string>xhtml</string>
+          <string>htm</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>HTML Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>tex</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>LaTeX Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>ltx</string>
+          <string>sty</string>
+          <string>cls</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>LaTeX Class or Package</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>md</string>
+          <string>markdown</string>
+          <string>mkd</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>Markdown Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>odt</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>OpenDocument Text</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>toml</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>TOML Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>docx</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>Word Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>yaml</string>
+          <string>yml</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>YAML Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
     </array>
     <key>CFBundleURLTypes</key>
     <array>

@@ -51,7 +51,18 @@ otherwise); an input method gets all the keys while it composes. Only the
 canvas which is the first responder of the key window has the focus.
 
 macOS itself: the files and URLs given by the Finder, the Dock or `open`
-are loaded (the first one in the current window, as in Qt); a quit from the
+are loaded (the first one in the current window, as in Qt), in the format
+of their suffix (`load-buffer-from-system`, as File › Open); the
+application declares the documents of `document-formats` (tm-convert.scm,
+the formats of the Import menu) in the `CFBundleDocumentTypes` of
+`packages/macos/Info.plist.in`, as an alternative application (the suite
+`open-formats` checks that the plist has their suffixes; a format added to
+the Import menu gets an entry there; `Info-Xcode.plist.in`, of the Xcode
+project, still declares only the TeXmacs files; `packages/macos/Info.plist`
+is made from it by configure, so that an existing build tree needs
+`./config.status packages/macos/Info.plist` after a change); a document dropped on a
+canvas is opened the same way (`dropped-documents`, tm-files.scm: full
+names of local files only, so that a dropped text is inserted); a quit from the
 Dock or at logout goes through `safely-quit-TeXmacs`; the close button of a
 window runs its quit command (`safely-kill-window` for the main windows);
 each main window has its own menu bar, installed when it becomes main (not

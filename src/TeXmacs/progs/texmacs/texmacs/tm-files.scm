@@ -909,11 +909,31 @@
       (buffer-set-master name master)))
   (noop))
 
+(define (import-failed? t)
+  ;; the result of tree-import for a file which could not be read ("error")
+  ;; or converted ((error "bad format or data"), generic->texmacs): never
+  ;; a document, which would be empty
+  (or (== t (tm->tree "error")) (tm-func? t 'error)))
+
+(define (load-buffer-openable? name)
+  ;; the files of tmfs have formats of their own (tmfs-format)
+  (or (url-rooted-tmfs? name)
+      (format-openable? (url-format name))))
+
 (define (load-buffer-load name opts)
   ;;(display* "load-buffer-load " name ", " opts "\n")
   (with vname `(verbatim ,(url->system name))
     (cond ((buffer-exists? name)
            (load-buffer-open name opts))
+          ((not (load-buffer-openable? name))
+           ;; no converter to TeXmacs (an image, a pdf, a converter whose
+           ;; program is missing): a message, not an empty document (nor a
+           ;; new one, when the file does not exist)
+           (set-message (replace "Could not load %1: no converter from %2 to TeXmacs"
+                                 (url->system name)
+                                 (or (format-get-name (url-format name))
+                                     (url-format name)))
+                        "Load file"))
           ((url-exists? name)
            (with skipped (texmacs-skipped-nestings)
              (if (buffer-load name)
@@ -973,11 +993,19 @@
                        (format (url-format name))
                        (skipped (texmacs-skipped-nestings))
                        (doc (tree-import autosave-name format)))
-                  (buffer-set name doc)
-                  (buffer-nesting-update
-                   name (> (texmacs-skipped-nestings) skipped))
-                  (load-buffer-open name opts)
-                  (buffer-pretend-modified name))
+                  (if (import-failed? doc)
+                      ;; (the converter failed: the file itself, not an
+                      ;; empty document marked as the autosave)
+                      (begin
+                        (set-message "Could not load the autosave file"
+                                     "Load file")
+                        (load-buffer-check-permissions name opts))
+                      (begin
+                        (buffer-set name doc)
+                        (buffer-nesting-update
+                         name (> (texmacs-skipped-nestings) skipped))
+                        (load-buffer-open name opts)
+                        (buffer-pretend-modified name))))
                 (load-buffer-check-permissions name opts)))))
       (load-buffer-check-permissions name opts)))
 
@@ -1063,13 +1091,87 @@
   ;; the command runs, so several files given at once go one after the other:
   ;; the first takes the startup buffer, which it reserves for the rest
   ;; of the session (even if its load fails), the others get new windows.
+  ;; A file of a format which cannot be opened does not reserve it.
   (with b (current-buffer)
     (if (and (startup-buffer?) (!= b startup-reserved)
-             (not (buffer->window name)))
+             (not (buffer->window name))
+             ;; (a file which cannot be opened only gives a message)
+             (load-buffer-openable? (load-buffer-resolve-name name)))
         (begin
           (set! startup-reserved b)
           (load-buffer name))
         (load-buffer-in-new-window name))))
+
+;; The files dropped on a document are inserted, by their names or as images
+;; (mouse-drop-event in kbd-handlers.scm); documents which TeXmacs opens
+;; (document-formats: TeXmacs, Markdown, LaTeX, Html, BibTeX, Word...) are
+;; opened instead, as when the Finder or the Dock gives them. The interfaces
+;; give the files by their full names (TMView, QTMWidget), and a text which
+;; is dropped as a plain string: only full names of local files count, so
+;; that a dropped word is never taken for a file next to the document, and
+;; no web address is fetched (a dropped text which is the full name of a
+;; document opens it, as its file would).
+
+(define (dropped-file-name? s)
+  ;; a full local name: /a/b, or c:/a, c:\a (Windows)
+  (let* ((n (string-length s)))
+    (or (and (> n 1) (== (string-ref s 0) #\/))
+        (and (> n 2) (char-alphabetic? (string-ref s 0))
+             (== (string-ref s 1) #\:)
+             (in? (string-ref s 2) (list #\/ #\\))))))
+
+(tm-define (dropped-documents x)
+  (:synopsis "The files of the drop @x when all are documents, or #f")
+  (let* ((l (cond ((string? x) (list x))
+                  ((tm-func? x 'concat) (cdr x))
+                  (else (list x))))
+         ;; (several files are separated by spaces; the names are in the
+         ;; Cork encoding, as strings of the document)
+         (l (list-filter l (lambda (y)
+                             (not (and (string? y)
+                                       (== (tm-string-trim-both y) ""))))))
+         (sufs (document-format-suffixes))
+         (files (map (lambda (y)
+                       (and (string? y)
+                            (let* ((name (cork->utf8 y)))
+                              (and (dropped-file-name? name)
+                                   (with u (system->url name)
+                                     (and (in? (locase-all (url-suffix u)) sufs)
+                                          (url-exists? u)
+                                          (not (url-directory? u))
+                                          u))))))
+                     l)))
+    (and (nnull? files) (list-and files) files)))
+
+(tm-define (mouse-drop-event x y obj)
+  (with l (dropped-documents (tm->stree obj))
+    (if l
+        ;; (after the event: the drop is handled inside the event of an
+        ;; editor)
+        (exec-delayed (lambda () (for-each load-buffer-from-system l)))
+        (former x y obj))))
+
+(define (convert-file-source in)
+  ;; the buffer which (load-buffer in) loads, as load-buffer-main finds it:
+  ;; the one file which a wildcard matches (#790), or #f
+  (if (url-wildcard? in)
+      (with l (link-wildcard-candidates in #f)
+        (and (= (length l) 1) (load-buffer-resolve-name (car l))))
+      (load-buffer-resolve-name in)))
+
+(tm-define (convert-file in out)
+  (:synopsis "Convert the file @in to @out (texmacs -c), #f if it can't")
+  ;; the load succeeded when the buffer of @in is current and is a file of
+  ;; the disk (it may have been loaded already, by an earlier -c of the
+  ;; same file); a file which could not be read gives no buffer, and one
+  ;; which does not exist a new document, neither of which is converted
+  (with src (convert-file-source in)
+    (load-buffer in :strict)
+    ;; (src may be a string, as the name given: compared as file names)
+    (and src (current-buffer)
+         (== (url->system (current-buffer)) (url->system src))
+         (buffer-exists? src) (url-exists? src)
+         (begin (export-buffer out) #t))))
 
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
@@ -1097,8 +1199,11 @@
           (url-cache-invalidate name)
           (let* ((skipped (texmacs-skipped-nestings))
                  (t (tree-import name (url-format name))))
-            (if (== t (tm->tree "error"))
-                (set-message "Error: file not found" "Revert buffer")
+            (if (import-failed? t)
+                (set-message (if (url-exists? name)
+                                 (replace "Could not load %1" (url->system name))
+                                 "Error: file not found")
+                             "Revert buffer")
                 (begin
                   (typeset-failure-forget name)
                   (buffer-set name t)
