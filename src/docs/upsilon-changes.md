@@ -33,8 +33,8 @@ have the details, and the problems go to the
   Cocoa interface): a window showing an auxiliary buffer such as
   `tmfs://aux/x*y` stopped with "wildcards only implemented for files",
   since the title bar looked the name up as a pattern of files. Only a file
-  on the disk, found by its name as it is, now gets the icon of the title,
-  and other names are left alone, as in Qt (#790).
+  on the disk, found by its name as it is, now gets the icon of the title;
+  other names get no icon and are not looked up (#790).
 
 ## 19 November 2026
 
