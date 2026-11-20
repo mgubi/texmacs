@@ -1130,7 +1130,9 @@ done
 
 # A buffer named with a wildcard (Save as a*.tm, a name in tmfs://aux): the
 # views of the buffer are found as they were, not as the plain name of a file
-# with a star (#790).
+# with a star (#790). With Cocoa, the window of the buffer looked its name up
+# as a pattern of files for the icon of its title, which threw "wildcards
+# only implemented for files" (ns_tm_widget.mm, SLOT_FILE).
 mkdir -p "$out/startup-save"
 cat > "$out/startup-aux.scm" <<'EOF'
 (open-auxiliary "x*y" '(document "x"))

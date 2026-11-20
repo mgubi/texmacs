@@ -29,6 +29,13 @@ have the details, and the problems go to the
   compressed into a toolbar keeps the buffer of its corrections (#776,
   #838, #887).
 
+- **Cocoa: a buffer whose name has a star opens in a window** (desktop,
+  Cocoa interface): a window showing an auxiliary buffer such as
+  `tmfs://aux/x*y` stopped with "wildcards only implemented for files",
+  since the title bar looked the name up as a pattern of files. Only a file
+  on the disk, found by its name as it is, now gets the icon of the title,
+  and other names are left alone, as in Qt (#790).
+
 ## 19 November 2026
 
 - **femtolisp: LanguageTool, the AI translation and very deep documents**

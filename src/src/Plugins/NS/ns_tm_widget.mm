@@ -686,13 +686,19 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     
   case SLOT_FILE:
     {
-      // the file of the window (for the proxy icon of the title)
+      // the file of the window (for the proxy icon of the title): only a
+      // file on the disk, found by its name as it is. A star in the name
+      // made a wildcard of the url, and exists completed it: for a buffer
+      // of tmfs (tmfs://aux/x*y) it threw "wildcards only implemented for
+      // files" (#790); Qt only gives the name to the window
       check_type<string> (val, s);
       string file = open_box<string> (val);
       if (DEBUG_EVENTS) cout << "File: " << file << LF;
       url u= url_system (file);
-      if (file != "" && is_rooted (u) && exists (u))
-        [[view window] setRepresentedFilename: to_nsstring_utf8 (as_string (u))];
+      NSString* path= to_nsstring_utf8 (as_string (u));
+      if (file != "" && is_rooted (u, "default") &&
+          [[NSFileManager defaultManager] fileExistsAtPath: path])
+        [[view window] setRepresentedFilename: path];
       else [[view window] setRepresentedFilename: @""];
     }
       break;
