@@ -619,6 +619,62 @@
                           (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
                       (lambda (n) #t) 150 1500 "levels")))
 
+;; Two more kinds of nesting were exported in a time quadratic in their
+;; depth (#883): inline markup around a block, whose block was looked for
+;; down all the levels below at each level (force-block?), and a <concat>
+;; with a document among its items, whose blocks were copied and looked at
+;; again at each level (tmhtml-concat). Each is timed as the nested
+;; documents above, on a size which takes 7 to 20 s without the fix, on
+;; the binary of CI (limit 4 s), and 0.1 to 0.3 s with it
+(define nested-blocks
+  (list (list "inline markup around a block"
+              (lambda (t) `(document (with "color" "red" ,t))) 3000)
+        (list "a concat with a document"
+              (lambda (t) `(concat "a" (document ,t))) 2000)
+        (list "a vertical space before a document"
+              (lambda (t) `(document "p" (concat (vspace* "1fn") (document ,t))))
+              2000)
+        (list "a concat with documents"
+              (lambda (t) `(concat (document "a") "b" (document ,t "c") (label "l")))
+              2000)))
+
+(define (test-html-nested-blocks)
+  (check-group "html export: nested inline markup and concat")
+  ;; the HTML of a <concat> with documents among its items is that of the
+  ;; paragraphs side by side, here; a label glued to a table at the edge of
+  ;; a document, and a heading after a label, are kept
+  (let ((table '(tformat (twith "table-width" "1par")
+                         (table (row (cell "c1") (cell "c2"))))))
+    (for (p (list (list '(document "before" (concat "a" (document "x" "y")) "after")
+                        '(document "before" "a" "x" "y" "after"))
+                  (list '(document "p" (concat (vspace* "1fn") (document "x" "y")
+                                               (vspace "2fn")))
+                        '(document "p" (concat (vspace* "1fn") "x")
+                                   (concat "y" (vspace "2fn"))))
+                  (list '(document (concat "a" (document "x") "b" (document "y") "c"))
+                        '(document "a" "x" "b" "y" "c"))
+                  (list `(document (concat (label "l") (document ,table "x")))
+                        `(document (concat (label "l") ,table) "x"))
+                  (list `(document (concat (document "x" ,table) (label "l")))
+                        `(document "x" (concat ,table (label "l"))))
+                  (list '(document (concat (label "l") (document (section-title "s") "x")))
+                        '(document (concat (label "l") (section-title "s")) "x"))
+                  (list '(document (concat (section-title "s") (document "x") (label "l")))
+                        '(document (concat (section-title "s") (label "l")) "x"))))
+      (check= (export (car p) "html-snippet") (export (cadr p) "html-snippet")))
+    (with s (export `(document (concat (label "l") (document ,table "x")))
+                    "html-snippet")
+      (check-true (string-occurs? "id=\"l\"" s))))
+  ;; deep nestings, in a time linear in their depth: whole, or cut with the
+  ;; error
+  (for (nest nested-blocks)
+    (check-fast-sizes (string-append "nested blocks, " (car nest))
+                      (lambda (n)
+                        (lambda ()
+                          (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
+                      (lambda (n) #t) (quotient (caddr nest) 10) (caddr nest)
+                      "levels")))
+
 ;; The LaTeX of a formula, also that of the formulas for MathJax in the
 ;; HTML export, in a time linear in its size: the export of a macro which
 ;; calls itself in a formula (a formula of 1 MB, which s7 converts whole)
@@ -3054,7 +3110,8 @@
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
                   test-html-weak-tabs
-                  test-html-nested-documents test-latex-linear
+                  test-html-nested-documents test-html-nested-blocks
+                  test-latex-linear
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
