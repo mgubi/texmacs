@@ -393,7 +393,8 @@ quit ()" \
   # set (TEXMACS_NS_PASTEBOARD, TEXMACS_VUE_CLIPBOARD; Qt runs offscreen,
   # whose clipboard is in the process): the copies of the test suites never
   # replace the user's (the Vue build put them on the clipboard of SDL, #894)
-  # (set again: sh keeps the assignments made for a function call)
+  # (set again: sh keeps the assignments made for a function call). Vue has
+  # no offscreen platform: its window shows briefly, as in tests/scheme.
   TEXMACS_NS_PASTEBOARD=private TEXMACS_VUE_CLIPBOARD=private \
   check "$pb_window" \
         "pasteboard $pb_before
