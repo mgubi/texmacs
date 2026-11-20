@@ -14,6 +14,14 @@ have the details, and the problems go to the
 
 ## 20 November 2026
 
+- **Cocoa: headless runs no longer replace the clipboard** (desktop, Cocoa
+  interface): a script or a test run with `-headless` put its copies on the
+  clipboard of macOS, replacing what the user had copied, and read it back
+  after a clear. Without a window the copies now stay inside TeXmacs, as in
+  Qt; a session with a window uses the clipboard of macOS as before. The
+  test runners give the runs with a window a clipboard of their own
+  (`TEXMACS_NS_PASTEBOARD=private`) (#708).
+
 - **Text fields of dialogs and side tools: each opening has its own
   editor** (the macro editor, the search field, the fields of the side
   tools): a field keeps its undo history while its dialog or tool is

@@ -13,6 +13,9 @@
 # snapshots go to OUTDIR/<test> (/tmp/gui-tests).
 
 set -u
+# the Cocoa build: the copies of the runs with a window go to a pasteboard of
+# their own, not to the clipboard of the user (#708)
+export TEXMACS_NS_PASTEBOARD=private
 D=tests/gui
 [ -d "$D" ] || { echo "run me from the top of the source tree"; exit 2; }
 tests="$*"

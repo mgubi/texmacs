@@ -174,6 +174,14 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   saves the window as `bench-<i>.png` in `TEXMACS_NS_SNAPSHOT`; then a
   table is printed, the window is put back at its size (a preference) and
   TeXmacs quits (see "Benchmark" below);
+* `TEXMACS_NS_PASTEBOARD=private`: the clipboard commands of TeXmacs go
+  to a pasteboard of the process alone (`pasteboardWithUniqueName`,
+  released at the exit), not to the clipboard of the user (copy and cut in
+  the native text fields of the dialogs still use it: AppKit does them);
+  the test runners (`tests/scheme`, `tests/startup`, `tests/shared`,
+  `tests/cocoa`, `tests/gui`) set it for their runs with a window.
+  Under `-headless` there is no pasteboard at all, as in Qt (#708): the
+  selections stay in TeXmacs, and no image is put on the clipboard;
 * `TEXMACS_NS_THEME=light|dark`: the appearance, instead of the preference
   `gui theme`;
 * `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
