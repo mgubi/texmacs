@@ -659,8 +659,12 @@
                                      (car r) (caddr r) (cadr r))
                                docs))))
                 (else
-                 (loop (cdr l) top (reverse-onto (tmhtml (car l)) seg)
-                       docs)))))))
+                 ;; (the HTML bound before the call of loop: under s7, a
+                 ;; call of loop whose argument converts a document in
+                 ;; inline markup, which comes back here, saw the @x and
+                 ;; @acc of that inner call, audit 1 of #896)
+                 (with h (tmhtml (car l))
+                   (loop (cdr l) top (reverse-onto h seg) docs))))))))
 
 (define (doc-seg d) (car d))
 (define (doc-place d) (cadr d))
