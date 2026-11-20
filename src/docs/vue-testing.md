@@ -88,7 +88,7 @@ of the system, as while a script of the driver runs and under `-headless`
 (#894): the runners of `tests/scheme`, `tests/startup`, `tests/shared` and
 `tests/gui` set it (with `TEXMACS_NS_PASTEBOARD=private` for Cocoa), so that
 the copies of their runs with a window never replace the user's. Any other
-value (the startup cases of #708 give `system`) means the clipboard of SDL.
+value (the headless startup cases of #708 give `system`) means the clipboard of SDL.
 No image is kept on a private clipboard: `graphics-file-to-clipboard`
 returns `#f` and "Copy to > Image" puts nothing anywhere (the private
 pasteboard of Cocoa and the offscreen clipboard of Qt take it). The tests of

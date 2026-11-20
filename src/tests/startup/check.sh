@@ -289,8 +289,8 @@ fi
 # alone: the Cocoa build put the copies of a headless run on the general
 # pasteboard, which replaced what the user had copied (#708). When one of
 # them runs, the change count of the pasteboard and its text (pbpaste, kept
-# in a variable, never in a file) are read first; the second case checks the
-# count. Not where the pasteboard can't be read (not macOS). A copy made by
+# in a variable, never in a file) are read first; the other two cases check
+# the count. Not where the pasteboard can't be read (not macOS). A copy made by
 # the user while the case runs fails it.
 pb_jxa () {
   osascript -l JavaScript -e "ObjC.import('AppKit'); $1" 2> /dev/null
