@@ -14,8 +14,10 @@
 
 set -u
 # the Cocoa build: the copies of the runs with a window go to a pasteboard of
-# their own, not to the clipboard of the user (#708)
+# their own, not to the clipboard of the user (#708); the Vue build keeps
+# them inside TeXmacs (#894)
 export TEXMACS_NS_PASTEBOARD=private
+export TEXMACS_VUE_CLIPBOARD=private
 D=tests/gui
 [ -d "$D" ] || { echo "run me from the top of the source tree"; exit 2; }
 tests="$*"

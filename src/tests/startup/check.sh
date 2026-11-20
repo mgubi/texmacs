@@ -40,8 +40,10 @@ export TEXMACS_PATH="$top/TeXmacs"
 export TEXMACS_HOME_PATH="${TM_TEST_HOME:-$out/home}"
 export QT_QPA_PLATFORM=offscreen
 # the Cocoa build: the copies of the runs with a window go to a pasteboard of
-# their own, not to the clipboard of the user (#708)
+# their own, not to the clipboard of the user (#708); the Vue build keeps
+# them inside TeXmacs (#894)
 export TEXMACS_NS_PASTEBOARD=private
+export TEXMACS_VUE_CLIPBOARD=private
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 timeout=${TM_TEST_TIMEOUT:-60}
 
@@ -300,9 +302,11 @@ pb_has () {
 }
 pb_keep="headless: the clipboard commands keep the selection (#708)"
 pb_name="headless: a copy leaves the clipboard of the system alone (#708) (macOS)"
+pb_window="a copy with a window leaves the clipboard of the system alone (#708) (macOS)"
 pb_before=""
 case "$pb_keep
-$pb_name" in
+$pb_name
+$pb_window" in
   *"${TM_STARTUP_CASES:-}"*)
     pb_before=$(pb_count)
     [ -z "$pb_before" ] || pb_text=$(LC_ALL=en_US.UTF-8 pbpaste 2> /dev/null) ;;
@@ -350,8 +354,9 @@ cat > "$out/startup-clip.scm" <<'EOF'
   (buffer-close u))
 EOF
 
-# (both cases with the general pasteboard, which a headless run must not use)
-TEXMACS_NS_PASTEBOARD=general \
+# (both cases with the general pasteboard and the clipboard of SDL, which a
+# headless run must not use: the clipboard of SDL kept no copy, #894)
+TEXMACS_NS_PASTEBOARD=general TEXMACS_VUE_CLIPBOARD=system \
 check "$pb_keep" \
       "copy #t
 extern #t
@@ -379,20 +384,31 @@ if [ -n "$pb_before" ]; then
   (buffer-pretend-saved u)
   (buffer-close u))
 EOF
-  TEXMACS_NS_PASTEBOARD=general \
+  TEXMACS_NS_PASTEBOARD=general TEXMACS_VUE_CLIPBOARD=system \
   check "$pb_name" \
         "pasteboard $pb_before
 quit ()" \
         -headless -x "$atquit" -x '(load "startup-pasteboard.scm")'
+  # The same with a window, under the private clipboard which the runners
+  # set (TEXMACS_NS_PASTEBOARD, TEXMACS_VUE_CLIPBOARD; Qt runs offscreen,
+  # whose clipboard is in the process): the copies of the test suites never
+  # replace the user's (the Vue build put them on the clipboard of SDL, #894)
+  # (set again: sh keeps the assignments made for a function call)
+  TEXMACS_NS_PASTEBOARD=private TEXMACS_VUE_CLIPBOARD=private \
+  check "$pb_window" \
+        "pasteboard $pb_before
+quit ()" \
+        -x "$atquit" -x '(load "startup-pasteboard.scm")' -q
 fi
 # Put the text back when a copy of these cases reached the pasteboard (only
-# without the fix): the type org.texmacs.pid of a copy, the sentence of
-# startup-a.tm of an export, or the image of graphics-file-to-clipboard (a
-# picture without text). Only the text is put back (not pictures or rich
-# text); a copy made meanwhile by the user, or by another TeXmacs, would be
-# replaced too.
+# without the fix): the type org.texmacs.pid of a copy, the type which SDL
+# gives to application/x-texmacs-clipboard (a copy of Vue, whose data are
+# gone with the process), the sentence of startup-a.tm of an export, or the
+# image of graphics-file-to-clipboard (a picture without text). Only the
+# text is put back (not pictures or rich text); a copy made meanwhile by the
+# user, or by another TeXmacs, would be replaced too.
 if [ -n "$pb_before" ] && [ "$(pb_count)" != "$pb_before" ]; then
-  if pb_has "'org.texmacs.pid'" ||
+  if pb_has "'org.texmacs.pid','dyn.agq80c6durvy0g2pyrf106p52fz4gn8drqfv1gppdrvy1a2xtqf3gk'" ||
      LC_ALL=en_US.UTF-8 pbpaste 2> /dev/null | grep -q "startup checks" ||
      { pb_has "'public.tiff','public.png'" &&
        ! pb_has "'public.utf8-plain-text'"; }; then
@@ -401,7 +417,7 @@ if [ -n "$pb_before" ] && [ "$(pb_count)" != "$pb_before" ]; then
   fi
 fi
 pb_text=""
-export TEXMACS_NS_PASTEBOARD=private
+export TEXMACS_NS_PASTEBOARD=private TEXMACS_VUE_CLIPBOARD=private
 
 # A copy in a buffer which was never typeset (a script, no update-forced):
 # the selection is found in the boxes, which did not exist yet, and the

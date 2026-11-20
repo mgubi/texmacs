@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 20 November 2026
 
+- **Vue: the clipboard commands work in headless runs** (desktop, Vue
+  interface): a script or a test run with `-headless` lost what it copied
+  (copy then paste pasted nothing), since SDL has no clipboard without a
+  window. Without a window the copies now stay inside TeXmacs, as in Qt and
+  Cocoa, and the clipboard of the system is still never touched; a session
+  with a window uses the clipboard of the system as before. The test
+  runners keep the copies of their runs with a window inside TeXmacs too
+  (`TEXMACS_VUE_CLIPBOARD=private`), so that they no longer replace what
+  the user copied (#894).
+
 - **Cocoa: headless runs no longer replace the clipboard** (desktop, Cocoa
   interface): a script or a test run with `-headless` put its copies on the
   clipboard of macOS, replacing what the user had copied, and read it back

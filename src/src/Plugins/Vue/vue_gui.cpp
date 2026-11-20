@@ -7076,6 +7076,23 @@ void load_system_font (string family, int size, int dpi,
 static hashmap<string,tree> selection_t ("none");
 static hashmap<string,string> selection_s ("");
 
+// The clipboard commands keep their selections in selection_t and
+// selection_s alone, without the clipboard of the system:
+// - while a script runs: the tests share the clipboard of the system
+//   neither with the user's session nor with each other (gui_test_pump);
+// - under -headless, as in Qt and Cocoa (#708): SDL has no video subsystem
+//   there, hence no clipboard, and the copies were lost (#894);
+// - with TEXMACS_VUE_CLIPBOARD=private, a testing aid which the test
+//   runners set for their runs with a window (as TEXMACS_NS_PASTEBOARD=
+//   private for Cocoa), so that their copies never replace the user's.
+static bool
+private_clipboard () {
+  if (script_pump || is_headless ()) return true;
+  static int env= -1;
+  if (env < 0) env= (get_env ("TEXMACS_VUE_CLIPBOARD") == "private")? 1: 0;
+  return env == 1;
+}
+
 // the clipboard of a script (its command "clipboard"): the text as a paste
 // from the system gives it
 static void
@@ -7283,10 +7300,9 @@ bool set_selection (string key, tree t,
   selection_s (key)= copy (s);
 
   // SDL3 only supports the system clipboard, not primary/mouse selections
-  // So we only set the system clipboard for "primary" key; while a script
-  // runs, not even that one: the tests do not share the clipboard of the
-  // system with the user's session or with each other (gui_test_pump)
-  if (key != "primary" || script_pump) return true;
+  // So we only set the system clipboard for "primary" key, and not even
+  // that one when the clipboard is private (private_clipboard)
+  if (key != "primary" || private_clipboard ()) return true;
 
   // Prepare clipboard data structure
   clipboard_data* clip_data = new clipboard_data();
@@ -7423,6 +7439,9 @@ image_clipboard_cleanup (void *userdata) {
 
 bool
 vue_put_graphics_on_clipboard (url file) {
+  // no image is put on a private clipboard (as without a pasteboard in
+  // Cocoa and without a clipboard in Qt)
+  if (private_clipboard ()) return false;
   string ext= locase_all (suffix (file));
   string mime;
   if (ext == "png") mime= "image/png";
@@ -7469,7 +7488,8 @@ bool get_selection (string key, tree& t, string& s, string format) {
   // ("secondary", "ternary", "temp", "wrapbuf", the registers): they live
   // in our own storage, which set_selection fills. This used to sit after
   // a "return false" for every such key, so nothing was ever read back.
-  if (key != "primary" || script_pump) {
+  // So does "primary" when the clipboard is private (private_clipboard).
+  if (key != "primary" || private_clipboard ()) {
     if (!selection_t->contains (key)) return false;
     t = copy (selection_t [key]);
     s = copy (selection_s [key]);
@@ -7618,7 +7638,7 @@ void clear_selection (string key) {
   selection_s->reset (key);
 
   // SDL3 only supports system clipboard, not primary/mouse selections
-  if (key != "primary" || script_pump) return;
+  if (key != "primary" || private_clipboard ()) return;
 
 #ifdef __EMSCRIPTEN__
   web_clip_texmacs= ""; // the clipboard of the system stays as it is
