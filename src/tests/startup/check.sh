@@ -39,6 +39,9 @@ bin="$top/TeXmacs/bin/texmacs.bin"
 export TEXMACS_PATH="$top/TeXmacs"
 export TEXMACS_HOME_PATH="${TM_TEST_HOME:-$out/home}"
 export QT_QPA_PLATFORM=offscreen
+# the Cocoa build: the copies of the runs with a window go to a pasteboard of
+# their own, not to the clipboard of the user (#708)
+export TEXMACS_NS_PASTEBOARD=private
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 timeout=${TM_TEST_TIMEOUT:-60}
 
@@ -280,6 +283,23 @@ EOF2
   export SHELL="$old_shell" PATH="$old_path"
 fi
 
+# On macOS, the clipboard cases below must leave the clipboard of the system
+# alone: the Cocoa build put the copies of a headless run on the general
+# pasteboard, which replaced what the user had copied (#708). Its change
+# count and its text (pbpaste) are saved here; the second case checks the
+# count. If a copy of TeXmacs reached the pasteboard (the type
+# org.texmacs.pid), the text is put back with pbcopy after the cases (a copy
+# made by the user meanwhile is kept). Not where the pasteboard can't be
+# read (not macOS).
+pb_jxa () {
+  osascript -l JavaScript -e "ObjC.import('AppKit'); $1" 2> /dev/null
+}
+pb_count () { pb_jxa '$.NSPasteboard.generalPasteboard.changeCount'; }
+pb_name="headless: a copy leaves the clipboard of the system alone (#708, macOS)"
+pb_before=$(pb_count)
+pb_saved="$out/startup-pasteboard.txt"
+[ -z "$pb_before" ] || pbpaste > "$pb_saved" 2> /dev/null
+
 # The clipboard commands under -headless, which runs a QCoreApplication: the
 # clipboard of Qt has no platform there, and copying crashed (#708). The
 # selections are kept by TeXmacs itself: a copy, also exported to LaTeX, is
@@ -322,6 +342,8 @@ cat > "$out/startup-clip.scm" <<'EOF'
   (buffer-close u))
 EOF
 
+# (both cases with the general pasteboard, which a headless run must not use)
+TEXMACS_NS_PASTEBOARD=general \
 check "headless: the clipboard commands keep the selection (#708)" \
       "copy #t
 extern #t
@@ -331,6 +353,36 @@ clear none
 graphics #f
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-clip.scm")'
+
+# A copy under -headless leaves the general pasteboard as it was (its change
+# count read by the headless process after the copy).
+if [ -n "$pb_before" ]; then
+  cat > "$out/startup-pasteboard.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (update-forced)
+  (select-all)
+  (clipboard-copy "primary")
+  (display* "CHECK pasteboard "
+            (string-trim-both
+             (eval-system "osascript -l JavaScript -e 'ObjC.import(\"AppKit\"); $.NSPasteboard.generalPasteboard.changeCount'"))
+            "\n")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+  TEXMACS_NS_PASTEBOARD=general \
+  check "$pb_name" \
+        "pasteboard $pb_before
+quit ()" \
+        -headless -x "$atquit" -x '(load "startup-pasteboard.scm")'
+  if [ "$(pb_count)" != "$pb_before" ] &&
+     [ "$(pb_jxa 'ObjC.unwrap($.NSPasteboard.generalPasteboard.availableTypeFromArray($(["org.texmacs.pid"]))) ? "yes" : "no"')" = yes ]; then
+    pbcopy < "$pb_saved"
+    echo "         (the text of the clipboard was put back)"
+  fi
+fi
+export TEXMACS_NS_PASTEBOARD=private
 
 # A copy in a buffer which was never typeset (a script, no update-forced):
 # the selection is found in the boxes, which did not exist yet, and the

@@ -141,6 +141,38 @@ ns_gui_rep::~ns_gui_rep()  {
 static NSString* texmacs_clipboard_type= @"org.texmacs.clipboard";
 static NSString* texmacs_pid_type= @"org.texmacs.pid";
 
+/* The pasteboard of the system, or nil. In the headless mode, as in Qt
+ (#708), there is none: the selections are only kept in selection_t and
+ selection_s, so that scripts and tests never touch the clipboard of the
+ user. TEXMACS_NS_PASTEBOARD=private (a testing aid, for the runs with a
+ window of the test suites) gives a pasteboard of this process alone, made
+ with a unique name and released at the exit; a session with a window uses
+ the general pasteboard. */
+
+static NSPasteboard* private_pasteboard= nil;
+
+static void
+release_private_pasteboard () {
+  if (private_pasteboard) {
+    [private_pasteboard releaseGlobally];
+    [private_pasteboard release];
+    private_pasteboard= nil;
+  }
+}
+
+static NSPasteboard*
+system_pasteboard () {
+  if (is_headless ()) return nil;
+  if (get_env ("TEXMACS_NS_PASTEBOARD") == "private") {
+    if (!private_pasteboard) {
+      private_pasteboard= [[NSPasteboard pasteboardWithUniqueName] retain];
+      atexit (release_private_pasteboard);
+    }
+    return private_pasteboard;
+  }
+  return [NSPasteboard generalPasteboard];
+}
+
 static bool
 owns_pasteboard (NSPasteboard* pb) {
   NSString* pid= [pb stringForType: texmacs_pid_type];
@@ -153,7 +185,14 @@ ns_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   if (direct_selection) key= "primary";
   s= "";
   t= "none";
-  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  NSPasteboard *pb = system_pasteboard ();
+  if (!pb) {
+    // headless: the selection kept by TeXmacs ("extern" is "primary")
+    if (!selection_t->contains (key)) return false;
+    t= copy (selection_t [key]);
+    s= copy (selection_s [key]);
+    return true;
+  }
   bool owns= (format != "temp" && format != "wrapbuf" && key != "primary") ||
              (key == "primary" && owns_pasteboard (pb));
   if (owns) {
@@ -239,7 +278,8 @@ ns_gui_rep::set_selection (string key, tree t,
   selection_t (key)= copy (t);
   selection_s (key)= copy (s);
   if (key != "primary") return true;
-  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  NSPasteboard *pb = system_pasteboard ();
+  if (!pb) return true;
   [pb clearContents];
   string text= s;
   if (format == "default") {
@@ -267,7 +307,8 @@ ns_gui_rep::clear_selection (string key) {
   selection_t->reset (key);
   selection_s->reset (key);
   if (key != "primary") return;
-  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  NSPasteboard *pb = system_pasteboard ();
+  if (!pb) return;
   // as in Qt: when a TeXmacs (this one or another) put it there
   if ([pb stringForType: texmacs_pid_type]) [pb clearContents];
 }
@@ -379,7 +420,8 @@ void gui_interpose (void (*r) (void)) { the_interpose_handler= r; }
 bool
 ns_gui_rep::put_graphics_on_clipboard (url file) {
   string ext= locase_all (suffix (file));
-  NSPasteboard* pb= [NSPasteboard generalPasteboard];
+  NSPasteboard* pb= system_pasteboard ();
+  if (!pb) return false; // headless, as in Qt (#708)
   NSString* path= to_nsstring_utf8 (concretize (file));
   if (ext == "bmp" || ext == "png" || ext == "jpg" || ext == "jpeg" ||
       ext == "tif" || ext == "tiff") {
