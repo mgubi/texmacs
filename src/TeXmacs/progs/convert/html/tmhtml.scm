@@ -630,14 +630,14 @@
 (define (tmhtml-concat-document? x)
   (and (func? x 'concat)
        (not (ahash-ref tmhtml-env :math))
-       (list-any full-document? (cdr x))))
+       (list-any full-document? (concat-items (cdr x)))))
 
 (define (tmhtml-concat-document x acc)
   ;; the blocks of the paragraph @x, a <concat> with documents among its
   ;; items, as (tmhtml-p x) makes them, in reverse order on @acc, as
   ;; tmhtml-pars
   (with l (tmconcat-simplify-tabs
-           (tmhtml-glue-scripts (cdr x)))
+           (tmhtml-glue-scripts (concat-items (cdr x))))
     (if (list-any (cut func? <> 'htab) l)
         ;; the line is cut at its tabs (tmconcat-structure-tabs)
         (push-blocks (tmhtml-p x) acc '())
@@ -929,8 +929,20 @@
 	  (else (cons x knil))))
   (list-fold-right glue-label-to-table '() l))
 
+(define (concat-items l)
+  ;; the items of a <concat>, those of the <concat> among them included: a
+  ;; tab in an inner <concat> is a tab of the line (#883)
+  (if (not (list-any (cut func? <> 'concat) l)) l
+      (let loop ((l l) (stack '()) (r '()))
+        (cond ((pair? l)
+               (if (func? (car l) 'concat)
+                   (loop (cdar l) (cons (cdr l) stack) r)
+                   (loop (cdr l) stack (cons (car l) r))))
+              ((pair? stack) (loop (car stack) (cdr stack) r))
+              (else (reverse r))))))
+
 (define (tmhtml-concat l)
-  (set! l (tmhtml-glue-scripts l))
+  (set! l (tmhtml-glue-scripts (concat-items l)))
   ;;(display* "l << " l "\n")
   (set! l (tmconcat-structure-tabs l))
   ;;(display* "l >> " l "\n")
@@ -998,6 +1010,11 @@
   (with len (tmlength->htmllength (if (list-1? l) (car l) (cadr l)) #t)
     (if (not len) '()
 	`((h:span (@ (style ,(string-append "margin-left: " len))))))))
+
+(define (tmhtml-htab l)
+  ;; a tab which does not cut a line: a space of its length (the second
+  ;; argument is "first", "last" or a weight, #883)
+  (tmhtml-hspace (list (car l))))
 
 (define (tmhtml-vspace l)
   '())
@@ -2359,7 +2376,7 @@
   (vspace* tmhtml-vspace)
   (vspace tmhtml-vspace)
   (space tmhtml-hspace)
-  (htab tmhtml-hspace)
+  (htab tmhtml-htab)
   (split tmhtml-noop)
   (move tmhtml-move)
   (shift tmhtml-move)

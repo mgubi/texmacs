@@ -514,10 +514,16 @@
                               2000)))
     (check-true (whole-or-cut? s "leaf"))))
 
-;; A weak tab of a line (tmconcat.scm): "last" is a tab when no tab follows
-;; it in the line, else it is dropped; "first" likewise, with the tabs before
-;; it. A "last" tab was always dropped: has-tab-after? looked for the tabs
-;; from the tab itself on (since 2012)
+;; The tabs of a line (tmconcat.scm) cut it in the HTML when they get a
+;; part of the line in the typesetter (lazy_paragraph.cpp): the tabs with a
+;; weight (an ordinary tab has the weight 1), or, when no tab has one, the
+;; first "first" tab, the last "last" tab and the tabs of weight 0; the
+;; others are dropped. A "last" tab was always dropped (has-tab-after?
+;; looked for the tabs from the tab itself on, since 2012), and a weak tab
+;; was dropped when any tab followed it ("last") or preceded it ("first"),
+;; also a weak tab of the other kind, and kept with an ordinary tab on its
+;; other side (#883). A kept weak tab in a <with> had no width, and a tab
+;; in a <concat> in the line was lost (#883)
 (define (html-of-line . l)
   (export `(document (concat ,@l)) "html-snippet"))
 
@@ -525,21 +531,35 @@
   (check-group "html export: weak tabs")
   (let ((tab '(htab "5mm"))
         (first-tab '(htab "5mm" "first"))
-        (last-tab '(htab "5mm" "last")))
+        (last-tab '(htab "5mm" "last"))
+        (zero-tab '(htab "5mm" "0")))
     ;; alone in the line: a tab
     (check= (html-of-line "x" last-tab "y") (html-of-line "x" tab "y"))
     (check= (html-of-line "x" first-tab "y") (html-of-line "x" tab "y"))
     (check-true (string-occurs? "right-tab" (html-of-line "x" last-tab "y")))
-    ;; after the other tabs, or before them: a tab
-    (check= (html-of-line "x" tab "y" last-tab "z")
-            (html-of-line "x" tab "y" tab "z"))
-    (check= (html-of-line "x" first-tab "y" tab "z")
-            (html-of-line "x" tab "y" tab "z"))
-    ;; before another tab, or after one: dropped
+    ;; with an ordinary tab in the line: dropped
+    (check= (html-of-line "x" tab "y" last-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" first-tab "y" tab "z") (html-of-line "xy" tab "z"))
     (check= (html-of-line "x" last-tab "y" tab "z") (html-of-line "xy" tab "z"))
     (check= (html-of-line "x" tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" tab "y" zero-tab "z") (html-of-line "x" tab "yz"))
+    ;; without one: the first "first" tab, the last "last" tab and the tabs
+    ;; of weight 0
     (check= (html-of-line "x" last-tab "y" last-tab "z") (html-of-line "xy" tab "z"))
     (check= (html-of-line "x" first-tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" last-tab "y" first-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" first-tab "y" last-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" zero-tab "y" first-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" zero-tab "y") (html-of-line "x" tab "y"))
+    ;; the centering of wide-centered
+    (check= (html-of-line '(htab "0fn" "last") "x" '(htab "0fn" "first"))
+            (html-of-line tab "x" tab))
+    (check-true (string-occurs? "center-tab"
+                                (html-of-line '(htab "0fn" "last") "x"
+                                              '(htab "0fn" "first"))))
     ;; in a <with>, as a tab there
     (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b")) "y")
             (html-of-line "x" `(with "color" "red" (concat "a" ,tab "b")) "y"))
@@ -548,7 +568,22 @@
             (html-of-line "x" '(with "color" "red" "ab") tab "y"))
     (check= (html-of-line "x" `(with "color" "red"
                                      (concat "a" ,last-tab "b" ,tab "c")))
-            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))))
+            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))
+    ;; the whole body of a <with>: a space of its length
+    (for (t (list last-tab first-tab '(htab "5mm" "2")))
+      (check= (html-of-line "x" `(with "color" "red" ,t) "y")
+              (html-of-line "x" `(with "color" "red" ,tab) "y")))
+    (check-true (string-occurs? "margin-left: 5mm"
+                                (html-of-line "x" `(with "color" "red" ,last-tab)
+                                              "y")))
+    ;; in a <concat> in the line
+    (check= (html-of-line "x" `(concat "a" ,tab "b") "y")
+            (html-of-line "x" "a" tab "b" "y"))
+    (check= (html-of-line "x" `(concat "a" ,last-tab "b") "y" `(concat ,tab) "z")
+            (html-of-line "xaby" tab "z"))
+    (check= (html-of-line "x" `(concat (concat ,first-tab) "y") "z")
+            (html-of-line "x" tab "yz"))))
+
 ;; A paragraph which is a document is made blocks again at each level of a
 ;; nesting (tmhtml-p): the blocks of the inner levels were cut again one at
 ;; a time at each level, and the export of 2000 nested documents took 40 s

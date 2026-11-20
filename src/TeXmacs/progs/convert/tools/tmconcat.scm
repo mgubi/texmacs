@@ -96,10 +96,29 @@
 ;; Simplification of weak tabs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The tabs of a line are typeset as follows (make_unit, lazy_paragraph.cpp;
+;; tab.cpp): each is a space of its length, and the rest of the line goes
+;; to the tabs with a weight (an ordinary tab has the weight 1, <htab|len|w>
+;; the weight w), in proportion to it. When no tab has a weight, it goes in
+;; equal parts to the first "first" tab, the last "last" tab (the weak tabs)
+;; and the tabs of weight 0; the others get nothing. In HTML, the tabs which
+;; get a part of the line cut it (tmconcat-structure-tabs), as ordinary
+;; tabs; the others are removed. What stays different: a tab which gets
+;; nothing loses its length too; the parts of the line are equal whatever
+;; the weights; the typesetter applies this to the last line of a
+;; paragraph only (the other lines are justified), and the HTML to the
+;; whole paragraph; and a tab in a <with> cuts that <with> only
+
 (define (tab? tab) (func? tab 'htab))
 (define (tab-left? tab) (and (func? tab 'htab 2) (== (caddr tab) "last")))
 (define (tab-right? tab) (and (func? tab 'htab 2) (== (caddr tab) "first")))
-(define (tab-weak tab) `(,(car tab) ,(cadr tab) "0"))
+(define (tab-weak? tab) (or (tab-left? tab) (tab-right? tab)))
+
+(define (tab-weight tab)
+  ;; the weight of a tab (0 for a weak tab)
+  (cond ((tab-weak? tab) 0)
+        ((or (not (func? tab 'htab 2)) (not (string? (caddr tab)))) 1)
+        (else (or (string->number (caddr tab)) 0))))
 
 ;; The tabs of a concatenation include those of its <with> and <concat>
 ;; descendants, down to tabs-depth levels: a deeper tab is simplified with
@@ -110,63 +129,65 @@
 ;; depth is that of @x below the concatenation which is simplified
 (define tabs-depth 64)
 
-(define (has-tab-sub? pred? x depth)
-  ;; does @x or one of its <with> and <concat> descendants down to @depth
-  ;; levels satisfy @pred?
-  (cond ((pred? x) #t)
-        ((<= depth 0) #f)
-        ((func? x 'with) (has-tab-sub? pred? (cAr x) (- depth 1)))
+(define (line-tabs x depth acc)
+  ;; the tabs of @x and of its <with> and <concat> descendants down to
+  ;; @depth levels, the last one first, on @acc
+  (cond ((tab? x) (cons x acc))
+        ((<= depth 0) acc)
+        ((func? x 'with) (line-tabs (cAr x) (- depth 1) acc))
         ((func? x 'concat)
-         (list-any (lambda (y) (has-tab-sub? pred? y (- depth 1))) (cdr x)))
-        (else #f)))
+         (let loop ((l (cdr x)) (acc acc))
+           (if (null? l) acc
+               (loop (cdr l) (line-tabs (car l) (- depth 1) acc)))))
+        (else acc)))
 
-(define (has-tab? x depth)
-  (has-tab-sub? tab? x depth))
+(define (tabs-replacements tabs)
+  ;; what each of the tabs @tabs of a line becomes: itself or an ordinary
+  ;; tab when it gets a part of the line, else ""
+  (let* ((weighted? (not (= (apply + (map tab-weight tabs)) 0)))
+         (lasts (length (list-filter tabs tab-left?))))
+    (let loop ((l tabs) (nf 0) (nl 0) (r '()))
+      (if (null? l) (reverse r)
+          (let* ((t (car l))
+                 (nf2 (if (tab-right? t) (+ nf 1) nf))
+                 (nl2 (if (tab-left? t) (+ nl 1) nl))
+                 (part? (cond (weighted? (not (= (tab-weight t) 0)))
+                              ((tab-right? t) (= nf2 1))
+                              ((tab-left? t) (= nl2 lasts))
+                              (else #t))))
+            (loop (cdr l) nf2 nl2
+                  (cons (cond ((not part?) "")
+                              ((tab-weak? t) (list 'htab (cadr t)))
+                              (else t))
+                        r)))))))
 
-(define (has-weak-tab? x depth)
-  (has-tab-sub? (lambda (y) (or (tab-left? y) (tab-right? y))) x depth))
-
-(define (has-tab-before? x pos depth)
-  ;; @x is at @depth, its children one level below
-  (cond ((null? pos) #f)
-        ((list-any (lambda (y) (has-tab? y (- depth 1)))
-                   (sublist x 0 (car pos))) #t)
-        (else (has-tab-before? (list-ref x (car pos)) (cdr pos) (- depth 1)))))
-
-(define (has-tab-after? x pos depth)
-  (cond ((null? pos) #f)
-        ((list-any (lambda (y) (has-tab? y (- depth 1)))
-                   (sublist x (+ (car pos) 1) (length x))) #t)
-        (else (has-tab-after? (list-ref x (car pos)) (cdr pos) (- depth 1)))))
-
-(define (simplify-tabs-sub x pos i in depth)
-  (if (null? x) x
-      (cons (simplify-tabs (car x) (rcons pos i) in depth)
-            (simplify-tabs-sub (cdr x) pos (+ i 1) in depth))))
-
-(define (simplify-tabs x pos in depth)
-  ;;(display* "Simplify " x ", " pos "\n")
-  ;; FIXME: in our recursive descent, we might want to treat
-  ;; other constructs besides with, such as surround
-  (cond ((npair? x) x)
-        ((tab-left? x)
-         (if (has-tab-after? in pos tabs-depth) "" (tab-weak x)))
-        ((tab-right? x)
-         (if (has-tab-before? in pos tabs-depth) "" (tab-weak x)))
+(define (replace-tabs x depth next)
+  ;; @x with each of its tabs (as line-tabs) replaced by (next)
+  (cond ((tab? x) (next))
         ((<= depth 0) x)
         ((func? x 'with)
-         (with spos (rcons pos (- (length x) 1))
-           (rcons (cDr x) (simplify-tabs (cAr x) spos in (- depth 1)))))
+         (rcons (cDr x) (replace-tabs (cAr x) (- depth 1) next)))
         ((func? x 'concat)
-         (simplify-tabs-sub x pos 0 in (- depth 1)))
+         (cons 'concat
+               (let loop ((l (cdr x)) (r '()))
+                 (if (null? l) (reverse r)
+                     (loop (cdr l)
+                           (cons (replace-tabs (car l) (- depth 1) next)
+                                 r))))))
         (else x)))
 
 (tm-define (tmconcat-simplify-tabs l)
   (:type (forall T (-> (list T) (list T))))
   (:synopsis "Rewrite weak left and right tabs in concatenation @l")
-  (with c (cons 'concat l)
-    (if (not (has-weak-tab? c tabs-depth)) l
-        (cdr (simplify-tabs c (list) c tabs-depth)))))
+  (let* ((c (cons 'concat l))
+         (tabs (reverse (line-tabs c tabs-depth '())))
+         (new (tabs-replacements tabs)))
+    (if (list-and (map eq? tabs new)) l
+        (cdr (replace-tabs c tabs-depth
+                           (lambda ()
+                             (with t (car new)
+                               (set! new (cdr new))
+                               t)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Replacing tab information by alignment information
