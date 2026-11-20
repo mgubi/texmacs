@@ -206,9 +206,22 @@ title_ok () {
 }
 verdict title "a French dialog title with accents (#468)" title_ok
 
-# (close) messages of several kinds give the console several tabs
+# The cases which wait for a window made by their command line: the
+# command line comes 2.5 s after the start-up, which a slow runner (the
+# first start of a home loads the fonts and opens the Welcome) ends late,
+# so a step at a fixed time may come before the window (queries in run
+# 44642164389). Their window test waits for the window (wait:<title>, at
+# most 20 s), and ends with this quit; quit_after=30000 keeps the quit of
+# run (14 s by default) from cutting the wait, and stops TeXmacs if the
+# window test does not end
+step_quit='eval:(begin (display "CHECK alive\n") (quit-TeXmacs))'
+
+# (close) messages of several kinds give the console several tabs (the
+# window test waits for the console: without it, close: would close the
+# main window)
 msgs='(for-each (lambda (ch) (debug-message ch (string-append ch " line\n"))) (list "std-error" "std-warning" "debug-io" "debug-automatic"))'
-run close "" "windows;windows;windows;windows;close:Error messages;windows;windows" \
+quit_after=30000
+run close "" "windows;wait:Error messages;windows;windows;close:Error messages;windows;windows;$step_quit" \
     "(begin $msgs (open-error-messages))"
 close_ok () {
   fail="the console was not open"
@@ -320,9 +333,11 @@ verdict repeats "an error which comes again prints its report on the terminal on
 # lengths are replaced by 0 for AppKit, with one warning for each place
 # (ns_safe_length, ns_safe_size) in all the run, and the dialogs are shown.
 # (ns_decode_length also warns about the lengths of the resize, each time
-# they are decoded: not counted here)
+# they are decoded: not counted here). The window test waits for the
+# second dialog
 widget='(tm-widget (cocoa-check-sizes cmd) (resize "-100px" "-20px" (glue #f #f -10 -20)) (text "Bad sizes"))'
-run sizes "" "windows;windows;windows" \
+quit_after=30000
+run sizes "" "windows;wait:Bad sizes again;windows;$step_quit" \
     '(begin (dialogue-window cocoa-check-sizes noop "Bad sizes") (dialogue-window cocoa-check-sizes noop "Bad sizes again"))' \
     "$widget"
 sizes_ok () {
@@ -455,17 +470,14 @@ header_ok () {
 verdict header "the window queries of a console, the View menu (#661)" header_ok
 
 # (queries) the widgets of the windows of TeXmacs answer false to the queries
-# of the View menu. The console opens 2.5 s after the command line, which a
-# slow runner reaches late (the first start of a home loads the fonts and
-# opens the Welcome): the window test waits for it (at most 20 s) instead of
-# asking at a fixed time, the fifth second, which came before the console in
-# run 44642164389 and only 0.1 to 0.5 s after it on a Mac M4; then it quits
-# (the quit after 30 s is for a console which never comes)
+# of the View menu. The window test waits for the console: at the fifth
+# second, the console was not there yet in run 44642164389, and it comes
+# only 0.1 to 0.5 s before it on a Mac M4
 quit_after=30000
-run queries "" "queries;wait:Error messages;queries;eval:(begin (display \"CHECK alive\n\") (quit-TeXmacs))" \
+run queries "" "queries;wait:Error messages;queries;$step_quit" \
     "(open-error-messages)"
 queries_ok () {
-  fail="no answer for the console: $(grep -a "NSTEST queries" "$out/queries.log" | head -2 | tr '\n' ' ')"
+  fail="no answer for the console after the wait: $(sed -n '/NSTEST step wait:/,$p' "$out/queries.log" | grep -a "NSTEST queries" | tr '\n' ' ')"
   grep -aq "^NSTEST queries 'Error messages': 0 0 0 0 0 0 0 0 0 0 0$" "$out/queries.log" || return 1
   fail="a query failed: $(grep -a "NSTEST queries.*error" "$out/queries.log" | head -1)"
   ! grep -aq "NSTEST queries.*error" "$out/queries.log"
