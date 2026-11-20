@@ -455,8 +455,15 @@ header_ok () {
 verdict header "the window queries of a console, the View menu (#661)" header_ok
 
 # (queries) the widgets of the windows of TeXmacs answer false to the queries
-# of the View menu
-run queries "" "queries;queries" "(open-error-messages)"
+# of the View menu. The console opens 2.5 s after the command line, which a
+# slow runner reaches late (the first start of a home loads the fonts and
+# opens the Welcome): the window test waits for it (at most 20 s) instead of
+# asking at a fixed time, the fifth second, which came before the console in
+# run 44642164389 and only 0.1 to 0.5 s after it on a Mac M4; then it quits
+# (the quit after 30 s is for a console which never comes)
+quit_after=30000
+run queries "" "queries;wait:Error messages;queries;eval:(begin (display \"CHECK alive\n\") (quit-TeXmacs))" \
+    "(open-error-messages)"
 queries_ok () {
   fail="no answer for the console: $(grep -a "NSTEST queries" "$out/queries.log" | head -2 | tr '\n' ' ')"
   grep -aq "^NSTEST queries 'Error messages': 0 0 0 0 0 0 0 0 0 0 0$" "$out/queries.log" || return 1
