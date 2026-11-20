@@ -428,7 +428,31 @@
       (and (tm-in? x '(h:i h:b h:u h:var h:font h:class))
            ;; FIXME: we should really restructure this kind of Html output
            ;; such that these tags never contain block content
-           (exists? force-block? (sxml-content x)))))
+           (inline-with-block? x))))
+
+;; Whether inline markup (<font>, <b>...) contains a block is asked at each
+;; level of a nesting of such markup around a block, and the answer went
+;; down all the levels below: the export of (document (with "color" "red"
+;; t)) 2000 deep took 6 s, quadratic in its depth. The answers are kept for
+;; the conversion (tmhtml-root), by node (eq?): a node is never changed
+(define tmhtml-block-memo #f)
+(define tmhtml-hashq? (defined? 'hashq-ref))
+
+(define (make-block-memo)
+  (if tmhtml-hashq? (make-hash-table 64) (make-hash-table 64 eq?)))
+
+(define (inline-with-block? x)
+  (if (not tmhtml-block-memo)
+      (exists? force-block? (sxml-content x))
+      (let ((m (if tmhtml-hashq?
+                   (hashq-ref tmhtml-block-memo x #f)
+                   (hash-table-ref tmhtml-block-memo x))))
+        (if m (eq? m 'yes)
+            (let ((r (exists? force-block? (sxml-content x))))
+              (if tmhtml-hashq?
+                  (hashq-set! tmhtml-block-memo x (if r 'yes 'no))
+                  (hash-table-set! tmhtml-block-memo x (if r 'yes 'no)))
+              r)))))
 
 (define (split-blocks sl)
   ;; The items @sl of a paragraph cut at its blocks: each block, and each
@@ -464,17 +488,24 @@
            `(h:p (@ (style ,s)) (h:div ,(cdr x))))
           (else `(h:div (@ (style ,s)) ,x)))))
 
-(define (tmhtml-p x)
-  (let* ((body (tmhtml-document-elem x))
-         (bl (as-blocks (list `(h:p ,@body))))
-	 (l1 (tmhtml-compute-vspace x #f))
+(define (tmhtml-margins x)
+  ;; the styles of the margins of the paragraph @x: its vertical spaces
+  (let* ((l1 (tmhtml-compute-vspace x #f))
 	 (l2 (tmhtml-compute-vspace x #t))
 	 (h1 (and l1 (tmlength->htmllength l1 #t)))
-	 (h2 (and l2 (tmlength->htmllength l2 #t)))
-	 (s1 (and h1 (string-append "margin-top: " h1)))
-	 (s2 (and h2 (string-append "margin-bottom: " h2))))
-    ;;(display* "  <<<<< " body "\n")
-    ;;(display* "  >>>>> " bl "\n")
+	 (h2 (and l2 (tmlength->htmllength l2 #t))))
+    (cons (and h1 (string-append "margin-top: " h1))
+          (and h2 (string-append "margin-bottom: " h2)))))
+
+(define (tmhtml-p x)
+  (tmhtml-p-blocks x (tmhtml-document-elem x)))
+
+(define (tmhtml-p-blocks x body)
+  ;; the blocks of the paragraph @x, whose HTML is @body
+  (let* ((bl (as-blocks (list `(h:p ,@body))))
+         (m (tmhtml-margins x))
+         (s1 (car m))
+         (s2 (cdr m)))
     (cond ((null? bl) bl)
           ((null? (cdr bl)) (list (add-style-attr (car bl) s1 s2)))
           (else (append (list (add-style-attr (car bl) s1 #f))
@@ -500,66 +531,260 @@
 ;; list of stable blocks as it is, and applies as-block to each block of a
 ;; list of blocks. So at each level, as-blocks only changes the blocks
 ;; which are not stable yet (a <div> which as-block merges with the <div>
-;; in it, one level at a time) and the items which are not blocks
+;; in it, one level at a time) and the items which are not blocks. The
+;; same holds for a paragraph which is a <concat> with documents among its
+;; items (tmhtml-concat-document)
 
 (define (stable-block? x)
   (and (force-block? x) (eq? (as-block x) x)))
 
 (define (push-blocks l acc unstable)
-  ;; the blocks @l pushed on @acc, and the cells of @acc of those which are
-  ;; not stable added to @unstable
-  (if (null? l) (cons acc unstable)
-      (with acc2 (cons (car l) acc)
-        (push-blocks (cdr l) acc2
-                     (if (stable-block? (car l)) unstable
-                         (cons acc2 unstable))))))
+  ;; the blocks @l pushed on @acc: (acc unstable bottom), with the cells of
+  ;; those which are not stable added to @unstable, and the cell of the
+  ;; first one (#f if @l is empty)
+  (let loop ((l l) (acc acc) (unstable unstable) (bottom #f))
+    (if (null? l) (list acc unstable bottom)
+        (with acc2 (cons (car l) acc)
+          (loop (cdr l) acc2
+                (if (stable-block? (car l)) unstable (cons acc2 unstable))
+                (or bottom acc2))))))
+
+(define (full-document? x)
+  (and (func? x 'document) (nnull? (cdr x))))
 
 (define (tmhtml-pars l acc nested?)
-  ;; the blocks of the paragraphs @l, in reverse order, on @acc, and (when
-  ;; @nested?) the cells of those which are not stable
-  (let loop ((l l) (acc acc) (unstable '()))
-    (cond ((null? l) (cons acc unstable))
-          ((and (func? (car l) 'document) (nnull? (cdar l))
-                (not (ahash-ref tmhtml-env :math)))
-           (with r (tmhtml-nested-document (car l) acc)
-             (loop (cdr l) (car r)
-                   (if nested? (append (cdr r) unstable) '()))))
-          (nested?
-           (with r (push-blocks (tmhtml-p (car l)) acc unstable)
-             (loop (cdr l) (car r) (cdr r))))
-          (else
-           (loop (cdr l) (reverse-onto (tmhtml-p (car l)) acc) '())))))
+  ;; the blocks of the paragraphs @l, in reverse order, on @acc: a list
+  ;; (acc unstable bottom), with (when @nested?) the cells of the blocks
+  ;; which are not stable, in the order of acc, and the cell of the first
+  ;; block, below the others (#f if there is none)
+  (let loop ((l l) (acc acc) (unstable '()) (bottom #f))
+    (if (null? l) (list acc unstable bottom)
+        (let* ((x (car l))
+               (r (cond ((and (full-document? x)
+                              (not (ahash-ref tmhtml-env :math)))
+                         (tmhtml-nested-document x acc))
+                        ((tmhtml-concat-document? x)
+                         (tmhtml-concat-document x acc))
+                        (nested? (push-blocks (tmhtml-p x) acc '()))
+                        (else (list (reverse-onto (tmhtml-p x) acc) '() #f)))))
+          (loop (cdr l) (car r)
+                (if nested? (append (cadr r) unstable) '())
+                (or bottom (caddr r)))))))
 
 (define (reverse-onto l acc)
   (if (null? l) acc (reverse-onto (cdr l) (cons (car l) acc))))
 
+(define (as-blocks-cells! u bottom)
+  ;; As-blocks of a list of blocks, in place. @u are the cells of the
+  ;; blocks which are not stable, in the order of the list (the cells are
+  ;; those of this conversion, shared with nothing else), and @bottom is
+  ;; the cell of the first block. As-blocks applies as-block to each block,
+  ;; which leaves the stable ones as they are, and to the paragraph of each
+  ;; run of items which are not blocks; these items are not stable: the
+  ;; runs are runs of cells of @u, each replaced by its first cell in @u.
+  ;; Returns (keep . bottom): the cells of the blocks which are not stable,
+  ;; in reverse order (the first block first), and the cell of the first
+  ;; block
+  (let loop ((u u) (keep '()) (bottom bottom))
+    (cond ((null? u) (cons keep bottom))
+          ((force-block? (caar u))
+           (set-car! (car u) (as-block (caar u)))
+           (loop (cdr u)
+                 (if (stable-block? (caar u)) keep (cons (car u) keep))
+                 bottom))
+          (else
+           (let run ((v (cdr u)) (last (car u)) (items (list (caar u))))
+             (if (and (pair? v) (eq? (cdr last) (car v))
+                      (not (force-block? (caar v))))
+                 (run (cdr v) (car v) (cons (caar v) items))
+                 (with c (car u)
+                   (set-car! c (as-block `(h:p ,@items)))
+                   (set-cdr! c (cdr last))
+                   (loop v (if (stable-block? (car c)) keep (cons c keep))
+                         (if (eq? last bottom) c bottom)))))))))
+
 (define (tmhtml-nested-document x acc)
   ;; the blocks of the paragraph @x, a document, as (tmhtml-p x) makes
-  ;; them, in reverse order on @acc, and the cells of those not stable.
-  ;; As-blocks of the blocks of @x applies as-block to each block, which
-  ;; leaves the stable ones as they are, and to the paragraph of each run of
-  ;; items which are not blocks; these items are not stable: the runs are
-  ;; runs of cells in the list of those not stable (in the same order as
-  ;; the blocks), each replaced by one of its cells. The cells are those of
-  ;; this conversion (push-blocks), shared with nothing else. (tmhtml-p of
-  ;; a document adds no margins: tmhtml-compute-vspace of a document is #f)
-  (let* ((r (tmhtml-pars (cdr x) acc #t)))
-    (let loop ((u (cdr r)) (keep '()))
-      (cond ((null? u) (cons (car r) (reverse keep)))
-            ((force-block? (caar u))
-             (set-car! (car u) (as-block (caar u)))
-             (loop (cdr u)
-                   (if (stable-block? (caar u)) keep (cons (car u) keep))))
-            (else
-             (let run ((v (cdr u)) (last (car u)) (items (list (caar u))))
-               (if (and (pair? v) (eq? (cdr last) (car v))
-                        (not (force-block? (caar v))))
-                   (run (cdr v) (car v) (cons (caar v) items))
-                   (with c (car u)
-                     (set-car! c (as-block `(h:p ,@items)))
-                     (set-cdr! c (cdr last))
-                     (loop v (if (stable-block? (car c)) keep
-                                 (cons c keep)))))))))))
+  ;; them, in reverse order on @acc, as tmhtml-pars. (tmhtml-p of a
+  ;; document adds no margins: tmhtml-compute-vspace of a document is #f)
+  (let* ((r (tmhtml-pars (cdr x) acc #t))
+         (k (as-blocks-cells! (cadr r) (caddr r))))
+    (list (car r) (reverse (car k)) (cdr k))))
+
+;; A paragraph which is a <concat> with documents among its items, such as
+;; (concat "a" (document t)), is converted by tmhtml-p: the HTML of its
+;; items, which includes the blocks of the documents, goes through
+;; tmhtml-concat (glued labels, merged strings...) and as-blocks; in a
+;; nesting, the blocks of the inner levels were copied and looked at again
+;; at each level, and the export of 2000 levels took 6 to 20 s, quadratic
+;; in the depth. The blocks of the documents are now pushed on the blocks
+;; of the nesting once, as for nested documents. Tmhtml-concat only looks
+;; at the first and the last block of a document, beside the other items:
+;; a label before a table or after it is glued to it, and the first
+;; element which is not a label may be a heading. It is applied to the
+;; HTML of the other items, with a mark in place of the blocks of each
+;; document, which is no label, table, heading or string. When the first
+;; or the last block of a document would matter there, the paragraph is
+;; converted as before, from the blocks of its documents
+
+(define (tmhtml-concat-document? x)
+  (and (func? x 'concat)
+       (not (ahash-ref tmhtml-env :math))
+       (list-any full-document? (concat-items (cdr x)))))
+
+(define (tmhtml-concat-document x acc)
+  ;; the blocks of the paragraph @x, a <concat> with documents among its
+  ;; items, as (tmhtml-p x) makes them, in reverse order on @acc, as
+  ;; tmhtml-pars
+  (with l (tmconcat-simplify-tabs
+           (tmhtml-glue-scripts (concat-items (cdr x))))
+    (if (list-any (cut func? <> 'htab) l)
+        ;; the line is cut at its tabs (tmconcat-structure-tabs)
+        (push-blocks (tmhtml-p x) acc '())
+        (let loop ((l l) (top acc) (seg '()) (docs '()))
+          ;; @seg: the HTML of the items since the last document (reversed);
+          ;; @docs: for each document (the last first), the HTML of the
+          ;; items before it, the cell for that HTML below its blocks (if
+          ;; there is any), its mark, the cells of its last and first
+          ;; blocks, and the cells of its blocks which are not stable
+          (cond ((null? l)
+                 (concat-document-blocks x acc top (reverse seg)
+                                         (reverse docs)))
+                ((full-document? (car l))
+                 (let* ((s (reverse seg))
+                        (place (and (pair? s) (cons #f top)))
+                        (r (tmhtml-pars (cdar l) (or place top) #t)))
+                   (loop (cdr l) (car r) '()
+                         (cons (list s place (list 'tmhtml-document-mark)
+                                     (car r) (caddr r) (cadr r))
+                               docs))))
+                (else
+                 ;; (the HTML bound before the call of loop: under s7, a
+                 ;; call of loop whose argument converts a document in
+                 ;; inline markup, which comes back here, saw the @x and
+                 ;; @acc of that inner call, audit 1 of #896)
+                 (with h (tmhtml (car l))
+                   (loop (cdr l) top (reverse-onto h seg) docs))))))))
+
+(define (doc-seg d) (car d))
+(define (doc-place d) (cadr d))
+(define (doc-mark d) (caddr d))
+(define (doc-top d) (cadddr d))
+(define (doc-bottom d) (list-ref d 4))
+(define (doc-unstable d) (list-ref d 5))
+
+(define (concat-document-exact? h docs)
+  ;; does tmhtml-concat of the HTML @h, with the marks of the documents
+  ;; @docs, treat each mark as the blocks of its document?
+  (let ((labels? (list-any sxhtml-label? h))
+        (d1 (car docs)))
+    (and
+     ;; the first element which is not a label is no heading
+     (not (and labels? (forall? sxhtml-label? (doc-seg d1))
+               (sxhtml-heading? (car (doc-bottom d1)))))
+     ;; no label before or after a table
+     (let loop ((h h) (prev #f) (docs docs))
+       (cond ((null? h) #t)
+             ((and (pair? docs) (eq? (car h) (doc-mark (car docs))))
+              (let ((d (car docs)))
+                (and (not (and prev (sxhtml-label? prev)
+                               (sxhtml-table? (car (doc-bottom d)))))
+                     (not (and (pair? (cdr h)) (sxhtml-label? (cadr h))
+                               (sxhtml-table? (car (doc-top d)))))
+                     (loop (cdr h) (car h) (cdr docs)))))
+             (else (loop (cdr h) (car h) docs))))
+     ;; not one block alone (which may be a tab, made inline)
+     (not (and (null? (cdr h)) (eq? (doc-top d1) (doc-bottom d1)))))))
+
+(define (doc-blocks d)
+  ;; the blocks of the document @d, from its cells
+  (let loop ((c (doc-top d)) (r '()))
+    (if (eq? c (doc-bottom d)) (cons (car c) r)
+        (loop (cdr c) (cons (car c) r)))))
+
+(define (split-at-marks l docs)
+  ;; the items of @l between the marks of @docs, or #f
+  (let loop ((l l) (docs docs) (seg '()) (r '()))
+    (cond ((null? l)
+           (and (null? docs) (reverse (cons (reverse seg) r))))
+          ((and (pair? docs) (eq? (car l) (doc-mark (car docs))))
+           (loop (cdr l) (cdr docs) '() (cons (reverse seg) r)))
+          (else (loop (cdr l) docs (cons (car l) seg) r)))))
+
+(define (fill-place! place items)
+  ;; the cell @place made the cells of @items (the last one in @place),
+  ;; above the cells below it; returns the cells, the last item first
+  (let loop ((l items) (below (cdr place)) (cells '()))
+    (if (null? (cdr l))
+        (begin
+          (set-car! place (car l))
+          (set-cdr! place below)
+          (cons place cells))
+        (with c (cons (car l) below)
+          (loop (cdr l) c (cons c cells))))))
+
+(define (concat-document-blocks x acc top last-seg docs)
+  ;; the end of tmhtml-concat-document: @acc is the list below the blocks
+  ;; of @x, @top the list of its blocks, @last-seg the HTML of its items
+  ;; after its last document, and @docs as there
+  (let* ((h (append (append-map (lambda (d)
+                                  (append (doc-seg d) (list (doc-mark d))))
+                                docs)
+                    last-seg))
+         (segs (and (concat-document-exact? h docs)
+                    (split-at-marks (tmhtml-concat-post h) docs))))
+    (if (not segs)
+        (push-blocks
+         (tmhtml-p-blocks
+          x (tmhtml-concat-post
+             (append (append-map (lambda (d)
+                                   (append (doc-seg d) (doc-blocks d)))
+                                 docs)
+                     last-seg)))
+         acc '())
+        (let loop ((docs docs) (segs segs) (u '()) (bottom #f))
+          (if (pair? docs)
+              (let* ((d (car docs))
+                     (place (doc-place d))
+                     (cells (cond ((not place) '())
+                                  ((null? (car segs))
+                                   ;; no HTML before the document
+                                   (set-cdr! (doc-bottom d) (cdr place))
+                                   '())
+                                  (else (fill-place! place (car segs)))))
+                     (u2 (append (doc-unstable d)
+                                 (list-filter cells
+                                              (lambda (c)
+                                                (not (stable-block? (car c)))))
+                                 u)))
+                (loop (cdr docs) (cdr segs) u2
+                      (or bottom (and (pair? cells) (cAr cells))
+                          (doc-bottom d))))
+              (let* ((r (push-blocks (car segs) top '()))
+                     (k (as-blocks-cells! (append (cadr r) u) bottom)))
+                (concat-document-margins x (car r) (car k) (cdr k))))))))
+
+(define (concat-document-margins x top keep bottom)
+  ;; the margins of the paragraph @x on its first and its last block, the
+  ;; cells @bottom and @top; @keep are the cells of its blocks which are
+  ;; not stable, the first block first. Returns (top unstable bottom)
+  (let* ((m (tmhtml-margins x))
+         (s1 (car m))
+         (s2 (cdr m)))
+    (when (or s1 s2)
+      (if (eq? top bottom)
+          (set-car! top (add-style-attr (car top) s1 s2))
+          (begin
+            (set-car! bottom (add-style-attr (car bottom) s1 #f))
+            (set-car! top (add-style-attr (car top) #f s2)))))
+    (let* ((k1 (if (or (stable-block? (car bottom))
+                       (and (pair? keep) (eq? (car keep) bottom)))
+                   keep (cons bottom keep)))
+           (k2 (reverse k1))
+           (k3 (if (or (stable-block? (car top))
+                       (and (pair? k2) (eq? (car k2) top)))
+                   k2 (cons top k2))))
+      (list top k3 bottom))))
 
 (define (tmhtml-paragraph l)
   (let rec ((l l))
@@ -708,21 +933,37 @@
 	  (else (cons x knil))))
   (list-fold-right glue-label-to-table '() l))
 
+(define (concat-items l)
+  ;; the items of a <concat>, those of the <concat> among them included: a
+  ;; tab in an inner <concat> is a tab of the line (#883)
+  (if (not (list-any (cut func? <> 'concat) l)) l
+      (let loop ((l l) (stack '()) (r '()))
+        (cond ((pair? l)
+               (if (func? (car l) 'concat)
+                   (loop (cdar l) (cons (cdr l) stack) r)
+                   (loop (cdr l) stack (cons (car l) r))))
+              ((pair? stack) (loop (car stack) (cdr stack) r))
+              (else (reverse r))))))
+
 (define (tmhtml-concat l)
-  (set! l (tmhtml-glue-scripts l))
+  (set! l (tmhtml-glue-scripts (concat-items l)))
   ;;(display* "l << " l "\n")
   (set! l (tmconcat-structure-tabs l))
   ;;(display* "l >> " l "\n")
+  (tmhtml-concat-post (tmhtml-list l)))
+
+(define (tmhtml-concat-post l)
+  ;; the HTML @l of the items of a <concat>, labels glued to the headings
+  ;; and tables, and strings merged
   (tmhtml-post-simplify-nodes
-   (let ((l (tmhtml-list l)))
-     (cond ((null? l) '())
-	   ((string? (car l)) l)
-	   ((heading? l) (tmhtml-post-heading l))
-	   ((list-any sxhtml-table? l) (tmhtml-post-table l))
-	   ((and (null? (cdr l)) (pair? (car l))
-		 (== (caar l) 'h:div) (== (cadar l) '(@ (class "left-tab"))))
-	    (cddar l))
-	   (else l)))))
+   (cond ((null? l) '())
+         ((string? (car l)) l)
+         ((heading? l) (tmhtml-post-heading l))
+         ((list-any sxhtml-table? l) (tmhtml-post-table l))
+         ((and (null? (cdr l)) (pair? (car l))
+               (== (caar l) 'h:div) (== (cadar l) '(@ (class "left-tab"))))
+          (cddar l))
+         (else l))))
 
 (define (tmhtml-align-left l)
   (with r (tmhtml-concat l)
@@ -773,6 +1014,11 @@
   (with len (tmlength->htmllength (if (list-1? l) (car l) (cadr l)) #t)
     (if (not len) '()
 	`((h:span (@ (style ,(string-append "margin-left: " len))))))))
+
+(define (tmhtml-htab l)
+  ;; a tab which does not cut a line: a space of its length (the second
+  ;; argument is "first", "last" or a weight, #883)
+  (tmhtml-hspace (list (car l))))
 
 (define (tmhtml-vspace l)
   '())
@@ -2094,7 +2340,8 @@
           (ahash-with tmhtml-env :verbatim #f
             (ahash-with tmhtml-env :left-margin 0
               (ahash-with tmhtml-env :right-margin 0
-                (tmhtml x)))))))))
+                (with-global tmhtml-block-memo (make-block-memo)
+                  (tmhtml x))))))))))
 
 (define (tmhtml x)
   ;; Main conversion function.
@@ -2133,7 +2380,7 @@
   (vspace* tmhtml-vspace)
   (vspace tmhtml-vspace)
   (space tmhtml-hspace)
-  (htab tmhtml-hspace)
+  (htab tmhtml-htab)
   (split tmhtml-noop)
   (move tmhtml-move)
   (shift tmhtml-move)
