@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 20 November 2026
 
+- **HTML export: deep inline markup and documents in paragraphs in linear
+  time**: inline markup around blocks, and paragraphs with documents in
+  them, were exported in a time quadratic in their depth (2000 levels: 7 to
+  20 s); they now take 0.2 s (#883, #896).
+- **HTML export: tabs as the typesetter stretches them**: the tabs which
+  cut a line are those the typesetter stretches (weak tabs `first` and
+  `last`, weights), so that `wide-centered` and the like are centered; a
+  weak tab alone in a `with` keeps its width, and a tab in a nested
+  concatenation cuts the line (#883, #896).
+
 - **Vue: the clipboard commands work in headless runs** (desktop, Vue
   interface): a script or a test run with `-headless` lost what it copied
   (copy then paste pasted nothing), since SDL has no clipboard without a
