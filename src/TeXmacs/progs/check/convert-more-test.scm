@@ -540,10 +540,16 @@
                               2000)))
     (check-true (whole-or-cut? s "leaf"))))
 
-;; A weak tab of a line (tmconcat.scm): "last" is a tab when no tab follows
-;; it in the line, else it is dropped; "first" likewise, with the tabs before
-;; it. A "last" tab was always dropped: has-tab-after? looked for the tabs
-;; from the tab itself on (since 2012)
+;; The tabs of a line (tmconcat.scm) cut it in the HTML when they get a
+;; part of the line in the typesetter (lazy_paragraph.cpp): the tabs with a
+;; weight (an ordinary tab has the weight 1), or, when no tab has one, the
+;; first "first" tab, the last "last" tab and the tabs of weight 0; the
+;; others are dropped. A "last" tab was always dropped (has-tab-after?
+;; looked for the tabs from the tab itself on, since 2012), and a weak tab
+;; was dropped when any tab followed it ("last") or preceded it ("first"),
+;; also a weak tab of the other kind, and kept with an ordinary tab on its
+;; other side (#883). A kept weak tab in a <with> had no width, and a tab
+;; in a <concat> in the line was lost (#883)
 (define (html-of-line . l)
   (export `(document (concat ,@l)) "html-snippet"))
 
@@ -551,21 +557,35 @@
   (check-group "html export: weak tabs")
   (let ((tab '(htab "5mm"))
         (first-tab '(htab "5mm" "first"))
-        (last-tab '(htab "5mm" "last")))
+        (last-tab '(htab "5mm" "last"))
+        (zero-tab '(htab "5mm" "0")))
     ;; alone in the line: a tab
     (check= (html-of-line "x" last-tab "y") (html-of-line "x" tab "y"))
     (check= (html-of-line "x" first-tab "y") (html-of-line "x" tab "y"))
     (check-true (string-occurs? "right-tab" (html-of-line "x" last-tab "y")))
-    ;; after the other tabs, or before them: a tab
-    (check= (html-of-line "x" tab "y" last-tab "z")
-            (html-of-line "x" tab "y" tab "z"))
-    (check= (html-of-line "x" first-tab "y" tab "z")
-            (html-of-line "x" tab "y" tab "z"))
-    ;; before another tab, or after one: dropped
+    ;; with an ordinary tab in the line: dropped
+    (check= (html-of-line "x" tab "y" last-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" first-tab "y" tab "z") (html-of-line "xy" tab "z"))
     (check= (html-of-line "x" last-tab "y" tab "z") (html-of-line "xy" tab "z"))
     (check= (html-of-line "x" tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" tab "y" zero-tab "z") (html-of-line "x" tab "yz"))
+    ;; without one: the first "first" tab, the last "last" tab and the tabs
+    ;; of weight 0
     (check= (html-of-line "x" last-tab "y" last-tab "z") (html-of-line "xy" tab "z"))
     (check= (html-of-line "x" first-tab "y" first-tab "z") (html-of-line "x" tab "yz"))
+    (check= (html-of-line "x" last-tab "y" first-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" first-tab "y" last-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" zero-tab "y" first-tab "z")
+            (html-of-line "x" tab "y" tab "z"))
+    (check= (html-of-line "x" zero-tab "y") (html-of-line "x" tab "y"))
+    ;; the centering of wide-centered
+    (check= (html-of-line '(htab "0fn" "last") "x" '(htab "0fn" "first"))
+            (html-of-line tab "x" tab))
+    (check-true (string-occurs? "center-tab"
+                                (html-of-line '(htab "0fn" "last") "x"
+                                              '(htab "0fn" "first"))))
     ;; in a <with>, as a tab there
     (check= (html-of-line "x" `(with "color" "red" (concat "a" ,last-tab "b")) "y")
             (html-of-line "x" `(with "color" "red" (concat "a" ,tab "b")) "y"))
@@ -574,7 +594,22 @@
             (html-of-line "x" '(with "color" "red" "ab") tab "y"))
     (check= (html-of-line "x" `(with "color" "red"
                                      (concat "a" ,last-tab "b" ,tab "c")))
-            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))))
+            (html-of-line "x" `(with "color" "red" (concat "ab" ,tab "c"))))
+    ;; the whole body of a <with>: a space of its length
+    (for (t (list last-tab first-tab '(htab "5mm" "2")))
+      (check= (html-of-line "x" `(with "color" "red" ,t) "y")
+              (html-of-line "x" `(with "color" "red" ,tab) "y")))
+    (check-true (string-occurs? "margin-left: 5mm"
+                                (html-of-line "x" `(with "color" "red" ,last-tab)
+                                              "y")))
+    ;; in a <concat> in the line
+    (check= (html-of-line "x" `(concat "a" ,tab "b") "y")
+            (html-of-line "x" "a" tab "b" "y"))
+    (check= (html-of-line "x" `(concat "a" ,last-tab "b") "y" `(concat ,tab) "z")
+            (html-of-line "xaby" tab "z"))
+    (check= (html-of-line "x" `(concat (concat ,first-tab) "y") "z")
+            (html-of-line "x" tab "yz"))))
+
 ;; A paragraph which is a document is made blocks again at each level of a
 ;; nesting (tmhtml-p): the blocks of the inner levels were cut again one at
 ;; a time at each level, and the export of 2000 nested documents took 40 s
@@ -644,6 +679,71 @@
                         (lambda ()
                           (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
                       (lambda (n) #t) 150 1500 "levels")))
+
+;; Two more kinds of nesting were exported in a time quadratic in their
+;; depth (#883): inline markup around a block, whose block was looked for
+;; down all the levels below at each level (force-block?), and a <concat>
+;; with a document among its items, whose blocks were copied and looked at
+;; again at each level (tmhtml-concat). Each is timed as the nested
+;; documents above, on a size which takes 7 to 20 s without the fix, on
+;; the binary of CI (limit 4 s), and 0.1 to 0.3 s with it
+(define nested-blocks
+  (list (list "inline markup around a block"
+              (lambda (t) `(document (with "color" "red" ,t))) 3000)
+        (list "a concat with a document"
+              (lambda (t) `(concat "a" (document ,t))) 2000)
+        (list "a vertical space before a document"
+              (lambda (t) `(document "p" (concat (vspace* "1fn") (document ,t))))
+              2000)
+        (list "a concat with documents"
+              (lambda (t) `(concat (document "a") "b" (document ,t "c") (label "l")))
+              2000)))
+
+(define (test-html-nested-blocks)
+  (check-group "html export: nested inline markup and concat")
+  ;; the HTML of a <concat> with documents among its items is that of the
+  ;; paragraphs side by side, here; a label glued to a table at the edge of
+  ;; a document, and a heading after a label, are kept
+  (let ((table '(tformat (twith "table-width" "1par")
+                         (table (row (cell "c1") (cell "c2"))))))
+    (for (p (list (list '(document "before" (concat "a" (document "x" "y")) "after")
+                        '(document "before" "a" "x" "y" "after"))
+                  (list '(document "p" (concat (vspace* "1fn") (document "x" "y")
+                                               (vspace "2fn")))
+                        '(document "p" (concat (vspace* "1fn") "x")
+                                   (concat "y" (vspace "2fn"))))
+                  (list '(document (concat "a" (document "x") "b" (document "y") "c"))
+                        '(document "a" "x" "b" "y" "c"))
+                  (list `(document (concat (label "l") (document ,table "x")))
+                        `(document (concat (label "l") ,table) "x"))
+                  (list `(document (concat (document "x" ,table) (label "l")))
+                        `(document "x" (concat ,table (label "l"))))
+                  (list '(document (concat (label "l") (document (section-title "s") "x")))
+                        '(document (concat (label "l") (section-title "s")) "x"))
+                  (list '(document (concat (section-title "s") (document "x") (label "l")))
+                        '(document (concat (section-title "s") (label "l")) "x"))
+                  ;; a document in inline markup among the items (lost
+                  ;; paragraphs and margins under s7, audit 1 of #896)
+                  (list `(document "p" (concat (label "l") (document ,table)
+                                               (strong (document (concat "a" (document "b"))))))
+                        `(document "p" (concat (label "l") ,table)
+                                   (strong (document "a" "b"))))
+                  (list '(document (concat (strong (document (concat "x" (document "y"))))
+                                           (document "z") (vspace "2fn")))
+                        '(document (strong (document "x" "y")) (concat "z" (vspace "2fn"))))))
+      (check= (export (car p) "html-snippet") (export (cadr p) "html-snippet")))
+    (with s (export `(document (concat (label "l") (document ,table "x")))
+                    "html-snippet")
+      (check-true (string-occurs? "id=\"l\"" s))))
+  ;; deep nestings, in a time linear in their depth: whole, or cut with the
+  ;; error
+  (for (nest nested-blocks)
+    (check-fast-sizes (string-append "nested blocks, " (car nest))
+                      (lambda (n)
+                        (lambda ()
+                          (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
+                      (lambda (n) #t) (quotient (caddr nest) 10) (caddr nest)
+                      "levels")))
 
 ;; The LaTeX of a formula, also that of the formulas for MathJax in the
 ;; HTML export, in a time linear in its size: the export of a macro which
@@ -3170,7 +3270,8 @@
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
                   test-html-weak-tabs
-                  test-html-nested-documents test-latex-linear
+                  test-html-nested-documents test-html-nested-blocks
+                  test-latex-linear
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
