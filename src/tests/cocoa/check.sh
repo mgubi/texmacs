@@ -213,7 +213,8 @@ verdict title "a French dialog title with accents (#468)" title_ok
 # 44642164389). Their window test waits for the window (wait:<title>, at
 # most 20 s), and ends with this quit; quit_after=30000 keeps the quit of
 # run (14 s by default) from cutting the wait, and stops TeXmacs if the
-# window test does not end
+# window test does not end. Their steps after the action last about as
+# long as the 14 s did before (TeXmacs goes on, no warning comes later)
 step_quit='eval:(begin (display "CHECK alive\n") (quit-TeXmacs))'
 
 # (close) messages of several kinds give the console several tabs (the
@@ -221,7 +222,7 @@ step_quit='eval:(begin (display "CHECK alive\n") (quit-TeXmacs))'
 # main window)
 msgs='(for-each (lambda (ch) (debug-message ch (string-append ch " line\n"))) (list "std-error" "std-warning" "debug-io" "debug-automatic"))'
 quit_after=30000
-run close "" "windows;wait:Error messages;windows;windows;close:Error messages;windows;windows;$step_quit" \
+run close "" "windows;wait:Error messages;windows;windows;close:Error messages;windows;windows;windows;windows;windows;windows;windows;windows;$step_quit" \
     "(begin $msgs (open-error-messages))"
 close_ok () {
   fail="the console was not open"
@@ -337,7 +338,7 @@ verdict repeats "an error which comes again prints its report on the terminal on
 # second dialog
 widget='(tm-widget (cocoa-check-sizes cmd) (resize "-100px" "-20px" (glue #f #f -10 -20)) (text "Bad sizes"))'
 quit_after=30000
-run sizes "" "windows;wait:Bad sizes again;windows;$step_quit" \
+run sizes "" "windows;wait:Bad sizes again;windows;windows;windows;windows;windows;windows;windows;windows;$step_quit" \
     '(begin (dialogue-window cocoa-check-sizes noop "Bad sizes") (dialogue-window cocoa-check-sizes noop "Bad sizes again"))' \
     "$widget"
 sizes_ok () {
@@ -619,7 +620,7 @@ EOF
 focus_defs='(tm-define (cocoa-check-state) (display* "CHECK current " (url-tail (current-buffer)) " " (tree->stree (buffer-get-body (current-buffer))) "\n"))'
 focus_steps='wait:quiet.tm;front:quiet.tm;activate;windows'
 state='eval:(cocoa-check-state)'
-focus_quit='eval:(begin (display "CHECK alive\n") (quit-TeXmacs))'
+focus_quit=$step_quit
 on_actions=
 [ "${GITHUB_ACTIONS:-}" = true ] && on_actions=1
 case "${TM_COCOA_FOCUS:-}" in
