@@ -213,8 +213,9 @@ verdict title "a French dialog title with accents (#468)" title_ok
 # 44642164389). Their window test waits for the window (wait:<title>, at
 # most 20 s), and ends with this quit; quit_after=30000 keeps the quit of
 # run (14 s by default) from cutting the wait, and stops TeXmacs if the
-# window test does not end. Their steps after the action last about as
-# long as the 14 s did before (TeXmacs goes on, no warning comes later)
+# window test does not end. The steps of close and sizes after their
+# action last about as long as the 14 s did before (TeXmacs goes on, no
+# warning comes later); queries prints its answers at once
 step_quit='eval:(begin (display "CHECK alive\n") (quit-TeXmacs))'
 
 # (close) messages of several kinds give the console several tabs (the
