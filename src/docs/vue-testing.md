@@ -82,6 +82,19 @@ need `-debug-events` on the command line.
 set it, and `TEXMACS_VUE_FOOTER=plain|interactive` for the preference
 "interactive footer" (test `footer-emoji`).
 
+`TEXMACS_VUE_CLIPBOARD=private` keeps the selections of the clipboard
+commands inside TeXmacs (`selection_t`, `selection_s`), never on the clipboard
+of the system, as while a script of the driver runs and under `-headless`
+(#894): the runners of `tests/scheme`, `tests/startup`, `tests/shared` and
+`tests/gui` set it (with `TEXMACS_NS_PASTEBOARD=private` for Cocoa), so that
+the copies of their runs with a window never replace the user's. Any other
+value (the headless startup cases of #708 give `system`) means the clipboard of SDL.
+No image is kept on a private clipboard: `graphics-file-to-clipboard`
+returns `#f` and "Copy to > Image" puts nothing anywhere (the private
+pasteboard of Cocoa and the offscreen clipboard of Qt take it). The tests of
+`tests/Plugins/Vue` (`run.sh`) don't set it: `copy-image`, which has no
+driver script, uses the clipboard of the system.
+
 `TEXMACS_VUE_THEME=light|dark` forces the theme of the interface. The
 `theme` and `icons` tests each render one window under whichever theme is
 forced, so comparing the two means running them twice; `icons` shows one row

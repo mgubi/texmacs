@@ -62,8 +62,10 @@ mkdir -p "$run" || exit 1
 export TEXMACS_PATH="$top/TeXmacs"
 export QT_QPA_PLATFORM=offscreen
 # the Cocoa build: the copies of the runs with a window go to a pasteboard of
-# their own, not to the clipboard of the user (#708)
+# their own, not to the clipboard of the user (#708); the Vue build keeps
+# them inside TeXmacs (#894)
 export TEXMACS_NS_PASTEBOARD=private
+export TEXMACS_VUE_CLIPBOARD=private
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
