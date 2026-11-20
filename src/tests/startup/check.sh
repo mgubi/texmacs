@@ -285,20 +285,28 @@ fi
 
 # On macOS, the clipboard cases below must leave the clipboard of the system
 # alone: the Cocoa build put the copies of a headless run on the general
-# pasteboard, which replaced what the user had copied (#708). Its change
-# count and its text (pbpaste) are saved here; the second case checks the
-# count. If a copy of TeXmacs reached the pasteboard (the type
-# org.texmacs.pid), the text is put back with pbcopy after the cases (a copy
-# made by the user meanwhile is kept). Not where the pasteboard can't be
-# read (not macOS).
+# pasteboard, which replaced what the user had copied (#708). When one of
+# them runs, the change count of the pasteboard and its text (pbpaste, kept
+# in a variable, never in a file) are read first; the second case checks the
+# count. Not where the pasteboard can't be read (not macOS). A copy made by
+# the user while the case runs fails it.
 pb_jxa () {
   osascript -l JavaScript -e "ObjC.import('AppKit'); $1" 2> /dev/null
 }
 pb_count () { pb_jxa '$.NSPasteboard.generalPasteboard.changeCount'; }
-pb_name="headless: a copy leaves the clipboard of the system alone (#708, macOS)"
-pb_before=$(pb_count)
-pb_saved="$out/startup-pasteboard.txt"
-[ -z "$pb_before" ] || pbpaste > "$pb_saved" 2> /dev/null
+pb_has () {
+  # the pasteboard has one of these types
+  [ "$(pb_jxa "ObjC.unwrap(\$.NSPasteboard.generalPasteboard.availableTypeFromArray(\$([$1]))) ? 'yes' : 'no'")" = yes ]
+}
+pb_keep="headless: the clipboard commands keep the selection (#708)"
+pb_name="headless: a copy leaves the clipboard of the system alone (#708) (macOS)"
+pb_before=""
+case "$pb_keep
+$pb_name" in
+  *"${TM_STARTUP_CASES:-}"*)
+    pb_before=$(pb_count)
+    [ -z "$pb_before" ] || pb_text=$(LC_ALL=en_US.UTF-8 pbpaste 2> /dev/null) ;;
+esac
 
 # The clipboard commands under -headless, which runs a QCoreApplication: the
 # clipboard of Qt has no platform there, and copying crashed (#708). The
@@ -344,7 +352,7 @@ EOF
 
 # (both cases with the general pasteboard, which a headless run must not use)
 TEXMACS_NS_PASTEBOARD=general \
-check "headless: the clipboard commands keep the selection (#708)" \
+check "$pb_keep" \
       "copy #t
 extern #t
 latex #t
@@ -376,12 +384,23 @@ EOF
         "pasteboard $pb_before
 quit ()" \
         -headless -x "$atquit" -x '(load "startup-pasteboard.scm")'
-  if [ "$(pb_count)" != "$pb_before" ] &&
-     [ "$(pb_jxa 'ObjC.unwrap($.NSPasteboard.generalPasteboard.availableTypeFromArray($(["org.texmacs.pid"]))) ? "yes" : "no"')" = yes ]; then
-    pbcopy < "$pb_saved"
+fi
+# Put the text back when a copy of these cases reached the pasteboard (only
+# without the fix): the type org.texmacs.pid of a copy, the sentence of
+# startup-a.tm of an export, or the image of graphics-file-to-clipboard (a
+# picture without text). Only the text is put back (not pictures or rich
+# text); a copy made meanwhile by the user, or by another TeXmacs, would be
+# replaced too.
+if [ -n "$pb_before" ] && [ "$(pb_count)" != "$pb_before" ]; then
+  if pb_has "'org.texmacs.pid'" ||
+     LC_ALL=en_US.UTF-8 pbpaste 2> /dev/null | grep -q "startup checks" ||
+     { pb_has "'public.tiff','public.png'" &&
+       ! pb_has "'public.utf8-plain-text'"; }; then
+    printf '%s' "$pb_text" | LC_ALL=en_US.UTF-8 pbcopy
     echo "         (the text of the clipboard was put back)"
   fi
 fi
+pb_text=""
 export TEXMACS_NS_PASTEBOARD=private
 
 # A copy in a buffer which was never typeset (a script, no update-forced):

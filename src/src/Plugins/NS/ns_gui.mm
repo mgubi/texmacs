@@ -141,22 +141,25 @@ ns_gui_rep::~ns_gui_rep()  {
 static NSString* texmacs_clipboard_type= @"org.texmacs.clipboard";
 static NSString* texmacs_pid_type= @"org.texmacs.pid";
 
-/* The pasteboard of the system, or nil. In the headless mode, as in Qt
- (#708), there is none: the selections are only kept in selection_t and
- selection_s, so that scripts and tests never touch the clipboard of the
- user. TEXMACS_NS_PASTEBOARD=private (a testing aid, for the runs with a
- window of the test suites) gives a pasteboard of this process alone, made
- with a unique name and released at the exit; a session with a window uses
- the general pasteboard. */
+/* The pasteboard of the clipboard commands of TeXmacs, or nil. In the
+ headless mode, as in Qt (#708), there is none: the selections are only kept
+ in selection_t and selection_s, so that scripts and tests never touch the
+ clipboard of the user. TEXMACS_NS_PASTEBOARD=private (a testing aid, for
+ the runs with a window of the test suites) gives a pasteboard of this
+ process alone, made with a unique name and released at the exit; a session
+ with a window uses the general pasteboard. (Copy and cut in the native text
+ fields of the dialogs are done by AppKit, on the general pasteboard.) */
 
 static NSPasteboard* private_pasteboard= nil;
 
 static void
 release_private_pasteboard () {
-  if (private_pasteboard) {
-    [private_pasteboard releaseGlobally];
-    [private_pasteboard release];
-    private_pasteboard= nil;
+  @autoreleasepool {
+    if (private_pasteboard) {
+      [private_pasteboard releaseGlobally];
+      [private_pasteboard release];
+      private_pasteboard= nil;
+    }
   }
 }
 

@@ -110,6 +110,9 @@ else
 fi
 [ -x "$bin" ] || { echo "no $bin, build TeXmacs first" >&2; exit 1; }
 timeout=${TM_TEST_TIMEOUT:-60}
+# the Cocoa build: the copies of the runs with a window go to a pasteboard of
+# their own, not to the clipboard of the user (#708)
+export TEXMACS_NS_PASTEBOARD=private
 homes=${TM_TEST_HOME:-$out}
 mkdir -p "$out"
 
