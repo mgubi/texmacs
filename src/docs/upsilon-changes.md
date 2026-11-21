@@ -12,6 +12,16 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 21 November 2026
+
+- **Vue: the text fields of dialogs which change their content belong to
+  their dialog** (Vue interface, desktop and browser): the content of a
+  `refresh` or `refreshable` widget was made at its first layout, after the
+  window of its dialog, so that a `texmacs-input` in it (the headers and
+  footers of the page format dialog, for instance) belonged to no window,
+  and Close window or Close buffer in the field did not close the dialog.
+  The content is now made with the widget, as in Qt (#776).
+
 ## 20 November 2026
 
 - **HTML export: deep inline markup and documents in paragraphs in linear

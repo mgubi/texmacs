@@ -301,6 +301,14 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|21 November 2026>
+
+  <\itemize>
+    <item>In a text field of a dialog whose content changes (the headers
+    and footers of the page format dialog), <menu|File|Close window> closes
+    the dialog.
+  </itemize>
+
   <paragraph|19 November 2026>
 
   <\itemize>
