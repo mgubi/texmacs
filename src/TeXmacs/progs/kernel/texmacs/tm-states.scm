@@ -27,8 +27,19 @@
 (define (state-cprops sr)
   (caddr sr))
 
-(define (slotlist-load l)
+;; On Chez, define-state also compiles a setter and a getter for each slot
+;; (see define-state): slots are module variables there, which eval cannot
+;; reach; the other interpreters have no such lists
+(define (state-csetters sr)
+  (and (> (length sr) 3) (list-ref sr 3)))
+
+(define (state-cgetters sr)
+  (and (> (length sr) 4) (list-ref sr 4)))
+
+(define (slotlist-load l . setters)
  ;(display* "load=" l "\n")
+  (if (and (pair? setters) (car setters))
+      (for-each (lambda (e set-val!) (set-val! (cadr e))) l (car setters))
   (for (e l)
      (eval
         `(begin
@@ -38,20 +49,24 @@
                  ,(with val (cadr e)
                      (if (and (pair? val) (eq? (car val) 'quote))
                          val
-                        `(quote ,(eval val)))))))))
+                        `(quote ,(eval val))))))))))
 
 (define (proplist-load l funcs b)
  ;(display* "load[props]=" l "\n")
+  (if (not (chez-scheme?)) ;; defined by define-state on Chez
   (for (e l)
      (if (not (defined? `,(car e)))
-         (eval `(define-public ,(car e) #f))))
+         (eval `(define-public ,(car e) #f)))))
   (if b
       (for (f funcs)
          (f))))
 
-(define (slotlist-save l)
+(define (slotlist-save l . getters)
+  (if (and (pair? getters) (car getters))
+      (for-each (lambda (e get-val) (set-car! (cdr e) (get-val)))
+                l (car getters))
   (for (e l)
-     (set-car! (cdr e) `(quote ,(eval (car e)))))
+     (set-car! (cdr e) `(quote ,(eval (car e))))))
  ;(display* "save=" l "\n")
  ;(for (e l)
  ;   (eval `(undefine ,(car e))))
@@ -72,13 +87,13 @@
         (if (not (eq? sr current-state))
             (begin
               (state-synchronize)
-              (slotlist-load (state-slots sr))))
+              (slotlist-load (state-slots sr) (state-csetters sr))))
         (proplist-load (state-props sr) (state-cprops sr) (null? opt))
         (set! current-state sr))))
 
 (define-public (state-save sr)
   (if (and sr (not (eq? sr current-state)))
-      (slotlist-save (state-slots sr)))
+      (slotlist-save (state-slots sr) (state-cgetters sr)))
  ;(display* "ss=" sr "\n")
   )
 
@@ -130,6 +145,21 @@
   (let* ((theslots (copy-tree slotlists))
          (slots (cadr (car theslots)))
          (props (cadr (cadr theslots))))
+    (if (chez-scheme?)
+    ;; no eval on Chez: the slots and the properties are defined here, and
+    ;; the state gets compiled setters and getters for the slots
+    `(begin
+       ,@(map (lambda (s) `(define-public ,(car s) ,(cadr s))) slots)
+       ,@(map (lambda (p) `(define-public ,(car p) #f)) props)
+       (define-public ,name
+         (state-create
+           (list (list ,@(map (lambda (s) `(list ',(car s) ,(cadr s))) slots))
+                 ',props
+                 (list ,@(map (lambda (x) `(lambda () (set! ,(car x) ,(cadr x))))
+                              props))
+                 (list ,@(map (lambda (x) `(lambda (val) (set! ,(car x) val)))
+                              slots))
+                 (list ,@(map (lambda (x) `(lambda () ,(car x))) slots))))))
     `(begin
         (if (not (defined? ',name))
             (define-public ,name #f))
@@ -138,7 +168,7 @@
                                (eval
                                   `(lambda () (set! ,(car x) ,(cadr x)))))
                            ',props))
-          (set! ,name (state-create (append '(,slots ,props) `(,cprops))))))))
+          (set! ,name (state-create (append '(,slots ,props) `(,cprops)))))))))
 
 (define-public-macro (with-state sr . body)
  `(begin

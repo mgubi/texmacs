@@ -78,16 +78,18 @@
         "tm-ieeetr" "tm-siam" "tm-unsrt"))
 
 (tm-define-macro (bib-define-style s d)
-  (if (equal? s d)
-      `(begin
-	 (set! bib-default-style ,s)
-	 (texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
-			 (bib-mode? ,s))))
-      `(begin
-	 (set! bib-default-style ,d)
-	 (texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
-			 (bib-mode? ,s)
-			 ,(string->symbol (string-append "bib-" d "%")))))))
+  ;; in a Chez module body, no definition may follow an expression: the
+  ;; assignment becomes a definition there
+  (let ((modes (if (equal? s d)
+                   `(texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
+                                    (bib-mode? ,s)))
+                   `(texmacs-modes (,(string->symbol (string-append "bib-" s "%"))
+                                    (bib-mode? ,s)
+                                    ,(string->symbol (string-append "bib-" d "%"))))))
+        (assign `(set! bib-default-style ,d)))
+    (if (chez-scheme?)
+        `(begin ,modes (define ,(fresh-tm-dummy) (begin ,assign (void))))
+        `(begin ,assign ,modes))))
 
 (tm-define (bib-with-style s f . args)
   (with tmp-s bib-style

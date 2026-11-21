@@ -273,7 +273,7 @@
 (cond ((s7-scheme?)
        (varlet *texmacs-module* 'select tm-select))
       ((or (os-mingw?) ;; mingw guile does not define select
-           (femtolisp-scheme?))
+           (femtolisp-scheme?) (chez-scheme?))
        (with-module texmacs-user
          (define-public (select . args) (apply tm-select args))))
       (else

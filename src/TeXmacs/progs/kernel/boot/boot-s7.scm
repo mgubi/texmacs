@@ -15,6 +15,7 @@
 
 (define (s7-scheme?) #t)
 (define (femtolisp-scheme?) #f)
+(define (chez-scheme?) #f)
 (define has-look-and-feel? (lambda (x) (== x "emacs")))
 
 ;; TeXmacs expects Guile's list?, which only holds for proper lists. Like the

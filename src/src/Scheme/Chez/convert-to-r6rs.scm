@@ -69,6 +69,31 @@
          (exists has-def? (cdr form)))
         (else #f)))
 
+;; The body of a module, in the order of the source, as Guile loads it: no
+;; definition may follow an expression in a Chez module body, so a plain
+;; expression becomes the definition of a dummy variable where it stands.
+;; Moving the expressions after the definitions instead breaks a definition
+;; which reads what an earlier expression defines, such as
+;;   (tm-define (table-encode-mode m) ...)  ; an expression on Chez
+;;   (define encode-mode table-encode-mode)
+;; Expressions which contain definitions (cond-def?) still come last.
+(define expression-counter 0)
+
+(define (expression->definition form)
+  (set! expression-counter (+ expression-counter 1))
+  `(define ,(string->symbol
+             (string-append "%tm-expr-" (number->string expression-counter)))
+     (begin ,form (void))))
+
+(define (in-order-body forms)
+  (let loop ((fs forms) (body '()) (late '()))
+    (cond ((null? fs) (values (reverse body) (reverse late)))
+          ((def-form? (car fs)) (loop (cdr fs) (cons (car fs) body) late))
+          ((or (cond-def? (car fs)) (has-def? (car fs)))
+           (loop (cdr fs) body (cons (car fs) late)))
+          (else (loop (cdr fs) (cons (expression->definition (car fs)) body)
+                      late)))))
+
 (define (cond-def? form)
   (and (pair? form)
        (case (car form)
@@ -734,14 +759,18 @@
                              (module-link-forms mod-name deps options public local)))
                  (hashtable-set! module-exports-table mod-sym public)
                  (let-values (((definitions expressions)
-                               (partition def-form? prepared)))
+                               (in-order-body prepared)))
                    (write-module-file
                      out-path rel-path mod-name mod-sym
                      imports exports
                      (keyword-definitions forms)
                      local
-                     definitions
-                     (map (lambda (dep) `(module-provide ',dep)) deps)
+                     (append
+                       (map (lambda (dep)
+                              (expression->definition `(module-provide ',dep)))
+                            deps)
+                       definitions)
+                     '()
                      expressions))
                  mod-sym)))))))
 

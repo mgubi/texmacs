@@ -17,6 +17,15 @@
 ;; export machinery (`define-public', `define-public-macro', `define-macro',
 ;; `provide-public') that every module needs in order to be compiled at all.
 
+;;; Dialect predicates
+;;
+;; Shared code tests these where the interpreters differ; Chez runs the Guile
+;; branch.  The compiler folds the calls it sees (compiler-scan.scm), these
+;; serve the code evaluated at run time.
+(define-public (s7-scheme?) #f)
+(define-public (femtolisp-scheme?) #f)
+(define-public (chez-scheme?) #t)
+
 ;;; Numeric helpers
 ;;
 ;; No `1+' / `1-' here: `(chezscheme)' already exports both with the same
@@ -36,6 +45,7 @@
 ;; Only `delq!' is used (kernel/boot/srfi.scm).  `delete!', `delq' and `delv!'
 ;; had no callers and are gone.
 (define-public (delq! x l) (remq! x l))
+(define-public (delq x l) (remq x l))
 
 (define-public (acons k v l) (cons (cons k v) l))
 
