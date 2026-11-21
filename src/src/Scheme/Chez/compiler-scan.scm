@@ -72,29 +72,45 @@
       lazy-input-converter-force
       plugin-serializer))  ; read by check/plugins-test.scm
 
-  ;; Private definitions which the tests reach in their module (priv,
+  ;; Private definitions which the tests reach in their module, by module
+  ;; (two modules may have private definitions of the same name) (priv,
   ;; module-ref, eval in resolve-module, next-serial, (eval '(set! x ...)
   ;; (resolve-module ...)): the patterns of TeXmacs/progs/check/*.scm): global
   ;; definitions on Chez, whose modules export no private binding and
   ;; cannot assign an imported one.
   (define chez-global-names
-    '(volatile-cache-stamp version-grain chat-room-name chat-room-table-entry client-serial
-      client-start-errno->string credentials->authentications
-      db-change-status db-dub-in-sync db-last-sync docgrep dont-sync?
-      fix-link fix-links get-sync-status is-on? live-load live-name
-      live-save live-table-entry load-preferences-in-stree message->document
-      message->share messages->document object_commit requalify-deleted
-      server-mailer-instantiate server-serial shared-table-entry
-      sort-directory-entries split-server-name-and-port tmdoc-add-aux
-      tmdoc-down tmdoc-expand tmdoc-internal-label tmdoc-internalize
-      tmdoc-language tmdoc-relative tmdoc-remove-hyper-links
-      url-resolve-help version->file-name version-get-info
-      version-get-versions))
+    '(
+      ("client/client-base.scm" client-serial client-start-errno->string split-server-name-and-port)
+      ("client/client-chat.scm" chat-room-name chat-room-table-entry fix-link fix-links message->document message->share messages->document shared-table-entry)
+      ("client/client-db-sync.scm" db-change-status db-dub-in-sync db-last-sync)
+      ("client/client-live.scm" live-table-entry)
+      ("client/client-sync.scm" dont-sync? get-sync-status requalify-deleted)
+      ("client/client-tmfs.scm" sort-directory-entries)
+      ("doc/docgrep.scm" docgrep)
+      ("doc/help-funcs.scm" url-resolve-help)
+      ("doc/tmdoc.scm" tmdoc-add-aux tmdoc-down tmdoc-expand tmdoc-internal-label tmdoc-internalize tmdoc-language tmdoc-relative tmdoc-remove-hyper-links)
+      ("graphics/graphics-single.scm" object_commit)
+      ("server/server-base.scm" credentials->authentications is-on? load-preferences-in-stree server-mailer-instantiate server-serial)
+      ("server/server-live.scm" live-load live-name live-save)
+      ("server/server-tmfs.scm" version->file-name version-get-info version-get-versions)
+      ("tools/comment/comment-edit.scm" volatile-cache-stamp)
+      ("utils/plugins/plugin-cmd.scm" plugin-serializer)
+      ("version/version-compare.scm" version-grain)))
 
-  (define (globalize-private f)
+  ;; the names of the file at file-path (.../progs/<rel>) which are global
+  (define (file-global-names file-path)
+    (let loop ((l chez-global-names))
+      (cond ((null? l) '())
+            ((let* ((rel (string-append "/" (caar l)))
+                    (n (string-length file-path)) (m (string-length rel)))
+               (and (>= n m) (string=? (substring file-path (- n m) n) rel)))
+             (cdar l))
+            (else (loop (cdr l))))))
+
+  (define (globalize-private f names)
     (if (and (pair? f) (eq? (car f) 'define) (pair? (cdr f))
              (let ((h (cadr f)))
-               (memq (if (pair? h) (car h) h) chez-global-names)))
+               (memq (if (pair? h) (car h) h) names)))
         (let* ((h (cadr f))
                (name (if (pair? h) (car h) h))
                (val (if (pair? h) `(lambda ,(cdr h) ,@(cddr f)) (caddr f))))
@@ -137,7 +153,8 @@
                   (else (loop (cdr fs) (cons n seen) (cons f acc))))))))
 
   (define (read-all-forms file-path)
-    (let ((forms (map (lambda (f) (globalize-private (promote-private f)))
+    (let* ((globals (file-global-names file-path))
+           (forms (map (lambda (f) (globalize-private (promote-private f) globals))
                       (single-definitions
                         (tm-read-guile-file file-path)))))
       (if (compat-file? file-path)

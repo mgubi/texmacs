@@ -53,6 +53,14 @@
 ;;; Numeric helpers
 
 ;; Guile writes the digits above 9 in lower case (colours "#8020c0")
+;; Chez 10.4.1 compiles (equal? x "") as a test against the unique mutable
+;; empty string, so that the immutable empty string which names the symbol
+;; || is not equal to "" (it is to (string-copy "")): the empty name is
+;; returned as "", which TeXmacs compares with equal? everywhere (bib-null?)
+(define-public (symbol->string s)
+  (let ((r (chez:symbol->string s)))
+    (if (fx= (string-length r) 0) "" r)))
+
 (define-public (number->string n . radix)
   (let ((s (apply chez:number->string n radix)))
     (if (and (pair? radix) (> (car radix) 10)) (string-downcase s) s)))
@@ -790,7 +798,7 @@
          (if (and (or (pair? v) (null? v))
                   (not (and (pair? v)
                             (symbol? (car v))
-                            (let ((s (symbol->string (car v))))
+                            (let ((s (chez:symbol->string (car v))))
                               (and (> (string-length s) 0)
                                    (char=? (string-ref s 0) #\:))))))
              #'(apply (lambda var body ...) val)
