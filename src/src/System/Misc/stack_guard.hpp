@@ -31,13 +31,24 @@ long stack_remaining ();
 // levels on the main thread. The readers of .tm files (fromtm.cpp) and the
 // conversions of Scheme lists to trees (glue.cpp) cut what is deeper, with an
 // error "nesting too deep" in its place (#813: deeper, the recursions of C++
-// on the tree crashed)
+// on the tree crashed). Whatever the stack left, TREE_DEPTH_FLOOR levels are
+// always taken, so that a shallow tree is whole also when it is made deep in
+// a recursion (of Scheme: near the limit of Guile, the stack nearly full cut
+// trees 3 levels deep); reading them takes a few hundred bytes for each
+#define TREE_DEPTH_FLOOR 64
 int tree_max_depth ();
 
 inline bool
 stack_nearly_full () {
   long n= stack_remaining ();
   return n >= 0 && n < STACK_MARGIN;
+}
+
+// is a level @depth too deep, for a reader whose limit is @max (from
+// tree_max_depth)?
+inline bool
+tree_too_deep (int depth, int max) {
+  return depth >= max || (depth >= TREE_DEPTH_FLOOR && stack_nearly_full ());
 }
 
 // The Scheme interpreter may have a limit of its own for the stack it shares

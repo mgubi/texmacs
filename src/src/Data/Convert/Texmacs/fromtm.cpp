@@ -256,7 +256,7 @@ tree
 tm_reader::read_apply (string name, bool skip_flag) {
   // cout << "Read apply " << name << INDENT << LF;
   // (a file which nests too deep: an error tree, not a stack overflow, #813)
-  if (depth >= max_depth || stack_nearly_full ()) {
+  if (tree_too_deep (depth, max_depth)) {
     // (the warning is given once the reader is back at the top, by
     // texmacs_to_tree: a message calls Scheme, which needs the stack too)
     skipped_nestings++;

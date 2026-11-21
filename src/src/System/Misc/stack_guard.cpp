@@ -114,5 +114,6 @@ int
 tree_max_depth () {
   long left= stack_remaining ();
   if (left < 0) left= 8L * 1024L * 1024L;
-  return (int) (left / 4096);
+  int n= (int) (left / 4096);
+  return n < TREE_DEPTH_FLOOR? TREE_DEPTH_FLOOR: n;
 }

@@ -483,8 +483,7 @@ struct tmscm_depth_cap {
   int max;  // deeper lists are cut
   int cut;  // the number of lists cut
   tmscm_depth_cap (): max (tree_max_depth ()), cut (0) {}
-  bool too_deep (int depth) {
-    return depth >= max || stack_nearly_full (); }
+  bool too_deep (int depth) { return tree_too_deep (depth, max); }
   void done (const char* what) {
     if (cut == 0) return;
     convert_warning << "Scheme " << what << " nested deeper than "
@@ -611,9 +610,13 @@ path_to_tmscm (path p) {
 
 path
 tmscm_to_path (tmscm p) {
-  if (tmscm_is_null (p)) return path ();
-  else return path ((int) tmscm_to_int (tmscm_car (p)), 
-                          tmscm_to_path (tmscm_cdr (p)));
+  // (a loop: a recursion along the list overflowed the stack for long ones)
+  array<int> a;
+  for (; !tmscm_is_null (p); p= tmscm_cdr (p))
+    a << (int) tmscm_to_int (tmscm_car (p));
+  path r;
+  for (int i= N(a) - 1; i >= 0; i--) r= path (a[i], r);
+  return r;
 }
 
 
@@ -1278,9 +1281,13 @@ list_string_to_tmscm (list_string l) {
 
 list_string
 tmscm_to_list_string (tmscm p) {
-  if (tmscm_is_null (p)) return list_string ();
-  return list_string (tmscm_to_string (tmscm_car (p)),
-            tmscm_to_list_string (tmscm_cdr (p)));
+  // (a loop: a recursion along the list overflowed the stack for long ones)
+  array<string> a;
+  for (; !tmscm_is_null (p); p= tmscm_cdr (p))
+    a << tmscm_to_string (tmscm_car (p));
+  list_string r;
+  for (int i= N(a) - 1; i >= 0; i--) r= list_string (a[i], r);
+  return r;
 }
 
 typedef list<tree> list_tree;
@@ -1305,9 +1312,13 @@ list_tree_to_tmscm (list_tree l) {
 
 list_tree
 tmscm_to_list_tree (tmscm p) {
-  if (tmscm_is_null (p)) return list_tree ();
-  return list_tree (tmscm_to_tree (tmscm_car (p)),
-            tmscm_to_list_tree (tmscm_cdr (p)));
+  // (a loop: a recursion along the list overflowed the stack for long ones)
+  array<tree> a;
+  for (; !tmscm_is_null (p); p= tmscm_cdr (p))
+    a << tmscm_to_tree (tmscm_car (p));
+  list_tree r;
+  for (int i= N(a) - 1; i >= 0; i--) r= list_tree (a[i], r);
+  return r;
 }
 
 /******************************************************************************

@@ -3703,7 +3703,46 @@
       (check-true (and cell (tree-is? cell 'cell)))
       (with-typeset-body `(document ,tab)
         (lambda ()
-          (check-true (> (get-page-count) 0)))))))
+          (check-true (> (get-page-count) 0))))))
+  ;; a text of Scheme (the scheme: output of a plug-in, stm-snippet->texmacs,
+  ;; .stm files) is cut in the same way, and read on after the cut
+  (let* ((n deep-list-levels)
+         (deep (string-append (repeat-string "(with \"color\" \"red\" " n)
+                              "\"leaf\"" (repeat-string ")" n)))
+         (t (stm-snippet->texmacs
+             (string-append "(document " deep " \"after; (\\\")\" \"end\")")))
+         (tab (stm-snippet->texmacs
+               (string-append (repeat-string "(tformat (table (row (cell " (quotient n 4))
+                              "\"leaf\"" (repeat-string "))))" (quotient n 4))))))
+    (check-true (deep-with-cut? (stm-snippet->texmacs deep)))
+    (check= (tree-arity t) 3)
+    (check-true (deep-with-cut? (tree-ref t 0)))
+    (check= (tree->stree (tree-ref t 1)) "after; (\")")
+    (check= (tree->stree (tree-ref t 2)) "end")
+    (check-true (tree-is? (deep-leaf-parent tab) 'cell))
+    (check= (tree->stree (stm-snippet->texmacs
+                          "(concat \"a\" (with \"color\" \"red\" \"b\"))"))
+            '(concat "a" (with "color" "red" "b"))))
+  ;; a shallow tree is whole, also made into a tree from deep in a recursion
+  ;; of Scheme: near the limit of Guile, the stack nearly full, it was cut
+  ;; from its first level ((error "nesting too deep") for a <concat>); deeper
+  ;; still, Guile stops with stack-overflow
+  (let ((x '(concat "a" (with "color" "red" "b"))))
+    (for (n '(1000 2000 2500 2800 2900 3000 3050 3100 3150 3200 3250 3500))
+      (with r (catch #t
+                (lambda () (deep-call n (lambda () (tree->stree (stree->tree x)))))
+                (lambda args 'overflow))
+        (check-true (in? r (list x 'overflow)))))))
+
+(define (deep-call n thunk)
+  ;; (thunk) at the bottom of @n frames of a recursion of Scheme
+  (if (= n 0) (thunk) (car (list (deep-call (- n 1) thunk)))))
+
+(define (deep-leaf-parent t)
+  ;; the node above the last leaf of @t, without recursion
+  (with u (tree-ref t (- (tree-arity t) 1))
+    (if (or (tree-atomic? u) (== (tree-arity u) 0) (tree-is? u 'error)) t
+        (deep-leaf-parent u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
