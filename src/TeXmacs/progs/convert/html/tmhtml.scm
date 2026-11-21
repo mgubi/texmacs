@@ -408,14 +408,19 @@
             (cons `(h:div (@ (style "display: inline")) ,@s) r)))))
 
 (define (as-block x)
+  ;; A <p> may only contain phrasing content: a paragraph with a block in
+  ;; it (an inline table on a line of text, a <div>...) is a <div>, the runs
+  ;; of inline items between its blocks in inline <div>. It stayed a <p>,
+  ;; which a browser closed before the block, leaving an empty <p> after
+  ;; it (#903)
   ;;(display* "--- " x "\n")
   (cond ((func? x 'h:div) (tmhtml-simplify-div x))
-        ((and (func? x 'h:p)
-              (not (forall? (negate xhtml-block?) (sxml-content x)))
-              (not (forall? xhtml-block? (sxml-content x))))
+        ((and (func? x 'h:p) (exists? xhtml-block? (sxml-content x)))
          (let* ((a (sxml-attr-list x))
-                (m (mixed-block (sxml-content x))))
-           (if (null? a) `(h:p ,@m) `(h:p (@ ,@a) ,@m))))
+                (c (sxml-content x))
+                (m (if (forall? xhtml-block? c) c (mixed-block c))))
+           (tmhtml-simplify-div
+            (if (null? a) `(h:div ,@m) `(h:div (@ ,@a) ,@m)))))
         (else x)))
 
 (define (force-block? x)
@@ -1342,7 +1347,11 @@
 	     (unit (symbol->string (tmlength-unit tmlen)))
 	     (incm (ahash-ref tmhtml-length-table unit))
 	     (cmpx (/ 1 (ahash-ref tmhtml-length-table "px"))))
-    (cond ((== unit "px") (number->htmlstring val))
+    ;; a length of CSS has a unit: a bare number is only for the attributes
+    ;; of HTML (width="10"), a bare number in a style was dropped by the
+    ;; browsers (vspace "10px" gave margin-bottom: 10, #901)
+    (cond ((== unit "px")
+           (string-append (number->htmlstring val) (if css? "px" "")))
 	  ((in? unit '("par" "pag"))
 	   (string-append (number->htmlstring (* 100 val)) "%"))
 	  ((and css? (== unit "tmpt"))
@@ -2649,9 +2658,13 @@
   (("font-shape" "small-caps")
    (h:class (@ (style "font-variant: small-caps")))))
 
-(logic-table tmhtml-with-cmd% ; deprecated
-  (("par-mode" "left") (h:div (@ (align "left"))))
-  (("par-mode" "justify") (h:div (@ (align "justify"))))
+;; the alignments of the paragraphs: in CSS (the attribute align of <div> is
+;; not HTML5); "right" was missing, and the alignment of padded-right-aligned
+;; was lost (#904)
+(logic-table tmhtml-with-cmd%
+  (("par-mode" "left") (h:div (@ (style "text-align: left"))))
+  (("par-mode" "justify") (h:div (@ (style "text-align: justify"))))
+  (("par-mode" "right") (h:div (@ (style "text-align: right"))))
   (("par-mode" "center") (h:center)))
 
 (logic-table tmhtml-with-cmd% ; netscape4

@@ -40,10 +40,14 @@
                    (cons "texmacs->latex:indirect-bib"       "off")
                    (cons "texmacs->latex:encoding"           "ascii")
                    (cons "texmacs->latex:use-macros"         "off"))))
-    (with old-exact (output-set-exact #t)
-      (output-flush)
-      (texout (texmacs->latex (bibtex-remove-keepcase x) options))
-      (output-set-exact old-exact))))
+    (let ((old-exact #f))
+      ;; restored after an error too: it was left on for the next exports
+      (dynamic-wind
+        (lambda () (set! old-exact (output-set-exact #t)))
+        (lambda ()
+          (output-flush)
+          (texout (texmacs->latex (bibtex-remove-keepcase x) options)))
+        (lambda () (output-set-exact old-exact))))))
 
 (define (bibtex-match l s a)
   (and (list? l) (>= (length l) (+ a 1)) (equal? (car l) s)))
@@ -301,17 +305,24 @@
      (bibtex-preamble "@" (cadr x))
      (output-lf-verbatim))))
 
+(define (bibtex-with-long-lines thunk)
+  ;; @thunk with lines of any length, as before after it, also after an
+  ;; error (the length was left at 999999 for the next exports, #902)
+  (let ((old-line-length #f))
+    (dynamic-wind
+      (lambda () (set! old-line-length (output-set-line-length 999999)))
+      thunk
+      (lambda () (output-set-line-length old-line-length)))))
+
 (tm-define (serialize-bibtex x)
-  (with old-line-length (output-set-line-length 999999)
-    (bibtexout x)
-    (output-set-line-length old-line-length)
-    (output-produce)))
+  (output-reset)
+  (bibtex-with-long-lines (lambda () (bibtexout x)))
+  (output-produce))
 
 (tm-define (serialize-bibtex-arg x)
-  (with old-line-length (output-set-line-length 999999)
-    (bibtex-arg x)
-    (output-set-line-length old-line-length)
-    (with r (output-produce)
-      (if (and (string-starts? r "{") (string-ends? r "}"))
-          (substring r 1 (- (string-length r) 1))
-          r))))
+  (output-reset)
+  (bibtex-with-long-lines (lambda () (bibtex-arg x)))
+  (with r (output-produce)
+    (if (and (string-starts? r "{") (string-ends? r "}"))
+        (substring r 1 (- (string-length r) 1))
+        r)))

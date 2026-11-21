@@ -196,5 +196,6 @@
 	    (lambda () (set! preformatted? saved-preformatted))))))
 
 (tm-define (serialize-html x)
+  (output-reset)
   (htmlout x)
   (output-produce))

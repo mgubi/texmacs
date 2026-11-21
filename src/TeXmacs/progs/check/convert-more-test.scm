@@ -823,6 +823,118 @@
                       (lambda (n) #t) (quotient (caddr nest) 10) (caddr nest)
                       "levels")))
 
+;; A length in px kept its unit only in the attributes of HTML: in CSS it
+;; was a bare number, which the browsers drop (vspace "10px" gave
+;; margin-bottom: 10, #901). The larger of two margins which collapse,
+;; when one of them is not a length, was the second one, whatever the
+;; other was
+(define (test-html-css-lengths)
+  (check-group "html export: lengths in CSS")
+  (check= (tmlength->htmllength "10px") "10px")
+  (check= (tmlength->htmllength "10px" #t) "10px")
+  (check= (tmlength->htmllength "10px" #f) "10")
+  (check= (tmlength->htmllength "10mm") "10mm")
+  (with s (html-of-buffer '(document (concat "a" (vspace "10px")) "b"))
+    (check-true (string-occurs? "margin-bottom: 10px" s)))
+  (with s (html-of-buffer '(document (concat (vspace* "1fn") "a" (vspace "10px"))))
+    (check= (map style-set (p-styles s))
+            (list (style-set "margin-top: 1em; margin-bottom: 10px"))))
+  (check= (css-merge-styles "margin-bottom: auto" "margin-bottom: 5mm")
+          "margin-bottom: 5mm")
+  (check= (css-merge-styles "margin-bottom: 5mm" "margin-bottom: auto")
+          "margin-bottom: 5mm")
+  (check= (css-merge-styles "margin-top: 1em" "margin-top: 2em")
+          "margin-top: 2em")
+  (check= (css-merge-styles "margin-top: 2em" "margin-top: 1em")
+          "margin-top: 2em"))
+
+;; The alignment of a paragraph: "right" (Format > Alignment > Right
+;; aligned, padded-right-aligned) was lost, as the table of the HTML of
+;; <with> had no entry for it (#904); left and justify used the attribute
+;; align of <div>, which is not HTML5
+(define (test-html-paragraph-alignment)
+  (check-group "html export: alignment of paragraphs")
+  (for (p '(((padded-right-aligned "ctr") "text-align: right")
+            ((with "par-mode" "right" "ctr") "text-align: right")
+            ((with "par-mode" "left" "ctr") "text-align: left")
+            ((with "par-mode" "justify" "ctr") "text-align: justify")
+            ((with "par-mode" "center" "ctr") "<center>")
+            ((padded-center "ctr") "<center>")))
+    (with s (html-of-buffer `(document "a" ,(car p) "b"))
+      (check= (map (cut string-occurs? <> s) (list (cadr p) "ctr" "align="))
+              (list #t #t #f)))))
+
+(define (p-contents s)
+  ;; the contents of the <p> of the HTML @s (they are not nested)
+  (let loop ((pos 0) (r '()))
+    (let* ((i1 (string-search-forwards "<p>" pos s))
+           (i2 (string-search-forwards "<p " pos s))
+           (i (cond ((< i1 0) i2) ((< i2 0) i1) (else (min i1 i2)))))
+      (if (< i 0) (reverse r)
+          (let* ((e (string-search-forwards "</p>" i s))
+                 (e* (if (< e 0) (string-length s) e)))
+            (loop e* (cons (substring s i e*) r)))))))
+
+;; A table on a line of text (an inline table) was put in a <p>, with the
+;; text around it in inline <div>: a <p> may not contain them, a browser
+;; closed the <p> before the table and left an empty <p> after it (#903).
+;; Such a paragraph is a <div>; the blocks and tables beside a tab are kept
+;; on their side of the tab (#896)
+(define (test-html-tables-in-lines)
+  (check-group "html export: a table on a line of text")
+  (let* ((table '(tabular (table (row (cell "ta") (cell "tb")))))
+         (no-block-in-p?
+          (lambda (s)
+            (list-and (map (lambda (c) (and (not (string-occurs? "<table" c))
+                                            (not (string-occurs? "<div" c))
+                                            (not (string-occurs? "<center" c))))
+                           (p-contents s))))))
+    (for (body (list `(concat "qq" ,table)
+                     table
+                     `(concat "qq" ,table "d")
+                     `(concat "qq" (center "x") ,table)
+                     `(concat "qq" (center "x") "d" ,table)
+                     `(concat "qq" (padded-right-aligned "x") "d" ,table)
+                     `(concat "qq" (htab "5mm") ,table)
+                     `(concat "qq" ,table (htab "5mm") "d")
+                     `(concat (vspace* "1fn") "qq" ,table (vspace "2fn"))))
+      (with s (html-of-buffer `(document "a" ,body "b"))
+        (check= (list (no-block-in-p? s) (string-occurs? "<table" s)
+                      (string-occurs? "ta" s)
+                      (or (== body table) (string-occurs? "qq" s)))
+                (list #t #t #t #t))))
+    ;; the margins of the paragraph are kept by its <div>
+    (with s (html-of-buffer `(document (concat (vspace* "1fn") "qq" ,table
+                                               (vspace "2fn"))))
+      (check-true (string-occurs? "margin-top: 1em" s))
+      (check-true (string-occurs? "margin-bottom: 2em" s)))
+    ;; text alone stays in a <p>
+    (check-true (string-occurs? "<p>" (html-of-buffer '(document "a"))))))
+
+;; A serialization which failed left its text, indentation and flags to the
+;; next one, also to a LaTeX export after an HTML one (#902); ahash-with,
+;; around the conversion of a formula (:math in tmhtml-env), keeps its old
+;; value after an error
+(define (test-output-after-error)
+  (check-group "html and latex export after a failed serialization")
+  (let* ((html (lambda () (convert '(document "hello") "texmacs-stree"
+                                   "html-snippet")))
+         (latex (lambda () (convert '(document "hello") "texmacs-stree"
+                                    "latex-snippet")))
+         (html0 (html))
+         (latex0 (latex))
+         (bad '(p "AAA" (div "BBB" ((@ (style "s")) "CCC"))))
+         (fail (lambda ()
+                 (catch #t (lambda () (serialize-html bad) 'no-error)
+                   (lambda args 'error)))))
+    (check= (fail) 'error)
+    (check= (html) html0)
+    (check= (fail) 'error)
+    (check= (latex) latex0)
+    (check= (fail) 'error)
+    (check= (serialize-latex '(!document "x")) "x")
+    (check= (latex) latex0)))
+
 ;; The LaTeX of a formula, also that of the formulas for MathJax in the
 ;; HTML export, in a time linear in its size: the export of a macro which
 ;; calls itself in a formula (a formula of 1 MB, which s7 converts whole)
@@ -3260,6 +3372,8 @@
                   test-html-weak-tabs test-html-blocks-and-tabs
                   test-html-nested-documents test-html-margins-of-nested-paragraphs
                   test-html-nested-blocks
+                  test-html-css-lengths test-html-paragraph-alignment
+                  test-html-tables-in-lines test-output-after-error
                   test-latex-linear
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
