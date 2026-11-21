@@ -30,8 +30,10 @@
              lst))
         (else (loop (cdr rest)))))))
 
-;; Curated startup resident module list (178 .so modules = boot-chez.so + 177 app modules)
+;; Curated startup resident module list (177 .so modules = boot-chez.so + 176 app modules)
 ;; in topological import order: unforced startup closure + high-frequency top-level menus.
+;; Not developer-menu: its preference call-back (update-bottom-tools) needs a
+;; view, which does not exist while the heap is built; it is a lazy menu.
 (define *startup-boot-modules*
   '("kernel/boot/boot-chez.so"
     "kernel/boot/chez-compat.so"
@@ -183,7 +185,6 @@
     "doc/apidoc.so"
     "language/natural.so"
     "utils/misc/gui-utils.so"
-    "texmacs/menus/developer-menu.so"
     "texmacs/menus/view-widgets.so"
     "texmacs/menus/view-menu.so"
     "database/db-base.so"

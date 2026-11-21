@@ -17,7 +17,7 @@
 
 ;; 1. Import all 177 resident application modules (matches *startup-boot-modules* minus boot-chez.so)
 ;; into the interaction environment and mark them loaded in *texmacs-modules-loaded*.
-;; The 178 startup modules are already loaded directly into the static generation via
+;; The 177 startup modules are already loaded directly into the static generation via
 ;; texmacs.boot during Sbuild_heap(); remaining modules lazy-load on demand.
 (define-macro (import-boot-resident-modules . specs)
   `(begin
@@ -118,7 +118,7 @@
   (prog scheme-tools) (prog scheme-menu)
   (doc apidoc-markup) (doc apidoc)
   (language natural) (utils misc gui-utils)
-  (texmacs menus developer-menu) (texmacs menus view-widgets)
+  (texmacs menus view-widgets)
   (texmacs menus view-menu)
   (database db-base) (database db-format)
   (database db-users) (database db-version)
