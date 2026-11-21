@@ -282,6 +282,22 @@
     (check-false (dropped-documents (name (tmp-dir))))
     (check-false (dropped-documents (name (tmp-file "missing.md"))))
     (check-false (dropped-documents "some text"))
+    ;; a file with a colon or a star in its name is the file of that name,
+    ;; not a list of paths or a pattern (#905; Windows forbids these names)
+    (unless (or (os-mingw?) (os-win32?))
+      (let* ((lit (lambda (n)
+                    (system-literal->url
+                     (string-append (url->system (tmp-dir)) "/" n))))
+             (colon (lit "p:q.md"))
+             (star (lit "p*q.md"))
+             (other (lit "p-other-q.md")))
+        (string-save "Colon\n" colon)
+        (string-save "Star\n" star)
+        (string-save "Other\n" other)
+        (check= (dropped-documents (name colon)) (list colon))
+        (check= (dropped-documents (name star)) (list star))
+        (for (f (list colon star other))
+          (when (url-exists? f) (system-remove f)))))
     ;; a text is not taken for a file: a name next to the document, a
     ;; relative name, a web address (never fetched)
     (let* ((host (write-file "host.md" "Host\n"))

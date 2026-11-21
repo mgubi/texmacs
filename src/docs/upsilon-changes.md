@@ -16,12 +16,14 @@ have the details, and the problems go to the
 
 - **Files with a star or a colon in their name open from the Finder**
   (desktop applications): a file given by the system (the Finder, the Dock,
-  `open`, the command line, the dialogs of files) was read as a name typed
-  by the user, so that `a*b.tm` was a pattern, which opened nothing when
-  another file of its folder matched it, and `a:b.tm` (shown as `a/b.tm` in
-  the Finder) a list of two paths, which opened the file `a` under a
-  garbled name. The path is now taken as it is, in the Cocoa, Qt and Vue
-  interfaces, also in the Open Recent menu (#905).
+  `open`, the command line, the file dialogs of the system, a file dropped
+  on a window) was read as a name typed by the user, so that `a*b.tm` was a
+  pattern, which opened nothing when another file of its folder matched
+  it, and `a:b.tm` (shown as `a/b.tm` in the Finder) a list of two paths,
+  which opened the file `a` under a garbled name. The path is now taken as
+  it is, in the Cocoa, Qt and Vue interfaces, also in the Open Recent menu
+  (a name typed in the file chooser made by TeXmacs, which Vue shows when
+  the system has no dialog, is read as before) (#905).
 - **Vue: the text fields of dialogs which change their content belong to
   their dialog** (Vue interface, desktop and browser): the content of a
   `refresh` or `refreshable` widget was made at its first layout, after the

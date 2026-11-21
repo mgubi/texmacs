@@ -7982,7 +7982,7 @@ vue_dialog_finish (vue_dialog_result* res, char* file, int code) {
   if (w != NULL) {
     if (res->chosen) {
       c_string name (res->file);
-      w->callback ((char*) name);
+      w->callback ((char*) name, true); // a path of the system (#905)
     }
     else w->callback (NULL);
   }

@@ -7897,7 +7897,11 @@ chooser_pretty_image_size (url image, string& w, string& h) {
 }
 
 void
-vue_chooser_widget_rep::callback (char* res) {
+vue_chooser_widget_rep::callback (char* res, bool literal) {
+  // literal: the path of a file chosen in a dialog of the system (or the
+  // panel of the browser), taken as it is, not as a pattern or a list of
+  // paths (a*b.tm, a:b.tm, #905); a name typed in the chooser of TeXmacs
+  // is parsed as everywhere else
   if (!res) {
     // cancelled: the dialogue command gets #f and the dialogue ends (as
     // with the Qt chooser), otherwise the next dialog could not open
@@ -7906,9 +7910,10 @@ vue_chooser_widget_rep::callback (char* res) {
     if (!is_nil (quit)) quit ();
   } else {
     string name (res, strlen (res));
-    file= "(system->url " * scm_quote (name) * ")";
+    file= (literal? string ("(system-literal->url "): string ("(system->url "))
+          * scm_quote (name) * ")";
     if (file_type == "image") {
-      url u= url_system (name);
+      url u= literal? url_system_literal (name): url_system (name);
       string w, h;
       chooser_pretty_image_size (u, w, h);
       string params;
