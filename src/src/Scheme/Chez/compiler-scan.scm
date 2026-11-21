@@ -113,6 +113,15 @@
            (emit "\\x7c;")
            (loop (+ i 1) #f))
 
+          ;; Sources are read byte for byte (Latin-1, see boot-chez.scm): a
+          ;; byte of a UTF-8 symbol such as 0x85 or 0xA0 would be read as
+          ;; whitespace; written \xHH; it stays in the symbol
+          ((and (not in-string?) (fx>= (char->integer c) 128))
+           (emit "\\x")
+           (emit (number->string (char->integer c) 16))
+           (emit ";")
+           (loop (+ i 1) #f))
+
           ;; Guile reads [ and ] as symbols too (latex-command-drd.scm),
           ;; Chez as parentheses
           ((and (not in-string?) (memv c '(#\[ #\])))
@@ -127,7 +136,11 @@
           ;; Comments are copied whole, so a quote inside one stays put.
           ((and (not in-string?) (eqv? c #\;))
            (let ((end (line-end i)))
-             (emit (substring str i end))
+             ;; without its non-ASCII bytes, which may be line breaks in
+             ;; Latin-1 (0x85)
+             (do ((j i (+ j 1))) ((= j end))
+               (let ((d (string-ref str j)))
+                 (emit (if (char<? d #\x80) d #\?))))
              (loop end #f)))
 
           ;; Escapes only matter inside a string.
@@ -149,7 +162,10 @@
            (loop (+ i 1) in-string?))))))
 
   (define (read-raw-forms file-path)
-    (let* ((port (open-input-file file-path))
+    (let* ((port (open-file-input-port file-path
+                                  (file-options) (buffer-mode block)
+                                  (make-transcoder (latin-1-codec)
+                                                   (eol-style none))))
            (content (get-string-all port)))
       (close-port port)
       (let* ((str (if (eof-object? content) "" content))
@@ -414,7 +430,12 @@
                (macros '())
                (impls '()))
       (if (null? rest)
-          (values (reverse exports)
+          ;; a tm-define may be overloaded in the module which defines it
+          ;; (check/define-test.scm): each name is exported once
+          (values (let dedup ((l (reverse exports)) (seen '()))
+                    (cond ((null? l) (reverse seen))
+                          ((memq (car l) seen) (dedup (cdr l) seen))
+                          (else (dedup (cdr l) (cons (car l) seen)))))
                   (reverse globals)
                   (reverse macros)
                   (reverse impls))

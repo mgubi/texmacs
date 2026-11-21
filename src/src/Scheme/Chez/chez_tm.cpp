@@ -192,8 +192,12 @@ tmscm_to_symbol (tmscm s) {
   tmscm str= Ssymbol_to_string (s);
   iptr n= Sstring_length (str);
   string r;
-  for (iptr i= 0; i < n; i++)
-    r << encode_as_utf8 (Sstring_ref (str, i));
+  for (iptr i= 0; i < n; i++) {
+    // byte strings (boot-chez.scm); a character above 255 in UTF-8
+    unsigned int c= (unsigned int) Sstring_ref (str, i);
+    if (c < 256) r << (char) c;
+    else r << encode_as_utf8 (c);
+  }
   return r;
 }
 
@@ -308,7 +312,7 @@ load_scheme_file (string file) {
   if (!Sprocedurep (load_proc))
     boot_failed ("Chez Scheme: 'load' is not bound, cannot load " * file);
   c_string _file (file);
-  ptr str= Sstring_of_length (_file, (iptr) N (file));
+  ptr str= Sstring_utf8 (_file, (iptr) N (file)); // a path for the system
   Slock_object (str);
   Scall1 (load_proc, str);
   Sunlock_object (str);
@@ -320,14 +324,16 @@ load_scheme_file (string file) {
 
 tmscm
 eval_scheme_file (string file) {
+  // a path for the system: Chez encodes path strings in UTF-8
   c_string _file (file);
   return Scall1 (tm_load_file_proc, Sstring_utf8 (_file, (iptr) N (file)));
 }
 
 tmscm
 eval_scheme (string s) {
+  // Scheme strings are byte strings (boot-chez.scm): one char per byte
   c_string _s (s);
-  return Scall1 (tm_eval_string_proc, Sstring_utf8 (_s, (iptr) N (s)));
+  return Scall1 (tm_eval_string_proc, Sstring_of_length (_s, (iptr) N (s)));
 }
 
 /* ------------------------------------------------------------------------

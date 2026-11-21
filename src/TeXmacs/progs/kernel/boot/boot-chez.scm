@@ -38,6 +38,39 @@
       compilation-environment
       (make-parameter (interaction-environment))))
 
+;; --- Strings are byte strings ----------------------------------------------
+;; As in Guile 1.8 and s7, a Scheme string holds bytes: one character per
+;; byte, of code 0 to 255, whether the bytes are UTF-8 text, 8-bit Cork or
+;; binary data.  The TeXmacs Scheme code is written for that (lengths and
+;; offsets in bytes, Cork in documents, UTF-8 through explicit conversions).
+;; Files, sources and the console are read and written byte for byte;
+;; strings cross the glue the same way (utf8-bytes->string below).
+(define tm-byte-transcoder
+  (make-transcoder (latin-1-codec) (eol-style none) (error-handling-mode replace)))
+(current-transcoder tm-byte-transcoder)
+(let ((out (open-fd-output-port 1 (buffer-mode line) tm-byte-transcoder))
+      (err (open-fd-output-port 2 (buffer-mode none) tm-byte-transcoder)))
+  ;; the parameters of Chez, not the R6RS procedures without argument
+  (for-each (lambda (name port)
+              ((top-level-value name (scheme-environment)) port))
+            '(current-output-port console-output-port
+              current-error-port console-error-port)
+            (list out out err err)))
+
+;; A path which came from C++ as bytes, as Chez wants it for the system:
+;; Chez encodes the path strings it hands to the system as UTF-8
+(define (tm-os-path s)
+  (if (and (string? s)
+           (let loop ((i 0))
+             (or (fx= i (string-length s))
+                 (and (fx< (char->integer (string-ref s i)) 128)
+                      (loop (fx+ i 1))))))
+      s
+      (guard (e (else s))
+        (bytevector->string (string->utf8-bytes s)
+                            (make-transcoder (utf-8-codec) (eol-style none)
+                                             (error-handling-mode raise))))))
+
 ;; Guile's primitive loader
 (unless (top-level-bound? 'primitive-load)
   (define-top-level-value 'primitive-load
@@ -728,16 +761,31 @@
         ((fx= i n) s)
       (string-set! s i (integer->char (bytevector-u8-ref bv i))))))
 
+;; A byte string to its bytes.  A character above 255 (only integer->char
+;; makes one) is written in UTF-8, so that nothing is lost.
 (define (string->cork-bytes s)
   (let* ((n (string-length s))
          (bv (make-bytevector n)))
-    (do ((i 0 (fx+ i 1)))
-        ((fx= i n) bv)
-      (let ((c (char->integer (string-ref s i))))
-        (bytevector-u8-set! bv i (if (fx<= c 255) c 63))))))
+    (let loop ((i 0))
+      (if (fx= i n)
+          bv
+          (let ((c (char->integer (string-ref s i))))
+            (if (fx<= c 255)
+                (begin (bytevector-u8-set! bv i c) (loop (fx+ i 1)))
+                (call-with-bytevector-output-port
+                  (lambda (p)
+                    (do ((j 0 (fx+ j 1))) ((fx= j n))
+                      (let ((c (char->integer (string-ref s j))))
+                        (if (fx<= c 255)
+                            (put-u8 p c)
+                            (put-bytevector
+                              p (string->utf8 (string (string-ref s j)))))))))))))))
 
-(define (utf8-bytes->string bv) (utf8->string bv))
-(define (string->utf8-bytes s)  (string->utf8 s))
+;; Every string crosses the glue byte for byte (see tm-byte-transcoder):
+;; the names say utf8 because the text is UTF-8 by convention, but Cork and
+;; binary data pass the same way, unchanged
+(define (utf8-bytes->string bv) (cork-bytes->string bv))
+(define (string->utf8-bytes s)  (string->cork-bytes s))
 
 (define-syntax recur-transcoder
   (syntax-rules ()
@@ -812,8 +860,8 @@
 ;; (a full crash report) for an unresolvable URL, and C++ exceptions cannot be
 ;; caught from Scheme.  The old C++ string_load() just returned "" in that case.
 (define (tm-load-path u)
-  (cond ((string? u) (and (file-exists? u) u))
-        ((url-exists? u) (url-materialize u "r"))
+  (cond ((string? u) (let ((p (tm-os-path u))) (and (file-exists? p) p)))
+        ((url-exists? u) (tm-os-path (url-materialize u "r")))
         (else #f)))
 
 (define (tm-loadable? path)
@@ -828,30 +876,12 @@
         #vu8())))
 
 
-;; TODO: The current approach is load byte if failing utf8 loading.
-;; Change it to something smarter like looking at the file suffix.
+;; The contents of a file as a byte string, as C++ string_load() and Guile
 (define (string-load u)
   (let ((path (tm-load-path u)))
     (if (not path)
-      ""
-      (guard (e
-               ((i/o-decoding-error? e) (tm-load-bytes path))
-               (else
-                 ;; Mirrors C++ string_load(): a failed load yields ""
-                 ;; rather than aborting, but is still reported.
-                 (display (list 'STRING-LOAD-ERROR u
-                            (if (condition? e)
-                              (condition-message e)
-                              e))
-                   (console-error-port))
-                 (newline (console-error-port))
-                 ""))
-        (if (tm-loadable? path)
-          (call-with-port
-            (open-file-input-port path (file-options) 'block
-              tm-text-transcoder)
-            (lambda (p) (or (get-string-all p) "")))
-          "")))))
+        ""
+        (cork-bytes->string (tm-load-bytes path)))))
 
 ;; [C++] (tm-eval-string s): read one form and evaluate it in tm-user-env.
 ;; eval_scheme() routes every C++-side evaluation through this.

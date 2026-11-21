@@ -447,12 +447,14 @@
 (define-public OPEN_READ "r")
 (define-public OPEN_WRITE "w")
 
-(define-public (open-file file mode)
-  (cond ((or (string=? mode "r") (string=? mode "rb"))
-         (open-input-file file))
-        ((or (string=? mode "w") (string=? mode "wb"))
-         (open-output-file file 'replace))
-        (else (open-input-file file))))
+(define-public (open-file file* mode)
+  ;; file* comes from C++ (url-materialize) as bytes
+  (let ((file ((top-level-value 'tm-os-path) file*)))  ;; from boot-chez.scm
+    (cond ((or (string=? mode "r") (string=? mode "rb"))
+           (open-input-file file))
+          ((or (string=? mode "w") (string=? mode "wb"))
+           (open-output-file file 'replace))
+          (else (open-input-file file)))))
 
 (define-public (call-with-input-string str proc)
   (proc (open-input-string str)))

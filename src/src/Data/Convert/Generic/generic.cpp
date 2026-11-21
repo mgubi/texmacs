@@ -57,21 +57,10 @@ format_exists (string format) {
 
 tree
 generic_to_tree (string s, string fm) {
-#ifdef USE_CHEZ
-  // The converters of these formats are the C++ functions below (see
-  // convert/rewrite/init-rewrite.scm); on Chez, call them directly: a
-  // .tm file is 8-bit Cork, which the Chez glue would read as UTF-8
-  if (fm == "texmacs-document") return texmacs_document_to_tree (s);
-  if (fm == "texmacs-snippet") return texmacs_to_tree (s);
-#endif
   return as_tree (call ("generic->texmacs", s, fm));
 }
 
 string
 tree_to_generic (tree doc, string fm) {
-#ifdef USE_CHEZ
-  if (fm == "texmacs-document" || fm == "texmacs-snippet")
-    return tree_to_texmacs (doc);
-#endif
   return as_string (call ("texmacs->generic", doc, fm));
 }
