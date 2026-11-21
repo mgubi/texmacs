@@ -71,6 +71,11 @@
                             (make-transcoder (utf-8-codec) (eol-style none)
                                              (error-handling-mode raise))))))
 
+;; The reader of the Guile-flavoured sources (Guile's lexical syntax, the
+;; dialect tests folded), which the module compiler uses too
+(include "chez-reader.scm")
+(import (chez-reader))
+
 ;; Guile's primitive loader
 (unless (top-level-bound? 'primitive-load)
   (define-top-level-value 'primitive-load
@@ -974,7 +979,51 @@
                             (tm-safe-irritants e)))
              (newline)
              (cons #t (list (tm-error-message e))))))
-    (primitive-load f)))
+    (if (tm-guile-source? f)
+        ;; a source of TeXmacs, a plug-in or the user, read as on Guile
+        (for-each tm-eval-toplevel (tm-read-guile-file (tm-os-path f)))
+        (primitive-load f))))
+
+;; A top-level form of a source, as Guile evaluates it: a conditional at
+;; the top level may hold definitions (the init files of the plug-ins), which
+;; Chez allows only at the top level, so its test is evaluated first, then
+;; the forms of the chosen branch one by one
+(define (tm-eval-toplevel x)
+  (define (each l) (for-each tm-eval-toplevel l))
+  (if (pair? x)
+      (case (car x)
+        ((begin) (each (cdr x)))
+        ((if)
+         (if (and (pair? (cdr x)) (pair? (cddr x)))
+             (if (eval (cadr x) tm-user-env)
+                 (tm-eval-toplevel (caddr x))
+                 (when (pair? (cdddr x)) (tm-eval-toplevel (cadddr x))))
+             (eval x tm-user-env)))
+        ((when) (when (eval (cadr x) tm-user-env) (each (cddr x))))
+        ((unless) (unless (eval (cadr x) tm-user-env) (each (cddr x))))
+        (else (eval x tm-user-env)))
+      (eval x tm-user-env)))
+
+;; The sources written for Guile: not the compiled modules, the compiler of
+;; src/Scheme/Chez, nor the files of TeXmacs/progs written for Chez
+(define tm-chez-sources
+  '("boot-chez.scm" "chez-compat.scm" "chez-reader.scm" "glue-chez.scm"
+    "raw-ffi-table.scm" "init-texmacs-chez.scm" "init-chez-compile.scm"
+    "init-texmacs-boot-file.scm"))
+
+(define (tm-guile-source? f)
+  (and (string? f)
+       (let ((n (string-length f)))
+         (and (> n 4) (string=? (substring f (- n 4) n) ".scm")
+              (not (tm-string-contains? f "/src/Scheme/Chez/"))
+              (not (member (path-last f) tm-chez-sources))))))
+
+(define (tm-string-contains? s sub)
+  (let ((n (string-length s)) (m (string-length sub)))
+    (let loop ((i 0))
+      (and (<= (+ i m) n)
+           (or (string=? (substring s i (+ i m)) sub)
+               (loop (+ i 1)))))))
 
 (define (tm-backtrace c)
   (guard (e (else (display (list 'BT-ERR (tm-error-message e))) (newline)))
