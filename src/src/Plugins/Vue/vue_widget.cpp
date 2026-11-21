@@ -4815,7 +4815,9 @@ void
 vue_input_text_widget_rep::copy_selection (bool cut) {
   int b, e;
   if (!selection (b, e)) return;
-  // a symbol (<alpha>) becomes its character, not its name
+  // a symbol (<alpha>) becomes its character, not its name; the bytes
+  // 0x09 and 0x0A are the macron and the dot accent which were typed or
+  // pasted (see paste: a field holds no tab and no newline, #439)
   string t= verbatim_in_utf8 (false)
             ? cork_to_utf8 (s (b, e)) : tm_decode (s (b, e));
   // "primary" is the system clipboard of the Vue GUI (see vue_gui.cpp)
@@ -4846,10 +4848,13 @@ vue_input_text_widget_rep::paste () {
   string ins;
   bool utf8= verbatim_in_utf8 (true);
   if (is_tuple (t, "extern", 1)) str= as_string (t[1]);
+  // a single line: the line ends and tabs of the clipboard become spaces,
+  // before the conversion to Cork, where a dot accent, a macron and a
+  // breve are the bytes of a newline, a tab and a backspace (#866)
+  str= replace (replace (replace (str, "\r\n", " "), "\r", " "), "\n", " ");
+  str= replace (str, "\t", " ");
   if (N(str) > 0) ins= utf8 ? utf8_to_cork (str) : tm_encode (str);
   if (N(ins) == 0) return;
-  // a single line: the newlines of the clipboard become spaces
-  ins= replace (ins, "\n", " ");
   insert (ins);
 }
 

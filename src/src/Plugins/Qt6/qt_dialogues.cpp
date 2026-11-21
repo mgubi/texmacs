@@ -119,8 +119,8 @@ qt_field_widget_rep::as_qwidget (QWidget* parent_widget) {
     QTMComboBox* cb              = new QTMComboBox (qwid);
     QTMFieldWidgetHelper* helper = new QTMFieldWidgetHelper (this, cb);
     (void) helper;
-    cb->addItems (to_qstringlist (proposals));
-    cb->setEditText (to_qstring (scm_unquote (input)));
+    cb->addItems (to_qstringlist_value (proposals));
+    cb->setEditText (to_qstring_value (scm_unquote (input)));
     cb->setEditable (true);
     cb->setLineEdit (new QTMLineEdit (cb, type, "1w", WIDGET_STYLE_MINI));
     cb->setSizeAdjustPolicy (QComboBox::AdjustToContents);
@@ -396,7 +396,7 @@ qt_input_text_widget_rep::as_qwidget (QWidget* parent_widget) {
   QTMInputTextWidgetHelper* helper =
     new QTMInputTextWidgetHelper (this, can_autocommit);
   (void) helper;
-  le->setText (to_qstring (input));
+  le->setText (to_qstring_value (input));
   le->setObjectName (to_qstring (type));
   if (ends (type, "file") || type == "directory") {
     QCompleter*     completer = new QCompleter(le);
@@ -407,7 +407,7 @@ qt_input_text_widget_rep::as_qwidget (QWidget* parent_widget) {
   }
   else if (type != "password" && N(proposals) > 0 && ! (N(proposals) == 1 && N(proposals[0]) == 0)){
     //else if (N(proposals) > 0 && ! (N(proposals) == 1 && N(proposals[0]) == 0)){
-    QCompleter* completer = new QCompleter (to_qstringlist(proposals), le);
+    QCompleter* completer = new QCompleter (to_qstringlist_value (proposals), le);
     completer->setCaseSensitivity (Qt::CaseSensitive);
     completer->setCompletionMode (QCompleter::InlineCompletion);
     le->setCompleter (completer);
@@ -425,7 +425,7 @@ qt_input_text_widget_rep::commit(bool flag) {
     ok    = true;
     input = from_qstring (le->text());
   } else {
-    le->setText (to_qstring (input));
+    le->setText (to_qstring_value (input));
   }
   if (win) // This is 0 inside a dialog => no command
   {

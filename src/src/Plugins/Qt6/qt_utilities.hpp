@@ -63,11 +63,13 @@ QSize qt_decode_length (string width, string height,
 QKeySequence to_qkeysequence (string s);
 
 QStringList     to_qstringlist (array<string> l);
+QStringList     to_qstringlist_value (array<string> l);
 array<string> from_qstringlist (const QStringList& l);
 
 ///// String conversion: Assumes UTF8 encodings both in QT and TeXmacs.
 
 QString        to_qstring (const string& s);
+QString        to_qstring_value (const string& s);
 string       from_qstring (const QString & s);
 QString   utf8_to_qstring (const string& s);
 QString latin1_to_qstring (const string& s);
