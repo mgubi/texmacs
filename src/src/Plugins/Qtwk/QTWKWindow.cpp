@@ -830,8 +830,10 @@ QTWKWindow::dropEvent (QDropEvent *event)
                    "", "", "", "");
     doc << t;
   }  else if (md->hasText ()) {
+    // read as a pasted plain text (#918): not the raw UTF-8 bytes, whose
+    // newlines and tabs would be the dot accents and macrons of Cork
     buf= md->text ().toUtf8 ();
-    doc << string (buf.constData (), buf.size ());
+    doc << as_tree (call ("dropped-text", string (buf.constData (), buf.size ())));
   }
 
   if (N(doc)>0) {

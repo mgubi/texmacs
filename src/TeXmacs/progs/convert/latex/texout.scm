@@ -539,6 +539,7 @@
         (else (texout-apply (car x) (cdr x)))))
 
 (tm-define (serialize-latex x)
+  (output-reset)
   (texout x)
   (output-produce))
 

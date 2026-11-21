@@ -3781,7 +3781,8 @@ EM_JS (char*, vue_web_javascript, (const char* code), {
 static tmscm
 web_javascript_tm (tmscm a) {
   TMSCM_ASSERT (tmscm_is_string (a), a, TMSCM_ARG1, "web-javascript");
-  c_string code (cork_to_utf8 (tmscm_to_string (a)));
+  // (code, whose newlines and tabs stay newlines and tabs: #439)
+  c_string code (cork_text_to_utf8 (tmscm_to_string (a)));
   char* r= vue_web_javascript (code);
   string res= utf8_to_cork (string (r));
   free (r);
@@ -6162,8 +6163,12 @@ system_files_deliver () {
   for (int i= 0; i < N(system_files); i++) {
     if (DEBUG_VUE_EVENTS)
       debug_events << "file given by the system: " << system_files[i] << LF;
+    // a path is taken as it is: a*b.tm or a:b.tm is not a pattern nor a
+    // list of paths (#905); a url (tmfs://...) is parsed
+    string f= system_files[i];
+    url u= starts (f, "/")? url_system_literal (f): url_system (f);
     exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer-from-system"),
-                                           object (url_system (system_files[i])))));
+                                           object (u))));
   }
   system_files= array<string> ();
   gui_needs_update= true;
@@ -6180,7 +6185,10 @@ drop_deliver (vue_window win, float x, float y) {
   in.mouse_x= (int) (x * win->density);
   in.mouse_y= (int) (y * win->density);
   in.mouse_ticket= ++drop_serial;
-  payloads (in.mouse_ticket)= drop_doc;
+  // a text of several lines alone: its document, not a concat of it
+  if (N(drop_doc) == 1 && is_func (drop_doc[0], DOCUMENT))
+    payloads (in.mouse_ticket)= drop_doc[0];
+  else payloads (in.mouse_ticket)= drop_doc;
   if (DEBUG_VUE_EVENTS)
     debug_events << "drop of " << N(drop_doc) << " item(s) at "
                  << in.mouse_x << "," << in.mouse_y << LF;
@@ -6316,7 +6324,8 @@ vue_web_scheme_eval (const char* cmd) {
     r= "(error " * scm_quote (msg) * ")";
   }
   if (last != NULL) tm_delete_array (last);
-  last= as_charp (cork_to_utf8 (r));
+  // (text, whose newlines and tabs stay newlines and tabs: #439)
+  last= as_charp (cork_text_to_utf8 (r));
   gui_needs_update= true;
   return last;
 }
@@ -6851,9 +6860,12 @@ process_event (SDL_Event *event) {
         system_files << utf8_to_cork (system_file_path (raw));
         break;
       }
-      string item= utf8_to_cork (raw);
-      if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
-      else drop_add_file (item);
+      if (event->type == SDL_EVENT_DROP_TEXT)
+        // read as a pasted plain text (#918): utf8_to_cork of the whole
+        // text kept its newlines and tabs, the dot accents and macrons of
+        // Cork
+        drop_doc << as_tree (call ("dropped-text", raw));
+      else drop_add_file (utf8_to_cork (raw));
       break;
     }
     case SDL_EVENT_DROP_COMPLETE:
@@ -7978,7 +7990,7 @@ vue_dialog_finish (vue_dialog_result* res, char* file, int code) {
   if (w != NULL) {
     if (res->chosen) {
       c_string name (res->file);
-      w->callback ((char*) name);
+      w->callback ((char*) name, true); // a path of the system (#905)
     }
     else w->callback (NULL);
   }

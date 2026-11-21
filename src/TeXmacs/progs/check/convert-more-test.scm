@@ -849,6 +849,157 @@
                       (lambda (n) #t) (quotient (caddr nest) 10) (caddr nest)
                       "levels")))
 
+;; A length in px kept its unit only in the attributes of HTML: in CSS it
+;; was a bare number, which the browsers drop (vspace "10px" gave
+;; margin-bottom: 10, #901). The larger of two margins which collapse,
+;; when one of them is not a length, was the second one, whatever the
+;; other was
+(define (test-html-css-lengths)
+  (check-group "html export: lengths in CSS")
+  (check= (tmlength->htmllength "10px") "10px")
+  (check= (tmlength->htmllength "10px" #t) "10px")
+  (check= (tmlength->htmllength "10px" #f) "10")
+  (check= (tmlength->htmllength "10mm") "10mm")
+  (with s (html-of-buffer '(document (concat "a" (vspace "10px")) "b"))
+    (check-true (string-occurs? "margin-bottom: 10px" s)))
+  (with s (html-of-buffer '(document (concat (vspace* "1fn") "a" (vspace "10px"))))
+    (check= (map style-set (p-styles s))
+            (list (style-set "margin-top: 1em; margin-bottom: 10px"))))
+  (check= (css-merge-styles "margin-bottom: auto" "margin-bottom: 5mm")
+          "margin-bottom: 5mm")
+  (check= (css-merge-styles "margin-bottom: 5mm" "margin-bottom: auto")
+          "margin-bottom: 5mm")
+  (check= (css-merge-styles "margin-top: 1em" "margin-top: 2em")
+          "margin-top: 2em")
+  (check= (css-merge-styles "margin-top: 2em" "margin-top: 1em")
+          "margin-top: 2em"))
+
+;; The alignment of a paragraph: "right" (Format > Alignment > Right
+;; aligned, padded-right-aligned) was lost, as the table of the HTML of
+;; <with> had no entry for it (#904); left and justify used the attribute
+;; align of <div>, which is not HTML5
+(define (test-html-paragraph-alignment)
+  (check-group "html export: alignment of paragraphs")
+  (for (p '(((padded-right-aligned "ctr") "text-align: right")
+            ((with "par-mode" "right" "ctr") "text-align: right")
+            ((with "par-mode" "left" "ctr") "text-align: left")
+            ((with "par-mode" "justify" "ctr") "text-align: justify")
+            ((with "par-mode" "center" "ctr") "<center>")
+            ((padded-center "ctr") "<center>")))
+    (with s (html-of-buffer `(document "a" ,(car p) "b"))
+      (check= (map (cut string-occurs? <> s) (list (cadr p) "ctr" "align="))
+              (list #t #t #f)))))
+
+(define (p-contents s)
+  ;; the contents of the <p> of the HTML @s (they are not nested)
+  (let loop ((pos 0) (r '()))
+    (let* ((i1 (string-search-forwards "<p>" pos s))
+           (i2 (string-search-forwards "<p " pos s))
+           (i (cond ((< i1 0) i2) ((< i2 0) i1) (else (min i1 i2)))))
+      (if (< i 0) (reverse r)
+          (let* ((e (string-search-forwards "</p>" i s))
+                 (e* (if (< e 0) (string-length s) e)))
+            (loop e* (cons (substring s i e*) r)))))))
+
+;; A table on a line of text (an inline table) was put in a <p>, with the
+;; text around it in inline <div>: a <p> may not contain them, a browser
+;; closed the <p> before the table and left an empty <p> after it (#903).
+;; Such a paragraph is a <div> of the class tmhtml-p, with the margins of a
+;; <p> (without them, it was closer to the paragraphs around it); the blocks
+;; and tables beside a tab are kept on their side of the tab (#896)
+(define (test-html-tables-in-lines)
+  (check-group "html export: a table on a line of text")
+  (let* ((table '(tabular (table (row (cell "ta") (cell "tb")))))
+         (no-block-in-p?
+          (lambda (s)
+            (list-and (map (lambda (c) (and (not (string-occurs? "<table" c))
+                                            (not (string-occurs? "<div" c))
+                                            (not (string-occurs? "<center" c))))
+                           (p-contents s))))))
+    (for (body (list `(concat "qq" ,table)
+                     table
+                     `(concat "qq" ,table "d")
+                     `(concat "qq" (center "x") ,table)
+                     `(concat "qq" (center "x") "d" ,table)
+                     `(concat "qq" (padded-right-aligned "x") "d" ,table)
+                     `(concat "qq" (htab "5mm") ,table)
+                     `(concat "qq" ,table (htab "5mm") "d")
+                     `(concat (vspace* "1fn") "qq" ,table (vspace "2fn"))))
+      (with s (html-of-buffer `(document "a" ,body "b"))
+        (check= (list (no-block-in-p? s) (string-occurs? "<table" s)
+                      (string-occurs? "ta" s)
+                      (or (== body table) (string-occurs? "qq" s)))
+                (list #t #t #t #t))))
+    ;; the <div> has the class tmhtml-p, whose CSS gives it the margins of
+    ;; a <p> (none in a compact block); the vertical spaces of the
+    ;; paragraph are in its style, which wins over the class
+    (with s (html-of-buffer `(document "a" (concat "qq" ,table) "b"))
+      (check= (list (string-occurs? "<div class=\"tmhtml-p\">" s)
+                    (string-occurs? "margin" s))
+              (list #t #f)))
+    (with s (html-of-buffer `(document (concat (vspace* "0.5fn") "qq" ,table
+                                               (vspace "2fn"))))
+      (check= (list (string-occurs? "class=\"tmhtml-p\"" s)
+                    (string-occurs?
+                     "style=\"margin-top: 0.5em; margin-bottom: 2em\"" s))
+              (list #t #t)))
+    (with s (html-of-buffer `(document "p" (concat (vspace* "0.5fn")
+                                                   (document (concat "qq" ,table)))
+                                       "b"))
+      (check= (list (string-occurs? "class=\"tmhtml-p\"" s)
+                    (string-occurs? "style=\"margin-top: 0.5em\"" s)
+                    (occurrences "<div" s))
+              (list #t #t 2)))
+    (with s (html-of-buffer `(document "a" (with "par-par-sep" "0fn"
+                                                 (document "x" (concat "qq" ,table)
+                                                           "y"))
+                                       "b"))
+      (check= (list (string-occurs? "compact-block" s)
+                    (string-occurs? "<div class=\"tmhtml-p\">" s)
+                    (string-occurs? "margin" s))
+              (list #t #t #f)))
+    ;; the CSS of the export has the margins of the class, also where those
+    ;; of a <p> are changed
+    (with s (string-recompose
+             (list-filter (string-tokenize-by-char
+                           (string-replace
+                            (html-export-of-buffer `(document (concat "qq" ,table)))
+                            "\n" " ")
+                           #\space)
+                          (lambda (w) (!= w "")))
+             " ")
+      (for (rule '(".tmhtml-p { margin-top: 1em; margin-bottom: 1em }"
+                   ".title-block p, .title-block .tmhtml-p { margin: 0px }"
+                   ".compact-block p, .compact-block .tmhtml-p { margin-top: 0px; margin-bottom: 0px }"
+                   "dd p, dd .tmhtml-p { padding-top: 0em; }"))
+        (check-true (string-occurs? rule s))))
+    ;; text alone stays in a <p>
+    (check-true (string-occurs? "<p>" (html-of-buffer '(document "a"))))))
+
+;; A serialization which failed left its text, indentation and flags to the
+;; next one, also to a LaTeX export after an HTML one (#902); ahash-with,
+;; around the conversion of a formula (:math in tmhtml-env), keeps its old
+;; value after an error
+(define (test-output-after-error)
+  (check-group "html and latex export after a failed serialization")
+  (let* ((html (lambda () (convert '(document "hello") "texmacs-stree"
+                                   "html-snippet")))
+         (latex (lambda () (convert '(document "hello") "texmacs-stree"
+                                    "latex-snippet")))
+         (html0 (html))
+         (latex0 (latex))
+         (bad '(p "AAA" (div "BBB" ((@ (style "s")) "CCC"))))
+         (fail (lambda ()
+                 (catch #t (lambda () (serialize-html bad) 'no-error)
+                   (lambda args 'error)))))
+    (check= (fail) 'error)
+    (check= (html) html0)
+    (check= (fail) 'error)
+    (check= (latex) latex0)
+    (check= (fail) 'error)
+    (check= (serialize-latex '(!document "x")) "x")
+    (check= (latex) latex0)))
+
 ;; The LaTeX of a formula, also that of the formulas for MathJax in the
 ;; HTML export, in a time linear in its size: the export of a macro which
 ;; calls itself in a formula (a formula of 1 MB, which s7 converts whole)
@@ -1648,6 +1799,136 @@
 
 ;; The other encodings: HTML entities, LaTeX accents, T2A (Cyrillic), the
 ;; source code (UTF-8, but the TeX ligatures of ASCII kept), iconv.
+;; Plain text and the Cork bytes 0x08-0x0A (#439, #866). In document text
+;; they are the glyphs of the breve, the macron and the dot accent (cork->utf8,
+;; the exports); in plain text (cork-text->utf8, the "Cork-text" source of
+;; string-convert) 0x09 and 0x0A are a tab and a newline. The import of
+;; plain text reads its tabs, newlines and backspaces before the conversion
+;; to Cork, and its export writes the glyphs of the document <#AF>, <#2D9>.
+(define (test-cork-text)
+  (define (dot) (u8 #x2D9))
+  (define (macron) (u8 #xAF))
+  (define (breve) (u8 #x2D8))
+  (define (paste s . opts) (apply import (cons* s "verbatim-snippet" opts)))
+  (define (verb t . opts) (apply export (cons* t "verbatim-snippet" opts)))
+  (check-group "cork text")
+  (check= (cork-text->utf8 "a\nb\tc") "a\nb\tc")
+  (check= (cork->utf8 "a\nb\tc") (string-append "a" (dot) "b" (macron) "c"))
+  ;; the other bytes are those of cork->utf8 (0x08 the breve, 0x0D U+201A)
+  (check= (cork-text->utf8 (string-append (cork 8 #x0d #xe9) "<#2D9><alpha>\n"))
+          (string-append (u8 #x2D8 #x201A #xE9 #x2D9 #x3B1) "\n"))
+  ;; (0xFF is the sharp s in Cork, 0xDF in Latin-1)
+  (check= (string-convert "a\nb\t\xff" "Cork-text" "UTF-8")
+          (string-append "a\nb\t" (u8 #xDF)))
+  (check= (string-convert "a\nb\t\xff" "Cork-text" "ISO-8859-1") "a\nb\t\xdf")
+  (check= (string-convert "a\nb\t<alpha>" "Cork-text" "SourceCode")
+          (string-append "a\nb\t" (u8 #x3B1)))
+  (check= (string-convert "a\nb\tc" "Cork" "UTF-8")
+          (string-append "a" (dot) "b" (macron) "c"))
+  (check= (string-convert "a\nb\tc" "Cork" "SourceCode")
+          (string-append "a" (dot) "b" (macron) "c"))
+  ;; raw HTML is text: its newlines and tabs are kept
+  (check= (export '(specific "html" "<less>p<gtr>\nx\ty") "html-snippet")
+          "<p>\nx\ty")
+  ;; the exports of a document keep the glyphs
+  (with s (string-append "a" (cork 9) "b" (cork 10) "c")
+    (check= (export s "html-snippet") "a&macr;b&#x02D9;c")
+    (check= (export s "latex-snippet") "a\\={}b\\.{}c")
+    (check= (export s "tmml-snippet") (string-append "a" (macron) "b" (dot) "c")))
+  (check-group "plain text import of the breve, macron and dot accent")
+  (check= (paste (dot)) (cork 10))
+  (check= (paste (macron)) (cork 9))
+  (check= (paste (breve)) (cork 8))
+  (check= (paste (string-append "x" (dot) "y" (macron) "z"))
+          (string-append "x" (cork 10) "y" (cork 9) "z"))
+  (check= (paste (string-append "a" (breve) "b")) (string-append "a" (cork 8) "b"))
+  ;; next to a real tab, newline and backspace (the encoding is given: a
+  ;; text with a backspace is not guessed to be UTF-8)
+  (check= (paste (string-append (dot) "\t" (macron) "\n" (breve)))
+          `(document ,(string-append (cork 10) "       " (cork 9)) ,(cork 8)))
+  (check= (paste (string-append (dot) "\t" (macron) "\n" (breve) "\nab" (cork 8) "c")
+                 (cons "verbatim->texmacs:encoding" "utf-8"))
+          `(document ,(string-append (cork 10) "       " (cork 9))
+                     ,(cork 8) "ac"))
+  (check= (paste (string-append "x\t" (dot) "\ny"))
+          `(document ,(string-append "x       " (cork 10)) "y"))
+  ;; the tabs go to the next multiple of 8 characters, not bytes
+  (check= (paste (string-append (u8 #x3B1) "\tx")) "<alpha>       x")
+  (check= (paste (string-append "a" (u8 #x3B1) (cork 8) "b")
+                 (cons "verbatim->texmacs:encoding" "utf-8"))
+          "ab")
+  ;; Latin-1 (0xAF is the macron) and a file of text
+  (check= (paste "\xaf\tx\nb" (cons "verbatim->texmacs:encoding" "iso-8859-1"))
+          `(document ,(string-append (cork 9) "       x") "b"))
+  ;; (the body of the document: its initial environment is tested in formats)
+  (check= (cadr (import (string-append "x" (dot)) "verbatim-document"))
+          `(body ,(string-append "x" (cork 10))))
+  (check-group "plain text export of the breve, macron and dot accent")
+  (check= (verb (cork 10 9 8)) (string-append (dot) (macron) (breve)))
+  (check= (verb `(document ,(string-append "a" (cork 10)) ,(string-append (cork 9) "b")))
+          (string-append "a" (dot) "\n" (macron) "b"))
+  (check= (verb (cork 10) (cons "texmacs->verbatim:encoding" "cork")) "<#2D9>")
+  (check= (verb (string-append "a" (cork 9 10))
+                (cons "texmacs->verbatim:encoding" "iso-8859-1"))
+          "a\xaf?")
+  (check= (verb (cork 10 9) (cons "texmacs->verbatim:encoding" "SourceCode"))
+          (string-append (dot) (macron)))
+  (check= (verb (cork 8) (cons "texmacs->verbatim:encoding" "cork")) "<#2D8>")
+  ;; the round trip export -> import keeps them, also in Cork, where the
+  ;; import keeps the names which the export writes (<less> for a <)
+  (with docs (list (cork 10 9 8)
+                   (string-append "x" (cork 10) "y" (cork 9) "z" (cork 8) "w")
+                   `(document ,(string-append "x" (cork 10) "y")
+                              ,(string-append (cork 9 8) "z") "")
+                   `(document ,(string-append "a<less>b<gtr><alpha>" (cork 9))
+                              "c"))
+    (for-each (lambda (d) (check= (paste (verb d)) d)) docs)
+    (with c (cons "texmacs->verbatim:encoding" "cork")
+      (for-each (lambda (d)
+                  (check= (paste (verb d c) (cons "verbatim->texmacs:encoding"
+                                                  "cork"))
+                          d))
+                docs)))
+  ;; a text in Cork with a bare < is still encoded
+  (check= (paste "a<b" (cons "verbatim->texmacs:encoding" "cork")) "a<less>b")
+  (check-group "plain text import of a long line with tabs")
+  ;; the column of the tabs is counted as the line is made: a line of
+  ;; 400 KB with a tab every 10 bytes took 29 s when it was counted again
+  ;; at each tab, and takes some 30 ms (the bound is generous for CI)
+  (let* ((line (apply string-append (make-list 40000 "abcdefghi\t")))
+         (r (timed (lambda () (paste line)))))
+    (check= (string-length (car r)) 640000)
+    (check= (substring (car r) 0 20) "abcdefghi       abcd")
+    (check-true (< (cdr r) 2000))))
+
+;; A plain text dropped on a document (#918): the interfaces give its UTF-8
+;; to dropped-text, which reads it as a pasted text. TMView and the SDL
+;; drops of Vue inserted utf8->cork of the text, QTMWidget its raw UTF-8:
+;; the newlines and tabs became dot accents and macrons, in one line.
+(define (test-dropped-text)
+  (define (dot) (u8 #x2D9))
+  (define (macron) (u8 #xAF))
+  (define (breve) (u8 #x2D8))
+  (define (drop s) (st (dropped-text s)))
+  (check-group "dropped plain text")
+  (check= (drop "abc") "abc")
+  (check= (drop "a\nb\tc") '(document "a" "b       c"))
+  ;; CR LF and CR are newlines, as in a paste (a CR was a low quote)
+  (check= (drop "a\r\nb\rc") '(document "a" "b" "c"))
+  (check= (drop (string-append "caf" (u8 #xE9) " " (u8 #x3B1)))
+          "caf\xe9 <alpha>")
+  ;; the dot accent, macron and breve stay characters, also next to a
+  ;; real newline and tab
+  (check= (drop (string-append "x" (dot) "y" (macron) "z" (breve)))
+          (string-append "x" (cork 10) "y" (cork 9) "z" (cork 8)))
+  (check= (drop (string-append (dot) "\t" (macron) "\n" (breve)))
+          `(document ,(string-append (cork 10) "       " (cork 9)) ,(cork 8)))
+  ;; the same tree as the paste of the same text
+  (for (s (list "a\nb\tc" (string-append (u8 #xE9) "\t" (dot) "\n\nz")))
+    (check= (drop s) (import s "verbatim-snippet")))
+  ;; a full file name stays one string, as dropped-documents reads it
+  (check= (drop (string-append "/tmp/caf" (u8 #xE9) ".tm")) "/tmp/caf\xe9.tm"))
+
 (define (test-other-encodings)
   (check-group "other encodings")
   (check= (utf8->html (string-append (u8 #xE9) "<&>" (u8 #x3B1 #x20AC #x221E)))
@@ -3376,11 +3657,14 @@
                   test-html-weak-tabs test-html-blocks-and-tabs
                   test-html-nested-documents test-html-margins-of-nested-paragraphs
                   test-html-nested-blocks
+                  test-html-css-lengths test-html-paragraph-alignment
+                  test-html-tables-in-lines test-output-after-error
                   test-latex-linear
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
-                  test-cork-bytes test-cork-unicode test-other-encodings
+                  test-cork-bytes test-cork-unicode test-cork-text test-dropped-text
+                  test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables

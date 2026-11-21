@@ -233,7 +233,7 @@ public:
   virtual widget read (slot s, blackbox index);
   
   void perform_dialog (vue_window win);
-  void callback (char *res);
+  void callback (char *res, bool literal= false);
 };
 
 #endif

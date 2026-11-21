@@ -24,6 +24,38 @@ have the details, and the problems go to the
   A hash table among its own values (directly or through a list) also
   crashed it or was copied twice; it is now copied once. Collections are
   not slower (#908).
+- **Files with a star or a colon in their name open from the Finder**
+  (desktop applications): a file given by the system (the Finder, the Dock,
+  `open`, the command line, the file dialogs of the system, a file dropped
+  on a window) was read as a name typed by the user, so that `a*b.tm` was a
+  pattern, which opened nothing when another file of its folder matched
+  it, and `a:b.tm` (shown as `a/b.tm` in the Finder) a list of two paths,
+  which opened the file `a` under a garbled name. The path is now taken as
+  it is, in the Cocoa, Qt and Vue interfaces, also in the Open Recent menu
+  (a name typed in the file chooser made by TeXmacs, which Vue shows when
+  the system has no dialog, is read as before) (#905).
+- **Plain text keeps the characters ˙, ¯ and ˘**: text pasted from other
+  applications, opened from a `.txt` file or printed by a plug-in session
+  turned a dot accent (˙) into a line break, a macron (¯) into a tab and a
+  breve (˘) into a backspace, which erased the character before it; they
+  now stay characters, and tabs after a symbol such as α are expanded to
+  the right column. *Export as verbatim* and the copy as text no longer
+  write a ˙ or ¯ of the document as a newline or a tab, so that the text
+  comes back as it was, also in the Cork encoding. A text field of the Vue
+  interface no longer turns a pasted ˙ into a space. The other plain texts
+  (the commit messages of svn and git, the labels and messages of the
+  widgets of Qt and Cocoa, raw HTML, the `TeXmacs.scheme` results and the
+  `web-javascript` code of the browser version) keep their newlines and
+  tabs instead of showing ˙ and ¯, while the text fields still show a ¯ or
+  ˙ typed in them; for developers, `cork-text->utf8` and the source
+  `"Cork-text"` of `string-convert` convert such text (#866, #439).
+- **A text dragged onto a document is inserted as it is pasted**: its lines
+  were inserted as one line with a ˙ in place of each line break and a ¯ in
+  place of each tab (Cocoa, Vue, also in the browser), and under Qt its
+  accented letters were garbled as well. It is now read as a pasted plain
+  text: its lines become paragraphs, its tabs spaces, and a ˙, ¯ or ˘ in it
+  stays a character. The title of a web link dropped under Qt keeps its
+  accented letters too (#918).
 - **Vue: the text fields of dialogs which change their content belong to
   their dialog** (Vue interface, desktop and browser): the content of a
   `refresh` or `refreshable` widget was made at its first layout, after the

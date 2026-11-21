@@ -45,9 +45,14 @@
     character set of the locale (<cpp|get_locale_charset>);
     <verbatim|iso-8859-1> then applies <cpp|tm_decode>, <verbatim|cork>
     applies nothing, <verbatim|SourceCode> applies
-    <cpp|cork_to_sourcecode> line by line, and any other value applies
-    <cpp|cork_to_utf8> line by line (<cpp|var_cork_to_utf8>). On Windows,
-    line ends are then converted to <verbatim|CR LF>.
+    <cpp|cork_text_to_sourcecode>, and any other value applies
+    <cpp|cork_text_to_utf8> (<cpp|var_cork_to_utf8>): the macron and the
+    dot accent of the strings of the document are first written
+    <verbatim|\<less\>#AF\<gtr\>> and <verbatim|\<less\>#2D9\<gtr\>>, so
+    that the tabs and newlines of the text are those of its structure. On
+    import, the text is split into lines and its tabs and backspaces are
+    read before the conversion of each piece to Cork. On Windows, line ends
+    are then converted to <verbatim|CR LF>.
 
     <item*|Selections in other languages>Copying or pasting text in
     Croatian, Czech, Hungarian, Polish, Slovak or Slovene with the verbatim

@@ -168,7 +168,7 @@
           "dt { float: left; min-width: 1.75em; text-align: right; "
           "padding-right: 0.75em; font-weight: bold; } "
           "dd { margin-left: 2.75em; padding-bottom: 0.25em; } "
-          "dd p { padding-top: 0em; } "
+          "dd p, dd .tmhtml-p { padding-top: 0em; } "
 	  ".subsup { display: inline; vertical-align: -0.2em } "
 	  ".subsup td { padding: 0px; text-align: left} "
 	  ".fraction { display: inline; vertical-align: -0.8em } "
@@ -176,8 +176,10 @@
 	  ".wide { position: relative; margin-left: -0.4em } "
 	  ".accent { position: relative; margin-left: -0.4em; top: -0.1em } "
 	  ".title-block { width: 100%; text-align: center } "
-	  ".title-block p { margin: 0px } "
-	  ".compact-block p { margin-top: 0px; margin-bottom: 0px } "
+	  ".tmhtml-p { margin-top: 1em; margin-bottom: 1em } "
+	  ".title-block p, .title-block .tmhtml-p { margin: 0px } "
+	  ".compact-block p, .compact-block .tmhtml-p"
+	  " { margin-top: 0px; margin-bottom: 0px } "
 	  ".left-tab { text-align: left } "
 	  ".center-tab { text-align: center } "
           ".balloon-anchor { border-bottom: 1px dotted #000000; outline: none;"
@@ -434,15 +436,40 @@
             (cons `(h:div (@ (style "display: inline")) ,@s) r)))))
 
 (define (as-block x)
+  ;; A <p> may only contain phrasing content: a paragraph with a block in
+  ;; it (an inline table on a line of text, a <div>...) is a <div>, the runs
+  ;; of inline items between its blocks in inline <div>. It stayed a <p>,
+  ;; which a browser closed before the block, leaving an empty <p> after
+  ;; it (#903)
   ;;(display* "--- " x "\n")
   (cond ((func? x 'h:div) (tmhtml-simplify-div x))
-        ((and (func? x 'h:p)
-              (not (forall? (negate xhtml-block?) (sxml-content x)))
-              (not (forall? xhtml-block? (sxml-content x))))
+        ((and (func? x 'h:p) (exists? xhtml-block? (sxml-content x)))
          (let* ((a (sxml-attr-list x))
-                (m (mixed-block (sxml-content x))))
-           (if (null? a) `(h:p ,@m) `(h:p (@ ,@a) ,@m))))
+                (c (sxml-content x))
+                (m (if (forall? xhtml-block? c) c (mixed-block c))))
+           (par-div-with-class
+            (tmhtml-simplify-div
+             (if (null? a) `(h:div ,@m) `(h:div (@ ,@a) ,@m))))))
         (else x)))
+
+;; The <div> of a paragraph has the class tmhtml-p, which gives it the
+;; margins of a <p> in the CSS of the export, also in the blocks where a
+;; <p> has none (.compact-block...): without them, a line with a table was
+;; closer to the paragraphs around it (#903). The vertical spaces of the
+;; paragraph are in its style, which wins over the class
+(define (par-div-with-class x)
+  (let* ((c (sxml-attr x 'class))
+         (other (list-filter (sxml-attr-list x)
+                             (lambda (a) (not (func? a 'class))))))
+    (if (par-div? x) x
+        `(h:div (@ (class ,(if c (string-append c " tmhtml-p") "tmhtml-p"))
+                   ,@other)
+                ,@(sxml-content x)))))
+
+(define (par-div? x)
+  (and (func? x 'h:div)
+       (and-with c (sxml-attr x 'class)
+         (in? "tmhtml-p" (string-tokenize-by-char c #\space)))))
 
 (define (force-block? x)
   (or (and (tm-in? x '(h:p h:div h:center h:pre h:h1 h:h2 h:h3 h:h4
@@ -504,8 +531,8 @@
                     (as-blocks (cdr l))))))
 
 (define (add-style-attr x s1 s2)
-  ;; the block @x with the margins @s1 (top) and @s2 (bottom). A <p> which
-  ;; has a style (the margins of a paragraph of a nested document, which
+  ;; the block @x with the margins @s1 (top) and @s2 (bottom). A <p> (or
+  ;; the <div> of a paragraph, #903) which has a style (the margins of a paragraph of a nested document, which
   ;; gets those of the outer paragraph too) takes them in its style, as
   ;; tmhtml-simplify-div merges a <div> with the <div> in it: a margin of
   ;; both is the larger one, as their margins collapse in a browser. It
@@ -517,12 +544,12 @@
            `(,(car x) (@ (style ,s)) ,@(cdr x)))
           ((and (xhtml-block? x) (not (sxml-attr x 'style)))
            `(,(car x) (@ (style ,s) ,@(sxml-attr-list x)) ,@(sxml-content x)))
-          ((func? x 'h:p)
+          ((or (func? x 'h:p) (par-div? x))
            (let* ((old (sxml-attr x 'style))
                   (other (list-filter (sxml-attr-list x)
                                       (lambda (a) (not (func? a 'style))))))
-             `(h:p (@ (style ,(css-merge-styles old s)) ,@other)
-                   ,@(sxml-content x))))
+             `(,(car x) (@ (style ,(css-merge-styles old s)) ,@other)
+                        ,@(sxml-content x))))
           (else `(h:div (@ (style ,s)) ,x)))))
 
 (define (tmhtml-margins x)
@@ -1369,7 +1396,11 @@
 	     (unit (symbol->string (tmlength-unit tmlen)))
 	     (incm (ahash-ref tmhtml-length-table unit))
 	     (cmpx (/ 1 (ahash-ref tmhtml-length-table "px"))))
-    (cond ((== unit "px") (number->htmlstring val))
+    ;; a length of CSS has a unit: a bare number is only for the attributes
+    ;; of HTML (width="10"), a bare number in a style was dropped by the
+    ;; browsers (vspace "10px" gave margin-bottom: 10, #901)
+    (cond ((== unit "px")
+           (string-append (number->htmlstring val) (if css? "px" "")))
 	  ((in? unit '("par" "pag"))
 	   (string-append (number->htmlstring (/ (round (* val 10000)) 100)) "%"))
 	  ((and css? (== unit "tmpt"))
@@ -1596,8 +1627,9 @@
 
 (define (tmhtml-specific l)
   ;; raw HTML: <less> and <gtr> give its markup, the other characters
-  ;; (Cork or <name>) are written in UTF-8 like the rest of the page
-  (cond ((== (car l) "html") (list (cork->utf8 (force-string (cadr l)))))
+  ;; (Cork or <name>) are written in UTF-8 like the rest of the page; it is
+  ;; text, whose newlines and tabs stay newlines and tabs (#439)
+  (cond ((== (car l) "html") (list (cork-text->utf8 (force-string (cadr l)))))
 	((== (car l) "html*") (tmhtml (cadr l)))
 	((== (car l) "image") (tmhtml-png (cadr l)))
 	(else '())))
@@ -3286,9 +3318,13 @@
   (("font-shape" "small-caps")
    (h:class (@ (style "font-variant: small-caps")))))
 
-(logic-table tmhtml-with-cmd% ; deprecated
-  (("par-mode" "left") (h:div (@ (align "left"))))
-  (("par-mode" "justify") (h:div (@ (align "justify"))))
+;; the alignments of the paragraphs: in CSS (the attribute align of <div> is
+;; not HTML5); "right" was missing, and the alignment of padded-right-aligned
+;; was lost (#904)
+(logic-table tmhtml-with-cmd%
+  (("par-mode" "left") (h:div (@ (style "text-align: left"))))
+  (("par-mode" "justify") (h:div (@ (style "text-align: justify"))))
+  (("par-mode" "right") (h:div (@ (style "text-align: right"))))
   (("par-mode" "center") (h:center)))
 
 (logic-table tmhtml-with-cmd% ; netscape4

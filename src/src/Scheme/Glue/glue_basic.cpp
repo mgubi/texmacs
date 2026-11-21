@@ -6631,6 +6631,19 @@ tmg_emoji_to_code_points (tmscm arg1) {
 }
 
 tmscm
+tmg_cork_text_2utf8 (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cork-text->utf8");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= cork_text_to_utf8 (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_utf8_2t2a (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->t2a");
 
@@ -8549,6 +8562,19 @@ tmg_system_2url (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   url out= url_system (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
+tmg_system_literal_2url (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "system-literal->url");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= url_system_literal (in1);
   // TMSCM_ALLOW_INTS;
 
   return url_to_tmscm (out);
@@ -13640,6 +13666,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("emoji-latex-name",  tmg_emoji_latex_name, 1, 0, 0);
   tmscm_install_procedure ("emoji-from-latex",  tmg_emoji_from_latex, 1, 0, 0);
   tmscm_install_procedure ("emoji-to-code-points",  tmg_emoji_to_code_points, 1, 0, 0);
+  tmscm_install_procedure ("cork-text->utf8",  tmg_cork_text_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->t2a",  tmg_utf8_2t2a, 1, 0, 0);
   tmscm_install_procedure ("t2a->utf8",  tmg_t2a_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->html",  tmg_utf8_2html, 1, 0, 0);
@@ -13776,6 +13803,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url->string",  tmg_url_2string, 1, 0, 0);
   tmscm_install_procedure ("url->stree",  tmg_url_2stree, 1, 0, 0);
   tmscm_install_procedure ("system->url",  tmg_system_2url, 1, 0, 0);
+  tmscm_install_procedure ("system-literal->url",  tmg_system_literal_2url, 1, 0, 0);
   tmscm_install_procedure ("url->system",  tmg_url_2system, 1, 0, 0);
   tmscm_install_procedure ("unix->url",  tmg_unix_2url, 1, 0, 0);
   tmscm_install_procedure ("url->unix",  tmg_url_2unix, 1, 0, 0);

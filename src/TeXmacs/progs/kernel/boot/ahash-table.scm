@@ -123,13 +123,15 @@
     t))
 
 (define-public-macro (ahash-with t var val . body)
-  (let ((old-val (gensym))
-	(ret-val (gensym)))
-    `(with ,old-val (ahash-ref ,t ,var)
-       (ahash-set! ,t ,var ,val)
-       (with ,ret-val (begin ,@body)
-	 (ahash-set! ,t ,var ,old-val)
-	 ,ret-val))))
+  ;; the old value is put back after an error too, as by with-global: it
+  ;; was left set (#902). dynamic-wind restores it while the error unwinds,
+  ;; without catching it. A key which was missing comes back bound to #f
+  (let ((tab (gensym)) (key (gensym)) (old (gensym)) (new (gensym)))
+    `(let* ((,tab ,t) (,key ,var) (,old (ahash-ref ,tab ,key)) (,new ,val))
+       (dynamic-wind
+         (lambda () (ahash-set! ,tab ,key ,new))
+         (lambda () ,@body)
+         (lambda () (ahash-set! ,tab ,key ,old))))))
 
 (define-public (ahash-table-invert t)
   (let* ((l (ahash-table->list t))

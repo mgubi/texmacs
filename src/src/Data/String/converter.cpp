@@ -277,6 +277,8 @@ string
 convert (string input, string from, string to) {
   if (from == "Cork")
     return convert_from_cork (input, to);
+  else if (from == "Cork-text")
+    return convert_from_cork_text (input, to);
   else if (to == "Cork")
     return convert_to_cork (input,from);
   else if (from == "LaTeX" && to == "UTF-8")
@@ -313,6 +315,20 @@ convert_from_cork (string input, string to) {
     return cork_to_sourcecode (input);
 #ifdef USE_ICONV
   string str = cork_to_utf8 (input);
+  return convert_using_iconv (str, "UTF-8", to);
+#else
+  return input; // can't do anything.
+#endif
+}
+
+string
+convert_from_cork_text (string input, string to) {
+  if (to == "UTF-8")
+    return cork_text_to_utf8 (input);
+  else if (to == "SourceCode")
+    return cork_text_to_sourcecode (input);
+#ifdef USE_ICONV
+  string str = cork_text_to_utf8 (input);
   return convert_using_iconv (str, "UTF-8", to);
 #else
   return input; // can't do anything.
@@ -762,13 +778,21 @@ sourcecode_to_cork (string input) {
   return output;
 }
 
-string
-cork_to_utf8 (string input) {
-  converter conv= load_converter ("Cork", "UTF-8");
+static string
+apply_cork (string input, string from, string to, bool text) {
+  // applies the converter from Cork (or Strict-Cork) to @to, with <#xxxx>
+  // written as the UTF-8 of xxxx; with @text, the bytes 0x09 and 0x0A are
+  // a tab and a newline rather than their Cork glyphs (see converter.hpp)
+  converter conv= load_converter (from, to);
   int start= 0, i, n= N(input);
   string r;
   for (i=0; i<n; i++)
-    if (input[i] == '<' && i+1<n && input[i+1] == '#') {
+    if (text && (input[i] == '\t' || input[i] == '\n')) {
+      r << apply (conv, input (start, i));
+      r << input[i];
+      start= i+1;
+    }
+    else if (input[i] == '<' && i+1<n && input[i+1] == '#') {
       r << apply (conv, input (start, i));
       start= i= i+2;
       while (i<n && input[i] != '>') i++;
@@ -778,42 +802,31 @@ cork_to_utf8 (string input) {
     }
   r << apply (conv, input (start, n));
   return r;
+}
+
+string
+cork_to_utf8 (string input) {
+  return apply_cork (input, "Cork", "UTF-8", false);
+}
+
+string
+cork_text_to_utf8 (string input) {
+  return apply_cork (input, "Cork", "UTF-8", true);
 }
 
 string
 strict_cork_to_utf8 (string input) {
-  converter conv= load_converter ("Strict-Cork", "UTF-8");
-  int start= 0, i, n= N(input);
-  string r;
-  for (i=0; i<n; i++)
-    if (input[i] == '<' && i+1<n && input[i+1] == '#') {
-      r << apply (conv, input (start, i));
-      start= i= i+2;
-      while (i<n && input[i] != '>') i++;
-      if (i >= n || i == start) { start -= 2; i= start + 1; continue; }
-      r << encode_as_utf8 (from_hexadecimal (input (start, i)));
-      start= i+1;
-    }
-  r << apply (conv, input (start, n));
-  return r;
+  return apply_cork (input, "Strict-Cork", "UTF-8", false);
 }
 
 string
 cork_to_sourcecode (string input) {
-  converter conv= load_converter ("Cork", "SourceCode");
-  int start= 0, i, n= N(input);
-  string r;
-  for (i=0; i<n; i++)
-    if (input[i] == '<' && i+1<n && input[i+1] == '#') {
-      r << apply (conv, input (start, i));
-      start= i= i+2;
-      while (i<n && input[i] != '>') i++;
-      if (i >= n || i == start) { start -= 2; i= start + 1; continue; }
-      r << encode_as_utf8 (from_hexadecimal (input (start, i)));
-      start= i+1;
-    }
-  r << apply (conv, input (start, n));
-  return r;
+  return apply_cork (input, "Cork", "SourceCode", false);
+}
+
+string
+cork_text_to_sourcecode (string input) {
+  return apply_cork (input, "Cork", "SourceCode", true);
 }
 
 string
