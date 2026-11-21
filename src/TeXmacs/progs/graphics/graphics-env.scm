@@ -71,16 +71,17 @@
 (tm-define state-slots
   `(quote ,(state-names graphics-state)))
 
-;; state-slots is read when the code runs, not when the macro expands: a
-;; module compiled ahead of time (Chez) does not have its value yet
+;; state-slots, the form (quote <slot names>), is read when the code runs,
+;; not when the macro expands: a module compiled ahead of time (Chez) does
+;; not have its value yet
 (define-public-macro (state-len)
-  `(length state-slots))
+  `(length (cadr state-slots)))
 
 (tm-define (new-state)
   (make-vector (state-len)))
 
 (define-public-macro (state-slot-ref i)
-  `(- (length (memq ,i state-slots)) 1))
+  `(- (length (memq ,i (cadr state-slots))) 1))
 
 (define-public-macro (state-ref st var)
   `(vector-ref ,st (state-slot-ref ,var)))
