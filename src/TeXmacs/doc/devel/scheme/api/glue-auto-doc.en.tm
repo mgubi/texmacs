@@ -3379,6 +3379,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(cork-text-\<gtr\>utf8 <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|cork_text_to_utf8> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(utf8-\<gtr\>t2a <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

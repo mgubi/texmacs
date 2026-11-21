@@ -311,7 +311,7 @@
 (tm-define (git-commit message)
   (let* ((cmd (string-append
                (current-git-command) " commit -m "
-               (version-quote (cork->utf8 message))))
+               (version-quote (cork-text->utf8 message))))
          (ret (eval-system cmd)))
     ;; (display ret)
     (set-message (string-append (current-git-command) " commit") message))

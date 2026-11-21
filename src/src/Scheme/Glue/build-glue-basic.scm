@@ -473,6 +473,7 @@
   (cork->sourcecode cork_to_sourcecode (string string))
   (utf8->cork utf8_to_cork (string string))
   (cork->utf8 cork_to_utf8 (string string))
+  (cork-text->utf8 cork_text_to_utf8 (string string))
   (utf8->t2a utf8_to_t2a (string string))
   (t2a->utf8 t2a_to_utf8 (string string))
   (utf8->html utf8_to_html (string string))

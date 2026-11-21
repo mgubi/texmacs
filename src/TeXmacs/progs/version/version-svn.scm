@@ -126,7 +126,7 @@
 (tm-define (version-commit name msg)
   (:require (== (version-tool name) "svn"))
   (let* ((name-s (url->string name))
-         (encoded (cork->utf8 msg))
+         (encoded (cork-text->utf8 msg))
          (cmd (string-append "svn commit -m " (version-quote encoded) " "
                              (version-quote name-s)))
          (ret (eval-svn cmd))
