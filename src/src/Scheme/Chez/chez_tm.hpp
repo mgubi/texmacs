@@ -113,7 +113,9 @@ inline bool tmscm_is_null (tmscm obj) { return Snullp (obj); }
 inline bool tmscm_is_pair (tmscm obj) { return Spairp (obj); }
 inline bool tmscm_is_bool (tmscm obj) { return Sbooleanp (obj); }
 inline bool tmscm_is_int (tmscm obj)   { return Sfixnump (obj) || Sbignump (obj); }
-inline bool tmscm_is_double (tmscm obj) { return Sflonump (obj); }
+// an exact integer is accepted where a double is expected, as by s7
+inline bool tmscm_is_double (tmscm obj) {
+  return Sflonump (obj) || Sfixnump (obj) || Sbignump (obj); }
 inline bool tmscm_is_string (tmscm obj) { return Sbytevectorp (obj); }
 inline bool tmscm_is_symbol (tmscm obj) { return Ssymbolp (obj); }
 bool tmscm_is_list (tmscm obj);   /* needs a call to list?; defined in cpp  */
@@ -165,7 +167,10 @@ inline unsigned int tmscm_to_uint (tmscm obj) {
   throw string ("Value out of range in ") *
         string (current_glue_proc ? current_glue_proc : "tmscm_to_uint");
 }
-inline double tmscm_to_double (tmscm obj) { return Sflonum_value (obj); }
+inline double tmscm_to_double (tmscm obj) {
+  if (Sflonump (obj)) return Sflonum_value (obj);
+  if (Sfixnump (obj)) return (double) Sfixnum_value (obj);
+  return (double) Sinteger64_value (obj); }
 string tmscm_to_string (tmscm obj);
 string tmscm_to_symbol (tmscm obj);
 

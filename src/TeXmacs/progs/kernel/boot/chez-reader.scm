@@ -307,6 +307,60 @@
   ;; one Chez uses: the module's own is dropped, rather than deleted from the
   ;; sources shared with the other interpreters.
 
+  ;; Guile and s7 evaluate the initial values of a let from left to right,
+  ;; and TeXmacs code relies on it (tmdoc-rewrite: two calls which fill the
+  ;; same table); Chez evaluates them in any order.  A let whose values are
+  ;; calls gets them in sequence, through temporaries, with the same scope:
+  ;;   (let ((a (f)) (b (g))) body)
+  ;;   => (let ((%let-1 (f))) (let ((%let-2 (g))) (let ((a %let-1) (b %let-2)) body)))
+  ;; Named lets too; quoted data is left alone.
+  (define let-counter 0)
+
+  (define (fresh-let-temp)
+    (set! let-counter (+ let-counter 1))
+    (string->symbol (string-append "%let-" (number->string let-counter))))
+
+  (define (binding-list? l)
+    (and (list? l)
+         (for-all (lambda (b) (and (pair? b) (symbol? (car b))
+                                   (pair? (cdr b)) (null? (cddr b))))
+                  l)))
+
+  (define (sequence-let bindings wrap)
+    ;; wrap: the let (or named let) taking the new bindings
+    (if (< (length (filter (lambda (b) (pair? (cadr b))) bindings)) 2)
+        (wrap bindings)
+        (let ((temps (map (lambda (b) (if (pair? (cadr b)) (fresh-let-temp) #f))
+                          bindings)))
+          (let loop ((bs bindings) (ts temps))
+            (cond ((null? bs)
+                   (wrap (map (lambda (b t) (if t (list (car b) t) b))
+                              bindings temps)))
+                  ((car ts) `(let ((,(car ts) ,(cadar bs))) ,(loop (cdr bs) (cdr ts))))
+                  (else (loop (cdr bs) (cdr ts))))))))
+
+  (define (sequence-lets x)
+    (cond
+      ((not (pair? x)) x)
+      ((memq (car x) '(quote quasiquote)) x)
+      ((and (eq? (car x) 'let) (pair? (cdr x)) (binding-list? (cadr x))
+            (pair? (cddr x)))
+       (let ((bindings (map (lambda (b) (list (car b) (sequence-lets (cadr b))))
+                            (cadr x)))
+             (body (map sequence-lets (cddr x))))
+         (sequence-let bindings (lambda (bs) `(let ,bs ,@body)))))
+      ((and (eq? (car x) 'let) (pair? (cdr x)) (symbol? (cadr x))
+            (pair? (cddr x)) (binding-list? (caddr x)) (pair? (cdddr x)))
+       (let ((name (cadr x))
+             (bindings (map (lambda (b) (list (car b) (sequence-lets (cadr b))))
+                            (caddr x)))
+             (body (map sequence-lets (cdddr x))))
+         (sequence-let bindings (lambda (bs) `(let ,name ,bs ,@body)))))
+      (else
+       (let walk ((l x))
+         (cond ((pair? l) (cons (sequence-lets (car l)) (walk (cdr l))))
+               (else l))))))
+
   ;; The forms of a source file, as Chez should see them
   (define (tm-read-guile-file file-path)
-    (fold-dialect-forms (read-raw-forms file-path))))
+    (map sequence-lets (fold-dialect-forms (read-raw-forms file-path)))))

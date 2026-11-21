@@ -146,11 +146,12 @@
          (slots (cadr (car theslots)))
          (props (cadr (cadr theslots))))
     (if (chez-scheme?)
-    ;; no eval on Chez: the slots and the properties are defined here, and
-    ;; the state gets compiled setters and getters for the slots
+    ;; no eval on Chez: the slots and the properties are global variables,
+    ;; as on Guile (graphics-utils uses those of graphics-env), defined
+    ;; here, and the state gets compiled setters and getters for the slots
     `(begin
-       ,@(map (lambda (s) `(define-public ,(car s) ,(cadr s))) slots)
-       ,@(map (lambda (p) `(define-public ,(car p) #f)) props)
+       ,@(map (lambda (s) `(define-top-level-value ',(car s) ,(cadr s))) slots)
+       ,@(map (lambda (p) `(define-top-level-value ',(car p) #f)) props)
        (define-public ,name
          (state-create
            (list (list ,@(map (lambda (s) `(list ',(car s) ,(cadr s))) slots))
