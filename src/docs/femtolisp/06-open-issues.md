@@ -2,13 +2,31 @@
 
 ## 6.1 Failing checks
 
-With `tests/scheme/check.sh all`, 40 of 43 suites pass. The 4 failing checks:
+The full run of `tests/scheme/check.sh` (all, typeset-check and
+code-lines-check: 64 suites in one process) under femtolisp, measured by
+#888 on its branch (19 November 2026, Vue on macOS arm64), fails 6 suites
+and 22 checks. They are the same 22 checks as under s7 in the same run:
+none is specific to femtolisp.
 
-| Suite | Check | Cause |
-|---|---|---|
-| htmltm | `img, %` | no exact rationals: a width of 50% gives `0.5par`, Guile `1/2par` (the same length) |
-| graphics-edit | `create` (2 checks) | the order of the attributes of `with` comes from the iteration order of a hash table (`ahash-table->list`), which differs between Guile, s7 and femtolisp |
-| formats | verbatim export to iso-8859-1 | not femtolisp: `cork_to_latin1` writes `?` since 8d286547e9, the test expects the character to be left out |
+| Suite | Failed | Group | Cause |
+|---|---|---|---|
+| editing | 1 | structure | the order of the suites and the state they leave (one process, #906) |
+| math-edit | 5 | enter math | the same |
+| misc-modules | 1 | mirrors in a buffer with two views | the same (#906) |
+| parse | 6 | highlight fortran | the same: the colours of another language mode |
+| kbd-menu | 5 | entering and leaving math, closing windows | the same |
+| plugins | 4 | processes: the group of a plugin | timing of pipes and sessions (#874) |
+
+The checks which failed only under femtolisp before (`htmltm` "img, %",
+the exact rationals; `graphics-edit` "create", the order of a hash table;
+`formats`, the verbatim export to iso-8859-1) pass, in #888's run and in
+a run of 21 November; the known differences behind the first two are in
+6.2.
+
+At `b3881bfcdb` (21 November 2026, after #900), `convert-more` no longer
+ends under femtolisp: in the group "html export: a macro which calls
+itself" it hashes deep trees in a table (`fl_table_put`, `equal?` with
+cycle detection) for more than 10 minutes, with or without patch 0039.
 
 ## 6.2 Differences with Guile
 
@@ -26,9 +44,12 @@ With `tests/scheme/check.sh all`, 40 of 43 suites pass. The 4 failing checks:
   nested too deep. The conversions of C++ between trees and lists (`stree->tree`,
   the glue) are recursions of C++ too, with no check, under every Scheme:
   past about 45000 levels (femtolisp) or 50000 (s7) they overflow the stack.
-  The collector of femtolisp bounds its recursion only for lists nested in
-  their cars (patch 0037): data nested as deep through vectors, closures or
-  the tails of improper lists still overflows the stack of C.
+  The collector of femtolisp relocates data nested as deep (lists, vectors,
+  closures, hash tables...) without a recursion of C past 1000 levels
+  (patches 0037 and 0039, #908). `equal?`, the printer and the hash tables
+  (which compare their keys with `equal?`) still recurse in C through
+  data nested deep: a list or a vector nested a million deep overflows the
+  stack of C there (a crash, in a standalone femtolisp).
 - Macros are expanded when code is compiled. Code which runs at expansion time
   (macros with side effects, self-recursive expansions) behaves differently
   from Guile; late calls and deferred expansion errors cover the common cases.

@@ -97,7 +97,10 @@
     0031: undefined behaviour (names of symbols, operands of the bytecode,
     fixnums, keywords). 0037: the collector copies the lists nested deep in
     their cars without a recursion of C past 1000 levels (a crash past
-    150000 levels, or 45000 during an export).
+    150000 levels, or 45000 during an export). 0039: the same for every
+    object (vectors, closures, the tails of improper lists, hash tables),
+    and a hash table which contains itself is copied once (it was copied
+    without end, a crash).
 
     <item*|For speed>0024: the jumps of the errors save no signal mask on
     macOS. 0026: <verbatim|\<gtr\>>, <verbatim|\<less\>=>,

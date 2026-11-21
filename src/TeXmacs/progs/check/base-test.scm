@@ -601,6 +601,22 @@
   ;; a callback named return (LanguageTool, the AI translation...)
   (return x))
 
+(define (deep-nest n wrap leaf)
+  ;; @leaf wrapped @n times by @wrap
+  (do ((i 0 (+ i 1)) (x leaf (wrap x))) ((= i n) x)))
+
+(define (nest-depth x unwrap)
+  ;; how many times @unwrap applies to @x (until it gives #f), and the leaf
+  (let loop ((x x) (n 0))
+    (let ((y (unwrap x)))
+      (if y (loop y (+ n 1)) (list n x)))))
+
+(define (deep-nest-survives-gc? n wrap unwrap)
+  ;; nesting @n deep through @wrap is still there after a collection
+  (let ((x (deep-nest n wrap "leaf")))
+    (gc)
+    (equal? (nest-depth x unwrap) (list n "leaf"))))
+
 (define (test-deep-recursions)
   (check-group "deep recursions")
   ;; a local variable named return is called (femtolisp made it its special
@@ -621,7 +637,36 @@
       (gc)
       (check= (let loop ((t x) (n 0))
                 (if (pair? t) (loop (cadr t) (+ n 1)) (list n t)))
-              '(1000000 "leaf")))))
+              '(1000000 "leaf"))))
+  ;; and the other objects by a recursion of C too (#908): a crash for data
+  ;; nested deep through vectors, closures, the tails of improper lists,
+  ;; vectors in lists or hash tables (and the values of femtolisp's own
+  ;; gensyms, which TeXmacs does not make: its gensym interns its symbols)
+  (when (femtolisp-scheme?)
+    (check-true (deep-nest-survives-gc? 1000000
+                  (lambda (x) (vector x))
+                  (lambda (x) (and (vector? x) (vector-ref x 0)))))
+    (check-true (deep-nest-survives-gc? 1000000
+                  (lambda (x) (lambda () x))
+                  (lambda (x) (and (procedure? x) (x)))))
+    (check-true (deep-nest-survives-gc? 1000000
+                  (lambda (x) (cons 'f (vector x)))
+                  (lambda (x) (and (pair? x) (vector-ref (cdr x) 0)))))
+    (check-true (deep-nest-survives-gc? 1000000
+                  (lambda (x) (list (vector x)))
+                  (lambda (x) (and (pair? x) (vector-ref (car x) 0)))))
+    (check-true (deep-nest-survives-gc? 200000
+                  (lambda (x) (let ((h (make-ahash-table)))
+                                (ahash-set! h 'next x) h))
+                  (lambda (x) (and (hash-table? x) (ahash-ref x 'next))))))
+  ;; a hash table reachable from its own values is copied once by the
+  ;; collector of femtolisp (a crash, or two copies of the table)
+  (let ((h (make-ahash-table)))
+    (ahash-set! h 'self h)
+    (ahash-set! h 'list (list 1 h))
+    (gc)
+    (check-true (eq? (ahash-ref h 'self) h))
+    (check-true (eq? (cadr (ahash-ref h 'list)) h))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
