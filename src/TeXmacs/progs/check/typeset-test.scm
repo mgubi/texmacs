@@ -3723,6 +3723,7 @@
     (check= (tree->stree (stm-snippet->texmacs
                           "(concat \"a\" (with \"color\" \"red\" \"b\"))"))
             '(concat "a" (with "color" "red" "b"))))
+  (test-stm-ends)
   ;; a shallow tree is whole, also made into a tree from deep in a recursion
   ;; of Scheme: near the limit of Guile, the stack nearly full, it was cut
   ;; from its first level ((error "nesting too deep") for a <concat>); deeper
@@ -3733,6 +3734,130 @@
                 (lambda () (deep-call n (lambda () (tree->stree (stree->tree x)))))
                 (lambda args 'overflow))
         (check-true (in? r (list x 'overflow)))))))
+
+;; The reader of Scheme text read past the end of a text which ended in a
+;; string or a comment: in a list cut too deep (the end of the text in the
+;; skipped part), and even without a cut, after a comment with no newline.
+;; It then added empty atoms to a list for ever, gigabytes in seconds. Its
+;; skipper also took a " or a ; inside an atom (ab"c, ab;c) for a string or
+;; a comment, and lost the text after the cut. The texts are read in a
+;; TeXmacs of its own, killed after 2 minutes or 400 MB, so that a reader
+;; which loops makes the checks fail instead of stopping the suite (here,
+;; when that TeXmacs cannot be started).
+
+(define stm-reading-source
+  ;; (the reading of a text, summarized: a nesting of <with> deeper than 60
+  ;; levels is deep, for the TeXmacs which reads it too)
+  "(define (stm-reading s)
+     (define (summ t)
+       (let loop ((t t) (d 0))
+         (cond ((and (tree-is? t 'with) (> (tree-arity t) 2) (< d 60))
+                (loop (tree-ref t 2) (+ d 1)))
+               ((>= d 60) 'deep)
+               ((> d 0) (list 'with d (tree->stree t)))
+               (else (tree->stree t)))))
+     (catch #t
+       (lambda ()
+         (let ((t (stm-snippet->texmacs s)))
+           (if (tree-compound? t)
+               (cons (tree-label t) (map summ (tree-children t)))
+               (tree->stree t))))
+       (lambda args 'error)))")
+
+(define (stm-reading s)
+  ;; (as stm-reading-source)
+  (define (summ t)
+    (let loop ((t t) (d 0))
+      (cond ((and (tree-is? t 'with) (> (tree-arity t) 2) (< d 60))
+             (loop (tree-ref t 2) (+ d 1)))
+            ((>= d 60) 'deep)
+            ((> d 0) (list 'with d (tree->stree t)))
+            (else (tree->stree t)))))
+  (catch #t
+    (lambda ()
+      (let ((t (stm-snippet->texmacs s)))
+        (if (tree-compound? t)
+            (cons (tree-label t) (map summ (tree-children t)))
+            (tree->stree t))))
+    (lambda args 'error)))
+
+(define stm-guard
+  ;; perl: the command in a process of its own, killed when it takes more
+  ;; than 400 MB or 2 minutes (exit 3)
+  (string-append
+   "$p=fork; if (!$p) { exec @ARGV; exit 127 } $n=0;"
+   " while (waitpid ($p, 1) == 0) {"
+   "  $r=`ps -o rss= -p $p`;"
+   "  if ($r > 409600 || $n > 2400) { kill 9, $p; waitpid ($p, 0); exit 3 }"
+   "  select (undef, undef, undef, 0.05); $n++ }"
+   " exit ($? >> 8)"))
+
+(define (stm-readings texts)
+  ;; the readings of @texts, in a TeXmacs of its own when it can be started;
+  ;; 'stopped if it was killed
+  (let* ((bin (url-concretize "$TEXMACS_PATH/bin/texmacs.bin"))
+         (dir (url-append (url-temp-dir) "typeset-stm"))
+         (in (url-append dir "read.scm"))
+         (out (url-append dir "read.out")))
+    (if (or (os-mingw?) (os-win32?) (not (url-exists? bin))
+            (not (url-exists-in-path? "perl")) (not (url-exists-in-path? "ps")))
+        (map stm-reading texts)
+        (begin
+          (when (url-exists? dir) (system-rmdir-recursive dir))
+          (system-mkdir dir)
+          (string-save
+           (string-append stm-reading-source
+                          "\n(string-save (object->string (map stm-reading (list "
+                          (apply string-append
+                                 (map (lambda (x) (string-append (object->string x) " "))
+                                      texts))
+                          "))) " (object->string (url->system out)) ")\n(exit 0)\n")
+           in)
+          (evaluate-system (list "perl" "-e" stm-guard (url->system bin) "-x"
+                                 (string-append "(load "
+                                                (object->string (url->system in))
+                                                ")")
+                                 "-q")
+                           '() '() '(1 2))
+          (with r (if (url-exists? out) (string->object (string-load out)) 'stopped)
+            (system-rmdir-recursive dir)
+            r)))))
+
+(define (test-stm-ends)
+  (let* ((w (lambda (n) (repeat-string "(with \"color\" \"red\" " n)))
+         (deep (string-append "(document " (w 3000) "\"x\" ; c\n ab\"c \"y\" "
+                              (repeat-string ")" 3000) " \"after\" ; t\n \"end\")"))
+         (n (string-length deep))
+         (texts (list
+                 ;; a string, a comment with no newline, in the cut list
+                 (string-append "(document " (w 3000) "\"abc")
+                 (string-append "(document " (w 3000) "\"x\" ; hi")
+                 ;; ab"c and ab;c are atoms, in the cut list and after it,
+                 ;; as without a cut
+                 (string-append "(document " (w 3000) "\"x\" ab\"c ab;c \"s ) (\" "
+                                (repeat-string ")" 3000) " \"after\" ab\"c ab;c)")
+                 (string-append "(document " (w 3) "\"x\" ab\"c ab;c \"s ) (\" "
+                                (repeat-string ")" 3) " \"after\" ab\"c ab;c)")
+                 ;; a comment at the end of a text, with no newline
+                 "(document (with \"c\" \"r\" \"x\" ; hi"
+                 (string-append "(document " (w 3000) "\"x\")))) ; hi")
+                 ;; the deep text, truncated
+                 (substring deep 0 30000) (substring deep 0 60020)
+                 (substring deep 0 (- n 12)) (substring deep 0 (- n 5))
+                 (substring deep 0 (- n 1)) deep))
+         (r (stm-readings texts)))
+    (check-true (list? r))
+    (when (list? r)
+      (check= (list-head r 3)
+              '((document deep) (document deep)
+                (document deep "after" "ab\"c" "ab;c")))
+      (check= (list-ref r 3)
+              '(document (with 3 "x") "after" "ab\"c" "ab;c"))
+      (check= (list-tail r 4)
+              '((document (with 1 "x")) (document deep)
+                (document deep) (document deep)
+                (document deep "after") (document deep "after" "\"")
+                (document deep "after" "end") (document deep "after" "end"))))))
 
 (define (deep-call n thunk)
   ;; (thunk) at the bottom of @n frames of a recursion of Scheme

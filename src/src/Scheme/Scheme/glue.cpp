@@ -482,12 +482,16 @@ scheme_tree_to_tmscm (scheme_tree t) {
 struct tmscm_depth_cap {
   int max;  // deeper lists are cut
   int cut;  // the number of lists cut
-  tmscm_depth_cap (): max (tree_max_depth ()), cut (0) {}
-  bool too_deep (int depth) { return tree_too_deep (depth, max); }
+  int at;   // the least depth at which a list was cut
+  tmscm_depth_cap (): max (tree_max_depth ()), cut (0), at (max) {}
+  bool too_deep (int depth) {
+    if (!tree_too_deep (depth, max)) return false;
+    if (depth < at) at= depth;
+    return true; }
   void done (const char* what) {
     if (cut == 0) return;
     convert_warning << "Scheme " << what << " nested deeper than "
-                    << max << " levels cut" << LF; }
+                    << at << " levels cut" << LF; }
 };
 
 static scheme_tree
