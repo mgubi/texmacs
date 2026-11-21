@@ -45,9 +45,12 @@ QTMGuiHelper::eventFilter (QObject *obj, QEvent *event) {
     const string s (tmp.constData(), tmp.size());
     if (DEBUG_EVENTS)
       debug_events << "File open event: " << s << LF;
+    // the path of a file is taken as it is: a*b.tm or a:b.tm is not a
+    // pattern nor a list of paths (#905)
+    ::url u= url.isLocalFile ()? url_system_literal (s): url_system (s);
       // the window is chosen when the command runs (see load-buffer-from-system)
     exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer-from-system"),
-                              object (url_system (s)))));
+                              object (u))));
     return true;
   } else {
       // standard event processing

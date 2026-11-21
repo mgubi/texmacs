@@ -340,6 +340,31 @@ url_system (string dir, string name) {
 }
 
 url
+url_system_literal (string name) {
+  // The path of a file given by the system (the Finder, the Dock, the
+  // command line, the dialogs of files): it names one file, which may have
+  // any name. Unlike url_system, a '*' is not a wildcard (a*b.tm), a ':'
+  // does not separate a list of paths (a:b.tm is shown as a/b.tm by the
+  // Finder), and '~' and '$x' are not expanded (#905). On Windows, whose
+  // file names have none of these characters, it is url_system.
+#ifdef WINPATHS
+  return url_system (name);
+#else
+  if (name == "") return url_system (name);
+  url u= url_here ();
+  int i= 0, n= N(name);
+  while (i < n) {
+    int start= i;
+    while (i < n && name[i] != '/') i++;
+    if (i > start) u= u * as_url (tree (name (start, i)));
+    i++;
+  }
+  if (name[0] == '/') return url_root ("default") * u;
+  return u;
+#endif
+}
+
+url
 url_standard (string name) {
   return url_general (name, URL_STANDARD);
 }
