@@ -461,6 +461,21 @@ static string s_texmacs_boot_file = "";
 static int s_argc = 0;
 static char** s_argv = NULL;
 static bool s_scheme_initialized = false;
+static bool s_compile_modules = false;
+
+string
+scheme_init_file () {
+  // -compile-modules runs the compiler of TeXmacs/progs to Chez modules;
+  // otherwise the modules of texmacs.boot are already in the heap, and
+  // init-texmacs-boot-file.so only finishes the initialization; without
+  // texmacs.boot (TEXMACS_NO_BOOT=1), the compiled modules are loaded one
+  // by one by init-texmacs-chez.scm
+  if (s_compile_modules) return "$TEXMACS_PATH/progs/init-chez-compile.scm";
+  if (s_has_texmacs_boot)
+    return as_string (url ("$TEXMACS_BOOT_PATH:$TEXMACS_PATH/boot") *
+                      "init-texmacs-boot-file.so");
+  return "$TEXMACS_PATH/progs/init-texmacs-chez.scm";
+}
 
 bool
 chez_has_boot () {
@@ -490,7 +505,7 @@ build_chez_heap () {
   Sregister_boot_file (c_string (dir * "petite.boot"));
   Sregister_boot_file (c_string (dir * "scheme.boot"));
 
-  bool is_compile_modules = false;
+  bool& is_compile_modules = s_compile_modules;
   for (int i = 1; i < s_argc; i++) {
     if (strcmp (s_argv[i], "-compile-modules") == 0 ||
         strcmp (s_argv[i], "--compile-modules") == 0 ||

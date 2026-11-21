@@ -23,7 +23,7 @@
 * which is a Scall3 into (tm-install-procedure! name id arity), which interns
 * a symbol and allocates a closure.  Two consequences matter here:
 *
-*   - it costs ~1176 round trips into the interpreter during
+*   - it costs ~1185 round trips into the interpreter during
 *     every start-up, plus the resulting nursery churn;
 *   - it needs a live Scheme heap, so it cannot run before Sbuild_heap()
 *     returns.  Any boot file evaluated during heap construction -- a
@@ -47,7 +47,7 @@
 * what tm_fast_call_N did on the legacy path.  The shim also records the
 * routine name for the diagnostics in chez_tm.hpp.
 *
-* 1176 routines: 444 bound raw, 732 with UTF-8 transcoding.
+* 1185 routines: 444 bound raw, 741 with UTF-8 transcoding.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -206,6 +206,8 @@ extern tmscm tmg_rescue_modeP ();
 extern tmscm tmg_scheme_dialect ();
 extern tmscm tmg_get_texmacs_path ();
 extern tmscm tmg_get_texmacs_home_path ();
+extern tmscm tmg_get_user_login ();
+extern tmscm tmg_get_user_name ();
 extern tmscm tmg_plugin_list ();
 extern tmscm tmg_set_fast_environments (tmscm);
 extern tmscm tmg_font_exists_in_ttP (tmscm);
@@ -213,6 +215,10 @@ extern tmscm tmg_eval_system (tmscm);
 extern tmscm tmg_var_eval_system (tmscm);
 extern tmscm tmg_evaluate_system (tmscm, tmscm, tmscm, tmscm);
 extern tmscm tmg_async_eval_system (tmscm, tmscm);
+extern tmscm tmg_http_post (tmscm, tmscm, tmscm);
+extern tmscm tmg_http_post_query (tmscm, tmscm, tmscm);
+extern tmscm tmg_async_http_post (tmscm, tmscm, tmscm, tmscm);
+extern tmscm tmg_async_http_post_query (tmscm, tmscm, tmscm, tmscm);
 extern tmscm tmg_get_locale_language ();
 extern tmscm tmg_get_locale_charset ();
 extern tmscm tmg_locale_to_language (tmscm);
@@ -667,9 +673,12 @@ extern tmscm tmg_compressed_2html (tmscm, tmscm);
 extern tmscm tmg_compress_html (tmscm, tmscm);
 extern tmscm tmg_decompress_html (tmscm, tmscm);
 extern tmscm tmg_cpp_ai_command (tmscm, tmscm, tmscm);
+extern tmscm tmg_cpp_ai_eval_command (tmscm);
+extern tmscm tmg_cpp_ai_async_eval_command (tmscm, tmscm);
 extern tmscm tmg_cpp_ai_output (tmscm, tmscm);
 extern tmscm tmg_cpp_ai_get_body (tmscm);
 extern tmscm tmg_cpp_ai_latex_command (tmscm, tmscm, tmscm);
+extern tmscm tmg_cpp_ai_latex_request (tmscm, tmscm, tmscm);
 extern tmscm tmg_cpp_ai_latex_output (tmscm, tmscm, tmscm);
 extern tmscm tmg_cpp_ai_chat (tmscm, tmscm, tmscm);
 extern tmscm tmg_cpp_ai_correct (tmscm, tmscm, tmscm);
@@ -1386,6 +1395,8 @@ TMG_GUARDED_0 ("rescue-mode?", tmg_rescue_modeP)
 TMG_GUARDED_0 ("scheme-dialect", tmg_scheme_dialect)
 TMG_GUARDED_0 ("get-texmacs-path", tmg_get_texmacs_path)
 TMG_GUARDED_0 ("get-texmacs-home-path", tmg_get_texmacs_home_path)
+TMG_GUARDED_0 ("get-user-login", tmg_get_user_login)
+TMG_GUARDED_0 ("get-user-name", tmg_get_user_name)
 TMG_GUARDED_0 ("plugin-list", tmg_plugin_list)
 TMG_GUARDED_1 ("set-fast-environments", tmg_set_fast_environments)
 TMG_GUARDED_1 ("font-exists-in-tt?", tmg_font_exists_in_ttP)
@@ -1393,6 +1404,10 @@ TMG_GUARDED_1 ("eval-system", tmg_eval_system)
 TMG_GUARDED_1 ("var-eval-system", tmg_var_eval_system)
 TMG_GUARDED_4 ("evaluate-system", tmg_evaluate_system)
 TMG_GUARDED_2 ("async-eval-system", tmg_async_eval_system)
+TMG_GUARDED_3 ("http-post", tmg_http_post)
+TMG_GUARDED_3 ("http-post-query", tmg_http_post_query)
+TMG_GUARDED_4 ("async-http-post", tmg_async_http_post)
+TMG_GUARDED_4 ("async-http-post-query", tmg_async_http_post_query)
 TMG_GUARDED_0 ("get-locale-language", tmg_get_locale_language)
 TMG_GUARDED_0 ("get-locale-charset", tmg_get_locale_charset)
 TMG_GUARDED_1 ("locale-to-language", tmg_locale_to_language)
@@ -1847,9 +1862,12 @@ TMG_GUARDED_2 ("compressed->html", tmg_compressed_2html)
 TMG_GUARDED_2 ("compress-html", tmg_compress_html)
 TMG_GUARDED_2 ("decompress-html", tmg_decompress_html)
 TMG_GUARDED_3 ("cpp-ai-command", tmg_cpp_ai_command)
+TMG_GUARDED_1 ("cpp-ai-eval-command", tmg_cpp_ai_eval_command)
+TMG_GUARDED_2 ("cpp-ai-async-eval-command", tmg_cpp_ai_async_eval_command)
 TMG_GUARDED_2 ("cpp-ai-output", tmg_cpp_ai_output)
 TMG_GUARDED_1 ("cpp-ai-get-body", tmg_cpp_ai_get_body)
 TMG_GUARDED_3 ("cpp-ai-latex-command", tmg_cpp_ai_latex_command)
+TMG_GUARDED_3 ("cpp-ai-latex-request", tmg_cpp_ai_latex_request)
 TMG_GUARDED_3 ("cpp-ai-latex-output", tmg_cpp_ai_latex_output)
 TMG_GUARDED_3 ("cpp-ai-chat", tmg_cpp_ai_chat)
 TMG_GUARDED_3 ("cpp-ai-correct", tmg_cpp_ai_correct)
@@ -2576,6 +2594,8 @@ static const tmg_entry tmg_entries[]= {
   { "tmg_scheme_dialect", (void*) tmgc_tmg_scheme_dialect },
   { "tmg_get_texmacs_path", (void*) tmgc_tmg_get_texmacs_path },
   { "tmg_get_texmacs_home_path", (void*) tmgc_tmg_get_texmacs_home_path },
+  { "tmg_get_user_login", (void*) tmgc_tmg_get_user_login },
+  { "tmg_get_user_name", (void*) tmgc_tmg_get_user_name },
   { "tmg_plugin_list", (void*) tmgc_tmg_plugin_list },
   { "tmg_set_fast_environments", (void*) tmgc_tmg_set_fast_environments },
   { "tmg_font_exists_in_ttP", (void*) tmgc_tmg_font_exists_in_ttP },
@@ -2583,6 +2603,10 @@ static const tmg_entry tmg_entries[]= {
   { "tmg_var_eval_system", (void*) tmgc_tmg_var_eval_system },
   { "tmg_evaluate_system", (void*) tmgc_tmg_evaluate_system },
   { "tmg_async_eval_system", (void*) tmgc_tmg_async_eval_system },
+  { "tmg_http_post", (void*) tmgc_tmg_http_post },
+  { "tmg_http_post_query", (void*) tmgc_tmg_http_post_query },
+  { "tmg_async_http_post", (void*) tmgc_tmg_async_http_post },
+  { "tmg_async_http_post_query", (void*) tmgc_tmg_async_http_post_query },
   { "tmg_get_locale_language", (void*) tmgc_tmg_get_locale_language },
   { "tmg_get_locale_charset", (void*) tmgc_tmg_get_locale_charset },
   { "tmg_locale_to_language", (void*) tmgc_tmg_locale_to_language },
@@ -3037,9 +3061,12 @@ static const tmg_entry tmg_entries[]= {
   { "tmg_compress_html", (void*) tmgc_tmg_compress_html },
   { "tmg_decompress_html", (void*) tmgc_tmg_decompress_html },
   { "tmg_cpp_ai_command", (void*) tmgc_tmg_cpp_ai_command },
+  { "tmg_cpp_ai_eval_command", (void*) tmgc_tmg_cpp_ai_eval_command },
+  { "tmg_cpp_ai_async_eval_command", (void*) tmgc_tmg_cpp_ai_async_eval_command },
   { "tmg_cpp_ai_output", (void*) tmgc_tmg_cpp_ai_output },
   { "tmg_cpp_ai_get_body", (void*) tmgc_tmg_cpp_ai_get_body },
   { "tmg_cpp_ai_latex_command", (void*) tmgc_tmg_cpp_ai_latex_command },
+  { "tmg_cpp_ai_latex_request", (void*) tmgc_tmg_cpp_ai_latex_request },
   { "tmg_cpp_ai_latex_output", (void*) tmgc_tmg_cpp_ai_latex_output },
   { "tmg_cpp_ai_chat", (void*) tmgc_tmg_cpp_ai_chat },
   { "tmg_cpp_ai_correct", (void*) tmgc_tmg_cpp_ai_correct },

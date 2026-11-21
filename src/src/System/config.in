@@ -36,6 +36,12 @@
 /* gs lib path relative to TEXMACS_PATH */
 #undef GS_LIB
 
+/* Default directory of the Chez Scheme heap images */
+#undef CHEZ_BOOT_DIR
+
+/* Use Chez Scheme */
+#undef USE_CHEZ
+
 /* Use the Guile Scheme interpreter */
 #undef USE_GUILE
 

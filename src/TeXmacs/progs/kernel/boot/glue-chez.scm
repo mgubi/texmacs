@@ -38,7 +38,7 @@
 ;;              converts Scheme strings to bytevectors on the way in and back
 ;;              on the way out, exactly as tm-install-procedure! did.
 ;;
-;; 1176 routines: 444 raw, 732 transcoded.
+;; 1185 routines: 444 raw, 741 transcoded.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1013,6 +1013,18 @@
 (define (get-texmacs-home-path)
   (recur-utf8->string (c-glue-get_texmacs_home_path)))
 
+(define c-glue-get_user_login
+  (foreign-procedure "tmg_get_user_login" () scheme-object))
+
+(define (get-user-login)
+  (recur-utf8->string (c-glue-get_user_login)))
+
+(define c-glue-get_user_name
+  (foreign-procedure "tmg_get_user_name" () scheme-object))
+
+(define (get-user-name)
+  (recur-utf8->string (c-glue-get_user_name)))
+
 (define c-glue-plugin_list
   (foreign-procedure "tmg_plugin_list" () scheme-object))
 
@@ -1048,6 +1060,30 @@
 
 (define (async-eval-system a1 a2)
   (recur-utf8->string (c-glue-async_eval_system (recur-string->utf8 a1) (recur-string->utf8 a2))))
+
+(define c-glue-http_post
+  (foreign-procedure "tmg_http_post" (scheme-object scheme-object scheme-object) scheme-object))
+
+(define (http-post a1 a2 a3)
+  (recur-utf8->string (c-glue-http_post (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+
+(define c-glue-http_post_query
+  (foreign-procedure "tmg_http_post_query" (scheme-object scheme-object scheme-object) scheme-object))
+
+(define (http-post-query a1 a2 a3)
+  (recur-utf8->string (c-glue-http_post_query (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+
+(define c-glue-async_http_post
+  (foreign-procedure "tmg_async_http_post" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
+
+(define (async-http-post a1 a2 a3 a4)
+  (recur-utf8->string (c-glue-async_http_post (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+
+(define c-glue-async_http_post_query
+  (foreign-procedure "tmg_async_http_post_query" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
+
+(define (async-http-post-query a1 a2 a3 a4)
+  (recur-utf8->string (c-glue-async_http_post_query (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
 
 (define c-glue-get_locale_language
   (foreign-procedure "tmg_get_locale_language" () scheme-object))
@@ -2976,6 +3012,18 @@
 (define (cpp-ai-command a1 a2 a3)
   (recur-utf8->string (c-glue-cpp_ai_command (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
 
+(define c-glue-cpp_ai_eval_command
+  (foreign-procedure "tmg_cpp_ai_eval_command" (scheme-object) scheme-object))
+
+(define (cpp-ai-eval-command a1)
+  (recur-utf8->string (c-glue-cpp_ai_eval_command (recur-string->utf8 a1))))
+
+(define c-glue-cpp_ai_async_eval_command
+  (foreign-procedure "tmg_cpp_ai_async_eval_command" (scheme-object scheme-object) scheme-object))
+
+(define (cpp-ai-async-eval-command a1 a2)
+  (recur-utf8->string (c-glue-cpp_ai_async_eval_command (recur-string->utf8 a1) (recur-string->utf8 a2))))
+
 (define c-glue-cpp_ai_output
   (foreign-procedure "tmg_cpp_ai_output" (scheme-object scheme-object) scheme-object))
 
@@ -2993,6 +3041,12 @@
 
 (define (cpp-ai-latex-command a1 a2 a3)
   (recur-utf8->string (c-glue-cpp_ai_latex_command (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+
+(define c-glue-cpp_ai_latex_request
+  (foreign-procedure "tmg_cpp_ai_latex_request" (scheme-object scheme-object scheme-object) scheme-object))
+
+(define (cpp-ai-latex-request a1 a2 a3)
+  (recur-utf8->string (c-glue-cpp_ai_latex_request (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
 
 (define c-glue-cpp_ai_latex_output
   (foreign-procedure "tmg_cpp_ai_latex_output" (scheme-object scheme-object scheme-object) scheme-object))

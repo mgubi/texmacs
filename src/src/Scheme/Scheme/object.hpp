@@ -19,6 +19,8 @@
 #include "../S7/s7_tm.hpp" // interface to S7
 #elif defined(USE_FEMTOLISP)
 #include "../Femtolisp/femtolisp_tm.hpp" // interface to femtolisp
+#elif defined(USE_CHEZ)
+#include "../Chez/chez_tm.hpp" // interface to Chez Scheme
 #else
 #include "../Guile/guile_tm.hpp" // interface to guile
 #endif

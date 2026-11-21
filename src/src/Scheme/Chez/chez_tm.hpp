@@ -118,6 +118,9 @@ inline bool tmscm_is_symbol (tmscm obj) { return Ssymbolp (obj); }
 bool tmscm_is_list (tmscm obj);   /* needs a call to list?; defined in cpp  */
 bool tmscm_is_equal (tmscm o1, tmscm o2); /* needs equal?; defined in cpp   */
 
+/* The conversions of glue.cpp root their partial results with ChezRoot,
+   there is no collector to switch off as for S7 */
+struct tmscm_builder { inline tmscm_builder () {} inline ~tmscm_builder () {} };
 inline tmscm tmscm_cons (tmscm obj1, tmscm obj2) { return Scons (obj1, obj2); }
 inline tmscm tmscm_car (tmscm obj) { return Scar (obj); }
 inline tmscm tmscm_cdr (tmscm obj) { return Scdr (obj); }

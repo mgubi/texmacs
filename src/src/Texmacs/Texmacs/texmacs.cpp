@@ -30,6 +30,7 @@
 #include "data_cache.hpp"
 #include "tm_window.hpp"
 #include "client_server.hpp"
+#include "scheme.hpp"
 
 #ifdef AQUATEXMACS
 void mac_fix_paths ();
@@ -69,6 +70,11 @@ bool open_mode= false;
 string open_mode_url;
 bool tls_no_verify= false;
 string extra_init_cmd;
+#ifdef USE_CHEZ
+// -compile-modules: compile TeXmacs/progs to Chez modules, then quit
+static bool compile_modules_mode= false;
+static string compile_modules_script= "";
+#endif
 bool exec_exit= true;
 void server_start ();
 
@@ -441,6 +447,11 @@ set_global_options  (int argc, char** argv)  {
                (s == "-delete-server-data") || (s == "-delete-databases") ||
 	       (s == "-headless") || (s == "-H") || s == "-open");
       else if (s == "-tls-no-verify") tls_no_verify= true;
+#ifdef USE_CHEZ
+      else if (s == "-compile-modules" || s == "-recompile-modules") {
+        if (i + 1 < argc && argv[i + 1][0] != '-') i++;
+      }
+#endif
       else if (s == "-build-manual") {
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
@@ -568,6 +579,15 @@ TeXmacs_main (int argc, char** argv) {
   { // opening scope for server sv
     if (DEBUG_STD) debug_boot << "Starting server...\n";
     server sv;
+#ifdef USE_CHEZ
+    if (compile_modules_mode) {
+      url script= "$TEXMACS_PATH/../src/Scheme/Chez/compile-texmacs.scm";
+      if (compile_modules_script != "") script= url (compile_modules_script);
+      cout << "TeXmacs] Executing module compiler: " << concretize (script) << LF;
+      exec_file (script);
+      exit (0);
+    }
+#endif
   
     // append commands to open standard welcome messages if needed
     if (install_status == 1) {
@@ -747,6 +767,15 @@ immediate_options (int argc, char** argv) {
 	     s == "-build-website" || s == "-W" ||
 	     s == "-update-website" || s == "-U")
       headless_mode= true;
+#endif
+#ifdef USE_CHEZ
+    else if (s == "-compile-modules" || s == "-recompile-modules") {
+      headless_mode= true;
+      compile_modules_mode= true;
+      if (s == "-recompile-modules") set_env ("TEXMACS_RECOMPILE_ALL", "1");
+      if (i + 1 < argc && argv[i + 1][0] != '-')
+        compile_modules_script= argv[++i];
+    }
 #endif
     else if (s == "-log-file" && i + 1 < argc) {
       i++;
