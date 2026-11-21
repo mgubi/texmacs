@@ -2566,12 +2566,13 @@
     (lambda ()
       (let* ((m (resolve-module '(part part-shared)))
              (invalidate (eval 'mirror-invalidate m))
-             (black-list (eval 'mirror-black-list m))
+             ;; read when used: mirror-synchronize replaces it (set!)
+             (black-list (lambda () (eval 'mirror-black-list m)))
              ;; copies left by earlier suites (the synchronization never
              ;; runs headless) are set aside, so that the list starts empty
-             (left (map car (ahash-table->list black-list)))
+             (left (map car (ahash-table->list (black-list))))
              (scheduled 0))
-        (for (uid left) (ahash-remove! black-list uid))
+        (for (uid left) (ahash-remove! (black-list) uid))
         (with-global exec-delayed-pause
             (lambda (c) (set! scheduled (+ scheduled 1)))
           (check= (catch #t (lambda () (invalidate (bt 0 2)) "ok")
@@ -2580,30 +2581,52 @@
           (check= (catch #t (lambda () (invalidate (bt 1 2)) "ok")
                     (lambda args (car args)))
                   "ok"))
-        (check-true (ahash-ref black-list "mt-u"))
-        (check-true (ahash-ref black-list "mt-v"))
+        (check-true (ahash-ref (black-list) "mt-u"))
+        (check-true (ahash-ref (black-list) "mt-v"))
         (check= scheduled 1)
-        (ahash-remove! black-list "mt-u")
-        (ahash-remove! black-list "mt-v")
-        (for (uid left) (ahash-set! black-list uid #t))))))
+        (ahash-remove! (black-list) "mt-u")
+        (ahash-remove! (black-list) "mt-v")
+        (for (uid left) (ahash-set! (black-list) uid #t))))))
 
 ;; A buffer with two views is typeset by two editors, each with its observer
 ;; on each mirror (#833, as #796 for live documents): id->trees gave each
 ;; mirror twice, so that every mirror looked like a copy to separate (on the
 ;; black list, its changes no longer passed to the others), and a change was
 ;; announced twice, to be applied twice to the other mirrors.
+;;
+;; The group depends on nothing which ran before it (#906): the tables of
+;; part-shared.scm are replaced (set!) by mirror-treat-pending and
+;; mirror-synchronize, so they are read from the module when they are
+;; checked, not once at the start; what earlier suites left in them (their
+;; treatment is delayed, and never runs headless: a change of a mirror stays
+;; pending) is set aside, and the tables end as they were; the second view
+;; is made in the window which shows the buffer, and the window gets its
+;; view back: the windows, their views and the views of the buffers are the
+;; same after the group as before. A failure of the setup (no view, no
+;; window) is a failed check, not an error which would stop the suite.
+(define mirror-tables '(mirror-black-list mirror-pending mirror-announced))
+
+(define (window-layout)
+  (list (current-window)
+        (map (lambda (w) (cons w (window->view w))) (window-list))
+        (view-list)
+        (map (lambda (b) (cons b (buffer->views b))) (buffer-list))))
+
 (define (test-mirror-views)
   (check-group "mirrors in a buffer with two views")
   (let* ((u (string->url "tmfs://aux/misc-mirror-views"))
          (old (current-buffer))
+         (old-win (current-window))
+         (old-view (and old-win (window->view old-win)))
          (buffers (buffer-list))
+         (layout (window-layout))
          (m (resolve-module '(part part-shared)))
          (treat (eval 'mirror-treat-pending m))
-         (black-list (eval 'mirror-black-list m))
-         (pending (eval 'mirror-pending m))
-         (left (map car (ahash-table->list black-list)))
-         (body (lambda () (tree->stree (buffer-get-body u)))))
-    (for (uid left) (ahash-remove! black-list uid))
+         (table (lambda (name) (eval name m)))
+         (saved (map (lambda (name) (cons name (ahash-table->list (table name))))
+                     mirror-tables)))
+    (for (s saved)
+      (for (kv (cdr s)) (ahash-remove! (table (car s)) (car kv))))
     (dynamic-wind
       (lambda () (noop))
       (lambda ()
@@ -2614,33 +2637,50 @@
                                         (mirror "mv-v" "mv-c" (document "abc"))))))
         (switch-to-buffer u)
         (update-forced)
-        (window-set-view (current-window) (view-new u) #t)
-        (update-forced)
-        (check= (length (buffer->views u)) 2)
-        (check= (length (id->trees "mv-c")) 2)
-        (check= (length (id->trees "mv-u")) 1)
-        (check= (sort (tree->ids (car (id->trees "mv-u"))) string<?)
-                '("mv-c" "mv-u"))
-        (check-false (ahash-ref black-list "mv-u"))
-        (check-false (ahash-ref black-list "mv-v"))
-        ;; a character typed in one mirror reaches the other once
-        (with-global exec-delayed-pause (lambda (c) (noop))
-          (go-to (append (tree->path (buffer-get-body u)) '(0 2 0 3)))
-          (insert "x")
-          (check= (map (lambda (x) (length (cdr x))) (ahash-table->list pending))
-                  '(1))
-          (treat))
-        (check= (body) '(document (mirror "mv-u" "mv-c" (document "abcx"))
-                                  (mirror "mv-v" "mv-c" (document "abcx")))))
+        (check= (length (buffer->views u)) 1)
+        (let* ((vs (buffer->views u))
+               (win (and (pair? vs) (view->window-url (car vs)))))
+          (check-true (and win #t))
+          (when win
+            (window-set-view win (view-new u) #t)
+            (update-forced)
+            (test-mirror-views-edit u treat table))))
       (lambda ()
-        (ahash-remove! black-list "mv-u")
-        (ahash-remove! black-list "mv-v")
-        (for (uid left) (ahash-set! black-list uid #t))
+        ;; what the group added goes, what was set aside comes back
+        (for (s saved)
+          (for (kv (ahash-table->list (table (car s))))
+            (ahash-remove! (table (car s)) (car kv)))
+          (for (kv (cdr s)) (ahash-set! (table (car s)) (car kv) (cdr kv))))
         (when (buffer-exists? u)
           (buffer-pretend-saved u)
           (buffer-close u))
-        (when (buffer-exists? old) (switch-to-buffer old))))
-    (check= (buffer-list) buffers)))
+        ;; (switch-to-buffer would give the window a new view of old)
+        (if (and old-view (in? old-view (view-list))
+                 (in? old-win (window-list)))
+            (window-set-view old-win old-view #t)
+            (when (buffer-exists? old) (switch-to-buffer old)))))
+    (check= (buffer-list) buffers)
+    (check= (window-layout) layout)))
+
+(define (test-mirror-views-edit u treat table)
+  (let ((body (lambda () (tree->stree (buffer-get-body u)))))
+    (check= (length (buffer->views u)) 2)
+    (check= (length (id->trees "mv-c")) 2)
+    (check= (length (id->trees "mv-u")) 1)
+    (check= (sort (tree->ids (car (id->trees "mv-u"))) string<?)
+            '("mv-c" "mv-u"))
+    (check-false (ahash-ref (table 'mirror-black-list) "mv-u"))
+    (check-false (ahash-ref (table 'mirror-black-list) "mv-v"))
+    ;; a character typed in one mirror reaches the other once
+    (with-global exec-delayed-pause (lambda (c) (noop))
+      (go-to (append (tree->path (buffer-get-body u)) '(0 2 0 3)))
+      (insert "x")
+      (check= (map (lambda (x) (cons (car x) (length (cdr x))))
+                   (ahash-table->list (table 'mirror-pending)))
+              '(("mv-v" . 1)))
+      (treat))
+    (check= (body) '(document (mirror "mv-u" "mv-c" (document "abcx"))
+                              (mirror "mv-v" "mv-c" (document "abcx"))))))
 
 (define (test-comments)
   (check-group "comments")
