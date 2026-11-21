@@ -60,6 +60,7 @@ url url_unix (string name);
 url url_unix (string dir, string name);
 url url_system (string name);
 url url_system (string dir, string name);
+url url_system_literal (string name); // a path of the system, not parsed
 url url_standard (string name);
 url url_standard (string dir, string name);
 
