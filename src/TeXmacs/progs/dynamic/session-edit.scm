@@ -178,7 +178,9 @@
 
 (define (var-object->string t)
   (with s (object->string t)
-    (if (== s "#<unspecified>") "" (replace-newline (string->tmstring s)))))
+    ;; the unspecified value (Chez prints it #<void>)
+    (if (in? s '("#<unspecified>" "#<void>")) ""
+        (replace-newline (string->tmstring s)))))
 
 (define (eval-string-with-catch s)
   (catch #t

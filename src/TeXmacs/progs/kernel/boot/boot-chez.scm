@@ -977,7 +977,10 @@
   (guard (e (else #vu8()))
     (if (tm-loadable? path)
         (call-with-port (open-file-input-port path)
-          (lambda (p) (or (get-bytevector-all p) #vu8())))
+          (lambda (p)
+            ;; the end of file for an empty file
+            (let ((bv (get-bytevector-all p)))
+              (if (eof-object? bv) #vu8() bv))))
         #vu8())))
 
 
@@ -995,7 +998,7 @@
     (display (list 'EVAL-ERROR s (tm-error-message e)
                    (tm-safe-irritants e)))
     (newline)
-    (cons #t (list (tm-error-message e))))))
+    (cons (tm-condition-key e) (tm-condition-args e)))))
     (let ((x (read (open-input-string s))))
       (if (eof-object? x) x (recur-string->utf8 (eval x tm-user-env))))))
 
@@ -1015,6 +1018,10 @@
         ;; a source of TeXmacs, a plug-in or the user, read as on Guile
         (for-each tm-eval-toplevel (tm-read-guile-file (tm-os-path f)))
         (primitive-load f))))
+
+;; The forms of a Scheme source of TeXmacs, read as Guile reads it (the plain
+;; read of Chez does not know Guile's lexical syntax, "\x05" for instance)
+(define (tm-read-scheme-file f) (tm-read-guile-file (tm-os-path f)))
 
 ;; A top-level form of a source, as Guile evaluates it: a conditional at
 ;; the top level may hold definitions (the init files of the plug-ins), which
@@ -1086,7 +1093,8 @@
   (display-condition e)
   (newline)
   (tm-backtrace e)
-  (cons #t (list (tm-error-message e))))
+  ;; as Guile and s7, the error comes back to C++ as (key . args)
+  (cons (tm-condition-key e) (tm-condition-args e)))
 
 (define (tm-call-0 fun)
   (recur-string->utf8
