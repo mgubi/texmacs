@@ -1835,6 +1835,34 @@
     (check= (substring (car r) 0 20) "abcdefghi       abcd")
     (check-true (< (cdr r) 2000))))
 
+;; A plain text dropped on a document (#918): the interfaces give its UTF-8
+;; to dropped-text, which reads it as a pasted text. TMView and the SDL
+;; drops of Vue inserted utf8->cork of the text, QTMWidget its raw UTF-8:
+;; the newlines and tabs became dot accents and macrons, in one line.
+(define (test-dropped-text)
+  (define (dot) (u8 #x2D9))
+  (define (macron) (u8 #xAF))
+  (define (breve) (u8 #x2D8))
+  (define (drop s) (st (dropped-text s)))
+  (check-group "dropped plain text")
+  (check= (drop "abc") "abc")
+  (check= (drop "a\nb\tc") '(document "a" "b       c"))
+  ;; CR LF and CR are newlines, as in a paste (a CR was a low quote)
+  (check= (drop "a\r\nb\rc") '(document "a" "b" "c"))
+  (check= (drop (string-append "caf" (u8 #xE9) " " (u8 #x3B1)))
+          "caf\xe9 <alpha>")
+  ;; the dot accent, macron and breve stay characters, also next to a
+  ;; real newline and tab
+  (check= (drop (string-append "x" (dot) "y" (macron) "z" (breve)))
+          (string-append "x" (cork 10) "y" (cork 9) "z" (cork 8)))
+  (check= (drop (string-append (dot) "\t" (macron) "\n" (breve)))
+          `(document ,(string-append (cork 10) "       " (cork 9)) ,(cork 8)))
+  ;; the same tree as the paste of the same text
+  (for (s (list "a\nb\tc" (string-append (u8 #xE9) "\t" (dot) "\n\nz")))
+    (check= (drop s) (import s "verbatim-snippet")))
+  ;; a full file name stays one string, as dropped-documents reads it
+  (check= (drop (string-append "/tmp/caf" (u8 #xE9) ".tm")) "/tmp/caf\xe9.tm"))
+
 (define (test-other-encodings)
   (check-group "other encodings")
   (check= (utf8->html (string-append (u8 #xE9) "<&>" (u8 #x3B1 #x20AC #x221E)))
@@ -3519,7 +3547,8 @@
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-cork-symbols
-                  test-cork-bytes test-cork-unicode test-cork-text test-other-encodings
+                  test-cork-bytes test-cork-unicode test-cork-text test-dropped-text
+                  test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables

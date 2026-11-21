@@ -2404,6 +2404,24 @@
                        (cons "texmacs->verbatim:encoding" "utf-8"))
         (check= r "x in {0,...,5} `a`")))))
 
+;; A plain text dropped in a paragraph (#918): the interfaces give it to
+;; dropped-text and the payload to mouse-drop-event, which inserts it at
+;; the cursor as a paste would, its lines as paragraphs and its tabs as
+;; spaces. It was inserted in one line, with a dot accent for each newline.
+(define (test-drop-text)
+  (check-group "dropped plain text")
+  (with-buffer-body '(document "xy")
+    (lambda ()
+      (edit (go-to (at 0 1)))
+      (edit (mouse-drop-event 0 0 (dropped-text "a\nb\tc")))
+      (check= (body) '(document "xa" "b       cy"))))
+  ;; a text which is not the name of a file is inserted, also on one line
+  (with-buffer-body '(document "xy")
+    (lambda ()
+      (edit (go-to (at 0 1)))
+      (edit (mouse-drop-event 0 0 (dropped-text "/no/such/file.tm")))
+      (check= (body) '(document "x/no/such/file.tmy")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2449,5 +2467,6 @@
   (test-views-style)
   (test-export)
   (test-copy-as-text)
+  (test-drop-text)
   (remove-tmp-files)
   (check-end))
