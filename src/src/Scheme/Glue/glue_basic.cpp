@@ -5636,6 +5636,19 @@ tmg_cork_2utf8 (tmscm arg1) {
 }
 
 tmscm
+tmg_cork_text_2utf8 (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cork-text->utf8");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= cork_text_to_utf8 (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_utf8_2t2a (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->t2a");
 
@@ -12139,6 +12152,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cork->sourcecode",  tmg_cork_2sourcecode, 1, 0, 0);
   tmscm_install_procedure ("utf8->cork",  tmg_utf8_2cork, 1, 0, 0);
   tmscm_install_procedure ("cork->utf8",  tmg_cork_2utf8, 1, 0, 0);
+  tmscm_install_procedure ("cork-text->utf8",  tmg_cork_text_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->t2a",  tmg_utf8_2t2a, 1, 0, 0);
   tmscm_install_procedure ("t2a->utf8",  tmg_t2a_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->html",  tmg_utf8_2html, 1, 0, 0);

@@ -447,6 +447,7 @@
 "cork->sourcecode"
 "utf8->cork"
 "cork->utf8"
+"cork-text->utf8"
 "utf8->t2a"
 "t2a->utf8"
 "utf8->html"

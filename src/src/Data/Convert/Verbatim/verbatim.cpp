@@ -76,8 +76,20 @@ print_verbatim_table (string& buf, tree t, bool wrap) {
 }
 
 static void
+print_verbatim_string (string& buf, string s) {
+  // in a string of the document, the bytes 0x09 and 0x0A are the Cork
+  // glyphs of the macron and of the dot accent: they are written <#AF> and
+  // <#2D9>, so that the tabs and newlines of the text are only those of its
+  // structure, and the text is converted by cork_text_to_utf8 (#439)
+  for (int i=0; i<N(s); i++)
+    if (s[i] == '\t') buf << "<#AF>";
+    else if (s[i] == '\n') buf << "<#2D9>";
+    else buf << s[i];
+}
+
+static void
 print_verbatim (string& buf, tree t, bool wrap) {
-  if (is_atomic (t)) buf << t->label;
+  if (is_atomic (t)) print_verbatim_string (buf, t->label);
   else switch (L(t)) {
     case SURROUND:
       print_verbatim (buf, t[0], wrap);
@@ -216,26 +228,13 @@ unix_to_dos (string s) {
 
 string
 var_cork_to_utf8 (string s) {
-  string r;
-  for (int i=0; i<N(s); ) {
-    int start= i;
-    while (i<N(s) && s[i] != '\n') i++;
-    r << cork_to_utf8 (s (start, i));
-    if (i<N(s)) { r << '\n'; i++; }
-  }
-  return r;
+  // the text made by as_verbatim: its newlines are those of the structure
+  return cork_text_to_utf8 (s);
 }
 
 string
 var_cork_to_sourcecode (string s) {
-  string r;
-  for (int i=0; i<N(s); ) {
-    int start= i;
-    while (i<N(s) && s[i] != '\n') i++;
-    r << cork_to_sourcecode (s (start, i));
-    if (i<N(s)) { r << '\n'; i++; }
-  }
-  return r;
+  return cork_text_to_sourcecode (s);
 }
 
 static string
@@ -278,48 +277,77 @@ tree_to_verbatim (tree t, bool wrap, string enc) {
 ******************************************************************************/
 
 static string
-un_special (string s) {
-  int i, j;
-  string r;
-  for (i=0, j=0; i<N(s); i++, j++)
-    if (s[i] == '\t') {
-      do {
-        r << " "; j++;
-      } while ((j&7) != 0);
-      j--;
-    }
-    else if ((s[i] == '\b') && (N(r)>0) && (r[N(r)-1]!='\n'))
-      r->resize (N(r)-1);
-    else r << s[i];
-  return r;
+encode (string s, string enc) {
+  // @enc is resolved (see resolve_encoding): @s holds no newline
+  if (enc == "utf-8") return utf8_to_cork (s);
+  else if (enc == "iso-8859-1" || enc == "ISO-8859-1")
+    return latin1_to_cork (s);
+  else if (enc == "SourceCode") return sourcecode_to_cork (s);
+  else if (enc == "universal") return s;
+  else if (starts (enc, "iconv:")) return convert (s, enc (6, N(enc)), "Cork");
+  else return tm_encode (s);
 }
 
 static string
-encode (string s, string enc) {
-  if (enc == "auto") return western_to_cork (s);
-  else if (enc == "utf-8") return utf8_to_cork (s);
-  else if (enc == "iso-8859-1" || enc == "ISO-8859-1")
-    return latin1_to_cork (s);
-  else if (enc == "SourceCode") return sourcecode_to_cork(s);
-  else return tm_encode (s);
+resolve_encoding (string& s, string enc) {
+  // the encoding "auto" is guessed on the whole text, as western_to_cork
+  // does, and its byte order mark is removed
+  if (enc != "auto") return enc;
+  string charset= guess_wencoding (s);
+  if (charset == "UTF-8-BOM") { s= s (3, N(s)); return "utf-8"; }
+  if (charset == "UTF-8") return "utf-8";
+  if (charset == "ISO-8859") {
+    charset= language_to_local_ISO_charset (get_locale_language ());
+    if (charset != "") return "iconv:" * charset;
+  }
+  if (looks_universal (s)) return "universal";
+  return "verbatim";
+}
+
+static string
+encode_line (string s, string enc) {
+  // a line of the text in Cork: the tabs are expanded and a backspace erases
+  // the character before it. This is done on the bytes of the text, before
+  // the conversion to Cork, where the glyphs of the macron, of the dot accent
+  // and of the breve are the bytes of a tab, a newline and a backspace (#866)
+  string r;
+  int i, n= N(s), start= 0;
+  for (i=0; i<n; i++)
+    if (s[i] == '\t' || s[i] == '\b') {
+      r << encode (s (start, i), enc);
+      start= i+1;
+      if (s[i] == '\t') {
+        int col= tm_string_length (r);
+        do { r << " "; col++; } while ((col&7) != 0);
+      }
+      else if (N(r) > 0) {
+        int pos= N(r);
+        tm_char_backwards (r, pos);
+        r->resize (pos);
+      }
+    }
+  r << encode (s (start, n), enc);
+  return r;
 }
 
 tree
 verbatim_to_tree (string s, string enc) {
-  s= encode (s, enc);
+  // the text is split into lines before its conversion to Cork (see
+  // encode_line)
+  enc= resolve_encoding (s, enc);
   int i, j;
   for (i=0; i<N(s); i++)
     if (s[i]=='\n') {
       tree t (DOCUMENT);
       for (i=0, j=0; i<N(s); i++)
         if (s[i]=='\n') {
-          t << un_special (s (j, i));
+          t << encode_line (s (j, i), enc);
           j= i+1;
         }
-      t << un_special (s (j, i));
+      t << encode_line (s (j, i), enc);
       return t;
     }
-  return un_special (s);
+  return encode_line (s, enc);
 }
 
 string
