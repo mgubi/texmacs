@@ -2303,7 +2303,8 @@
 ;; wildcard (a*b.tm did not open when another file matched it), a colon
 ;; does not separate a list of paths (a:b.tm, shown as a/b.tm by the Finder,
 ;; opened the file a), and ~ or $x are names. The buffer of such a file is
-;; found from the names of its views. Windows forbids these names, and
+;; found from the names of its views, never another buffer (a folder named
+;; $X next to the folder which $X names). Windows forbids these names, and
 ;; system-literal->url is system->url there: the group is left out.
 (define (test-open-from-system-literal)
   (check-group "files from the system: names with a star or a colon")
@@ -2343,6 +2344,33 @@
         (check= (tree->stree (buffer-get-body u)) `(document ,x))
         (check= (map view->buffer (buffer->views u)) (list u))
         (buffer-close u)))
+    ;; a folder named $X, next to the folder which $X names: the views of
+    ;; its file are not those of the other file, which is open too
+    (let* ((var "TM_EDITING_LITV")
+           (dir (lambda (name)
+                  (system-literal->url (string-append editing-dir "/" name))))
+           (dollar (string-append "$" var)))
+      (system-setenv var (string-append editing-dir "/lit-other"))
+      (system-mkdir (dir "lit-other"))
+      (system-mkdir (dir dollar))
+      (string-save (doc "other") (lit "lit-other/x.tm"))
+      (string-save (doc "dollar") (lit (string-append dollar "/x.tm")))
+      (with v (lit (string-append dollar "/x.tm"))
+        (check= (url->system (url-tail (url-head v))) dollar)
+        (load-buffer (lit "lit-other/x.tm"))
+        (load-buffer v)
+        (check= (current-buffer) v)
+        (check= (tree->stree (buffer-get-body v)) '(document "dollar"))
+        (check= (map view->buffer (buffer->views v)) (list v))
+        (check= (map view->buffer (buffer->views (lit "lit-other/x.tm")))
+                (list (lit "lit-other/x.tm"))))
+      (for (x (buffer-list))
+        (when (nin? x before) (buffer-close x)))
+      (for (f (list (lit "lit-other/x.tm") (lit (string-append dollar "/x.tm"))))
+        (when (url-exists? f) (system-remove f)))
+      (system-rmdir (dir "lit-other"))
+      (system-rmdir (dir dollar))
+      (system-setenv var ""))
     (for (x (buffer-list))
       (when (nin? x before) (buffer-close x)))
     (when (buffer-exists? old) (switch-to-buffer old))))

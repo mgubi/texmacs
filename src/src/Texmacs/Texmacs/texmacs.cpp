@@ -572,7 +572,17 @@ set_global_options  (int argc, char** argv)  {
       // (a url, a file still to be made)
 #ifndef OS_MINGW
       string path= s;
-      if (N(path) > 0 && path[0] != '/') path= get_env ("PWD") * "/" * path;
+      if (N(path) > 0 && path[0] != '/') {
+        // (get_env gives HOME for an unset PWD, as url_pwd: the directory
+        // of the process is the one where the name was typed)
+        const char* env_pwd= getenv ("PWD");
+        string pwd= (env_pwd == NULL)? string (""): string (env_pwd);
+        if (pwd == "") {
+          char buf[4096];
+          if (getcwd (buf, sizeof (buf)) != NULL) pwd= string (buf);
+        }
+        path= (pwd == ""? string ("."): pwd) * "/" * path;
+      }
       url lit= url_system_literal (path);
       if (u != lit && is_rooted (lit, "default") && is_regular (lit))
         b= "(system-literal->url " * scm_quote (as_system_string (lit)) * ")";

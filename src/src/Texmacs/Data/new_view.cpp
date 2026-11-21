@@ -53,15 +53,6 @@ encode_url (url u) {
 }
 
 static url
-plain_name (url u) {
-  // The name of a buffer which comes from a file name with a star (a*b.scm)
-  // is a plain name, not the wildcard which url (string) makes of it (#790).
-  if (is_wildcard (u, 1)) return as_url (tree (u->t[1]->label));
-  if (is_concat (u)) return plain_name (u[1]) * plain_name (u[2]);
-  return u;
-}
-
-static url
 decode_url (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
@@ -90,22 +81,6 @@ decode_url (string s) {
   return url_root (root) * url_general (s (i+1, N(s)), URL_CLEAN_UNIX);
 }
 
-static url
-decode_literal_url (string s) {
-  // The name of a buffer which comes from a path of the system taken as it
-  // is (url_system_literal: a file a:b.tm given by the Finder), which
-  // decode_url makes into a list of paths a | b.tm (#905).
-#ifdef WINPATHS
-  return decode_url (s);
-#else
-  int i= search_forwards ("/", 0, s);
-  if (i < 0) return url_none ();
-  if (s (0, i) == "here") return url_system_literal (s (i+1, N(s)));
-  if (s (0, i) == "default") return url_system_literal (s (i, N(s)));
-  return url_root (s (0, i)) * url_system_literal (s (i+1, N(s)));
-#endif
-}
-
 url
 abstract_view (tm_view vw) {
   if (vw == NULL) return url_none ();
@@ -113,6 +88,14 @@ abstract_view (tm_view vw) {
   //cout << vw->buf->buf->name << " -> " << name << "\n";
   string nr  = as_string (vw->nr);
   return "tmfs://view/" * nr * "/" * name;
+}
+
+static tm_view
+view_number (tm_buffer buf, int nr) {
+  for (int i=0; i<N(buf->vws); i++)
+    if (buf->vws[i]->nr == nr)
+      return buf->vws[i];
+  return NULL;
 }
 
 tm_view
@@ -125,26 +108,24 @@ concrete_view (url u) {
   if (i < 0) return NULL;
   int nr= as_int (s (0, i));
   string enc= s (i+1, N(s));
-  url name= decode_url (enc);
-  //cout << s (i+1, N(s)) << " -> " << name << "\n";
-  // a buffer named with a wildcard (Save as a*.tm) is found as it is, the
-  // buffer of a file with a star (a*b.scm) as a plain name; both can have the
-  // same view name, the one which holds a view of this number is the buffer
-  tm_buffer buf= concrete_buffer (name);
-  if (!is_nil (buf))
-    for (i=0; i<N(buf->vws); i++)
-      if (buf->vws[i]->nr == nr)
-        return buf->vws[i];
-  buf= concrete_buffer (plain_name (name));
-  if (!is_nil (buf))
-    for (i=0; i<N(buf->vws); i++)
-      if (buf->vws[i]->nr == nr)
-        return buf->vws[i];
-  buf= concrete_buffer (decode_literal_url (enc));
-  if (!is_nil (buf))
-    for (i=0; i<N(buf->vws); i++)
-      if (buf->vws[i]->nr == nr)
-        return buf->vws[i];
+  // The view names its buffer by encode_url, which is compared, not parsed
+  // back: a parse can give the name of another buffer. A file with a star
+  // (a*b.scm) gives a wildcard (#790), a path of the system taken as it is
+  // (url_system_literal) gives a list for a:b.tm, and the name of another
+  // file for a folder named ~ or $X, whose buffer may be open too (#905).
+  // A buffer named with a wildcard (Save as a*.tm) and the buffer of the
+  // file a*.tm have the same view names: the parsed name is tried first,
+  // then the buffer which holds a view of this number.
+  tm_buffer buf= concrete_buffer (decode_url (enc));
+  if (!is_nil (buf) && encode_url (buf->buf->name) == enc) {
+    tm_view vw= view_number (buf, nr);
+    if (vw != NULL) return vw;
+  }
+  for (i=0; i<N(bufs); i++)
+    if (encode_url (bufs[i]->buf->name) == enc) {
+      tm_view vw= view_number (bufs[i], nr);
+      if (vw != NULL) return vw;
+    }
   return NULL;
 }
 
