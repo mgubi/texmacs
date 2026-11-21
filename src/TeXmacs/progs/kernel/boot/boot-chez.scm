@@ -329,6 +329,44 @@
 
 ;; Macro transformer bodies are evaluated dynamically in `(compilation-environment)`
 ;; so they can access expand-time helpers installed during compilation.
+
+;; In a Chez module body no definition may follow an expression, which Guile
+;; and s7 allow.  A macro expansion such as plugin-configure's,
+;;   (begin (texmacs-modes ...) (plugin-configure-start ...) (texmacs-modes ...)),
+;; is put in order here: its expressions become definitions of dummy
+;; variables, so that the definitions of the next forms may follow it.
+(define tm-definition-heads
+  '(define define-syntax define-public define-public-macro define-module-macro
+    define-state provide-public define-macro define-menu define-widget
+    define-record-type define-values bib-define-style texmacs-modes
+    cas-define-test plugin-configure))
+
+(define (tm-definition-form? f)
+  (and (pair? f)
+       (or (memq (car f) tm-definition-heads)
+           (and (eq? (car f) 'begin) (exists tm-definition-form? (cdr f))))))
+
+(define tm-body-counter 0)
+
+(define (tm-body-order x)
+  (if (and (pair? x) (eq? (car x) 'begin) (list? x)
+           (exists tm-definition-form? (cdr x)))
+      (let ((forms (cdr x)))
+        (cons 'begin
+              (let loop ((l forms))
+                (cond ((null? l) '())
+                      ((tm-definition-form? (car l))
+                       (cons (car l) (loop (cdr l))))
+                      (else
+                       (set! tm-body-counter (+ tm-body-counter 1))
+                       (cons `(define ,(string->symbol
+                                        (string-append
+                                         "_tm_expr_"
+                                         (number->string tm-body-counter)))
+                                (begin ,(car l) (void)))
+                             (loop (cdr l))))))))
+      x))
+
 (define-syntax define-macro
   (lambda (x)
     (syntax-case x ()
@@ -336,22 +374,25 @@
        #'(define-syntax nm
            (lambda (stx)
              (datum->syntax (car (syntax->list stx))
+               (tm-body-order
                (eval `(apply (lambda formals body ...)
                              ',(cdr (syntax->datum stx)))
-                     (compilation-environment))))))
+                     (compilation-environment)))))))
       ((_ nm (lambda formals body ...))
        #'(define-syntax nm
            (lambda (stx)
              (datum->syntax (car (syntax->list stx))
+               (tm-body-order
                (eval `(apply (lambda formals body ...)
                              ',(cdr (syntax->datum stx)))
-                     (compilation-environment))))))
+                     (compilation-environment)))))))
       ((_ nm proc)
        #'(define-syntax nm
            (lambda (stx)
              (datum->syntax (car (syntax->list stx))
+               (tm-body-order
                (eval `(apply proc ',(cdr (syntax->datum stx)))
-                     (compilation-environment)))))))))
+                     (compilation-environment))))))))))
 
 ;; The Guile macro-expansion helpers (`ca*r', `ca*adr', `apply*', `listify',
 ;; `and*', `begin*', `unlambda') and `fresh-tm-dummy' are in chez-compat.scm.
@@ -622,6 +663,15 @@
 (define (resolve-module m)
   (module-provide m)
   m)
+
+;; Guile's module-ref, for the exports of a module (a module is its name)
+(define (module-ref m sym . default)
+  (module-provide m)
+  (guard (e (#t (if (pair? default)
+                    (car default)
+                    (raise e))))
+    (eval `(let () (import ,(module-spec->symbol m)) ,sym)
+          (interaction-environment))))
 
 
 (define-syntax use-modules

@@ -58,7 +58,7 @@
   '(define define-syntax define-public define-public-macro define-module-macro
     define-state provide-public define-macro define-menu define-widget
     define-record-type define-values bib-define-style texmacs-modes
-    cas-define-test import export indirect-export))
+    cas-define-test plugin-configure import export indirect-export))
 
 (define (def-form? form)
   (and (pair? form) (memq (car form) *definition-heads*)))

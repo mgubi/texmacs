@@ -202,6 +202,11 @@
     (cond
       ((not (pair? x)) x)
       ((memq (car x) '(quote quasiquote)) x)
+      ;; Guile's curried definition: (define ((f a) b) body) is
+      ;; (define (f a) (lambda (b) body))
+      ((and (memq (car x) '(define define-public provide-public))
+            (pair? (cdr x)) (pair? (cadr x)) (pair? (caadr x)))
+       (fold-dialect `(,(car x) ,(caadr x) (lambda ,(cdadr x) ,@(cddr x)))))
       ;; the head of a definition is not a call
       ((and (memq (car x) definers) (pair? (cdr x)) (pair? (cadr x)))
        (cons* (car x) (cadr x) (map fold-dialect (cddr x))))
@@ -211,6 +216,15 @@
        (let ((y (let walk ((l x))
                   (cond ((pair? l) (cons (fold-dialect (car l)) (walk (cdr l))))
                         (else l)))))
+         ;; simplify only where a dialect test was folded: the arguments
+         ;; of a macro may be data, such as (or) in a grammar
+         (cond
+          ;; Chez modules have no Guile `with-module': the public
+          ;; definitions it wraps are global anyway
+          ((and (eq? (car y) 'with-module) (pair? (cdr y)))
+           (cons 'begin (cddr y)))
+          ((equal? y x) y)
+          (else
          (case (car y)
            ((not)
             (if (and (= (length y) 2) (const? (cadr y))) (not (cadr y)) y))
@@ -229,10 +243,6 @@
                     ((null? args) (not stop))
                     ((null? (cdr args)) (car args))
                     (else (cons (car y) args)))))
-           ;; Chez modules have no Guile `with-module': the public definitions
-           ;; it wraps are global anyway
-           ((with-module)
-            (if (pair? (cdr y)) (cons 'begin (cddr y)) y))
            ((when unless)
             (if (and (>= (length y) 2) (const? (cadr y)))
                 (if (eq? (cadr y) (eq? (car y) 'when))
@@ -247,7 +257,7 @@
                     ((and (pair? (car cs)) (eq? (caar cs) #t))
                      (cons 'cond (reverse (cons (cons 'else (cdar cs)) acc))))
                     (else (clauses (cdr cs) (cons (car cs) acc))))))
-           (else y))))))
+           (else y))))))))
 
   ;; A top-level cond choosing between groups of definitions, as an `if'
   ;; chain, which the transpiler knows how to handle.
@@ -332,7 +342,8 @@
       is-assume? quote-all logic-table-rule
       save-learned retrieve-learned
       define-preference define-preference-call-back
-      lazy-input-converter-force))
+      lazy-input-converter-force
+      plugin-serializer))  ; read by check/plugins-test.scm
 
   (define (promote-private f)
     (if (and (pair? f) (eq? (car f) 'define) (pair? (cdr f))
@@ -341,9 +352,38 @@
         (cons 'define-public (cdr f))
         f))
 
+  ;; A name defined again in the same module: Guile assigns it, Chez does
+  ;; not allow it.  The next definitions become assignments; provide-public,
+  ;; which defines only what is not defined yet, is dropped for a name the
+  ;; module or Chez (car...) already defines.
+  (define (defined-head f)
+    (and (pair? f) (pair? (cdr f))
+         (memq (car f) '(define define-public provide-public))
+         (let ((h (cadr f))) (if (pair? h) (car h) h))))
+
+  (define (chez-defines? name)
+    (guard (e (#t #f)) (top-level-bound? name (scheme-environment))))
+
+  (define (single-definitions forms)
+    (let loop ((fs forms) (seen '()) (acc '()))
+      (if (null? fs)
+          (reverse acc)
+          (let* ((f (car fs)) (n (defined-head f)))
+            (cond ((not (symbol? n)) (loop (cdr fs) seen (cons f acc)))
+                  ((and (eq? (car f) 'provide-public)
+                        (or (memq n seen) (chez-defines? n)))
+                   (loop (cdr fs) seen acc))
+                  ((memq n seen)
+                   (let ((val (if (pair? (cadr f))
+                                  `(lambda ,(cdadr f) ,@(cddr f))
+                                  (caddr f))))
+                     (loop (cdr fs) seen (cons `(set! ,n ,val) acc))))
+                  (else (loop (cdr fs) (cons n seen) (cons f acc))))))))
+
   (define (read-all-forms file-path)
     (let ((forms (map promote-private
-                      (fold-dialect-forms (read-raw-forms file-path)))))
+                      (single-definitions
+                        (fold-dialect-forms (read-raw-forms file-path))))))
       (if (compat-file? file-path)
           forms
           (let ((names (append chez-native-names
