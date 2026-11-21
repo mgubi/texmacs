@@ -109,3 +109,11 @@ stack_remaining () {
   return scheme_remaining (&here, low == NULL ? -1L : (long) (&here - low));
 }
 #endif
+
+int
+tree_max_depth () {
+  long left= stack_remaining ();
+  if (left < 0) left= 8L * 1024L * 1024L;
+  int n= (int) (left / 4096);
+  return n < TREE_DEPTH_FLOOR? TREE_DEPTH_FLOOR: n;
+}
