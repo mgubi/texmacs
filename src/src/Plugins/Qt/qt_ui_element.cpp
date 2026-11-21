@@ -1148,8 +1148,8 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
       typedef quintuple<command, array<string>, string, int, string> T;
       T                x = open_box<T>(load);
       command        cmd = x.x1;
-      QStringList values = to_qstringlist (x.x2);
-      QString      value = to_qstring (x.x3);
+      QStringList values = to_qstringlist_value (x.x2);
+      QString      value = to_qstring_value (x.x3);
       int          style = x.x4;
             
       QTMComboBox* w = new QTMComboBox (parent_widget);
@@ -1211,8 +1211,8 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
       T                x = open_box<T>(load);
       command        cmd = x.x1;
       QString       txt = to_qstring (x.x2);
-      QStringList values = to_qstringlist (x.x3);
-      QString      value = to_qstring (x.x4);
+      QStringList values = to_qstringlist_value (x.x3);
+      QString      value = to_qstring_value (x.x4);
       int          style = x.x5;
 
       QTMSettingSelect * w = new QTMSettingSelect (parent_widget);
@@ -1268,7 +1268,7 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
     {
       typedef quintuple<command, array<string>, array<string>, bool, int> T;
       T  x = open_box<T>(load);
-      qwid = new QTMListView (x.x1, to_qstringlist(x.x2), to_qstringlist(x.x3),
+      qwid = new QTMListView (x.x1, to_qstringlist_value (x.x2), to_qstringlist_value (x.x3),
                               x.x4, true, false, x.x5, parent_widget);
     }
       break;
@@ -1283,8 +1283,8 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
       QVBoxLayout* layout = new QVBoxLayout ();
       qwid->setLayout (layout);
 
-      QTMListView* choiceWidget = new QTMListView (x.x1, to_qstringlist (x.x2),
-                                                   QStringList (to_qstring (x.x3)),
+      QTMListView* choiceWidget = new QTMListView (x.x1, to_qstringlist_value (x.x2),
+                                                   QStringList (to_qstring_value (x.x3)),
                                                    false, true, true, 0, qwid);
 
       QTMLineEdit* lineEdit = new QTMLineEdit (qwid, "string", "1w");
@@ -1295,7 +1295,7 @@ qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
       QObject::connect (lineEdit, &QLineEdit::textChanged,
                         choiceWidget, &QTMListView::setFilterRegularExpression);
 #endif
-      lineEdit->setText (to_qstring (filter));
+      lineEdit->setText (to_qstring_value (filter));
       lineEdit->setFocusPolicy (Qt::StrongFocus);
 
       layout->addWidget (lineEdit);

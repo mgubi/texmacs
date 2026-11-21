@@ -78,13 +78,15 @@ print_verbatim_table (string& buf, tree t, bool wrap) {
 
 static void
 print_verbatim_string (string& buf, string s) {
-  // in a string of the document, the bytes 0x09 and 0x0A are the Cork
-  // glyphs of the macron and of the dot accent: they are written <#AF> and
-  // <#2D9>, so that the tabs and newlines of the text are only those of its
-  // structure, and the text is converted by cork_text_to_utf8 (#439)
+  // in a string of the document, the bytes 0x09, 0x0A and 0x08 are the
+  // Cork glyphs of the macron, of the dot accent and of the breve: they are
+  // written <#AF>, <#2D9> and <#2D8>, so that the tabs and newlines of the
+  // text are only those of its structure, the text is converted by
+  // cork_text_to_utf8, and no backspace is read back on import (#439)
   for (int i=0; i<N(s); i++)
     if (s[i] == '\t') buf << "<#AF>";
     else if (s[i] == '\n') buf << "<#2D9>";
+    else if (s[i] == '\b') buf << "<#2D8>";
     else buf << s[i];
 }
 
@@ -310,12 +312,17 @@ tree_to_verbatim (tree t, bool wrap, string enc) {
 
 static string
 encode (string s, string enc) {
-  // @enc is resolved (see resolve_encoding): @s holds no newline
+  // @enc is resolved (see resolve_encoding, which also gives the internal
+  // names "universal", "iconv:<charset>" and "verbatim"): @s holds no newline
   if (enc == "utf-8") return utf8_to_cork (s);
   else if (enc == "iso-8859-1" || enc == "ISO-8859-1")
     return latin1_to_cork (s);
   else if (enc == "SourceCode") return sourcecode_to_cork (s);
-  else if (enc == "universal") return s;
+  else if (enc == "universal")
+    // the names which the export writes for the glyphs at 0x08-0x0A of
+    // Cork (see print_verbatim_string) are these bytes again
+    return replace (replace (replace (s, "<#AF>", "\t"), "<#2D9>", "\n"),
+                    "<#2D8>", "\b");
   else if (starts (enc, "iconv:")) return convert (s, enc (6, N(enc)), "Cork");
   else return tm_encode (s);
 }
@@ -323,7 +330,12 @@ encode (string s, string enc) {
 static string
 resolve_encoding (string& s, string enc) {
   // the encoding "auto" is guessed on the whole text, as western_to_cork
-  // does, and its byte order mark is removed
+  // does, and its byte order mark is removed. The encoding "cork" is the
+  // text which the export in Cork writes, with its <name> and <#xxxx>
+  // (<less> for a <): it is kept as it is when it has these names, and a
+  // text with a bare < or > is encoded as before
+  if (enc == "cork" || enc == "Cork")
+    return looks_universal (s) ? string ("universal") : string ("verbatim");
   if (enc != "auto") return enc;
   string charset= guess_wencoding (s);
   if (charset == "UTF-8-BOM") { s= s (3, N(s)); return "utf-8"; }
@@ -342,20 +354,22 @@ encode_line (string s, string enc) {
   // the character before it. This is done on the bytes of the text, before
   // the conversion to Cork, where the glyphs of the macron, of the dot accent
   // and of the breve are the bytes of a tab, a newline and a backspace (#866)
+  // (the column is counted as the line is made, in characters)
   string r;
-  int i, n= N(s), start= 0;
+  int i, n= N(s), start= 0, col= 0;
   for (i=0; i<n; i++)
     if (s[i] == '\t' || s[i] == '\b') {
-      r << encode (s (start, i), enc);
+      string piece= encode (s (start, i), enc);
+      r << piece;
+      col += tm_string_length (piece);
       start= i+1;
-      if (s[i] == '\t') {
-        int col= tm_string_length (r);
+      if (s[i] == '\t')
         do { r << " "; col++; } while ((col&7) != 0);
-      }
       else if (N(r) > 0) {
         int pos= N(r);
         tm_char_backwards (r, pos);
         r->resize (pos);
+        col--;
       }
     }
   r << encode (s (start, n), enc);

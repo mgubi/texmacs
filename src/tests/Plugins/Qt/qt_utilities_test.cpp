@@ -1,4 +1,3 @@
-
 /******************************************************************************
 * MODULE     : qt_utilities_test.cpp
 * COPYRIGHT  : (C) 2019  Darcy Shen
@@ -12,6 +11,7 @@
 #include "url.hpp"
 #ifdef QTTEXMACS
 #include "Qt/qt_utilities.hpp"
+#include "converter.hpp"
 #endif
 
 static void
@@ -24,8 +24,31 @@ test_qt_supports () {
 #endif
 }
 
+// The text of labels keeps its tabs and newlines; the value of a field
+// comes back as it was read by from_qstring, which writes the macron and
+// the dot accent as the Cork bytes 0x09 and 0x0A (#439)
+static void
+test_widget_text () {
+#ifdef QTTEXMACS
+  QString glyphs= QString::fromUtf8 ("x\xc2\xaf\xcb\x99y");
+  string v= from_qstring (glyphs);
+  CHECK (N(v) == 4 && v[1] == '\t' && v[2] == '\n');
+  CHECK (to_qstring_value (v) == glyphs);
+  CHECK (from_qstring (to_qstring_value (v)) == v);
+  array<string> a;
+  a << v;
+  CHECK (to_qstringlist_value (a) == QStringList (glyphs));
+  CHECK (to_qstring ("a\nb\tc") == QString ("a\nb\tc"));
+  CHECK (to_qstring ("<alpha>") == QString::fromUtf8 ("\xce\xb1"));
+  CHECK (to_qstring_value ("<alpha>") == QString::fromUtf8 ("\xce\xb1"));
+#else
+  SKIP ("no Qt in this build");
+#endif
+}
+
 int
 main () {
   RUN (test_qt_supports);
+  RUN (test_widget_text);
   return test_report ();
 }

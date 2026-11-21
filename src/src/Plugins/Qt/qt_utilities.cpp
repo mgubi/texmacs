@@ -308,6 +308,14 @@ to_qstringlist (array<string> l) {
   return ql;
 }
 
+QStringList
+to_qstringlist_value (array<string> l) {
+  QStringList ql;
+  for(int i=0; i<N(l); ++i)
+    ql << to_qstring_value (l[i]);
+  return ql;
+}
+
 /* HACK!!! Something has to be done wrt. to internal encoding: most of the times
  it's cork, but often it's utf8. For instance when the title is built in a tmfs
  title handler in scheme, it is sent to us as an utf8 string. Should we convert
@@ -324,6 +332,18 @@ to_qstring (const string& s) {
     return utf8_to_qstring (s);
   else
     return utf8_to_qstring (cork_text_to_utf8 (s));
+}
+
+// The text which a field or a list of choices shows and gives back
+// (through from_qstring, whose utf8_to_cork writes the macron and the dot
+// accent as the Cork bytes 0x09 and 0x0A): its 0x09 and 0x0A are these
+// glyphs, not a tab and a newline, which a line of text cannot hold (#439)
+QString
+to_qstring_value (const string& s) {
+  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
+    return utf8_to_qstring (s);
+  else
+    return utf8_to_qstring (cork_to_utf8 (s));
 }
 
 string
