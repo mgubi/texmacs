@@ -1011,6 +1011,14 @@
 ;; Formatting text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmhtml-error l)
+  ;; an error in the document, red as on the screen: a part nested too
+  ;; deep, cut by the reader of .tm files or when a list of Scheme is made
+  ;; into a tree, "nesting too deep" (#813); it was left out
+  (if (and (= (length l) 1) (string? (car l)))
+      (tmhtml `(with "color" "red" ,(car l)))
+      '()))
+
 (define (tmhtml-hidden l)
   ;; FIXME: distinguish inline and block?
   (with r (tmhtml (car l))
@@ -2385,6 +2393,7 @@
   (rigid tmhtml-id)
   (hgroup tmhtml-id)
   (hidden tmhtml-hidden)
+  (error tmhtml-error)
   (freeze tmhtml-id)
   (unfreeze tmhtml-id)
   (hspace tmhtml-hspace)

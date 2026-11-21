@@ -438,7 +438,8 @@
         (tab (lambda (t) `(tformat (table (row (cell ,t))))))
         (eq (lambda (t) `(equation* (document ,t))))
         (sur (lambda (t) `(surround "a" "b" (with "par-left" "1cm" ,t)))))
-    ;; deep trees: whole, or cut with the error
+    ;; deep trees: whole, or cut with the error (by the HTML export, or,
+    ;; past about 2000 levels, when export makes the stree a tree)
     (for (s (list (html-of-deep with1 3000) (html-of-deep with3 1000)
                   (html-of-deep frac 1500) (html-of-deep tab 1000)
                   (html-of-deep sur 3000) (html-of-deep eq 1000)
@@ -457,6 +458,24 @@
     ;; a table, whole or cut, keeps its structure: a <td> in each <table>
     (with s (html-of-deep tab 1000)
       (check= (occurrences "<table" s) (occurrences "<td" s)))
+    ;; 100000 levels: the stree made into a tree for the export was not cut,
+    ;; and the recursions of C++ on it crashed TeXmacs (in the conversion to
+    ;; a tree, under every Scheme, or in rewrite_equation_number for LaTeX);
+    ;; it is cut at the depth which the editor takes (about 2000 levels with
+    ;; a stack of 8 MB), with the error, which the HTML shows (#813)
+    (with deep (deep-tree with1 100000 "leaf")
+      (with s (export `(document "before" ,deep "after") "html-snippet")
+        (check-true (whole-or-cut? s "leaf"))
+        (check-true (string-occurs? "nesting" s)))
+      (with s (export `(document "before" ,deep "after") "latex-snippet")
+        (check-true (string-occurs? "before" s))
+        (check-true (string-occurs? "after" s))
+        (check-false (string-occurs? "leaf" s))))
+    ;; the error of a document is shown, in red (it was left out)
+    (with s (export '(document "before" (error "nesting too deep") "after")
+                    "html-snippet")
+      (check-true (string-occurs? "nesting" s))
+      (check-true (string-occurs? "red" s)))
     ;; shallow trees are whole
     (for (s (list (html-of-deep with1 100) (html-of-deep with3 40)
                   (html-of-deep frac 40) (html-of-deep tab 15)

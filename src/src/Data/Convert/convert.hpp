@@ -40,6 +40,7 @@ scheme_tree compute_index (url u);
 tree   texmacs_to_tree (string s);
 tree   texmacs_document_to_tree (string s);
 int    texmacs_skipped_nestings ();
+tree   texmacs_nesting_error (string name);
 string tree_to_texmacs (tree t);
 tree   extract (tree doc, string attr);
 tree   extract_document (tree doc);
