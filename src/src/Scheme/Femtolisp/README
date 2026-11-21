@@ -123,6 +123,12 @@ The patches
 0038  a local variable named return is called, not the special form return
       (0016 made it the special form: the callbacks named return of
       TeXmacs were never called); boot image regenerated
+0039  the collector relocates any object nested deep (vectors, closures,
+      the tails of improper lists, gensyms, hash tables) without
+      overflowing the stack of C: past 1000 levels, an object is copied
+      and its fields relocated later, from the list of pending objects of
+      0037; a hash table is forwarded before its keys and values are
+      relocated (a table which contained itself was copied without end)
 
 fl_core.c also binds vector-ref, vector-set!, vector-length, char->integer
 and integer->char as constants to the builtins aref, aset!, length, fixnum

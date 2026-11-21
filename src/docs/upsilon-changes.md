@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 21 November 2026
 
+- **femtolisp: no crash of the collector on data nested deep or on a hash
+  table which contains itself** (builds with `--with-scheme=femtolisp`):
+  the collector copied vectors, closures, hash tables and the tails of
+  improper lists by a recursion of C as deep as their nesting, so data
+  nested some 100,000 levels deep through them crashed TeXmacs at the next
+  collection (only the lists nested in their cars were bounded, #888). Any
+  object past 1000 levels is now copied and its contents relocated later.
+  A hash table among its own values (directly or through a list) also
+  crashed it or was copied twice; it is now copied once. Collections are
+  not slower (#908).
 - **Files with a star or a colon in their name open from the Finder**
   (desktop applications): a file given by the system (the Finder, the Dock,
   `open`, the command line, the file dialogs of the system, a file dropped

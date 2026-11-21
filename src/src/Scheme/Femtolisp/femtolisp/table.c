@@ -49,17 +49,15 @@ void free_htable(value_t self)
     htable_free(h);
 }
 
+// TeXmacs: the copy of the table points to its own inline space; the
+// collector relocates its keys and values (scan_object in flisp.c) once the
+// table is forwarded, so that a table reachable from them is copied once
 void relocate_htable(value_t oldv, value_t newv)
 {
     htable_t *oldh = (htable_t*)cv_data((cvalue_t*)ptr(oldv));
     htable_t *h = (htable_t*)cv_data((cvalue_t*)ptr(newv));
     if (oldh->table == &oldh->_space[0])
         h->table = &h->_space[0];
-    size_t i;
-    for(i=0; i < h->size; i++) {
-        if (h->table[i] != HT_NOTFOUND)
-            h->table[i] = (void*)relocate_lispvalue((value_t)h->table[i]);
-    }
 }
 
 cvtable_t table_vtable = { print_htable, relocate_htable, free_htable,

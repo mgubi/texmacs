@@ -428,62 +428,204 @@ void fl_free_gc_handles(uint32_t n)
     N_GCHND -= n;
 }
 
-// TeXmacs: the cars of a list are relocated by a recursion of C, as deep as
-// the lists are nested in their cars: a tree nested 45000 deep (the stree of
-// a document) overflowed the stack of C during a collection, a crash. Past
-// RELOC_MAX_DEPTH levels, a cons is copied with its car and its cdr not yet
-// relocated, and put on a list of pending conses, whose car and cdr are
-// relocated before the end of the collection (relocate_pending), as in
-// Cheney's algorithm. Without memory for that list, the recursion goes on.
+// TeXmacs: relocate copied the data by a recursion of C as deep as its
+// nesting, through the cars of lists, the tails of improper lists, vectors,
+// closures, gensyms and hash tables: data nested a million deep overflowed
+// the stack of C during a collection, a crash. The recursion now counts its
+// depth (the argument d): past RELOC_MAX_DEPTH levels, an object is copied
+// with its fields not yet relocated (copy_object) and put on a list of
+// pending objects, whose fields are relocated (scan_object) before the end
+// of the collection (relocate_pending), as in Cheney's algorithm. (To-space
+// cannot be scanned linearly as in Cheney's: a cons has no header which
+// gives its type.) Without memory for that list, the recursion goes on. A
+// hash table is forwarded before its keys and values are relocated, as the
+// other objects are: a table which contained itself was copied without
+// end (a crash), and a table reachable from its values was copied twice.
 #define RELOC_MAX_DEPTH 1000
-static uint32_t reloc_depth = 0;
 static value_t *reloc_pending = NULL;
 static size_t n_reloc_pending = 0, sz_reloc_pending = 0;
 
-static value_t relocate_car(value_t a)
+// a pointer into fromspace, which has to be relocated
+#define reloc_needed(a) ((tag(a)&3) != 0 && ismanaged(a))
+#define isgrownvector(v) (tag(v) == TAG_VECTOR && (vector_elt(v,-1) & 0x1))
+
+extern cvtable_t table_vtable;
+static value_t relocate_at(value_t v, uint32_t d);
+static value_t relocate_deep(value_t v, uint32_t d);
+
+// relocates a field of an object of depth d
+static inline value_t relocate_child(value_t v, uint32_t d)
+{
+    if (__unlikely(d >= RELOC_MAX_DEPTH))
+        return relocate_deep(v, d);
+    return relocate_at(v, d+1);
+}
+
+static inline int ishashtable_cv(value_t v)
+{
+    return cv_class((cvalue_t*)ptr(v))->vtable == &table_vtable;
+}
+
+// copies v (in fromspace, neither forwarded nor a grown vector) to tospace
+// and forwards it; the fields of the copy still point to fromspace
+static value_t copy_object(value_t v)
 {
     value_t nc;
-    if (reloc_depth >= RELOC_MAX_DEPTH && iscons(a) && car_(a) != TAG_FWD) {
-        if (n_reloc_pending == sz_reloc_pending) {
-            size_t nsz = sz_reloc_pending ? 2*sz_reloc_pending : 1024;
-            value_t *np = realloc(reloc_pending, nsz*sizeof(value_t));
-            if (np != NULL) {
-                reloc_pending = np;
-                sz_reloc_pending = nsz;
+    switch (tag(v)) {
+    case TAG_CONS:
+        nc = tagptr((cons_t*)curheap, TAG_CONS);
+        curheap += sizeof(cons_t);
+        car_(nc) = car_(v);
+        cdr_(nc) = cdr_(v);
+        break;
+    case TAG_VECTOR: {
+        // N.B.: 0-length vectors secretly have space for a first element
+        size_t sz = vector_size(v);
+        nc = tagptr(alloc_words(sz+1), TAG_VECTOR);
+        vector_setsize(nc, sz);
+        memcpy(&vector_elt(nc,0), &vector_elt(v,0), sz*sizeof(value_t));
+        break;
+    }
+    case TAG_CPRIM: {
+        cprim_t *pcp = (cprim_t*)ptr(v);
+        size_t nw = CPRIM_NWORDS-1+NWORDS(cp_class(pcp)->size);
+        cprim_t *ncp = (cprim_t*)alloc_words(nw);
+        while (nw--)
+            ((value_t*)ncp)[nw] = ((value_t*)pcp)[nw];
+        nc = tagptr(ncp, TAG_CPRIM);
+        break;
+    }
+    case TAG_CVALUE:
+        // forwards v itself (the relocate of the vtable needs v)
+        return cvalue_relocate(v);
+    case TAG_FUNCTION: {
+        function_t *fn = (function_t*)ptr(v);
+        function_t *nfn = (function_t*)alloc_words(4);
+        nfn->bcode = fn->bcode;
+        nfn->vals = fn->vals;
+        nfn->env = fn->env;
+        assert(!ismanaged(fn->name));
+        nfn->name = fn->name;
+        nc = tagptr(nfn, TAG_FUNCTION);
+        break;
+    }
+    case TAG_SYM: {
+        gensym_t *gs = (gensym_t*)ptr(v);
+        gensym_t *ng = (gensym_t*)alloc_words(sizeof(gensym_t)/sizeof(void*));
+        ng->id = gs->id;
+        ng->binding = gs->binding;
+        ng->isconst = 0;
+        nc = tagptr(ng, TAG_SYM);
+        break;
+    }
+    default:
+        return v;
+    }
+    forward(v, nc);
+    return nc;
+}
+
+// whether the copy nc has fields to relocate
+static int has_fields(value_t nc)
+{
+    switch (tag(nc)) {
+    case TAG_CONS:     return 1;
+    case TAG_VECTOR:   return vector_size(nc) > 0;
+    case TAG_FUNCTION: return 1;
+    case TAG_SYM:      return ((gensym_t*)ptr(nc))->binding != UNBOUND;
+    case TAG_CVALUE:   return ishashtable_cv(nc);
+    }
+    return 0;
+}
+
+// relocates the fields of nc, a copy of depth d made by copy_object
+static void scan_object(value_t nc, uint32_t d)
+{
+    value_t a;
+    size_t i, sz;
+    switch (tag(nc)) {
+    case TAG_CONS:
+        a = car_(nc);
+        if (reloc_needed(a)) car_(nc) = relocate_child(a, d);
+        a = cdr_(nc);
+        if (reloc_needed(a)) cdr_(nc) = relocate_child(a, d);
+        break;
+    case TAG_VECTOR:
+        sz = vector_size(nc);
+        for(i=0; i < sz; i++) {
+            a = vector_elt(nc,i);
+            if (reloc_needed(a)) vector_elt(nc,i) = relocate_child(a, d);
+        }
+        break;
+    case TAG_FUNCTION: {
+        function_t *fn = (function_t*)ptr(nc);
+        fn->env = relocate_child(fn->env, d);
+        fn->vals = relocate_child(fn->vals, d);
+        fn->bcode = relocate_child(fn->bcode, d);
+        break;
+    }
+    case TAG_SYM: {
+        gensym_t *ng = (gensym_t*)ptr(nc);
+        if (ng->binding != UNBOUND)
+            ng->binding = relocate_child(ng->binding, d);
+        break;
+    }
+    case TAG_CVALUE:
+        if (ishashtable_cv(nc)) {
+            // the keys and values (relocate_htable fixed the table itself)
+            htable_t *h = (htable_t*)cv_data((cvalue_t*)ptr(nc));
+            for(i=0; i < h->size; i++) {
+                a = (value_t)h->table[i];
+                if ((void*)a != HT_NOTFOUND)
+                    h->table[i] = (void*)relocate_child(a, d);
             }
         }
-        if (n_reloc_pending < sz_reloc_pending) {
-            nc = tagptr((cons_t*)curheap, TAG_CONS);
-            curheap += sizeof(cons_t);
-            car_(nc) = car_(a);
-            cdr_(nc) = cdr_(a);
-            car_(a) = TAG_FWD; cdr_(a) = nc;
-            reloc_pending[n_reloc_pending++] = nc;
-            return nc;
-        }
+        break;
     }
-    reloc_depth++;
-    nc = relocate(a);
-    reloc_depth--;
-    return nc;
+}
+
+static int reserve_pending(void)
+{
+    if (n_reloc_pending == sz_reloc_pending) {
+        size_t nsz = sz_reloc_pending ? 2*sz_reloc_pending : 1024;
+        value_t *np = realloc(reloc_pending, nsz*sizeof(value_t));
+        if (np == NULL)
+            return 0;
+        reloc_pending = np;
+        sz_reloc_pending = nsz;
+    }
+    return 1;
+}
+
+// a field of an object of depth d past RELOC_MAX_DEPTH: copies v and puts
+// the copy on the pending list
+static value_t relocate_deep(value_t v, uint32_t d)
+{
+    value_t nc;
+    if (!reloc_needed(v))
+        return v;
+    if (isforwarded(v))
+        return forwardloc(v);
+    if (!isgrownvector(v) && reserve_pending()) {
+        nc = copy_object(v);
+        if (has_fields(nc))
+            reloc_pending[n_reloc_pending++] = nc;
+        return nc;
+    }
+    return relocate_at(v, d+1);
 }
 
 static void relocate_pending(void)
 {
-    value_t nc, a, d;
-    while (n_reloc_pending > 0) {
-        nc = reloc_pending[--n_reloc_pending];
-        a = car_(nc);
-        d = cdr_(nc);
-        if ((tag(a)&3) != 0 && ismanaged(a))
-            car_(nc) = relocate_car(a);
-        cdr_(nc) = (d==NIL) ? NIL : relocate(d);
-    }
+    while (n_reloc_pending > 0)
+        scan_object(reloc_pending[--n_reloc_pending], 0);
 }
 
-static value_t relocate(value_t v)
+// relocates v, of depth d
+static value_t relocate_at(value_t v, uint32_t d)
 {
-    value_t a, d, nc, first, *pcdr;
+    value_t a, nc, first, *pcdr;
+    value_t dd = NIL;
     uptrint_t t = tag(v);
 
     if (t == TAG_CONS) {
@@ -496,28 +638,29 @@ static value_t relocate(value_t v)
             }
             *pcdr = nc = tagptr((cons_t*)curheap, TAG_CONS);
             curheap += sizeof(cons_t);
-            d = cdr_(v);
+            dd = cdr_(v);
             car_(v) = TAG_FWD; cdr_(v) = nc;
             if ((tag(a)&3) == 0 || !ismanaged(a))
                 car_(nc) = a;
             else
-                car_(nc) = relocate_car(a);
+                car_(nc) = relocate_child(a, d);
             pcdr = &cdr_(nc);
-            v = d;
+            v = dd;
         } while (iscons(v));
-        *pcdr = (d==NIL) ? NIL : relocate(d);
+        *pcdr = (dd==NIL) ? NIL : relocate_child(dd, d);
         return first;
     }
 
     if ((t&3) == 0 || !ismanaged(v)) return v;
     if (isforwarded(v)) return forwardloc(v);
 
+    // vectors and closures: copy_object and scan_object in one pass
     if (t == TAG_VECTOR) {
         // N.B.: 0-length vectors secretly have space for a first element
         size_t i, sz = vector_size(v);
         if (vector_elt(v,-1) & 0x1) {
             // grown vector
-            nc = relocate(vector_elt(v,0));
+            nc = relocate_child(vector_elt(v,0), d);
             forward(v, nc);
         }
         else {
@@ -526,30 +669,17 @@ static value_t relocate(value_t v)
             a = vector_elt(v,0);
             forward(v, nc);
             if (sz > 0) {
-                vector_elt(nc,0) = relocate(a);
+                vector_elt(nc,0) = relocate_child(a, d);
                 for(i=1; i < sz; i++) {
                     a = vector_elt(v,i);
                     if ((tag(a)&3) == 0 || !ismanaged(a))
                         vector_elt(nc,i) = a;
                     else
-                        vector_elt(nc,i) = relocate(a);
+                        vector_elt(nc,i) = relocate_child(a, d);
                 }
             }
         }
         return nc;
-    }
-    else if (t == TAG_CPRIM) {
-        cprim_t *pcp = (cprim_t*)ptr(v);
-        size_t nw = CPRIM_NWORDS-1+NWORDS(cp_class(pcp)->size);
-        cprim_t *ncp = (cprim_t*)alloc_words(nw);
-        while (nw--)
-            ((value_t*)ncp)[nw] = ((value_t*)pcp)[nw];
-        nc = tagptr(ncp, TAG_CPRIM);
-        forward(v, nc);
-        return nc;
-    }
-    else if (t == TAG_CVALUE) {
-        return cvalue_relocate(v);
     }
     else if (t == TAG_FUNCTION) {
         function_t *fn = (function_t*)ptr(v);
@@ -558,26 +688,23 @@ static value_t relocate(value_t v)
         nfn->vals = fn->vals;
         nc = tagptr(nfn, TAG_FUNCTION);
         forward(v, nc);
-        nfn->env = relocate(fn->env);
-        nfn->vals = relocate(nfn->vals);
-        nfn->bcode = relocate(nfn->bcode);
+        nfn->env = relocate_child(fn->env, d);
+        nfn->vals = relocate_child(nfn->vals, d);
+        nfn->bcode = relocate_child(nfn->bcode, d);
         assert(!ismanaged(fn->name));
         nfn->name = fn->name;
         return nc;
     }
-    else if (t == TAG_SYM) {
-        gensym_t *gs = (gensym_t*)ptr(v);
-        gensym_t *ng = (gensym_t*)alloc_words(sizeof(gensym_t)/sizeof(void*));
-        ng->id = gs->id;
-        ng->binding = gs->binding;
-        ng->isconst = 0;
-        nc = tagptr(ng, TAG_SYM);
-        forward(v, nc);
-        if (ng->binding != UNBOUND)
-            ng->binding = relocate(ng->binding);
-        return nc;
-    }
-    return v;
+    nc = copy_object(v);
+    if (has_fields(nc))
+        scan_object(nc, d);
+    return nc;
+}
+
+// a root: the pending objects are relocated by gc, after all the roots
+static value_t relocate(value_t v)
+{
+    return relocate_at(v, 0);
 }
 
 value_t relocate_lispvalue(value_t v)
