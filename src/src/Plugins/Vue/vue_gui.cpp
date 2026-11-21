@@ -6181,7 +6181,10 @@ drop_deliver (vue_window win, float x, float y) {
   in.mouse_x= (int) (x * win->density);
   in.mouse_y= (int) (y * win->density);
   in.mouse_ticket= ++drop_serial;
-  payloads (in.mouse_ticket)= drop_doc;
+  // a text of several lines alone: its document, not a concat of it
+  if (N(drop_doc) == 1 && is_func (drop_doc[0], DOCUMENT))
+    payloads (in.mouse_ticket)= drop_doc[0];
+  else payloads (in.mouse_ticket)= drop_doc;
   if (DEBUG_VUE_EVENTS)
     debug_events << "drop of " << N(drop_doc) << " item(s) at "
                  << in.mouse_x << "," << in.mouse_y << LF;
@@ -6853,9 +6856,12 @@ process_event (SDL_Event *event) {
         system_files << utf8_to_cork (system_file_path (raw));
         break;
       }
-      string item= utf8_to_cork (raw);
-      if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
-      else drop_add_file (item);
+      if (event->type == SDL_EVENT_DROP_TEXT)
+        // read as a pasted plain text (#918): utf8_to_cork of the whole
+        // text kept its newlines and tabs, the dot accents and macrons of
+        // Cork
+        drop_doc << as_tree (call ("dropped-text", raw));
+      else drop_add_file (utf8_to_cork (raw));
       break;
     }
     case SDL_EVENT_DROP_COMPLETE:

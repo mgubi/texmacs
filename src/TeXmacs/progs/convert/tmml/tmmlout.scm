@@ -136,5 +136,6 @@
 	(else (tmmlout-tag (car x) '() (cdr x)))))
 
 (tm-define (serialize-tmml x)
+  (output-reset)
   (tmmlout x)
   (output-produce))

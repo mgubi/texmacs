@@ -29,6 +29,13 @@ have the details, and the problems go to the
   tabs instead of showing ˙ and ¯, while the text fields still show a ¯ or
   ˙ typed in them; for developers, `cork-text->utf8` and the source
   `"Cork-text"` of `string-convert` convert such text (#866, #439).
+- **A text dragged onto a document is inserted as it is pasted**: its lines
+  were inserted as one line with a ˙ in place of each line break and a ¯ in
+  place of each tab (Cocoa, Vue, also in the browser), and under Qt its
+  accented letters were garbled as well. It is now read as a pasted plain
+  text: its lines become paragraphs, its tabs spaces, and a ˙, ¯ or ˘ in it
+  stays a character. The title of a web link dropped under Qt keeps its
+  accented letters too (#918).
 - **Vue: the text fields of dialogs which change their content belong to
   their dialog** (Vue interface, desktop and browser): the content of a
   `refresh` or `refreshable` widget was made at its first layout, after the

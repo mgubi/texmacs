@@ -140,6 +140,7 @@
 	(else (display* "TeXmacs] bad formatted stree:\n" x "\n"))))
 
 (tm-define (serialize-vernac x)
+  (output-reset)
   (vernacout-initialize)
   (vernacout x)
   (output-produce))

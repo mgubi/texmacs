@@ -106,5 +106,6 @@
 	(else (coqmlout-tag (car x) '() (cdr x)))))
 
 (tm-define (serialize-coqml x)
+  (output-reset)
   (coqmlout x)
   (output-produce))

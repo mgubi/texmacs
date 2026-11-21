@@ -540,8 +540,8 @@
     (ahash-table-invert h)
     (check= (sorted-alist h) '((a . 1) (b . 2) (c . 3)))))
 
-;; ahash-with binds a key during its body and puts the old value back; a key
-;; which was missing comes back bound to #f
+;; ahash-with binds a key during its body and puts the old value back, also
+;; after an error; a key which was missing comes back bound to #f
 (define (test-hash-with)
   (check-group "ahash-with")
   (let ((h (make-abc)))
@@ -550,7 +550,16 @@
     (check= (ahash-with h 'z 5 (+ (ahash-ref h 'z) (ahash-ref h 'b))) 7)
     (check= (ahash-ref h 'z) #f)
     (check= (ahash-with h 'a 2 (ahash-with h 'a 3 (ahash-ref h 'a))) 3)
-    (check= (ahash-ref h 'a) 1)))
+    (check= (ahash-ref h 'a) 1)
+    ;; also after an error in the body (#902)
+    (check= (catch #t (lambda () (ahash-with h 'a 10 (car '())))
+              (lambda args 'error))
+            'error)
+    (check= (ahash-ref h 'a) 1)
+    (check= (catch #t (lambda () (ahash-with h 'z 5 (ahash-with h 'a 3 (car '()))))
+              (lambda args 'error))
+            'error)
+    (check= (list (ahash-ref h 'a) (ahash-ref h 'z)) '(1 #f))))
 
 (define-table base-test-table
   (a . 1)
