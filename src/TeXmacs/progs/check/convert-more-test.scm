@@ -584,6 +584,28 @@
     (check= (html-of-line "x" `(concat (concat ,first-tab) "y") "z")
             (html-of-line "x" tab "yz"))))
 
+;; A block among the items of a line with a tab, and a table after the tab,
+;; are kept on their side of the tab (seen as lost while fuzzing #896, with
+;; <center> and <tabular> not expanded: the converter only knows the
+;; primitives which these macros of the style expand to, as File > Export
+;; expands them first)
+(define (test-html-blocks-and-tabs)
+  (check-group "html export: blocks and tables beside a tab")
+  (let* ((table '(tabular (table (row (cell "ta") (cell "tb")))))
+         (has-all? (lambda (s l) (list-and (map (cut string-occurs? <> s) l)))))
+    (for (block '((center "ctr") (padded-center "ctr")
+                  (padded-right-aligned "ctr") (with "par-mode" "right" "ctr")))
+      (for (tab '((htab "5mm") (htab "5mm" "first") (htab "5mm" "last")))
+        (for (right (list table "x"))
+          (with s (html-of-buffer `(document (concat "c" ,block ,tab ,right)))
+            (check-true (has-all? s (list "left-tab" "right-tab" "c" "ctr"
+                                          (if (== right "x") "x" "<table"))))
+            (when (== (car block) 'center)
+              (check-true (string-occurs? "<center>" s)))))))
+    (check-true (has-all? (html-of-buffer `(document (concat (center "ctr")
+                                                             (htab "5mm") ,table)))
+                          (list "<center>" "ctr" "<table" "right-tab")))))
+
 ;; A paragraph which is a document is made blocks again at each level of a
 ;; nesting (tmhtml-p): the blocks of the inner levels were cut again one at
 ;; a time at each level, and the export of 2000 nested documents took 40 s
@@ -653,6 +675,69 @@
                         (lambda ()
                           (whole-or-cut? (html-of-deep (cadr nest) n) "leaf")))
                       (lambda (n) #t) 150 1500 "levels")))
+
+;; The paragraph of a nested document whose only paragraph has a vertical
+;; space takes the margins of the outer paragraph too: its <p>, which has
+;; a style, was given a <div> whose first child was its attribute list
+;; (add-style-attr), and the export failed (wrong-type-arg). A margin set
+;; by both is the larger one, as for nested <div>
+(define (p-styles s)
+  ;; the styles of the <p> of the HTML @s
+  (let loop ((pos 0) (r '()))
+    (with i (string-search-forwards "<p" pos s)
+      (if (< i 0) (reverse r)
+          (let* ((e (string-search-forwards ">" i s))
+                 (tag (substring s i e))
+                 (j (string-search-forwards "style=\"" 0 tag)))
+            (loop e (cons (if (< j 0) ""
+                              (with k (string-search-forwards "\"" (+ j 7) tag)
+                                (substring tag (+ j 7) k)))
+                          r)))))))
+
+(define (style-set s)
+  ;; the declarations of the style @s, sorted
+  (sort (map tm-string-trim-both (string-tokenize-by-char s #\;)) string<?))
+
+(define (test-html-margins-of-nested-paragraphs)
+  (check-group "html export: margins of a paragraph and of its nested document")
+  (for (p (list
+           ;; the case of the audit of #896 (<center> is no primitive: it
+           ;; is lost, as without the fix)
+           (list '(document (concat (vspace "2fn") (concat (center "ctr"))
+                                    (document (concat (with "font-shape" "italic"
+                                                            (vspace* "1fn"))))))
+                 '(("margin-top: 1em" "margin-bottom: 2em")))
+           (list '(document (concat (vspace "2fn")
+                                    (document (concat (vspace* "1fn") "x"))))
+                 '(("margin-top: 1em" "margin-bottom: 2em")))
+           (list '(document (concat (document (concat (vspace* "1fn") "x"))
+                                    (vspace "2fn")))
+                 '(("margin-top: 1em" "margin-bottom: 2em")))
+           (list '(document (concat (vspace* "3fn")
+                                    (document (concat "x" (vspace "1fn")))))
+                 '(("margin-top: 3em" "margin-bottom: 1em")))
+           ;; set by both: the larger one
+           (list '(document (concat (vspace* "3fn")
+                                    (document (concat (vspace* "1fn") "x"
+                                                      (vspace "5fn")))
+                                    (vspace "4fn")))
+                 '(("margin-top: 3em" "margin-bottom: 5em")))
+           (list '(document (concat (vspace* "1fn")
+                                    (document (concat (vspace* "2fn") "x"))))
+                 '(("margin-top: 2em")))
+           ;; after another paragraph, in inline markup
+           (list '(document "p" (concat (vspace "2fn")
+                                        (document (concat (with "font-shape" "italic"
+                                                                (concat (vspace* "1fn") "y"))))))
+                 '(() ("margin-top: 1em" "margin-bottom: 2em")))))
+    (with s (catch #t (lambda () (export (car p) "html-snippet"))
+              (lambda args (string-append "error " (object->string args))))
+      (check= (map style-set (p-styles s)) (map style-set (map (cut string-recompose <> "; ") (cadr p))))))
+  (check= (export '(document (concat (vspace "2fn")
+                                     (document (concat (vspace* "1fn") "x"))))
+                  "html-snippet")
+          (export '(document (concat (vspace* "1fn") "x" (vspace "2fn")))
+                  "html-snippet")))
 
 ;; Two more kinds of nesting were exported in a time quadratic in their
 ;; depth (#883): inline markup around a block, whose block was looked for
@@ -3153,8 +3238,9 @@
                   test-html-mathjax-formulas test-html-pattern-background
                   test-html-include
                   test-html-deep-recursion test-html-nested-lines
-                  test-html-weak-tabs
-                  test-html-nested-documents test-html-nested-blocks
+                  test-html-weak-tabs test-html-blocks-and-tabs
+                  test-html-nested-documents test-html-margins-of-nested-paragraphs
+                  test-html-nested-blocks
                   test-latex-linear
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
