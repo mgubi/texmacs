@@ -81,9 +81,11 @@ string flush (converter c);
 // they keep that mapping: the typesetter, the PDF, and the exports to HTML,
 // LaTeX and TMML rely on 0x09 = macron and 0x0A = dot accent.
 // cork_text_to_utf8 and cork_text_to_sourcecode are for plain text in Cork
-// (commit messages, widget text, results for JavaScript, raw HTML, the
-// verbatim export...): 0x09 and 0x0A are a tab and a newline, and every other
-// byte is as in cork_to_utf8. utf8_to_cork maps both U+00AF and a tab to
+// (commit messages, the labels and messages of widgets, results for
+// JavaScript, raw HTML, the verbatim export...): 0x09 and 0x0A are a tab and
+// a newline, and every other byte is as in cork_to_utf8. A value which a
+// field of a widget shows and gives back is read by utf8_to_cork (a typed
+// macron is 0x09), so it is shown again with cork_to_utf8 (to_qstring_value). utf8_to_cork maps both U+00AF and a tab to
 // 0x09 (and U+02D9 and a newline to 0x0A), so plain text which may hold these
 // two glyphs must write them <#AF> and <#2D9>. The other bytes below 0x20
 // (0x0D in particular, U+201A, a real quote in German text) stay glyphs: a

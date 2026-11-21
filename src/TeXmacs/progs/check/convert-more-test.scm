@@ -1656,11 +1656,33 @@
           "a\xaf?")
   (check= (verb (cork 10 9) (cons "texmacs->verbatim:encoding" "SourceCode"))
           (string-append (dot) (macron)))
-  ;; the round trip export -> import keeps them
-  (for-each (lambda (d) (check= (paste (verb d)) d))
-            (list (cork 10 9 8)
-                  `(document ,(string-append "x" (cork 10) "y")
-                             ,(string-append (cork 9 8) "z") ""))))
+  (check= (verb (cork 8) (cons "texmacs->verbatim:encoding" "cork")) "<#2D8>")
+  ;; the round trip export -> import keeps them, also in Cork, where the
+  ;; import keeps the names which the export writes (<less> for a <)
+  (with docs (list (cork 10 9 8)
+                   (string-append "x" (cork 10) "y" (cork 9) "z" (cork 8) "w")
+                   `(document ,(string-append "x" (cork 10) "y")
+                              ,(string-append (cork 9 8) "z") "")
+                   `(document ,(string-append "a<less>b<gtr><alpha>" (cork 9))
+                              "c"))
+    (for-each (lambda (d) (check= (paste (verb d)) d)) docs)
+    (with c (cons "texmacs->verbatim:encoding" "cork")
+      (for-each (lambda (d)
+                  (check= (paste (verb d c) (cons "verbatim->texmacs:encoding"
+                                                  "cork"))
+                          d))
+                docs)))
+  ;; a text in Cork with a bare < is still encoded
+  (check= (paste "a<b" (cons "verbatim->texmacs:encoding" "cork")) "a<less>b")
+  (check-group "plain text import of a long line with tabs")
+  ;; the column of the tabs is counted as the line is made: a line of
+  ;; 400 KB with a tab every 10 bytes took 29 s when it was counted again
+  ;; at each tab, and takes some 30 ms (the bound is generous for CI)
+  (let* ((line (apply string-append (make-list 40000 "abcdefghi\t")))
+         (r (timed (lambda () (paste line)))))
+    (check= (string-length (car r)) 640000)
+    (check= (substring (car r) 0 20) "abcdefghi       abcd")
+    (check-true (< (cdr r) 2000))))
 
 (define (test-other-encodings)
   (check-group "other encodings")
