@@ -113,6 +113,12 @@
            (emit "\\x7c;")
            (loop (+ i 1) #f))
 
+          ;; Guile reads [ and ] as symbols too (latex-command-drd.scm),
+          ;; Chez as parentheses
+          ((and (not in-string?) (memv c '(#\[ #\])))
+           (emit (if (eqv? c #\[) "\\x5b;" "\\x5d;"))
+           (loop (+ i 1) #f))
+
           ;; A quote opens a string outside one and closes it inside one.
           ((eqv? c #\")
            (emit c)
@@ -264,8 +270,9 @@
          (let ((h (cadr f)))
            (let head ((h h)) (if (pair? h) (head (car h)) (and (symbol? h) h))))))
 
-  ;; Definitions the Guile branch makes of what Chez has natively.
-  (define chez-native-names '(when unless case-lambda))
+  ;; Definitions the Guile branch makes of what Chez has natively, or
+  ;; boot-chez.scm (module-load).
+  (define chez-native-names '(when unless case-lambda module-load))
 
   (define chez-compat-names #f)
 
