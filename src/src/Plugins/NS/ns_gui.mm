@@ -1723,11 +1723,14 @@ static NSAutoreleasePool *pool = nil;
   // as in Qt: the untitled, unmodified buffer of the start is replaced by
   // the first file, the others (and any file opened later) get new windows;
   // load-buffer-from-system chooses when the command runs (#739)
+  // the path of a file is taken as it is: a*b.tm or a:b.tm is not a
+  // pattern nor a list of paths (#905)
   for (NSURL* u in urls) {
-    string name= [u isFileURL]? from_nsstring_utf8 ([u path]):
-                                from_nsstring_utf8 ([u absoluteString]);
+    url name= [u isFileURL]?
+      url_system_literal (from_nsstring_utf8 ([u path])):
+      url_system (from_nsstring_utf8 ([u absoluteString]));
     exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer-from-system"),
-                                           object (url_system (name)))));
+                                           object (name))));
   }
   if (the_gui) the_gui->need_update ();
   NS_ENTRY_END ("application:openURLs:")

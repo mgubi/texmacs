@@ -263,16 +263,17 @@ ns_chooser_widget_rep::perform_dialog () {
   if (answer == NSModalResponseOK) {
     string name= from_nsstring_utf8 ([[panel URL] path]); // not cork
     // the default suffix, when there is none (see qt_chooser_widget_rep)
-    if (save && N(suffixes) > 0 && suffix (url_system (name)) == "")
+    if (save && N(suffixes) > 0 && suffix (url_system_literal (name)) == "")
       name= name * "." * suffixes[0];
-    file= "(system->url " * scm_quote (name) * ")";
+    // the path is taken as it is, not as a pattern or a list of paths (#905)
+    file= "(system-literal->url " * scm_quote (name) * ")";
     if (type == "image") {
       // the size of the image (see qt_pretty_image_size)
       string w= "", h= "";
       int ww, hh;
-      string ext= locase_all (suffix (url_system (name)));
+      string ext= locase_all (suffix (url_system_literal (name)));
       if (ext != "pdf" && ext != "ps" && ext != "eps" &&
-          mac_image_size (url_system (name), ww, hh)) {
+          mac_image_size (url_system_literal (name), ww, hh)) {
         SI pt = get_current_editor()->as_length ("1pt");
         SI par= get_current_editor()->as_length ("1par");
         if (ww <= 0 || hh <= 0 || ww * pt > par) w= "1par";

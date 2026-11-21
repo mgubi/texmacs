@@ -6162,8 +6162,12 @@ system_files_deliver () {
   for (int i= 0; i < N(system_files); i++) {
     if (DEBUG_VUE_EVENTS)
       debug_events << "file given by the system: " << system_files[i] << LF;
+    // a path is taken as it is: a*b.tm or a:b.tm is not a pattern nor a
+    // list of paths (#905); a url (tmfs://...) is parsed
+    string f= system_files[i];
+    url u= starts (f, "/")? url_system_literal (f): url_system (f);
     exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer-from-system"),
-                                           object (url_system (system_files[i])))));
+                                           object (u))));
   }
   system_files= array<string> ();
   gui_needs_update= true;
