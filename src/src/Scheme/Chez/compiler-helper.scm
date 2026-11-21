@@ -385,8 +385,13 @@
 
 ;; ---- Keywords ----------------------------------------------------------
 
+(define (tm-symbol-or-keyword? x)
+  ;; in TeXmacs, boot-chez.scm makes symbol? false on keywords, as in Guile
+  (or (symbol? x)
+      (and (top-level-bound? 'keyword?) ((top-level-value 'keyword?) x))))
+
 (define (tm-collect-keywords form acc)
-  (cond ((and (symbol? form)
+  (cond ((and (tm-symbol-or-keyword? form)
               (string-prefix? ":" (symbol->string form)))
          (if (member form acc) acc (cons form acc)))
         ((pair? form)

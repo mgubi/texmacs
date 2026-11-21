@@ -134,12 +134,12 @@
   (define (compiler-db-check-symbol-list field value)
     (unless (compiler-db-list-of-symbols? value)
       (error 'compiler-db
-             (string-append field " must be a list of symbols")
+             (string-append (if (symbol? field) (symbol->string field) field) " must be a list of symbols")
              value))
     (let ((dups (compiler-db-duplicates-symbols value)))
       (when (pair? dups)
         (error 'compiler-db
-               (string-append field " contains duplicate symbols")
+               (string-append (if (symbol? field) (symbol->string field) field) " contains duplicate symbols")
                dups))))
 
   ;; tm-define supports overloads and conditional definitions, so the same name
@@ -147,24 +147,24 @@
   (define (compiler-db-check-symbol-list/allow-duplicates field value)
     (unless (compiler-db-list-of-symbols? value)
       (error 'compiler-db
-             (string-append field " must be a list of symbols")
+             (string-append (if (symbol? field) (symbol->string field) field) " must be a list of symbols")
              value)))
 
   (define (compiler-db-check-mod-names field value)
     (unless (compiler-db-list-of-mod-names? value)
       (error 'compiler-db
-             (string-append field " must be a list of module names")
+             (string-append (if (symbol? field) (symbol->string field) field) " must be a list of module names")
              value))
     (let ((dups (compiler-db-duplicates-mod-names value)))
       (when (pair? dups)
         (error 'compiler-db
-               (string-append field " contains duplicate module names")
+               (string-append (if (symbol? field) (symbol->string field) field) " contains duplicate module names")
                dups))))
 
   (define (compiler-db-check-hash field value)
     (unless (or (not value) (compiler-db-exact-integer? value))
       (error 'compiler-db
-             (string-append field " must be #f or an exact integer")
+             (string-append (if (symbol? field) (symbol->string field) field) " must be #f or an exact integer")
              value)))
 
   (define (validate-module-info info)

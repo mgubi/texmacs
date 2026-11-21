@@ -330,6 +330,11 @@
 
   (define *tier7-extended-files*
     '(
+      ;; modules added upstream after the list was made
+      "database/ai-agents-db.scm"
+      "database/ai-agents-menu.scm"
+      "tools/spell/correct-widgets.scm"
+
       "bibtex/plain.scm"
       "bibtex/abbrv.scm"
       "bibtex/abstract.scm"
