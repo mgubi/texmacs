@@ -887,7 +887,7 @@ static NSView*
 choice_list (command cmd, array<string> vals, array<string> chosen, bool multiple,
              string filter= "", bool filtered= false) {
   NSMutableArray* its= [NSMutableArray array];
-  for (int i=0; i<N(vals); i++) [its addObject: to_label (vals[i])];
+  for (int i=0; i<N(vals); i++) [its addObject: to_label_value (vals[i])];
   NSTableView* t= [[[NSTableView alloc] init] autorelease];
   NSTableColumn* col= [[[NSTableColumn alloc] initWithIdentifier: @"c"] autorelease];
   [col setWidth: 200];
@@ -918,7 +918,7 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
   if (!filtered) { [ds setFiltering: NO]; return sv; }
   // a filter above the list (see the Qt interface)
   NSSearchField* f= [[[NSSearchField alloc] init] autorelease];
-  [f setStringValue: to_label (filter)];
+  [f setStringValue: to_label_value (filter)];
   objc_setAssociatedObject (f, "TMChoiceList", ds, OBJC_ASSOCIATION_RETAIN);
   [f setDelegate: ds];
   [ds setFilter: [f stringValue]];
@@ -1554,10 +1554,10 @@ ns_ui_element_rep::make_nsview () {
       if (editable) {
         TMCommandCombo* cb= [[[TMCommandCombo alloc] init] autorelease];
         for (int i=0; i<N(vals); i++)
-          [cb addItemWithObjectValue: to_label (vals[i])];
+          [cb addItemWithObjectValue: to_label_value (vals[i])];
         [cb setNumberOfVisibleItems: min (max (N(vals), 1), 15)];
         [cb setCompletes: YES];
-        [cb setStringValue: to_label (x.x3)];
+        [cb setStringValue: to_label_value (x.x3)];
         [[cb cell] setSendsActionOnEndEditing: YES];
         [cb setCommand: x.x1.rep];
         p= cb;
@@ -1565,9 +1565,9 @@ ns_ui_element_rep::make_nsview () {
       else {
         TMCommandPopUp* pb= [[[TMCommandPopUp alloc] init] autorelease];
         for (int i=0; i<N(vals); i++)
-          if (vals[i] != "") [pb addItemWithTitle: to_label (vals[i])];
+          if (vals[i] != "") [pb addItemWithTitle: to_label_value (vals[i])];
         // a value which is not in the list is shown anyway
-        NSString* cur= to_label (x.x3);
+        NSString* cur= to_label_value (x.x3);
         if (![pb itemWithTitle: cur]) [pb addItemWithTitle: cur];
         [pb selectItemWithTitle: cur];
         [pb setCommand: x.x1.rep];
@@ -1587,8 +1587,8 @@ ns_ui_element_rep::make_nsview () {
         CGFloat w= 60;
         NSDictionary* attrs= @{ NSFontAttributeName: [p font] };
         for (int i=0; i<N(vals); i++)
-          w= max (w, [to_label (vals[i]) sizeWithAttributes: attrs].width);
-        w= max (w, [to_label (x.x3) sizeWithAttributes: attrs].width);
+          w= max (w, [to_label_value (vals[i]) sizeWithAttributes: attrs].width);
+        w= max (w, [to_label_value (x.x3) sizeWithAttributes: attrs].width);
         fit.width= w + 34;
       }
       if (x.x5 != "" || editable) {

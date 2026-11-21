@@ -278,6 +278,19 @@ to_label (string s) {
   return to_nsstring_utf8 (s);
 }
 
+NSString*
+to_label_value (string s) {
+  // the text which a field or a list of choices shows and gives back
+  // (through from_label, whose utf8_to_cork writes a typed macron and dot
+  // accent as the Cork bytes 0x09 and 0x0A): these bytes are the glyphs,
+  // as in to_qstring_value of the Qt interface (#439)
+  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
+    return to_nsstring (s);
+  c_string p (cork_to_utf8 (s));
+  NSString* nss= [NSString stringWithCString: p encoding: NSUTF8StringEncoding];
+  return nss? nss: @"";
+}
+
 string
 from_label (NSString* s) {
   // Inputs are returned in the cork encoding, like in the Qt interface

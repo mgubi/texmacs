@@ -84,6 +84,7 @@ tm_ostream& operator << (tm_ostream& out, coord2 c);
 
 NSSize ns_decode_length (string width, string height, NSSize ref);
 NSString* to_label (string s);
+NSString* to_label_value (string s);
 string from_label (NSString* s);
 
 #define NOT_IMPLEMENTED(x) \

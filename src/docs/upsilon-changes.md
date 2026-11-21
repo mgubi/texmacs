@@ -21,12 +21,14 @@ have the details, and the problems go to the
   now stay characters, and tabs after a symbol such as α are expanded to
   the right column. *Export as verbatim* and the copy as text no longer
   write a ˙ or ¯ of the document as a newline or a tab, so that the text
-  comes back as it was. The other plain texts (the commit messages of svn
-  and git, the text of the widgets of Qt and Cocoa, raw HTML, the
-  `TeXmacs.scheme` results and the `web-javascript` code of the browser
-  version) keep their newlines and tabs instead of showing ˙ and ¯; for
-  developers, `cork-text->utf8` and the source `"Cork-text"` of
-  `string-convert` convert such text (#866, #439).
+  comes back as it was, also in the Cork encoding. A text field of the Vue
+  interface no longer turns a pasted ˙ into a space. The other plain texts
+  (the commit messages of svn and git, the labels and messages of the
+  widgets of Qt and Cocoa, raw HTML, the `TeXmacs.scheme` results and the
+  `web-javascript` code of the browser version) keep their newlines and
+  tabs instead of showing ˙ and ¯, while the text fields still show a ¯ or
+  ˙ typed in them; for developers, `cork-text->utf8` and the source
+  `"Cork-text"` of `string-convert` convert such text (#866, #439).
 - **Vue: the text fields of dialogs which change their content belong to
   their dialog** (Vue interface, desktop and browser): the content of a
   `refresh` or `refreshable` widget was made at its first layout, after the

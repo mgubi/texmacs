@@ -441,8 +441,8 @@ ns_inputs_list_widget_rep::perform_dialog () {
         NSComboBox* cb= [[[NSComboBox alloc]
                            initWithFrame: NSMakeRect (0, 0, 300, 24)] autorelease];
         for (int j=0; j<N(f->proposals); j++)
-          [cb addItemWithObjectValue: to_label (f->proposals[j])];
-        if (N(f->proposals) > 0) [cb setStringValue: to_label (f->proposals[0])];
+          [cb addItemWithObjectValue: to_label_value (f->proposals[j])];
+        if (N(f->proposals) > 0) [cb setStringValue: to_label_value (f->proposals[0])];
         box= cb;
       }
       [grid addRowWithViews: [NSArray arrayWithObjects: label, box, nil]];
@@ -649,7 +649,7 @@ ns_input_text_widget_rep::as_nsview () {
   NSTextField* f= (type == "password")
     ? [[[NSSecureTextField alloc] init] autorelease]
     : [[[NSTextField alloc] init] autorelease];
-  [f setStringValue: to_label (input)];
+  [f setStringValue: to_label_value (input)];
   [f setIdentifier: to_nsstring (type)];
   if (style & WIDGET_STYLE_MINI) [f setControlSize: NSControlSizeSmall];
   [f setFont: [NSFont systemFontOfSize:
@@ -657,7 +657,7 @@ ns_input_text_widget_rep::as_nsview () {
   NSMutableArray* props= [NSMutableArray array];
   if (N(proposals) > 1 || (N(proposals) == 1 && N(proposals[0]) > 0))
     for (int i=0; i<N(proposals); i++)
-      [props addObject: to_label (proposals[i])];
+      [props addObject: to_label_value (proposals[i])];
   // NOTE: the text field keeps its delegate (the delegate is a weak reference)
   TMInputTextHelper* h= [[[TMInputTextHelper alloc] initWithWidget: this
                                                           proposals: props]
@@ -691,7 +691,7 @@ ns_input_text_widget_rep::commit (bool flag) {
     ok   = true;
     if (f) input= from_label ([f stringValue]);
   }
-  else if (f) [f setStringValue: to_label (input)];
+  else if (f) [f setStringValue: to_label_value (input)];
   if (done) return;
   done= true;
   the_gui->process_command (cmd, ok? list_object (object (input))

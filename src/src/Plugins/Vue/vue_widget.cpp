@@ -28,7 +28,7 @@
 #include "tm_window.hpp"
 #include "sys_utils.hpp" // for system (printer widget)
 #include "analyze.hpp"   // for occurs (filtered choice)
-#include "converter.hpp" // cork_text_to_utf8 (the clipboard of the input fields)
+#include "converter.hpp" // cork_to_utf8 (the clipboard of the input fields)
 #include "locale.hpp"    // get_locale_charset
 #include "boot.hpp"      // for get_user_preference (the icon bars)
 #include "poly_line.hpp" // for ink widget
@@ -4815,10 +4815,11 @@ void
 vue_input_text_widget_rep::copy_selection (bool cut) {
   int b, e;
   if (!selection (b, e)) return;
-  // a symbol (<alpha>) becomes its character, not its name; the text is
-  // plain text, as for the verbatim export (#439)
+  // a symbol (<alpha>) becomes its character, not its name; the bytes
+  // 0x09 and 0x0A are the macron and the dot accent which were typed or
+  // pasted (see paste: a field holds no tab and no newline, #439)
   string t= verbatim_in_utf8 (false)
-            ? cork_text_to_utf8 (s (b, e)) : tm_decode (s (b, e));
+            ? cork_to_utf8 (s (b, e)) : tm_decode (s (b, e));
   // "primary" is the system clipboard of the Vue GUI (see vue_gui.cpp)
   set_selection ("primary", tuple ("extern", t), t, t, "", "verbatim");
   if (cut) delete_selection ();
@@ -4847,10 +4848,13 @@ vue_input_text_widget_rep::paste () {
   string ins;
   bool utf8= verbatim_in_utf8 (true);
   if (is_tuple (t, "extern", 1)) str= as_string (t[1]);
+  // a single line: the line ends and tabs of the clipboard become spaces,
+  // before the conversion to Cork, where a dot accent, a macron and a
+  // breve are the bytes of a newline, a tab and a backspace (#866)
+  str= replace (replace (replace (str, "\r\n", " "), "\r", " "), "\n", " ");
+  str= replace (str, "\t", " ");
   if (N(str) > 0) ins= utf8 ? utf8_to_cork (str) : tm_encode (str);
   if (N(ins) == 0) return;
-  // a single line: the newlines of the clipboard become spaces
-  ins= replace (ins, "\n", " ");
   insert (ins);
 }
 
