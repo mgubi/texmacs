@@ -8555,6 +8555,19 @@ tmg_system_2url (tmscm arg1) {
 }
 
 tmscm
+tmg_system_literal_2url (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "system-literal->url");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= url_system_literal (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
 tmg_url_2system (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->system");
 
@@ -13776,6 +13789,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url->string",  tmg_url_2string, 1, 0, 0);
   tmscm_install_procedure ("url->stree",  tmg_url_2stree, 1, 0, 0);
   tmscm_install_procedure ("system->url",  tmg_system_2url, 1, 0, 0);
+  tmscm_install_procedure ("system-literal->url",  tmg_system_literal_2url, 1, 0, 0);
   tmscm_install_procedure ("url->system",  tmg_url_2system, 1, 0, 0);
   tmscm_install_procedure ("unix->url",  tmg_unix_2url, 1, 0, 0);
   tmscm_install_procedure ("url->unix",  tmg_url_2unix, 1, 0, 0);

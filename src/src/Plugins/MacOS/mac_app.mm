@@ -36,7 +36,8 @@ from_nsstring (NSString *s) {
 - (BOOL)application:(NSApplication *)theApplication openFile:(NSString *)filename 
 {
   (void) theApplication;
-  call ("load-buffer", object (url_system (from_nsstring (filename))),
+  // the path is taken as it is, not as a pattern or a list of paths (#905)
+  call ("load-buffer", object (url_system_literal (from_nsstring (filename))),
                        eval (":new-window"), eval (":confirm-large"));
   return YES;
 }

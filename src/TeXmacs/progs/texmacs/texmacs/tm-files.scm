@@ -1029,14 +1029,16 @@
   ;; wildcards of the other roots (tmfs, web) are never completed.
   (with l (link-wildcard-candidates name #f)
     (cond ((null? l)
-           (set-message (replace "No file matches %1" (url->system name))
+           ;; the name of a file is UTF-8, a message Cork (#905)
+           (set-message (replace "No file matches %1"
+                                 (utf8->cork (url->system name)))
                         "Load file"))
           ((null? (cdr l))
            (apply load-buffer-main (cons (car l) opts)))
           (else
             (set-message (replace "%1 files match %2, none is loaded"
                                   (number->string (length l))
-                                  (url->system name))
+                                  (utf8->cork (url->system name)))
                          "Load file")))))
 
 (tm-define (load-buffer-main name . opts)
