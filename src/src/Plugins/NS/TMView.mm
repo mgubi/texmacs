@@ -117,7 +117,11 @@ ns_dropped_document (NSPasteboard* pb) {
   else if ([pb dataForType: NSPasteboardTypePDF])
     doc << ns_raw_image ([pb dataForType: NSPasteboardTypePDF], "pdf", 0, 0);
   else if ([pb stringForType: NSPasteboardTypeString])
-    doc << from_nsstring ([pb stringForType: NSPasteboardTypeString]);
+    // read as a pasted plain text (#918, see get_selection in ns_gui.mm):
+    // utf8_to_cork of the whole text kept its newlines and tabs, which are
+    // the dot accents and macrons of Cork
+    doc << as_tree (call ("dropped-text", from_nsstring_utf8 (
+                            [pb stringForType: NSPasteboardTypeString])));
   if (N(doc) == 1) return doc[0];
   if (N(doc) > 1) {
     tree sec (CONCAT, doc[0]);
