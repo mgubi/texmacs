@@ -3490,8 +3490,15 @@
 
 (tm-define (typeset-test-deep-leaf) "y")
 
+(define (deep-with-tree n leaf)
+  ;; the tree of (deep-with n leaf), made level by level from trees: a list
+  ;; of Scheme is cut when it is made into a tree, at about 2000 levels
+  ;; (tree_max_depth), and the evaluator would not see the deeper levels
+  (let loop ((i 0) (t (stree->tree leaf)))
+    (if (= i n) t (loop (+ i 1) (tree 'with "color" "red" t)))))
+
 (define (expand-deep-leaf n leaf)
-  (tree->stree (deep-leaf (texmacs-expand (stree->tree (deep-with n leaf))))))
+  (tree->stree (deep-leaf (texmacs-expand (deep-with-tree n leaf)))))
 
 (define (with-guile-stack-limit words thunk)
   ;; Guile 1.8 stops a program with "Stack overflow" when the stack is
@@ -3635,6 +3642,70 @@
       (system-rmdir-recursive dir))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Lists of Scheme nested very deep, made into trees
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A list of Scheme was made into a tree by a recursion as deep as the list,
+;; and the recursions of C++ on the tree (the typesetter, the paths, the
+;; converters) went as deep: 100000 levels crashed TeXmacs, under every
+;; Scheme (#813). The conversion now cuts the list at the depth which the
+;; editor takes, as the reader of .tm files does (tree_max_depth, about 2000
+;; levels with a stack of 8 MB), with an error "nesting too deep" there.
+
+(define deep-list-levels 100000)
+
+(define (deep-with-cut? t)
+  ;; @t is a nesting of <with>, cut with the error at a depth the editor
+  ;; takes (a tree made of a list nested deeper than that)
+  (let loop ((t t) (n 0))
+    (cond ((tree-is? t 'with) (loop (tree-ref t 2) (+ n 1)))
+          ((tree-is? t 'error)
+           (and (== (tree->stree t) '(error "nesting too deep"))
+                (> n 100) (< n 20000)))
+          (else #f))))
+
+(define (test-deep-scheme-lists)
+  (check-group "deep lists of Scheme made into trees")
+  (with d (deep-with deep-list-levels "leaf")
+    ;; stree->tree (a scheme_tree), tm->tree (content), and the content of
+    ;; tree-set
+    (check-true (deep-with-cut? (stree->tree d)))
+    (check-true (deep-with-cut? (tree 'with "color" "red" d)))
+    (with t (stree->tree '(document "a"))
+      (tree-set t 0 d)
+      (check-true (deep-with-cut? (tree-ref t 0))))
+    ;; a list which is not too deep is whole
+    (with t (stree->tree (deep-with 1000 "leaf"))
+      (check= (tree->stree (deep-leaf t)) "leaf"))
+    ;; inserted in a buffer, and set as its body: the content is typeset
+    (with-typeset-body '(document "before" "after")
+      (lambda ()
+        (tree-go-to (buffer-tree) 0 0)
+        (insert d)
+        (update-forced)
+        (check-true (> (get-page-count) 0))
+        (check-true (deep-with-cut? (tree-ref (buffer-tree) 0 0)))
+        (buffer-set-body (current-buffer)
+                         (stree->tree `(document "before" ,d "after")))
+        (update-forced)
+        (check-true (> (get-page-count) 0))
+        (check= (tree->stree (tree-ref (buffer-tree) 2)) "after")
+        (check-true (deep-with-cut? (tree-ref (buffer-tree) 1)))))
+    ;; a table cut stays a table: the error is in a cell
+    (let* ((tab (let loop ((i 0) (t "leaf"))
+                  (if (= i (quotient deep-list-levels 4)) t
+                      (loop (+ i 1) `(tformat (table (row (cell ,t))))))))
+           (t (stree->tree tab))
+           (cell (let loop ((t t))
+                   (if (tree-is? t 'error) #f
+                       (with u (tree-ref t (- (tree-arity t) 1))
+                         (if (tree-is? u 'error) t (loop u)))))))
+      (check-true (and cell (tree-is? cell 'cell)))
+      (with-typeset-body `(document ,tab)
+        (lambda ()
+          (check-true (> (get-page-count) 0)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3700,4 +3771,5 @@
   (test-included-files)
   (test-runaway-macro-recursion)
   (test-deep-nesting)
+  (test-deep-scheme-lists)
   (check-end))

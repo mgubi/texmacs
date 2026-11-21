@@ -24,6 +24,16 @@ long stack_remaining ();
 
 #define STACK_MARGIN (1024L * 1024L)
 
+// The depth of the trees which the editor can take: the bridges, the
+// typesetter and the paths recurse on the levels of a tree, with up to about
+// 2 KB of stack for each (a <with> in a paragraph); 4 KB are counted, of the
+// stack which is left (or of 8 MB, if the system does not tell), about 2000
+// levels on the main thread. The readers of .tm files (fromtm.cpp) and the
+// conversions of Scheme lists to trees (glue.cpp) cut what is deeper, with an
+// error "nesting too deep" in its place (#813: deeper, the recursions of C++
+// on the tree crashed)
+int tree_max_depth ();
+
 inline bool
 stack_nearly_full () {
   long n= stack_remaining ();

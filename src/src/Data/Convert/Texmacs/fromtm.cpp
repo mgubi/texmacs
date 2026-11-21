@@ -20,19 +20,6 @@
 * Conversion of TeXmacs strings of the present format to TeXmacs trees
 ******************************************************************************/
 
-static int
-read_max_depth () {
-  // the depth of the trees which the editor can take: the bridges, the
-  // typesetter and the paths recurse on the levels of a tree, with up to about
-  // 2 KB of stack for each (a <with> in a paragraph); 4 KB are counted, of the
-  // stack which is left (or of 8 MB, if the system does not tell). A file
-  // which nests deeper is cut there, as when the stack is nearly full (#813:
-  // read up to the full stack, it crashed the typesetter)
-  long left= stack_remaining ();
-  if (left < 0) left= 8L * 1024L * 1024L;
-  return (int) (left / 4096);
-}
-
 struct tm_reader {
   string  version;            // document was composed using this version
   hashmap<string,int> codes;  // codes for to present version
@@ -51,14 +38,14 @@ struct tm_reader {
     EXPAND_APPLY (EXPAND),
     backslash_ok (true),
     with_extensions (true),
-    buf (buf2), pos (0), last (""), depth (0), max_depth (read_max_depth ()) {}
+    buf (buf2), pos (0), last (""), depth (0), max_depth (tree_max_depth ()) {}
   tm_reader (string buf2, string version2):
     version (version2),
     codes (get_codes (version)),
     EXPAND_APPLY (version_inf (version, "0.3.3.22")? APPLY: EXPAND),
     backslash_ok (version_inf (version, "1.0.1.23")? false: true),
     with_extensions (version_inf (version, "1.0.2.4")? false: true),
-    buf (buf2), pos (0), last (""), depth (0), max_depth (read_max_depth ()) {}
+    buf (buf2), pos (0), last (""), depth (0), max_depth (tree_max_depth ()) {}
 
   int    skip_blank ();
   string decode (string s);
@@ -212,6 +199,21 @@ texmacs_skipped_nestings () {
   return skipped_nestings;
 }
 
+tree
+texmacs_nesting_error (string name) {
+  // the error in place of an apply @name nested too deep; a table stays a
+  // table, whose cell is the error (the converters and the typesetter take
+  // the children of a <tformat>, a <table> or a <row> for tables, rows and
+  // cells, as tmhtml-prune does in the HTML export)
+  tree err (_ERROR, "nesting too deep");
+  if (name == "cell") return tree (CELL, err);
+  if (name == "row") return tree (ROW, tree (CELL, err));
+  if (name == "table") return tree (TABLE, tree (ROW, tree (CELL, err)));
+  if (name == "tformat")
+    return tree (TFORMAT, tree (TABLE, tree (ROW, tree (CELL, err))));
+  return err;
+}
+
 void
 tm_reader::skip_apply (bool skip_flag) {
   // the rest of an apply nested too deep, up to its end, skipped without
@@ -259,7 +261,7 @@ tm_reader::read_apply (string name, bool skip_flag) {
     // texmacs_to_tree: a message calls Scheme, which needs the stack too)
     skipped_nestings++;
     skip_apply (skip_flag);
-    return tree (_ERROR, "nesting too deep");
+    return texmacs_nesting_error (name);
   }
   tree t (make_tree_label (name));
   if (!with_extensions)

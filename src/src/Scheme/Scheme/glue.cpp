@@ -23,6 +23,7 @@
 #include "typesetter.hpp" // get_typeset_check_mismatches
 #include "universal.hpp"
 #include "convert.hpp"
+#include "stack_guard.hpp"
 #include "file.hpp"
 #include "locale.hpp"
 #include "iterator.hpp"
@@ -463,12 +464,45 @@ scheme_tree_to_tmscm (scheme_tree t) {
   }
 }
 
-scheme_tree
-tmscm_to_scheme_tree (tmscm p) {
+/******************************************************************************
+* Lists of Scheme nested too deep
+******************************************************************************/
+
+// A list of Scheme made into a tree is cut at the depth which the editor can
+// take (tree_max_depth, as the reader of .tm files does): deeper, the
+// conversion itself, and then the recursions of C++ on the tree (the
+// typesetter, the paths, the converters...), overflowed the stack, a crash
+// under every Scheme (#813). What is deeper is an error "nesting too deep"
+// (in a table, a cell with the error: texmacs_nesting_error); one warning
+// for each conversion which cuts. The cuts are not counted with those of the
+// reader (texmacs-skipped-nestings, which marks a buffer whose file was cut):
+// a tree which the reader cut, converted to Scheme and back deeper in the
+// stack, is cut again a few levels higher, also while another buffer loads
+
+struct tmscm_depth_cap {
+  int max;  // deeper lists are cut
+  int cut;  // the number of lists cut
+  tmscm_depth_cap (): max (tree_max_depth ()), cut (0) {}
+  bool too_deep (int depth) {
+    return depth >= max || stack_nearly_full (); }
+  void done (const char* what) {
+    if (cut == 0) return;
+    convert_warning << "Scheme " << what << " nested deeper than "
+                    << max << " levels cut" << LF; }
+};
+
+static scheme_tree
+tmscm_to_scheme_tree (tmscm p, int depth, tmscm_depth_cap& cap) {
   if (tmscm_is_list (p)) {
+    if (cap.too_deep (depth)) {
+      cap.cut++;
+      tmscm f= tmscm_is_pair (p)? tmscm_car (p): tmscm_null ();
+      string name= tmscm_is_symbol (f)? tmscm_to_symbol (f): string ("");
+      return tree_to_scheme_tree (texmacs_nesting_error (name));
+    }
     tree t (TUPLE);
     while (!tmscm_is_null (p)) {
-      t << tmscm_to_scheme_tree (tmscm_car (p));
+      t << tmscm_to_scheme_tree (tmscm_car (p), depth + 1, cap);
       p= tmscm_cdr (p);
     }
     return t;
@@ -483,19 +517,35 @@ tmscm_to_scheme_tree (tmscm p) {
   return "?";
 }
 
+scheme_tree
+tmscm_to_scheme_tree (tmscm p) {
+  tmscm_depth_cap cap;
+  scheme_tree t= tmscm_to_scheme_tree (p, 0, cap);
+  cap.done ("list");
+  return t;
+}
+
 /******************************************************************************
 * Content
 ******************************************************************************/
 
-bool
-tmscm_is_content (tmscm p) {
+static bool
+tmscm_is_content (tmscm p, int depth, tmscm_depth_cap& cap) {
   if (tmscm_is_string (p) || tmscm_is_tree (p)) return true;
   else if (!tmscm_is_pair (p) || !tmscm_is_symbol (tmscm_car (p))) return false;
+  // (what is deeper is not looked at: the conversion cuts it)
+  else if (cap.too_deep (depth)) return true;
   else {
     for (p= tmscm_cdr (p); tmscm_is_pair (p); p= tmscm_cdr (p))
-      if (!tmscm_is_content (tmscm_car (p))) return false;
+      if (!tmscm_is_content (tmscm_car (p), depth + 1, cap)) return false;
     return tmscm_is_null (p);
   }
+}
+
+bool
+tmscm_is_content (tmscm p) {
+  tmscm_depth_cap cap;
+  return tmscm_is_content (p, 0, cap);
 }
 
 #define content tree
@@ -503,21 +553,33 @@ tmscm_is_content (tmscm p) {
    TMSCM_ASSERT (tmscm_is_content (p), p, arg, rout)
 #define content_to_tmscm tree_to_tmscm
 
-tree
-tmscm_to_content (tmscm p) {
+static tree
+tmscm_to_content (tmscm p, int depth, tmscm_depth_cap& cap) {
   if (tmscm_is_string (p)) return tmscm_to_string (p);
   if (tmscm_is_tree (p)) return tmscm_to_tree (p);
   if (tmscm_is_pair (p)) {
     if (!tmscm_is_symbol (tmscm_car (p))) return "?";
+    if (cap.too_deep (depth)) {
+      cap.cut++;
+      return texmacs_nesting_error (tmscm_to_symbol (tmscm_car (p)));
+    }
     tree t (make_tree_label (tmscm_to_symbol (tmscm_car (p))));
     p= tmscm_cdr (p);
     while (!tmscm_is_null (p)) {
-      t << tmscm_to_content (tmscm_car (p));
+      t << tmscm_to_content (tmscm_car (p), depth + 1, cap);
       p= tmscm_cdr (p);
     }
     return t;
   }
   return "?";
+}
+
+tree
+tmscm_to_content (tmscm p) {
+  tmscm_depth_cap cap;
+  tree t= tmscm_to_content (p, 0, cap);
+  cap.done ("content");
+  return t;
 }
 
 tmscm 
