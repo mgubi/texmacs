@@ -972,7 +972,7 @@ QTMWidget::dropEvent (QDropEvent *event) {
           // retrieve a meaningful string for the label if available
           // and only the first line as it can be multiline
           buf= md->text ().toUtf8 ().split('\n')[0];
-          label= string (buf.constData (), buf.size ());
+          label= utf8_to_cork (string (buf.constData (), buf.size ()));
         }
         tree ln (HLINK, label, url);
         doc << ln;
@@ -1004,8 +1004,10 @@ QTMWidget::dropEvent (QDropEvent *event) {
                    "", "", "", "");
     doc << t;
   } else if (md->hasText ()) {
+    // read as a pasted plain text (#918): not the raw UTF-8 bytes, whose
+    // newlines and tabs would be the dot accents and macrons of Cork
     buf= md->text ().toUtf8 ();
-    doc << string (buf.constData (), buf.size ());
+    doc << as_tree (call ("dropped-text", string (buf.constData (), buf.size ())));
   }
 
   if (N(doc)>0) {
