@@ -110,10 +110,14 @@
            (load-buffer name :confirm-large))))))
 
 (define (recent->url s)
-  ;; a file with a star or a colon (a*b.tm, a:b.tm) is named as it is, not
-  ;; as a pattern or a list of paths (#905)
+  ;; a file whose name the parser would change is named as it is (#905): a
+  ;; star (a*b.tm, not a pattern), a colon (a:b.tm, not a list of paths), a
+  ;; folder named ~ or $X (not expanded); the names are stored by url->unix,
+  ;; so an ordinary path reads back the same (and Windows has none of these)
   (with u (unix->url s)
-    (if (and (or (url-wildcard? u) (url-or? u))
+    (if (and (string-starts? s "/")
+             (not (or (os-mingw?) (os-win32?)))
+             (!= u (system-literal->url s))
              (url-exists? (system-literal->url s)))
         (system-literal->url s)
         u)))
