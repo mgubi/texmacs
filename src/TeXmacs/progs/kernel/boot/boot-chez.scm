@@ -671,6 +671,14 @@
   (module-provide m)
   m)
 
+;; Guile's debug and reader options, which do not apply
+(define (debug-options . args) '())
+(define (debug-enable . opts) (noop))
+(define (debug-disable . opts) (noop))
+(define (debug-set! . opts) (noop))
+(define (read-set! . opts) (noop))
+(define (read-enable . opts) (noop))
+
 ;; as on s7: the module is loaded
 (define (module-available? m)
   (and (module-loaded? m) #t))
@@ -921,9 +929,8 @@
 ;; (a full crash report) for an unresolvable URL, and C++ exceptions cannot be
 ;; caught from Scheme.  The old C++ string_load() just returned "" in that case.
 (define (tm-load-path u)
-  (cond ((string? u) (let ((p (tm-os-path u))) (and (file-exists? p) p)))
-        ((url-exists? u) (tm-os-path (url-materialize u "r")))
-        (else #f)))
+  ;; a string is a url, as for the glue ("$TEXMACS_PATH/progs/...")
+  (and (url-exists? u) (tm-os-path (url-materialize u "r"))))
 
 (define (tm-loadable? path)
   (and (string? path) (> (string-length path) 0) (file-exists? path)))

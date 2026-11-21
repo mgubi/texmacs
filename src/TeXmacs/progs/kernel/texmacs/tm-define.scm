@@ -360,6 +360,14 @@
                        (list ,(tm-defining-module-name)))
            ,@(map property-rewrite cur-props))))))
 
+(define-public (tm-thunk-with-source body)
+  ;; the expression of a thunk running body, for the macros of menus and
+  ;; keyboards; procedure-source gives the source of the thunk back to the
+  ;; shortcuts and the help, which Chez does not keep by itself
+  (if (chez-scheme?)
+      `(source-record! (lambda () ,@body) '(lambda () ,@body))
+      `(lambda () ,@body)))
+
 (define-public (tm-define-sub head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
       (let ((decl (tm-define-sub head (cdr body))))

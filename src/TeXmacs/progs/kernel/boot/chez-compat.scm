@@ -26,6 +26,30 @@
 (define-public (femtolisp-scheme?) #f)
 (define-public (chez-scheme?) #t)
 
+;;; Procedure properties
+;;
+;; Guile's procedure-property: 'arity gives the required and the optional
+;; arguments and whether there is a rest argument, from Chez's arity mask
+;; (bit n set when n arguments are accepted, negative with a rest argument);
+;; the other properties are kept in a weak table.
+(define procedure-properties (make-weak-eq-hashtable))
+
+(define-public (procedure-property f key)
+  (cond ((not (procedure? f)) #f)
+        ((eq? key 'arity)
+         (let* ((m (procedure-arity-mask f))
+                (req (let loop ((i 0)) (if (logbit? i m) i (loop (+ i 1))))))
+           (if (< m 0)
+               (list req 0 #t)
+               (list req (- (integer-length m) 1 req) #f))))
+        (else (let ((l (hashtable-ref procedure-properties f '())))
+                (let ((p (assq key l))) (and p (cdr p)))))))
+
+(define-public (set-procedure-property! f key val)
+  (hashtable-set! procedure-properties f
+                  (cons (cons key val)
+                        (hashtable-ref procedure-properties f '()))))
+
 ;;; Numeric helpers
 
 ;; Guile writes the digits above 9 in lower case (colours "#8020c0")
