@@ -124,9 +124,11 @@ tmscm_is_list (tmscm obj) {
 void
 tmscm_wrong_type_arg (tmscm arg, int pos, const char* subr) {
   (void) arg;
-  string msg= "Wrong type argument in " * string (subr ? subr : "unknown")
-            * " at position " * as_string (pos);
-  tm_throw ((char*) c_string (msg));
+  // a Scheme error, as with s7 and Guile: thrown without the crash report
+  // and backtrace of tm_throw (0.2 s each); the shim of the glue returns it
+  // to tm-glue-check, which raises wrong-type-arg
+  throw string ("Wrong type argument in ") * string (subr ? subr : "unknown")
+        * " at position " * as_string (pos);
 }
 
 bool

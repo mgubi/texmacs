@@ -53,6 +53,7 @@
 #include "chez_tm.hpp"
 #include "basic.hpp"
 #include "string.hpp"
+#include "analyze.hpp"
 
 #include <string>
 
@@ -78,6 +79,13 @@ tmg_error_texmacs (const string& e) {
   return tmg_error_literal (_e, (iptr) N (e));
 }
 
+/* A wrong argument (TMSCM_ASSERT, tmscm_to_int): an ordinary Scheme error,
+   not reported on stderr, as with s7 */
+static bool
+tmg_argument_error (const string& e) {
+  return starts (e, "Wrong type argument") || starts (e, "Value out of range");
+}
+
 static tmscm
 tmg_error_std (const std::string& e) {
   return tmg_error_literal (e.c_str (), (iptr) e.size ());
@@ -95,7 +103,8 @@ tmg_error_std (const std::string& e) {
   current_glue_proc= NAME;                                               \
   try { return FN CALL; }                                                \
   catch (const string& e) {                                              \
-    fprintf (stderr, "[GLUE EXCEPTION in %s]: %s\n", NAME, (char*) c_string (e)); \
+    if (!tmg_argument_error (e))                                         \
+      fprintf (stderr, "[GLUE EXCEPTION in %s]: %s\n", NAME, (char*) c_string (e)); \
     return tmg_error_texmacs (e);                                        \
   }                                                                      \
   catch (const std::string& e) {                                         \
