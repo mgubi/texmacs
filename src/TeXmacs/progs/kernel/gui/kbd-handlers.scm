@@ -37,6 +37,15 @@
   ;;(display* "mouse-drop-event " x ", " y ", " (tm->stree obj) "\n")
   (insert obj))
 
+(tm-define (dropped-text s)
+  (:synopsis "The tree of the plain text @s (UTF-8) dropped on a document")
+  ;; The interfaces give a dropped text (TMView, QTMWidget, the SDL drops
+  ;; of Vue) to this function, which reads it as a pasted plain text is
+  ;; read (verbatim-snippet): the lines become paragraphs, the tabs spaces,
+  ;; and a dot accent, macron or breve of the text stays a character
+  ;; (#866, #918), instead of the newline, tab and backspace of Cork.
+  (convert s "verbatim-snippet" "texmacs-tree"))
+
 (tm-define (kbd-insert s)
   (insert s))
 
