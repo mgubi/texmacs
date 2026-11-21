@@ -878,9 +878,9 @@
 ;; A table on a line of text (an inline table) was put in a <p>, with the
 ;; text around it in inline <div>: a <p> may not contain them, a browser
 ;; closed the <p> before the table and left an empty <p> after it (#903).
-;; Such a paragraph is a <div>, with the margins of a <p> where it sets
-;; none (it was closer to the paragraphs around it); the blocks and tables
-;; beside a tab are kept on their side of the tab (#896)
+;; Such a paragraph is a <div> of the class tmhtml-p, with the margins of a
+;; <p> (without them, it was closer to the paragraphs around it); the blocks
+;; and tables beside a tab are kept on their side of the tab (#896)
 (define (test-html-tables-in-lines)
   (check-group "html export: a table on a line of text")
   (let* ((table '(tabular (table (row (cell "ta") (cell "tb")))))
@@ -904,18 +904,49 @@
                       (string-occurs? "ta" s)
                       (or (== body table) (string-occurs? "qq" s)))
                 (list #t #t #t #t))))
-    ;; the <div> has the margins of a <p> (1em), on the sides where the
-    ;; paragraph has no vertical space; one which it has is kept
+    ;; the <div> has the class tmhtml-p, whose CSS gives it the margins of
+    ;; a <p> (none in a compact block); the vertical spaces of the
+    ;; paragraph are in its style, which wins over the class
     (with s (html-of-buffer `(document "a" (concat "qq" ,table) "b"))
-      (check-true (string-occurs?
-                   "<div style=\"margin-top: 1em; margin-bottom: 1em\">" s)))
+      (check= (list (string-occurs? "<div class=\"tmhtml-p\">" s)
+                    (string-occurs? "margin" s))
+              (list #t #f)))
     (with s (html-of-buffer `(document (concat (vspace* "0.5fn") "qq" ,table
                                                (vspace "2fn"))))
-      (check-true (string-occurs?
-                   "<div style=\"margin-top: 0.5em; margin-bottom: 2em\">" s)))
-    (with s (html-of-buffer `(document (concat "qq" ,table (vspace "2fn"))))
-      (check-true (string-occurs?
-                   "<div style=\"margin-top: 1em; margin-bottom: 2em\">" s)))
+      (check= (list (string-occurs? "class=\"tmhtml-p\"" s)
+                    (string-occurs?
+                     "style=\"margin-top: 0.5em; margin-bottom: 2em\"" s))
+              (list #t #t)))
+    (with s (html-of-buffer `(document "p" (concat (vspace* "0.5fn")
+                                                   (document (concat "qq" ,table)))
+                                       "b"))
+      (check= (list (string-occurs? "class=\"tmhtml-p\"" s)
+                    (string-occurs? "style=\"margin-top: 0.5em\"" s)
+                    (occurrences "<div" s))
+              (list #t #t 2)))
+    (with s (html-of-buffer `(document "a" (with "par-par-sep" "0fn"
+                                                 (document "x" (concat "qq" ,table)
+                                                           "y"))
+                                       "b"))
+      (check= (list (string-occurs? "compact-block" s)
+                    (string-occurs? "<div class=\"tmhtml-p\">" s)
+                    (string-occurs? "margin" s))
+              (list #t #t #f)))
+    ;; the CSS of the export has the margins of the class, also where those
+    ;; of a <p> are changed
+    (with s (string-recompose
+             (list-filter (string-tokenize-by-char
+                           (string-replace
+                            (html-export-of-buffer `(document (concat "qq" ,table)))
+                            "\n" " ")
+                           #\space)
+                          (lambda (w) (!= w "")))
+             " ")
+      (for (rule '(".tmhtml-p { margin-top: 1em; margin-bottom: 1em }"
+                   ".title-block p, .title-block .tmhtml-p { margin: 0px }"
+                   ".compact-block p, .compact-block .tmhtml-p { margin-top: 0px; margin-bottom: 0px }"
+                   "dd p, dd .tmhtml-p { padding-top: 0em; }"))
+        (check-true (string-occurs? rule s))))
     ;; text alone stays in a <p>
     (check-true (string-occurs? "<p>" (html-of-buffer '(document "a"))))))
 

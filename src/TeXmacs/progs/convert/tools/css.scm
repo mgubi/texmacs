@@ -68,11 +68,6 @@
            (css-merge-attrs (cdr a1) a2*)))
         (else (cons (car a1) (css-merge-attrs (cdr a1) a2)))))
 
-(tm-define (css-remove-properties s keys)
-  ;; the style @s without its properties @keys
-  (assoc->css-style (list-filter (css-style->assoc s)
-                                 (lambda (p) (nin? (car p) keys)))))
-
 (tm-define (css-merge-styles s1 s2)
   (let* ((a1 (css-style->assoc s1))
          (a2 (css-style->assoc s2))
