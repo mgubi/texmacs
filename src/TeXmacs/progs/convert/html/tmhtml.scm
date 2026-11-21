@@ -478,6 +478,13 @@
                     (as-blocks (cdr l))))))
 
 (define (add-style-attr x s1 s2)
+  ;; the block @x with the margins @s1 (top) and @s2 (bottom). A <p> which
+  ;; has a style (the margins of a paragraph of a nested document, which
+  ;; gets those of the outer paragraph too) takes them in its style, as
+  ;; tmhtml-simplify-div merges a <div> with the <div> in it: a margin of
+  ;; both is the larger one, as their margins collapse in a browser. It
+  ;; was put in a <div> in the <p> with its attributes as the first child,
+  ;; which made the export fail
   (with s (or (and s1 s2 (string-append s1 "; " s2)) s1 s2)
     (cond ((not s) x)
           ((and (xhtml-block? x) (null? (sxml-attr-list x)))
@@ -485,7 +492,11 @@
           ((and (xhtml-block? x) (not (sxml-attr x 'style)))
            `(,(car x) (@ (style ,s) ,@(sxml-attr-list x)) ,@(sxml-content x)))
           ((func? x 'h:p)
-           `(h:p (@ (style ,s)) (h:div ,(cdr x))))
+           (let* ((old (sxml-attr x 'style))
+                  (other (list-filter (sxml-attr-list x)
+                                      (lambda (a) (not (func? a 'style))))))
+             `(h:p (@ (style ,(css-merge-styles old s)) ,@other)
+                   ,@(sxml-content x))))
           (else `(h:div (@ (style ,s)) ,x)))))
 
 (define (tmhtml-margins x)
