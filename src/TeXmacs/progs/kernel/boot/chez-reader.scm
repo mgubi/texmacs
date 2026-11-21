@@ -159,6 +159,12 @@
                  (emit (if (char<? d #\x80) d #\?))))
              (loop end #f)))
 
+          ;; In a string, the byte 0x85 (in the UTF-8 of many letters) is NEL for
+          ;; Chez, a line ending which the reader turns into a newline: escaped
+          ((and in-string? (eqv? c (integer->char #x85)))
+           (emit "\\x85;")
+           (loop (+ i 1) #t))
+
           ;; Escapes only matter inside a string.
           ((and in-string? (eqv? c #\\) (hex-escape? i))
            (loop (copy-hex-escape i) #t))

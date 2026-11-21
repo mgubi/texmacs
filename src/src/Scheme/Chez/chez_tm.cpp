@@ -15,6 +15,7 @@
 #include "converter.hpp"
 #include "basic.hpp"
 #include "../Scheme/glue.hpp"
+#include "convert.hpp" // tree_to_texmacs, for printing blackboxes
 
 #include <map>
 #include <mutex>
@@ -232,6 +233,28 @@ tmscm_delete_blackbox (void* p) {
   if (p) tm_delete ((blackbox*) p);
 }
 
+/* How a blackbox prints (record-writer of tm-blackbox, boot-chez.scm), as
+   with Guile and s7: "<tree ...>", "<url a/b>"... */
+extern "C" tmscm
+tmscm_blackbox_to_string (uptr p) {
+  string s= "<blackbox>";
+  if (p) {
+    blackbox b= *((blackbox*) p);
+    int t= type_box (b);
+    if (t == type_helper<tree>::id)
+      s= "<tree " * tree_to_texmacs (open_box<tree> (b)) * ">";
+    else if (t == type_helper<url>::id)
+      s= "<url " * as_string (open_box<url> (b)) * ">";
+    else if (t == type_helper<observer>::id) s= "<observer>";
+    else if (t == type_helper<widget>::id) s= "<widget>";
+    else if (t == type_helper<promise<widget> >::id) s= "<promise-widget>";
+    else if (t == type_helper<command>::id) s= "<command>";
+    else if (t == type_helper<modification>::id) s= "<modification>";
+    else if (t == type_helper<patch>::id) s= "<patch>";
+  }
+  return string_to_tmscm (s);
+}
+
 extern "C" bool
 tmscm_blackbox_equal (uptr p1, uptr p2) {
   if (p1 == p2) return true;
@@ -430,6 +453,7 @@ register_foreign_symbols () {
   Sforeign_symbol ("tmscm_delete_blackbox", (void*) tmscm_delete_blackbox);
   Sforeign_symbol ("tmscm_blackbox_equal", (void*) tmscm_blackbox_equal);
   Sforeign_symbol ("tmscm_blackbox_hash", (void*) tmscm_blackbox_hash);
+  Sforeign_symbol ("tmscm_blackbox_to_string", (void*) tmscm_blackbox_to_string);
   Sforeign_symbol ("chez_root_stack_depth", (void*) chez_root_stack_depth);
   Sforeign_symbol ("chez_root_stack_capacity", (void*) chez_root_stack_capacity);
   Sforeign_symbol ("chez_call_scheme_1", (void*) chez_call_scheme_1);

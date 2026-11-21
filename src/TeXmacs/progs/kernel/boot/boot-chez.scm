@@ -204,6 +204,9 @@
 (define c-blackbox-hash
   (foreign-procedure "tmscm_blackbox_hash" (uptr) iptr))
 
+(define c-blackbox->string
+  (foreign-procedure "tmscm_blackbox_to_string" (uptr) scheme-object))
+
 (define chez-heap-built?
   (foreign-procedure "chez_heap_built" () boolean))
 
@@ -224,6 +227,11 @@
 (record-type-equal-procedure tm-blackbox-rtd
   (lambda (b1 b2 eql?)
     (c-blackbox-equal? (tm-blackbox-ptr b1) (tm-blackbox-ptr b2))))
+
+;; printed as with Guile and s7: <tree ...>, <url a/b>...
+(record-writer tm-blackbox-rtd
+  (lambda (b port wr)
+    (display (utf8-bytes->string (c-blackbox->string (tm-blackbox-ptr b))) port)))
 
 (record-type-hash-procedure tm-blackbox-rtd
   (lambda (b hash)
@@ -681,6 +689,9 @@
   (module-provide m)
   m)
 
+;; Guile's gc
+(define (gc) (collect))
+
 ;; Guile's debug and reader options, which do not apply
 (define (debug-options . args) '())
 (define (debug-enable . opts) (noop))
@@ -783,7 +794,6 @@
 
 ;; Stays in boot-chez.scm because kernel/texmacs/tm-define.scm:95 replaces it
 ;; via a top-level `(set! procedure-name ...)`.
-(define (procedure-name p) #f)
 
 (define (promise-source action)
   (and (procedure? action)
@@ -1254,9 +1264,22 @@
   (let ((h (make-weak-eq-hashtable)))
     (for-each (lambda (n)
                 (when (top-level-bound? n)
-                  (hashtable-set! h (top-level-value n) #t)))
+                  (hashtable-set! h (top-level-value n) n)))
               tm-glue-names)
     h))
+
+;; the name of a glue routine, as Guile knows the names of its primitives
+;; (tm-define.scm adds the names of the tm-defined functions)
+(define (procedure-name p)
+  (and (procedure? p)
+       (or (hashtable-ref tm-glue-procedures p #f)
+           ;; a procedure of Chez (system...): the name of its code, if it
+           ;; is the procedure of that name
+           (let ((n (guard (e (#t #f)) (((inspect/object p) 'code) 'name))))
+             (and (string? n)
+                  (let ((s (string->symbol n)))
+                    (and (top-level-bound? s) (eq? (top-level-value s) p)
+                         s)))))))
 
 (define (closure? f)
   (and (procedure? f) (not (hashtable-contains? tm-glue-procedures f))))
