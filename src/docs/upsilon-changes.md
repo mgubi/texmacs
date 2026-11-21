@@ -21,6 +21,19 @@ have the details, and the problems go to the
   footers of the page format dialog, for instance) belonged to no window,
   and Close window or Close buffer in the field did not close the dialog.
   The content is now made with the widget, as in Qt (#776).
+- **HTML export: a nested document with a vertical space in a paragraph
+  with one too**: the export stopped with an error (wrong-type-arg) when a
+  paragraph of a nested document had a vertical space and so did the
+  paragraph around it; the two margins are now merged, the larger one
+  winning, as for the flat paragraph (#897, #898).
+- **Trees nested too deep from Scheme are cut, not a crash**: a tree made in
+  Scheme (by a plug-in, a script or a converter) and handed to the editor,
+  or Scheme text read by the `scheme:` output of plug-ins, `.stm` files and
+  `stm->texmacs`, crashed TeXmacs when it nested some 45,000 levels deep.
+  It is now cut where the `.tm` reader cuts (about 2000 levels, after the
+  stack left), with `nesting too deep` in its place, which the HTML export
+  also shows; a comment at the very end of Scheme text no longer hangs the
+  reader (#813, #900).
 
 ## 20 November 2026
 
