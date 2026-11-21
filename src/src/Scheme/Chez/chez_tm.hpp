@@ -51,6 +51,8 @@ extern tmscm tm_call_4_proc;       /* (tm-call-4 fun a1 a2 a3 a4)             */
 extern tmscm tm_call_n_proc;       /* (tm-call-n fun args)                    */
 extern tmscm tm_list_pred;         /* list?                                    */
 extern tmscm tm_equal_pred;        /* equal?                                   */
+extern tmscm tm_string_to_symbol;  /* string->symbol                          */
+tmscm chez_bytes_to_string (const char* s, iptr n);
 
 /* -- shadow root stack for GC-safe C++ -> Scheme conversions -------------- */
 

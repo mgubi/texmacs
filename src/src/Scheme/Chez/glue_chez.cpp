@@ -68,7 +68,7 @@
 static tmscm
 tmg_error_literal (const char* msg, iptr n) {
   return Scons (Sstring_to_symbol ("tm-glue-error"),
-                Scons (Sstring_of_length (msg, n), (tm_null != NULL) ? tm_null : Snil));
+                Scons (chez_bytes_to_string (msg, n), (tm_null != NULL) ? tm_null : Snil));
 }
 
 /* TeXmacs throws its own string class (basic.cpp: throw string (msg)), which

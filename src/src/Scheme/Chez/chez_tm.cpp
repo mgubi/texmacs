@@ -42,6 +42,7 @@ tmscm tm_call_4_proc= 0;
 tmscm tm_call_n_proc= 0;
 tmscm tm_list_pred= 0;
 tmscm tm_equal_pred= 0;
+tmscm tm_string_to_symbol= 0;
 tmscm object_stack= 0;
 
 /* ------------------------------------------------------------------------
@@ -184,10 +185,26 @@ tmscm_to_string (tmscm s) {
   return "";
 }
 
+/* A Scheme string of the bytes of s, one char per byte (boot-chez.scm).
+   Not Sstring_of_length: it reads a (signed) char, and a byte >= 0x80 would
+   become an invalid char (0xFFFFC3 for 0xC3). */
+tmscm
+chez_bytes_to_string (const char* s, iptr n) {
+  tmscm r= Smake_string (n, 0);
+  for (iptr i= 0; i < n; i++)
+    Sstring_set (r, i, (unsigned char) s[i]);
+  return r;
+}
+
 tmscm
 symbol_to_tmscm (string s) {
   c_string _s (s);
-  return Sstring_to_symbol (_s);
+  int i, n= N(s);
+  for (i=0; i<n; i++)
+    if (((unsigned char) s[i]) >= 0x80) break;
+  if (i == n || tm_string_to_symbol == 0) return Sstring_to_symbol (_s);
+  // Sstring_to_symbol reads signed chars too: the name has to be made first
+  return Scall1 (tm_string_to_symbol, chez_bytes_to_string (_s, (iptr) n));
 }
 
 string
@@ -358,7 +375,7 @@ tmscm
 eval_scheme (string s) {
   // Scheme strings are byte strings (boot-chez.scm): one char per byte
   c_string _s (s);
-  return Scall1 (tm_eval_string_proc, Sstring_of_length (_s, (iptr) N (s)));
+  return Scall1 (tm_eval_string_proc, chez_bytes_to_string (_s, (iptr) N (s)));
 }
 
 /* ------------------------------------------------------------------------
@@ -656,6 +673,10 @@ chez_cache_runtime_procedures () {
   ASSERT (tm_equal_pred != 0 && Sprocedurep (tm_equal_pred),
           "equal? must be a procedure");
   Slock_object (tm_equal_pred);
+  tm_string_to_symbol= Stop_level_value (Sstring_to_symbol ("string->symbol"));
+  ASSERT (tm_string_to_symbol != 0 && Sprocedurep (tm_string_to_symbol),
+          "string->symbol must be a procedure");
+  Slock_object (tm_string_to_symbol);
   object_stack= Stop_level_value (Sstring_to_symbol ("object-stack"));
   Slock_object (object_stack);
   if (chez_root_stack_vec == 0)
