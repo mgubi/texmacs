@@ -618,6 +618,7 @@
   (url->string as_string (string url))
   (url->stree as_tree (scheme_tree url))
   (system->url url_system (url string))
+  (system-literal->url url_system_literal (url string))
   (url->system as_system_string (string url))
   (unix->url url_unix (url string))
   (url->unix as_unix_string (string url))

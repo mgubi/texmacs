@@ -104,6 +104,24 @@ check "a command after a file has it as the current buffer" \
       -headless startup-a.tm \
       -x '(display* "CHECK current " (url->string (url-tail (current-buffer))) "\n")'
 
+# A file named with a colon or a star is the file of that name, not a list
+# of paths (startup-c, then d.tm) nor a pattern (which startup-e-f.tm
+# matches as well) (#905); Windows forbids these names.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*|Windows*) ;;
+  *)
+    printf '<TeXmacs|2.1.4>\n\n<\\body>\n  %s\n</body>\n' colon > "$out/startup-c:d.tm"
+    printf '<TeXmacs|2.1.4>\n\n<\\body>\n  %s\n</body>\n' c > "$out/startup-c"
+    printf '<TeXmacs|2.1.4>\n\n<\\body>\n  %s\n</body>\n' star > "$out/startup-e*f.tm"
+    cp "$out/startup-a.tm" "$out/startup-e-f.tm"
+    body='(display* "CHECK " (url->string (url-tail (current-buffer))) " " (tree->stree (tree-ref (buffer-get-body (current-buffer)) 0)) "\n")'
+    check "a file named with a colon or a star is opened as it is" \
+          "startup-c:d.tm colon
+startup-e*f.tm star" \
+          -headless startup-c:d.tm -x "$body" startup-e\*f.tm -x "$body"
+    ;;
+esac
+
 check "headless: -X does not quit" \
       "one ()
 two ()" \

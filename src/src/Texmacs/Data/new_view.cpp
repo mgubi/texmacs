@@ -83,6 +83,22 @@ decode_url (string s) {
   return url_root (s (0, i)) * url_general (s (i+1, N(s)), URL_CLEAN_UNIX);
 }
 
+static url
+decode_literal_url (string s) {
+  // The name of a buffer which comes from a path of the system taken as it
+  // is (url_system_literal: a file a:b.tm given by the Finder), which
+  // decode_url makes into a list of paths a | b.tm (#905).
+#ifdef WINPATHS
+  return decode_url (s);
+#else
+  int i= search_forwards ("/", 0, s);
+  if (i < 0) return url_none ();
+  if (s (0, i) == "here") return url_system_literal (s (i+1, N(s)));
+  if (s (0, i) == "default") return url_system_literal (s (i, N(s)));
+  return url_root (s (0, i)) * url_system_literal (s (i+1, N(s)));
+#endif
+}
+
 url
 abstract_view (tm_view vw) {
   if (vw == NULL) return url_none ();
@@ -101,7 +117,8 @@ concrete_view (url u) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return NULL;
   int nr= as_int (s (0, i));
-  url name= decode_url (s (i+1, N(s)));
+  string enc= s (i+1, N(s));
+  url name= decode_url (enc);
   //cout << s (i+1, N(s)) << " -> " << name << "\n";
   // a buffer named with a wildcard (Save as a*.tm) is found as it is, the
   // buffer of a file with a star (a*b.scm) as a plain name; both can have the
@@ -112,6 +129,11 @@ concrete_view (url u) {
       if (buf->vws[i]->nr == nr)
         return buf->vws[i];
   buf= concrete_buffer (plain_name (name));
+  if (!is_nil (buf))
+    for (i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr == nr)
+        return buf->vws[i];
+  buf= concrete_buffer (decode_literal_url (enc));
   if (!is_nil (buf))
     for (i=0; i<N(buf->vws); i++)
       if (buf->vws[i]->nr == nr)

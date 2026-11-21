@@ -237,9 +237,9 @@ qt_chooser_widget_rep::perform_dialog_with_qfiledialog() {
   QByteArray imqstringutf8 = imqstring.toUtf8();
   string imname(imqstringutf8.data(), imqstringutf8.size());
 
-  file = "(system->url " * scm_quote (imname) * ")";
+  file = "(system-literal->url " * scm_quote (imname) * ")";
   if (type == "image") {
-    url u= url_system (imname);
+    url u= url_system_literal (imname);
     string w, h;
     qt_pretty_image_size (u, w, h);
     string params;
@@ -332,7 +332,7 @@ qt_chooser_widget_rep::perform_dialog () {
             imqstring = imqstring + QLatin1Char('.') + defaultSuffix;
           }
       string imname    = from_qstring_utf8 (imqstring);
-      file = "(system->url " * scm_quote (imname) * ")";
+      file = "(system-literal->url " * scm_quote (imname) * ")";
       if (type == "image") {
 #if !defined(Q_OS_MAC) // && !defined(Q_WS_WIN)   //at least windows Xp and 7 lack image preview, switch to custom dialog
         file = "(list " * file * imgdialog->getParamsAsString () * ")"; //set image size from preview
@@ -366,7 +366,7 @@ qt_chooser_widget_rep::perform_dialog () {
         }
         file = "(list " * file * params * ")";
         */
-        url u= url_system (imname);
+        url u= url_system_literal (imname);
         string w, h;
         qt_pretty_image_size (u, w, h);
         string params;

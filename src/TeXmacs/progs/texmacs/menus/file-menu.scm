@@ -109,15 +109,24 @@
            (load-buffer-in-new-window name :confirm-large)
            (load-buffer name :confirm-large))))))
 
+(define (recent->url s)
+  ;; a file with a star or a colon (a*b.tm, a:b.tm) is named as it is, not
+  ;; as a pattern or a list of paths (#905)
+  (with u (unix->url s)
+    (if (and (or (url-wildcard? u) (url-or? u))
+             (url-exists? (system-literal->url s)))
+        (system-literal->url s)
+        u)))
+
 (tm-define (recent-file-list nr)
   (let* ((l1 (map cdar (learned-interactive "recent-buffer")))
-         (l2 (map unix->url l1))
+         (l2 (map recent->url l1))
          (l3 (list-filter l2 buffer-in-recent-menu?)))
     (sublist l3 0 (min (length l3) nr))))
 
 (tm-define (recent-unloaded-file-list nr)
   (let* ((l1 (map cdar (learned-interactive "recent-buffer")))
-         (l2 (map unix->url l1))
+         (l2 (map recent->url l1))
          (l3 (list-filter l2 buffer-in-recent-menu?))
          (dl (list-difference l3 (buffer-list))))
     (sublist dl 0 (min (length dl) nr))))

@@ -494,6 +494,16 @@ set_global_options  (int argc, char** argv)  {
       url u= url_system (s);
       if (!is_rooted (u)) u= resolve (url_pwd (), "") * u;
       string b= scm_quote (as_string (u));
+      // an existing file is named as it is: a*b.tm or a:b.tm is not a
+      // pattern nor a list of paths (#905); other arguments are parsed
+      // (a url, a file still to be made)
+#ifndef OS_MINGW
+      string path= s;
+      if (N(path) > 0 && path[0] != '/') path= get_env ("PWD") * "/" * path;
+      url lit= url_system_literal (path);
+      if (u != lit && is_rooted (lit, "default") && is_regular (lit))
+        b= "(system-literal->url " * scm_quote (as_system_string (lit)) * ")";
+#endif
       string cmd= "(load-buffer " * b * " " * where * ")";
       where= " :new-window";
       // with the commands of -x and -c, in the order of the command line

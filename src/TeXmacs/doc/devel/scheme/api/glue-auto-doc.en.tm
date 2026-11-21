@@ -4411,6 +4411,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(system-literal-\<gtr\>url <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|url_system_literal> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
     <scm|(url-\<gtr\>system <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
