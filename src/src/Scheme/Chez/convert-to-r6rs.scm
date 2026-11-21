@@ -649,21 +649,28 @@
     ((eq? mod-sym 'kernel:boot:chez-compat)
      '(import
         (except (chezscheme)
-                sort current-time random record-accessor number->string)
+                sort current-time random record-accessor number->string
+                open-output-file call-with-output-file with-output-to-file open-input-file call-with-input-file with-input-from-file
+                map)
         (rename (only (chezscheme)
                       sort current-time random record-accessor
-                      display write number->string)
+                      display write number->string
+                      open-output-file call-with-output-file with-output-to-file open-input-file call-with-input-file with-input-from-file
+                      map)
                 (sort chez:sort)
                 (current-time chez:current-time)
                 (random chez-sys-random)
                 (record-accessor old-record-accessor)
                 (display chez:display)
                 (write chez:write)
-                (number->string chez:number->string))))
+                (number->string chez:number->string)
+                (open-output-file chez:open-output-file) (call-with-output-file chez:call-with-output-file) (with-output-to-file chez:with-output-to-file) (open-input-file chez:open-input-file) (call-with-input-file chez:call-with-input-file) (with-input-from-file chez:with-input-from-file) (map chez:map))))
     ((eq? mod-sym 'kernel:boot:abbrevs)
      '(import
         (except (chezscheme)
-                sort current-time random record-accessor number->string ...)
+                sort current-time random record-accessor number->string
+                open-output-file call-with-output-file with-output-to-file open-input-file call-with-input-file with-input-from-file
+                map ...)
         (kernel boot chez-compat)))
     (else
      (error 'library-import-form "unknown library module" mod-sym))))

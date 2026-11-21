@@ -482,7 +482,7 @@
 
 (define-public (open-file file* mode)
   ;; file* comes from C++ (url-materialize) as bytes
-  (let ((file ((top-level-value 'tm-os-path) file*)))  ;; from boot-chez.scm
+  (let ((file (os-path file*)))
     (cond ((or (string=? mode "r") (string=? mode "rb"))
            (open-input-file file))
           ((or (string=? mode "w") (string=? mode "wb"))
@@ -524,6 +524,105 @@
     (cond ((null? chars) res)
           ((memv (car chars) res) (loop (cdr chars) res))
           (else (loop (cdr chars) (cons (car chars) res))))))
+
+;; The rest of Guile's character sets (SRFI-14).  Strings hold bytes, so a
+;; set is a subset of the 256 characters of code 0-255; a character or a
+;; predicate is accepted wherever a set is, as by Guile's string-index.
+(define (all-chars) (map integer->char (iota 256)))
+
+(define (->char-set x)
+  (cond ((char? x) (list x))
+        ((procedure? x) (filter x (all-chars)))
+        ((string? x) (string->char-set x))
+        (else x)))
+
+(define-public (char-set . chars) (apply char-set-adjoin '() chars))
+(define-public (list->char-set l . base)
+  (apply char-set-adjoin (if (null? base) '() (->char-set (car base))) l))
+(define-public (char-set->list cs) (->char-set cs))
+(define-public (char-set? x) (and (list? x) (for-all char? x)))
+(define-public (char-set-from-predicate pred . base)
+  (apply char-set-adjoin (if (null? base) '() (->char-set (car base)))
+         (filter pred (all-chars))))
+(define-public (char-set-contains? cs ch) (and (memv ch (->char-set cs)) #t))
+(define-public (char-set-size cs) (length (->char-set cs)))
+(define-public (char-set-complement cs)
+  (let ((cs (->char-set cs)))
+    (filter (lambda (c) (not (memv c cs))) (all-chars))))
+(define-public (char-set-union . l)
+  (fold-left (lambda (acc cs) (apply char-set-adjoin acc (->char-set cs)))
+             '() l))
+(define-public (char-set-intersection cs . l)
+  (let ((l (map ->char-set l)))
+    (filter (lambda (c) (for-all (lambda (s) (memv c s)) l))
+            (->char-set cs))))
+(define-public (char-set-difference cs . l)
+  (let ((l (map ->char-set l)))
+    (filter (lambda (c) (not (exists (lambda (s) (memv c s)) l)))
+            (->char-set cs))))
+
+(define-public (string-skip s cs . opt)
+  ;; the index of the first character not in cs, or #f
+  (let* ((cs (->char-set cs))
+         (start (if (null? opt) 0 (car opt)))
+         (end (if (or (null? opt) (null? (cdr opt))) (string-length s) (cadr opt))))
+    (let loop ((i start))
+      (cond ((>= i end) #f)
+            ((memv (string-ref s i) cs) (loop (+ i 1)))
+            (else i)))))
+
+;;; map in the order of the list, as Guile and s7 apply it: the order of
+;;; Chez's map is unspecified (5 3 4 1 2 for a list of five), and TeXmacs
+;;; code with effects relies on it (remote-upload creates a directory before
+;;; its files)
+(define-public map
+  (case-lambda
+    ((f l)
+     (let loop ((l l) (acc '()))
+       (if (pair? l) (loop (cdr l) (cons (f (car l)) acc)) (reverse! acc))))
+    ((f l1 l2)
+     (let loop ((l1 l1) (l2 l2) (acc '()))
+       (if (and (pair? l1) (pair? l2))
+           (loop (cdr l1) (cdr l2) (cons (f (car l1) (car l2)) acc))
+           (reverse! acc))))
+    ((f . ls)
+     (let loop ((ls ls) (acc '()))
+       (if (for-all pair? ls)
+           (loop (chez:map cdr ls) (cons (apply f (chez:map car ls)) acc))
+           (reverse! acc))))))
+
+;;; Files, as Guile opens them: an existing file is replaced (Chez refuses
+;;; by default), and the path, which comes from C++ as bytes, is given to the
+;;; system as Chez wants it (tm-os-path, boot-chez.scm)
+(define (os-path p) ((top-level-value 'tm-os-path) p))
+
+(define-public (open-output-file f . opt)
+  (chez:open-output-file (os-path f) (if (null? opt) 'replace (car opt))))
+(define-public (call-with-output-file f proc)
+  (let* ((port (open-output-file f))
+         (r (proc port)))
+    (close-port port)
+    r))
+(define-public (with-output-to-file f thunk)
+  (chez:with-output-to-file (os-path f) thunk 'replace))
+(define-public (open-input-file f . opt)
+  (apply chez:open-input-file (os-path f) opt))
+(define-public (call-with-input-file f proc)
+  (chez:call-with-input-file (os-path f) proc))
+(define-public (with-input-from-file f thunk)
+  (chez:with-input-from-file (os-path f) thunk))
+
+(define-public (list-set! l k v)
+  (set-car! (list-tail l k) v))
+
+;; Guile's display-error, used by format-err (debug.scm) for the errors of
+;; remote services: "subr: message", the message formatted with args
+(define-public (display-error frame port subr message args rest)
+  (when subr (display subr port) (display ": " port))
+  (display (guard (e (#t message))
+             (apply format #f message (if (list? args) args '())))
+           port)
+  (newline port))
 
 ;;; Process and error reporting
 (define-public (server-mode?)

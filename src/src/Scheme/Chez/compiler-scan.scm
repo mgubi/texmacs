@@ -72,6 +72,31 @@
       lazy-input-converter-force
       plugin-serializer))  ; read by check/plugins-test.scm
 
+  ;; Private definitions which the tests reach in their module, with
+  ;; module-ref, or which they assign with eval (remote-test.scm): global
+  ;; definitions on Chez, whose modules export no private binding and
+  ;; cannot assign an imported one.
+  (define chez-global-names
+    '(chat-room-name chat-room-table-entry client-serial
+      client-start-errno->string credentials->authentications db-change-status
+      db-dub-in-sync db-last-sync dont-sync? fix-link fix-links get-sync-status
+      is-on? live-load live-name live-save live-table-entry
+      load-preferences-in-stree message->document message->share
+      messages->document requalify-deleted server-mailer-instantiate
+      server-serial shared-table-entry sort-directory-entries
+      split-server-name-and-port version->file-name version-get-info
+      version-get-versions))
+
+  (define (globalize-private f)
+    (if (and (pair? f) (eq? (car f) 'define) (pair? (cdr f))
+             (let ((h (cadr f)))
+               (memq (if (pair? h) (car h) h) chez-global-names)))
+        (let* ((h (cadr f))
+               (name (if (pair? h) (car h) h))
+               (val (if (pair? h) `(lambda ,(cdr h) ,@(cddr f)) (caddr f))))
+          `(define-top-level-value ',name ,val))
+        f))
+
   (define (promote-private f)
     (if (and (pair? f) (eq? (car f) 'define) (pair? (cdr f))
              (let ((h (cadr f)))
@@ -108,7 +133,7 @@
                   (else (loop (cdr fs) (cons n seen) (cons f acc))))))))
 
   (define (read-all-forms file-path)
-    (let ((forms (map promote-private
+    (let ((forms (map (lambda (f) (globalize-private (promote-private f)))
                       (single-definitions
                         (fold-dialect-forms (read-raw-forms file-path))))))
       (if (compat-file? file-path)

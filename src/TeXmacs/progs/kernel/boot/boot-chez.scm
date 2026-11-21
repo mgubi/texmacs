@@ -149,7 +149,12 @@
 ;;; ---------------------------------------------------------------------------
 (define eval
   (lambda (form . env)
-    (let ((e (if (null? env) tm-user-env (car env))))
+    (let ((e (cond ((null? env) tm-user-env)
+                   ;; a module (resolve-module gives its name): its public
+                   ;; definitions are global (see chez-global-names in
+                   ;; src/Scheme/Chez/compiler-scan.scm)
+                   ((list? (car env)) tm-user-env)
+                   (else (car env)))))
       (cond
         ;; 1. Bound symbols (fast variable lookup)
         ((and (symbol? form) (top-level-bound? form e))
@@ -694,8 +699,10 @@
   (guard (e (#t (if (pair? default)
                     (car default)
                     (raise e))))
-    (eval `(let () (import ,(module-spec->symbol m)) ,sym)
-          (interaction-environment))))
+    (if (top-level-bound? sym (interaction-environment))
+        (top-level-value sym (interaction-environment))
+        (eval `(let () (import ,(module-spec->symbol m)) ,sym)
+              (interaction-environment)))))
 
 
 (define-syntax use-modules
