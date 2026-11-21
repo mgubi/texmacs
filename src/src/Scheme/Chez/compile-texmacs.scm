@@ -68,6 +68,33 @@
       (log-progress-pct "Verified" base))
     out))
 
+;; The shared initialization files (init-kernel.scm, init-texmacs.scm), which
+;; Guile, s7 and femtolisp load as sources: read as Guile reads them
+;; (chez-reader.scm), written to the boot directory and compiled there as a
+;; script, which init-texmacs-chez.scm and init-texmacs-boot-file.scm load
+;; (tm-load-init, boot-chez.scm).
+(define (compile-guile-script! rel-path dirty?)
+  (let* ((src (progs-path rel-path))
+         (tmp (boot-path rel-path))
+         (out (boot-path (scm->so rel-path)))
+         (dirty? (or dirty?
+                     (not (file-exists? out))
+                     (env-flag? "TEXMACS_RECOMPILE_ALL")
+                     (time>? (file-modification-time src)
+                             (file-modification-time out)))))
+    (ensure-dir out)
+    (when dirty?
+      (log-progress-pct "Compiling" (string-append rel-path " -> "
+                                                   (path-basename out)))
+      (call-with-output-file tmp
+        (lambda (p)
+          (for-each (lambda (f) (write f p) (newline p))
+                    (tm-read-guile-file src)))
+        'replace)
+      (compile-file tmp out)
+      (log-progress-pct "Verified" (path-basename out)))
+    out))
+
 (let ((out (compile-init-file! "kernel/boot/boot-chez.scm")))
   (unless (top-level-bound? 'boot-chez-loaded?)
     (load out)))
@@ -254,6 +281,8 @@
     (for-each compile-tier! (cdr inventory-tiers))
     (save-module-deps-manifest!)
     (write-compiler-db *compiler-db* *compiler-db-file*)
+    (compile-guile-script! "init-kernel.scm" (> compiled-count 0))
+    (compile-guile-script! "init-texmacs.scm" (> compiled-count 0))
     (compile-init-file! "init-texmacs-boot-file.scm" (> compiled-count 0))))
 
 (report-build-summary!)

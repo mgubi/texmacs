@@ -1023,6 +1023,15 @@
 ;; read of Chez does not know Guile's lexical syntax, "\x05" for instance)
 (define (tm-read-scheme-file f) (tm-read-guile-file (tm-os-path f)))
 
+;; A shared initialization file (init-kernel, init-texmacs), compiled in the
+;; boot directory by the module compiler, else its source
+(define (tm-load-init name)
+  (let ((so (module-so-file (list name))))
+    (if so
+        (primitive-load so)
+        (tm-load-file (string-append (getenv "TEXMACS_PATH") "/progs/"
+                                     (symbol->string name) ".scm")))))
+
 ;; A top-level form of a source, as Guile evaluates it: a conditional at
 ;; the top level may hold definitions (the init files of the plug-ins), which
 ;; Chez allows only at the top level, so its test is evaluated first, then
