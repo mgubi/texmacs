@@ -1921,6 +1921,53 @@ make_enum_input (command cb, array<string> vals, string val, int st, string w) {
 }
 
 
+// (re)make the contents of a refreshable widget: at its creation, then at
+// its layout after a message of its kind (refresh_stale)
+static void
+refreshable_recompute (vue_refreshable_widget_star& d) {
+  d.stamp= refresh_serial;
+  eval ("(lazy-initialize-force)");
+  object xwid= call (d.prom);
+  if (d.curobj != xwid)  {
+    // cache does not match
+    if (is_widget (xwid)) {
+      d.curobj= xwid;
+      d.current= as_widget (xwid);
+    } else {
+      d.current= glue_widget();
+    }
+  }
+}
+
+// (re)make the contents of a refresh widget (see refreshable_recompute)
+static void
+refresh_recompute (vue_refresh_widget_star& d) {
+  d.stamp= refresh_serial;
+  string s= "'(vertical (link " * d.tmwid * "))";
+  eval ("(lazy-initialize-force)");
+  object xwid_expanded= eval (s); // evaluated once, was evaluated twice
+  object xwid= call ("menu-expand", xwid_expanded);
+  // the widgets this one has built, by expansion: its own cache, as in
+  // Qt (QTMRefreshWidget::cache); a cache shared by all of them handed
+  // the same widget to two refresh widgets showing the same menu
+  int k= -1;
+  for (int i= 0; i < N(d.cache_keys); i++)
+    if (d.cache_keys[i] == xwid) { k= i; break; }
+  if (d.curobj == xwid); // unchanged: keep the widget we already have
+  else if (k >= 0) {
+    d.curobj= xwid;
+    d.current= d.cache_widgets[k];
+  }
+  else {
+    d.curobj= xwid;
+    d.current= make_menu_widget (xwid_expanded);
+    if (menu_caching) {
+      d.cache_keys << xwid;
+      d.cache_widgets << d.current;
+    }
+  }
+}
+
 // false once the gui is closed: a widget let go then queues no command
 bool vue_commands_open= true;
 
@@ -1939,15 +1986,24 @@ vue_ui_rep::~vue_ui_rep () {
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)
 {
+  // the contents of a refresh or refreshable widget are made at once, as
+  // in Qt (doRefresh ("init") in the constructors of QTMRefreshWidget and
+  // QTMRefreshableWidget), not at its first layout: made while the window
+  // of a dialog is being built, a texmacs-input in them belongs to that
+  // window (pending_window_handle, tm_window.cpp) and its buffer is an
+  // embedded one; made at the first layout, after window_create, it
+  // belonged to no window (#776)
   if (type == "refresh_widget") {
     vue_refresh_widget d= open_box<vue_refresh_widget> (data);
     vue_refresh_widget_star dd { .tmwid= d.tmwid, .kind= d.kind };
+    refresh_recompute (dd);
     data= close_box (dd);
     return;
   }
   if (type == "refreshable_widget") {
     vue_refreshable_widget d= open_box<vue_refreshable_widget> (data);
     vue_refreshable_widget_star dd { .prom= d.prom, .kind= d.kind };
+    refreshable_recompute (dd);
     data= close_box (dd);
     return;
   }
@@ -3985,20 +4041,9 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(refreshable_widget, object, prom, string, kind);
     vue_refreshable_widget_star d= open_box<vue_refreshable_widget_star> (data);
     if (is_nil (d.current) || refresh_stale (d.kind, d.stamp)) {
-      // (re)initialize the widget: it is new, or a message of its kind came
-      // since it last was, maybe while it was not laid out (refresh_stale)
-      d.stamp= refresh_serial;
-      eval ("(lazy-initialize-force)");
-      object xwid= call (d.prom);
-      if (d.curobj != xwid)  {
-        // cache does not match
-        if (is_widget (xwid)) {
-          d.curobj= xwid;
-          d.current= as_widget (xwid);
-        } else {
-          d.current= glue_widget();
-        }
-      }
+      // a message of its kind came since it last was made, maybe while it
+      // was not laid out (refresh_stale)
+      refreshable_recompute (d);
       data= close_box (d);
     }
     // a pass-through container: it grows along an axis when its contents
@@ -4021,31 +4066,8 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(refreshable_widget, object, prom, string, kind);
     vue_refresh_widget_star d= open_box<vue_refresh_widget_star> (data);
     if (is_nil (d.current) || refresh_stale (d.kind, d.stamp)) {
-      // (re)initialize the widget (see refreshable_widget)
-      d.stamp= refresh_serial;
-      string s= "'(vertical (link " * d.tmwid * "))";
-      eval ("(lazy-initialize-force)");
-      object xwid_expanded= eval (s); // evaluated once, was evaluated twice
-      object xwid= call ("menu-expand", xwid_expanded);
-      // the widgets this one has built, by expansion: its own cache, as in
-      // Qt (QTMRefreshWidget::cache); a cache shared by all of them handed
-      // the same widget to two refresh widgets showing the same menu
-      int k= -1;
-      for (int i= 0; i < N(d.cache_keys); i++)
-        if (d.cache_keys[i] == xwid) { k= i; break; }
-      if (d.curobj == xwid); // unchanged: keep the widget we already have
-      else if (k >= 0) {
-        d.curobj= xwid;
-        d.current= d.cache_widgets[k];
-      }
-      else {
-        d.curobj= xwid;
-        d.current= make_menu_widget (xwid_expanded);
-        if (menu_caching) {
-          d.cache_keys << xwid;
-          d.cache_widgets << d.current;
-        }
-      }
+      // (see refreshable_widget)
+      refresh_recompute (d);
       data= close_box (d);
     }
     // a pass-through container: it grows along an axis when its contents
