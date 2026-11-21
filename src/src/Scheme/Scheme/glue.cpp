@@ -620,7 +620,10 @@ path_to_tmscm (path p) {
 path
 tmscm_to_path (tmscm p) {
   if (tmscm_is_null (p)) return path ();
+#ifdef USE_CHEZ
+  // Chez's tmscm_car does not check its argument
   if (!tmscm_is_pair (p) || !tmscm_is_int (tmscm_car (p))) return path ();
+#endif
   return path ((int) tmscm_to_int (tmscm_car (p)), 
                       tmscm_to_path (tmscm_cdr (p)));
 }
@@ -754,8 +757,10 @@ tmscm_to_url (tmscm obj) {
 #else
   return tmscm_to_string (obj);
 #endif
+#ifdef USE_CHEZ
   if (!tmscm_is_blackbox (obj) || (type_box (tmscm_to_blackbox (obj)) != type_helper<url>::id))
     return url_none ();
+#endif
   return open_box<url> (tmscm_to_blackbox (obj));
 }
 
