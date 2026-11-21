@@ -878,8 +878,9 @@
 ;; A table on a line of text (an inline table) was put in a <p>, with the
 ;; text around it in inline <div>: a <p> may not contain them, a browser
 ;; closed the <p> before the table and left an empty <p> after it (#903).
-;; Such a paragraph is a <div>; the blocks and tables beside a tab are kept
-;; on their side of the tab (#896)
+;; Such a paragraph is a <div>, with the margins of a <p> where it sets
+;; none (it was closer to the paragraphs around it); the blocks and tables
+;; beside a tab are kept on their side of the tab (#896)
 (define (test-html-tables-in-lines)
   (check-group "html export: a table on a line of text")
   (let* ((table '(tabular (table (row (cell "ta") (cell "tb")))))
@@ -903,11 +904,18 @@
                       (string-occurs? "ta" s)
                       (or (== body table) (string-occurs? "qq" s)))
                 (list #t #t #t #t))))
-    ;; the margins of the paragraph are kept by its <div>
-    (with s (html-of-buffer `(document (concat (vspace* "1fn") "qq" ,table
+    ;; the <div> has the margins of a <p> (1em), on the sides where the
+    ;; paragraph has no vertical space; one which it has is kept
+    (with s (html-of-buffer `(document "a" (concat "qq" ,table) "b"))
+      (check-true (string-occurs?
+                   "<div style=\"margin-top: 1em; margin-bottom: 1em\">" s)))
+    (with s (html-of-buffer `(document (concat (vspace* "0.5fn") "qq" ,table
                                                (vspace "2fn"))))
-      (check-true (string-occurs? "margin-top: 1em" s))
-      (check-true (string-occurs? "margin-bottom: 2em" s)))
+      (check-true (string-occurs?
+                   "<div style=\"margin-top: 0.5em; margin-bottom: 2em\">" s)))
+    (with s (html-of-buffer `(document (concat "qq" ,table (vspace "2fn"))))
+      (check-true (string-occurs?
+                   "<div style=\"margin-top: 1em; margin-bottom: 2em\">" s)))
     ;; text alone stays in a <p>
     (check-true (string-occurs? "<p>" (html-of-buffer '(document "a"))))))
 

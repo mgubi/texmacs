@@ -419,9 +419,63 @@
          (let* ((a (sxml-attr-list x))
                 (c (sxml-content x))
                 (m (if (forall? xhtml-block? c) c (mixed-block c))))
-           (tmhtml-simplify-div
-            (if (null? a) `(h:div ,@m) `(h:div (@ ,@a) ,@m)))))
+           (par-div-with-margins
+            (tmhtml-simplify-div
+             (if (null? a) `(h:div ,@m) `(h:div (@ ,@a) ,@m))))))
         (else x)))
+
+;; The <div> of a paragraph has the margins which a browser gives to a <p>
+;; (1em above and below), on the sides where it has none: without them, a
+;; line with a table was closer to the paragraphs around it (#903). Those
+;; margins are only defaults: a vertical space of the paragraph, added
+;; later by add-style-attr, replaces them. The defaults of each such <div>
+;; are kept in tmhtml-par-div-memo (by node, for the conversion)
+(define tmhtml-par-div-memo #f)
+(define par-div-margins '("margin-top" "margin-bottom"))
+
+(define (par-div-defaults x)
+  ;; the margins of @x which are the defaults of a paragraph, or #f
+  (and tmhtml-par-div-memo (func? x 'h:div)
+       (if tmhtml-hashq?
+           (hashq-ref tmhtml-par-div-memo x #f)
+           (hash-table-ref tmhtml-par-div-memo x))))
+
+(define (par-div-make x style defaults)
+  ;; the <div> @x with the style @style, whose margins @defaults are those
+  ;; of a paragraph
+  (let* ((other (list-filter (sxml-attr-list x)
+                             (lambda (a) (not (func? a 'style)))))
+         (d `(h:div (@ ,@(if (== style "") '() `((style ,style))) ,@other)
+                    ,@(sxml-content x))))
+    (when (and tmhtml-par-div-memo (nnull? defaults))
+      (if tmhtml-hashq?
+          (hashq-set! tmhtml-par-div-memo d defaults)
+          (hash-table-set! tmhtml-par-div-memo d defaults)))
+    d))
+
+(define (par-div-with-margins x)
+  ;; the <div> @x of a paragraph, with the margins of a paragraph where it
+  ;; has none
+  (let* ((old (or (sxml-attr x 'style) ""))
+         (keys (if (string-occurs? "margin:" old) '()
+                   (list-filter par-div-margins
+                                (lambda (k)
+                                  (not (string-occurs? (string-append k ":")
+                                                       old))))))
+         (def (string-recompose (map (cut string-append <> ": 1em") keys)
+                                "; ")))
+    (if (null? keys) x
+        (par-div-make x (if (== old "") def (string-append def "; " old))
+                      keys))))
+
+(define (par-div-add-style x defaults s)
+  ;; the <div> @x of a paragraph, whose margins @defaults are defaults,
+  ;; with the margins @s, which replace them
+  (let* ((given (list-filter defaults
+                           (lambda (k) (string-occurs? (string-append k ":") s))))
+         (old (css-remove-properties (or (sxml-attr x 'style) "") given)))
+    (par-div-make x (if (== old "") s (css-merge-styles old s))
+                  (list-difference defaults given))))
 
 (define (force-block? x)
   (or (and (tm-in? x '(h:p h:div h:center h:pre h:h1 h:h2 h:h3 h:h4
@@ -492,6 +546,7 @@
   ;; which made the export fail
   (with s (or (and s1 s2 (string-append s1 "; " s2)) s1 s2)
     (cond ((not s) x)
+          ((par-div-defaults x) => (lambda (d) (par-div-add-style x d s)))
           ((and (xhtml-block? x) (null? (sxml-attr-list x)))
            `(,(car x) (@ (style ,s)) ,@(cdr x)))
           ((and (xhtml-block? x) (not (sxml-attr x 'style)))
@@ -2369,7 +2424,8 @@
             (ahash-with tmhtml-env :left-margin 0
               (ahash-with tmhtml-env :right-margin 0
                 (with-global tmhtml-block-memo (make-block-memo)
-                  (tmhtml x))))))))))
+                  (with-global tmhtml-par-div-memo (make-block-memo)
+                    (tmhtml x)))))))))))
 
 (define (tmhtml x)
   ;; Main conversion function.
