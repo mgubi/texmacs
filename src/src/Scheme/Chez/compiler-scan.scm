@@ -78,7 +78,7 @@
   ;; definitions on Chez, whose modules export no private binding and
   ;; cannot assign an imported one.
   (define chez-global-names
-    '(volatile-cache-stamp chat-room-name chat-room-table-entry client-serial
+    '(volatile-cache-stamp version-grain chat-room-name chat-room-table-entry client-serial
       client-start-errno->string credentials->authentications
       db-change-status db-dub-in-sync db-last-sync docgrep dont-sync?
       fix-link fix-links get-sync-status is-on? live-load live-name
