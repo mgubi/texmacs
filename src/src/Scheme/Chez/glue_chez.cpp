@@ -23,7 +23,7 @@
 * which is a Scall3 into (tm-install-procedure! name id arity), which interns
 * a symbol and allocates a closure.  Two consequences matter here:
 *
-*   - it costs ~1185 round trips into the interpreter during
+*   - it costs ~1187 round trips into the interpreter during
 *     every start-up, plus the resulting nursery churn;
 *   - it needs a live Scheme heap, so it cannot run before Sbuild_heap()
 *     returns.  Any boot file evaluated during heap construction -- a
@@ -47,7 +47,7 @@
 * what tm_fast_call_N did on the legacy path.  The shim also records the
 * routine name for the diagnostics in chez_tm.hpp.
 *
-* 1185 routines: 444 bound raw, 741 with UTF-8 transcoding.
+* 1187 routines: 444 bound raw, 743 with UTF-8 transcoding.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -59,14 +59,15 @@
 /* ---------------------------------------------------------------------------
  * Error containment
  *
- * Mirrors the catch chain of tm_fast_call_N in chez_tm.cpp: the kernel error
- * pair (tag . (message)) is what TeXmacs Scheme code already expects back
- * from a failing glue routine.
+ * A failing routine returns (tm-glue-error message), which the Scheme
+ * side of the glue (tm-glue-check, boot-chez.scm) raises as a Guile error:
+ * a C++ exception cannot cross the frames of Chez.
  * ------------------------------------------------------------------------- */
 
 static tmscm
 tmg_error_literal (const char* msg, iptr n) {
-  return Scons (Sboolean (1), Scons (Sstring_of_length (msg, n), (tm_null != NULL) ? tm_null : Snil));
+  return Scons (Sstring_to_symbol ("tm-glue-error"),
+                Scons (Sstring_of_length (msg, n), (tm_null != NULL) ? tm_null : Snil));
 }
 
 /* TeXmacs throws its own string class (basic.cpp: throw string (msg)), which
@@ -198,6 +199,8 @@ extern tmscm tmg_set_retina_factor (tmscm);
 extern tmscm tmg_set_retina_zoom (tmscm);
 extern tmscm tmg_set_retina_icons (tmscm);
 extern tmscm tmg_set_retina_scale (tmscm);
+extern tmscm tmg_tm_output (tmscm);
+extern tmscm tmg_tm_errput (tmscm);
 extern tmscm tmg_win32_display (tmscm);
 extern tmscm tmg_cpp_error ();
 extern tmscm tmg_supports_native_pdfP ();
@@ -1387,6 +1390,8 @@ TMG_GUARDED_1 ("set-retina-factor", tmg_set_retina_factor)
 TMG_GUARDED_1 ("set-retina-zoom", tmg_set_retina_zoom)
 TMG_GUARDED_1 ("set-retina-icons", tmg_set_retina_icons)
 TMG_GUARDED_1 ("set-retina-scale", tmg_set_retina_scale)
+TMG_GUARDED_1 ("tm-output", tmg_tm_output)
+TMG_GUARDED_1 ("tm-errput", tmg_tm_errput)
 TMG_GUARDED_1 ("win32-display", tmg_win32_display)
 TMG_GUARDED_0 ("cpp-error", tmg_cpp_error)
 TMG_GUARDED_0 ("supports-native-pdf?", tmg_supports_native_pdfP)
@@ -2586,6 +2591,8 @@ static const tmg_entry tmg_entries[]= {
   { "tmg_set_retina_zoom", (void*) tmgc_tmg_set_retina_zoom },
   { "tmg_set_retina_icons", (void*) tmgc_tmg_set_retina_icons },
   { "tmg_set_retina_scale", (void*) tmgc_tmg_set_retina_scale },
+  { "tmg_tm_output", (void*) tmgc_tmg_tm_output },
+  { "tmg_tm_errput", (void*) tmgc_tmg_tm_errput },
   { "tmg_win32_display", (void*) tmgc_tmg_win32_display },
   { "tmg_cpp_error", (void*) tmgc_tmg_cpp_error },
   { "tmg_supports_native_pdfP", (void*) tmgc_tmg_supports_native_pdfP },

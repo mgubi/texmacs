@@ -38,900 +38,1788 @@
 ;;              converts Scheme strings to bytevectors on the way in and back
 ;;              on the way out, exactly as tm-install-procedure! did.
 ;;
-;; 1185 routines: 444 raw, 741 transcoded.
+;; 1187 routines: 444 raw, 743 transcoded.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; --- Raw bindings: no transcoding, one direct call each -----------
 
-(define updater-supported?
+(define c-glue-raw-updater-supported?
   (foreign-procedure "tmg_updater_supportedP" () scheme-object))
-(define updater-running?
+(define (updater-supported?)
+  (tm-glue-check (c-glue-raw-updater-supported?)))
+(define c-glue-raw-updater-running?
   (foreign-procedure "tmg_updater_runningP" () scheme-object))
-(define updater-check-background
+(define (updater-running?)
+  (tm-glue-check (c-glue-raw-updater-running?)))
+(define c-glue-raw-updater-check-background
   (foreign-procedure "tmg_updater_check_background" () scheme-object))
-(define updater-check-foreground
+(define (updater-check-background)
+  (tm-glue-check (c-glue-raw-updater-check-background)))
+(define c-glue-raw-updater-check-foreground
   (foreign-procedure "tmg_updater_check_foreground" () scheme-object))
-(define updater-last-check
+(define (updater-check-foreground)
+  (tm-glue-check (c-glue-raw-updater-check-foreground)))
+(define c-glue-raw-updater-last-check
   (foreign-procedure "tmg_updater_last_check" () scheme-object))
-(define updater-set-interval
+(define (updater-last-check)
+  (tm-glue-check (c-glue-raw-updater-last-check)))
+(define c-glue-raw-updater-set-interval
   (foreign-procedure "tmg_updater_set_interval" (scheme-object) scheme-object))
-(define os-win32?
+(define (updater-set-interval a1)
+  (tm-glue-check (c-glue-raw-updater-set-interval a1)))
+(define c-glue-raw-os-win32?
   (foreign-procedure "tmg_os_win32P" () scheme-object))
-(define os-mingw?
+(define (os-win32?)
+  (tm-glue-check (c-glue-raw-os-win32?)))
+(define c-glue-raw-os-mingw?
   (foreign-procedure "tmg_os_mingwP" () scheme-object))
-(define os-mingw64?
+(define (os-mingw?)
+  (tm-glue-check (c-glue-raw-os-mingw?)))
+(define c-glue-raw-os-mingw64?
   (foreign-procedure "tmg_os_mingw64P" () scheme-object))
-(define os-macos?
+(define (os-mingw64?)
+  (tm-glue-check (c-glue-raw-os-mingw64?)))
+(define c-glue-raw-os-macos?
   (foreign-procedure "tmg_os_macosP" () scheme-object))
-(define os-android?
+(define (os-macos?)
+  (tm-glue-check (c-glue-raw-os-macos?)))
+(define c-glue-raw-os-android?
   (foreign-procedure "tmg_os_androidP" () scheme-object))
-(define has-printing-cmd?
+(define (os-android?)
+  (tm-glue-check (c-glue-raw-os-android?)))
+(define c-glue-raw-has-printing-cmd?
   (foreign-procedure "tmg_has_printing_cmdP" () scheme-object))
-(define x-gui?
+(define (has-printing-cmd?)
+  (tm-glue-check (c-glue-raw-has-printing-cmd?)))
+(define c-glue-raw-x-gui?
   (foreign-procedure "tmg_x_guiP" () scheme-object))
-(define qt-gui?
+(define (x-gui?)
+  (tm-glue-check (c-glue-raw-x-gui?)))
+(define c-glue-raw-qt-gui?
   (foreign-procedure "tmg_qt_guiP" () scheme-object))
-(define gui-set-next-window-as-popup
+(define (qt-gui?)
+  (tm-glue-check (c-glue-raw-qt-gui?)))
+(define c-glue-raw-gui-set-next-window-as-popup
   (foreign-procedure "tmg_gui_set_next_window_as_popup" () scheme-object))
-(define get-retina-factor
+(define (gui-set-next-window-as-popup)
+  (tm-glue-check (c-glue-raw-gui-set-next-window-as-popup)))
+(define c-glue-raw-get-retina-factor
   (foreign-procedure "tmg_get_retina_factor" () scheme-object))
-(define get-retina-zoom
+(define (get-retina-factor)
+  (tm-glue-check (c-glue-raw-get-retina-factor)))
+(define c-glue-raw-get-retina-zoom
   (foreign-procedure "tmg_get_retina_zoom" () scheme-object))
-(define get-retina-icons
+(define (get-retina-zoom)
+  (tm-glue-check (c-glue-raw-get-retina-zoom)))
+(define c-glue-raw-get-retina-icons
   (foreign-procedure "tmg_get_retina_icons" () scheme-object))
-(define get-retina-scale
+(define (get-retina-icons)
+  (tm-glue-check (c-glue-raw-get-retina-icons)))
+(define c-glue-raw-get-retina-scale
   (foreign-procedure "tmg_get_retina_scale" () scheme-object))
-(define set-retina-factor
+(define (get-retina-scale)
+  (tm-glue-check (c-glue-raw-get-retina-scale)))
+(define c-glue-raw-set-retina-factor
   (foreign-procedure "tmg_set_retina_factor" (scheme-object) scheme-object))
-(define set-retina-zoom
+(define (set-retina-factor a1)
+  (tm-glue-check (c-glue-raw-set-retina-factor a1)))
+(define c-glue-raw-set-retina-zoom
   (foreign-procedure "tmg_set_retina_zoom" (scheme-object) scheme-object))
-(define set-retina-icons
+(define (set-retina-zoom a1)
+  (tm-glue-check (c-glue-raw-set-retina-zoom a1)))
+(define c-glue-raw-set-retina-icons
   (foreign-procedure "tmg_set_retina_icons" (scheme-object) scheme-object))
-(define set-retina-scale
+(define (set-retina-icons a1)
+  (tm-glue-check (c-glue-raw-set-retina-icons a1)))
+(define c-glue-raw-set-retina-scale
   (foreign-procedure "tmg_set_retina_scale" (scheme-object) scheme-object))
-(define cpp-error
+(define (set-retina-scale a1)
+  (tm-glue-check (c-glue-raw-set-retina-scale a1)))
+(define c-glue-raw-cpp-error
   (foreign-procedure "tmg_cpp_error" () scheme-object))
-(define supports-native-pdf?
+(define (cpp-error)
+  (tm-glue-check (c-glue-raw-cpp-error)))
+(define c-glue-raw-supports-native-pdf?
   (foreign-procedure "tmg_supports_native_pdfP" () scheme-object))
-(define supports-ghostscript?
+(define (supports-native-pdf?)
+  (tm-glue-check (c-glue-raw-supports-native-pdf?)))
+(define c-glue-raw-supports-ghostscript?
   (foreign-procedure "tmg_supports_ghostscriptP" () scheme-object))
-(define rescue-mode?
+(define (supports-ghostscript?)
+  (tm-glue-check (c-glue-raw-supports-ghostscript?)))
+(define c-glue-raw-rescue-mode?
   (foreign-procedure "tmg_rescue_modeP" () scheme-object))
-(define set-fast-environments
+(define (rescue-mode?)
+  (tm-glue-check (c-glue-raw-rescue-mode?)))
+(define c-glue-raw-set-fast-environments
   (foreign-procedure "tmg_set_fast_environments" (scheme-object) scheme-object))
-(define texmacs-time
+(define (set-fast-environments a1)
+  (tm-glue-check (c-glue-raw-set-fast-environments a1)))
+(define c-glue-raw-texmacs-time
   (foreign-procedure "tmg_texmacs_time" () scheme-object))
-(define cpu-idle-time
+(define (texmacs-time)
+  (tm-glue-check (c-glue-raw-texmacs-time)))
+(define c-glue-raw-cpu-idle-time
   (foreign-procedure "tmg_cpu_idle_time" () scheme-object))
-(define texmacs-memory
+(define (cpu-idle-time)
+  (tm-glue-check (c-glue-raw-cpu-idle-time)))
+(define c-glue-raw-texmacs-memory
   (foreign-procedure "tmg_texmacs_memory" () scheme-object))
-(define bench-print-all
+(define (texmacs-memory)
+  (tm-glue-check (c-glue-raw-texmacs-memory)))
+(define c-glue-raw-bench-print-all
   (foreign-procedure "tmg_bench_print_all" () scheme-object))
-(define get-show-kbd
+(define (bench-print-all)
+  (tm-glue-check (c-glue-raw-bench-print-all)))
+(define c-glue-raw-get-show-kbd
   (foreign-procedure "tmg_get_show_kbd" () scheme-object))
-(define set-show-kbd
+(define (get-show-kbd)
+  (tm-glue-check (c-glue-raw-get-show-kbd)))
+(define c-glue-raw-set-show-kbd
   (foreign-procedure "tmg_set_show_kbd" (scheme-object) scheme-object))
-(define command-eval
+(define (set-show-kbd a1)
+  (tm-glue-check (c-glue-raw-set-show-kbd a1)))
+(define c-glue-raw-command-eval
   (foreign-procedure "tmg_command_eval" (scheme-object) scheme-object))
-(define notify-preferences-booted
+(define (command-eval a1)
+  (tm-glue-check (c-glue-raw-command-eval a1)))
+(define c-glue-raw-notify-preferences-booted
   (foreign-procedure "tmg_notify_preferences_booted" () scheme-object))
-(define save-preferences
+(define (notify-preferences-booted)
+  (tm-glue-check (c-glue-raw-notify-preferences-booted)))
+(define c-glue-raw-save-preferences
   (foreign-procedure "tmg_save_preferences" () scheme-object))
-(define new-author
+(define (save-preferences)
+  (tm-glue-check (c-glue-raw-save-preferences)))
+(define c-glue-raw-new-author
   (foreign-procedure "tmg_new_author" () scheme-object))
-(define set-author
+(define (new-author)
+  (tm-glue-check (c-glue-raw-new-author)))
+(define c-glue-raw-set-author
   (foreign-procedure "tmg_set_author" (scheme-object) scheme-object))
-(define get-author
+(define (set-author a1)
+  (tm-glue-check (c-glue-raw-set-author a1)))
+(define c-glue-raw-get-author
   (foreign-procedure "tmg_get_author" () scheme-object))
-(define clear-debug-messages
+(define (get-author)
+  (tm-glue-check (c-glue-raw-get-author)))
+(define c-glue-raw-clear-debug-messages
   (foreign-procedure "tmg_clear_debug_messages" () scheme-object))
-(define cout-buffer
+(define (clear-debug-messages)
+  (tm-glue-check (c-glue-raw-clear-debug-messages)))
+(define c-glue-raw-cout-buffer
   (foreign-procedure "tmg_cout_buffer" () scheme-object))
-(define mark-new
+(define (cout-buffer)
+  (tm-glue-check (c-glue-raw-cout-buffer)))
+(define c-glue-raw-mark-new
   (foreign-procedure "tmg_mark_new" () scheme-object))
-(define set-new-fonts
+(define (mark-new)
+  (tm-glue-check (c-glue-raw-mark-new)))
+(define c-glue-raw-set-new-fonts
   (foreign-procedure "tmg_set_new_fonts" (scheme-object) scheme-object))
-(define new-fonts?
+(define (set-new-fonts a1)
+  (tm-glue-check (c-glue-raw-set-new-fonts a1)))
+(define c-glue-raw-new-fonts?
   (foreign-procedure "tmg_new_fontsP" () scheme-object))
-(define tmtm-eqnumber->nonumber
+(define (new-fonts?)
+  (tm-glue-check (c-glue-raw-new-fonts?)))
+(define c-glue-raw-tmtm-eqnumber->nonumber
   (foreign-procedure "tmg_tmtm_eqnumber_2nonumber" (scheme-object) scheme-object))
-(define busy-versioning?
+(define (tmtm-eqnumber->nonumber a1)
+  (tm-glue-check (c-glue-raw-tmtm-eqnumber->nonumber a1)))
+(define c-glue-raw-busy-versioning?
   (foreign-procedure "tmg_busy_versioningP" () scheme-object))
-(define players-set-elapsed
+(define (busy-versioning?)
+  (tm-glue-check (c-glue-raw-busy-versioning?)))
+(define c-glue-raw-players-set-elapsed
   (foreign-procedure "tmg_players_set_elapsed" (scheme-object scheme-object) scheme-object))
-(define players-set-speed
+(define (players-set-elapsed a1 a2)
+  (tm-glue-check (c-glue-raw-players-set-elapsed a1 a2)))
+(define c-glue-raw-players-set-speed
   (foreign-procedure "tmg_players_set_speed" (scheme-object scheme-object) scheme-object))
-(define headless?
+(define (players-set-speed a1 a2)
+  (tm-glue-check (c-glue-raw-players-set-speed a1 a2)))
+(define c-glue-raw-headless?
   (foreign-procedure "tmg_headlessP" () scheme-object))
-(define font-database-build-local
+(define (headless?)
+  (tm-glue-check (c-glue-raw-headless?)))
+(define c-glue-raw-font-database-build-local
   (foreign-procedure "tmg_font_database_build_local" () scheme-object))
-(define font-database-build-global
+(define (font-database-build-local)
+  (tm-glue-check (c-glue-raw-font-database-build-local)))
+(define c-glue-raw-font-database-build-global
   (foreign-procedure "tmg_font_database_build_global" () scheme-object))
-(define font-database-build-characteristics
+(define (font-database-build-global)
+  (tm-glue-check (c-glue-raw-font-database-build-global)))
+(define c-glue-raw-font-database-build-characteristics
   (foreign-procedure "tmg_font_database_build_characteristics" (scheme-object) scheme-object))
-(define font-database-save-local-delta
+(define (font-database-build-characteristics a1)
+  (tm-glue-check (c-glue-raw-font-database-build-characteristics a1)))
+(define c-glue-raw-font-database-save-local-delta
   (foreign-procedure "tmg_font_database_save_local_delta" () scheme-object))
-(define font-database-load
+(define (font-database-save-local-delta)
+  (tm-glue-check (c-glue-raw-font-database-save-local-delta)))
+(define c-glue-raw-font-database-load
   (foreign-procedure "tmg_font_database_load" () scheme-object))
-(define font-database-save
+(define (font-database-load)
+  (tm-glue-check (c-glue-raw-font-database-load)))
+(define c-glue-raw-font-database-save
   (foreign-procedure "tmg_font_database_save" () scheme-object))
-(define font-database-filter
+(define (font-database-save)
+  (tm-glue-check (c-glue-raw-font-database-save)))
+(define c-glue-raw-font-database-filter
   (foreign-procedure "tmg_font_database_filter" () scheme-object))
-(define tree-atomic?
+(define (font-database-filter)
+  (tm-glue-check (c-glue-raw-font-database-filter)))
+(define c-glue-raw-tree-atomic?
   (foreign-procedure "tmg_tree_atomicP" (scheme-object) scheme-object))
-(define tree-compound?
+(define (tree-atomic? a1)
+  (tm-glue-check (c-glue-raw-tree-atomic? a1)))
+(define c-glue-raw-tree-compound?
   (foreign-procedure "tmg_tree_compoundP" (scheme-object) scheme-object))
-(define tree-label
+(define (tree-compound? a1)
+  (tm-glue-check (c-glue-raw-tree-compound? a1)))
+(define c-glue-raw-tree-label
   (foreign-procedure "tmg_tree_label" (scheme-object) scheme-object))
-(define tree-children
+(define (tree-label a1)
+  (tm-glue-check (c-glue-raw-tree-label a1)))
+(define c-glue-raw-tree-children
   (foreign-procedure "tmg_tree_children" (scheme-object) scheme-object))
-(define tree-arity
+(define (tree-children a1)
+  (tm-glue-check (c-glue-raw-tree-children a1)))
+(define c-glue-raw-tree-arity
   (foreign-procedure "tmg_tree_arity" (scheme-object) scheme-object))
-(define tree-child-ref
+(define (tree-arity a1)
+  (tm-glue-check (c-glue-raw-tree-arity a1)))
+(define c-glue-raw-tree-child-ref
   (foreign-procedure "tmg_tree_child_ref" (scheme-object scheme-object) scheme-object))
-(define tree-ip
+(define (tree-child-ref a1 a2)
+  (tm-glue-check (c-glue-raw-tree-child-ref a1 a2)))
+(define c-glue-raw-tree-ip
   (foreign-procedure "tmg_tree_ip" (scheme-object) scheme-object))
-(define tree-active?
+(define (tree-ip a1)
+  (tm-glue-check (c-glue-raw-tree-ip a1)))
+(define c-glue-raw-tree-active?
   (foreign-procedure "tmg_tree_activeP" (scheme-object) scheme-object))
-(define tree-eq?
+(define (tree-active? a1)
+  (tm-glue-check (c-glue-raw-tree-active? a1)))
+(define c-glue-raw-tree-eq?
   (foreign-procedure "tmg_tree_eqP" (scheme-object scheme-object) scheme-object))
-(define subtree
+(define (tree-eq? a1 a2)
+  (tm-glue-check (c-glue-raw-tree-eq? a1 a2)))
+(define c-glue-raw-subtree
   (foreign-procedure "tmg_subtree" (scheme-object scheme-object) scheme-object))
-(define tree-range
+(define (subtree a1 a2)
+  (tm-glue-check (c-glue-raw-subtree a1 a2)))
+(define c-glue-raw-tree-range
   (foreign-procedure "tmg_tree_range" (scheme-object scheme-object scheme-object) scheme-object))
-(define tree-copy
+(define (tree-range a1 a2 a3)
+  (tm-glue-check (c-glue-raw-tree-range a1 a2 a3)))
+(define c-glue-raw-tree-copy
   (foreign-procedure "tmg_tree_copy" (scheme-object) scheme-object))
-(define tree-append
+(define (tree-copy a1)
+  (tm-glue-check (c-glue-raw-tree-copy a1)))
+(define c-glue-raw-tree-append
   (foreign-procedure "tmg_tree_append" (scheme-object scheme-object) scheme-object))
-(define tree-right-index
+(define (tree-append a1 a2)
+  (tm-glue-check (c-glue-raw-tree-append a1 a2)))
+(define c-glue-raw-tree-right-index
   (foreign-procedure "tmg_tree_right_index" (scheme-object) scheme-object))
-(define tree-label-extension?
+(define (tree-right-index a1)
+  (tm-glue-check (c-glue-raw-tree-right-index a1)))
+(define c-glue-raw-tree-label-extension?
   (foreign-procedure "tmg_tree_label_extensionP" (scheme-object) scheme-object))
-(define tree-label-macro?
+(define (tree-label-extension? a1)
+  (tm-glue-check (c-glue-raw-tree-label-extension? a1)))
+(define c-glue-raw-tree-label-macro?
   (foreign-procedure "tmg_tree_label_macroP" (scheme-object) scheme-object))
-(define tree-label-parameter?
+(define (tree-label-macro? a1)
+  (tm-glue-check (c-glue-raw-tree-label-macro? a1)))
+(define c-glue-raw-tree-label-parameter?
   (foreign-procedure "tmg_tree_label_parameterP" (scheme-object) scheme-object))
-(define tree-multi-paragraph?
+(define (tree-label-parameter? a1)
+  (tm-glue-check (c-glue-raw-tree-label-parameter? a1)))
+(define c-glue-raw-tree-multi-paragraph?
   (foreign-procedure "tmg_tree_multi_paragraphP" (scheme-object) scheme-object))
-(define tree-simplify
+(define (tree-multi-paragraph? a1)
+  (tm-glue-check (c-glue-raw-tree-multi-paragraph? a1)))
+(define c-glue-raw-tree-simplify
   (foreign-procedure "tmg_tree_simplify" (scheme-object) scheme-object))
-(define tree-minimal-arity
+(define (tree-simplify a1)
+  (tm-glue-check (c-glue-raw-tree-simplify a1)))
+(define c-glue-raw-tree-minimal-arity
   (foreign-procedure "tmg_tree_minimal_arity" (scheme-object) scheme-object))
-(define tree-maximal-arity
+(define (tree-minimal-arity a1)
+  (tm-glue-check (c-glue-raw-tree-minimal-arity a1)))
+(define c-glue-raw-tree-maximal-arity
   (foreign-procedure "tmg_tree_maximal_arity" (scheme-object) scheme-object))
-(define tree-possible-arity?
+(define (tree-maximal-arity a1)
+  (tm-glue-check (c-glue-raw-tree-maximal-arity a1)))
+(define c-glue-raw-tree-possible-arity?
   (foreign-procedure "tmg_tree_possible_arityP" (scheme-object scheme-object) scheme-object))
-(define tree-insert_point
+(define (tree-possible-arity? a1 a2)
+  (tm-glue-check (c-glue-raw-tree-possible-arity? a1 a2)))
+(define c-glue-raw-tree-insert_point
   (foreign-procedure "tmg_tree_insert_point" (scheme-object scheme-object) scheme-object))
-(define tree-is-dynamic?
+(define (tree-insert_point a1 a2)
+  (tm-glue-check (c-glue-raw-tree-insert_point a1 a2)))
+(define c-glue-raw-tree-is-dynamic?
   (foreign-procedure "tmg_tree_is_dynamicP" (scheme-object) scheme-object))
-(define tree-accessible-child?
+(define (tree-is-dynamic? a1)
+  (tm-glue-check (c-glue-raw-tree-is-dynamic? a1)))
+(define c-glue-raw-tree-accessible-child?
   (foreign-procedure "tmg_tree_accessible_childP" (scheme-object scheme-object) scheme-object))
-(define tree-accessible-children
+(define (tree-accessible-child? a1 a2)
+  (tm-glue-check (c-glue-raw-tree-accessible-child? a1 a2)))
+(define c-glue-raw-tree-accessible-children
   (foreign-procedure "tmg_tree_accessible_children" (scheme-object) scheme-object))
-(define tree-is-buffer?
+(define (tree-accessible-children a1)
+  (tm-glue-check (c-glue-raw-tree-accessible-children a1)))
+(define c-glue-raw-tree-is-buffer?
   (foreign-procedure "tmg_tree_is_bufferP" (scheme-object) scheme-object))
-(define tree-search-sections
+(define (tree-is-buffer? a1)
+  (tm-glue-check (c-glue-raw-tree-is-buffer? a1)))
+(define c-glue-raw-tree-search-sections
   (foreign-procedure "tmg_tree_search_sections" (scheme-object) scheme-object))
-(define previous-search-hit
+(define (tree-search-sections a1)
+  (tm-glue-check (c-glue-raw-tree-search-sections a1)))
+(define c-glue-raw-previous-search-hit
   (foreign-procedure "tmg_previous_search_hit" (scheme-object scheme-object scheme-object) scheme-object))
-(define next-search-hit
+(define (previous-search-hit a1 a2 a3)
+  (tm-glue-check (c-glue-raw-previous-search-hit a1 a2 a3)))
+(define c-glue-raw-next-search-hit
   (foreign-procedure "tmg_next_search_hit" (scheme-object scheme-object scheme-object) scheme-object))
-(define navigate-search-hit
+(define (next-search-hit a1 a2 a3)
+  (tm-glue-check (c-glue-raw-next-search-hit a1 a2 a3)))
+(define c-glue-raw-navigate-search-hit
   (foreign-procedure "tmg_navigate_search_hit" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
-(define tag-minimal-arity
+(define (navigate-search-hit a1 a2 a3 a4)
+  (tm-glue-check (c-glue-raw-navigate-search-hit a1 a2 a3 a4)))
+(define c-glue-raw-tag-minimal-arity
   (foreign-procedure "tmg_tag_minimal_arity" (scheme-object) scheme-object))
-(define tag-maximal-arity
+(define (tag-minimal-arity a1)
+  (tm-glue-check (c-glue-raw-tag-minimal-arity a1)))
+(define c-glue-raw-tag-maximal-arity
   (foreign-procedure "tmg_tag_maximal_arity" (scheme-object) scheme-object))
-(define tag-possible-arity?
+(define (tag-maximal-arity a1)
+  (tm-glue-check (c-glue-raw-tag-maximal-arity a1)))
+(define c-glue-raw-tag-possible-arity?
   (foreign-procedure "tmg_tag_possible_arityP" (scheme-object scheme-object) scheme-object))
-(define set-access-mode
+(define (tag-possible-arity? a1 a2)
+  (tm-glue-check (c-glue-raw-tag-possible-arity? a1 a2)))
+(define c-glue-raw-set-access-mode
   (foreign-procedure "tmg_set_access_mode" (scheme-object) scheme-object))
-(define get-access-mode
+(define (set-access-mode a1)
+  (tm-glue-check (c-glue-raw-set-access-mode a1)))
+(define c-glue-raw-get-access-mode
   (foreign-procedure "tmg_get_access_mode" () scheme-object))
-(define tree-remove
+(define (get-access-mode)
+  (tm-glue-check (c-glue-raw-get-access-mode)))
+(define c-glue-raw-tree-remove
   (foreign-procedure "tmg_tree_remove" (scheme-object scheme-object scheme-object) scheme-object))
-(define tree-split
+(define (tree-remove a1 a2 a3)
+  (tm-glue-check (c-glue-raw-tree-remove a1 a2 a3)))
+(define c-glue-raw-tree-split
   (foreign-procedure "tmg_tree_split" (scheme-object scheme-object scheme-object) scheme-object))
-(define tree-join
+(define (tree-split a1 a2 a3)
+  (tm-glue-check (c-glue-raw-tree-split a1 a2 a3)))
+(define c-glue-raw-tree-join
   (foreign-procedure "tmg_tree_join" (scheme-object scheme-object) scheme-object))
-(define tree-assign-node
+(define (tree-join a1 a2)
+  (tm-glue-check (c-glue-raw-tree-join a1 a2)))
+(define c-glue-raw-tree-assign-node
   (foreign-procedure "tmg_tree_assign_node" (scheme-object scheme-object) scheme-object))
-(define tree-remove-node
+(define (tree-assign-node a1 a2)
+  (tm-glue-check (c-glue-raw-tree-assign-node a1 a2)))
+(define c-glue-raw-tree-remove-node
   (foreign-procedure "tmg_tree_remove_node" (scheme-object scheme-object) scheme-object))
-(define tree-cache-clear-all
+(define (tree-remove-node a1 a2)
+  (tm-glue-check (c-glue-raw-tree-remove-node a1 a2)))
+(define c-glue-raw-tree-cache-clear-all
   (foreign-procedure "tmg_tree_cache_clear_all" () scheme-object))
-(define tree-cache-janitor-all
+(define (tree-cache-clear-all)
+  (tm-glue-check (c-glue-raw-tree-cache-clear-all)))
+(define c-glue-raw-tree-cache-janitor-all
   (foreign-procedure "tmg_tree_cache_janitor_all" () scheme-object))
-(define tree-hash-set-limit
+(define (tree-cache-janitor-all)
+  (tm-glue-check (c-glue-raw-tree-cache-janitor-all)))
+(define c-glue-raw-tree-hash-set-limit
   (foreign-procedure "tmg_tree_hash_set_limit" (scheme-object) scheme-object))
-(define cpp-tree-correct-node
+(define (tree-hash-set-limit a1)
+  (tm-glue-check (c-glue-raw-tree-hash-set-limit a1)))
+(define c-glue-raw-cpp-tree-correct-node
   (foreign-procedure "tmg_cpp_tree_correct_node" (scheme-object) scheme-object))
-(define cpp-tree-correct-downwards
+(define (cpp-tree-correct-node a1)
+  (tm-glue-check (c-glue-raw-cpp-tree-correct-node a1)))
+(define c-glue-raw-cpp-tree-correct-downwards
   (foreign-procedure "tmg_cpp_tree_correct_downwards" (scheme-object) scheme-object))
-(define cpp-tree-correct-upwards
+(define (cpp-tree-correct-downwards a1)
+  (tm-glue-check (c-glue-raw-cpp-tree-correct-downwards a1)))
+(define c-glue-raw-cpp-tree-correct-upwards
   (foreign-procedure "tmg_cpp_tree_correct_upwards" (scheme-object) scheme-object))
-(define concat-recompose
+(define (cpp-tree-correct-upwards a1)
+  (tm-glue-check (c-glue-raw-cpp-tree-correct-upwards a1)))
+(define c-glue-raw-concat-recompose
   (foreign-procedure "tmg_concat_recompose" (scheme-object) scheme-object))
-(define math-status-print
+(define (concat-recompose a1)
+  (tm-glue-check (c-glue-raw-concat-recompose a1)))
+(define c-glue-raw-math-status-print
   (foreign-procedure "tmg_math_status_print" () scheme-object))
-(define math-status-reset
+(define (math-status-print)
+  (tm-glue-check (c-glue-raw-math-status-print)))
+(define c-glue-raw-math-status-reset
   (foreign-procedure "tmg_math_status_reset" () scheme-object))
-(define path-strip
+(define (math-status-reset)
+  (tm-glue-check (c-glue-raw-math-status-reset)))
+(define c-glue-raw-path-strip
   (foreign-procedure "tmg_path_strip" (scheme-object scheme-object) scheme-object))
-(define path-inf?
+(define (path-strip a1 a2)
+  (tm-glue-check (c-glue-raw-path-strip a1 a2)))
+(define c-glue-raw-path-inf?
   (foreign-procedure "tmg_path_infP" (scheme-object scheme-object) scheme-object))
-(define path-inf-eq?
+(define (path-inf? a1 a2)
+  (tm-glue-check (c-glue-raw-path-inf? a1 a2)))
+(define c-glue-raw-path-inf-eq?
   (foreign-procedure "tmg_path_inf_eqP" (scheme-object scheme-object) scheme-object))
-(define path-less?
+(define (path-inf-eq? a1 a2)
+  (tm-glue-check (c-glue-raw-path-inf-eq? a1 a2)))
+(define c-glue-raw-path-less?
   (foreign-procedure "tmg_path_lessP" (scheme-object scheme-object) scheme-object))
-(define path-less-eq?
+(define (path-less? a1 a2)
+  (tm-glue-check (c-glue-raw-path-less? a1 a2)))
+(define c-glue-raw-path-less-eq?
   (foreign-procedure "tmg_path_less_eqP" (scheme-object scheme-object) scheme-object))
-(define modification-remove
+(define (path-less-eq? a1 a2)
+  (tm-glue-check (c-glue-raw-path-less-eq? a1 a2)))
+(define c-glue-raw-modification-remove
   (foreign-procedure "tmg_modification_remove" (scheme-object scheme-object scheme-object) scheme-object))
-(define modification-split
+(define (modification-remove a1 a2 a3)
+  (tm-glue-check (c-glue-raw-modification-remove a1 a2 a3)))
+(define c-glue-raw-modification-split
   (foreign-procedure "tmg_modification_split" (scheme-object scheme-object scheme-object) scheme-object))
-(define modification-join
+(define (modification-split a1 a2 a3)
+  (tm-glue-check (c-glue-raw-modification-split a1 a2 a3)))
+(define c-glue-raw-modification-join
   (foreign-procedure "tmg_modification_join" (scheme-object scheme-object) scheme-object))
-(define modification-assign-node
+(define (modification-join a1 a2)
+  (tm-glue-check (c-glue-raw-modification-join a1 a2)))
+(define c-glue-raw-modification-assign-node
   (foreign-procedure "tmg_modification_assign_node" (scheme-object scheme-object) scheme-object))
-(define modification-remove-node
+(define (modification-assign-node a1 a2)
+  (tm-glue-check (c-glue-raw-modification-assign-node a1 a2)))
+(define c-glue-raw-modification-remove-node
   (foreign-procedure "tmg_modification_remove_node" (scheme-object scheme-object) scheme-object))
-(define modification-path
+(define (modification-remove-node a1 a2)
+  (tm-glue-check (c-glue-raw-modification-remove-node a1 a2)))
+(define c-glue-raw-modification-path
   (foreign-procedure "tmg_modification_path" (scheme-object) scheme-object))
-(define modification-tree
+(define (modification-path a1)
+  (tm-glue-check (c-glue-raw-modification-path a1)))
+(define c-glue-raw-modification-tree
   (foreign-procedure "tmg_modification_tree" (scheme-object) scheme-object))
-(define modification-root
+(define (modification-tree a1)
+  (tm-glue-check (c-glue-raw-modification-tree a1)))
+(define c-glue-raw-modification-root
   (foreign-procedure "tmg_modification_root" (scheme-object) scheme-object))
-(define modification-index
+(define (modification-root a1)
+  (tm-glue-check (c-glue-raw-modification-root a1)))
+(define c-glue-raw-modification-index
   (foreign-procedure "tmg_modification_index" (scheme-object) scheme-object))
-(define modification-argument
+(define (modification-index a1)
+  (tm-glue-check (c-glue-raw-modification-index a1)))
+(define c-glue-raw-modification-argument
   (foreign-procedure "tmg_modification_argument" (scheme-object) scheme-object))
-(define modification-label
+(define (modification-argument a1)
+  (tm-glue-check (c-glue-raw-modification-argument a1)))
+(define c-glue-raw-modification-label
   (foreign-procedure "tmg_modification_label" (scheme-object) scheme-object))
-(define modification-copy
+(define (modification-label a1)
+  (tm-glue-check (c-glue-raw-modification-label a1)))
+(define c-glue-raw-modification-copy
   (foreign-procedure "tmg_modification_copy" (scheme-object) scheme-object))
-(define modification-inplace-apply
+(define (modification-copy a1)
+  (tm-glue-check (c-glue-raw-modification-copy a1)))
+(define c-glue-raw-modification-inplace-apply
   (foreign-procedure "tmg_modification_inplace_apply" (scheme-object scheme-object) scheme-object))
-(define modification-commute?
+(define (modification-inplace-apply a1 a2)
+  (tm-glue-check (c-glue-raw-modification-inplace-apply a1 a2)))
+(define c-glue-raw-modification-commute?
   (foreign-procedure "tmg_modification_commuteP" (scheme-object scheme-object) scheme-object))
-(define modification-can-pull?
+(define (modification-commute? a1 a2)
+  (tm-glue-check (c-glue-raw-modification-commute? a1 a2)))
+(define c-glue-raw-modification-can-pull?
   (foreign-procedure "tmg_modification_can_pullP" (scheme-object scheme-object) scheme-object))
-(define modification-pull
+(define (modification-can-pull? a1 a2)
+  (tm-glue-check (c-glue-raw-modification-can-pull? a1 a2)))
+(define c-glue-raw-modification-pull
   (foreign-procedure "tmg_modification_pull" (scheme-object scheme-object) scheme-object))
-(define modification-co-pull
+(define (modification-pull a1 a2)
+  (tm-glue-check (c-glue-raw-modification-pull a1 a2)))
+(define c-glue-raw-modification-co-pull
   (foreign-procedure "tmg_modification_co_pull" (scheme-object scheme-object) scheme-object))
-(define patch-pair
+(define (modification-co-pull a1 a2)
+  (tm-glue-check (c-glue-raw-modification-co-pull a1 a2)))
+(define c-glue-raw-patch-pair
   (foreign-procedure "tmg_patch_pair" (scheme-object scheme-object) scheme-object))
-(define patch-compound
+(define (patch-pair a1 a2)
+  (tm-glue-check (c-glue-raw-patch-pair a1 a2)))
+(define c-glue-raw-patch-compound
   (foreign-procedure "tmg_patch_compound" (scheme-object) scheme-object))
-(define patch-branch
+(define (patch-compound a1)
+  (tm-glue-check (c-glue-raw-patch-compound a1)))
+(define c-glue-raw-patch-branch
   (foreign-procedure "tmg_patch_branch" (scheme-object) scheme-object))
-(define patch-birth
+(define (patch-branch a1)
+  (tm-glue-check (c-glue-raw-patch-branch a1)))
+(define c-glue-raw-patch-birth
   (foreign-procedure "tmg_patch_birth" (scheme-object scheme-object) scheme-object))
-(define patch-author
+(define (patch-birth a1 a2)
+  (tm-glue-check (c-glue-raw-patch-birth a1 a2)))
+(define c-glue-raw-patch-author
   (foreign-procedure "tmg_patch_author" (scheme-object scheme-object) scheme-object))
-(define patch-pair?
+(define (patch-author a1 a2)
+  (tm-glue-check (c-glue-raw-patch-author a1 a2)))
+(define c-glue-raw-patch-pair?
   (foreign-procedure "tmg_patch_pairP" (scheme-object) scheme-object))
-(define patch-compound?
+(define (patch-pair? a1)
+  (tm-glue-check (c-glue-raw-patch-pair? a1)))
+(define c-glue-raw-patch-compound?
   (foreign-procedure "tmg_patch_compoundP" (scheme-object) scheme-object))
-(define patch-branch?
+(define (patch-compound? a1)
+  (tm-glue-check (c-glue-raw-patch-compound? a1)))
+(define c-glue-raw-patch-branch?
   (foreign-procedure "tmg_patch_branchP" (scheme-object) scheme-object))
-(define patch-birth?
+(define (patch-branch? a1)
+  (tm-glue-check (c-glue-raw-patch-branch? a1)))
+(define c-glue-raw-patch-birth?
   (foreign-procedure "tmg_patch_birthP" (scheme-object) scheme-object))
-(define patch-author?
+(define (patch-birth? a1)
+  (tm-glue-check (c-glue-raw-patch-birth? a1)))
+(define c-glue-raw-patch-author?
   (foreign-procedure "tmg_patch_authorP" (scheme-object) scheme-object))
-(define patch-arity
+(define (patch-author? a1)
+  (tm-glue-check (c-glue-raw-patch-author? a1)))
+(define c-glue-raw-patch-arity
   (foreign-procedure "tmg_patch_arity" (scheme-object) scheme-object))
-(define patch-ref
+(define (patch-arity a1)
+  (tm-glue-check (c-glue-raw-patch-arity a1)))
+(define c-glue-raw-patch-ref
   (foreign-procedure "tmg_patch_ref" (scheme-object scheme-object) scheme-object))
-(define patch-direct
+(define (patch-ref a1 a2)
+  (tm-glue-check (c-glue-raw-patch-ref a1 a2)))
+(define c-glue-raw-patch-direct
   (foreign-procedure "tmg_patch_direct" (scheme-object) scheme-object))
-(define patch-inverse
+(define (patch-direct a1)
+  (tm-glue-check (c-glue-raw-patch-direct a1)))
+(define c-glue-raw-patch-inverse
   (foreign-procedure "tmg_patch_inverse" (scheme-object) scheme-object))
-(define patch-get-birth
+(define (patch-inverse a1)
+  (tm-glue-check (c-glue-raw-patch-inverse a1)))
+(define c-glue-raw-patch-get-birth
   (foreign-procedure "tmg_patch_get_birth" (scheme-object) scheme-object))
-(define patch-get-author
+(define (patch-get-birth a1)
+  (tm-glue-check (c-glue-raw-patch-get-birth a1)))
+(define c-glue-raw-patch-get-author
   (foreign-procedure "tmg_patch_get_author" (scheme-object) scheme-object))
-(define patch-copy
+(define (patch-get-author a1)
+  (tm-glue-check (c-glue-raw-patch-get-author a1)))
+(define c-glue-raw-patch-copy
   (foreign-procedure "tmg_patch_copy" (scheme-object) scheme-object))
-(define patch-inplace-apply
+(define (patch-copy a1)
+  (tm-glue-check (c-glue-raw-patch-copy a1)))
+(define c-glue-raw-patch-inplace-apply
   (foreign-procedure "tmg_patch_inplace_apply" (scheme-object scheme-object) scheme-object))
-(define patch-compactify
+(define (patch-inplace-apply a1 a2)
+  (tm-glue-check (c-glue-raw-patch-inplace-apply a1 a2)))
+(define c-glue-raw-patch-compactify
   (foreign-procedure "tmg_patch_compactify" (scheme-object) scheme-object))
-(define patch-commute?
+(define (patch-compactify a1)
+  (tm-glue-check (c-glue-raw-patch-compactify a1)))
+(define c-glue-raw-patch-commute?
   (foreign-procedure "tmg_patch_commuteP" (scheme-object scheme-object) scheme-object))
-(define patch-can-pull?
+(define (patch-commute? a1 a2)
+  (tm-glue-check (c-glue-raw-patch-commute? a1 a2)))
+(define c-glue-raw-patch-can-pull?
   (foreign-procedure "tmg_patch_can_pullP" (scheme-object scheme-object) scheme-object))
-(define patch-pull
+(define (patch-can-pull? a1 a2)
+  (tm-glue-check (c-glue-raw-patch-can-pull? a1 a2)))
+(define c-glue-raw-patch-pull
   (foreign-procedure "tmg_patch_pull" (scheme-object scheme-object) scheme-object))
-(define patch-co-pull
+(define (patch-pull a1 a2)
+  (tm-glue-check (c-glue-raw-patch-pull a1 a2)))
+(define c-glue-raw-patch-co-pull
   (foreign-procedure "tmg_patch_co_pull" (scheme-object scheme-object) scheme-object))
-(define patch-remove-set-cursor
+(define (patch-co-pull a1 a2)
+  (tm-glue-check (c-glue-raw-patch-co-pull a1 a2)))
+(define c-glue-raw-patch-remove-set-cursor
   (foreign-procedure "tmg_patch_remove_set_cursor" (scheme-object) scheme-object))
-(define patch-modifies?
+(define (patch-remove-set-cursor a1)
+  (tm-glue-check (c-glue-raw-patch-remove-set-cursor a1)))
+(define c-glue-raw-patch-modifies?
   (foreign-procedure "tmg_patch_modifiesP" (scheme-object) scheme-object))
-(define tree->tree-pointer
+(define (patch-modifies? a1)
+  (tm-glue-check (c-glue-raw-patch-modifies? a1)))
+(define c-glue-raw-tree->tree-pointer
   (foreign-procedure "tmg_tree_2tree_pointer" (scheme-object) scheme-object))
-(define tree-pointer-detach
+(define (tree->tree-pointer a1)
+  (tm-glue-check (c-glue-raw-tree->tree-pointer a1)))
+(define c-glue-raw-tree-pointer-detach
   (foreign-procedure "tmg_tree_pointer_detach" (scheme-object) scheme-object))
-(define tree-pointer->tree
+(define (tree-pointer-detach a1)
+  (tm-glue-check (c-glue-raw-tree-pointer-detach a1)))
+(define c-glue-raw-tree-pointer->tree
   (foreign-procedure "tmg_tree_pointer_2tree" (scheme-object) scheme-object))
-(define graphics-needs-update?
+(define (tree-pointer->tree a1)
+  (tm-glue-check (c-glue-raw-tree-pointer->tree a1)))
+(define c-glue-raw-graphics-needs-update?
   (foreign-procedure "tmg_graphics_needs_updateP" () scheme-object))
-(define multi-spell-start
+(define (graphics-needs-update?)
+  (tm-glue-check (c-glue-raw-graphics-needs-update?)))
+(define c-glue-raw-multi-spell-start
   (foreign-procedure "tmg_multi_spell_start" () scheme-object))
-(define multi-spell-done
+(define (multi-spell-start)
+  (tm-glue-check (c-glue-raw-multi-spell-start)))
+(define c-glue-raw-multi-spell-done
   (foreign-procedure "tmg_multi_spell_done" () scheme-object))
-(define latex->texmacs
+(define (multi-spell-done)
+  (tm-glue-check (c-glue-raw-multi-spell-done)))
+(define c-glue-raw-latex->texmacs
   (foreign-procedure "tmg_latex_2texmacs" (scheme-object) scheme-object))
-(define retrieve-mathjax
+(define (latex->texmacs a1)
+  (tm-glue-check (c-glue-raw-latex->texmacs a1)))
+(define c-glue-raw-retrieve-mathjax
   (foreign-procedure "tmg_retrieve_mathjax" (scheme-object) scheme-object))
-(define picture-cache-reset
+(define (retrieve-mathjax a1)
+  (tm-glue-check (c-glue-raw-retrieve-mathjax a1)))
+(define c-glue-raw-picture-cache-reset
   (foreign-procedure "tmg_picture_cache_reset" () scheme-object))
-(define supports-sql?
+(define (picture-cache-reset)
+  (tm-glue-check (c-glue-raw-picture-cache-reset)))
+(define c-glue-raw-supports-sql?
   (foreign-procedure "tmg_supports_sqlP" () scheme-object))
-(define server-define-error-codes
+(define (supports-sql?)
+  (tm-glue-check (c-glue-raw-supports-sql?)))
+(define c-glue-raw-server-define-error-codes
   (foreign-procedure "tmg_server_define_error_codes" () scheme-object))
-(define server-start
+(define (server-define-error-codes)
+  (tm-glue-check (c-glue-raw-server-define-error-codes)))
+(define c-glue-raw-server-start
   (foreign-procedure "tmg_server_start" () scheme-object))
-(define server-stop
+(define (server-start)
+  (tm-glue-check (c-glue-raw-server-start)))
+(define c-glue-raw-server-stop
   (foreign-procedure "tmg_server_stop" () scheme-object))
-(define server-started?
+(define (server-stop)
+  (tm-glue-check (c-glue-raw-server-stop)))
+(define c-glue-raw-server-started?
   (foreign-procedure "tmg_server_startedP" () scheme-object))
-(define server-port-in-use
+(define (server-started?)
+  (tm-glue-check (c-glue-raw-server-started?)))
+(define c-glue-raw-server-port-in-use
   (foreign-procedure "tmg_server_port_in_use" () scheme-object))
-(define client-stop
+(define (server-port-in-use)
+  (tm-glue-check (c-glue-raw-server-port-in-use)))
+(define c-glue-raw-client-stop
   (foreign-procedure "tmg_client_stop" (scheme-object) scheme-object))
-(define client-protocol-version
+(define (client-stop a1)
+  (tm-glue-check (c-glue-raw-client-stop a1)))
+(define c-glue-raw-client-protocol-version
   (foreign-procedure "tmg_client_protocol_version" () scheme-object))
-(define enter-secure-mode
+(define (client-protocol-version)
+  (tm-glue-check (c-glue-raw-client-protocol-version)))
+(define c-glue-raw-enter-secure-mode
   (foreign-procedure "tmg_enter_secure_mode" (scheme-object) scheme-object))
-(define supports-gnutls?
+(define (enter-secure-mode a1)
+  (tm-glue-check (c-glue-raw-enter-secure-mode a1)))
+(define c-glue-raw-supports-gnutls?
   (foreign-procedure "tmg_supports_gnutlsP" () scheme-object))
-(define gnutls-random-number
+(define (supports-gnutls?)
+  (tm-glue-check (c-glue-raw-supports-gnutls?)))
+(define c-glue-raw-gnutls-random-number
   (foreign-procedure "tmg_gnutls_random_number" (scheme-object) scheme-object))
-(define disable-certificate-time-checks
+(define (gnutls-random-number a1)
+  (tm-glue-check (c-glue-raw-gnutls-random-number a1)))
+(define c-glue-raw-disable-certificate-time-checks
   (foreign-procedure "tmg_disable_certificate_time_checks" () scheme-object))
-(define quit-TeXmacs-code
+(define (disable-certificate-time-checks)
+  (tm-glue-check (c-glue-raw-disable-certificate-time-checks)))
+(define c-glue-raw-quit-TeXmacs-code
   (foreign-procedure "tmg_quit_TeXmacs_code" (scheme-object) scheme-object))
-(define widget-color-picker
+(define (quit-TeXmacs-code a1)
+  (tm-glue-check (c-glue-raw-quit-TeXmacs-code a1)))
+(define c-glue-raw-widget-color-picker
   (foreign-procedure "tmg_widget_color_picker" (scheme-object scheme-object scheme-object) scheme-object))
-(define widget-extend
+(define (widget-color-picker a1 a2 a3)
+  (tm-glue-check (c-glue-raw-widget-color-picker a1 a2 a3)))
+(define c-glue-raw-widget-extend
   (foreign-procedure "tmg_widget_extend" (scheme-object scheme-object) scheme-object))
-(define widget-hmenu
+(define (widget-extend a1 a2)
+  (tm-glue-check (c-glue-raw-widget-extend a1 a2)))
+(define c-glue-raw-widget-hmenu
   (foreign-procedure "tmg_widget_hmenu" (scheme-object) scheme-object))
-(define widget-vmenu
+(define (widget-hmenu a1)
+  (tm-glue-check (c-glue-raw-widget-hmenu a1)))
+(define c-glue-raw-widget-vmenu
   (foreign-procedure "tmg_widget_vmenu" (scheme-object) scheme-object))
-(define widget-tmenu
+(define (widget-vmenu a1)
+  (tm-glue-check (c-glue-raw-widget-vmenu a1)))
+(define c-glue-raw-widget-tmenu
   (foreign-procedure "tmg_widget_tmenu" (scheme-object scheme-object) scheme-object))
-(define widget-minibar-menu
+(define (widget-tmenu a1 a2)
+  (tm-glue-check (c-glue-raw-widget-tmenu a1 a2)))
+(define c-glue-raw-widget-minibar-menu
   (foreign-procedure "tmg_widget_minibar_menu" (scheme-object) scheme-object))
-(define widget-separator
+(define (widget-minibar-menu a1)
+  (tm-glue-check (c-glue-raw-widget-minibar-menu a1)))
+(define c-glue-raw-widget-separator
   (foreign-procedure "tmg_widget_separator" (scheme-object) scheme-object))
-(define widget-pulldown-button
+(define (widget-separator a1)
+  (tm-glue-check (c-glue-raw-widget-separator a1)))
+(define c-glue-raw-widget-pulldown-button
   (foreign-procedure "tmg_widget_pulldown_button" (scheme-object scheme-object) scheme-object))
-(define widget-pullright-button
+(define (widget-pulldown-button a1 a2)
+  (tm-glue-check (c-glue-raw-widget-pulldown-button a1 a2)))
+(define c-glue-raw-widget-pullright-button
   (foreign-procedure "tmg_widget_pullright_button" (scheme-object scheme-object) scheme-object))
-(define widget-toggle
+(define (widget-pullright-button a1 a2)
+  (tm-glue-check (c-glue-raw-widget-pullright-button a1 a2)))
+(define c-glue-raw-widget-toggle
   (foreign-procedure "tmg_widget_toggle" (scheme-object scheme-object scheme-object) scheme-object))
-(define widget-balloon
+(define (widget-toggle a1 a2 a3)
+  (tm-glue-check (c-glue-raw-widget-toggle a1 a2 a3)))
+(define c-glue-raw-widget-balloon
   (foreign-procedure "tmg_widget_balloon" (scheme-object scheme-object) scheme-object))
-(define widget-empty
+(define (widget-balloon a1 a2)
+  (tm-glue-check (c-glue-raw-widget-balloon a1 a2)))
+(define c-glue-raw-widget-empty
   (foreign-procedure "tmg_widget_empty" () scheme-object))
-(define widget-tree-view
+(define (widget-empty)
+  (tm-glue-check (c-glue-raw-widget-empty)))
+(define c-glue-raw-widget-tree-view
   (foreign-procedure "tmg_widget_tree_view" (scheme-object scheme-object scheme-object) scheme-object))
-(define widget-glue
+(define (widget-tree-view a1 a2 a3)
+  (tm-glue-check (c-glue-raw-widget-tree-view a1 a2 a3)))
+(define c-glue-raw-widget-glue
   (foreign-procedure "tmg_widget_glue" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
-(define widget-hlist
+(define (widget-glue a1 a2 a3 a4)
+  (tm-glue-check (c-glue-raw-widget-glue a1 a2 a3 a4)))
+(define c-glue-raw-widget-hlist
   (foreign-procedure "tmg_widget_hlist" (scheme-object) scheme-object))
-(define widget-vlist
+(define (widget-hlist a1)
+  (tm-glue-check (c-glue-raw-widget-hlist a1)))
+(define c-glue-raw-widget-vlist
   (foreign-procedure "tmg_widget_vlist" (scheme-object) scheme-object))
-(define widget-aligned
+(define (widget-vlist a1)
+  (tm-glue-check (c-glue-raw-widget-vlist a1)))
+(define c-glue-raw-widget-aligned
   (foreign-procedure "tmg_widget_aligned" (scheme-object scheme-object) scheme-object))
-(define widget-tabs
+(define (widget-aligned a1 a2)
+  (tm-glue-check (c-glue-raw-widget-aligned a1 a2)))
+(define c-glue-raw-widget-tabs
   (foreign-procedure "tmg_widget_tabs" (scheme-object scheme-object) scheme-object))
-(define widget-responsive-tabs
+(define (widget-tabs a1 a2)
+  (tm-glue-check (c-glue-raw-widget-tabs a1 a2)))
+(define c-glue-raw-widget-responsive-tabs
   (foreign-procedure "tmg_widget_responsive_tabs" (scheme-object scheme-object) scheme-object))
-(define widget-scrollable
+(define (widget-responsive-tabs a1 a2)
+  (tm-glue-check (c-glue-raw-widget-responsive-tabs a1 a2)))
+(define c-glue-raw-widget-scrollable
   (foreign-procedure "tmg_widget_scrollable" (scheme-object scheme-object) scheme-object))
-(define widget-hsplit
+(define (widget-scrollable a1 a2)
+  (tm-glue-check (c-glue-raw-widget-scrollable a1 a2)))
+(define c-glue-raw-widget-hsplit
   (foreign-procedure "tmg_widget_hsplit" (scheme-object scheme-object) scheme-object))
-(define widget-vsplit
+(define (widget-hsplit a1 a2)
+  (tm-glue-check (c-glue-raw-widget-hsplit a1 a2)))
+(define c-glue-raw-widget-vsplit
   (foreign-procedure "tmg_widget_vsplit" (scheme-object scheme-object) scheme-object))
-(define widget-ink
+(define (widget-vsplit a1 a2)
+  (tm-glue-check (c-glue-raw-widget-vsplit a1 a2)))
+(define c-glue-raw-widget-ink
   (foreign-procedure "tmg_widget_ink" (scheme-object) scheme-object))
-(define tree-bounding-rectangle
+(define (widget-ink a1)
+  (tm-glue-check (c-glue-raw-widget-ink a1)))
+(define c-glue-raw-tree-bounding-rectangle
   (foreign-procedure "tmg_tree_bounding_rectangle" (scheme-object) scheme-object))
-(define widget-size
+(define (tree-bounding-rectangle a1)
+  (tm-glue-check (c-glue-raw-tree-bounding-rectangle a1)))
+(define c-glue-raw-widget-size
   (foreign-procedure "tmg_widget_size" (scheme-object) scheme-object))
-(define texmacs-widget-size
+(define (widget-size a1)
+  (tm-glue-check (c-glue-raw-widget-size a1)))
+(define c-glue-raw-texmacs-widget-size
   (foreign-procedure "tmg_texmacs_widget_size" (scheme-object) scheme-object))
-(define show-balloon
+(define (texmacs-widget-size a1)
+  (tm-glue-check (c-glue-raw-texmacs-widget-size a1)))
+(define c-glue-raw-show-balloon
   (foreign-procedure "tmg_show_balloon" (scheme-object scheme-object scheme-object) scheme-object))
-(define get-screen-size
+(define (show-balloon a1 a2 a3)
+  (tm-glue-check (c-glue-raw-show-balloon a1 a2 a3)))
+(define c-glue-raw-get-screen-size
   (foreign-procedure "tmg_get_screen_size" () scheme-object))
-(define windows-number
+(define (get-screen-size)
+  (tm-glue-check (c-glue-raw-get-screen-size)))
+(define c-glue-raw-windows-number
   (foreign-procedure "tmg_windows_number" () scheme-object))
-(define clone-window
+(define (windows-number)
+  (tm-glue-check (c-glue-raw-windows-number)))
+(define c-glue-raw-clone-window
   (foreign-procedure "tmg_clone_window" () scheme-object))
-(define kill-current-window-and-buffer
+(define (clone-window)
+  (tm-glue-check (c-glue-raw-clone-window)))
+(define c-glue-raw-kill-current-window-and-buffer
   (foreign-procedure "tmg_kill_current_window_and_buffer" () scheme-object))
-(define project-detach
+(define (kill-current-window-and-buffer)
+  (tm-glue-check (c-glue-raw-kill-current-window-and-buffer)))
+(define c-glue-raw-project-detach
   (foreign-procedure "tmg_project_detach" () scheme-object))
-(define project-attached?
+(define (project-detach)
+  (tm-glue-check (c-glue-raw-project-detach)))
+(define c-glue-raw-project-attached?
   (foreign-procedure "tmg_project_attachedP" () scheme-object))
-(define alt-window-handle
+(define (project-attached?)
+  (tm-glue-check (c-glue-raw-project-attached?)))
+(define c-glue-raw-alt-window-handle
   (foreign-procedure "tmg_alt_window_handle" () scheme-object))
-(define alt-window-delete
+(define (alt-window-handle)
+  (tm-glue-check (c-glue-raw-alt-window-handle)))
+(define c-glue-raw-alt-window-delete
   (foreign-procedure "tmg_alt_window_delete" (scheme-object) scheme-object))
-(define alt-window-show
+(define (alt-window-delete a1)
+  (tm-glue-check (c-glue-raw-alt-window-delete a1)))
+(define c-glue-raw-alt-window-show
   (foreign-procedure "tmg_alt_window_show" (scheme-object) scheme-object))
-(define alt-window-hide
+(define (alt-window-show a1)
+  (tm-glue-check (c-glue-raw-alt-window-show a1)))
+(define c-glue-raw-alt-window-hide
   (foreign-procedure "tmg_alt_window_hide" (scheme-object) scheme-object))
-(define alt-window-set-size
+(define (alt-window-hide a1)
+  (tm-glue-check (c-glue-raw-alt-window-hide a1)))
+(define c-glue-raw-alt-window-set-size
   (foreign-procedure "tmg_alt_window_set_size" (scheme-object scheme-object scheme-object) scheme-object))
-(define alt-window-set-position
+(define (alt-window-set-size a1 a2 a3)
+  (tm-glue-check (c-glue-raw-alt-window-set-size a1 a2 a3)))
+(define c-glue-raw-alt-window-set-position
   (foreign-procedure "tmg_alt_window_set_position" (scheme-object scheme-object scheme-object) scheme-object))
-(define supports-bibtex?
+(define (alt-window-set-position a1 a2 a3)
+  (tm-glue-check (c-glue-raw-alt-window-set-position a1 a2 a3)))
+(define c-glue-raw-supports-bibtex?
   (foreign-procedure "tmg_supports_bibtexP" () scheme-object))
-(define root-tree
+(define (supports-bibtex?)
+  (tm-glue-check (c-glue-raw-supports-bibtex?)))
+(define c-glue-raw-root-tree
   (foreign-procedure "tmg_root_tree" () scheme-object))
-(define buffer-path
+(define (root-tree)
+  (tm-glue-check (c-glue-raw-root-tree)))
+(define c-glue-raw-buffer-path
   (foreign-procedure "tmg_buffer_path" () scheme-object))
-(define buffer-tree
+(define (buffer-path)
+  (tm-glue-check (c-glue-raw-buffer-path)))
+(define c-glue-raw-buffer-tree
   (foreign-procedure "tmg_buffer_tree" () scheme-object))
-(define paragraph-tree
+(define (buffer-tree)
+  (tm-glue-check (c-glue-raw-buffer-tree)))
+(define c-glue-raw-paragraph-tree
   (foreign-procedure "tmg_paragraph_tree" () scheme-object))
-(define cursor-path
+(define (paragraph-tree)
+  (tm-glue-check (c-glue-raw-paragraph-tree)))
+(define c-glue-raw-cursor-path
   (foreign-procedure "tmg_cursor_path" () scheme-object))
-(define cursor-path*
+(define (cursor-path)
+  (tm-glue-check (c-glue-raw-cursor-path)))
+(define c-glue-raw-cursor-path*
   (foreign-procedure "tmg_cursor_path_dot" () scheme-object))
-(define selection-tree
+(define (cursor-path*)
+  (tm-glue-check (c-glue-raw-cursor-path*)))
+(define c-glue-raw-selection-tree
   (foreign-procedure "tmg_selection_tree" () scheme-object))
-(define path-exists?
+(define (selection-tree)
+  (tm-glue-check (c-glue-raw-selection-tree)))
+(define c-glue-raw-path-exists?
   (foreign-procedure "tmg_path_existsP" (scheme-object) scheme-object))
-(define cpp-path->tree
+(define (path-exists? a1)
+  (tm-glue-check (c-glue-raw-path-exists? a1)))
+(define c-glue-raw-cpp-path->tree
   (foreign-procedure "tmg_cpp_path_2tree" (scheme-object) scheme-object))
-(define path-correct-old
+(define (cpp-path->tree a1)
+  (tm-glue-check (c-glue-raw-cpp-path->tree a1)))
+(define c-glue-raw-path-correct-old
   (foreign-procedure "tmg_path_correct_old" (scheme-object) scheme-object))
-(define position-new-path
+(define (path-correct-old a1)
+  (tm-glue-check (c-glue-raw-path-correct-old a1)))
+(define c-glue-raw-position-new-path
   (foreign-procedure "tmg_position_new_path" (scheme-object) scheme-object))
-(define position-delete
+(define (position-new-path a1)
+  (tm-glue-check (c-glue-raw-position-new-path a1)))
+(define c-glue-raw-position-delete
   (foreign-procedure "tmg_position_delete" (scheme-object) scheme-object))
-(define position-set
+(define (position-delete a1)
+  (tm-glue-check (c-glue-raw-position-delete a1)))
+(define c-glue-raw-position-set
   (foreign-procedure "tmg_position_set" (scheme-object scheme-object) scheme-object))
-(define position-get
+(define (position-set a1 a2)
+  (tm-glue-check (c-glue-raw-position-set a1 a2)))
+(define c-glue-raw-position-get
   (foreign-procedure "tmg_position_get" (scheme-object) scheme-object))
-(define inside?
+(define (position-get a1)
+  (tm-glue-check (c-glue-raw-position-get a1)))
+(define c-glue-raw-inside?
   (foreign-procedure "tmg_insideP" (scheme-object) scheme-object))
-(define insert-raw-return
+(define (inside? a1)
+  (tm-glue-check (c-glue-raw-inside? a1)))
+(define c-glue-raw-insert-raw-return
   (foreign-procedure "tmg_insert_raw_return" () scheme-object))
-(define remove-text
+(define (insert-raw-return)
+  (tm-glue-check (c-glue-raw-insert-raw-return)))
+(define c-glue-raw-remove-text
   (foreign-procedure "tmg_remove_text" (scheme-object) scheme-object))
-(define remove-structure
+(define (remove-text a1)
+  (tm-glue-check (c-glue-raw-remove-text a1)))
+(define c-glue-raw-remove-structure
   (foreign-procedure "tmg_remove_structure" (scheme-object) scheme-object))
-(define remove-structure-upwards
+(define (remove-structure a1)
+  (tm-glue-check (c-glue-raw-remove-structure a1)))
+(define c-glue-raw-remove-structure-upwards
   (foreign-procedure "tmg_remove_structure_upwards" () scheme-object))
-(define cpp-make
+(define (remove-structure-upwards)
+  (tm-glue-check (c-glue-raw-remove-structure-upwards)))
+(define c-glue-raw-cpp-make
   (foreign-procedure "tmg_cpp_make" (scheme-object) scheme-object))
-(define cpp-make-arity
+(define (cpp-make a1)
+  (tm-glue-check (c-glue-raw-cpp-make a1)))
+(define c-glue-raw-cpp-make-arity
   (foreign-procedure "tmg_cpp_make_arity" (scheme-object scheme-object) scheme-object))
-(define activate
+(define (cpp-make-arity a1 a2)
+  (tm-glue-check (c-glue-raw-cpp-make-arity a1 a2)))
+(define c-glue-raw-activate
   (foreign-procedure "tmg_activate" () scheme-object))
-(define insert-argument
+(define (activate)
+  (tm-glue-check (c-glue-raw-activate)))
+(define c-glue-raw-insert-argument
   (foreign-procedure "tmg_insert_argument" (scheme-object) scheme-object))
-(define remove-argument
+(define (insert-argument a1)
+  (tm-glue-check (c-glue-raw-insert-argument a1)))
+(define c-glue-raw-remove-argument
   (foreign-procedure "tmg_remove_argument" (scheme-object) scheme-object))
-(define insert-argument-at
+(define (remove-argument a1)
+  (tm-glue-check (c-glue-raw-remove-argument a1)))
+(define c-glue-raw-insert-argument-at
   (foreign-procedure "tmg_insert_argument_at" (scheme-object scheme-object) scheme-object))
-(define remove-argument-at
+(define (insert-argument-at a1 a2)
+  (tm-glue-check (c-glue-raw-insert-argument-at a1 a2)))
+(define c-glue-raw-remove-argument-at
   (foreign-procedure "tmg_remove_argument_at" (scheme-object scheme-object) scheme-object))
-(define make-mod-active
+(define (remove-argument-at a1 a2)
+  (tm-glue-check (c-glue-raw-remove-argument-at a1 a2)))
+(define c-glue-raw-make-mod-active
   (foreign-procedure "tmg_make_mod_active" (scheme-object) scheme-object))
-(define cpp-make-hybrid
+(define (make-mod-active a1)
+  (tm-glue-check (c-glue-raw-make-mod-active a1)))
+(define c-glue-raw-cpp-make-hybrid
   (foreign-procedure "tmg_cpp_make_hybrid" () scheme-object))
-(define activate-latex
+(define (cpp-make-hybrid)
+  (tm-glue-check (c-glue-raw-cpp-make-hybrid)))
+(define c-glue-raw-activate-latex
   (foreign-procedure "tmg_activate_latex" () scheme-object))
-(define activate-hybrid
+(define (activate-latex)
+  (tm-glue-check (c-glue-raw-activate-latex)))
+(define c-glue-raw-activate-hybrid
   (foreign-procedure "tmg_activate_hybrid" (scheme-object) scheme-object))
-(define activate-symbol
+(define (activate-hybrid a1)
+  (tm-glue-check (c-glue-raw-activate-hybrid a1)))
+(define c-glue-raw-activate-symbol
   (foreign-procedure "tmg_activate_symbol" () scheme-object))
-(define make-return-before
+(define (activate-symbol)
+  (tm-glue-check (c-glue-raw-activate-symbol)))
+(define c-glue-raw-make-return-before
   (foreign-procedure "tmg_make_return_before" () scheme-object))
-(define make-return-after
+(define (make-return-before)
+  (tm-glue-check (c-glue-raw-make-return-before)))
+(define c-glue-raw-make-return-after
   (foreign-procedure "tmg_make_return_after" () scheme-object))
-(define temp-proof-fix
+(define (make-return-after)
+  (tm-glue-check (c-glue-raw-make-return-after)))
+(define c-glue-raw-temp-proof-fix
   (foreign-procedure "tmg_temp_proof_fix" () scheme-object))
-(define get-full-env
+(define (temp-proof-fix)
+  (tm-glue-check (c-glue-raw-temp-proof-fix)))
+(define c-glue-raw-get-full-env
   (foreign-procedure "tmg_get_full_env" () scheme-object))
-(define get-all-inits
+(define (get-full-env)
+  (tm-glue-check (c-glue-raw-get-full-env)))
+(define c-glue-raw-get-all-inits
   (foreign-procedure "tmg_get_all_inits" () scheme-object))
-(define get-style-tree
+(define (get-all-inits)
+  (tm-glue-check (c-glue-raw-get-all-inits)))
+(define c-glue-raw-get-style-tree
   (foreign-procedure "tmg_get_style_tree" () scheme-object))
-(define set-style-tree
+(define (get-style-tree)
+  (tm-glue-check (c-glue-raw-get-style-tree)))
+(define c-glue-raw-set-style-tree
   (foreign-procedure "tmg_set_style_tree" (scheme-object) scheme-object))
-(define get-page-count
+(define (set-style-tree a1)
+  (tm-glue-check (c-glue-raw-set-style-tree a1)))
+(define c-glue-raw-get-page-count
   (foreign-procedure "tmg_get_page_count" () scheme-object))
-(define get-page-width
+(define (get-page-count)
+  (tm-glue-check (c-glue-raw-get-page-count)))
+(define c-glue-raw-get-page-width
   (foreign-procedure "tmg_get_page_width" (scheme-object) scheme-object))
-(define get-pages-width
+(define (get-page-width a1)
+  (tm-glue-check (c-glue-raw-get-page-width a1)))
+(define c-glue-raw-get-pages-width
   (foreign-procedure "tmg_get_pages_width" (scheme-object) scheme-object))
-(define get-page-height
+(define (get-pages-width a1)
+  (tm-glue-check (c-glue-raw-get-pages-width a1)))
+(define c-glue-raw-get-page-height
   (foreign-procedure "tmg_get_page_height" (scheme-object) scheme-object))
-(define get-total-width
+(define (get-page-height a1)
+  (tm-glue-check (c-glue-raw-get-page-height a1)))
+(define c-glue-raw-get-total-width
   (foreign-procedure "tmg_get_total_width" (scheme-object) scheme-object))
-(define get-total-height
+(define (get-total-width a1)
+  (tm-glue-check (c-glue-raw-get-total-width a1)))
+(define c-glue-raw-get-total-height
   (foreign-procedure "tmg_get_total_height" (scheme-object) scheme-object))
-(define cpp-make-rigid
+(define (get-total-height a1)
+  (tm-glue-check (c-glue-raw-get-total-height a1)))
+(define c-glue-raw-cpp-make-rigid
   (foreign-procedure "tmg_cpp_make_rigid" () scheme-object))
-(define cpp-make-below
+(define (cpp-make-rigid)
+  (tm-glue-check (c-glue-raw-cpp-make-rigid)))
+(define c-glue-raw-cpp-make-below
   (foreign-procedure "tmg_cpp_make_below" () scheme-object))
-(define cpp-make-above
+(define (cpp-make-below)
+  (tm-glue-check (c-glue-raw-cpp-make-below)))
+(define c-glue-raw-cpp-make-above
   (foreign-procedure "tmg_cpp_make_above" () scheme-object))
-(define cpp-make-script
+(define (cpp-make-above)
+  (tm-glue-check (c-glue-raw-cpp-make-above)))
+(define c-glue-raw-cpp-make-script
   (foreign-procedure "tmg_cpp_make_script" (scheme-object scheme-object) scheme-object))
-(define cpp-make-fraction
+(define (cpp-make-script a1 a2)
+  (tm-glue-check (c-glue-raw-cpp-make-script a1 a2)))
+(define c-glue-raw-cpp-make-fraction
   (foreign-procedure "tmg_cpp_make_fraction" () scheme-object))
-(define cpp-make-sqrt
+(define (cpp-make-fraction)
+  (tm-glue-check (c-glue-raw-cpp-make-fraction)))
+(define c-glue-raw-cpp-make-sqrt
   (foreign-procedure "tmg_cpp_make_sqrt" () scheme-object))
-(define cpp-make-var-sqrt
+(define (cpp-make-sqrt)
+  (tm-glue-check (c-glue-raw-cpp-make-sqrt)))
+(define c-glue-raw-cpp-make-var-sqrt
   (foreign-procedure "tmg_cpp_make_var_sqrt" () scheme-object))
-(define cpp-make-neg
+(define (cpp-make-var-sqrt)
+  (tm-glue-check (c-glue-raw-cpp-make-var-sqrt)))
+(define c-glue-raw-cpp-make-neg
   (foreign-procedure "tmg_cpp_make_neg" () scheme-object))
-(define cpp-make-tree
+(define (cpp-make-neg)
+  (tm-glue-check (c-glue-raw-cpp-make-neg)))
+(define c-glue-raw-cpp-make-tree
   (foreign-procedure "tmg_cpp_make_tree" () scheme-object))
-(define make-subtable
+(define (cpp-make-tree)
+  (tm-glue-check (c-glue-raw-cpp-make-tree)))
+(define c-glue-raw-make-subtable
   (foreign-procedure "tmg_make_subtable" () scheme-object))
-(define table-deactivate
+(define (make-subtable)
+  (tm-glue-check (c-glue-raw-make-subtable)))
+(define c-glue-raw-table-deactivate
   (foreign-procedure "tmg_table_deactivate" () scheme-object))
-(define table-extract-format
+(define (table-deactivate)
+  (tm-glue-check (c-glue-raw-table-deactivate)))
+(define c-glue-raw-table-extract-format
   (foreign-procedure "tmg_table_extract_format" () scheme-object))
-(define table-insert-row
+(define (table-extract-format)
+  (tm-glue-check (c-glue-raw-table-extract-format)))
+(define c-glue-raw-table-insert-row
   (foreign-procedure "tmg_table_insert_row" (scheme-object) scheme-object))
-(define table-insert-column
+(define (table-insert-row a1)
+  (tm-glue-check (c-glue-raw-table-insert-row a1)))
+(define c-glue-raw-table-insert-column
   (foreign-procedure "tmg_table_insert_column" (scheme-object) scheme-object))
-(define table-remove-row
+(define (table-insert-column a1)
+  (tm-glue-check (c-glue-raw-table-insert-column a1)))
+(define c-glue-raw-table-remove-row
   (foreign-procedure "tmg_table_remove_row" (scheme-object) scheme-object))
-(define table-remove-column
+(define (table-remove-row a1)
+  (tm-glue-check (c-glue-raw-table-remove-row a1)))
+(define c-glue-raw-table-remove-column
   (foreign-procedure "tmg_table_remove_column" (scheme-object) scheme-object))
-(define table-nr-rows
+(define (table-remove-column a1)
+  (tm-glue-check (c-glue-raw-table-remove-column a1)))
+(define c-glue-raw-table-nr-rows
   (foreign-procedure "tmg_table_nr_rows" () scheme-object))
-(define table-nr-columns
+(define (table-nr-rows)
+  (tm-glue-check (c-glue-raw-table-nr-rows)))
+(define c-glue-raw-table-nr-columns
   (foreign-procedure "tmg_table_nr_columns" () scheme-object))
-(define table-get-extents
+(define (table-nr-columns)
+  (tm-glue-check (c-glue-raw-table-nr-columns)))
+(define c-glue-raw-table-get-extents
   (foreign-procedure "tmg_table_get_extents" () scheme-object))
-(define table-set-extents
+(define (table-get-extents)
+  (tm-glue-check (c-glue-raw-table-get-extents)))
+(define c-glue-raw-table-set-extents
   (foreign-procedure "tmg_table_set_extents" (scheme-object scheme-object) scheme-object))
-(define table-which-row
+(define (table-set-extents a1 a2)
+  (tm-glue-check (c-glue-raw-table-set-extents a1 a2)))
+(define c-glue-raw-table-which-row
   (foreign-procedure "tmg_table_which_row" () scheme-object))
-(define table-which-column
+(define (table-which-row)
+  (tm-glue-check (c-glue-raw-table-which-row)))
+(define c-glue-raw-table-which-column
   (foreign-procedure "tmg_table_which_column" () scheme-object))
-(define table-which-cells
+(define (table-which-column)
+  (tm-glue-check (c-glue-raw-table-which-column)))
+(define c-glue-raw-table-which-cells
   (foreign-procedure "tmg_table_which_cells" () scheme-object))
-(define table-cell-path
+(define (table-which-cells)
+  (tm-glue-check (c-glue-raw-table-which-cells)))
+(define c-glue-raw-table-cell-path
   (foreign-procedure "tmg_table_cell_path" (scheme-object scheme-object) scheme-object))
-(define table-go-to
+(define (table-cell-path a1 a2)
+  (tm-glue-check (c-glue-raw-table-cell-path a1 a2)))
+(define c-glue-raw-table-go-to
   (foreign-procedure "tmg_table_go_to" (scheme-object scheme-object) scheme-object))
-(define table-get-format-all
+(define (table-go-to a1 a2)
+  (tm-glue-check (c-glue-raw-table-go-to a1 a2)))
+(define c-glue-raw-table-get-format-all
   (foreign-procedure "tmg_table_get_format_all" () scheme-object))
-(define table-row-decoration
+(define (table-get-format-all)
+  (tm-glue-check (c-glue-raw-table-get-format-all)))
+(define c-glue-raw-table-row-decoration
   (foreign-procedure "tmg_table_row_decoration" (scheme-object) scheme-object))
-(define table-column-decoration
+(define (table-row-decoration a1)
+  (tm-glue-check (c-glue-raw-table-row-decoration a1)))
+(define c-glue-raw-table-column-decoration
   (foreign-procedure "tmg_table_column_decoration" (scheme-object) scheme-object))
-(define table-format-center
+(define (table-column-decoration a1)
+  (tm-glue-check (c-glue-raw-table-column-decoration a1)))
+(define c-glue-raw-table-format-center
   (foreign-procedure "tmg_table_format_center" () scheme-object))
-(define table-correct-block-content
+(define (table-format-center)
+  (tm-glue-check (c-glue-raw-table-format-center)))
+(define c-glue-raw-table-correct-block-content
   (foreign-procedure "tmg_table_correct_block_content" () scheme-object))
-(define table-test
+(define (table-correct-block-content)
+  (tm-glue-check (c-glue-raw-table-correct-block-content)))
+(define c-glue-raw-table-test
   (foreign-procedure "tmg_table_test" () scheme-object))
-(define complete-try?
+(define (table-test)
+  (tm-glue-check (c-glue-raw-table-test)))
+(define c-glue-raw-complete-try?
   (foreign-procedure "tmg_complete_tryP" () scheme-object))
-(define get-input-mode
+(define (complete-try?)
+  (tm-glue-check (c-glue-raw-complete-try?)))
+(define c-glue-raw-get-input-mode
   (foreign-procedure "tmg_get_input_mode" () scheme-object))
-(define get-mouse-position
+(define (get-input-mode)
+  (tm-glue-check (c-glue-raw-get-input-mode)))
+(define c-glue-raw-get-mouse-position
   (foreign-procedure "tmg_get_mouse_position" () scheme-object))
-(define go-to-path
+(define (get-mouse-position)
+  (tm-glue-check (c-glue-raw-get-mouse-position)))
+(define c-glue-raw-go-to-path
   (foreign-procedure "tmg_go_to_path" (scheme-object) scheme-object))
-(define go-left
+(define (go-to-path a1)
+  (tm-glue-check (c-glue-raw-go-to-path a1)))
+(define c-glue-raw-go-left
   (foreign-procedure "tmg_go_left" () scheme-object))
-(define go-right
+(define (go-left)
+  (tm-glue-check (c-glue-raw-go-left)))
+(define c-glue-raw-go-right
   (foreign-procedure "tmg_go_right" () scheme-object))
-(define go-up
+(define (go-right)
+  (tm-glue-check (c-glue-raw-go-right)))
+(define c-glue-raw-go-up
   (foreign-procedure "tmg_go_up" () scheme-object))
-(define go-down
+(define (go-up)
+  (tm-glue-check (c-glue-raw-go-up)))
+(define c-glue-raw-go-down
   (foreign-procedure "tmg_go_down" () scheme-object))
-(define go-start
+(define (go-down)
+  (tm-glue-check (c-glue-raw-go-down)))
+(define c-glue-raw-go-start
   (foreign-procedure "tmg_go_start" () scheme-object))
-(define go-end
+(define (go-start)
+  (tm-glue-check (c-glue-raw-go-start)))
+(define c-glue-raw-go-end
   (foreign-procedure "tmg_go_end" () scheme-object))
-(define go-start-of
+(define (go-end)
+  (tm-glue-check (c-glue-raw-go-end)))
+(define c-glue-raw-go-start-of
   (foreign-procedure "tmg_go_start_of" (scheme-object) scheme-object))
-(define go-end-of
+(define (go-start-of a1)
+  (tm-glue-check (c-glue-raw-go-start-of a1)))
+(define c-glue-raw-go-end-of
   (foreign-procedure "tmg_go_end_of" (scheme-object) scheme-object))
-(define go-start-line
+(define (go-end-of a1)
+  (tm-glue-check (c-glue-raw-go-end-of a1)))
+(define c-glue-raw-go-start-line
   (foreign-procedure "tmg_go_start_line" () scheme-object))
-(define go-end-line
+(define (go-start-line)
+  (tm-glue-check (c-glue-raw-go-start-line)))
+(define c-glue-raw-go-end-line
   (foreign-procedure "tmg_go_end_line" () scheme-object))
-(define go-page-up
+(define (go-end-line)
+  (tm-glue-check (c-glue-raw-go-end-line)))
+(define c-glue-raw-go-page-up
   (foreign-procedure "tmg_go_page_up" () scheme-object))
-(define go-page-down
+(define (go-page-up)
+  (tm-glue-check (c-glue-raw-go-page-up)))
+(define c-glue-raw-go-page-down
   (foreign-procedure "tmg_go_page_down" () scheme-object))
-(define go-start-paragraph
+(define (go-page-down)
+  (tm-glue-check (c-glue-raw-go-page-down)))
+(define c-glue-raw-go-start-paragraph
   (foreign-procedure "tmg_go_start_paragraph" () scheme-object))
-(define go-end-paragraph
+(define (go-start-paragraph)
+  (tm-glue-check (c-glue-raw-go-start-paragraph)))
+(define c-glue-raw-go-end-paragraph
   (foreign-procedure "tmg_go_end_paragraph" () scheme-object))
-(define cursor-accessible?
+(define (go-end-paragraph)
+  (tm-glue-check (c-glue-raw-go-end-paragraph)))
+(define c-glue-raw-cursor-accessible?
   (foreign-procedure "tmg_cursor_accessibleP" () scheme-object))
-(define cursor-show-if-hidden
+(define (cursor-accessible?)
+  (tm-glue-check (c-glue-raw-cursor-accessible?)))
+(define c-glue-raw-cursor-show-if-hidden
   (foreign-procedure "tmg_cursor_show_if_hidden" () scheme-object))
-(define select-all
+(define (cursor-show-if-hidden)
+  (tm-glue-check (c-glue-raw-cursor-show-if-hidden)))
+(define c-glue-raw-select-all
   (foreign-procedure "tmg_select_all" () scheme-object))
-(define select-line
+(define (select-all)
+  (tm-glue-check (c-glue-raw-select-all)))
+(define c-glue-raw-select-line
   (foreign-procedure "tmg_select_line" () scheme-object))
-(define select-from-cursor
+(define (select-line)
+  (tm-glue-check (c-glue-raw-select-line)))
+(define c-glue-raw-select-from-cursor
   (foreign-procedure "tmg_select_from_cursor" () scheme-object))
-(define select-from-cursor-if-active
+(define (select-from-cursor)
+  (tm-glue-check (c-glue-raw-select-from-cursor)))
+(define c-glue-raw-select-from-cursor-if-active
   (foreign-procedure "tmg_select_from_cursor_if_active" () scheme-object))
-(define select-from-keyboard
+(define (select-from-cursor-if-active)
+  (tm-glue-check (c-glue-raw-select-from-cursor-if-active)))
+(define c-glue-raw-select-from-keyboard
   (foreign-procedure "tmg_select_from_keyboard" (scheme-object) scheme-object))
-(define select-from-shift-keyboard
+(define (select-from-keyboard a1)
+  (tm-glue-check (c-glue-raw-select-from-keyboard a1)))
+(define c-glue-raw-select-from-shift-keyboard
   (foreign-procedure "tmg_select_from_shift_keyboard" () scheme-object))
-(define select-enlarge
+(define (select-from-shift-keyboard)
+  (tm-glue-check (c-glue-raw-select-from-shift-keyboard)))
+(define c-glue-raw-select-enlarge
   (foreign-procedure "tmg_select_enlarge" () scheme-object))
-(define select-enlarge-environmental
+(define (select-enlarge)
+  (tm-glue-check (c-glue-raw-select-enlarge)))
+(define c-glue-raw-select-enlarge-environmental
   (foreign-procedure "tmg_select_enlarge_environmental" () scheme-object))
-(define selection-active-any?
+(define (select-enlarge-environmental)
+  (tm-glue-check (c-glue-raw-select-enlarge-environmental)))
+(define c-glue-raw-selection-active-any?
   (foreign-procedure "tmg_selection_active_anyP" () scheme-object))
-(define selection-active-normal?
+(define (selection-active-any?)
+  (tm-glue-check (c-glue-raw-selection-active-any?)))
+(define c-glue-raw-selection-active-normal?
   (foreign-procedure "tmg_selection_active_normalP" () scheme-object))
-(define selection-active-table?
+(define (selection-active-normal?)
+  (tm-glue-check (c-glue-raw-selection-active-normal?)))
+(define c-glue-raw-selection-active-table?
   (foreign-procedure "tmg_selection_active_tableP" () scheme-object))
-(define selection-active-small?
+(define (selection-active-table?)
+  (tm-glue-check (c-glue-raw-selection-active-table?)))
+(define c-glue-raw-selection-active-small?
   (foreign-procedure "tmg_selection_active_smallP" () scheme-object))
-(define selection-active-enlarging?
+(define (selection-active-small?)
+  (tm-glue-check (c-glue-raw-selection-active-small?)))
+(define c-glue-raw-selection-active-enlarging?
   (foreign-procedure "tmg_selection_active_enlargingP" () scheme-object))
-(define selection-set-start
+(define (selection-active-enlarging?)
+  (tm-glue-check (c-glue-raw-selection-active-enlarging?)))
+(define c-glue-raw-selection-set-start
   (foreign-procedure "tmg_selection_set_start" () scheme-object))
-(define selection-set-end
+(define (selection-set-start)
+  (tm-glue-check (c-glue-raw-selection-set-start)))
+(define c-glue-raw-selection-set-end
   (foreign-procedure "tmg_selection_set_end" () scheme-object))
-(define selection-get-start
+(define (selection-set-end)
+  (tm-glue-check (c-glue-raw-selection-set-end)))
+(define c-glue-raw-selection-get-start
   (foreign-procedure "tmg_selection_get_start" () scheme-object))
-(define selection-get-end
+(define (selection-get-start)
+  (tm-glue-check (c-glue-raw-selection-get-start)))
+(define c-glue-raw-selection-get-end
   (foreign-procedure "tmg_selection_get_end" () scheme-object))
-(define selection-get-start*
+(define (selection-get-end)
+  (tm-glue-check (c-glue-raw-selection-get-end)))
+(define c-glue-raw-selection-get-start*
   (foreign-procedure "tmg_selection_get_start_dot" () scheme-object))
-(define selection-get-end*
+(define (selection-get-start*)
+  (tm-glue-check (c-glue-raw-selection-get-start*)))
+(define c-glue-raw-selection-get-end*
   (foreign-procedure "tmg_selection_get_end_dot" () scheme-object))
-(define selection-path
+(define (selection-get-end*)
+  (tm-glue-check (c-glue-raw-selection-get-end*)))
+(define c-glue-raw-selection-path
   (foreign-procedure "tmg_selection_path" () scheme-object))
-(define selection-set
+(define (selection-path)
+  (tm-glue-check (c-glue-raw-selection-path)))
+(define c-glue-raw-selection-set
   (foreign-procedure "tmg_selection_set" (scheme-object scheme-object) scheme-object))
-(define selection-set-range-set
+(define (selection-set a1 a2)
+  (tm-glue-check (c-glue-raw-selection-set a1 a2)))
+(define c-glue-raw-selection-set-range-set
   (foreign-procedure "tmg_selection_set_range_set" (scheme-object) scheme-object))
-(define clipboard-cut-at
+(define (selection-set-range-set a1)
+  (tm-glue-check (c-glue-raw-selection-set-range-set a1)))
+(define c-glue-raw-clipboard-cut-at
   (foreign-procedure "tmg_clipboard_cut_at" (scheme-object) scheme-object))
-(define clipboard-cut-between
+(define (clipboard-cut-at a1)
+  (tm-glue-check (c-glue-raw-clipboard-cut-at a1)))
+(define c-glue-raw-clipboard-cut-between
   (foreign-procedure "tmg_clipboard_cut_between" (scheme-object scheme-object) scheme-object))
-(define selection-move
+(define (clipboard-cut-between a1 a2)
+  (tm-glue-check (c-glue-raw-clipboard-cut-between a1 a2)))
+(define c-glue-raw-selection-move
   (foreign-procedure "tmg_selection_move" () scheme-object))
-(define selection-cancel
+(define (selection-move)
+  (tm-glue-check (c-glue-raw-selection-move)))
+(define c-glue-raw-selection-cancel
   (foreign-procedure "tmg_selection_cancel" () scheme-object))
-(define set-manual-focus-path
+(define (selection-cancel)
+  (tm-glue-check (c-glue-raw-selection-cancel)))
+(define c-glue-raw-set-manual-focus-path
   (foreign-procedure "tmg_set_manual_focus_path" (scheme-object) scheme-object))
-(define get-manual-focus-path
+(define (set-manual-focus-path a1)
+  (tm-glue-check (c-glue-raw-set-manual-focus-path a1)))
+(define c-glue-raw-get-manual-focus-path
   (foreign-procedure "tmg_get_manual_focus_path" () scheme-object))
-(define get-focus-path
+(define (get-manual-focus-path)
+  (tm-glue-check (c-glue-raw-get-manual-focus-path)))
+(define c-glue-raw-get-focus-path
   (foreign-procedure "tmg_get_focus_path" () scheme-object))
-(define cancel-alt-selections
+(define (get-focus-path)
+  (tm-glue-check (c-glue-raw-get-focus-path)))
+(define c-glue-raw-cancel-alt-selections
   (foreign-procedure "tmg_cancel_alt_selections" () scheme-object))
-(define clear-undo-history
+(define (cancel-alt-selections)
+  (tm-glue-check (c-glue-raw-cancel-alt-selections)))
+(define c-glue-raw-clear-undo-history
   (foreign-procedure "tmg_clear_undo_history" () scheme-object))
-(define commit-changes
+(define (clear-undo-history)
+  (tm-glue-check (c-glue-raw-clear-undo-history)))
+(define c-glue-raw-commit-changes
   (foreign-procedure "tmg_commit_changes" () scheme-object))
-(define start-slave
+(define (commit-changes)
+  (tm-glue-check (c-glue-raw-commit-changes)))
+(define c-glue-raw-start-slave
   (foreign-procedure "tmg_start_slave" (scheme-object) scheme-object))
-(define mark-start
+(define (start-slave a1)
+  (tm-glue-check (c-glue-raw-start-slave a1)))
+(define c-glue-raw-mark-start
   (foreign-procedure "tmg_mark_start" (scheme-object) scheme-object))
-(define mark-end
+(define (mark-start a1)
+  (tm-glue-check (c-glue-raw-mark-start a1)))
+(define c-glue-raw-mark-end
   (foreign-procedure "tmg_mark_end" (scheme-object) scheme-object))
-(define mark-cancel
+(define (mark-end a1)
+  (tm-glue-check (c-glue-raw-mark-end a1)))
+(define c-glue-raw-mark-cancel
   (foreign-procedure "tmg_mark_cancel" (scheme-object) scheme-object))
-(define remove-undo-mark
+(define (mark-cancel a1)
+  (tm-glue-check (c-glue-raw-mark-cancel a1)))
+(define c-glue-raw-remove-undo-mark
   (foreign-procedure "tmg_remove_undo_mark" () scheme-object))
-(define add-undo-mark
+(define (remove-undo-mark)
+  (tm-glue-check (c-glue-raw-remove-undo-mark)))
+(define c-glue-raw-add-undo-mark
   (foreign-procedure "tmg_add_undo_mark" () scheme-object))
-(define unredoable-undo
+(define (add-undo-mark)
+  (tm-glue-check (c-glue-raw-add-undo-mark)))
+(define c-glue-raw-unredoable-undo
   (foreign-procedure "tmg_unredoable_undo" () scheme-object))
-(define undo-possibilities
+(define (unredoable-undo)
+  (tm-glue-check (c-glue-raw-unredoable-undo)))
+(define c-glue-raw-undo-possibilities
   (foreign-procedure "tmg_undo_possibilities" () scheme-object))
-(define undo
+(define (undo-possibilities)
+  (tm-glue-check (c-glue-raw-undo-possibilities)))
+(define c-glue-raw-undo
   (foreign-procedure "tmg_undo" (scheme-object) scheme-object))
-(define redo-possibilities
+(define (undo a1)
+  (tm-glue-check (c-glue-raw-undo a1)))
+(define c-glue-raw-redo-possibilities
   (foreign-procedure "tmg_redo_possibilities" () scheme-object))
-(define redo
+(define (redo-possibilities)
+  (tm-glue-check (c-glue-raw-redo-possibilities)))
+(define c-glue-raw-redo
   (foreign-procedure "tmg_redo" (scheme-object) scheme-object))
-(define show-history
+(define (redo a1)
+  (tm-glue-check (c-glue-raw-redo a1)))
+(define c-glue-raw-show-history
   (foreign-procedure "tmg_show_history" () scheme-object))
-(define archive-state
+(define (show-history)
+  (tm-glue-check (c-glue-raw-show-history)))
+(define c-glue-raw-archive-state
   (foreign-procedure "tmg_archive_state" () scheme-object))
-(define start-editing
+(define (archive-state)
+  (tm-glue-check (c-glue-raw-archive-state)))
+(define c-glue-raw-start-editing
   (foreign-procedure "tmg_start_editing" () scheme-object))
-(define end-editing
+(define (start-editing)
+  (tm-glue-check (c-glue-raw-start-editing)))
+(define c-glue-raw-end-editing
   (foreign-procedure "tmg_end_editing" () scheme-object))
-(define cancel-editing
+(define (end-editing)
+  (tm-glue-check (c-glue-raw-end-editing)))
+(define c-glue-raw-cancel-editing
   (foreign-procedure "tmg_cancel_editing" () scheme-object))
-(define in-graphics?
+(define (cancel-editing)
+  (tm-glue-check (c-glue-raw-cancel-editing)))
+(define c-glue-raw-in-graphics?
   (foreign-procedure "tmg_in_graphicsP" () scheme-object))
-(define get-graphical-x
+(define (in-graphics?)
+  (tm-glue-check (c-glue-raw-in-graphics?)))
+(define c-glue-raw-get-graphical-x
   (foreign-procedure "tmg_get_graphical_x" () scheme-object))
-(define get-graphical-y
+(define (get-graphical-x)
+  (tm-glue-check (c-glue-raw-get-graphical-x)))
+(define c-glue-raw-get-graphical-y
   (foreign-procedure "tmg_get_graphical_y" () scheme-object))
-(define get-graphical-pixel
+(define (get-graphical-y)
+  (tm-glue-check (c-glue-raw-get-graphical-y)))
+(define c-glue-raw-get-graphical-pixel
   (foreign-procedure "tmg_get_graphical_pixel" () scheme-object))
-(define get-graphical-object
+(define (get-graphical-pixel)
+  (tm-glue-check (c-glue-raw-get-graphical-pixel)))
+(define c-glue-raw-get-graphical-object
   (foreign-procedure "tmg_get_graphical_object" () scheme-object))
-(define set-graphical-object
+(define (get-graphical-object)
+  (tm-glue-check (c-glue-raw-get-graphical-object)))
+(define c-glue-raw-set-graphical-object
   (foreign-procedure "tmg_set_graphical_object" (scheme-object) scheme-object))
-(define invalidate-graphical-object
+(define (set-graphical-object a1)
+  (tm-glue-check (c-glue-raw-set-graphical-object a1)))
+(define c-glue-raw-invalidate-graphical-object
   (foreign-procedure "tmg_invalidate_graphical_object" () scheme-object))
-(define graphical-select
+(define (invalidate-graphical-object)
+  (tm-glue-check (c-glue-raw-invalidate-graphical-object)))
+(define c-glue-raw-graphical-select
   (foreign-procedure "tmg_graphical_select" (scheme-object scheme-object) scheme-object))
-(define graphical-select-area
+(define (graphical-select a1 a2)
+  (tm-glue-check (c-glue-raw-graphical-select a1 a2)))
+(define c-glue-raw-graphical-select-area
   (foreign-procedure "tmg_graphical_select_area" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
-(define in-normal-mode?
+(define (graphical-select-area a1 a2 a3 a4)
+  (tm-glue-check (c-glue-raw-graphical-select-area a1 a2 a3 a4)))
+(define c-glue-raw-in-normal-mode?
   (foreign-procedure "tmg_in_normal_modeP" () scheme-object))
-(define in-search-mode?
+(define (in-normal-mode?)
+  (tm-glue-check (c-glue-raw-in-normal-mode?)))
+(define c-glue-raw-in-search-mode?
   (foreign-procedure "tmg_in_search_modeP" () scheme-object))
-(define in-replace-mode?
+(define (in-search-mode?)
+  (tm-glue-check (c-glue-raw-in-search-mode?)))
+(define c-glue-raw-in-replace-mode?
   (foreign-procedure "tmg_in_replace_modeP" () scheme-object))
-(define in-spell-mode?
+(define (in-replace-mode?)
+  (tm-glue-check (c-glue-raw-in-replace-mode?)))
+(define c-glue-raw-in-spell-mode?
   (foreign-procedure "tmg_in_spell_modeP" () scheme-object))
-(define search-start
+(define (in-spell-mode?)
+  (tm-glue-check (c-glue-raw-in-spell-mode?)))
+(define c-glue-raw-search-start
   (foreign-procedure "tmg_search_start" (scheme-object) scheme-object))
-(define search-button-next
+(define (search-start a1)
+  (tm-glue-check (c-glue-raw-search-start a1)))
+(define c-glue-raw-search-button-next
   (foreign-procedure "tmg_search_button_next" () scheme-object))
-(define spell-start
+(define (search-button-next)
+  (tm-glue-check (c-glue-raw-search-button-next)))
+(define c-glue-raw-spell-start
   (foreign-procedure "tmg_spell_start" () scheme-object))
-(define custom-complete
+(define (spell-start)
+  (tm-glue-check (c-glue-raw-spell-start)))
+(define c-glue-raw-custom-complete
   (foreign-procedure "tmg_custom_complete" (scheme-object) scheme-object))
-(define get-window-width
+(define (custom-complete a1)
+  (tm-glue-check (c-glue-raw-custom-complete a1)))
+(define c-glue-raw-get-window-width
   (foreign-procedure "tmg_get_window_width" () scheme-object))
-(define get-window-height
+(define (get-window-width)
+  (tm-glue-check (c-glue-raw-get-window-width)))
+(define c-glue-raw-get-window-height
   (foreign-procedure "tmg_get_window_height" () scheme-object))
-(define get-window-x
+(define (get-window-height)
+  (tm-glue-check (c-glue-raw-get-window-height)))
+(define c-glue-raw-get-window-x
   (foreign-procedure "tmg_get_window_x" () scheme-object))
-(define get-window-y
+(define (get-window-x)
+  (tm-glue-check (c-glue-raw-get-window-x)))
+(define c-glue-raw-get-window-y
   (foreign-procedure "tmg_get_window_y" () scheme-object))
-(define get-canvas-x
+(define (get-window-y)
+  (tm-glue-check (c-glue-raw-get-window-y)))
+(define c-glue-raw-get-canvas-x
   (foreign-procedure "tmg_get_canvas_x" () scheme-object))
-(define get-canvas-y
+(define (get-canvas-x)
+  (tm-glue-check (c-glue-raw-get-canvas-x)))
+(define c-glue-raw-get-canvas-y
   (foreign-procedure "tmg_get_canvas_y" () scheme-object))
-(define get-scroll-x
+(define (get-canvas-y)
+  (tm-glue-check (c-glue-raw-get-canvas-y)))
+(define c-glue-raw-get-scroll-x
   (foreign-procedure "tmg_get_scroll_x" () scheme-object))
-(define get-scroll-y
+(define (get-scroll-x)
+  (tm-glue-check (c-glue-raw-get-scroll-x)))
+(define c-glue-raw-get-scroll-y
   (foreign-procedure "tmg_get_scroll_y" () scheme-object))
-(define set-scroll
+(define (get-scroll-y)
+  (tm-glue-check (c-glue-raw-get-scroll-y)))
+(define c-glue-raw-set-scroll
   (foreign-procedure "tmg_set_scroll" (scheme-object scheme-object) scheme-object))
-(define get-cursor-x
+(define (set-scroll a1 a2)
+  (tm-glue-check (c-glue-raw-set-scroll a1 a2)))
+(define c-glue-raw-get-cursor-x
   (foreign-procedure "tmg_get_cursor_x" () scheme-object))
-(define get-cursor-y
+(define (get-cursor-x)
+  (tm-glue-check (c-glue-raw-get-cursor-x)))
+(define c-glue-raw-get-cursor-y
   (foreign-procedure "tmg_get_cursor_y" () scheme-object))
-(define clear-buffer
+(define (get-cursor-y)
+  (tm-glue-check (c-glue-raw-get-cursor-y)))
+(define c-glue-raw-clear-buffer
   (foreign-procedure "tmg_clear_buffer" () scheme-object))
-(define tex-buffer
+(define (clear-buffer)
+  (tm-glue-check (c-glue-raw-clear-buffer)))
+(define c-glue-raw-tex-buffer
   (foreign-procedure "tmg_tex_buffer" () scheme-object))
-(define clear-local-info
+(define (tex-buffer)
+  (tm-glue-check (c-glue-raw-tex-buffer)))
+(define c-glue-raw-clear-local-info
   (foreign-procedure "tmg_clear_local_info" () scheme-object))
-(define refresh-window
+(define (clear-local-info)
+  (tm-glue-check (c-glue-raw-clear-local-info)))
+(define c-glue-raw-refresh-window
   (foreign-procedure "tmg_refresh_window" () scheme-object))
-(define update-forced
+(define (refresh-window)
+  (tm-glue-check (c-glue-raw-refresh-window)))
+(define c-glue-raw-update-forced
   (foreign-procedure "tmg_update_forced" () scheme-object))
-(define update-path
+(define (update-forced)
+  (tm-glue-check (c-glue-raw-update-forced)))
+(define c-glue-raw-update-path
   (foreign-procedure "tmg_update_path" (scheme-object) scheme-object))
-(define update-current-buffer
+(define (update-path a1)
+  (tm-glue-check (c-glue-raw-update-path a1)))
+(define c-glue-raw-update-current-buffer
   (foreign-procedure "tmg_update_current_buffer" () scheme-object))
-(define update-players
+(define (update-current-buffer)
+  (tm-glue-check (c-glue-raw-update-current-buffer)))
+(define c-glue-raw-update-players
   (foreign-procedure "tmg_update_players" (scheme-object scheme-object) scheme-object))
-(define generate-all-aux
+(define (update-players a1 a2)
+  (tm-glue-check (c-glue-raw-update-players a1 a2)))
+(define c-glue-raw-generate-all-aux
   (foreign-procedure "tmg_generate_all_aux" () scheme-object))
-(define notify-page-change
+(define (generate-all-aux)
+  (tm-glue-check (c-glue-raw-generate-all-aux)))
+(define c-glue-raw-notify-page-change
   (foreign-procedure "tmg_notify_page_change" () scheme-object))
-(define notify-change
+(define (notify-page-change)
+  (tm-glue-check (c-glue-raw-notify-page-change)))
+(define c-glue-raw-notify-change
   (foreign-procedure "tmg_notify_change" (scheme-object) scheme-object))
-(define notified-change?
+(define (notify-change a1)
+  (tm-glue-check (c-glue-raw-notify-change a1)))
+(define c-glue-raw-notified-change?
   (foreign-procedure "tmg_notified_changeP" (scheme-object) scheme-object))
-(define cpp-nr-pages
+(define (notified-change? a1)
+  (tm-glue-check (c-glue-raw-notified-change? a1)))
+(define c-glue-raw-cpp-nr-pages
   (foreign-procedure "tmg_cpp_nr_pages" () scheme-object))
-(define print
+(define (cpp-nr-pages)
+  (tm-glue-check (c-glue-raw-cpp-nr-pages)))
+(define c-glue-raw-print
   (foreign-procedure "tmg_print" () scheme-object))
-(define idle-time
+(define (print)
+  (tm-glue-check (c-glue-raw-print)))
+(define c-glue-raw-idle-time
   (foreign-procedure "tmg_idle_time" () scheme-object))
-(define change-time
+(define (idle-time)
+  (tm-glue-check (c-glue-raw-idle-time)))
+(define c-glue-raw-change-time
   (foreign-procedure "tmg_change_time" () scheme-object))
-(define menu-before-action
+(define (change-time)
+  (tm-glue-check (c-glue-raw-change-time)))
+(define c-glue-raw-menu-before-action
   (foreign-procedure "tmg_menu_before_action" () scheme-object))
-(define menu-after-action
+(define (menu-before-action)
+  (tm-glue-check (c-glue-raw-menu-before-action)))
+(define c-glue-raw-menu-after-action
   (foreign-procedure "tmg_menu_after_action" () scheme-object))
-(define update-menus
+(define (menu-after-action)
+  (tm-glue-check (c-glue-raw-menu-after-action)))
+(define c-glue-raw-update-menus
   (foreign-procedure "tmg_update_menus" () scheme-object))
-(define show-tree
+(define (update-menus)
+  (tm-glue-check (c-glue-raw-update-menus)))
+(define c-glue-raw-show-tree
   (foreign-procedure "tmg_show_tree" () scheme-object))
-(define show-box
+(define (show-tree)
+  (tm-glue-check (c-glue-raw-show-tree)))
+(define c-glue-raw-show-box
   (foreign-procedure "tmg_show_box" () scheme-object))
-(define show-env
+(define (show-box)
+  (tm-glue-check (c-glue-raw-show-box)))
+(define c-glue-raw-show-env
   (foreign-procedure "tmg_show_env" () scheme-object))
-(define show-path
+(define (show-env)
+  (tm-glue-check (c-glue-raw-show-env)))
+(define c-glue-raw-show-path
   (foreign-procedure "tmg_show_path" () scheme-object))
-(define show-cursor
+(define (show-path)
+  (tm-glue-check (c-glue-raw-show-path)))
+(define c-glue-raw-show-cursor
   (foreign-procedure "tmg_show_cursor" () scheme-object))
-(define show-selection
+(define (show-cursor)
+  (tm-glue-check (c-glue-raw-show-cursor)))
+(define c-glue-raw-show-selection
   (foreign-procedure "tmg_show_selection" () scheme-object))
-(define show-meminfo
+(define (show-selection)
+  (tm-glue-check (c-glue-raw-show-selection)))
+(define c-glue-raw-show-meminfo
   (foreign-procedure "tmg_show_meminfo" () scheme-object))
-(define edit-special
+(define (show-meminfo)
+  (tm-glue-check (c-glue-raw-show-meminfo)))
+(define c-glue-raw-edit-special
   (foreign-procedure "tmg_edit_special" () scheme-object))
-(define edit-test
+(define (edit-special)
+  (tm-glue-check (c-glue-raw-edit-special)))
+(define c-glue-raw-edit-test
   (foreign-procedure "tmg_edit_test" () scheme-object))
-(define window-get-serial
+(define (edit-test)
+  (tm-glue-check (c-glue-raw-edit-test)))
+(define c-glue-raw-window-get-serial
   (foreign-procedure "tmg_window_get_serial" () scheme-object))
-(define show-header
+(define (window-get-serial)
+  (tm-glue-check (c-glue-raw-window-get-serial)))
+(define c-glue-raw-show-header
   (foreign-procedure "tmg_show_header" (scheme-object) scheme-object))
-(define show-icon-bar
+(define (show-header a1)
+  (tm-glue-check (c-glue-raw-show-header a1)))
+(define c-glue-raw-show-icon-bar
   (foreign-procedure "tmg_show_icon_bar" (scheme-object scheme-object) scheme-object))
-(define show-side-tools
+(define (show-icon-bar a1 a2)
+  (tm-glue-check (c-glue-raw-show-icon-bar a1 a2)))
+(define c-glue-raw-show-side-tools
   (foreign-procedure "tmg_show_side_tools" (scheme-object scheme-object) scheme-object))
-(define show-bottom-tools
+(define (show-side-tools a1 a2)
+  (tm-glue-check (c-glue-raw-show-side-tools a1 a2)))
+(define c-glue-raw-show-bottom-tools
   (foreign-procedure "tmg_show_bottom_tools" (scheme-object scheme-object) scheme-object))
-(define show-footer
+(define (show-bottom-tools a1 a2)
+  (tm-glue-check (c-glue-raw-show-bottom-tools a1 a2)))
+(define c-glue-raw-show-footer
   (foreign-procedure "tmg_show_footer" (scheme-object) scheme-object))
-(define visible-header?
+(define (show-footer a1)
+  (tm-glue-check (c-glue-raw-show-footer a1)))
+(define c-glue-raw-visible-header?
   (foreign-procedure "tmg_visible_headerP" () scheme-object))
-(define visible-icon-bar?
+(define (visible-header?)
+  (tm-glue-check (c-glue-raw-visible-header?)))
+(define c-glue-raw-visible-icon-bar?
   (foreign-procedure "tmg_visible_icon_barP" (scheme-object) scheme-object))
-(define visible-side-tools?
+(define (visible-icon-bar? a1)
+  (tm-glue-check (c-glue-raw-visible-icon-bar? a1)))
+(define c-glue-raw-visible-side-tools?
   (foreign-procedure "tmg_visible_side_toolsP" (scheme-object) scheme-object))
-(define visible-bottom-tools?
+(define (visible-side-tools? a1)
+  (tm-glue-check (c-glue-raw-visible-side-tools? a1)))
+(define c-glue-raw-visible-bottom-tools?
   (foreign-procedure "tmg_visible_bottom_toolsP" (scheme-object) scheme-object))
-(define visible-footer?
+(define (visible-bottom-tools? a1)
+  (tm-glue-check (c-glue-raw-visible-bottom-tools? a1)))
+(define c-glue-raw-visible-footer?
   (foreign-procedure "tmg_visible_footerP" () scheme-object))
-(define full-screen-mode
+(define (visible-footer?)
+  (tm-glue-check (c-glue-raw-visible-footer?)))
+(define c-glue-raw-full-screen-mode
   (foreign-procedure "tmg_full_screen_mode" (scheme-object scheme-object) scheme-object))
-(define full-screen?
+(define (full-screen-mode a1 a2)
+  (tm-glue-check (c-glue-raw-full-screen-mode a1 a2)))
+(define c-glue-raw-full-screen?
   (foreign-procedure "tmg_full_screenP" () scheme-object))
-(define full-screen-edit?
+(define (full-screen?)
+  (tm-glue-check (c-glue-raw-full-screen?)))
+(define c-glue-raw-full-screen-edit?
   (foreign-procedure "tmg_full_screen_editP" () scheme-object))
-(define set-window-zoom-factor
+(define (full-screen-edit?)
+  (tm-glue-check (c-glue-raw-full-screen-edit?)))
+(define c-glue-raw-set-window-zoom-factor
   (foreign-procedure "tmg_set_window_zoom_factor" (scheme-object) scheme-object))
-(define get-window-zoom-factor
+(define (set-window-zoom-factor a1)
+  (tm-glue-check (c-glue-raw-set-window-zoom-factor a1)))
+(define c-glue-raw-get-window-zoom-factor
   (foreign-procedure "tmg_get_window_zoom_factor" () scheme-object))
-(define dialogue-end
+(define (get-window-zoom-factor)
+  (tm-glue-check (c-glue-raw-get-window-zoom-factor)))
+(define c-glue-raw-dialogue-end
   (foreign-procedure "tmg_dialogue_end" () scheme-object))
-(define cpp-style-clear-cache
+(define (dialogue-end)
+  (tm-glue-check (c-glue-raw-dialogue-end)))
+(define c-glue-raw-cpp-style-clear-cache
   (foreign-procedure "tmg_cpp_style_clear_cache" () scheme-object))
-(define set-script-status
+(define (cpp-style-clear-cache)
+  (tm-glue-check (c-glue-raw-cpp-style-clear-cache)))
+(define c-glue-raw-set-script-status
   (foreign-procedure "tmg_set_script_status" (scheme-object) scheme-object))
-(define set-default-zoom-factor
+(define (set-script-status a1)
+  (tm-glue-check (c-glue-raw-set-script-status a1)))
+(define c-glue-raw-set-default-zoom-factor
   (foreign-procedure "tmg_set_default_zoom_factor" (scheme-object) scheme-object))
-(define get-default-zoom-factor
+(define (set-default-zoom-factor a1)
+  (tm-glue-check (c-glue-raw-set-default-zoom-factor a1)))
+(define c-glue-raw-get-default-zoom-factor
   (foreign-procedure "tmg_get_default_zoom_factor" () scheme-object))
-(define inclusions-gc
+(define (get-default-zoom-factor)
+  (tm-glue-check (c-glue-raw-get-default-zoom-factor)))
+(define c-glue-raw-inclusions-gc
   (foreign-procedure "tmg_inclusions_gc" () scheme-object))
-(define update-all-path
+(define (inclusions-gc)
+  (tm-glue-check (c-glue-raw-inclusions-gc)))
+(define c-glue-raw-update-all-path
   (foreign-procedure "tmg_update_all_path" (scheme-object) scheme-object))
-(define update-all-buffers
+(define (update-all-path a1)
+  (tm-glue-check (c-glue-raw-update-all-path a1)))
+(define c-glue-raw-update-all-buffers
   (foreign-procedure "tmg_update_all_buffers" () scheme-object))
-(define recall-message
+(define (update-all-buffers)
+  (tm-glue-check (c-glue-raw-update-all-buffers)))
+(define c-glue-raw-recall-message
   (foreign-procedure "tmg_recall_message" () scheme-object))
-(define quit-TeXmacs
+(define (recall-message)
+  (tm-glue-check (c-glue-raw-recall-message)))
+(define c-glue-raw-quit-TeXmacs
   (foreign-procedure "tmg_quit_TeXmacs" () scheme-object))
-(define tree?
+(define (quit-TeXmacs)
+  (tm-glue-check (c-glue-raw-quit-TeXmacs)))
+(define c-glue-raw-tree?
   (foreign-procedure "tmg_treeP" (scheme-object) scheme-object))
-(define observer?
+(define (tree? a1)
+  (tm-glue-check (c-glue-raw-tree? a1)))
+(define c-glue-raw-observer?
   (foreign-procedure "tmg_observerP" (scheme-object) scheme-object))
-(define blackbox?
+(define (observer? a1)
+  (tm-glue-check (c-glue-raw-observer? a1)))
+(define c-glue-raw-blackbox?
   (foreign-procedure "tmg_blackboxP" (scheme-object) scheme-object))
+(define (blackbox? a1)
+  (tm-glue-check (c-glue-raw-blackbox? a1)))
 
 ;;; --- Transcoded bindings: UTF-8 at the boundary -------------------
 
@@ -939,1447 +1827,1459 @@
   (foreign-procedure "tmg_texmacs_version_release" (scheme-object) scheme-object))
 
 (define (texmacs-version-release a1)
-  (recur-utf8->string (c-glue-texmacs_version_release (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-texmacs_version_release (recur-string->utf8 a1)))))
 
 (define c-glue-version_beforeP
   (foreign-procedure "tmg_version_beforeP" (scheme-object scheme-object) scheme-object))
 
 (define (version-before? a1 a2)
-  (recur-utf8->string (c-glue-version_beforeP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-version_beforeP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-get_original_path
   (foreign-procedure "tmg_get_original_path" () scheme-object))
 
 (define (get-original-path)
-  (recur-utf8->string (c-glue-get_original_path)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_original_path))))
 
 (define c-glue-support_functionalityP
   (foreign-procedure "tmg_support_functionalityP" (scheme-object) scheme-object))
 
 (define (support-functionality? a1)
-  (recur-utf8->string (c-glue-support_functionalityP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-support_functionalityP (recur-string->utf8 a1)))))
 
 (define c-glue-gui_version
   (foreign-procedure "tmg_gui_version" () scheme-object))
 
 (define (gui-version)
-  (recur-utf8->string (c-glue-gui_version)))
+  (recur-utf8->string (tm-glue-check (c-glue-gui_version))))
 
 (define c-glue-default_look_and_feel
   (foreign-procedure "tmg_default_look_and_feel" () scheme-object))
 
 (define (default-look-and-feel)
-  (recur-utf8->string (c-glue-default_look_and_feel)))
+  (recur-utf8->string (tm-glue-check (c-glue-default_look_and_feel))))
 
 (define c-glue-default_chinese_font
   (foreign-procedure "tmg_default_chinese_font" () scheme-object))
 
 (define (default-chinese-font)
-  (recur-utf8->string (c-glue-default_chinese_font)))
+  (recur-utf8->string (tm-glue-check (c-glue-default_chinese_font))))
 
 (define c-glue-default_japanese_font
   (foreign-procedure "tmg_default_japanese_font" () scheme-object))
 
 (define (default-japanese-font)
-  (recur-utf8->string (c-glue-default_japanese_font)))
+  (recur-utf8->string (tm-glue-check (c-glue-default_japanese_font))))
 
 (define c-glue-default_korean_font
   (foreign-procedure "tmg_default_korean_font" () scheme-object))
 
 (define (default-korean-font)
-  (recur-utf8->string (c-glue-default_korean_font)))
+  (recur-utf8->string (tm-glue-check (c-glue-default_korean_font))))
+
+(define c-glue-tm_output
+  (foreign-procedure "tmg_tm_output" (scheme-object) scheme-object))
+
+(define (tm-output a1)
+  (recur-utf8->string (tm-glue-check (c-glue-tm_output (recur-string->utf8 a1)))))
+
+(define c-glue-tm_errput
+  (foreign-procedure "tmg_tm_errput" (scheme-object) scheme-object))
+
+(define (tm-errput a1)
+  (recur-utf8->string (tm-glue-check (c-glue-tm_errput (recur-string->utf8 a1)))))
 
 (define c-glue-win32_display
   (foreign-procedure "tmg_win32_display" (scheme-object) scheme-object))
 
 (define (win32-display a1)
-  (recur-utf8->string (c-glue-win32_display (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-win32_display (recur-string->utf8 a1)))))
 
 (define c-glue-scheme_dialect
   (foreign-procedure "tmg_scheme_dialect" () scheme-object))
 
 (define (scheme-dialect)
-  (recur-utf8->string (c-glue-scheme_dialect)))
+  (recur-utf8->string (tm-glue-check (c-glue-scheme_dialect))))
 
 (define c-glue-get_texmacs_path
   (foreign-procedure "tmg_get_texmacs_path" () scheme-object))
 
 (define (get-texmacs-path)
-  (recur-utf8->string (c-glue-get_texmacs_path)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_texmacs_path))))
 
 (define c-glue-get_texmacs_home_path
   (foreign-procedure "tmg_get_texmacs_home_path" () scheme-object))
 
 (define (get-texmacs-home-path)
-  (recur-utf8->string (c-glue-get_texmacs_home_path)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_texmacs_home_path))))
 
 (define c-glue-get_user_login
   (foreign-procedure "tmg_get_user_login" () scheme-object))
 
 (define (get-user-login)
-  (recur-utf8->string (c-glue-get_user_login)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_user_login))))
 
 (define c-glue-get_user_name
   (foreign-procedure "tmg_get_user_name" () scheme-object))
 
 (define (get-user-name)
-  (recur-utf8->string (c-glue-get_user_name)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_user_name))))
 
 (define c-glue-plugin_list
   (foreign-procedure "tmg_plugin_list" () scheme-object))
 
 (define (plugin-list)
-  (recur-cork->string (c-glue-plugin_list)))
+  (recur-cork->string (tm-glue-check (c-glue-plugin_list))))
 
 (define c-glue-font_exists_in_ttP
   (foreign-procedure "tmg_font_exists_in_ttP" (scheme-object) scheme-object))
 
 (define (font-exists-in-tt? a1)
-  (recur-utf8->string (c-glue-font_exists_in_ttP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_exists_in_ttP (recur-string->utf8 a1)))))
 
 (define c-glue-eval_system
   (foreign-procedure "tmg_eval_system" (scheme-object) scheme-object))
 
 (define (eval-system a1)
-  (recur-utf8->string (c-glue-eval_system (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-eval_system (recur-string->utf8 a1)))))
 
 (define c-glue-var_eval_system
   (foreign-procedure "tmg_var_eval_system" (scheme-object) scheme-object))
 
 (define (var-eval-system a1)
-  (recur-utf8->string (c-glue-var_eval_system (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-var_eval_system (recur-string->utf8 a1)))))
 
 (define c-glue-evaluate_system
   (foreign-procedure "tmg_evaluate_system" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (evaluate-system a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-evaluate_system (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-evaluate_system (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-async_eval_system
   (foreign-procedure "tmg_async_eval_system" (scheme-object scheme-object) scheme-object))
 
 (define (async-eval-system a1 a2)
-  (recur-utf8->string (c-glue-async_eval_system (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-async_eval_system (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-http_post
   (foreign-procedure "tmg_http_post" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (http-post a1 a2 a3)
-  (recur-utf8->string (c-glue-http_post (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-http_post (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-http_post_query
   (foreign-procedure "tmg_http_post_query" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (http-post-query a1 a2 a3)
-  (recur-utf8->string (c-glue-http_post_query (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-http_post_query (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-async_http_post
   (foreign-procedure "tmg_async_http_post" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (async-http-post a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-async_http_post (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-async_http_post (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-async_http_post_query
   (foreign-procedure "tmg_async_http_post_query" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (async-http-post-query a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-async_http_post_query (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-async_http_post_query (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-get_locale_language
   (foreign-procedure "tmg_get_locale_language" () scheme-object))
 
 (define (get-locale-language)
-  (recur-utf8->string (c-glue-get_locale_language)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_locale_language))))
 
 (define c-glue-get_locale_charset
   (foreign-procedure "tmg_get_locale_charset" () scheme-object))
 
 (define (get-locale-charset)
-  (recur-utf8->string (c-glue-get_locale_charset)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_locale_charset))))
 
 (define c-glue-locale_to_language
   (foreign-procedure "tmg_locale_to_language" (scheme-object) scheme-object))
 
 (define (locale-to-language a1)
-  (recur-utf8->string (c-glue-locale_to_language (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-locale_to_language (recur-string->utf8 a1)))))
 
 (define c-glue-language_to_locale
   (foreign-procedure "tmg_language_to_locale" (scheme-object) scheme-object))
 
 (define (language-to-locale a1)
-  (recur-utf8->string (c-glue-language_to_locale (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-language_to_locale (recur-string->utf8 a1)))))
 
 (define c-glue-pretty_time
   (foreign-procedure "tmg_pretty_time" (scheme-object) scheme-object))
 
 (define (pretty-time a1)
-  (recur-utf8->string (c-glue-pretty_time (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-pretty_time (recur-string->utf8 a1)))))
 
 (define c-glue-pretty_date
   (foreign-procedure "tmg_pretty_date" (scheme-object scheme-object) scheme-object))
 
 (define (pretty-date a1 a2)
-  (recur-utf8->string (c-glue-pretty_date (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-pretty_date (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-bench_print
   (foreign-procedure "tmg_bench_print" (scheme-object) scheme-object))
 
 (define (bench-print a1)
-  (recur-utf8->string (c-glue-bench_print (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-bench_print (recur-string->utf8 a1)))))
 
 (define c-glue-system_wait
   (foreign-procedure "tmg_system_wait" (scheme-object scheme-object) scheme-object))
 
 (define (system-wait a1 a2)
-  (recur-utf8->string (c-glue-system_wait (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_wait (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-set_latex_command
   (foreign-procedure "tmg_set_latex_command" (scheme-object) scheme-object))
 
 (define (set-latex-command a1)
-  (recur-utf8->string (c-glue-set_latex_command (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_latex_command (recur-string->utf8 a1)))))
 
 (define c-glue-set_bibtex_command
   (foreign-procedure "tmg_set_bibtex_command" (scheme-object) scheme-object))
 
 (define (set-bibtex-command a1)
-  (recur-utf8->string (c-glue-set_bibtex_command (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_bibtex_command (recur-string->utf8 a1)))))
 
 (define c-glue-number_latex_errors
   (foreign-procedure "tmg_number_latex_errors" (scheme-object) scheme-object))
 
 (define (number-latex-errors a1)
-  (recur-utf8->string (c-glue-number_latex_errors (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-number_latex_errors (recur-string->utf8 a1)))))
 
 (define c-glue-number_latex_pages
   (foreign-procedure "tmg_number_latex_pages" (scheme-object) scheme-object))
 
 (define (number-latex-pages a1)
-  (recur-utf8->string (c-glue-number_latex_pages (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-number_latex_pages (recur-string->utf8 a1)))))
 
 (define c-glue-math_symbol_group
   (foreign-procedure "tmg_math_symbol_group" (scheme-object) scheme-object))
 
 (define (math-symbol-group a1)
-  (recur-utf8->string (c-glue-math_symbol_group (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-math_symbol_group (recur-string->utf8 a1)))))
 
 (define c-glue-math_group_members
   (foreign-procedure "tmg_math_group_members" (scheme-object) scheme-object))
 
 (define (math-group-members a1)
-  (recur-utf8->string (c-glue-math_group_members (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-math_group_members (recur-string->utf8 a1)))))
 
 (define c-glue-math_symbol_type
   (foreign-procedure "tmg_math_symbol_type" (scheme-object) scheme-object))
 
 (define (math-symbol-type a1)
-  (recur-utf8->string (c-glue-math_symbol_type (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-math_symbol_type (recur-string->utf8 a1)))))
 
 (define c-glue-object_2command
   (foreign-procedure "tmg_object_2command" (scheme-object) scheme-object))
 
 (define (object->command a1)
-  (recur-utf8->string (c-glue-object_2command (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-object_2command (recur-string->utf8 a1)))))
 
 (define c-glue-command_apply
   (foreign-procedure "tmg_command_apply" (scheme-object scheme-object) scheme-object))
 
 (define (command-apply a1 a2)
-  (recur-utf8->string (c-glue-command_apply (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-command_apply (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-exec_delayed
   (foreign-procedure "tmg_exec_delayed" (scheme-object) scheme-object))
 
 (define (exec-delayed a1)
-  (recur-utf8->string (c-glue-exec_delayed (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-exec_delayed (recur-string->utf8 a1)))))
 
 (define c-glue-exec_delayed_pause
   (foreign-procedure "tmg_exec_delayed_pause" (scheme-object) scheme-object))
 
 (define (exec-delayed-pause a1)
-  (recur-utf8->string (c-glue-exec_delayed_pause (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-exec_delayed_pause (recur-string->utf8 a1)))))
 
 (define c-glue-protected_call
   (foreign-procedure "tmg_protected_call" (scheme-object) scheme-object))
 
 (define (protected-call a1)
-  (recur-utf8->string (c-glue-protected_call (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-protected_call (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_has_preferenceP
   (foreign-procedure "tmg_cpp_has_preferenceP" (scheme-object) scheme-object))
 
 (define (cpp-has-preference? a1)
-  (recur-utf8->string (c-glue-cpp_has_preferenceP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_has_preferenceP (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_get_preference
   (foreign-procedure "tmg_cpp_get_preference" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-get-preference a1 a2)
-  (recur-utf8->string (c-glue-cpp_get_preference (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_get_preference (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_set_preference
   (foreign-procedure "tmg_cpp_set_preference" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-set-preference a1 a2)
-  (recur-utf8->string (c-glue-cpp_set_preference (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_set_preference (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_reset_preference
   (foreign-procedure "tmg_cpp_reset_preference" (scheme-object) scheme-object))
 
 (define (cpp-reset-preference a1)
-  (recur-utf8->string (c-glue-cpp_reset_preference (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_reset_preference (recur-string->utf8 a1)))))
 
 (define c-glue-get_default_printing_command
   (foreign-procedure "tmg_get_default_printing_command" () scheme-object))
 
 (define (get-default-printing-command)
-  (recur-utf8->string (c-glue-get_default_printing_command)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_default_printing_command))))
 
 (define c-glue-set_input_language
   (foreign-procedure "tmg_set_input_language" (scheme-object) scheme-object))
 
 (define (set-input-language a1)
-  (recur-utf8->string (c-glue-set_input_language (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_input_language (recur-string->utf8 a1)))))
 
 (define c-glue-get_input_language
   (foreign-procedure "tmg_get_input_language" () scheme-object))
 
 (define (get-input-language)
-  (recur-utf8->string (c-glue-get_input_language)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_input_language))))
 
 (define c-glue-set_output_language
   (foreign-procedure "tmg_set_output_language" (scheme-object) scheme-object))
 
 (define (set-output-language a1)
-  (recur-utf8->string (c-glue-set_output_language (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_output_language (recur-string->utf8 a1)))))
 
 (define c-glue-get_output_language
   (foreign-procedure "tmg_get_output_language" () scheme-object))
 
 (define (get-output-language)
-  (recur-utf8->string (c-glue-get_output_language)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_output_language))))
 
 (define c-glue-translate
   (foreign-procedure "tmg_translate" (scheme-object) scheme-object))
 
 (define (translate a1)
-  (recur-utf8->string (c-glue-translate (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-translate (recur-string->cork a1)))))
 
 (define c-glue-string_translate
   (foreign-procedure "tmg_string_translate" (scheme-object) scheme-object))
 
 (define (string-translate a1)
-  (recur-utf8->string (c-glue-string_translate (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_translate (recur-string->utf8 a1)))))
 
 (define c-glue-translate_from_to
   (foreign-procedure "tmg_translate_from_to" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (translate-from-to a1 a2 a3)
-  (recur-utf8->string (c-glue-translate_from_to (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-translate_from_to (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tree_translate
   (foreign-procedure "tmg_tree_translate" (scheme-object) scheme-object))
 
 (define (tree-translate a1)
-  (recur-utf8->string (c-glue-tree_translate (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_translate (recur-string->cork a1)))))
 
 (define c-glue-tree_translate_from_to
   (foreign-procedure "tmg_tree_translate_from_to" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-translate-from-to a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_translate_from_to (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_translate_from_to (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-force_load_translations
   (foreign-procedure "tmg_force_load_translations" (scheme-object scheme-object) scheme-object))
 
 (define (force-load-translations a1 a2)
-  (recur-utf8->string (c-glue-force_load_translations (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-force_load_translations (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-color
   (foreign-procedure "tmg_color" (scheme-object) scheme-object))
 
 (define (color a1)
-  (recur-utf8->string (c-glue-color (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-color (recur-string->utf8 a1)))))
 
 (define c-glue-get_hex_color
   (foreign-procedure "tmg_get_hex_color" (scheme-object) scheme-object))
 
 (define (get-hex-color a1)
-  (recur-utf8->string (c-glue-get_hex_color (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_hex_color (recur-string->utf8 a1)))))
 
 (define c-glue-named_color_2xcolormap
   (foreign-procedure "tmg_named_color_2xcolormap" (scheme-object) scheme-object))
 
 (define (named-color->xcolormap a1)
-  (recur-utf8->string (c-glue-named_color_2xcolormap (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-named_color_2xcolormap (recur-string->utf8 a1)))))
 
 (define c-glue-rgba_2named_color
   (foreign-procedure "tmg_rgba_2named_color" (scheme-object) scheme-object))
 
 (define (rgba->named-color a1)
-  (recur-utf8->string (c-glue-rgba_2named_color (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-rgba_2named_color (recur-string->utf8 a1)))))
 
 (define c-glue-named_color_2rgba
   (foreign-procedure "tmg_named_color_2rgba" (scheme-object) scheme-object))
 
 (define (named-color->rgba a1)
-  (recur-utf8->string (c-glue-named_color_2rgba (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-named_color_2rgba (recur-string->utf8 a1)))))
 
 (define c-glue-debug_set
   (foreign-procedure "tmg_debug_set" (scheme-object scheme-object) scheme-object))
 
 (define (debug-set a1 a2)
-  (recur-utf8->string (c-glue-debug_set (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-debug_set (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-debug_get
   (foreign-procedure "tmg_debug_get" (scheme-object) scheme-object))
 
 (define (debug-get a1)
-  (recur-utf8->string (c-glue-debug_get (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-debug_get (recur-string->utf8 a1)))))
 
 (define c-glue-debug_message
   (foreign-procedure "tmg_debug_message" (scheme-object scheme-object) scheme-object))
 
 (define (debug-message a1 a2)
-  (recur-utf8->string (c-glue-debug_message (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-debug_message (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-get_debug_messages
   (foreign-procedure "tmg_get_debug_messages" (scheme-object scheme-object) scheme-object))
 
 (define (get-debug-messages a1 a2)
-  (recur-utf8->string (c-glue-get_debug_messages (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_debug_messages (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cout_unbuffer
   (foreign-procedure "tmg_cout_unbuffer" () scheme-object))
 
 (define (cout-unbuffer)
-  (recur-utf8->string (c-glue-cout_unbuffer)))
+  (recur-utf8->string (tm-glue-check (c-glue-cout_unbuffer))))
 
 (define c-glue-glyph_register
   (foreign-procedure "tmg_glyph_register" (scheme-object scheme-object) scheme-object))
 
 (define (glyph-register a1 a2)
-  (recur-utf8->string (c-glue-glyph_register (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-glyph_register (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-glyph_recognize
   (foreign-procedure "tmg_glyph_recognize" (scheme-object) scheme-object))
 
 (define (glyph-recognize a1)
-  (recur-utf8->string (c-glue-glyph_recognize (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-glyph_recognize (recur-string->utf8 a1)))))
 
 (define c-glue-apply_effect
   (foreign-procedure "tmg_apply_effect" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (apply-effect a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-apply_effect (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-apply_effect (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-tt_existsP
   (foreign-procedure "tmg_tt_existsP" (scheme-object) scheme-object))
 
 (define (tt-exists? a1)
-  (recur-utf8->string (c-glue-tt_existsP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tt_existsP (recur-string->utf8 a1)))))
 
 (define c-glue-tt_dump
   (foreign-procedure "tmg_tt_dump" (scheme-object) scheme-object))
 
 (define (tt-dump a1)
-  (recur-utf8->string (c-glue-tt_dump (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tt_dump (recur-string->utf8 a1)))))
 
 (define c-glue-tt_font_name
   (foreign-procedure "tmg_tt_font_name" (scheme-object) scheme-object))
 
 (define (tt-font-name a1)
-  (recur-cork->string (c-glue-tt_font_name (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-tt_font_name (recur-string->utf8 a1)))))
 
 (define c-glue-tt_analyze
   (foreign-procedure "tmg_tt_analyze" (scheme-object) scheme-object))
 
 (define (tt-analyze a1)
-  (recur-utf8->string (c-glue-tt_analyze (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tt_analyze (recur-string->utf8 a1)))))
 
 (define c-glue-font_database_build
   (foreign-procedure "tmg_font_database_build" (scheme-object) scheme-object))
 
 (define (font-database-build a1)
-  (recur-utf8->string (c-glue-font_database_build (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_build (recur-string->utf8 a1)))))
 
 (define c-glue-font_database_extend_local
   (foreign-procedure "tmg_font_database_extend_local" (scheme-object) scheme-object))
 
 (define (font-database-extend-local a1)
-  (recur-utf8->string (c-glue-font_database_extend_local (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_extend_local (recur-string->utf8 a1)))))
 
 (define c-glue-font_database_insert_global
   (foreign-procedure "tmg_font_database_insert_global" (scheme-object) scheme-object))
 
 (define (font-database-insert-global a1)
-  (recur-utf8->string (c-glue-font_database_insert_global (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_insert_global (recur-string->utf8 a1)))))
 
 (define c-glue-font_database_families
   (foreign-procedure "tmg_font_database_families" () scheme-object))
 
 (define (font-database-families)
-  (recur-utf8->string (c-glue-font_database_families)))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_families))))
 
 (define c-glue-font_database_delta_families
   (foreign-procedure "tmg_font_database_delta_families" () scheme-object))
 
 (define (font-database-delta-families)
-  (recur-utf8->string (c-glue-font_database_delta_families)))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_delta_families))))
 
 (define c-glue-font_database_styles
   (foreign-procedure "tmg_font_database_styles" (scheme-object) scheme-object))
 
 (define (font-database-styles a1)
-  (recur-utf8->string (c-glue-font_database_styles (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_styles (recur-string->utf8 a1)))))
 
 (define c-glue-font_database_search
   (foreign-procedure "tmg_font_database_search" (scheme-object scheme-object) scheme-object))
 
 (define (font-database-search a1 a2)
-  (recur-utf8->string (c-glue-font_database_search (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_search (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-font_database_characteristics
   (foreign-procedure "tmg_font_database_characteristics" (scheme-object scheme-object) scheme-object))
 
 (define (font-database-characteristics a1 a2)
-  (recur-utf8->string (c-glue-font_database_characteristics (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_database_characteristics (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-font_database_substitutions
   (foreign-procedure "tmg_font_database_substitutions" (scheme-object) scheme-object))
 
 (define (font-database-substitutions a1)
-  (recur-cork->string (c-glue-font_database_substitutions (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-font_database_substitutions (recur-string->utf8 a1)))))
 
 (define c-glue-font_family_2master
   (foreign-procedure "tmg_font_family_2master" (scheme-object) scheme-object))
 
 (define (font-family->master a1)
-  (recur-utf8->string (c-glue-font_family_2master (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_family_2master (recur-string->utf8 a1)))))
 
 (define c-glue-font_master_2families
   (foreign-procedure "tmg_font_master_2families" (scheme-object) scheme-object))
 
 (define (font-master->families a1)
-  (recur-utf8->string (c-glue-font_master_2families (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_master_2families (recur-string->utf8 a1)))))
 
 (define c-glue-font_master_features
   (foreign-procedure "tmg_font_master_features" (scheme-object) scheme-object))
 
 (define (font-master-features a1)
-  (recur-utf8->string (c-glue-font_master_features (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_master_features (recur-string->utf8 a1)))))
 
 (define c-glue-font_family_features
   (foreign-procedure "tmg_font_family_features" (scheme-object) scheme-object))
 
 (define (font-family-features a1)
-  (recur-utf8->string (c-glue-font_family_features (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_family_features (recur-string->utf8 a1)))))
 
 (define c-glue-font_family_strict_features
   (foreign-procedure "tmg_font_family_strict_features" (scheme-object) scheme-object))
 
 (define (font-family-strict-features a1)
-  (recur-utf8->string (c-glue-font_family_strict_features (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_family_strict_features (recur-string->utf8 a1)))))
 
 (define c-glue-font_style_features
   (foreign-procedure "tmg_font_style_features" (scheme-object) scheme-object))
 
 (define (font-style-features a1)
-  (recur-utf8->string (c-glue-font_style_features (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_style_features (recur-string->utf8 a1)))))
 
 (define c-glue-font_guessed_features
   (foreign-procedure "tmg_font_guessed_features" (scheme-object scheme-object) scheme-object))
 
 (define (font-guessed-features a1 a2)
-  (recur-utf8->string (c-glue-font_guessed_features (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_guessed_features (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-font_guessed_distance
   (foreign-procedure "tmg_font_guessed_distance" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (font-guessed-distance a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-font_guessed_distance (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_guessed_distance (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-font_master_guessed_distance
   (foreign-procedure "tmg_font_master_guessed_distance" (scheme-object scheme-object) scheme-object))
 
 (define (font-master-guessed-distance a1 a2)
-  (recur-utf8->string (c-glue-font_master_guessed_distance (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_master_guessed_distance (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-font_family_guessed_features
   (foreign-procedure "tmg_font_family_guessed_features" (scheme-object scheme-object) scheme-object))
 
 (define (font-family-guessed-features a1 a2)
-  (recur-utf8->string (c-glue-font_family_guessed_features (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_family_guessed_features (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-characteristic_distance
   (foreign-procedure "tmg_characteristic_distance" (scheme-object scheme-object) scheme-object))
 
 (define (characteristic-distance a1 a2)
-  (recur-utf8->string (c-glue-characteristic_distance (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-characteristic_distance (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-trace_distance
   (foreign-procedure "tmg_trace_distance" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (trace-distance a1 a2 a3)
-  (recur-utf8->string (c-glue-trace_distance (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-trace_distance (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-logical_font_public
   (foreign-procedure "tmg_logical_font_public" (scheme-object scheme-object) scheme-object))
 
 (define (logical-font-public a1 a2)
-  (recur-utf8->string (c-glue-logical_font_public (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_public (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-logical_font_exact
   (foreign-procedure "tmg_logical_font_exact" (scheme-object scheme-object) scheme-object))
 
 (define (logical-font-exact a1 a2)
-  (recur-utf8->string (c-glue-logical_font_exact (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_exact (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-logical_font_private
   (foreign-procedure "tmg_logical_font_private" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (logical-font-private a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-logical_font_private (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_private (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-logical_font_family
   (foreign-procedure "tmg_logical_font_family" (scheme-object) scheme-object))
 
 (define (logical-font-family a1)
-  (recur-utf8->string (c-glue-logical_font_family (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_family (recur-string->utf8 a1)))))
 
 (define c-glue-logical_font_variant
   (foreign-procedure "tmg_logical_font_variant" (scheme-object) scheme-object))
 
 (define (logical-font-variant a1)
-  (recur-utf8->string (c-glue-logical_font_variant (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_variant (recur-string->utf8 a1)))))
 
 (define c-glue-logical_font_series
   (foreign-procedure "tmg_logical_font_series" (scheme-object) scheme-object))
 
 (define (logical-font-series a1)
-  (recur-utf8->string (c-glue-logical_font_series (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_series (recur-string->utf8 a1)))))
 
 (define c-glue-logical_font_shape
   (foreign-procedure "tmg_logical_font_shape" (scheme-object) scheme-object))
 
 (define (logical-font-shape a1)
-  (recur-utf8->string (c-glue-logical_font_shape (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_shape (recur-string->utf8 a1)))))
 
 (define c-glue-logical_font_search
   (foreign-procedure "tmg_logical_font_search" (scheme-object) scheme-object))
 
 (define (logical-font-search a1)
-  (recur-utf8->string (c-glue-logical_font_search (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_search (recur-string->utf8 a1)))))
 
 (define c-glue-logical_font_search_exact
   (foreign-procedure "tmg_logical_font_search_exact" (scheme-object) scheme-object))
 
 (define (logical-font-search-exact a1)
-  (recur-utf8->string (c-glue-logical_font_search_exact (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_search_exact (recur-string->utf8 a1)))))
 
 (define c-glue-search_font_families
   (foreign-procedure "tmg_search_font_families" (scheme-object) scheme-object))
 
 (define (search-font-families a1)
-  (recur-utf8->string (c-glue-search_font_families (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-search_font_families (recur-string->utf8 a1)))))
 
 (define c-glue-search_font_styles
   (foreign-procedure "tmg_search_font_styles" (scheme-object scheme-object) scheme-object))
 
 (define (search-font-styles a1 a2)
-  (recur-utf8->string (c-glue-search_font_styles (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-search_font_styles (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-logical_font_patch
   (foreign-procedure "tmg_logical_font_patch" (scheme-object scheme-object) scheme-object))
 
 (define (logical-font-patch a1 a2)
-  (recur-utf8->string (c-glue-logical_font_patch (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_patch (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-logical_font_substitute
   (foreign-procedure "tmg_logical_font_substitute" (scheme-object) scheme-object))
 
 (define (logical-font-substitute a1)
-  (recur-utf8->string (c-glue-logical_font_substitute (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-logical_font_substitute (recur-string->utf8 a1)))))
 
 (define c-glue-font_family_main
   (foreign-procedure "tmg_font_family_main" (scheme-object) scheme-object))
 
 (define (font-family-main a1)
-  (recur-utf8->string (c-glue-font_family_main (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-font_family_main (recur-string->utf8 a1)))))
 
 (define c-glue-image_2psdoc
   (foreign-procedure "tmg_image_2psdoc" (scheme-object) scheme-object))
 
 (define (image->psdoc a1)
-  (recur-utf8->string (c-glue-image_2psdoc (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-image_2psdoc (recur-string->utf8 a1)))))
 
 (define c-glue-anim_control_times
   (foreign-procedure "tmg_anim_control_times" (scheme-object) scheme-object))
 
 (define (anim-control-times a1)
-  (recur-utf8->string (c-glue-anim_control_times (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-anim_control_times (recur-string->cork a1)))))
 
 (define c-glue-tree_2stree
   (foreign-procedure "tmg_tree_2stree" (scheme-object) scheme-object))
 
 (define (tree->stree a1)
-  (recur-cork->string (c-glue-tree_2stree (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-tree_2stree (recur-string->utf8 a1)))))
 
 (define c-glue-stree_2tree
   (foreign-procedure "tmg_stree_2tree" (scheme-object) scheme-object))
 
 (define (stree->tree a1)
-  (recur-utf8->string (c-glue-stree_2tree (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-stree_2tree (recur-string->cork a1)))))
 
 (define c-glue-tree_2string
   (foreign-procedure "tmg_tree_2string" (scheme-object) scheme-object))
 
 (define (tree->string a1)
-  (recur-utf8->string (c-glue-tree_2string (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_2string (recur-string->utf8 a1)))))
 
 (define c-glue-string_2tree
   (foreign-procedure "tmg_string_2tree" (scheme-object) scheme-object))
 
 (define (string->tree a1)
-  (recur-utf8->string (c-glue-string_2tree (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_2tree (recur-string->utf8 a1)))))
 
 (define c-glue-tm_2tree
   (foreign-procedure "tmg_tm_2tree" (scheme-object) scheme-object))
 
 (define (tm->tree a1)
-  (recur-utf8->string (c-glue-tm_2tree (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tm_2tree (recur-string->cork a1)))))
 
 (define c-glue-tree_child_setS
   (foreign-procedure "tmg_tree_child_setS" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-child-set! a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_child_setS (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_setS (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-tree_child_insert
   (foreign-procedure "tmg_tree_child_insert" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-child-insert a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_child_insert (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_insert (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-tree_label_type
   (foreign-procedure "tmg_tree_label_type" (scheme-object) scheme-object))
 
 (define (tree-label-type a1)
-  (recur-utf8->string (c-glue-tree_label_type (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_label_type (recur-string->utf8 a1)))))
 
 (define c-glue-tree_all_accessibleP
   (foreign-procedure "tmg_tree_all_accessibleP" (scheme-object) scheme-object))
 
 (define (tree-all-accessible? a1)
-  (recur-utf8->string (c-glue-tree_all_accessibleP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_all_accessibleP (recur-string->cork a1)))))
 
 (define c-glue-tree_none_accessibleP
   (foreign-procedure "tmg_tree_none_accessibleP" (scheme-object) scheme-object))
 
 (define (tree-none-accessible? a1)
-  (recur-utf8->string (c-glue-tree_none_accessibleP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_none_accessibleP (recur-string->cork a1)))))
 
 (define c-glue-tree_name
   (foreign-procedure "tmg_tree_name" (scheme-object) scheme-object))
 
 (define (tree-name a1)
-  (recur-utf8->string (c-glue-tree_name (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_name (recur-string->cork a1)))))
 
 (define c-glue-tree_long_name
   (foreign-procedure "tmg_tree_long_name" (scheme-object) scheme-object))
 
 (define (tree-long-name a1)
-  (recur-utf8->string (c-glue-tree_long_name (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_long_name (recur-string->cork a1)))))
 
 (define c-glue-tree_child_name
   (foreign-procedure "tmg_tree_child_name" (scheme-object scheme-object) scheme-object))
 
 (define (tree-child-name a1 a2)
-  (recur-utf8->string (c-glue-tree_child_name (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_name (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_child_long_name
   (foreign-procedure "tmg_tree_child_long_name" (scheme-object scheme-object) scheme-object))
 
 (define (tree-child-long-name a1 a2)
-  (recur-utf8->string (c-glue-tree_child_long_name (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_long_name (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_child_type
   (foreign-procedure "tmg_tree_child_type" (scheme-object scheme-object) scheme-object))
 
 (define (tree-child-type a1 a2)
-  (recur-utf8->string (c-glue-tree_child_type (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_type (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_child_env_dot
   (foreign-procedure "tmg_tree_child_env_dot" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-child-env* a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_child_env_dot (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_env_dot (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-tree_child_env
   (foreign-procedure "tmg_tree_child_env" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-child-env a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tree_child_env (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->cork a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_child_env (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->cork a4)))))
 
 (define c-glue-tree_descendant_env_dot
   (foreign-procedure "tmg_tree_descendant_env_dot" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-descendant-env* a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_descendant_env_dot (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_descendant_env_dot (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-tree_descendant_env
   (foreign-procedure "tmg_tree_descendant_env" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-descendant-env a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tree_descendant_env (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->cork a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_descendant_env (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->cork a4)))))
 
 (define c-glue-tree_load_inclusion
   (foreign-procedure "tmg_tree_load_inclusion" (scheme-object) scheme-object))
 
 (define (tree-load-inclusion a1)
-  (recur-utf8->string (c-glue-tree_load_inclusion (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_load_inclusion (recur-string->utf8 a1)))))
 
 (define c-glue-tree_as_string
   (foreign-procedure "tmg_tree_as_string" (scheme-object) scheme-object))
 
 (define (tree-as-string a1)
-  (recur-utf8->string (c-glue-tree_as_string (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_as_string (recur-string->cork a1)))))
 
 (define c-glue-tree_extents
   (foreign-procedure "tmg_tree_extents" (scheme-object) scheme-object))
 
 (define (tree-extents a1)
-  (recur-utf8->string (c-glue-tree_extents (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_extents (recur-string->cork a1)))))
 
 (define c-glue-tree_emptyP
   (foreign-procedure "tmg_tree_emptyP" (scheme-object) scheme-object))
 
 (define (tree-empty? a1)
-  (recur-utf8->string (c-glue-tree_emptyP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_emptyP (recur-string->cork a1)))))
 
 (define c-glue-tree_multi_lineP
   (foreign-procedure "tmg_tree_multi_lineP" (scheme-object) scheme-object))
 
 (define (tree-multi-line? a1)
-  (recur-utf8->string (c-glue-tree_multi_lineP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_multi_lineP (recur-string->cork a1)))))
 
 (define c-glue-tree_search_tree
   (foreign-procedure "tmg_tree_search_tree" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-search-tree a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tree_search_tree (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_search_tree (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-tree_search_tree_at
   (foreign-procedure "tmg_tree_search_tree_at" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-search-tree-at a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-tree_search_tree_at (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_search_tree_at (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-tree_spell
   (foreign-procedure "tmg_tree_spell" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-spell a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tree_spell (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_spell (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-tree_spell_dot
   (foreign-procedure "tmg_tree_spell_dot" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-spell* a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tree_spell_dot (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_spell_dot (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-tree_spell_at
   (foreign-procedure "tmg_tree_spell_at" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-spell-at a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-tree_spell_at (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_spell_at (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-tree_spell_selection
   (foreign-procedure "tmg_tree_spell_selection" (scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-spell-selection a1 a2 a3 a4 a5 a6)
-  (recur-utf8->string (c-glue-tree_spell_selection (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_spell_selection (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6)))))
 
 (define c-glue-tree_assign
   (foreign-procedure "tmg_tree_assign" (scheme-object scheme-object) scheme-object))
 
 (define (tree-assign a1 a2)
-  (recur-utf8->string (c-glue-tree_assign (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_assign (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-tree_var_insert
   (foreign-procedure "tmg_tree_var_insert" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-var-insert a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_var_insert (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_var_insert (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-tree_insert_node
   (foreign-procedure "tmg_tree_insert_node" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-insert-node a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_insert_node (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_insert_node (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-tree_hash
   (foreign-procedure "tmg_tree_hash" (scheme-object) scheme-object))
 
 (define (tree-hash a1)
-  (recur-utf8->string (c-glue-tree_hash (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_hash (recur-string->utf8 a1)))))
 
 (define c-glue-tree_cache_clear
   (foreign-procedure "tmg_tree_cache_clear" (scheme-object) scheme-object))
 
 (define (tree-cache-clear a1)
-  (recur-utf8->string (c-glue-tree_cache_clear (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_clear (recur-string->utf8 a1)))))
 
 (define c-glue-tree_cache_containsP
   (foreign-procedure "tmg_tree_cache_containsP" (scheme-object scheme-object) scheme-object))
 
 (define (tree-cache-contains? a1 a2)
-  (recur-utf8->string (c-glue-tree_cache_containsP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_containsP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_cache_put
   (foreign-procedure "tmg_tree_cache_put" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-cache-put a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_cache_put (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_put (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tree_cache_get
   (foreign-procedure "tmg_tree_cache_get" (scheme-object scheme-object) scheme-object))
 
 (define (tree-cache-get a1 a2)
-  (recur-utf8->string (c-glue-tree_cache_get (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_get (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_cache_get_any
   (foreign-procedure "tmg_tree_cache_get_any" (scheme-object) scheme-object))
 
 (define (tree-cache-get-any a1)
-  (recur-utf8->string (c-glue-tree_cache_get_any (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_get_any (recur-string->utf8 a1)))))
 
 (define c-glue-tree_cache_update
   (foreign-procedure "tmg_tree_cache_update" (scheme-object scheme-object) scheme-object))
 
 (define (tree-cache-update a1 a2)
-  (recur-utf8->string (c-glue-tree_cache_update (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_update (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_cache_update_tmdoc
   (foreign-procedure "tmg_tree_cache_update_tmdoc" (scheme-object scheme-object) scheme-object))
 
 (define (tree-cache-update-tmdoc a1 a2)
-  (recur-utf8->string (c-glue-tree_cache_update_tmdoc (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_update_tmdoc (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_cache_janitor
   (foreign-procedure "tmg_tree_cache_janitor" (scheme-object) scheme-object))
 
 (define (tree-cache-janitor a1)
-  (recur-utf8->string (c-glue-tree_cache_janitor (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_janitor (recur-string->utf8 a1)))))
 
 (define c-glue-tree_cache_set_max_size
   (foreign-procedure "tmg_tree_cache_set_max_size" (scheme-object scheme-object) scheme-object))
 
 (define (tree-cache-set-max-size a1 a2)
-  (recur-utf8->string (c-glue-tree_cache_set_max_size (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_set_max_size (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_cache_size
   (foreign-procedure "tmg_tree_cache_size" (scheme-object) scheme-object))
 
 (define (tree-cache-size a1)
-  (recur-utf8->string (c-glue-tree_cache_size (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_cache_size (recur-string->utf8 a1)))))
 
 (define c-glue-concat_tokenize_math
   (foreign-procedure "tmg_concat_tokenize_math" (scheme-object) scheme-object))
 
 (define (concat-tokenize-math a1)
-  (recur-utf8->string (c-glue-concat_tokenize_math (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-concat_tokenize_math (recur-string->cork a1)))))
 
 (define c-glue-concat_decompose
   (foreign-procedure "tmg_concat_decompose" (scheme-object) scheme-object))
 
 (define (concat-decompose a1)
-  (recur-utf8->string (c-glue-concat_decompose (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-concat_decompose (recur-string->cork a1)))))
 
 (define c-glue-with_likeP
   (foreign-procedure "tmg_with_likeP" (scheme-object) scheme-object))
 
 (define (with-like? a1)
-  (recur-utf8->string (c-glue-with_likeP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-with_likeP (recur-string->cork a1)))))
 
 (define c-glue-with_same_typeP
   (foreign-procedure "tmg_with_same_typeP" (scheme-object scheme-object) scheme-object))
 
 (define (with-same-type? a1 a2)
-  (recur-utf8->string (c-glue-with_same_typeP (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-with_same_typeP (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-with_similar_typeP
   (foreign-procedure "tmg_with_similar_typeP" (scheme-object scheme-object) scheme-object))
 
 (define (with-similar-type? a1 a2)
-  (recur-utf8->string (c-glue-with_similar_typeP (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-with_similar_typeP (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-with_correct
   (foreign-procedure "tmg_with_correct" (scheme-object) scheme-object))
 
 (define (with-correct a1)
-  (recur-utf8->string (c-glue-with_correct (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-with_correct (recur-string->cork a1)))))
 
 (define c-glue-with_correct_superfluous
   (foreign-procedure "tmg_with_correct_superfluous" (scheme-object) scheme-object))
 
 (define (with-correct-superfluous a1)
-  (recur-utf8->string (c-glue-with_correct_superfluous (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-with_correct_superfluous (recur-string->cork a1)))))
 
 (define c-glue-invisible_correct_superfluous
   (foreign-procedure "tmg_invisible_correct_superfluous" (scheme-object) scheme-object))
 
 (define (invisible-correct-superfluous a1)
-  (recur-utf8->string (c-glue-invisible_correct_superfluous (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-invisible_correct_superfluous (recur-string->cork a1)))))
 
 (define c-glue-invisible_correct_missing
   (foreign-procedure "tmg_invisible_correct_missing" (scheme-object scheme-object) scheme-object))
 
 (define (invisible-correct-missing a1 a2)
-  (recur-utf8->string (c-glue-invisible_correct_missing (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-invisible_correct_missing (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-automatic_correct
   (foreign-procedure "tmg_automatic_correct" (scheme-object scheme-object) scheme-object))
 
 (define (automatic-correct a1 a2)
-  (recur-utf8->string (c-glue-automatic_correct (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-automatic_correct (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-manual_correct
   (foreign-procedure "tmg_manual_correct" (scheme-object) scheme-object))
 
 (define (manual-correct a1)
-  (recur-utf8->string (c-glue-manual_correct (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-manual_correct (recur-string->cork a1)))))
 
 (define c-glue-tree_upgrade_brackets
   (foreign-procedure "tmg_tree_upgrade_brackets" (scheme-object scheme-object) scheme-object))
 
 (define (tree-upgrade-brackets a1 a2)
-  (recur-utf8->string (c-glue-tree_upgrade_brackets (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_upgrade_brackets (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_upgrade_big
   (foreign-procedure "tmg_tree_upgrade_big" (scheme-object) scheme-object))
 
 (define (tree-upgrade-big a1)
-  (recur-utf8->string (c-glue-tree_upgrade_big (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_upgrade_big (recur-string->cork a1)))))
 
 (define c-glue-tree_downgrade_brackets
   (foreign-procedure "tmg_tree_downgrade_brackets" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-downgrade-brackets a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_downgrade_brackets (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_downgrade_brackets (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tree_downgrade_big
   (foreign-procedure "tmg_tree_downgrade_big" (scheme-object) scheme-object))
 
 (define (tree-downgrade-big a1)
-  (recur-utf8->string (c-glue-tree_downgrade_big (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_downgrade_big (recur-string->cork a1)))))
 
 (define c-glue-math_stats_compile
   (foreign-procedure "tmg_math_stats_compile" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (math-stats-compile a1 a2 a3)
-  (recur-utf8->string (c-glue-math_stats_compile (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-math_stats_compile (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3)))))
 
 (define c-glue-math_stats_occurrences
   (foreign-procedure "tmg_math_stats_occurrences" (scheme-object scheme-object) scheme-object))
 
 (define (math-stats-occurrences a1 a2)
-  (recur-utf8->string (c-glue-math_stats_occurrences (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-math_stats_occurrences (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-math_stats_number_in_role
   (foreign-procedure "tmg_math_stats_number_in_role" (scheme-object scheme-object) scheme-object))
 
 (define (math-stats-number-in-role a1 a2)
-  (recur-utf8->string (c-glue-math_stats_number_in_role (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-math_stats_number_in_role (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-path_start
   (foreign-procedure "tmg_path_start" (scheme-object scheme-object) scheme-object))
 
 (define (path-start a1 a2)
-  (recur-utf8->string (c-glue-path_start (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_start (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_end
   (foreign-procedure "tmg_path_end" (scheme-object scheme-object) scheme-object))
 
 (define (path-end a1 a2)
-  (recur-utf8->string (c-glue-path_end (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_end (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_next
   (foreign-procedure "tmg_path_next" (scheme-object scheme-object) scheme-object))
 
 (define (path-next a1 a2)
-  (recur-utf8->string (c-glue-path_next (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_next (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_previous
   (foreign-procedure "tmg_path_previous" (scheme-object scheme-object) scheme-object))
 
 (define (path-previous a1 a2)
-  (recur-utf8->string (c-glue-path_previous (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_next_word
   (foreign-procedure "tmg_path_next_word" (scheme-object scheme-object) scheme-object))
 
 (define (path-next-word a1 a2)
-  (recur-utf8->string (c-glue-path_next_word (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_next_word (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_previous_word
   (foreign-procedure "tmg_path_previous_word" (scheme-object scheme-object) scheme-object))
 
 (define (path-previous-word a1 a2)
-  (recur-utf8->string (c-glue-path_previous_word (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous_word (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_next_node
   (foreign-procedure "tmg_path_next_node" (scheme-object scheme-object) scheme-object))
 
 (define (path-next-node a1 a2)
-  (recur-utf8->string (c-glue-path_next_node (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_next_node (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_previous_node
   (foreign-procedure "tmg_path_previous_node" (scheme-object scheme-object) scheme-object))
 
 (define (path-previous-node a1 a2)
-  (recur-utf8->string (c-glue-path_previous_node (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous_node (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_next_tag
   (foreign-procedure "tmg_path_next_tag" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (path-next-tag a1 a2 a3)
-  (recur-utf8->string (c-glue-path_next_tag (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_next_tag (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-path_previous_tag
   (foreign-procedure "tmg_path_previous_tag" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (path-previous-tag a1 a2 a3)
-  (recur-utf8->string (c-glue-path_previous_tag (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous_tag (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-path_next_tag_same_argument
   (foreign-procedure "tmg_path_next_tag_same_argument" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (path-next-tag-same-argument a1 a2 a3)
-  (recur-utf8->string (c-glue-path_next_tag_same_argument (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_next_tag_same_argument (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-path_previous_tag_same_argument
   (foreign-procedure "tmg_path_previous_tag_same_argument" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (path-previous-tag-same-argument a1 a2 a3)
-  (recur-utf8->string (c-glue-path_previous_tag_same_argument (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous_tag_same_argument (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-path_next_argument
   (foreign-procedure "tmg_path_next_argument" (scheme-object scheme-object) scheme-object))
 
 (define (path-next-argument a1 a2)
-  (recur-utf8->string (c-glue-path_next_argument (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_next_argument (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_previous_argument
   (foreign-procedure "tmg_path_previous_argument" (scheme-object scheme-object) scheme-object))
 
 (define (path-previous-argument a1 a2)
-  (recur-utf8->string (c-glue-path_previous_argument (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous_argument (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_previous_section
   (foreign-procedure "tmg_path_previous_section" (scheme-object scheme-object) scheme-object))
 
 (define (path-previous-section a1 a2)
-  (recur-utf8->string (c-glue-path_previous_section (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_previous_section (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-make_modification
   (foreign-procedure "tmg_make_modification" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (make-modification a1 a2 a3)
-  (recur-utf8->string (c-glue-make_modification (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_modification (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-modification_assign
   (foreign-procedure "tmg_modification_assign" (scheme-object scheme-object) scheme-object))
 
 (define (modification-assign a1 a2)
-  (recur-utf8->string (c-glue-modification_assign (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_assign (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-modification_insert
   (foreign-procedure "tmg_modification_insert" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (modification-insert a1 a2 a3)
-  (recur-utf8->string (c-glue-modification_insert (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_insert (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-modification_insert_node
   (foreign-procedure "tmg_modification_insert_node" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (modification-insert-node a1 a2 a3)
-  (recur-utf8->string (c-glue-modification_insert_node (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_insert_node (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-modification_set_cursor
   (foreign-procedure "tmg_modification_set_cursor" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (modification-set-cursor a1 a2 a3)
-  (recur-utf8->string (c-glue-modification_set_cursor (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_set_cursor (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-modification_kind
   (foreign-procedure "tmg_modification_kind" (scheme-object) scheme-object))
 
 (define (modification-kind a1)
-  (recur-utf8->string (c-glue-modification_kind (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_kind (recur-string->utf8 a1)))))
 
 (define c-glue-modification_applicableP
   (foreign-procedure "tmg_modification_applicableP" (scheme-object scheme-object) scheme-object))
 
 (define (modification-applicable? a1 a2)
-  (recur-utf8->string (c-glue-modification_applicableP (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_applicableP (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-modification_apply
   (foreign-procedure "tmg_modification_apply" (scheme-object scheme-object) scheme-object))
 
 (define (modification-apply a1 a2)
-  (recur-utf8->string (c-glue-modification_apply (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_apply (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-modification_invert
   (foreign-procedure "tmg_modification_invert" (scheme-object scheme-object) scheme-object))
 
 (define (modification-invert a1 a2)
-  (recur-utf8->string (c-glue-modification_invert (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-modification_invert (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-patch_applicableP
   (foreign-procedure "tmg_patch_applicableP" (scheme-object scheme-object) scheme-object))
 
 (define (patch-applicable? a1 a2)
-  (recur-utf8->string (c-glue-patch_applicableP (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-patch_applicableP (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-patch_apply
   (foreign-procedure "tmg_patch_apply" (scheme-object scheme-object) scheme-object))
 
 (define (patch-apply a1 a2)
-  (recur-utf8->string (c-glue-patch_apply (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-patch_apply (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-patch_cursor_hint
   (foreign-procedure "tmg_patch_cursor_hint" (scheme-object scheme-object) scheme-object))
 
 (define (patch-cursor-hint a1 a2)
-  (recur-utf8->string (c-glue-patch_cursor_hint (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-patch_cursor_hint (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-patch_invert
   (foreign-procedure "tmg_patch_invert" (scheme-object scheme-object) scheme-object))
 
 (define (patch-invert a1 a2)
-  (recur-utf8->string (c-glue-patch_invert (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-patch_invert (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-tree_2ids
   (foreign-procedure "tmg_tree_2ids" (scheme-object) scheme-object))
 
 (define (tree->ids a1)
-  (recur-utf8->string (c-glue-tree_2ids (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_2ids (recur-string->utf8 a1)))))
 
 (define c-glue-id_2trees
   (foreign-procedure "tmg_id_2trees" (scheme-object) scheme-object))
 
 (define (id->trees a1)
-  (recur-utf8->string (c-glue-id_2trees (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-id_2trees (recur-string->utf8 a1)))))
 
 (define c-glue-vertex_2links
   (foreign-procedure "tmg_vertex_2links" (scheme-object) scheme-object))
 
 (define (vertex->links a1)
-  (recur-utf8->string (c-glue-vertex_2links (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-vertex_2links (recur-string->cork a1)))))
 
 (define c-glue-current_link_types
   (foreign-procedure "tmg_current_link_types" () scheme-object))
 
 (define (current-link-types)
-  (recur-utf8->string (c-glue-current_link_types)))
+  (recur-utf8->string (tm-glue-check (c-glue-current_link_types))))
 
 (define c-glue-get_locus_rendering
   (foreign-procedure "tmg_get_locus_rendering" (scheme-object) scheme-object))
 
 (define (get-locus-rendering a1)
-  (recur-utf8->string (c-glue-get_locus_rendering (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_locus_rendering (recur-string->utf8 a1)))))
 
 (define c-glue-set_locus_rendering
   (foreign-procedure "tmg_set_locus_rendering" (scheme-object scheme-object) scheme-object))
 
 (define (set-locus-rendering a1 a2)
-  (recur-utf8->string (c-glue-set_locus_rendering (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_locus_rendering (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-declare_visited
   (foreign-procedure "tmg_declare_visited" (scheme-object) scheme-object))
 
 (define (declare-visited a1)
-  (recur-utf8->string (c-glue-declare_visited (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-declare_visited (recur-string->utf8 a1)))))
 
 (define c-glue-has_been_visitedP
   (foreign-procedure "tmg_has_been_visitedP" (scheme-object) scheme-object))
 
 (define (has-been-visited? a1)
-  (recur-utf8->string (c-glue-has_been_visitedP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-has_been_visitedP (recur-string->utf8 a1)))))
 
 (define c-glue-graphics_set
   (foreign-procedure "tmg_graphics_set" (scheme-object scheme-object) scheme-object))
 
 (define (graphics-set a1 a2)
-  (recur-utf8->string (c-glue-graphics_set (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-graphics_set (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-graphics_hasP
   (foreign-procedure "tmg_graphics_hasP" (scheme-object) scheme-object))
 
 (define (graphics-has? a1)
-  (recur-utf8->string (c-glue-graphics_hasP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-graphics_hasP (recur-string->cork a1)))))
 
 (define c-glue-graphics_ref
   (foreign-procedure "tmg_graphics_ref" (scheme-object) scheme-object))
 
 (define (graphics-ref a1)
-  (recur-utf8->string (c-glue-graphics_ref (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-graphics_ref (recur-string->cork a1)))))
 
 (define c-glue-graphics_notify_update
   (foreign-procedure "tmg_graphics_notify_update" (scheme-object) scheme-object))
 
 (define (graphics-notify-update a1)
-  (recur-utf8->string (c-glue-graphics_notify_update (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-graphics_notify_update (recur-string->cork a1)))))
 
 (define c-glue-cpp_string_numberP
   (foreign-procedure "tmg_cpp_string_numberP" (scheme-object) scheme-object))
 
 (define (cpp-string-number? a1)
-  (recur-utf8->string (c-glue-cpp_string_numberP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_string_numberP (recur-string->utf8 a1)))))
 
 (define c-glue-string_occursP
   (foreign-procedure "tmg_string_occursP" (scheme-object scheme-object) scheme-object))
 
 (define (string-occurs? a1 a2)
-  (recur-utf8->string (c-glue-string_occursP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_occursP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_count_occurrences
   (foreign-procedure "tmg_string_count_occurrences" (scheme-object scheme-object) scheme-object))
 
 (define (string-count-occurrences a1 a2)
-  (recur-utf8->string (c-glue-string_count_occurrences (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_count_occurrences (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_overlapping
   (foreign-procedure "tmg_string_overlapping" (scheme-object scheme-object) scheme-object))
 
 (define (string-overlapping a1 a2)
-  (recur-utf8->string (c-glue-string_overlapping (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_overlapping (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_replace
   (foreign-procedure "tmg_string_replace" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (string-replace a1 a2 a3)
-  (recur-utf8->string (c-glue-string_replace (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_replace (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-string_find_non_alpha
   (foreign-procedure "tmg_string_find_non_alpha" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (string-find-non-alpha a1 a2 a3)
-  (recur-utf8->string (c-glue-string_find_non_alpha (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_find_non_alpha (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-string_alphaP
   (foreign-procedure "tmg_string_alphaP" (scheme-object) scheme-object))
 
 (define (string-alpha? a1)
-  (recur-utf8->string (c-glue-string_alphaP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_alphaP (recur-string->utf8 a1)))))
 
 (define c-glue-string_locase_alphaP
   (foreign-procedure "tmg_string_locase_alphaP" (scheme-object) scheme-object))
 
 (define (string-locase-alpha? a1)
-  (recur-utf8->string (c-glue-string_locase_alphaP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_locase_alphaP (recur-string->utf8 a1)))))
 
 (define c-glue-upcase_first
   (foreign-procedure "tmg_upcase_first" (scheme-object) scheme-object))
 
 (define (upcase-first a1)
-  (recur-utf8->string (c-glue-upcase_first (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-upcase_first (recur-string->utf8 a1)))))
 
 (define c-glue-locase_first
   (foreign-procedure "tmg_locase_first" (scheme-object) scheme-object))
 
 (define (locase-first a1)
-  (recur-utf8->string (c-glue-locase_first (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-locase_first (recur-string->utf8 a1)))))
 
 (define c-glue-upcase_all
   (foreign-procedure "tmg_upcase_all" (scheme-object) scheme-object))
 
 (define (upcase-all a1)
-  (recur-utf8->string (c-glue-upcase_all (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-upcase_all (recur-string->utf8 a1)))))
 
 (define c-glue-locase_all
   (foreign-procedure "tmg_locase_all" (scheme-object) scheme-object))
 
 (define (locase-all a1)
-  (recur-utf8->string (c-glue-locase_all (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-locase_all (recur-string->utf8 a1)))))
 
 (define c-glue-string_union
   (foreign-procedure "tmg_string_union" (scheme-object scheme-object) scheme-object))
 
 (define (string-union a1 a2)
-  (recur-utf8->string (c-glue-string_union (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_union (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_minus
   (foreign-procedure "tmg_string_minus" (scheme-object scheme-object) scheme-object))
 
 (define (string-minus a1 a2)
-  (recur-utf8->string (c-glue-string_minus (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_minus (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-escape_generic
   (foreign-procedure "tmg_escape_generic" (scheme-object) scheme-object))
 
 (define (escape-generic a1)
-  (recur-utf8->string (c-glue-escape_generic (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-escape_generic (recur-string->utf8 a1)))))
 
 (define c-glue-escape_verbatim
   (foreign-procedure "tmg_escape_verbatim" (scheme-object) scheme-object))
 
 (define (escape-verbatim a1)
-  (recur-utf8->string (c-glue-escape_verbatim (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-escape_verbatim (recur-string->utf8 a1)))))
 
 (define c-glue-escape_shell
   (foreign-procedure "tmg_escape_shell" (scheme-object) scheme-object))
 
 (define (escape-shell a1)
-  (recur-utf8->string (c-glue-escape_shell (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-escape_shell (recur-string->utf8 a1)))))
 
 (define c-glue-escape_to_ascii
   (foreign-procedure "tmg_escape_to_ascii" (scheme-object) scheme-object))
 
 (define (escape-to-ascii a1)
-  (recur-utf8->string (c-glue-escape_to_ascii (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-escape_to_ascii (recur-string->cork a1)))))
 
 (define c-glue-unescape_guile
   (foreign-procedure "tmg_unescape_guile" (scheme-object) scheme-object))
 
 (define (unescape-guile a1)
-  (recur-utf8->string (c-glue-unescape_guile (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-unescape_guile (recur-string->utf8 a1)))))
 
 (define c-glue-string_quote
   (foreign-procedure "tmg_string_quote" (scheme-object) scheme-object))
 
 (define (string-quote a1)
-  (recur-utf8->string (c-glue-string_quote (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_quote (recur-string->utf8 a1)))))
 
 (define c-glue-string_unquote
   (foreign-procedure "tmg_string_unquote" (scheme-object) scheme-object))
 
 (define (string-unquote a1)
-  (recur-utf8->string (c-glue-string_unquote (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_unquote (recur-string->utf8 a1)))))
 
 (define c-glue-string_trim_spaces_left
   (foreign-procedure "tmg_string_trim_spaces_left" (scheme-object) scheme-object))
 
 (define (string-trim-spaces-left a1)
-  (recur-utf8->string (c-glue-string_trim_spaces_left (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_trim_spaces_left (recur-string->utf8 a1)))))
 
 (define c-glue-string_trim_spaces_right
   (foreign-procedure "tmg_string_trim_spaces_right" (scheme-object) scheme-object))
 
 (define (string-trim-spaces-right a1)
-  (recur-utf8->string (c-glue-string_trim_spaces_right (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_trim_spaces_right (recur-string->utf8 a1)))))
 
 (define c-glue-string_trim_spaces
   (foreign-procedure "tmg_string_trim_spaces" (scheme-object) scheme-object))
 
 (define (string-trim-spaces a1)
-  (recur-utf8->string (c-glue-string_trim_spaces (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_trim_spaces (recur-string->utf8 a1)))))
 
 (define c-glue-downgrade_math_letters
   (foreign-procedure "tmg_downgrade_math_letters" (scheme-object) scheme-object))
 
 (define (downgrade-math-letters a1)
-  (recur-utf8->string (c-glue-downgrade_math_letters (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-downgrade_math_letters (recur-string->utf8 a1)))))
 
 ;; Universal character-set converter: dynamically transcode Cork vs UTF-8 based on from/to
 (define c-glue-string_convert
@@ -2389,7 +3289,7 @@
   (let* ((in-b (if (equal? from "Cork") (recur-string->cork s) (recur-string->utf8 s)))
          (f-b  (recur-string->utf8 from))
          (t-b  (recur-string->utf8 to))
-         (res  (c-glue-string_convert in-b f-b t-b)))
+         (res  (tm-glue-check (c-glue-string_convert in-b f-b t-b))))
     (if (equal? to "Cork")
         (recur-cork->string res)
         (recur-utf8->string res))))
@@ -2398,2993 +3298,2993 @@
   (foreign-procedure "tmg_encode_base64" (scheme-object) scheme-object))
 
 (define (encode-base64 a1)
-  (recur-utf8->string (c-glue-encode_base64 (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-encode_base64 (recur-string->utf8 a1)))))
 
 (define c-glue-decode_base64
   (foreign-procedure "tmg_decode_base64" (scheme-object) scheme-object))
 
 (define (decode-base64 a1)
-  (recur-utf8->string (c-glue-decode_base64 (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-decode_base64 (recur-string->utf8 a1)))))
 
 (define c-glue-sourcecode_2cork
   (foreign-procedure "tmg_sourcecode_2cork" (scheme-object) scheme-object))
 
 (define (sourcecode->cork a1)
-  (recur-cork->string (c-glue-sourcecode_2cork (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-sourcecode_2cork (recur-string->utf8 a1)))))
 
 (define c-glue-cork_2sourcecode
   (foreign-procedure "tmg_cork_2sourcecode" (scheme-object) scheme-object))
 
 (define (cork->sourcecode a1)
-  (recur-utf8->string (c-glue-cork_2sourcecode (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cork_2sourcecode (recur-string->cork a1)))))
 
 (define c-glue-utf8_2cork
   (foreign-procedure "tmg_utf8_2cork" (scheme-object) scheme-object))
 
 (define (utf8->cork a1)
-  (recur-cork->string (c-glue-utf8_2cork (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-utf8_2cork (recur-string->utf8 a1)))))
 
 (define c-glue-cork_2utf8
   (foreign-procedure "tmg_cork_2utf8" (scheme-object) scheme-object))
 
 (define (cork->utf8 a1)
-  (recur-utf8->string (c-glue-cork_2utf8 (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cork_2utf8 (recur-string->cork a1)))))
 
 (define c-glue-utf8_2t2a
   (foreign-procedure "tmg_utf8_2t2a" (scheme-object) scheme-object))
 
 (define (utf8->t2a a1)
-  (recur-utf8->string (c-glue-utf8_2t2a (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-utf8_2t2a (recur-string->utf8 a1)))))
 
 (define c-glue-t2a_2utf8
   (foreign-procedure "tmg_t2a_2utf8" (scheme-object) scheme-object))
 
 (define (t2a->utf8 a1)
-  (recur-utf8->string (c-glue-t2a_2utf8 (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-t2a_2utf8 (recur-string->utf8 a1)))))
 
 (define c-glue-utf8_2html
   (foreign-procedure "tmg_utf8_2html" (scheme-object) scheme-object))
 
 (define (utf8->html a1)
-  (recur-utf8->string (c-glue-utf8_2html (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-utf8_2html (recur-string->utf8 a1)))))
 
 (define c-glue-html_2utf8
   (foreign-procedure "tmg_html_2utf8" (scheme-object) scheme-object))
 
 (define (html->utf8 a1)
-  (recur-utf8->string (c-glue-html_2utf8 (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-html_2utf8 (recur-string->utf8 a1)))))
 
 (define c-glue-guess_wencoding
   (foreign-procedure "tmg_guess_wencoding" (scheme-object) scheme-object))
 
 (define (guess-wencoding a1)
-  (recur-utf8->string (c-glue-guess_wencoding (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-guess_wencoding (recur-string->utf8 a1)))))
 
 (define c-glue-tm_2xml_name
   (foreign-procedure "tmg_tm_2xml_name" (scheme-object) scheme-object))
 
 (define (tm->xml-name a1)
-  (recur-utf8->string (c-glue-tm_2xml_name (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tm_2xml_name (recur-string->utf8 a1)))))
 
 (define c-glue-old_tm_2xml_cdata
   (foreign-procedure "tmg_old_tm_2xml_cdata" (scheme-object) scheme-object))
 
 (define (old-tm->xml-cdata a1)
-  (recur-utf8->string (c-glue-old_tm_2xml_cdata (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-old_tm_2xml_cdata (recur-string->utf8 a1)))))
 
 (define c-glue-tm_2xml_cdata
   (foreign-procedure "tmg_tm_2xml_cdata" (scheme-object) scheme-object))
 
 (define (tm->xml-cdata a1)
-  (recur-utf8->string (c-glue-tm_2xml_cdata (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tm_2xml_cdata (recur-string->utf8 a1)))))
 
 (define c-glue-xml_name_2tm
   (foreign-procedure "tmg_xml_name_2tm" (scheme-object) scheme-object))
 
 (define (xml-name->tm a1)
-  (recur-utf8->string (c-glue-xml_name_2tm (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-xml_name_2tm (recur-string->utf8 a1)))))
 
 (define c-glue-old_xml_cdata_2tm
   (foreign-procedure "tmg_old_xml_cdata_2tm" (scheme-object) scheme-object))
 
 (define (old-xml-cdata->tm a1)
-  (recur-utf8->string (c-glue-old_xml_cdata_2tm (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-old_xml_cdata_2tm (recur-string->utf8 a1)))))
 
 (define c-glue-xml_unspace
   (foreign-procedure "tmg_xml_unspace" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (xml-unspace a1 a2 a3)
-  (recur-utf8->string (c-glue-xml_unspace (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-xml_unspace (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-integer_2hexadecimal
   (foreign-procedure "tmg_integer_2hexadecimal" (scheme-object) scheme-object))
 
 (define (integer->hexadecimal a1)
-  (recur-utf8->string (c-glue-integer_2hexadecimal (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-integer_2hexadecimal (recur-string->utf8 a1)))))
 
 (define c-glue-integer_2padded_hexadecimal
   (foreign-procedure "tmg_integer_2padded_hexadecimal" (scheme-object scheme-object) scheme-object))
 
 (define (integer->padded-hexadecimal a1 a2)
-  (recur-utf8->string (c-glue-integer_2padded_hexadecimal (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-integer_2padded_hexadecimal (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-hexadecimal_2integer
   (foreign-procedure "tmg_hexadecimal_2integer" (scheme-object) scheme-object))
 
 (define (hexadecimal->integer a1)
-  (recur-utf8->string (c-glue-hexadecimal_2integer (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-hexadecimal_2integer (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_string_tokenize
   (foreign-procedure "tmg_cpp_string_tokenize" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-string-tokenize a1 a2)
-  (recur-utf8->string (c-glue-cpp_string_tokenize (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_string_tokenize (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_string_recompose
   (foreign-procedure "tmg_cpp_string_recompose" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-string-recompose a1 a2)
-  (recur-utf8->string (c-glue-cpp_string_recompose (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_string_recompose (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_differences
   (foreign-procedure "tmg_string_differences" (scheme-object scheme-object) scheme-object))
 
 (define (string-differences a1 a2)
-  (recur-utf8->string (c-glue-string_differences (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_differences (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_distance
   (foreign-procedure "tmg_string_distance" (scheme-object scheme-object) scheme-object))
 
 (define (string-distance a1 a2)
-  (recur-utf8->string (c-glue-string_distance (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_distance (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-find_left_bracket
   (foreign-procedure "tmg_find_left_bracket" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (find-left-bracket a1 a2 a3)
-  (recur-utf8->string (c-glue-find_left_bracket (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-find_left_bracket (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-find_right_bracket
   (foreign-procedure "tmg_find_right_bracket" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (find-right-bracket a1 a2 a3)
-  (recur-utf8->string (c-glue-find_right_bracket (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-find_right_bracket (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-string_2tmstring
   (foreign-procedure "tmg_string_2tmstring" (scheme-object) scheme-object))
 
 (define (string->tmstring a1)
-  (recur-utf8->string (c-glue-string_2tmstring (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_2tmstring (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_2string
   (foreign-procedure "tmg_tmstring_2string" (scheme-object) scheme-object))
 
 (define (tmstring->string a1)
-  (recur-utf8->string (c-glue-tmstring_2string (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_2string (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_length
   (foreign-procedure "tmg_tmstring_length" (scheme-object) scheme-object))
 
 (define (tmstring-length a1)
-  (recur-utf8->string (c-glue-tmstring_length (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_length (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_ref
   (foreign-procedure "tmg_tmstring_ref" (scheme-object scheme-object) scheme-object))
 
 (define (tmstring-ref a1 a2)
-  (recur-utf8->string (c-glue-tmstring_ref (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_ref (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmstring_reverse_ref
   (foreign-procedure "tmg_tmstring_reverse_ref" (scheme-object scheme-object) scheme-object))
 
 (define (tmstring-reverse-ref a1 a2)
-  (recur-utf8->string (c-glue-tmstring_reverse_ref (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_reverse_ref (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmstring_2list
   (foreign-procedure "tmg_tmstring_2list" (scheme-object) scheme-object))
 
 (define (tmstring->list a1)
-  (recur-utf8->string (c-glue-tmstring_2list (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_2list (recur-string->utf8 a1)))))
 
 (define c-glue-list_2tmstring
   (foreign-procedure "tmg_list_2tmstring" (scheme-object) scheme-object))
 
 (define (list->tmstring a1)
-  (recur-utf8->string (c-glue-list_2tmstring (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-list_2tmstring (recur-string->utf8 a1)))))
 
 (define c-glue-string_next
   (foreign-procedure "tmg_string_next" (scheme-object scheme-object) scheme-object))
 
 (define (string-next a1 a2)
-  (recur-utf8->string (c-glue-string_next (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_next (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_previous
   (foreign-procedure "tmg_string_previous" (scheme-object scheme-object) scheme-object))
 
 (define (string-previous a1 a2)
-  (recur-utf8->string (c-glue-string_previous (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_previous (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmstring_split
   (foreign-procedure "tmg_tmstring_split" (scheme-object) scheme-object))
 
 (define (tmstring-split a1)
-  (recur-utf8->string (c-glue-tmstring_split (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_split (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_translit
   (foreign-procedure "tmg_tmstring_translit" (scheme-object) scheme-object))
 
 (define (tmstring-translit a1)
-  (recur-utf8->string (c-glue-tmstring_translit (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_translit (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_locase_first
   (foreign-procedure "tmg_tmstring_locase_first" (scheme-object) scheme-object))
 
 (define (tmstring-locase-first a1)
-  (recur-utf8->string (c-glue-tmstring_locase_first (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_locase_first (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_upcase_first
   (foreign-procedure "tmg_tmstring_upcase_first" (scheme-object) scheme-object))
 
 (define (tmstring-upcase-first a1)
-  (recur-utf8->string (c-glue-tmstring_upcase_first (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_upcase_first (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_locase_all
   (foreign-procedure "tmg_tmstring_locase_all" (scheme-object) scheme-object))
 
 (define (tmstring-locase-all a1)
-  (recur-utf8->string (c-glue-tmstring_locase_all (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_locase_all (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_upcase_all
   (foreign-procedure "tmg_tmstring_upcase_all" (scheme-object) scheme-object))
 
 (define (tmstring-upcase-all a1)
-  (recur-utf8->string (c-glue-tmstring_upcase_all (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_upcase_all (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_unaccent_all
   (foreign-procedure "tmg_tmstring_unaccent_all" (scheme-object) scheme-object))
 
 (define (tmstring-unaccent-all a1)
-  (recur-utf8->string (c-glue-tmstring_unaccent_all (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_unaccent_all (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_letterP
   (foreign-procedure "tmg_tmstring_letterP" (scheme-object) scheme-object))
 
 (define (tmstring-letter? a1)
-  (recur-utf8->string (c-glue-tmstring_letterP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_letterP (recur-string->utf8 a1)))))
 
 (define c-glue-tmstring_beforeP
   (foreign-procedure "tmg_tmstring_beforeP" (scheme-object scheme-object) scheme-object))
 
 (define (tmstring-before? a1 a2)
-  (recur-utf8->string (c-glue-tmstring_beforeP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmstring_beforeP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-single_spell_start
   (foreign-procedure "tmg_single_spell_start" (scheme-object) scheme-object))
 
 (define (single-spell-start a1)
-  (recur-utf8->string (c-glue-single_spell_start (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-single_spell_start (recur-string->utf8 a1)))))
 
 (define c-glue-single_spell_done
   (foreign-procedure "tmg_single_spell_done" (scheme-object) scheme-object))
 
 (define (single-spell-done a1)
-  (recur-utf8->string (c-glue-single_spell_done (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-single_spell_done (recur-string->utf8 a1)))))
 
 (define c-glue-spell_check
   (foreign-procedure "tmg_spell_check" (scheme-object scheme-object) scheme-object))
 
 (define (spell-check a1 a2)
-  (recur-utf8->string (c-glue-spell_check (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_check (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-spell_checkP
   (foreign-procedure "tmg_spell_checkP" (scheme-object scheme-object) scheme-object))
 
 (define (spell-check? a1 a2)
-  (recur-utf8->string (c-glue-spell_checkP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_checkP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-spell_accept
   (foreign-procedure "tmg_spell_accept" (scheme-object scheme-object) scheme-object))
 
 (define (spell-accept a1 a2)
-  (recur-utf8->string (c-glue-spell_accept (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_accept (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-spell_var_accept
   (foreign-procedure "tmg_spell_var_accept" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (spell-var-accept a1 a2 a3)
-  (recur-utf8->string (c-glue-spell_var_accept (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_var_accept (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-spell_insert
   (foreign-procedure "tmg_spell_insert" (scheme-object scheme-object) scheme-object))
 
 (define (spell-insert a1 a2)
-  (recur-utf8->string (c-glue-spell_insert (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_insert (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-spell_notify_insert
   (foreign-procedure "tmg_spell_notify_insert" (scheme-object scheme-object) scheme-object))
 
 (define (spell-notify-insert a1 a2)
-  (recur-utf8->string (c-glue-spell_notify_insert (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_notify_insert (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-packrat_define
   (foreign-procedure "tmg_packrat_define" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (packrat-define a1 a2 a3)
-  (recur-utf8->string (c-glue-packrat_define (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-packrat_define (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-packrat_property
   (foreign-procedure "tmg_packrat_property" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (packrat-property a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-packrat_property (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-packrat_property (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-packrat_inherit
   (foreign-procedure "tmg_packrat_inherit" (scheme-object scheme-object) scheme-object))
 
 (define (packrat-inherit a1 a2)
-  (recur-utf8->string (c-glue-packrat_inherit (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-packrat_inherit (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-packrat_parse
   (foreign-procedure "tmg_packrat_parse" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (packrat-parse a1 a2 a3)
-  (recur-utf8->string (c-glue-packrat_parse (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-packrat_parse (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-packrat_correctP
   (foreign-procedure "tmg_packrat_correctP" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (packrat-correct? a1 a2 a3)
-  (recur-utf8->string (c-glue-packrat_correctP (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-packrat_correctP (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-packrat_context
   (foreign-procedure "tmg_packrat_context" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (packrat-context a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-packrat_context (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-packrat_context (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3) (recur-string->utf8 a4)))))
 
 (define c-glue-syntax_read_preferences
   (foreign-procedure "tmg_syntax_read_preferences" (scheme-object) scheme-object))
 
 (define (syntax-read-preferences a1)
-  (recur-utf8->string (c-glue-syntax_read_preferences (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-syntax_read_preferences (recur-string->utf8 a1)))))
 
 (define c-glue-parse_texmacs
   (foreign-procedure "tmg_parse_texmacs" (scheme-object) scheme-object))
 
 (define (parse-texmacs a1)
-  (recur-utf8->string (c-glue-parse_texmacs (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-parse_texmacs (recur-string->cork a1)))))
 
 (define c-glue-serialize_texmacs
   (foreign-procedure "tmg_serialize_texmacs" (scheme-object) scheme-object))
 
 (define (serialize-texmacs a1)
-  (recur-cork->string (c-glue-serialize_texmacs (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-serialize_texmacs (recur-string->utf8 a1)))))
 
 (define c-glue-parse_texmacs_snippet
   (foreign-procedure "tmg_parse_texmacs_snippet" (scheme-object) scheme-object))
 
 (define (parse-texmacs-snippet a1)
-  (recur-utf8->string (c-glue-parse_texmacs_snippet (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-parse_texmacs_snippet (recur-string->cork a1)))))
 
 (define c-glue-serialize_texmacs_snippet
   (foreign-procedure "tmg_serialize_texmacs_snippet" (scheme-object) scheme-object))
 
 (define (serialize-texmacs-snippet a1)
-  (recur-cork->string (c-glue-serialize_texmacs_snippet (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-serialize_texmacs_snippet (recur-string->utf8 a1)))))
 
 (define c-glue-texmacs_2stm
   (foreign-procedure "tmg_texmacs_2stm" (scheme-object) scheme-object))
 
 (define (texmacs->stm a1)
-  (recur-utf8->string (c-glue-texmacs_2stm (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-texmacs_2stm (recur-string->utf8 a1)))))
 
 (define c-glue-stm_2texmacs
   (foreign-procedure "tmg_stm_2texmacs" (scheme-object) scheme-object))
 
 (define (stm->texmacs a1)
-  (recur-utf8->string (c-glue-stm_2texmacs (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-stm_2texmacs (recur-string->utf8 a1)))))
 
 (define c-glue-stm_snippet_2texmacs
   (foreign-procedure "tmg_stm_snippet_2texmacs" (scheme-object) scheme-object))
 
 (define (stm-snippet->texmacs a1)
-  (recur-utf8->string (c-glue-stm_snippet_2texmacs (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-stm_snippet_2texmacs (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_texmacs_2verbatim
   (foreign-procedure "tmg_cpp_texmacs_2verbatim" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-texmacs->verbatim a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_texmacs_2verbatim (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_texmacs_2verbatim (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_verbatim_snippet_2texmacs
   (foreign-procedure "tmg_cpp_verbatim_snippet_2texmacs" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-verbatim-snippet->texmacs a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_verbatim_snippet_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_verbatim_snippet_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_verbatim_2texmacs
   (foreign-procedure "tmg_cpp_verbatim_2texmacs" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-verbatim->texmacs a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_verbatim_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_verbatim_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-parse_latex
   (foreign-procedure "tmg_parse_latex" (scheme-object) scheme-object))
 
 (define (parse-latex a1)
-  (recur-utf8->string (c-glue-parse_latex (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-parse_latex (recur-string->utf8 a1)))))
 
 (define c-glue-parse_latex_document
   (foreign-procedure "tmg_parse_latex_document" (scheme-object) scheme-object))
 
 (define (parse-latex-document a1)
-  (recur-utf8->string (c-glue-parse_latex_document (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-parse_latex_document (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_latex_document_2texmacs
   (foreign-procedure "tmg_cpp_latex_document_2texmacs" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-latex-document->texmacs a1 a2)
-  (recur-utf8->string (c-glue-cpp_latex_document_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_latex_document_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-latex_class_document_2texmacs
   (foreign-procedure "tmg_latex_class_document_2texmacs" (scheme-object) scheme-object))
 
 (define (latex-class-document->texmacs a1)
-  (recur-utf8->string (c-glue-latex_class_document_2texmacs (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-latex_class_document_2texmacs (recur-string->utf8 a1)))))
 
 (define c-glue-tracked_latex_2texmacs
   (foreign-procedure "tmg_tracked_latex_2texmacs" (scheme-object scheme-object) scheme-object))
 
 (define (tracked-latex->texmacs a1 a2)
-  (recur-utf8->string (c-glue-tracked_latex_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tracked_latex_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-conservative_texmacs_2latex
   (foreign-procedure "tmg_conservative_texmacs_2latex" (scheme-object scheme-object) scheme-object))
 
 (define (conservative-texmacs->latex a1 a2)
-  (recur-utf8->string (c-glue-conservative_texmacs_2latex (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-conservative_texmacs_2latex (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tracked_texmacs_2latex
   (foreign-procedure "tmg_tracked_texmacs_2latex" (scheme-object scheme-object) scheme-object))
 
 (define (tracked-texmacs->latex a1 a2)
-  (recur-utf8->string (c-glue-tracked_texmacs_2latex (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tracked_texmacs_2latex (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-conservative_latex_2texmacs
   (foreign-procedure "tmg_conservative_latex_2texmacs" (scheme-object scheme-object) scheme-object))
 
 (define (conservative-latex->texmacs a1 a2)
-  (recur-utf8->string (c-glue-conservative_latex_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-conservative_latex_2texmacs (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-get_line_number
   (foreign-procedure "tmg_get_line_number" (scheme-object scheme-object) scheme-object))
 
 (define (get-line-number a1 a2)
-  (recur-utf8->string (c-glue-get_line_number (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_line_number (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-get_column_number
   (foreign-procedure "tmg_get_column_number" (scheme-object scheme-object) scheme-object))
 
 (define (get-column-number a1 a2)
-  (recur-utf8->string (c-glue-get_column_number (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_column_number (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-try_latex_export
   (foreign-procedure "tmg_try_latex_export" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (try-latex-export a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-try_latex_export (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-try_latex_export (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-parse_xml
   (foreign-procedure "tmg_parse_xml" (scheme-object) scheme-object))
 
 (define (parse-xml a1)
-  (recur-cork->string (c-glue-parse_xml (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-parse_xml (recur-string->utf8 a1)))))
 
 (define c-glue-parse_html
   (foreign-procedure "tmg_parse_html" (scheme-object) scheme-object))
 
 (define (parse-html a1)
-  (recur-cork->string (c-glue-parse_html (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-parse_html (recur-string->utf8 a1)))))
 
 (define c-glue-parse_bib
   (foreign-procedure "tmg_parse_bib" (scheme-object) scheme-object))
 
 (define (parse-bib a1)
-  (recur-utf8->string (c-glue-parse_bib (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-parse_bib (recur-string->utf8 a1)))))
 
 (define c-glue-conservative_bib_import
   (foreign-procedure "tmg_conservative_bib_import" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (conservative-bib-import a1 a2 a3)
-  (recur-utf8->string (c-glue-conservative_bib_import (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-conservative_bib_import (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3)))))
 
 (define c-glue-conservative_bib_export
   (foreign-procedure "tmg_conservative_bib_export" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (conservative-bib-export a1 a2 a3)
-  (recur-utf8->string (c-glue-conservative_bib_export (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-conservative_bib_export (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-clean_html
   (foreign-procedure "tmg_clean_html" (scheme-object) scheme-object))
 
 (define (clean-html a1)
-  (recur-utf8->string (c-glue-clean_html (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-clean_html (recur-string->cork a1)))))
 
 (define c-glue-upgrade_tmml
   (foreign-procedure "tmg_upgrade_tmml" (scheme-object) scheme-object))
 
 (define (upgrade-tmml a1)
-  (recur-utf8->string (c-glue-upgrade_tmml (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-upgrade_tmml (recur-string->cork a1)))))
 
 (define c-glue-upgrade_mathml
   (foreign-procedure "tmg_upgrade_mathml" (scheme-object) scheme-object))
 
 (define (upgrade-mathml a1)
-  (recur-utf8->string (c-glue-upgrade_mathml (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-upgrade_mathml (recur-string->cork a1)))))
 
 (define c-glue-vernac_2texmacs
   (foreign-procedure "tmg_vernac_2texmacs" (scheme-object) scheme-object))
 
 (define (vernac->texmacs a1)
-  (recur-utf8->string (c-glue-vernac_2texmacs (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-vernac_2texmacs (recur-string->utf8 a1)))))
 
 (define c-glue-vernac_document_2texmacs
   (foreign-procedure "tmg_vernac_document_2texmacs" (scheme-object) scheme-object))
 
 (define (vernac-document->texmacs a1)
-  (recur-utf8->string (c-glue-vernac_document_2texmacs (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-vernac_document_2texmacs (recur-string->utf8 a1)))))
 
 (define c-glue-compute_keys_string
   (foreign-procedure "tmg_compute_keys_string" (scheme-object scheme-object) scheme-object))
 
 (define (compute-keys-string a1 a2)
-  (recur-utf8->string (c-glue-compute_keys_string (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-compute_keys_string (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-compute_keys_tree
   (foreign-procedure "tmg_compute_keys_tree" (scheme-object scheme-object) scheme-object))
 
 (define (compute-keys-tree a1 a2)
-  (recur-utf8->string (c-glue-compute_keys_tree (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-compute_keys_tree (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-compute_keys_url
   (foreign-procedure "tmg_compute_keys_url" (scheme-object) scheme-object))
 
 (define (compute-keys-url a1)
-  (recur-utf8->string (c-glue-compute_keys_url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-compute_keys_url (recur-string->utf8 a1)))))
 
 (define c-glue-compute_index_string
   (foreign-procedure "tmg_compute_index_string" (scheme-object scheme-object) scheme-object))
 
 (define (compute-index-string a1 a2)
-  (recur-cork->string (c-glue-compute_index_string (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-cork->string (tm-glue-check (c-glue-compute_index_string (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-compute_index_tree
   (foreign-procedure "tmg_compute_index_tree" (scheme-object scheme-object) scheme-object))
 
 (define (compute-index-tree a1 a2)
-  (recur-cork->string (c-glue-compute_index_tree (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-cork->string (tm-glue-check (c-glue-compute_index_tree (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-compute_index_url
   (foreign-procedure "tmg_compute_index_url" (scheme-object) scheme-object))
 
 (define (compute-index-url a1)
-  (recur-cork->string (c-glue-compute_index_url (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-compute_index_url (recur-string->utf8 a1)))))
 
 (define c-glue-compress_tree
   (foreign-procedure "tmg_compress_tree" (scheme-object) scheme-object))
 
 (define (compress-tree a1)
-  (recur-utf8->string (c-glue-compress_tree (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-compress_tree (recur-string->cork a1)))))
 
 (define c-glue-decompress_tree
   (foreign-procedure "tmg_decompress_tree" (scheme-object) scheme-object))
 
 (define (decompress-tree a1)
-  (recur-utf8->string (c-glue-decompress_tree (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-decompress_tree (recur-string->cork a1)))))
 
 (define c-glue-compressed_contains_textP
   (foreign-procedure "tmg_compressed_contains_textP" (scheme-object) scheme-object))
 
 (define (compressed-contains-text? a1)
-  (recur-utf8->string (c-glue-compressed_contains_textP (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-compressed_contains_textP (recur-string->cork a1)))))
 
 (define c-glue-compressed_2html
   (foreign-procedure "tmg_compressed_2html" (scheme-object scheme-object) scheme-object))
 
 (define (compressed->html a1 a2)
-  (recur-utf8->string (c-glue-compressed_2html (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-compressed_2html (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-compress_html
   (foreign-procedure "tmg_compress_html" (scheme-object scheme-object) scheme-object))
 
 (define (compress-html a1 a2)
-  (recur-utf8->string (c-glue-compress_html (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-compress_html (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-decompress_html
   (foreign-procedure "tmg_decompress_html" (scheme-object scheme-object) scheme-object))
 
 (define (decompress-html a1 a2)
-  (recur-utf8->string (c-glue-decompress_html (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-decompress_html (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_ai_command
   (foreign-procedure "tmg_cpp_ai_command" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-command a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_ai_command (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_command (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_ai_eval_command
   (foreign-procedure "tmg_cpp_ai_eval_command" (scheme-object) scheme-object))
 
 (define (cpp-ai-eval-command a1)
-  (recur-utf8->string (c-glue-cpp_ai_eval_command (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_eval_command (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_ai_async_eval_command
   (foreign-procedure "tmg_cpp_ai_async_eval_command" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-async-eval-command a1 a2)
-  (recur-utf8->string (c-glue-cpp_ai_async_eval_command (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_async_eval_command (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_ai_output
   (foreign-procedure "tmg_cpp_ai_output" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-output a1 a2)
-  (recur-utf8->string (c-glue-cpp_ai_output (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_output (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_ai_get_body
   (foreign-procedure "tmg_cpp_ai_get_body" (scheme-object) scheme-object))
 
 (define (cpp-ai-get-body a1)
-  (recur-utf8->string (c-glue-cpp_ai_get_body (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_get_body (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_ai_latex_command
   (foreign-procedure "tmg_cpp_ai_latex_command" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-latex-command a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_ai_latex_command (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_latex_command (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_ai_latex_request
   (foreign-procedure "tmg_cpp_ai_latex_request" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-latex-request a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_ai_latex_request (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_latex_request (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_ai_latex_output
   (foreign-procedure "tmg_cpp_ai_latex_output" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-latex-output a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_ai_latex_output (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_latex_output (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_ai_chat
   (foreign-procedure "tmg_cpp_ai_chat" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-chat a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_ai_chat (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_chat (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_ai_correct
   (foreign-procedure "tmg_cpp_ai_correct" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-correct a1 a2 a3)
-  (recur-utf8->string (c-glue-cpp_ai_correct (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_correct (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-cpp_ai_translate
   (foreign-procedure "tmg_cpp_ai_translate" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-ai-translate a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-cpp_ai_translate (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_ai_translate (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-json_2tree
   (foreign-procedure "tmg_json_2tree" (scheme-object) scheme-object))
 
 (define (json->tree a1)
-  (recur-utf8->string (c-glue-json_2tree (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-json_2tree (recur-string->utf8 a1)))))
 
 (define c-glue-tree_2json
   (foreign-procedure "tmg_tree_2json" (scheme-object) scheme-object))
 
 (define (tree->json a1)
-  (recur-utf8->string (c-glue-tree_2json (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_2json (recur-string->cork a1)))))
 
 (define c-glue-lantool_correct
   (foreign-procedure "tmg_lantool_correct" (scheme-object scheme-object) scheme-object))
 
 (define (lantool-correct a1 a2)
-  (recur-utf8->string (c-glue-lantool_correct (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-lantool_correct (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_2url
   (foreign-procedure "tmg_url_2url" (scheme-object) scheme-object))
 
 (define (url->url a1)
-  (recur-utf8->string (c-glue-url_2url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_2url (recur-string->utf8 a1)))))
 
 (define c-glue-root_2url
   (foreign-procedure "tmg_root_2url" (scheme-object) scheme-object))
 
 (define (root->url a1)
-  (recur-utf8->string (c-glue-root_2url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-root_2url (recur-string->utf8 a1)))))
 
 (define c-glue-string_2url
   (foreign-procedure "tmg_string_2url" (scheme-object) scheme-object))
 
 (define (string->url a1)
-  (recur-utf8->string (c-glue-string_2url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_2url (recur-string->utf8 a1)))))
 
 (define c-glue-url_2string
   (foreign-procedure "tmg_url_2string" (scheme-object) scheme-object))
 
 (define (url->string a1)
-  (recur-utf8->string (c-glue-url_2string (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_2string (recur-string->utf8 a1)))))
 
 (define c-glue-url_2stree
   (foreign-procedure "tmg_url_2stree" (scheme-object) scheme-object))
 
 (define (url->stree a1)
-  (recur-cork->string (c-glue-url_2stree (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-url_2stree (recur-string->utf8 a1)))))
 
 (define c-glue-system_2url
   (foreign-procedure "tmg_system_2url" (scheme-object) scheme-object))
 
 (define (system->url a1)
-  (recur-utf8->string (c-glue-system_2url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_2url (recur-string->utf8 a1)))))
 
 (define c-glue-url_2system
   (foreign-procedure "tmg_url_2system" (scheme-object) scheme-object))
 
 (define (url->system a1)
-  (recur-utf8->string (c-glue-url_2system (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_2system (recur-string->utf8 a1)))))
 
 (define c-glue-unix_2url
   (foreign-procedure "tmg_unix_2url" (scheme-object) scheme-object))
 
 (define (unix->url a1)
-  (recur-utf8->string (c-glue-unix_2url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-unix_2url (recur-string->utf8 a1)))))
 
 (define c-glue-url_2unix
   (foreign-procedure "tmg_url_2unix" (scheme-object) scheme-object))
 
 (define (url->unix a1)
-  (recur-utf8->string (c-glue-url_2unix (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_2unix (recur-string->utf8 a1)))))
 
 (define c-glue-url_unix
   (foreign-procedure "tmg_url_unix" (scheme-object scheme-object) scheme-object))
 
 (define (url-unix a1 a2)
-  (recur-utf8->string (c-glue-url_unix (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_unix (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_none
   (foreign-procedure "tmg_url_none" () scheme-object))
 
 (define (url-none)
-  (recur-utf8->string (c-glue-url_none)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_none))))
 
 (define c-glue-url_any
   (foreign-procedure "tmg_url_any" () scheme-object))
 
 (define (url-any)
-  (recur-utf8->string (c-glue-url_any)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_any))))
 
 (define c-glue-url_wildcard
   (foreign-procedure "tmg_url_wildcard" (scheme-object) scheme-object))
 
 (define (url-wildcard a1)
-  (recur-utf8->string (c-glue-url_wildcard (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_wildcard (recur-string->utf8 a1)))))
 
 (define c-glue-url_pwd
   (foreign-procedure "tmg_url_pwd" () scheme-object))
 
 (define (url-pwd)
-  (recur-utf8->string (c-glue-url_pwd)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_pwd))))
 
 (define c-glue-url_parent
   (foreign-procedure "tmg_url_parent" () scheme-object))
 
 (define (url-parent)
-  (recur-utf8->string (c-glue-url_parent)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_parent))))
 
 (define c-glue-url_ancestor
   (foreign-procedure "tmg_url_ancestor" () scheme-object))
 
 (define (url-ancestor)
-  (recur-utf8->string (c-glue-url_ancestor)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_ancestor))))
 
 (define c-glue-url_append
   (foreign-procedure "tmg_url_append" (scheme-object scheme-object) scheme-object))
 
 (define (url-append a1 a2)
-  (recur-utf8->string (c-glue-url_append (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_append (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_or
   (foreign-procedure "tmg_url_or" (scheme-object scheme-object) scheme-object))
 
 (define (url-or a1 a2)
-  (recur-utf8->string (c-glue-url_or (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_or (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_noneP
   (foreign-procedure "tmg_url_noneP" (scheme-object) scheme-object))
 
 (define (url-none? a1)
-  (recur-utf8->string (c-glue-url_noneP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_noneP (recur-string->utf8 a1)))))
 
 (define c-glue-url_rootedP
   (foreign-procedure "tmg_url_rootedP" (scheme-object) scheme-object))
 
 (define (url-rooted? a1)
-  (recur-utf8->string (c-glue-url_rootedP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_rootedP (recur-string->utf8 a1)))))
 
 (define c-glue-url_rooted_protocolP
   (foreign-procedure "tmg_url_rooted_protocolP" (scheme-object scheme-object) scheme-object))
 
 (define (url-rooted-protocol? a1 a2)
-  (recur-utf8->string (c-glue-url_rooted_protocolP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_rooted_protocolP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_rooted_webP
   (foreign-procedure "tmg_url_rooted_webP" (scheme-object) scheme-object))
 
 (define (url-rooted-web? a1)
-  (recur-utf8->string (c-glue-url_rooted_webP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_rooted_webP (recur-string->utf8 a1)))))
 
 (define c-glue-url_rooted_tmfsP
   (foreign-procedure "tmg_url_rooted_tmfsP" (scheme-object) scheme-object))
 
 (define (url-rooted-tmfs? a1)
-  (recur-utf8->string (c-glue-url_rooted_tmfsP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_rooted_tmfsP (recur-string->utf8 a1)))))
 
 (define c-glue-url_rooted_tmfs_protocolP
   (foreign-procedure "tmg_url_rooted_tmfs_protocolP" (scheme-object scheme-object) scheme-object))
 
 (define (url-rooted-tmfs-protocol? a1 a2)
-  (recur-utf8->string (c-glue-url_rooted_tmfs_protocolP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_rooted_tmfs_protocolP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_root
   (foreign-procedure "tmg_url_root" (scheme-object) scheme-object))
 
 (define (url-root a1)
-  (recur-utf8->string (c-glue-url_root (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_root (recur-string->utf8 a1)))))
 
 (define c-glue-url_unroot
   (foreign-procedure "tmg_url_unroot" (scheme-object) scheme-object))
 
 (define (url-unroot a1)
-  (recur-utf8->string (c-glue-url_unroot (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_unroot (recur-string->utf8 a1)))))
 
 (define c-glue-url_atomicP
   (foreign-procedure "tmg_url_atomicP" (scheme-object) scheme-object))
 
 (define (url-atomic? a1)
-  (recur-utf8->string (c-glue-url_atomicP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_atomicP (recur-string->utf8 a1)))))
 
 (define c-glue-url_concatP
   (foreign-procedure "tmg_url_concatP" (scheme-object) scheme-object))
 
 (define (url-concat? a1)
-  (recur-utf8->string (c-glue-url_concatP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_concatP (recur-string->utf8 a1)))))
 
 (define c-glue-url_orP
   (foreign-procedure "tmg_url_orP" (scheme-object) scheme-object))
 
 (define (url-or? a1)
-  (recur-utf8->string (c-glue-url_orP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_orP (recur-string->utf8 a1)))))
 
 (define c-glue-url_ref
   (foreign-procedure "tmg_url_ref" (scheme-object scheme-object) scheme-object))
 
 (define (url-ref a1 a2)
-  (recur-utf8->string (c-glue-url_ref (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_ref (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_head
   (foreign-procedure "tmg_url_head" (scheme-object) scheme-object))
 
 (define (url-head a1)
-  (recur-utf8->string (c-glue-url_head (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_head (recur-string->utf8 a1)))))
 
 (define c-glue-url_tail
   (foreign-procedure "tmg_url_tail" (scheme-object) scheme-object))
 
 (define (url-tail a1)
-  (recur-utf8->string (c-glue-url_tail (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_tail (recur-string->utf8 a1)))))
 
 (define c-glue-url_format
   (foreign-procedure "tmg_url_format" (scheme-object) scheme-object))
 
 (define (url-format a1)
-  (recur-utf8->string (c-glue-url_format (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_format (recur-string->utf8 a1)))))
 
 (define c-glue-url_suffix
   (foreign-procedure "tmg_url_suffix" (scheme-object) scheme-object))
 
 (define (url-suffix a1)
-  (recur-utf8->string (c-glue-url_suffix (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_suffix (recur-string->utf8 a1)))))
 
 (define c-glue-url_basename
   (foreign-procedure "tmg_url_basename" (scheme-object) scheme-object))
 
 (define (url-basename a1)
-  (recur-utf8->string (c-glue-url_basename (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_basename (recur-string->utf8 a1)))))
 
 (define c-glue-url_glue
   (foreign-procedure "tmg_url_glue" (scheme-object scheme-object) scheme-object))
 
 (define (url-glue a1 a2)
-  (recur-utf8->string (c-glue-url_glue (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_glue (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_unglue
   (foreign-procedure "tmg_url_unglue" (scheme-object scheme-object) scheme-object))
 
 (define (url-unglue a1 a2)
-  (recur-utf8->string (c-glue-url_unglue (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_unglue (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_relative
   (foreign-procedure "tmg_url_relative" (scheme-object scheme-object) scheme-object))
 
 (define (url-relative a1 a2)
-  (recur-utf8->string (c-glue-url_relative (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_relative (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_expand
   (foreign-procedure "tmg_url_expand" (scheme-object) scheme-object))
 
 (define (url-expand a1)
-  (recur-utf8->string (c-glue-url_expand (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_expand (recur-string->utf8 a1)))))
 
 (define c-glue-url_factor
   (foreign-procedure "tmg_url_factor" (scheme-object) scheme-object))
 
 (define (url-factor a1)
-  (recur-utf8->string (c-glue-url_factor (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_factor (recur-string->utf8 a1)))))
 
 (define c-glue-url_delta
   (foreign-procedure "tmg_url_delta" (scheme-object scheme-object) scheme-object))
 
 (define (url-delta a1 a2)
-  (recur-utf8->string (c-glue-url_delta (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_delta (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_secureP
   (foreign-procedure "tmg_url_secureP" (scheme-object) scheme-object))
 
 (define (url-secure? a1)
-  (recur-utf8->string (c-glue-url_secureP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_secureP (recur-string->utf8 a1)))))
 
 (define c-glue-url_descendsP
   (foreign-procedure "tmg_url_descendsP" (scheme-object scheme-object) scheme-object))
 
 (define (url-descends? a1 a2)
-  (recur-utf8->string (c-glue-url_descendsP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_descendsP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_complete
   (foreign-procedure "tmg_url_complete" (scheme-object scheme-object) scheme-object))
 
 (define (url-complete a1 a2)
-  (recur-utf8->string (c-glue-url_complete (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_complete (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_resolve
   (foreign-procedure "tmg_url_resolve" (scheme-object scheme-object) scheme-object))
 
 (define (url-resolve a1 a2)
-  (recur-utf8->string (c-glue-url_resolve (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_resolve (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_resolve_in_path
   (foreign-procedure "tmg_url_resolve_in_path" (scheme-object) scheme-object))
 
 (define (url-resolve-in-path a1)
-  (recur-utf8->string (c-glue-url_resolve_in_path (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_resolve_in_path (recur-string->utf8 a1)))))
 
 (define c-glue-url_resolve_pattern
   (foreign-procedure "tmg_url_resolve_pattern" (scheme-object) scheme-object))
 
 (define (url-resolve-pattern a1)
-  (recur-utf8->string (c-glue-url_resolve_pattern (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_resolve_pattern (recur-string->utf8 a1)))))
 
 (define c-glue-url_existsP
   (foreign-procedure "tmg_url_existsP" (scheme-object) scheme-object))
 
 (define (url-exists? a1)
-  (recur-utf8->string (c-glue-url_existsP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_existsP (recur-string->utf8 a1)))))
 
 (define c-glue-url_exists_in_pathP
   (foreign-procedure "tmg_url_exists_in_pathP" (scheme-object) scheme-object))
 
 (define (url-exists-in-path? a1)
-  (recur-utf8->string (c-glue-url_exists_in_pathP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_exists_in_pathP (recur-string->utf8 a1)))))
 
 (define c-glue-url_exists_in_texP
   (foreign-procedure "tmg_url_exists_in_texP" (scheme-object) scheme-object))
 
 (define (url-exists-in-tex? a1)
-  (recur-utf8->string (c-glue-url_exists_in_texP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_exists_in_texP (recur-string->utf8 a1)))))
 
 (define c-glue-url_concretize_dot
   (foreign-procedure "tmg_url_concretize_dot" (scheme-object) scheme-object))
 
 (define (url-concretize* a1)
-  (recur-utf8->string (c-glue-url_concretize_dot (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_concretize_dot (recur-string->utf8 a1)))))
 
 (define c-glue-url_concretize
   (foreign-procedure "tmg_url_concretize" (scheme-object) scheme-object))
 
 (define (url-concretize a1)
-  (recur-utf8->string (c-glue-url_concretize (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_concretize (recur-string->utf8 a1)))))
 
 (define c-glue-url_sys_concretize
   (foreign-procedure "tmg_url_sys_concretize" (scheme-object) scheme-object))
 
 (define (url-sys-concretize a1)
-  (recur-utf8->string (c-glue-url_sys_concretize (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_sys_concretize (recur-string->utf8 a1)))))
 
 (define c-glue-url_materialize
   (foreign-procedure "tmg_url_materialize" (scheme-object scheme-object) scheme-object))
 
 (define (url-materialize a1 a2)
-  (recur-utf8->string (c-glue-url_materialize (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_materialize (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_testP
   (foreign-procedure "tmg_url_testP" (scheme-object scheme-object) scheme-object))
 
 (define (url-test? a1 a2)
-  (recur-utf8->string (c-glue-url_testP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_testP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_regularP
   (foreign-procedure "tmg_url_regularP" (scheme-object) scheme-object))
 
 (define (url-regular? a1)
-  (recur-utf8->string (c-glue-url_regularP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_regularP (recur-string->utf8 a1)))))
 
 (define c-glue-url_directoryP
   (foreign-procedure "tmg_url_directoryP" (scheme-object) scheme-object))
 
 (define (url-directory? a1)
-  (recur-utf8->string (c-glue-url_directoryP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_directoryP (recur-string->utf8 a1)))))
 
 (define c-glue-url_linkP
   (foreign-procedure "tmg_url_linkP" (scheme-object) scheme-object))
 
 (define (url-link? a1)
-  (recur-utf8->string (c-glue-url_linkP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_linkP (recur-string->utf8 a1)))))
 
 (define c-glue-url_newerP
   (foreign-procedure "tmg_url_newerP" (scheme-object scheme-object) scheme-object))
 
 (define (url-newer? a1 a2)
-  (recur-utf8->string (c-glue-url_newerP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_newerP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_size
   (foreign-procedure "tmg_url_size" (scheme-object) scheme-object))
 
 (define (url-size a1)
-  (recur-utf8->string (c-glue-url_size (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_size (recur-string->utf8 a1)))))
 
 (define c-glue-url_last_modified
   (foreign-procedure "tmg_url_last_modified" (scheme-object) scheme-object))
 
 (define (url-last-modified a1)
-  (recur-utf8->string (c-glue-url_last_modified (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_last_modified (recur-string->utf8 a1)))))
 
 (define c-glue-url_temp
   (foreign-procedure "tmg_url_temp" () scheme-object))
 
 (define (url-temp)
-  (recur-utf8->string (c-glue-url_temp)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_temp))))
 
 (define c-glue-url_temp_dir
   (foreign-procedure "tmg_url_temp_dir" () scheme-object))
 
 (define (url-temp-dir)
-  (recur-utf8->string (c-glue-url_temp_dir)))
+  (recur-utf8->string (tm-glue-check (c-glue-url_temp_dir))))
 
 (define c-glue-url_scratch
   (foreign-procedure "tmg_url_scratch" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (url-scratch a1 a2 a3)
-  (recur-utf8->string (c-glue-url_scratch (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_scratch (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-url_scratchP
   (foreign-procedure "tmg_url_scratchP" (scheme-object) scheme-object))
 
 (define (url-scratch? a1)
-  (recur-utf8->string (c-glue-url_scratchP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_scratchP (recur-string->utf8 a1)))))
 
 (define c-glue-url_backup
   (foreign-procedure "tmg_url_backup" (scheme-object) scheme-object))
 
 (define (url-backup a1)
-  (recur-utf8->string (c-glue-url_backup (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_backup (recur-string->utf8 a1)))))
 
 (define c-glue-url_backupP
   (foreign-procedure "tmg_url_backupP" (scheme-object) scheme-object))
 
 (define (url-backup? a1)
-  (recur-utf8->string (c-glue-url_backupP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_backupP (recur-string->utf8 a1)))))
 
 (define c-glue-url_cache_invalidate
   (foreign-procedure "tmg_url_cache_invalidate" (scheme-object) scheme-object))
 
 (define (url-cache-invalidate a1)
-  (recur-utf8->string (c-glue-url_cache_invalidate (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_cache_invalidate (recur-string->utf8 a1)))))
 
 (define c-glue-string_save
   (foreign-procedure "tmg_string_save" (scheme-object scheme-object) scheme-object))
 
 (define (string-save a1 a2)
-  (recur-utf8->string (c-glue-string_save (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_save (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-string_append_to_file
   (foreign-procedure "tmg_string_append_to_file" (scheme-object scheme-object) scheme-object))
 
 (define (string-append-to-file a1 a2)
-  (recur-utf8->string (c-glue-string_append_to_file (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-string_append_to_file (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-system_move
   (foreign-procedure "tmg_system_move" (scheme-object scheme-object) scheme-object))
 
 (define (system-move a1 a2)
-  (recur-utf8->string (c-glue-system_move (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_move (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-system_copy
   (foreign-procedure "tmg_system_copy" (scheme-object scheme-object) scheme-object))
 
 (define (system-copy a1 a2)
-  (recur-utf8->string (c-glue-system_copy (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_copy (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-system_remove
   (foreign-procedure "tmg_system_remove" (scheme-object) scheme-object))
 
 (define (system-remove a1)
-  (recur-utf8->string (c-glue-system_remove (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_remove (recur-string->utf8 a1)))))
 
 (define c-glue-system_mkdir
   (foreign-procedure "tmg_system_mkdir" (scheme-object) scheme-object))
 
 (define (system-mkdir a1)
-  (recur-utf8->string (c-glue-system_mkdir (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_mkdir (recur-string->utf8 a1)))))
 
 (define c-glue-system_rmdir
   (foreign-procedure "tmg_system_rmdir" (scheme-object) scheme-object))
 
 (define (system-rmdir a1)
-  (recur-utf8->string (c-glue-system_rmdir (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_rmdir (recur-string->utf8 a1)))))
 
 (define c-glue-system_rmdir_recursive
   (foreign-procedure "tmg_system_rmdir_recursive" (scheme-object) scheme-object))
 
 (define (system-rmdir-recursive a1)
-  (recur-utf8->string (c-glue-system_rmdir_recursive (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_rmdir_recursive (recur-string->utf8 a1)))))
 
 (define c-glue-system_setenv
   (foreign-procedure "tmg_system_setenv" (scheme-object scheme-object) scheme-object))
 
 (define (system-setenv a1 a2)
-  (recur-utf8->string (c-glue-system_setenv (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_setenv (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-system_search_score
   (foreign-procedure "tmg_system_search_score" (scheme-object scheme-object) scheme-object))
 
 (define (system-search-score a1 a2)
-  (recur-utf8->string (c-glue-system_search_score (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_search_score (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-system_1
   (foreign-procedure "tmg_system_1" (scheme-object scheme-object) scheme-object))
 
 (define (system-1 a1 a2)
-  (recur-utf8->string (c-glue-system_1 (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_1 (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-system_2
   (foreign-procedure "tmg_system_2" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (system-2 a1 a2 a3)
-  (recur-utf8->string (c-glue-system_2 (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_2 (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-system_url_2string
   (foreign-procedure "tmg_system_url_2string" (scheme-object) scheme-object))
 
 (define (system-url->string a1)
-  (recur-utf8->string (c-glue-system_url_2string (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-system_url_2string (recur-string->utf8 a1)))))
 
 (define c-glue-url_grep
   (foreign-procedure "tmg_url_grep" (scheme-object scheme-object) scheme-object))
 
 (define (url-grep a1 a2)
-  (recur-utf8->string (c-glue-url_grep (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_grep (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-url_search_upwards
   (foreign-procedure "tmg_url_search_upwards" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (url-search-upwards a1 a2 a3)
-  (recur-utf8->string (c-glue-url_search_upwards (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-url_search_upwards (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-set_file_focus
   (foreign-procedure "tmg_set_file_focus" (scheme-object) scheme-object))
 
 (define (set-file-focus a1)
-  (recur-utf8->string (c-glue-set_file_focus (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_file_focus (recur-string->utf8 a1)))))
 
 (define c-glue-get_file_focus
   (foreign-procedure "tmg_get_file_focus" () scheme-object))
 
 (define (get-file-focus)
-  (recur-utf8->string (c-glue-get_file_focus)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_file_focus))))
 
 (define c-glue-persistent_set
   (foreign-procedure "tmg_persistent_set" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (persistent-set a1 a2 a3)
-  (recur-utf8->string (c-glue-persistent_set (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-persistent_set (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-persistent_remove
   (foreign-procedure "tmg_persistent_remove" (scheme-object scheme-object) scheme-object))
 
 (define (persistent-remove a1 a2)
-  (recur-utf8->string (c-glue-persistent_remove (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-persistent_remove (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-persistent_hasP
   (foreign-procedure "tmg_persistent_hasP" (scheme-object scheme-object) scheme-object))
 
 (define (persistent-has? a1 a2)
-  (recur-utf8->string (c-glue-persistent_hasP (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-persistent_hasP (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-persistent_get
   (foreign-procedure "tmg_persistent_get" (scheme-object scheme-object) scheme-object))
 
 (define (persistent-get a1 a2)
-  (recur-utf8->string (c-glue-persistent_get (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-persistent_get (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-persistent_file_name
   (foreign-procedure "tmg_persistent_file_name" (scheme-object scheme-object) scheme-object))
 
 (define (persistent-file-name a1 a2)
-  (recur-utf8->string (c-glue-persistent_file_name (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-persistent_file_name (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmdb_keep_history
   (foreign-procedure "tmg_tmdb_keep_history" (scheme-object scheme-object) scheme-object))
 
 (define (tmdb-keep-history a1 a2)
-  (recur-utf8->string (c-glue-tmdb_keep_history (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_keep_history (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmdb_set_field
   (foreign-procedure "tmg_tmdb_set_field" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-set-field a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-tmdb_set_field (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_set_field (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-tmdb_get_field
   (foreign-procedure "tmg_tmdb_get_field" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-get-field a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tmdb_get_field (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_get_field (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-tmdb_remove_field
   (foreign-procedure "tmg_tmdb_remove_field" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-remove-field a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tmdb_remove_field (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_remove_field (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-tmdb_get_attributes
   (foreign-procedure "tmg_tmdb_get_attributes" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-get-attributes a1 a2 a3)
-  (recur-utf8->string (c-glue-tmdb_get_attributes (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_get_attributes (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tmdb_set_entry
   (foreign-procedure "tmg_tmdb_set_entry" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-set-entry a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-tmdb_set_entry (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_set_entry (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3) (recur-string->utf8 a4)))))
 
 (define c-glue-tmdb_get_entry
   (foreign-procedure "tmg_tmdb_get_entry" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-get-entry a1 a2 a3)
-  (recur-cork->string (c-glue-tmdb_get_entry (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-cork->string (tm-glue-check (c-glue-tmdb_get_entry (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tmdb_remove_entry
   (foreign-procedure "tmg_tmdb_remove_entry" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-remove-entry a1 a2 a3)
-  (recur-utf8->string (c-glue-tmdb_remove_entry (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_remove_entry (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tmdb_query
   (foreign-procedure "tmg_tmdb_query" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tmdb-query a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-tmdb_query (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_query (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-tmdb_inspect_history
   (foreign-procedure "tmg_tmdb_inspect_history" (scheme-object scheme-object) scheme-object))
 
 (define (tmdb-inspect-history a1 a2)
-  (recur-utf8->string (c-glue-tmdb_inspect_history (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_inspect_history (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmdb_get_completions
   (foreign-procedure "tmg_tmdb_get_completions" (scheme-object scheme-object) scheme-object))
 
 (define (tmdb-get-completions a1 a2)
-  (recur-utf8->string (c-glue-tmdb_get_completions (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_get_completions (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tmdb_get_name_completions
   (foreign-procedure "tmg_tmdb_get_name_completions" (scheme-object scheme-object) scheme-object))
 
 (define (tmdb-get-name-completions a1 a2)
-  (recur-utf8->string (c-glue-tmdb_get_name_completions (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmdb_get_name_completions (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-sql_exec
   (foreign-procedure "tmg_sql_exec" (scheme-object scheme-object) scheme-object))
 
 (define (sql-exec a1 a2)
-  (recur-cork->string (c-glue-sql_exec (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-cork->string (tm-glue-check (c-glue-sql_exec (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-sql_quote
   (foreign-procedure "tmg_sql_quote" (scheme-object) scheme-object))
 
 (define (sql-quote a1)
-  (recur-utf8->string (c-glue-sql_quote (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-sql_quote (recur-string->utf8 a1)))))
 
 (define c-glue-server_read
   (foreign-procedure "tmg_server_read" (scheme-object) scheme-object))
 
 (define (server-read a1)
-  (recur-utf8->string (c-glue-server_read (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-server_read (recur-string->utf8 a1)))))
 
 (define c-glue-server_write
   (foreign-procedure "tmg_server_write" (scheme-object scheme-object) scheme-object))
 
 (define (server-write a1 a2)
-  (recur-utf8->string (c-glue-server_write (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-server_write (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-legacy_client_start
   (foreign-procedure "tmg_legacy_client_start" (scheme-object scheme-object) scheme-object))
 
 (define (legacy-client-start a1 a2)
-  (recur-utf8->string (c-glue-legacy_client_start (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-legacy_client_start (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-client_read
   (foreign-procedure "tmg_client_read" (scheme-object) scheme-object))
 
 (define (client-read a1)
-  (recur-utf8->string (c-glue-client_read (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-client_read (recur-string->utf8 a1)))))
 
 (define c-glue-client_write
   (foreign-procedure "tmg_client_write" (scheme-object scheme-object) scheme-object))
 
 (define (client-write a1 a2)
-  (recur-utf8->string (c-glue-client_write (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-client_write (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-server_client_address
   (foreign-procedure "tmg_server_client_address" (scheme-object) scheme-object))
 
 (define (server-client-address a1)
-  (recur-utf8->string (c-glue-server_client_address (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-server_client_address (recur-string->utf8 a1)))))
 
 (define c-glue-server_log_write_int
   (foreign-procedure "tmg_server_log_write_int" (scheme-object scheme-object) scheme-object))
 
 (define (server-log-write-int a1 a2)
-  (recur-utf8->string (c-glue-server_log_write_int (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-server_log_write_int (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tls_client_start
   (foreign-procedure "tmg_tls_client_start" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tls-client-start a1 a2 a3)
-  (recur-utf8->string (c-glue-tls_client_start (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tls_client_start (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-gnutls_generate_salt
   (foreign-procedure "tmg_gnutls_generate_salt" () scheme-object))
 
 (define (gnutls-generate-salt)
-  (recur-utf8->string (c-glue-gnutls_generate_salt)))
+  (recur-utf8->string (tm-glue-check (c-glue-gnutls_generate_salt))))
 
 (define c-glue-hash_password_pbkdf2
   (foreign-procedure "tmg_hash_password_pbkdf2" (scheme-object scheme-object) scheme-object))
 
 (define (hash-password-pbkdf2 a1 a2)
-  (recur-utf8->string (c-glue-hash_password_pbkdf2 (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-hash_password_pbkdf2 (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-generate_self_signed_certificate
   (foreign-procedure "tmg_generate_self_signed_certificate" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (generate-self-signed-certificate a1 a2 a3)
-  (recur-utf8->string (c-glue-generate_self_signed_certificate (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-generate_self_signed_certificate (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-trust_certificate
   (foreign-procedure "tmg_trust_certificate" (scheme-object) scheme-object))
 
 (define (trust-certificate a1)
-  (recur-utf8->string (c-glue-trust_certificate (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-trust_certificate (recur-string->utf8 a1)))))
 
 (define c-glue-connection_start
   (foreign-procedure "tmg_connection_start" (scheme-object scheme-object) scheme-object))
 
 (define (connection-start a1 a2)
-  (recur-utf8->string (c-glue-connection_start (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_start (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-connection_status
   (foreign-procedure "tmg_connection_status" (scheme-object scheme-object) scheme-object))
 
 (define (connection-status a1 a2)
-  (recur-utf8->string (c-glue-connection_status (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_status (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-connection_write_string
   (foreign-procedure "tmg_connection_write_string" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (connection-write-string a1 a2 a3)
-  (recur-utf8->string (c-glue-connection_write_string (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_write_string (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-connection_write
   (foreign-procedure "tmg_connection_write" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (connection-write a1 a2 a3)
-  (recur-utf8->string (c-glue-connection_write (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_write (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-connection_cmd
   (foreign-procedure "tmg_connection_cmd" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (connection-cmd a1 a2 a3)
-  (recur-utf8->string (c-glue-connection_cmd (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_cmd (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-connection_eval
   (foreign-procedure "tmg_connection_eval" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (connection-eval a1 a2 a3)
-  (recur-utf8->string (c-glue-connection_eval (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_eval (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-connection_interrupt
   (foreign-procedure "tmg_connection_interrupt" (scheme-object scheme-object) scheme-object))
 
 (define (connection-interrupt a1 a2)
-  (recur-utf8->string (c-glue-connection_interrupt (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_interrupt (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-connection_stop
   (foreign-procedure "tmg_connection_stop" (scheme-object scheme-object) scheme-object))
 
 (define (connection-stop a1 a2)
-  (recur-utf8->string (c-glue-connection_stop (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-connection_stop (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-widget_printer
   (foreign-procedure "tmg_widget_printer" (scheme-object scheme-object) scheme-object))
 
 (define (widget-printer a1 a2)
-  (recur-utf8->string (c-glue-widget_printer (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_printer (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-widget_menu_group
   (foreign-procedure "tmg_widget_menu_group" (scheme-object scheme-object) scheme-object))
 
 (define (widget-menu-group a1 a2)
-  (recur-utf8->string (c-glue-widget_menu_group (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_menu_group (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-widget_menu_button
   (foreign-procedure "tmg_widget_menu_button" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-menu-button a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-widget_menu_button (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_menu_button (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-widget_setting_toggle
   (foreign-procedure "tmg_widget_setting_toggle" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-setting-toggle a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-widget_setting_toggle (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_setting_toggle (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-widget_setting_group
   (foreign-procedure "tmg_widget_setting_group" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-setting-group a1 a2 a3)
-  (recur-utf8->string (c-glue-widget_setting_group (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_setting_group (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-widget_text
   (foreign-procedure "tmg_widget_text" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-text a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-widget_text (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_text (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-widget_input
   (foreign-procedure "tmg_widget_input" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-input a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-widget_input (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_input (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-widget_enum
   (foreign-procedure "tmg_widget_enum" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-enum a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-widget_enum (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_enum (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-widget_setting_enum
   (foreign-procedure "tmg_widget_setting_enum" (scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-setting-enum a1 a2 a3 a4 a5 a6)
-  (recur-utf8->string (c-glue-widget_setting_enum (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_setting_enum (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6)))))
 
 (define c-glue-widget_choice
   (foreign-procedure "tmg_widget_choice" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-choice a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-widget_choice (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_choice (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-widget_choices
   (foreign-procedure "tmg_widget_choices" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-choices a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-widget_choices (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_choices (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-widget_filtered_choice
   (foreign-procedure "tmg_widget_filtered_choice" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-filtered-choice a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-widget_filtered_choice (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_filtered_choice (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-widget_xpm
   (foreign-procedure "tmg_widget_xpm" (scheme-object) scheme-object))
 
 (define (widget-xpm a1)
-  (recur-utf8->string (c-glue-widget_xpm (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_xpm (recur-string->utf8 a1)))))
 
 (define c-glue-widget_box
   (foreign-procedure "tmg_widget_box" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-box a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-widget_box (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_box (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-widget_color
   (foreign-procedure "tmg_widget_color" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-color a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-widget_color (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_color (recur-string->cork a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-widget_division
   (foreign-procedure "tmg_widget_division" (scheme-object scheme-object) scheme-object))
 
 (define (widget-division a1 a2)
-  (recur-utf8->string (c-glue-widget_division (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_division (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-widget_icon_tabs
   (foreign-procedure "tmg_widget_icon_tabs" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-icon-tabs a1 a2 a3)
-  (recur-utf8->string (c-glue-widget_icon_tabs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_icon_tabs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-widget_responsive_icon_tabs
   (foreign-procedure "tmg_widget_responsive_icon_tabs" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-responsive-icon-tabs a1 a2 a3)
-  (recur-utf8->string (c-glue-widget_responsive_icon_tabs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_responsive_icon_tabs (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-widget_resize
   (foreign-procedure "tmg_widget_resize" (scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-resize a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
-  (recur-utf8->string (c-glue-widget_resize (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6) (recur-string->utf8 a7) (recur-string->utf8 a8) (recur-string->utf8 a9) (recur-string->utf8 a10))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_resize (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6) (recur-string->utf8 a7) (recur-string->utf8 a8) (recur-string->utf8 a9) (recur-string->utf8 a10)))))
 
 (define c-glue-widget_texmacs_output
   (foreign-procedure "tmg_widget_texmacs_output" (scheme-object scheme-object) scheme-object))
 
 (define (widget-texmacs-output a1 a2)
-  (recur-utf8->string (c-glue-widget_texmacs_output (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_texmacs_output (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-widget_texmacs_input
   (foreign-procedure "tmg_widget_texmacs_input" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (widget-texmacs-input a1 a2 a3)
-  (recur-utf8->string (c-glue-widget_texmacs_input (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_texmacs_input (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3)))))
 
 (define c-glue-widget_refresh
   (foreign-procedure "tmg_widget_refresh" (scheme-object scheme-object) scheme-object))
 
 (define (widget-refresh a1 a2)
-  (recur-utf8->string (c-glue-widget_refresh (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_refresh (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-widget_refreshable
   (foreign-procedure "tmg_widget_refreshable" (scheme-object scheme-object) scheme-object))
 
 (define (widget-refreshable a1 a2)
-  (recur-utf8->string (c-glue-widget_refreshable (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-widget_refreshable (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-object_2promise_widget
   (foreign-procedure "tmg_object_2promise_widget" (scheme-object) scheme-object))
 
 (define (object->promise-widget a1)
-  (recur-utf8->string (c-glue-object_2promise_widget (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-object_2promise_widget (recur-string->utf8 a1)))))
 
 (define c-glue-get_style_menu
   (foreign-procedure "tmg_get_style_menu" () scheme-object))
 
 (define (get-style-menu)
-  (recur-utf8->string (c-glue-get_style_menu)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_style_menu))))
 
 (define c-glue-hidden_packageP
   (foreign-procedure "tmg_hidden_packageP" (scheme-object) scheme-object))
 
 (define (hidden-package? a1)
-  (recur-utf8->string (c-glue-hidden_packageP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-hidden_packageP (recur-string->utf8 a1)))))
 
 (define c-glue-get_add_package_menu
   (foreign-procedure "tmg_get_add_package_menu" () scheme-object))
 
 (define (get-add-package-menu)
-  (recur-utf8->string (c-glue-get_add_package_menu)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_add_package_menu))))
 
 (define c-glue-get_remove_package_menu
   (foreign-procedure "tmg_get_remove_package_menu" () scheme-object))
 
 (define (get-remove-package-menu)
-  (recur-utf8->string (c-glue-get_remove_package_menu)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_remove_package_menu))))
 
 (define c-glue-get_toggle_package_menu
   (foreign-procedure "tmg_get_toggle_package_menu" () scheme-object))
 
 (define (get-toggle-package-menu)
-  (recur-utf8->string (c-glue-get_toggle_package_menu)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_toggle_package_menu))))
 
 (define c-glue-refresh_now
   (foreign-procedure "tmg_refresh_now" (scheme-object) scheme-object))
 
 (define (refresh-now a1)
-  (recur-utf8->string (c-glue-refresh_now (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-refresh_now (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_list
   (foreign-procedure "tmg_buffer_list" () scheme-object))
 
 (define (buffer-list)
-  (recur-utf8->string (c-glue-buffer_list)))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_list))))
 
 (define c-glue-current_buffer_url
   (foreign-procedure "tmg_current_buffer_url" () scheme-object))
 
 (define (current-buffer-url)
-  (recur-utf8->string (c-glue-current_buffer_url)))
+  (recur-utf8->string (tm-glue-check (c-glue-current_buffer_url))))
 
 (define c-glue-path_to_buffer
   (foreign-procedure "tmg_path_to_buffer" (scheme-object) scheme-object))
 
 (define (path-to-buffer a1)
-  (recur-utf8->string (c-glue-path_to_buffer (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_to_buffer (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_new
   (foreign-procedure "tmg_buffer_new" () scheme-object))
 
 (define (buffer-new)
-  (recur-utf8->string (c-glue-buffer_new)))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_new))))
 
 (define c-glue-buffer_rename
   (foreign-procedure "tmg_buffer_rename" (scheme-object scheme-object) scheme-object))
 
 (define (buffer-rename a1 a2)
-  (recur-utf8->string (c-glue-buffer_rename (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_rename (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-buffer_set
   (foreign-procedure "tmg_buffer_set" (scheme-object scheme-object) scheme-object))
 
 (define (buffer-set a1 a2)
-  (recur-utf8->string (c-glue-buffer_set (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_set (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-buffer_get
   (foreign-procedure "tmg_buffer_get" (scheme-object) scheme-object))
 
 (define (buffer-get a1)
-  (recur-utf8->string (c-glue-buffer_get (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_get (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_set_body
   (foreign-procedure "tmg_buffer_set_body" (scheme-object scheme-object) scheme-object))
 
 (define (buffer-set-body a1 a2)
-  (recur-utf8->string (c-glue-buffer_set_body (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_set_body (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-buffer_get_body
   (foreign-procedure "tmg_buffer_get_body" (scheme-object) scheme-object))
 
 (define (buffer-get-body a1)
-  (recur-utf8->string (c-glue-buffer_get_body (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_get_body (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_set_master
   (foreign-procedure "tmg_buffer_set_master" (scheme-object scheme-object) scheme-object))
 
 (define (buffer-set-master a1 a2)
-  (recur-utf8->string (c-glue-buffer_set_master (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_set_master (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-buffer_get_master
   (foreign-procedure "tmg_buffer_get_master" (scheme-object) scheme-object))
 
 (define (buffer-get-master a1)
-  (recur-utf8->string (c-glue-buffer_get_master (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_get_master (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_set_title
   (foreign-procedure "tmg_buffer_set_title" (scheme-object scheme-object) scheme-object))
 
 (define (buffer-set-title a1 a2)
-  (recur-utf8->string (c-glue-buffer_set_title (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_set_title (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-buffer_get_title
   (foreign-procedure "tmg_buffer_get_title" (scheme-object) scheme-object))
 
 (define (buffer-get-title a1)
-  (recur-utf8->string (c-glue-buffer_get_title (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_get_title (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_last_save
   (foreign-procedure "tmg_buffer_last_save" (scheme-object) scheme-object))
 
 (define (buffer-last-save a1)
-  (recur-utf8->string (c-glue-buffer_last_save (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_last_save (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_last_visited
   (foreign-procedure "tmg_buffer_last_visited" (scheme-object) scheme-object))
 
 (define (buffer-last-visited a1)
-  (recur-utf8->string (c-glue-buffer_last_visited (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_last_visited (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_modifiedP
   (foreign-procedure "tmg_buffer_modifiedP" (scheme-object) scheme-object))
 
 (define (buffer-modified? a1)
-  (recur-utf8->string (c-glue-buffer_modifiedP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_modifiedP (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_modified_since_autosaveP
   (foreign-procedure "tmg_buffer_modified_since_autosaveP" (scheme-object) scheme-object))
 
 (define (buffer-modified-since-autosave? a1)
-  (recur-utf8->string (c-glue-buffer_modified_since_autosaveP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_modified_since_autosaveP (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_pretend_modified
   (foreign-procedure "tmg_buffer_pretend_modified" (scheme-object) scheme-object))
 
 (define (buffer-pretend-modified a1)
-  (recur-utf8->string (c-glue-buffer_pretend_modified (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_pretend_modified (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_pretend_saved
   (foreign-procedure "tmg_buffer_pretend_saved" (scheme-object) scheme-object))
 
 (define (buffer-pretend-saved a1)
-  (recur-utf8->string (c-glue-buffer_pretend_saved (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_pretend_saved (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_pretend_autosaved
   (foreign-procedure "tmg_buffer_pretend_autosaved" (scheme-object) scheme-object))
 
 (define (buffer-pretend-autosaved a1)
-  (recur-utf8->string (c-glue-buffer_pretend_autosaved (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_pretend_autosaved (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_attach_notifier
   (foreign-procedure "tmg_buffer_attach_notifier" (scheme-object) scheme-object))
 
 (define (buffer-attach-notifier a1)
-  (recur-utf8->string (c-glue-buffer_attach_notifier (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_attach_notifier (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_has_nameP
   (foreign-procedure "tmg_buffer_has_nameP" (scheme-object) scheme-object))
 
 (define (buffer-has-name? a1)
-  (recur-utf8->string (c-glue-buffer_has_nameP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_has_nameP (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_auxP
   (foreign-procedure "tmg_buffer_auxP" (scheme-object) scheme-object))
 
 (define (buffer-aux? a1)
-  (recur-utf8->string (c-glue-buffer_auxP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_auxP (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_embeddedP
   (foreign-procedure "tmg_buffer_embeddedP" (scheme-object) scheme-object))
 
 (define (buffer-embedded? a1)
-  (recur-utf8->string (c-glue-buffer_embeddedP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_embeddedP (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_import
   (foreign-procedure "tmg_buffer_import" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (buffer-import a1 a2 a3)
-  (recur-utf8->string (c-glue-buffer_import (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_import (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-buffer_load
   (foreign-procedure "tmg_buffer_load" (scheme-object) scheme-object))
 
 (define (buffer-load a1)
-  (recur-utf8->string (c-glue-buffer_load (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_load (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_export
   (foreign-procedure "tmg_buffer_export" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (buffer-export a1 a2 a3)
-  (recur-utf8->string (c-glue-buffer_export (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_export (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-buffer_save
   (foreign-procedure "tmg_buffer_save" (scheme-object) scheme-object))
 
 (define (buffer-save a1)
-  (recur-utf8->string (c-glue-buffer_save (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_save (recur-string->utf8 a1)))))
 
 (define c-glue-tree_import_loaded
   (foreign-procedure "tmg_tree_import_loaded" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-import-loaded a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_import_loaded (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_import_loaded (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tree_import_loaded_from_object
   (foreign-procedure "tmg_tree_import_loaded_from_object" (scheme-object scheme-object) scheme-object))
 
 (define (tree-import-loaded-from-object a1 a2)
-  (recur-utf8->string (c-glue-tree_import_loaded_from_object (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_import_loaded_from_object (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_import
   (foreign-procedure "tmg_tree_import" (scheme-object scheme-object) scheme-object))
 
 (define (tree-import a1 a2)
-  (recur-utf8->string (c-glue-tree_import (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_import (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-tree_inclusion
   (foreign-procedure "tmg_tree_inclusion" (scheme-object) scheme-object))
 
 (define (tree-inclusion a1)
-  (recur-utf8->string (c-glue-tree_inclusion (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_inclusion (recur-string->utf8 a1)))))
 
 (define c-glue-tree_export
   (foreign-procedure "tmg_tree_export" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (tree-export a1 a2 a3)
-  (recur-utf8->string (c-glue-tree_export (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_export (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-tree_load_style
   (foreign-procedure "tmg_tree_load_style" (scheme-object) scheme-object))
 
 (define (tree-load-style a1)
-  (recur-utf8->string (c-glue-tree_load_style (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tree_load_style (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_focus
   (foreign-procedure "tmg_buffer_focus" (scheme-object) scheme-object))
 
 (define (buffer-focus a1)
-  (recur-utf8->string (c-glue-buffer_focus (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_focus (recur-string->utf8 a1)))))
 
 (define c-glue-buffer_focus_dot
   (foreign-procedure "tmg_buffer_focus_dot" (scheme-object) scheme-object))
 
 (define (buffer-focus* a1)
-  (recur-utf8->string (c-glue-buffer_focus_dot (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_focus_dot (recur-string->utf8 a1)))))
 
 (define c-glue-view_list
   (foreign-procedure "tmg_view_list" () scheme-object))
 
 (define (view-list)
-  (recur-utf8->string (c-glue-view_list)))
+  (recur-utf8->string (tm-glue-check (c-glue-view_list))))
 
 (define c-glue-buffer_2views
   (foreign-procedure "tmg_buffer_2views" (scheme-object) scheme-object))
 
 (define (buffer->views a1)
-  (recur-utf8->string (c-glue-buffer_2views (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_2views (recur-string->utf8 a1)))))
 
 (define c-glue-current_view_url
   (foreign-procedure "tmg_current_view_url" () scheme-object))
 
 (define (current-view-url)
-  (recur-utf8->string (c-glue-current_view_url)))
+  (recur-utf8->string (tm-glue-check (c-glue-current_view_url))))
 
 (define c-glue-window_2view
   (foreign-procedure "tmg_window_2view" (scheme-object) scheme-object))
 
 (define (window->view a1)
-  (recur-utf8->string (c-glue-window_2view (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-window_2view (recur-string->utf8 a1)))))
 
 (define c-glue-view_2buffer
   (foreign-procedure "tmg_view_2buffer" (scheme-object) scheme-object))
 
 (define (view->buffer a1)
-  (recur-utf8->string (c-glue-view_2buffer (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_2buffer (recur-string->utf8 a1)))))
 
 (define c-glue-view_2window_url
   (foreign-procedure "tmg_view_2window_url" (scheme-object) scheme-object))
 
 (define (view->window-url a1)
-  (recur-utf8->string (c-glue-view_2window_url (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_2window_url (recur-string->utf8 a1)))))
 
 (define c-glue-view_new
   (foreign-procedure "tmg_view_new" (scheme-object) scheme-object))
 
 (define (view-new a1)
-  (recur-utf8->string (c-glue-view_new (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_new (recur-string->utf8 a1)))))
 
 (define c-glue-view_passive
   (foreign-procedure "tmg_view_passive" (scheme-object) scheme-object))
 
 (define (view-passive a1)
-  (recur-utf8->string (c-glue-view_passive (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_passive (recur-string->utf8 a1)))))
 
 (define c-glue-view_recent
   (foreign-procedure "tmg_view_recent" (scheme-object) scheme-object))
 
 (define (view-recent a1)
-  (recur-utf8->string (c-glue-view_recent (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_recent (recur-string->utf8 a1)))))
 
 (define c-glue-view_delete
   (foreign-procedure "tmg_view_delete" (scheme-object) scheme-object))
 
 (define (view-delete a1)
-  (recur-utf8->string (c-glue-view_delete (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_delete (recur-string->utf8 a1)))))
 
 (define c-glue-window_set_view
   (foreign-procedure "tmg_window_set_view" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (window-set-view a1 a2 a3)
-  (recur-utf8->string (c-glue-window_set_view (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-window_set_view (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-switch_to_buffer
   (foreign-procedure "tmg_switch_to_buffer" (scheme-object) scheme-object))
 
 (define (switch-to-buffer a1)
-  (recur-utf8->string (c-glue-switch_to_buffer (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-switch_to_buffer (recur-string->utf8 a1)))))
 
 (define c-glue-set_drd
   (foreign-procedure "tmg_set_drd" (scheme-object) scheme-object))
 
 (define (set-drd a1)
-  (recur-utf8->string (c-glue-set_drd (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_drd (recur-string->utf8 a1)))))
 
 (define c-glue-window_list
   (foreign-procedure "tmg_window_list" () scheme-object))
 
 (define (window-list)
-  (recur-utf8->string (c-glue-window_list)))
+  (recur-utf8->string (tm-glue-check (c-glue-window_list))))
 
 (define c-glue-current_window
   (foreign-procedure "tmg_current_window" () scheme-object))
 
 (define (current-window)
-  (recur-utf8->string (c-glue-current_window)))
+  (recur-utf8->string (tm-glue-check (c-glue-current_window))))
 
 (define c-glue-buffer_2windows
   (foreign-procedure "tmg_buffer_2windows" (scheme-object) scheme-object))
 
 (define (buffer->windows a1)
-  (recur-utf8->string (c-glue-buffer_2windows (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-buffer_2windows (recur-string->utf8 a1)))))
 
 (define c-glue-window_to_buffer
   (foreign-procedure "tmg_window_to_buffer" (scheme-object) scheme-object))
 
 (define (window-to-buffer a1)
-  (recur-utf8->string (c-glue-window_to_buffer (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-window_to_buffer (recur-string->utf8 a1)))))
 
 (define c-glue-window_set_buffer
   (foreign-procedure "tmg_window_set_buffer" (scheme-object scheme-object) scheme-object))
 
 (define (window-set-buffer a1 a2)
-  (recur-utf8->string (c-glue-window_set_buffer (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-window_set_buffer (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-window_focus
   (foreign-procedure "tmg_window_focus" (scheme-object) scheme-object))
 
 (define (window-focus a1)
-  (recur-utf8->string (c-glue-window_focus (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-window_focus (recur-string->utf8 a1)))))
 
 (define c-glue-switch_to_window
   (foreign-procedure "tmg_switch_to_window" (scheme-object) scheme-object))
 
 (define (switch-to-window a1)
-  (recur-utf8->string (c-glue-switch_to_window (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-switch_to_window (recur-string->utf8 a1)))))
 
 (define c-glue-new_buffer
   (foreign-procedure "tmg_new_buffer" () scheme-object))
 
 (define (new-buffer)
-  (recur-utf8->string (c-glue-new_buffer)))
+  (recur-utf8->string (tm-glue-check (c-glue-new_buffer))))
 
 (define c-glue-open_buffer_in_window
   (foreign-procedure "tmg_open_buffer_in_window" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (open-buffer-in-window a1 a2 a3)
-  (recur-utf8->string (c-glue-open_buffer_in_window (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-open_buffer_in_window (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->cork a3)))))
 
 (define c-glue-open_window
   (foreign-procedure "tmg_open_window" () scheme-object))
 
 (define (open-window)
-  (recur-utf8->string (c-glue-open_window)))
+  (recur-utf8->string (tm-glue-check (c-glue-open_window))))
 
 (define c-glue-open_window_geometry
   (foreign-procedure "tmg_open_window_geometry" (scheme-object) scheme-object))
 
 (define (open-window-geometry a1)
-  (recur-utf8->string (c-glue-open_window_geometry (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-open_window_geometry (recur-string->cork a1)))))
 
 (define c-glue-cpp_buffer_close
   (foreign-procedure "tmg_cpp_buffer_close" (scheme-object) scheme-object))
 
 (define (cpp-buffer-close a1)
-  (recur-utf8->string (c-glue-cpp_buffer_close (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_buffer_close (recur-string->utf8 a1)))))
 
 (define c-glue-kill_window
   (foreign-procedure "tmg_kill_window" (scheme-object) scheme-object))
 
 (define (kill-window a1)
-  (recur-utf8->string (c-glue-kill_window (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-kill_window (recur-string->utf8 a1)))))
 
 (define c-glue-project_attach
   (foreign-procedure "tmg_project_attach" (scheme-object) scheme-object))
 
 (define (project-attach a1)
-  (recur-utf8->string (c-glue-project_attach (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-project_attach (recur-string->utf8 a1)))))
 
 (define c-glue-project_get
   (foreign-procedure "tmg_project_get" () scheme-object))
 
 (define (project-get)
-  (recur-utf8->string (c-glue-project_get)))
+  (recur-utf8->string (tm-glue-check (c-glue-project_get))))
 
 (define c-glue-alt_window_create_quit
   (foreign-procedure "tmg_alt_window_create_quit" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (alt-window-create-quit a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-alt_window_create_quit (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-alt_window_create_quit (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-alt_window_create_plain
   (foreign-procedure "tmg_alt_window_create_plain" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (alt-window-create-plain a1 a2 a3)
-  (recur-utf8->string (c-glue-alt_window_create_plain (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-alt_window_create_plain (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-alt_window_create_popup
   (foreign-procedure "tmg_alt_window_create_popup" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (alt-window-create-popup a1 a2 a3)
-  (recur-utf8->string (c-glue-alt_window_create_popup (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-alt_window_create_popup (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-alt_window_create_tooltip
   (foreign-procedure "tmg_alt_window_create_tooltip" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (alt-window-create-tooltip a1 a2 a3)
-  (recur-utf8->string (c-glue-alt_window_create_tooltip (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-alt_window_create_tooltip (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-alt_window_get_size
   (foreign-procedure "tmg_alt_window_get_size" (scheme-object) scheme-object))
 
 (define (alt-window-get-size a1)
-  (recur-cork->string (c-glue-alt_window_get_size (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-alt_window_get_size (recur-string->utf8 a1)))))
 
 (define c-glue-alt_window_get_position
   (foreign-procedure "tmg_alt_window_get_position" (scheme-object) scheme-object))
 
 (define (alt-window-get-position a1)
-  (recur-cork->string (c-glue-alt_window_get_position (recur-string->utf8 a1))))
+  (recur-cork->string (tm-glue-check (c-glue-alt_window_get_position (recur-string->utf8 a1)))))
 
 (define c-glue-alt_window_search
   (foreign-procedure "tmg_alt_window_search" (scheme-object) scheme-object))
 
 (define (alt-window-search a1)
-  (recur-utf8->string (c-glue-alt_window_search (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-alt_window_search (recur-string->utf8 a1)))))
 
 (define c-glue-bibtex_run
   (foreign-procedure "tmg_bibtex_run" (scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (bibtex-run a1 a2 a3 a4)
-  (recur-utf8->string (c-glue-bibtex_run (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4))))
+  (recur-utf8->string (tm-glue-check (c-glue-bibtex_run (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4)))))
 
 (define c-glue-bib_add_period
   (foreign-procedure "tmg_bib_add_period" (scheme-object) scheme-object))
 
 (define (bib-add-period a1)
-  (recur-cork->string (c-glue-bib_add_period (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_add_period (recur-string->cork a1)))))
 
 (define c-glue-bib_locase_first
   (foreign-procedure "tmg_bib_locase_first" (scheme-object) scheme-object))
 
 (define (bib-locase-first a1)
-  (recur-cork->string (c-glue-bib_locase_first (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_locase_first (recur-string->cork a1)))))
 
 (define c-glue-bib_upcase_first
   (foreign-procedure "tmg_bib_upcase_first" (scheme-object) scheme-object))
 
 (define (bib-upcase-first a1)
-  (recur-cork->string (c-glue-bib_upcase_first (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_upcase_first (recur-string->cork a1)))))
 
 (define c-glue-bib_locase
   (foreign-procedure "tmg_bib_locase" (scheme-object) scheme-object))
 
 (define (bib-locase a1)
-  (recur-cork->string (c-glue-bib_locase (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_locase (recur-string->cork a1)))))
 
 (define c-glue-bib_upcase
   (foreign-procedure "tmg_bib_upcase" (scheme-object) scheme-object))
 
 (define (bib-upcase a1)
-  (recur-cork->string (c-glue-bib_upcase (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_upcase (recur-string->cork a1)))))
 
 (define c-glue-bib_default_preserve_case
   (foreign-procedure "tmg_bib_default_preserve_case" (scheme-object) scheme-object))
 
 (define (bib-default-preserve-case a1)
-  (recur-cork->string (c-glue-bib_default_preserve_case (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_default_preserve_case (recur-string->cork a1)))))
 
 (define c-glue-bib_default_upcase_first
   (foreign-procedure "tmg_bib_default_upcase_first" (scheme-object) scheme-object))
 
 (define (bib-default-upcase-first a1)
-  (recur-cork->string (c-glue-bib_default_upcase_first (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_default_upcase_first (recur-string->cork a1)))))
 
 (define c-glue-bib_purify
   (foreign-procedure "tmg_bib_purify" (scheme-object) scheme-object))
 
 (define (bib-purify a1)
-  (recur-utf8->string (c-glue-bib_purify (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-bib_purify (recur-string->cork a1)))))
 
 (define c-glue-bib_text_length
   (foreign-procedure "tmg_bib_text_length" (scheme-object) scheme-object))
 
 (define (bib-text-length a1)
-  (recur-utf8->string (c-glue-bib_text_length (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-bib_text_length (recur-string->cork a1)))))
 
 (define c-glue-bib_prefix
   (foreign-procedure "tmg_bib_prefix" (scheme-object scheme-object) scheme-object))
 
 (define (bib-prefix a1 a2)
-  (recur-utf8->string (c-glue-bib_prefix (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-bib_prefix (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-bib_emptyP
   (foreign-procedure "tmg_bib_emptyP" (scheme-object scheme-object) scheme-object))
 
 (define (bib-empty? a1 a2)
-  (recur-utf8->string (c-glue-bib_emptyP (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-bib_emptyP (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-bib_field
   (foreign-procedure "tmg_bib_field" (scheme-object scheme-object) scheme-object))
 
 (define (bib-field a1 a2)
-  (recur-cork->string (c-glue-bib_field (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_field (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-bib_abbreviate
   (foreign-procedure "tmg_bib_abbreviate" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (bib-abbreviate a1 a2 a3)
-  (recur-cork->string (c-glue-bib_abbreviate (recur-string->cork a1) (recur-string->cork a2) (recur-string->cork a3))))
+  (recur-cork->string (tm-glue-check (c-glue-bib_abbreviate (recur-string->cork a1) (recur-string->cork a2) (recur-string->cork a3)))))
 
 (define c-glue-extract_attachments
   (foreign-procedure "tmg_extract_attachments" (scheme-object) scheme-object))
 
 (define (extract-attachments a1)
-  (recur-utf8->string (c-glue-extract_attachments (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-extract_attachments (recur-string->utf8 a1)))))
 
 (define c-glue-pdf_make_attachments
   (foreign-procedure "tmg_pdf_make_attachments" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (pdf-make-attachments a1 a2 a3)
-  (recur-utf8->string (c-glue-pdf_make_attachments (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-pdf_make_attachments (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-pdf_get_linked_file_paths
   (foreign-procedure "tmg_pdf_get_linked_file_paths" (scheme-object scheme-object) scheme-object))
 
 (define (pdf-get-linked-file-paths a1 a2)
-  (recur-utf8->string (c-glue-pdf_get_linked_file_paths (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-pdf_get_linked_file_paths (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-pdf_replace_linked_path
   (foreign-procedure "tmg_pdf_replace_linked_path" (scheme-object scheme-object) scheme-object))
 
 (define (pdf-replace-linked-path a1 a2)
-  (recur-utf8->string (c-glue-pdf_replace_linked_path (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-pdf_replace_linked_path (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-pdf_get_attached_main_tm
   (foreign-procedure "tmg_pdf_get_attached_main_tm" (scheme-object) scheme-object))
 
 (define (pdf-get-attached-main-tm a1)
-  (recur-utf8->string (c-glue-pdf_get_attached_main_tm (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-pdf_get_attached_main_tm (recur-string->utf8 a1)))))
 
 (define c-glue-array_url_append
   (foreign-procedure "tmg_array_url_append" (scheme-object scheme-object) scheme-object))
 
 (define (array-url-append a1 a2)
-  (recur-utf8->string (c-glue-array_url_append (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-array_url_append (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-path_insert_with
   (foreign-procedure "tmg_path_insert_with" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (path-insert-with a1 a2 a3)
-  (recur-utf8->string (c-glue-path_insert_with (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_insert_with (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->cork a3)))))
 
 (define c-glue-path_remove_with
   (foreign-procedure "tmg_path_remove_with" (scheme-object scheme-object) scheme-object))
 
 (define (path-remove-with a1 a2)
-  (recur-utf8->string (c-glue-path_remove_with (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-path_remove_with (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_insert
   (foreign-procedure "tmg_cpp_insert" (scheme-object) scheme-object))
 
 (define (cpp-insert a1)
-  (recur-utf8->string (c-glue-cpp_insert (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_insert (recur-string->cork a1)))))
 
 (define c-glue-cpp_insert_go_to
   (foreign-procedure "tmg_cpp_insert_go_to" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-insert-go-to a1 a2)
-  (recur-utf8->string (c-glue-cpp_insert_go_to (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_insert_go_to (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-insert_raw_go_to
   (foreign-procedure "tmg_insert_raw_go_to" (scheme-object scheme-object) scheme-object))
 
 (define (insert-raw-go-to a1 a2)
-  (recur-utf8->string (c-glue-insert_raw_go_to (recur-string->cork a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-insert_raw_go_to (recur-string->cork a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_make_with
   (foreign-procedure "tmg_cpp_make_with" (scheme-object scheme-object) scheme-object))
 
 (define (cpp-make-with a1 a2)
-  (recur-utf8->string (c-glue-cpp_make_with (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_make_with (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-make_style_with
   (foreign-procedure "tmg_make_style_with" (scheme-object scheme-object) scheme-object))
 
 (define (make-style-with a1 a2)
-  (recur-utf8->string (c-glue-make_style_with (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_style_with (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-init_default_one
   (foreign-procedure "tmg_init_default_one" (scheme-object) scheme-object))
 
 (define (init-default-one a1)
-  (recur-utf8->string (c-glue-init_default_one (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-init_default_one (recur-string->utf8 a1)))))
 
 (define c-glue-init_env
   (foreign-procedure "tmg_init_env" (scheme-object scheme-object) scheme-object))
 
 (define (init-env a1 a2)
-  (recur-utf8->string (c-glue-init_env (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-init_env (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-init_env_tree
   (foreign-procedure "tmg_init_env_tree" (scheme-object scheme-object) scheme-object))
 
 (define (init-env-tree a1 a2)
-  (recur-utf8->string (c-glue-init_env_tree (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-init_env_tree (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-init_style
   (foreign-procedure "tmg_init_style" (scheme-object) scheme-object))
 
 (define (init-style a1)
-  (recur-utf8->string (c-glue-init_style (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-init_style (recur-string->utf8 a1)))))
 
 (define c-glue-get_env
   (foreign-procedure "tmg_get_env" (scheme-object) scheme-object))
 
 (define (get-env a1)
-  (recur-utf8->string (c-glue-get_env (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_env (recur-string->utf8 a1)))))
 
 (define c-glue-get_env_tree
   (foreign-procedure "tmg_get_env_tree" (scheme-object) scheme-object))
 
 (define (get-env-tree a1)
-  (recur-utf8->string (c-glue-get_env_tree (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_env_tree (recur-string->utf8 a1)))))
 
 (define c-glue-get_env_tree_at
   (foreign-procedure "tmg_get_env_tree_at" (scheme-object scheme-object) scheme-object))
 
 (define (get-env-tree-at a1 a2)
-  (recur-utf8->string (c-glue-get_env_tree_at (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_env_tree_at (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-get_init
   (foreign-procedure "tmg_get_init" (scheme-object) scheme-object))
 
 (define (get-init a1)
-  (recur-utf8->string (c-glue-get_init (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_init (recur-string->utf8 a1)))))
 
 (define c-glue-get_init_tree
   (foreign-procedure "tmg_get_init_tree" (scheme-object) scheme-object))
 
 (define (get-init-tree a1)
-  (recur-utf8->string (c-glue-get_init_tree (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_init_tree (recur-string->utf8 a1)))))
 
 (define c-glue-context_hasP
   (foreign-procedure "tmg_context_hasP" (scheme-object) scheme-object))
 
 (define (context-has? a1)
-  (recur-utf8->string (c-glue-context_hasP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-context_hasP (recur-string->utf8 a1)))))
 
 (define c-glue-style_hasP
   (foreign-procedure "tmg_style_hasP" (scheme-object) scheme-object))
 
 (define (style-has? a1)
-  (recur-utf8->string (c-glue-style_hasP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-style_hasP (recur-string->utf8 a1)))))
 
 (define c-glue-init_hasP
   (foreign-procedure "tmg_init_hasP" (scheme-object) scheme-object))
 
 (define (init-has? a1)
-  (recur-utf8->string (c-glue-init_hasP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-init_hasP (recur-string->utf8 a1)))))
 
 (define c-glue-get_reference
   (foreign-procedure "tmg_get_reference" (scheme-object) scheme-object))
 
 (define (get-reference a1)
-  (recur-utf8->string (c-glue-get_reference (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_reference (recur-string->utf8 a1)))))
 
 (define c-glue-set_reference
   (foreign-procedure "tmg_set_reference" (scheme-object scheme-object) scheme-object))
 
 (define (set-reference a1 a2)
-  (recur-utf8->string (c-glue-set_reference (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_reference (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-reset_reference
   (foreign-procedure "tmg_reset_reference" (scheme-object) scheme-object))
 
 (define (reset-reference a1)
-  (recur-utf8->string (c-glue-reset_reference (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-reset_reference (recur-string->utf8 a1)))))
 
 (define c-glue-find_references
   (foreign-procedure "tmg_find_references" (scheme-object) scheme-object))
 
 (define (find-references a1)
-  (recur-utf8->string (c-glue-find_references (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-find_references (recur-string->utf8 a1)))))
 
 (define c-glue-list_references
   (foreign-procedure "tmg_list_references" () scheme-object))
 
 (define (list-references)
-  (recur-utf8->string (c-glue-list_references)))
+  (recur-utf8->string (tm-glue-check (c-glue-list_references))))
 
 (define c-glue-list_references_dot
   (foreign-procedure "tmg_list_references_dot" (scheme-object) scheme-object))
 
 (define (list-references* a1)
-  (recur-utf8->string (c-glue-list_references_dot (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-list_references_dot (recur-string->utf8 a1)))))
 
 (define c-glue-get_auxiliary
   (foreign-procedure "tmg_get_auxiliary" (scheme-object) scheme-object))
 
 (define (get-auxiliary a1)
-  (recur-utf8->string (c-glue-get_auxiliary (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_auxiliary (recur-string->utf8 a1)))))
 
 (define c-glue-set_auxiliary
   (foreign-procedure "tmg_set_auxiliary" (scheme-object scheme-object) scheme-object))
 
 (define (set-auxiliary a1 a2)
-  (recur-utf8->string (c-glue-set_auxiliary (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_auxiliary (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-reset_auxiliary
   (foreign-procedure "tmg_reset_auxiliary" (scheme-object) scheme-object))
 
 (define (reset-auxiliary a1)
-  (recur-utf8->string (c-glue-reset_auxiliary (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-reset_auxiliary (recur-string->utf8 a1)))))
 
 (define c-glue-list_auxiliaries
   (foreign-procedure "tmg_list_auxiliaries" () scheme-object))
 
 (define (list-auxiliaries)
-  (recur-utf8->string (c-glue-list_auxiliaries)))
+  (recur-utf8->string (tm-glue-check (c-glue-list_auxiliaries))))
 
 (define c-glue-list_auxiliaries_dot
   (foreign-procedure "tmg_list_auxiliaries_dot" (scheme-object) scheme-object))
 
 (define (list-auxiliaries* a1)
-  (recur-utf8->string (c-glue-list_auxiliaries_dot (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-list_auxiliaries_dot (recur-string->utf8 a1)))))
 
 (define c-glue-get_attachment
   (foreign-procedure "tmg_get_attachment" (scheme-object) scheme-object))
 
 (define (get-attachment a1)
-  (recur-utf8->string (c-glue-get_attachment (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_attachment (recur-string->utf8 a1)))))
 
 (define c-glue-set_attachment
   (foreign-procedure "tmg_set_attachment" (scheme-object scheme-object) scheme-object))
 
 (define (set-attachment a1 a2)
-  (recur-utf8->string (c-glue-set_attachment (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_attachment (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-reset_attachment
   (foreign-procedure "tmg_reset_attachment" (scheme-object) scheme-object))
 
 (define (reset-attachment a1)
-  (recur-utf8->string (c-glue-reset_attachment (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-reset_attachment (recur-string->utf8 a1)))))
 
 (define c-glue-list_attachments
   (foreign-procedure "tmg_list_attachments" () scheme-object))
 
 (define (list-attachments)
-  (recur-utf8->string (c-glue-list_attachments)))
+  (recur-utf8->string (tm-glue-check (c-glue-list_attachments))))
 
 (define c-glue-list_attachments_dot
   (foreign-procedure "tmg_list_attachments_dot" (scheme-object) scheme-object))
 
 (define (list-attachments* a1)
-  (recur-utf8->string (c-glue-list_attachments_dot (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-list_attachments_dot (recur-string->utf8 a1)))))
 
 (define c-glue-make_htab
   (foreign-procedure "tmg_make_htab" (scheme-object) scheme-object))
 
 (define (make-htab a1)
-  (recur-utf8->string (c-glue-make_htab (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_htab (recur-string->utf8 a1)))))
 
 (define c-glue-make_space
   (foreign-procedure "tmg_make_space" (scheme-object) scheme-object))
 
 (define (make-space a1)
-  (recur-utf8->string (c-glue-make_space (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_space (recur-string->utf8 a1)))))
 
 (define c-glue-make_var_space
   (foreign-procedure "tmg_make_var_space" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (make-var-space a1 a2 a3)
-  (recur-utf8->string (c-glue-make_var_space (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_var_space (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-make_hspace
   (foreign-procedure "tmg_make_hspace" (scheme-object) scheme-object))
 
 (define (make-hspace a1)
-  (recur-utf8->string (c-glue-make_hspace (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_hspace (recur-string->utf8 a1)))))
 
 (define c-glue-make_var_hspace
   (foreign-procedure "tmg_make_var_hspace" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (make-var-hspace a1 a2 a3)
-  (recur-utf8->string (c-glue-make_var_hspace (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_var_hspace (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-make_vspace_before
   (foreign-procedure "tmg_make_vspace_before" (scheme-object) scheme-object))
 
 (define (make-vspace-before a1)
-  (recur-utf8->string (c-glue-make_vspace_before (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_vspace_before (recur-string->utf8 a1)))))
 
 (define c-glue-make_var_vspace_before
   (foreign-procedure "tmg_make_var_vspace_before" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (make-var-vspace-before a1 a2 a3)
-  (recur-utf8->string (c-glue-make_var_vspace_before (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_var_vspace_before (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-make_vspace_after
   (foreign-procedure "tmg_make_vspace_after" (scheme-object) scheme-object))
 
 (define (make-vspace-after a1)
-  (recur-utf8->string (c-glue-make_vspace_after (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_vspace_after (recur-string->utf8 a1)))))
 
 (define c-glue-make_var_vspace_after
   (foreign-procedure "tmg_make_var_vspace_after" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (make-var-vspace-after a1 a2 a3)
-  (recur-utf8->string (c-glue-make_var_vspace_after (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_var_vspace_after (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-make_image
   (foreign-procedure "tmg_make_image" (scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (make-image a1 a2 a3 a4 a5 a6)
-  (recur-utf8->string (c-glue-make_image (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6))))
+  (recur-utf8->string (tm-glue-check (c-glue-make_image (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6)))))
 
 (define c-glue-length_decode
   (foreign-procedure "tmg_length_decode" (scheme-object) scheme-object))
 
 (define (length-decode a1)
-  (recur-utf8->string (c-glue-length_decode (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_decode (recur-string->utf8 a1)))))
 
 (define c-glue-length_add
   (foreign-procedure "tmg_length_add" (scheme-object scheme-object) scheme-object))
 
 (define (length-add a1 a2)
-  (recur-utf8->string (c-glue-length_add (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_add (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-length_sub
   (foreign-procedure "tmg_length_sub" (scheme-object scheme-object) scheme-object))
 
 (define (length-sub a1 a2)
-  (recur-utf8->string (c-glue-length_sub (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_sub (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-length_max
   (foreign-procedure "tmg_length_max" (scheme-object scheme-object) scheme-object))
 
 (define (length-max a1 a2)
-  (recur-utf8->string (c-glue-length_max (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_max (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-length_min
   (foreign-procedure "tmg_length_min" (scheme-object scheme-object) scheme-object))
 
 (define (length-min a1 a2)
-  (recur-utf8->string (c-glue-length_min (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_min (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-length_mult
   (foreign-procedure "tmg_length_mult" (scheme-object scheme-object) scheme-object))
 
 (define (length-mult a1 a2)
-  (recur-utf8->string (c-glue-length_mult (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_mult (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-lengthP
   (foreign-procedure "tmg_lengthP" (scheme-object) scheme-object))
 
 (define (length? a1)
-  (recur-utf8->string (c-glue-lengthP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-lengthP (recur-string->utf8 a1)))))
 
 (define c-glue-length_divide
   (foreign-procedure "tmg_length_divide" (scheme-object scheme-object) scheme-object))
 
 (define (length-divide a1 a2)
-  (recur-utf8->string (c-glue-length_divide (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-length_divide (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-cpp_make_lprime
   (foreign-procedure "tmg_cpp_make_lprime" (scheme-object) scheme-object))
 
 (define (cpp-make-lprime a1)
-  (recur-utf8->string (c-glue-cpp_make_lprime (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_make_lprime (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_make_rprime
   (foreign-procedure "tmg_cpp_make_rprime" (scheme-object) scheme-object))
 
 (define (cpp-make-rprime a1)
-  (recur-utf8->string (c-glue-cpp_make_rprime (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_make_rprime (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_make_wide
   (foreign-procedure "tmg_cpp_make_wide" (scheme-object) scheme-object))
 
 (define (cpp-make-wide a1)
-  (recur-utf8->string (c-glue-cpp_make_wide (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_make_wide (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_make_wide_under
   (foreign-procedure "tmg_cpp_make_wide_under" (scheme-object) scheme-object))
 
 (define (cpp-make-wide-under a1)
-  (recur-utf8->string (c-glue-cpp_make_wide_under (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_make_wide_under (recur-string->utf8 a1)))))
 
 (define c-glue-table_set_format
   (foreign-procedure "tmg_table_set_format" (scheme-object scheme-object) scheme-object))
 
 (define (table-set-format a1 a2)
-  (recur-utf8->string (c-glue-table_set_format (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-table_set_format (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-table_get_format
   (foreign-procedure "tmg_table_get_format" (scheme-object) scheme-object))
 
 (define (table-get-format a1)
-  (recur-utf8->string (c-glue-table_get_format (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-table_get_format (recur-string->utf8 a1)))))
 
 (define c-glue-table_del_format
   (foreign-procedure "tmg_table_del_format" (scheme-object) scheme-object))
 
 (define (table-del-format a1)
-  (recur-utf8->string (c-glue-table_del_format (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-table_del_format (recur-string->utf8 a1)))))
 
 (define c-glue-set_cell_mode
   (foreign-procedure "tmg_set_cell_mode" (scheme-object) scheme-object))
 
 (define (set-cell-mode a1)
-  (recur-utf8->string (c-glue-set_cell_mode (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_cell_mode (recur-string->utf8 a1)))))
 
 (define c-glue-get_cell_mode
   (foreign-procedure "tmg_get_cell_mode" () scheme-object))
 
 (define (get-cell-mode)
-  (recur-utf8->string (c-glue-get_cell_mode)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_cell_mode))))
 
 (define c-glue-cell_set_format
   (foreign-procedure "tmg_cell_set_format" (scheme-object scheme-object) scheme-object))
 
 (define (cell-set-format a1 a2)
-  (recur-utf8->string (c-glue-cell_set_format (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-cell_set_format (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-cell_get_format
   (foreign-procedure "tmg_cell_get_format" (scheme-object) scheme-object))
 
 (define (cell-get-format a1)
-  (recur-utf8->string (c-glue-cell_get_format (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cell_get_format (recur-string->utf8 a1)))))
 
 (define c-glue-cell_del_format
   (foreign-procedure "tmg_cell_del_format" (scheme-object) scheme-object))
 
 (define (cell-del-format a1)
-  (recur-utf8->string (c-glue-cell_del_format (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cell_del_format (recur-string->utf8 a1)))))
 
 (define c-glue-key_press
   (foreign-procedure "tmg_key_press" (scheme-object) scheme-object))
 
 (define (key-press a1)
-  (recur-utf8->string (c-glue-key_press (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-key_press (recur-string->utf8 a1)))))
 
 (define c-glue-raw_emulate_keyboard
   (foreign-procedure "tmg_raw_emulate_keyboard" (scheme-object) scheme-object))
 
 (define (raw-emulate-keyboard a1)
-  (recur-utf8->string (c-glue-raw_emulate_keyboard (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-raw_emulate_keyboard (recur-string->utf8 a1)))))
 
 (define c-glue-key_press_search
   (foreign-procedure "tmg_key_press_search" (scheme-object) scheme-object))
 
 (define (key-press-search a1)
-  (recur-utf8->string (c-glue-key_press_search (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-key_press_search (recur-string->utf8 a1)))))
 
 (define c-glue-key_press_replace
   (foreign-procedure "tmg_key_press_replace" (scheme-object) scheme-object))
 
 (define (key-press-replace a1)
-  (recur-utf8->string (c-glue-key_press_replace (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-key_press_replace (recur-string->utf8 a1)))))
 
 (define c-glue-key_press_spell
   (foreign-procedure "tmg_key_press_spell" (scheme-object) scheme-object))
 
 (define (key-press-spell a1)
-  (recur-utf8->string (c-glue-key_press_spell (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-key_press_spell (recur-string->utf8 a1)))))
 
 (define c-glue-key_press_complete
   (foreign-procedure "tmg_key_press_complete" (scheme-object) scheme-object))
 
 (define (key-press-complete a1)
-  (recur-utf8->string (c-glue-key_press_complete (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-key_press_complete (recur-string->utf8 a1)))))
 
 (define c-glue-mouse_any
   (foreign-procedure "tmg_mouse_any" (scheme-object scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (mouse-any a1 a2 a3 a4 a5 a6)
-  (recur-utf8->string (c-glue-mouse_any (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6))))
+  (recur-utf8->string (tm-glue-check (c-glue-mouse_any (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5) (recur-string->utf8 a6)))))
 
 (define c-glue-set_mouse_pointer
   (foreign-procedure "tmg_set_mouse_pointer" (scheme-object scheme-object) scheme-object))
 
 (define (set-mouse-pointer a1 a2)
-  (recur-utf8->string (c-glue-set_mouse_pointer (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_mouse_pointer (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-set_predef_mouse_pointer
   (foreign-procedure "tmg_set_predef_mouse_pointer" (scheme-object) scheme-object))
 
 (define (set-predef-mouse-pointer a1)
-  (recur-utf8->string (c-glue-set_predef_mouse_pointer (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_predef_mouse_pointer (recur-string->utf8 a1)))))
 
 (define c-glue-go_start_with
   (foreign-procedure "tmg_go_start_with" (scheme-object scheme-object) scheme-object))
 
 (define (go-start-with a1 a2)
-  (recur-utf8->string (c-glue-go_start_with (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-go_start_with (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-go_end_with
   (foreign-procedure "tmg_go_end_with" (scheme-object scheme-object) scheme-object))
 
 (define (go-end-with a1 a2)
-  (recur-utf8->string (c-glue-go_end_with (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-go_end_with (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-label_2path
   (foreign-procedure "tmg_label_2path" (scheme-object) scheme-object))
 
 (define (label->path a1)
-  (recur-utf8->string (c-glue-label_2path (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-label_2path (recur-string->utf8 a1)))))
 
 (define c-glue-go_to_label
   (foreign-procedure "tmg_go_to_label" (scheme-object) scheme-object))
 
 (define (go-to-label a1)
-  (recur-utf8->string (c-glue-go_to_label (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-go_to_label (recur-string->utf8 a1)))))
 
 (define c-glue-clipboard_set
   (foreign-procedure "tmg_clipboard_set" (scheme-object scheme-object) scheme-object))
 
 (define (clipboard-set a1 a2)
-  (recur-utf8->string (c-glue-clipboard_set (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_set (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-clipboard_get
   (foreign-procedure "tmg_clipboard_get" (scheme-object) scheme-object))
 
 (define (clipboard-get a1)
-  (recur-utf8->string (c-glue-clipboard_get (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_get (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_clipboard_copy
   (foreign-procedure "tmg_cpp_clipboard_copy" (scheme-object) scheme-object))
 
 (define (cpp-clipboard-copy a1)
-  (recur-utf8->string (c-glue-cpp_clipboard_copy (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_clipboard_copy (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_clipboard_cut
   (foreign-procedure "tmg_cpp_clipboard_cut" (scheme-object) scheme-object))
 
 (define (cpp-clipboard-cut a1)
-  (recur-utf8->string (c-glue-cpp_clipboard_cut (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_clipboard_cut (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_clipboard_paste
   (foreign-procedure "tmg_cpp_clipboard_paste" (scheme-object) scheme-object))
 
 (define (cpp-clipboard-paste a1)
-  (recur-utf8->string (c-glue-cpp_clipboard_paste (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_clipboard_paste (recur-string->utf8 a1)))))
 
 (define c-glue-clipboard_clear
   (foreign-procedure "tmg_clipboard_clear" (scheme-object) scheme-object))
 
 (define (clipboard-clear a1)
-  (recur-utf8->string (c-glue-clipboard_clear (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_clear (recur-string->utf8 a1)))))
 
 (define c-glue-clipboard_set_import
   (foreign-procedure "tmg_clipboard_set_import" (scheme-object) scheme-object))
 
 (define (clipboard-set-import a1)
-  (recur-utf8->string (c-glue-clipboard_set_import (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_set_import (recur-string->utf8 a1)))))
 
 (define c-glue-clipboard_set_export
   (foreign-procedure "tmg_clipboard_set_export" (scheme-object) scheme-object))
 
 (define (clipboard-set-export a1)
-  (recur-utf8->string (c-glue-clipboard_set_export (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_set_export (recur-string->utf8 a1)))))
 
 (define c-glue-clipboard_get_import
   (foreign-procedure "tmg_clipboard_get_import" () scheme-object))
 
 (define (clipboard-get-import)
-  (recur-utf8->string (c-glue-clipboard_get_import)))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_get_import))))
 
 (define c-glue-clipboard_get_export
   (foreign-procedure "tmg_clipboard_get_export" () scheme-object))
 
 (define (clipboard-get-export)
-  (recur-utf8->string (c-glue-clipboard_get_export)))
+  (recur-utf8->string (tm-glue-check (c-glue-clipboard_get_export))))
 
 (define c-glue-set_alt_selection
   (foreign-procedure "tmg_set_alt_selection" (scheme-object scheme-object) scheme-object))
 
 (define (set-alt-selection a1 a2)
-  (recur-utf8->string (c-glue-set_alt_selection (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_alt_selection (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-get_alt_selection
   (foreign-procedure "tmg_get_alt_selection" (scheme-object) scheme-object))
 
 (define (get-alt-selection a1)
-  (recur-utf8->string (c-glue-get_alt_selection (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_alt_selection (recur-string->utf8 a1)))))
 
 (define c-glue-cancel_alt_selection
   (foreign-procedure "tmg_cancel_alt_selection" (scheme-object) scheme-object))
 
 (define (cancel-alt-selection a1)
-  (recur-utf8->string (c-glue-cancel_alt_selection (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-cancel_alt_selection (recur-string->utf8 a1)))))
 
 (define c-glue-replace_start
   (foreign-procedure "tmg_replace_start" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (replace-start a1 a2 a3)
-  (recur-utf8->string (c-glue-replace_start (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-replace_start (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-spell_replace
   (foreign-procedure "tmg_spell_replace" (scheme-object) scheme-object))
 
 (define (spell-replace a1)
-  (recur-utf8->string (c-glue-spell_replace (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-spell_replace (recur-string->utf8 a1)))))
 
 (define c-glue-session_complete_command
   (foreign-procedure "tmg_session_complete_command" (scheme-object) scheme-object))
 
 (define (session-complete-command a1)
-  (recur-utf8->string (c-glue-session_complete_command (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-session_complete_command (recur-string->utf8 a1)))))
 
 (define c-glue-keyboard_focus_on
   (foreign-procedure "tmg_keyboard_focus_on" (scheme-object) scheme-object))
 
 (define (keyboard-focus-on a1)
-  (recur-utf8->string (c-glue-keyboard_focus_on (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-keyboard_focus_on (recur-string->utf8 a1)))))
 
 (define c-glue-broadcast_message
   (foreign-procedure "tmg_broadcast_message" (scheme-object) scheme-object))
 
 (define (broadcast-message a1)
-  (recur-utf8->string (c-glue-broadcast_message (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-broadcast_message (recur-string->utf8 a1)))))
 
 (define c-glue-view_set_property
   (foreign-procedure "tmg_view_set_property" (scheme-object scheme-object) scheme-object))
 
 (define (view-set-property a1 a2)
-  (recur-utf8->string (c-glue-view_set_property (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-view_set_property (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-view_get_property
   (foreign-procedure "tmg_view_get_property" (scheme-object) scheme-object))
 
 (define (view-get-property a1)
-  (recur-cork->string (c-glue-view_get_property (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-view_get_property (recur-string->cork a1)))))
 
 (define c-glue-generate_aux
   (foreign-procedure "tmg_generate_aux" (scheme-object) scheme-object))
 
 (define (generate-aux a1)
-  (recur-utf8->string (c-glue-generate_aux (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-generate_aux (recur-string->utf8 a1)))))
 
 (define c-glue-get_metadata
   (foreign-procedure "tmg_get_metadata" (scheme-object) scheme-object))
 
 (define (get-metadata a1)
-  (recur-utf8->string (c-glue-get_metadata (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-get_metadata (recur-string->utf8 a1)))))
 
 (define c-glue-print_to_file
   (foreign-procedure "tmg_print_to_file" (scheme-object) scheme-object))
 
 (define (print-to-file a1)
-  (recur-utf8->string (c-glue-print_to_file (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-print_to_file (recur-string->utf8 a1)))))
 
 (define c-glue-print_pages_to_file
   (foreign-procedure "tmg_print_pages_to_file" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (print-pages-to-file a1 a2 a3)
-  (recur-utf8->string (c-glue-print_pages_to_file (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-print_pages_to_file (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-print_pages
   (foreign-procedure "tmg_print_pages" (scheme-object scheme-object) scheme-object))
 
 (define (print-pages a1 a2)
-  (recur-utf8->string (c-glue-print_pages (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-print_pages (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-print_snippet
   (foreign-procedure "tmg_print_snippet" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (print-snippet a1 a2 a3)
-  (recur-utf8->string (c-glue-print_snippet (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-print_snippet (recur-string->utf8 a1) (recur-string->cork a2) (recur-string->utf8 a3)))))
 
 (define c-glue-graphics_file_to_clipboard
   (foreign-procedure "tmg_graphics_file_to_clipboard" (scheme-object) scheme-object))
 
 (define (graphics-file-to-clipboard a1)
-  (recur-utf8->string (c-glue-graphics_file_to_clipboard (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-graphics_file_to_clipboard (recur-string->utf8 a1)))))
 
 (define c-glue-export_postscript
   (foreign-procedure "tmg_export_postscript" (scheme-object) scheme-object))
 
 (define (export-postscript a1)
-  (recur-utf8->string (c-glue-export_postscript (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-export_postscript (recur-string->utf8 a1)))))
 
 (define c-glue-export_pages_postscript
   (foreign-procedure "tmg_export_pages_postscript" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (export-pages-postscript a1 a2 a3)
-  (recur-utf8->string (c-glue-export_pages_postscript (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-export_pages_postscript (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3)))))
 
 (define c-glue-footer_eval
   (foreign-procedure "tmg_footer_eval" (scheme-object) scheme-object))
 
 (define (footer-eval a1)
-  (recur-utf8->string (c-glue-footer_eval (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-footer_eval (recur-string->utf8 a1)))))
 
 (define c-glue-texmacs_exec
   (foreign-procedure "tmg_texmacs_exec" (scheme-object) scheme-object))
 
 (define (texmacs-exec a1)
-  (recur-utf8->string (c-glue-texmacs_exec (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-texmacs_exec (recur-string->cork a1)))))
 
 (define c-glue-texmacs_exec_dot
   (foreign-procedure "tmg_texmacs_exec_dot" (scheme-object) scheme-object))
 
 (define (texmacs-exec* a1)
-  (recur-utf8->string (c-glue-texmacs_exec_dot (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-texmacs_exec_dot (recur-string->cork a1)))))
 
 (define c-glue-texmacs_expand
   (foreign-procedure "tmg_texmacs_expand" (scheme-object) scheme-object))
 
 (define (texmacs-expand a1)
-  (recur-utf8->string (c-glue-texmacs_expand (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-texmacs_expand (recur-string->cork a1)))))
 
 (define c-glue-verbatim_expand
   (foreign-procedure "tmg_verbatim_expand" (scheme-object) scheme-object))
 
 (define (verbatim-expand a1)
-  (recur-utf8->string (c-glue-verbatim_expand (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-verbatim_expand (recur-string->cork a1)))))
 
 (define c-glue-latex_expand
   (foreign-procedure "tmg_latex_expand" (scheme-object) scheme-object))
 
 (define (latex-expand a1)
-  (recur-utf8->string (c-glue-latex_expand (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-latex_expand (recur-string->cork a1)))))
 
 (define c-glue-html_expand
   (foreign-procedure "tmg_html_expand" (scheme-object) scheme-object))
 
 (define (html-expand a1)
-  (recur-utf8->string (c-glue-html_expand (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-html_expand (recur-string->cork a1)))))
 
 (define c-glue-animate_checkout
   (foreign-procedure "tmg_animate_checkout" (scheme-object) scheme-object))
 
 (define (animate-checkout a1)
-  (recur-utf8->string (c-glue-animate_checkout (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-animate_checkout (recur-string->cork a1)))))
 
 (define c-glue-animate_commit
   (foreign-procedure "tmg_animate_commit" (scheme-object) scheme-object))
 
 (define (animate-commit a1)
-  (recur-utf8->string (c-glue-animate_commit (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-animate_commit (recur-string->cork a1)))))
 
 (define c-glue-insert_kbd_wildcard
   (foreign-procedure "tmg_insert_kbd_wildcard" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (insert-kbd-wildcard a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-insert_kbd_wildcard (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-insert_kbd_wildcard (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-set_variant_keys
   (foreign-procedure "tmg_set_variant_keys" (scheme-object scheme-object) scheme-object))
 
 (define (set-variant-keys a1 a2)
-  (recur-utf8->string (c-glue-set_variant_keys (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_variant_keys (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-kbd_pre_rewrite
   (foreign-procedure "tmg_kbd_pre_rewrite" (scheme-object) scheme-object))
 
 (define (kbd-pre-rewrite a1)
-  (recur-utf8->string (c-glue-kbd_pre_rewrite (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-kbd_pre_rewrite (recur-string->utf8 a1)))))
 
 (define c-glue-kbd_post_rewrite
   (foreign-procedure "tmg_kbd_post_rewrite" (scheme-object scheme-object) scheme-object))
 
 (define (kbd-post-rewrite a1 a2)
-  (recur-utf8->string (c-glue-kbd_post_rewrite (recur-string->utf8 a1) (recur-string->utf8 a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-kbd_post_rewrite (recur-string->utf8 a1) (recur-string->utf8 a2)))))
 
 (define c-glue-kbd_system_rewrite
   (foreign-procedure "tmg_kbd_system_rewrite" (scheme-object) scheme-object))
 
 (define (kbd-system-rewrite a1)
-  (recur-utf8->string (c-glue-kbd_system_rewrite (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-kbd_system_rewrite (recur-string->utf8 a1)))))
 
 (define c-glue-set_font_rules
   (foreign-procedure "tmg_set_font_rules" (scheme-object) scheme-object))
 
 (define (set-font-rules a1)
-  (recur-utf8->string (c-glue-set_font_rules (recur-string->cork a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_font_rules (recur-string->cork a1)))))
 
 (define c-glue-window_set_property
   (foreign-procedure "tmg_window_set_property" (scheme-object scheme-object) scheme-object))
 
 (define (window-set-property a1 a2)
-  (recur-utf8->string (c-glue-window_set_property (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-window_set_property (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-window_get_property
   (foreign-procedure "tmg_window_get_property" (scheme-object) scheme-object))
 
 (define (window-get-property a1)
-  (recur-cork->string (c-glue-window_get_property (recur-string->cork a1))))
+  (recur-cork->string (tm-glue-check (c-glue-window_get_property (recur-string->cork a1)))))
 
 (define c-glue-shell
   (foreign-procedure "tmg_shell" (scheme-object) scheme-object))
 
 (define (shell a1)
-  (recur-utf8->string (c-glue-shell (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-shell (recur-string->utf8 a1)))))
 
 (define c-glue-cpp_choose_file
   (foreign-procedure "tmg_cpp_choose_file" (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object))
 
 (define (cpp-choose-file a1 a2 a3 a4 a5)
-  (recur-utf8->string (c-glue-cpp_choose_file (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5))))
+  (recur-utf8->string (tm-glue-check (c-glue-cpp_choose_file (recur-string->utf8 a1) (recur-string->utf8 a2) (recur-string->utf8 a3) (recur-string->utf8 a4) (recur-string->utf8 a5)))))
 
 (define c-glue-tm_interactive
   (foreign-procedure "tmg_tm_interactive" (scheme-object scheme-object) scheme-object))
 
 (define (tm-interactive a1 a2)
-  (recur-utf8->string (c-glue-tm_interactive (recur-string->utf8 a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-tm_interactive (recur-string->utf8 a1) (recur-string->cork a2)))))
 
 (define c-glue-set_printing_command
   (foreign-procedure "tmg_set_printing_command" (scheme-object) scheme-object))
 
 (define (set-printing-command a1)
-  (recur-utf8->string (c-glue-set_printing_command (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_printing_command (recur-string->utf8 a1)))))
 
 (define c-glue-set_printer_paper_type
   (foreign-procedure "tmg_set_printer_paper_type" (scheme-object) scheme-object))
 
 (define (set-printer-paper-type a1)
-  (recur-utf8->string (c-glue-set_printer_paper_type (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_printer_paper_type (recur-string->utf8 a1)))))
 
 (define c-glue-get_printer_paper_type
   (foreign-procedure "tmg_get_printer_paper_type" () scheme-object))
 
 (define (get-printer-paper-type)
-  (recur-utf8->string (c-glue-get_printer_paper_type)))
+  (recur-utf8->string (tm-glue-check (c-glue-get_printer_paper_type))))
 
 (define c-glue-set_printer_dpi
   (foreign-procedure "tmg_set_printer_dpi" (scheme-object) scheme-object))
 
 (define (set-printer-dpi a1)
-  (recur-utf8->string (c-glue-set_printer_dpi (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_printer_dpi (recur-string->utf8 a1)))))
 
 (define c-glue-set_message
   (foreign-procedure "tmg_set_message" (scheme-object scheme-object) scheme-object))
 
 (define (set-message a1 a2)
-  (recur-utf8->string (c-glue-set_message (recur-string->cork a1) (recur-string->cork a2))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_message (recur-string->cork a1) (recur-string->cork a2)))))
 
 (define c-glue-set_message_temp
   (foreign-procedure "tmg_set_message_temp" (scheme-object scheme-object scheme-object) scheme-object))
 
 (define (set-message-temp a1 a2 a3)
-  (recur-utf8->string (c-glue-set_message_temp (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3))))
+  (recur-utf8->string (tm-glue-check (c-glue-set_message_temp (recur-string->cork a1) (recur-string->cork a2) (recur-string->utf8 a3)))))
 
 (define c-glue-yesP
   (foreign-procedure "tmg_yesP" (scheme-object) scheme-object))
 
 (define (yes? a1)
-  (recur-utf8->string (c-glue-yesP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-yesP (recur-string->utf8 a1)))))
 
 (define c-glue-tmP
   (foreign-procedure "tmg_tmP" (scheme-object) scheme-object))
 
 (define (tm? a1)
-  (recur-utf8->string (c-glue-tmP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-tmP (recur-string->utf8 a1)))))
 
 (define c-glue-urlP
   (foreign-procedure "tmg_urlP" (scheme-object) scheme-object))
 
 (define (url? a1)
-  (recur-utf8->string (c-glue-urlP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-urlP (recur-string->utf8 a1)))))
 
 (define c-glue-modificationP
   (foreign-procedure "tmg_modificationP" (scheme-object) scheme-object))
 
 (define (modification? a1)
-  (recur-utf8->string (c-glue-modificationP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-modificationP (recur-string->utf8 a1)))))
 
 (define c-glue-patchP
   (foreign-procedure "tmg_patchP" (scheme-object) scheme-object))
 
 (define (patch? a1)
-  (recur-utf8->string (c-glue-patchP (recur-string->utf8 a1))))
+  (recur-utf8->string (tm-glue-check (c-glue-patchP (recur-string->utf8 a1)))))
 

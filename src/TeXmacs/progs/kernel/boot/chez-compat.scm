@@ -388,7 +388,11 @@
   v)
 
 (define-public (hash-remove! t k)
-  (hashtable-delete! t k))
+  ;; as Guile: the entry which was removed, or #f
+  (and (hashtable-contains? t k)
+       (let ((v (hashtable-ref t k #f)))
+         (hashtable-delete! t k)
+         (cons k v))))
 
 (define-public (hash-get-handle t k)
   (if (hashtable-contains? t k)
@@ -499,9 +503,12 @@
       #f))
 
 (define-public (scm-error key subr message args rest)
-  (if (and (string? message) (list? args))
-      (apply error subr message args)
-      (error subr (format "~a: ~a" key message))))
+  ;; as Guile: the handler of (catch key ...) gets (key subr message args rest)
+  ((top-level-value 'tm-throw)
+   key (list subr message args rest)
+   (if (and (string? message) (list? args))
+       (guard (e (#t message)) (apply format message args))
+       (format "~a: ~a" key message))))
 
 ;;; Random numbers and hashing
 (define-public (random n . state)
@@ -611,13 +618,15 @@
   (top-level-bound? sym))
 
 (define-public (tm-catch-runtime key handler thunk)
-  (guard (e (else
-             (let* ((msg (if (condition? e) (condition-message e) e))
-                    (irr (if (and (condition? e) (condition-irritants e))
-                             (condition-irritants e)
-                             '()))
-                    (payload (list key #f msg irr '())))
-               (if (procedure? handler) (apply handler payload) #f))))
+  ;; Guile's catch: key #t handles every error, another key only its own
+  ;; errors; the handler gets the key of the error and its arguments
+  (guard (e ((or (eq? key #t)
+                 (eq? key ((top-level-value 'tm-condition-key) e)))
+             (if (procedure? handler)
+                 (apply handler
+                        ((top-level-value 'tm-condition-key) e)
+                        ((top-level-value 'tm-condition-args) e))
+                 #f)))
     (thunk)))
 
 (export catch lazy-catch with while)
@@ -631,13 +640,12 @@
     ((_ key thunk handler) (tm-catch-runtime key handler thunk))))
 
 (define-public (throw key . args)
-  (raise (condition
-           (make-error)
-           (make-message-condition
-             (if (and (pair? args) (string? (car args)))
-                 (car args)
-                 (format "~s" (cons key args))))
-           (make-irritants-condition args))))
+  ;; a condition which keeps the key (tm-throw in boot-chez.scm)
+  ((top-level-value 'tm-throw)
+   key args
+   (if (and (pair? args) (string? (car args)))
+       (car args)
+       (format "~s" (cons key args)))))
 
 (define-syntax with
   (lambda (x)

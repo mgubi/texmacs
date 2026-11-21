@@ -83,16 +83,17 @@
 ;; blocks.  Emitting a binding for any of them would either fail to link or
 ;; shadow the definition the kernel already has:
 ;;
-;;   tm-output, tm-errput                  defined by boot-chez.scm
 ;;   string-load                           defined by boot-chez.scm
 ;;   string-search-{forwards,backwards}    defined by chez-compat.scm
 ;;
 ;; The five os-*? predicates used to be on this list.  Their guard has been
 ;; removed from glue_basic.cpp, so they are now ordinary glue like everything
 ;; else: generated here and installed by initialize_glue() on the legacy path.
+;; tm-output and tm-errput are generated: Scheme output goes through the
+;; C++ streams, which cout-buffer captures (tm-with-output-to-string); the
+;; definitions of boot-chez.scm only serve until this glue is loaded.
 (define *chez-unsupported-names*
-  '(tm-output tm-errput
-    string-load string-search-forwards string-search-backwards))
+  '(string-load string-search-forwards string-search-backwards))
 
 ;; The glue type names whose values are Scheme objects holding a TeXmacs
 ;; string -- a raw 8-bit bytevector on the C++ side, a Scheme string on the
@@ -421,14 +422,15 @@
 /* ---------------------------------------------------------------------------
  * Error containment
  *
- * Mirrors the catch chain of tm_fast_call_N in chez_tm.cpp: the kernel error
- * pair (tag . (message)) is what TeXmacs Scheme code already expects back
- * from a failing glue routine.
+ * A failing routine returns (tm-glue-error message), which the Scheme
+ * side of the glue (tm-glue-check, boot-chez.scm) raises as a Guile error:
+ * a C++ exception cannot cross the frames of Chez.
  * ------------------------------------------------------------------------- */
 
 static tmscm
 tmg_error_literal (const char* msg, iptr n) {
-  return Scons (Sboolean (1), Scons (Sstring_of_length (msg, n), (tm_null != NULL) ? tm_null : Snil));
+  return Scons (Sstring_to_symbol (\"tm-glue-error\"),
+                Scons (Sstring_of_length (msg, n), (tm_null != NULL) ? tm_null : Snil));
 }
 
 /* TeXmacs throws its own string class (basic.cpp: throw string (msg)), which
@@ -598,10 +600,15 @@ tmg_error_std (const std::string& e) {
     "\n"))
 
 (define (scm-raw-binding entry)
-  (string-append
-    "(define " (e-name entry) "\n"
-    "  (foreign-procedure \"" (e-sym entry) "\" ("
-    (scheme-ffi-types (e-arity entry)) ") scheme-object))\n"))
+  ;; the C function, then the procedure, which raises its errors
+  (let* ((n (e-arity entry))
+         (alias (string-append "c-glue-raw-" (e-name entry))))
+    (string-append
+      "(define " alias "\n"
+      "  (foreign-procedure \"" (e-sym entry) "\" ("
+      (scheme-ffi-types n) ") scheme-object))\n"
+      "(define (" (e-name entry) (if (= n 0) "" " ") (scheme-formals n) ")\n"
+      "  (tm-glue-check (" alias (if (= n 0) "" " ") (scheme-formals n) ")))\n")))
 
 (define (scheme-arg-actual name i type)
   (let ((trans (scheme-arg-transcoder name type))
@@ -638,7 +645,7 @@ tmg_error_std (const std::string& e) {
     "  (let* ((in-b (if (equal? from \"Cork\") (recur-string->cork s) (recur-string->utf8 s)))\n"
     "         (f-b  (recur-string->utf8 from))\n"
     "         (t-b  (recur-string->utf8 to))\n"
-    "         (res  (" alias " in-b f-b t-b)))\n"
+    "         (res  (tm-glue-check (" alias " in-b f-b t-b))))\n"
     "    (if (equal? to \"Cork\")\n"
     "        (recur-cork->string res)\n"
     "        (recur-utf8->string res))))\n\n"))
@@ -656,7 +663,7 @@ tmg_error_std (const std::string& e) {
         ;; Emit two top-level definitions per transcoded glue routine:
         ;;   1. `c-glue-*': the raw (foreign-procedure ...) registration (no encoding support).
         ;;   2. `<name>':   the public calling handle that transcodes string args/return values.
-        (let ((call-expr (string-append "(" alias (if (= n 0) "" " ") actuals ")")))
+        (let ((call-expr (string-append "(tm-glue-check (" alias (if (= n 0) "" " ") actuals "))")))
           (string-append
             "(define " alias "\n"
             "  (foreign-procedure \"" sym "\" (" (scheme-ffi-types n) ") scheme-object))\n\n"

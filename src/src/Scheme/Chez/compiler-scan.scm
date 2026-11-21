@@ -122,10 +122,19 @@
            (emit ";")
            (loop (+ i 1) #f))
 
+          ;; In Guile a backslash is an ordinary symbol character (left\{ in
+          ;; tmtex.scm), in Chez it escapes the next one
+          ((and (not in-string?) (eqv? c #\\))
+           (emit "\\x5c;")
+           (loop (+ i 1) #f))
+
           ;; Guile reads [ and ] as symbols too (latex-command-drd.scm),
           ;; Chez as parentheses
-          ((and (not in-string?) (memv c '(#\[ #\])))
-           (emit (if (eqv? c #\[) "\\x5b;" "\\x5d;"))
+          ;; and so are { and }, which Chez reserves
+          ((and (not in-string?) (memv c '(#\[ #\] #\{ #\})))
+           (emit (case c
+                   ((#\[) "\\x5b;") ((#\]) "\\x5d;")
+                   ((#\{) "\\x7b;") (else "\\x7d;")))
            (loop (+ i 1) #f))
 
           ;; A quote opens a string outside one and closes it inside one.
