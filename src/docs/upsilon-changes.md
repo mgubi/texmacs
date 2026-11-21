@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 21 November 2026
 
+- **HTML export: lengths, alignment and paragraphs which hold blocks**: a
+  length in pixels lost its unit in the CSS (and the largest of two lengths
+  depended on their order), a paragraph aligned to the right was exported
+  left-aligned, an error in one export left its state (counters, settings
+  of the bibliography) to the next one, and a paragraph which contains a
+  table or another block became a `<p>` around it, which browsers break
+  apart, losing its margins. Such a paragraph is now a `<div>` of the class
+  `tmhtml-p`, with the margins of a paragraph also in titles, compact lists
+  and descriptions (#901, #902, #903, #904).
 - **femtolisp: no crash of the collector on data nested deep or on a hash
   table which contains itself** (builds with `--with-scheme=femtolisp`):
   the collector copied vectors, closures, hash tables and the tails of
