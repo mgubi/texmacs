@@ -158,7 +158,7 @@ NSString *to_nsstring (string s)
 	  // should use to_nsstring_utf8 or to_label)
 	  ns_conversion_warning ("to_nsstring", "not UTF-8, taken as cork", s,
 	                         __builtin_return_address (0));
-	  c_string q = c_string (cork_to_utf8 (s));
+	  c_string q = c_string (cork_text_to_utf8 (s));
 	  nss = [NSString stringWithCString:q encoding:NSUTF8StringEncoding];
 	}
 	if (!nss || ([nss length] == 0 && N(s) > 0))
@@ -190,11 +190,12 @@ from_nsstring_utf8 (NSString *s) {
 
 
 /*! From the cork encoding, or UTF-8 already (the names of files may be in
- both: see to_qstring in the Qt interface) */
+ both: see to_qstring in the Qt interface); the text of a widget, whose
+ tabs and newlines stay tabs and newlines (#439) */
 NSString *to_nsstring_utf8(string s)
 {
   if (!looks_utf8 (s) || looks_ascii (s) || looks_universal (s))
-    s = cork_to_utf8 (s);
+    s = cork_text_to_utf8 (s);
   c_string p = c_string (s);
   NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
   if (!nss || ([nss length] == 0 && N(s) > 0))

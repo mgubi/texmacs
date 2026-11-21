@@ -304,6 +304,11 @@
   <paragraph|21 November 2026>
 
   <\itemize>
+    <item>Text pasted from other applications or opened from a
+    <verbatim|.txt> file keeps the characters \<#2D9\>, \<#AF\> and
+    \<#2D8\>, which became a line break, a tab and a backspace; the copy as
+    text writes them as characters, not as a newline or a tab.
+
     <item>In a text field of a dialog whose content changes (the headers
     and footers of the page format dialog), <menu|File|Close window> closes
     the dialog.

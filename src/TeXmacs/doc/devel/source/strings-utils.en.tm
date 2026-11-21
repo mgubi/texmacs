@@ -124,9 +124,13 @@
   (macron, dot accent and a low quote). <cpp|cork_to_utf8> therefore turns
   a tab into <verbatim|U+00AF> and a newline into <verbatim|U+02D9>
   (verified: <scm|(cork-\<gtr\>utf8 "a\\nb")> gives an a, a dot accent and
-  a b). Multi-line text must be converted line by line, as
-  <cpp|var_cork_to_utf8> in <source-link|Data/Convert/Verbatim/verbatim.cpp|src/Data/Convert/Verbatim/verbatim.cpp>
-  does. In the other direction, <cpp|utf8_to_cork> keeps tabs and newlines
+  a b): it is the converter of document text, whose strings hold no line
+  break. Plain text (widget text, commit messages, the verbatim export in
+  <source-link|Data/Convert/Verbatim/verbatim.cpp|src/Data/Convert/Verbatim/verbatim.cpp>)
+  is converted by <cpp|cork_text_to_utf8> (<scm|cork-text-\<gtr\>utf8>, or
+  the source <verbatim|Cork-text> of <scm|string-convert>), which keeps
+  <verbatim|0x09> and <verbatim|0x0A> as a tab and a newline. In the other
+  direction, <cpp|utf8_to_cork> keeps tabs and newlines
   as bytes, so the two functions are not inverse to each other on such
   strings. Code points <verbatim|U+0080>--<verbatim|U+009F> (the C1
   control characters) have no table entry and are left as raw

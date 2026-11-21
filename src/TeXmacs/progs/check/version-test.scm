@@ -986,6 +986,14 @@
       ;; which garbled the utf8 of git, #641)
       (check= (git-sh "log -1 --pretty=%s")
               (string-append (cork->utf8 msg) "\n")))
+    ;; a message of several lines keeps its newlines, which are not dot
+    ;; accents (#439)
+    (string-save (string-append doc1 " ") (url->system g))
+    (git-invalidate root)
+    (version-commit g "subject\n\nbody\tend")
+    (check= (git-file-state g) 'unmodified)
+    (check= (git-sh "log -1 --pretty=%s") "subject\n")
+    (check= (git-sh "log -1 --pretty=%b") "body\tend\n\n")
     ;; a renamed file: the status gives the new and the old name
     (with new (string-append "new " fb)
       (git-sh "mv \"" fb "\" \"" new "\"")

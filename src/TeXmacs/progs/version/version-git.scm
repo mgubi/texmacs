@@ -291,7 +291,7 @@
 
 (tm-define (version-commit name msg)
   (:require (== (version-tool name) "git"))
-  (git-commit-file name (cork->utf8 msg)))
+  (git-commit-file name (cork-text->utf8 msg)))
 
 (tm-define (git-commit-file name msg . opt-sign)
   (:synopsis "Commit the file @name with the message @msg (in utf8)")

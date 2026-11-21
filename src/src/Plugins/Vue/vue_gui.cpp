@@ -3781,7 +3781,8 @@ EM_JS (char*, vue_web_javascript, (const char* code), {
 static tmscm
 web_javascript_tm (tmscm a) {
   TMSCM_ASSERT (tmscm_is_string (a), a, TMSCM_ARG1, "web-javascript");
-  c_string code (cork_to_utf8 (tmscm_to_string (a)));
+  // (code, whose newlines and tabs stay newlines and tabs: #439)
+  c_string code (cork_text_to_utf8 (tmscm_to_string (a)));
   char* r= vue_web_javascript (code);
   string res= utf8_to_cork (string (r));
   free (r);
@@ -6316,7 +6317,8 @@ vue_web_scheme_eval (const char* cmd) {
     r= "(error " * scm_quote (msg) * ")";
   }
   if (last != NULL) tm_delete_array (last);
-  last= as_charp (cork_to_utf8 (r));
+  // (text, whose newlines and tabs stay newlines and tabs: #439)
+  last= as_charp (cork_text_to_utf8 (r));
   gui_needs_update= true;
   return last;
 }

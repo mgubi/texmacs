@@ -28,7 +28,7 @@
 #include "tm_window.hpp"
 #include "sys_utils.hpp" // for system (printer widget)
 #include "analyze.hpp"   // for occurs (filtered choice)
-#include "converter.hpp" // cork_to_utf8 (the clipboard of the input fields)
+#include "converter.hpp" // cork_text_to_utf8 (the clipboard of the input fields)
 #include "locale.hpp"    // get_locale_charset
 #include "boot.hpp"      // for get_user_preference (the icon bars)
 #include "poly_line.hpp" // for ink widget
@@ -4815,9 +4815,10 @@ void
 vue_input_text_widget_rep::copy_selection (bool cut) {
   int b, e;
   if (!selection (b, e)) return;
-  // a symbol (<alpha>) becomes its character, not its name
+  // a symbol (<alpha>) becomes its character, not its name; the text is
+  // plain text, as for the verbatim export (#439)
   string t= verbatim_in_utf8 (false)
-            ? cork_to_utf8 (s (b, e)) : tm_decode (s (b, e));
+            ? cork_text_to_utf8 (s (b, e)) : tm_decode (s (b, e));
   // "primary" is the system clipboard of the Vue GUI (see vue_gui.cpp)
   set_selection ("primary", tuple ("extern", t), t, t, "", "verbatim");
   if (cut) delete_selection ();
