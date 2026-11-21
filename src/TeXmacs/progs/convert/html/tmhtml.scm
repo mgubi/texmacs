@@ -1596,8 +1596,9 @@
 
 (define (tmhtml-specific l)
   ;; raw HTML: <less> and <gtr> give its markup, the other characters
-  ;; (Cork or <name>) are written in UTF-8 like the rest of the page
-  (cond ((== (car l) "html") (list (cork->utf8 (force-string (cadr l)))))
+  ;; (Cork or <name>) are written in UTF-8 like the rest of the page; it is
+  ;; text, whose newlines and tabs stay newlines and tabs (#439)
+  (cond ((== (car l) "html") (list (cork-text->utf8 (force-string (cadr l)))))
 	((== (car l) "html*") (tmhtml (cadr l)))
 	((== (car l) "image") (tmhtml-png (cadr l)))
 	(else '())))

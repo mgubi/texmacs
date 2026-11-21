@@ -323,7 +323,7 @@ to_qstring (const string& s) {
   if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
     return utf8_to_qstring (s);
   else
-    return utf8_to_qstring (cork_to_utf8 (s));
+    return utf8_to_qstring (cork_text_to_utf8 (s));
 }
 
 string

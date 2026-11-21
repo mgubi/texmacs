@@ -1648,6 +1648,88 @@
 
 ;; The other encodings: HTML entities, LaTeX accents, T2A (Cyrillic), the
 ;; source code (UTF-8, but the TeX ligatures of ASCII kept), iconv.
+;; Plain text and the Cork bytes 0x08-0x0A (#439, #866). In document text
+;; they are the glyphs of the breve, the macron and the dot accent (cork->utf8,
+;; the exports); in plain text (cork-text->utf8, the "Cork-text" source of
+;; string-convert) 0x09 and 0x0A are a tab and a newline. The import of
+;; plain text reads its tabs, newlines and backspaces before the conversion
+;; to Cork, and its export writes the glyphs of the document <#AF>, <#2D9>.
+(define (test-cork-text)
+  (define (dot) (u8 #x2D9))
+  (define (macron) (u8 #xAF))
+  (define (breve) (u8 #x2D8))
+  (define (paste s . opts) (apply import (cons* s "verbatim-snippet" opts)))
+  (define (verb t . opts) (apply export (cons* t "verbatim-snippet" opts)))
+  (check-group "cork text")
+  (check= (cork-text->utf8 "a\nb\tc") "a\nb\tc")
+  (check= (cork->utf8 "a\nb\tc") (string-append "a" (dot) "b" (macron) "c"))
+  ;; the other bytes are those of cork->utf8 (0x08 the breve, 0x0D U+201A)
+  (check= (cork-text->utf8 (string-append (cork 8 #x0d #xe9) "<#2D9><alpha>\n"))
+          (string-append (u8 #x2D8 #x201A #xE9 #x2D9 #x3B1) "\n"))
+  ;; (0xFF is the sharp s in Cork, 0xDF in Latin-1)
+  (check= (string-convert "a\nb\t\xff" "Cork-text" "UTF-8")
+          (string-append "a\nb\t" (u8 #xDF)))
+  (check= (string-convert "a\nb\t\xff" "Cork-text" "ISO-8859-1") "a\nb\t\xdf")
+  (check= (string-convert "a\nb\t<alpha>" "Cork-text" "SourceCode")
+          (string-append "a\nb\t" (u8 #x3B1)))
+  (check= (string-convert "a\nb\tc" "Cork" "UTF-8")
+          (string-append "a" (dot) "b" (macron) "c"))
+  (check= (string-convert "a\nb\tc" "Cork" "SourceCode")
+          (string-append "a" (dot) "b" (macron) "c"))
+  ;; raw HTML is text: its newlines and tabs are kept
+  (check= (export '(specific "html" "<less>p<gtr>\nx\ty") "html-snippet")
+          "<p>\nx\ty")
+  ;; the exports of a document keep the glyphs
+  (with s (string-append "a" (cork 9) "b" (cork 10) "c")
+    (check= (export s "html-snippet") "a&macr;b&#x02D9;c")
+    (check= (export s "latex-snippet") "a\\={}b\\.{}c")
+    (check= (export s "tmml-snippet") (string-append "a" (macron) "b" (dot) "c")))
+  (check-group "plain text import of the breve, macron and dot accent")
+  (check= (paste (dot)) (cork 10))
+  (check= (paste (macron)) (cork 9))
+  (check= (paste (breve)) (cork 8))
+  (check= (paste (string-append "x" (dot) "y" (macron) "z"))
+          (string-append "x" (cork 10) "y" (cork 9) "z"))
+  (check= (paste (string-append "a" (breve) "b")) (string-append "a" (cork 8) "b"))
+  ;; next to a real tab, newline and backspace (the encoding is given: a
+  ;; text with a backspace is not guessed to be UTF-8)
+  (check= (paste (string-append (dot) "\t" (macron) "\n" (breve)))
+          `(document ,(string-append (cork 10) "       " (cork 9)) ,(cork 8)))
+  (check= (paste (string-append (dot) "\t" (macron) "\n" (breve) "\nab" (cork 8) "c")
+                 (cons "verbatim->texmacs:encoding" "utf-8"))
+          `(document ,(string-append (cork 10) "       " (cork 9))
+                     ,(cork 8) "ac"))
+  (check= (paste (string-append "x\t" (dot) "\ny"))
+          `(document ,(string-append "x       " (cork 10)) "y"))
+  ;; the tabs go to the next multiple of 8 characters, not bytes
+  (check= (paste (string-append (u8 #x3B1) "\tx")) "<alpha>       x")
+  (check= (paste (string-append "a" (u8 #x3B1) (cork 8) "b")
+                 (cons "verbatim->texmacs:encoding" "utf-8"))
+          "ab")
+  ;; Latin-1 (0xAF is the macron) and a file of text
+  (check= (paste "\xaf\tx\nb" (cons "verbatim->texmacs:encoding" "iso-8859-1"))
+          `(document ,(string-append (cork 9) "       x") "b"))
+  (check= (import (string-append "x" (dot)) "verbatim-document")
+          `(document (body ,(string-append "x" (cork 10)))
+                     (initial (collection (associate "language" "verbatim")
+                                          (associate "font-family" "tt")
+                                          (associate "par-first" "0cm")))))
+  (check-group "plain text export of the breve, macron and dot accent")
+  (check= (verb (cork 10 9 8)) (string-append (dot) (macron) (breve)))
+  (check= (verb `(document ,(string-append "a" (cork 10)) ,(string-append (cork 9) "b")))
+          (string-append "a" (dot) "\n" (macron) "b"))
+  (check= (verb (cork 10) (cons "texmacs->verbatim:encoding" "cork")) "<#2D9>")
+  (check= (verb (string-append "a" (cork 9 10))
+                (cons "texmacs->verbatim:encoding" "iso-8859-1"))
+          "a\xaf?")
+  (check= (verb (cork 10 9) (cons "texmacs->verbatim:encoding" "SourceCode"))
+          (string-append (dot) (macron)))
+  ;; the round trip export -> import keeps them
+  (for-each (lambda (d) (check= (paste (verb d)) d))
+            (list (cork 10 9 8)
+                  `(document ,(string-append "x" (cork 10) "y")
+                             ,(string-append (cork 9 8) "z") ""))))
+
 (define (test-other-encodings)
   (check-group "other encodings")
   (check= (utf8->html (string-append (u8 #xE9) "<&>" (u8 #x3B1 #x20AC #x221E)))
@@ -3380,7 +3462,7 @@
                   test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
                   test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
-                  test-cork-bytes test-cork-unicode test-other-encodings
+                  test-cork-bytes test-cork-unicode test-cork-text test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables

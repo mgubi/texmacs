@@ -69,17 +69,39 @@ string flush (converter c);
 
 // check that the input string is valid according to the specified encoding
 // converts the input string from one encoding to the other
-// recognized encodings are "Cork", "UTF-8" and all those recognized by iconv.
+// recognized encodings are "Cork", "UTF-8" and all those recognized by iconv,
+// and "Cork-text" as a source (Cork plain text, see below).
+//
+// Cork and the bytes below 0x20: in Cork, every byte 0x00-0x1F is a glyph of
+// the T1 encoding of TeX (the table langs/encoding/corktounicode.scm, shared
+// with the fonts through strict_cork_to_utf8): 0x08 is the breve, 0x09 the
+// macron U+00AF, 0x0A the dot accent U+02D9, 0x0D the quote U+201A...
+// cork_to_utf8 and cork_to_sourcecode are the converters for document text
+// (string atoms of a document, which never hold a line break or a tab), so
+// they keep that mapping: the typesetter, the PDF, and the exports to HTML,
+// LaTeX and TMML rely on 0x09 = macron and 0x0A = dot accent.
+// cork_text_to_utf8 and cork_text_to_sourcecode are for plain text in Cork
+// (commit messages, widget text, results for JavaScript, raw HTML, the
+// verbatim export...): 0x09 and 0x0A are a tab and a newline, and every other
+// byte is as in cork_to_utf8. utf8_to_cork maps both U+00AF and a tab to
+// 0x09 (and U+02D9 and a newline to 0x0A), so plain text which may hold these
+// two glyphs must write them <#AF> and <#2D9>. The other bytes below 0x20
+// (0x0D in particular, U+201A, a real quote in German text) stay glyphs: a
+// carriage return does not reach Cork strings (the import of text turns it
+// into a newline first).
 
 bool check_encoding (string input, string encoding);
 string convert (string input, string from, string to);
 string convert_to_cork (string input, string from); 
 string convert_from_cork (string input, string to); 
+string convert_from_cork_text (string input, string to);
 string utf8_to_cork (string input); 
 string cork_to_utf8 (string input); 
+string cork_text_to_utf8 (string input);
 string var_utf8_to_cork (string input); 
 string strict_cork_to_utf8 (string input); 
 string cork_to_sourcecode (string input);
+string cork_text_to_sourcecode (string input);
 string sourcecode_to_cork (string input);
 string convert_utf8_to_LaTeX (string input);
 string convert_LaTeX_to_utf8 (string input);
