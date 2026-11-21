@@ -14,6 +14,7 @@
 #include "tm_configure.hpp"
 #include "blackbox.hpp"
 #include "array.hpp"
+#include "string.hpp"
 
 /* The Chez Scheme kernel API header ("scheme.h").  The include directory
    must be supplied by the build system (e.g. -I/usr/lib/csv<version>/<mach>).
@@ -145,13 +146,25 @@ tmscm string_to_tmscm (string s);
 tmscm symbol_to_tmscm (string s);
 extern const char* current_glue_proc;
 inline bool tmscm_to_bool (tmscm obj) { return Sboolean_value (obj); }
+// as Guile's scm_to_int, out-of-range rather than truncate an integer which
+// does not fit (the glue shims report the exception, tm-glue-raise gives the
+// key out-of-range)
 inline int  tmscm_to_int (tmscm obj)  {
-  if (!Sfixnump (obj) && !Sbignump (obj)) {
-    fprintf (stderr, "CHEZDBG: tmscm_to_int in %s: non-int!\n", current_glue_proc ? current_glue_proc : "unknown"); fflush (stderr);
+  if (Sfixnump (obj)) {
+    iptr i= Sfixnum_value (obj);
+    if (i >= -2147483647 - 1 && i <= 2147483647) return (int) i;
   }
-  return (int) Sinteger_value (obj);
+  throw string ("Value out of range in ") *
+        string (current_glue_proc ? current_glue_proc : "tmscm_to_int");
 }
-inline unsigned int tmscm_to_uint (tmscm obj) { return (unsigned int) Sunsigned_value (obj); }
+inline unsigned int tmscm_to_uint (tmscm obj) {
+  if (Sfixnump (obj)) {
+    iptr i= Sfixnum_value (obj);
+    if (i >= 0 && i <= 4294967295LL) return (unsigned int) i;
+  }
+  throw string ("Value out of range in ") *
+        string (current_glue_proc ? current_glue_proc : "tmscm_to_uint");
+}
 inline double tmscm_to_double (tmscm obj) { return Sflonum_value (obj); }
 string tmscm_to_string (tmscm obj);
 string tmscm_to_symbol (tmscm obj);

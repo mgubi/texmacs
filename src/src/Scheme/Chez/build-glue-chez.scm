@@ -749,7 +749,14 @@ tmg_error_std (const std::string& e) {
               "\n"
               ";;; --- Transcoded bindings: UTF-8 at the boundary -------------------\n"
               "\n"
-              (apply string-append (map scm-transcoded-binding wrapped)))))
+              (apply string-append (map scm-transcoded-binding wrapped))
+              "\n"
+              ";;; The names of the glue routines (closure?, boot-chez.scm)\n"
+              "(define tm-glue-names\n  '("
+              (apply string-append
+                     (map (lambda (e) (string-append (e-name e) " "))
+                          (append raw wrapped)))
+              "))\n")))
 
       (write-text (under *out-cpp-relative-path*) cpp-text)
       (write-text (under *out-scm-relative-path*) scm-text)

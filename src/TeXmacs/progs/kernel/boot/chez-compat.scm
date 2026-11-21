@@ -591,6 +591,13 @@
            (loop (chez:map cdr ls) (cons (apply f (chez:map car ls)) acc))
            (reverse! acc))))))
 
+;; Guile's stable-sort and stable-sort!, of a list or a vector (the sorts of
+;; Chez are stable)
+(define-public (stable-sort l less?)
+  (if (vector? l) (vector-sort less? l) (list-sort less? l)))
+(define-public (stable-sort! l less?)
+  (if (vector? l) (begin (vector-sort! less? l) l) (list-sort less? l)))
+
 ;;; Files, as Guile opens them: an existing file is replaced (Chez refuses
 ;;; by default), and the path, which comes from C++ as bytes, is given to the
 ;;; system as Chez wants it (tm-os-path, boot-chez.scm)

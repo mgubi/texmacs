@@ -51,6 +51,9 @@
                        defn)
                    `(define ,(fresh-tm-dummy)
                       (begin ,arch1 ,arch2
+                             ,@(if (== mode 'always%) '()
+                                   ;; the name of the predicate (texmacs-mode-mode)
+                                   `((ahash-set! tm-defined-name ,pred ',pred)))
                              ,@(if (null? deps) '() (list logic-cmd))
                              (void)))))
             (else

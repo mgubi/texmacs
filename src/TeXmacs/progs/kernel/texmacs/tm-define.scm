@@ -293,7 +293,7 @@
                  (cons ',nval (or (ahash-ref tm-defined-table ',var) '())))
      (ahash-set! tm-defined-name new-val ',var)
      (ahash-set! tm-defined-module ',var
-                 (cons 'texmacs-user
+                 (cons (tm-current-module-name)
                        (or (ahash-ref tm-defined-module ',var) '())))
      ,@(map property-rewrite cur-props)))
 

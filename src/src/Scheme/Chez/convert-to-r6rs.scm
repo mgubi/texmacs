@@ -774,12 +774,16 @@
                      (keyword-definitions forms)
                      local
                      (append
+                       ;; the module being loaded, for tm-define
+                       ;; (tm-module-start!, boot-chez.scm)
+                       (list (expression->definition
+                               `((top-level-value 'tm-module-start!) ',mod-name)))
                        (map (lambda (dep)
                               (expression->definition `(module-provide ',dep)))
                             deps)
                        definitions)
                      '()
-                     expressions))
+                     (append expressions '(((top-level-value 'tm-module-end!))))))
                  mod-sym)))))))
 
 ;; Pass 1: rewrite each module that needs a rebuild into a Chez Scheme module
