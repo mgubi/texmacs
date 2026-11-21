@@ -1519,18 +1519,31 @@
 ;; mirror twice, so that every mirror looked like a copy to separate (on the
 ;; black list, its changes no longer passed to the others), and a change was
 ;; announced twice, to be applied twice to the other mirrors.
+;;
+;; The group depends on nothing which ran before it (#906): the tables of
+;; part-shared.scm are replaced (set!) by mirror-treat-pending and
+;; mirror-synchronize, so they are read from the module when they are
+;; checked, not once at the start; what earlier suites left in them (their
+;; treatment is delayed, and never runs headless: a change of a mirror stays
+;; pending) is set aside and put back at the end; the second view is made in
+;; the window which shows the buffer, and the window gets its view back.
+(define mirror-tables '(mirror-black-list mirror-pending mirror-announced))
+
 (define (test-mirror-views)
   (check-group "mirrors in a buffer with two views")
   (let* ((u (string->url "tmfs://aux/misc-mirror-views"))
          (old (current-buffer))
+         (old-win (current-window))
+         (old-view (and old-win (window->view old-win)))
          (buffers (buffer-list))
          (m (resolve-module '(part part-shared)))
          (treat (eval 'mirror-treat-pending m))
-         (black-list (eval 'mirror-black-list m))
-         (pending (eval 'mirror-pending m))
-         (left (map car (ahash-table->list black-list)))
+         (table (lambda (name) (eval name m)))
+         (saved (map (lambda (name) (cons name (ahash-table->list (table name))))
+                     mirror-tables))
          (body (lambda () (tree->stree (buffer-get-body u)))))
-    (for (uid left) (ahash-remove! black-list uid))
+    (for (s saved)
+      (for (kv (cdr s)) (ahash-remove! (table (car s)) (car kv))))
     (dynamic-wind
       (lambda () (noop))
       (lambda ()
@@ -1541,31 +1554,39 @@
                                         (mirror "mv-v" "mv-c" (document "abc"))))))
         (switch-to-buffer u)
         (update-forced)
-        (window-set-view (current-window) (view-new u) #t)
+        (check= (length (buffer->views u)) 1)
+        (window-set-view (view->window-url (car (buffer->views u)))
+                         (view-new u) #t)
         (update-forced)
         (check= (length (buffer->views u)) 2)
         (check= (length (id->trees "mv-c")) 2)
         (check= (length (id->trees "mv-u")) 1)
         (check= (sort (tree->ids (car (id->trees "mv-u"))) string<?)
                 '("mv-c" "mv-u"))
-        (check-false (ahash-ref black-list "mv-u"))
-        (check-false (ahash-ref black-list "mv-v"))
+        (check-false (ahash-ref (table 'mirror-black-list) "mv-u"))
+        (check-false (ahash-ref (table 'mirror-black-list) "mv-v"))
         ;; a character typed in one mirror reaches the other once
         (with-global exec-delayed-pause (lambda (c) (noop))
           (go-to (append (tree->path (buffer-get-body u)) '(0 2 0 3)))
           (insert "x")
-          (check= (map (lambda (x) (length (cdr x))) (ahash-table->list pending))
-                  '(1))
+          (check= (map (lambda (x) (cons (car x) (length (cdr x))))
+                       (ahash-table->list (table 'mirror-pending)))
+                  '(("mv-v" . 1)))
           (treat))
         (check= (body) '(document (mirror "mv-u" "mv-c" (document "abcx"))
                                   (mirror "mv-v" "mv-c" (document "abcx")))))
       (lambda ()
-        (ahash-remove! black-list "mv-u")
-        (ahash-remove! black-list "mv-v")
-        (for (uid left) (ahash-set! black-list uid #t))
+        (for (name mirror-tables)
+          (ahash-remove! (table name) "mv-u")
+          (ahash-remove! (table name) "mv-v"))
+        (for (s saved)
+          (for (kv (cdr s)) (ahash-set! (table (car s)) (car kv) (cdr kv))))
         (when (buffer-exists? u)
           (buffer-pretend-saved u)
           (buffer-close u))
+        (when (and old-view (in? old-view (view-list))
+                   (in? old-win (window-list)))
+          (window-set-view old-win old-view #t))
         (when (buffer-exists? old) (switch-to-buffer old))))
     (check= (buffer-list) buffers)))
 
