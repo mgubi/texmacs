@@ -42,17 +42,24 @@
     (set! output-line-length x)
     old))
 
+(tm-define (output-reset)
+  ;; the state of a new output: output-produce leaves it after an output,
+  ;; and each serializer starts with it, as a serialization which failed
+  ;; (an error in htmlout or texout) left its text, its indentation and its
+  ;; flags to the next HTML or LaTeX export (#902)
+  (set! output-accu '())
+  (set! output-comment #f)
+  (set! output-indentation 0)
+  (set! output-count 0)
+  (set! output-start-flag #t)
+  (set! output-space-flag #f)
+  (set! output-break-flag #t)
+  (set! output-tail '()))
+
 (tm-define (output-produce)
   (output-flush)
   (let ((r (apply string-append (reverse output-accu))))
-    (set! output-accu '())
-    (set! output-comment #f)
-    (set! output-indentation 0)
-    (set! output-count 0)
-    (set! output-start-flag #t)
-    (set! output-space-flag #f)
-    (set! output-break-flag #t)
-    (set! output-tail '())
+    (output-reset)
 ;;    (display* "OUTPUT\n" r "\n")
     r))
 

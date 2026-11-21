@@ -33,9 +33,12 @@
     (string-recompose l "; ")))
 
 (define (css-max l1 l2)
-  (if (and (length? l1) (length? l2))
-      (length-max l1 l2)
-      l2))
+  ;; the larger margin, as they collapse; a margin which is not a length
+  ;; (auto, or a bare number before #901) counts as none: the other one is
+  ;; kept whatever their order
+  (cond ((and (length? l1) (length? l2)) (length-max l1 l2))
+        ((length? l1) l1)
+        (else l2)))
 
 (define (css-add l1 l2)
   (if (and (length? l1) (length? l2))
