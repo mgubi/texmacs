@@ -27,6 +27,11 @@
 (define-public (chez-scheme?) #t)
 
 ;;; Numeric helpers
+
+;; Guile writes the digits above 9 in lower case (colours "#8020c0")
+(define-public (number->string n . radix)
+  (let ((s (apply chez:number->string n radix)))
+    (if (and (pair? radix) (> (car radix) 10)) (string-downcase s) s)))
 ;;
 ;; No `1+' / `1-' here: `(chezscheme)' already exports both with the same
 ;; meaning, so a shim would only shadow a builtin with itself.

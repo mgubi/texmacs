@@ -649,20 +649,21 @@
     ((eq? mod-sym 'kernel:boot:chez-compat)
      '(import
         (except (chezscheme)
-                sort current-time random record-accessor)
+                sort current-time random record-accessor number->string)
         (rename (only (chezscheme)
                       sort current-time random record-accessor
-                      display write)
+                      display write number->string)
                 (sort chez:sort)
                 (current-time chez:current-time)
                 (random chez-sys-random)
                 (record-accessor old-record-accessor)
                 (display chez:display)
-                (write chez:write))))
+                (write chez:write)
+                (number->string chez:number->string))))
     ((eq? mod-sym 'kernel:boot:abbrevs)
      '(import
         (except (chezscheme)
-                sort current-time random record-accessor ...)
+                sort current-time random record-accessor number->string ...)
         (kernel boot chez-compat)))
     (else
      (error 'library-import-form "unknown library module" mod-sym))))

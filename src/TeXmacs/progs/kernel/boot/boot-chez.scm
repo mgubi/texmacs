@@ -524,11 +524,18 @@
 (define *texmacs-modules-loaded* (make-ahash-table))
 
 (define (module-file-name which)
-  (let ((ps (map symbol->string which)))
-    (string-append (getenv "TEXMACS_PATH") "/progs/"
-                   (apply string-append
-                          (map (lambda (p) (string-append "/" p)) ps))
-                   ".scm")))
+  (let* ((ps (map symbol->string which))
+         (rel (apply string-append
+                     (cdr (apply append (map (lambda (p) (list "/" p)) ps)))))
+         (std (string-append (getenv "TEXMACS_PATH") "/progs/" rel ".scm")))
+    ;; else in $GUILE_LOAD_PATH, which has the progs of the plug-ins and of
+    ;; the user, as on Guile, s7 and femtolisp
+    (if (or (file-exists? std) (not (top-level-bound? 'url-exists?)))
+        std
+        (let ((u (url-unix "$GUILE_LOAD_PATH" (string-append rel ".scm"))))
+          (if (url-exists? u)
+              (tm-os-path (url-materialize u "r"))
+              std)))))
 
 (define (module-loaded? m)
   (hashtable-ref *texmacs-modules-loaded* m #f))
@@ -663,6 +670,10 @@
 (define (resolve-module m)
   (module-provide m)
   m)
+
+;; as on s7: the module is loaded
+(define (module-available? m)
+  (and (module-loaded? m) #t))
 
 ;; Guile's module-ref, for the exports of a module (a module is its name)
 (define (module-ref m sym . default)
