@@ -410,7 +410,7 @@
       (cond ((== role "Formula") (pdf-tag-latex t))
             ((and (== role "Figure") (tree-is? t 'image)
                   (tree-atomic? (tree-ref t 0)))
-             (string-append "Image " (tree->string (tree-ref t 0))))
+             (string-append "Image " (cork->utf8 (tree->string (tree-ref t 0)))))
             ((== role "Figure") "Image")
             (else "")))
     (lambda args (if (== role "Formula") "Formula" "Image"))))

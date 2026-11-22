@@ -324,7 +324,8 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   string glyph_name (pdf_font_item& it, int key, int fallback, int& gid);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
-  void write_tex_to_unicode (pdf_font_item& it, int first, int last);
+  void write_tex_to_unicode (pdf_font_item& it, int first, int last,
+                             array<string>& gname);
   int  glyph_name_unicode (pdf_font_item& it, int gid);
   void write_encoding (pdf_font_item& it, int first, int last,
                        array<string>& gname);
@@ -1421,7 +1422,7 @@ mupdf_pdf_renderer_rep::write_fonts () {
       keep << nm;
     }
     write_encoding (it, first, last, gname);
-    write_tex_to_unicode (it, first, last);
+    write_tex_to_unicode (it, first, last, gname);
     // The font program, cut down to the glyphs which are used. MuPDF
     // subsets TrueType and CFF only, so a Type 1 would go in whole -- some
     // eighty kilobytes for a handful of letters; mupdf_t1_subset is
@@ -1500,7 +1501,7 @@ mupdf_pdf_renderer_rep::glyph_name_unicode (pdf_font_item& it, int gid) {
 // which readers understand.
 void
 mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
-                                              int last) {
+                                              int last, array<string>& gname) {
   array<int> tex;
   if (is_t2a_font_file (url_system (it.path))) {
     // the Cyrillic fonts name their glyphs after the Latin-1 letters at
@@ -1508,6 +1509,21 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
     for (int c=0; c<256; c++) tex << tex_glyph_unicode (c, true);
   }
   else tex= tex_math_unicode (it.tex_name);
+  if (N(tex) == 0 && tagger != NULL) {
+    // a tagged PDF maps every code used (PDF/UA): those of a font of no
+    // table after the names of their glyphs, which a reader would read,
+    // also uniXXXX, which veraPDF does not
+    for (int c=0; c<256; c++) tex << -1;
+    for (int c=first; c<=last && c<N(gname); c++) {
+      if (it.gid[c] < 0 || N(gname[c]) <= 1) continue;
+      string nm= gname[c] (0, N(gname[c]) - 1);
+      int dot= search_forwards (".", nm);
+      if (dot > 0) nm= nm (0, dot);
+      c_string cn (nm);
+      int u= fz_unicode_from_glyph_name (cn);
+      if (u >= 0x20 && u != 0xfffd) tex[c]= u;
+    }
+  }
   if (N(tex) == 0) return;
   // (a position without a single character, below U+0020, is left out)
   for (int c=0; c<N(tex); c++) if (tex[c] < 0x20) tex[c]= -1;

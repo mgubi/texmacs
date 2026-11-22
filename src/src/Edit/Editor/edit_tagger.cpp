@@ -37,7 +37,6 @@ class pdf_tagger_rep: public tagger_rep {
   hashmap<string,string> roles;      // by tag; "" for none
   hashmap<string,string> child_roles;
   hashmap<string,string> alts;       // by key of element
-  hashmap<int,int> levels;           // the level of each rank of heading
   hashmap<string,string> heading_of; // the role of each heading, by key
   array<int> open_ranks;             // the ranks of the headings above
   int    appendix_rank;              // that of an appendix: chapter or section
@@ -62,21 +61,13 @@ private:
 pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
                                 string title2):
   body (body2), rp (rp2), lang (lang2), ttl (title2),
-  roles ("?"), child_roles ("?"), alts (""), levels (0),
+  roles ("?"), child_roles ("?"), alts (""),
   heading_of (""), appendix_rank (3)
 {
-  // the ranks of the headings which the document uses become H1, H2...
-  // in their order, so that no level is skipped (PDF/UA)
+  // the ranks of the headings which the document uses: an appendix is a
+  // chapter in a book, a section elsewhere
   hashset<int> ranks;
   collect_ranks (body, ranks);
-  array<int> r;
-  iterator<int> it= iterate (ranks);
-  while (it->busy ()) r << it->next ();
-  for (int i=1; i<N(r); i++)
-    for (int j=i; j>0 && r[j] < r[j-1]; j--) {
-      int t= r[j]; r[j]= r[j-1]; r[j-1]= t; }
-  for (int i=0; i<N(r); i++) levels (r[i])= min (i + 1, 6);
-  // an appendix is a chapter in a book, a section elsewhere
   appendix_rank= (ranks->contains (2)? 2: 3);
 }
 
@@ -137,6 +128,15 @@ pdf_tagger_rep::heading (string key, string role) {
   return r;
 }
 
+// The columns of a table: as many as its shortest row has (table_rep)
+static int
+table_columns (tree tab) {
+  int nc= -1;
+  for (int i=0; i<N(tab); i++)
+    if (is_compound (tab[i])) nc= (nc < 0? N(tab[i]): min (nc, N(tab[i])));
+  return max (nc, 0);
+}
+
 // The spans of the cell (row, col) of the table which ends trail (the
 // table, then the formats around it, inside out), as attributes; the
 // formats inside apply after those outside, and a negative index counts
@@ -144,12 +144,15 @@ pdf_tagger_rep::heading (string key, string role) {
 string
 pdf_tagger_rep::cell_spans (array<tree> trail, int row, int col) {
   tree tab= trail[0];
-  int nr= N(tab), nc= (nr > 0 && is_compound (tab[0])? N(tab[0]): 0);
+  int nr= N(tab), nc= table_columns (tab);
   string rs= "1", cs= "1";
+  bool breakable= false;
   for (int k= N(trail) - 1; k >= 1; k--) {
     tree f= trail[k];
     for (int i=0; i+1<N(f); i++) {
       tree w= f[i];
+      if (is_compound (w, "twith", 2) && w[0] == "table-hyphen")
+        breakable= (w[1] == "y");
       if (!is_compound (w, "cwith", 6) || !is_atomic (w[4])) continue;
       int r1= as_int (w[0]), r2= as_int (w[1]);
       int c1= as_int (w[2]), c2= as_int (w[3]);
@@ -161,12 +164,27 @@ pdf_tagger_rep::cell_spans (array<tree> trail, int row, int col) {
       if (w[4] == "cell-col-span" && is_atomic (w[5])) cs= w[5]->label;
     }
   }
-  // (a span does not go past the table)
+  // (a span does not go past the table; a table broken across pages has
+  // no rows of several rows, as in table_rep::typeset)
+  if (breakable) rs= "1";
   int ncs= min (as_int (cs), nc - col), nrs= min (as_int (rs), nr - row);
   string r;
   if (ncs > 1) r << "ColSpan=" << as_string (ncs);
   if (nrs > 1) r << (N(r) > 0? " ": "") << "RowSpan=" << as_string (nrs);
   return r;
+}
+
+static bool
+is_item (tree t) {
+  return is_compound (t, "item") || is_compound (t, "item*") ||
+         is_compound (t, "bibitem") || is_compound (t, "bibitem*");
+}
+
+// whether a paragraph of a list begins a new item
+static bool
+begins_with_item (tree t) {
+  if (is_item (t)) return true;
+  return is_compound (t, "concat") && N(t) > 0 && is_item (t[0]);
 }
 
 static bool
@@ -229,6 +247,28 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     // LI); one which is not a line of text (an equation) is all its body
     if (last == "L" && !is_document (t) &&
         (is_document (parent) || role_of (as_string (L(parent))) == "L")) {
+      // a paragraph which does not begin with an item continues the item
+      // before it (a second paragraph, a pause): it is in its body
+      int j= i;
+      while (j > 0 && !begins_with_item (parent[j])) j--;
+      if (j < i && begins_with_item (parent[j])) {
+        path ip= path_up (cur) * j;
+        string ikey= as_string (ip) * "/i";
+        r << tag_node (ikey, "LI", ip);
+        r << tag_node (ikey * "/b", "LBody", ip * 1);
+        last= "LBody"; li_body= true; li_key= ikey; li_pos= ip;
+        string role= (is_compound (t) && has_document_child (t))? "Div": "P";
+        if (is_compound (t) && role_of (as_string (L(t))) != "")
+          role= role_of (as_string (L(t)));
+        if (starts (role, "H:")) role= heading (as_string (cur), role);
+        string alt;
+        if (role == "Formula" || role == "Figure")
+          alt= alt_of (as_string (cur), t, role);
+        r << tag_node (as_string (cur), role, cur, alt);
+        last= role;
+        if (is_atomic (t) || role == "Formula" || role == "Figure") break;
+        continue;
+      }
       // (the node may be an element too, a list in a list: another key)
       string key= as_string (cur) * "/i";
       r << tag_node (key, "LI", cur);
@@ -305,8 +345,9 @@ pdf_tagger_rep::row_cells (path pos) {
   // the cells covered by the span of another one, once for the table
   string tkey= as_string (path_up (pos));
   bool known= this->covered->contains (tkey);
-  hashset<int> covered= this->covered [tkey];
-  if (!known) this->covered (tkey)= covered;
+  hashset<int> covered;   // (a set of its own: the default one is shared)
+  if (known) covered= this->covered [tkey];
+  else this->covered (tkey)= covered;
   for (int i=0; i<N(tab) && !known; i++)
     for (int j=0; is_compound (tab[i]) && j<N(tab[i]); j++) {
       string sp= cell_spans (trail, i, j);
@@ -321,7 +362,8 @@ pdf_tagger_rep::row_cells (path pos) {
         for (int dj=0; dj<cs; dj++)
           if (di > 0 || dj > 0) covered->insert ((i + di) * 10000 + j + dj);
     }
-  for (int j=0; j<N(t); j++) {
+  int nc= table_columns (tab);
+  for (int j=0; j<N(t) && j<nc; j++) {
     if (covered->contains (row * 10000 + j)) continue;
     path cp= pos * j;
     tag_node nd (as_string (cp), "TD", cp);

@@ -27,7 +27,7 @@ static const char* tex_math_encodings[][3]= {
   { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
   { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
   { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
-  { "grmn", "math-upgreek", "" }, { "grxn", "math-upgreek", "" },
+  { "grmn", "grmn", "math-upgreek" }, { "grxn", "grmn", "math-upgreek" },
   { "stmary", "stmary", "rubber-stmary" },
   { "wasy", "wasy", "rubber-wasy" }, { "wasyb", "wasy", "rubber-wasy" },
   { "", "", "" }
@@ -101,6 +101,10 @@ tex_math_unicode (string fontname) {
   int k, n= 0;
   while (n < N(fontname) && is_alpha (fontname[n])) n++;
   string base= fontname (0, n);
+  // the CB Greek fonts (grmn, grbx, grmi, gttn...) have the encoding of grmn:
+  // their text letters, accents and punctuation
+  if (N(base) == 4 && (starts (base, "gr") || starts (base, "gt")))
+    base= "grmn";
   for (k=0; tex_math_encodings[k][0][0] != '\0'; k++)
     if (base == tex_math_encodings[k][0]) break;
   if (tex_math_encodings[k][0][0] != '\0' &&
