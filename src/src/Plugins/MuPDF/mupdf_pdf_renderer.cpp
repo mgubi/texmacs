@@ -31,6 +31,7 @@
 
 #include "mupdf_pdf_renderer.hpp"
 #include "Metafont/tex_unicode.hpp"
+#include "pdf_tags.hpp"
 #include "mupdf_renderer.hpp"
 #include "mupdf_picture.hpp"
 #include "analyze.hpp"
@@ -165,27 +166,6 @@ static string uri_bytes (string s);
 // pages, of which there are fewer
 static const int tag_annot_key0= 1000000;
 
-// Tagged PDF (docs/pdf-tagging.md). A structure element, as the tagger
-// gives it (tag_node), with its parent and, once written, its object
-struct pdf_tag_elem {
-  string role, alt;   // both ending with a 0, to be C strings
-  array<string> akeys; array<int> avals;   // integer attributes (/A)
-  int    parent;      // -1 for the document
-  pdf_obj* obj;
-  pdf_tag_elem (): parent (-1), obj (NULL) {}
-};
-
-// A child of a structure element: another element, a marked content (the
-// MCID n of a page) or an annotation; pos and seq give the order
-struct pdf_tag_kid {
-  int  parent, kind;  // kind: 0 element, 1 marked content, 2 annotation
-  int  id;            // the element, the MCID, the annotation (tag_annots)
-  int  page;
-  path pos;
-  int  seq;
-  pdf_tag_kid (): parent (-1), kind (0), id (0), page (0), seq (0) {}
-};
-
 class mupdf_pdf_renderer_rep : public renderer_rep {
   static const int default_dpi= 72;
 
@@ -212,24 +192,14 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   // their children; the block of marked content open on the page (-2:
   // none, -1: an artifact, else its element) and the element of each MCID
   // of the page; the last box resolved, its elements and its place
-  array<pdf_tag_elem> tag_elems;
-  hashmap<string,int> tag_index;
-  hashset<int>        tag_rows;      // the rows whose cells were made
-  array<pdf_tag_kid>  tag_kids;
-  int                 tag_block;
-  array<int>          tag_mcids;
-  array<array<int> >  tag_page_mcids;
-  array<pdf_obj*>     tag_annots;    // the links, for their OBJR
+  pdf_tags            tags;          // NULL until there is a tagger
+  array<pdf_obj*>     tag_objs;      // the objects of the elements
+  array<pdf_obj*>     tag_annots;    // the annotations, for their OBJR
   array<int>          tag_annot_page;
   array<int>          link_elem;     // the element of each link of the page
   array<path>         link_pos;      // ... and the place of its text
   array<string>       link_text;     // its /Contents, ending with a 0
   int                 link_annot0;   // the first of them in tag_annots
-  bool                tag_have;
-  path                tag_last_ip, tag_last_pos;
-  int                 tag_last_elem;
-  int                 tag_span;      // the depth of ActualText spans
-  int                 tag_seq;
 
   // embedded videos (see embed_video): the file specification of each MP4
   // file, by the image and its delay (-1: it could not be made), and the
@@ -335,7 +305,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_outline ();
   void write_dests ();
   void write_videos (pdf_obj* pobj);
-  void tag_resolve ();
+  pdf_tags tg ();
   void tag_mark (int kind);
   void tag_close ();
   void write_structure ();
@@ -435,9 +405,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     image_pool (-1), xobj_num (-1), pattern_pool (-1), n_pat (0),
     transform_level (0),
     n_alpha (0), n_xobj (0),
-    link_annot0 (0), video_annot0 (0),
-    tag_index (-1), tag_block (-2), tag_have (false), tag_last_elem (-1),
-    tag_span (0), tag_seq (0)
+    tags (NULL), link_annot0 (0), video_annot0 (0)
 {
   last_save_ok= false;
   width = default_dpi * paper_w / 2.54;
@@ -570,7 +538,8 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
     pdf_drop_obj (ctx, font_list[i].obj);
   }
   for (int i=0; i<N(pages); i++) pdf_drop_obj (ctx, pages[i]);
-  for (int i=0; i<N(tag_elems); i++) pdf_drop_obj (ctx, tag_elems[i].obj);
+  for (int i=0; i<N(tag_objs); i++) pdf_drop_obj (ctx, tag_objs[i]);
+  if (tags != NULL) tm_delete (tags);
   for (int i=0; i<N(tag_annots); i++) pdf_drop_obj (ctx, tag_annots[i]);
   for (int i=0; i<N(video_fs); i++) pdf_drop_obj (ctx, video_fs[i]);
   for (int i=0; i<N(temp_videos); i++)
@@ -623,8 +592,6 @@ mupdf_pdf_renderer_rep::begin_page () {
   links= array<pdf_link_item> ();
   link_elem= array<int> ();
   link_pos= array<path> ();
-  tag_block= -2;
-  tag_mcids= array<int> ();
   page_videos= array<pdf_link_item> ();
   page_video_file= array<int> ();
   page_video_vars= array<string> ();
@@ -698,22 +665,18 @@ mupdf_pdf_renderer_rep::end_page () {
     fail ("a page");
   }
   if (page != NULL) pages << page;
-  tag_page_mcids << tag_mcids;
+  if (tags != NULL) tags->end_page ();
   if (tagger != NULL)
     for (int i=0; i<N(links) && i<N(link_elem); i++)
       if (link_elem[i] >= 0 && tag_annots[link_annot0 + i] != NULL) {
-        pdf_tag_kid k;
-        k.parent= link_elem[i]; k.kind= 2; k.id= link_annot0 + i;
-        k.page= page_num; k.pos= link_pos[i]; k.seq= tag_seq++;
-        tag_kids << k;
+        tg ()->add_annotation (link_elem[i], link_annot0 + i, page_num,
+                               link_pos[i]);
       }
   if (tagger != NULL)
     for (int i=0; i<N(page_videos) && i<N(page_video_elem); i++)
       if (page_video_elem[i] >= 0 && tag_annots[video_annot0 + i] != NULL) {
-        pdf_tag_kid k;
-        k.parent= page_video_elem[i]; k.kind= 2; k.id= video_annot0 + i;
-        k.page= page_num; k.pos= page_video_pos[i]; k.seq= tag_seq++;
-        tag_kids << k;
+        tg ()->add_annotation (page_video_elem[i], video_annot0 + i,
+                               page_num, page_video_pos[i]);
       }
   fz_drop_buffer (ctx, contents); contents= NULL;
   page_num++;
@@ -1095,7 +1058,7 @@ void
 mupdf_pdf_renderer_rep::begin_actual_text (string s) {
   if (contents == NULL) return;
   tag_mark (0);
-  tag_span++;   // no new block in the span: it would cut it
+  if (tagger != NULL) tg ()->span++;   // no new block in the span
   if (!in_text) {
     put ("BT\n"); in_text= true; cur_font= -1; text_x= text_y= 0;
   }
@@ -1106,7 +1069,7 @@ mupdf_pdf_renderer_rep::begin_actual_text (string s) {
 void
 mupdf_pdf_renderer_rep::end_actual_text () {
   if (contents == NULL) return;
-  if (tag_span > 0) tag_span--;
+  if (tagger != NULL && tg ()->span > 0) tg ()->span--;
   put ("EMC\n");
 }
 
@@ -2530,25 +2493,7 @@ mupdf_pdf_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2) {
   // a tagged PDF: the Link element of its text (or what holds the text)
   int e= -1;
   path pos;
-  if (tagger != NULL) {
-    tag_resolve ();
-    pos= tag_last_pos;
-    for (e= tag_last_elem; e >= 0; e= tag_elems[e].parent)
-      if (strcmp (&tag_elems[e].role[0], "Link") == 0) break;
-    if (e < 0 && N(tag_elems) > 0) {
-      // a link of no hlink (the call of a footnote, its way back): a Link
-      // element of its own, in the element of its text (PDF/UA)
-      int parent= (tag_last_elem >= 0? tag_last_elem: 0);
-      e= N(tag_elems);
-      pdf_tag_elem el;
-      el.role= string ("Link") * string ((char) 0);
-      el.parent= parent;
-      tag_elems << el;
-      pdf_tag_kid k;
-      k.parent= parent; k.kind= 0; k.id= e; k.pos= pos; k.seq= tag_seq++;
-      tag_kids << k;
-    }
-  }
+  if (tagger != NULL) e= tg ()->link_element (tag_ip, pos);
   link_elem << e;
   link_pos << pos;
 }
@@ -2682,21 +2627,7 @@ mupdf_pdf_renderer_rep::embed_video (url u, int ms, bool repeat,
   // a tagged PDF: an Annot element in the element of the picture
   int ve= -1;
   path vpos;
-  if (tagger != NULL) {
-    tag_resolve ();
-    vpos= tag_last_pos;
-    int parent= (tag_last_elem >= 0? tag_last_elem: 0);
-    if (N(tag_elems) > 0) {
-      ve= N(tag_elems);
-      pdf_tag_elem el;
-      el.role= string ("Annot") * string ((char) 0);
-      el.parent= parent;
-      tag_elems << el;
-      pdf_tag_kid k;
-      k.parent= parent; k.kind= 0; k.id= ve; k.pos= vpos; k.seq= tag_seq++;
-      tag_kids << k;
-    }
-  }
+  if (tagger != NULL) ve= tg ()->annot_element (tag_ip, vpos);
   page_video_elem << ve;
   page_video_pos << vpos;
   page_video_nm << ("video-" * as_string (N(page_videos)) * "-" *
@@ -2811,134 +2742,35 @@ mupdf_pdf_renderer_rep::supports_tagging () {
   return true;
 }
 
-// The element of the box being drawn, its chain registered
-void
-mupdf_pdf_renderer_rep::tag_resolve () {
-  if (tag_have && tag_ip == tag_last_ip) return;
-  path pos;
-  array<tag_node> chain= tagger->resolve (tag_ip, pos);
-  int parent= -1;
-  for (int i=0; i<N(chain); i++) {
-    tag_node& nd= chain[i];
-    int e= tag_index [nd.key];
-    if (e < 0) {
-      e= N(tag_elems);
-      pdf_tag_elem el;
-      el.role= nd.role * string ((char) 0);
-      el.alt = (N(nd.alt) > 0? nd.alt * string ((char) 0): string ());
-      array<string> av= tokenize (nd.attrs, " ");
-      for (int j=0; j<N(av); j++) {
-        int eq= search_forwards ("=", av[j]);
-        if (eq <= 0) continue;
-        el.akeys << (av[j] (0, eq) * string ((char) 0));
-        el.avals << as_int (av[j] (eq+1, N(av[j])));
-      }
-      el.parent= parent;
-      tag_elems << el;
-      tag_index (nd.key)= e;
-      if (parent >= 0) {
-        pdf_tag_kid k;
-        k.parent= parent; k.kind= 0; k.id= e; k.pos= nd.pos; k.seq= tag_seq++;
-        tag_kids << k;
-      }
-    }
-    parent= e;
-    // a row has all its cells, also those which draw nothing, but not
-    // those which the span of another one covers (PDF/UA)
-    if (nd.role == "TR" && !tag_rows->contains (e)) {
-      tag_rows->insert (e);
-      array<tag_node> cells= tagger->row_cells (nd.pos);
-      for (int j=0; j<N(cells); j++)
-        if (tag_index [cells[j].key] < 0) {
-          int c= N(tag_elems);
-          pdf_tag_elem el;
-          el.role= cells[j].role * string ((char) 0);
-          array<string> av= tokenize (cells[j].attrs, " ");
-          for (int a=0; a<N(av); a++) {
-            int eq= search_forwards ("=", av[a]);
-            if (eq <= 0) continue;
-            el.akeys << (av[a] (0, eq) * string ((char) 0));
-            el.avals << as_int (av[a] (eq+1, N(av[a])));
-          }
-          el.parent= e;
-          tag_elems << el;
-          tag_index (cells[j].key)= c;
-          pdf_tag_kid k;
-          k.parent= e; k.kind= 0; k.id= c; k.pos= cells[j].pos;
-          k.seq= tag_seq++;
-          tag_kids << k;
-        }
-    }
-  }
-  tag_last_ip  = tag_ip;
-  tag_last_pos = pos;
-  tag_last_elem= parent;
-  tag_have= true;
+// the structure of the PDF, made when the tagger is known (print_doc gives
+// it after the renderer is made)
+pdf_tags
+mupdf_pdf_renderer_rep::tg () {
+  if (tags == NULL) tags= tm_new<pdf_tags_rep> (tagger);
+  return tags;
 }
 
 // The drawing which follows is of the box being drawn: of kind 0 (text),
 // 1 (lines, fills) or 2 (images)
 void
 mupdf_pdf_renderer_rep::tag_mark (int kind) {
-  if (tagger == NULL || contents == NULL || tag_span > 0) return;
-  tag_resolve ();
-  int e= tag_last_elem;
-  if (e >= 0 && kind == 1) {
-    const char* r= &tag_elems[e].role[0];
-    if (strcmp (r, "Formula") != 0 && strcmp (r, "Figure") != 0) e= -1;
-  }
-  if (e < 0 && tag_block == -1) return;
-  if (e >= 0 && e == tag_block) return;
+  if (tagger == NULL || contents == NULL) return;
+  string ops= tg ()->mark (tag_ip, kind, page_num);
+  if (N(ops) == 0) return;
   // a block of marked content may not cross a text object
   end_text ();
-  if (tag_block != -2) put ("EMC\n");
-  if (e < 0) put ("/Artifact BMC\n");
-  else {
-    int mcid= N(tag_mcids);
-    tag_mcids << e;
-    pdf_tag_kid k;
-    k.parent= e; k.kind= 1; k.id= mcid; k.page= page_num;
-    k.pos= tag_last_pos; k.seq= tag_seq++;
-    tag_kids << k;
-    app ("/%s <</MCID %d>> BDC\n", &tag_elems[e].role[0], mcid);
-  }
-  tag_block= e;
+  c_string cops (ops);
+  put (cops);
 }
 
 void
 mupdf_pdf_renderer_rep::tag_close () {
-  if (tagger == NULL || tag_block == -2) return;
+  if (tags == NULL) return;
+  string ops= tags->close ();
+  if (N(ops) == 0) return;
   end_text ();
-  put ("EMC\n");
-  tag_block= -2;
-}
-
-static bool
-tag_path_less (path a, path b) {
-  while (!is_nil (a) && !is_nil (b)) {
-    if (a->item != b->item) return a->item < b->item;
-    a= a->next; b= b->next;
-  }
-  return is_nil (a) && !is_nil (b);
-}
-
-static bool
-kid_less (const pdf_tag_kid& a, const pdf_tag_kid& b) {
-  if (tag_path_less (a.pos, b.pos)) return true;
-  if (tag_path_less (b.pos, a.pos)) return false;
-  return a.seq < b.seq;
-}
-
-static string
-xml_escape (string s) {
-  string r;
-  for (int i=0; i<N(s); i++)
-    if (s[i] == '&') r << "&amp;";
-    else if (s[i] == '<') r << "&lt;";
-    else if (s[i] == '>') r << "&gt;";
-    else if (s[i] == '"') r << "&quot;";
-    else r << s[i];
-  return r;
+  c_string cops (ops);
+  put (cops);
 }
 
 // The structure tree, the parent tree, and what the catalog of a tagged
@@ -2946,52 +2778,32 @@ xml_escape (string s) {
 // with the part of PDF/UA)
 void
 mupdf_pdf_renderer_rep::write_structure () {
-  if (tagger == NULL || N(tag_elems) == 0) return;
+  if (tags == NULL || N(tags->elems) == 0) return;
   // everything with a destructor first (see put): the children of each
-  // element in their order, and the strings
-  int n= N(tag_elems);
-  array<array<int> > kids (n);
-  for (int i=0; i<N(tag_kids); i++) kids[tag_kids[i].parent] << i;
+  // element in their order, and the strings, as C strings
+  int n= N(tags->elems);
+  array<array<int> > kids= tags->children ();
+  array<pdf_tag_kid>& tag_kids= tags->kids;
+  array<string> role (n), alt (n), note_id (n);
+  array<array<string> > akeys (n);
   for (int e=0; e<n; e++) {
-    array<int>& a= kids[e];
-    for (int i=1; i<N(a); i++)   // insertion sort: the lists are short
-      for (int j=i; j>0 && kid_less (tag_kids[a[j]], tag_kids[a[j-1]]); j--) {
-        int t= a[j]; a[j]= a[j-1]; a[j-1]= t; }
-  }
-  array<string> note_id (n);
-  for (int e=0; e<n; e++)
-    if (strcmp (&tag_elems[e].role[0], "Note") == 0)
+    pdf_tag_elem& el= tags->elems[e];
+    role[e]= el.role * string ((char) 0);
+    if (N(el.alt) > 0) alt[e]= el.alt * string ((char) 0);
+    for (int j=0; j<N(el.akeys); j++)
+      akeys[e] << (el.akeys[j] * string ((char) 0));
+    if (el.role == "Note")
       note_id[e]= "note-" * as_string (e) * string ((char) 0);
+  }
   string lang= tagger->language () * string ((char) 0);
   string title= cork_to_utf8 (tagger->title ());
   if (N(title) == 0 && metadata->contains ("title")) title= metadata ("title");
   if (N(title) == 0) title= as_string (tail (pdf_file_name));
   string author= (metadata->contains ("author")? metadata ("author"): "");
-  string xmp;
-  xmp << "<?xpacket begin=\"\xef\xbb\xbf\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n"
-      << "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n"
-      << "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n"
-      << "<rdf:Description rdf:about=\"\" "
-      << "xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n"
-      << "<dc:format>application/pdf</dc:format>\n"
-      << "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">"
-      << xml_escape (title) << "</rdf:li></rdf:Alt></dc:title>\n";
-  if (N(author) > 0)
-    xmp << "<dc:creator><rdf:Seq><rdf:li>" << xml_escape (author)
-        << "</rdf:li></rdf:Seq></dc:creator>\n";
-  xmp << "</rdf:Description>\n"
-      << "<rdf:Description rdf:about=\"\" "
-      << "xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\">\n"
-      << "<pdfuaid:part>1</pdfuaid:part>\n</rdf:Description>\n"
-      << "<rdf:Description rdf:about=\"\" "
-      << "xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\">\n"
-      << "<pdf:Producer>TeXmacs " TEXMACS_VERSION " + MuPDF " FZ_VERSION
-      << "</pdf:Producer>\n</rdf:Description>\n"
-      << "<rdf:Description rdf:about=\"\" "
-      << "xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\">\n"
-      << "<xmp:CreatorTool>TeXmacs " TEXMACS_VERSION "</xmp:CreatorTool>\n"
-      << "</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n"
-      << "<?xpacket end=\"w\"?>";
+  string xmp= pdf_tags_xmp (title, author,
+                            "TeXmacs " TEXMACS_VERSION " + MuPDF " FZ_VERSION);
+  tag_objs= array<pdf_obj*> (n);
+  for (int e=0; e<n; e++) tag_objs[e]= NULL;
   int annots_base= tag_annot_key0;   // the keys of the annotations
   fz_buffer* xb= NULL;
   fz_var (xb);
@@ -3001,22 +2813,22 @@ mupdf_pdf_renderer_rep::write_structure () {
     pdf_dict_put_drop (ctx, root, PDF_NAME(StructTreeRoot), tree);
     pdf_dict_put (ctx, tree, PDF_NAME(Type), PDF_NAME(StructTreeRoot));
     for (int e=0; e<n; e++)
-      tag_elems[e].obj= pdf_add_new_dict (ctx, doc, 6);
+      tag_objs[e]= pdf_add_new_dict (ctx, doc, 6);
     for (int e=0; e<n; e++) {
-      pdf_tag_elem& el= tag_elems[e];
-      pdf_obj* d= el.obj;
+      pdf_tag_elem& el= tags->elems[e];
+      pdf_obj* d= tag_objs[e];
       pdf_dict_put (ctx, d, PDF_NAME(Type), PDF_NAME(StructElem));
-      pdf_dict_put_name (ctx, d, PDF_NAME(S), &el.role[0]);
+      pdf_dict_put_name (ctx, d, PDF_NAME(S), &role[e][0]);
       pdf_dict_put (ctx, d, PDF_NAME(P),
-                    el.parent < 0? tree: tag_elems[el.parent].obj);
-      if (N(el.alt) > 0)
-        pdf_dict_put_text_string (ctx, d, PDF_NAME(Alt), &el.alt[0]);
-      if (N(el.akeys) > 0) {
+                    el.parent < 0? tree: tag_objs[el.parent]);
+      if (N(alt[e]) > 0)
+        pdf_dict_put_text_string (ctx, d, PDF_NAME(Alt), &alt[e][0]);
+      if (N(akeys[e]) > 0) {
         // the attributes of a cell (its spans), owner Table
-        pdf_obj* a= pdf_dict_put_dict (ctx, d, PDF_NAME(A), 1 + N(el.akeys));
+        pdf_obj* a= pdf_dict_put_dict (ctx, d, PDF_NAME(A), 1 + N(akeys[e]));
         pdf_dict_put_name (ctx, a, PDF_NAME(O), "Table");
-        for (int j=0; j<N(el.akeys); j++)
-          pdf_dict_puts_drop (ctx, a, &el.akeys[j][0],
+        for (int j=0; j<N(akeys[e]); j++)
+          pdf_dict_puts_drop (ctx, a, &akeys[e][j][0],
                               pdf_new_int (ctx, el.avals[j]));
       }
       if (N(note_id[e]) > 0)
@@ -3025,7 +2837,7 @@ mupdf_pdf_renderer_rep::write_structure () {
       pdf_obj* k= pdf_dict_put_array (ctx, d, PDF_NAME(K), N(kids[e]));
       for (int i=0; i<N(kids[e]); i++) {
         pdf_tag_kid& kd= tag_kids[kids[e][i]];
-        if (kd.kind == 0) pdf_array_push (ctx, k, tag_elems[kd.id].obj);
+        if (kd.kind == 0) pdf_array_push (ctx, k, tag_objs[kd.id]);
         else if (kd.kind == 1 && kd.page < N(pages)) {
           pdf_obj* m= pdf_array_push_dict (ctx, k, 3);
           pdf_dict_put (ctx, m, PDF_NAME(Type), PDF_NAME(MCR));
@@ -3040,22 +2852,23 @@ mupdf_pdf_renderer_rep::write_structure () {
         }
       }
     }
-    pdf_dict_put (ctx, tree, PDF_NAME(K), tag_elems[0].obj);
+    pdf_dict_put (ctx, tree, PDF_NAME(K), tag_objs[0]);
     // the parent tree: for each page its elements by MCID, then each link
     pdf_obj* pt= pdf_add_new_dict (ctx, doc, 1);
     pdf_dict_put_drop (ctx, tree, PDF_NAME(ParentTree), pt);
     pdf_obj* nums= pdf_dict_put_array (ctx, pt, PDF_NAME(Nums),
                                        2 * (N(pages) + N(tag_annots)));
-    for (int p=0; p<N(pages) && p<N(tag_page_mcids); p++) {
+    array<array<int> >& pm= tags->page_mcids;
+    for (int p=0; p<N(pages) && p<N(pm); p++) {
       pdf_array_push_int (ctx, nums, p);
-      pdf_obj* a= pdf_array_push_array (ctx, nums, N(tag_page_mcids[p]));
-      for (int m=0; m<N(tag_page_mcids[p]); m++)
-        pdf_array_push (ctx, a, tag_elems[tag_page_mcids[p][m]].obj);
+      pdf_obj* a= pdf_array_push_array (ctx, nums, N(pm[p]));
+      for (int m=0; m<N(pm[p]); m++)
+        pdf_array_push (ctx, a, tag_objs[pm[p][m]]);
     }
     for (int i=0; i<N(tag_kids); i++)
       if (tag_kids[i].kind == 2) {
         pdf_array_push_int (ctx, nums, annots_base + tag_kids[i].id);
-        pdf_array_push (ctx, nums, tag_elems[tag_kids[i].parent].obj);
+        pdf_array_push (ctx, nums, tag_objs[tag_kids[i].parent]);
       }
     pdf_dict_puts_drop (ctx, tree, "ParentTreeNextKey",
                         pdf_new_int (ctx, annots_base + N(tag_annots)));

@@ -166,6 +166,7 @@ Graphics/Renderer/basic_renderer.cpp
 Graphics/Renderer/brush.cpp
 Graphics/Renderer/page_type.cpp
 Graphics/Renderer/pencil.cpp
+Graphics/Renderer/pdf_tags.cpp
 Graphics/Renderer/printer.cpp
 Graphics/Renderer/renderer.cpp
 Graphics/Spacial/enlightened.cpp
