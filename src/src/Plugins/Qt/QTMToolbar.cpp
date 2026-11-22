@@ -31,7 +31,7 @@
 #endif
 
 QTMToolbar::QTMToolbar (const QString& title, QSize iconSize, QWidget* parent)
-  : QToolBar (title, parent)
+  : QToolBar (title, parent), mBaseHeight (0), mDeferMetrics (false)
 {  
 #if QT_VERSION >= 0x050000
   // strong focus
@@ -101,11 +101,49 @@ QTMToolbar::QTMToolbar (const QString& title, QSize iconSize, QWidget* parent)
 QTMToolbar::~QTMToolbar () {
 }
 
+void QTMToolbar::setFixedHeight (int h) {
+  // hides QWidget::setFixedHeight: the height asked for the bar with its
+  // icons (qt_tm_widget.cpp); the bar is as tall as this or as its tallest
+  // button (updateToolbarMetrics)
+  mBaseHeight= h;
+  updateToolbarMetrics ();
+}
+
+void QTMToolbar::updateToolbarMetrics () {
+  // the height follows the current buttons, as in Plugins/Qt6: a tall
+  // button (a label of several lines) no longer makes the bar tall for
+  // good, it is back to its height once the button is gone (#936)
+#if QT_VERSION >= 0x050000
+  int requiredHeight= mBaseHeight;
+  QList<QWidget*> widgets;
+  if (tmapp()->useNewToolbar() && mLayout) {
+    for (int i = 0; i < mLayout->count(); i++)
+      widgets << mLayout->itemAt(i)->widget();
+  } else {
+    QList<QAction*> acts= actions ();
+    for (int i = 0; i < acts.count(); i++)
+      widgets << widgetForAction (acts[i]);
+  }
+  for (int i = 0; i < widgets.count(); i++) {
+    QToolButton* button = qobject_cast<QToolButton*> (widgets[i]);
+    if (!button) continue;
+    requiredHeight = qMax (requiredHeight,
+                           button->sizeHint().height() + QTMTOOLBAR_MARGIN * 2);
+  }
+  if (requiredHeight > 0 &&
+      (minimumHeight () != requiredHeight || maximumHeight () != requiredHeight))
+    QToolBar::setFixedHeight (requiredHeight);
+#else
+  if (mBaseHeight > 0) QToolBar::setFixedHeight (mBaseHeight);
+#endif // QT_VERSION >= 0x050000
+}
+
 void QTMToolbar::replaceActions (QList<QAction*>* src) {
 #if QT_VERSION >= 0x050000
   if (src == NULL)
     FAILED ("replaceActions expects valid objects");
   setUpdatesEnabled (false);
+  mDeferMetrics= true;
 
   if (tmapp()->useNewToolbar()) {
     while (mLayout && mLayout->count() > 0) {
@@ -123,6 +161,8 @@ void QTMToolbar::replaceActions (QList<QAction*>* src) {
     QAction* a = (*src)[i];
     addAction(a);
   }
+  mDeferMetrics= false;
+  updateToolbarMetrics ();
   setUpdatesEnabled (true);
   if (tmapp()->useNewToolbar()) {
     addRightSpacer();
@@ -136,6 +176,7 @@ void QTMToolbar::replaceButtons (QList<QAction*>* src) {
   if (src == NULL)
     FAILED ("replaceButtons expects valid objects");
   setUpdatesEnabled (false);
+  mDeferMetrics= true;
   if (tmapp()->useNewToolbar()) {
     while (mLayout && mLayout->count() > 0) {
       QWidget* w = mLayout->itemAt(0)->widget();
@@ -152,6 +193,8 @@ void QTMToolbar::replaceButtons (QList<QAction*>* src) {
     QAction* a = (*src)[i];
     addAction(a);
   }
+  mDeferMetrics= false;
+  updateToolbarMetrics ();
   setUpdatesEnabled (true);
   if (tmapp()->useNewToolbar()) {
     addRightSpacer();
@@ -274,21 +317,7 @@ void QTMToolbar::addAction (QAction* action) {
     // if the action contains only text, add a margin to the button
     if (action->icon().isNull()) {
       button->setToolButtonStyle (Qt::ToolButtonTextOnly);
-      // a label is one line: the bar would grow for good to the height of
-      // a label of several lines, since it never shrinks (#936)
-      QString txt= action->text ();
-      if (txt.contains (QLatin1Char ('\n')) || txt.contains (QLatin1Char ('\t'))) {
-        txt.replace (QLatin1Char ('\n'), QLatin1Char (' '));
-        txt.replace (QLatin1Char ('\t'), QLatin1Char (' '));
-        action->setText (txt);
-      }
       button->setContentsMargins (QTMTOOLBAR_MARGIN, QTMTOOLBAR_MARGIN, QTMTOOLBAR_MARGIN, QTMTOOLBAR_MARGIN);
-    }
-    
-    // if the fixed height is lower than the required height, set the fixed height
-    int requiredHeight = button->sizeHint().height() + QTMTOOLBAR_MARGIN * 2;
-    if (height() < requiredHeight) {
-      setFixedHeight (requiredHeight);
     }
   }
   
@@ -300,6 +329,7 @@ void QTMToolbar::addAction (QAction* action) {
   } else {
     QToolBar::addWidget (actionWidget);
   }
+  if (!mDeferMetrics) updateToolbarMetrics ();
 #else
   QToolBar::addAction (action);
 #endif // QT_VERSION >= 0x050000
@@ -309,6 +339,7 @@ void QTMToolbar::removeAction (QAction* action) {
 #if QT_VERSION >= 0x050000
   if (!tmapp()->useNewToolbar() || !mLayout) {
     QToolBar::removeAction(action);
+    updateToolbarMetrics ();
     return;
   }
   for (int i = 0; i < mLayout->count(); i++) {
@@ -320,6 +351,7 @@ void QTMToolbar::removeAction (QAction* action) {
     }
   }
   updateNavButtons();
+  updateToolbarMetrics ();
 #else
   QToolBar::removeAction(action);
 #endif // QT_VERSION >= 0x050000
@@ -329,6 +361,7 @@ void QTMToolbar::clear () {
 #if QT_VERSION >= 0x050000
   if (!tmapp()->useNewToolbar() || !mLayout) {
     QToolBar::clear();
+    if (!mDeferMetrics) updateToolbarMetrics ();
     return;
   }
   while (mLayout->count() > 0) {
@@ -339,6 +372,7 @@ void QTMToolbar::clear () {
     w->deleteLater();
   }
   updateNavButtons();
+  if (!mDeferMetrics) updateToolbarMetrics ();
 #else
   QToolBar::clear();
 #endif // QT_VERSION >= 0x050000

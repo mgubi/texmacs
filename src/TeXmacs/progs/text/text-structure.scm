@@ -42,11 +42,14 @@
   (texmacs->code (verbatim-expand x) "cork"))
 
 (tm-define (texmacs->title-string x)
-  ;; a title is shown on one line (menus, the focus bar): the line breaks
-  ;; and tabs of its verbatim text, as in a title of several paragraphs,
-  ;; become spaces; the Qt and Cocoa labels show them as such (#936)
-  (with s (downgrade-math-letters (texmacs->string x))
-    (string-replace (string-replace s "\n" " ") "\t" " ")))
+  ;; a title is shown on one line (menus, the focus bar): the lines of its
+  ;; verbatim text (paragraphs, table rows...) are joined by one space,
+  ;; without the empty ones and the spaces around them; the spaces inside
+  ;; a line are kept (#936)
+  (let* ((s (downgrade-math-letters (texmacs->string x)))
+         (l (string-tokenize-by-char (string-replace s "\t" "\n") #\newline))
+         (r (list-filter (map tm-string-trim-both l) (lambda (p) (!= p "")))))
+    (string-recompose r " ")))
 
 (define (indent-prefix* sec)
   (cond ((in? sec '(chapter chapter*)) "")

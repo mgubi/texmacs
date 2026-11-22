@@ -266,6 +266,21 @@
       (check= (texmacs->title-string
                (stree->tree '(document "a" (concat "b" (next-line) "c"))))
               "a bc")
+      ;; no double space for an empty paragraph, no space at the ends,
+      ;; one space between the cells and the rows of a table; the spaces
+      ;; inside a line are kept
+      (check= (texmacs->title-string (stree->tree '(document "a" "" "b")))
+              "a b")
+      (check= (texmacs->title-string (stree->tree '(document "a" "")))
+              "a")
+      (check= (texmacs->title-string (stree->tree '(document "" " a " "")))
+              "a")
+      (check= (texmacs->title-string
+               (stree->tree '(tabular (table (row (cell "a") (cell "b"))
+                                             (row (cell "c") (cell "d"))))))
+              "a b c d")
+      (check= (texmacs->title-string (stree->tree '(document "a  b" "c")))
+              "a  b c")
       (check-true (principal-section? (node 0)))
       (check-false (principal-section? (node 1)))
       (check-true (principal-section? (node 2)))
