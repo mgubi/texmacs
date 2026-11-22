@@ -281,6 +281,8 @@ edit_main_rep::nr_pages () {
   return N (the_box[0]);
 }
 
+tagger_rep* make_pdf_tagger (tree body, path rp, string lang, string title);
+
 bool
 edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // true when the file was written (#705)
@@ -364,6 +366,17 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   renderer ren= printer (name, dpi, pages, page_type, landsc, w/cm, h/cm);
   bool ok= ren->is_started ();
   
+  // a tagged PDF (PDF/UA, docs/pdf-tagging.md): the structure of the body
+  tagger_rep* tagger= NULL;
+  if (ok && mupdf_target && ren->supports_tagging () &&
+      (get_env ("TEXMACS_PDF_TAGGED") == "1" ||
+       get_preference ("texmacs->pdf:tagged", "off") == "on")) {
+    string lan= as_string (call ("pdf-tag-language",
+                                 object (env->get_string (LANGUAGE))));
+    tagger= make_pdf_tagger (subtree (et, rp), rp, lan,
+                             get_metadata ("title"));
+    ren->tagger= tagger;
+  }
   if (ok) {
     int i;
     ren->set_metadata ("title", get_metadata ("title"));
@@ -383,6 +396,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     }
   }
   tm_delete (ren);
+  if (tagger != NULL) tm_delete (tagger);
   delete_typesetter (ttt);
 #ifdef MUPDF_RENDERER
   if (mupdf_target) ok= ok && mupdf_pdf_saved ();

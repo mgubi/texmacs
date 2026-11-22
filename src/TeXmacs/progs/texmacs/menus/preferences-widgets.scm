@@ -770,7 +770,11 @@
                 (get-boolean-preference "texmacs->pdf:distill inclusion")))
       (meti (hlist // (text "Check exported Pdf files for correctness"))
         (toggle (set-boolean-preference "texmacs->pdf:check" answer)
-                (get-boolean-preference "texmacs->pdf:check")))))
+                (get-boolean-preference "texmacs->pdf:check"))))
+    (assuming (mupdf-writes-pdf?)
+      (meti (hlist // (text "Tagged Pdf, for accessibility (PDF/UA)"))
+        (toggle (set-boolean-preference "texmacs->pdf:tagged" answer)
+                (get-boolean-preference "texmacs->pdf:tagged")))))
   (assuming (supports-native-pdf?)
     (aligned
       (item (text "Pdf version number:")

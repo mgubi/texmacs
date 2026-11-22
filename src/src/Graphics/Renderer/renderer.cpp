@@ -64,7 +64,7 @@ renderer_rep::renderer_rep (bool screen_flag, double pixel_ratio2):
   zoomf (pixel_ratio2 * std_shrinkf), shrinkf (1),
   pixel (PIXEL), retina_pixel (pixel_ratio2 * PIXEL),
   brushpx (-1), thicken (0),
-  master (NULL), cur_page (0) {}
+  master (NULL), cur_page (0), tagger (NULL) {}
 
 renderer_rep::~renderer_rep () {}
 
@@ -157,6 +157,11 @@ void
 renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
                               double hscale) {
   (void) c; (void) fn; (void) x; (void) y; (void) hscale;
+}
+
+bool
+renderer_rep::supports_tagging () {
+  return false;
 }
 
 void

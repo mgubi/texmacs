@@ -87,6 +87,7 @@ Data/Tree/tree_select.cpp
 Data/Tree/tree_spell.cpp
 Data/Tree/tree_traverse.cpp
 Edit/Editor/edit_main.cpp
+Edit/Editor/edit_tagger.cpp
 Edit/Editor/edit_typeset.cpp
 Edit/Interface/edit_complete.cpp
 Edit/Interface/edit_cursor.cpp

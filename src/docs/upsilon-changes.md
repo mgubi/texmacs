@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **Tagged PDF, for accessibility (PDF/UA-1)** (Vue builds, desktop
+  applications): with *Preferences → Convert → Pdf → Tagged Pdf, for
+  accessibility* (or `TEXMACS_PDF_TAGGED=1`), Export as PDF writes the
+  structure of the document for screen readers: headings, paragraphs,
+  lists, tables, footnotes, links and formulas, the formulas described by
+  their LaTeX, in the order of the document, with its language and title;
+  the headers, footers and page numbers are marked as artifacts. veraPDF
+  finds the PDF of the sample documents compliant with PDF/UA-1. The
+  author of a PDF is no longer garbled when it has accents (#945).
 - **Qt: the icon bars keep their height** (Qt builds, desktop
   applications, seen in the Linux AppImage): a tall button, such as a
   section title of several lines shown in the focus bar, made the bar grow

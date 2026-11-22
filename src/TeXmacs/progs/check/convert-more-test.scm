@@ -3222,6 +3222,56 @@
           (check-true (or (has? "/URI (https://example.org/a\\\\b)")
                           (has? "/URI(https://example.org/a\\\\b)")))))))
 
+;; #945: a tagged PDF (PDF/UA-1), by the writer on MuPDF when it is asked
+;; for (TEXMACS_PDF_TAGGED=1, or the preference texmacs->pdf:tagged): a
+;; structure tree in the catalog, which says the PDF is marked and in which
+;; language, the headings, paragraphs, lists, formulas (with their LaTeX as
+;; alternate description) and links of the document as structure elements,
+;; and the links with a description and their place in the structure.
+(define (test-tagged-pdf-export)
+  (check-group "tagged pdf export")
+  (if (not (mupdf-writes-pdf?))
+      (images-skip "tagged pdf export" "the PDF is not written by MuPDF")
+      (let* ((tm (url-append (temp-dir) "tagged.tm"))
+             (pdf (url-append (temp-dir) "tagged.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED"))
+             (body `(document
+                      (section "Title")
+                      (concat "See " (hlink "the site" "https://example.org")
+                              " and " (math "x+1") ".")
+                      (itemize (document (concat (item) "One")
+                                         (concat (item) "Two"))))))
+        (string-save (serialize-texmacs (stree->tree (tmfile body))) tm)
+        (load-buffer tm :strict)
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define (has? what) (>= (string-search-forwards what 0 s) 0))
+          (check-true (string-starts? s "%PDF-"))
+          (check-true (has? "/StructTreeRoot"))
+          (check-true (has? "/MarkInfo<</Marked true>>"))
+          (check-true (has? "/Lang(en-US)"))
+          (check-true (has? "/DisplayDocTitle true"))
+          (check-true (has? "/Type/Metadata"))
+          (check-true (has? "/S/H1"))
+          (check-true (has? "/S/P"))
+          (check-true (has? "/S/L"))
+          (check-true (has? "/S/LI"))
+          (check-true (has? "/S/Lbl"))
+          (check-true (has? "/S/LBody"))
+          (check-true (has? "/S/Formula"))
+          (check-true (has? "/Alt(x + 1)"))
+          (check-true (has? "/S/Link"))
+          (check-true (has? "/Contents(https://example.org)"))
+          (check-true (has? "/StructParents 0"))
+          (check-true (has? "/Tabs/S"))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3681,6 +3731,7 @@
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
                   test-html-escape test-serialize-special test-big-document test-pdf-export
+                  test-tagged-pdf-export
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))
