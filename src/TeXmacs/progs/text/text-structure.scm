@@ -41,14 +41,35 @@
 (tm-define (texmacs->string x)
   (texmacs->code (verbatim-expand x) "cork"))
 
+(define (title-line-breaks t)
+  ;; a line broken by hand in a title (next-line...) is dropped by the
+  ;; verbatim export: it becomes a space, as between two paragraphs
+  (cond ((in? t '((next-line) (new-line) (line-break))) " ")
+        ((pair? t) (cons (car t) (map title-line-breaks (cdr t))))
+        (else t)))
+
+(define (title-trim-spaces s)
+  ;; only the spaces: in Cork, the other bytes which Scheme takes for
+  ;; whitespace are characters (#x0D is the low quote of German)
+  (let* ((n (string-length s))
+         (i (let loop ((i 0))
+              (if (and (< i n) (char=? (string-ref s i) #\space))
+                  (loop (+ i 1)) i)))
+         (j (let loop ((j n))
+              (if (and (> j i) (char=? (string-ref s (- j 1)) #\space))
+                  (loop (- j 1)) j))))
+    (substring s i j)))
+
 (tm-define (texmacs->title-string x)
   ;; a title is shown on one line (menus, the focus bar): the lines of its
-  ;; verbatim text (paragraphs, table rows...) are joined by one space,
-  ;; without the empty ones and the spaces around them; the spaces inside
-  ;; a line are kept (#936)
-  (let* ((s (downgrade-math-letters (texmacs->string x)))
+  ;; verbatim text (paragraphs, table rows, lines broken by hand) are
+  ;; joined by one space, without the empty ones and the spaces around
+  ;; them; the spaces inside a line are kept (#936)
+  (let* ((t (if (tree? x) (tree->stree x) x))
+         (s (downgrade-math-letters
+             (texmacs->string (stree->tree (title-line-breaks t)))))
          (l (string-tokenize-by-char (string-replace s "\t" "\n") #\newline))
-         (r (list-filter (map tm-string-trim-both l) (lambda (p) (!= p "")))))
+         (r (list-filter (map title-trim-spaces l) (lambda (p) (!= p "")))))
     (string-recompose r " ")))
 
 (define (indent-prefix* sec)

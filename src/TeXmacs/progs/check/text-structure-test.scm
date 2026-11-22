@@ -265,7 +265,14 @@
               "Un deux trois")
       (check= (texmacs->title-string
                (stree->tree '(document "a" (concat "b" (next-line) "c"))))
-              "a bc")
+              "a b c")
+      ;; the Cork byte #x0D is a character (a German low quote), kept at
+      ;; the ends of a title
+      (check= (texmacs->title-string
+               (stree->tree (string-append (string (integer->char 13))
+                                           "Hallo" (string (integer->char 13)))))
+              (string-append (string (integer->char 13))
+                             "Hallo" (string (integer->char 13))))
       ;; no double space for an empty paragraph, no space at the ends,
       ;; one space between the cells and the rows of a table; the spaces
       ;; inside a line are kept
