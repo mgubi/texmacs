@@ -12,15 +12,22 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 22 November 2026
+
+- **HTML export: the paragraphs which hold blocks keep the spacing of a
+  paragraph with a stylesheet**: such a paragraph is a `<div>` of the class
+  `tmhtml-p` (21 November), whose margins were only in the CSS that the
+  export writes. The stylesheets in `web/css` and `misc/web/css` now give it
+  the spacing of a `<p>` in each place: `tmdoc.css` and `mmxdoc.css`
+  (linked by documents which set `html-css` to a copy of them),
+  `tmweb2.css` (pages of the style `tmdoc-web2`) and `web-article.css` (the
+  stylesheet which can be chosen in the preferences of the HTML export,
+  also through its dark and colored variants); with the latter, the CSS of
+  the export no longer overrides it. The copies on texmacs.org, which the
+  styles `tmdoc`, `mmxdoc` and `mmxmanual` link to, are not changed (#929).
+
 ## 21 November 2026
 
-- **HTML export with the stylesheets of the documentation: margins of the
-  paragraphs which hold blocks**: with `tmdoc`, `mmxdoc` and `tmdoc-web2`
-  (the help pages, texmacs.org and this site), the export links to
-  `tmdoc.css`, `mmxdoc.css` or `tmweb2.css` instead of writing its own CSS,
-  and these had no rule for the `<div class="tmhtml-p">` of such a
-  paragraph, which lost the space above and below it; they now give it the
-  spacing of a `<p>` (#929).
 - **HTML export: lengths, alignment and paragraphs which hold blocks**: a
   length in pixels lost its unit in the CSS (and the largest of two lengths
   depended on their order), a paragraph aligned to the right was exported
