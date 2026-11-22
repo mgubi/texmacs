@@ -906,13 +906,29 @@ unescape_guile (string s) {
         r << s[i] << s[i+1];
         i++;
       }
+#if defined(USE_S7) || defined(USE_CHEZ)
+      else if (i+3 < n && s[i+1] == 'x' && is_hex_digit (s[i+2])) {
+        // "\xH...H;": Chez writes as few digits as needed ("\x1;")
+        int j= i+2;
+        while (j < n && is_hex_digit (s[j])) j++;
+        if (j < n && s[j] == ';') {
+          r << (unsigned char) from_hexadecimal (s(i+2, j));
+          i= j;
+        }
+        else if (j >= i+4) {
+          r << (unsigned char) from_hexadecimal (s(i+2, i+4));
+          i+= 3;
+        }
+        else r << s[i];
+      }
+#endif
       else if (i+3 < n && s[i+1] == 'x'
           && is_hex_digit (s[i+2]) && is_hex_digit (s[i+3])) {
         string e= s(i+2, i+4);
         r << (unsigned char) from_hexadecimal (e);
         i+=3;
-#ifdef USE_S7
-        // s7 prints the escape as "\xHH;" and Guile as "\xHH"
+#if defined(USE_S7) || defined(USE_CHEZ)
+        // s7 and Chez print the escape as "\xHH;" and Guile as "\xHH"
         if (i+1 < n && s[i+1] == ';') i++;
 #endif
       }

@@ -504,6 +504,14 @@
   (form-choices ,gui-make-form-choices)
   (form-toggle ,gui-make-form-toggle))
 
+;; An invalid menu item. On Chez, menus are expanded by the module compiler,
+;; where an error would stop the compilation of the whole module: there the
+;; error is raised when the item is used.
+(define-public (gui-make-invalid x)
+  (if (chez-scheme?)
+      `(texmacs-error "gui-make" "invalid menu item ~S" ',x)
+      (texmacs-error "gui-make" "invalid menu item ~S" x)))
+
 (tm-define (gui-make x)
   ;;(display* "x= " x "\n")
   (cond ((symbol? x)
@@ -516,15 +524,13 @@
                ((== x '>>) (gui-make '(glue #t #f 5 0)))
                ((== x '>>>) (gui-make '(glue #t #f 15 0)))
                ((== x (string->symbol "|")) '$/)
-               (else
-                 (texmacs-error "gui-make" "invalid menu item ~S" x))))
+               (else (gui-make-invalid x))))
         ((string? x) x)
         ((and (pair? x) (ahash-ref gui-make-table (car x)))
          (apply (car (ahash-ref gui-make-table (car x))) (list x)))
         ((and (pair? x) (or (string? (car x)) (pair? (car x))))
          `($> ,(gui-make (car x)) ,@(cdr x)))
-        (else
-          (texmacs-error "gui-make" "invalid menu item ~S" x))))
+        (else (gui-make-invalid x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; User interface for dynamic menu definitions
