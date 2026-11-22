@@ -370,9 +370,11 @@ check "headless: apply-changes on a view without a window (#937)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-no-window.scm")'
 
-# The changes applied under -headless (#937) reach the editor's widget,
-# which has no canvas there: it said so on stdout at each apply-changes,
-# among the output of the script.
+# Under -headless the pending changes were never applied, so a cursor move
+# after an edit did nothing (#937): the cursor goes from after the Z (34)
+# to before it (33). The changes reach the editor's widget, which has no
+# canvas there: it said so on stdout at each apply-changes, among the
+# output of the script (any "... is null" line of qt_simple_widget).
 cat > "$out/startup-apply.scm" <<'EOF'
 (let ((u (url-append (url-pwd) "startup-a.tm")))
   (load-buffer u)
@@ -391,14 +393,16 @@ total=$((total + 1))
 (cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -headless \
    -x '(load "startup-apply.scm")' -q > "$out/$total.out" 2> "$out/$total.err")
 code=$?
-noise=$(grep -av '^CHECK ' "$out/$total.out" | grep -a 'canvas() is null')
-if [ $code -eq 0 ] && grep -aq '^CHECK moved' "$out/$total.out" && [ -z "$noise" ]
+noise=$(grep -av '^CHECK ' "$out/$total.out" | grep -a 'qt_simple_widget_rep.*is null')
+moved=$(grep -a '^CHECK moved' "$out/$total.out" | sed 's/^CHECK //')
+if [ $code -eq 0 ] && [ "$moved" = "moved (1 0 33)" ] && [ -z "$noise" ]
 then
-  echo "  ok     headless: apply-changes writes nothing on stdout (#937)"
+  echo "  ok     headless: a cursor move after an edit, nothing on stdout (#937)"
 else
-  echo "  FAILED headless: apply-changes writes nothing on stdout (#937)"
-  echo "    exit status $code"
-  echo "$noise" | head -3 | sed 's/^/    got:      /'
+  echo "  FAILED headless: a cursor move after an edit, nothing on stdout (#937)"
+  echo "    expected: moved (1 0 33), exit status 0, no qt_simple_widget lines"
+  echo "    got:      ${moved:-no CHECK moved line}, exit status $code"
+  [ -z "$noise" ] || echo "$noise" | head -3 | sed 's/^/    got:      /'
   failed=$((failed + 1))
   status=1
 fi
