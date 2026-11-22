@@ -58,7 +58,14 @@
   ;; (line-break is only a hint, as no-break)
   (cond ((title-break? t) "")
         ((and (pair? t) (== (car t) 'concat) (list-or (map title-break? (cdr t))))
-         (cons 'document (map title-line-breaks (title-split-lines (cdr t)))))
+         (let* ((l (title-split-lines (cdr t)))
+                (r (list-filter l (lambda (p) (nnull? (cdr p)))))
+                (r* (map title-line-breaks r)))
+           ;; no empty pieces (a break at an end), and no document for one
+           ;; piece, as in a script: x^(2 ) for (rsup (concat "2" (next-line)))
+           (cond ((null? r*) "")
+                 ((null? (cdr r*)) (car r*))
+                 (else (cons 'document r*)))))
         ((pair? t) (cons (car t) (map title-line-breaks (cdr t))))
         (else t)))
 

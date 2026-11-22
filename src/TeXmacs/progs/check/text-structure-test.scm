@@ -280,6 +280,12 @@
       (check= (texmacs->title-string
                (stree->tree '(strong (concat "x" (next-line) "y"))))
               "x y")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "x" (rsup (concat "2" (next-line))))))
+              "x^2")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "x" (rsub (concat (next-line) "i")))))
+              "x_i")
       ;; the Cork byte #x0D is a character (a German low quote), kept at
       ;; the ends of a title
       (check= (texmacs->title-string
