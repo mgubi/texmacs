@@ -1553,6 +1553,11 @@ edit_typeset_rep::typeset_invalidate_all () {
   //cout << "Invalidate all\n";
   notify_change (THE_ENVIRONMENT);
   typeset_preamble ();
+  // the environments kept for get-env (typeset_exec_until) are made from
+  // pre, which was just made again: they are dropped now, not only by
+  // apply_changes, which does not run for a view without a window
+  // (headless: a change of the initial environment, presentation mode)
+  typeset_invalidate_env ();
   ::notify_assign (ttt, path(), subtree (et, rp));
 }
 

@@ -1642,30 +1642,15 @@
 ;; other window keeps it, the buffer is not modified, the saved file has it.
 ;; The delayed fit-to-screen of toggle-full-screen-mode is dropped (with one
 ;; window left, change-zoom-factor would write the zoom preference).
-;;
-;; Headless (-headless, the only way the Vue builds run the suites), the
-;; event loop applies no changes to the views and apply-changes does nothing
-;; (tm_server_rep::interpose_handler, apply_pending_changes in
-;; edit_interface.cpp): get-env keeps the environment it computed first
-;; (the cache of typeset_exec_until, cleared only by apply_changes), which
-;; does not even have the info-flag of the loaded file (see the head of
-;; editing-test.scm). The flags a view shows are then those its initial
-;; environment asks the typesetter for (typeset_preamble): none when
-;; full_screen_mode wrote full-screen-mode "true" in it, else info-flag.
-
-(define (shown-flags)
-  ;; the informative flags of the current view
-  (if (headless?)
-      (if (== (get-init "full-screen-mode") "true") "none"
-          (get-init "info-flag"))
-      (get-env "info-flag")))
-
-(define (check-shown-flags expected)
-  (check= (shown-flags) expected))
 
 (define (refresh-view)
-  ;; as the event loop would: a change of the environment is typeset again
+  ;; as the event loop would: a change of the environment is typeset again.
+  ;; Headless (-headless, how the Vue builds run the suites), the event loop
+  ;; applies no changes to the views and apply-changes does nothing
+  ;; (apply_pending_changes): the view is typeset again from its initial
+  ;; environment here, as apply_changes does after full_screen_mode
   (apply-changes)
+  (when (headless?) (update-current-buffer))
   (update-forced))
 
 (define (toggle-presentation)
@@ -1712,7 +1697,7 @@
                 (toggle-presentation)
                 (check-true (full-screen?))
                 ;; the full screen window: flags hidden, setting unchanged
-                (check-shown-flags "none")
+                (check= (get-env "info-flag") "none")
                 (check= (get-init "info-flag") "detailed")
                 (check-true (init-has? "info-flag"))
                 (check-false (buffer-modified? f))
@@ -1720,7 +1705,7 @@
                 (window-focus (cadr ws))
                 (refresh-view)
                 (check= (get-init "info-flag") "detailed")
-                (check-shown-flags "detailed")
+                (check= (get-env "info-flag") "detailed")
                 (window-focus (car ws))
                 (refresh-view)
                 ;; a save during the presentation keeps the setting
@@ -1731,29 +1716,29 @@
                 (check-false (buffer-modified? f))
                 (toggle-presentation)
                 (check-false (full-screen?))
-                (check-shown-flags "detailed")
+                (check= (get-env "info-flag") "detailed")
                 (check= (get-init "info-flag") "detailed")
                 (check-false (buffer-modified? f))
                 ;; the default setting (no info-flag in the document)
                 (edit-step (lambda () (init-default "info-flag")))
                 (refresh-view)
                 (buffer-save f)
-                (with dflt (shown-flags)
+                (with dflt (get-env "info-flag")
                   (check= dflt (get-init "info-flag"))
                   (check-true (!= dflt "none"))
                   (toggle-presentation)
-                  (check-shown-flags "none")
+                  (check= (get-env "info-flag") "none")
                   (check= (get-init "info-flag") dflt)
                   (check-false (init-has? "info-flag"))
                   (check-false (buffer-modified? f))
                   (window-focus (cadr ws))
                   (refresh-view)
-                  (check-shown-flags dflt)
+                  (check= (get-env "info-flag") dflt)
                   (check-false (init-has? "info-flag"))
                   (window-focus (car ws))
                   (refresh-view)
                   (toggle-presentation)
-                  (check-shown-flags dflt)
+                  (check= (get-env "info-flag") dflt)
                   (check-false (init-has? "info-flag"))
                   (check-false (buffer-modified? f))
                   (check= (saved-info) #f)))
