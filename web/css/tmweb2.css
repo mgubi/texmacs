@@ -129,6 +129,16 @@ p, center {
     padding-top: 0.35em;
 }
 
+/* div:where(.tmhtml-p): the <div> of a paragraph which holds blocks in the
+   HTML export (tmhtml.scm); each rule of p is repeated for it, with the
+   specificity of p (which :where keeps) */
+div:where(.tmhtml-p) {
+    margin: 0px;
+    padding: 0px;
+    padding-bottom: 0.35em;
+    padding-top: 0.35em;
+}
+
 ul, ol, dl, di {
     margin-top: 0px;
     margin-bottom: 0px;
@@ -141,11 +151,21 @@ ul > p, ol > p, dl > p, di > p {
     padding-top: 0.1em;
 }
 
+ul > div:where(.tmhtml-p), ol > div:where(.tmhtml-p), dl > div:where(.tmhtml-p), di > div:where(.tmhtml-p) {
+    padding-bottom: 0.1em;
+    padding-top: 0.1em;
+}
+
 table {
     border-collapse: collapse;
 }
 
 tbody p {
+    margin: 0px;
+    padding: 0px;
+}
+
+tbody div:where(.tmhtml-p) {
     margin: 0px;
     padding: 0px;
 }
@@ -637,6 +657,11 @@ a:active, a:focus, a:hover {
     padding: 0px;
 }
 
+.compact-block div:where(.tmhtml-p) {
+    margin: 0px;
+    padding: 0px;
+}
+
 .left-tab {
     text-align: left;
 }
@@ -670,6 +695,11 @@ tt, .verbatim {
 }
 
 .tmweb-code p, .tmweb-code pre {
+    margin: 0px;
+    padding: 0px;
+}
+
+.tmweb-code div:where(.tmhtml-p) {
     margin: 0px;
     padding: 0px;
 }

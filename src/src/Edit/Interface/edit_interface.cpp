@@ -233,6 +233,8 @@ edit_interface_rep::get_visible_height () {
 #include <QStyle>
 static SI
 scrollbar_width () {
+  // no QApplication, hence no style, under -headless (#923)
+  if (headless_mode) return 20 * PIXEL;
   return (qApp->style()->pixelMetric (QStyle::PM_ScrollBarExtent) + 2) * PIXEL;
 }
 #else
