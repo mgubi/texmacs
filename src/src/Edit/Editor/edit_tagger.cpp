@@ -180,11 +180,15 @@ is_item (tree t) {
          is_compound (t, "bibitem") || is_compound (t, "bibitem*");
 }
 
-// whether a paragraph of a list begins a new item
+// whether a paragraph of a list begins a new item: it has an item, maybe
+// after markup which draws nothing (vspace*, label, assign...)
 static bool
 begins_with_item (tree t) {
   if (is_item (t)) return true;
-  return is_compound (t, "concat") && N(t) > 0 && is_item (t[0]);
+  if (!is_compound (t, "concat")) return false;
+  for (int i=0; i<N(t); i++)
+    if (is_item (t[i])) return true;
+  return false;
 }
 
 static bool
@@ -274,6 +278,11 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
       r << tag_node (key, "LI", cur);
       last= "LI"; li_body= false; li_key= key; li_pos= cur;
       if (is_atomic (t)) break;
+      // an item alone in its paragraph (<item*|Term>) is the label
+      if (is_item (t)) {
+        r << tag_node (as_string (cur), "Lbl", cur);
+        return r;
+      }
       if (!is_compound (t, "concat")) {
         r << tag_node (key * "/b", "LBody", cur);
         li_body= true;
