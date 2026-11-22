@@ -37,15 +37,20 @@ a document (a P, or a Div when they hold paragraphs themselves).
   decoration (`DECORATION...`), and belongs to its element.
 * A box of no place in the body (the headers, footers, page numbers, the
   rule of the footnotes) has no element: an artifact.
-* Headings: `H:n` in the table is a rank; the ranks a document uses
-  become H1, H2... in their order, and a heading is at most one level
-  deeper than the one before it (PDF/UA asks for no skipped level).
+* Headings: `H:n` in the table is a rank (`H:A` an appendix: a chapter
+  in a document which has chapters, a section elsewhere). A heading is
+  one level deeper than the headings above it, those of a smaller rank
+  met before it in the pages and not closed by one of its rank since: no
+  level is skipped (PDF/UA), and the headings of a rank under the same one
+  have the same level.
 * Lists: every child of the document of a list is an LI, with an Lbl
   (the `item`) and an LBody; a nested list or an equation in a list is in
   the LBody.
-* Tables: `tabular` (or a `table` which no tabular holds) is the Table,
+* Tables: `tabular` (or a `table` which no tabular holds) is the Table
+  (the document of a table in the form of a block is not a paragraph),
   `row` a TR, `cell` a TD, with `ColSpan` and `RowSpan` read from the
-  `cwith` of the formats around the table. A row has all its cells,
+  `cwith` of the formats around the table, clamped to the table. A row
+  has all its cells,
   those which draw nothing included, and not those which a span covers
   (`row_cells`), so that the rows have the same number of columns.
 * A formula (`math`, `equation*`, `eqnarray*`, `align*`...) or a picture
@@ -53,7 +58,7 @@ a document (a P, or a Div when they hold paragraphs themselves).
   LaTeX (`pdf-tag-alt`), for a picture the name of its file for now.
 * A link of the document (`hlink`) is a Link element; a link of no
   `hlink` (the call of a footnote and its way back) gets a Link of its
-  own in the element of its text.
+  own in the element of its text. A video is an Annot element.
 
 **Marked content** (`tag_mark`). Before each drawing operation the writer
 asks the element of the box being drawn (`tag_resolve`, cached for the
@@ -104,6 +109,15 @@ in the Matterhorn Protocol.
 * **Table headers** (TH, with a Scope): TeXmacs has no markup for them.
 * **The OpenType math variants** (#943): U+FFFD in the text until the
   fonts record their characters.
+* **Included documents** (`include`): their boxes have the place of the
+  `include`, after the marks of a decoration, so everything they hold is
+  one element, without its headings or formulas. Keeping the places inside
+  the included document needs the typesetter (`typeset_include`).
+* **The call of a footnote** has the place of the footnote, as the number
+  in front of the note, so it is in the Note rather than in its paragraph.
+* **Marked content and the graphics state**: a block may open inside a
+  `q` (a clipping) and close after its `Q`; veraPDF and MuPDF accept it,
+  ISO 32000-1 does not forbid it, but they do not nest.
 * **PDFHummus** does not tag; the tagger and the box hook are its for the
   taking.
 * **PDF/UA-2** (PDF 2.0): MathML as associated files of the formulas,

@@ -341,8 +341,9 @@
 ;; Tagged PDF (PDF/UA, docs/pdf-tagging.md): the structure of a document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The standard structure type of a tag; "H:n" is a heading of rank n (the
-;; ranks used by a document become H1, H2... in their order). A tag which is
+;; The standard structure type of a tag; "H:n" is a heading of rank n (H1,
+;; H2... after the headings above it in the document), "H:A" an appendix (a
+;; chapter in a book, a section elsewhere). A tag which is
 ;; not here is transparent, except at the level of a paragraph (a child of
 ;; a document), where it is a P, or a Div when it holds paragraphs.
 (define pdf-tag-roles
@@ -351,7 +352,7 @@
     (abstract-data . "Div") (abstract . "Div")
     (abstract-keywords . "P") (abstract-msc . "P")
     (part . "H:1") (part* . "H:1") (chapter . "H:2") (chapter* . "H:2")
-    (appendix . "H:2") (section . "H:3") (section* . "H:3")
+    (appendix . "H:A") (appendix* . "H:A") (section . "H:3") (section* . "H:3")
     (subsection . "H:4") (subsection* . "H:4")
     (subsubsection . "H:5") (subsubsection* . "H:5")
     (paragraph . "H:6") (paragraph* . "H:6")
@@ -416,4 +417,4 @@
 
 (tm-define (pdf-tag-language lan)
   (:synopsis "The language @lan of TeXmacs as a code (de-DE) for a PDF")
-  (csl-language->locale lan))
+  (string-replace (language-to-locale lan) "_" "-"))

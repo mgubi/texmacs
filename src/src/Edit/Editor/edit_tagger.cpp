@@ -39,7 +39,9 @@ class pdf_tagger_rep: public tagger_rep {
   hashmap<string,string> alts;       // by key of element
   hashmap<int,int> levels;           // the level of each rank of heading
   hashmap<string,string> heading_of; // the role of each heading, by key
-  int    last_level;                 // that of the last heading met
+  array<int> open_ranks;             // the ranks of the headings above
+  int    appendix_rank;              // that of an appendix: chapter or section
+  hashmap<string,hashset<int> > covered;  // the cells a span covers, by table
 
 public:
   pdf_tagger_rep (tree body, path rp, string lang, string title);
@@ -61,7 +63,7 @@ pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
                                 string title2):
   body (body2), rp (rp2), lang (lang2), ttl (title2),
   roles ("?"), child_roles ("?"), alts (""), levels (0),
-  heading_of (""), last_level (0)
+  heading_of (""), appendix_rank (3)
 {
   // the ranks of the headings which the document uses become H1, H2...
   // in their order, so that no level is skipped (PDF/UA)
@@ -74,6 +76,8 @@ pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
     for (int j=i; j>0 && r[j] < r[j-1]; j--) {
       int t= r[j]; r[j]= r[j-1]; r[j-1]= t; }
   for (int i=0; i<N(r); i++) levels (r[i])= min (i + 1, 6);
+  // an appendix is a chapter in a book, a section elsewhere
+  appendix_rank= (ranks->contains (2)? 2: 3);
 }
 
 string
@@ -111,23 +115,24 @@ void
 pdf_tagger_rep::collect_ranks (tree t, hashset<int>& ranks) {
   if (is_atomic (t)) return;
   string r= role_of (as_string (L(t)));
-  if (starts (r, "H:")) ranks->insert (as_int (r (2, N(r))));
+  if (starts (r, "H:") && r != "H:A") ranks->insert (as_int (r (2, N(r))));
   if (r == "Formula" || r == "Figure") return;
   for (int i=0; i<N(t); i++) collect_ranks (t[i], ranks);
 }
 
-// The level of a heading: that of its rank, but at most one deeper than the
-// heading before it (PDF/UA), the headings being met in the order of the
-// pages
+// The level of a heading, the headings being met in the order of the
+// pages: one deeper than the headings above it, those of a smaller rank
+// met before it and not closed since, so that a level is never skipped
+// (PDF/UA) and headings of a rank have the same level under the same one
 string
 pdf_tagger_rep::heading (string key, string role) {
   if (heading_of->contains (key)) return heading_of [key];
-  int rank= as_int (role (2, N(role)));
-  int lv= levels [rank];
-  if (lv <= 0) lv= 1;
-  lv= min (lv, last_level + 1);
-  last_level= lv;
-  string r= "H" * as_string (lv);
+  string rk= role (2, N(role));
+  int rank= (rk == "A"? appendix_rank: as_int (rk));
+  while (N(open_ranks) > 0 && open_ranks[N(open_ranks)-1] >= rank)
+    open_ranks->resize (N(open_ranks) - 1);
+  open_ranks << rank;
+  string r= "H" * as_string (min (N(open_ranks), 6));
   heading_of (key)= r;
   return r;
 }
@@ -156,10 +161,11 @@ pdf_tagger_rep::cell_spans (array<tree> trail, int row, int col) {
       if (w[4] == "cell-col-span" && is_atomic (w[5])) cs= w[5]->label;
     }
   }
+  // (a span does not go past the table)
+  int ncs= min (as_int (cs), nc - col), nrs= min (as_int (rs), nr - row);
   string r;
-  if (as_int (cs) > 1) r << "ColSpan=" << as_string (as_int (cs));
-  if (as_int (rs) > 1) r << (N(r) > 0? " ": "") << "RowSpan="
-                         << as_string (as_int (rs));
+  if (ncs > 1) r << "ColSpan=" << as_string (ncs);
+  if (nrs > 1) r << (N(r) > 0? " ": "") << "RowSpan=" << as_string (nrs);
   return r;
 }
 
@@ -221,7 +227,8 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     }
     // every child of the document of a list is an item (L may hold only
     // LI); one which is not a line of text (an equation) is all its body
-    if (last == "L" && is_document (parent) && !is_document (t)) {
+    if (last == "L" && !is_document (t) &&
+        (is_document (parent) || role_of (as_string (L(parent))) == "L")) {
       // (the node may be an element too, a list in a list: another key)
       string key= as_string (cur) * "/i";
       r << tag_node (key, "LI", cur);
@@ -237,7 +244,9 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     // (a paragraph or a caption may be a mere string)
     string role= child_role_of (as_string (L(parent)), i, N(parent));
     if (role == "" && is_compound (t)) role= role_of (as_string (L(t)));
-    if (role == "" && is_document (parent) && !is_document (t)) {
+    // (the document of a table in the form of a block holds its format)
+    if (role == "" && is_document (parent) && !is_document (t) &&
+        last != "Table" && last != "TR") {
       if (last == "L") role= "LI";
       else role= has_document_child (t)? "Div": "P";
     }
@@ -293,9 +302,12 @@ pdf_tagger_rep::row_cells (path pos) {
     trail << above[k];
   tree tab= trail[0];
   int row= last_index (pos, 0);
-  // the cells covered by the span of another one
-  hashset<int> covered;
-  for (int i=0; i<N(tab); i++)
+  // the cells covered by the span of another one, once for the table
+  string tkey= as_string (path_up (pos));
+  bool known= this->covered->contains (tkey);
+  hashset<int> covered= this->covered [tkey];
+  if (!known) this->covered (tkey)= covered;
+  for (int i=0; i<N(tab) && !known; i++)
     for (int j=0; is_compound (tab[i]) && j<N(tab[i]); j++) {
       string sp= cell_spans (trail, i, j);
       if (sp == "" || covered->contains (i * 10000 + j)) continue;

@@ -242,6 +242,9 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   array<int>      page_video_file;
   array<string>   page_video_vars; // its FlashVars, ending with a 0
   array<string>   page_video_nm;   // its /NM, ending with a 0
+  array<int>      page_video_elem; // its Annot element (tagged PDF)
+  array<path>     page_video_pos;
+  int             video_annot0;    // the first of them in tag_annots
 
   // the graphics state as it stands in the stream
   pencil pen;
@@ -431,7 +434,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     image_pool (-1), xobj_num (-1), pattern_pool (-1), n_pat (0),
     transform_level (0),
     n_alpha (0), n_xobj (0),
-    link_annot0 (0),
+    link_annot0 (0), video_annot0 (0),
     tag_index (-1), tag_block (-2), tag_have (false), tag_last_elem (-1),
     tag_span (0), tag_seq (0)
 {
@@ -625,6 +628,8 @@ mupdf_pdf_renderer_rep::begin_page () {
   page_video_file= array<int> ();
   page_video_vars= array<string> ();
   page_video_nm= array<string> ();
+  page_video_elem= array<int> ();
+  page_video_pos= array<path> ();
   // the whole page is written in the pixels of the renderer
   app ("q\n%g 0 0 %g 0 0 cm\n",
                     (double) default_dpi / dpi, (double) default_dpi / dpi);
@@ -662,8 +667,14 @@ mupdf_pdf_renderer_rep::end_page () {
       tag_annots << ((pdf_obj*) NULL);
       tag_annot_page << page_num;
       string l= links[i].label;
-      link_text << ((starts (l, "#")? "Link to " * l (1, N(l)): l) *
-                    string ((char) 0));
+      link_text << (cork_to_utf8 (starts (l, "#")? "Link to " * l (1, N(l)): l)
+                    * string ((char) 0));
+    }
+  video_annot0= N(tag_annots);
+  if (tagger != NULL)
+    for (int i=0; i<N(page_videos); i++) {
+      tag_annots << ((pdf_obj*) NULL);
+      tag_annot_page << page_num;
     }
   pdf_obj* page= NULL;
   fz_var (page);
@@ -693,6 +704,14 @@ mupdf_pdf_renderer_rep::end_page () {
         pdf_tag_kid k;
         k.parent= link_elem[i]; k.kind= 2; k.id= link_annot0 + i;
         k.page= page_num; k.pos= link_pos[i]; k.seq= tag_seq++;
+        tag_kids << k;
+      }
+  if (tagger != NULL)
+    for (int i=0; i<N(page_videos) && i<N(page_video_elem); i++)
+      if (page_video_elem[i] >= 0 && tag_annots[video_annot0 + i] != NULL) {
+        pdf_tag_kid k;
+        k.parent= page_video_elem[i]; k.kind= 2; k.id= video_annot0 + i;
+        k.page= page_num; k.pos= page_video_pos[i]; k.seq= tag_seq++;
         tag_kids << k;
       }
   fz_drop_buffer (ctx, contents); contents= NULL;
@@ -1364,16 +1383,19 @@ mupdf_pdf_renderer_rep::write_fonts () {
     if (it.t3) { write_type3 (it); continue; }
     if (it.font != NULL && !it.simple && it.obj != NULL) {
       // a TrueType CID font says how its CIDs are glyphs (PDF/UA)
-      fz_try (ctx) {
-        pdf_obj* df= pdf_array_get (ctx, pdf_dict_get (ctx, it.obj,
-                                    PDF_NAME(DescendantFonts)), 0);
-        if (df != NULL &&
-            pdf_name_eq (ctx, pdf_dict_get (ctx, df, PDF_NAME(Subtype)),
-                         PDF_NAME(CIDFontType2)) &&
-            pdf_dict_get (ctx, df, PDF_NAME(CIDToGIDMap)) == NULL)
-          pdf_dict_put (ctx, df, PDF_NAME(CIDToGIDMap), PDF_NAME(Identity));
+      // (braced: fz_catch is a statement of its own)
+      if (tagger != NULL) {
+        fz_try (ctx) {
+          pdf_obj* df= pdf_array_get (ctx, pdf_dict_get (ctx, it.obj,
+                                      PDF_NAME(DescendantFonts)), 0);
+          if (df != NULL &&
+              pdf_name_eq (ctx, pdf_dict_get (ctx, df, PDF_NAME(Subtype)),
+                           PDF_NAME(CIDFontType2)) &&
+              pdf_dict_get (ctx, df, PDF_NAME(CIDToGIDMap)) == NULL)
+            pdf_dict_put (ctx, df, PDF_NAME(CIDToGIDMap), PDF_NAME(Identity));
+        }
+        fz_catch (ctx) {}
       }
-      fz_catch (ctx) {}
       fix_to_unicode (it); continue; }
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
     int first= 256, last= -1;
@@ -2641,6 +2663,26 @@ mupdf_pdf_renderer_rep::embed_video (url u, int ms, bool repeat,
                                 f * to_x (x1), f * to_y (y1),
                                 f * to_x (x2), f * to_y (y2));
   page_video_file << k;
+  // a tagged PDF: an Annot element in the element of the picture
+  int ve= -1;
+  path vpos;
+  if (tagger != NULL) {
+    tag_resolve ();
+    vpos= tag_last_pos;
+    int parent= (tag_last_elem >= 0? tag_last_elem: 0);
+    if (N(tag_elems) > 0) {
+      ve= N(tag_elems);
+      pdf_tag_elem el;
+      el.role= string ("Annot") * string ((char) 0);
+      el.parent= parent;
+      tag_elems << el;
+      pdf_tag_kid k;
+      k.parent= parent; k.kind= 0; k.id= ve; k.pos= vpos; k.seq= tag_seq++;
+      tag_kids << k;
+    }
+  }
+  page_video_elem << ve;
+  page_video_pos << vpos;
   page_video_nm << ("video-" * as_string (N(page_videos)) * "-" *
                     as_string (tail (u)) * string ((char) 0));
   page_video_vars << ("source=" * fname * "&loop=" *
@@ -2723,7 +2765,16 @@ mupdf_pdf_renderer_rep::write_videos (pdf_obj* pobj) {
     const char* vars= &page_video_vars[i][0];
     pdf_dict_puts_drop (ctx, par, "FlashVars",
                         pdf_new_string (ctx, vars, strlen (vars)));
-    pdf_array_push_drop (ctx, annots, pdf_add_object_drop (ctx, doc, a));
+    if (tagger != NULL) {
+      // PDF/UA: its place in the structure
+      pdf_dict_put_int (ctx, a, PDF_NAME(StructParent),
+                        tag_annot_key0 + video_annot0 + i);
+      pdf_obj* ref= pdf_add_object_drop (ctx, doc, a);
+      pdf_array_push (ctx, annots, ref);
+      tag_annots[video_annot0 + i]= ref;
+    }
+    else
+      pdf_array_push_drop (ctx, annots, pdf_add_object_drop (ctx, doc, a));
   }
 }
 
@@ -2896,7 +2947,7 @@ mupdf_pdf_renderer_rep::write_structure () {
     if (strcmp (&tag_elems[e].role[0], "Note") == 0)
       note_id[e]= "note-" * as_string (e) * string ((char) 0);
   string lang= tagger->language () * string ((char) 0);
-  string title= tagger->title ();
+  string title= cork_to_utf8 (tagger->title ());
   if (N(title) == 0 && metadata->contains ("title")) title= metadata ("title");
   if (N(title) == 0) title= as_string (tail (pdf_file_name));
   string author= (metadata->contains ("author")? metadata ("author"): "");
