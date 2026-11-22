@@ -1644,8 +1644,13 @@
 ;; window left, change-zoom-factor would write the zoom preference).
 
 (define (refresh-view)
-  ;; as the event loop would: a change of the environment is typeset again
+  ;; as the event loop would: a change of the environment is typeset again.
+  ;; Headless (-headless, how the Vue builds run the suites), the event loop
+  ;; applies no changes to the views and apply-changes does nothing
+  ;; (apply_pending_changes): the view is typeset again from its initial
+  ;; environment here, as apply_changes does after full_screen_mode
   (apply-changes)
+  (when (headless?) (update-current-buffer))
   (update-forced))
 
 (define (toggle-presentation)
