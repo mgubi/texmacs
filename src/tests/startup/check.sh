@@ -269,6 +269,29 @@ check "headless: a copy in a buffer which was never typeset (#729)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-untypeset.scm")'
 
+# An undo which gives back the document as it was saved beeps: the beep of
+# Qt needs a QApplication, which -headless does not make (a
+# QCoreApplication), and the undo crashed (#923).
+cat > "$out/startup-undo.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (go-end)
+  (archive-state) (start-editing)
+  (insert " More.")
+  (end-editing)
+  (display* "CHECK modified " (buffer-modified? u) "\n")
+  (archive-state) (start-editing) (undo 0) (end-editing)
+  (display* "CHECK undone " (buffer-modified? u) "\n")
+  (buffer-close u))
+EOF
+
+check "headless: an undo back to the saved document (#923)" \
+      "modified #t
+undone #f
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-undo.scm")'
+
 # A buffer which is closed gives back the memory of its editor and of its
 # boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
 # window which showed another view kept the canvas of the former one, so the
