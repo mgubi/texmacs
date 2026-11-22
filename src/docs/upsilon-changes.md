@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **No crash under `-headless`** (Qt builds, desktop applications): TeXmacs
+  run with `-headless` (scripts, the regression suites, the MCP server)
+  crashed on an undo which came back to the saved state (a beep), on a
+  change of the theme of the interface, on Alt and a letter under macOS and
+  on Fit to screen (the width of the window); these now work as without a
+  window (#923).
 - **HTML export: the paragraphs which hold blocks keep the spacing of a
   paragraph with a stylesheet**: such a paragraph is a `<div>` of the class
   `tmhtml-p` (21 November), whose margins were only in the CSS that the
