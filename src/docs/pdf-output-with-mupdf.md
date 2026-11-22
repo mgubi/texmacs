@@ -624,8 +624,8 @@ well, so a folder of the name of the target is refused.
   A name which says nothing is not taken: a number (a font without names
   gives the number of the glyph, which MuPDF reads as a character code),
   `a` and digits, `g` and hexadecimal digits, a name MuPDF does not know
-  (U+FFFD), or one which gives an enclosed letter (the legacy `lparen` of
-  the Adobe glyph list is U+24A7). The name is a guess: it only fills in a
+  (U+FFFD), or a legacy name of the Adobe glyph list for a parenthesized
+  small letter (`lparen` is U+24A7, a parenthesis in a math font). The name is a guess: it only fills in a
   glyph which the cmap does not reach.
 * **Private use codes**: a glyph which the cmap reaches by a private use
   code and by a real one takes the real one; and a character which the

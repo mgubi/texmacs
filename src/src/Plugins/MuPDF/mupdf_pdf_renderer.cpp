@@ -1172,9 +1172,10 @@ mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
     iterator<int> dit= iterate (m);
     while (dit->busy ()) {
       int g= dit->next (), u= m [g];
-      if (g <= 0 || g > 0xffff || compatibility_char (u)) continue;
+      if (g <= 0 || g > 0xffff) continue;
       if (!uni->contains (g)) gids << g;
-      else if (pass == 1 || !compatibility_char (uni [g])) continue;
+      else if (pass == 1 || compatibility_char (u) ||
+               !compatibility_char (uni [g])) continue;
       uni (g)= u;
       changed= true;
     }
@@ -1336,10 +1337,11 @@ mupdf_pdf_renderer_rep::glyph_name_unicode (pdf_font_item& it, int gid) {
     while (nm[i] != 0 && isxdigit ((unsigned char) nm[i])) i++;
     if (i > 1 && nm[i] == 0) return -1;
   }
+  // the legacy names of the Adobe glyph list for the parenthesized small
+  // letters (lparen is U+24A7) are what math fonts call their parentheses
+  int legacy= fz_unicode_from_glyph_name_strict (nm);
+  if (legacy >= 0x249c && legacy <= 0x24b5) return -1;
   int u= fz_unicode_from_glyph_name (nm);
-  // the enclosed letters are what the legacy names of the Adobe glyph list
-  // give for the lparen and rparen of KpMath (U+24A7, U+24AD)
-  if (u >= 0x2460 && u <= 0x24ff) return -1;
   return (u >= 0x20 && u != 0xfffd)? u: -1;
 }
 
