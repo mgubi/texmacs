@@ -27,6 +27,7 @@
     set-retina-scale
     cpp-error
     supports-native-pdf?
+    mupdf-writes-pdf?
     supports-ghostscript?
     rescue-mode?
     set-fast-environments

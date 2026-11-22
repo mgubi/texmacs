@@ -47,7 +47,7 @@
 * what tm_fast_call_N did on the legacy path.  The shim also records the
 * routine name for the diagnostics in chez_tm.hpp.
 *
-* 1402 routines: 444 bound raw, 958 with UTF-8 transcoding.
+* 1402 routines: 445 bound raw, 957 with UTF-8 transcoding.
 ******************************************************************************/
 
 #include "chez_tm.hpp"

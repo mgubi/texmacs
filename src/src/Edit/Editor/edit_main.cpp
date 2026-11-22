@@ -26,6 +26,9 @@ extern bool typeset_folds;   // Typeset/Bridge/bridge.cpp
 #include "image_files.hpp"
 #include "iterator.hpp"
 #include "Bridge/bridge.hpp"
+#ifdef MUPDF_RENDERER
+#include "MuPDF/mupdf_pdf_renderer.hpp"
+#endif
 
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
@@ -281,13 +284,10 @@ edit_main_rep::nr_pages () {
 bool
 edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // true when the file was written (#705)
-  // The MuPDF renderer writes the file when it is closed, and only says so
-  // when it cannot (a missing folder): the file is what tells, and an old
-  // one is removed first, so that it does not pass for the new one
+  // The MuPDF renderer writes the file when it is deleted, where a failure
+  // (a missing folder) is only a message: it says afterwards whether it
+  // saved the file
   bool mupdf_target= suffix (name) == "pdf" && use_pdf () && use_mupdf_pdf ();
-  url  written= resolve (name, "");
-  if (mupdf_target && exists (written) && !is_directory (written))
-    ::remove (written);
 #ifdef USE_GS
   bool ps  = (suffix (name) == "ps");
   bool pdf = (suffix (name) == "pdf");
@@ -384,7 +384,11 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   }
   tm_delete (ren);
   delete_typesetter (ttt);
-  if (mupdf_target) ok= ok && exists (written) && !is_directory (written);
+#ifdef MUPDF_RENDERER
+  if (mupdf_target) ok= ok && mupdf_pdf_saved ();
+#else
+  (void) mupdf_target;
+#endif
 
 #ifdef USE_GS
   // through Ghostscript, the target is written by a conversion: an old

@@ -593,11 +593,11 @@ answers for the MuPDF renderer when it is the one chosen, which it has to:
 `printer-file-suffix` and `printer-file-format` are built on it.
 
 The writer writes the file when it is closed (`pdf_save_document`), and an
-error there is only a message: `print_doc` takes the file for the answer,
-after removing an old one, so that a target in a missing folder is an
-error (#705). MuPDF removes the file it writes first, and `remove`
-removes an empty folder as well, so a folder of the name of the target is
-refused.
+error there is only a message: `print_doc` asks it afterwards
+(`mupdf_pdf_saved`), so that a target in a missing folder is an error
+(#705), and an old file is left as it was when the export fails. MuPDF
+removes the file it writes first, and `remove` removes an empty folder as
+well, so a folder of the name of the target is refused.
 
 ### The text layer (#941)
 
@@ -614,8 +614,16 @@ refused.
   glyph, the Kangxi radical (U+2F47) rather than the ideograph (U+65E5);
   `fix_to_unicode` writes it again with the ideograph.
 * **Glyphs drawn by their number** (`0xc000000` + glyph): the character
-  the font recorded for it (`native_glyph_get_unicode`), or no text for
-  the further pieces of an assembly (an empty `ActualText`), as PDFHummus.
+  the font recorded for it (`native_glyph_get_unicode`); when it recorded
+  none, which is the case of the variants of the MATH table (#943), the
+  name of the glyph without its suffix (`uni27E8.size1`, `braceleft.v2`);
+  no text when the font recorded that the glyph stands for nothing (an
+  empty `ActualText`). The pieces of an assembled delimiter, which have
+  names too, each give the delimiter, as the pieces of the TeX
+  delimiters do (`tex_math_unicode`, as with PDFHummus): `((((`.
+* **Controls**: a position or a glyph whose character is below U+0020 is
+  left out of the maps, and the map of a CID font which is written again
+  has only the glyphs drawn (a CJK font has tens of thousands).
 
 `mutool` drops the third f of "Schifffahrt" (a ligature ff in an
 `ActualText` span, then an f): Ghostscript reads it, the PDF has it.

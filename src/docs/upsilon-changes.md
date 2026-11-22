@@ -29,10 +29,12 @@ have the details, and the problems go to the
   (sum, integral, large parentheses and braces were U+FFFD) and the minus
   sign (a hyphen before), in every PDF writer. The ideographs are no longer
   copied as the radicals of the same shape, the Cyrillic TeX fonts no
-  longer as accented Latin letters, and a `<video>` (an animated GIF) is
+  longer as accented Latin letters, the large delimiters and accents of
+  the OpenType math fonts are in the text, and a `<video>` (an animated GIF) is
   embedded as a video, as in the Qt and Cocoa applications. A target which
-  cannot be written (a missing folder) is reported, and an empty folder of
-  the name of the target is no longer replaced. The preference "Produce
+  cannot be written (a missing folder) is reported, a failed export leaves
+  the previous PDF in place, and an empty folder of the name of the target
+  is not replaced. The preference "Produce
   Pdf using native export filter" (Preferences, Convert) off goes back to
   Ghostscript, as `TEXMACS_PDF_MUPDF=0` does (#941).
 - **A macOS package with Chez Scheme** (desktop applications, Apple

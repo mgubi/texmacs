@@ -78,12 +78,11 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
 - **The PDF writer on MuPDF, the native writer of Vue since #941**: the
   fixes of #341 and #249 are ported (the TeX math fonts in the text layer,
-  the videos; the bookmarks and the URIs were right). Left: the larger
-  variants and the assembled delimiters of the OpenType math fonts carry no
-  character in the text layer (blank, as with PDFHummus; 6 U+FFFD remain in
-  the `opentype-math` sample): `native_glyph_set_unicode` is never reached
-  for them, so the renderers cannot tell which character a variant stands
-  for. And #356 reloads a changed picture file in the picture cache of Qt
+  the videos; the bookmarks and the URIs were right). Left (#943): the
+  larger variants and the assembled delimiters of the OpenType math fonts
+  are never recorded (`native_glyph_set_unicode`), so PDFHummus writes no
+  text for them; the MuPDF writer falls back on the names of the glyphs,
+  and 6 U+FFFD remain in the `opentype-math` sample. And #356 reloads a changed picture file in the picture cache of Qt
   only (`qt_picture.cpp`).
 
 - **Remote tools: what the check of 2026-10-08 left** (issues of

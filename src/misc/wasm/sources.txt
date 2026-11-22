@@ -243,6 +243,7 @@ Plugins/Metafont/tex_files.cpp
 Plugins/Metafont/tex_font.cpp
 Plugins/Metafont/tex_init.cpp
 Plugins/Metafont/tex_rubber_font.cpp
+Plugins/Metafont/tex_unicode.cpp
 Plugins/MuPDF/mupdf_attachments.cpp
 Plugins/MuPDF/mupdf_pdf_renderer.cpp
 Plugins/MuPDF/mupdf_picture.cpp

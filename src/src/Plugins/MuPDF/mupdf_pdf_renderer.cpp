@@ -109,15 +109,13 @@ struct pdf_font_item {
   // the font recorded (the larger variants of a math symbol), which its
   // cmap does not have
   hashmap<int,int> drawn;
+  // a CID font: the glyphs drawn, whose characters the map gives
+  hashmap<int,bool> used;
   pdf_font_item ()
     : font (NULL), obj (NULL), num (0), simple (false), t3 (false), chunk (0),
-      lig (""), drawn (0) {}
+      lig (""), drawn (0), used (false) {}
 };
 
-// The letters of a ligature, from the name of its glyph, or "" when the
-// glyph is not one. The names are those of the Adobe glyph list: the five
-// of the Latin ligatures as TeX fonts name them, their uniFB0x forms, and
-// the f_f_i of OpenType fonts, whose parts are joined by underscores.
 // The UTF-16 of the character u in hexadecimal, as a CMap wants it: a
 // surrogate pair beyond U+FFFF
 static string
@@ -128,6 +126,10 @@ utf16_hex (int u) {
          as_hexadecimal (0xdc00 + (v & 0x3ff), 4);
 }
 
+// The letters of a ligature, from the name of its glyph, or "" when the
+// glyph is not one. The names are those of the Adobe glyph list: the five
+// of the Latin ligatures as TeX fonts name them, their uniFB0x forms, and
+// the f_f_i of OpenType fonts, whose parts are joined by underscores.
 static string
 ligature_letters (string name) {
   if (name == "ff" || name == "fi" || name == "fl" ||
@@ -187,6 +189,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   array<pdf_link_item> page_videos;  // label: the name of the annotation
   array<int>      page_video_file;
   array<string>   page_video_vars; // its FlashVars, ending with a 0
+  array<string>   page_video_nm;   // its /NM, ending with a 0
 
   // the graphics state as it stands in the stream
   pencil pen;
@@ -267,6 +270,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
   void write_tex_to_unicode (pdf_font_item& it, int first, int last);
+  int  glyph_name_unicode (pdf_font_item& it, int gid);
   void write_encoding (pdf_font_item& it, int first, int last,
                        array<string>& gname);
   void write_widths (pdf_font_item& it, int first, int last,
@@ -342,6 +346,15 @@ public:
 * Construction
 ******************************************************************************/
 
+// Whether the last PDF was saved: the writer saves it when it is closed,
+// and print_doc asks afterwards (an error there is only a message)
+static bool last_save_ok= false;
+
+bool
+mupdf_pdf_saved () {
+  return last_save_ok;
+}
+
 mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
   url pdf_file_name2, int dpi2, int nr_pages2,
   string page_type2, bool landscape2, double paper_w2, double paper_h2)
@@ -362,6 +375,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     transform_level (0),
     n_alpha (0), n_xobj (0)
 {
+  last_save_ok= false;
   width = default_dpi * paper_w / 2.54;
   height= default_dpi * paper_h / 2.54;
   fz_try (ctx) {
@@ -477,6 +491,7 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
     // fz_try does not cover)
     fz_try (ctx) {
       pdf_save_document (ctx, doc, name, &opts);
+      last_save_ok= true;
     }
     fz_catch (ctx) {
       convert_error << "MuPDF cannot write " << pdf_file_name << ": "
@@ -540,6 +555,7 @@ mupdf_pdf_renderer_rep::begin_page () {
   page_videos= array<pdf_link_item> ();
   page_video_file= array<int> ();
   page_video_vars= array<string> ();
+  page_video_nm= array<string> ();
   // the whole page is written in the pixels of the renderer
   app ("q\n%g 0 0 %g 0 0 cm\n",
                     (double) default_dpi / dpi, (double) default_dpi / dpi);
@@ -1018,10 +1034,15 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   // of an assembly, which then add nothing to the text (as in
   // pdf_hummus_renderer)
   bool blank= false;
+  if (!font_list[k].simple && !font_list[k].t3)
+    font_list[k].used ((int) gl->index)= true;
   if (ch >= 0xc000000 && !font_list[k].simple && !font_list[k].t3) {
     int code= native_glyph_get_unicode (fn->res_name, ch - 0xc000000);
+    // nothing recorded (the variants of the MATH table, #943): the name of
+    // the glyph says it often enough (uni27E8.size1, braceleft.v2)
+    if (code < 0) code= glyph_name_unicode (font_list[k], (int) gl->index);
     if (code > 0) font_list[k].drawn ((int) gl->index)= code;
-    else blank= (N(lig) == 0);
+    else if (code == 0) blank= (N(lig) == 0);
   }
   if (N(lig) > 0) {
     c_string cl (lig);
@@ -1118,7 +1139,7 @@ mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
   FT_UInt gid= 0;
   FT_ULong ucs= FT_Get_First_Char (face, &gid);
   while (gid > 0) {
-    if (gid < (FT_UInt) face->num_glyphs && gid <= 0xffff) {
+    if (gid < (FT_UInt) face->num_glyphs && gid <= 0xffff && ucs >= 0x20) {
       if (!uni->contains ((int) gid)) {
         uni ((int) gid)= (int) ucs;
         gids << (int) gid;
@@ -1143,6 +1164,15 @@ mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
   for (int i=0; i<N(gids); i++)
     if (uni [gids[i]] > 0xffff) beyond= true;
   if (!beyond && !changed) return;
+  // only the glyphs drawn: the map of every glyph of a CJK font is tens of
+  // thousands of entries, for the glyphs which subsetting takes out
+  if (N(it.used) > 0) {
+    array<int> kept;
+    for (int i=0; i<N(gids); i++)
+      if (it.used->contains (gids[i])) kept << gids[i];
+    gids= kept;
+    if (N(gids) == 0) return;
+  }
   string cmap;
   cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
        << "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) "
@@ -1264,6 +1294,23 @@ mupdf_pdf_renderer_rep::write_encoding (pdf_font_item& it, int first,
   }
 }
 
+// The character of a glyph after its name, without its suffix (uni27E8.size1
+// is U+27E8, braceleft.v2 is {), -1 if the name says nothing
+int
+mupdf_pdf_renderer_rep::glyph_name_unicode (pdf_font_item& it, int gid) {
+  if (it.font == NULL) return -1;
+  char nm[64];
+  nm[0]= 0;
+  fz_try (ctx) fz_get_glyph_name (ctx, it.font, gid, nm, (int) sizeof (nm));
+  fz_catch (ctx) nm[0]= 0;
+  nm[sizeof (nm) - 1]= 0;
+  char* dot= strchr (nm, '.');
+  if (dot != NULL) *dot= 0;
+  if (nm[0] == 0) return -1;
+  int u= fz_unicode_from_glyph_name (nm);
+  return (u >= 0x20)? u: -1;
+}
+
 // The characters of the codes of a TeX math font (cmmi, cmsy, cmex, msbm...)
 // or of a Cyrillic TeX font (T2A), as a /ToUnicode CMap: the names of their glyphs (summationdisplay,
 // parenleftbig...) mean nothing to a reader, which then gave U+FFFD for
@@ -1280,6 +1327,8 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
   }
   else tex= tex_math_unicode (it.tex_name);
   if (N(tex) == 0) return;
+  // (a position without a single character, below U+0020, is left out)
+  for (int c=0; c<N(tex); c++) if (tex[c] < 0x20) tex[c]= -1;
   int nused= 0;
   for (int c=first; c<=last; c++)
     if (it.gid[c] >= 0 && c < N(tex) && tex[c] >= 0) nused++;
@@ -2388,6 +2437,8 @@ mupdf_pdf_renderer_rep::embed_video (url u, int ms, bool repeat,
                                 f * to_x (x1), f * to_y (y1),
                                 f * to_x (x2), f * to_y (y2));
   page_video_file << k;
+  page_video_nm << ("video-" * as_string (N(page_videos)) * "-" *
+                    as_string (tail (u)) * string ((char) 0));
   page_video_vars << ("source=" * fname * "&loop=" *
                       (repeat? string ("true"): string ("false")) *
                       string ((char) 0));
@@ -2414,7 +2465,8 @@ mupdf_pdf_renderer_rep::write_videos (pdf_obj* pobj) {
     pdf_array_push_real (ctx, rect, v.y1);
     pdf_array_push_real (ctx, rect, v.x2);
     pdf_array_push_real (ctx, rect, v.y2);
-    pdf_dict_put_text_string (ctx, a, PDF_NAME(NM), name);
+    // (the name of an annotation is unique on its page)
+    pdf_dict_put_text_string (ctx, a, PDF_NAME(NM), &page_video_nm[i][0]);
     pdf_dict_put_text_string (ctx, a, PDF_NAME(Contents), name);
     pdf_dict_put (ctx, a, PDF_NAME(P), pobj);
     // an empty appearance: a reader which plays no video shows the picture
