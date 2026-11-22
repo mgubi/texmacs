@@ -192,4 +192,9 @@ void   set_retina_zoom (int z);
 void   set_retina_icons (int i);
 void   set_retina_scale (double s);
 
+// An MP4 video of the frames of the animated image u, each during ms
+// milliseconds, for a PDF (ImageMagick and ffmpeg); url_none () when it
+// cannot be made. The file is added to temps, to be removed by the caller.
+url video_for_pdf (url u, int ms, array<url>& temps);
+
 #endif // defined RENDERER_H

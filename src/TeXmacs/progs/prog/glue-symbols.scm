@@ -89,6 +89,7 @@
 "win32-display"
 "cpp-error"
 "supports-native-pdf?"
+"mupdf-writes-pdf?"
 "supports-ghostscript?"
 "gs-executable"
 "rescue-mode?"

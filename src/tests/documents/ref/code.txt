@@ -1,5 +1,8 @@
 pages: 1
 --- page 1
+Program code
+1
+
 1 Program code
 
 Code is set in a typewriter font, with the colors of the syntax of its language.
@@ -23,7 +26,7 @@ a, b = b, a + b
 return a
 
 (define (square x) (* x x))
-(map square '(1 2 3))
+(map square ’(1 2 3))
 
 Inline code: std::vector<int>, (car l) and plain verbatim text.
 
@@ -32,8 +35,5 @@ A verbatim block keeps
 its spaces and
 
 its line breaks.
-
-Program code
-1
 
 

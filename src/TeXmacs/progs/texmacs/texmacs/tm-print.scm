@@ -113,11 +113,9 @@
 
 (tm-define (pdf-encryption?)
   ;; whether the PDF will be written by the MuPDF renderer, which encrypts
-  ;; (as use_mupdf_pdf in edit_main.cpp): anything else would ignore the
+  ;; (mupdf_writes_pdf in glue.cpp): anything else would ignore the
   ;; passwords and write a PDF which is not protected
-  (and (supports-native-pdf?)
-       (or (== (getenv "TEXMACS_PDF_MUPDF") "1")
-           (== (get-preference "native pdf renderer") "mupdf"))))
+  (mupdf-writes-pdf?))
 
 (define pdf-password-target #f)
 

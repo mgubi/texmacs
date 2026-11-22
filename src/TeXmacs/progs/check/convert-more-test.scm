@@ -3190,7 +3190,9 @@
 ;; of the links, which are read in the file. The buffer is exported as soon
 ;; as it is loaded, as texmacs -c does: its hyperlinks are in the PDF. The
 ;; title of a bookmark is a hexadecimal string (UTF-16BE) without escapes,
-;; and a URI a literal string in which ( ) and \ are escaped.
+;; and a URI a literal string in which ( ) and \ are escaped. The writer on
+;; MuPDF (the one of the Vue builds) leaves out the spaces and writes the
+;; title as a literal string, escaped as a URI is.
 (define (test-pdf-export)
   (check-group "pdf export")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
@@ -3213,9 +3215,12 @@
         (with s (if (url-exists? pdf) (string-load pdf) "")
           (define (has? what) (>= (string-search-forwards what 0 s) 0))
           (check-true (string-starts? s "%PDF-"))
-          (check-true (has? "/Title <FEFF003100200066002800780029>"))
-          (check-true (has? "/URI (https://example.org/a\\)b)"))
-          (check-true (has? "/URI (https://example.org/a\\\\b)"))))))
+          (check-true (or (has? "/Title <FEFF003100200066002800780029>")
+                          (has? "/Title(1 f\\(x\\))")))
+          (check-true (or (has? "/URI (https://example.org/a\\)b)")
+                          (has? "/URI(https://example.org/a\\)b)")))
+          (check-true (or (has? "/URI (https://example.org/a\\\\b)")
+                          (has? "/URI(https://example.org/a\\\\b)")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
@@ -3245,13 +3250,17 @@
 (define (has-text? what s)
   (>= (string-search-forwards what 0 s) 0))
 
+(define (has-image? s)
+  ;; an image in a PDF, as PDFHummus writes it or the writer on MuPDF
+  (or (has-text? "/Subtype /Image" s) (has-text? "/Subtype/Image" s)))
+
 (define (check-image-file u)
   ;; @u holds the picture
   (with s (if (url-exists? u) (string-load u) "")
     (cond ((== (eps-suffix) "eps") (check-true (string-starts? s "%!PS")))
           ((supports-native-pdf?)
            (check-true (string-starts? s "%PDF-"))
-           (check-true (has-text? "/Subtype /Image" s)))
+           (check-true (has-image? s)))
           (else (check-true (!= s ""))))))
 
 (define (check-latex-image root suffix)

@@ -26,6 +26,9 @@ extern bool typeset_folds;   // Typeset/Bridge/bridge.cpp
 #include "image_files.hpp"
 #include "iterator.hpp"
 #include "Bridge/bridge.hpp"
+#ifdef MUPDF_RENDERER
+#include "MuPDF/mupdf_pdf_renderer.hpp"
+#endif
 
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
@@ -215,16 +218,25 @@ edit_main_rep::get_metadata (string kind) {
 string printing_dpi ("600");
 string printing_on ("a4");
 
-// Is the PDF written by the MuPDF renderer? It is a prototype, so it is
-// off unless it is asked for, by the preference or by the environment
-// (see docs/pdf-output-with-mupdf.md).
+// Is the native PDF written by the MuPDF renderer rather than PDFHummus?
+// (see docs/pdf-output-with-mupdf.md). Where PDFHummus is built (Qt,
+// Cocoa) it writes the PDF unless MuPDF is asked for, by the preference or
+// by the environment; elsewhere (Vue, SDL, the browser) MuPDF is the only
+// native writer and writes it, unless TEXMACS_PDF_MUPDF=0. Whether a native
+// writer is used at all is use_pdf ().
 bool
 use_mupdf_pdf () {
 #ifdef __EMSCRIPTEN__
   return true; // the only way to a PDF in the browser (no Ghostscript)
 #elif defined(MUPDF_RENDERER)
-  if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
+  string env= get_env ("TEXMACS_PDF_MUPDF");
+  if (env == "1") return true;
+  if (env == "0") return false;
+#ifdef PDF_RENDERER
   return get_preference ("native pdf renderer", "default") == "mupdf";
+#else
+  return true;
+#endif
 #else
   return false;
 #endif
@@ -235,9 +247,15 @@ use_pdf () {
 #ifdef PDF_RENDERER
   return get_preference ("native pdf", "on") == "on";
 #else
-  // without a PDF renderer the document goes out as PostScript and
-  // Ghostscript makes the PDF; the MuPDF renderer writes it itself
-  return use_mupdf_pdf ();
+  // without PDFHummus the MuPDF renderer writes the PDF, unless the
+  // preference "native pdf" is off: then the document goes out as
+  // PostScript and Ghostscript makes the PDF, as without MuPDF
+  if (!use_mupdf_pdf ()) return false;
+#if defined(USE_GS) && !defined(__EMSCRIPTEN__)
+  return get_preference ("native pdf", "on") == "on";
+#else
+  return true;
+#endif
 #endif
 }
 
@@ -266,6 +284,10 @@ edit_main_rep::nr_pages () {
 bool
 edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // true when the file was written (#705)
+  // The MuPDF renderer writes the file when it is deleted, where a failure
+  // (a missing folder) is only a message: it says afterwards whether it
+  // saved the file
+  bool mupdf_target= suffix (name) == "pdf" && use_pdf () && use_mupdf_pdf ();
 #ifdef USE_GS
   bool ps  = (suffix (name) == "ps");
   bool pdf = (suffix (name) == "pdf");
@@ -362,6 +384,11 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   }
   tm_delete (ren);
   delete_typesetter (ttt);
+#ifdef MUPDF_RENDERER
+  if (mupdf_target) ok= ok && mupdf_pdf_saved ();
+#else
+  (void) mupdf_target;
+#endif
 
 #ifdef USE_GS
   // through Ghostscript, the target is written by a conversion: an old

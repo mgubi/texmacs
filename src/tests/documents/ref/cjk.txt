@@ -1,5 +1,8 @@
 pages: 1
 --- page 1
+Chinese, Japanese and Korean
+1
+
 1 Chinese, Japanese and Korean
 
 Chinese text in the default font, whose ideographs come from a system font found by the font
@@ -22,8 +25,5 @@ by the font fallback (on macOS, Hiragino), and the Korean syllables have the siz
 ひらがなとカタカナを書きます。
 한국어문장입니다.
 Ideographs may also occur in a Latin paragraph, as in 中文(Chinese) and 日本(Japan).
-
-Chinese, Japanese and Korean
-1
 
 

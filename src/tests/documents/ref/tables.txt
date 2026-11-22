@@ -1,5 +1,8 @@
 pages: 1
 --- page 1
+Tables
+1
+
 1 Tables
 
 A plain table with borders, and cells aligned left, centered and right:
@@ -40,14 +43,11 @@ Another paragraph, shorter.
 
 A matrix-like table inside a formula:
 
-
+||||
 
 1 0
 0 1
 
-    = 1.
-
-Tables
-1
+|||| = 1.
 
 

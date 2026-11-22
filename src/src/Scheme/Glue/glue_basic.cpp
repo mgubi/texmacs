@@ -664,6 +664,15 @@ tmg_supports_native_pdfP () {
 }
 
 tmscm
+tmg_mupdf_writes_pdfP () {
+  // TMSCM_DEFER_INTS;
+  bool out= mupdf_writes_pdf ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_supports_ghostscriptP () {
   // TMSCM_DEFER_INTS;
   bool out= supports_ghostscript ();
@@ -13227,6 +13236,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("win32-display",  tmg_win32_display, 1, 0, 0);
   tmscm_install_procedure ("cpp-error",  tmg_cpp_error, 0, 0, 0);
   tmscm_install_procedure ("supports-native-pdf?",  tmg_supports_native_pdfP, 0, 0, 0);
+  tmscm_install_procedure ("mupdf-writes-pdf?",  tmg_mupdf_writes_pdfP, 0, 0, 0);
   tmscm_install_procedure ("supports-ghostscript?",  tmg_supports_ghostscriptP, 0, 0, 0);
   tmscm_install_procedure ("gs-executable",  tmg_gs_executable, 0, 0, 0);
   tmscm_install_procedure ("rescue-mode?",  tmg_rescue_modeP, 0, 0, 0);

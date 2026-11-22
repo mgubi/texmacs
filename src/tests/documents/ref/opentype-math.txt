@@ -1,5 +1,7 @@
 pages: 2
 --- page 1
+1
+
 OpenType mathematical fonts
 
 The same formulas are set with each of the OpenType fonts of the Document > Font >
@@ -16,7 +18,7 @@ ak,
 
 ∞e−xdx.
 
-(((((((((
+((((((((
 (
 (
 
@@ -30,7 +32,7 @@ x2+1
 ∑k=0
 
 n
-xk )))))))))
+xk ))))))))
 
 )
 ),
@@ -69,7 +71,6 @@ f B←←←
 h
 
 g C ↔
-↔
 ↔
 ↔
 ↔
@@ -186,20 +187,16 @@ x ]]]]]]]]]]]]
 
 b}
 
-A→→
+A→
+→
 →→
 
-f B ←←←
+f B←←←
 ←←
 
 h
 
 g C ↔
-↔
-↔
-↔
-↔
-↔
 ↔
 ↔
 ↔
@@ -388,20 +385,20 @@ x + y,
 x + y,
 A B,
 a + b + c
-zzzzzzzz
-z z}|{{{{{{{{
-{ {
-
+��������
+������������
+��
 ,
 a + b + c
-||||||||
-| |{z}}}}}}}}
-} }
-
-1
+��������
+������������
+��
 
 
 --- page 2
+2
+Section 6
+
 4 TeX Gyre Schola
 
 Big delimiters, extensible arrows, small radicals and wide accents; big operators in the text
@@ -412,7 +409,7 @@ ak, ∏p p−s and ∫0
 
 ∞e−xdx.
 
-((((((((((
+((((((((
 (
 (
 
@@ -426,7 +423,7 @@ x2+1
 ∑k=0
 
 n
-xk ))))))))))
+xk ))))))))
 
 )
 ),
@@ -572,7 +569,7 @@ xk ⎠⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎞
 4⟩,
 ∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣x
 
-y ∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣
+y∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣
 
 ,
 
@@ -661,8 +658,5 @@ b
 
 This paragraph is set in Skia, a variable font of macOS, in its default instance, with a bold series
 and a slanted shape made from it.
-
-2
-Section 6
 
 

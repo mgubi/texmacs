@@ -570,21 +570,85 @@ fail only for want of memory -- a `setjmp` for each glyph is not worth it.
 
 * **An image with an effect** on it has to be computed, so it is
   rasterized -- at a print resolution, but rasterized.
-* **A preference in the menus.** The renderer is chosen by the preference
-  `native pdf renderer` set to `mupdf`, or by `TEXMACS_PDF_MUPDF=1`, not by
-  anything a user can click. The menu it belongs in,
-  *TeXmacs -> Pdf/Postscript*, is itself shown only when
-  `supports-native-pdf?` is true, which -- now that the answer depends on
-  the preference -- would mean the entry which turns the renderer on is
-  hidden until it is on. Reaching it wants either a glue predicate of its
-  own or an entry in the shared menu which does nothing on the builds
-  without MuPDF; for a prototype the preference is interface enough.
+* **A preference in the menus** for the Qt and Cocoa builds, which have
+  both writers: there MuPDF writes the PDF when the preference `native pdf
+  renderer` is `mupdf`, or with `TEXMACS_PDF_MUPDF=1`, and no menu entry
+  sets it.
 
-`supports-native-pdf?` does answer for the MuPDF renderer when it is the
-one chosen, which it has to: `printer-file-suffix` and
-`printer-file-format` are built on it, and they were asking for PostScript
-while `use_pdf ()` was writing a PDF. With the renderer off both say
-PostScript, as before; with it on both say PDF.
+## Which writer writes the PDF
+
+`use_mupdf_pdf` and `use_pdf` (`edit_main.cpp`) decide, and
+`mupdf-writes-pdf?` tells the Scheme side (`pdf-encryption?`):
+
+| Build | Default | Otherwise |
+|---|---|---|
+| Qt, Cocoa (PDFHummus) | PDFHummus | MuPDF with `native pdf renderer` = `mupdf` or `TEXMACS_PDF_MUPDF=1` |
+| Vue, SDL (#941) | MuPDF | Ghostscript, from PostScript, with `native pdf` off or `TEXMACS_PDF_MUPDF=0` |
+| the browser | MuPDF | -- (no Ghostscript) |
+
+Until #941 a Vue build wrote its PDF with Ghostscript unless MuPDF was
+asked for; that lost the text of the CJK, OpenType math and Fira samples
+(U+FFFD) and could carry no structure (tagged PDF). `supports-native-pdf?`
+answers for the MuPDF renderer when it is the one chosen, which it has to:
+`printer-file-suffix` and `printer-file-format` are built on it.
+
+The writer writes the file when it is closed (`pdf_save_document`), and an
+error there is only a message: `print_doc` asks it afterwards
+(`mupdf_pdf_saved`), so that a target in a missing folder is an error
+(#705), and an old file is left as it was when the export fails. MuPDF
+removes the file it writes first, and `remove` removes an empty folder as
+well, so a folder of the name of the target is refused.
+
+### The text layer (#941)
+
+* **TeX math fonts**: the glyph names of cmex (`summationdisplay`,
+  `parenleftbig`...) mean nothing to a reader, which gave U+FFFD for the
+  big operators and delimiters. A `/ToUnicode` of the positions in use is
+  written from `tex_math_unicode` (`Plugins/Metafont/tex_unicode.cpp`,
+  shared with PDFHummus since #341): the encodings of `fonts/enc` and the
+  lists of larger variants of the TFM. The `-` of `cmsy` is the minus sign.
+* **Cyrillic TeX fonts** (T2A, the LH fonts): their glyph names are those
+  of the Latin-1 letters at the same positions (`aring` for е), so the map
+  comes from `tex_glyph_unicode`.
+* **CJK fonts**: MuPDF's map of a CID font takes the first character of a
+  glyph, the Kangxi radical (U+2F47) rather than the ideograph (U+65E5);
+  `fix_to_unicode` writes it again with the ideograph.
+* **Glyphs drawn by their number** (`0xc000000` + glyph): the character
+  the font recorded for it (`native_glyph_get_unicode`); when it recorded
+  none, which is the case of the variants of the MATH table (#943), the
+  name of the glyph without its suffix (`uni27E8.size1`, `braceleft.v2`);
+  no text when the font recorded that the glyph stands for nothing (an
+  empty `ActualText`). The pieces of an assembled delimiter, which have
+  names too, each give the delimiter, as the pieces of the TeX
+  delimiters do (`tex_math_unicode`, as with PDFHummus): `((((`.
+  A name which says nothing is not taken: a number (a font without names
+  gives the number of the glyph, which MuPDF reads as a character code),
+  `a` and digits, `g` and hexadecimal digits, a name MuPDF does not know
+  (U+FFFD), or a legacy name of the Adobe glyph list for a parenthesized
+  small letter (`lparen` is U+24A7, a parenthesis in a math font). The name is a guess: it only fills in a
+  glyph which the cmap does not reach.
+* **Private use codes**: a glyph which the cmap reaches by a private use
+  code and by a real one takes the real one; and a character which the
+  font recorded for a glyph drawn by its number replaces a private use
+  code. The variants of KpMath (`lparen.v4` is U+E327, `mita.sst` U+EB29)
+  are reached only by private use codes and recorded by nothing (#943), so
+  they keep them for now.
+* **Controls**: a position or a glyph whose character is below U+0020 is
+  left out of the maps, and the map of a CID font which is written again
+  has only the glyphs drawn (a CJK font has tens of thousands).
+
+`mutool` drops the third f of "Schifffahrt" (a ligature ff in an
+`ActualText` span, then an f): Ghostscript reads it, the PDF has it.
+
+### Videos (#249, #941)
+
+A `<video>` becomes a RichMedia annotation, as PDFHummus writes it
+(`embed_video`, `write_videos`): the MP4 of `video_for_pdf`
+(`renderer.cpp`, ImageMagick and ffmpeg) embedded once per image and delay
+with `pdf_add_embedded_file`, and the catalog declares PDF 1.7 with
+Adobe's extension level 3. The annotation has an empty appearance: a
+reader which plays no video shows the picture of the frame under it, and
+MuPDF does not try to make one (an error at each save before).
 
 ## Checking it
 

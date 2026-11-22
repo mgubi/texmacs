@@ -12,6 +12,7 @@
 #include "pdf_hummus_renderer.hpp"
 #include "Metafont/tex_files.hpp"
 #include "Metafont/load_tfm.hpp"
+#include "Metafont/tex_unicode.hpp"
 #include "Freetype/tt_file.hpp"
 #include "file.hpp"
 #include "image_files.hpp"
@@ -1406,173 +1407,7 @@ no_font_issues (url u) {
   return !pdf_font_issues ()->contains (h);
 }
 
-// The Unicode character of the glyph at position ch of a TeX font in the
-// Cork encoding (the EC fonts) or the T2A encoding (the Cyrillic fonts),
-// for the text layer: the positions are not Unicode code points, and
-// differ from Latin-1 for some letters (oe at 0xF7, sharp s at 0xFF)
-static int
-tex_glyph_unicode (int ch, bool t2a) {
-  static int cork_table[256], t2a_table[256];
-  static bool done= false;
-  if (!done) {
-    for (int c=0; c<256; c++) {
-      string s (1);
-      s[0]= (char) c;
-      for (int k=0; k<2; k++) {
-        string u= (k == 0? cork_to_utf8 (s): t2a_to_utf8 (s));
-        int i= 0;
-        unsigned int code= (N(u) == 0? c: decode_from_utf8 (u, i));
-        // a position without a single character keeps its number
-        if (N(u) == 0 || i != N(u)) code= c;
-        (k == 0? cork_table: t2a_table)[c]= (int) code;
-      }
-    }
-    done= true;
-  }
-  if (ch < 0 || ch > 255) return ch;
-  return t2a? t2a_table[ch]: cork_table[ch];
-}
 
-// The encodings (fonts/enc) of the TeX math fonts, by the name of the font
-// without its size
-static const char* tex_math_encodings[][3]= {
-  { "cmr", "cmr", "" }, { "cmbx", "cmr", "" },
-  { "cmmi", "cmmi", "" }, { "cmmib", "cmmi", "" },
-  { "cmsy", "cmsy", "math-cal" }, { "cmbsy", "cmsy", "math-cal" },
-  { "cmex", "cmex", "rubber-cmex" }, { "cmexb", "cmex", "rubber-cmex" },
-  { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
-  { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
-  { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
-  { "grmn", "math-upgreek", "" }, { "grxn", "math-upgreek", "" },
-  { "stmary", "stmary", "rubber-stmary" },
-  { "wasy", "wasy", "rubber-wasy" }, { "wasyb", "wasy", "rubber-wasy" },
-  { "", "", "" }
-};
-
-// The Unicode character of the symbol name of an encoding file, or -1.
-// The variants of the big symbols stand for the symbol itself: large-(-1,
-// big-sum-2 and cmex-int-1 are (, sum and int.
-static int
-tex_symbol_unicode (string name) {
-  for (int pass=0; pass<3; pass++) {
-    string sym= (N(name) > 1? "<" * name * ">": name);
-    string u  = cork_to_utf8 (sym);
-    int i= 0;
-    if (N(u) > 0) {
-      unsigned int code= decode_from_utf8 (u, i);
-      if (i == N(u) && (N(name) == 1 || u != sym)) return (int) code;
-    }
-    if (pass == 0) {
-      int n= N(name);
-      while (n > 0 && is_digit (name[n-1])) n--;
-      if (n > 1 && n < N(name) && name[n-1] == '-') name= name (0, n-1);
-    }
-    else if (pass == 1) {
-      if (starts (name, "large-")) name= name (6, N(name));
-      else if (starts (name, "big-")) name= name (4, N(name));
-      else if (starts (name, "wide-")) name= name (5, N(name));
-      else if (starts (name, "cmex-")) name= name (5, N(name));
-      else break;
-    }
-  }
-  return -1;
-}
-
-// The symbols of the encoding file enc are added to the table of the Unicode
-// characters by position; the first symbol at a position is the main one
-static void
-tex_encoding_unicode (string enc, array<int>& table) {
-  string s;
-  url u ("$TEXMACS_HOME_PATH/fonts/enc:$TEXMACS_PATH/fonts/enc", enc * ".enc");
-  if (load_string (u, s, false)) return;
-  int i, n= N(s), pos= 0;
-  for (i=0; i<n; i++)
-    if (s[i] == '\"') {
-      string name;
-      for (i++; i<n && s[i] != '\"'; i++) {
-        if (s[i] == '\\' && i+1 < n) i++;
-        name << s[i];
-      }
-      if (N(name) > 0 && pos < 256 && table[pos] < 0)
-        table[pos]= tex_symbol_unicode (name);
-      pos++;
-    }
-    else if (is_digit (s[i])) {
-      int start= i;
-      while (i+1 < n && is_digit (s[i+1])) i++;
-      pos= as_int (s (start, i+1));
-    }
-}
-
-// The Unicode characters of the glyphs of a TeX math font, by position, for
-// the text layer; an empty table for the other fonts, and -1 at a position
-// whose symbol has no single character
-static array<int>
-tex_math_unicode (string fontname) {
-  static hashmap<string,array<int> > tables;
-  if (tables->contains (fontname)) return tables[fontname];
-  array<int> table;
-  int k, n= 0;
-  while (n < N(fontname) && is_alpha (fontname[n])) n++;
-  string base= fontname (0, n);
-  for (k=0; tex_math_encodings[k][0][0] != '\0'; k++)
-    if (base == tex_math_encodings[k][0]) break;
-  if (tex_math_encodings[k][0][0] != '\0' &&
-      n < N(fontname) && is_digit (fontname[n])) {
-    table= array<int> (256);
-    for (int i=0; i<256; i++) table[i]= -1;
-    for (int j=1; j<3; j++)
-      if (tex_math_encodings[k][j][0] != '\0')
-        tex_encoding_unicode (tex_math_encodings[k][j], table);
-    // the larger variants of a symbol follow it in the list of its metric
-    while (n < N(fontname) && is_digit (fontname[n])) n++;
-    string tfm_name= fontname (0, n) * ".tfm";
-    if (tex_font_metric::instances->contains (tfm_name)) {
-      tex_font_metric tfm (tfm_name);
-      for (int c= tfm->bc; c <= tfm->ec && c < 256; c++)
-        if (table[c] >= 0) {
-          int d= c;
-          for (int len=0; len<256 && tfm->tag (d) == 2; len++) {
-            d= tfm->rem (d);
-            if (d < tfm->bc || d > tfm->ec) break;
-            if (table[d] < 0) table[d]= table[c];
-          }
-          // the largest variant may be built from pieces (top, middle,
-          // bottom, repeated): each piece is the delimiter, which is what
-          // a search or a copy of the text expects; Hummus writes no
-          // mapping as the character 0, not as nothing
-          if (d >= tfm->bc && d <= tfm->ec && tfm->tag (d) == 3) {
-            int piece[4]= { tfm->top (d), tfm->mid (d),
-                            tfm->bot (d), tfm->rep (d) };
-            for (int k=0; k<4; k++)
-              if (piece[k] > 0 && piece[k] < 256 && table[piece[k]] < 0)
-                table[piece[k]]= table[c];
-          }
-        }
-    }
-    // see requires_hack_notdef_for_tex_font
-    table[161]= table[0];
-  }
-  tables (fontname)= table;
-  return table;
-}
-
-// Whether the font file u is a Cyrillic TeX font in the T2A encoding: the LH
-// fonts of TeXmacs (fonts/type1/la) and the T2A fonts of cm-super are named
-// la + two letters for the shape + the size in hundredths of a point
-// (larm1000, larm700, labx1728, larm0500). Other TeX fonts begin with la
-// too: lasy10 and lasyb10 (the LaTeX symbols), which are not in T2A.
-static bool
-is_t2a_font_file (url u) {
-  if (suffix (u) != "pfb") return false;
-  string s= basename (u);
-  int n= N(s);
-  if (n < 7 || n > 8 || !starts (s, "la")) return false;
-  if (!is_alpha (s[2]) || !is_alpha (s[3])) return false;
-  for (int i= 4; i < n; i++)
-    if (!is_digit (s[i])) return false;
-  return true;
-}
 
 void
 pdf_hummus_renderer_rep::make_pdf_font (string fontname)
@@ -2643,40 +2478,6 @@ pdf_hummus_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2)
 * a click pauses it; viewers which cannot play videos show the picture.
 ******************************************************************************/
 
-static url
-video_for_pdf (url u, int ms, array<url>& temps) {
-  // An MP4 video with the frames of the animated image u as TeXmacs shows
-  // them: coalesced by ImageMagick (see decompose_gif), on a white
-  // background, each during ms milliseconds.  PDF viewers do not play
-  // animated gifs, and gif delays are multiples of 10 ms.
-  if (ms <= 0 || !has_image_magick () || !exists_in_path ("ffmpeg"))
-    return url_none ();
-  url dir= url_temp ("");
-  mkdir (dir);
-  string frames= sys_concretize (dir * "f_%05d.png");
-  url out= url_temp (".mp4");
-  if (system (imagemagick_cmd () * " " * sys_concretize (u) *
-              " -coalesce -background white -alpha remove -alpha off"
-              " +adjoin " * frames) == 0) {
-    string rate= "1000/" * as_string (ms);
-    string cmd= "ffmpeg -nostdin -loglevel error -y -framerate " * rate *
-      " -i " * frames * " -r " * rate *
-      " -vf 'scale=trunc(iw/2)*2:trunc(ih/2)*2' -pix_fmt yuv420p"
-      " -map_metadata -1 -fflags +bitexact -flags:v +bitexact"
-      " -movflags +faststart ";
-    // a failed run may leave a partial file: drop it, so that the mpeg4
-    // fallback (ffmpeg built without libx264) or no video is used
-    if (system (cmd * "-c:v libx264 -crf 18 " * sys_concretize (out)) != 0)
-      remove (out);
-    if (!exists (out) &&
-        system (cmd * "-c:v mpeg4 -q:v 2 " * sys_concretize (out)) != 0)
-      remove (out);
-  }
-  rmdir_recursive (dir);
-  if (!exists (out)) return url_none ();
-  temps << out;
-  return out;
-}
 
 void
 pdf_hummus_renderer_rep::embed_video (url u, int ms, bool repeat,

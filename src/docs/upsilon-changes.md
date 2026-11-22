@@ -20,6 +20,23 @@ have the details, and the problems go to the
   for the rest of the session; the bar now follows the buttons it shows,
   and the section titles in the focus bar and the menus are on one line
   (#936).
+- **Export as PDF writes the PDF itself** (Vue builds, desktop
+  applications): the PDF was made by Ghostscript from PostScript, although
+  the application has its own PDF writer (on MuPDF), which the browser
+  version already used. The text of the PDF is now right where Ghostscript
+  lost it (Chinese and Japanese, the OpenType math fonts, the slides in
+  Fira), and so are the big operators and delimiters of the TeX math fonts
+  (sum, integral, large parentheses and braces were U+FFFD) and the minus
+  sign (a hyphen before), in every PDF writer. The ideographs are no longer
+  copied as the radicals of the same shape, the Cyrillic TeX fonts no
+  longer as accented Latin letters, the large delimiters and accents of
+  the OpenType math fonts are in the text, and a `<video>` (an animated GIF) is
+  embedded as a video, as in the Qt and Cocoa applications. A target which
+  cannot be written (a missing folder) is reported, a failed export leaves
+  the previous PDF in place, and an empty folder of the name of the target
+  is not replaced. The preference "Produce
+  Pdf using native export filter" (Preferences, Convert) off goes back to
+  Ghostscript, as `TEXMACS_PDF_MUPDF=0` does (#941).
 - **A macOS package with Chez Scheme** (desktop applications, Apple
   silicon, macOS 15 or later): `texmacs-qt-chez-macos-arm64.zip` among the
   [latest builds](https://mgubi.github.io/texmacs/), "TeXmacs Upsilon Qt
