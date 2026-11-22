@@ -1239,7 +1239,8 @@ int char_clip = 0;
 void
 beep () {
     // Issue a beep
-  QApplication::beep();
+  // (no application in a headless process: it would crash, e.g. on an undo)
+  if (!is_headless ()) QApplication::beep();
 }
 
 void
