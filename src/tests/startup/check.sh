@@ -292,6 +292,41 @@ undone #f
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-undo.scm")'
 
+# Under -headless the application is a QCoreApplication, not a
+# QTMApplication: the notification of a new theme took it for one and
+# crashed in init_palette (#923). The preference is put back (the home is a
+# scratch one).
+cat > "$out/startup-theme.scm" <<'EOF'
+(with old (get-preference "gui theme")
+  (set-preference "gui theme" "dark")
+  (display* "CHECK theme " (get-preference "gui theme") "\n")
+  (set-preference "gui theme" old))
+EOF
+
+check "headless: a new theme is not shown, without a crash (#923)" \
+      "theme dark
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-theme.scm")'
+
+# Alt and a letter looked for a composed character in the keyboard of the
+# QTMApplication on macOS, which aborted under -headless (#923); there is no
+# compose map there, the key is a shortcut or nothing.
+cat > "$out/startup-alt-key.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (go-end)
+  (key-press "A-e")
+  (display* "CHECK alt key " (buffer-exists? u) "\n")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+
+check "headless: Alt and a letter on a buffer (#923)" \
+      "alt key #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-alt-key.scm")'
+
 # A buffer which is closed gives back the memory of its editor and of its
 # boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
 # window which showed another view kept the canvas of the former one, so the
