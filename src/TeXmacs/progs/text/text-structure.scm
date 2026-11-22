@@ -41,8 +41,57 @@
 (tm-define (texmacs->string x)
   (texmacs->code (verbatim-expand x) "cork"))
 
+(define (title-break? t)
+  (in? t '((next-line) (new-line))))
+
+(define (title-split-lines l)
+  ;; the children of a concat, cut at the lines broken by hand
+  (let loop ((l l) (cur '()) (acc '()))
+    (cond ((null? l) (reverse (cons (cons 'concat (reverse cur)) acc)))
+          ((title-break? (car l)) (loop (cdr l) '() (cons (cons 'concat (reverse cur)) acc)))
+          (else (loop (cdr l) (cons (car l) cur) acc)))))
+
+(define (title-line-breaks t)
+  ;; a line broken by hand in a title (next-line, new-line) is dropped by
+  ;; the verbatim export: its concat becomes the paragraphs of a document,
+  ;; whose lines are joined as those of a title of several paragraphs
+  ;; (line-break is only a hint, as no-break)
+  (cond ((title-break? t) "")
+        ((and (pair? t) (== (car t) 'concat) (list-or (map title-break? (cdr t))))
+         (let* ((l (title-split-lines (cdr t)))
+                (r (list-filter l (lambda (p) (nnull? (cdr p)))))
+                (r* (map title-line-breaks r)))
+           ;; no empty pieces (a break at an end), and no document for one
+           ;; piece, as in a script: x^(2 ) for (rsup (concat "2" (next-line)))
+           (cond ((null? r*) "")
+                 ((null? (cdr r*)) (car r*))
+                 (else (cons 'document r*)))))
+        ((pair? t) (cons (car t) (map title-line-breaks (cdr t))))
+        (else t)))
+
+(define (title-trim-spaces s)
+  ;; only the spaces: in Cork, the other bytes which Scheme takes for
+  ;; whitespace are characters (#x0D is the low quote of German)
+  (let* ((n (string-length s))
+         (i (let loop ((i 0))
+              (if (and (< i n) (char=? (string-ref s i) #\space))
+                  (loop (+ i 1)) i)))
+         (j (let loop ((j n))
+              (if (and (> j i) (char=? (string-ref s (- j 1)) #\space))
+                  (loop (- j 1)) j))))
+    (substring s i j)))
+
 (tm-define (texmacs->title-string x)
-  (downgrade-math-letters (texmacs->string x)))
+  ;; a title is shown on one line (menus, the focus bar): the lines of its
+  ;; verbatim text (paragraphs, table rows, lines broken by hand) are
+  ;; joined by one space, without the empty ones and the spaces around
+  ;; them; the spaces inside a line are kept (#936)
+  (let* ((t (if (tree? x) (tree->stree x) x))
+         (s (downgrade-math-letters
+             (texmacs->string (stree->tree (title-line-breaks t)))))
+         (l (string-tokenize-by-char (string-replace s "\t" "\n") #\newline))
+         (r (list-filter (map title-trim-spaces l) (lambda (p) (!= p "")))))
+    (string-recompose r " ")))
 
 (define (indent-prefix* sec)
   (cond ((in? sec '(chapter chapter*)) "")

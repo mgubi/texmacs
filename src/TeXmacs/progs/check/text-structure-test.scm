@@ -258,6 +258,56 @@
               "Glossary")
       (check= (texmacs->string (stree->tree '(concat "a" (em "b"))))
               "ab")
+      ;; a title of several paragraphs is one line, else the label of the
+      ;; focus bar has several lines and the bar grows for good (#936)
+      (check= (tm/section-get-title-string
+               (stree->tree '(section (document "Un" "deux" "trois"))) #f)
+              "Un deux trois")
+      (check= (texmacs->title-string
+               (stree->tree '(document "a" (concat "b" (next-line) "c"))))
+              "a b c")
+      ;; a space next to a hand break is not doubled; a line-break is only
+      ;; a hint, which does not cut a word
+      (check= (texmacs->title-string
+               (stree->tree '(concat "a " (next-line) "b")))
+              "a b")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "a" (new-line) " b")))
+              "a b")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "Super" (line-break) "cali")))
+              "Supercali")
+      (check= (texmacs->title-string
+               (stree->tree '(strong (concat "x" (next-line) "y"))))
+              "x y")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "x" (rsup (concat "2" (next-line))))))
+              "x^2")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "x" (rsub (concat (next-line) "i")))))
+              "x_i")
+      ;; the Cork byte #x0D is a character (a German low quote), kept at
+      ;; the ends of a title
+      (check= (texmacs->title-string
+               (stree->tree (string-append (string (integer->char 13))
+                                           "Hallo" (string (integer->char 13)))))
+              (string-append (string (integer->char 13))
+                             "Hallo" (string (integer->char 13))))
+      ;; no double space for an empty paragraph, no space at the ends,
+      ;; one space between the cells and the rows of a table; the spaces
+      ;; inside a line are kept
+      (check= (texmacs->title-string (stree->tree '(document "a" "" "b")))
+              "a b")
+      (check= (texmacs->title-string (stree->tree '(document "a" "")))
+              "a")
+      (check= (texmacs->title-string (stree->tree '(document "" " a " "")))
+              "a")
+      (check= (texmacs->title-string
+               (stree->tree '(tabular (table (row (cell "a") (cell "b"))
+                                             (row (cell "c") (cell "d"))))))
+              "a b c d")
+      (check= (texmacs->title-string (stree->tree '(document "a  b" "c")))
+              "a  b c")
       (check-true (principal-section? (node 0)))
       (check-false (principal-section? (node 1)))
       (check-true (principal-section? (node 2)))
