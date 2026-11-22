@@ -18,13 +18,16 @@ have the details, and the problems go to the
   paragraph with a stylesheet**: such a paragraph is a `<div>` of the class
   `tmhtml-p` (21 November), whose margins were only in the CSS that the
   export writes. The stylesheets in `web/css` and `misc/web/css` now give it
-  the spacing of a `<p>` in each place: `tmdoc.css` and `mmxdoc.css`
-  (linked by documents which set `html-css` to a copy of them),
-  `tmweb2.css` (pages of the style `tmdoc-web2`) and `web-article.css` (the
-  stylesheet which can be chosen in the preferences of the HTML export,
-  also through its dark and colored variants); with the latter, the CSS of
-  the export no longer overrides it. The copies on texmacs.org, which the
-  styles `tmdoc`, `mmxdoc` and `mmxmanual` link to, are not changed (#929).
+  the spacing of a `<p>` in each place: `tmdoc.css`, `mmxdoc.css`,
+  `tmweb2.css` (pages of the style `tmdoc-web2`) and `web-article.css`
+  with its dark and colored variants; the CSS written by the export now
+  gives way to a stylesheet linked after it, as for a `<p>`. The styles
+  `tmdoc`, `mmxdoc` and `mmxmanual` and the CSS stylesheet of the
+  preferences of the HTML export link to the copies on texmacs.org
+  (`tmdoc.css`, `mmxdoc.css`, `web-article*.css`, and `tmweb2.css` for the
+  pages of the site), which this does not change: until they are updated,
+  such a paragraph has no margin there (with `web-article*.css`, it is now
+  a little closer to its neighbours than a `<p>`) (#929).
 
 ## 21 November 2026
 
