@@ -623,10 +623,16 @@ well, so a folder of the name of the target is refused.
   delimiters do (`tex_math_unicode`, as with PDFHummus): `((((`.
   A name which says nothing is not taken: a number (a font without names
   gives the number of the glyph, which MuPDF reads as a character code),
-  `a` and digits, or a name MuPDF does not know (U+FFFD).
+  `a` and digits, `g` and hexadecimal digits, a name MuPDF does not know
+  (U+FFFD), or one which gives an enclosed letter (the legacy `lparen` of
+  the Adobe glyph list is U+24A7). The name is a guess: it only fills in a
+  glyph which the cmap does not reach.
 * **Private use codes**: a glyph which the cmap reaches by a private use
-  code and by a real one takes the real one (KpMath). Its variants reached
-  only by private use codes keep them.
+  code and by a real one takes the real one; and a character which the
+  font recorded for a glyph drawn by its number replaces a private use
+  code. The variants of KpMath (`lparen.v4` is U+E327, `mita.sst` U+EB29)
+  are reached only by private use codes and recorded by nothing (#943), so
+  they keep them for now.
 * **Controls**: a position or a glyph whose character is below U+0020 is
   left out of the maps, and the map of a CID font which is written again
   has only the glyphs drawn (a CJK font has tens of thousands).

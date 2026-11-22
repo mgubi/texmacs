@@ -109,11 +109,14 @@ struct pdf_font_item {
   // the font recorded (the larger variants of a math symbol), which its
   // cmap does not have
   hashmap<int,int> drawn;
+  // ... and of those of which the font recorded none, the character of
+  // the name of the glyph, a guess (see glyph_name_unicode)
+  hashmap<int,int> named;
   // a CID font: the glyphs drawn, whose characters the map gives
   hashmap<int,bool> used;
   pdf_font_item ()
     : font (NULL), obj (NULL), num (0), simple (false), t3 (false), chunk (0),
-      lig (""), drawn (0), used (false) {}
+      lig (""), drawn (0), named (0), used (false) {}
 };
 
 // The UTF-16 of the character u in hexadecimal, as a CMap wants it: a
@@ -1040,11 +1043,14 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     font_list[k].used ((int) gl->index)= true;
   if (ch >= 0xc000000 && !font_list[k].simple && !font_list[k].t3) {
     int code= native_glyph_get_unicode (fn->res_name, ch - 0xc000000);
-    // nothing recorded (the variants of the MATH table, #943): the name of
-    // the glyph says it often enough (uni27E8.size1, braceleft.v2)
-    if (code < 0) code= glyph_name_unicode (font_list[k], (int) gl->index);
     if (code > 0) font_list[k].drawn ((int) gl->index)= code;
     else if (code == 0) blank= (N(lig) == 0);
+    else {
+      // nothing recorded (the variants of the MATH table, #943): the name
+      // of the glyph says it often enough (uni27E8.size1, braceleft.v2)
+      int u= glyph_name_unicode (font_list[k], (int) gl->index);
+      if (u > 0) font_list[k].named ((int) gl->index)= u;
+    }
   }
   if (N(lig) > 0) {
     c_string cl (lig);
@@ -1111,8 +1117,8 @@ mupdf_pdf_renderer_rep::glyph_name (pdf_font_item& it, int key, int fallback,
 
 // Whether u is a form of another character which fonts draw with the same
 // glyph: the Kangxi and CJK radicals (U+2F47 for U+65E5), the compatibility
-// ideographs and the CJK compatibility forms, and the private use codes
-// (KpMath gives its math italic a by U+E325 as well as by U+1D44E)
+// ideographs and the CJK compatibility forms, and the private use codes,
+// which a font may give to a glyph which is also a real character
 static bool
 compatibility_char (int u) {
   return (u >= 0x2e80 && u <= 0x2fdf) || (u >= 0xf900 && u <= 0xfaff) ||
@@ -1157,13 +1163,21 @@ mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
     ucs= FT_Get_Next_Char (face, ucs, &gid);
   }
   fz_ft_unlock (ctx);
-  iterator<int> dit= iterate (it.drawn);
-  while (dit->busy ()) {
-    int g= dit->next ();
-    if (g <= 0 || g > 0xffff || uni->contains (g)) continue;
-    uni (g)= it.drawn [g];
-    gids << g;
-    changed= true;
+  // the characters the font recorded for the glyphs drawn by their number,
+  // which also replace a private use code of the cmap (the variants of
+  // KpMath: lparen.v4 is U+E327); the characters of the names, a guess,
+  // only for the glyphs which the cmap does not reach
+  for (int pass=0; pass<2; pass++) {
+    hashmap<int,int>& m= (pass == 0? it.drawn: it.named);
+    iterator<int> dit= iterate (m);
+    while (dit->busy ()) {
+      int g= dit->next (), u= m [g];
+      if (g <= 0 || g > 0xffff || compatibility_char (u)) continue;
+      if (!uni->contains (g)) gids << g;
+      else if (pass == 1 || !compatibility_char (uni [g])) continue;
+      uni (g)= u;
+      changed= true;
+    }
   }
   for (int i=0; i<N(gids); i++)
     if (uni [gids[i]] > 0xffff) beyond= true;
@@ -1316,7 +1330,16 @@ mupdf_pdf_renderer_rep::glyph_name_unicode (pdf_font_item& it, int gid) {
   // uniXXXX names.)
   if (nm[0] == 0 || (nm[0] >= '0' && nm[0] <= '9')) return -1;
   if (nm[0] == 'a' && nm[1] >= '0' && nm[1] <= '9') return -1;
+  // g or G and hexadecimal digits: MuPDF reads a character code (g12 is /)
+  if (nm[0] == 'g' || nm[0] == 'G') {
+    int i= 1;
+    while (nm[i] != 0 && isxdigit ((unsigned char) nm[i])) i++;
+    if (i > 1 && nm[i] == 0) return -1;
+  }
   int u= fz_unicode_from_glyph_name (nm);
+  // the enclosed letters are what the legacy names of the Adobe glyph list
+  // give for the lparen and rparen of KpMath (U+24A7, U+24AD)
+  if (u >= 0x2460 && u <= 0x24ff) return -1;
   return (u >= 0x20 && u != 0xfffd)? u: -1;
 }
 
