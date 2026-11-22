@@ -168,7 +168,8 @@
           "dt { float: left; min-width: 1.75em; text-align: right; "
           "padding-right: 0.75em; font-weight: bold; } "
           "dd { margin-left: 2.75em; padding-bottom: 0.25em; } "
-          "dd p, dd .tmhtml-p { padding-top: 0em; } "
+          "dd p { padding-top: 0em; } "
+          "dd div:where(.tmhtml-p) { padding-top: 0em; } "
 	  ".subsup { display: inline; vertical-align: -0.2em } "
 	  ".subsup td { padding: 0px; text-align: left} "
 	  ".fraction { display: inline; vertical-align: -0.8em } "
@@ -176,9 +177,12 @@
 	  ".wide { position: relative; margin-left: -0.4em } "
 	  ".accent { position: relative; margin-left: -0.4em; top: -0.1em } "
 	  ".title-block { width: 100%; text-align: center } "
-	  ".tmhtml-p { margin-top: 1em; margin-bottom: 1em } "
-	  ".title-block p, .title-block .tmhtml-p { margin: 0px } "
-	  ".compact-block p, .compact-block .tmhtml-p"
+	  ;; div:where(.tmhtml-p) ranks like a p (see par-div-with-class)
+	  "div:where(.tmhtml-p) { margin-top: 1em; margin-bottom: 1em } "
+	  ".title-block p { margin: 0px } "
+	  ".title-block div:where(.tmhtml-p) { margin: 0px } "
+	  ".compact-block p { margin-top: 0px; margin-bottom: 0px } "
+	  ".compact-block div:where(.tmhtml-p)"
 	  " { margin-top: 0px; margin-bottom: 0px } "
 	  ".left-tab { text-align: left } "
 	  ".center-tab { text-align: center } "
@@ -456,7 +460,10 @@
 ;; margins of a <p> in the CSS of the export, also in the blocks where a
 ;; <p> has none (.compact-block...): without them, a line with a table was
 ;; closer to the paragraphs around it (#903). The vertical spaces of the
-;; paragraph are in its style, which wins over the class
+;; paragraph are in its style, which wins over the class. The CSS selects
+;; it as div:where(.tmhtml-p), which ranks like p against the other rules
+;; (those of the stylesheets which style p, the classes of the div), also in
+;; web/css (#929)
 (define (par-div-with-class x)
   (let* ((c (sxml-attr x 'class))
          (other (list-filter (sxml-attr-list x)

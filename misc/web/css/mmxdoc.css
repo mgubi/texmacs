@@ -221,11 +221,25 @@ P
 {
     TEXT-ALIGN: justify
 }
+/* div:where(.tmhtml-p): the <div> of a paragraph which holds blocks in the
+   HTML export (tmhtml.scm); it gets the default margins of P and
+   the rules of TBODY P and .compact-block P, with the specificity of P
+   (:where); not the TEXT-ALIGN of P, which would beat a CENTER */
+DIV:where(.tmhtml-p)
+{
+    MARGIN-TOP: 1em;
+    MARGIN-BOTTOM: 1em
+}
 TABLE
 {
     BORDER-COLLAPSE: collapse
 }
 TBODY P
+{
+    MARGIN-TOP: 0px;
+    MARGIN-BOTTOM: 0px
+}
+TBODY DIV:where(.tmhtml-p)
 {
     MARGIN-TOP: 0px;
     MARGIN-BOTTOM: 0px
@@ -267,6 +281,11 @@ TD
     TOP: -0.1em
 }
 .compact-block P
+{
+    MARGIN-TOP: 0px;
+    MARGIN-BOTTOM: 0px
+}
+.compact-block DIV:where(.tmhtml-p)
 {
     MARGIN-TOP: 0px;
     MARGIN-BOTTOM: 0px
