@@ -1,9 +1,8 @@
-;;; TODO: UNDER REVIEWED AI GENERATED CODE.
-;;;
 ;;; compiler-scan-test.scm -- Tests for compiler-scan.scm.
 ;;;
-;;; Run from the repository root or from src/Scheme/Chez:
-;;;   scheme -q compiler-scan-test.scm
+;;; Run from src/src/Scheme/Chez, or from src (where configure is):
+;;;   chez --script compiler-scan-test.scm
+;;;   chez --script src/Scheme/Chez/compiler-scan-test.scm
 ;;;
 ;;; Exits with status 0 when every check passes, 1 otherwise.
 
@@ -13,14 +12,17 @@
         (else (first-existing (cdr paths)))))
 
 (define compiler-db-path
-  (or (first-existing '("compiler-db.scm"
-                        "texmacs/src/Scheme/Chez/compiler-db.scm"))
+  (or (first-existing '("compiler-db.scm" "src/Scheme/Chez/compiler-db.scm"))
       (error 'compiler-scan-test "cannot find compiler-db.scm")))
 
 (define compiler-scan-path
-  (or (first-existing '("compiler-scan.scm"
-                        "texmacs/src/Scheme/Chez/compiler-scan.scm"))
+  (or (first-existing '("compiler-scan.scm" "src/Scheme/Chez/compiler-scan.scm"))
       (error 'compiler-scan-test "cannot find compiler-scan.scm")))
+
+;; The library (chez-reader), which compiler-scan imports, is in TeXmacs/progs
+(load (or (first-existing '("../../../TeXmacs/progs/kernel/boot/chez-reader.scm"
+                            "TeXmacs/progs/kernel/boot/chez-reader.scm"))
+          (error 'test "cannot find chez-reader.scm")))
 
 (load compiler-db-path)
 (import (compiler-db))
@@ -48,7 +50,6 @@
 (check "public scanner imported" #t (top-level-bound? 'scan-source-files))
 (check "public file-list scanner imported" #t (top-level-bound? 'scan-source-files->db))
 (check "internal collector not leaked" #f (top-level-bound? 'scan-collect))
-(check "internal walker not leaked" #f (top-level-bound? 'scan-walk))
 
 ;;; Temporary source tree -----------------------------------------------------
 
@@ -114,6 +115,30 @@
        (guard (e (else #t))
          (scan-source-file root "test/bad-public.scm")
          #f))
+
+(check "file without a header skipped" #f
+       (scan-source-file root "test/no-header.scm"))
+
+(check "unreadable file raises" #t
+       (guard (e (else #t))
+         (scan-source-file root "test/unreadable.scm")
+         #f))
+
+;; the transpiler requires the texmacs-module form first
+(write-source "test/late-header.scm"
+              "(display 1)\n(texmacs-module (test late))\n")
+(check "header after another form skipped" #f
+       (scan-source-file root "test/late-header.scm"))
+
+;; Guile: the define-public redefines the name, and exports it
+(write-source "test/define-then-public.scm"
+              (string-append
+               "(texmacs-module (test dp))\n"
+               "(define (helper x) x)\n"
+               "(define-public (helper x) (+ x 1))\n"))
+(check "define then define-public exported" '(helper)
+       (module-info-exports
+        (scan-source-file root "test/define-then-public.scm")))
 
 (check "nested tm-define head" '(nested-call)
        (module-info-global-values

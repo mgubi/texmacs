@@ -47,7 +47,11 @@ chez --script src/Scheme/Chez/make-boot.scm TeXmacs/boot TeXmacs/boot/texmacs.bo
 - `-compile-modules` recompiles the modules whose source changed;
   `-recompile-modules` (or `TEXMACS_RECOMPILE_ALL=1`) all of them. A full
   compilation of the 488 modules takes about 16 s, the boot image 2 s
-  (macOS, Apple silicon).
+  (macOS, Apple silicon). A change of the runtime (`boot-chez.scm`,
+  `chez-reader.scm`, the glue) or of the compiler recompiles every module
+  ([02](02-reader-and-compiler.md#22-the-module-compiler)).
+- When a module fails to compile, the compiler exits with 1 and `make` stops
+  before the boot image.
 - The compiler writes the transpiled sources and the compiled modules (`.so`)
   under `$TEXMACS_BOOT_PATH`, by default `$TEXMACS_PATH/boot`, where TeXmacs
   looks for them. The whole folder is about 50 MB.

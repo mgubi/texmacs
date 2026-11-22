@@ -42,8 +42,7 @@
                    (file-modification-time f2)))))
 
 (define *recompile-all?*
-  (or (and (top-level-bound? '*recompile-all*) *recompile-all?*)
-      (env-flag? "TEXMACS_RECOMPILE_ALL")))
+  (env-flag? "TEXMACS_RECOMPILE_ALL"))
 
 (define (module-needs-recompile? rel-path trans-scm out-so)
   (or *recompile-all?*
@@ -117,14 +116,7 @@
 
 ;; Digest of a compiled .so artifact for integrity checking.
 (define (compute-file-hash path)
-  (and (file-exists? path)
-       (let ((port (open-file-input-port path)))
-         (dynamic-wind
-           void
-           (lambda ()
-             (let ((bytes (get-bytevector-all port)))
-               (if (eof-object? bytes) 0 (equal-hash bytes))))
-           (lambda () (close-port port))))))
+  (file-content-hash path))
 
 (define (update-compiler-db-artifact! mod-name artifact-hash built-at)
   (let ((info (compiler-db-ref *compiler-db* mod-name)))
@@ -243,9 +235,10 @@
         (not (file-exists? trans-scm))
         ;; 1. Artifact integrity against the saved database record
         (artifact-changed? old-info out-so)
-        ;; 2. Source content hash (defeats spurious mtime changes from touch/git)
+        ;; 2. Source content hash: an edit, also one that keeps the source
+        ;; older than its .so (a copy restored with its date)
         (source-changed? old-info new-info)
-        ;; 3. Filesystem mtime, when database hashes are unavailable
+        ;; 3. Filesystem mtime (a touched source is recompiled too)
         (file-newer? src out-so)
         (file-newer? trans-scm out-so))))
 

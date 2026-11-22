@@ -585,7 +585,10 @@ TeXmacs_main (int argc, char** argv) {
       if (compile_modules_script != "") script= url (compile_modules_script);
       cout << "TeXmacs] Executing module compiler: " << concretize (script) << LF;
       exec_file (script);
-      exit (0);
+      // compile-texmacs.scm normally quits itself; here when it raised
+      bool ok= as_bool (eval ("(and (top-level-bound? 'compile-modules-succeeded?)"
+                              " compile-modules-succeeded?)"));
+      exit (ok? 0: 1);
     }
 #endif
   

@@ -1,9 +1,9 @@
-;;; TODO: UNDER REVIEWED AI GENERATED CODE.
-;;;
 ;;; compile-texmacs.scm -- Transpiles and compiles all TeXmacs modules into native Chez Scheme modules
 ;;;
-;;; Usage:
-;;;  ENV=??? TeXmacs --compile-modules
+;;; Usage (docs/chez/01-build.md):
+;;;  TEXMACS_PATH=<TeXmacs> [TEXMACS_BOOT_PATH=<boot>] texmacs.bin -compile-modules
+;;;  (-recompile-modules, or TEXMACS_RECOMPILE_ALL=1: every module)
+;;; TeXmacs exits with 1 when a module fails to compile.
 
 
 ;; ---- Bootstrap -----------------------------------------------------------
@@ -47,6 +47,32 @@
 ;; environment.
 (primitive-load (string-append *compiler-dir* "/compiler-oracle.scm"))
 (primitive-load (string-append *compiler-dir* "/compiler-helper.scm"))
+
+;; ---- What the dependency graph does not see ----------------------------
+;;
+;; The graph of modules knows the sources of the modules and their :use. The
+;; runtime that every module expands with (boot-chez.scm and the files it
+;; includes) and the compiler itself are not in it: when one of them changes,
+;; every module is recompiled. Their content hashes are kept in the boot
+;; directory after a successful build.
+(define *toolchain-files*
+  (append
+   (map progs-path '("kernel/boot/boot-chez.scm" "kernel/boot/chez-reader.scm"
+                     "kernel/boot/glue-chez.scm"))
+   (map (lambda (f) (string-append *compiler-dir* "/" f))
+        '("compile-texmacs.scm" "compiler-helper.scm" "compiler-oracle.scm"
+          "compiler-scan.scm" "compiler-db.scm" "compile-graph.scm"
+          "compile-inventory.scm" "convert-to-r6rs.scm" "tarjan.scm"))))
+
+(define *toolchain-stamp* (map file-content-hash *toolchain-files*))
+(define *toolchain-stamp-file* (boot-path "toolchain-stamp.scm"))
+
+(unless (equal? (guard (e (#t #f))
+                  (call-with-input-file *toolchain-stamp-file* read))
+                *toolchain-stamp*)
+  (emit-progress-line
+   "mode: the runtime or the compiler changed, every module is recompiled")
+  (putenv "TEXMACS_RECOMPILE_ALL" "1"))
 
 ;; compiler-helper.scm resolves the progs tree, so boot-chez is handled right
 ;; after it: check if it needs compiling; if yes, compile then load; otherwise
@@ -249,11 +275,7 @@
         (format #t "  - Recompiled: ~a module~a\n"
                 compiled-count (plural-suffix compiled-count))
         (format #t "  - Up-to-date (cached): ~a module~a\n"
-                cached-count (plural-suffix cached-count))
-        (format #t "  - Failures: ~a\n" (length compile-errors))
-        (for-each (lambda (error)
-                    (format #t "    * FAILED: ~a\n" (car error)))
-                  (reverse compile-errors)))
+                cached-count (plural-suffix cached-count)))
       (begin
         (format #t "[FAILED] Built target texmacs-chez-modules: ~a failure(s)\n"
                 (length compile-errors))
@@ -287,6 +309,26 @@
 
 (report-build-summary!)
 
+;; Entries of the hand-kept lists of compiler-scan.scm which no definition
+;; uses any more (renamed or removed upstream)
+(let ((unused (unused-name-list-entries)))
+  (unless (null? unused)
+    (format #t "WARNING: unused entries of chez-promoted-names or chez-global-names (compiler-scan.scm): ~a\n"
+            unused)))
+
+(when (null? compile-errors)
+  (let ((p (open-file-output-port *toolchain-stamp-file*
+                                  (file-options no-fail)
+                                  (buffer-mode block)
+                                  (native-transcoder))))
+    (write *toolchain-stamp* p)
+    (newline p)
+    (close-port p)))
+
+;; The exit status (make stops before the boot image on a failure):
+;; texmacs.cpp exits with 1 unless this script got here without a failure,
+;; also when the script itself raised an error.
+(define-top-level-value 'compile-modules-succeeded? (null? compile-errors))
 (when (and (top-level-bound? 'quit-TeXmacs)
            (not (top-level-bound? '*dont-quit*)))
-  (quit-TeXmacs))
+  (quit-TeXmacs-code (if (null? compile-errors) 0 1)))

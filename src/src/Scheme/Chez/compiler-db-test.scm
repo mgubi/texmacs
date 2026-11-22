@@ -1,9 +1,8 @@
-;;; TODO: UNDER REVIEWED AI GENERATED CODE.
-;;;
 ;;; compiler-db-test.scm -- Tests for compiler-db.scm.
 ;;;
-;;; Run from this directory:
-;;;   scheme -q compiler-db-test.scm
+;;; Run from src/src/Scheme/Chez, or from src (where configure is):
+;;;   chez --script compiler-db-test.scm
+;;;   chez --script src/Scheme/Chez/compiler-db-test.scm
 ;;;
 ;;; Exits with status 0 when every check passes, 1 otherwise.
 
@@ -13,10 +12,8 @@
         (else (first-existing (cdr paths)))))
 
 (define compiler-db-path
-  (or (first-existing '("compiler-db.scm"
-                        "texmacs/src/Scheme/Chez/compiler-db.scm"))
-      (error 'compiler-db-test
-             "cannot find compiler-db.scm; run from the repository root or from src/Scheme/Chez")))
+  (or (first-existing '("compiler-db.scm" "src/Scheme/Chez/compiler-db.scm"))
+      (error 'compiler-db-test "cannot find compiler-db.scm")))
 
 (load compiler-db-path)
 (import (compiler-db))
@@ -229,6 +226,21 @@
   (delete-file test-path))
 (when (file-exists? corrupt-path)
   (delete-file corrupt-path))
+
+;;; Content hashes ------------------------------------------------------------
+
+;; every position counts (string-hash and equal-hash of Chez sample a few)
+(define long-a (make-string 20000 #\a))
+(define long-b (string-copy long-a))
+(string-set! long-b 10000 #\b)
+(check "content-hash: equal contents" #t
+       (= (content-hash long-a) (content-hash (string-copy long-a))))
+(check "content-hash: one character changed" #f
+       (= (content-hash long-a) (content-hash long-b)))
+(check "content-hash: one byte changed" #f
+       (= (content-hash (string->utf8 long-a)) (content-hash (string->utf8 long-b))))
+(check "file-content-hash: missing file" #f
+       (file-content-hash "no-such-file-for-the-test"))
 
 (display "------------------------------------------------------------") (newline)
 (display checks) (display " checks, ")

@@ -1,8 +1,7 @@
-;;; TODO: UNDER REVIEWED AI GENERATED CODE.
-;;;
 ;;; compile-graph-test.scm -- Tests for compile-graph.scm.
 ;;;
-;;; Run from the repository root or from src/Scheme/Chez:
+;;; Run from src/src/Scheme/Chez, or from src (where configure is):
+;;;   chez --script compile-graph-test.scm
 ;;;   chez --script src/Scheme/Chez/compile-graph-test.scm
 ;;;
 ;;; Exits with status 0 when every check passes, 1 otherwise.
@@ -29,6 +28,10 @@
 (import (tarjan))
 (load (string-append compiler-dir "/compiler-db.scm"))
 (import (compiler-db))
+;; The library (chez-reader), which compiler-scan imports, is in TeXmacs/progs
+(load (or (first-existing '("../../../TeXmacs/progs/kernel/boot/chez-reader.scm"
+                            "TeXmacs/progs/kernel/boot/chez-reader.scm"))
+          (error 'test "cannot find chez-reader.scm")))
 (load (string-append compiler-dir "/compiler-scan.scm"))
 (import (compiler-scan))
 (load (string-append compiler-dir "/compile-graph.scm"))

@@ -1,5 +1,3 @@
-;;; TODO: UNDER REVIEWED AI GENERATED CODE.
-;;;
 ;;; compiler-db.scm -- Persistent compiler database for the Chez TeXmacs build.
 ;;;
 ;;; This file is loaded by compile-texmacs.scm. It has no dependency on the
@@ -7,9 +5,6 @@
 ;;;
 ;;; In memory the database is a hash table keyed by module name. On disk it is
 ;;; a list-based snapshot record, so fasl files stay simple and ordered.
-
-;; The record accessor compiler-db-table is generated below; the earmuffed
-;; constant avoids shadowing it.
 
 (library (compiler-db)
   (export
@@ -29,6 +24,8 @@
     module-info-artifact-hash
     module-info-built-at
     make-module-info
+    content-hash
+    file-content-hash
     compiler-db?
     compiler-db-chez-version
     compiler-db-generated-at
@@ -47,6 +44,37 @@
   (define *compiler-db-schema-version* 1)
 
   ;;; ---------------------------------------------------------------------------
+  ;;; Content hashes
+  ;;; ---------------------------------------------------------------------------
+
+  ;; A digest of all the content of a string or a bytevector: two 32-bit
+  ;; FNV-1a lanes. Not string-hash nor equal-hash, which in Chez look at a few
+  ;; dozen positions only, so that most edits of a long file keep the hash.
+  (define (content-hash x)
+    (let ((n (if (string? x) (string-length x) (bytevector-length x)))
+          (ref (if (string? x)
+                   (lambda (i) (char->integer (string-ref x i)))
+                   (lambda (i) (bytevector-u8-ref x i)))))
+      (let loop ((i 0) (h1 2166136261) (h2 3735928559))
+        (if (fx= i n)
+            (+ (* h1 4294967296) h2)
+            (let ((c (ref i)))
+              (loop (fx+ i 1)
+                    (fxand (fx* (fxlogxor h1 c) 16777619) #xFFFFFFFF)
+                    (fxand (fx* (fxlogxor h2 c) 16777619) #xFFFFFFFF)))))))
+
+  ;; The content hash of a file, or #f when it does not exist.
+  (define (file-content-hash path)
+    (and (file-exists? path)
+         (let ((port (open-file-input-port path)))
+           (dynamic-wind
+             void
+             (lambda ()
+               (let ((bytes (get-bytevector-all port)))
+                 (content-hash (if (eof-object? bytes) (bytevector) bytes))))
+             (lambda () (close-port port))))))
+
+  ;;; ---------------------------------------------------------------------------
   ;;; Records
   ;;; ---------------------------------------------------------------------------
 
@@ -59,9 +87,9 @@
       (immutable global-macros)    ; tm-define-macro names
       (immutable macro-impls)      ; $impl helper names
       (immutable deps)             ; declared texmacs-module dependencies
-      (immutable compile-uses)     ; global names needed during expansion
-      (immutable runtime-uses)     ; global names needed at load/run time
-      (immutable interface-hash)   ; compile-time interface digest, or #f
+      (immutable compile-uses)     ; unused: always '() (kept for the format)
+      (immutable runtime-uses)     ; unused: always '() (kept for the format)
+      (immutable interface-hash)   ; interface digest, or #f (recorded, not compared)
       (immutable source-hash)      ; source content digest, or #f
       (immutable artifact-hash)    ; .so content digest, or #f
       (immutable built-at))        ; build timestamp, or #f

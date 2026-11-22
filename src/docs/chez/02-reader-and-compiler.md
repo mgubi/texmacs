@@ -69,8 +69,19 @@ time, for the files loaded from source (plug-ins, user files).
 5. `init-kernel.scm` and `init-texmacs.scm` are compiled the same way
    (`compile-guile-script!`), then `init-texmacs-boot-file.scm`.
 
-A module is recompiled when its source is newer than its `.so`;
+A module is recompiled when its source changed (its content hash, or a date
+newer than its `.so`), when its `.so` is missing or was changed, and when a
+module it uses (`:use`, `:inherit`) is recompiled; a change in the kernel
+modules recompiles all. What the graph of modules does not see, the runtime
+(`boot-chez.scm` and the files it includes, `chez-reader.scm` and
+`glue-chez.scm`) and the compiler itself, is covered by a stamp: the content
+hashes of these files, kept in `$TEXMACS_BOOT_PATH/toolchain-stamp.scm` after
+a successful build; when one of them changes, every module is recompiled.
 `-recompile-modules` recompiles all.
+
+A module which fails to compile is reported (`FAILED`), and the run exits
+with 1, also when the compiler itself raises an error: `make` then stops
+before the boot image.
 
 ## 2.3 Macros that act when they are expanded
 

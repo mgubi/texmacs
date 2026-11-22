@@ -39,6 +39,15 @@
   recursively through lists and vectors): no shared mutation, a cost for
   large results, and a cyclic list would not end.
 - `define-state` evaluates the initial value of each slot twice.
+- **The compiler** (smaller points of its review):
+  - a `tm-define` under `if` or `when` is not in the database of the module;
+  - two `tm-define-macro` of the same name in a module would stop the scan
+    (none today);
+  - a raw `(raise 'x)` while a module expands stops the whole build, where a
+    condition only fails the module;
+  - while it loads the compiled modules, `developer-menu` (it needs a view)
+    and `client-tmfs` (`url->url`) report a `LOAD-ERROR`, which does not stop
+    the build; both load normally in TeXmacs.
 
 ## 6.3 To do
 
@@ -49,7 +58,5 @@
   briefly with a window. The original branch built on Linux and Windows
   (MSYS2) with CMake ([build_guide/](build_guide)).
 - **CI:** no workflow builds Chez.
-- **Clean-up:** several files of the compiler still say "UNDER REVIEWED AI
-  GENERATED CODE".
 - `client/client-widgets.scm`: the confirmation of a pending account refers
   to `credentials`, not bound there (as in the official sources).

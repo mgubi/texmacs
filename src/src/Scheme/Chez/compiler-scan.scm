@@ -1,5 +1,3 @@
-;;; TODO: UNDER REVIEWED AI GENERATED CODE.
-;;;
 ;;; compiler-scan.scm -- Scan TeXmacs Scheme sources into compiler-db records.
 ;;;
 ;;; This library depends only on compiler-db and Chez Scheme. It does not load
@@ -10,7 +8,8 @@
           scan-interface-hash
           scan-source-file
           scan-source-files
-          scan-source-files->db)
+          scan-source-files->db
+          unused-name-list-entries)
   (import (chezscheme) (compiler-db) (chez-reader))
 
   ;; The reader and the dialect folding are in the library (chez-reader),
@@ -27,6 +26,7 @@
   ;; boot-chez.scm (module-load).
   (define chez-native-names '(when unless case-lambda module-load))
 
+  ;; (path . names): the names chez-compat.scm defines, read once per path
   (define chez-compat-names #f)
 
   (define (compat-file? file-path)
@@ -37,26 +37,27 @@
   (define (chez-compat-path file-path)
     ;; FILE-PATH is .../progs/<rel>; find .../progs from the module name
     (let loop ((i (- (string-length file-path) 1)))
-      (cond ((< i 6) #f)
+      (cond ((< i 5) #f)
             ((string=? (substring file-path (- i 5) (+ i 1)) "progs/")
              (string-append (substring file-path 0 (+ i 1))
                             "kernel/boot/chez-compat.scm"))
             (else (loop (- i 1))))))
 
   (define (compat-names file-path)
-    (or chez-compat-names
-        (let ((p (chez-compat-path file-path)))
-          (and p (file-exists? p)
-               (begin
-                 (set! chez-compat-names
-                       (filter (lambda (x) x)
-                               (map (lambda (f)
-                                      (or (defined-public-name f)
-                                          (and (pair? f) (eq? (car f) 'define-syntax)
-                                               (pair? (cdr f)) (symbol? (cadr f))
-                                               (cadr f))))
-                                    (fold-dialect-forms (read-raw-forms p)))))
-                 chez-compat-names)))))
+    (let ((p (chez-compat-path file-path)))
+      (and p (file-exists? p)
+           (begin
+             (unless (and chez-compat-names (equal? (car chez-compat-names) p))
+               (set! chez-compat-names
+                     (cons p
+                           (filter (lambda (x) x)
+                                   (map (lambda (f)
+                                          (or (defined-public-name f)
+                                              (and (pair? f) (eq? (car f) 'define-syntax)
+                                                   (pair? (cdr f)) (symbol? (cadr f))
+                                                   (cadr f))))
+                                        (fold-dialect-forms (read-raw-forms p)))))))
+             (cdr chez-compat-names)))))
 
   ;; Private helpers that macros of other modules call when they expand.
   ;; The expansion happens outside the defining module here, so Chez needs
@@ -94,7 +95,6 @@
       ("server/server-live.scm" live-load live-name live-save)
       ("server/server-tmfs.scm" version->file-name version-get-info version-get-versions)
       ("tools/comment/comment-edit.scm" volatile-cache-stamp)
-      ("utils/plugins/plugin-cmd.scm" plugin-serializer)
       ("version/version-compare.scm" version-grain)))
 
   ;; the names of the file at file-path (.../progs/<rel>) which are global
@@ -107,13 +107,18 @@
              (cdar l))
             (else (loop (cdr l))))))
 
-  (define (globalize-private f names)
+  ;; The entries of the two lists above which were applied, so that the
+  ;; driver can report the stale ones (unused-name-list-entries)
+  (define used-names (make-hashtable equal-hash equal?))
+
+  (define (globalize-private f names file-path)
     (if (and (pair? f) (eq? (car f) 'define) (pair? (cdr f))
              (let ((h (cadr f)))
                (memq (if (pair? h) (car h) h) names)))
         (let* ((h (cadr f))
                (name (if (pair? h) (car h) h))
                (val (if (pair? h) `(lambda ,(cdr h) ,@(cddr f)) (caddr f))))
+          (hashtable-set! used-names (cons file-path name) #t)
           `(define-top-level-value ',name ,val))
         f))
 
@@ -121,8 +126,32 @@
     (if (and (pair? f) (eq? (car f) 'define) (pair? (cdr f))
              (let ((h (cadr f)))
                (memq (if (pair? h) (car h) h) chez-promoted-names)))
-        (cons 'define-public (cdr f))
+        (let ((h (cadr f)))
+          (hashtable-set! used-names (if (pair? h) (car h) h) #t)
+          (cons 'define-public (cdr f)))
         f))
+
+  ;; The names of chez-promoted-names and of chez-global-names (as
+  ;; "<file> <name>") that no scanned definition used: after a scan of all
+  ;; the sources, entries which no longer name a private definition
+  (define (unused-name-list-entries)
+    (define (used-global? rel name)
+      (exists (lambda (k)
+                (and (pair? k) (eq? (cdr k) name)
+                     (let* ((p (car k)) (r (string-append "/" rel))
+                            (n (string-length p)) (m (string-length r)))
+                       (and (>= n m) (string=? (substring p (- n m) n) r)))))
+              (vector->list (hashtable-keys used-names))))
+    (append
+     (filter (lambda (n) (not (hashtable-ref used-names n #f)))
+             chez-promoted-names)
+     (apply append
+            (map (lambda (entry)
+                   (map (lambda (n) (string-append (car entry) " "
+                                                   (symbol->string n)))
+                        (filter (lambda (n) (not (used-global? (car entry) n)))
+                                (cdr entry))))
+                 chez-global-names))))
 
   ;; A name defined again in the same module: Guile assigns it, Chez does
   ;; not allow it.  The next definitions become assignments; provide-public,
@@ -148,13 +177,24 @@
                   ((memq n seen)
                    (let ((val (if (pair? (cadr f))
                                   `(lambda ,(cdadr f) ,@(cddr f))
-                                  (caddr f))))
+                                  (caddr f)))
+                         ;; a define-public of a name first defined privately
+                         ;; makes the first definition public
+                         (acc (if (eq? (car f) 'define-public)
+                                  (map (lambda (g)
+                                         (if (and (pair? g) (eq? (car g) 'define)
+                                                  (eq? (defined-head g) n))
+                                             (cons 'define-public (cdr g))
+                                             g))
+                                       acc)
+                                  acc)))
                      (loop (cdr fs) seen (cons `(set! ,n ,val) acc))))
                   (else (loop (cdr fs) (cons n seen) (cons f acc))))))))
 
   (define (read-all-forms file-path)
     (let* ((globals (file-global-names file-path))
-           (forms (map (lambda (f) (globalize-private (promote-private f) globals))
+           (forms (map (lambda (f)
+                         (globalize-private (promote-private f) globals file-path))
                       (single-definitions
                         (tm-read-guile-file file-path)))))
       (if (compat-file? file-path)
@@ -177,13 +217,13 @@
         (lambda (port)
           (get-string-all port)))))
 
+  ;; The texmacs-module form, which must come first, as the transpiler
+  ;; requires (module-header, convert-to-r6rs.scm)
   (define (scan-header forms)
-    (let loop ((rest forms))
-      (cond ((null? rest) #f)
-            ((and (pair? (car rest))
-                  (eq? (caar rest) 'texmacs-module))
-             (car rest))
-            (else (loop (cdr rest))))))
+    (and (pair? forms)
+         (pair? (car forms))
+         (eq? (caar forms) 'texmacs-module)
+         (car forms)))
 
   (define (scan-header->deps header mod-name)
     (let ((deps '()))
@@ -306,20 +346,21 @@
                    (string-append acc (symbol->string (car rest)) "\n"))))))
 
   (define (scan-interface-hash exports global-macros macro-impls)
-    (string-hash
+    (content-hash
      (string-append "E\n" (scan-canonical-symbols exports)
                     "G\n" (scan-canonical-symbols global-macros)
                     "M\n" (scan-canonical-symbols macro-impls))))
 
   (define (scan-source-hash text)
-    (and text (string-hash text)))
+    (and text (content-hash text)))
 
   ;;; -------------------------------------------------------------------------
   ;;; One file
   ;;; -------------------------------------------------------------------------
 
-  ;; A file that cannot be read raises: the build stops where the problem is,
-  ;; instead of silently dropping a module from the database.
+  ;; A file that the reader cannot read raises (read-all-forms): the build
+  ;; stops where the problem is, instead of silently dropping a module from
+  ;; the database. A file without a texmacs-module header is skipped.
   (define (scan-source-file progs-dir rel-path)
     (let* ((full (string-append progs-dir "/" rel-path))
            (forms (read-all-forms full))
