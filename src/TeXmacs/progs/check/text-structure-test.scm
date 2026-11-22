@@ -258,6 +258,14 @@
               "Glossary")
       (check= (texmacs->string (stree->tree '(concat "a" (em "b"))))
               "ab")
+      ;; a title of several paragraphs is one line, else the label of the
+      ;; focus bar has several lines and the bar grows for good (#936)
+      (check= (tm/section-get-title-string
+               (stree->tree '(section (document "Un" "deux" "trois"))) #f)
+              "Un deux trois")
+      (check= (texmacs->title-string
+               (stree->tree '(document "a" (concat "b" (next-line) "c"))))
+              "a bc")
       (check-true (principal-section? (node 0)))
       (check-false (principal-section? (node 1)))
       (check-true (principal-section? (node 2)))

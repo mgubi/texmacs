@@ -42,7 +42,11 @@
   (texmacs->code (verbatim-expand x) "cork"))
 
 (tm-define (texmacs->title-string x)
-  (downgrade-math-letters (texmacs->string x)))
+  ;; a title is shown on one line (menus, the focus bar): the line breaks
+  ;; and tabs of its verbatim text, as in a title of several paragraphs,
+  ;; become spaces; the Qt and Cocoa labels show them as such (#936)
+  (with s (downgrade-math-letters (texmacs->string x))
+    (string-replace (string-replace s "\n" " ") "\t" " ")))
 
 (define (indent-prefix* sec)
   (cond ((in? sec '(chapter chapter*)) "")

@@ -274,6 +274,14 @@ void QTMToolbar::addAction (QAction* action) {
     // if the action contains only text, add a margin to the button
     if (action->icon().isNull()) {
       button->setToolButtonStyle (Qt::ToolButtonTextOnly);
+      // a label is one line: the bar would grow for good to the height of
+      // a label of several lines, since it never shrinks (#936)
+      QString txt= action->text ();
+      if (txt.contains (QLatin1Char ('\n')) || txt.contains (QLatin1Char ('\t'))) {
+        txt.replace (QLatin1Char ('\n'), QLatin1Char (' '));
+        txt.replace (QLatin1Char ('\t'), QLatin1Char (' '));
+        action->setText (txt);
+      }
       button->setContentsMargins (QTMTOOLBAR_MARGIN, QTMTOOLBAR_MARGIN, QTMTOOLBAR_MARGIN, QTMTOOLBAR_MARGIN);
     }
     
