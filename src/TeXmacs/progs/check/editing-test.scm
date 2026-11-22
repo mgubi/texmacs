@@ -1573,9 +1573,11 @@
       (check= (selection-get-end) (at 0 11))
       ;; copy and paste; the selection stays after a copy, and go-to does
       ;; not cancel it (a paste would replace it), so it is cancelled first
+      ;; (the clipboard has the language of the document, which follows the
+      ;; locale: british in en_GB)
       (edit (clipboard-copy "editing-test"))
       (check= (tree->stree (clipboard-get "editing-test"))
-              '(tuple "texmacs" "world" "text" "english"))
+              `(tuple "texmacs" "world" "text" ,(get-init "language")))
       (check= (body) '(document "hello world" "second"))
       (check-true (selection-active-any?))
       (edit (selection-cancel) (go-to (at 1 6)) (clipboard-paste "editing-test"))
@@ -1586,7 +1588,7 @@
       (check= (body) '(document "world" "secondworld"))
       (check-false (selection-active-any?))
       (check= (tree->stree (clipboard-get "editing-test"))
-              '(tuple "texmacs" "hello " "text" "english"))
+              `(tuple "texmacs" "hello " "text" ,(get-init "language")))
       (edit (go-end) (clipboard-paste "editing-test"))
       (check= (body) '(document "world" "secondworldhello "))
       ;; a paste replaces the selection
