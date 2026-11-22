@@ -322,6 +322,29 @@ cat > "$out/startup-alt-key.scm" <<'EOF'
   (buffer-close u))
 EOF
 
+# The width of the window takes away the width of a scrollbar, which Qt
+# takes from the style of the QApplication: there is none under -headless,
+# and get-window-width (also Fit to screen width) crashed (#923). The zoom
+# factor saved by change-zoom-factor is put back (a scratch home).
+cat > "$out/startup-fit.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm"))
+      (old (get-preference "zoom factor")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (update-forced)
+  (display* "CHECK width " (integer? (get-window-width)) "\n")
+  (fit-to-screen-width)
+  (display* "CHECK zoom " (> (get-window-zoom-factor) 0) "\n")
+  (set-preference "zoom factor" old)
+  (buffer-close u))
+EOF
+
+check "headless: the width of the window, and Fit to screen width (#923)" \
+      "width #t
+zoom #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-fit.scm")'
+
 check "headless: Alt and a letter on a buffer (#923)" \
       "alt key #t
 quit ()" \
