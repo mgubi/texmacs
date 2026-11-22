@@ -942,10 +942,13 @@
                            #\space)
                           (lambda (w) (!= w "")))
              " ")
-      (for (rule '(".tmhtml-p { margin-top: 1em; margin-bottom: 1em }"
-                   ".title-block p, .title-block .tmhtml-p { margin: 0px }"
-                   ".compact-block p, .compact-block .tmhtml-p { margin-top: 0px; margin-bottom: 0px }"
-                   "dd p, dd .tmhtml-p { padding-top: 0em; }"))
+      (for (rule '("div:where(.tmhtml-p) { margin-top: 1em; margin-bottom: 1em }"
+                   ".title-block p { margin: 0px }"
+                   ".title-block div:where(.tmhtml-p) { margin: 0px }"
+                   ".compact-block p { margin-top: 0px; margin-bottom: 0px }"
+                   ".compact-block div:where(.tmhtml-p) { margin-top: 0px; margin-bottom: 0px }"
+                   "dd p { padding-top: 0em; }"
+                   "dd div:where(.tmhtml-p) { padding-top: 0em; }"))
         (check-true (string-occurs? rule s))))
     ;; text alone stays in a <p>
     (check-true (string-occurs? "<p>" (html-of-buffer '(document "a"))))))
