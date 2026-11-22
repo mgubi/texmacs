@@ -283,6 +283,44 @@ edit_main_rep::nr_pages () {
 
 tagger_rep* make_pdf_tagger (tree body, path rp, string lang, string title);
 
+// The body of a buffer replaced by another tree for a while, without telling
+// the observers, and put back, also when an error unwinds (print_doc)
+struct body_swap {
+  tree& slot;
+  tree  saved;
+  bool  swapped;
+  body_swap (tree& s): slot (s), saved (s), swapped (false) {}
+  void put (tree t) { slot= t; swapped= true; }
+  void restore () { if (swapped) { slot= saved; swapped= false; } }
+  ~body_swap () { restore (); }
+};
+
+// t with each include replaced by the document it includes (as
+// typeset_include finds it: relative to the main document)
+static tree
+expand_includes (tree t, url base, int depth) {
+  if (is_atomic (t)) return t;
+  if (is_compound (t, "include", 1) && is_atomic (t[0]) && depth < 16) {
+    url f= relative (base, url_unix (t[0]->label));
+    if (f == base || inclusion_busy (f)) return t;
+    tree d= load_inclusion (f);
+    if (is_func (d, _ERROR)) return t;
+    // (a copy: the nodes of the cached inclusion carry the places which
+    // the editor gave them, as decorations of the include)
+    // (in a surround: a document is no child of a document, which the
+    // bridges would typeset as a decoration)
+    return compound ("surround", "", "",
+                     expand_includes (copy (d), base, depth + 1));
+  }
+  tree r (t, N(t));
+  bool changed= false;
+  for (int i=0; i<N(t); i++) {
+    r[i]= expand_includes (t[i], base, depth);
+    if (r[i] != t[i]) changed= true;
+  }
+  return changed? r: t;
+}
+
 bool
 edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // true when the file was written (#705)
@@ -334,9 +372,31 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // Dropped, they were found only when the editor had typeset the same
   // document on the screen before -- never in a batch export (texmacs -c).
 
+  // a tagged PDF (PDF/UA, docs/pdf-tagging.md), and with it the places
+  // of what included documents hold
+  bool want_tags= mupdf_target &&
+    (get_env ("TEXMACS_PDF_TAGGED") == "1" ||
+     get_preference ("texmacs->pdf:tagged", "off") == "on");
   env->style_init_env ();
   env->update ();
-  typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+  // a tagged PDF typesets the included documents in place of their
+  // includes: they keep their places, so that their structure is found
+  // (the content of an include has the place of the include otherwise)
+  tree body= subtree (et, rp);
+  body_swap swap (subtree (et, rp));
+  if (want_tags) {
+    tree eb= expand_includes (body, env->base_file_name, 0);
+    if (!strong_equal (eb, body)) {
+      // (the typesetter finds the places of the nodes in their observers:
+      // the new ones get theirs, the others keep those they have; and it
+      // reads the tree of the buffer again at each place, my_resync: the
+      // expanded body is the body of the buffer while it is typeset and
+      // drawn, without telling the editor, and the body is put back after)
+      body= attach_dip (eb, reverse (rp));
+      swap.put (body);
+    }
+  }
+  typesetter ttt= new_typesetter (env, body, reverse (rp));
   typeset_folds= false;   // all the lines of program code are printed
   box the_box= ::typeset (ttt);
   typeset_folds= true;
@@ -368,13 +428,10 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   
   // a tagged PDF (PDF/UA, docs/pdf-tagging.md): the structure of the body
   tagger_rep* tagger= NULL;
-  if (ok && mupdf_target && ren->supports_tagging () &&
-      (get_env ("TEXMACS_PDF_TAGGED") == "1" ||
-       get_preference ("texmacs->pdf:tagged", "off") == "on")) {
+  if (ok && want_tags && ren->supports_tagging ()) {
     string lan= as_string (call ("pdf-tag-language",
                                  object (env->get_string (LANGUAGE))));
-    tagger= make_pdf_tagger (subtree (et, rp), rp, lan,
-                             get_metadata ("title"));
+    tagger= make_pdf_tagger (body, rp, lan, get_metadata ("title"));
     ren->tagger= tagger;
   }
   if (ok) {
@@ -398,6 +455,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   tm_delete (ren);
   if (tagger != NULL) tm_delete (tagger);
   delete_typesetter (ttt);
+  swap.restore ();
 #ifdef MUPDF_RENDERER
   if (mupdf_target) ok= ok && mupdf_pdf_saved ();
 #else

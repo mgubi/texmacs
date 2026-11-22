@@ -392,10 +392,35 @@
   (:synopsis "The structure type of the child @i of @n of a tag @l, or \"\"")
   (if (and (in? l pdf-tag-caption-tags) (== i (- n 1))) "Caption" ""))
 
+(define (pdf-tag-drop-labels s)
+  ;; @s without its \label{...}
+  (with i (string-search-forwards "\\label{" 0 s)
+    (if (< i 0) s
+        (with j (string-search-forwards "}" i s)
+          (if (< j 0) s
+              (pdf-tag-drop-labels
+               (string-append (substring s 0 i)
+                              (substring s (+ j 1) (string-length s)))))))))
+
+(define pdf-tag-environments
+  '("equation" "eqnarray" "align" "gather" "multline" "flalign" "alignat"))
+
+(define (pdf-tag-strip s)
+  ;; the formula of a LaTeX equation: without its environment and labels
+  (let loop ((s (pdf-tag-drop-labels s)) (l pdf-tag-environments))
+    (if (null? l)
+        (string-trim-both (string-replace s "  " " "))
+        (let* ((e (car l))
+               (s1 (string-replace s (string-append "\\begin{" e "*}") ""))
+               (s2 (string-replace s1 (string-append "\\end{" e "*}") ""))
+               (s3 (string-replace s2 (string-append "\\begin{" e "}") ""))
+               (s4 (string-replace s3 (string-append "\\end{" e "}") "")))
+          (loop s4 (cdr l))))))
+
 (define (pdf-tag-latex t)
   (let* ((s (convert (tree->stree t) "texmacs-stree" "latex-snippet"))
          (s1 (string-replace (string-replace s "\n" " ") "\t" " "))
-         (s2 (string-trim-both (cork->utf8 s1))))
+         (s2 (pdf-tag-strip (string-trim-both (cork->utf8 s1)))))
     (cond ((and (string-starts? s2 "$") (string-ends? s2 "$")
                 (> (string-length s2) 1))
            (string-trim-both (substring s2 1 (- (string-length s2) 1))))

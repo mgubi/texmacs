@@ -3272,6 +3272,45 @@
           (check-true (has? "/StructParents 0"))
           (check-true (has? "/Tabs/S"))))))
 
+;; An included document is tagged too: its content keeps its places while the
+;; tagged PDF is typeset (the body of the buffer, with the include replaced
+;; by what it includes, for that time), and the buffer is as it was after.
+(define (test-tagged-pdf-include)
+  (check-group "tagged pdf export: an included document")
+  (if (not (mupdf-writes-pdf?))
+      (images-skip "tagged pdf include" "the PDF is not written by MuPDF")
+      (let* ((part (url-append (temp-dir) "tagged-part.tm"))
+             (tm (url-append (temp-dir) "tagged-main.tm"))
+             (pdf (url-append (temp-dir) "tagged-main.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document (section "Part")
+                                          (concat "So " (math "y+2") ".")))))
+                     part)
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document "Main." (include "tagged-part.tm")
+                                          "End."))))
+                     tm)
+        (load-buffer tm :strict)
+        (let ((body (tree->stree (buffer-tree))))
+          (system-setenv "TEXMACS_PDF_TAGGED" "1")
+          (export-buffer pdf)
+          (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+          (check-true (== (tree->stree (buffer-tree)) body))
+          (check-false (buffer-modified? tm)))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define (has? what) (>= (string-search-forwards what 0 s) 0))
+          (check-true (has? "/StructTreeRoot"))
+          (check-true (has? "/S/H1"))
+          (check-true (has? "/Alt(y + 2)"))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3731,7 +3770,7 @@
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
                   test-html-escape test-serialize-special test-big-document test-pdf-export
-                  test-tagged-pdf-export
+                  test-tagged-pdf-export test-tagged-pdf-include
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

@@ -50,6 +50,8 @@ public:
   string title () { return ttl; }
 
 private:
+  bool   child (tree t, int i, tree& c);
+  bool   holds_heading (tree t);
   string role_of (string tag);
   string child_role_of (string tag, int i, int n);
   string alt_of (string key, tree t, string role);
@@ -69,6 +71,15 @@ pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
   hashset<int> ranks;
   collect_ranks (body, ranks);
   appendix_rank= (ranks->contains (2)? 2: 3);
+}
+
+// The child i of t, if any
+bool
+pdf_tagger_rep::child (tree t, int i, tree& c) {
+  if (is_atomic (t)) return false;
+  if (i < 0 || i >= N(t)) return false;
+  c= t[i];
+  return true;
 }
 
 string
@@ -201,6 +212,17 @@ begins_with_item (tree t) {
   return false;
 }
 
+// whether a paragraph holds a heading (<section|..><label|..>): it is no
+// paragraph then, but where the heading is
+bool
+pdf_tagger_rep::holds_heading (tree t) {
+  if (!is_compound (t, "concat")) return false;
+  for (int i=0; i<N(t); i++)
+    if (is_compound (t[i]) && starts (role_of (as_string (L(t[i]))), "H:"))
+      return true;
+  return false;
+}
+
 static bool
 has_document_child (tree t) {
   if (is_atomic (t)) return false;
@@ -240,10 +262,10 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
   path   li_pos;
   while (!is_nil (s) && is_compound (t)) {
     int i= s->item;
-    if (i < 0 || i >= N(t)) break;
-    tree parent= t;
+    tree parent= t, c;
+    if (!child (t, i, c)) break;
     above << parent;
-    t= t[i]; cur= cur * i; s= s->next;
+    t= c; cur= cur * i; s= s->next;
     // a list item is a label (the item tag) and a body
     if (last == "LI" && !li_body) {
       string lb= is_atomic (t)? string (""): as_string (L(t));
@@ -305,7 +327,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     if (role == "" && is_compound (t)) role= role_of (as_string (L(t)));
     // (the document of a table in the form of a block holds its format)
     if (role == "" && is_document (parent) && !is_document (t) &&
-        last != "Table" && last != "TR") {
+        last != "Table" && last != "TR" && !holds_heading (t)) {
       if (last == "L") role= "LI";
       else role= has_document_child (t)? "Div": "P";
     }
@@ -349,9 +371,10 @@ pdf_tagger_rep::row_cells (path pos) {
   array<tree> above;
   tree t= body;
   for (path q= pos; !is_nil (q); q= q->next) {
-    if (is_atomic (t) || q->item < 0 || q->item >= N(t)) return r;
+    tree c;
+    if (!child (t, q->item, c)) return r;
     above << t;
-    t= t[q->item];
+    t= c;
   }
   if (!is_compound (t, "row") || N(above) < 1 ||
       !is_compound (above[N(above)-1], "table")) return r;

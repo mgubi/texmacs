@@ -59,6 +59,15 @@ a document (a P, or a Div when they hold paragraphs themselves).
 * A formula (`math`, `equation*`, `eqnarray*`, `align*`...) or a picture
   is a whole: nothing inside it is an element of its own. Its Alt is its
   LaTeX (`pdf-tag-alt`), for a picture the name of its file for now.
+* Included documents: the content of an `include` is typeset as a
+  decoration of the include, one box of no place inside. A tagged PDF is
+  therefore typeset from the body with each include replaced by what it
+  includes, in a `surround` (`expand_includes` in `print_doc`; a document
+  is no child of a document). As the bridges read the tree of the buffer
+  again at each place (`bridge_rep::my_resync`), this expanded body is the
+  body of the buffer while the PDF is typeset and drawn, swapped in
+  without telling the observers and put back after, also on an error
+  (`body_swap`); the buffer is as it was (convert-more checks it).
 * A link of the document (`hlink`) is a Link element; a link of no
   `hlink` (the call of a footnote and its way back) gets a Link of its
   own in the element of its text. A video is an Annot element.
@@ -115,10 +124,6 @@ in the Matterhorn Protocol.
 * **Table headers** (TH, with a Scope): TeXmacs has no markup for them.
 * **The OpenType math variants** (#943): U+FFFD in the text until the
   fonts record their characters.
-* **Included documents** (`include`): their boxes have the place of the
-  `include`, after the marks of a decoration, so everything they hold is
-  one element, without its headings or formulas. Keeping the places inside
-  the included document needs the typesetter (`typeset_include`).
 * **The call of a footnote** has the place of the footnote, as the number
   in front of the note, so it is in the Note rather than in its paragraph.
 * **Marked content and the graphics state**: a block may open inside a
