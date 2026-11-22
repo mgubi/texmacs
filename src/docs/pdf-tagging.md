@@ -43,13 +43,16 @@ a document (a P, or a Div when they hold paragraphs themselves).
   met before it in the pages and not closed by one of its rank since: no
   level is skipped (PDF/UA), and the headings of a rank under the same one
   have the same level.
-* Lists: every child of the document of a list is an LI, with an Lbl
-  (the `item`) and an LBody; a nested list or an equation in a list is in
-  the LBody.
+* Lists: a child of the document of a list which begins with an `item`
+  is an LI, with an Lbl (the `item`) and an LBody; one which does not (a
+  second paragraph, an equation, a nested list, a pause) is in the LBody
+  of the item before it.
 * Tables: `tabular` (or a `table` which no tabular holds) is the Table
   (the document of a table in the form of a block is not a paragraph),
   `row` a TR, `cell` a TD, with `ColSpan` and `RowSpan` read from the
-  `cwith` of the formats around the table, clamped to the table. A row
+  `cwith` of the formats around the table, clamped to the table (no row
+  spans in a table broken across pages, `table-hyphen`, as the typesetter
+  does; as many columns as the shortest row). A row
   has all its cells,
   those which draw nothing included, and not those which a span covers
   (`row_cells`), so that the rows have the same number of columns.
@@ -79,10 +82,13 @@ catalog gets `/MarkInfo <</Marked true>>`, `/Lang` (the language of the
 document, `pdf-tag-language`), `/ViewerPreferences <</DisplayDocTitle
 true>>`, and XMP metadata with the title and `pdfuaid:part 1`.
 
-**Fonts.** PDF/UA wants a Unicode value for every glyph drawn: in a tagged
-PDF the glyphs of no known character (the pieces of the horizontal braces
-of cmex, some variants of the OpenType math fonts, #943) are mapped to
-U+FFFD, and a TrueType CID font gets `/CIDToGIDMap /Identity`.
+**Fonts.** PDF/UA wants a Unicode value for every glyph drawn. The TeX
+fonts take theirs from their encodings (`tex_math_unicode`: the math
+fonts, and the CB Greek fonts, `grmn.enc`), a TeX font of no table in a
+tagged PDF from the names of its glyphs; the glyphs of no known character
+(the pieces of the horizontal braces of cmex, some variants of the
+OpenType math fonts, #943) are mapped to U+FFFD, and a TrueType CID font
+gets `/CIDToGIDMap /Identity`.
 
 ## Checking it
 
@@ -118,6 +124,12 @@ in the Matterhorn Protocol.
 * **Marked content and the graphics state**: a block may open inside a
   `q` (a clipping) and close after its `Q`; veraPDF and MuPDF accept it,
   ISO 32000-1 does not forbid it, but they do not nest.
+* **Headings which macros write**: the titles of the table of contents,
+  the bibliography, the index, the title of a slide are text in a Div, not
+  headings.
+* **Languages** which `language_to_locale` does not know are `en-US`.
+* **A missing glyph** (`.notdef`) drawn by the typesetter (STIX size
+  fonts in a thesis of the corpus) is forbidden by PDF/UA (7.21.8).
 * **PDFHummus** does not tag; the tagger and the box hook are its for the
   taking.
 * **PDF/UA-2** (PDF 2.0): MathML as associated files of the formulas,
