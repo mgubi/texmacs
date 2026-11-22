@@ -32,6 +32,7 @@
 #include "mupdf_pdf_renderer.hpp"
 #include "Metafont/tex_unicode.hpp"
 #include "pdf_tags.hpp"
+#include "Freetype/pdf_font_subst.hpp"
 #include "mupdf_renderer.hpp"
 #include "mupdf_picture.hpp"
 #include "analyze.hpp"
@@ -314,6 +315,9 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
   int  embed_image (url u);
+  void embed_picture_fonts (pdf_obj* res);
+  array<pdf_obj*> picture_font_objs;   // the programs embedded for them
+  hashmap<string,int> picture_font_files;   // whole programs, by file
   void merge_layers (pdf_document* src, pdf_graft_map* map);
   void place_image (int num, double w, double h, SI x, SI y, int alpha);
   int  name_xobject (pdf_obj* ref);
@@ -539,6 +543,8 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   }
   for (int i=0; i<N(pages); i++) pdf_drop_obj (ctx, pages[i]);
   for (int i=0; i<N(tag_objs); i++) pdf_drop_obj (ctx, tag_objs[i]);
+  for (int i=0; i<N(picture_font_objs); i++)
+    pdf_drop_obj (ctx, picture_font_objs[i]);
   if (tags != NULL) tm_delete (tags);
   for (int i=0; i<N(tag_annots); i++) pdf_drop_obj (ctx, tag_annots[i]);
   for (int i=0; i<N(video_fs); i++) pdf_drop_obj (ctx, video_fs[i]);
@@ -2077,6 +2083,7 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
     pdf_document* src= NULL;
     fz_buffer* buf= NULL;
     pdf_graft_map* map= NULL;
+    pdf_obj* kept= NULL;   // the resources, for embed_picture_fonts
     // made before fz_try: a throw is a longjmp, which skips destructors
     c_string path (concretize (pdf));
     fz_try (ctx) {
@@ -2105,7 +2112,7 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
       char cnm[32];
       snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
       pdf_dict_puts_drop (ctx, res_xobj, cnm, xo);
-      pdf_drop_obj (ctx, res);
+      kept= res;
     }
     fz_always (ctx) {
       pdf_drop_graft_map (ctx, map);
@@ -2117,10 +2124,197 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
                       << fz_caught_message (ctx) << LF;
       num= -1;
     }
+    // a tagged PDF embeds the fonts which the picture names only (PDF/UA)
+    if (kept != NULL && tagger != NULL) embed_picture_fonts (kept);
+    pdf_drop_obj (ctx, kept);
     if (!is_none (tmp)) remove (tmp);
   }
   image_pool (key)= num;
   return num;
+}
+
+
+/******************************************************************************
+* The fonts which a PDF picture names only (docs/pdf-tagging.md): in a
+* tagged PDF, a font which TeXmacs ships is embedded instead (pdf_font_subst)
+******************************************************************************/
+
+#define PICTURE_FONTS_MAX 64
+
+void
+mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
+  // the fonts of the resources and of the forms in them, which have no
+  // program; read into C buffers (no destructors in fz_try)
+  pdf_obj* fonts[PICTURE_FONTS_MAX];
+  char base[PICTURE_FONTS_MAX][128];
+  char enc[PICTURE_FONTS_MAX][64];
+  static char diff[PICTURE_FONTS_MAX][256][64];
+  int n= 0;
+  pdf_obj* todo[256];
+  int ntodo= 0, seen= 0;
+  fz_try (ctx) {
+    todo[ntodo++]= res;
+    while (seen < ntodo && n < PICTURE_FONTS_MAX) {
+      pdf_obj* r= todo[seen++];
+      pdf_obj* fd= pdf_dict_get (ctx, r, PDF_NAME(Font));
+      for (int i=0; fd != NULL && i < pdf_dict_len (ctx, fd) &&
+                    n < PICTURE_FONTS_MAX; i++) {
+        pdf_obj* f= pdf_dict_get_val (ctx, fd, i);
+        pdf_obj* st= pdf_dict_get (ctx, f, PDF_NAME(Subtype));
+        if (!pdf_name_eq (ctx, st, PDF_NAME(Type1)) &&
+            !pdf_name_eq (ctx, st, PDF_NAME(TrueType)) &&
+            !pdf_name_eq (ctx, st, PDF_NAME(MMType1))) continue;
+        pdf_obj* desc= pdf_dict_get (ctx, f, PDF_NAME(FontDescriptor));
+        if (desc != NULL &&
+            (pdf_dict_get (ctx, desc, PDF_NAME(FontFile)) != NULL ||
+             pdf_dict_get (ctx, desc, PDF_NAME(FontFile2)) != NULL ||
+             pdf_dict_get (ctx, desc, PDF_NAME(FontFile3)) != NULL)) continue;
+        int dup= 0;
+        for (int j=0; j<n; j++) if (pdf_objcmp (ctx, fonts[j], f) == 0) dup= 1;
+        if (dup) continue;
+        fonts[n]= f;
+        fz_strlcpy (base[n], pdf_to_name (ctx, pdf_dict_get (ctx, f, PDF_NAME(BaseFont))), 128);
+        pdf_obj* e= pdf_dict_get (ctx, f, PDF_NAME(Encoding));
+        enc[n][0]= '\0';
+        for (int c=0; c<256; c++) diff[n][c][0]= '\0';
+        if (pdf_is_name (ctx, e)) fz_strlcpy (enc[n], pdf_to_name (ctx, e), 64);
+        else if (pdf_is_dict (ctx, e)) {
+          fz_strlcpy (enc[n], pdf_to_name (ctx, pdf_dict_get (ctx, e, PDF_NAME(BaseEncoding))), 64);
+          pdf_obj* d= pdf_dict_get (ctx, e, PDF_NAME(Differences));
+          int code= 0;
+          for (int j=0; j < pdf_array_len (ctx, d); j++) {
+            pdf_obj* it= pdf_array_get (ctx, d, j);
+            if (pdf_is_int (ctx, it)) code= pdf_to_int (ctx, it);
+            else if (pdf_is_name (ctx, it) && code >= 0 && code < 256)
+              fz_strlcpy (diff[n][code++], pdf_to_name (ctx, it), 64);
+          }
+        }
+        n++;
+      }
+      pdf_obj* xd= pdf_dict_get (ctx, r, PDF_NAME(XObject));
+      for (int i=0; xd != NULL && i < pdf_dict_len (ctx, xd) && ntodo < 256; i++) {
+        pdf_obj* x= pdf_dict_get_val (ctx, xd, i);
+        pdf_obj* xr= pdf_dict_get (ctx, x, PDF_NAME(Resources));
+        if (xr != NULL && pdf_name_eq (ctx, pdf_dict_get (ctx, x, PDF_NAME(Subtype)),
+                                       PDF_NAME(Form))) {
+          int dup= 0;
+          for (int j=0; j<ntodo; j++) if (todo[j] == xr) dup= 1;
+          if (!dup) todo[ntodo++]= xr;
+        }
+      }
+    }
+  }
+  fz_catch (ctx) { n= 0; }
+  for (int k=0; k<n; k++) {
+    // what goes in the font, made before the fz_try below
+    array<string> diffs (256);
+    for (int c=0; c<256; c++) diffs[c]= string (diff[k][c]);
+    string bname (base[k]);
+    array<string> names= pdf_encoding_names (bname, string (enc[k]), diffs);
+    pdf_font_subst r;
+    if (!pdf_font_substitute (bname, names, r)) {
+      convert_warning << "no font to embed for " << bname
+                      << " (a picture), the PDF is not PDF/UA" << LF;
+      continue;
+    }
+    // a program subset to the glyphs of the font, or else the whole one,
+    // once for the document
+    string key= as_string (r.file);
+    int fi= (picture_font_files->contains (key)? picture_font_files [key]: -1);
+    // the bare CFF program (Type1C), which pdf_subset_fonts cuts down to
+    // the glyphs used, else the whole OpenType font
+    string prog;
+    bool cff= false;
+    if (fi < 0) {
+      prog= pdf_cff_program (r.file);
+      cff= (N(prog) > 0);
+      if (!cff && load_string (r.file, prog, false)) continue;
+    }
+    string ps= r.ps_name * string ((char) 0);
+    array<string> gn (256);
+    for (int c=0; c<256; c++) gn[c]= r.glyph[c] * string ((char) 0);
+    string tu= pdf_simple_to_unicode (r.unicode);
+    int ng= N(r.gids);
+    int* gids= tm_new_array<int> (ng);
+    for (int j=0; j<ng; j++) gids[j]= r.gids[j];
+    fz_buffer* fb= NULL;
+    fz_buffer* tb= NULL;
+    fz_buffer* sb= NULL;
+    fz_var (fb); fz_var (tb); fz_var (sb);
+    pdf_obj* ff= NULL;
+    int subset= 0;
+    fz_var (subset);
+    fz_try (ctx) {
+      if (fi < 0) {
+        fb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) &prog[0],
+                                            (size_t) N(prog));
+        // (the subsetter of MuPDF 1.28 fails on some glyphs of the TeX Gyre
+        // fonts: the whole program then)
+        if (cff) {
+          fz_try (ctx) sb= fz_subset_cff_for_gids (ctx, fb, gids, ng, 0, 0);
+          fz_catch (ctx) sb= NULL;
+          if (sb != NULL) { fz_drop_buffer (ctx, fb); fb= sb; sb= NULL; subset= 1; }
+        }
+        pdf_obj* sd= pdf_new_dict (ctx, doc, 1);
+        pdf_dict_put (ctx, sd, PDF_NAME(Subtype),
+                      cff? PDF_NAME(Type1C): PDF_NAME(OpenType));
+        ff= pdf_add_stream (ctx, doc, fb, sd, 0);
+        pdf_drop_obj (ctx, sd);
+      }
+      else ff= pdf_keep_obj (ctx, picture_font_objs[fi]);
+      pdf_obj* f= fonts[k];
+      pdf_obj* d= pdf_add_new_dict (ctx, doc, 10);
+      pdf_dict_put (ctx, d, PDF_NAME(Type), PDF_NAME(FontDescriptor));
+      pdf_dict_put_name (ctx, d, PDF_NAME(FontName), &ps[0]);
+      pdf_dict_put_int (ctx, d, PDF_NAME(Flags), r.flags);
+      pdf_obj* bb= pdf_dict_put_array (ctx, d, PDF_NAME(FontBBox), 4);
+      for (int j=0; j<4; j++) pdf_array_push_int (ctx, bb, r.bbox[j]);
+      pdf_dict_put_int (ctx, d, PDF_NAME(ItalicAngle), r.italic);
+      pdf_dict_put_int (ctx, d, PDF_NAME(Ascent), r.ascent);
+      pdf_dict_put_int (ctx, d, PDF_NAME(Descent), r.descent);
+      pdf_dict_put_int (ctx, d, PDF_NAME(CapHeight), r.cap_height);
+      pdf_dict_put_int (ctx, d, PDF_NAME(StemV), r.stem_v);
+      pdf_dict_put (ctx, d, PDF_NAME(FontFile3), ff);
+      pdf_dict_put_drop (ctx, f, PDF_NAME(FontDescriptor), d);
+      pdf_dict_put (ctx, f, PDF_NAME(Subtype), PDF_NAME(Type1));
+      pdf_dict_put_name (ctx, f, PDF_NAME(BaseFont), &ps[0]);
+      pdf_dict_put_int (ctx, f, PDF_NAME(FirstChar), r.first);
+      pdf_dict_put_int (ctx, f, PDF_NAME(LastChar), r.last);
+      pdf_obj* w= pdf_dict_put_array (ctx, f, PDF_NAME(Widths), N(r.widths));
+      for (int j=0; j<N(r.widths); j++) pdf_array_push_int (ctx, w, r.widths[j]);
+      // the glyphs of the program by their names, whatever the encoding said
+      pdf_obj* e= pdf_new_dict (ctx, doc, 2);
+      pdf_dict_put (ctx, e, PDF_NAME(Type), PDF_NAME(Encoding));
+      pdf_obj* da= pdf_dict_put_array (ctx, e, PDF_NAME(Differences), 64);
+      int prev= -2;
+      for (int c= r.first; c <= r.last; c++) {
+        if (N(gn[c]) <= 1) continue;
+        if (c != prev + 1) pdf_array_push_int (ctx, da, c);
+        pdf_array_push_name (ctx, da, &gn[c][0]);
+        prev= c;
+      }
+      pdf_dict_put_drop (ctx, f, PDF_NAME(Encoding), pdf_add_object_drop (ctx, doc, e));
+      tb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) &tu[0],
+                                          (size_t) N(tu));
+      pdf_dict_put_drop (ctx, f, PDF_NAME(ToUnicode),
+                         pdf_add_stream (ctx, doc, tb, NULL, 0));
+    }
+    fz_always (ctx) {
+      fz_drop_buffer (ctx, fb); fz_drop_buffer (ctx, tb);
+      fz_drop_buffer (ctx, sb);
+    }
+    fz_catch (ctx) {
+      pdf_drop_obj (ctx, ff); ff= NULL;
+      convert_warning << "MuPDF could not embed a font for " << bname
+                      << " (a picture): " << fz_caught_message (ctx) << LF;
+    }
+    tm_delete_array (gids);
+    if (ff != NULL && fi < 0) {
+      if (!subset) picture_font_files (key)= N(picture_font_objs);
+      picture_font_objs << ff;
+    }
+    else if (ff != NULL) pdf_drop_obj (ctx, ff);
+  }
 }
 
 // w and h are the size the picture must have, in the pixels of the

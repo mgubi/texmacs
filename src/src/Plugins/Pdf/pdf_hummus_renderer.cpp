@@ -13,6 +13,8 @@
 #include "pdf_tags.hpp"
 
 extern bool hummus_write_cidset;  // PDFWriter/DescendentFontWriter.cpp
+// the PDF pictures get their fonts embedded (a tagged PDF, PDF/UA)
+static bool hummus_embed_fonts= false;
 #include "Metafont/tex_files.hpp"
 #include "Metafont/load_tfm.hpp"
 #include "Metafont/tex_unicode.hpp"
@@ -59,6 +61,18 @@ extern bool hummus_write_cidset;  // PDFWriter/DescendentFontWriter.cpp
 #include "PDFWriter/PDFTiledPattern.h"
 #include "PDFWriter/TiledPatternContentContext.h"
 #include "PDFWriter/PDFUsedFont.h"
+#include "PDFWriter/PDFParser.h"
+#include "PDFWriter/PDFDictionary.h"
+#include "PDFWriter/PDFArray.h"
+#include "PDFWriter/PDFName.h"
+#include "PDFWriter/PDFInteger.h"
+#include "PDFWriter/PDFStreamInput.h"
+#include "PDFWriter/PDFIndirectObjectReference.h"
+#include "PDFWriter/PDFObjectCast.h"
+#include "PDFWriter/FreeTypeWrapper.h"
+#include "PDFWriter/FreeTypeFaceWrapper.h"
+#include "PDFWriter/CFFEmbeddedFontWriter.h"
+#include "Freetype/pdf_font_subst.hpp"
  
 /******************************************************************************
  * pdf_hummus_renderer
@@ -412,7 +426,9 @@ pdf_hummus_renderer_rep::~pdf_hummus_renderer_rep () {
   if (!started) return; // no cleanup to do
   end_page();
   
+  hummus_embed_fonts= (tagger != NULL);
   flush_images();
+  hummus_embed_fonts= false;
   flush_patterns();
   flush_glyphs();
   flush_dests();
@@ -2009,6 +2025,213 @@ pdf_hummus_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
     contentContext->fStar(); // nonzero winding
 }
 
+/******************************************************************************
+* The fonts which a PDF picture names only (docs/pdf-tagging.md): in a
+* tagged PDF, a copy of the picture embeds a font which TeXmacs ships
+* instead (pdf_font_subst), written by an incremental update of PDFHummus
+******************************************************************************/
+
+static std::string
+as_charp_std (string s) {
+  return std::string (N(s) == 0? "": &s[0], (size_t) N(s));
+}
+
+static string
+hummus_name (PDFParser& p, PDFDictionary* d, const char* key) {
+  PDFObjectCastPtr<PDFName> n (p.QueryDictionaryObject (d, key));
+  return (!n? string (""): string (n->GetValue ().c_str ()));
+}
+
+static void
+hummus_font_dicts (PDFParser& p, PDFDictionary* res,
+                   array<int>& ids, int depth) {
+  if (res == NULL || depth > 8) return;
+  PDFObjectCastPtr<PDFDictionary> fd (p.QueryDictionaryObject (res, "Font"));
+  if (!!fd) {
+    MapIterator<PDFNameToPDFObjectMap> it= fd->GetIterator ();
+    while (it.MoveNext ()) {
+      PDFObject* v= it.GetValue ();
+      if (v->GetType () != PDFObject::ePDFObjectIndirectObjectReference) {
+        convert_warning << "a font of a picture is not an object of its own, "
+                        << "it is left as it is" << LF;
+        continue;
+      }
+      int id= (int) ((PDFIndirectObjectReference*) v)->mObjectID;
+      bool dup= false;
+      for (int i=0; i<N(ids); i++) if (ids[i] == id) dup= true;
+      if (!dup) ids << id;
+    }
+  }
+  PDFObjectCastPtr<PDFDictionary> xd (p.QueryDictionaryObject (res, "XObject"));
+  if (!xd) return;
+  MapIterator<PDFNameToPDFObjectMap> it= xd->GetIterator ();
+  while (it.MoveNext ()) {
+    PDFObjectCastPtr<PDFStreamInput> x (p.QueryDictionaryObject (xd.GetPtr (),
+                                          it.GetKey ()->GetValue ()));
+    if (!x) continue;
+    PDFObjectCastPtr<PDFDictionary> xdict (x->QueryStreamDictionary ());
+    if (!xdict || hummus_name (p, xdict.GetPtr (), "Subtype") != "Form")
+      continue;
+    PDFObjectCastPtr<PDFDictionary> xr (p.QueryDictionaryObject (xdict.GetPtr (),
+                                                                 "Resources"));
+    if (!!xr) hummus_font_dicts (p, xr.GetPtr (), ids, depth + 1);
+  }
+}
+
+static ObjectIDType
+hummus_write_stream (ObjectsContext& oc, string data, string subtype) {
+  ObjectIDType id= oc.StartNewIndirectObject ();
+  DictionaryContext* d= oc.StartDictionary ();
+  if (N(subtype) > 0) {
+    d->WriteKey ("Subtype");
+    d->WriteNameValue (as_charp_std (subtype));
+  }
+  PDFStream* st= oc.StartPDFStream (d);
+  st->GetWriteStream ()->Write ((const IOBasicTypes::Byte*) &data[0], N(data));
+  oc.EndPDFStream (st);
+  delete st;
+  return id;
+}
+
+// Writes a copy of the picture in to out, with fonts in place of those it
+// names only; false when there were none or when it failed
+static bool
+hummus_embed_picture_fonts (url in, url out) {
+  PDFWriter w;
+  string sin= concretize (in), sout= concretize (out);
+  if (w.ModifyPDF (std::string (&sin[0], N(sin)), ePDFVersion17,
+                   std::string (&sout[0], N(sout))) != PDFHummus::eSuccess)
+    return false;
+  PDFParser& p= w.GetModifiedFileParser ();
+  ObjectsContext& oc= w.GetObjectsContext ();
+  array<int> ids;
+  {
+    RefCountPtr<PDFDictionary> page (p.ParsePage (0));
+    if (!page) { w.EndPDF (); return false; }
+    PDFObjectCastPtr<PDFDictionary> res (p.QueryDictionaryObject (page.GetPtr (),
+                                                                  "Resources"));
+    if (!res) {
+      PDFObjectCastPtr<PDFDictionary> parent (p.QueryDictionaryObject (page.GetPtr (),
+                                                                       "Parent"));
+      if (!!parent) res= p.QueryDictionaryObject (parent.GetPtr (), "Resources");
+    }
+    hummus_font_dicts (p, res.GetPtr (), ids, 0);
+  }
+  int done= 0;
+  FreeTypeWrapper ft;
+  for (int k=0; k<N(ids); k++) {
+    PDFObjectCastPtr<PDFDictionary> f (p.ParseNewObject (ids[k]));
+    if (!f) continue;
+    string st= hummus_name (p, f.GetPtr (), "Subtype");
+    if (st != "Type1" && st != "TrueType" && st != "MMType1") continue;
+    PDFObjectCastPtr<PDFDictionary> desc (p.QueryDictionaryObject (f.GetPtr (),
+                                                                   "FontDescriptor"));
+    if (!!desc && (desc->Exists ("FontFile") || desc->Exists ("FontFile2") ||
+                   desc->Exists ("FontFile3"))) continue;
+    string base= hummus_name (p, f.GetPtr (), "BaseFont");
+    string enc;
+    array<string> diffs (256);
+    PDFObject* e= p.QueryDictionaryObject (f.GetPtr (), "Encoding");
+    if (e != NULL && e->GetType () == PDFObject::ePDFObjectName)
+      enc= ((PDFName*) e)->GetValue ().c_str ();
+    else if (e != NULL && e->GetType () == PDFObject::ePDFObjectDictionary) {
+      PDFDictionary* ed= (PDFDictionary*) e;
+      enc= hummus_name (p, ed, "BaseEncoding");
+      PDFObjectCastPtr<PDFArray> da (p.QueryDictionaryObject (ed, "Differences"));
+      int code= 0;
+      for (unsigned long j=0; !!da && j < da->GetLength (); j++) {
+        RefCountPtr<PDFObject> it (da->QueryObject (j));
+        if (it->GetType () == PDFObject::ePDFObjectInteger)
+          code= (int) ((PDFInteger*) it.GetPtr ())->GetValue ();
+        else if (it->GetType () == PDFObject::ePDFObjectName &&
+                 code >= 0 && code < 256)
+          diffs[code++]= ((PDFName*) it.GetPtr ())->GetValue ().c_str ();
+      }
+    }
+    if (e != NULL) e->Release ();
+    pdf_font_subst r;
+    if (!pdf_font_substitute (base, pdf_encoding_names (base, enc, diffs), r)) {
+      convert_warning << "no font to embed for " << base
+                      << " (a picture), the PDF is not PDF/UA" << LF;
+      continue;
+    }
+    // the program, subset to the glyphs of the font
+    string path= concretize (r.file);
+    std::string spath (&path[0], N(path));
+    FT_Face face= ft.NewFace (spath, 0);
+    if (face == NULL) continue;
+    ObjectIDType ff= 0;
+    {
+      FreeTypeFaceWrapper fw (face, spath, 0, false);
+      UIntVector gids;
+      for (int j=0; j<N(r.gids); j++) gids.push_back ((unsigned int) r.gids[j]);
+      CFFEmbeddedFontWriter cw;
+      string sub= string ("TMPIC") * string ((char) ('A' + (k % 26))) *
+                  "+" * r.ps_name;
+      if (cw.WriteEmbeddedFont (fw, gids, "Type1C", as_charp_std (sub), &oc, ff)
+          != PDFHummus::eSuccess) ff= 0;
+      r.ps_name= sub;
+    }
+    ft.DoneFace (face);
+    if (ff == 0) {
+      convert_warning << "PDFHummus could not embed a font for " << base
+                      << " (a picture)" << LF;
+      continue;
+    }
+    ObjectIDType tu= hummus_write_stream (oc, pdf_simple_to_unicode (r.unicode), "");
+    ObjectIDType did= oc.StartNewIndirectObject ();
+    DictionaryContext* d= oc.StartDictionary ();
+    d->WriteKey ("Type"); d->WriteNameValue ("FontDescriptor");
+    d->WriteKey ("FontName"); d->WriteNameValue (as_charp_std (r.ps_name));
+    d->WriteKey ("Flags"); d->WriteIntegerValue (r.flags);
+    d->WriteKey ("FontBBox");
+    d->WriteRectangleValue (PDFRectangle (r.bbox[0], r.bbox[1], r.bbox[2], r.bbox[3]));
+    d->WriteKey ("ItalicAngle"); d->WriteIntegerValue (r.italic);
+    d->WriteKey ("Ascent"); d->WriteIntegerValue (r.ascent);
+    d->WriteKey ("Descent"); d->WriteIntegerValue (r.descent);
+    d->WriteKey ("CapHeight"); d->WriteIntegerValue (r.cap_height);
+    d->WriteKey ("StemV"); d->WriteIntegerValue (r.stem_v);
+    d->WriteKey ("FontFile3"); d->WriteNewObjectReferenceValue (ff);
+    oc.EndDictionary (d);
+    oc.EndIndirectObject ();
+    // the font, in place of the old one: the glyphs of the program by
+    // their names, whatever the encoding said
+    oc.StartModifiedIndirectObject (ids[k]);
+    d= oc.StartDictionary ();
+    d->WriteKey ("Type"); d->WriteNameValue ("Font");
+    d->WriteKey ("Subtype"); d->WriteNameValue ("Type1");
+    d->WriteKey ("BaseFont"); d->WriteNameValue (as_charp_std (r.ps_name));
+    d->WriteKey ("FirstChar"); d->WriteIntegerValue (r.first);
+    d->WriteKey ("LastChar"); d->WriteIntegerValue (r.last);
+    d->WriteKey ("Widths");
+    oc.StartArray ();
+    for (int j=0; j<N(r.widths); j++) oc.WriteInteger (r.widths[j]);
+    oc.EndArray (eTokenSeparatorEndLine);
+    d->WriteKey ("Encoding");
+    DictionaryContext* ed= oc.StartDictionary ();
+    ed->WriteKey ("Type"); ed->WriteNameValue ("Encoding");
+    ed->WriteKey ("Differences");
+    oc.StartArray ();
+    int prev= -2;
+    for (int c= r.first; c <= r.last; c++) {
+      if (N(r.glyph[c]) == 0) continue;
+      if (c != prev + 1) oc.WriteInteger (c);
+      oc.WriteName (as_charp_std (r.glyph[c]));
+      prev= c;
+    }
+    oc.EndArray (eTokenSeparatorEndLine);
+    oc.EndDictionary (ed);
+    d->WriteKey ("FontDescriptor"); d->WriteNewObjectReferenceValue (did);
+    d->WriteKey ("ToUnicode"); d->WriteNewObjectReferenceValue (tu);
+    oc.EndDictionary (d);
+    oc.EndIndirectObject ();
+    done++;
+  }
+  w.EndPDF ();
+  if (done == 0) remove (out);
+  return done > 0;
+}
+
 void
 pdf_image_rep::flush (PDFWriter& pdfw)
 {
@@ -2075,6 +2298,14 @@ pdf_image_rep::flush (PDFWriter& pdfw)
         inform_about_dependencies ();
     }
 
+  }
+  if (hummus_embed_fonts) {
+    url with_fonts= url_temp (".pdf");
+    if (hummus_embed_picture_fonts (temp, with_fonts)) {
+      if (!is_none (name)) remove (temp);
+      else name= u;   // (a temporary file now, which is removed below)
+      temp= with_fonts;
+    }
   }
   EStatusCode status = PDFHummus::eFailure;
   DocumentContext& dc = pdfw.GetDocumentContext();

@@ -220,6 +220,7 @@ Plugins/Freetype/adjust_termes.cpp
 Plugins/Freetype/free_type.cpp
 Plugins/Freetype/rubber_assemble_font.cpp
 Plugins/Freetype/rubber_stix_font.cpp
+Plugins/Freetype/pdf_font_subst.cpp
 Plugins/Freetype/rubber_unicode_font.cpp
 Plugins/Freetype/tt_analyze.cpp
 Plugins/Freetype/tt_face.cpp
