@@ -362,9 +362,29 @@ make_lazy_compound (edit_env env, tree t, path ip) {
 
 lazy
 make_lazy_rewrite (edit_env env, tree t, path ip) {
-  tree r= env->rewrite (t);
   array<line_item> a= typeset_marker (env, descend (ip, 0));
   array<line_item> b= typeset_marker (env, descend (ip, 1));
+  // <include*|f|doc>: the document doc of f, given as a child, is typeset
+  // in place (a tagged PDF, print_doc), as bridge_rewrite_rep::my_typeset
+  if (is_func (t, VAR_INCLUDE, 2)) {
+    url save_name= env->cur_file_name;
+    url incl_file= relative (env->base_file_name,
+                             url_unix (env->exec_string (t[0])));
+    if (inclusion_busy (incl_file))
+      return make_lazy (env, attach_right (tree (_ERROR, "inclusion cycle"),
+                                           ip));
+    env->cur_file_name= incl_file;
+    env->secure= is_secure (env->cur_file_name);
+    lazy par;
+    {
+      inclusion_guard guard (incl_file);
+      par= make_lazy (env, t[1], descend (ip, 1));
+    }
+    env->cur_file_name= save_name;
+    env->secure= is_secure (env->cur_file_name);
+    return lazy_surround (a, b, par, ip);
+  }
+  tree r= env->rewrite (t);
   lazy par= make_lazy (env, attach_right (r, ip));
   return lazy_surround (a, b, par, ip);
 }

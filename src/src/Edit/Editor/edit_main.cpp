@@ -283,12 +283,11 @@ edit_main_rep::nr_pages () {
 
 tagger_rep* make_pdf_tagger (tree body, path rp, string lang, string title);
 
-// The body of a buffer replaced by another tree for a while, without telling
-// the observers, and put back, also when an error unwinds (print_doc)
 // The tables the typesetting writes (the references, the auxiliary data,
-// the attributes of the buffer or its project) are also put back as they
-// were: what the expanded body gives (labels without the file they are in)
-// stays out of the document. In place: the typesetter holds them.
+// the attributes of the buffer or its project), put back as they were
+// after a tagged PDF: what the expanded body gives (labels without the
+// file they are in) stays out of the document. In place: the typesetter
+// holds them.
 static void
 restore_table (hashmap<string,tree> h, hashmap<string,tree> saved) {
   array<string> keys;
@@ -299,31 +298,102 @@ restore_table (hashmap<string,tree> h, hashmap<string,tree> saved) {
   while (it2->busy ()) { string k= it2->next (); h (k)= saved [k]; }
 }
 
+// The numbers of the labels of a tag (exec_auto_id), which the typesetting
+// of a tagged PDF must not change in the tags of the body
+static bool
+auto_id_data (tree t, array<int>& a) {
+  blackbox bb;
+  if (is_atomic (t) || is_nil (t->obs) ||
+      !t->obs->get_contents (ADDENDUM_AUTO_ID, bb)) return false;
+  a= open_box<array<int> > (bb);
+  return true;
+}
+
+static void
+auto_id_copy (tree from, tree to) {
+  array<int> a;
+  if (auto_id_data (from, a))
+    (void) tree_addendum_new (to, ADDENDUM_AUTO_ID,
+                              close_box<array<int> > (copy (a)), false);
+}
+
+struct auto_id_snapshot {
+  array<tree> nodes;
+  array<array<int> > values;
+  void take (tree t) {
+    if (is_atomic (t)) return;
+    array<int> a;
+    if (auto_id_data (t, a)) { nodes << t; values << copy (a); }
+    for (int i=0; i<N(t); i++) take (t[i]);
+  }
+  void restore (tree t, int& k) {
+    if (is_atomic (t)) return;
+    array<int> a;
+    if (auto_id_data (t, a)) {
+      if (k < N(nodes) && nodes[k].operator-> () == t.operator-> ()) {
+        array<int>& v= values[k++];
+        a->resize (N(v));
+        for (int i=0; i<N(v); i++) a[i]= v[i];
+      }
+      else tree_addendum_delete (t, ADDENDUM_AUTO_ID);
+    }
+    for (int i=0; i<N(t); i++) restore (t[i], k);
+  }
+};
+
+// The body of a buffer replaced by another tree for a while, without telling
+// the observers, and put back, also when an error unwinds (print_doc), with
+// the tables and the numbers of the labels of its tags
 struct body_swap {
   tree& slot;
   tree  saved;
   bool  swapped;
   array<hashmap<string,tree> > tables, copies;
+  auto_id_snapshot ids;
   body_swap (tree& s): slot (s), saved (s), swapped (false) {}
   void keep (hashmap<string,tree> h) { tables << h; copies << copy (h); }
-  void put (tree t) { slot= t; swapped= true; }
+  void put (tree t) { ids.take (saved); slot= t; swapped= true; }
   void restore () {
     if (!swapped) return;
     slot= saved;
     for (int i=0; i<N(tables); i++) restore_table (tables[i], copies[i]);
+    int k= 0;
+    ids.restore (saved, k);
     swapped= false;
   }
   ~body_swap () { restore (); }
 };
 
-// t with each include replaced by what the include macro (std-automatic)
-// typesets: <surround|<part-info|f>||the document f includes> (found as
-// typeset_include finds it: relative to the main document). A file which
-// is being expanded is left as an include, which the typesetter reports
-// as a cycle, as it does without tagging; so is an include in markup
-// which is not typeset as such (inactive, raw data).
+// The body of the macro include (the environment's: std-automatic, or a
+// style's or the document's) applied to the name of a file, with doc, the
+// document of the file, given to the include* which loads it: what the
+// typesetter typesets for the include, the document in place
 static tree
-expand_includes (tree t, url base, array<string> active) {
+apply_include (tree body, string var, tree name, tree doc, tree incl,
+               bool& found) {
+  if (is_atomic (body)) return body;
+  if (is_func (body, ARG, 1) && body[0] == var) return copy (name);
+  if (is_func (body, MACRO) || is_func (body, XMACRO)) return copy (body);
+  tree r (body, N(body));
+  for (int i=0; i<N(body); i++)
+    r[i]= apply_include (body[i], var, name, doc, incl, found);
+  if (!found && is_func (r, VAR_INCLUDE, 1) && r[0] == name) {
+    found= true;
+    r << doc;
+    // (it numbers the labels of the document as the include does)
+    auto_id_copy (incl, r);
+  }
+  return r;
+}
+
+// t with each include applied (apply_include), the document of its file
+// given (found as typeset_include finds it: relative to the main
+// document). A file which is being expanded is left as an include, which
+// the typesetter reports as a cycle, as it does without tagging; so is an
+// include in markup which is not typeset as such (inactive, raw data),
+// and an include which the macro does not load with include*.
+static tree
+expand_includes (tree t, url base, array<string> active, tree macro) {
   if (is_atomic (t)) return t;
   if (is_compound (t, "inactive") || is_compound (t, "inactive*") ||
       is_compound (t, "var-inactive") || is_compound (t, "raw-data"))
@@ -338,16 +408,32 @@ expand_includes (tree t, url base, array<string> active) {
     // the editor gave them, as decorations of the include)
     array<string> inner= copy (active);
     inner << fs;
-    return compound ("surround", compound ("part-info", t[0]), "",
-                     expand_includes (copy (d), base, inner));
+    tree doc= expand_includes (copy (d), base, inner, macro);
+    bool found= false;
+    tree r= apply_include (macro[1], macro[0]->label, t[0], doc, t, found);
+    return found? r: t;
   }
   tree r (t, N(t));
   bool changed= false;
   for (int i=0; i<N(t); i++) {
-    r[i]= expand_includes (t[i], base, active);
+    r[i]= expand_includes (t[i], base, active, macro);
     if (r[i] != t[i]) changed= true;
   }
   return changed? r: t;
+}
+
+// whether the document redefines include itself (the environment of
+// print_doc knows the definitions of the style and the preamble)
+static bool
+assigns_include (tree t) {
+  if (is_atomic (t)) return false;
+  if ((is_func (t, ASSIGN) || is_func (t, WITH)) && N(t) >= 2) {
+    for (int i=0; i+1<N(t); i+=2)
+      if (t[i] == "include") return true;
+  }
+  for (int i=0; i<N(t); i++)
+    if (assigns_include (t[i])) return true;
+  return false;
 }
 
 bool
@@ -413,8 +499,12 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // (the content of an include has the place of the include otherwise)
   tree body= subtree (et, rp);
   body_swap swap (subtree (et, rp));
-  if (want_tags) {
-    tree eb= expand_includes (body, env->base_file_name, array<string> ());
+  tree incl_macro= env->read ("include");
+  if (want_tags && !env->preamble &&
+      is_func (incl_macro, MACRO, 2) && is_atomic (incl_macro[0]) &&
+      !assigns_include (body)) {
+    tree eb= expand_includes (body, env->base_file_name, array<string> (),
+                              incl_macro);
     if (!strong_equal (eb, body)) {
       // (the typesetter finds the places of the nodes in their observers:
       // the new ones get theirs, the others keep those they have; and it
@@ -422,6 +512,8 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
       // expanded body is the body of the buffer while it is typeset and
       // drawn, without telling the editor, and the body is put back after)
       body= attach_dip (eb, reverse (rp));
+      // (the same numbers of the labels: auto_buffer is the expanded body)
+      auto_id_copy (subtree (et, rp), body);
       swap.keep (buf->data->ref);
       swap.keep (buf->data->aux);
       swap.keep (buf->data->att);

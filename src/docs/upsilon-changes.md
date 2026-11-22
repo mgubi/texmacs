@@ -22,7 +22,9 @@ have the details, and the problems go to the
   their LaTeX, in the order of the document, with its language and title;
   the headers, footers and page numbers are marked as artifacts. Included
   documents are tagged too. A picture is described by its *alternative
-  text* (*Focus → Alternative text...*), else by its caption. veraPDF
+  text* (*Focus → Alternative text...*), else by its caption. The fonts
+  which a PDF picture (a plot) names without embedding them are embedded,
+  from the TeX Gyre fonts which TeXmacs ships. veraPDF
   finds the PDF of the sample documents compliant with PDF/UA-1. The
   author of a PDF is no longer garbled when it has accents (#945).
 - **Qt: the icon bars keep their height** (Qt builds, desktop

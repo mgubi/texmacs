@@ -73,20 +73,34 @@ a document (a P, or a Div when they hold paragraphs themselves).
   rank of an appendix; the title of a slide (`tit`) is a heading.
 * Included documents: the content of an `include` is typeset as a
   decoration of the include, one box of no place inside. A tagged PDF is
-  therefore typeset from the body with each include replaced by what the
-  include macro typesets, `<surround|<part-info|f>||the document>`
-  (`expand_includes` in `print_doc`; a document is no child of a
-  document). A file being expanded is not expanded again (a cycle is
-  reported by the typesetter, as without tagging), nor is an include in
-  inactive markup or raw data. As the bridges read the tree of the buffer
-  again at each place (`bridge_rep::my_resync`), this expanded body is the
-  body of the buffer while the PDF is typeset and drawn, swapped in
-  without telling the observers and put back after, also on an error
-  (`body_swap`). The tables which the typesetting writes (the references,
-  the auxiliary data, the attributes of the buffer or of its project) are
-  put back too, in place: the labels of the expanded body lack the file
-  they are in, which must not reach the document. The buffer is as it was
-  (convert-more checks the body and the auxiliary data).
+  therefore typeset from the body with each include replaced by the body
+  of the `include` macro of the environment (std-automatic's, a style's)
+  applied to its file, whose `include*` is given the document of the file
+  as a second child: `<include*|f|doc>` typesets `doc` in place, as a
+  child with places of its own, with what an include sets around it (the
+  file, whether its scripts are trusted, the guard against cycles), in
+  the three typesetters of `include*` (`bridge_rewrite`, the concater,
+  `make_lazy_rewrite`). So a redefined `include`, a style without
+  `part-info`, a script and a cycle give what they give without tagging.
+  Nothing is expanded in the preamble mode, nor when the body assigns
+  `include`, nor in inactive markup or raw data, nor for a file which is
+  being expanded (the typesetter reports the cycle). The `include*` is no
+  element: the document holds the paragraphs.
+
+  As the bridges read the tree of the buffer again at each place
+  (`bridge_rep::my_resync`), this expanded body is the body of the buffer
+  while the PDF is typeset and drawn, swapped in without telling the
+  observers and put back after, also on an error (`body_swap`). The tables
+  which the typesetting writes (the references, the auxiliary data, the
+  attributes of the buffer or of its project) are put back too, in place:
+  the labels of the expanded body lack the file they are in, which must
+  not reach the document. The labels keep their numbers
+  (`exec_auto_id`): the expanded body has those of the body, a tag of an
+  included document numbers its labels on the `include*`, which has those
+  of its include (as on the screen, where they are numbered on the
+  include), and the numbers of the tags of the body are put back after.
+  The buffer is as it was (convert-more checks the body, the auxiliary
+  data and the labels after the document is typeset again).
 * A link of the document (`hlink`) is a Link element; a link of no
   `hlink` (the call of a footnote and its way back) gets a Link of its
   own in the element of its text. A video is an Annot element.
@@ -126,13 +140,28 @@ tagged PDF from the names of its glyphs; the glyphs of no known character
 OpenType math fonts, #943) are mapped to U+FFFD, and a TrueType CID font
 gets `/CIDToGIDMap /Identity`.
 
+**Fonts of the pictures.** A PDF picture (a plot) often names its fonts
+(Times-Roman, Helvetica, Courier, Symbol, Arial) without embedding them,
+which PDF/UA forbids. In a tagged PDF both writers embed a font which
+TeXmacs ships instead (`src/Plugins/Freetype/pdf_font_subst.cpp`): the
+TeX Gyre clone of a standard font, by its family and style (Termes,
+Heros, Cursor, Pagella, Bonum, Schola, Adventor; Termes for Symbol, which
+has its Greek letters and most of its signs), with the glyph of each
+code found by its name (the encoding of the font and its differences),
+the widths of the glyphs, the descriptor and a ToUnicode. The MuPDF
+writer does it in the resources it grafts; its subsetter fails on the TeX
+Gyre fonts, so each program is embedded whole, once for the document.
+PDFHummus makes a copy of the picture with the fonts embedded (an
+incremental update, subset by its CFF writer) and includes it. A font of
+no replacement (ZapfDingbats) is reported.
+
 ## Checking it
 
 `verapdf -f ua1 file.pdf` (Homebrew: `brew install verapdf`). On
 2026-11-22 the 18 samples of `tests/documents/samples`, a paper of 21
-pages, and 14 documents drawn at random from the corpus
-(`~/t/lab/test-documents`) were compliant, but one: a picture included
-as a PDF whose own font is not embedded. `convert-more` checks the
+pages, 14 documents drawn at random from the corpus
+(`~/t/lab/test-documents`), a document with pictures of other programs
+and one with alternative texts were compliant, from both writers. `convert-more` checks the
 structure of a small document (`test-tagged-pdf-export`).
 
 `tests/documents/tagged.sh [sample...]` does it for the samples. A dump of the
@@ -142,9 +171,9 @@ in the Matterhorn Protocol.
 
 ## Left
 
-* **Included PDF and EPS pictures**: their fonts, when not embedded, make
-  the PDF non compliant; their content is not tagged either (an artifact
-  inside a Figure would be right).
+* **Included PDF pictures**: their content is a Figure as a whole; a
+  picture which is itself tagged keeps its marked content, which the
+  structure tree does not know.
 * **Table headers** (TH, with a Scope): TeXmacs has no markup for them.
 * **The OpenType math variants** (#943): U+FFFD in the text until the
   fonts record their characters.

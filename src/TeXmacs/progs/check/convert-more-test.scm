@@ -3303,18 +3303,25 @@
                      part)
         (string-save (serialize-texmacs
                       (stree->tree
-                       (tmfile `(document "Main." (include "tagged-part.tm")
+                       (tmfile `(document (section "Main") "Main."
+                                          (include "tagged-part.tm")
                                           "End."))))
                      tm)
         (load-buffer tm :strict)
         (switch-to-buffer tm)
         (update-forced)
         (let ((body (tree->stree (buffer-tree)))
-              (parts (tree->stree (get-auxiliary "parts"))))
+              (parts (tree->stree (get-auxiliary "parts")))
+              (refs (sort (list-references* #f) string<?)))
           (system-setenv "TEXMACS_PDF_TAGGED" "1")
           (export-buffer pdf)
           (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
           (check-true (== (tree->stree (buffer-tree)) body))
+          ;; (the labels of the tags keep their numbers when the document
+          ;; is typeset again: the expanded body numbers them as the body)
+          (update-current-buffer)
+          (update-forced)
+          (check-true (== (sort (list-references* #f) string<?) refs))
           ;; (the typesetting of the expanded body does not stay in the
           ;; auxiliary data of the document, which a save would write)
           (check-true (== (tree->stree (get-auxiliary "parts")) parts))
