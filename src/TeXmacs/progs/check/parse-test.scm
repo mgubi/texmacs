@@ -45,7 +45,8 @@
 ;; tree of the buffer (multi-line comments, preprocessor lines).
 
 (texmacs-module (check parse-test)
-  (:use (check check-lib)))
+  (:use (check check-lib)
+        (prog fortran-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test grammars
@@ -750,24 +751,36 @@
        ("mutable" ,env-keyword) ("s:" ,black) ("String" ,env-type)
        (":=" ,black) ("\"a\"" ,env-string) (";" ,black) ("}" ,black)))))
 
-;; fortran_language.cpp, colored by classes as prog_language_rep
+;; fortran_language.cpp, colored by classes as prog_language_rep, in the
+;; colors of the preferences of fortran-edit.scm. prog-kbd loads that module
+;; with the keyboard of the programs, so the colors of the classes would
+;; depend on whether an earlier suite loaded it: the suite loads it itself.
+(define f-declare "#4040c0")
+(define f-comment "#707070")
+(define f-keyword "#800080")
+(define f-operator "#800000")
+(define f-type "#800000")
+(define f-number "#4040c0")
+(define f-string "#800000")
+(define f-function "#0000c0")
+
 (define (test-fortran)
   (check-lines "fortran"
     ("program p ! c"
-     `(("program" ,c-declare) ("p" ,black) ("!" ,c-comment) ("c" ,c-comment)))
+     `(("program" ,f-declare) ("p" ,black) ("!" ,f-comment) ("c" ,f-comment)))
     ("  integer :: i = 10"
-     `(("integer" "#00c000") ("::" ,c-special) ("i" ,black) ("=" ,c-operator)
-       ("10" ,c-number)))
+     `(("integer" ,f-type) ("::" ,f-operator) ("i" ,black) ("=" ,f-operator)
+       ("10" ,f-number)))
     ("  if (i .eq. 1) then"
-     `(("if" ,c-keyword) ("(" ,c-openclose) ("i" ,black) (".eq." ,black)
-       ("1" ,c-number) (")" ,c-openclose) ("then" ,c-keyword)))
+     `(("if" ,f-keyword) ("(" ,f-operator) ("i" ,black) (".eq." ,black)
+       ("1" ,f-number) (")" ,f-operator) ("then" ,f-keyword)))
     ("    print *, 'hi', 1.5e3"
-     `(("print" ,c-constant) ("*" ,c-operator) ("," ,black) ("'hi'" ,c-string)
-       ("," ,black) ("1.5e3" ,c-number)))
+     `(("print" ,f-function) ("*" ,f-operator) ("," ,black) ("'hi'" ,f-string)
+       ("," ,black) ("1.5e3" ,f-number)))
     ("  end if"
-     `(("end" ,c-declare) ("if" ,c-keyword)))
+     `(("end" ,f-declare) ("if" ,f-keyword)))
     ("end program"
-     `(("end" ,c-declare) ("program" ,c-declare)))))
+     `(("end" ,f-declare) ("program" ,f-declare)))))
 
 ;; r_language.cpp: keywords, constants, numbers and strings in the colors
 ;; of the environment, operators in red, assignments in dark green, index

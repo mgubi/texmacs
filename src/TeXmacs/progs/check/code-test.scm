@@ -17,6 +17,7 @@
 
 (texmacs-module (check code-test)
   (:use (check check-lib)
+        (utils library cursor)
         (code code-features)
         (code code-fold)
         (code code-navigate)
@@ -130,6 +131,23 @@
         (check= (focus-menu-count "Outline") 0)))
     (code-provider-remove! 'outline 'test)))
 
+;; The generated pages (the outline) come in the current window: with a
+;; window per buffer, they would come in a window of their own, which stays
+;; for the suites run afterwards (kbd-menu counts the windows), and which Qt
+;; cannot delete when TeXmacs quits just after closing it. The preference is
+;; set in memory only.
+(define (with-shared-windows thunk)
+  (let* ((which "buffer management")
+         (had? (cpp-has-preference? which))
+         (old (get-preference which)))
+    (dynamic-wind
+      (lambda () (cpp-set-preference which "shared"))
+      thunk
+      (lambda ()
+        (if had?
+            (cpp-set-preference which old)
+            (cpp-reset-preference which))))))
+
 (define (test-definitions-menu)
   ;; a menu with thousands of definitions would take seconds to make: the
   ;; first ones, then the page of the outline which has them all (#698)
@@ -173,7 +191,7 @@
     (with-loaded-file "code-outline-test.py" "def f(x):\n  return x\n"
       (lambda ()
         (with src (current-buffer)
-          (code-outline)
+          (with-shared-windows code-outline)
           (update-forced)
           (apply-changes)
           ;; made again, its view shown, then while another buffer is shown
@@ -418,25 +436,14 @@
                             (lambda () (list (list 0 "function" "f" "()" f-at)
                                              (list 1 "variable" "g" "" g-at))))
         (check= (map caddr (code-outline-entries)) '("f" "g"))
-        ;; the page of the outline: its entries go to their places. (The
-        ;; page comes in the current window: with a window per buffer, it
-        ;; would come in a window of its own, which stays for the suites
-        ;; run afterwards, and which Qt cannot delete when TeXmacs quits
-        ;; just after closing it; the preference is set in memory only)
-        (let* ((which "buffer management")
-               (had? (cpp-has-preference? which))
-               (old (get-preference which)))
-          (cpp-set-preference which "shared")
-          (code-outline)
-          (if had?
-              (cpp-set-preference which old)
-              (cpp-reset-preference which))
-          (with page (current-buffer)
-            (check-true (url-rooted-tmfs? page))
-            (with s (object->string (tree->stree (buffer-get-body page)))
-              (check-true (string-contains? s "function"))
-              (check-true (string-contains? s "code-go-to")))
-            (buffer-close page)))
+        ;; the page of the outline: its entries go to their places
+        (with-shared-windows code-outline)
+        (with page (current-buffer)
+          (check-true (url-rooted-tmfs? page))
+          (with s (object->string (tree->stree (buffer-get-body page)))
+            (check-true (string-contains? s "function"))
+            (check-true (string-contains? s "code-go-to")))
+          (buffer-close page))
         ;; a provider which finds nothing lets the next one look
         (code-provider-set! 'definition 'first 0 (lambda () #t)
                             (lambda () (set! jumps (cons 'first jumps)) #f))
