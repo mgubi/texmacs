@@ -29,10 +29,10 @@ regression suites.
 - **A build option:** `./configure --with-scheme=chez`. Chez is linked
   statically from its installation (`libkernel.a`); its heap images
   (`petite.boot`, `scheme.boot`) are read at start-up.
-- **Compiled ahead of time:** after `make`, `texmacs.bin -recompile-modules`
-  compiles the 488 modules of `TeXmacs/progs` into `TeXmacs/boot/`, and
-  `make-boot.scm` packs the 177 modules of the start-up into
-  `TeXmacs/boot/texmacs.boot` (18 MB). Neither step is run by `make` yet.
+- **Compiled ahead of time:** `make` compiles the 488 modules of
+  `TeXmacs/progs` into `TeXmacs/boot/` (those whose source changed), and
+  packs the 177 modules of the start-up into `TeXmacs/boot/texmacs.boot`
+  (18 MB); `make install` installs them.
 - **Guile code, read as Guile reads it:** the sources are unchanged Guile
   code; a reader of Guile's syntax folds the tests of the Scheme
   (`(chez-scheme?)`, `(s7-scheme?)`...) when it reads them, and the compiler

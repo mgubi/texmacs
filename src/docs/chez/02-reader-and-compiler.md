@@ -105,4 +105,3 @@ is built before the first window (this is why `developer-menu` is lazy).
 | `src/Scheme/Chez/compiler-helper.scm`, `compiler-oracle.scm`, `compile-graph.scm` | compiling one module, the helpers of macros, the dependency graph |
 | `src/Scheme/Chez/make-boot.scm` | the boot image |
 | `src/Scheme/Chez/*-test.scm` | tests of the compiler (`chez --script`) |
-| `src/Scheme/Chez/convert-to-r6rs-v2.scm` | unused, from the original branch |

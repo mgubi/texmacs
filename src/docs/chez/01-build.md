@@ -30,8 +30,12 @@ which writes `src/Scheme/Chez/glue_chez.cpp` and
 
 ## 1.3 Compiling the Scheme modules and the boot image
 
-`make` builds the binary only. The Scheme code is compiled in two more steps,
-which have to be run again after a change of `TeXmacs/progs` (or of the glue):
+With Chez, `make` (in `src/`, the top-level `Makefile`) also compiles the
+Scheme code, after the binary: the modules whose source changed, then the boot
+image (target `CHEZ_MODULES`; TeXmacs runs headless, with the home
+`.chez-compile-home`). With nothing to recompile it takes about 2 s.
+`make install` copies `TeXmacs/boot` with the rest. By hand, the two steps
+are:
 
 ```sh
 export TEXMACS_PATH=$PWD/TeXmacs TEXMACS_BOOT_PATH=$PWD/TeXmacs/boot
@@ -45,9 +49,8 @@ chez --script src/Scheme/Chez/make-boot.scm TeXmacs/boot TeXmacs/boot/texmacs.bo
   compilation of the 488 modules takes about 16 s, the boot image 2 s
   (macOS, Apple silicon).
 - The compiler writes the transpiled sources and the compiled modules (`.so`)
-  under `$TEXMACS_BOOT_PATH`. Set it: without it the compiler writes to
-  `build-texmacos/boot` (the layout of the original CMake build), while
-  TeXmacs looks in `$TEXMACS_PATH/boot`.
+  under `$TEXMACS_BOOT_PATH`, by default `$TEXMACS_PATH/boot`, where TeXmacs
+  looks for them. The whole folder is about 50 MB.
 - `make-boot.scm` packs the 177 modules of the start-up (its list
   `*startup-boot-modules*`) into `texmacs.boot`; the other modules are
   loaded from their `.so` when they are first used.

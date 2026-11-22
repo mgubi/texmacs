@@ -42,15 +42,14 @@
 
 ## 6.3 To do
 
-- **The build:** `make` does not compile the modules nor the boot image, and
-  the compiler writes to `build-texmacos/boot` unless `TEXMACS_BOOT_PATH` is
-  set ([01](01-build.md#13-compiling-the-scheme-modules-and-the-boot-image));
-  `make install` and the packages do not include `TeXmacs/boot`.
+- **Packages:** `make install` copies `TeXmacs/boot`, but the rules of the
+  packages (the macOS bundle, the Linux and Windows packages) were not
+  checked for Chez.
 - **Platforms:** only macOS on arm64 was tested on this branch, headless and
   briefly with a window. The original branch built on Linux and Windows
   (MSYS2) with CMake ([build_guide/](build_guide)).
 - **CI:** no workflow builds Chez.
-- **Clean-up:** `convert-to-r6rs-v2.scm` is unused; several files of the
-  compiler still say "UNDER REVIEWED AI GENERATED CODE".
+- **Clean-up:** several files of the compiler still say "UNDER REVIEWED AI
+  GENERATED CODE".
 - `client/client-widgets.scm`: the confirmation of a pending account refers
   to `credentials`, not bound there (as in the official sources).

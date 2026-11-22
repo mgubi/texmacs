@@ -79,12 +79,14 @@
 
 ;; Where transpiled sources and compiled modules are written.
 ;;
-;; TEXMACS_BOOT_PATH takes precedence, mirroring how boot-chez.scm resolves
-;; compiled modules at runtime, so that build trees with another name (for
-;; instance build-win) work without editing this file. The literals below are
-;; the historical default.
+;; TEXMACS_BOOT_PATH takes precedence, then $TEXMACS_PATH/boot, where TeXmacs
+;; looks for them at run time (chez_tm.cpp, boot-chez.scm). The literals below
+;; are the layout of the original CMake build.
 (define *boot-dir*
   (or (getenv "TEXMACS_BOOT_PATH")
+      (let ((tm (getenv "TEXMACS_PATH")))
+        (and tm (> (string-length tm) 0) (file-exists? tm)
+             (string-append tm "/boot")))
       (and (file-exists? "build-texmacos/boot") "build-texmacos/boot")
       (and (file-exists? "texmacs/build-texmacos/boot") "texmacs/build-texmacos/boot")
       (and (file-exists? "../build-texmacos/boot") "../build-texmacos/boot")
