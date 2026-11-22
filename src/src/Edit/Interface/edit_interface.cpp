@@ -240,6 +240,8 @@ edit_interface_rep::get_visible_height () {
 #include <QStyle>
 static SI
 scrollbar_width () {
+  // no QApplication, hence no style, under -headless (#923)
+  if (headless_mode) return 20 * PIXEL;
   return (qApp->style()->pixelMetric (QStyle::PM_ScrollBarExtent) + 2) * PIXEL;
 }
 #else
@@ -741,6 +743,16 @@ watch_full_typesets (const void* ed, url name, time_t last_event,
 void
 edit_interface_rep::notify_change (int env_set, int env_unset) {
   env_change= (env_change | env_set) & (~env_unset);
+  // the environments kept for get-env (cur, typeset_exec_until) were
+  // computed from the tree as it was: dropped at once after an edit, not
+  // only by apply_changes, which does not run without a window (headless)
+  // nor between the edits and the get-env of one command (#924). They are
+  // computed again from pre, which set_pre also drops them for. A change of
+  // the initial environment (init-env) does not make pre again: get-env
+  // sees it only after typeset_invalidate_all (update-current-buffer, or
+  // apply_changes, which calls it)
+  if ((env_set & (THE_TREE | THE_ENVIRONMENT)) != 0)
+    typeset_invalidate_env ();
   needs_update ();
   if ((env_set & (THE_TREE | THE_SELECTION | THE_CURSOR)) != 0)
     manual_focus_set (path (), (env_set & THE_TREE) != 0);

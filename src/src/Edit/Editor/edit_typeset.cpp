@@ -344,11 +344,16 @@ edit_typeset_rep::typeset_preamble () {
 }
 
 // pre is only changed by these, which tell typeset_prepare that what it
-// kept is not the environment for it any more
+// kept is not the environment for it any more. The environments kept for
+// get-env (cur, typeset_exec_until) are made from pre: they are dropped
+// too, not only by apply_changes, which does not run for a view without a
+// window (headless: a change of the initial environment, presentation
+// mode, #924)
 void
 edit_typeset_rep::set_pre (hashmap<string,tree> h) {
   pre= h;
   pre_version++;
+  typeset_invalidate_env ();
 }
 
 void
@@ -358,6 +363,7 @@ edit_typeset_rep::set_pre (string var, tree val) {
   if (val == tree (UNINIT)) pre->reset (var);
   else pre (var)= val;
   pre_version++;
+  typeset_invalidate_env ();
 }
 
 int typeset_caches_mode (); // see typesetter.hpp
