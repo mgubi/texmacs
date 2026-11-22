@@ -48,3 +48,11 @@
 (if (not (defined? 'filter))
     (define-public (filter pred? l)
       (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l))))
+
+;;; s7's call-with-exit (the scanners of tree-sitter leave a loop with it):
+;;; an escape-only continuation, by a throw (call/cc copies the stack)
+(define-public (call-with-exit f)
+  (let ((tag (gensym "call-with-exit")))
+    (catch tag
+      (lambda () (f (lambda vals (throw tag vals))))
+      (lambda (key vals) (apply values vals)))))

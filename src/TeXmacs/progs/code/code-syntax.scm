@@ -16,10 +16,12 @@
 ;; tree-sitter when it is part of the build (its glue), else those of
 ;; code-syntax-none.scm, which answer that the code has no syntax tree. The
 ;; modules which call them use this one (never treesit/ts-edit.scm itself:
-;; its functions, which are public, would replace the others).
+;; its functions, which are public, would replace the others). It inherits
+;; the module it chooses: with Guile, where the public names of a module are
+;; seen only by the modules which use it, the users of this one see them.
 
 (texmacs-module (code code-syntax))
 
 (if (defined? 'tree-sitter-program-language)
-    (use-modules (treesit ts-edit))
-    (use-modules (code code-syntax-none)))
+    (inherit-modules (treesit ts-edit))
+    (inherit-modules (code code-syntax-none)))

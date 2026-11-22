@@ -27,7 +27,7 @@
 ;; pending?), with one head per version.
 
 (texmacs-module (treesit ts-parse)
-  (:use (treesit ts-base) (treesit ts-language)))
+  (:use (treesit ts-base) (treesit ts-grammar) (treesit ts-language)))
 
 (define-public ts-parse-log #f)   ; a procedure receiving the trace
 

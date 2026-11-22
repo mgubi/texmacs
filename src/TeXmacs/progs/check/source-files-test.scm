@@ -132,7 +132,7 @@
   ;; (loaded here, not with this module: check-master loads all the tests
   ;; in each suite, and the keys of programs must not be there for the
   ;; tests of mathematics, see kbd-menu-test.scm)
-  (use-modules (prog prog-edit))
+  (module-provide '(prog prog-edit))
   ;; a file indented by tabs: tabs at stops of 8 columns (the preference)
   (in-file "e.cpp" (string-append "int f () {\n" tab "return 1;\n}\n")
     (lambda ()

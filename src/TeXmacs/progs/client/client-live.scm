@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (client client-live)
-  (:use (utils relate live-connection)
+  (:use (utils library cursor)
+        (utils relate live-connection)
         (utils relate live-view)
         (client client-tmfs)))
 
