@@ -495,12 +495,24 @@
                def-form)
            #'def-form)))))
 
+;; A public name is also global, as with Guile: a module which uses it without
+;; importing it (one compiled before the module which defines it, whose
+;; import the compiler then leaves out, or a module which does not :use it)
+;; finds it there. Not over a global of the same name (a tm-define).
+(define (tm-public-global! name value)
+  (unless (top-level-bound? name)
+    (define-top-level-value name value)))
+
 (define-syntax define-public
   (syntax-rules ()
     ((_ (name . args) body ...)
-     (with-export-if-active name (define (name . args) body ...)))
+     (begin
+       (with-export-if-active name (define (name . args) body ...))
+       (define-values () (begin (tm-public-global! 'name name) (values)))))
     ((_ name val)
-     (with-export-if-active name (define name val)))))
+     (begin
+       (with-export-if-active name (define name val))
+       (define-values () (begin (tm-public-global! 'name name) (values)))))))
 
 
 (meta define (recolor-syntax x helpers module-scope call-scope)
@@ -732,15 +744,27 @@
   (and (module-loaded? m) #t))
 
 ;; Guile's module-ref, for the exports of a module (a module is its name)
+;; The private definitions which the tests reach in their module, but which
+;; cannot be global because another module defines the same name
+;; (chez-registered-names, compiler-scan.scm): their values, by module
+(define tm-module-privates (make-hashtable equal-hash equal?))
+(define (tm-module-private! m sym v)
+  (hashtable-set! tm-module-privates (cons m sym) v)
+  v)
+
 (define (module-ref m sym . default)
   (module-provide m)
   (guard (e (#t (if (pair? default)
                     (car default)
                     (raise e))))
-    (if (top-level-bound? sym (interaction-environment))
-        (top-level-value sym (interaction-environment))
-        (eval `(let () (import ,(module-spec->symbol m)) ,sym)
-              (interaction-environment)))))
+    (cond
+     ((hashtable-contains? tm-module-privates (cons m sym))
+      (hashtable-ref tm-module-privates (cons m sym) #f))
+     ((top-level-bound? sym (interaction-environment))
+      (top-level-value sym (interaction-environment)))
+     (else
+      (eval `(let () (import ,(module-spec->symbol m)) ,sym)
+            (interaction-environment))))))
 
 
 (define-syntax use-modules

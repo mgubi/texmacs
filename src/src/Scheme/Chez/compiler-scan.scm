@@ -63,7 +63,7 @@
   ;; The expansion happens outside the defining module here, so Chez needs
   ;; them public; the other interpreters keep them private.
   (define chez-promoted-names
-    '(cur-props lambda* property-rewrite lazy-define-table
+    '(cur-props cur-cond-kinds lambda* property-rewrite lazy-define-table
       tm-define-overloaded-chez lazy-define-one-chez
       process-translate
       kbd-add-condition kbd-map-one kbd-map-body kbd-remove-one kbd-remove-body
@@ -86,7 +86,7 @@
       ("check/git-test.scm" keep-dialogues?)
       ("check/kbd-menu-test.scm" kbd-menu-test-closing? kbd-test-on?)
       ("check/remote-test.scm" remote-active?)
-      ("check/zotero-test.scm" fake-error? fake-library-answer fake? sim-browser? test-db?)
+      ("check/zotero-test.scm" fake-error? fake-library-answer fake? sim-browser? test-db-file test-db?)
       ("client/client-base.scm" client-beat client-heard client-notify-heard client-ping-sent client-serial client-start-errno->string split-server-name-and-port)
       ("client/client-chat.scm" chat-room-name chat-room-table-entry fix-link fix-links message->document message->share messages->document shared-table-entry)
       ("client/client-db-sync.scm" db-change-status db-dub-in-sync db-last-sync)
@@ -101,11 +101,11 @@
       ("doc/tmdoc.scm" tmdoc-add-aux tmdoc-demote tmdoc-down tmdoc-expand tmdoc-internal-label tmdoc-internalize tmdoc-language tmdoc-relative tmdoc-remove-hyper-links)
       ("generic/document-edit.scm" zotero-update)
       ("generic/format-widgets.scm" page-this-bg-color-val)
-      ("generic/search-widgets.scm" adjust-by in-leading-text? perform-search* range-unchanged? replace-skip-message replace-trace search-filter-accepts-all? search-filter-table)
+      ("generic/search-widgets.scm" adjust-by in-leading-text? perform-search* perform-search-sub range-unchanged? replace-skip-message replace-trace search-filter-accepts-all? search-filter-table)
       ("graphics/graphics-single.scm" object_commit)
       ("kernel/texmacs/tm-modes.scm" versioning-directory-delay)
       ("link/ref-edit.scm" in-inactive-reference? keyboard-preview-update)
-      ("part/part-shared.scm" mirror-black-list mirror-invalidate mirror-treat-pending)
+      ("part/part-shared.scm" mirror-announced mirror-black-list mirror-invalidate mirror-pending mirror-treat-pending)
       ("server/server-base.scm" credentials->authentications generate-preferences-form is-on? load-preferences-in-stree server-mailer-instantiate server-serial)
       ("server/server-live.scm" live-cursor-refused live-cursor-table live-load live-name live-save)
       ("server/server-tmfs.scm" version->file-name version-get-info version-get-versions)
@@ -114,9 +114,17 @@
       ("version/version-compare.scm" version-grain)
       ("version/version-kbd.scm" shortcut-compare shortcut-root)))
 
+;; Private definitions which the tests reach in their module, but which
+  ;; cannot be global, because another module has a global definition of the
+  ;; same name (live-documents is also a tm-define of client-live.scm): they
+  ;; stay private and are registered for module-ref (boot-chez.scm). For
+  ;; values which the module does not assign again.
+  (define chez-registered-names
+    '(("utils/relate/live-document.scm" live-documents live-states live-changes)))
+
   ;; the names of the file at file-path (.../progs/<rel>) which are global
-  (define (file-global-names file-path)
-    (let loop ((l chez-global-names))
+  (define (file-global-names file-path . list)
+    (let loop ((l (if (pair? list) (car list) chez-global-names)))
       (cond ((null? l) '())
             ((let* ((rel (string-append "/" (caar l)))
                     (n (string-length file-path)) (m (string-length rel)))
@@ -208,12 +216,33 @@
                      (loop (cdr fs) seen (cons `(set! ,n ,val) acc))))
                   (else (loop (cdr fs) (cons n seen) (cons f acc))))))))
 
+  ;; (define name val) of a registered name: then its registration
+  (define (register-private f names module counter)
+    (if (and module (pair? f) (eq? (car f) 'define) (pair? (cdr f))
+             (symbol? (cadr f)) (memq (cadr f) names))
+        (begin
+          (set-car! counter (+ (car counter) 1))
+          (hashtable-set! used-names (cons 'registered (cadr f)) #t)
+          (list f `(define ,(string->symbol
+                             (string-append "%tm-private-"
+                                            (number->string (car counter))))
+                     (tm-module-private! ',module ',(cadr f) ,(cadr f)))))
+        (list f)))
+
   (define (read-all-forms file-path)
     (let* ((globals (file-global-names file-path))
-           (forms (map (lambda (f)
-                         (globalize-private (promote-private f) globals file-path))
-                      (single-definitions
-                        (tm-read-guile-file file-path)))))
+           (registered (file-global-names file-path chez-registered-names))
+           (raw (single-definitions (tm-read-guile-file file-path)))
+           (module (and (pair? raw) (pair? (car raw))
+                        (eq? (caar raw) 'texmacs-module) (pair? (cdar raw))
+                        (cadar raw)))
+           (counter (list 0))
+           (forms (apply append
+                         (map (lambda (f)
+                                (register-private
+                                 (globalize-private (promote-private f) globals file-path)
+                                 registered module counter))
+                              raw))))
       (if (compat-file? file-path)
           forms
           (let ((names (append chez-native-names

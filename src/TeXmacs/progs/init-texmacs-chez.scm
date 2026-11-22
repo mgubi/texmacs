@@ -100,6 +100,7 @@
              (kernel logic logic-rules) (kernel logic logic-query)
              (kernel logic logic-data))
 (use-modules (kernel texmacs tm-define)
+             (kernel texmacs tm-program-languages)
              (kernel texmacs tm-preferences) (kernel texmacs tm-modes)
              (kernel texmacs tm-plugins) (kernel texmacs tm-secure)
              (kernel texmacs tm-convert) (kernel texmacs tm-dialogue)
