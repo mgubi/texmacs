@@ -11,14 +11,6 @@ BODY
     BORDER-LEFT: #000 1px solid;
     BORDER-BOTTOM: #000 1px solid
 }
-/* the <div> of a paragraph with blocks (tmhtml.scm): the margins of P;
-   before the class rules, so that .tmdoc-license... win over it */
-.tmhtml-p
-{
-    MARGIN-TOP: 1em;
-    MARGIN-BOTTOM: 1em;
-    TEXT-ALIGN: justify
-}
 .tmdoc-body
 {
     BACKGROUND: #ffffff;
@@ -223,11 +215,25 @@ P
 {
     TEXT-ALIGN: justify
 }
+/* div:where(.tmhtml-p): the <div> of a paragraph which holds blocks in the
+   HTML export (tmhtml.scm); it gets the default margins of P and
+   the rules of TBODY P and .compact-block P, with the specificity of P
+   (:where); not the TEXT-ALIGN of P, which would beat a CENTER */
+DIV:where(.tmhtml-p)
+{
+    MARGIN-TOP: 1em;
+    MARGIN-BOTTOM: 1em
+}
 TABLE
 {
     BORDER-COLLAPSE: collapse
 }
-TBODY P, TBODY .tmhtml-p
+TBODY P
+{
+    MARGIN-TOP: 0px;
+    MARGIN-BOTTOM: 0px
+}
+TBODY DIV:where(.tmhtml-p)
 {
     MARGIN-TOP: 0px;
     MARGIN-BOTTOM: 0px
@@ -268,7 +274,12 @@ TD
     MARGIN-LEFT: -0.4em;
     TOP: -0.1em
 }
-.compact-block P, .compact-block .tmhtml-p
+.compact-block P
+{
+    MARGIN-TOP: 0px;
+    MARGIN-BOTTOM: 0px;
+}
+.compact-block DIV:where(.tmhtml-p)
 {
     MARGIN-TOP: 0px;
     MARGIN-BOTTOM: 0px;
