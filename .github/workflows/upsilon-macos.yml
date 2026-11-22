@@ -30,6 +30,11 @@
 #     of Homebrew (the job of ci.yml): built, the regression suites run,
 #     and "TeXmacs Upsilon Qt.app" (deployed with macdeployqt) kept as an artifact of
 #     the run. It is on its own: not in the disk images nor in the release.
+#   * qt-chez: the same Qt 6 build with Chez Scheme instead of S7
+#     (src/docs/chez/README.md), Chez from Homebrew: built, with its Scheme
+#     modules and boot image (make CHEZ_MODULES), and the regression suites
+#     and the startup checks run. Nothing is kept or published, and the
+#     release does not wait for it.
 #
 # The applications are signed ad hoc and not notarized: Gatekeeper rejects
 # them on another machine until the quarantine is removed,
@@ -426,6 +431,47 @@ jobs:
           name: texmacs-qt-macos-arm64
           path: src/texmacs-qt-macos-arm64.zip
           retention-days: 14
+
+  qt-chez:
+    name: macOS (Apple silicon, Qt 6, Chez Scheme)
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install qt freetype libpng jpeg gnutls sqlite chezscheme
+
+      # configure finds the machine directory of Chez (scheme.h, libkernel.a,
+      # the heap images) from the chez of the PATH
+      - name: Configure
+        run: |
+          B=$(brew --prefix)
+          chez --version
+          ./configure --with-scheme=chez \
+            QMAKE="$(brew --prefix qt)/bin/qmake" \
+            CPPFLAGS="-I$(brew --prefix libpng)/include/libpng16 -I$B/include" \
+            LDFLAGS="-L$(brew --prefix libpng)/lib -L$B/lib"
+
+      # the binary, then the Scheme modules compiled into TeXmacs/boot and
+      # the boot image (docs/chez/01-build.md)
+      - name: Build
+        run: |
+          make -j"$(sysctl -n hw.ncpu)"
+          make CHEZ_MODULES
+          ls -l TeXmacs/boot/texmacs.boot
+
+      - name: Run the regression suites
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+
+      - name: The startup checks
+        env:
+          TM_TEST_TIMEOUT: 300
+          TM_TEST_HOME: ${{ runner.temp }}/startup-home
+        run: tests/startup/check.sh
 
   # The corresponding source of the programs of others which the packages
   # bring under the AGPL (Ghostscript) and the LGPL (Aspell, its dictionaries),

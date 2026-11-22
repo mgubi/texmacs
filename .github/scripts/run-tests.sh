@@ -55,6 +55,9 @@ if [ -f tests/scheme/check.sh ]; then
                 on' TeXmacs/progs/check/check-master.scm |
            grep -oE "^[ ']*\(*\(\"[a-z0-9-]+\" [a-z]" |
            sed -E 's/.*"([^"]+)".*/\1/')}
+  # compat-s7 and boot-s7 are suites of check-master with s7 only
+  grep -q '^SCHEME_DIR *= *S7' Makefile 2> /dev/null ||
+    SUITES=$(echo $SUITES | tr ' ' '\n' | grep -v -- '-s7$')
   echo "suites: $(echo $SUITES | wc -w)"
   # (300 s each: the 43 suites stay within the 60 minutes of the job)
   TM_TEST_HOME="$TEXMACS_HOME_PATH" TM_TEST_TIMEOUT=300 \

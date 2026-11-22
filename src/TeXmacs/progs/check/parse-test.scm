@@ -148,7 +148,10 @@
   ;; inherited rules are not copied on the Scheme side
   (check-false (get-packrat-definition "parse-test-derived" "Main"))
   (check= (get-packrat-definition "parse-test-derived" "Letter") '((- "a" "e")))
-  ;; the definitions of std-math
+  ;; the definitions of std-math, a language defined lazily: it is loaded
+  ;; when a formula is typeset, which may not have happened yet (with Chez,
+  ;; a start-up in a home already used typesets none)
+  (lazy-language-force std-math)
   (check= (get-packrat-definition "std-math" "Main") #f)
   (check= (get-packrat-definition "std-math-grammar" "Identifier")
           '((+ (or (- "a" "z") (- "A" "Z")))))

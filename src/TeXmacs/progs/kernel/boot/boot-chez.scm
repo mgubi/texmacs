@@ -701,8 +701,13 @@
   (module-provide m)
   m)
 
-;; Guile's gc
-(define (gc) (collect))
+;; Guile's gc: all the generations, then the C++ objects of the blackboxes
+;; which became unreachable are deleted (a plain (collect) may leave the
+;; older generations, and the guardian is reaped by the collect-request
+;; handler only; the widgets let go of #776 stayed)
+(define (gc)
+  (collect (collect-maximum-generation))
+  (reap-blackboxes!))
 
 ;; Guile's debug and reader options, which do not apply
 (define (debug-options . args) '())
@@ -1027,6 +1032,16 @@
         ""
         (cork-bytes->string (tm-load-bytes path)))))
 
+;; Keywords evaluate to themselves in Guile and s7. The module compiler binds
+;; those of a module (tm-bind-keywords), and the list above the common ones;
+;; the forms read at run time (scripts, -x, the evaluations of C++) bind
+;; theirs before they are evaluated, as (load-buffer f :confirm-large).
+(define (tm-bind-form-keywords x)
+  (let walk ((x x))
+    (cond ((pair? x) (walk (car x)) (walk (cdr x)))
+          ((and (keyword? x) (not (top-level-bound? x tm-user-env)))
+           (define-top-level-value x x tm-user-env)))))
+
 ;; [C++] (tm-eval-string s): read one form and evaluate it in tm-user-env.
 ;; eval_scheme() routes every C++-side evaluation through this.
 ;; counts, for scheme_caught_errors () in C++, the errors which a call from
@@ -1042,7 +1057,10 @@
     (newline)
     (cons (tm-condition-key e) (tm-condition-args e)))))
     (let ((x (read (open-input-string s))))
-      (if (eof-object? x) x (recur-string->utf8 (eval x tm-user-env))))))
+      (if (eof-object? x) x
+          (begin
+            (tm-bind-form-keywords x)
+            (recur-string->utf8 (eval x tm-user-env)))))))
 
 ;; [C++] (tm-load-file f): the engine's file loader.  Calls the primitive
 ;; `load' bound at definition time, not the Guile-compatible `load' that
@@ -1058,7 +1076,10 @@
              (cons #t (list (tm-error-message e))))))
     (if (tm-guile-source? f)
         ;; a source of TeXmacs, a plug-in or the user, read as on Guile
-        (for-each tm-eval-toplevel (tm-read-guile-file (tm-os-path f)))
+        (for-each (lambda (x)
+                    (tm-bind-form-keywords x)
+                    (tm-eval-toplevel x))
+                  (tm-read-guile-file (tm-os-path f)))
         (primitive-load f))))
 
 ;; The forms of a Scheme source of TeXmacs, read as Guile reads it (the plain
