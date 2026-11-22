@@ -810,7 +810,11 @@ edit_interface_rep::apply_changes () {
   // cout << "Handling automatic resizing\n";
   int sb= 1;
   bool zoomed= false;
-  if (is_attached (this) && has_current_window ()) {
+  // (under -headless the window is a stand-in, to which the view is not
+  // attached: the zoom of the window is the document's all the same, but
+  // the stand-in has no size for an automatic page)
+  bool attached= is_attached (this);
+  if ((attached || headless_mode) && has_current_window ()) {
     tree new_zoom= as_string (zoomf);
     tree old_zoom= get_init_value (ZOOM_FACTOR);
     if (new_zoom != old_zoom) {
@@ -819,7 +823,7 @@ edit_interface_rep::apply_changes () {
       zoomed= true;
     }
   
-    if (get_init_string (PAGE_MEDIUM) == "automatic")
+    if (attached && get_init_string (PAGE_MEDIUM) == "automatic")
     {
       SI wx, wy;
       if (cvw == NULL) ::get_size (get_window (this), wx, wy);
@@ -1238,8 +1242,12 @@ edit_interface_rep::apply_changes () {
 // not from within apply_changes (from Scheme which it calls)
 void
 edit_interface_rep::apply_pending_changes () {
-  if (applying_changes > 0 || headless_mode ||
-      !is_attached (this) || !has_current_window ()) return;
+  // under -headless the window is a stand-in (headless_widget), to
+  // which the view is never attached: apply the changes all the same,
+  // but only to a view in a window (with-buffer makes views without)
+  if (applying_changes > 0 || !has_current_window () ||
+      (!headless_mode && !is_attached (this)))
+    return;
   apply_changes ();
 }
 

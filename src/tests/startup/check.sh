@@ -350,6 +350,63 @@ check "headless: Alt and a letter on a buffer (#923)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-alt-key.scm")'
 
+# Under -headless the pending changes of the current view are applied
+# (#937), but only to a view in a window: a view made for a buffer which is
+# not shown (view-new and buffer-focus, as with-buffer does) has none, and
+# apply-changes crashed on it.
+cat > "$out/startup-no-window.scm" <<'EOF'
+(let ((b (buffer-new)))
+  (buffer-set-body b (stree->tree '(document "a")))
+  (view-new b)
+  (buffer-focus b)
+  (apply-changes)
+  (display* "CHECK applied " (buffer-exists? b) "\n")
+  (buffer-pretend-saved b)
+  (buffer-close b))
+EOF
+
+check "headless: apply-changes on a view without a window (#937)" \
+      "applied #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-no-window.scm")'
+
+# Under -headless the pending changes were never applied, so a cursor move
+# after an edit did nothing (#937): the cursor goes from after the Z (34)
+# to before it (33). The changes reach the editor's widget, which has no
+# canvas there: it said so on stdout at each apply-changes, among the
+# output of the script (any "... is null" line of qt_simple_widget).
+cat > "$out/startup-apply.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (go-end)
+  (insert "Z")
+  (apply-changes)
+  (kbd-left)
+  (apply-changes)
+  (display* "CHECK moved " (cursor-path) "\n")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+
+total=$((total + 1))
+(cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -headless \
+   -x '(load "startup-apply.scm")' -q > "$out/$total.out" 2> "$out/$total.err")
+code=$?
+noise=$(grep -av '^CHECK ' "$out/$total.out" | grep -a 'qt_simple_widget_rep.*is null')
+moved=$(grep -a '^CHECK moved' "$out/$total.out" | sed 's/^CHECK //')
+if [ $code -eq 0 ] && [ "$moved" = "moved (1 0 33)" ] && [ -z "$noise" ]
+then
+  echo "  ok     headless: a cursor move after an edit, nothing on stdout (#937)"
+else
+  echo "  FAILED headless: a cursor move after an edit, nothing on stdout (#937)"
+  echo "    expected: moved (1 0 33), exit status 0, no qt_simple_widget lines"
+  echo "    got:      ${moved:-no CHECK moved line}, exit status $code"
+  [ -z "$noise" ] || echo "$noise" | head -3 | sed 's/^/    got:      /'
+  failed=$((failed + 1))
+  status=1
+fi
+
 # A buffer which is closed gives back the memory of its editor and of its
 # boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
 # window which showed another view kept the canvas of the former one, so the

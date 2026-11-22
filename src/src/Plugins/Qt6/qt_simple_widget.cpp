@@ -215,7 +215,7 @@ qt_simple_widget_rep::send (slot s, blackbox val) {
       check_type<coord2>(val, s);
       coord2 p = open_box<coord2> (val);
       if (canvas()) canvas()->resize (to_qsize(p));
-      else cout << "qt_simple_widget_rep::send: cannot resize canvas, canvas() is null" << LF;
+      else if (!headless_mode) cout << "qt_simple_widget_rep::send: cannot resize canvas, canvas() is null" << LF;
     }
       break;
       
@@ -277,7 +277,7 @@ qt_simple_widget_rep::send (slot s, blackbox val) {
       check_type<coord2>(val, s);
       coord2 p = open_box<coord2> (val);
       if (canvas()) canvas()->setCursorPos(to_qpoint(p));
-      else cout << "qt_simple_widget_rep::send: cannot set cursor position, canvas() is null" << LF;
+      else if (!headless_mode) cout << "qt_simple_widget_rep::send: cannot set cursor position, canvas() is null" << LF;
     }
       break;
       
@@ -341,7 +341,7 @@ qt_simple_widget_rep::query (slot s, int type_id) {
     {
       check_type_id<coord2> (type_id, s);
       if (!canvas()) {
-        cout << "qt_simple_widget_rep::query: cannot get size, canvas() is null" << LF;
+        if (!headless_mode) cout << "qt_simple_widget_rep::query: cannot get size, canvas() is null" << LF;
         return close_box<coord2>(coord2(0,0));
       }
       return close_box<coord2> (from_qsize (canvas()->size()));
@@ -351,7 +351,7 @@ qt_simple_widget_rep::query (slot s, int type_id) {
     {
       check_type_id<coord2> (type_id, s);
       if (!canvas()) {
-        cout << "qt_simple_widget_rep::query: cannot get scroll position, canvas() is null" << LF;
+        if (!headless_mode) cout << "qt_simple_widget_rep::query: cannot get scroll position, canvas() is null" << LF;
         return close_box<coord2>(coord2(0,0));
       }
       return close_box<coord2> (from_qpoint (canvas()->origin()));
@@ -361,7 +361,7 @@ qt_simple_widget_rep::query (slot s, int type_id) {
     {
       check_type_id<coord4> (type_id, s);
       if (!canvas()) {
-        cout << "qt_simple_widget_rep::query: cannot get extents, canvas() is null" << LF;
+        if (!headless_mode) cout << "qt_simple_widget_rep::query: cannot get extents, canvas() is null" << LF;
         return close_box<coord4>(coord4(0,0,0,0));
       }
       return close_box<coord4> (from_qrect (canvas()->extents()));
@@ -470,7 +470,7 @@ qt_simple_widget_rep::as_qaction () {
 void
 qt_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
   if (!canvas()) {
-    cout << "qt_simple_widget_rep::invalidate_rect: cannot invalidate rect, canvas() is null" << LF;
+    if (!headless_mode) cout << "qt_simple_widget_rep::invalidate_rect: cannot invalidate rect, canvas() is null" << LF;
     return;
   }
   // Because of accumulated rounding error on screen with a dpr > 1, 
@@ -501,7 +501,7 @@ qt_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
 void
 qt_simple_widget_rep::invalidate_all () {
   if (!canvas()) {
-    cout << "qt_simple_widget_rep::invalidate_all: cannot invalidate all, canvas() is null" << LF;
+    if (!headless_mode) cout << "qt_simple_widget_rep::invalidate_all: cannot invalidate all, canvas() is null" << LF;
     return;
   }
   QSize sz = canvas()->surface()->size();
@@ -568,7 +568,7 @@ qt_simple_widget_rep::get_renderer() {
 void
 qt_simple_widget_rep::repaint_invalid_regions () {
   if (!canvas()) {
-    cout << "qt_simple_widget_rep::repaint_invalid_regions: cannot repaint invalid regions, canvas() is null" << LF;
+    if (!headless_mode) cout << "qt_simple_widget_rep::repaint_invalid_regions: cannot repaint invalid regions, canvas() is null" << LF;
     return;
   }
 #if QT_VERSION >= 0x060000
