@@ -186,8 +186,18 @@ static bool
 begins_with_item (tree t) {
   if (is_item (t)) return true;
   if (!is_compound (t, "concat")) return false;
-  for (int i=0; i<N(t); i++)
+  for (int i=0; i<N(t); i++) {
     if (is_item (t[i])) return true;
+    // (only markup which draws nothing may come before it)
+    if (!(is_compound (t[i], "vspace") || is_compound (t[i], "vspace*") ||
+          is_compound (t[i], "label") || is_compound (t[i], "assign") ||
+          is_compound (t[i], "no-break-here") ||
+          is_compound (t[i], "no-break-here*") ||
+          is_compound (t[i], "no-page-break") ||
+          is_compound (t[i], "no-page-break*") ||
+          is_compound (t[i], "pause") || is_compound (t[i], "flag")))
+      return false;
+  }
   return false;
 }
 
