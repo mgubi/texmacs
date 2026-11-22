@@ -22,6 +22,14 @@ BODY
     BORDER-LEFT: #000 1px solid;
     BORDER-BOTTOM: #000 1px solid
 }
+/* the <div> of a paragraph with blocks (tmhtml.scm): the margins of P;
+   before the class rules, so that .tmdoc-license... win over it */
+.tmhtml-p
+{
+    MARGIN-TOP: 1em;
+    MARGIN-BOTTOM: 1em;
+    TEXT-ALIGN: justify
+}
 .tmdoc-body
 {
     BACKGROUND: #ffffff;
@@ -230,7 +238,7 @@ TABLE
 {
     BORDER-COLLAPSE: collapse
 }
-TBODY P
+TBODY P, TBODY .tmhtml-p
 {
     MARGIN-TOP: 0px;
     MARGIN-BOTTOM: 0px
@@ -271,7 +279,7 @@ TD
     MARGIN-LEFT: -0.4em;
     TOP: -0.1em
 }
-.compact-block P
+.compact-block P, .compact-block .tmhtml-p
 {
     MARGIN-TOP: 0px;
     MARGIN-BOTTOM: 0px;

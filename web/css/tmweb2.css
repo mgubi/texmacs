@@ -122,7 +122,7 @@ div {
     padding: 0px;
 }
 
-p, center {
+p, center, .tmhtml-p {
     margin: 0px;
     padding: 0px;
     padding-bottom: 0.35em;
@@ -136,7 +136,8 @@ ul, ol, dl, di {
     padding-bottom: 0.35em;
 }
 
-ul > p, ol > p, dl > p, di > p {
+ul > p, ol > p, dl > p, di > p,
+ul > .tmhtml-p, ol > .tmhtml-p, dl > .tmhtml-p, di > .tmhtml-p {
     padding-bottom: 0.1em;
     padding-top: 0.1em;
 }
@@ -145,7 +146,7 @@ table {
     border-collapse: collapse;
 }
 
-tbody p {
+tbody p, tbody .tmhtml-p {
     margin: 0px;
     padding: 0px;
 }
@@ -632,7 +633,7 @@ a:active, a:focus, a:hover {
     top: -0.1em;
 }
 
-.compact-block p, .compact-block center {
+.compact-block p, .compact-block center, .compact-block .tmhtml-p {
     margin: 0px;
     padding: 0px;
 }
@@ -669,7 +670,7 @@ tt, .verbatim {
     margin: 0.5em 0em;
 }
 
-.tmweb-code p, .tmweb-code pre {
+.tmweb-code p, .tmweb-code pre, .tmweb-code .tmhtml-p {
     margin: 0px;
     padding: 0px;
 }
