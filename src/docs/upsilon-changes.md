@@ -14,11 +14,15 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
-- **TeXmacs starts again with Guile 1.8** (builds with Guile): the table
+- **TeXmacs works again with Guile 1.8** (builds with Guile): the table
   of the program languages (`program-languages`...) was not visible from
   the modules which use it, so the startup stopped with "Unbound variable:
   previous-section" (the text menus), the plugin `ai` failed to initialize
-  and the test suites did not load.
+  and the test suites did not load. The editing of program code, and with
+  it many editing keys, failed too (`call-with-exit` and the functions of
+  the syntax trees were missing on Guile), and the Scheme tree-sitter had
+  definitions after expressions, which Guile refuses. All the regression
+  suites pass again with Guile.
 - **Qt: the icon bars keep their height** (Qt builds, desktop
   applications, seen in the Linux AppImage): a tall button, such as a
   section title of several lines shown in the focus bar, made the bar grow
