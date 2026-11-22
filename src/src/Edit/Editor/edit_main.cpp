@@ -285,37 +285,66 @@ tagger_rep* make_pdf_tagger (tree body, path rp, string lang, string title);
 
 // The body of a buffer replaced by another tree for a while, without telling
 // the observers, and put back, also when an error unwinds (print_doc)
+// The tables the typesetting writes (the references, the auxiliary data,
+// the attributes of the buffer or its project) are also put back as they
+// were: what the expanded body gives (labels without the file they are in)
+// stays out of the document. In place: the typesetter holds them.
+static void
+restore_table (hashmap<string,tree> h, hashmap<string,tree> saved) {
+  array<string> keys;
+  iterator<string> it= iterate (h);
+  while (it->busy ()) keys << it->next ();
+  for (int i=0; i<N(keys); i++) h->reset (keys[i]);
+  iterator<string> it2= iterate (saved);
+  while (it2->busy ()) { string k= it2->next (); h (k)= saved [k]; }
+}
+
 struct body_swap {
   tree& slot;
   tree  saved;
   bool  swapped;
+  array<hashmap<string,tree> > tables, copies;
   body_swap (tree& s): slot (s), saved (s), swapped (false) {}
+  void keep (hashmap<string,tree> h) { tables << h; copies << copy (h); }
   void put (tree t) { slot= t; swapped= true; }
-  void restore () { if (swapped) { slot= saved; swapped= false; } }
+  void restore () {
+    if (!swapped) return;
+    slot= saved;
+    for (int i=0; i<N(tables); i++) restore_table (tables[i], copies[i]);
+    swapped= false;
+  }
   ~body_swap () { restore (); }
 };
 
-// t with each include replaced by the document it includes (as
-// typeset_include finds it: relative to the main document)
+// t with each include replaced by what the include macro (std-automatic)
+// typesets: <surround|<part-info|f>||the document f includes> (found as
+// typeset_include finds it: relative to the main document). A file which
+// is being expanded is left as an include, which the typesetter reports
+// as a cycle, as it does without tagging; so is an include in markup
+// which is not typeset as such (inactive, raw data).
 static tree
-expand_includes (tree t, url base, int depth) {
+expand_includes (tree t, url base, array<string> active) {
   if (is_atomic (t)) return t;
-  if (is_compound (t, "include", 1) && is_atomic (t[0]) && depth < 16) {
+  if (is_compound (t, "inactive") || is_compound (t, "inactive*") ||
+      is_compound (t, "var-inactive") || is_compound (t, "raw-data"))
+    return t;
+  if (is_compound (t, "include", 1) && is_atomic (t[0])) {
     url f= relative (base, url_unix (t[0]->label));
-    if (f == base || inclusion_busy (f)) return t;
+    string fs= as_string (f);
+    if (f == base || contains (fs, active) || inclusion_busy (f)) return t;
     tree d= load_inclusion (f);
     if (is_func (d, _ERROR)) return t;
     // (a copy: the nodes of the cached inclusion carry the places which
     // the editor gave them, as decorations of the include)
-    // (in a surround: a document is no child of a document, which the
-    // bridges would typeset as a decoration)
-    return compound ("surround", "", "",
-                     expand_includes (copy (d), base, depth + 1));
+    array<string> inner= copy (active);
+    inner << fs;
+    return compound ("surround", compound ("part-info", t[0]), "",
+                     expand_includes (copy (d), base, inner));
   }
   tree r (t, N(t));
   bool changed= false;
   for (int i=0; i<N(t); i++) {
-    r[i]= expand_includes (t[i], base, depth);
+    r[i]= expand_includes (t[i], base, active);
     if (r[i] != t[i]) changed= true;
   }
   return changed? r: t;
@@ -385,7 +414,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   tree body= subtree (et, rp);
   body_swap swap (subtree (et, rp));
   if (want_tags) {
-    tree eb= expand_includes (body, env->base_file_name, 0);
+    tree eb= expand_includes (body, env->base_file_name, array<string> ());
     if (!strong_equal (eb, body)) {
       // (the typesetter finds the places of the nodes in their observers:
       // the new ones get theirs, the others keep those they have; and it
@@ -393,6 +422,15 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
       // expanded body is the body of the buffer while it is typeset and
       // drawn, without telling the editor, and the body is put back after)
       body= attach_dip (eb, reverse (rp));
+      swap.keep (buf->data->ref);
+      swap.keep (buf->data->aux);
+      swap.keep (buf->data->att);
+      if (buf->prj != NULL) {
+        swap.keep (buf->prj->data->ref);
+        swap.keep (buf->prj->data->aux);
+        swap.keep (buf->prj->data->att);
+      }
+      else swap.keep (grefs);
       swap.put (body);
     }
   }
@@ -458,7 +496,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     // caption or its file: the author should say what it shows
     int n= tagger->pictures_without_alt ();
     if (n > 0)
-      convert_warning << as_string (n) << (n == 1? " picture has": " pictures have")
+      convert_warning << as_string (n) << (n == 1? " image has": " images have")
                       << " no alternative text (Focus > Alternative text): "
                       << "the tagged PDF describes "
                       << (n == 1? "it": "them") << " by a caption or a file name"

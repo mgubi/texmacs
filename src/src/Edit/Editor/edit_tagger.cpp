@@ -56,7 +56,8 @@ private:
   bool   holds_heading (tree t);
   string role_of (string tag);
   string child_role_of (string tag, int i, int n);
-  string alt_of (string key, tree t, string role, array<tree> above);
+  string alt_of (string key, tree t, string role, array<tree> above,
+                 path cur);
   int    without_alt;   // the pictures with no alternative text of their own
   void   collect_ranks (tree t, hashset<int>& ranks);
   string heading (string key, string role);
@@ -108,7 +109,8 @@ pdf_tagger_rep::child_role_of (string tag, int i, int n) {
 }
 
 string
-pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above) {
+pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above,
+                        path cur) {
   if (alts->contains (key)) return alts [key];
   if (role == "Figure") {
     // the alternative text of a picture: the variable image-alt around it
@@ -124,12 +126,18 @@ pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above) {
           return r;
         }
     }
-    without_alt++;
+    // (the warning of print_doc counts the images, for which the focus
+    // menu has the alternative text)
+    if (is_compound (t, "image")) without_alt++;
     for (int k= N(above) - 1; k >= 0; k--) {
       tree f= above[k];
       if (!is_compound (f) || N(f) < 2) continue;
       string fl= as_string (L(f));
       if (child_role_of (fl, N(f) - 1, N(f)) != "Caption") continue;
+      // (a picture in the caption itself is not described by it)
+      path q= cur;
+      for (int j=0; j<k && !is_nil (q); j++) q= q->next;
+      if (!is_nil (q) && q->item == N(f) - 1) continue;
       string r= as_string (call ("pdf-tag-text", object (f[N(f)-1])));
       if (N(r) > 0) { alts (key)= r; return r; }
     }
@@ -327,7 +335,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
         if (starts (role, "H:")) role= heading (as_string (cur), role);
         string alt;
         if (role == "Formula" || role == "Figure")
-          alt= alt_of (as_string (cur), t, role, above);
+          alt= alt_of (as_string (cur), t, role, above, cur);
         r << tag_node (as_string (cur), role, cur, alt);
         last= role;
         if (is_atomic (t) || role == "Formula" || role == "Figure") break;
@@ -369,7 +377,8 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     string key= as_string (cur);
     if (starts (role, "H:")) role= heading (key, role);
     string alt;
-    if (role == "Formula" || role == "Figure") alt= alt_of (key, t, role, above);
+    if (role == "Formula" || role == "Figure")
+      alt= alt_of (key, t, role, above, cur);
     tag_node nd (key, role, cur, alt);
     if (role == "TD" && N(above) >= 2 && is_compound (above[N(above)-2],
                                                      "table")) {

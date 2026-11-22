@@ -3307,11 +3307,17 @@
                                           "End."))))
                      tm)
         (load-buffer tm :strict)
-        (let ((body (tree->stree (buffer-tree))))
+        (switch-to-buffer tm)
+        (update-forced)
+        (let ((body (tree->stree (buffer-tree)))
+              (parts (tree->stree (get-auxiliary "parts"))))
           (system-setenv "TEXMACS_PDF_TAGGED" "1")
           (export-buffer pdf)
           (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
           (check-true (== (tree->stree (buffer-tree)) body))
+          ;; (the typesetting of the expanded body does not stay in the
+          ;; auxiliary data of the document, which a save would write)
+          (check-true (== (tree->stree (get-auxiliary "parts")) parts))
           (check-false (buffer-modified? tm)))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
@@ -3326,6 +3332,32 @@
           (check-true (has? "/StructTreeRoot"))
           (check-true (has? "/S/H1"))
           (check-true (has? "/Alt(y + 2)"))))))
+
+;; A document which includes itself (twice) is expanded once: the typesetter
+;; reports the cycle, as without tagging (the expansion grew as 2^16 before)
+(define (test-tagged-pdf-cycle)
+  (check-group "tagged pdf export: an include cycle")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf cycle" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "tagged-self.tm"))
+             (pdf (url-append (temp-dir) "tagged-self.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document "Self." (include "tagged-self.tm")
+                                          (include "tagged-self.tm")))))
+                     tm)
+        (load-buffer tm :strict)
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-true (url-exists? pdf))
+        (check-true (< (url-size pdf) 1000000)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
@@ -3787,6 +3819,7 @@
                   test-compress test-compress-tables
                   test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-tagged-pdf-export test-tagged-pdf-include
+                  test-tagged-pdf-cycle
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))
