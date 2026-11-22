@@ -38,6 +38,7 @@ public:
   void addSeparator ();
   void addSmallSeparator ();
   void addRightSpacer ();
+  void setFixedHeight (int h);
 
   QList<QTMToolbar*> getAllToolbarsFromMainWindow () const;
   QList<QToolButton*> getAllButtonsFromAllToolbars () const;
@@ -62,6 +63,10 @@ private:
   QPointer<QMenu>       mCurrentMenu;
   QPointer<QToolButton> mPendingResetButton;
 
+  int  mBaseHeight;    // the height set for the icons, see setFixedHeight
+  bool mDeferMetrics;  // while the buttons are replaced
+
+  void updateToolbarMetrics ();
   void scrollBy (int dx);
   void updateNavButtons ();
   int scrollStep () const;
