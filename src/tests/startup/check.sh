@@ -462,6 +462,87 @@ check "headless: a copy in a buffer which was never typeset (#729)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-untypeset.scm")'
 
+# An undo which gives back the document as it was saved beeps: the beep of
+# Qt needs a QApplication, which -headless does not make (a
+# QCoreApplication), and the undo crashed (#923).
+cat > "$out/startup-undo.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (go-end)
+  (archive-state) (start-editing)
+  (insert " More.")
+  (end-editing)
+  (display* "CHECK modified " (buffer-modified? u) "\n")
+  (archive-state) (start-editing) (undo 0) (end-editing)
+  (display* "CHECK undone " (buffer-modified? u) "\n")
+  (buffer-close u))
+EOF
+
+check "headless: an undo back to the saved document (#923)" \
+      "modified #t
+undone #f
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-undo.scm")'
+
+# Under -headless the application is a QCoreApplication, not a
+# QTMApplication: the notification of a new theme took it for one and
+# crashed in init_palette (#923). The preference is put back (the home is a
+# scratch one).
+cat > "$out/startup-theme.scm" <<'EOF'
+(with old (get-preference "gui theme")
+  (set-preference "gui theme" "dark")
+  (display* "CHECK theme " (get-preference "gui theme") "\n")
+  (set-preference "gui theme" old))
+EOF
+
+check "headless: a new theme is not shown, without a crash (#923)" \
+      "theme dark
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-theme.scm")'
+
+# Alt and a letter looked for a composed character in the keyboard of the
+# QTMApplication on macOS, which aborted under -headless (#923); there is no
+# compose map there, the key is a shortcut or nothing.
+cat > "$out/startup-alt-key.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (go-end)
+  (key-press "A-e")
+  (display* "CHECK alt key " (buffer-exists? u) "\n")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+
+# The width of the window takes away the width of a scrollbar, which Qt
+# takes from the style of the QApplication: there is none under -headless,
+# and get-window-width (also Fit to screen width) crashed (#923). The zoom
+# factor saved by change-zoom-factor is put back (a scratch home).
+cat > "$out/startup-fit.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm"))
+      (old (get-preference "zoom factor")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (update-forced)
+  (display* "CHECK width " (integer? (get-window-width)) "\n")
+  (fit-to-screen-width)
+  (display* "CHECK zoom " (> (get-window-zoom-factor) 0) "\n")
+  (set-preference "zoom factor" old)
+  (buffer-close u))
+EOF
+
+check "headless: the width of the window, and Fit to screen width (#923)" \
+      "width #t
+zoom #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-fit.scm")'
+
+check "headless: Alt and a letter on a buffer (#923)" \
+      "alt key #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-alt-key.scm")'
+
 # A buffer which is closed gives back the memory of its editor and of its
 # boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
 # window which showed another view kept the canvas of the former one, so the

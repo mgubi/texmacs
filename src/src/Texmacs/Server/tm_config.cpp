@@ -163,6 +163,7 @@ tm_config_rep::get_keycomb (
 #ifdef Q_OS_MAC
   if (N(which) == 3 && starts (which, "A-") &&
       N(orig) == 7 && (orig == which * " tab") &&
+      !headless_mode &&  // no QTMApplication there, no compose map (#923)
       tmapp()->keyboard().composemap()->contains ((int) (unsigned char) which[2])) {
     string compose= tmapp()->keyboard().composemap()[(int) (unsigned char) which[2]];
     if (N(compose) > 1 &&

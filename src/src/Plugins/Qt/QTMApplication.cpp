@@ -105,7 +105,9 @@ void QTMApplication::notify_preference (string var) {
 }
 
 void qt_notify_preference (string var) {
-  QTMApplication* app= static_cast<QTMApplication*> (QApplication::instance ());
+  // under -headless, the application is a QCoreApplication, not a
+  // QTMApplication (#923)
+  QTMApplication* app= qobject_cast<QTMApplication*> (QCoreApplication::instance ());
   if (app) app->notify_preference (var);
 }
 
