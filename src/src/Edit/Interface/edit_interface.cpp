@@ -1243,9 +1243,10 @@ edit_interface_rep::apply_changes () {
 void
 edit_interface_rep::apply_pending_changes () {
   // under -headless the window is a stand-in (headless_widget), to
-  // which the view is never attached: apply the changes all the same
-  if (applying_changes > 0 ||
-      (!headless_mode && (!is_attached (this) || !has_current_window ())))
+  // which the view is never attached: apply the changes all the same,
+  // but only to a view in a window (with-buffer makes views without)
+  if (applying_changes > 0 || !has_current_window () ||
+      (!headless_mode && !is_attached (this)))
     return;
   apply_changes ();
 }

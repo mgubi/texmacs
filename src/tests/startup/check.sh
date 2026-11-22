@@ -350,6 +350,26 @@ check "headless: Alt and a letter on a buffer (#923)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-alt-key.scm")'
 
+# Under -headless the pending changes of the current view are applied
+# (#937), but only to a view in a window: a view made for a buffer which is
+# not shown (view-new and buffer-focus, as with-buffer does) has none, and
+# apply-changes crashed on it.
+cat > "$out/startup-no-window.scm" <<'EOF'
+(let ((b (buffer-new)))
+  (buffer-set-body b (stree->tree '(document "a")))
+  (view-new b)
+  (buffer-focus b)
+  (apply-changes)
+  (display* "CHECK applied " (buffer-exists? b) "\n")
+  (buffer-pretend-saved b)
+  (buffer-close b))
+EOF
+
+check "headless: apply-changes on a view without a window (#937)" \
+      "applied #t
+quit ()" \
+      -headless -x "$atquit" -x '(load "startup-no-window.scm")'
+
 # A buffer which is closed gives back the memory of its editor and of its
 # boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
 # window which showed another view kept the canvas of the former one, so the
