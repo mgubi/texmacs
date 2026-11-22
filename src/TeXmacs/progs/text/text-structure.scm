@@ -41,10 +41,24 @@
 (tm-define (texmacs->string x)
   (texmacs->code (verbatim-expand x) "cork"))
 
+(define (title-break? t)
+  (in? t '((next-line) (new-line))))
+
+(define (title-split-lines l)
+  ;; the children of a concat, cut at the lines broken by hand
+  (let loop ((l l) (cur '()) (acc '()))
+    (cond ((null? l) (reverse (cons (cons 'concat (reverse cur)) acc)))
+          ((title-break? (car l)) (loop (cdr l) '() (cons (cons 'concat (reverse cur)) acc)))
+          (else (loop (cdr l) (cons (car l) cur) acc)))))
+
 (define (title-line-breaks t)
-  ;; a line broken by hand in a title (next-line...) is dropped by the
-  ;; verbatim export: it becomes a space, as between two paragraphs
-  (cond ((in? t '((next-line) (new-line) (line-break))) " ")
+  ;; a line broken by hand in a title (next-line, new-line) is dropped by
+  ;; the verbatim export: its concat becomes the paragraphs of a document,
+  ;; whose lines are joined as those of a title of several paragraphs
+  ;; (line-break is only a hint, as no-break)
+  (cond ((title-break? t) "")
+        ((and (pair? t) (== (car t) 'concat) (list-or (map title-break? (cdr t))))
+         (cons 'document (map title-line-breaks (title-split-lines (cdr t)))))
         ((pair? t) (cons (car t) (map title-line-breaks (cdr t))))
         (else t)))
 

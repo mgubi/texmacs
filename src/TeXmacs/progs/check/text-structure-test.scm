@@ -266,6 +266,20 @@
       (check= (texmacs->title-string
                (stree->tree '(document "a" (concat "b" (next-line) "c"))))
               "a b c")
+      ;; a space next to a hand break is not doubled; a line-break is only
+      ;; a hint, which does not cut a word
+      (check= (texmacs->title-string
+               (stree->tree '(concat "a " (next-line) "b")))
+              "a b")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "a" (new-line) " b")))
+              "a b")
+      (check= (texmacs->title-string
+               (stree->tree '(concat "Super" (line-break) "cali")))
+              "Supercali")
+      (check= (texmacs->title-string
+               (stree->tree '(strong (concat "x" (next-line) "y"))))
+              "x y")
       ;; the Cork byte #x0D is a character (a German low quote), kept at
       ;; the ends of a title
       (check= (texmacs->title-string
