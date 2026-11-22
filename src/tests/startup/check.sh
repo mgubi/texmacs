@@ -370,6 +370,39 @@ check "headless: apply-changes on a view without a window (#937)" \
 quit ()" \
       -headless -x "$atquit" -x '(load "startup-no-window.scm")'
 
+# The changes applied under -headless (#937) reach the editor's widget,
+# which has no canvas there: it said so on stdout at each apply-changes,
+# among the output of the script.
+cat > "$out/startup-apply.scm" <<'EOF'
+(let ((u (url-append (url-pwd) "startup-a.tm")))
+  (load-buffer u)
+  (switch-to-buffer* u)
+  (go-end)
+  (insert "Z")
+  (apply-changes)
+  (kbd-left)
+  (apply-changes)
+  (display* "CHECK moved " (cursor-path) "\n")
+  (buffer-pretend-saved u)
+  (buffer-close u))
+EOF
+
+total=$((total + 1))
+(cd "$out" && perl -e 'alarm shift; exec @ARGV' "$timeout" "$bin" -headless \
+   -x '(load "startup-apply.scm")' -q > "$out/$total.out" 2> "$out/$total.err")
+code=$?
+noise=$(grep -av '^CHECK ' "$out/$total.out" | grep -a 'canvas() is null')
+if [ $code -eq 0 ] && grep -aq '^CHECK moved' "$out/$total.out" && [ -z "$noise" ]
+then
+  echo "  ok     headless: apply-changes writes nothing on stdout (#937)"
+else
+  echo "  FAILED headless: apply-changes writes nothing on stdout (#937)"
+  echo "    exit status $code"
+  echo "$noise" | head -3 | sed 's/^/    got:      /'
+  failed=$((failed + 1))
+  status=1
+fi
+
 # A buffer which is closed gives back the memory of its editor and of its
 # boxes. The canvas which shows an editor (QTMWidget) holds that editor: a
 # window which showed another view kept the canvas of the former one, so the

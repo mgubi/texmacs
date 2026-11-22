@@ -858,7 +858,9 @@ tm_window_rep::set_window_zoom_factor (double zoom) {
   ::set_zoom_factor (wid, zoomf);
   // under -headless the window is a stand-in (headless_widget) which does
   // not pass the zoom on to the canvas of its view, as a window does
-  if (headless_mode && !is_none (window_to_view (id))) {
+  // (an embedded window, of an input field, has no id: its view is not
+  // found by window_to_view)
+  if (headless_mode && !is_none (id) && !is_none (window_to_view (id))) {
     tm_view vw= concrete_view (window_to_view (id));
     if (vw != NULL) vw->ed->handle_set_zoom_factor (zoomf);
   }
