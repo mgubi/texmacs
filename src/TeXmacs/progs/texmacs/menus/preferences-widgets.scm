@@ -771,7 +771,7 @@
       (meti (hlist // (text "Check exported Pdf files for correctness"))
         (toggle (set-boolean-preference "texmacs->pdf:check" answer)
                 (get-boolean-preference "texmacs->pdf:check"))))
-    (assuming (mupdf-writes-pdf?)
+    (assuming (and (supports-native-pdf?) (get-boolean-preference "native pdf"))
       (meti (hlist // (text "Tagged Pdf, for accessibility (PDF/UA)"))
         (toggle (set-boolean-preference "texmacs->pdf:tagged" answer)
                 (get-boolean-preference "texmacs->pdf:tagged")))))

@@ -14,8 +14,8 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
-- **Tagged PDF, for accessibility (PDF/UA-1)** (Vue builds, desktop
-  applications): with *Preferences → Convert → Pdf → Tagged Pdf, for
+- **Tagged PDF, for accessibility (PDF/UA-1)** (desktop applications):
+  with *Preferences → Convert → Pdf → Tagged Pdf, for
   accessibility* (or `TEXMACS_PDF_TAGGED=1`), Export as PDF writes the
   structure of the document for screen readers: headings, paragraphs,
   lists, tables, footnotes, links and formulas, the formulas described by

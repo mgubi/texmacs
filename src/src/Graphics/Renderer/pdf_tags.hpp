@@ -23,6 +23,10 @@
 #include "renderer.hpp"
 #include "hashset.hpp"
 
+// the keys of the parent tree of the annotations come after those of the
+// pages, of which there are fewer
+static const int pdf_tag_annot_key0= 1000000;
+
 // A structure element: its standard type, its alternate description (""
 // for none) and its integer attributes (the spans of a cell, owner Table)
 struct pdf_tag_elem {

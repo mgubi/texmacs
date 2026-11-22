@@ -10,11 +10,15 @@ issue #945. A user had resorted to exporting to Typst
 ([texmacs-typst-exporter](https://github.com/ingolfschaefer/texmacs-typst-exporter)),
 which gives up the typesetting of TeXmacs.
 
-The PDF writer on MuPDF (`src/Plugins/MuPDF/mupdf_pdf_renderer.cpp`, the
-writer of the Vue builds since #942) writes a tagged PDF when asked:
-*Preferences → Convert → Pdf → Tagged Pdf, for accessibility*, the
-preference `texmacs->pdf:tagged`, or `TEXMACS_PDF_TAGGED=1`. PDFHummus
-(Qt, Cocoa) does not tag.
+Both PDF writers write a tagged PDF when asked: *Preferences → Convert →
+Pdf → Tagged Pdf, for accessibility*, the preference
+`texmacs->pdf:tagged`, or `TEXMACS_PDF_TAGGED=1` -- the writer on MuPDF
+(`src/Plugins/MuPDF/mupdf_pdf_renderer.cpp`, Vue since #942) and
+PDFHummus (`src/Plugins/Pdf/pdf_hummus_renderer.cpp`, Qt and Cocoa). What
+they share (the elements, the blocks of marked content, the order of the
+children, the annotations, the XMP metadata) is `pdf_tags`
+(`src/Graphics/Renderer/pdf_tags.cpp`); each writes the operators and the
+objects its own way.
 
 ## How it works
 
@@ -99,6 +103,14 @@ catalog gets `/MarkInfo <</Marked true>>`, `/Lang` (the language of the
 document, `pdf-tag-language`), `/ViewerPreferences <</DisplayDocTitle
 true>>`, and XMP metadata with the title and `pdfuaid:part 1`.
 
+**PDFHummus.** The pages get `/StructParents` and `/Tabs` through
+`OnPageWrite` of its extender, the catalog its keys through
+`on_catalog_write`; the annotations are written at the end, so their
+OBJR name them by the ids allocated when they were met. It writes a
+`/CIDSet` for the subsets of CID fonts which does not identify exactly
+their glyphs: in a tagged PDF it writes none (`hummus_write_cidset`, in
+the vendored `DescendentFontWriter.cpp`), which PDF/UA allows.
+
 **Fonts.** PDF/UA wants a Unicode value for every glyph drawn. The TeX
 fonts take theirs from their encodings (`tex_math_unicode`: the math
 fonts, and the CB Greek fonts, `grmn.enc`), a TeX font of no table in a
@@ -138,8 +150,6 @@ in the Matterhorn Protocol.
 * **Languages** which `language_to_locale` does not know are `en-US`.
 * **A missing glyph** (`.notdef`) drawn by the typesetter (STIX size
   fonts in a thesis of the corpus) is forbidden by PDF/UA (7.21.8).
-* **PDFHummus** does not tag; the tagger and the box hook are its for the
-  taking.
 * **PDF/UA-2** (PDF 2.0): MathML as associated files of the formulas,
   the namespaces of PDF 2.0.
 * Tagging by default, once tried with screen readers and the viewers.

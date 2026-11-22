@@ -3230,8 +3230,8 @@
 ;; and the links with a description and their place in the structure.
 (define (test-tagged-pdf-export)
   (check-group "tagged pdf export")
-  (if (not (mupdf-writes-pdf?))
-      (images-skip "tagged pdf export" "the PDF is not written by MuPDF")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf export" "no native PDF writer")
       (let* ((tm (url-append (temp-dir) "tagged.tm"))
              (pdf (url-append (temp-dir) "tagged.pdf"))
              (old (current-buffer))
@@ -3255,7 +3255,13 @@
           (when (nin? b before) (buffer-close b)))
         (when (buffer-exists? old) (switch-to-buffer old))
         (with s (if (url-exists? pdf) (string-load pdf) "")
-          (define (has? what) (>= (string-search-forwards what 0 s) 0))
+          ;; (the writers differ by their spaces: none is compared)
+          (define s* (string-replace
+                      (string-replace
+                       (string-replace (string-replace s " " "") "\t" "")
+                       "\r" "") "\n" ""))
+          (define (has? what)
+            (>= (string-search-forwards (string-replace what " " "") 0 s*) 0))
           (check-true (string-starts? s "%PDF-"))
           (check-true (has? "/StructTreeRoot"))
           (check-true (has? "/MarkInfo<</Marked true>>"))
@@ -3282,8 +3288,8 @@
 ;; by what it includes, for that time), and the buffer is as it was after.
 (define (test-tagged-pdf-include)
   (check-group "tagged pdf export: an included document")
-  (if (not (mupdf-writes-pdf?))
-      (images-skip "tagged pdf include" "the PDF is not written by MuPDF")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf include" "no native PDF writer")
       (let* ((part (url-append (temp-dir) "tagged-part.tm"))
              (tm (url-append (temp-dir) "tagged-main.tm"))
              (pdf (url-append (temp-dir) "tagged-main.pdf"))
@@ -3311,7 +3317,12 @@
           (when (nin? b before) (buffer-close b)))
         (when (buffer-exists? old) (switch-to-buffer old))
         (with s (if (url-exists? pdf) (string-load pdf) "")
-          (define (has? what) (>= (string-search-forwards what 0 s) 0))
+          (define s* (string-replace
+                      (string-replace
+                       (string-replace (string-replace s " " "") "\t" "")
+                       "\r" "") "\n" ""))
+          (define (has? what)
+            (>= (string-search-forwards (string-replace what " " "") 0 s*) 0))
           (check-true (has? "/StructTreeRoot"))
           (check-true (has? "/S/H1"))
           (check-true (has? "/Alt(y + 2)"))))))

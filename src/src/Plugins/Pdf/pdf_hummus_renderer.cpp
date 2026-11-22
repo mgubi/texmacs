@@ -10,6 +10,9 @@
 ******************************************************************************/
 
 #include "pdf_hummus_renderer.hpp"
+#include "pdf_tags.hpp"
+
+extern bool hummus_write_cidset;  // PDFWriter/DescendentFontWriter.cpp
 #include "Metafont/tex_files.hpp"
 #include "Metafont/load_tfm.hpp"
 #include "Metafont/tex_unicode.hpp"
@@ -133,6 +136,13 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   int label_count;
   hashmap<string,string> metadata;
 
+  // a tagged PDF (docs/pdf-tagging.md): the structure, once there is a
+  // tagger, the annotations of the structure (links, videos), and the
+  // objects which the catalog names
+  pdf_tags tags;
+  array<ObjectIDType> tag_annot_ids;
+  ObjectIDType struct_tree_id, xmp_id;
+
   // outline support
   ObjectIDType outlineId;
   list<outline_data> outlines;
@@ -212,8 +222,22 @@ class pdf_hummus_renderer_rep : public renderer_rep {
       ren->on_catalog_write (inCatalogInformation, inCatalogDictionaryContext, inPDFWriterObjectContext, inDocumentContext);
       return eSuccess;
     }
+    virtual PDFHummus::EStatusCode OnPageWrite(PDFPage* inPage,
+                                               DictionaryContext* inPageDictionaryContext,
+                                               ObjectsContext* inPDFWriterObjectContext,
+                                               PDFHummus::DocumentContext* inDocumentContext)
+    {
+      (void) inPage; (void) inPDFWriterObjectContext; (void) inDocumentContext;
+      ren->on_page_write (inPageDictionaryContext);
+      return eSuccess;
+    }
   };
   
+  void on_page_write (DictionaryContext* page_dict);
+  pdf_tags tg ();
+  void tag_mark (int kind);
+  void tag_close ();
+  void write_structure ();
   PDFHummus::EStatusCode on_catalog_write (CatalogInformation* inCatalogInformation,
                                            DictionaryContext* inCatalogDictionaryContext,
                                            ObjectsContext* inPDFWriterObjectContext,
@@ -231,6 +255,7 @@ public:
   ~pdf_hummus_renderer_rep ();
   bool is_printer ();
   bool is_started ();
+  bool supports_tagging ();
   void next_page ();
   
   void set_transformation (frame fr);
@@ -320,6 +345,7 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
 {
   width = default_dpi * paper_w / 2.54;
   height= default_dpi * paper_h / 2.54;
+  tags= NULL; struct_tree_id= 0; xmp_id= 0;
 
   // setup library
 
@@ -427,8 +453,13 @@ pdf_hummus_renderer_rep::~pdf_hummus_renderer_rep () {
   }
   
   flush_videos ();
+  write_structure ();
 
+  // (the fonts are written now: no CIDSet in a tagged PDF)
+  hummus_write_cidset= (tagger == NULL);
   EStatusCode status = pdfWriter.EndPDF();
+  hummus_write_cidset= true;
+  if (tags != NULL) { tm_delete (tags); tags= NULL; }
   if (status != PDFHummus::eSuccess) {
     convert_error << "Failed in end PDF\n";
   }
@@ -437,6 +468,157 @@ pdf_hummus_renderer_rep::~pdf_hummus_renderer_rep () {
   for (int i=0; i<N(temp_images); i++)
     if (!is_none (temp_images[i]) && exists(temp_images[i]))
       remove (temp_images[i]);
+}
+
+/******************************************************************************
+* Tagged PDF (docs/pdf-tagging.md, the structure in pdf_tags)
+******************************************************************************/
+
+bool
+pdf_hummus_renderer_rep::supports_tagging () {
+  return true;
+}
+
+// the structure, made when the tagger is known (print_doc gives it after
+// the renderer is made)
+pdf_tags
+pdf_hummus_renderer_rep::tg () {
+  if (tags == NULL) tags= tm_new<pdf_tags_rep> (tagger);
+  return tags;
+}
+
+// The drawing which follows is of the box being drawn: of kind 0 (text),
+// 1 (lines, fills) or 2 (images)
+void
+pdf_hummus_renderer_rep::tag_mark (int kind) {
+  if (tagger == NULL || contentContext == NULL) return;
+  string ops= tg ()->mark (tag_ip, kind, page_num);
+  if (N(ops) == 0) return;
+  // a block of marked content may not cross a text object
+  end_text ();
+  c_string cops (ops);
+  contentContext->WriteFreeCode (std::string ((char*) cops));
+}
+
+void
+pdf_hummus_renderer_rep::tag_close () {
+  if (tags == NULL || contentContext == NULL) return;
+  string ops= tags->close ();
+  if (N(ops) == 0) return;
+  end_text ();
+  c_string cops (ops);
+  contentContext->WriteFreeCode (std::string ((char*) cops));
+}
+
+// the page: its marked contents are entry page_num of the parent tree, and
+// its annotations are visited in the order of the structure (PDF/UA)
+void
+pdf_hummus_renderer_rep::on_page_write (DictionaryContext* page_dict) {
+  if (tagger == NULL) return;
+  page_dict->WriteKey ("StructParents");
+  page_dict->WriteIntegerValue (page_num);
+  page_dict->WriteKey ("Tabs");
+  page_dict->WriteNameValue ("S");
+}
+
+static string escape_string (string s);   // below
+
+// a text string of a PDF: literal when it is printable ASCII, which is
+// read as it is, UTF-16 otherwise
+static string
+pdf_text_string (string s) {
+  for (int i=0; i<N(s); i++)
+    if (((unsigned char) s[i]) < 32 || ((unsigned char) s[i]) > 126)
+      return utf8_to_pdf_hex_string (s);
+  return "(" * escape_string (s) * ")";
+}
+
+// The structure tree, the parent tree and the XMP metadata, whose objects
+// the catalog names (on_catalog_write)
+void
+pdf_hummus_renderer_rep::write_structure () {
+  if (tags == NULL || N(tags->elems) == 0) return;
+  ObjectsContext& oc= pdfWriter.GetObjectsContext ();
+  IndirectObjectsReferenceRegistry& reg= oc.GetInDirectObjectsRegistry ();
+  int n= N(tags->elems);
+  array<ObjectIDType> ids (n);
+  for (int e=0; e<n; e++) ids[e]= reg.AllocateNewObjectID ();
+  struct_tree_id= reg.AllocateNewObjectID ();
+  ObjectIDType pt_id= reg.AllocateNewObjectID ();
+  xmp_id= reg.AllocateNewObjectID ();
+  array<array<int> > kids= tags->children ();
+  for (int e=0; e<n; e++) {
+    pdf_tag_elem& el= tags->elems[e];
+    string d;
+    d << "<< /Type /StructElem /S /" << el.role << " /P "
+      << as_string ((int) (el.parent < 0? struct_tree_id: ids[el.parent]))
+      << " 0 R";
+    if (N(el.alt) > 0) d << " /Alt " << pdf_text_string (el.alt);
+    if (el.role == "Note") d << " /ID (note-" << as_string (e) << ")";
+    if (N(el.akeys) > 0) {
+      // the attributes of a cell (its spans), owner Table
+      d << " /A << /O /Table";
+      for (int j=0; j<N(el.akeys); j++)
+        d << " /" << el.akeys[j] << " " << as_string (el.avals[j]);
+      d << " >>";
+    }
+    d << "\r\n /K [";
+    for (int i=0; i<N(kids[e]); i++) {
+      pdf_tag_kid& kd= tags->kids[kids[e][i]];
+      if (kd.kind == 0) d << " " << as_string ((int) ids[kd.id]) << " 0 R";
+      else if (kd.kind == 1 && page_id->contains (kd.page))
+        d << " << /Type /MCR /Pg " << as_string ((int) page_id [kd.page])
+          << " 0 R /MCID " << as_string (kd.id) << " >>";
+      else if (kd.kind == 2 && page_id->contains (kd.page) &&
+               kd.id < N(tag_annot_ids))
+        d << " << /Type /OBJR /Obj " << as_string ((int) tag_annot_ids[kd.id])
+          << " 0 R /Pg " << as_string ((int) page_id [kd.page]) << " 0 R >>";
+    }
+    d << " ] >>\r\n";
+    write_indirect_obj (oc, ids[e], d);
+  }
+  // the parent tree: for each page its elements by MCID, then each
+  // annotation, under keys above those of the pages
+  string pt= "<< /Nums [";
+  array<array<int> >& pm= tags->page_mcids;
+  for (int p=0; p<N(pm); p++) {
+    pt << "\r\n " << as_string (p) << " [";
+    for (int m=0; m<N(pm[p]); m++)
+      pt << " " << as_string ((int) ids[pm[p][m]]) << " 0 R";
+    pt << " ]";
+  }
+  for (int i=0; i<N(tags->kids); i++)
+    if (tags->kids[i].kind == 2)
+      pt << "\r\n " << as_string (pdf_tag_annot_key0 + tags->kids[i].id)
+         << " " << as_string ((int) ids[tags->kids[i].parent]) << " 0 R";
+  pt << " ] >>\r\n";
+  write_indirect_obj (oc, pt_id, pt);
+  string root;
+  root << "<< /Type /StructTreeRoot /K " << as_string ((int) ids[0])
+       << " 0 R /ParentTree " << as_string ((int) pt_id)
+       << " 0 R /ParentTreeNextKey "
+       << as_string (pdf_tag_annot_key0 + N(tag_annot_ids)) << " >>\r\n";
+  write_indirect_obj (oc, struct_tree_id, root);
+  // the XMP metadata, with the part of PDF/UA (an uncompressed stream)
+  string title= cork_to_utf8 (tagger->title ());
+  if (N(title) == 0 && metadata->contains ("title"))
+    title= cork_to_utf8 (metadata ["title"]);
+  if (N(title) == 0) title= as_string (tail (pdf_file_name));
+  string author= (metadata->contains ("author")?
+                  cork_to_utf8 (metadata ["author"]): string (""));
+  string xmp= pdf_tags_xmp (title, author,
+                            "TeXmacs " * string (TEXMACS_VERSION) * " + Hummus 4.0");
+  string pre;
+  pre << "<< /Type /Metadata /Subtype /XML /Length " << as_string (N(xmp))
+      << " >>\r\nstream\r\n";
+  string post= "\r\nendstream\r\n";
+  oc.StartNewIndirectObject (xmp_id);
+  IByteWriter* w= oc.StartFreeContext ();
+  w->Write ((unsigned char*) &(pre[0]), N(pre));
+  w->Write ((unsigned char*) &(xmp[0]), N(xmp));
+  w->Write ((unsigned char*) &(post[0]), N(post));
+  oc.EndFreeContext ();
+  oc.EndIndirectObject ();
 }
 
 bool
@@ -492,6 +674,7 @@ pdf_hummus_renderer_rep::end_page(){
   if (!page) return;
   EStatusCode status;
 
+  tag_close ();
   end_text ();
   
 
@@ -514,6 +697,7 @@ pdf_hummus_renderer_rep::end_page(){
   }
 
   page_id (page_num) = res.second;
+  if (tags != NULL) tags->end_page ();
   page_num++;
 }
 
@@ -541,6 +725,8 @@ pdf_hummus_renderer_rep::end_text () {
 // glyphs does not end the text object)
 void
 pdf_hummus_renderer_rep::begin_actual_text (string s) {
+  tag_mark (0);
+  if (tagger != NULL) tg ()->span++;   // no new block in the span
   // (marked content is of PDF 1.2, its ActualText of 1.5, which the
   // readers take whatever the version of the file)
   begin_text ();
@@ -551,12 +737,14 @@ pdf_hummus_renderer_rep::begin_actual_text (string s) {
 
 void
 pdf_hummus_renderer_rep::end_actual_text () {
+  if (tagger != NULL && tg ()->span > 0) tg ()->span--;
   contentContext->WriteFreeCode (" EMC\r\n");
 }
 
 void
 pdf_hummus_renderer_rep::draw_invisible (int c, font_glyphs fn, SI x, SI y,
                                          double hscale) {
+  tag_mark (0);
   begin_text ();
   contentContext->Tr (3);
   if (hscale != 1.0) contentContext->Tz ((int) (100.0 * hscale + 0.5));
@@ -1541,6 +1729,7 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   //		<< fn->res_name << "\n";
   glyph gl= fn->get(ch);
   if (is_nil (gl)) return;
+  tag_mark (0);
   string fontname = fn->res_name;
   int fontchunk= t3font_font_chunk (ch);
   string fontchunkname= fontname * string ("-chunk") * as_string (fontchunk);
@@ -1635,7 +1824,11 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   else {
     if (cfid != NULL) {
-      if (by_number && code <= 0)
+      if (by_number && code <= 0 && tagger != NULL)
+        // a tagged PDF maps every glyph drawn to a character (PDF/UA): those
+        // of no character known (#943) to U+FFFD, as readers took them
+        glyphs.push_back (GlyphUnicodeMapping (gl_index, 0xfffd));
+      else if (by_number && code <= 0)
         glyphs.push_back (GlyphUnicodeMapping (gl_index, ULongVector ()));
       else {
         int uc= code;
@@ -1647,6 +1840,9 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
           array<int> table= tex_math_unicode (cfn);
           if (ch >= 0 && ch < N(table) && table[ch] >= 0) uc= table[ch];
         }
+        // (PDF/UA forbids 0, U+FEFF and U+FFFE in the map)
+        if (tagger != NULL && (uc <= 0 || uc == 0xfeff || uc == 0xfffe))
+          uc= 0xfffd;
         glyphs.push_back (GlyphUnicodeMapping (gl_index, uc));
       }
       contentContext->Tj(glyphs);
@@ -1664,6 +1860,7 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
 
 void
 pdf_hummus_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
+  tag_mark (1);
   // debug_convert << "line\n";
   end_text ();
   contentContext->m(to_x (x1), to_y (y1));
@@ -1673,6 +1870,7 @@ pdf_hummus_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
 
 void
 pdf_hummus_renderer_rep::lines (array<SI> x, array<SI> y) {
+  tag_mark (1);
   // debug_convert << "lines\n";
   end_text ();
   int i, n= N(x);
@@ -1695,6 +1893,7 @@ pdf_hummus_renderer_rep::lines (array<SI> x, array<SI> y) {
 
 void
 pdf_hummus_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
+  tag_mark (1);
   end_text ();
   double xx1= to_x (min (x1, x2));
   double yy1= to_y (min (y1, y2));
@@ -1714,6 +1913,7 @@ pdf_hummus_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
 
 void
 pdf_hummus_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
+  tag_mark (1);
   if ((x1<x2) && (y1<y2)) {
     end_text ();
     double xx1= to_x (min (x1, x2));
@@ -1729,6 +1929,7 @@ pdf_hummus_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
 void
 pdf_hummus_renderer_rep::bezier_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta, bool filled)
 {
+  tag_mark (1);
   // PDF can describe only cubic bezier paths, so we have to make up the arc with them
   // Since this is not mathematically exact, we minimize errors by drawing beziers sub-arcs of at most 90??
   end_text ();
@@ -1793,6 +1994,7 @@ pdf_hummus_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int de
 
 void
 pdf_hummus_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
+  tag_mark (1);
   // debug_convert << "polygon\n";
   int i, n= N(x);
   if ((N(y) != n) || (n<1)) return;
@@ -2214,6 +2416,7 @@ void
 pdf_hummus_renderer_rep::image (
   url u, double w, double h, SI x, SI y, int alpha)
 {
+  tag_mark (2);
   // debug_convert << "pdf renderer, image " << u << ", " << w << " x " << h
   //		<< " + (" << x << ", " << y << ")" << LF;
   tree lookup= tuple (u->t);
@@ -2261,6 +2464,7 @@ pdf_raster_picture (picture pic) {
 
 void
 pdf_hummus_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
+  tag_mark (2);
   // debug_convert << "pdf renderer, draw_picture " << x << ", " << y
   //		<< " (" << alpha << ")" << LF;
   url temp;
@@ -2290,6 +2494,7 @@ pdf_hummus_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 
 void
 pdf_hummus_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
+  tag_mark (2);
   // debug_convert << "pdf renderer, draw_scalable "
   //   << im->get_name () << " at " << x << ", " << y
   //   << " (" << alpha << ")" << LF;
@@ -2401,6 +2606,35 @@ pdf_hummus_renderer_rep::on_catalog_write (CatalogInformation* inCatalogInformat
     inCatalogDictionaryContext->WriteKey("Outlines");
     inCatalogDictionaryContext->WriteNewObjectReferenceValue(outlineId);
   }
+  if (struct_tree_id) {
+    // a tagged PDF (PDF/UA-1, see write_structure)
+    ObjectsContext* oc= inPDFWriterObjectContext;
+    DictionaryContext* cat= inCatalogDictionaryContext;
+    cat->WriteKey ("StructTreeRoot");
+    cat->WriteNewObjectReferenceValue (struct_tree_id);
+    cat->WriteKey ("MarkInfo");
+    DictionaryContext* mi= oc->StartDictionary ();
+    mi->WriteKey ("Marked");
+    mi->WriteBooleanValue (true);
+    oc->EndDictionary (mi);
+    string lang= tagger->language ();
+    if (N(lang) > 0) {
+      c_string cl (lang);
+      cat->WriteKey ("Lang");
+      cat->WriteLiteralStringValue (std::string ((char*) cl));
+    }
+    cat->WriteKey ("ViewerPreferences");
+    DictionaryContext* vp= oc->StartDictionary ();
+    vp->WriteKey ("DisplayDocTitle");
+    vp->WriteBooleanValue (true);
+    oc->EndDictionary (vp);
+    cat->WriteKey ("Metadata");
+    cat->WriteNewObjectReferenceValue (xmp_id);
+    if (N (video_files) == 0) {
+      cat->WriteKey ("Version");
+      cat->WriteNameValue ("1.7");
+    }
+  }
   if (N (video_files) > 0) {
     // embedded videos are RichMedia annotations: PDF 1.7, Adobe extension
     // level 3 (the catalog may raise the version of the header)
@@ -2462,6 +2696,19 @@ pdf_hummus_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2)
     dict << "/A << /S /URI /URI (" << escape_string (prepare_text (label))
          << ") >>\r\n";
   }
+  if (tagger != NULL) {
+    // PDF/UA: a description, and the place in the structure (the Link of
+    // the text, see pdf_tags)
+    path pos;
+    int e= tg ()->link_element (tag_ip, pos);
+    int k= N(tag_annot_ids);
+    tag_annot_ids << annotId;
+    tg ()->add_annotation (e, k, page_num, pos);
+    string l= cork_to_utf8 (starts (label, "#")?
+                            "Link to " * label (1, N(label)): label);
+    dict << "\t/Contents " << pdf_text_string (l) << "\r\n";
+    dict << "\t/StructParent " << as_string (pdf_tag_annot_key0 + k) << "\r\n";
+  }
   dict << ">>\r\n";
   annot_list (annotId) = dict;
 }
@@ -2512,6 +2759,15 @@ pdf_hummus_renderer_rep::embed_video (url u, int ms, bool repeat,
        << " " << as_string (f * to_y (y2)) << "]\r\n";
   dict << "\t/NM (" << name << ")\r\n\t/Contents (" << name << ")\r\n";
   dict << "\t/P @PAGE@\r\n";
+  if (tagger != NULL) {
+    // PDF/UA: an Annot element in the element of the picture
+    path pos;
+    int e= tg ()->annot_element (tag_ip, pos);
+    int k= N(tag_annot_ids);
+    tag_annot_ids << annotId;
+    tg ()->add_annotation (e, k, page_num, pos);
+    dict << "\t/StructParent " << as_string (pdf_tag_annot_key0 + k) << "\r\n";
+  }
   video_annot_page (annotId)= page_num;
   dict << "\t/RichMediaSettings << /Type /RichMediaSettings\r\n"
        << "\t\t/Activation << /Type /RichMediaActivation /Condition /PV"
