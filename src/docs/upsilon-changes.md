@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **Scripts under `-headless` edit and move the cursor as with a window**
+  (desktop applications): a script run with `-headless` (batch editing,
+  the MCP server) left the changes of the document pending, so the cursor
+  moves after an edit (the arrow keys, `kbd-left`...) did nothing and the
+  environment at the cursor was out of date; `(apply-changes)` now applies
+  them, with the zoom of the window, and no longer writes `canvas() is
+  null` lines among the output of the script (#937).
 - **No crash under `-headless`** (Qt builds, desktop applications): TeXmacs
   run with `-headless` (scripts, the regression suites, the MCP server)
   crashed on a change of the theme of the interface, on Alt and a letter
