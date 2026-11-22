@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **Qt: the icon bars keep their height** (Qt builds, desktop
+  applications, seen in the Linux AppImage): a tall button, such as a
+  section title of several lines shown in the focus bar, made the bar grow
+  for the rest of the session; the bar now follows the buttons it shows,
+  and the section titles in the focus bar and the menus are on one line
+  (#936).
 - **A macOS package with Chez Scheme** (desktop applications, Apple
   silicon, macOS 15 or later): `texmacs-qt-chez-macos-arm64.zip` among the
   [latest builds](https://mgubi.github.io/texmacs/), "TeXmacs Upsilon Qt
