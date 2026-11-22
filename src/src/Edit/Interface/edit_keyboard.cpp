@@ -331,6 +331,7 @@ edit_interface_rep::key_press (string gkey) {
   }
 #if defined(Q_OS_MAC)
   else if (N(key) == 3 && starts (key, "A-") &&
+           !headless_mode &&  // no QTMApplication there, no compose map (#923)
            tmapp()->keyboard().composemap()->contains ((int) (unsigned char) key[2])) {
     string compose_key= tmapp()->keyboard().composemap()[(int) (unsigned char) key[2]];
     key_press (compose_key);
