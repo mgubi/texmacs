@@ -1,73 +1,69 @@
-# TeXmacs / Chez Scheme — Developer Guide
+# TeXmacs on Chez Scheme
 
-**Status (`wip-chez`):** Chez Scheme **10.4.1**, Qt **6.12.0** (macOS arm64 / Windows MSYS2) and Qt **6.10.2** (Ubuntu 26.04 arm64). All **453/453** Scheme modules transpile and compile to native `.so` with 0 failures, packaged with a VFASL `texmacs.boot` fast-boot image and 1,176 static C++ glue procedures (`initialize_glue_chez` + `foreign-procedure`). GUI launch is verified (`texmacs-version` 2.1.5).
+The branch `wip_other_schemes` (merged from `wip_chez`) lets TeXmacs run its
+Scheme code on [Chez Scheme](https://cisco.github.io/ChezScheme/) 10.4, beside
+Guile, s7 and femtolisp. Chez compiles to machine code: the Scheme sources of
+`TeXmacs/progs` are compiled ahead of time into Chez modules, and the modules
+needed at start-up are packed into a boot image.
 
----
+The port comes from the branch `wip-chez` of
+[nerd-qp/texmacs](https://github.com/nerd-qp/texmacs) (Joy Yang), which made
+the module compiler, the boot image and the C++ glue. It was then adapted to
+this branch: built by `configure`, strings as byte strings (as in Guile 1.8
+and the other Schemes of this branch), start through the shared
+`init-texmacs.scm`, errors with Guile's keys, and the fixes needed for all the
+regression suites.
 
-## Documentation Index
+| File | Contents |
+|---|---|
+| [01-build.md](01-build.md) | Configuring, building, compiling the modules and the boot image, running, the environment variables, the tests |
+| [02-reader-and-compiler.md](02-reader-and-compiler.md) | Reading Guile code (`chez-reader.scm`), the module compiler, the boot image |
+| [03-runtime.md](03-runtime.md) | `boot-chez.scm` and `chez-compat.scm`: byte strings, ports, modules, errors, blackboxes, what Guile has and Chez lacks |
+| [04-cpp-binding.md](04-cpp-binding.md) | The C++ side: `chez_tm`, the generated glue, errors across the boundary, strings from C++ |
+| [05-progs-changes.md](05-progs-changes.md) | The changes to the code shared by all the Schemes |
+| [06-open-issues.md](06-open-issues.md) | Known differences, fragile spots, what is left |
+| [07-performance.md](07-performance.md) | Start-up, the LaTeX export and the test suites on Chez, s7, femtolisp and Guile |
 
-### Build & Packaging Guides
-- [build_guide/MACOS.md](build_guide/MACOS.md) — Building, running, and packaging (`.app` / `.dmg`) on macOS
-- [build_guide/LINUX.md](build_guide/LINUX.md) — Building Chez Scheme and TeXmacs on Linux (Ubuntu arm64 / x86_64)
-- [build_guide/WINDOWS_MSYS2.md](build_guide/WINDOWS_MSYS2.md) — Building and running on Windows with MSYS2 (UCRT64)
+## Summary
 
-### Architecture, Migration & Tasks
-- [TODO_CHEZ.md](TODO_CHEZ.md) — Active bugs, crash/stability fixes, and remaining optimization tasks
-- [CHEZ_MIGRATION_LOG.md](CHEZ_MIGRATION_LOG.md) — Phasing, `texmacs.boot` heap construction, native glue migration, and dependency fixes
-- [Load_Chez_Fast.md](Load_Chez_Fast.md) — Fast boot (`texmacs.boot` VFASL) vs. normal `.so` init startup and memory findings
-- [Handling_Encoding_Chez.md](Handling_Encoding_Chez.md) — String encoding duality (UTF-8 text, 8-bit Cork, raw binary bytevectors)
-- [PARALLEL_COMPILER_PLAN.md](PARALLEL_COMPILER_PLAN.md) — Two-pass compiler split and lessons from the reverted parallel worker pool
+- **A build option:** `./configure --with-scheme=chez`. Chez is linked
+  statically from its installation (`libkernel.a`); its heap images
+  (`petite.boot`, `scheme.boot`) are read at start-up.
+- **Compiled ahead of time:** after `make`, `texmacs.bin -recompile-modules`
+  compiles the 488 modules of `TeXmacs/progs` into `TeXmacs/boot/`, and
+  `make-boot.scm` packs the 177 modules of the start-up into
+  `TeXmacs/boot/texmacs.boot` (18 MB). Neither step is run by `make` yet.
+- **Guile code, read as Guile reads it:** the sources are unchanged Guile
+  code; a reader of Guile's syntax folds the tests of the Scheme
+  (`(chez-scheme?)`, `(s7-scheme?)`...) when it reads them, and the compiler
+  turns each TeXmacs module into a Chez module.
+- **Strings are byte strings:** one character per byte (Latin-1 for Chez), so
+  Cork text and UTF-8 bytes go through Scheme unchanged, as with Guile 1.8.
+- **Tests:** all the regression suites pass, 43 of 43, as on Guile and
+  femtolisp (s7 has two suites of its own, 45).
+- **Performance** (see [07](07-performance.md)): start-up 0.69 s (s7 0.88 s);
+  a warm LaTeX export of the change log 80 ms (s7 300 ms, femtolisp 181 ms);
+  the whole test run 64 s (s7 72 s, femtolisp 68 s), where most of the time
+  is C++.
 
-### Performance, Benchmarks & Profiling
-- [benchmarks.md](benchmarks.md) — 10-run UI, manual regeneration, and conversion benchmarks (Chez vs. s7 vs. Femtolisp)
-- [bench/CHEZ_PERFORMANCE_ANALYSIS.md](bench/CHEZ_PERFORMANCE_ANALYSIS.md) — Root-cause analysis of Chez vs. interpreter performance
-- [bench/PROFILING.md](bench/PROFILING.md) — Profiling `ui.scm` keystroke latency and memory
-- [bench/CONVERSIONS_PROFILING.md](bench/CONVERSIONS_PROFILING.md) — Source-level `compile-profile` of `conversions.scm`
+## The notes of the original branch
 
----
+The other files of this folder come from the branch of nerd-qp and describe
+it as it was there (a CMake build in `build-texmacos/`, UTF-8 strings beside
+Cork text, its own copy of the start-up). They are kept for their history
+and measurements; where they disagree with the numbered notes, the numbered
+notes describe this branch.
 
-## 1. Compilation & Boot Pipeline
-
-- **Two-pass AOT compilation** (`src/Scheme/Chez/convert-to-r6rs.scm` → `compile-texmacs.scm`, assisted by `compiler-oracle.scm`):
-  1. Reads pristine sources from `TeXmacs/progs/` (kept `git diff`-clean) and transpiles them into `build-texmacos/boot/`. `chez-compat` and `abbrevs` are emitted as auto-imported R6RS libraries; remaining modules are wrapped in Chez `(module ...)` forms and compiled in topological dependency order.
-  2. Writes `module-deps.scm` and `compiler-db.fasl`.
-- **Fast boot vs. dev boot:** `make-boot.scm` packages the 178 startup modules into VFASL `texmacs.boot` (loaded during `Sbuild_heap()` via `init-texmacs-boot-file.so`); remaining modules lazy-load from `.so` on demand. Set `TEXMACS_NO_BOOT=1` to bypass `texmacs.boot` and load individual `.so` files via `init-texmacs-chez.scm` (see [Load_Chez_Fast.md](Load_Chez_Fast.md)).
-- **Manual module rebuilds:**
-  - Incremental: `TeXmacs -compile-modules`
-  - Clean full rebuild (~23–30 s; recommended after structural or macro changes): `TeXmacs -recompile-modules`
-  - Always recompile the C++ binary (`ninja -C build-texmacos`) before running `-compile-modules` if C++ or FFI glue files changed.
-
----
-
-## 2. Core Invariants
-
-1. **Pristine upstream sources:** Keep `TeXmacs/progs/` free of Guile-incompatible rewrites; do not load Guile's `init-texmacs.scm`.
-2. **Static glue FFI:** `initialize_glue_chez()` (`src/Scheme/Chez/glue_chez.cpp`) registers C++ entry points via `Sforeign_symbol()` in `custom_init()` before `Sbuild_heap()`, and `TeXmacs/progs/kernel/boot/glue-chez.scm` binds them with `foreign-procedure`. Do not put Scheme source strings in `chez_tm.cpp`.
-3. **GC & thread safety:** Process-lifetime Scheme handles cached in `initialize_scheme()` are pinned once with `Slock_object`; transient C++↔Scheme conversions use the `ChezRoot` shadow root stack (`chez_tm.hpp`). Every C++→Scheme entry from Qt must activate the Chez thread (`Sactivate_thread`) and hold `chez_lock`.
-4. **Encoding boundaries:** `string-load` and `tmfs-load` return R6RS `bytevector`s for binary assets; 8-bit Cork strings tunnel through Latin-1 Scheme strings (`*latin1-tc*`, `eol-style none`). See [Handling_Encoding_Chez.md](Handling_Encoding_Chez.md).
-5. **No AI git commits:** Leave agent changes unstaged/uncommitted for user review.
-
----
-
-## 3. Tests & Benchmarks
-
-**Native toolchain tests** (`src/Scheme/Chez/*-test.scm`, 195 checks):
-
-```bash
-cd texmacs
-for t in compile-inventory-test.scm compile-graph-test.scm macro-closure-test.scm; do
-  chez -q "src/Scheme/Chez/$t"
-done
-(cd src/Scheme/Chez && for t in compiler-db-test.scm compiler-scan-test.scm; do chez -q "$t"; done)
-```
-
-**TeXmacs runtime test suite** (run from `texmacs/` with the platform runtime environment + `TEXMACS_HOME_PATH="$PWD/.sandbox-texmacs"`):
-
-```bash
-./build-texmacos/TeXmacs.app/Contents/MacOS/TeXmacs -H \
-  -x '(begin (use-modules (check check-master)) (run-all-tests) (display "ALL-TESTS-DONE") (newline) (quit-TeXmacs))'
-```
-
-*(Note: `run-all-tests` currently stops on the known `regtest-xmltm` Latin-1/UTF-8 mismatch and `regtest-tmhtml` fixture mismatch; inspect the log for `Do not match!` / `Regression failure`.)*
-
-**Benchmarks** (`docs/chez/bench/`): Run `ui.scm`, `ui-profile.scm`, `manual.scm`, `conversions.scm`, or `memory.scm` via `-x '(load "docs/chez/bench/<script>.scm")'` with `TEXMACS_DOC_PATH="$PWD/TeXmacs/doc"`. See [benchmarks.md](benchmarks.md) for methodology and results.
+- [build_guide/](build_guide) — building Chez and TeXmacs on macOS, Linux and
+  Windows (MSYS2), with CMake
+- [TODO_CHEZ.md](TODO_CHEZ.md), [CHEZ_MIGRATION_LOG.md](CHEZ_MIGRATION_LOG.md)
+  — the tasks and the history of the port
+- [Load_Chez_Fast.md](Load_Chez_Fast.md) — the boot image against loading the
+  modules one by one
+- [Handling_Encoding_Chez.md](Handling_Encoding_Chez.md) — the strings of the
+  original port (UTF-8 and Cork); this branch uses byte strings instead
+  ([03](03-runtime.md#31-byte-strings))
+- [PARALLEL_COMPILER_PLAN.md](PARALLEL_COMPILER_PLAN.md) — the two passes of
+  the compiler
+- [benchmarks.md](benchmarks.md), [bench/](bench) — benchmarks and profiles
+  of the original port
