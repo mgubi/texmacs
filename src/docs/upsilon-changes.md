@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 21 November 2026
 
+- **HTML export with the stylesheets of the documentation: margins of the
+  paragraphs which hold blocks**: with `tmdoc`, `mmxdoc` and `tmdoc-web2`
+  (the help pages, texmacs.org and this site), the export links to
+  `tmdoc.css`, `mmxdoc.css` or `tmweb2.css` instead of writing its own CSS,
+  and these had no rule for the `<div class="tmhtml-p">` of such a
+  paragraph, which lost the space above and below it; they now give it the
+  spacing of a `<p>` (#929).
 - **HTML export: lengths, alignment and paragraphs which hold blocks**: a
   length in pixels lost its unit in the CSS (and the largest of two lengths
   depended on their order), a paragraph aligned to the right was exported
