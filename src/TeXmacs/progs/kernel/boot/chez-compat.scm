@@ -431,6 +431,33 @@
          (hashtable-delete! t k)
          (cons k v))))
 
+;; Guile's hashq-*: keys compared with eq?, in constant time. A table of
+;; make-hash-table compares with equal? (whose hash walks the whole key: a memo
+;; keyed by long lists became quadratic), so the entries of hashq-* are kept in
+;; an eq? table of their own, attached to it. (Guile shares the entries between
+;; hash-* and hashq-*; TeXmacs does not mix them on one table.)
+(define hashq-tables (make-weak-eq-hashtable))
+(define (hashq-table t create?)
+  (or (hashtable-ref hashq-tables t #f)
+      (and create?
+           (let ((e (make-eq-hashtable)))
+             (hashtable-set! hashq-tables t e)
+             e))))
+(define-public (hashq-ref t k . default)
+  (let ((e (hashq-table t #f)))
+    (if (and e (hashtable-contains? e k))
+        (hashtable-ref e k #f)
+        (if (pair? default) (car default) #f))))
+(define-public (hashq-set! t k v)
+  (hashtable-set! (hashq-table t #t) k v)
+  v)
+(define-public (hashq-remove! t k)
+  (let ((e (hashq-table t #f)))
+    (and e (hashtable-contains? e k)
+         (let ((v (hashtable-ref e k #f)))
+           (hashtable-delete! e k)
+           (cons k v)))))
+
 (define-public (hash-get-handle t k)
   (if (hashtable-contains? t k)
       (cons k (hashtable-ref t k #f))
@@ -578,6 +605,29 @@
       (cond ((>= i end) #f)
             ((memv (string-ref s i) cs) (loop (+ i 1)))
             (else i)))))
+
+;; Guile's (SRFI-13) trims: whitespace by default, else a character, a set of
+;; characters or a predicate
+(define (trim-matcher opt)
+  (if (null? opt) char-whitespace?
+      (let ((x (car opt)))
+        (cond ((procedure? x) x)
+              ((char? x) (lambda (c) (char=? c x)))
+              (else (let ((cs (->char-set x))) (lambda (c) (memv c cs))))))))
+(define-public (string-trim s . opt)
+  (let ((m (trim-matcher opt)) (n (string-length s)))
+    (let loop ((i 0))
+      (if (and (< i n) (m (string-ref s i))) (loop (+ i 1)) (substring s i n)))))
+(define-public (string-trim-right s . opt)
+  (let ((m (trim-matcher opt)))
+    (let loop ((j (string-length s)))
+      (if (and (> j 0) (m (string-ref s (- j 1)))) (loop (- j 1)) (substring s 0 j)))))
+(define-public (string-trim-both s . opt)
+  (apply string-trim (apply string-trim-right s opt) opt))
+
+;; s7's call-with-exit (the scanners of tree-sitter leave a loop with it): a
+;; continuation used once, to leave
+(define-public (call-with-exit f) (call/1cc f))
 
 ;;; map in the order of the list, as Guile and s7 apply it: the order of
 ;;; Chez's map is unspecified (5 3 4 1 2 for a list of five), and TeXmacs
@@ -757,8 +807,18 @@
     ((x) x)
     ((x . _) x)))
 
+;; also the names of this library: the modules which test them while they are
+;; loaded (regexp-match.scm: (defined? 'hashq-ref)) may be loaded before
+;; the library is imported at the top level (the boot image)
+(define compat-environment #f)
 (define-public (defined? sym)
-  (top-level-bound? sym))
+  (or (top-level-bound? sym)
+      (begin
+        (unless compat-environment
+          (set! compat-environment
+                (guard (e (#t #f)) (environment '(kernel boot chez-compat)))))
+        (and compat-environment
+             (top-level-bound? sym compat-environment)))))
 
 (define-public (tm-catch-runtime key handler thunk)
   ;; Guile's catch: key #t handles every error, another key only its own

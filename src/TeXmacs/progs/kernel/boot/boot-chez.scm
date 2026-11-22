@@ -716,6 +716,8 @@
 (define (current-module)
   (if (pair? tm-module-stack) (car tm-module-stack) '(texmacs-user)))
 (define (module-public-interface m) m)
+;; Guile's module-name: a module is its name here
+(define (module-name m) m)
 (define (module-defined? m sym)
   ;; a module (its name): what it exports, or a global definition
   (or (top-level-bound? sym)

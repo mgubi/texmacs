@@ -367,6 +367,69 @@
          (cond ((pair? l) (cons (sequence-lets (car l)) (walk (cdr l))))
                (else l))))))
 
+;; Bodies with a definition after an expression. Guile accepts them;
+  ;; Chez (R6RS) wants the definitions of a body first. The rest of the body,
+  ;; from such a definition on, is nested in a (let () ...): every form stays
+  ;; where it is, also a macro call which expands into definitions
+  ;; (regtest-table-library), which the reader cannot tell from an
+  ;; expression. In the bodies of define, lambda, the lets, tm-define (after
+  ;; its options) and with; the bodies of other macros are left as they are.
+  (define (body-definition? f)
+    (and (pair? f)
+         (memq (car f) '(define define-values define-record-type define-syntax))))
+
+  (define (option-form? f)
+    (and (pair? f) (symbol? (car f))
+         (let ((s (symbol->string (car f))))
+           (and (> (string-length s) 1) (char=? (string-ref s 0) #\:)))))
+
+  (define (order-body body)
+    (if (not (list? body))
+        body
+        (let loop ((l body) (expr? #f) (acc '()))
+          (cond ((null? l) body)
+                ((and expr? (body-definition? (car l)))
+                 (let ((rest (order-body (cdr l))))
+                   (append (reverse acc)
+                           (list `(let () ,(car l)
+                                    ,@(if (null? rest) '((void)) rest))))))
+                (else (loop (cdr l) (or expr? (not (body-definition? (car l))))
+                            (cons (car l) acc)))))))
+
+  ;; (Also: a vector in code is quoted, Guile evaluates it to itself.)
+  (define (order-bodies x)
+    (cond
+      ((vector? x) `(quote ,x))
+      ((not (pair? x)) x)
+      ((memq (car x) '(quote quasiquote)) x)
+      (else
+       (let ((x (let walk ((l x))
+                  (cond ((pair? l) (cons (order-bodies (car l)) (walk (cdr l))))
+                        (else l)))))
+         (cond
+           ((and (eq? (car x) 'lambda) (pair? (cdr x)) (list? (cddr x)))
+            `(lambda ,(cadr x) ,@(order-body (cddr x))))
+           ((and (eq? (car x) 'define) (pair? (cdr x)) (pair? (cadr x))
+                 (list? (cddr x)))
+            `(define ,(cadr x) ,@(order-body (cddr x))))
+           ((and (memq (car x) '(let let* letrec letrec*)) (pair? (cdr x))
+                 (symbol? (cadr x)) (pair? (cddr x)) (list? (cdddr x)))
+            `(,(car x) ,(cadr x) ,(caddr x) ,@(order-body (cdddr x))))
+           ((and (memq (car x) '(let let* letrec letrec*)) (pair? (cdr x))
+                 (list? (cddr x)))
+            `(,(car x) ,(cadr x) ,@(order-body (cddr x))))
+           ((and (eq? (car x) 'tm-define) (pair? (cdr x)) (pair? (cadr x))
+                 (list? (cddr x)))
+            (let split ((l (cddr x)) (opts '()))
+              (if (and (pair? l) (option-form? (car l)))
+                  (split (cdr l) (cons (car l) opts))
+                  `(tm-define ,(cadr x) ,@(reverse opts) ,@(order-body l)))))
+           ((and (eq? (car x) 'with) (pair? (cdr x)) (pair? (cddr x))
+                 (list? (cdddr x)))
+            `(with ,(cadr x) ,(caddr x) ,@(order-body (cdddr x))))
+           (else x))))))
+
   ;; The forms of a source file, as Chez should see them
   (define (tm-read-guile-file file-path)
-    (map sequence-lets (fold-dialect-forms (read-raw-forms file-path)))))
+    (map (lambda (f) (order-bodies (sequence-lets f)))
+         (fold-dialect-forms (read-raw-forms file-path)))))

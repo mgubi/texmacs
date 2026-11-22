@@ -30,6 +30,64 @@
              lst))
         (else (loop (cdr rest)))))))
 
+;; The dependencies (texmacs-module :use/:inherit, from the module-deps.scm
+;; which the compiler writes) of the modules of lst which lst lacks, each
+;; inserted before the first module which needs it. A module of the boot image
+;; whose dependency is not in it fails while the heap is built, before any
+;; handler of errors ("Call error"). The modules of lst keep their order.
+(define (make-boot:close-over-deps lst boot-dir)
+  (let ((manifest (string-append boot-dir "module-deps.scm")))
+    (if (not (file-exists? manifest))
+        lst
+        (let* ((deps (let ((h (make-hashtable equal-hash equal?)))
+                       (for-each (lambda (e) (hashtable-set! h (car e) (cadr e)))
+                                 (call-with-input-file manifest read))
+                       h))
+               (in-list (let ((h (make-hashtable equal-hash equal?)))
+                          (for-each (lambda (r) (hashtable-set! h r #t)) lst)
+                          h))
+               (emitted (make-hashtable equal-hash equal?))
+               (added '()))
+          (define (rel->name rel)
+            (let loop ((cs (string->list (substring rel 0 (- (string-length rel) 3))))
+                       (cur '()) (acc '()))
+              (cond ((null? cs)
+                     (reverse (cons (string->symbol (list->string (reverse cur))) acc)))
+                    ((char=? (car cs) #\/)
+                     (loop (cdr cs) '()
+                           (cons (string->symbol (list->string (reverse cur))) acc)))
+                    (else (loop (cdr cs) (cons (car cs) cur) acc)))))
+          (define (name->rel name)
+            (let loop ((l name) (acc ""))
+              (if (null? (cdr l))
+                  (string-append acc (symbol->string (car l)) ".so")
+                  (loop (cdr l) (string-append acc (symbol->string (car l)) "/")))))
+          (define (missing-deps rel visiting)
+            ;; the missing dependencies of rel, dependencies first
+            (apply append
+                   (map (lambda (d)
+                          (let ((r (name->rel d)))
+                            (if (or (hashtable-ref in-list r #f)
+                                    (hashtable-ref emitted r #f)
+                                    (member r visiting)
+                                    (not (file-exists? (string-append boot-dir r))))
+                                '()
+                                (begin
+                                  (hashtable-set! emitted r #t)
+                                  (set! added (cons r added))
+                                  (append (missing-deps r (cons r visiting))
+                                          (list r))))))
+                        (hashtable-ref deps (rel->name rel) '()))))
+          (let ((result (apply append
+                               (map (lambda (rel)
+                                      (append (missing-deps rel (list rel))
+                                              (list rel)))
+                                    lst))))
+            (unless (null? added)
+              (printf "[make-boot] Added the dependencies of the startup modules: ~a\n"
+                      (reverse added)))
+            result)))))
+
 ;; Curated startup resident module list (177 .so modules = boot-chez.so + 176 app modules)
 ;; in topological import order: unforced startup closure + high-frequency top-level menus.
 ;; Not developer-menu: its preference call-back (update-bottom-tools) needs a
@@ -240,9 +298,11 @@
                 (read (open-input-file order-file))
                 *startup-boot-modules*))
            (boot-order
-            (if full-boot?
-                (make-boot:patch-cyclic-boot-order raw-boot-order)
-                raw-boot-order))
+            (make-boot:close-over-deps
+             (if full-boot?
+                 (make-boot:patch-cyclic-boot-order raw-boot-order)
+                 raw-boot-order)
+             boot-dir))
            (raw-so-paths (map (lambda (rel) (string-append boot-dir rel)) boot-order))
            (legacy-so (string-append boot-dir "texmacs.so")))
 

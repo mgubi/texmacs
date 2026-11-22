@@ -274,8 +274,14 @@
    (tree-in? (tree-up (cursor-tree)) '(hlink reference pageref label))))
 
 ;; in-<name>% and in-prog-<name>% for each program language
-;; (tm-program-languages.scm)
-(eval `(texmacs-modes ,@(program-language-mode-items)))
+;; (tm-program-languages.scm). On Chez the modes are made when the module is
+;; compiled, like the others of this file: the public names of a module are
+;; only global once it is loaded, so the eval would not find texmacs-mode.
+(define-macro (program-language-modes)
+  `(texmacs-modes ,@(program-language-mode-items)))
+(if (chez-scheme?)
+    (program-language-modes)
+    (eval `(texmacs-modes ,@(program-language-mode-items))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Language related

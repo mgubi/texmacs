@@ -12,6 +12,18 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 22 November 2026
+
+- **Chez Scheme as the Scheme of TeXmacs** (desktop applications, builds
+  with `./configure --with-scheme=chez`): beside s7, Guile and femtolisp,
+  TeXmacs can run its Scheme code on Chez Scheme 10.4, which compiles it to
+  machine code. `make` compiles the modules of `TeXmacs/progs` and packs
+  those of the start-up into a boot image (`TeXmacs/boot`); the code of the
+  other Schemes is unchanged. All the regression suites pass; a LaTeX
+  export runs about 3.7 times faster than on s7 and TeXmacs starts in
+  0.7 s instead of 0.9 s. Ported from the work of Joy Yang (nerd-qp/texmacs,
+  branch `wip-chez`); see `src/docs/chez`.
+
 ## 21 November 2026
 
 - **HTML export: lengths, alignment and paragraphs which hold blocks**: a
