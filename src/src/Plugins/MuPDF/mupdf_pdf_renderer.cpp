@@ -452,6 +452,8 @@ pdf_encryption (pdf_write_options& opts) {
 }
 
 mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
+  // (another renderer may have saved its PDF meanwhile)
+  last_save_ok= false;
   if (!started) return;
   end_page ();
   // each of these catches its own errors (see put): an error in one part
@@ -1109,11 +1111,13 @@ mupdf_pdf_renderer_rep::glyph_name (pdf_font_item& it, int key, int fallback,
 
 // Whether u is a form of another character which fonts draw with the same
 // glyph: the Kangxi and CJK radicals (U+2F47 for U+65E5), the compatibility
-// ideographs and the CJK compatibility forms
+// ideographs and the CJK compatibility forms, and the private use codes
+// (KpMath gives its math italic a by U+E325 as well as by U+1D44E)
 static bool
 compatibility_char (int u) {
   return (u >= 0x2e80 && u <= 0x2fdf) || (u >= 0xf900 && u <= 0xfaff) ||
-         (u >= 0xfe30 && u <= 0xfe4f) || (u >= 0x2f800 && u <= 0x2fa1f);
+         (u >= 0xfe30 && u <= 0xfe4f) || (u >= 0x2f800 && u <= 0x2fa1f) ||
+         (u >= 0xe000 && u <= 0xf8ff) || u >= 0xf0000;
 }
 
 // The character map of a CID font (glyph to characters) as MuPDF writes it
@@ -1306,9 +1310,14 @@ mupdf_pdf_renderer_rep::glyph_name_unicode (pdf_font_item& it, int gid) {
   nm[sizeof (nm) - 1]= 0;
   char* dot= strchr (nm, '.');
   if (dot != NULL) *dot= 0;
-  if (nm[0] == 0) return -1;
+  // A font without names gives the number of the glyph, which MuPDF would
+  // read as a decimal character code, as it reads a65 as A: such names say
+  // nothing. An unknown name gives U+FFFD. (The strict lookup knows no
+  // uniXXXX names.)
+  if (nm[0] == 0 || (nm[0] >= '0' && nm[0] <= '9')) return -1;
+  if (nm[0] == 'a' && nm[1] >= '0' && nm[1] <= '9') return -1;
   int u= fz_unicode_from_glyph_name (nm);
-  return (u >= 0x20)? u: -1;
+  return (u >= 0x20 && u != 0xfffd)? u: -1;
 }
 
 // The characters of the codes of a TeX math font (cmmi, cmsy, cmex, msbm...)

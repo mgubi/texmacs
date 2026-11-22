@@ -621,6 +621,12 @@ well, so a folder of the name of the target is refused.
   empty `ActualText`). The pieces of an assembled delimiter, which have
   names too, each give the delimiter, as the pieces of the TeX
   delimiters do (`tex_math_unicode`, as with PDFHummus): `((((`.
+  A name which says nothing is not taken: a number (a font without names
+  gives the number of the glyph, which MuPDF reads as a character code),
+  `a` and digits, or a name MuPDF does not know (U+FFFD).
+* **Private use codes**: a glyph which the cmap reaches by a private use
+  code and by a real one takes the real one (KpMath). Its variants reached
+  only by private use codes keep them.
 * **Controls**: a position or a glyph whose character is below U+0020 is
   left out of the maps, and the map of a CID font which is written again
   has only the glyphs drawn (a CJK font has tens of thousands).
