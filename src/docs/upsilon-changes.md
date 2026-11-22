@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **TeXmacs starts again with Guile 1.8** (builds with Guile): the table
+  of the program languages (`program-languages`...) was not visible from
+  the modules which use it, so the startup stopped with "Unbound variable:
+  previous-section" (the text menus), the plugin `ai` failed to initialize
+  and the test suites did not load.
 - **Qt: the icon bars keep their height** (Qt builds, desktop
   applications, seen in the Linux AppImage): a tall button, such as a
   section title of several lines shown in the focus bar, made the bar grow
