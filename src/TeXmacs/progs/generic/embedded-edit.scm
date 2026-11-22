@@ -32,6 +32,46 @@
        (not (embedded-image-context? t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The alternative text of an image: what a screen reader says of it in a
+;; tagged PDF (docs/pdf-tagging.md), the variable image-alt around it:
+;; <with|image-alt|A plot of the solution|<image|...>>
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (image-alt-index t)
+  ;; the place of the value of image-alt in the with around @t, or #f
+  (let ((p (tree-up t)))
+    (and p (tree-is? p 'with)
+         (== (tree-index t) (- (tree-arity p) 1))
+         (let loop ((i 0))
+           (cond ((>= (+ i 1) (- (tree-arity p) 1)) #f)
+                 ((== (tree->string (tree-ref p i)) "image-alt") (+ i 1))
+                 (else (loop (+ i 2))))))))
+
+(tm-define (image-alt t)
+  (:synopsis "The alternative text of the image @t, or \"\"")
+  (with i (image-alt-index t)
+    (if i (cork->utf8 (tree->string (tree-ref (tree-up t) i))) "")))
+
+(tm-define (image-set-alt t s)
+  (:synopsis "Set the alternative text of the image @t to @s")
+  (with i (image-alt-index t)
+    (if i
+        (tree-set (tree-ref (tree-up t) i) (utf8->cork s))
+        (tree-insert-node! t 2 `(with "image-alt" ,(utf8->cork s))))))
+
+(define (current-image)
+  (tree-innermost image-context? #t))
+
+(tm-define (current-image-alt)
+  (with t (current-image) (if t (image-alt t) "")))
+
+(tm-define (set-current-image-alt s)
+  (:argument s "Alternative text (for screen readers)")
+  (:proposals s (list (current-image-alt)))
+  (with t (current-image)
+    (when t (image-set-alt t s))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Manage embedded images
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

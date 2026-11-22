@@ -3242,7 +3242,10 @@
                       (concat "See " (hlink "the site" "https://example.org")
                               " and " (math "x+1") ".")
                       (itemize (document (concat (item) "One")
-                                         (concat (item) "Two"))))))
+                                         (concat (item) "Two")))
+                      (with "image-alt" "A drawing"
+                        (image (tuple (raw-data ,(export-png)) "png")
+                               "1cm" "" "" "")))))
         (string-save (serialize-texmacs (stree->tree (tmfile body))) tm)
         (load-buffer tm :strict)
         (system-setenv "TEXMACS_PDF_TAGGED" "1")
@@ -3269,6 +3272,8 @@
           (check-true (has? "/Alt(x + 1)"))
           (check-true (has? "/S/Link"))
           (check-true (has? "/Contents(https://example.org)"))
+          (check-true (has? "/S/Figure"))
+          (check-true (has? "/Alt(A drawing)"))
           (check-true (has? "/StructParents 0"))
           (check-true (has? "/Tabs/S"))))))
 

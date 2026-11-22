@@ -345,7 +345,9 @@
 ;; H2... after the headings above it in the document), "H:A" an appendix (a
 ;; chapter in a book, a section elsewhere). A tag which is
 ;; not here is transparent, except at the level of a paragraph (a child of
-;; a document), where it is a P, or a Div when it holds paragraphs.
+;; a document), where it is a P, or a Div when it holds paragraphs. A Sect
+;; (a bibliography, a table of contents, an index) has its title, which its
+;; macro writes, as a heading of the rank of an appendix.
 (define pdf-tag-roles
   '((doc-data . "Div") (doc-title . "H:0") (doc-subtitle . "P")
     (doc-author . "P") (doc-date . "P") (doc-note . "P") (doc-misc . "P")
@@ -371,6 +373,9 @@
     (row . "TR") (cell . "TD")
     (hlink . "Link") (href . "Link") (footnote . "Note")
     (image . "Figure") (graphics . "Figure")
+    (bibliography . "Sect") (bibliography* . "Sect")
+    (table-of-contents . "Sect") (the-index . "Sect") (the-glossary . "Sect")
+    (list-of-figures . "Sect") (list-of-tables . "Sect") (tit . "H:3")
     (big-figure . "Div") (small-figure . "Div")
     (big-table . "Div") (small-table . "Div")
     (quote-env . "BlockQuote") (quotation . "BlockQuote")
@@ -439,6 +444,15 @@
             ((== role "Figure") "Image")
             (else "")))
     (lambda args (if (== role "Formula") "Formula" "Image"))))
+
+(tm-define (pdf-tag-text t)
+  (:synopsis "The text of @t, in UTF-8 on one line (a caption)")
+  (catch #t
+    (lambda ()
+      (let* ((s (convert (tree->stree t) "texmacs-stree" "verbatim-snippet"))
+             (s1 (string-replace (string-replace s "\n" " ") "\t" " ")))
+        (string-trim-both (string-replace s1 "  " " "))))
+    (lambda args "")))
 
 (tm-define (pdf-tag-language lan)
   (:synopsis "The language @lan of TeXmacs as a code (de-DE) for a PDF")

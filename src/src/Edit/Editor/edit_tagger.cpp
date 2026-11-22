@@ -29,6 +29,7 @@
 #include "hashset.hpp"
 #include "iterator.hpp"
 #include "scheme.hpp"
+#include "converter.hpp"
 
 class pdf_tagger_rep: public tagger_rep {
   tree   body;     // the body of the document
@@ -48,13 +49,15 @@ public:
   array<tag_node> row_cells (path pos);
   string language () { return lang; }
   string title () { return ttl; }
+  int pictures_without_alt () { return without_alt; }
 
 private:
   bool   child (tree t, int i, tree& c);
   bool   holds_heading (tree t);
   string role_of (string tag);
   string child_role_of (string tag, int i, int n);
-  string alt_of (string key, tree t, string role);
+  string alt_of (string key, tree t, string role, array<tree> above);
+  int    without_alt;   // the pictures with no alternative text of their own
   void   collect_ranks (tree t, hashset<int>& ranks);
   string heading (string key, string role);
   string cell_spans (array<tree> trail, int row, int col);
@@ -64,7 +67,7 @@ pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
                                 string title2):
   body (body2), rp (rp2), lang (lang2), ttl (title2),
   roles ("?"), child_roles ("?"), alts (""),
-  heading_of (""), appendix_rank (3)
+  heading_of (""), appendix_rank (3), without_alt (0)
 {
   // the ranks of the headings which the document uses: an appendix is a
   // chapter in a book, a section elsewhere
@@ -105,8 +108,32 @@ pdf_tagger_rep::child_role_of (string tag, int i, int n) {
 }
 
 string
-pdf_tagger_rep::alt_of (string key, tree t, string role) {
+pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above) {
   if (alts->contains (key)) return alts [key];
+  if (role == "Figure") {
+    // the alternative text of a picture: the variable image-alt around it
+    // (<with|image-alt|...|<image|...>>), else the caption of its figure,
+    // else its file
+    for (int k= N(above) - 1; k >= 0; k--) {
+      tree w= above[k];
+      if (!is_compound (w, "with")) continue;
+      for (int j=0; j+1<N(w); j+=2)
+        if (w[j] == "image-alt" && is_atomic (w[j+1]) && N(w[j+1]->label) > 0) {
+          string r= cork_to_utf8 (w[j+1]->label);
+          alts (key)= r;
+          return r;
+        }
+    }
+    without_alt++;
+    for (int k= N(above) - 1; k >= 0; k--) {
+      tree f= above[k];
+      if (!is_compound (f) || N(f) < 2) continue;
+      string fl= as_string (L(f));
+      if (child_role_of (fl, N(f) - 1, N(f)) != "Caption") continue;
+      string r= as_string (call ("pdf-tag-text", object (f[N(f)-1])));
+      if (N(r) > 0) { alts (key)= r; return r; }
+    }
+  }
   string r= as_string (call ("pdf-tag-alt", object (t), object (role)));
   if (N(r) == 0) r= role;   // PDF/UA wants one, whatever it says
   alts (key)= r;
@@ -246,6 +273,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
   // the text a macro writes has the place of the macro, after the marks
   // of a decoration; a box of no place of the body is an artifact
   path q= ip;
+  bool decoration= !is_nil (q) && q->item < 0;
   while (!is_nil (q) && q->item < 0) q= q->next;
   if (is_nil (q)) return r;
   path p= reverse (q);
@@ -299,7 +327,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
         if (starts (role, "H:")) role= heading (as_string (cur), role);
         string alt;
         if (role == "Formula" || role == "Figure")
-          alt= alt_of (as_string (cur), t, role);
+          alt= alt_of (as_string (cur), t, role, above);
         r << tag_node (as_string (cur), role, cur, alt);
         last= role;
         if (is_atomic (t) || role == "Formula" || role == "Figure") break;
@@ -341,7 +369,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     string key= as_string (cur);
     if (starts (role, "H:")) role= heading (key, role);
     string alt;
-    if (role == "Formula" || role == "Figure") alt= alt_of (key, t, role);
+    if (role == "Formula" || role == "Figure") alt= alt_of (key, t, role, above);
     tag_node nd (key, role, cur, alt);
     if (role == "TD" && N(above) >= 2 && is_compound (above[N(above)-2],
                                                      "table")) {
@@ -361,6 +389,13 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     if (role == "Formula" || role == "Figure" || is_atomic (t)) break;
   }
   if (last == "LI" && !li_body) r << tag_node (li_key * "/b", "LBody", li_pos);
+  // the title which the macro of a Sect writes (References, Contents) is
+  // its heading
+  if (decoration && last == "Sect" && is_nil (s) &&
+      N(r) > 0 && r[N(r)-1].pos == pos) {
+    string key= r[N(r)-1].key * "/h";
+    r << tag_node (key, heading (key, "H:A"), pos);
+  }
   return r;
 }
 

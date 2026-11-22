@@ -69,6 +69,8 @@ public:
   virtual array<tag_node> row_cells (path pos) = 0;
   virtual string language () = 0;   // of the document, as en or de-CH
   virtual string title () = 0;
+  // the pictures met which have no alternative text of their own
+  virtual int pictures_without_alt () { return 0; }
 };
 
 class renderer_rep {

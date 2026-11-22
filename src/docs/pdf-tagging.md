@@ -57,8 +57,16 @@ a document (a P, or a Div when they hold paragraphs themselves).
   those which draw nothing included, and not those which a span covers
   (`row_cells`), so that the rows have the same number of columns.
 * A formula (`math`, `equation*`, `eqnarray*`, `align*`...) or a picture
-  is a whole: nothing inside it is an element of its own. Its Alt is its
-  LaTeX (`pdf-tag-alt`), for a picture the name of its file for now.
+  is a whole: nothing inside it is an element of its own. The Alt of a
+  formula is its LaTeX, without its environment and labels
+  (`pdf-tag-alt`). The Alt of a picture is the variable `image-alt` around
+  it, `<with|image-alt|A plot of the solution|<image|...>>`, which *Focus →
+  Alternative text...* sets on an image (`set-current-image-alt`); without
+  it, the caption of its figure, or else the name of its file, and the
+  export warns of the pictures without one.
+* A Sect (a bibliography, a table of contents, an index, a glossary, a
+  list of figures) has the title its macro writes as a heading, of the
+  rank of an appendix; the title of a slide (`tit`) is a heading.
 * Included documents: the content of an `include` is typeset as a
   decoration of the include, one box of no place inside. A tagged PDF is
   therefore typeset from the body with each include replaced by what it
@@ -115,9 +123,6 @@ in the Matterhorn Protocol.
 
 ## Left
 
-* **Alternate descriptions of the pictures**: a picture says the name of
-  its file. It wants a way to write one in the document, and a check that
-  each picture has one (the Typst exporter has a dialog for it).
 * **Included PDF and EPS pictures**: their fonts, when not embedded, make
   the PDF non compliant; their content is not tagged either (an artifact
   inside a Figure would be right).
@@ -129,9 +134,7 @@ in the Matterhorn Protocol.
 * **Marked content and the graphics state**: a block may open inside a
   `q` (a clipping) and close after its `Q`; veraPDF and MuPDF accept it,
   ISO 32000-1 does not forbid it, but they do not nest.
-* **Headings which macros write**: the titles of the table of contents,
-  the bibliography, the index, the title of a slide are text in a Div, not
-  headings.
+* **Headings which other macros write** (those not in `pdf-tag-roles`).
 * **Languages** which `language_to_locale` does not know are `en-US`.
 * **A missing glyph** (`.notdef`) drawn by the typesetter (STIX size
   fonts in a thesis of the corpus) is forbidden by PDF/UA (7.21.8).
