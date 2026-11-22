@@ -304,6 +304,14 @@
           ((accept) (vector 'accept))
           ((reduce) (vector 'reduce (ahash-ref ids (cadr a)) (caddr a) (cadddr a) (list-ref a 4)))
           (else (ts-error "unknown action" a))))
+      (define (convert-lex-table lt)
+        (list->vector
+         (ts-map (lambda (s)
+                   (vector (let ((a (vector-ref s 0))) (if a (ahash-ref ids a) #f))
+                           (let ((e (vector-ref s 1))) (if e (car e) #f))
+                           (ts-map (lambda (a) (vector (car a) (cadr a) (cddr a)))
+                                   (vector-ref s 2))))
+                 (gvec->list lt))))
       (do ((i 0 (+ i 1))) ((= i n-states))
         (let ((s (gvec-ref states i)))
           (om-for-each
@@ -324,14 +332,6 @@
                                        (ts-filter (lambda (r) (ahash-ref ids r))
                                                   (state-reserved s)))))))
       (ts-profile "parse table")
-      (define (convert-lex-table lt)
-        (list->vector
-         (ts-map (lambda (s)
-                   (vector (let ((a (vector-ref s 0))) (if a (ahash-ref ids a) #f))
-                           (let ((e (vector-ref s 1))) (if e (car e) #f))
-                           (ts-map (lambda (a) (vector (car a) (cadr a) (cddr a)))
-                                   (vector-ref s 2))))
-                 (gvec->list lt))))
       (let* ((externals (g-ref g 'external-tokens))
              (external-states
               (list->vector

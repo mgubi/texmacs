@@ -718,8 +718,6 @@
          (reusable (make-reusable-node))
          (scanner (lang-external-scanner l))
          (scanner-payload (and scanner ((vector-ref scanner 0)))))
-    (stack-clear! stack)
-    (when old-tree (reusable-node-reset! reusable (tree-root old-tree)))
     (define (version-status v)
       (let ((cost (stack-error-cost stack v))
             (paused (stack-paused? stack v)))
@@ -1334,6 +1332,8 @@
                       (begin (stack-remove-version! stack i) (loop i (- n 1) has-unpaused)))
                   (loop (+ i 1) n #t)))))
         min-error-cost))
+    (stack-clear! stack)
+    (when old-tree (reusable-node-reset! reusable (tree-root old-tree)))
     ;; the main loop
     (let outer ((last-position 0))
       (let ((position 0) (last-position last-position))

@@ -182,14 +182,6 @@
          (kept (make-ahash-table))
          (now (make-ahash-table))
          (changed '()))
-    (for (i (iota n))
-      (with p (tree->path (vector-ref lines i))
-        (when p (ahash-set! places (object->string p) i))))
-    ;; (the place now of each line which was decorated: those which moved,
-    ;; after lines inserted or removed above them, are found there)
-    (for (x (ahash-table->list old))
-      (with k (line-index (cadr x))
-        (when k (ahash-set! now k (car x)))))
     (define (old-place t text i ds)
       ;; the line which @t (now at @i) was, if it had the decorations @ds
       ;; for its present @text then, or #f
@@ -200,6 +192,14 @@
         (and o (tree-eq? (car o) t) (== (cadr o) text) (== (cddr o) ds)
              (!= (tree->stree (code-line-layers t)) '(tuple (tuple) (tuple)))
              j)))
+    (for (i (iota n))
+      (with p (tree->path (vector-ref lines i))
+        (when p (ahash-set! places (object->string p) i))))
+    ;; (the place now of each line which was decorated: those which moved,
+    ;; after lines inserted or removed above them, are found there)
+    (for (x (ahash-table->list old))
+      (with k (line-index (cadr x))
+        (when k (ahash-set! now k (car x)))))
     (for (d decos)
       (with i (car d)
         (when (< i n)

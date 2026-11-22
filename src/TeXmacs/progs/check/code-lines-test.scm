@@ -962,8 +962,8 @@
 ;; as paragraphs, and exec_until goes through it as such; it took code-lines
 ;; from the environment of exec_until and dropped its paragraphs)
 (define (test-audit-9)
-  (check-group "environments in blocks, without the fast environments")
   (define fast? (== (get-preference "fast environments") "on"))
+  (check-group "environments in blocks, without the fast environments")
   (set-fast-environments #f)
   (with-body '(document (with "code-lines" "true"
                           (document "a"

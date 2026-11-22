@@ -454,6 +454,9 @@
   (let ((a (and (pair? actions) (ts-last actions))))
     (and a (eq? (car a) 'shift) (cadr a))))
 
+(define (sorted-pairs l)
+  (list->vector (ts-sort l (lambda (a b) (< (car a) (car b))))))
+
 (define (merge-compatible-states! g states tc keywords)
   (let* ((n (gvec-length states))
          (core-count (+ 1 (let loop ((i 0) (m 0))
@@ -463,30 +466,69 @@
          (word (g-ref g 'word))
          (internal-external (ts-filter (lambda (x) x)
                                        (ts-map (lambda (e) (vector-ref e 2))
-                                               (g-ref g 'external-tokens)))))
-    (do ((i 0 (+ i 1))) ((= i core-count)) (gvec-push! groups '()))
-    (do ((i 0 (+ i 1))) ((= i n))
-      (let ((c (state-core (gvec-ref states i))))
-        (gvec-set! groups c (append (gvec-ref groups c) (list i)))
-        (vector-set! group-of i c)))
-    (define n-terminals (vector-length (g-ref g 'lexical)))
-    (define state-terminal-sets
-      ;; for each state, a vector of booleans indexed by the terminals
-      (let ((v (make-vector n #f)))
-        (do ((i 0 (+ i 1))) ((= i n) v)
-          (let ((set (make-vector n-terminals #f)))
-            (for-each (lambda (s) (when (terminal? s) (vector-set! set (sym-index s) #t)))
-                      (om-keys (state-terminals (gvec-ref states i))))
-            (vector-set! v i set)))))
-    (define conflict-rows
-      ;; for each token, the tokens it conflicts with
-      (let ((v (make-vector n-terminals '())))
-        (do ((i 0 (+ i 1))) ((= i n-terminals) v)
-          (vector-set! v i (ts-filter (lambda (j) (does-conflict? tc i j)) (ts-iota n-terminals))))))
-    (define keyword-set
-      (let ((v (make-vector n-terminals #f)))
-        (for-each (lambda (k) (vector-set! v (sym-index k) #t)) keywords)
-        v))
+                                               (g-ref g 'external-tokens))))
+         (n-terminals (vector-length (g-ref g 'lexical)))
+         (state-terminal-sets
+           ;; for each state, a vector of booleans indexed by the terminals
+           (let ((v (make-vector n #f)))
+             (do ((i 0 (+ i 1))) ((= i n) v)
+               (let ((set (make-vector n-terminals #f)))
+                 (for-each (lambda (s) (when (terminal? s) (vector-set! set (sym-index s) #t)))
+                           (om-keys (state-terminals (gvec-ref states i))))
+                 (vector-set! v i set)))))
+         (conflict-rows
+           ;; for each token, the tokens it conflicts with
+           (let ((v (make-vector n-terminals '())))
+             (do ((i 0 (+ i 1))) ((= i n-terminals) v)
+               (vector-set! v i (ts-filter (lambda (j) (does-conflict? tc i j)) (ts-iota n-terminals))))))
+         (keyword-set
+           (let ((v (make-vector n-terminals #f)))
+             (for-each (lambda (k) (vector-set! v (sym-index k) #t)) keywords)
+             v))
+         (terminal-keys
+           (let ((v (make-vector n '())))
+             (do ((i 0 (+ i 1))) ((= i n) v)
+               (vector-set! v i (om-keys (state-terminals (gvec-ref states i)))))))
+         (shift-targets
+           ;; for each state, the vector of (token . target) of the tokens whose
+           ;; last action is a shift, sorted by token
+           (let ((v (make-vector n #f)))
+             (do ((i 0 (+ i 1))) ((= i n) v)
+               (let ((t (state-terminals (gvec-ref states i))))
+                 (vector-set! v i (sorted-pairs
+                                   (ts-filter (lambda (x) (cdr x))
+                                              (ts-map (lambda (k)
+                                                        (cons k (last-shift-target (entry-actions (om-ref t k)))))
+                                                      (vector-ref terminal-keys i)))))))))
+         (gotos
+           ;; for each state, the vector of (non-terminal . action), sorted
+           (let ((v (make-vector n #f)))
+             (do ((i 0 (+ i 1))) ((= i n) v)
+               (let ((t (state-nonterminals (gvec-ref states i))))
+                 (vector-set! v i (sorted-pairs (ts-map (lambda (k) (cons k (om-ref t k))) (om-keys t))))))))
+         (token-conflict-memo (make-ahash-table))
+         (state-entries
+           ;; for each state, the vector of (token . entry), sorted by token
+           (let ((v (make-vector n #f)))
+             (do ((i 0 (+ i 1))) ((= i n) v)
+               (let ((t (state-terminals (gvec-ref states i))))
+                 (vector-set! v i (sorted-pairs
+                                   (ts-map (lambda (k) (cons k (om-ref t k)))
+                                           (vector-ref terminal-keys i))))))))
+         (preds
+           ;; for each state, the states which shift or go to it
+           (let ((v (make-vector n '())))
+             (do ((i 0 (+ i 1))) ((= i n) v)
+               (let ((sh (vector-ref shift-targets i)))
+                 (do ((j 0 (+ j 1))) ((= j (vector-length sh)))
+                   (let ((t (cdr (vector-ref sh j))))
+                     (vector-set! v t (cons i (vector-ref v t))))))
+               (let ((go (vector-ref gotos i)))
+                 (do ((j 0 (+ j 1))) ((= j (vector-length go)))
+                   (let ((x (vector-ref go j)))
+                     (when (eq? (cadr x) 'goto)
+                       (let ((t (caddr x)))
+                         (vector-set! v t (cons i (vector-ref v t))))))))))))
     (define (token-conflicts? right new-token)
       (cond ((= new-token sym-eont) #t)
             ((external? new-token) #t)
@@ -514,30 +556,6 @@
                                                   (eq? (caddr x) (caddr y))))
                                         (not (equal? x y))))
                                   a1 a2))))))
-    (define terminal-keys
-      (let ((v (make-vector n '())))
-        (do ((i 0 (+ i 1))) ((= i n) v)
-          (vector-set! v i (om-keys (state-terminals (gvec-ref states i)))))))
-    (define (sorted-pairs l)
-      (list->vector (ts-sort l (lambda (a b) (< (car a) (car b))))))
-    (define shift-targets
-      ;; for each state, the vector of (token . target) of the tokens whose
-      ;; last action is a shift, sorted by token
-      (let ((v (make-vector n #f)))
-        (do ((i 0 (+ i 1))) ((= i n) v)
-          (let ((t (state-terminals (gvec-ref states i))))
-            (vector-set! v i (sorted-pairs
-                              (ts-filter (lambda (x) (cdr x))
-                                         (ts-map (lambda (k)
-                                                   (cons k (last-shift-target (entry-actions (om-ref t k)))))
-                                                 (vector-ref terminal-keys i)))))))))
-    (define gotos
-      ;; for each state, the vector of (non-terminal . action), sorted
-      (let ((v (make-vector n #f)))
-        (do ((i 0 (+ i 1))) ((= i n) v)
-          (let ((t (state-nonterminals (gvec-ref states i))))
-            (vector-set! v i (sorted-pairs (ts-map (lambda (k) (cons k (om-ref t k))) (om-keys t))))))))
-    (define token-conflict-memo (make-ahash-table))
     (define (token-conflicts-memo? right new-token)
       (let* ((key (+ (* (state-id right) 4194304) new-token))
              (old (ahash-ref token-conflict-memo key)))
@@ -545,14 +563,6 @@
             (let ((r (token-conflicts? right new-token)))
               (ahash-set! token-conflict-memo key (if r 'yes 'no))
               r))))
-    (define state-entries
-      ;; for each state, the vector of (token . entry), sorted by token
-      (let ((v (make-vector n #f)))
-        (do ((i 0 (+ i 1))) ((= i n) v)
-          (let ((t (state-terminals (gvec-ref states i))))
-            (vector-set! v i (sorted-pairs
-                              (ts-map (lambda (k) (cons k (om-ref t k)))
-                                      (vector-ref terminal-keys i))))))))
     (define (states-conflict? s1 s2 group-of)
       (let* ((v1 (vector-ref state-entries (state-id s1)))
              (v2 (vector-ref state-entries (state-id s2)))
@@ -595,20 +605,6 @@
                                    (not (= (vector-ref group-of (cadr a))
                                            (vector-ref group-of (cadr b)))))
                                   (else #t))))))
-    (define preds
-      ;; for each state, the states which shift or go to it
-      (let ((v (make-vector n '())))
-        (do ((i 0 (+ i 1))) ((= i n) v)
-          (let ((sh (vector-ref shift-targets i)))
-            (do ((j 0 (+ j 1))) ((= j (vector-length sh)))
-              (let ((t (cdr (vector-ref sh j))))
-                (vector-set! v t (cons i (vector-ref v t))))))
-          (let ((go (vector-ref gotos i)))
-            (do ((j 0 (+ j 1))) ((= j (vector-length go)))
-              (let ((x (vector-ref go j)))
-                (when (eq? (cadr x) 'goto)
-                  (let ((t (caddr x)))
-                    (vector-set! v t (cons i (vector-ref v t)))))))))))
     (define (entries-key s group-of)
       ;; what states-conflict? sees of s: the reserved words and the
       ;; entries, the shift targets replaced by their groups
@@ -634,6 +630,11 @@
                                  (if (and (pair? (cdr a)) (integer? (cadr a)))
                                      (modulo (+ (* h 31) (cadr a)) 1000000007)
                                      (modulo (+ h 1) 1000000007))))))))))
+    (do ((i 0 (+ i 1))) ((= i core-count)) (gvec-push! groups '()))
+    (do ((i 0 (+ i 1))) ((= i n))
+      (let ((c (state-core (gvec-ref states i))))
+        (gvec-set! groups c (append (gvec-ref groups c) (list i)))
+        (vector-set! group-of i c)))
     (split-conflicting-groups! states groups group-of states-conflict? entries-key key-hash)
     (let ((dirty (make-gvec)))
       (do ((i 0 (+ i 1))) ((= i (gvec-length groups))) (gvec-push! dirty #t))
