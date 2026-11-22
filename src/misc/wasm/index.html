@@ -358,16 +358,17 @@ make</code></pre>
   // the platforms, and the files of each one (by the start and end of the
   // name, as the workflows make them)
   var GROUPS = [
-    { title: 'macOS', note: 'For Apple silicon and Intel, macOS 13 or later (the Qt 6 package: Apple silicon only, macOS 15 or later). ' +
+    { title: 'macOS', note: 'For Apple silicon and Intel, macOS 13 or later (the Qt 6 packages: Apple silicon only, macOS 15 or later). ' +
         'Signed ad hoc and not notarized: macOS refuses to open the application the first time. ' +
         'Open it from its context menu (Open), or allow it in System Settings &gt; Privacy &amp; Security, ' +
         'or run <code>xattr -dr com.apple.quarantine "/Applications/TeXmacs Upsilon.app"</code> ' +
-        '(<code>TeXmacs Upsilon Vue.app</code>, <code>TeXmacs Upsilon Qt.app</code>). ' +
+        '(<code>TeXmacs Upsilon Vue.app</code>, <code>TeXmacs Upsilon Qt.app</code>, <code>TeXmacs Upsilon Qt Chez.app</code>). ' +
         'Each one installs beside the stock TeXmacs and the others, with preferences of its own.',
       kinds: [
         { test: /-cocoa-universal\.dmg$/, name: 'Cocoa (native interface)', desc: 'The menus, bars and dialogs of macOS; documents drawn by the GPU.' },
         { test: /-vue-universal\.dmg$/, name: 'Vue', desc: 'The interface drawn by TeXmacs itself, by the GPU; the same as in the browser.' },
-        { test: /^texmacs-qt-macos-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases. Apple silicon.' } ] },
+        { test: /^texmacs-qt-macos-/, name: 'Qt 6', desc: 'The interface of the official TeXmacs releases. Apple silicon.' },
+        { test: /^texmacs-qt-chez-macos-/, name: 'Qt 6, Chez Scheme (experimental)', desc: 'The same, with Chez Scheme, compiled to machine code, instead of S7: faster on the work done in Scheme (conversions, editing commands). Apple silicon.' } ] },
     { title: 'Linux', note: 'For x86_64. The AppImages are one file each, with their libraries, for most ' +
         'distributions (Ubuntu 22.04, Debian 12, Fedora 36 or later): make it executable and run it, ' +
         '<code>chmod +x texmacs-upsilon-vue-x86_64.AppImage; ./texmacs-upsilon-vue-x86_64.AppImage</code>. ' +

@@ -513,10 +513,19 @@ custom_init (void) {
 #define CHEZ_BOOT_DIR ""
 #endif
 
+// The heap images of Chez (petite.boot, scheme.boot): those of
+// SCHEMEHEAPDIRS, else those of TeXmacs/boot, which make CHEZ_MODULES copies
+// there and which the packages carry, else those of the installation of Chez
+// which texmacs.bin was linked with
 static string
 boot_dir () {
   const char* env= getenv ("SCHEMEHEAPDIRS");
   if (env != NULL && env[0] != '\0') return env;
+  string tm_path= get_env ("TEXMACS_PATH");
+  if (N (tm_path) > 0 &&
+      exists (url_system (tm_path * "/boot/petite.boot")) &&
+      exists (url_system (tm_path * "/boot/scheme.boot")))
+    return tm_path * "/boot";
   return CHEZ_BOOT_DIR;
 }
 

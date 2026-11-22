@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **A macOS package with Chez Scheme** (desktop applications, Apple
+  silicon, macOS 15 or later): `texmacs-qt-chez-macos-arm64.zip` among the
+  [latest builds](https://mgubi.github.io/texmacs/), "TeXmacs Upsilon Qt
+  Chez", the Qt 6 application with Chez Scheme instead of s7, experimental.
+  It carries the compiled modules, the boot image and the heap images of
+  Chez (in the folder `boot` of TeXmacs, where TeXmacs now looks for them
+  first), and installs beside the other applications, with preferences of
+  its own. The CI of macOS builds it and runs the regression suites and the
+  startup checks on it.
 - **Scripts under `-headless` edit and move the cursor as with a window**
   (desktop applications): a script run with `-headless` (batch editing,
   the MCP server) left the changes of the document pending, so the cursor

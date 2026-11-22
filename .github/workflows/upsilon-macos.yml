@@ -32,9 +32,11 @@
 #     the run. It is on its own: not in the disk images nor in the release.
 #   * qt-chez: the same Qt 6 build with Chez Scheme instead of S7
 #     (src/docs/chez/README.md), Chez from Homebrew: built, with its Scheme
-#     modules and boot image (make CHEZ_MODULES), and the regression suites
-#     and the startup checks run. Nothing is kept or published, and the
-#     release does not wait for it.
+#     modules, its boot image and the heap images of Chez in TeXmacs/boot
+#     (make CHEZ_MODULES), the regression suites and the startup checks run,
+#     and "TeXmacs Upsilon Qt Chez.app" deployed as the Qt one, checked to
+#     start without the installation of Chez, kept as an artifact and
+#     published with the others (Apple silicon only).
 #
 # The applications are signed ad hoc and not notarized: Gatekeeper rejects
 # them on another machine until the quarantine is removed,
@@ -434,6 +436,7 @@ jobs:
 
   qt-chez:
     name: macOS (Apple silicon, Qt 6, Chez Scheme)
+    needs: gs
     runs-on: macos-15
     timeout-minutes: 60
     defaults:
@@ -472,6 +475,57 @@ jobs:
           TM_TEST_TIMEOUT: 300
           TM_TEST_HOME: ${{ runner.temp }}/startup-home
         run: tests/startup/check.sh
+
+      # Ghostscript for Apple silicon, made by the job gs
+      - name: Ghostscript
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.tool_cache }}/texmacs-gs-arm64
+          key: texmacs-gs-arm64-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/build-gs.sh') }}
+          fail-on-cache-miss: true
+
+      # as the job qt; the folder TeXmacs of the application has boot, with
+      # the compiled modules, the boot image and the heap images of Chez
+      - name: Bundle
+        run: |
+          GSDIR="$RUNNER_TOOL_CACHE/texmacs-gs-arm64"
+          make MACOS_BUNDLE MACOS_DEPLOY=none GS_BUNDLE="$GSDIR/bin/gs" \
+            GS_LICENSES="$GSDIR/share/licenses/ghostscript"
+          "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
+          name=$(packages/macos/upsilon-identity.sh ../distr/TeXmacs.app qt-chez)
+          rm -rf "../distr/$name.app"
+          mv ../distr/TeXmacs.app "../distr/$name.app"
+          app="../distr/$name.app"
+          boot="$app/Contents/Resources/share/TeXmacs/boot"
+          ls -l "$boot/texmacs.boot" "$boot/petite.boot" "$boot/scheme.boot"
+          # (Homebrew's libraries target macOS 15, as for the job qt)
+          plutil -replace LSMinimumSystemVersion -string 15.0 "$app/Contents/Info.plist"
+          codesign --force --deep -s - "$app"
+          codesign --verify --deep --strict "$app"
+          "$app/Contents/MacOS/TeXmacs" -v | grep "^Revision $(git log -1 --abbrev=10 --format=%h) "
+          # the application starts on its own heap images: the installation
+          # of Chez put aside meanwhile
+          chez_dir=$(sed -n 's/^CHEZ_DIR = //p' Makefile)
+          sudo mv "$chez_dir" "$chez_dir.aside"
+          home="$RUNNER_TEMP/chez-app-home"; mkdir -p "$home"
+          TEXMACS_HOME_PATH="$home" "$app/Contents/MacOS/TeXmacs" -headless \
+            -x '(begin (display* "CHEZ-APP " (scheme-dialect) " " (+ 1 2) "\n") (quit-TeXmacs))' \
+            -q > chez-app.log 2>&1 || true
+          sudo mv "$chez_dir.aside" "$chez_dir"
+          cat chez-app.log | grep -v "does not support" | tail -20
+          grep -q "^CHEZ-APP .* 3$" chez-app.log
+          ditto -c -k --keepParent "$app" texmacs-qt-chez-macos-arm64.zip
+          TM_CHECK_QPA= packages/bundled-tools/check.sh -r "$PWD/$app/Contents/Resources/share/TeXmacs" \
+            -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$PWD/$app/Contents/MacOS/TeXmacs"
+
+      - name: Minimum macOS
+        run: ../.github/fixes/check-min-macos.sh ../distr/*.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-qt-chez-macos-arm64
+          path: src/texmacs-qt-chez-macos-arm64.zip
+          retention-days: 14
 
   # The corresponding source of the programs of others which the packages
   # bring under the AGPL (Ghostscript) and the LGPL (Aspell, its dictionaries),
@@ -535,7 +589,7 @@ jobs:
     # workflow replaces and removes only its own files
     # (the sources of the programs of others first: a package is not published
     # before them, #662)
-    needs: [dmg, qt, sources]
+    needs: [dmg, qt, qt-chez, sources]
     if: ${{ !cancelled() && github.ref == 'refs/heads/upsilon_ci' && needs.dmg.result == 'success' && needs.sources.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -552,6 +606,12 @@ jobs:
         if: needs.qt.result == 'success'
         with:
           name: texmacs-qt-macos-arm64
+          path: dist
+
+      - uses: actions/download-artifact@v8
+        if: needs.qt-chez.result == 'success'
+        with:
+          name: texmacs-qt-chez-macos-arm64
           path: dist
 
       - name: The pre-release upsilon-latest
@@ -577,7 +637,9 @@ jobs:
             \`TeXmacs-*-vue-universal.dmg\`, the Vue interface, drawn by the
             GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
             \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only, macOS 15
-            or later.
+            or later; \`texmacs-qt-chez-macos-arm64.zip\`, the same with Chez
+            Scheme instead of S7 (experimental), see
+            [src/docs/chez](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/chez/README.md).
             Signed ad hoc and not notarized (when they are, the program \`gs\`
             of the application will need the option of the hardened runtime
             for its own signature, as it is a program of its own). macOS refuses to open them the
@@ -606,6 +668,7 @@ jobs:
               *-cocoa-universal.dmg) echo "macOS, Cocoa, universal ($built)" ;;
               *-vue-universal.dmg)   echo "macOS, Vue, universal ($built)" ;;
               texmacs-qt-macos-*)    echo "macOS, Qt 6, Apple silicon ($built)" ;;
+              texmacs-qt-chez-macos-*) echo "macOS, Qt 6, Chez Scheme, Apple silicon ($built)" ;;
             esac
           }
           files=()

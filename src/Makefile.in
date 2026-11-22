@@ -57,6 +57,7 @@ SIGN = misc/admin/sign_update
 
 SCHEME_DIR = @SCHEME_DIR@
 CHEZ_BIN = @CHEZ_BIN@
+CHEZ_DIR = @CHEZ_DIR@
 
 TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS @MKGUILE@
 	cd src; $(MAKE) -r -f makefile
@@ -66,8 +67,16 @@ TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS @MKGUILE@
 # With Chez Scheme: compile the modules of TeXmacs/progs (those whose source
 # changed) into TeXmacs/boot, then the boot image TeXmacs/boot/texmacs.boot
 # (docs/chez/01-build.md). TeXmacs runs headless, with a home of its own.
+# The heap images of Chez (petite.boot, scheme.boot), those of the Chez linked
+# into texmacs.bin, are copied first into TeXmacs/boot, where TeXmacs finds
+# them before those of the installation of Chez: a package carries them.
 CHEZ_MODULES:
 	@if test "$(SCHEME_DIR)" = "Chez"; then \
+	  $(MKDIR) $(tmdir)/boot; \
+	  for f in petite.boot scheme.boot; do \
+	    cmp -s $(CHEZ_DIR)/$$f $(tmdir)/boot/$$f || \
+	      cp -f $(CHEZ_DIR)/$$f $(tmdir)/boot/$$f || exit 1; \
+	  done; \
 	  home=`pwd`/.chez-compile-home; $(MKDIR) $$home; \
 	  TEXMACS_PATH=`pwd`/$(tmdir) TEXMACS_BOOT_PATH=`pwd`/$(tmdir)/boot \
 	  TEXMACS_HOME_PATH=$$home QT_QPA_PLATFORM=offscreen \

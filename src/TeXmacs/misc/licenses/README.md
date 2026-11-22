@@ -41,6 +41,9 @@ program, as the libraries of the system they were made on.
 | Nettle, GMP | all (with GnuTLS) | LGPL 3 or later (or GPL 2 or later) | `LGPL-3.0.txt` |
 | FreeType (The FreeType Project) | all | FreeType License | `FreeType-LICENSE.txt`, `FreeType-FTL.txt` |
 | libpng | all | libpng license | `libpng-LICENSE.txt` |
+| Chez Scheme (Cisco Systems), its heap images in `boot` | Chez | Apache 2.0, with its notice | `Apache-2.0.txt`, `ChezScheme-NOTICE.txt` |
+| the Nanopass Infrastructure (Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell), in Chez Scheme | Chez | MIT | `nanopass-MIT.txt` |
+| LZ4 (Yann Collet), zlib (Jean-loup Gailly, Mark Adler), in Chez Scheme | Chez | BSD 2-clause; zlib | `lz4-BSD-2-Clause.txt`, `zlib-LICENSE.txt` |
 
 FreeType: portions of this software are copyright (C) The FreeType Project
 (www.freetype.org). All rights reserved.

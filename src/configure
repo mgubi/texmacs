@@ -775,6 +775,7 @@ ICONV_CPP
 ICONV_CXX
 CXXCPP
 SCHEME_DIR
+CHEZ_DIR
 CHEZ_LIBS
 CHEZ_BIN
 GUILE_LIBS
@@ -13507,6 +13508,7 @@ printf '%s\n' "$CHEZ_DIR" >&6; }
     (*)       CHEZ_LIBS="$CHEZ_LIBS -lncurses -ldl -lm" ;;
   esac
   CHEZ_LIBS="$CHEZ_LIBS -lpthread"
+
 
 
 printf '%s\n' "#define CHEZ_BOOT_DIR \"$CHEZ_DIR\"" >>confdefs.h

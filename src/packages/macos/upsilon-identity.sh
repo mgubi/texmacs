@@ -10,19 +10,20 @@
 # still opens with the stock TeXmacs when it is installed, and with Upsilon
 # otherwise or when it is chosen (Open With).
 #
-# Usage: packages/macos/upsilon-identity.sh APP cocoa|vue|qt
+# Usage: packages/macos/upsilon-identity.sh APP cocoa|vue|qt|qt-chez
 #   prints the name of the application ("TeXmacs Upsilon Vue"...), which
 #   the folder of the application should have (NAME.app); run it before
 #   the application is signed.
 
 set -e
-[ $# -eq 2 ] || { echo "usage: $0 APP cocoa|vue|qt" >&2; exit 1; }
+[ $# -eq 2 ] || { echo "usage: $0 APP cocoa|vue|qt|qt-chez" >&2; exit 1; }
 app="$1" gui="$2"
 case "$gui" in
   cocoa) name="TeXmacs Upsilon";     id=org.texmacs.upsilon ;;
   vue)   name="TeXmacs Upsilon Vue"; id=org.texmacs.upsilon.vue ;;
   qt)    name="TeXmacs Upsilon Qt";  id=org.texmacs.upsilon.qt ;;
-  *) echo "$0: cocoa, vue or qt, not $gui" >&2; exit 1 ;;
+  qt-chez) name="TeXmacs Upsilon Qt Chez"; id=org.texmacs.upsilon.qt.chez ;;
+  *) echo "$0: cocoa, vue, qt or qt-chez, not $gui" >&2; exit 1 ;;
 esac
 plist="$app/Contents/Info.plist"
 [ -f "$plist" ] || { echo "$0: no $plist" >&2; exit 1; }

@@ -9,8 +9,10 @@ gives `/opt/homebrew/lib/csv10.4.1/tarm64osx`.
 
 `configure` finds the machine directory from the `chez` (or `scheme`)
 executable on the `PATH`; `--with-chez=DIR` gives it otherwise
-(`misc/m4/scheme.m4`, `LC_CHEZ`). Chez is linked statically; the heap images
-are read at start-up from that directory, or from `$SCHEMEHEAPDIRS`.
+(`misc/m4/scheme.m4`, `LC_CHEZ`). Chez is linked statically. Its heap images
+are read at start-up from `$SCHEMEHEAPDIRS`, else from `TeXmacs/boot`, where
+`make` copies those of that directory (so that a package carries them, as the
+macOS package of the CI does), else from that directory.
 
 ## 1.2 Configuring and building
 

@@ -93,6 +93,7 @@ AC_DEFUN([LC_CHEZ],[
   esac
   CHEZ_LIBS="$CHEZ_LIBS -lpthread"
   AC_SUBST(CHEZ_LIBS)
+  AC_SUBST(CHEZ_DIR)
   AC_DEFINE_UNQUOTED([CHEZ_BOOT_DIR], ["$CHEZ_DIR"],
                      [Default directory of the Chez Scheme heap images])
   if test -z "$CHEZ_BIN"; then
