@@ -55,9 +55,26 @@ SIGN = misc/admin/sign_update
 # Main makes
 ###############################################################################
 
+SCHEME_DIR = @SCHEME_DIR@
+CHEZ_BIN = @CHEZ_BIN@
+
 TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS @MKGUILE@
 	cd src; $(MAKE) -r -f makefile
 	$(MAKE) -f Makefile PLUGINS
+	$(MAKE) -f Makefile CHEZ_MODULES
+
+# With Chez Scheme: compile the modules of TeXmacs/progs (those whose source
+# changed) into TeXmacs/boot, then the boot image TeXmacs/boot/texmacs.boot
+# (docs/chez/01-build.md). TeXmacs runs headless, with a home of its own.
+CHEZ_MODULES:
+	@if test "$(SCHEME_DIR)" = "Chez"; then \
+	  home=`pwd`/.chez-compile-home; $(MKDIR) $$home; \
+	  TEXMACS_PATH=`pwd`/$(tmdir) TEXMACS_BOOT_PATH=`pwd`/$(tmdir)/boot \
+	  TEXMACS_HOME_PATH=$$home QT_QPA_PLATFORM=offscreen \
+	    $(tmdir)/bin/texmacs.bin -compile-modules && \
+	  $(CHEZ_BIN) --script src/Scheme/Chez/make-boot.scm \
+	    $(tmdir)/boot $(tmdir)/boot/texmacs.boot; \
+	fi
 	$(MAKE) -f Makefile EX_PLUGINS
 	$(CP) misc/scripts/fig2ps $(tmdir)/bin
 	$(CP) misc/scripts/texmacs $(tmdir)/bin
@@ -101,7 +118,7 @@ GLUE:
 SAFE_TEXMACS_REV:
 	@echo "@ALTERNATIVE_VERSION@" > "$(tmdir)/SVNREV"
 
-.PHONY: TEXMACS STATIC_TEXMACS DEPS GLUE EXPERIMENTAL
+.PHONY: TEXMACS STATIC_TEXMACS DEPS GLUE EXPERIMENTAL CHEZ_MODULES
 
 deps: DEPS
 clean: CLEAN
@@ -171,6 +188,8 @@ INSTALL_DATA:
 	$(CP) $(tmdir)/misc $(DESTDIR)
 	$(CP) $(tmdir)/packages $(DESTDIR)
 	$(CP) $(tmdir)/progs $(DESTDIR)
+	if test "$(SCHEME_DIR)" = "Chez" -a -d $(tmdir)/boot; then \
+	  $(CP) $(tmdir)/boot $(DESTDIR); fi
 	$(CP) $(tmdir)/styles $(DESTDIR)
 	$(CP) $(tmdir)/texts $(DESTDIR)
 	$(CP) $(tmdir)/SVNREV $(DESTDIR)

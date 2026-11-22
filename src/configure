@@ -775,6 +775,8 @@ ICONV_CPP
 ICONV_CXX
 CXXCPP
 SCHEME_DIR
+CHEZ_LIBS
+CHEZ_BIN
 GUILE_LIBS
 GUILE_LDFLAGS
 GUILE_CFLAGS
@@ -939,6 +941,7 @@ enable_static
 with_scheme
 with_guile
 enable_guile2
+with_chez
 with_iconv
 with_freetype
 with_aspell
@@ -1662,10 +1665,12 @@ Optional Packages:
   --with-tmrepo[=no]      absolute texmacs sdk path
   --with-texmacs-builder[=no]
                           absolute texmacs builder path
-  --with-scheme[=s7|guile|femtolisp]
+  --with-scheme[=s7|guile|femtolisp|chez]
                           Scheme interpreter to use [default=s7]
   --with-guile[=system]   path to to find guile-config or [embedded] if any
                           tm-guile package included
+  --with-chez[=DIR]       machine directory of Chez Scheme (with scheme.h and
+                          libkernel.a)
   --with-iconv[=DIR]      where to find iconv []
   --with-freetype[DIR=]   where to find freetype-config []
   --with-aspell[DIR=]     where to find aspell library []
@@ -13402,8 +13407,124 @@ printf '%s\n' "#define USE_FEMTOLISP 1" >>confdefs.h
 
       SCHEME_DIR=Femtolisp
       ;;
+    (chez | Chez)
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: using Chez Scheme" >&5
+printf '%s\n' "$as_me: using Chez Scheme" >&6;}
+
+
+# Check whether --with-chez was given.
+if test ${with_chez+y}
+then :
+  withval=$with_chez;
+else case e in #(
+  e) with_chez=auto ;;
+esac
+fi
+
+  CHEZ_DIR=""
+  if test "$with_chez" != "auto" -a "$with_chez" != "yes"; then
+    CHEZ_DIR="$with_chez"
+  else
+    for ac_prog in chez scheme chezscheme
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+printf %s "checking for $ac_word... " >&6; }
+if test ${ac_cv_path_CHEZ_BIN+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e) case $CHEZ_BIN in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_CHEZ_BIN="$CHEZ_BIN" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  case $as_dir in #(((
+    '') as_dir=./ ;;
+    */) ;;
+    *) as_dir=$as_dir/ ;;
+  esac
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
+    ac_cv_path_CHEZ_BIN="$as_dir$ac_word$ac_exec_ext"
+    printf '%s\n' "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac ;;
+esac
+fi
+CHEZ_BIN=$ac_cv_path_CHEZ_BIN
+if test -n "$CHEZ_BIN"; then
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $CHEZ_BIN" >&5
+printf '%s\n' "$CHEZ_BIN" >&6; }
+else
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+fi
+
+
+  test -n "$CHEZ_BIN" && break
+done
+
+    if test -n "$CHEZ_BIN"; then
+      chez_machine=`echo '(display (machine-type))' | "$CHEZ_BIN" -q 2>/dev/null`
+      chez_version=`echo '(call-with-values scheme-version-number (lambda (a b c) (printf "~a.~a.~a" a b c)))' | "$CHEZ_BIN" -q 2>/dev/null`
+      chez_prefix=`dirname "$CHEZ_BIN"`/..
+      for d in "$chez_prefix/lib/csv$chez_version/$chez_machine" \
+               "$chez_prefix/lib/csv$chez_version-pre-release.1/$chez_machine"; do
+        if test -f "$d/scheme.h"; then CHEZ_DIR=`cd "$d" && pwd`; break; fi
+      done
+    fi
+  fi
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for the Chez Scheme machine directory" >&5
+printf %s "checking for the Chez Scheme machine directory... " >&6; }
+  if test -z "$CHEZ_DIR" -o ! -f "$CHEZ_DIR/scheme.h" -o ! -f "$CHEZ_DIR/libkernel.a"; then
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+    as_fn_error $? "Chez Scheme not found: give its machine directory with --with-chez=DIR" "$LINENO" 5
+  fi
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $CHEZ_DIR" >&5
+printf '%s\n' "$CHEZ_DIR" >&6; }
+  CPPFLAGS="$CPPFLAGS -I$CHEZ_DIR"
+  CHEZ_LIBS="$CHEZ_DIR/libkernel.a"
+  for l in lz4 z; do
+    if test -f "$CHEZ_DIR/lib$l.a"; then CHEZ_LIBS="$CHEZ_LIBS $CHEZ_DIR/lib$l.a"
+    else CHEZ_LIBS="$CHEZ_LIBS -l$l"; fi
+  done
+  case "$host_os" in
+    (darwin*) CHEZ_LIBS="$CHEZ_LIBS -liconv -lncurses" ;;
+    (mingw*)  CHEZ_LIBS="$CHEZ_LIBS -lole32 -lrpcrt4 -luuid" ;;
+    (*)       CHEZ_LIBS="$CHEZ_LIBS -lncurses -ldl -lm" ;;
+  esac
+  CHEZ_LIBS="$CHEZ_LIBS -lpthread"
+
+
+printf '%s\n' "#define CHEZ_BOOT_DIR \"$CHEZ_DIR\"" >>confdefs.h
+
+  if test -z "$CHEZ_BIN"; then
+    for b in chez scheme; do
+      if test -x "$CHEZ_DIR/$b"; then CHEZ_BIN="$CHEZ_DIR/$b"; break; fi
+    done
+  fi
+
+
+
+printf '%s\n' "#define USE_CHEZ 1" >>confdefs.h
+
+      SCHEME_DIR=Chez
+      ;;
     (*)
-      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7, guile or femtolisp" "$LINENO" 5
+      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7, guile, femtolisp or chez" "$LINENO" 5
       ;;
   esac
 

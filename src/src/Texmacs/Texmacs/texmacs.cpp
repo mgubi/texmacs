@@ -32,6 +32,7 @@
 #include "tm_window.hpp"
 #include "client_server.hpp"
 #include "mcp_stdio.hpp"
+#include "scheme.hpp"
 
 #if defined(QTWKTEXMACS)
 #include "Qtwk/QTWKApplication.hpp"
@@ -73,6 +74,11 @@ bool open_mode= false;
 string open_mode_url;
 bool tls_no_verify= false;
 string extra_init_cmd;
+#ifdef USE_CHEZ
+// -compile-modules: compile TeXmacs/progs to Chez modules, then quit
+static bool compile_modules_mode= false;
+static string compile_modules_script= "";
+#endif
 bool exec_exit= true;
 bool quit_at_end= false;
 void server_start ();
@@ -510,6 +516,11 @@ set_global_options  (int argc, char** argv)  {
                (s == "-delete-server-data") || (s == "-delete-databases") ||
 	       (s == "-headless") || (s == "-H") || s == "-open");
       else if (s == "-tls-no-verify") tls_no_verify= true;
+#ifdef USE_CHEZ
+      else if (s == "-compile-modules" || s == "-recompile-modules") {
+        if (i + 1 < argc && argv[i + 1][0] != '-') i++;
+      }
+#endif
       else if (s == "-build-manual") {
         // the manual and the test suites quit when they are done
         if (i+1<argc) exec_exit= false;
@@ -674,6 +685,18 @@ TeXmacs_main (int argc, char** argv) {
     (void) sv;
 #else
     server sv;
+#endif
+#ifdef USE_CHEZ
+    if (compile_modules_mode) {
+      url script= "$TEXMACS_PATH/../src/Scheme/Chez/compile-texmacs.scm";
+      if (compile_modules_script != "") script= url (compile_modules_script);
+      cout << "TeXmacs] Executing module compiler: " << concretize (script) << LF;
+      exec_file (script);
+      // compile-texmacs.scm normally quits itself; here when it raised
+      bool ok= as_bool (eval ("(and (top-level-bound? 'compile-modules-succeeded?)"
+                              " compile-modules-succeeded?)"));
+      exit (ok? 0: 1);
+    }
 #endif
   
     // append commands to open standard welcome messages if needed
@@ -869,6 +892,15 @@ immediate_options (int argc, char** argv) {
       mkdir (url_system (sys));
       mcp_stdio_setup (sys * "/mcp.log");
     }
+#ifdef USE_CHEZ
+    else if (s == "-compile-modules" || s == "-recompile-modules") {
+      headless_mode= true;
+      compile_modules_mode= true;
+      if (s == "-recompile-modules") set_env ("TEXMACS_RECOMPILE_ALL", "1");
+      if (i + 1 < argc && argv[i + 1][0] != '-')
+        compile_modules_script= argv[++i];
+    }
+#endif
     else if (s == "-log-file" && i + 1 < argc) {
       i++;
       char* log_file = argv[i];

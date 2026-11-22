@@ -431,8 +431,9 @@
                    'define-test-pub)))
   ;; S7 modules see everything in the rootlet, where the public names are
   ;; published, and :use is not enforced (see src/docs/s7); the same for
-  ;; femtolisp, which has one global environment
-  (when (not (or (s7-scheme?) (femtolisp-scheme?)))
+  ;; femtolisp, which has one global environment, and for Chez, whose
+  ;; modules are compiled ahead of time and cannot be made at run time
+  (when (not (or (s7-scheme?) (femtolisp-scheme?) (chez-scheme?)))
     (test-texmacs-module)))
 
 (define (test-texmacs-module)

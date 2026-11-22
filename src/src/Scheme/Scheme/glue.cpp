@@ -473,6 +473,67 @@ tree_remove_node (tree r, int pos) {
 
 #define TMSCM_ASSERT_SCHEME_TREE(p,arg,rout)
 
+#ifdef USE_CHEZ
+/* Chez's copying GC does not scan the C stack: holding an unrooted tmscm tail
+   pointer across allocating or Scheme-calling conversions (e.g. Scall1 in
+   blackbox_to_tmscm) can lose or corrupt partially built lists.  Root the
+   accumulator on the permanently-locked shadow root stack (ChezRoot) and
+   build cons cells directly -- zero per-node locking, zero temporary
+   vectors, and zero C-to-Scheme callbacks. */
+template <typename Array, typename Conv>
+static tmscm
+chez_array_to_tmscm (Array& a, Conv conv) {
+  iptr n= N(a);
+  if (n == 0) return tmscm_null ();
+  if (n == 1) return Scons (conv (a[0]), tmscm_null ());
+  ChezRoot acc;
+  tmscm tail= Scons (conv (a[(int) (n - 1)]), tmscm_null ());
+  acc.set (tail);
+  for (iptr i= n - 2; i >= 1; i--) {
+    tmscm elem= conv (a[(int) i]);
+    tail= Scons (elem, acc.get ());
+    acc.set (tail);
+  }
+  tmscm first= conv (a[0]);
+  return Scons (first, acc.get ());
+}
+
+template <typename List, typename Conv>
+static tmscm
+chez_list_to_tmscm (List l, Conv conv) {
+  if (is_nil (l)) return tmscm_null ();
+  tmscm first= Scons (conv (l->item), tmscm_null ());
+  l= l->next;
+  if (is_nil (l)) return first;
+  ChezRoot head (first);
+  ChezRoot tail (first);
+  for (; !is_nil (l); l= l->next) {
+    tmscm elem= conv (l->item);
+    tmscm cell= Scons (elem, tmscm_null ());
+    Sset_cdr (tail.get (), cell);
+    if (!is_nil (l->next)) tail.set (cell);
+  }
+  return head.get ();
+}
+
+template <typename Map, typename KeyConv, typename ValConv>
+static tmscm
+chez_hashmap_to_tmscm (Map& t, KeyConv key_conv, ValConv val_conv) {
+  auto it= iterate (t);
+  if (!it->busy ()) return tmscm_null ();
+  ChezRoot acc (tmscm_null ());
+  ChezRoot key;
+  while (it->busy ()) {
+    auto s= it->next ();
+    key.set (key_conv (s));
+    tmscm val= val_conv (t[s]);
+    tmscm entry= Scons (key.get (), val);
+    acc.set (Scons (entry, acc.get ()));
+  }
+  return acc.get ();
+}
+#endif
+
 tmscm 
 scheme_tree_to_tmscm (scheme_tree t) {
   tmscm_builder building;
@@ -490,11 +551,15 @@ scheme_tree_to_tmscm (scheme_tree t) {
     return symbol_to_tmscm (s);
   }
   else {
+#ifdef USE_CHEZ
+    return chez_array_to_tmscm (t, scheme_tree_to_tmscm);
+#else
     int i;
     tmscm p= tmscm_null ();
     for (i=N(t)-1; i>=0; i--)
       p= tmscm_cons (scheme_tree_to_tmscm (t[i]), p);
     return p;
+#endif
   }
 }
 
@@ -642,17 +707,26 @@ TMSCM_ASSERT (tmscm_is_path (p), p, arg, rout)
 
 tmscm 
 path_to_tmscm (path p) {
+#ifdef USE_CHEZ
+  return chez_list_to_tmscm (p, int_to_tmscm);
+#else
   tmscm_builder building;
   if (is_nil (p)) return tmscm_null ();
   else return tmscm_cons (int_to_tmscm (p->item), path_to_tmscm (p->next));
+#endif
 }
 
 path
 tmscm_to_path (tmscm p) {
   // (a loop: a recursion along the list overflowed the stack for long ones)
   array<int> a;
-  for (; !tmscm_is_null (p); p= tmscm_cdr (p))
+  for (; !tmscm_is_null (p); p= tmscm_cdr (p)) {
+#ifdef USE_CHEZ
+    // Chez's tmscm_car does not check its argument
+    if (!tmscm_is_pair (p) || !tmscm_is_int (tmscm_car (p))) return path ();
+#endif
     a << (int) tmscm_to_int (tmscm_car (p));
+  }
   path r;
   for (int i= N(a) - 1; i >= 0; i--) r= path (a[i], r);
   return r;
@@ -787,6 +861,10 @@ tmscm_to_url (tmscm obj) {
 #else
   return tmscm_to_string (obj);
 #endif
+#ifdef USE_CHEZ
+  if (!tmscm_is_blackbox (obj) || (type_box (tmscm_to_blackbox (obj)) != type_helper<url>::id))
+    return url_none ();
+#endif
   return open_box<url> (tmscm_to_blackbox (obj));
 }
 
@@ -917,6 +995,9 @@ TMSCM_ASSERT (tmscm_is_table_string_string (p), p, arg, rout)
 
 tmscm 
 table_string_string_to_tmscm (hashmap<string,string> t) {
+#ifdef USE_CHEZ
+  return chez_hashmap_to_tmscm (t, string_to_tmscm, string_to_tmscm);
+#else
   tmscm_builder building;
   tmscm p= tmscm_null ();
   iterator<string> it= iterate (t);
@@ -926,6 +1007,7 @@ table_string_string_to_tmscm (hashmap<string,string> t) {
     p= tmscm_cons (n, p);
   }
   return p;
+#endif
 }
 
 hashmap<string,string>
@@ -974,11 +1056,15 @@ TMSCM_ASSERT (tmscm_is_array_int (p), p, arg, rout)
 
 /* static */ tmscm 
 array_int_to_tmscm (array<int> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, int_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (int_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<int>
@@ -1011,11 +1097,15 @@ TMSCM_ASSERT (tmscm_is_array_SI (p), p, arg, rout)
 
 /* static */ tmscm 
 array_SI_to_tmscm (array<SI> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, SI_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (SI_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<SI>
@@ -1050,11 +1140,15 @@ TMSCM_ASSERT (tmscm_is_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_double_to_tmscm (array<double> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, double_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null();
   for (i=n-1; i>=0; i--) p= tmscm_cons (double_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<double>
@@ -1080,11 +1174,15 @@ TMSCM_ASSERT (tmscm_is_array_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_array_double_to_tmscm (array<array_double> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, array_double_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (array_double_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<array_double>
@@ -1110,11 +1208,15 @@ TMSCM_ASSERT (tmscm_is_array_array_array_double (p), p, arg, rout)
 
 /* static */ tmscm 
 array_array_array_double_to_tmscm (array<array_array_double> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, array_array_double_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (array_array_double_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<array_array_double>
@@ -1137,11 +1239,15 @@ TMSCM_ASSERT (tmscm_is_array_string (p), p, arg, rout)
 
 /* static */ tmscm 
 array_string_to_tmscm (array<string> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, string_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (string_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<string>
@@ -1167,11 +1273,15 @@ TMSCM_ASSERT (tmscm_is_array_tree (p), p, arg, rout)
 
 /* static */ tmscm 
 array_tree_to_tmscm (array<tree> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, tree_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (tree_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<tree>
@@ -1197,11 +1307,15 @@ TMSCM_ASSERT (tmscm_is_array_widget (p), p, arg, rout)
 
 /* static */ tmscm 
 array_widget_to_tmscm (array<widget> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, widget_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (widget_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<widget>
@@ -1228,11 +1342,15 @@ TMSCM_ASSERT (tmscm_is_array_url (p), p, arg, rout)
 
 /* static */ tmscm 
 array_url_to_tmscm (array<url> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, url_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (url_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<url>
@@ -1259,11 +1377,15 @@ TMSCM_ASSERT (tmscm_is_array_patch (p), p, arg, rout)
 
 /* static */ tmscm 
 array_patch_to_tmscm (array<patch> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, patch_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (patch_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<patch>
@@ -1289,11 +1411,15 @@ TMSCM_ASSERT (tmscm_is_array_path (p), p, arg, rout)
 
 /* static */ tmscm 
 array_path_to_tmscm (array<path> a) {
+#ifdef USE_CHEZ
+  return chez_array_to_tmscm (a, path_to_tmscm);
+#else
   tmscm_builder building;
   int i, n= N(a);
   tmscm p= tmscm_null ();
   for (i=n-1; i>=0; i--) p= tmscm_cons (path_to_tmscm (a[i]), p);
   return p;
+#endif
 }
 
 /* static */ array<path>
@@ -1325,10 +1451,14 @@ TMSCM_ASSERT (tmscm_is_list_string (p), p, arg, rout)
 
 tmscm 
 list_string_to_tmscm (list_string l) {
+#ifdef USE_CHEZ
+  return chez_list_to_tmscm (l, string_to_tmscm);
+#else
   tmscm_builder building;
   if (is_nil (l)) return tmscm_null ();
   return tmscm_cons (string_to_tmscm (l->item),
            list_string_to_tmscm (l->next));
+#endif
 }
 
 list_string
@@ -1357,10 +1487,14 @@ TMSCM_ASSERT (tmscm_is_list_tree (p), p, arg, rout)
 
 tmscm 
 list_tree_to_tmscm (list_tree l) {
+#ifdef USE_CHEZ
+  return chez_list_to_tmscm (l, tree_to_tmscm);
+#else
   tmscm_builder building;
   if (is_nil (l)) return tmscm_null ();
   return tmscm_cons (tree_to_tmscm (l->item),
            list_tree_to_tmscm (l->next));
+#endif
 }
 
 list_tree

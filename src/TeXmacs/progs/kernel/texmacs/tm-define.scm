@@ -282,11 +282,32 @@
       '*module-name*
       '(module-name temp-module)))
 
+(define (tm-define-overloaded-chez var nval)
+  ;; Chez compiles each module ahead of time: the definition goes to the
+  ;; interaction environment, which holds all the tm-defined names, and the
+  ;; expansion does not depend on what was defined before it
+  `(let* ((former (if (top-level-bound? ',var (interaction-environment))
+                      (top-level-value ',var (interaction-environment))
+                      (lambda args (noop))))
+          (new-val ,(if (null? cur-conds)
+                        nval
+                        `(let ((former former)) ,nval))))
+     (define-top-level-value ',var new-val (interaction-environment))
+     (ahash-set! tm-defined-table ',var
+                 (cons ',nval (or (ahash-ref tm-defined-table ',var) '())))
+     (ahash-set! tm-defined-name new-val ',var)
+     (ahash-set! tm-defined-module ',var
+                 (cons (tm-current-module-name)
+                       (or (ahash-ref tm-defined-module ',var) '())))
+     ,@(map property-rewrite cur-props)))
+
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
          (nval (lambda* head nbody)))
-    (if (ahash-ref tm-defined-table var)
+    (cond
+     ((chez-scheme?) (tm-define-overloaded-chez var nval))
+     ((ahash-ref tm-defined-table var)
         `(let ((former ,(tm-global-ref var)))
            ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
            ;;    (display* "Overloaded " ',var "\n"))
@@ -310,7 +331,8 @@
 	   (ahash-set! tm-defined-module ',var
 		       (cons ,(tm-defining-module-name)
 			     (ahash-ref tm-defined-module ',var)))
-           ,@(map property-rewrite cur-props))
+           ,@(map property-rewrite cur-props)))
+     (else
         `(begin
            ;; the conditions are tested when the definition is expanded: in
            ;; S7, cur-conds as seen by the expanded code is not this one
@@ -340,7 +362,15 @@
            (ahash-set! tm-defined-name ,(tm-global-ref var) ',var)
 	   (ahash-set! tm-defined-module ',var
                        (list ,(tm-defining-module-name)))
-           ,@(map property-rewrite cur-props)))))
+           ,@(map property-rewrite cur-props))))))
+
+(define-public (tm-thunk-with-source body)
+  ;; the expression of a thunk running body, for the macros of menus and
+  ;; keyboards; procedure-source gives the source of the thunk back to the
+  ;; shortcuts and the help, which Chez does not keep by itself
+  (if (chez-scheme?)
+      `(source-record! (lambda () ,@body) '(lambda () ,@body))
+      `(lambda () ,@body)))
 
 (define-public (tm-define-sub head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
@@ -375,7 +405,15 @@
     ;; with-module: with-let would renumber the user module, which then
     ;; looks newer than the modules loaded before, and every lookup of a
     ;; kernel symbol from those modules would scan their whole environment
-    (cond ((s7-scheme?)
+    (cond ((chez-scheme?)
+        `(begin
+           (tm-define ,macro-head ,@body)
+           (define-top-level-syntax ',(ca*r head)
+             (lambda (stx)
+               (datum->syntax (car (syntax->list stx))
+                 (apply ,(ca*r macro-head) (cdr (syntax->datum stx)))))
+             (interaction-environment))))
+          ((s7-scheme?)
         `(begin
            (tm-define ,macro-head ,@body)
            (eval '(define-public-macro ,head
@@ -438,10 +476,29 @@
          (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new)))
 
+(define (lazy-define-one-chez module opts name)
+  ;; the stub is replaced when the module defines name; if it does not,
+  ;; the stub would call itself
+  `(when (begin (lazy-define-add! ',module ',name) (not (defined? ',name)))
+     (letrec ((stub #f))
+       (tm-define (,name . args)
+         ,@opts
+         (unless (module-loaded? ',module)
+           (resolve-module ',module))
+         (let ((r (and (defined? ',name)
+                       (top-level-value ',name (interaction-environment)))))
+           (if (or (not r) (eq? r stub))
+               (texmacs-error "lazy-define"
+                              ,(string-append "Could not retrieve "
+                                              (symbol->string name))))
+           (apply r args)))
+       (set! stub (top-level-value ',name (interaction-environment))))))
+
 (define-public (lazy-define-one module opts name)
   ;; the module is recorded when the form is evaluated, not when it is
   ;; expanded (femtolisp expands (when #f (lazy-define ...)) when it
   ;; compiles it)
+  (if (chez-scheme?) (lazy-define-one-chez module opts name)
   (with name-star (string->symbol (string-append (symbol->string name) "*"))
     `(when (begin (lazy-define-add! ',module ',name) (not (defined? ',name)))
        (tm-define (,name . args)
@@ -466,7 +523,7 @@
                               ,(string-append "Could not retrieve "
                                               (symbol->string name))))
            (apply r args)))
-       (lazy-define-stub-set! ',name ,name))))
+       (lazy-define-stub-set! ',name ,name)))))
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)

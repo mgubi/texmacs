@@ -1085,12 +1085,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (file-forms u)
-  ;; the forms of the Scheme file @u
+  ;; the forms of the Scheme file @u (on Chez, read as Guile reads them)
+  (if (chez-scheme?) (tm-read-scheme-file (url-concretize u))
   (with-input-from-file (url-concretize u)
     (lambda ()
       (let loop ((acc '()))
         (with x (read)
-          (if (eof-object? x) (reverse acc) (loop (cons x acc))))))))
+          (if (eof-object? x) (reverse acc) (loop (cons x acc)))))))))
 
 (define (python-requirements)
   ;; the :require clauses of the installed plugins which use python-command

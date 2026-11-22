@@ -57,7 +57,7 @@ CXXRESVG = @RESVG_CFLAGS@
 
 LD = @CXX@
 LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE) $(CXXSANITIZERS)
-LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ 
+LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ @CHEZ_LIBS@
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
 LDPATH = @CONFIG_BPATH@
@@ -87,6 +87,12 @@ else ifeq ($(SCHEME_DIR),Femtolisp)
 # the glue generators also run on the S7 interpreter of Scheme/Glue/s7-run.c
 GLUE_BIN = $(CURDIR)/Objects/s7-run
 GLUE_DEPS = Objects/s7-run
+else ifeq ($(SCHEME_DIR),Chez)
+# the glue generators also run on the S7 interpreter of Scheme/Glue/s7-run.c;
+# Chez itself turns the same specifications into its static FFI glue
+GLUE_BIN = $(CURDIR)/Objects/s7-run
+GLUE_DEPS = Objects/s7-run
+GLUE_CHEZ = Scheme/Chez/glue_chez.cpp
 # the vendored femtolisp (Scheme/Femtolisp/fl_core.c, fl_llt.c) finds the
 # headers of its library llt by their names alone
 SCHEME_C_FLAGS = -IScheme/Femtolisp/femtolisp/llt -w
@@ -584,10 +590,14 @@ Objects/s7-run: Scheme/Glue/s7-run.c Scheme/S7/s7.c Scheme/S7/s7.h
 	$(CC) -O1 -DWITH_C_LOADER=0 -IScheme/S7 Scheme/Glue/s7-run.c Scheme/S7/s7.c -lm -o $@
 
 GLUE: $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp \
-      $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp
+      $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp $(GLUE_CHEZ)
 	$(RM) Objects/glue.o
 
-.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp
+# also writes ../TeXmacs/progs/kernel/boot/glue-chez.scm
+Scheme/Chez/glue_chez.cpp: $(gluesrc)/build-glue-basic.scm $(gluesrc)/build-glue-editor.scm $(gluesrc)/build-glue-server.scm $(gluesrc)/build-glue-treesit.scm $(gluesrc)/build-glue-lsp.scm Scheme/Chez/build-glue-chez.scm
+	cd .. && @CHEZ_BIN@ --script src/Scheme/Chez/build-glue-chez.scm .
+
+.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp $(GLUE_CHEZ)
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue.scm
 $(gluesrc)/glue_editor.cpp: $(gluesrc)/build-glue.scm 

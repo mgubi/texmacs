@@ -31,7 +31,27 @@
 		    (if l (append-map group-resolve-one l) '()))))
   (ahash-ref group-resolve-table which))
 
+(tm-define (group-define! group l)
+  ;; define-group on Chez, when the definition is loaded: true for a new
+  ;; group, whose procedures are then defined
+  (set! group-resolve-table (make-ahash-table))
+  (with old (ahash-ref group-table group)
+    (ahash-set! group-table group (if old (append old l) l))
+    (not old)))
+
 (tm-define-macro (define-group group . l)
+  ;; A module compiled ahead of time is expanded once, by the compiler,
+  ;; whose group-table is not the one of the program: on Chez the table is
+  ;; tested when the module is loaded
+  (if (chez-scheme?)
+      `(when (group-define! ',group ',l)
+         (tm-define (,(symbol-append group '-list))
+           (group-resolve ',group))
+         (tm-define (,(symbol-append group '?) lab)
+           (in? lab (group-resolve ',group)))
+         (tm-define (,(symbol-append 'inside- group '?))
+           (not (not (inside-which (group-resolve ',group))))))
+  (begin
   (set! group-resolve-table (make-ahash-table))
   (with old (ahash-ref group-table group)
     (if old
@@ -43,7 +63,7 @@
 	   (tm-define (,(symbol-append group '?) lab)
 	     (in? lab (group-resolve ',group)))
 	   (tm-define (,(symbol-append 'inside- group '?))
-	     (not (not (inside-which (group-resolve ',group)))))))))
+	     (not (not (inside-which (group-resolve ',group)))))))))))
 
 (tm-define (group-extend! group l)
   (:synopsis "Add the members @l to the group @group, already defined")

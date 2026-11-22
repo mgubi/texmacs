@@ -17,6 +17,7 @@
 
 (define (femtolisp-scheme?) #t)
 (define (s7-scheme?) #f)
+(define (chez-scheme?) #f)
 (define (guile-a?) #f)
 (define (guile-b?) #f)
 (define (guile-c?) #f)

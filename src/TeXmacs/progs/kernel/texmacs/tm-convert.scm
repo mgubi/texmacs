@@ -33,7 +33,10 @@
 
 (define (lazy-format-force)
   (if (nnull? lazy-format-todo)
-      (eval (cons 'import-from lazy-format-todo)))
+      (if (chez-scheme?)
+          ;; what import-from expands to, without eval
+          (for-each module-provide lazy-format-todo)
+          (eval (cons 'import-from lazy-format-todo))))
   (set! lazy-format-todo '()))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,10 +112,31 @@
          (list (car cmd) (list 'unquote `(lambda () ,(cadr cmd)))))
         (else cmd)))
 
+(define-public (converter-define! from to required? opts)
+  ;; the converter macro on Chez: what it does when it is expanded elsewhere
+  ;; is done here when the declaration is loaded, since a module compiled
+  ;; ahead of time is expanded once, by the compiler
+  (set! converter-distance (make-ahash-table))
+  (set! converter-path (make-ahash-table))
+  (when required?
+    (converter-set-penalty from to 1.0)
+    (for-each (lambda (x) (converter-cmd from to x)) opts)))
+
 (define-public-macro (converter from* to* . options)
   "Declare a converter between @from@ and @to* according to @options"
   (let* ((from (if (string? from*) from* (symbol->string from*)))
          (to (if (string? to*) to* (symbol->string to*))))
+   (if (chez-scheme?)
+    `(converter-define!
+       ,from ,to
+       ,(cond ((and (in? (car (first options)) '(:penalty))
+                    (in? (car (second options)) '(:require)))
+               (second (second options)))
+              ((in? (car (first options)) '(:require))
+               (second (first options)))
+              (else #t))
+       ,(list 'quasiquote (map converter-sub options)))
+   (begin
     (set! converter-distance (make-ahash-table))
     (set! converter-path (make-ahash-table))
 ;; NEW if (:required) clause present but not fulfilled do nothing
@@ -126,7 +150,7 @@
             (not (eval (second (first options))))) (noop))
           (else (converter-set-penalty from to 1.0) 
              `(for-each (lambda (x) (converter-cmd ,from ,to x))
-                 ,(list 'quasiquote (map converter-sub options)))))))
+                 ,(list 'quasiquote (map converter-sub options)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special converters

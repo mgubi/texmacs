@@ -62,6 +62,23 @@
                  (map symbol->string
                       (filter (lambda (s) (and (symbol? s) (bound? s)))
                               (environment)))))
+        ((chez-scheme?)
+         ;; the global names (functions and macros), where the public
+         ;; definitions and the glue are, without the internal names of
+         ;; Chez and of the module compiler
+         (filter (lambda (s)
+                   (not (or (string-null? s)
+                            (string-prefix? "%" s) (string-prefix? "$" s)
+                            (string-prefix? "c-glue-raw-" s)
+                            (string-prefix? "chez:" s)
+                            (string-prefix? "_tm_def_" s))))
+                 (map symbol->string
+                      (filter (lambda (s)
+                                (and (not (gensym? s))
+                                     (or (top-level-bound? s)
+                                         (top-level-syntax? s))))
+                              (environment-symbols
+                               (interaction-environment))))))
         (else (all-used-symbols-guile-s7))))
 
 (define (all-used-symbols-guile-s7)

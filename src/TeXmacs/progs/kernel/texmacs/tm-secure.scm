@@ -19,8 +19,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public-macro (define-secure-symbols . l)
-  (for-each (lambda (x) (property-set! x :secure #t '())) l)
-  '(noop))
+  (if (chez-scheme?)
+      ;; when the module is loaded: Chez expands it when it compiles it
+      `(for-each (lambda (x) (property-set! x :secure #t '())) ',l)
+      (begin
+        (for-each (lambda (x) (property-set! x :secure #t '())) l)
+        '(noop))))
 
 (define-secure-symbols
   boolean? null? symbol? string? pair? list?

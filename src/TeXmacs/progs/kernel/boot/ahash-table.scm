@@ -192,12 +192,19 @@
   (for-each insert l))
 
 (define-public-macro (define-table name . l)
-  `(begin
-     (when (not (defined? ',name))
-       (if (defined? 'tm-define)
-           (tm-define ,name (make-ahash-table))
-           (define-public ,name (make-ahash-table))))
-     (define-table-decls ,name ,(list 'quasiquote l))))
+  (if (chez-scheme?)
+      ;; no definition under an `if' in a Chez module body; tm-define is an
+      ;; expression there, and the tables are defined after tm-define
+      `(begin
+         (when (not (defined? ',name))
+           (tm-define ,name (make-ahash-table)))
+         (define-table-decls ,name ,(list 'quasiquote l)))
+      `(begin
+         (when (not (defined? ',name))
+           (if (defined? 'tm-define)
+               (tm-define ,name (make-ahash-table))
+               (define-public ,name (make-ahash-table))))
+         (define-table-decls ,name ,(list 'quasiquote l)))))
 
 (define-public-macro (extend-table name . l)
   `(define-table-decls ,name ,(list 'quasiquote l)))
@@ -208,12 +215,18 @@
   (for-each insert l))
 
 (define-public-macro (define-collection name . l)
-  `(begin
-     (when (not (defined? ',name))
-       (if (defined? 'tm-define)
-           (tm-define ,name (make-ahash-table))
-           (define-public ,name (make-ahash-table))))
-     (define-collection-decls ,name ,(list 'quasiquote l))))
+  (if (chez-scheme?)
+      ;; as define-table
+      `(begin
+         (when (not (defined? ',name))
+           (tm-define ,name (make-ahash-table)))
+         (define-collection-decls ,name ,(list 'quasiquote l)))
+      `(begin
+         (when (not (defined? ',name))
+           (if (defined? 'tm-define)
+               (tm-define ,name (make-ahash-table))
+               (define-public ,name (make-ahash-table))))
+         (define-collection-decls ,name ,(list 'quasiquote l)))))
 
 (define-public-macro (extend-collection name . l)
   `(define-collection-decls ,name ,(list 'quasiquote l)))
