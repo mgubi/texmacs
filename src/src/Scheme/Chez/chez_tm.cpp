@@ -185,6 +185,22 @@ tmscm_to_string (tmscm s) {
   return "";
 }
 
+static int caught_errors= 0;
+
+int
+scheme_caught_errors () {
+  // the number of errors caught so far at the calls from C++ to Scheme
+  // (tm-handle-call-error, tm-eval-string in boot-chez.scm), which then give
+  // the error as their result: a caller can tell that an empty result comes
+  // from an error (#705)
+  return caught_errors;
+}
+
+extern "C" void
+chez_count_caught_error () {
+  caught_errors++;
+}
+
 /* A Scheme string of the bytes of s, one char per byte (boot-chez.scm).
    Not Sstring_of_length: it reads a (signed) char, and a byte >= 0x80 would
    become an invalid char (0xFFFFC3 for 0xC3). */
@@ -473,6 +489,7 @@ register_foreign_symbols () {
   Sforeign_symbol ("tmscm_blackbox_equal", (void*) tmscm_blackbox_equal);
   Sforeign_symbol ("tmscm_blackbox_hash", (void*) tmscm_blackbox_hash);
   Sforeign_symbol ("tmscm_blackbox_to_string", (void*) tmscm_blackbox_to_string);
+  Sforeign_symbol ("chez_count_caught_error", (void*) chez_count_caught_error);
   Sforeign_symbol ("chez_root_stack_depth", (void*) chez_root_stack_depth);
   Sforeign_symbol ("chez_root_stack_capacity", (void*) chez_root_stack_capacity);
   Sforeign_symbol ("chez_call_scheme_1", (void*) chez_call_scheme_1);

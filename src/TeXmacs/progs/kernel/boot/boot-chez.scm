@@ -1003,8 +1003,14 @@
 
 ;; [C++] (tm-eval-string s): read one form and evaluate it in tm-user-env.
 ;; eval_scheme() routes every C++-side evaluation through this.
+;; counts, for scheme_caught_errors () in C++, the errors which a call from
+;; C++ gives back as its result
+(define tm-count-caught-error
+  (foreign-procedure "chez_count_caught_error" () void))
+
 (define (tm-eval-string s)
   (guard (e (else (begin
+    (tm-count-caught-error)
     (display (list 'EVAL-ERROR s (tm-error-message e)
                    (tm-safe-irritants e)))
     (newline)
@@ -1107,6 +1113,7 @@
 ;; Resolves symbols to top-level procedures, contains exceptions, and
 ;; transcodes C++ bytevectors <-> Scheme strings at the Scheme boundary.
 (define (tm-handle-call-error e fun args)
+  (tm-count-caught-error)
   (display (list 'TM-CALL-ERROR (tm-error-message e) 'FUN: fun 'ARGS: args))
   (newline)
   (display-condition e)
