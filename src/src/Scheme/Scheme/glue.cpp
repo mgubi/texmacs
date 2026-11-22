@@ -140,6 +140,7 @@ get_bounding_rectangle (tree t) {
 }
 
 bool use_mupdf_pdf (); // edit_main.cpp
+bool use_pdf ();       // edit_main.cpp
 
 bool
 supports_native_pdf () {
@@ -156,6 +157,13 @@ supports_native_pdf () {
   return false;
 #endif
 #endif
+}
+
+// Is a PDF target written by the MuPDF renderer? (as print_doc and printer
+// decide; for pdf-encryption?, since only that renderer encrypts)
+bool
+mupdf_writes_pdf () {
+  return use_pdf () && use_mupdf_pdf ();
 }
 
 bool

@@ -515,6 +515,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(mupdf-writes-pdf?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|mupdf_writes_pdf> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(supports-ghostscript?)>
 <explain-synopsis|no synopsis>
   <|explain>

@@ -9,9 +9,11 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 *******************************************************************************
 *
-* PROTOTYPE. An alternative to pdf_hummus_renderer which produces the PDF
-* with MuPDF instead of the vendored PDFHummus. See
-* docs/pdf-output-with-mupdf.md for what it does and what it does not.
+* The PDF writer of the builds without PDFHummus (Vue, SDL, the browser),
+* and an alternative to pdf_hummus_renderer elsewhere, which produces the
+* PDF with MuPDF instead of the vendored PDFHummus (use_mupdf_pdf in
+* edit_main.cpp). See docs/pdf-output-with-mupdf.md for what it does and
+* what it does not.
 *
 * The content stream of a page is written here rather than through the fz
 * device of pdf_page_write. The device would be less code, but it hands
@@ -28,6 +30,7 @@
 ******************************************************************************/
 
 #include "mupdf_pdf_renderer.hpp"
+#include "Metafont/tex_unicode.hpp"
 #include "mupdf_renderer.hpp"
 #include "mupdf_picture.hpp"
 #include "analyze.hpp"
@@ -35,6 +38,7 @@
 #include "scheme.hpp"
 #include "hashmap.hpp"
 #include "iterator.hpp"
+#include "font.hpp"
 #include "frame.hpp"
 #include "image_files.hpp"
 #include "scalable.hpp"
@@ -94,20 +98,36 @@ struct pdf_font_item {
   font_glyphs fn;      // for a Type 3 font: where the bitmaps come from
   int      chunk;      // ... and which 256 characters of it this is
   string   path;       // the file the program was read from (for subsetting)
+  string   tex_name;   // the TeX font (cmex10...) whose positions the codes
+                       // are, for the characters of the text layer
   array<int> gid;      // 256 entries: the glyph TeXmacs asked for, -1 if free
   // the letters a ligature glyph stands for, by the code (a simple font)
   // or the glyph (a CID font) it is written with; "" for a glyph which is
   // not a ligature, nothing when it has not been asked yet
   hashmap<int,string> lig;
+  // a CID font: the characters of the glyphs drawn by their number which
+  // the font recorded (the larger variants of a math symbol), which its
+  // cmap does not have
+  hashmap<int,int> drawn;
   pdf_font_item ()
     : font (NULL), obj (NULL), num (0), simple (false), t3 (false), chunk (0),
-      lig ("") {}
+      lig (""), drawn (0) {}
 };
 
 // The letters of a ligature, from the name of its glyph, or "" when the
 // glyph is not one. The names are those of the Adobe glyph list: the five
 // of the Latin ligatures as TeX fonts name them, their uniFB0x forms, and
 // the f_f_i of OpenType fonts, whose parts are joined by underscores.
+// The UTF-16 of the character u in hexadecimal, as a CMap wants it: a
+// surrogate pair beyond U+FFFF
+static string
+utf16_hex (int u) {
+  if (u <= 0xffff) return as_hexadecimal (u, 4);
+  int v= u - 0x10000;
+  return as_hexadecimal (0xd800 + (v >> 10), 4) *
+         as_hexadecimal (0xdc00 + (v & 0x3ff), 4);
+}
+
 static string
 ligature_letters (string name) {
   if (name == "ff" || name == "fi" || name == "fl" ||
@@ -156,6 +176,17 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   pdf_obj*      res_gs;
   pdf_obj*      res_pat;
   array<pdf_obj*> pages;
+
+  // embedded videos (see embed_video): the file specification of each MP4
+  // file, by the image and its delay (-1: it could not be made), and the
+  // videos of the page being written
+  hashmap<string,int> video_index;
+  array<pdf_obj*> video_fs;
+  array<string>   video_fname;     // the name of the file, ending with a 0
+  array<url>      temp_videos;
+  array<pdf_link_item> page_videos;  // label: the name of the annotation
+  array<int>      page_video_file;
+  array<string>   page_video_vars; // its FlashVars, ending with a 0
 
   // the graphics state as it stands in the stream
   pencil pen;
@@ -235,6 +266,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   string glyph_name (pdf_font_item& it, int key, int fallback, int& gid);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
+  void write_tex_to_unicode (pdf_font_item& it, int first, int last);
   void write_encoding (pdf_font_item& it, int first, int last,
                        array<string>& gname);
   void write_widths (pdf_font_item& it, int first, int last,
@@ -242,6 +274,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
   void write_dests ();
+  void write_videos (pdf_obj* pobj);
   void write_links (pdf_obj* pobj, array<string>& target, array<int>& local,
                     int border);
   void write_metadata ();
@@ -301,6 +334,7 @@ public:
   void anchor (string label, SI x1, SI y1, SI x2, SI y2);
   void href (string label, SI x1, SI y1, SI x2, SI y2);
   void toc_entry (string kind, string title, SI x, SI y);
+  void embed_video (url u, int ms, bool repeat, SI x1, SI y1, SI x2, SI y2);
   void set_metadata (string kind, string val);
 };
 
@@ -431,20 +465,32 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   if (broken)
     convert_error << "The PDF " << pdf_file_name << " is not written: "
                   << "a page of it could not be" << LF;
+  else if (is_directory (target))
+    // MuPDF removes the file it writes first (fz_new_output_with_path),
+    // and remove () takes an empty folder as well
+    convert_error << "The PDF " << pdf_file_name << " is not written: "
+                  << "a folder has its name" << LF;
   else if (!encrypt_ok)
     convert_error << "The PDF " << pdf_file_name << " is not written" << LF;
-  else fz_try (ctx) {
-    pdf_save_document (ctx, doc, name, &opts);
-  }
-  fz_catch (ctx) {
-    convert_error << "MuPDF cannot write " << pdf_file_name << ": "
-                  << fz_caught_message (ctx) << LF;
+  else {
+    // (braced: fz_catch is a statement of its own, which an else before
+    // fz_try does not cover)
+    fz_try (ctx) {
+      pdf_save_document (ctx, doc, name, &opts);
+    }
+    fz_catch (ctx) {
+      convert_error << "MuPDF cannot write " << pdf_file_name << ": "
+                    << fz_caught_message (ctx) << LF;
+    }
   }
   for (int i=0; i<N(font_list); i++) {
     if (font_list[i].font != NULL) fz_drop_font (ctx, font_list[i].font);
     pdf_drop_obj (ctx, font_list[i].obj);
   }
   for (int i=0; i<N(pages); i++) pdf_drop_obj (ctx, pages[i]);
+  for (int i=0; i<N(video_fs); i++) pdf_drop_obj (ctx, video_fs[i]);
+  for (int i=0; i<N(temp_videos); i++)
+    if (exists (temp_videos[i])) remove (temp_videos[i]);
   pdf_drop_obj (ctx, resources);
   pdf_drop_document (ctx, doc);
 }
@@ -491,6 +537,9 @@ mupdf_pdf_renderer_rep::begin_page () {
   cur_alpha= 255;   // what a page starts with
   in_text= false; cur_font= -1; cur_size= 0;
   links= array<pdf_link_item> ();
+  page_videos= array<pdf_link_item> ();
+  page_video_file= array<int> ();
+  page_video_vars= array<string> ();
   // the whole page is written in the pixels of the renderer
   app ("q\n%g 0 0 %g 0 0 cm\n",
                     (double) default_dpi / dpi, (double) default_dpi / dpi);
@@ -524,6 +573,7 @@ mupdf_pdf_renderer_rep::end_page () {
     fz_rect mediabox= fz_make_rect (0, 0, (float) width, (float) height);
     page= pdf_add_page (ctx, doc, mediabox, 0, resources, contents);
     write_links (page, target, local, border);
+    write_videos (page);
     pdf_insert_page (ctx, doc, -1, page);
   }
   fz_catch (ctx) {
@@ -825,6 +875,7 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
   if (it.font != NULL) {
     it.simple= is_type1_file (u);
     it.path= concretize (u);
+    it.tex_name= basename (u);
     fz_try (ctx) {
       if (it.simple) {
         // pdf_add_simple_font embeds the program and writes a descriptor;
@@ -837,7 +888,8 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
       }
       else {
         it.obj= pdf_add_cid_font (ctx, doc, it.font);
-        fix_to_unicode (it);
+        // (its character map is written again by write_fonts, see
+        // fix_to_unicode)
       }
       char cnm[32];
       snprintf (cnm, sizeof (cnm), "F%d", (int) (it.num));
@@ -854,6 +906,7 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
     // TeXmacs has, in a Type 3 font, which is what a PK font is anyway
     it.t3= true;
     it.fn= fn;
+    it.tex_name= fn->res_name;
     it.chunk= ch / 256;
     for (int i=0; i<256; i++) it.gid << -1;
     fz_try (ctx) {
@@ -960,11 +1013,22 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     int key= font_list[k].simple ? (ch & 255) : (int) gl->index;
     lig= ligature_of (font_list[k], key, (int) gl->index);
   }
+  // A glyph drawn by its number stands for the character the font recorded
+  // for it (a larger variant of a symbol), or for none: the further pieces
+  // of an assembly, which then add nothing to the text (as in
+  // pdf_hummus_renderer)
+  bool blank= false;
+  if (ch >= 0xc000000 && !font_list[k].simple && !font_list[k].t3) {
+    int code= native_glyph_get_unicode (fn->res_name, ch - 0xc000000);
+    if (code > 0) font_list[k].drawn ((int) gl->index)= code;
+    else blank= (N(lig) == 0);
+  }
   if (N(lig) > 0) {
     c_string cl (lig);
     app ("/Span << /ActualText (%s) >> BDC\n",
                       (const char*) cl);
   }
+  else if (blank) put ("/Span << /ActualText () >> BDC\n");
   if (font_list[k].simple || font_list[k].t3) {
     // one byte per glyph; the code is the one TeXmacs uses, and the
     // Differences array will say which glyph it selects
@@ -975,7 +1039,7 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   else
     app ("<%04x> Tj\n", ((int) gl->index) & 0xffff);
-  if (N(lig) > 0) put ("EMC\n");
+  if (N(lig) > 0 || blank) put ("EMC\n");
 }
 
 // The name of the glyph a font draws for key -- the code in a simple
@@ -1022,11 +1086,26 @@ mupdf_pdf_renderer_rep::glyph_name (pdf_font_item& it, int key, int fallback,
   return string (nm);
 }
 
+// Whether u is a form of another character which fonts draw with the same
+// glyph: the Kangxi and CJK radicals (U+2F47 for U+65E5), the compatibility
+// ideographs and the CJK compatibility forms
+static bool
+compatibility_char (int u) {
+  return (u >= 0x2e80 && u <= 0x2fdf) || (u >= 0xf900 && u <= 0xfaff) ||
+         (u >= 0xfe30 && u <= 0xfe4f) || (u >= 0x2f800 && u <= 0x2fa1f);
+}
+
 // The character map of a CID font (glyph to characters) as MuPDF writes it
 // gives the characters beyond U+FFFF as <1f600>, which no reader takes:
-// they are in UTF-16, two units (the emoji, the mathematical letters). The
-// map is written again then, from the cmap of the font, the first
-// character of a glyph taken.
+// they are in UTF-16, two units (the emoji, the mathematical letters). And
+// it takes the first character of a glyph, which for the ideographs of a
+// CJK font is the radical of the same shape (U+2F47 rather than U+65E5), so
+// that the text of the PDF cannot be searched. And it knows nothing of the
+// glyphs which the cmap does not reach, such as the larger variants of the
+// symbols of a math font, which TeXmacs draws by their number (see draw).
+// The map is written again in these cases, once the pages are written,
+// from the cmap of the font, the character proper taken, and the glyphs
+// drawn by their number.
 void
 mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
   if (it.font == NULL || it.obj == NULL) return;
@@ -1034,21 +1113,36 @@ mupdf_pdf_renderer_rep::fix_to_unicode (pdf_font_item& it) {
   if (face == NULL) return;
   hashmap<int,int> uni (0);
   array<int> gids;
-  bool beyond= false;
+  bool beyond= false, changed= false;
   fz_ft_lock (ctx);
   FT_UInt gid= 0;
   FT_ULong ucs= FT_Get_First_Char (face, &gid);
   while (gid > 0) {
-    if (gid < (FT_UInt) face->num_glyphs && gid <= 0xffff &&
-        !uni->contains ((int) gid)) {
-      uni ((int) gid)= (int) ucs;
-      gids << (int) gid;
-      if (ucs > 0xffff) beyond= true;
+    if (gid < (FT_UInt) face->num_glyphs && gid <= 0xffff) {
+      if (!uni->contains ((int) gid)) {
+        uni ((int) gid)= (int) ucs;
+        gids << (int) gid;
+      }
+      else if (compatibility_char (uni [(int) gid]) &&
+               !compatibility_char ((int) ucs)) {
+        uni ((int) gid)= (int) ucs;
+        changed= true;
+      }
     }
     ucs= FT_Get_Next_Char (face, ucs, &gid);
   }
   fz_ft_unlock (ctx);
-  if (!beyond) return;
+  iterator<int> dit= iterate (it.drawn);
+  while (dit->busy ()) {
+    int g= dit->next ();
+    if (g <= 0 || g > 0xffff || uni->contains (g)) continue;
+    uni (g)= it.drawn [g];
+    gids << g;
+    changed= true;
+  }
+  for (int i=0; i<N(gids); i++)
+    if (uni [gids[i]] > 0xffff) beyond= true;
+  if (!beyond && !changed) return;
   string cmap;
   cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
        << "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) "
@@ -1104,6 +1198,8 @@ mupdf_pdf_renderer_rep::write_fonts () {
   for (int k=0; k<N(font_list); k++) {
     pdf_font_item& it= font_list[k];
     if (it.t3) { write_type3 (it); continue; }
+    if (it.font != NULL && !it.simple && it.obj != NULL) {
+      fix_to_unicode (it); continue; }
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
     int first= 256, last= -1;
     for (int c=0; c<256; c++)
@@ -1128,6 +1224,7 @@ mupdf_pdf_renderer_rep::write_fonts () {
       keep << nm;
     }
     write_encoding (it, first, last, gname);
+    write_tex_to_unicode (it, first, last);
     // The font program, cut down to the glyphs which are used. MuPDF
     // subsets TrueType and CFF only, so a Type 1 would go in whole -- some
     // eighty kilobytes for a handful of letters; mupdf_t1_subset is
@@ -1164,6 +1261,56 @@ mupdf_pdf_renderer_rep::write_encoding (pdf_font_item& it, int first,
     pdf_drop_obj (ctx, enc);
     convert_warning << "MuPDF could not write the encoding of "
                     << it.path << ": " << fz_caught_message (ctx) << LF;
+  }
+}
+
+// The characters of the codes of a TeX math font (cmmi, cmsy, cmex, msbm...)
+// or of a Cyrillic TeX font (T2A), as a /ToUnicode CMap: the names of their glyphs (summationdisplay,
+// parenleftbig...) mean nothing to a reader, which then gave U+FFFD for
+// the big operators and delimiters. Text fonts keep their glyph names,
+// which readers understand.
+void
+mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
+                                              int last) {
+  array<int> tex;
+  if (is_t2a_font_file (url_system (it.path))) {
+    // the Cyrillic fonts name their glyphs after the Latin-1 letters at
+    // the same positions: a reader took å for е
+    for (int c=0; c<256; c++) tex << tex_glyph_unicode (c, true);
+  }
+  else tex= tex_math_unicode (it.tex_name);
+  if (N(tex) == 0) return;
+  int nused= 0;
+  for (int c=first; c<=last; c++)
+    if (it.gid[c] >= 0 && c < N(tex) && tex[c] >= 0) nused++;
+  if (nused == 0) return;
+  string cmap;
+  cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+       << "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) "
+       << "/Supplement 0 >> def\n"
+       << "/CMapName /Adobe-Identity-UCS def /CMapType 2 def\n"
+       << "1 begincodespacerange <00> <FF> endcodespacerange\n";
+  int done= 0;
+  for (int c=first; c<=last; c++) {
+    if (it.gid[c] < 0 || c >= N(tex) || tex[c] < 0) continue;
+    if (done % 100 == 0)
+      cmap << as_string (min (100, nused - done)) << " beginbfchar\n";
+    cmap << "<" << as_hexadecimal (c, 2) << "> <" << utf16_hex (tex[c])
+         << ">\n";
+    done++;
+    if (done % 100 == 0 || done == nused) cmap << "endbfchar\n";
+  }
+  cmap << "endcmap CMapName currentdict /CMap defineresource pop end end\n";
+  fz_buffer* cb= fz_new_buffer_from_copied_data (ctx,
+                   (unsigned char*) &cmap[0], (size_t) N(cmap));
+  fz_try (ctx) {
+    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(ToUnicode),
+                       pdf_add_stream (ctx, doc, cb, NULL, 0));
+  }
+  fz_always (ctx) fz_drop_buffer (ctx, cb);
+  fz_catch (ctx) {
+    convert_warning << "mupdf_pdf_renderer: no character map for "
+                    << it.path << LF;
   }
 }
 
@@ -1308,13 +1455,19 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
        << "/CMapName /TeXmacs-Type3 def /CMapType 2 def\n"
        << "1 begincodespacerange <" << as_hexadecimal (first, 2)
        << "> <" << as_hexadecimal (last, 2) << "> endcodespacerange\n";
+  // (the glyphs of a TeX math font are positions: their characters come
+  // from the encoding of the font, see tex_math_unicode)
+  array<int> tex= tex_math_unicode (it.tex_name);
   int nused= 0;
   for (int c=first; c<=last; c++) if (it.gid[c] >= 0) nused++;
   cmap << as_string (nused) << " beginbfchar\n";
   for (int c=first; c<=last; c++)
-    if (it.gid[c] >= 0)
+    if (it.gid[c] >= 0) {
+      int u= it.gid[c];
+      if (u >= 0 && u < N(tex) && tex[u] >= 0) u= tex[u];
       cmap << "<" << as_hexadecimal (c, 2) << "> <"
-           << as_hexadecimal (it.gid[c], 4) << ">\n";
+           << utf16_hex (u) << ">\n";
+    }
   cmap << "endbfchar\nendcmap CMapName currentdict /CMap defineresource "
        << "pop end end\n";
 
@@ -2184,6 +2337,140 @@ mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj, array<string>& target,
   }
 }
 
+/******************************************************************************
+* Embedded videos (as pdf_hummus_renderer, #249)
+*
+* A video (an animated gif inserted with <video>) becomes a RichMedia
+* annotation, as the media9 LaTeX package makes them, over the picture of
+* its current frame; its asset is an MP4 file made from the frames of the
+* image (video_for_pdf) and embedded in the PDF. Okular plays it when the
+* page is shown; a reader which plays no video shows the picture.
+******************************************************************************/
+
+void
+mupdf_pdf_renderer_rep::embed_video (url u, int ms, bool repeat,
+                                     SI x1, SI y1, SI x2, SI y2) {
+  string key= as_string (u) * "|" * as_string (ms);
+  if (!video_index->contains (key)) {
+    video_index (key)= -1;
+    url v= video_for_pdf (u, ms, temp_videos);
+    string data;
+    if (!is_none (v) && !load_string (v, data, false) && N(data) > 0) {
+      // made before the fz_try, which must create nothing with a destructor
+      string fname= "video-" * as_string (N(video_fs) + 1) * ".mp4" *
+                    string ((char) 0);
+      pdf_obj* fs= NULL;
+      fz_buffer* buf= NULL;
+      fz_var (fs);
+      fz_var (buf);
+      fz_try (ctx) {
+        buf= fz_new_buffer_from_copied_data (ctx, (unsigned char*) &data[0],
+                                             (size_t) N(data));
+        fs= pdf_add_embedded_file (ctx, doc, &fname[0], "video/mp4", buf,
+                                   -1, -1, 0);
+      }
+      fz_always (ctx) fz_drop_buffer (ctx, buf);
+      fz_catch (ctx) { pdf_drop_obj (ctx, fs); fs= NULL; }
+      if (fs != NULL) {
+        video_index (key)= N(video_fs);
+        video_fs << fs;
+        video_fname << fname;
+      }
+    }
+    if (video_index [key] < 0)
+      convert_warning << "Cannot embed video " << u << " in PDF" << LF;
+  }
+  int k= video_index [key];
+  if (k < 0) return;
+  string fname= video_fname[k] (0, N(video_fname[k]) - 1);
+  double f= (double) default_dpi / dpi;
+  page_videos << pdf_link_item (as_string (tail (u)) * string ((char) 0),
+                                f * to_x (x1), f * to_y (y1),
+                                f * to_x (x2), f * to_y (y2));
+  page_video_file << k;
+  page_video_vars << ("source=" * fname * "&loop=" *
+                      (repeat? string ("true"): string ("false")) *
+                      string ((char) 0));
+}
+
+// called inside the fz_try of end_page, after write_links: nothing here
+// may have a destructor
+void
+mupdf_pdf_renderer_rep::write_videos (pdf_obj* pobj) {
+  if (N(page_videos) == 0) return;
+  pdf_obj* annots= pdf_dict_get (ctx, pobj, PDF_NAME(Annots));
+  if (annots == NULL)
+    annots= pdf_dict_put_array (ctx, pobj, PDF_NAME(Annots), N(page_videos));
+  for (int i=0; i<N(page_videos); i++) {
+    pdf_link_item& v= page_videos[i];
+    const char* name = &v.label[0];
+    const char* fname= &video_fname[page_video_file[i]][0];
+    pdf_obj* a= pdf_new_dict (ctx, doc, 9);
+    pdf_dict_put (ctx, a, PDF_NAME(Type), PDF_NAME(Annot));
+    pdf_dict_put (ctx, a, PDF_NAME(Subtype), PDF_NAME(RichMedia));
+    pdf_dict_put_int (ctx, a, PDF_NAME(F), 4);
+    pdf_obj* rect= pdf_dict_put_array (ctx, a, PDF_NAME(Rect), 4);
+    pdf_array_push_real (ctx, rect, v.x1);
+    pdf_array_push_real (ctx, rect, v.y1);
+    pdf_array_push_real (ctx, rect, v.x2);
+    pdf_array_push_real (ctx, rect, v.y2);
+    pdf_dict_put_text_string (ctx, a, PDF_NAME(NM), name);
+    pdf_dict_put_text_string (ctx, a, PDF_NAME(Contents), name);
+    pdf_dict_put (ctx, a, PDF_NAME(P), pobj);
+    // an empty appearance: a reader which plays no video shows the picture
+    // of the frame under it, and MuPDF, which cannot make the appearance of
+    // a RichMedia annotation, does not try to (with an error each time)
+    fz_rect bbox= fz_make_rect (0, 0, (float) (v.x2 - v.x1),
+                                (float) (v.y2 - v.y1));
+    fz_buffer* empty= fz_new_buffer (ctx, 1);
+    pdf_obj* ap= NULL;
+    fz_try (ctx) ap= pdf_new_xobject (ctx, doc, bbox, fz_identity, NULL, empty);
+    fz_always (ctx) fz_drop_buffer (ctx, empty);
+    fz_catch (ctx) fz_rethrow (ctx);
+    pdf_obj* apd= pdf_dict_put_dict (ctx, a, PDF_NAME(AP), 1);
+    pdf_dict_put_drop (ctx, apd, PDF_NAME(N), ap);
+    pdf_obj* set= pdf_new_dict (ctx, doc, 3);
+    pdf_dict_puts_drop (ctx, a, "RichMediaSettings", set);
+    pdf_dict_put_name (ctx, set, PDF_NAME(Type), "RichMediaSettings");
+    pdf_obj* act= pdf_new_dict (ctx, doc, 3);
+    pdf_dict_puts_drop (ctx, set, "Activation", act);
+    pdf_dict_put_name (ctx, act, PDF_NAME(Type), "RichMediaActivation");
+    pdf_dict_puts_drop (ctx, act, "Condition", pdf_new_name (ctx, "PV"));
+    pdf_obj* pres= pdf_new_dict (ctx, doc, 2);
+    pdf_dict_puts_drop (ctx, act, "Presentation", pres);
+    pdf_dict_put_name (ctx, pres, PDF_NAME(Type), "RichMediaPresentation");
+    pdf_dict_puts_drop (ctx, pres, "Style", pdf_new_name (ctx, "Embedded"));
+    pdf_obj* deact= pdf_new_dict (ctx, doc, 2);
+    pdf_dict_puts_drop (ctx, set, "Deactivation", deact);
+    pdf_dict_put_name (ctx, deact, PDF_NAME(Type), "RichMediaDeactivation");
+    pdf_dict_puts_drop (ctx, deact, "Condition", pdf_new_name (ctx, "PI"));
+    pdf_obj* con= pdf_new_dict (ctx, doc, 3);
+    pdf_dict_puts_drop (ctx, a, "RichMediaContent", con);
+    pdf_dict_put_name (ctx, con, PDF_NAME(Type), "RichMediaContent");
+    pdf_obj* assets= pdf_new_dict (ctx, doc, 1);
+    pdf_dict_puts_drop (ctx, con, "Assets", assets);
+    pdf_obj* names= pdf_dict_put_array (ctx, assets, PDF_NAME(Names), 2);
+    pdf_array_push_string (ctx, names, fname, strlen (fname));
+    pdf_array_push (ctx, names, video_fs[page_video_file[i]]);
+    pdf_obj* confs= pdf_new_array (ctx, doc, 1);
+    pdf_dict_puts_drop (ctx, con, "Configurations", confs);
+    pdf_obj* conf= pdf_array_push_dict (ctx, confs, 3);
+    pdf_dict_put_name (ctx, conf, PDF_NAME(Type), "RichMediaConfiguration");
+    pdf_dict_put_name (ctx, conf, PDF_NAME(Subtype), "Video");
+    pdf_obj* insts= pdf_new_array (ctx, doc, 1);
+    pdf_dict_puts_drop (ctx, conf, "Instances", insts);
+    pdf_obj* inst= pdf_array_push_dict (ctx, insts, 3);
+    pdf_dict_put_name (ctx, inst, PDF_NAME(Type), "RichMediaInstance");
+    pdf_dict_put_name (ctx, inst, PDF_NAME(Subtype), "Video");
+    pdf_obj* par= pdf_dict_put_dict (ctx, inst, PDF_NAME(Params), 2);
+    pdf_dict_put_name (ctx, par, PDF_NAME(Type), "RichMediaParams");
+    const char* vars= &page_video_vars[i][0];
+    pdf_dict_puts_drop (ctx, par, "FlashVars",
+                        pdf_new_string (ctx, vars, strlen (vars)));
+    pdf_array_push_drop (ctx, annots, pdf_add_object_drop (ctx, doc, a));
+  }
+}
+
 // The outline, as the tree its levels describe. An entry hangs under the
 // last one of a smaller level; the count of an entry is negative when its
 // children start folded, which is what a reader expects of a deep tree.
@@ -2334,6 +2621,18 @@ mupdf_pdf_renderer_rep::write_metadata () {
     pdf_dict_put_text_string (ctx, info, PDF_NAME(Producer),
                               "TeXmacs " TEXMACS_VERSION " + MuPDF " FZ_VERSION);
     pdf_dict_put_date (ctx, info, PDF_NAME(CreationDate), (int64_t) time (NULL));
+    // RichMedia (the videos) is of PDF 1.7 with Adobe's extension level 3,
+    // which the catalog declares, as pdf_hummus_renderer does
+    if (N(video_fs) > 0) {
+      pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+      pdf_dict_put_name (ctx, root, PDF_NAME(Version), "1.7");
+      pdf_obj* ext= pdf_new_dict (ctx, doc, 1);
+      pdf_dict_puts_drop (ctx, root, "Extensions", ext);
+      pdf_obj* adbe= pdf_new_dict (ctx, doc, 2);
+      pdf_dict_puts_drop (ctx, ext, "ADBE", adbe);
+      pdf_dict_puts_drop (ctx, adbe, "BaseVersion", pdf_new_name (ctx, "1.7"));
+      pdf_dict_puts_drop (ctx, adbe, "ExtensionLevel", pdf_new_int (ctx, 3));
+    }
   }
   fz_catch (ctx) {
     convert_warning << "MuPDF could not write the metadata: "

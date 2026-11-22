@@ -1,5 +1,8 @@
 pages: 1
 --- page 1
+Bibliography
+1
+
 1 Citations
 
 This document cites entries of the file bibliography.bib, which lies next to it, and lets the
@@ -20,8 +23,5 @@ Leslie Lamport. LATEX: a document preparation system. Addison-Wesley, Second edi
 [4]
 Joris van der Hoeven. GNU TeXmacs: a free, structured, wysiwyg and technical text editor. In Proceedings of
 the GUTenberg conference, number 39–40, pages 39–50. Metz, 2001.
-
-Bibliography
-1
 
 

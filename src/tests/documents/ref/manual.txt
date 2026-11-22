@@ -1,5 +1,7 @@
 pages: 3
 --- page 1
+1
+
 Chapter 1
 
 One
@@ -22,12 +24,12 @@ Figure 1.3. second big
 
 See figures 1.1 and 1.3.
 
-1
-
 
 --- page 2
 
 --- page 3
+3
+
 Chapter 2
 
 Two
@@ -35,7 +37,5 @@ Two
 W
 
 Figure 2.1. third big
-
-3
 
 

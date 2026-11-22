@@ -80,6 +80,7 @@
   (win32-display win32_display (void string))
   (cpp-error cpp_error (void))
   (supports-native-pdf? supports_native_pdf (bool))
+  (mupdf-writes-pdf? mupdf_writes_pdf (bool))
   (supports-ghostscript? supports_ghostscript (bool))
   (gs-executable get_gs_executable (string))
   (rescue-mode? in_rescue_mode (bool))

@@ -1,5 +1,7 @@
 pages: 1
 --- page 1
+1
+
 A sample article
 
 by Ada Lovelace
@@ -34,10 +36,10 @@ A first item, short.
 A second item which is long enough to wrap onto a second line of the page, so that the
 indentation of continuation lines is checked.
 
-◦
+∘
 A nested item.
 
-◦
+∘
 Another nested item.
 
 1. One.
@@ -70,7 +72,5 @@ Theorem 2 is due to Euclid.
 Remark 3. Subsections are numbered within their section.
 
 1. A footnote is set at the bottom of the page on which its call occurs.
-
-1
 
 

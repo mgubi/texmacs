@@ -23,7 +23,7 @@
 * which is a Scall3 into (tm-install-procedure! name id arity), which interns
 * a symbol and allocates a closure.  Two consequences matter here:
 *
-*   - it costs ~1401 round trips into the interpreter during
+*   - it costs ~1402 round trips into the interpreter during
 *     every start-up, plus the resulting nursery churn;
 *   - it needs a live Scheme heap, so it cannot run before Sbuild_heap()
 *     returns.  Any boot file evaluated during heap construction -- a
@@ -47,7 +47,7 @@
 * what tm_fast_call_N did on the legacy path.  The shim also records the
 * routine name for the diagnostics in chez_tm.hpp.
 *
-* 1401 routines: 444 bound raw, 957 with UTF-8 transcoding.
+* 1402 routines: 444 bound raw, 958 with UTF-8 transcoding.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -238,6 +238,7 @@ extern tmscm tmg_tm_errput (tmscm);
 extern tmscm tmg_win32_display (tmscm);
 extern tmscm tmg_cpp_error ();
 extern tmscm tmg_supports_native_pdfP ();
+extern tmscm tmg_mupdf_writes_pdfP ();
 extern tmscm tmg_supports_ghostscriptP ();
 extern tmscm tmg_gs_executable ();
 extern tmscm tmg_rescue_modeP ();
@@ -1745,6 +1746,7 @@ TMG_GUARDED_1 ("tm-errput", tmg_tm_errput)
 TMG_GUARDED_1 ("win32-display", tmg_win32_display)
 TMG_GUARDED_0 ("cpp-error", tmg_cpp_error)
 TMG_GUARDED_0 ("supports-native-pdf?", tmg_supports_native_pdfP)
+TMG_GUARDED_0 ("mupdf-writes-pdf?", tmg_mupdf_writes_pdfP)
 TMG_GUARDED_0 ("supports-ghostscript?", tmg_supports_ghostscriptP)
 TMG_GUARDED_0 ("gs-executable", tmg_gs_executable)
 TMG_GUARDED_0 ("rescue-mode?", tmg_rescue_modeP)
@@ -3262,6 +3264,7 @@ static const tmg_entry tmg_entries[]= {
   { "tmg_win32_display", (void*) tmgc_tmg_win32_display },
   { "tmg_cpp_error", (void*) tmgc_tmg_cpp_error },
   { "tmg_supports_native_pdfP", (void*) tmgc_tmg_supports_native_pdfP },
+  { "tmg_mupdf_writes_pdfP", (void*) tmgc_tmg_mupdf_writes_pdfP },
   { "tmg_supports_ghostscriptP", (void*) tmgc_tmg_supports_ghostscriptP },
   { "tmg_gs_executable", (void*) tmgc_tmg_gs_executable },
   { "tmg_rescue_modeP", (void*) tmgc_tmg_rescue_modeP },

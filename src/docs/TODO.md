@@ -76,16 +76,15 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   locales of the manuals (de, es, fr, it, pl, pt, zh) every book adds
   "locale ... not found" warnings, counted as new problems.
 
-- **The PDF export of Vue (MuPDF) lacks the fixes of #341 and #249**
-  (merged here on 2026-10-21): they are in the native renderer of the Qt
-  and Cocoa builds (`pdf_hummus_renderer.cpp`): bookmarks without
-  backslashes, the symbols of the TeX math fonts in the text layer, escaped
-  URIs, embedded videos. To check in `Plugins/MuPDF/mupdf_pdf_renderer.cpp`
-  and port what applies; `tests/documents/ref` keeps the output of Vue
-  (the references of `wip_fixes` for article, math, slides and tables are
-  those of the Qt renderer). The merged Hummus code was only compiled
-  (syntax check), not run. Likewise #356 reloads a changed picture file in
-  the picture cache of Qt only (`qt_picture.cpp`).
+- **The PDF writer on MuPDF, the native writer of Vue since #941**: the
+  fixes of #341 and #249 are ported (the TeX math fonts in the text layer,
+  the videos; the bookmarks and the URIs were right). Left: the larger
+  variants and the assembled delimiters of the OpenType math fonts carry no
+  character in the text layer (blank, as with PDFHummus; 6 U+FFFD remain in
+  the `opentype-math` sample): `native_glyph_set_unicode` is never reached
+  for them, so the renderers cannot tell which character a variant stands
+  for. And #356 reloads a changed picture file in the picture cache of Qt
+  only (`qt_picture.cpp`).
 
 - **Remote tools: what the check of 2026-10-08 left** (issues of
   mgubi/texmacs). #319: the backups of the server are never registered,

@@ -1,26 +1,29 @@
 pages: 3
 --- page 1
+Words
+1
+
 1 Words
 
 A ligature joins two letters into one glyph, and kerning moves a pair of letters closer together or
 further apart. A glyph is drawn by a font. Fonts come in families and shapes, such as the italic
 shape.
 
-Words
-1
-
 
 --- page 2
+2
+Section 2
+
 2 Lines
 
 Paragraphs are broken into lines and lines into pages. Kerning also applies across a line, and every
 font has a design size. The measure is the width of the column, and the leading its vertical spacing.
 
-2
-Section 2
-
 
 --- page 3
+Index
+3
+
 3 Pages
 
 A page holds a number of lines, and its footnotes. A widow is the last line of a paragraph left alone
@@ -64,8 +67,5 @@ line breaking . . . . . . . . . . . . . . . . . . . . . 2
 page breaking
 . . . . . . . . . . . . . . . . . .
 2–3
-
-Index
-3
 
 

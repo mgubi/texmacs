@@ -1,5 +1,7 @@
 pages: 1
 --- page 1
+1
+
 Analytical Engine Society
 12 Difference Street
 London
@@ -27,7 +29,5 @@ Ada Lovelace
 Cc: Mary Somerville
 
 Encl: Notes on the Analytical Engine
-
-1
 
 

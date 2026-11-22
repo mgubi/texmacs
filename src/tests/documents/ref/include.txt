@@ -1,5 +1,8 @@
 pages: 1
 --- page 1
+After the inclusion
+1
+
 1 The main document
 
 This document includes the file include/include-part.tm, which becomes Section 2. The coun-
@@ -29,8 +32,5 @@ xn + yn =/ zn
 (3)
 
 Theorem 2. A theorem after the inclusion, numbered after Theorem 1.
-
-After the inclusion
-1
 
 

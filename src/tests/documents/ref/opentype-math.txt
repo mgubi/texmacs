@@ -1,5 +1,7 @@
 pages: 2
 --- page 1
+1
+
 OpenType mathematical fonts
 
 The same formulas are set with each of the OpenType fonts of the Document > Font >
@@ -16,7 +18,7 @@ ak,
 
 ∞e−xdx.
 
-(((((((((
+((((((((
 (
 (
 
@@ -25,25 +27,21 @@ ak,
 a
 b+c
 
-x2+1
-√
-∑k=0
+x2+1 ∑k=0
 
 n
-xk )))))))))
+xk ))))))))
 
 )
 ),
-⟨
 
 1
 2
 3
 4
-⟩,
-∣x
-
-y∣,
+,
+x
+y ,
 
 [[[[[[[[[[[
 [
@@ -57,9 +55,8 @@ x ]]]]]]]]]]]
 
 ]
 ],
-{a
-
-b}
+a
+b
 
 A→
 
@@ -104,30 +101,25 @@ g C ↔
 ↔
 ↔
 ↔
-↔
 a longer label D⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒
 ⇒⇒
 
 n→∞E,
 x
 √,
-x2+y2
-√
-,
+x2+y2,
 x+y
-3√
+3
 
 xˆ,
-x+ŷ,
+x+y,
 abcd,
 fg,
-x+y̌,
+x+y,
 x+y,
 AB,
+a+b+c,
 a+b+c
-⏞,
-a+b+c
-⏟
 
 2 TeX Gyre Pagella
 
@@ -148,25 +140,21 @@ ak, ∏p p−s and ∫0
 a
 b+c
 
-x2+1
-√
-∑k=0
+x2+1 ∑k=0
 
 n
 xk ))))))))
 
 )
 ),
-⟨
 
 1
 2
 3
 4
-⟩,
-∣x
-
-y∣,
+,
+x
+y ,
 
 [[[[[[[[[[[[
 [
@@ -182,24 +170,19 @@ x ]]]]]]]]]]]]
 
 ]
 ],
-{a
+a
+b
 
-b}
-
-A→→
+A→
+→
 →→
 
-f B ←←←
+f B←←←
 ←←
 
 h
 
 g C ↔
-↔
-↔
-↔
-↔
-↔
 ↔
 ↔
 ↔
@@ -235,11 +218,9 @@ a longer label D ⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒
 n→∞E,
 x
 √,
-x2+y2
-√
-,
+x2+y2,
 x+y
-3√
+3
 
 xˆ,
 x+y,
@@ -248,10 +229,8 @@ fg,
 x+y,
 x+y,
 AB,
+a+b+c,
 a+b+c
-⏞,
-a+b+c
-⏟
 
 3 TeX Gyre Bonum
 
@@ -272,25 +251,21 @@ ak, ∏p p−s and ∫0
 a
 b + c
 
-x 2 + 1
-√
-∑k=0
+x 2 + 1 ∑k=0
 
 n
 xk ))))))))))))
 
 )
 ),
-⟨
 
 1
 2
 3
 4
-⟩,
-∣x
-
-y∣,
+,
+x
+y ,
 
 [[[[[[[[[[[
 [
@@ -305,9 +280,8 @@ x ]]]]]]]]]]]
 
 ]
 ],
-{a
-
-b}
+a
+b
 
 A →
 
@@ -374,11 +348,9 @@ a longer label D ⇒
 n→∞E,
 x
 √,
-x 2 + y2
-√
-,
+x 2 + y2,
 x + y
-3√
+3
 
 xˆ,
 x + y,
@@ -388,20 +360,20 @@ x + y,
 x + y,
 A B,
 a + b + c
-zzzzzzzz
-z z}|{{{{{{{{
-{ {
-
+��������
+������������
+��
 ,
 a + b + c
-||||||||
-| |{z}}}}}}}}
-} }
-
-1
+��������
+������������
+��
 
 
 --- page 2
+2
+Section 6
+
 4 TeX Gyre Schola
 
 Big delimiters, extensible arrows, small radicals and wide accents; big operators in the text
@@ -412,7 +384,7 @@ ak, ∏p p−s and ∫0
 
 ∞e−xdx.
 
-((((((((((
+((((((((
 (
 (
 
@@ -421,25 +393,21 @@ ak, ∏p p−s and ∫0
 a
 b+c
 
-x2+1
-√
-∑k=0
+x2+1 ∑k=0
 
 n
-xk ))))))))))
+xk ))))))))
 
 )
 ),
-⟨
 
 1
 2
 3
 4
-⟩,
-∣x
-
-y∣,
+,
+x
+y ,
 
 [[[[[[[[[[[
 [
@@ -454,9 +422,8 @@ x ]]]]]]]]]]]
 
 ]
 ],
-{a
-
-b}
+a
+b
 
 A →
 
@@ -522,11 +489,9 @@ a longer label D ⇒
 n→∞E,
 x
 √,
-x2+ y2
-√
-,
+x2+ y2,
 x+ y
-3√
+3
 
 xˆ,
 x+ y,
@@ -535,10 +500,8 @@ fg,
 x+ y,
 x+ y,
 AB,
+a+b+c,
 a+b+c
-⏞,
-a+b+c
-⏟
 
 5 STIX
 
@@ -572,7 +535,7 @@ xk ⎠⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎞
 4⟩,
 ∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣x
 
-y ∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣
+y∣∣∣∣∣∣∣∣∣∣∣∣∣∣∣
 
 ,
 
@@ -661,8 +624,5 @@ b
 
 This paragraph is set in Skia, a variable font of macOS, in its default instance, with a bold series
 and a slanted shape made from it.
-
-2
-Section 6
 
 
