@@ -270,14 +270,16 @@
 ;;    in R, raw_string_delimiter in C++...) nor for an unquoted value
 ;;    (string_scalar in YAML);
 ;;  - its text has the shape of a quoted string: a prefix of letters, digits,
-;;    _, $ and @ (f, rb, u8, R, r, $'...' of Bash, @"..." of C#), a run of #
+;;    _, $, @ and symbols of TeXmacs (f, rb, u8, R, r, $'...' of Bash,
+;;    @"..." of C#, the string macros of Julia, <alpha>"..."), a run of #
 ;;    (raw strings of Rust), an opening quote q (" ' `), ..., a closing quote
 ;;    q and as many #; or <...> (#include <...>, <less>...<gtr> in the
 ;;    strings of TeXmacs), or the long brackets of
-;;    Lua ([[...]], [=[...]=]).
-;; The character must be the opening quote, or the last character of the
-;; string (its closing quote, or its last #); the characters in between,
-;; the prefix included, are plain characters.
+;;    Lua ([[...]], [=[...]=]); a suffix of letters and digits may follow
+;;    (the flags of r"..."i in Julia).
+;; The character must be the opening quote, or the closing quote (or its
+;; last #); the characters in between, the prefix and the suffix are plain
+;; characters.
 
 (define string-part-words
   '("start" "end" "open" "close" "content" "delimiter" "fragment" "escape"
@@ -293,20 +295,46 @@
 
 (define (quote-char? ch) (in? ch '(#\" #\' #\`)))
 
+(define (symbol-end s i)
+  ;; the end of a symbol <name> or <#xxxx> of TeXmacs at i in s (a letter
+  ;; such as the alpha of a string macro of Julia), else #f; not < and >
+  (and (< i (string-length s)) (== (string-ref s i) #\<)
+       (let loop ((k (+ i 1)))
+         (cond ((>= k (string-length s)) #f)
+               ((== (string-ref s k) #\>)
+                (and (> k (+ i 1))
+                     (not (in? (substring s (+ i 1) k) '("less" "gtr")))
+                     (+ k 1)))
+               ((or (char-alphabetic? (string-ref s k)) (char-numeric? (string-ref s k))
+                    (== (string-ref s k) #\#))
+                (loop (+ k 1)))
+               (else #f)))))
+
+(define (suffix-char? ch)
+  (or (char-alphabetic? ch) (char-numeric? ch) (== ch #\_)))
+
 (define (string-quotes root a b)
-  ;; for a node from the point a to the point b, the point of its opening
-  ;; quote when its text has the shape of a quoted string, else #f
+  ;; for a node from the point a to the point b, when its text has the shape
+  ;; of a quoted string: (open close), the point of its opening quote and
+  ;; the point after its closing one (before a suffix, such as the flags of
+  ;; r"..."i in Julia); else #f
   (let* ((s (line-string root (car a)))
          (n (string-length s))
          (e (line-string root (car b)))
-         (m (cadr b))
+         (m (let loop ((m (cadr b)))        ; without the suffix
+              (if (and (> m 0) (<= m (string-length e))
+                       (suffix-char? (string-ref e (- m 1))))
+                  (loop (- m 1)) m)))
          (skip (lambda (i ch?)
                  (let loop ((i i))
                    (if (and (< i n) (ch? (string-ref s i))) (loop (+ i 1)) i))))
          (ends? (lambda (tail)               ; the text ends with tail
                   (and (<= m (string-length e)) (>= m (string-length tail))
                        (== (substring e (- m (string-length tail)) m) tail))))
-         (i (skip (cadr a) prefix-char?))
+         (i (let loop ((i (cadr a)))         ; the prefix
+              (cond ((and (< i n) (prefix-char? (string-ref s i))) (loop (+ i 1)))
+                    ((symbol-end s i) => loop)
+                    (else i))))
          (o (skip i (lambda (ch) (== ch #\#))))
          (hashes (make-string (- o i) #\#))
          (ch (and (< o n) (string-ref s o)))
@@ -325,20 +353,22 @@
     (and close (ends? close)
          ;; the closing quote comes after the opening one
          (point<? (list (car a) o) (list (car b) (- m (string-length close))))
-         (list (car a) o))))
+         (list (list (car a) o) (list (car b) m)))))
 
 (define (quote-pair root lan p)
-  ;; when the character at p opens or closes a string: (start end open),
-  ;; open being the point of its opening quote. In a string inside another
-  ;; one (Python f-strings) it is the innermost string.
+  ;; when the character at p opens or closes a string: (start end open
+  ;; close), open being the point of its opening quote and close the point
+  ;; after its closing one. In a string inside another one (Python
+  ;; f-strings) it is the innermost string.
   (let* ((after (list (car p) (+ (cadr p) 1)))
          (pairs
           (list-filter
            (map (lambda (n)
                   (let ((a (node-start n)) (b (node-end n)))
                     (and (whole-string-type? (node-type n))
-                         (with o (string-quotes root a b)
-                           (and o (or (== o p) (== b after)) (list a b o))))))
+                         (with q (string-quotes root a b)
+                           (and q (or (== (car q) p) (== (cadr q) after))
+                                (list a b (car q) (cadr q)))))))
                 (syntax-region-node-range root lan (car p) (cadr p)
                                           (car p) (+ (cadr p) 1)))
            identity))
@@ -353,8 +383,8 @@
 (define (pair-at root lan p)
   ;; the pair of brackets or quotes of which the character at p is one:
   ;; (start end) from the opening one to after the closing one, or #f; for a
-  ;; string, (start end open) with the point of its opening quote after
-  ;; its prefix
+  ;; string, (start end open close) with the points of its quotes (after
+  ;; its prefix, before its suffix)
   (let ((q (syntax-matching-bracket root lan p)))
     (if q
         (let ((a (if (point<? p q) p q)) (b (if (point<? p q) q p)))
@@ -366,8 +396,9 @@
   (let ((pair (pair-at root lan p)))
     (and pair
          (let* ((a (car pair)) (b (cadr pair))
-                (o (if (pair? (cddr pair)) (caddr pair) a)))
-           (if (and (== (car o) (car b)) (== (+ (cadr o) 2) (cadr b)))
+                (o (if (pair? (cddr pair)) (caddr pair) a))
+                (c (if (pair? (cddr pair)) (cadddr pair) b)))
+           (if (and (== (car o) (car c)) (== (+ (cadr o) 2) (cadr c)))
                ;; empty: both go, and a prefix stays (f"" gives f)
                (begin
                  (tree-remove! (tree-ref root (car o)) (cadr o) 2)

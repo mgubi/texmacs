@@ -1642,6 +1642,23 @@
   (check= (string-deletion 'julia-code '("x = \"$x b\"") 0 5 #t) #f)
   (check= (string-deletion 'julia-code '("x = \"a$(y)\"") 0 10 #f) #f)
   (check= (string-deletion 'julia-code '("x = \"a$x\"") 0 9 #f) '(0 4 0 9))
+  ;; Julia: the flags after a string (r"..."i) are plain characters, and the
+  ;; quotes before them select the string
+  (let ((l '("x = r\"a\"i")))
+    (check= (string-deletion 'julia-code l 0 5 #t) '(0 4 0 9))
+    (check= (string-deletion 'julia-code l 0 6 #f) '(0 4 0 9))
+    (check= (string-deletion 'julia-code l 0 8 #f) '(0 4 0 9))
+    (check= (string-deletion 'julia-code l 0 9 #f) #f)
+    (check= (string-deletion 'julia-code l 0 8 #t) #f))
+  (check= (string-deletion 'julia-code '("x = r\"a\"") 0 8 #f) '(0 4 0 8))
+  (let ((l '("x = r\"\"\"a\"\"\"i")))
+    (check= (string-deletion 'julia-code l 0 5 #t) '(0 4 0 13))
+    (check= (string-deletion 'julia-code l 0 12 #f) '(0 4 0 13)))
+  ;; and a string macro named by a symbol of TeXmacs (<alpha>"ab")
+  (let ((l '("x = <alpha>\"ab\"")))
+    (check= (string-deletion 'julia-code l 0 11 #t) '(0 4 0 15))
+    (check= (string-deletion 'julia-code l 0 15 #f) '(0 4 0 15))
+    (check= (string-deletion 'julia-code l 0 4 #t) #f))
   ;; prefixes belong to the string, but are plain characters themselves
   (let ((l '("x = f\"ab\"")))
     (check= (string-deletion 'python-code l 0 6 #f) '(0 4 0 9))
@@ -1707,7 +1724,8 @@
   (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted)
   ;; an empty string with a prefix: its quotes go, its prefix stays
   (for (x '((python-code "x = f\"\"" 6 "x = f") (python-code "x = rb''" 7 "x = rb")
-            (python-code "x = b\"\"" 6 "x = b") (cpp-code "x = u8\"\";" 7 "x = u8;")))
+            (python-code "x = b\"\"" 6 "x = b") (cpp-code "x = u8\"\";" 7 "x = u8;")
+            (julia-code "x = r\"\"i" 6 "x = ri")))
     (with-test-buffer `(document (,(car x) (document ,(cadr x))))
       (lambda (u b)
         (update-forced)
