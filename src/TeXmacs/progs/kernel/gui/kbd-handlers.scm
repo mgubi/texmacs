@@ -50,22 +50,33 @@
   (insert s))
 
 (define delayed-keyboard-serial 0)
+(define delayed-keyboard-end #f)
 
-(tm-define (delayed-keyboard-command x t)
-  (:synopsis "The command which presses the pre-edit @x after 100 ms idle")
+(define (pre-edit-end? x)
+  ;; the empty pre-edit which ends a composition ("pre-edit:")
+  (with s (substring x 9 (string-length x))
+    (or (== s "")
+        (and (string-ends? s ":")
+             (string->number (substring s 0 (- (string-length s) 1)))
+             #t))))
+
+(tm-define (delayed-keyboard-press x t)
+  (:synopsis "Press the pre-edit @x once the user has been idle for 100 ms")
   ;; Only the last pre-edit is pressed: the command of an earlier one which
   ;; has not run yet does nothing. The pre-edits are numbered, since several
   ;; can come at the same time @t: a dead key typed after another one ends
   ;; the first pre-edit and starts the next one in the same event (#870).
-  ;; The command takes the idle time and returns, as for exec-delayed-pause,
-  ;; the delay before it is called again, or #t when it is done.
+  ;; The end of a pre-edit is never skipped, since it resets the state of
+  ;; the editor (pre_edit_skip, edit_keyboard.cpp): when a newer pre-edit
+  ;; comes, the end is pressed just before it.
   (set! delayed-keyboard-serial (+ delayed-keyboard-serial 1))
+  (if (pre-edit-end? x) (set! delayed-keyboard-end (list x t)))
   (with serial delayed-keyboard-serial
-    (lambda (idle)
-      (cond ((!= serial delayed-keyboard-serial) #t)
-            ((< idle 100) (- 100 idle))
-            (else (keyboard-press x t) #t)))))
-
-(tm-define (delayed-keyboard-press x t)
-  (with cmd (delayed-keyboard-command x t)
-    (exec-delayed-pause (lambda () (cmd (idle-time))))))
+    (delayed
+      (:idle 100)
+      (when (== serial delayed-keyboard-serial)
+        (with end delayed-keyboard-end
+          (set! delayed-keyboard-end #f)
+          (if (and end (not (pre-edit-end? x)))
+              (keyboard-press (car end) (cadr end))))
+        (keyboard-press x t)))))
