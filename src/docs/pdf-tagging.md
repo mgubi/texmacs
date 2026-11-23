@@ -165,10 +165,12 @@ virtual font of TeXmacs (`#virtual-`, `#enhance-`: the emulated symbols)
 to U+FFFD; a font of transformed glyphs (`make_bbb[...]`, `extended`,
 the font effects) through its inner font (make_bbb: the double-struck
 letters); a TeX font through its table (Concrete math: those of cmmi,
-cmsy, msam, cmex, msbm), as Cork (the ec fonts, Pandora), as OT1 (cm,
-Concrete and Duerer text; typewriter apart); a TrueType or OpenType font
-which cannot be embedded (GillSans, the keycaps of LucidaGrande), its
-codes, which are Unicode; another to U+FFFD; never to a control. The vendored
+cmsy, msam, cmex, msbm; Euler: cmmi), as Cork (the ec fonts, Pandora),
+as OT1 (cm, Concrete and Duerer text; typewriter apart); a font loaded
+by FreeType (`Name:size.dpitt`): a TrueType or OpenType one (GillSans,
+the keycaps of LucidaGrande) its codes, which are Unicode, a Type 1 one
+those of its encoding (the Adobe ec fonts, times-rm...: Cork; the T2A
+fonts), else U+FFFD; another to U+FFFD; never to a control. The vendored
 PDFHummus maps the glyph 0 of a simple font too (a symbol of stmary10 or
 wasy10, which it took for .notdef), and never to 0. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.

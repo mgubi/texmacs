@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 #include "converter.hpp"
 #include "hashmap.hpp"
+#include "Freetype/tt_file.hpp"
 
 // The encodings (fonts/enc) of the TeX math fonts, by the name of the font
 // without its size
@@ -27,6 +28,7 @@ static const char* tex_math_encodings[][3]= {
   { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
   { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
   { "ccmi", "cmmi", "" }, { "xccmi", "cmmi", "" },
+  { "eurm", "cmmi", "" }, { "eurb", "cmmi", "" },
   { "xccsy", "cmsy", "math-cal" }, { "xccam", "msam", "" },
   { "xccex", "cmex", "rubber-cmex" }, { "xccbm", "msbm", "math-bbb" },
   { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
@@ -270,11 +272,26 @@ tex_type3_unicode_sub (string fontname, int c) {
     else if (starts (base, "ec") || starts (base, "eo") ||
              starts (base, "pn")) u= tex_glyph_unicode (c, false);
     else if (is_ot1 || is_tt) u= tex_ot1_unicode (c, is_tt);
-    // a font of no TeX family, of the name of a TrueType or OpenType font
-    // (Name.k:size.dpitt): its codes are Unicode
+    // a font loaded by FreeType (Name.k:size.dpitt): its codes are Unicode
+    // if it is TrueType or OpenType; a Type 1 font (a TeX font: the Adobe
+    // ec fonts, the T2A fonts...) has those of its encoding
     else if (N(fontname) >= 3 && ends (fontname, "tt") &&
              is_digit (fontname[N(fontname)-3]) &&
-             search_forwards (":", fontname) >= 0) u= c;
+             search_forwards (":", fontname) >= 0) {
+      string fam= fontname (0, search_forwards (":", fontname));
+      int dot= search_forwards (".", fam);
+      if (dot > 0) fam= fam (0, dot);
+      url f= tt_font_find (fam);
+      string sf= (is_none (f)? string (""): locase_all (suffix (f)));
+      if (sf == "pfb" || sf == "pfa") {
+        if (is_t2a_font_file (f)) u= tex_glyph_unicode (c, true);
+        // (the Adobe ec fonts, times-rm..., have no size: Cork)
+        else if (N(fam) > 0 && !is_digit (fam[N(fam)-1]))
+          u= tex_glyph_unicode (c, false);
+        else u= 0xfffd;
+      }
+      else u= c;
+    }
     else u= 0xfffd;
   }
   return u;
