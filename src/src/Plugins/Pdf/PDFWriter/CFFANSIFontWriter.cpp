@@ -133,12 +133,19 @@ static const std::string scCharSet = "CharSet";
 //static const Byte scLeftParanthesis[] = {'('};
 //static const Byte scRightParanthesis[] = {')'};
 
+// TeXmacs: false in a tagged PDF (as hummus_write_cidset, see
+// DescendentFontWriter.cpp): the CharSet lists the glyphs of the codes, not
+// the base and accent glyphs of an accented one (seac), which PDF/UA wants
+// listed; it may be left out
+extern bool hummus_write_cidset;
+
 void CFFANSIFontWriter::WriteCharSet(	DictionaryContext* inDescriptorContext,
 										ObjectsContext* inObjectsContext,
 										FreeTypeFaceWrapper* inFontInfo,
 										const UIntAndGlyphEncodingInfoVector& inEncodedGlyphs)
 {
 	(void) inObjectsContext;
+	if (!hummus_write_cidset) return;
 	// constructing glyph names in a string as names. only when done - submit to output
 	OutputStringBufferStream aStream;
 	PrimitiveObjectsWriter primitiveWriter(&aStream);

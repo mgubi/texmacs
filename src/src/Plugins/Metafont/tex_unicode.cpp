@@ -117,7 +117,8 @@ tex_math_unicode (string fontname) {
   // picture mode) have no characters: a table of none, rather than their
   // codes, which are letters (@, P...)
   if ((base == "line" || base == "linew" || base == "lcircle" ||
-       base == "lcirclew") && n < N(fontname) && is_digit (fontname[n])) {
+       base == "lcirclew") &&
+      (n == N(fontname) || is_digit (fontname[n]))) {
     table= array<int> (256);
     for (int i=0; i<256; i++) table[i]= -1;
     tables (fontname)= table;
@@ -163,6 +164,18 @@ tex_math_unicode (string fontname) {
   }
   tables (fontname)= table;
   return table;
+}
+
+int
+tex_ot1_unicode (int c) {
+  static const int low[32]= {
+    0x393, 0x394, 0x398, 0x39B, 0x39E, 0x3A0, 0x3A3, 0x3A5,
+    0x3A6, 0x3A8, 0x3A9, 0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04,
+    0x131, 0x237, 0x60, 0xB4, 0x2C7, 0x2D8, 0xAF, 0x2DA,
+    0xB8, 0xDF, 0xE6, 0x153, 0xF8, 0xC6, 0x152, 0xD8 };
+  if (c >= 0 && c < 32) return low[c];
+  if (c < 0 || c > 0x10ffff) return 0xfffd;
+  return c;
 }
 
 // The Unicode character of the glyph at position ch of a TeX font in the

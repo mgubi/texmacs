@@ -28,4 +28,10 @@ int tex_glyph_unicode (int ch, bool t2a);
 // Whether the font file u is a Cyrillic TeX font in the T2A encoding
 bool is_t2a_font_file (url u);
 
+// The character of position c of a TeX text font of the OT1 encoding
+// (cmr, the Metafont fonts drawn as Type 3: Pandora, Duerer...): below
+// U+0020 its Greek capitals, ligatures, dotless letters, ß æ œ ø Æ Œ Ø;
+// U+FFFD for another position below U+0020; c otherwise
+int tex_ot1_unicode (int c);
+
 #endif // TEX_UNICODE_H

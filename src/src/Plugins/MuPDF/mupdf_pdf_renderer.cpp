@@ -665,7 +665,7 @@ mupdf_pdf_renderer_rep::end_page () {
       string l= links[i].label;
       // (PDF/UA: a description, never empty: a link of no target)
       string d= cork_to_utf8 (starts (l, "#")? "Link to " * l (1, N(l)): l);
-      if (N(d) == 0 || d == "Link to ") d= "Link";
+      if (N(trim_spaces (d)) == 0 || trim_spaces (d) == "Link to") d= "Link";
       link_text << (d * string ((char) 0));
     }
   video_annot0= N(tag_annots);
@@ -1512,9 +1512,12 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
       string nm= gname[c] (0, N(gname[c]) - 1);
       int dot= search_forwards (".", nm);
       if (dot > 0) nm= nm (0, dot);
+      // (aNN is a number for MuPDF, which says nothing)
+      if (N(nm) >= 2 && nm[0] == 'a' && is_digit (nm[1])) continue;
       c_string cn (nm);
       int u= fz_unicode_from_glyph_name (cn);
-      if (u >= 0x20 && u != 0xfffd) tex[c]= u;
+      if (u >= 0x20 && u != 0xfffd && !(u >= 0xe000 && u <= 0xf8ff))
+        tex[c]= u;
     }
   }
   if (N(tex) == 0) return;
@@ -1734,6 +1737,11 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
     if (it.gid[c] >= 0) {
       int u= it.gid[c];
       if (u >= 0 && u < N(tex) && tex[u] >= 0) u= tex[u];
+      // (a tagged PDF: a text font of no table is of the OT1 encoding,
+      // and no position is a control, PDF/UA)
+      else if (tagger != NULL) u= tex_ot1_unicode (u);
+      if (tagger != NULL && (u < 0x20 || u == 0xfeff || u == 0xfffe))
+        u= 0xfffd;
       cmap << "<" << as_hexadecimal (c, 2) << "> <"
            << utf16_hex (u) << ">\n";
     }

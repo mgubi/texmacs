@@ -16,6 +16,8 @@ extern bool hummus_write_cidset;  // PDFWriter/DescendentFontWriter.cpp
 extern int hummus_missing_objects;  // PDFWriter/PDFDocumentHandler.cpp
 // the PDF pictures get their fonts embedded (a tagged PDF, PDF/UA)
 static bool hummus_embed_fonts= false;
+// the Type 3 fonts are written for a tagged PDF (flush_fonts)
+static bool hummus_tagged_type3= false;
 #include "Metafont/tex_files.hpp"
 #include "Metafont/load_tfm.hpp"
 #include "Metafont/tex_unicode.hpp"
@@ -1591,12 +1593,29 @@ t3font_rep::write_definition (int& registry_id) {
        << "> <" << as_hexadecimal (lastchar, 2)
        << "> endcodespacerange\r\n";
 #if 1
+  if (hummus_tagged_type3) {
+    // a tagged PDF: the character of each code, not the code of the TeX
+    // font (through its table, or as OT1), none a control (PDF/UA)
+    array<int> table= tex_math_unicode (fn->res_name);
+    cmap << as_string (lastchar - firstchar + 1) << " beginbfchar\r\n";
+    for (int lch= firstchar; lch <= lastchar; lch++) {
+      int g= t3font_get_global_glyph (lch, font_chunk, fn->res_name);
+      int u= (g >= 0 && g < N(table) && table[g] >= 0)? table[g]:
+             tex_ot1_unicode (g);
+      if (u < 0x20 || u == 0xfeff || u == 0xfffe || u > 0xffff) u= 0xfffd;
+      cmap << "\t<" << as_hexadecimal (lch, 2) << "> <"
+           << as_hexadecimal (u, 4) << ">\r\n";
+    }
+    cmap << "endbfchar\r\n";
+  }
+  else {
   cmap << "1 beginbfrange\r\n";
   int ch= t3font_get_global_glyph (firstchar, font_chunk, fn->res_name);
   cmap << "\t<" << as_hexadecimal (firstchar, 2) << "> "
        << "<" << as_hexadecimal (lastchar, 2) << "> "
        << "<" << as_hexadecimal (ch, 4) << ">\r\n";
   cmap << "endbfrange\r\n";
+  }
 #else
   // Left for testing purpose
   cmap << as_string (N(glyph_list))
@@ -1630,12 +1649,14 @@ void
 pdf_hummus_renderer_rep::flush_fonts()
 {
   // flush t3 fonts
+  hummus_tagged_type3= (tagger != NULL);
   iterator<string> it = iterate(t3font_list);
   while (it->busy()) {
     string name = it->next();
     t3font f = t3font_list[name];
     f->write_definition(t3font_registry_id);
   }
+  hummus_tagged_type3= false;
 }
 
 /******************************************************************************
@@ -1919,12 +1940,14 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
           // none: stmary, wasy), the character of its glyph, as a reader
           // reads it (a code below U+0020 is a control otherwise)
           else if (tagger != NULL) {
-            // (code 161 is the glyph of code 0, requires_hack_notdef)
-            int g= hummus_glyph_unicode (cfid, ch == 161? 0: gl_index);
+            // (code 161 of a TeX math font, of a table, is the glyph of
+            // code 0, requires_hack_notdef; in a Cork font it is a letter)
+            bool hack= (ch == 161 && N(table) > 0);
+            int g= hummus_glyph_unicode (cfid, hack? 0: gl_index);
             if (g != 0xfffd) uc= g;
             // (a font of a table: its code is no character, which a
             // reader would take for one, as MuPDF does)
-            else if (ch == 161 || N(table) > 0) uc= 0xfffd;
+            else if (N(table) > 0) uc= 0xfffd;
           }
         }
         // (PDF/UA forbids 0, U+FEFF and U+FFFE in the map, and the
@@ -2282,9 +2305,11 @@ hummus_glyph_unicode (PDFUsedFont* f, unsigned int glyph) {
     (face->style_name? face->style_name: "");
   if (by_face.find (key) == by_face.end ()) {
     std::map<unsigned int, int>& m= by_face[key];
-    // (a Type 1 font: the map which FreeType makes of its glyph names,
-    // the aNN of ZapfDingbats included, says nothing: its names say it)
-    bool unicode= (face->charmap != NULL && FT_IS_SFNT (face) &&
+    // (a Type 1 font: FreeType makes the map of the names of its glyphs,
+    // after the Adobe glyph list -- zacute, ffi -- but also of aNN, after
+    // ZapfDingbats, which says nothing: those are left out)
+    bool sfnt= FT_IS_SFNT (face);
+    bool unicode= (face->charmap != NULL &&
                    face->charmap->encoding == FT_ENCODING_UNICODE);
     if (unicode) {
       FT_UInt g;
@@ -2292,7 +2317,18 @@ hummus_glyph_unicode (PDFUsedFont* f, unsigned int glyph) {
       while (g != 0) {
         // (a character of a compatibility block, a Kangxi radical, gives
         // way to the one of the same glyph which is not: 文, not ⽂)
-        if (hummus_usable_unicode ((int) c)) {
+        bool number= false;
+        if (!sfnt && FT_HAS_GLYPH_NAMES (face)) {
+          char nb[32];
+          nb[0]= '\0';
+          if (!FT_Get_Glyph_Name (face, g, nb, sizeof (nb)) &&
+              nb[0] == 'a' && nb[1] >= '0' && nb[1] <= '9') {
+            number= true;
+            for (int i=2; nb[i] != '\0'; i++)
+              if (nb[i] < '0' || nb[i] > '9') number= false;
+          }
+        }
+        if (!number && hummus_usable_unicode ((int) c)) {
           std::map<unsigned int, int>::iterator e= m.find (g);
           if (e == m.end ()) m[g]= (int) c;
           else if (hummus_compatibility (e->second) &&
@@ -3721,8 +3757,8 @@ pdf_hummus_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2)
     tg ()->add_annotation (e, k, page_num, pos);
     string l= cork_to_utf8 (starts (label, "#")?
                             "Link to " * label (1, N(label)): label);
-    // (never empty: a link of no target)
-    if (N(l) == 0 || l == "Link to ") l= "Link";
+    // (never empty, nor blank: a link of no target)
+    if (N(trim_spaces (l)) == 0 || trim_spaces (l) == "Link to") l= "Link";
     dict << "\t/Contents " << pdf_text_string (l) << "\r\n";
     dict << "\t/StructParent " << as_string (pdf_tag_annot_key0 + k) << "\r\n";
   }

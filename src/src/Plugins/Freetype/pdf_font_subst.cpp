@@ -760,7 +760,9 @@ pdf_font_substitute (string base_font, array<string> names,
     // (a code of no glyph: .notdef, rather than the glyph of the code in
     // the encoding of the font program)
     r.glyph[c]= ".notdef";
-    r.unicode[c]= uc;
+    // (a code of no glyph, and of no character: U+FFFD in the map, which
+    // maps every code used, PDF/UA)
+    r.unicode[c]= (uc > 0? uc: 0xfffd);
     if (gid == 0) { r.missing++; continue; }
     char buf[128];
     buf[0]= '\0';

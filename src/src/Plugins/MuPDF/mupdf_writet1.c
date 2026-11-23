@@ -1263,10 +1263,15 @@ static void cs_mark(const char *cs_name, int subr)
                 mark_cs(standard_glyph_names[a2]);
                 if (fd_cur->gl_tree != NULL) {
                     /* base and accent characters are needed in CharSet */
-                    avl_probe(fd_cur->gl_tree,
-                              (void *) standard_glyph_names[a1]);
-                    avl_probe(fd_cur->gl_tree,
-                              (void *) standard_glyph_names[a2]);
+                    /* TeXmacs: copies, the tree frees its items (a static
+                       name freed made the export abort: Times, x\<#17C\>) */
+                    int k;
+                    for (k = 0; k < 2; k++) {
+                        char *nm = xstrdup(standard_glyph_names[k == 0 ? a1 : a2]);
+                        void **aa = avl_probe(fd_cur->gl_tree, nm);
+                        if (aa != NULL && *aa != nm)
+                            xfree(nm);
+                    }
                 }
                 break;
             default:
