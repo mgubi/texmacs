@@ -406,18 +406,20 @@ process hosts, or only headless ones), the agent edits directly, as before.
   (the Review bar's Keep, Retain, Retain all, a selection), and records the
   outcome when no difference of the proposal is left: accepted (new kept
   everywhere), rejected (old everywhere), resolved (mixed). A choice for a difference that an undo
-  brought back is forgotten. When the block of a pending proposal is lost but its
-  markup is still in the document (the person compared the document with a saved
-  file: it is inside the comparison), the proposal stays pending, and is found
-  again when its markup is a block again. When the markup
-  disappears otherwise (deleted, typed over), the host compares the blocks, with
-  adjacent strings joined, with both versions; an empty version is taken as
-  kept when the other one is gone. The host looks only when the document
-  changed (a new live state). Known limit: an undo that brings back the markup
-  of a resolved proposal is not reported (the undo makes new trees, and
-  recognizing the markup by its content would take a comparison made by the
-  person for the proposal): the markup is plain version markup, the status
-  stays (#867). A patch of an agent that touches blocks
+  brought back is forgotten (the newest choices). When the markup of a pending
+  proposal disappears otherwise (deleted, typed over, or its block lost
+  because the person compared the document with a file), the answer is the
+  neutral `resolved` while the document holds other version markup than that
+  of the pending proposals (the proposal may be inside it); otherwise the host
+  compares the blocks, with adjacent strings joined, with both versions, and an
+  empty version is taken as kept when the other one is gone. A proposal is never followed by its
+  content, and one whose block is lost is never left pending: Tools > Agents
+  refuses to resolve it and the focus bar skips it until the next poll. The
+  host looks only when the document changed (a new live state). Known limits:
+  an undo that brings back the markup of a resolved proposal is not reported
+  (the undo makes new trees; the markup is then plain version markup and the
+  status stays); while the person's own Compare markup is in the document, a
+  proposal whose markup is lost is reported `resolved` (#867). A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status
   (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are

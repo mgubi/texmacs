@@ -980,7 +980,7 @@
 ;; document, and the one at the cursor (the block with the cursor)
 (define (pending-by-index name)
   (list-sort (list-filter (or (shared-proposals name) '())
-                          (lambda (e) (== (cadr e) "pending")))
+                          (lambda (e) (and (== (cadr e) "pending") (>= (caddr e) 0))))
              (lambda (a b) (< (caddr a) (caddr b)))))
 
 (define (cursor-block-index)
@@ -1636,8 +1636,11 @@
          t)))
 
 (define (proposal-index sf pr)
+  ;; (-1 for a pending proposal whose block is lost, until the next poll)
   (let ((t (proposal-tree sf pr)))
-    (if t (tree-index t) (or (prop-get pr 'index) -1))))
+    (cond (t (tree-index t))
+          ((proposal-pending? pr) -1)
+          (else (or (prop-get pr 'index) -1)))))
 
 (define (proposal-find sf id)
   (with l (list-filter (or (sf-get sf 'proposals) '()) (lambda (pr) (== (prop-get pr 'id) id)))
@@ -1683,6 +1686,8 @@
     (and (sf-host? sf)
          (with pr (proposal-find sf id)
            (and pr (proposal-pending? pr)
+                ;; (not a proposal whose block is lost: nothing to resolve)
+                (proposal-tree sf pr)
                 (begin
                   (proposal-resolve! sf pr which (if (== which 'new) "accepted" "rejected"))
                   #t))))))
@@ -1700,7 +1705,10 @@
 ;; brings back the markup of a resolved proposal is not reported (the undo
 ;; makes new trees, and recognizing the markup by its content would take a
 ;; comparison made by the person for the proposal): the markup is then
-;; plain version markup, and the status stays (#867).
+;; plain version markup, and the status stays. A proposal whose block is
+;; lost is never followed by its content: while the document holds other
+;; version markup (the person compared it with a file), its outcome is
+;; "resolved" (#867).
 
 (define (block-normalize st)
   ;; @st with nested concatenations flattened and adjacent strings joined
@@ -1720,9 +1728,12 @@
                  (else (cons 'concat l)))))
         (else (cons (car st) (map block-normalize (cdr st))))))
 
-(define (proposals-classify! sf pr)
+(define (proposals-classify! sf pr foreign?)
   ;; the markup of a pending proposal is gone, not by the Version tools (the
-  ;; person edited): was the new or the old version kept?
+  ;; person edited): was the new or the old version kept? An empty version
+  ;; counts as kept when the other one is gone. While the document holds
+  ;; other version markup (@foreign?: the proposal may be inside it), the
+  ;; neutral "resolved"
   (let* ((sts (map (lambda (t) (block-normalize (tm->stree t)))
                    (tree-children (sf-body sf))))
          (n (length sts))
@@ -1735,9 +1746,9 @@
                           (or (equal? (list-head l m) seq)
                               (loop (cdr l) (- k 1)))))))))
     (prop-put! pr 'status
-               (cond ((and (pair? new) (has? new)) "accepted")
+               (cond (foreign? "resolved")
+                     ((and (pair? new) (has? new)) "accepted")
                      ((and (pair? old) (has? old)) "rejected")
-                     ;; an empty version: the other one is gone
                      ((null? new) "accepted")
                      ((null? old) "rejected")
                      (else "resolved")))))
@@ -1747,10 +1758,6 @@
   (cond ((not (pair? st)) 0)
         ((memq (car st) '(version-both version-old version-new)) 1)
         (else (apply + (map stree-version-count (cdr st))))))
-
-(define (stree-contains? st x)
-  (or (equal? st x)
-      (and (pair? st) (list-or (map (lambda (c) (stree-contains? c x)) (cdr st))))))
 
 (define (version-nodes t)
   ;; the outermost version markup in @t (@t included), as the Version tools
@@ -1789,9 +1796,9 @@
              (old (list-filter (or (prop-get pr 'retained) '())
                                (lambda (c) (not (node-in? (car c) (map car hit))))))
              ;; an undo brought differences back: the choices made for them
-             ;; are no longer in the document (the newest first)
+             ;; are no longer in the document (the newest ones: undo goes back in time)
              (keep (max 0 (- (or (prop-get pr 'ndiffs) 0) (cadr e))))
-             (done (append hit (if (> (length old) keep) (list-head old keep) old))))
+             (done (append hit (if (> (length old) keep) (list-tail old (- (length old) keep)) old))))
         (if (< (length hit) (cadr e))
             (prop-put! pr 'retained done)
             (let ((ks (map cdr done)))
@@ -1831,28 +1838,20 @@
   (let ((state (live-current-state (sf-key sf))))
     (unless (and (sf-get sf 'prop-polled) (equal? state (sf-get sf 'prop-polled)))
       (sf-put! sf 'prop-polled state)
-      (for (pr (or (sf-get sf 'proposals) '()))
-        (when (proposal-pending? pr)
-          (let* ((t (proposal-tree sf pr)) (st (and t (tm->stree t))))
-            (cond ((and st (version-tag-in? st))
-                   (prop-put! pr 'index (tree-index t))
-                   (prop-put! pr 'markup st))
-                  ((proposal-markup-back! sf pr) (noop))
-                  (else (proposals-classify! sf pr)))))))))
-
-(define (proposal-markup-back! sf pr)
-  ;; the block of the pending proposal @pr is lost (the person replaced the
-  ;; document, e.g. Compare with a saved file), but its markup is still in the
-  ;; document (perhaps inside other version markup): it stays pending, and is
-  ;; found again when it is a block of the document
-  (let* ((m (prop-get pr 'markup)) (body (sf-body sf)) (sts (cdr (tm->stree body))))
-    (and (pair? m) (stree-contains? (cons 'document sts) m)
-         (with i (list-find-index sts (lambda (x) (equal? x m)))
-           (when i
-             (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
-             (prop-put! pr 'ptr (tree->tree-pointer (tree-ref body i)))
-             (prop-put! pr 'index i))
-           #t))))
+      (let* ((pending (list-filter (or (sf-get sf 'proposals) '()) proposal-pending?))
+             (trees (map (lambda (pr)
+                           (let* ((t (proposal-tree sf pr)) (st (and t (tm->stree t))))
+                             (and st (version-tag-in? st) (cons t st))))
+                         pending))
+             (lost (list-filter (map (lambda (pr x) (and (not x) pr)) pending trees) identity)))
+        (for-each (lambda (pr x) (when x (prop-put! pr 'index (tree-index (car x)))))
+                  pending trees)
+        (when (nnull? lost)
+          ;; version markup in the document that is not that of a pending
+          ;; proposal (e.g. the person compared the document with a file)
+          (let* ((tracked (apply + (map (lambda (x) (if x (stree-version-count (cdr x)) 0)) trees)))
+                 (foreign? (> (stree-version-count (tm->stree (sf-body sf))) tracked)))
+            (for (pr lost) (proposals-classify! sf pr foreign?))))))))
 
 (define (proposals-sync! sf)
   ;; tell each agent about its proposals when they changed
@@ -1900,7 +1899,6 @@
     (prop-put! pr 'preview (proposal-preview new-sts old-sts))
     (prop-put! pr 'old old-sts)
     (prop-put! pr 'new new-sts)
-    (prop-put! pr 'markup markup)
     (prop-put! pr 'ndiffs (stree-version-count markup))
     (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
       ;; (the resolved ones are kept for a while, so that the agent hears of them)
