@@ -19,28 +19,25 @@
 ;; construction -- notably a secondary boot file such as texmacs.boot -- can
 ;; see any glue at all.
 ;;
-;; This generator replaces it with static registration.  It reads the same
-;; declarative specifications that build-glue.scm consumes and emits two
-;; artefacts:
+;; This generator replaces it with a table in C++.  It reads the same
+;; declarative specifications that build-glue.scm consumes and writes
 ;;
 ;;   src/Scheme/Chez/glue_chez.cpp
 ;;       forward declarations for every tmg_* entry point, exception-safe
-;;       tmgc_* shims around them, and initialize_glue_chez(), which records
-;;       each shim in Chez's foreign symbol table with Sforeign_symbol().
-;;       That table is pure C, so it can be populated from custom_init()
+;;       tmgc_* shims around them, and the table of the routines: the name,
+;;       the number of arguments and the shim of each.  initialize_glue_chez()
+;;       registers one foreign symbol, tm_glue_table, from custom_init()
 ;;       inside Sbuild_heap(), before any boot file is evaluated.
 ;;
-;;   TeXmacs/progs/kernel/boot/glue-chez.scm
-;;       one (foreign-procedure ...) binding per entry point, which the Chez
-;;       compiler turns into a direct call to the C function.  boot-chez.scm
-;;       includes it, so every name initialize_glue() used to define exists
-;;       by the time any later boot file or module runs.
-;;
-;; Every binding is the same: the foreign procedure, and a procedure of the
-;; name which raises the errors of the C++ side (tm-glue-check).  Strings
-;; cross the boundary as they are, byte strings on both sides
-;; (string_to_tmscm and tmscm_to_string in chez_tm.cpp), so no argument or
-;; result is converted (#947).
+;; As with Guile and s7, nothing is written for the Scheme side: boot-chez.scm
+;; asks the table for the routines while it is loaded, and defines each of
+;; them with the procedure of its number of arguments (tm-glue-procedure),
+;; one foreign-procedure per number of arguments for all the routines.  Chez
+;; cannot make a Scheme procedure of a C function from C, as Guile and s7 do,
+;; and one foreign-procedure and one procedure per routine made 5 MB of
+;; compiled code (#944).  Strings cross the boundary as they are, byte strings
+;; on both sides (string_to_tmscm and tmscm_to_string in chez_tm.cpp), so no
+;; argument or result is converted (#947).
 ;;
 ;; Usage:
 ;;   scheme --script src/Scheme/Chez/build-glue-chez.scm [repo-root]
@@ -71,13 +68,12 @@
 (define *spec-relative-paths* (map car *specs*))
 
 (define *out-cpp-relative-path* "src/Scheme/Chez/glue_chez.cpp")
-(define *out-scm-relative-path* "TeXmacs/progs/kernel/boot/glue-chez.scm")
 
 ;; Routines the C++ side does not provide for Chez Scheme, because their
 ;; definitions and/or registrations in src/Scheme/Glue/glue_basic.cpp sit
 ;; inside
 ;;     #ifndef TEXMACS_ENGINE_CHEZ
-;; blocks.  Emitting a binding for any of them would either fail to link or
+;; blocks.  A table entry for any of them would either fail to link or
 ;; shadow the definition the kernel already has:
 ;;
 ;;   string-load                           defined by boot-chez.scm
@@ -210,8 +206,8 @@
 ;;;      bool (string string))
 ;;;
 ;;; c-function and foreign-symbol differ only for the core predicates, whose C
-;;; functions (treeP, urlP, ...) predate the tmg_ convention while their
-;;; foreign symbols still follow it.
+;;; functions (treeP, urlP, ...) predate the tmg_ convention; the foreign
+;;; symbol names the tmgc_ shim of the routine.
 ;;; ---------------------------------------------------------------------------
 
 (define (e-name e) (car e))
@@ -251,10 +247,6 @@
   (join ", " n (lambda (i) (string-append "tmscm a" (number->string i)))))
 (define (cpp-actuals n) (join ", " n (lambda (i) (string-append "a" (number->string i)))))
 
-(define (scheme-formals n)
-  (join " " n (lambda (i) (string-append "a" (number->string i)))))
-(define (scheme-ffi-types n) (join " " n (lambda (i) "scheme-object")))
-
 ;;; ---------------------------------------------------------------------------
 ;;; C++ artefact
 ;;; ---------------------------------------------------------------------------
@@ -291,13 +283,14 @@
 *     returns.  Any boot file evaluated during heap construction -- a
 *     secondary boot file such as texmacs.boot -- therefore sees no glue.
 *
-* This file replaces that with pure C registration.  Sforeign_symbol() records
-* an entry in Chez's foreign symbol table, which is a plain C array: no heap,
-* no interning, no Scheme call.  initialize_glue_chez() can therefore run from
-* custom_init() inside Sbuild_heap(), before a single boot file is evaluated,
-* and TeXmacs/progs/kernel/boot/glue-chez.scm -- included by boot-chez.scm --
-* binds the same names with (foreign-procedure ...), which the Chez compiler
-* emits as a direct call to the C function instead of a table lookup.
+* This file replaces that with a table: the Scheme name, the number of
+* arguments and the shim of each routine.  initialize_glue_chez() registers
+* one foreign symbol, tm_glue_table, from custom_init() inside Sbuild_heap(),
+* before a single boot file is evaluated; Sforeign_symbol() only writes to a
+* C table.  boot-chez.scm calls it while it is loaded, and defines every
+* routine with the foreign procedure of its number of arguments, called at
+* the address of the shim (tm-glue-procedure): one compiled foreign call per
+* number of arguments, not one per routine (#944).
 *
 * WHY THE tmgc_ SHIMS
 * -------------------
@@ -415,43 +408,57 @@ tmg_error_std (const std::string& e) {
 (define (cpp-table all)
   (string-append
     "\n/* ---------------------------------------------------------------------------\n"
-    " * Foreign symbol table\n"
+    " * The table of the routines\n"
     " *\n"
-    " * The name is what glue-chez.scm passes to foreign-procedure; the pointer is\n"
-    " * the shim, not the raw tmg_* entry point.\n"
+    " * The Scheme name, the number of arguments, and the shim, not the raw tmg_*\n"
+    " * entry point.  The routines of an optional feature are in the table only\n"
+    " * when it is built, so that (defined? 'name) tells whether the build has\n"
+    " * them.\n"
     " * ------------------------------------------------------------------------- */\n"
     "\nstruct tmg_entry {\n"
     "  const char* name;\n"
+    "  int         arity;\n"
     "  void*       fn;\n"
     "};\n"
     "\nstatic const tmg_entry tmg_entries[]= {\n"
     (apply string-append
       (map (lambda (e)
              (cpp-if-feature e
-               (string-append "  { \"" (e-sym e) "\", (void*) tmgc_" (e-cfn e) " },\n")))
+               (string-append "  { \"" (e-name e) "\", "
+                              (number->string (e-arity e))
+                              ", (void*) tmgc_" (e-cfn e) " },\n")))
            all))
     "};\n"
     "\nstatic const int tmg_entry_count=\n"
-    "  (int) (sizeof (tmg_entries) / sizeof (tmg_entries[0]));\n"
-    "\nstatic_assert (sizeof (tmg_entries) / sizeof (tmg_entries[0]) <= 4096,\n"
-    "               \"Chez Scheme: glue foreign symbol table overflow\");\n"))
+    "  (int) (sizeof (tmg_entries) / sizeof (tmg_entries[0]));\n"))
 
 (define (cpp-registration entries)
   (string-append
     "\n/* ---------------------------------------------------------------------------\n"
     " * Registration\n"
     " * ------------------------------------------------------------------------- */\n"
+    "\n/* The routines for boot-chez.scm, which defines them while it is loaded:\n"
+    "   a list of (name arity . address), the address of the shim, which\n"
+    "   foreign-procedure takes in place of the name of a foreign symbol. */\n"
+    "static tmscm\n"
+    "tm_glue_table () {\n"
+    "  tmscm l= Snil;\n"
+    "  for (int i= tmg_entry_count - 1; i >= 0; i--)\n"
+    "    l= Scons (Scons (Sstring_to_symbol (tmg_entries[i].name),\n"
+    "                     Scons (Sfixnum (tmg_entries[i].arity),\n"
+    "                            Sunsigned ((uptr) tmg_entries[i].fn))),\n"
+    "              l);\n"
+    "  return l;\n"
+    "}\n"
     "\nstatic bool tmg_registered= false;\n"
     "\n/* Called from custom_init(), i.e. inside Sbuild_heap() before the boot files\n"
-    "   are evaluated.  That placement is the point of this file: it is what makes\n"
-    "   the glue visible to boot-chez.scm and to any secondary boot file loaded\n"
-    "   during heap construction. */\n"
+    "   are evaluated, so that boot-chez.scm -- and any secondary boot file loaded\n"
+    "   during heap construction -- has the glue. */\n"
     "void\n"
     "initialize_glue_chez () {\n"
     "  if (tmg_registered) return;\n"
     "  tmg_registered= true;\n"
-    "  for (int i= 0; i < tmg_entry_count; i++)\n"
-    "    Sforeign_symbol (tmg_entries[i].name, tmg_entries[i].fn);\n"
+    "  Sforeign_symbol (\"tm_glue_table\", (void*) tm_glue_table);\n"
     "}\n"
     "\nint\n"
     "chez_glue_procedure_count () {\n"
@@ -459,84 +466,13 @@ tmg_error_std (const std::string& e) {
     "}\n"))
 
 ;;; ---------------------------------------------------------------------------
-;;; Scheme artefact
-;;; ---------------------------------------------------------------------------
-
-(define (scm-banner entries)
-  (string-append
-    ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"
-    ";;\n"
-    ";; MODULE      : glue-chez.scm\n"
-    ";; DESCRIPTION : Native FFI bindings for the C++ glue layer\n"
-    ";; COPYRIGHT   : (C) 2026\n"
-    ";;\n"
-    ";; This software falls under the GNU general public license version 3 or\n"
-    ";; later. It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the\n"
-    ";; file LICENSE in the root directory or\n"
-    ";; <http://www.gnu.org/licenses/gpl-3.0.html>.\n"
-    ";;\n"
-    ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"
-    ";;\n"
-    ";; Generated by src/Scheme/Chez/build-glue-chez.scm from\n"
-    ";;   src/Scheme/Glue/build-glue-basic.scm\n"
-    ";;   src/Scheme/Glue/build-glue-editor.scm\n"
-    ";;   src/Scheme/Glue/build-glue-server.scm\n"
-    ";; Do not edit it by hand; re-run the generator instead.\n"
-    ";;\n"
-    ";; boot-chez.scm includes this file, so every name initialize_glue() used to\n"
-    ";; define at run time exists before any later boot file or module is loaded.\n"
-    ";; The C side of each binding is registered by initialize_glue_chez()\n"
-    ";; (src/Scheme/Chez/glue_chez.cpp) from custom_init(), i.e. during\n"
-    ";; Sbuild_heap(), so foreign-procedure can resolve it while this file is\n"
-    ";; being loaded -- and, when boot-chez.scm is compiled, while it is expanded.\n"
-    ";;\n"
-    ";; Plain define, not define-public: boot-chez.scm is loaded and compiled with\n"
-    ";; compile-export-mode? off, where define-public expands to define anyway, and\n"
-    ";; define at the top level of the interaction environment is already global.\n"
-    ";;\n"
-    ";; Strings cross the boundary unchanged, byte strings on both sides\n"
-    ";; (string_to_tmscm and tmscm_to_string in chez_tm.cpp).\n"
-    ";;\n"
-    ";; " (number->string entries) " routines.\n"
-    ";;\n"
-    ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"
-    "\n"))
-
-;; The C function (alias), then the procedure name, whose body calls it.
-;; The routine of an optional feature is defined only when the C++ side
-;; registered it, so that (defined? 'name) tells whether the build has it.
-(define (scm-binding entry alias body)
-  (let* ((n (e-arity entry))
-         (ffi (string-append "(foreign-procedure \"" (e-sym entry) "\" ("
-                             (scheme-ffi-types n) ") scheme-object)"))
-         (formals (string-append (if (= n 0) "" " ") (scheme-formals n))))
-    (if (e-feature entry)
-        (string-append
-          "(when (foreign-entry? \"" (e-sym entry) "\")\n"
-          "  (let ((" alias " " ffi "))\n"
-          "    (define-top-level-value '" (e-name entry) "\n"
-          "      (lambda (" (scheme-formals n) ") " body "))))\n")
-        (string-append
-          "(define " alias "\n  " ffi ")\n"
-          "(define (" (e-name entry) formals ")\n  " body ")\n"))))
-
-(define (scm-glue-binding entry)
-  ;; the C function, then the procedure, which raises its errors
-  (let* ((n (e-arity entry))
-         (sym (e-sym entry))
-         (alias (string-append "c-glue-" (substring sym 4 (string-length sym)))))
-    (scm-binding entry alias
-      (string-append "(tm-glue-check (" alias (if (= n 0) "" " ")
-                     (scheme-formals n) "))"))))
-
-;;; ---------------------------------------------------------------------------
 ;;; Main
 ;;; ---------------------------------------------------------------------------
 
 ;; Stop on the first repeat in `keys`.  A repeat means two spec entries claim
-;; one binding: the generated C++ would define a symbol twice, or two
-;; Sforeign_symbol calls would fight over one foreign name -- both of which only
-;; surface at link or load time, far from the cause.  The C-function check is
+;; one binding: the generated C++ would define a symbol twice, or the table
+;; would define one Scheme name twice -- which only surface at link or load
+;; time, far from the cause.  The C-function check is
 ;; the one that can actually fire, because mangle is lossy (? -> P, - -> _,
 ;; > -> 2, < -> F): "a-b" and "a_b" both become tmg_a_b.
 (define (assert-unique! what keys)
@@ -567,8 +503,7 @@ tmg_error_std (const std::string& e) {
                                  (cadddr e))))
                        kept))
          ;; The core predicates keep their historical C function names but are
-         ;; registered under the same tmg_<mangled> convention as everything
-         ;; else, so glue-chez.scm needs no special case for them.
+         ;; in the table like everything else.
          (core (map (lambda (cp)
                       (let ((name (car cp)) (cfn (cdr cp)))
                         (list name cfn (mangle name) 'bool (list 'object))))
@@ -576,11 +511,10 @@ tmg_error_std (const std::string& e) {
          (all-entries (append entries core))
          (total (length all-entries)))
 
-    ;; Three name spaces, one check each.  This runs before anything is
-    ;; written, so a collision leaves the artefacts untouched.
+    ;; Two name spaces, one check each.  This runs before anything is
+    ;; written, so a collision leaves the artefact untouched.
     (assert-unique! "Scheme name" (map e-name all-entries))
     (assert-unique! "C function name" (map e-cfn all-entries))
-    (assert-unique! "foreign symbol name" (map e-sym all-entries))
 
     (let* ((cpp-text
             (string-append
@@ -589,21 +523,9 @@ tmg_error_std (const std::string& e) {
               (cpp-externs all-entries)
               (cpp-shims all-entries)
               (cpp-table all-entries)
-              (cpp-registration all-entries)))
-           (scm-text
-            (string-append
-              (scm-banner total)
-              (apply string-append (map scm-glue-binding all-entries))
-              "\n"
-              ";;; The names of the glue routines (closure?, boot-chez.scm)\n"
-              "(define tm-glue-names\n  '("
-              (apply string-append
-                     (map (lambda (e) (string-append (e-name e) " "))
-                          all-entries))
-              "))\n")))
+              (cpp-registration all-entries))))
 
       (write-text (under *out-cpp-relative-path*) cpp-text)
-      (write-text (under *out-scm-relative-path*) scm-text)
 
       (display "build-glue-chez: ")
       (display (number->string total))
@@ -612,7 +534,6 @@ tmg_error_std (const std::string& e) {
       (display " core predicates), ")
       (display (number->string (- (length all) (length kept))))
       (display " skipped for Chez\n")
-      (display "  -> ") (display (under *out-cpp-relative-path*)) (newline)
-      (display "  -> ") (display (under *out-scm-relative-path*)) (newline))))
+      (display "  -> ") (display (under *out-cpp-relative-path*)) (newline))))
 
 (build!)

@@ -57,8 +57,7 @@
 ;; directory after a successful build.
 (define *toolchain-files*
   (append
-   (map progs-path '("kernel/boot/boot-chez.scm" "kernel/boot/chez-reader.scm"
-                     "kernel/boot/glue-chez.scm"))
+   (map progs-path '("kernel/boot/boot-chez.scm" "kernel/boot/chez-reader.scm"))
    (map (lambda (f) (string-append *compiler-dir* "/" f))
         '("compile-texmacs.scm" "compiler-helper.scm" "compiler-oracle.scm"
           "compiler-scan.scm" "compiler-db.scm" "compile-graph.scm"

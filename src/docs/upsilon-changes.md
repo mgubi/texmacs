@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 23 November 2026
 
+- **Chez Scheme: a smaller boot image, less memory at start-up** (builds
+  with Chez): the routines of the C++ glue are defined from a table in C++
+  when TeXmacs starts, as with Guile and s7, with one foreign call per number
+  of arguments; one compiled binding per routine (1402) made 5 MB of the
+  boot image. The boot image goes from 20.4 to 18.3 MB, and TeXmacs uses
+  17 MB less memory after start-up (#944).
 - **Chez Scheme: the strings cross between C++ and Scheme unchanged**
   (builds with Chez): each call of a C++ routine from Scheme, and of
   Scheme from C++, copied its strings into bytevectors and walked its

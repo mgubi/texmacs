@@ -593,7 +593,7 @@ GLUE: $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_serve
       $(gluesrc)/glue_treesit.cpp $(gluesrc)/glue_lsp.cpp $(GLUE_CHEZ)
 	$(RM) Objects/glue.o
 
-# also writes ../TeXmacs/progs/kernel/boot/glue-chez.scm
+# the table of the glue routines, which boot-chez.scm defines when it is loaded
 Scheme/Chez/glue_chez.cpp: $(gluesrc)/build-glue-basic.scm $(gluesrc)/build-glue-editor.scm $(gluesrc)/build-glue-server.scm $(gluesrc)/build-glue-treesit.scm $(gluesrc)/build-glue-lsp.scm Scheme/Chez/build-glue-chez.scm
 	cd .. && @CHEZ_BIN@ --script src/Scheme/Chez/build-glue-chez.scm .
 

@@ -73,8 +73,8 @@ A module is recompiled when its source changed (its content hash, or a date
 newer than its `.so`), when its `.so` is missing or was changed, and when a
 module it uses (`:use`, `:inherit`) is recompiled; a change in the kernel
 modules recompiles all. What the graph of modules does not see, the runtime
-(`boot-chez.scm` and the files it includes, `chez-reader.scm` and
-`glue-chez.scm`) and the compiler itself, is covered by a stamp: the content
+(`boot-chez.scm` and the file it includes, `chez-reader.scm`) and the
+compiler itself, is covered by a stamp: the content
 hashes of these files, kept in `$TEXMACS_BOOT_PATH/toolchain-stamp.scm` after
 a successful build; when one of them changes, every module is recompiled.
 `-recompile-modules` recompiles all.

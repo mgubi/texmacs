@@ -37,17 +37,25 @@ rest of TeXmacs uses for every Scheme (`tmscm`, `tmscm_car`,
 
 The specifications of the glue (`src/Scheme/Glue/build-glue-*.scm`) are the
 same for every Scheme. `src/Scheme/Chez/build-glue-chez.scm`, run by Chez,
-generates:
+generates `src/Scheme/Chez/glue_chez.cpp`: one C function `tmg_NAME` per
+routine, wrapped in a shim (`tmgc_tmg_NAME`) that catches C++ exceptions,
+and the table of the routines (1402): the Scheme name, the number of
+arguments and the shim of each. `initialize_glue_chez`, called from
+`custom_init` before the boot files are loaded, registers one foreign
+symbol, `tm_glue_table`, which returns the table as a list of
+`(name arity . address)`.
 
-- `src/Scheme/Chez/glue_chez.cpp`: one C function `tmg_NAME` per routine,
-  wrapped in a shim (`tmgc_tmg_NAME`) that catches C++ exceptions, and
-  `initialize_glue_chez`, which registers them as foreign symbols (1402);
-- `TeXmacs/progs/kernel/boot/glue-chez.scm`: the Scheme side, a
-  `foreign-procedure` per routine, and the list `tm-glue-names`.
-
-Every routine is bound the same way: the foreign procedure (`c-glue-NAME`)
-and the procedure `NAME`, which raises the errors of the C++ side
-(`tm-glue-check`). The arguments and the result go through unchanged.
+As with Guile and s7, nothing is generated for the Scheme side.
+`boot-chez.scm` reads the table when it is loaded and defines each routine
+with `tm-glue-procedure`: the `foreign-procedure` of its number of arguments
+(0 to 10), called at the address of the shim, and `tm-glue-check`, which
+raises the errors of the C++ side. Chez cannot make a procedure of a C
+function from C, so the Scheme side is these eleven foreign procedures for
+all the routines; one `foreign-procedure` and one procedure for each routine
+made 5 MB of compiled code (#944). Each procedure takes exactly the
+arguments of its routine (its arity is checked by `glue-test.scm`), and
+`procedure-name` gives the name of a routine (`tm-glue-names`). The
+arguments and the result go through unchanged.
 
 ## 4.3 Errors across the boundary
 
