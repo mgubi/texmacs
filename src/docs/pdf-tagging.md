@@ -160,10 +160,15 @@ of the names of a Type 1 font, the entries of aNN names are left out; of
 two characters of a glyph, the one of no compatibility block: 文, not
 the Kangxi radical ⽂). The fonts of the pieces of lines and circles
 (line10, lcircle10) have a table of no characters: U+FFFD, not their
-codes. A font drawn as Type 3 (a Metafont font, an emulated symbol)
-maps its codes through its table, as Cork (the ec fonts, Pandora), as
-OT1 (cm, Concrete and Duerer text; typewriter apart), else to U+FFFD
-(`tex_type3_unicode`); never to a control. The vendored
+codes. A font drawn as Type 3 maps its codes (`tex_type3_unicode`): a
+virtual font of TeXmacs (`#virtual-`, `#enhance-`: the emulated symbols)
+to U+FFFD; a font of transformed glyphs (`make_bbb[...]`, `extended`,
+the font effects) through its inner font (make_bbb: the double-struck
+letters); a TeX font through its table (Concrete math: those of cmmi,
+cmsy, msam, cmex, msbm), as Cork (the ec fonts, Pandora), as OT1 (cm,
+Concrete and Duerer text; typewriter apart); a TrueType or OpenType font
+which cannot be embedded (GillSans, the keycaps of LucidaGrande), its
+codes, which are Unicode; another to U+FFFD; never to a control. The vendored
 PDFHummus maps the glyph 0 of a simple font too (a symbol of stmary10 or
 wasy10, which it took for .notdef), and never to 0. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.

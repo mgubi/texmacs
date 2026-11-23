@@ -27,6 +27,8 @@ static const char* tex_math_encodings[][3]= {
   { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
   { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
   { "ccmi", "cmmi", "" }, { "xccmi", "cmmi", "" },
+  { "xccsy", "cmsy", "math-cal" }, { "xccam", "msam", "" },
+  { "xccex", "cmex", "rubber-cmex" }, { "xccbm", "msbm", "math-bbb" },
   { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
   { "grmn", "grmn", "math-upgreek" }, { "grxn", "grmn", "math-upgreek" },
   { "stmary", "stmary", "rubber-stmary" },
@@ -201,8 +203,52 @@ tex_ot1_unicode (int c, bool tt) {
   }
 }
 
+// the double-struck letter or digit of a character (make_bbb)
+static int
+double_struck (int u) {
+  if (u == 'C') return 0x2102;
+  if (u == 'H') return 0x210D;
+  if (u == 'N') return 0x2115;
+  if (u == 'P') return 0x2119;
+  if (u == 'Q') return 0x211A;
+  if (u == 'R') return 0x211D;
+  if (u == 'Z') return 0x2124;
+  if (u >= 'A' && u <= 'Z') return 0x1D538 + (u - 'A');
+  if (u >= 'a' && u <= 'z') return 0x1D552 + (u - 'a');
+  if (u >= '0' && u <= '9') return 0x1D7D8 + (u - '0');
+  return u;
+}
+
+static int
+tex_type3_unicode_sub (string fontname, int c);
+
 int
 tex_type3_unicode (string fontname, int c) {
+  int u= tex_type3_unicode_sub (fontname, c);
+  if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u == 0xfeff || u == 0xfffe ||
+      u > 0x10ffff) u= 0xfffd;
+  return u;
+}
+
+static int
+tex_type3_unicode_sub (string fontname, int c) {
+  // a virtual font of TeXmacs (an emulated symbol): its codes are its own
+  if (search_forwards ("#virtual-", fontname) >= 0 ||
+      search_forwards ("#enhance-", fontname) >= 0) return 0xfffd;
+  // a font of transformed glyphs, name[inner,...]: those of the inner font
+  // (make_bbb: their double-struck forms)
+  int lb= search_forwards ("[", fontname);
+  if (lb > 0 && fontname[N(fontname)-1] == ']') {
+    int end= lb + 1, level= 0;
+    for (; end < N(fontname); end++) {
+      if (fontname[end] == '[') level++;
+      else if (fontname[end] == ']') { if (level == 0) break; level--; }
+      else if (fontname[end] == ',' && level == 0) break;
+    }
+    int u= tex_type3_unicode_sub (fontname (lb + 1, end), c);
+    if (starts (fontname, "make_bbb")) u= double_struck (u);
+    return u;
+  }
   int u= -1;
   array<int> table= tex_math_unicode (fontname);
   if (c >= 0 && c < N(table) && table[c] >= 0) u= table[c];
@@ -224,10 +270,13 @@ tex_type3_unicode (string fontname, int c) {
     else if (starts (base, "ec") || starts (base, "eo") ||
              starts (base, "pn")) u= tex_glyph_unicode (c, false);
     else if (is_ot1 || is_tt) u= tex_ot1_unicode (c, is_tt);
+    // a font of no TeX family, of the name of a TrueType or OpenType font
+    // (Name.k:size.dpitt): its codes are Unicode
+    else if (N(fontname) >= 3 && ends (fontname, "tt") &&
+             is_digit (fontname[N(fontname)-3]) &&
+             search_forwards (":", fontname) >= 0) u= c;
     else u= 0xfffd;
   }
-  if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u == 0xfeff || u == 0xfffe ||
-      u > 0x10ffff) u= 0xfffd;
   return u;
 }
 
