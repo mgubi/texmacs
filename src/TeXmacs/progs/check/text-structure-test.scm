@@ -42,6 +42,7 @@
         (text text-structure)
         (dynamic dynamic-drd)
         (dynamic fold-edit)
+        (dynamic fold-menu)
         (dynamic session-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1528,6 +1529,55 @@
       (check= (snode 4) "End"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Presentations: screens and slideshows when the style changes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A body which is a slideshow (the expanded form of screens) is a
+;; presentation: in beamer, the Screens button is not proposed and choosing
+;; beamer again leaves it alone; another style unwraps a single slide only
+;; (#872, savannah #68928).
+(define (set-style style)
+  ;; set the main style of the current buffer and typeset it
+  (set-style-list (list style))
+  (update-current-buffer)
+  (update-forced))
+
+(define (with-style style)
+  ;; set-main-style, with what it runs once idle
+  (set-style style)
+  (notify-new-style style))
+
+(define (test-presentations)
+  (check-group "presentations")
+  (with slides '(slideshow (document (slide (document "a"))
+                                     (slide (document "b"))))
+    (with-doc `(document ,slides)
+      (lambda ()
+        (edit (set-style "beamer"))
+        (check-true (slideshow-buffer?))
+        (check-false (document-propose-screens?))
+        (edit (with-style "beamer"))
+        (check= (body) `(document ,slides))))
+    (with-doc `(document ,slides)
+      (lambda ()
+        (edit (set-style "beamer"))
+        (edit (with-style "generic"))
+        (check= (body) `(document ,slides)))))
+  (with-doc '(document (slideshow (document (slide (document "a" "b")))))
+    (lambda ()
+      (edit (with-style "generic"))
+      (check= (body) '(document "a" "b"))))
+  (with-doc '(document "a")
+    (lambda ()
+      (edit (set-style "beamer"))
+      (check-true (document-propose-screens?))
+      (edit (with-style "beamer"))
+      (check= (body) '(document (screens (shown (document "a")))))
+      (check-false (document-propose-screens?))
+      (edit (with-style "generic"))
+      (check= (body) '(document "a")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Undo of structured changes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1580,5 +1630,6 @@
   (test-switch-lists)
   (test-dynamic-global)
   (test-sessions)
+  (test-presentations)
   (test-undo)
   (check-end))
