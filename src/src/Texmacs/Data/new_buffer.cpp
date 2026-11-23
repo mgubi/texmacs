@@ -902,6 +902,31 @@ inclusion_value (string name_s) {
   return load_inclusion (url_system (name_s));
 }
 
+static array<tree> given_inclusions;
+
+void
+given_inclusion_add (tree t) {
+  given_inclusions << t;
+}
+
+int
+given_inclusions_count () {
+  return N(given_inclusions);
+}
+
+void
+given_inclusions_clear (int n) {
+  if (n >= 0 && n < N(given_inclusions)) given_inclusions->resize (n);
+}
+
+bool
+is_given_inclusion (tree t) {
+  if (!is_func (t, VAR_INCLUDE, 2)) return false;
+  for (int i=0; i<N(given_inclusions); i++)
+    if (given_inclusions[i].operator-> () == t.operator-> ()) return true;
+  return false;
+}
+
 bool
 inclusion_busy (url name) {
   // Is the inclusion of name currently being processed (cycle detection)?

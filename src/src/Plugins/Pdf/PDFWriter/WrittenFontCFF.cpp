@@ -94,6 +94,14 @@ unsigned short WrittenFontCFF::EncodeGlyph(unsigned int inGlyph,const ULongVecto
 
 	UIntToGlyphEncodingInfoMap::iterator it = mANSIRepresentation->mGlyphIDToEncodedChar.find(inGlyph);
 
+	// TeXmacs: the glyph 0 of a Type 1 font may be one which the text draws
+	// (code 0 of stmary10, wasy10, msam10): the characters given for it
+	// replace the 0 put there first
+	if(it != mANSIRepresentation->mGlyphIDToEncodedChar.end() && inGlyph == 0 &&
+	   inCharacters.size() > 0 && it->second.mUnicodeCharacters.size() == 1 &&
+	   it->second.mUnicodeCharacters[0] == 0)
+		it->second.mUnicodeCharacters = inCharacters;
+
 	if(it == mANSIRepresentation->mGlyphIDToEncodedChar.end())
 	{
 		// as a default position, i'm grabbing the ansi bits. this should display nice characters, when possible

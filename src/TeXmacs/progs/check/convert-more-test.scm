@@ -3222,6 +3222,228 @@
           (check-true (or (has? "/URI (https://example.org/a\\\\b)")
                           (has? "/URI(https://example.org/a\\\\b)")))))))
 
+;; #945: a tagged PDF (PDF/UA-1), by the writer on MuPDF when it is asked
+;; for (TEXMACS_PDF_TAGGED=1, or the preference texmacs->pdf:tagged): a
+;; structure tree in the catalog, which says the PDF is marked and in which
+;; language, the headings, paragraphs, lists, formulas (with their LaTeX as
+;; alternate description) and links of the document as structure elements,
+;; and the links with a description and their place in the structure.
+(define (test-tagged-pdf-export)
+  (check-group "tagged pdf export")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf export" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "tagged.tm"))
+             (pdf (url-append (temp-dir) "tagged.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED"))
+             (body `(document
+                      (section "Title")
+                      (concat "See " (hlink "the site" "https://example.org")
+                              " and " (math "x+1") ".")
+                      (itemize (document (concat (item) "One")
+                                         (concat (item) "Two")))
+                      (with "image-alt" "A drawing"
+                        (image (tuple (raw-data ,(export-png)) "png")
+                               "1cm" "" "" "")))))
+        (string-save (serialize-texmacs (stree->tree (tmfile body))) tm)
+        (load-buffer tm :strict)
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          ;; (the writers differ by their spaces: none is compared)
+          (define s* (string-replace
+                      (string-replace
+                       (string-replace (string-replace s " " "") "\t" "")
+                       "\r" "") "\n" ""))
+          (define (has? what)
+            (>= (string-search-forwards (string-replace what " " "") 0 s*) 0))
+          (check-true (string-starts? s "%PDF-"))
+          (check-true (has? "/StructTreeRoot"))
+          (check-true (has? "/MarkInfo<</Marked true>>"))
+          (check-true (has? "/Lang(en-US)"))
+          (check-true (has? "/DisplayDocTitle true"))
+          (check-true (has? "/Type/Metadata"))
+          (check-true (has? "/S/H1"))
+          (check-true (has? "/S/P"))
+          (check-true (has? "/S/L"))
+          (check-true (has? "/S/LI"))
+          (check-true (has? "/S/Lbl"))
+          (check-true (has? "/S/LBody"))
+          (check-true (has? "/S/Formula"))
+          (check-true (has? "/Alt(x + 1)"))
+          (check-true (has? "/S/Link"))
+          (check-true (has? "/Contents(https://example.org)"))
+          (check-true (has? "/S/Figure"))
+          (check-true (has? "/Alt(A drawing)"))
+          (check-true (has? "/StructParents 0"))
+          (check-true (has? "/Tabs/S"))))))
+
+;; An included document is tagged too: its content keeps its places while the
+;; tagged PDF is typeset (the body of the buffer, with the include replaced
+;; by what it includes, for that time), and the buffer is as it was after.
+(define (test-tagged-pdf-include)
+  (check-group "tagged pdf export: an included document")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf include" "no native PDF writer")
+      (let* ((part (url-append (temp-dir) "tagged-part.tm"))
+             (tm (url-append (temp-dir) "tagged-main.tm"))
+             (pdf (url-append (temp-dir) "tagged-main.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document (section "Part")
+                                          (concat "So " (math "y+2") ".")))))
+                     part)
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document (section "Main") "Main."
+                                          (include "tagged-part.tm")
+                                          "End."))))
+                     tm)
+        (load-buffer tm :strict)
+        (switch-to-buffer tm)
+        (update-forced)
+        (let ((body (tree->stree (buffer-tree)))
+              (parts (tree->stree (get-auxiliary "parts")))
+              (refs (sort (list-references* #f) string<?)))
+          (system-setenv "TEXMACS_PDF_TAGGED" "1")
+          (export-buffer pdf)
+          (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+          (check-true (== (tree->stree (buffer-tree)) body))
+          ;; (the labels of the tags keep their numbers when the document
+          ;; is typeset again: the expanded body numbers them as the body)
+          (update-current-buffer)
+          (update-forced)
+          (check-true (== (sort (list-references* #f) string<?) refs))
+          ;; (the typesetting of the expanded body does not stay in the
+          ;; auxiliary data of the document, which a save would write)
+          (check-true (== (tree->stree (get-auxiliary "parts")) parts))
+          (check-false (buffer-modified? tm)))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define s* (string-replace
+                      (string-replace
+                       (string-replace (string-replace s " " "") "\t" "")
+                       "\r" "") "\n" ""))
+          (define (has? what)
+            (>= (string-search-forwards (string-replace what " " "") 0 s*) 0))
+          (check-true (has? "/StructTreeRoot"))
+          (check-true (has? "/S/H1"))
+          (check-true (has? "/Alt(y + 2)"))))))
+
+;; A document which includes itself (twice) is expanded once: the typesetter
+;; reports the cycle, as without tagging (the expansion grew as 2^16 before)
+;; A picture which is itself a tagged PDF, of no alternative text of the
+;; user's: its structure is grafted in place of its Figure (a Div), its
+;; marked content referred to in its form (/Stm, /StructParents); with an
+;; alternative text, it is a Figure (docs/pdf-tagging.md)
+(define (test-tagged-pdf-graft)
+  (check-group "tagged pdf export: a tagged picture")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf graft" "no native PDF writer")
+      (let* ((pic-tm (url-append (temp-dir) "graft-pic.tm"))
+             (pic (url-append (temp-dir) "graft-pic.pdf"))
+             (tm (url-append (temp-dir) "graft-main.tm"))
+             (pdf (url-append (temp-dir) "graft-main.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document "A paragraph of the picture."
+                                          (itemize
+                                           (document (concat (item) "Item")))))))
+                     pic-tm)
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document
+                                 "Main."
+                                 (big-figure (image "graft-pic.pdf" "6cm" ""
+                                                    "" "")
+                                             "Grafted.")
+                                 (with "image-alt" "A page"
+                                   (image "graft-pic.pdf" "3cm" "" "" ""))))))
+                     tm)
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (load-buffer pic-tm :strict)
+        (export-buffer pic)
+        (load-buffer tm :strict)
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define s* (string-replace
+                      (string-replace
+                       (string-replace (string-replace s " " "") "\t" "")
+                       "\r" "") "\n" ""))
+          (define (has? what)
+            (>= (string-search-forwards (string-replace what " " "") 0 s*) 0))
+          (check-true (has? "/StructParents 2000000"))
+          (check-true (has? "/Stm"))
+          (check-true (has? "/S/LBody"))
+          (check-true (has? "/Alt(A page)"))))))
+
+;; Tagged by default: TEXMACS_PDF_TAGGED=0 (or the preference off) gives
+;; a PDF of no structure
+(define (test-untagged-pdf-export)
+  (check-group "untagged pdf export")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "untagged pdf export" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "untagged.tm"))
+             (pdf (url-append (temp-dir) "untagged.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree (tmfile `(document (section "Title")
+                                                      "Text."))))
+                     tm)
+        (load-buffer tm :strict)
+        (system-setenv "TEXMACS_PDF_TAGGED" "0")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (check-true (string-starts? s "%PDF-"))
+          (check-false (>= (string-search-forwards "StructTreeRoot" 0 s) 0))))))
+
+(define (test-tagged-pdf-cycle)
+  (check-group "tagged pdf export: an include cycle")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf cycle" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "tagged-self.tm"))
+             (pdf (url-append (temp-dir) "tagged-self.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document "Self." (include "tagged-self.tm")
+                                          (include "tagged-self.tm")))))
+                     tm)
+        (load-buffer tm :strict)
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-true (url-exists? pdf))
+        (check-true (< (url-size pdf) 1000000)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3661,6 +3883,10 @@
   (check-suite "convert-more")
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (system-mkdir (temp-dir))
+  ;; (the checks read the objects of the PDF files: none in compressed
+  ;; object streams, which a tagged PDF of MuPDF uses)
+  (define objstms (getenv "TEXMACS_PDF_OBJSTMS"))
+  (system-setenv "TEXMACS_PDF_OBJSTMS" "0")
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
                   test-html-mathjax-formulas test-html-pattern-background
@@ -3681,6 +3907,10 @@
                   test-format-registry test-vernac test-json test-ai-answers
                   test-compress test-compress-tables
                   test-html-escape test-serialize-special test-big-document test-pdf-export
+                  test-tagged-pdf-export test-tagged-pdf-include
+                  test-tagged-pdf-cycle
+                  test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
+  (system-setenv "TEXMACS_PDF_OBJSTMS" (or objstms ""))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

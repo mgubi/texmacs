@@ -42,6 +42,22 @@ have the details, and the problems go to the
 
 ## 22 November 2026
 
+- **Tagged PDF, for accessibility (PDF/UA-1)** (desktop applications):
+  by default (*Preferences → Convert → Pdf → Tagged Pdf, for
+  accessibility* turns it off, as `TEXMACS_PDF_TAGGED=0`), Export as PDF
+  writes the
+  structure of the document for screen readers: headings, paragraphs,
+  lists, tables, footnotes, links and formulas, the formulas described by
+  their LaTeX, in the order of the document, with its language and title;
+  the headers, footers and page numbers are marked as artifacts. Included
+  documents are tagged too. A picture is described by its *alternative
+  text* (*Focus → Alternative text...*), else by its caption. The fonts
+  which a PDF picture (a plot) names without embedding them are embedded,
+  from the TeX Gyre fonts which TeXmacs ships. A picture which is itself a
+  tagged PDF brings its structure along, unless it has an alternative
+  text of its own. veraPDF
+  finds the PDF of the sample documents compliant with PDF/UA-1. The
+  author of a PDF is no longer garbled when it has accents (#945).
 - **TeXmacs works again with Guile 1.8** (builds with Guile): the table
   of the program languages (`program-languages`...) was not visible from
   the modules which use it, so the startup stopped with "Unbound variable:

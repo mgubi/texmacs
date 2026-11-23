@@ -22,5 +22,7 @@ renderer pdf_hummus_renderer (url pdf_file_name, int dpi, int nr_pages= 1,
                               double paper_w= 21.0, double paper_h= 29.7);
 		  
 void hummus_pdf_image_size (url image, int& w, int& h);
+// whether PDFHummus may read the PDF file u: it is not encrypted
+bool hummus_pdf_plain (url u);
 
 #endif // ifdef PDF_HUMMUS_RENDERER_H

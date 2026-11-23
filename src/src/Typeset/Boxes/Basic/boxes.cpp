@@ -564,6 +564,10 @@ box_rep::redraw (renderer ren, path p, rectangles& l) {
   if (ren->is_visible (x3- delta, y3- delta, x4+ delta, y4+ delta)) {
     rectangles ll;
     l= rectangles();
+    // a tagged PDF: what the box draws, and its links (post_display of a
+    // locus), come from its node; its children say their own
+    path tag_old;
+    if (ren->tagger != NULL) { tag_old= ren->tag_ip; ren->tag_ip= ip; }
     pre_display (ren);
     
     int i, item=-1, n=subnr (), i1= n, i2= -1;
@@ -604,6 +608,7 @@ box_rep::redraw (renderer ren, path p, rectangles& l) {
     }
 
     post_display (ren);
+    if (ren->tagger != NULL) ren->tag_ip= tag_old;
   }
   ren->move_origin (-x0, -y0);
 }

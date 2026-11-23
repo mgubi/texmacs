@@ -249,6 +249,11 @@ void DescendentFontWriter::WriteCIDSystemInfo(ObjectIDType inCIDSystemInfoObject
 
 static const std::string scCIDSet = "CIDSet";
 
+// TeXmacs: no CIDSet in a tagged PDF (pdf_hummus_renderer), where PDF/UA
+// asks that one identify exactly the glyphs of the subset, which this one
+// does not; it is optional
+bool hummus_write_cidset= true;
+
 void DescendentFontWriter::WriteCharSet(	DictionaryContext* inDescriptorContext,
 											ObjectsContext* inObjectsContext,
 											FreeTypeFaceWrapper* inFontInfo,
@@ -256,6 +261,7 @@ void DescendentFontWriter::WriteCharSet(	DictionaryContext* inDescriptorContext,
 {
 	(void) inFontInfo;
 	(void) inEncodedGlyphs;
+	if (!hummus_write_cidset) return;
 	// use this hook to Write the CIDSet key, and later write the CIDSet stream. 
 	// ignoring input values for now, assuming they are the same as the ones 
 	// used in the font. 

@@ -94,6 +94,8 @@ struct slanted_font_glyphs_rep: public font_glyphs_rep {
   hashmap<int,glyph> gs;
   slanted_font_glyphs_rep (string name, font_glyphs fng2, double slant2):
     font_glyphs_rep (name), fng (fng2), slant (slant2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))
@@ -204,6 +206,8 @@ struct stretched_font_glyphs_rep: public font_glyphs_rep {
                              double xf2, double yf2):
     font_glyphs_rep (name), fng (fng2),
     xf (xf2), yf (yf2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))
@@ -278,6 +282,8 @@ struct extended_font_glyphs_rep: public font_glyphs_rep {
   extended_font_glyphs_rep (string name, font_glyphs fng2, double xf2, SI p2):
     font_glyphs_rep (name), fng (fng2),
     xf (xf2), penw (p2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))
@@ -369,6 +375,8 @@ struct mono_font_glyphs_rep: public font_glyphs_rep {
   mono_font_glyphs_rep (string name, font_glyphs fng2, SI lw2, SI phw2):
     font_glyphs_rep (name), fng (fng2),
     lw (lw2), phw (phw2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))
@@ -472,6 +480,8 @@ struct bolden_font_glyphs_rep: public font_glyphs_rep {
                           SI dpen2, SI dtot2, SI dver2):
     font_glyphs_rep (name), fng (fng2),
     dpen (dpen2), dtot (dtot2), dver (dver2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))
@@ -743,6 +753,11 @@ struct make_bbb_font_glyphs_rep: public font_glyphs_rep {
 			    SI pw, SI ph, SI fw):
     font_glyphs_rep (name), fng (fng2),
     penw (pw), penh (ph), fatw (fw), gs (error_glyph) {}
+  // (the double-struck forms of the characters of its font)
+  string get_encoding () {
+    string e= fng->get_encoding ();
+    return e == ""? e: "bbb:" * e; }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))

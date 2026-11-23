@@ -214,6 +214,10 @@ struct font_rep: rep<font> {
   virtual void  advance_glyph (string s, int& pos, bool ligf);
   virtual glyph get_glyph (string s);
   virtual int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
+  // the encoding of the codes in which a font of glyphs (a TeX font) is
+  // drawn, said by the font which draws it through this one (the .enc file
+  // of a compound or math font): see font_glyphs_rep::encoding
+  virtual void  add_glyph_encoding (string enc);
 
   array<space> get_spacing_table (int mode, int id, array<array<space> >& t);
   space        get_spacing_entry (int mode, tree t, int i);

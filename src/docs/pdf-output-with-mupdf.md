@@ -604,12 +604,14 @@ well, so a folder of the name of the target is refused.
 * **TeX math fonts**: the glyph names of cmex (`summationdisplay`,
   `parenleftbig`...) mean nothing to a reader, which gave U+FFFD for the
   big operators and delimiters. A `/ToUnicode` of the positions in use is
-  written from `tex_math_unicode` (`Plugins/Metafont/tex_unicode.cpp`,
-  shared with PDFHummus since #341): the encodings of `fonts/enc` and the
-  lists of larger variants of the TFM. The `-` of `cmsy` is the minus sign.
+  written from `tex_encoding_table` (`Plugins/Metafont/tex_unicode.cpp`,
+  shared with PDFHummus since #341): the encoding the fonts drawing the
+  glyphs gave them (`font_glyphs_rep::encoding`: the `.enc` files of
+  `fonts/enc`) and the lists of larger variants of the TFM. The `-` of
+  `cmsy` is the minus sign.
 * **Cyrillic TeX fonts** (T2A, the LH fonts): their glyph names are those
   of the Latin-1 letters at the same positions (`aring` for е), so the map
-  comes from `tex_glyph_unicode`.
+  comes from the T2A table (`tex_glyph_unicode`).
 * **CJK fonts**: MuPDF's map of a CID font takes the first character of a
   glyph, the Kangxi radical (U+2F47) rather than the ideograph (U+65E5);
   `fix_to_unicode` writes it again with the ideograph.
@@ -620,7 +622,7 @@ well, so a folder of the name of the target is refused.
   no text when the font recorded that the glyph stands for nothing (an
   empty `ActualText`). The pieces of an assembled delimiter, which have
   names too, each give the delimiter, as the pieces of the TeX
-  delimiters do (`tex_math_unicode`, as with PDFHummus): `((((`.
+  delimiters do (`tex_encoding_table`, as with PDFHummus): `((((`.
   A name which says nothing is not taken: a number (a font without names
   gives the number of the glyph, which MuPDF reads as a character code),
   `a` and digits, `g` and hexadecimal digits, a name MuPDF does not know

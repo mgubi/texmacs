@@ -57,12 +57,26 @@ struct compound_font_rep: font_rep {
   SI     get_wide_correction  (string s, int mode);
 };
 
+// The encoding of the codes in which the font of an entry is drawn, when
+// they are positions (the .enc file of its charmap; the other charmaps,
+// ec, la..., hand over the text to a font which knows its own)
+static void
+compound_glyph_encoding (scheme_tree def, int i, font fn) {
+  if (is_nil (fn) || i < 0 || i >= N(def) || !is_atomic (def[i][0])) return;
+  string enc= as_string (def[i][0]);
+  if (enc == "any" || enc == "ec" || enc == "hangul" || enc == "la" ||
+      enc == "oriental") return;
+  fn->add_glyph_encoding (enc);
+}
+
 compound_font_rep::compound_font_rep (
   string name, scheme_tree def2, array<font> fn2, double hzf2, double vzf2):
     font_rep (name, fn2[0]),
     def (def2), fn (fn2), cm (load_charmap (map_car (def))),
     hzf (hzf2), vzf (vzf2)
-{}
+{
+  for (int i=0; i<N(fn); i++) compound_glyph_encoding (def, i, fn[i]);
+}
 
 bool
 compound_font_rep::supports (string c) {
@@ -85,6 +99,7 @@ compound_font_rep::advance (string s, int& pos, string& r, int& ch) {
     else
       fn[ch]= find_magnified_font (t, hzf, vzf);
     ASSERT (!is_nil (fn[ch]), "font not found");
+    compound_glyph_encoding (def, ch, fn[ch]);
     //fn[ch]->copy_math_pars (fn[0]);
   }
 }

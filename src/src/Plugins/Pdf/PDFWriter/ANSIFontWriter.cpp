@@ -19,6 +19,7 @@
    
 */
 #include "ANSIFontWriter.h"
+#include <vector>
 #include "ObjectsContext.h"
 #include "FreeTypeFaceWrapper.h"
 #include "DictionaryContext.h"
@@ -306,9 +307,19 @@ void ANSIFontWriter::WriteToUnicodeMap(ObjectIDType inToUnicodeMap)
 	PDFStream* pdfStream = mObjectsContext->StartPDFStream();
 	IByteWriter* cmapWriteContext = pdfStream->GetWriteStream();
 	PrimitiveObjectsWriter primitiveWriter(cmapWriteContext);
-	unsigned long i = 1;
-	UIntAndGlyphEncodingInfoVector::iterator it = mCharactersVector.begin() + 1; // skip 0 glyph
-	unsigned long vectorSize = (unsigned long)mCharactersVector.size() - 1; // cause 0 is not there
+
+	// TeXmacs: the glyph 0 has an entry too when it was given characters:
+	// in a Type 1 font loaded by FreeType it may be a glyph of the font,
+	// which the text draws, not .notdef (stmary10, wasy10), and a tagged
+	// PDF maps every code used (PDF/UA)
+	std::vector<UIntAndGlyphEncodingInfoVector::iterator> entries;
+	UIntAndGlyphEncodingInfoVector::iterator it = mCharactersVector.begin();
+	if (it != mCharactersVector.end()) {
+		if (it->second.mUnicodeCharacters.size() > 0) entries.push_back(it);
+		++it; // the 0 glyph otherwise
+	}
+	for(; it != mCharactersVector.end(); ++it) entries.push_back(it);
+	unsigned long vectorSize = (unsigned long)entries.size();
 
 	cmapWriteContext->Write((const Byte*)scCmapHeader,strlen(scCmapHeader));
 	primitiveWriter.WriteEncodedHexString(scTwoByteRangeStart);
@@ -320,25 +331,23 @@ void ANSIFontWriter::WriteToUnicodeMap(ObjectIDType inToUnicodeMap)
 	else
 		primitiveWriter.WriteInteger(100);
 	primitiveWriter.WriteKeyword(scBeginBFChar);
-	// vectorSize can be zero in a font with custom encoding with a meaningful zero glyph
-	if (vectorSize>0)
-    {
-		WriteGlyphEntry(cmapWriteContext,it->second.mEncodedCharacter,it->second.mUnicodeCharacters);
-		++it;
-
-		for(; it != mCharactersVector.end(); ++it,++i)
+	for(unsigned long i = 0; i < vectorSize; ++i)
+	{
+		if(i > 0 && i % 100 == 0)
 		{
-			if(i % 100 == 0)
-			{
-				primitiveWriter.WriteKeyword(scEndBFChar);
-				if(vectorSize - i < 100)
-					primitiveWriter.WriteInteger(vectorSize - i);
-				else
-					primitiveWriter.WriteInteger(100);
-				primitiveWriter.WriteKeyword(scBeginBFChar);
-			}
-			WriteGlyphEntry(cmapWriteContext,it->second.mEncodedCharacter,it->second.mUnicodeCharacters);
+			primitiveWriter.WriteKeyword(scEndBFChar);
+			if(vectorSize - i < 100)
+				primitiveWriter.WriteInteger(vectorSize - i);
+			else
+				primitiveWriter.WriteInteger(100);
+			primitiveWriter.WriteKeyword(scBeginBFChar);
 		}
+		// (the value 0 which PDFHummus gives the glyph 0 is no character:
+		// U+FFFD, PDF/UA)
+		ULongVector values= entries[i]->second.mUnicodeCharacters;
+		for (ULongVector::iterator v= values.begin(); v != values.end(); ++v)
+			if (*v == 0) *v= 0xfffd;
+		WriteGlyphEntry(cmapWriteContext,entries[i]->second.mEncodedCharacter,values);
 	}
 	primitiveWriter.WriteKeyword(scEndBFChar);
 	cmapWriteContext->Write((const Byte*)scCmapFooter,strlen(scCmapFooter));

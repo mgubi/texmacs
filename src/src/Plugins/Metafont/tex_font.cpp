@@ -91,6 +91,7 @@ struct tex_font_rep: font_rep {
   void  advance_glyph (string s, int& pos, bool ligf);
   glyph get_glyph (string s);
   int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
+  void  add_glyph_encoding (string enc);
   int   get_ligature_code (string s);
   void  special_get_extents (string s, metric& ex);
   void  special_get_xpositions (string s, SI* xpos, bool ligf);
@@ -133,6 +134,24 @@ tex_font_rep::tex_font_rep (string name, int status2,
   mspc         = spc;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
   exec         = !ends (family, "tt");
+
+  // the encoding of the codes drawn (the text of a PDF): that of the kind
+  // of the font; a font of any kind is given its own by the compound or
+  // math font which draws through it (add_glyph_encoding)
+  switch (status) {
+  case TEX_EC: add_glyph_encoding ("cork"); break;
+  // (T2A, not larm.enc: that one gives Є and є at the codes of Ѕ and ѕ)
+  case TEX_LA: add_glyph_encoding ("t2a"); break;
+  case TEX_GR: add_glyph_encoding ("grmn"); break;
+  case TEX_CM:
+    // (the typewriter fonts of TeX, whose ligature program is not run)
+    add_glyph_encoding (!exec || starts (family, "cmtcsc")? "ot1-tt": "ot1");
+    break;
+  case TEX_ADOBE:
+    // (not Dingbats, rpzdr: pictograms at the codes of its own)
+    if (!starts (family, "rpzd")) add_glyph_encoding ("adobe");
+    break;
+  }
 
   y1           = conv (-262080);   // -0.25 quad
   y2           = y1+ display_size; //  0.75 quad
@@ -235,6 +254,14 @@ tex_font_rep::tex_font_rep (string name, int status2,
     rsup_correct= hashmap<string,double> (0.0);
     above_correct= hashmap<string,double> (0.0);
   }
+}
+
+void
+tex_font_rep::add_glyph_encoding (string enc) {
+  // (a family not found: ecrm took its place, its glyphs are Cork)
+  if (is_nil (pk)) return;
+  pk->add_encoding (found? enc: string ("cork"));
+  if (pk->metric == "") pk->metric= tfm->res_name;
 }
 
 /******************************************************************************

@@ -87,7 +87,15 @@ bridge_rewrite_rep::notify_change () {
 
 void
 bridge_rewrite_rep::my_typeset (int desired_status) {
-  initialize (env->rewrite (st));
+  // <include*|f|doc>: the document doc of f, given as a child, is typeset
+  // in place (a tagged PDF, print_doc), its nodes with their own places
+  if (is_given_inclusion (st)) {
+    if (is_nil (body)) body= make_bridge (ttt, st[1], descend (ip, 1));
+    else if (!strong_equal (body->st, st[1]) || body->ip != descend (ip, 1))
+      replace_bridge (body, st[1], descend (ip, 1));
+    body_src= tree ();
+  }
+  else initialize (env->rewrite (st));
   ttt->insert_marker (st, ip);
   if (is_func (st, VAR_INCLUDE)) {
     url save_name= env->cur_file_name;

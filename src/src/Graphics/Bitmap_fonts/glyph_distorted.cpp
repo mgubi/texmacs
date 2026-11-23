@@ -94,6 +94,8 @@ struct distorted_font_glyphs_rep: public font_glyphs_rep {
   hashmap<int,glyph> gs;
   distorted_font_glyphs_rep (string name, font_glyphs fng2, tree k2, int e2):
     font_glyphs_rep (name), fng (fng2), kind (k2), em (e2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))
