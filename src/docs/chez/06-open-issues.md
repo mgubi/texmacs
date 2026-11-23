@@ -23,9 +23,7 @@
     (`chez-promoted-names`): a missing one fails when the macro is used;
   - the private names reached by the tests (`chez-global-names`);
   - `*definition-heads*`, the special cases of `prepare-forms`,
-    `tm-chez-sources`, the raw routines of the glue (`raw-ffi-table.scm`,
-    which overrides the types of the specifications), the modules of the
-    boot image.
+    `tm-chez-sources`, the modules of the boot image.
 - **Top-level conditionals** with definitions inside are decided by the
   compiler, once: a test on a preference or a path would be frozen.
 - **C++ exceptions outside the glue:** a conversion error thrown by

@@ -44,7 +44,7 @@
 ;; binary data.  The TeXmacs Scheme code is written for that (lengths and
 ;; offsets in bytes, Cork in documents, UTF-8 through explicit conversions).
 ;; Files, sources and the console are read and written byte for byte;
-;; strings cross the glue the same way (utf8-bytes->string below).
+;; strings cross the glue as they are (string_to_tmscm, chez_tm.cpp).
 (define tm-byte-transcoder
   (make-transcoder (latin-1-codec) (eol-style none) (error-handling-mode replace)))
 (current-transcoder tm-byte-transcoder)
@@ -67,7 +67,7 @@
                       (loop (fx+ i 1))))))
       s
       (guard (e (else s))
-        (bytevector->string (string->utf8-bytes s)
+        (bytevector->string (string->cork-bytes s)
                             (make-transcoder (utf-8-codec) (eol-style none)
                                              (error-handling-mode raise))))))
 
@@ -231,7 +231,7 @@
 ;; printed as with Guile and s7: <tree ...>, <url a/b>...
 (record-writer tm-blackbox-rtd
   (lambda (b port wr)
-    (display (utf8-bytes->string (c-blackbox->string (tm-blackbox-ptr b))) port)))
+    (display (c-blackbox->string (tm-blackbox-ptr b)) port)))
 
 (record-type-hash-procedure tm-blackbox-rtd
   (lambda (b hash)
@@ -892,13 +892,11 @@
 (import (rnrs io ports))
 
 ;;; ---------------------------------------------------------------------------
-;;; Cork Encoding & FFI Transcoding
-;;; Raw 8-bit Cork bytes (0x00-0xFF) are tunneled through Chez Scheme strings
-;;; (code points U+0000-U+00FF, no EOL translation of 0x0D) to preserve Guile
-;;; 1.8 compatibility (`string-length`, `substring`, `string=?`).
-;;; Implemented as direct fixnum loops rather than R6RS `bytevector->string` /
-;;; `string->bytevector`, which allocate a fresh transcoded port per string.
-;;; Detailed rationale, traps, and bytevector roadmap: see docs/chez/README.md §5.9b.
+;;; Byte strings and bytevectors
+;;; A Scheme string holds bytes (code points U+0000-U+00FF), which cross the
+;;; glue unchanged.  These two loops convert them from and to bytevectors,
+;;; for the files and the system; R6RS bytevector->string and
+;;; string->bytevector would allocate a transcoded port per string.
 ;;; ---------------------------------------------------------------------------
 
 (define (cork-bytes->string bv)
@@ -927,60 +925,6 @@
                             (put-u8 p c)
                             (put-bytevector
                               p (string->utf8 (string (string-ref s j)))))))))))))))
-
-;; Every string crosses the glue byte for byte (see tm-byte-transcoder):
-;; the names say utf8 because the text is UTF-8 by convention, but Cork and
-;; binary data pass the same way, unchanged
-(define (utf8-bytes->string bv) (cork-bytes->string bv))
-(define (string->utf8-bytes s)  (string->cork-bytes s))
-
-(define-syntax recur-transcoder
-  (syntax-rules ()
-    ((_ leaf? transform)
-     (lambda (x)
-       (define (transcode-vec v)
-         (let ((n (vector-length v)))
-           (let vprobe ((i 0))
-             (if (fx= i n)
-                 v
-                 (let* ((el (vector-ref v i))
-                        (el2 (loop el)))
-                   (if (eq? el2 el)
-                       (vprobe (fx+ i 1))
-                       (let ((v2 (make-vector n)))
-                         (do ((j 0 (fx+ j 1))) ((fx= j i))
-                           (vector-set! v2 j (vector-ref v j)))
-                         (vector-set! v2 i el2)
-                         (do ((j (fx+ i 1) (fx+ j 1))) ((fx= j n) v2)
-                           (vector-set! v2 j (loop (vector-ref v j)))))))))))
-       (define (loop x)
-         (cond
-           ((leaf? x) (transform x))
-           ((pair? x)
-            (let ((a (loop (car x)))
-                  (d (loop (cdr x))))
-              (if (and (eq? a (car x)) (eq? d (cdr x)))
-                  x
-                  (cons a d))))
-           ((vector? x) (transcode-vec x))
-           (else x)))
-       (loop x)))))
-
-(define (recur-transcode-bytevector transform)
-  (recur-transcoder bytevector? transform))
-
-(define (recur-transcode-string transform)
-  (recur-transcoder string? transform))
-
-(define recur-utf8->string (recur-transcoder bytevector? utf8-bytes->string))
-(define recur-string->utf8 (recur-transcoder string?     string->utf8-bytes))
-
-;; NOTE on Cork transcoders:
-;; The Scheme string handled by `recur-string->cork` and `recur-cork->string` does
-;; not store a semantic Unicode string, but raw 8-bit Cork encoding packed inside
-;; a 32-bit Unicode string (code points U+0000-U+00FF).
-(define recur-cork->string (recur-transcoder bytevector? cork-bytes->string))
-(define recur-string->cork (recur-transcoder string?     string->cork-bytes))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Native file loading
@@ -1060,7 +1004,7 @@
       (if (eof-object? x) x
           (begin
             (tm-bind-form-keywords x)
-            (recur-string->utf8 (eval x tm-user-env)))))))
+            (eval x tm-user-env))))))
 
 ;; [C++] (tm-load-file f): the engine's file loader.  Calls the primitive
 ;; `load' bound at definition time, not the Guile-compatible `load' that
@@ -1119,7 +1063,7 @@
 ;; src/Scheme/Chez, nor the files of TeXmacs/progs written for Chez
 (define tm-chez-sources
   '("boot-chez.scm" "chez-compat.scm" "chez-reader.scm" "glue-chez.scm"
-    "raw-ffi-table.scm" "init-texmacs-chez.scm" "init-chez-compile.scm"
+    "init-texmacs-chez.scm" "init-chez-compile.scm"
     "init-texmacs-boot-file.scm"))
 
 (define (tm-guile-source? f)
@@ -1157,8 +1101,7 @@
         (display "no continuation in condition\n"))))
 
 ;; [C++] Fixed-arity entry points for call_scheme.
-;; Resolves symbols to top-level procedures, contains exceptions, and
-;; transcodes C++ bytevectors <-> Scheme strings at the Scheme boundary.
+;; Resolves symbols to top-level procedures and contains exceptions.
 (define (tm-handle-call-error e fun args)
   (tm-count-caught-error)
   (display (list 'TM-CALL-ERROR (tm-error-message e) 'FUN: fun 'ARGS: args))
@@ -1170,46 +1113,34 @@
   (cons (tm-condition-key e) (tm-condition-args e)))
 
 (define (tm-call-0 fun)
-  (recur-string->utf8
-    (guard (e (else (tm-handle-call-error e fun '())))
-      (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
-        (proc)))))
+  (guard (e (else (tm-handle-call-error e fun '())))
+    (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
+      (proc))))
 
 (define (tm-call-1 fun a1)
-  (recur-string->utf8
-    (guard (e (else (tm-handle-call-error e fun (list a1))))
-      (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
-        (proc (recur-utf8->string a1))))))
+  (guard (e (else (tm-handle-call-error e fun (list a1))))
+    (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
+      (proc a1))))
 
 (define (tm-call-2 fun a1 a2)
-  (recur-string->utf8
-    (guard (e (else (tm-handle-call-error e fun (list a1 a2))))
-      (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
-        (proc (recur-utf8->string a1)
-              (recur-utf8->string a2))))))
+  (guard (e (else (tm-handle-call-error e fun (list a1 a2))))
+    (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
+      (proc a1 a2))))
 
 (define (tm-call-3 fun a1 a2 a3)
-  (recur-string->utf8
-    (guard (e (else (tm-handle-call-error e fun (list a1 a2 a3))))
-      (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
-        (proc (recur-utf8->string a1)
-              (recur-utf8->string a2)
-              (recur-utf8->string a3))))))
+  (guard (e (else (tm-handle-call-error e fun (list a1 a2 a3))))
+    (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
+      (proc a1 a2 a3))))
 
 (define (tm-call-4 fun a1 a2 a3 a4)
-  (recur-string->utf8
-    (guard (e (else (tm-handle-call-error e fun (list a1 a2 a3 a4))))
-      (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
-        (proc (recur-utf8->string a1)
-              (recur-utf8->string a2)
-              (recur-utf8->string a3)
-              (recur-utf8->string a4))))))
+  (guard (e (else (tm-handle-call-error e fun (list a1 a2 a3 a4))))
+    (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
+      (proc a1 a2 a3 a4))))
 
 (define (tm-call-n fun args)
-  (recur-string->utf8
-    (guard (e (else (tm-handle-call-error e fun args)))
-      (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
-        (apply proc (map recur-utf8->string args))))))
+  (guard (e (else (tm-handle-call-error e fun args)))
+    (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
+      (apply proc args))))
 
 (define (tm-apply fun args)
   (tm-call-n fun args))
@@ -1226,9 +1157,6 @@
 ;;; the bindings below exist for the whole life of the image -- including
 ;;; during the evaluation of a secondary boot file.  See
 ;;; docs/chez/GLUE_CHEZ_PLAN.md.
-;;;
-;;; The transcoded wrappers need recur-string->utf8 / recur-utf8->string,
-;;; which are defined above; the file must therefore stay after them.
 ;;;
 ;;; ---------------------------------------------------------------------------
 ;;; Guile's errors: a key and arguments

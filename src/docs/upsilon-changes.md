@@ -12,6 +12,20 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 23 November 2026
+
+- **Chez Scheme: the strings cross between C++ and Scheme unchanged**
+  (builds with Chez): each call of a C++ routine from Scheme, and of
+  Scheme from C++, copied its strings into bytevectors and walked its
+  arguments and results to convert them back; the strings now pass as they
+  are, as with the other Schemes (#947).
+- **The keyboard of the graphics no longer slows down the menus**: until
+  the graphics keyboard was loaded, each building of a menu evaluated two
+  unknown modes and caught the errors (`in-active-graphics?`, and
+  `graphics-wheel`, a function given as a mode). The mode now exists, and
+  the keys of the documentation of the developers no longer use a variable
+  as a mode (#947).
+
 ## 22 November 2026
 
 - **TeXmacs works again with Guile 1.8** (builds with Guile): the table

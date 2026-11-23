@@ -13,7 +13,7 @@ use.
 
 - The current transcoder is Latin-1, so reading and writing a file keep its
   bytes; the console ports are file-descriptor ports, without transcoding.
-- Strings cross to C++ as bytevectors (see [04](04-cpp-binding.md)).
+- Strings cross to C++ as they are (see [04](04-cpp-binding.md)).
 - File names are byte strings too; `tm-os-path` (`os-path` in
   `chez-compat`) converts them to the Unicode strings that Chez gives to the
   system, for opening files, `file-exists?`, directories.

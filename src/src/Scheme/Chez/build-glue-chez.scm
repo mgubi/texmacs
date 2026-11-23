@@ -36,18 +36,11 @@
 ;;       includes it, so every name initialize_glue() used to define exists
 ;;       by the time any later boot file or module runs.
 ;;
-;; Signature classification.  A routine is bound "raw" (no transcoding at
-;; all) when neither its result nor any of its arguments can carry a
-;; bytevector across the boundary; everything else gets the UTF-8 wrappers
-;; that the old tm-install-procedure! path applied:
-;;
-;;     (recur-utf8->string (c-fn (recur-string->utf8 arg) ...))
-;;
-;; The classification is derived from the declared types rather than copied
-;; from raw-ffi-table.scm, so it stays correct when a signature changes.  It
-;; reproduces that table exactly: of its 441 entries, the 436 that survive the
-;; exclusion list below come out raw here, and nothing outside it does.  That
-;; equality is the check to re-run after touching *tm-string-types*.
+;; Every binding is the same: the foreign procedure, and a procedure of the
+;; name which raises the errors of the C++ side (tm-glue-check).  Strings
+;; cross the boundary as they are, byte strings on both sides
+;; (string_to_tmscm and tmscm_to_string in chez_tm.cpp), so no argument or
+;; result is converted (#947).
 ;;
 ;; Usage:
 ;;   scheme --script src/Scheme/Chez/build-glue-chez.scm [repo-root]
@@ -62,7 +55,7 @@
 ;;; Configuration
 ;;;
 ;;; Top-level constants carry earmuffs, as elsewhere in the kernel
-;;; (*raw-ffi-table*, *boot-chez-loaded*, *traced-so-files*).
+;;; (*boot-chez-loaded*, *traced-so-files*).
 ;;; ---------------------------------------------------------------------------
 
 ;; The declarative specifications, in the order initialize_glue() installs
@@ -79,7 +72,6 @@
 
 (define *out-cpp-relative-path* "src/Scheme/Chez/glue_chez.cpp")
 (define *out-scm-relative-path* "TeXmacs/progs/kernel/boot/glue-chez.scm")
-(define *raw-ffi-table-relative-path* "TeXmacs/progs/kernel/boot/raw-ffi-table.scm")
 
 ;; Routines the C++ side does not provide for Chez Scheme, because their
 ;; definitions and/or registrations in src/Scheme/Glue/glue_basic.cpp sit
@@ -99,28 +91,6 @@
 ;; definitions of boot-chez.scm only serve until this glue is loaded.
 (define *chez-unsupported-names*
   '(string-load string-search-forwards string-search-backwards))
-
-;; The glue type names whose values are Scheme objects holding a TeXmacs
-;; string -- a raw 8-bit bytevector on the C++ side, a Scheme string on the
-;; Scheme side.  Every argument and result of one of these types needs
-;; transcoding at the boundary; every other type is either a number or an
-;; opaque blackbox and crosses untouched.
-;;
-;;   string       bytevector on the C++ side (string_to_tmscm)
-;;   scheme_tree  may hold quoted strings, which scheme_tree_to_tmscm turns
-;;                into bytevectors
-;;   content      tmscm_to_content accepts a string
-;;   object       an untyped Scheme object handle, so anything
-;;   url          tmscm_to_url accepts a string and turns it into a url
-;;   array_url    same, element-wise
-;;   array_string, list_string  arrays and lists of strings
-;;
-;; Opaque handles that never carry text -- tree, path, patch, modification,
-;; observer, widget, promise_widget, command, tree_label -- are not listed:
-;; they cross the boundary as blackboxes, which recur-*-transcode leaves
-;; alone, so transcoding them would only walk the structure for nothing.
-(define *tm-string-types*
-  '(string scheme_tree content object url array_url array_string list_string))
 
 ;; The seven core predicates are not part of the declarative specifications:
 ;; initialize_glue() installs them directly from src/Scheme/Scheme/glue.cpp.
@@ -259,30 +229,6 @@
       (string-append "#ifdef " (e-feature e) "\n" text "#endif\n")
       text))
 
-;; Read the whitelist of raw procedures from raw-ffi-table.scm
-(define *raw-ffi-table* #f)
-
-(define (load-raw-ffi-table!)
-  (let ((forms (read-file-forms (under *raw-ffi-table-relative-path*))))
-    (let loop ((f forms))
-      (cond
-        ((null? f)
-         (error 'build-glue-chez "could not find raw symbol list in raw-ffi-table.scm"))
-        ((and (pair? (car f))
-              (eq? (car (car f)) 'for-each)
-              (pair? (cddr (car f)))
-              (pair? (caddr (car f)))
-              (eq? (car (caddr (car f))) 'quote))
-         (let ((ht (make-eq-hashtable)))
-           (for-each (lambda (s) (hashtable-set! ht s #t)) (cadr (caddr (car f))))
-           (set! *raw-ffi-table* ht)
-           ht))
-        (else (loop (cdr f)))))))
-
-(define (raw-ffi? name)
-  (unless *raw-ffi-table* (load-raw-ffi-table!))
-  (hashtable-ref *raw-ffi-table* (string->symbol name) #f))
-
 ;;; ---------------------------------------------------------------------------
 ;;; Output helpers
 ;;; ---------------------------------------------------------------------------
@@ -309,70 +255,11 @@
   (join " " n (lambda (i) (string-append "a" (number->string i)))))
 (define (scheme-ffi-types n) (join " " n (lambda (i) "scheme-object")))
 
-;; Per-signature encoding overrides for C++ glue procedures whose `string'
-;; parameters or return values carry 8-bit Cork or raw binary bytes instead
-;; of UTF-8.  Keeping this table here avoids modifying upstream's
-;; build-glue-*.scm specs or regenerating glue_basic.cpp.
-;;
-;; Format: (proc-name (ret-enc arg1-enc arg2-enc ...))
-;; Encodings:
-;;   cork -> recur-string->cork (arg) / recur-cork->string (ret)
-;;   utf8 -> recur-string->utf8 (arg) / recur-utf8->string (ret)
-;;   raw  -> pass-through without string transcoding
-;;   #f   -> fall back to default type-based rule
-(define *chez-encoding-overrides*
-  '(("cork->utf8"               (utf8 cork))
-    ("cork->sourcecode"         (utf8 cork))
-    ("escape-to-ascii"          (utf8 cork))
-    ("parse-texmacs"            (utf8 cork))
-    ("parse-texmacs-snippet"    (utf8 cork))
-    ("utf8->cork"               (cork utf8))
-    ("sourcecode->cork"         (cork utf8))
-    ("serialize-texmacs"        (cork utf8))
-    ("serialize-texmacs-snippet" (cork utf8))))
-
-(define (override-enc->type orig-type enc)
-  (case enc
-    ((#f)   orig-type)
-    ((cork) 'cork_string)
-    ((utf8) 'utf8_string)
-    ((raw)  'raw_bytes)
-    (else   (error 'build-glue-chez "unknown encoding override"))))
-
-;; Rewrite an entry's (ret-type arg-types) using *chez-encoding-overrides*
-;; so scheme-arg-transcoder and scheme-ret-transcoder dispatch purely on type.
-(define (apply-encoding-overrides entry)
-  (let* ((name (car entry))
-         (ret (cadr entry))
-         (args (caddr entry))
-         (p (assoc name *chez-encoding-overrides*)))
-    (if (not p)
-        entry
-        (let ((sig (cadr p)))
-          (unless (= (length (cdr sig)) (length args))
-            (error 'build-glue-chez
-                   (string-append "encoding override arity mismatch for " name)))
-          (list name
-                (override-enc->type ret (car sig))
-                (map override-enc->type args (cdr sig)))))))
-
-(define (scheme-arg-transcoder name type)
-  (cond
-    ((or (raw-ffi? name) (eq? type 'raw_bytes)) #f)
-    ((memq type '(cork_string content scheme_tree)) "recur-string->cork")
-    (else "recur-string->utf8")))
-
-(define (scheme-ret-transcoder name ret-type)
-  (cond
-    ((or (raw-ffi? name) (eq? ret-type 'raw_bytes)) #f)
-    ((memq ret-type '(cork_string scheme_tree)) "recur-cork->string")
-    (else "recur-utf8->string")))
-
 ;;; ---------------------------------------------------------------------------
 ;;; C++ artefact
 ;;; ---------------------------------------------------------------------------
 
-(define (cpp-banner entries raw-count)
+(define (cpp-banner entries)
   (string-append "
 /******************************************************************************
 * MODULE     : glue_chez.cpp
@@ -422,8 +309,7 @@
 * what tm_fast_call_N did on the legacy path.  The shim also records the
 * routine name for the diagnostics in chez_tm.hpp.
 *
-* " (number->string entries) " routines: " (number->string raw-count) " bound raw, "
-   (number->string (- entries raw-count)) " with UTF-8 transcoding.
+* " (number->string entries) " routines.
 ******************************************************************************/
 
 #include \"chez_tm.hpp\"
@@ -576,7 +462,7 @@ tmg_error_std (const std::string& e) {
 ;;; Scheme artefact
 ;;; ---------------------------------------------------------------------------
 
-(define (scm-banner entries raw-count)
+(define (scm-banner entries)
   (string-append
     ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"
     ";;\n"
@@ -608,18 +494,10 @@ tmg_error_std (const std::string& e) {
     ";; compile-export-mode? off, where define-public expands to define anyway, and\n"
     ";; define at the top level of the interaction environment is already global.\n"
     ";;\n"
-    ";; Two groups:\n"
+    ";; Strings cross the boundary unchanged, byte strings on both sides\n"
+    ";; (string_to_tmscm and tmscm_to_string in chez_tm.cpp).\n"
     ";;\n"
-    ";;   raw        no argument or result can carry a string, so the binding is\n"
-    ";;              the foreign procedure itself: one direct call, no allocation.\n"
-    ";;\n"
-    ";;   transcoded arguments and results may carry a TeXmacs string, which the\n"
-    ";;              kernel represents as a raw 8-bit bytevector.  The wrapper\n"
-    ";;              converts Scheme strings to bytevectors on the way in and back\n"
-    ";;              on the way out, exactly as tm-install-procedure! did.\n"
-    ";;\n"
-    ";; " (number->string entries) " routines: " (number->string raw-count)
-    " raw, " (number->string (- entries raw-count)) " transcoded.\n"
+    ";; " (number->string entries) " routines.\n"
     ";;\n"
     ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"
     "\n"))
@@ -642,72 +520,14 @@ tmg_error_std (const std::string& e) {
           "(define " alias "\n  " ffi ")\n"
           "(define (" (e-name entry) formals ")\n  " body ")\n"))))
 
-(define (scm-raw-binding entry)
+(define (scm-glue-binding entry)
   ;; the C function, then the procedure, which raises its errors
   (let* ((n (e-arity entry))
-         (alias (string-append "c-glue-raw-" (e-name entry))))
+         (sym (e-sym entry))
+         (alias (string-append "c-glue-" (substring sym 4 (string-length sym)))))
     (scm-binding entry alias
       (string-append "(tm-glue-check (" alias (if (= n 0) "" " ")
                      (scheme-formals n) "))"))))
-
-(define (scheme-arg-actual name i type)
-  (let ((trans (scheme-arg-transcoder name type))
-        (var (string-append "a" (number->string i))))
-    (if trans
-        (string-append "(" trans " " var ")")
-        var)))
-
-(define (scheme-arg-actuals name types)
-  (let loop ((i 1) (types types))
-    (if (null? types)
-        ""
-        (string-append (if (= i 1) "" " ")
-                       (scheme-arg-actual name i (car types))
-                       (loop (+ i 1) (cdr types))))))
-
-;; `string-convert' is TeXmacs's universal character-set converter (e.g. "Cork" -> "UTF-8",
-;; "UTF-8" -> "LaTeX", etc.). C++ never calls Scheme's string-convert (C++ invokes its native
-;; `convert(s, from, to)' in src/Data/String/converter.cpp directly).
-;;
-;; Unlike ordinary glue routines whose encoding is statically determined by glue type signatures,
-;; the encoding of `s` and the return value here depends dynamically on the `from' and `to' arguments:
-;;   - If `from' is "Cork", `s' holds raw 8-bit Cork bytes (must pass via recur-string->cork;
-;;     UTF-8 transcoding would corrupt bytes >= 128 into 2-byte sequences).
-;;   - If `to' is "Cork", C++ outputs raw Cork bytes (must decode via recur-cork->string into
-;;     Scheme characters 0..255).
-;;   - Otherwise, standard UTF-8 / ASCII transcoding applies.
-(define (scm-string-convert-binding alias sym)
-  (string-append
-    ";; Universal character-set converter: dynamically transcode Cork vs UTF-8 based on from/to\n"
-    "(define " alias "\n"
-    "  (foreign-procedure \"" sym "\" (scheme-object scheme-object scheme-object) scheme-object))\n\n"
-    "(define (string-convert s from to)\n"
-    "  (let* ((in-b (if (equal? from \"Cork\") (recur-string->cork s) (recur-string->utf8 s)))\n"
-    "         (f-b  (recur-string->utf8 from))\n"
-    "         (t-b  (recur-string->utf8 to))\n"
-    "         (res  (tm-glue-check (" alias " in-b f-b t-b))))\n"
-    "    (if (equal? to \"Cork\")\n"
-    "        (recur-cork->string res)\n"
-    "        (recur-utf8->string res))))\n\n"))
-
-(define (scm-transcoded-binding entry)
-  (let* ((name (e-name entry))
-         (sym (e-sym entry))
-         (alias (string-append "c-glue-" (substring sym 4 (string-length sym))))
-         (args (e-args entry))
-         (n (length args))
-         (out-trans (scheme-ret-transcoder name (e-ret entry)))
-         (actuals (scheme-arg-actuals name args)))
-    (if (string=? name "string-convert")
-        (scm-string-convert-binding alias sym)
-        ;; Emit two top-level definitions per transcoded glue routine:
-        ;;   1. `c-glue-*': the raw (foreign-procedure ...) registration (no encoding support).
-        ;;   2. `<name>':   the public calling handle that transcodes string args/return values.
-        (let ((call-expr (string-append "(tm-glue-check (" alias (if (= n 0) "" " ") actuals "))")))
-          (string-append
-            (scm-binding entry alias
-              (if out-trans (string-append "(" out-trans " " call-expr ")") call-expr))
-            "\n")))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Main
@@ -741,11 +561,10 @@ tmg_error_std (const std::string& e) {
          ;; (scheme-name c-function foreign-symbol return-type arg-types).
          ;; spec-entries still yields the raw (name return-type arg-types)
          ;; shape at this point.
-         (entries (map (lambda (raw-e)
-                         (let* ((e (apply-encoding-overrides raw-e))
-                                (m (mangle (car e))))
+         (entries (map (lambda (e)
+                         (let ((m (mangle (car e))))
                            (list (car e) m m (cadr e) (caddr e)
-                                 (cadddr raw-e))))
+                                 (cadddr e))))
                        kept))
          ;; The core predicates keep their historical C function names but are
          ;; registered under the same tmg_<mangled> convention as everything
@@ -755,21 +574,7 @@ tmg_error_std (const std::string& e) {
                         (list name cfn (mangle name) 'bool (list 'object))))
                     *core-predicates*))
          (all-entries (append entries core))
-         (raw (filter (lambda (e) (raw-ffi? (e-name e))) all-entries))
-         (wrapped (filter (lambda (e) (not (raw-ffi? (e-name e)))) all-entries))
          (total (length all-entries)))
-
-    ;; Consistency checks:
-    ;; 1. Every symbol in raw-ffi-table must be in all-entries
-    (let ((all-names (map (lambda (e) (string->symbol (e-name e))) all-entries))
-          (raw-table (load-raw-ffi-table!)))
-      (vector-for-each
-        (lambda (s)
-          (unless (memq s all-names)
-            (error 'build-glue-chez
-                   (string-append "symbol in raw-ffi-table not in glue entries: "
-                                  (symbol->string s)))))
-        (hashtable-keys raw-table)))
 
     ;; Three name spaces, one check each.  This runs before anything is
     ;; written, so a collision leaves the artefacts untouched.
@@ -779,7 +584,7 @@ tmg_error_std (const std::string& e) {
 
     (let* ((cpp-text
             (string-append
-              (cpp-banner total (length raw))
+              (cpp-banner total)
               (apply string-append (map cpp-guard-macro '(0 1 2 3 4 5 6 7 8 9 10)))
               (cpp-externs all-entries)
               (cpp-shims all-entries)
@@ -787,20 +592,14 @@ tmg_error_std (const std::string& e) {
               (cpp-registration all-entries)))
            (scm-text
             (string-append
-              (scm-banner total (length raw))
-              ";;; --- Raw bindings: no transcoding, one direct call each -----------\n"
-              "\n"
-              (apply string-append (map scm-raw-binding raw))
-              "\n"
-              ";;; --- Transcoded bindings: UTF-8 at the boundary -------------------\n"
-              "\n"
-              (apply string-append (map scm-transcoded-binding wrapped))
+              (scm-banner total)
+              (apply string-append (map scm-glue-binding all-entries))
               "\n"
               ";;; The names of the glue routines (closure?, boot-chez.scm)\n"
               "(define tm-glue-names\n  '("
               (apply string-append
                      (map (lambda (e) (string-append (e-name e) " "))
-                          (append raw wrapped)))
+                          all-entries))
               "))\n")))
 
       (write-text (under *out-cpp-relative-path*) cpp-text)
@@ -809,10 +608,6 @@ tmg_error_std (const std::string& e) {
       (display "build-glue-chez: ")
       (display (number->string total))
       (display " routines (")
-      (display (number->string (length raw)))
-      (display " raw, ")
-      (display (number->string (length wrapped)))
-      (display " transcoded, ")
       (display (number->string (length core)))
       (display " core predicates), ")
       (display (number->string (- (length all) (length kept))))

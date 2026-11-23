@@ -2,7 +2,7 @@
 
 The Chez port adds about 9600 lines of new files to `TeXmacs/progs`, loaded
 only by Chez: `kernel/boot/boot-chez.scm`, `chez-compat.scm`,
-`chez-reader.scm`, `glue-chez.scm` (generated), `raw-ffi-table.scm`, and the
+`chez-reader.scm`, `glue-chez.scm` (generated), and the
 start-up files `init-texmacs-chez.scm`, `init-texmacs-boot-file.scm`,
 `init-chez-compile.scm`. The changes to the shared files are small. All the
 regression suites pass with them on Chez, s7, Guile 1.8 and femtolisp.

@@ -118,7 +118,9 @@ inline bool tmscm_is_int (tmscm obj)   { return Sfixnump (obj) || Sbignump (obj)
 // an exact integer is accepted where a double is expected, as by s7
 inline bool tmscm_is_double (tmscm obj) {
   return Sflonump (obj) || Sfixnump (obj) || Sbignump (obj); }
-inline bool tmscm_is_string (tmscm obj) { return Sbytevectorp (obj); }
+// a byte string, or a bytevector (string-save), read by tmscm_to_string
+inline bool tmscm_is_string (tmscm obj) {
+  return Sstringp (obj) || Sbytevectorp (obj); }
 inline bool tmscm_is_symbol (tmscm obj) { return Ssymbolp (obj); }
 bool tmscm_is_list (tmscm obj);   /* needs a call to list?; defined in cpp  */
 bool tmscm_is_equal (tmscm o1, tmscm o2); /* needs equal?; defined in cpp   */

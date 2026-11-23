@@ -156,32 +156,46 @@ tmscm_is_equal (tmscm o1, tmscm o2) {
  * >= 128 as UTF-8 expands them into multi-byte sequences (e.g. PNG magic 0x89
  * -> 0xC2 0x89), inflating and corrupting image data (see TODO_CHEZ.md).
  *
- * KNOWN CONSEQUENCE, deliberately kept: a Scheme character above 0xFF cannot
- * cross this bridge.  tmscm_to_string truncates it to its low byte, so
- * U+03BC mu reaches C++ as 0xBC and regtest-xmltm reports one mismatch in the
- * Bx row of latin1-chart.  Fixing that by encoding UTF-8 here breaks binary
- * round-trips through string-load / tmfs-load, so the fix has to distinguish
- * text from byte buffers at the boundary that knows which one it is holding --
- * not inside these two functions.
+ * A Scheme string crosses as it is, one char per byte: no bytevector, and
+ * nothing converted on the Scheme side (#947).  A character above 0xFF (only
+ * integer->char makes one) reaches C++ in UTF-8, as string->cork-bytes
+ * writes it.
  * ---------------------------------------------------------------------- */
 
 tmscm
 string_to_tmscm (string s) {
-  iptr n= (iptr) N (s);
-  tmscm res= Smake_bytevector (n, 0);
-  memcpy (Sbytevector_data (res), &s[0], n);
-  return res;
+  return chez_bytes_to_string (N (s) == 0 ? "" : &s[0], (iptr) N (s));
 }
 
 string
 tmscm_to_string (tmscm s) {
-  if (Sbytevectorp (s)) {
-    iptr n= Sbytevector_length (s);
+  if (Sstringp (s)) {
+    iptr n= Sstring_length (s);
     string r ((int) n);
-    memcpy (&r[0], Sbytevector_data (s), n);
+    for (iptr i= 0; i < n; i++) {
+      unsigned int c= (unsigned int) Sstring_ref (s, i);
+      if (c < 256) r[(int) i]= (char) c;
+      else {
+        // a character above 255: the rest goes through the UTF-8 path
+        string t= r (0, (int) i);
+        for (iptr j= i; j < n; j++) {
+          unsigned int d= (unsigned int) Sstring_ref (s, j);
+          if (d < 256) t << (char) d;
+          else t << encode_as_utf8 (d);
+        }
+        return t;
+      }
+    }
     return r;
   }
-  FAILED ("bytevector expected in tmscm_to_string");
+  if (Sbytevectorp (s)) {
+    // a bytevector given where a string is expected (string-save)
+    iptr n= Sbytevector_length (s);
+    string r ((int) n);
+    if (n > 0) memcpy (&r[0], Sbytevector_data (s), n);
+    return r;
+  }
+  FAILED ("string expected in tmscm_to_string");
   return "";
 }
 
@@ -218,7 +232,7 @@ symbol_to_tmscm (string s) {
   int i, n= N(s);
   for (i=0; i<n; i++)
     if (((unsigned char) s[i]) >= 0x80) break;
-  if (i == n || tm_string_to_symbol == 0) return Sstring_to_symbol (_s);
+  if (i == n) return Sstring_to_symbol (_s);
   // Sstring_to_symbol reads signed chars too: the name has to be made first
   return Scall1 (tm_string_to_symbol, chez_bytes_to_string (_s, (iptr) n));
 }
@@ -397,9 +411,8 @@ eval_scheme (string s) {
 /* ------------------------------------------------------------------------
  * Procedure calls
  *
- * UTF-8 transcoding between C++ bytevectors and Scheme UCS-4 strings is
- * handled on the Scheme side by tm-call-0..4 / tm-call-n (boot-chez.scm)
- * via recur-utf8->string and recur-string->utf8.
+ * The arguments and results cross as they are (string_to_tmscm);
+ * tm-call-0..4 / tm-call-n (boot-chez.scm) contain the errors.
  * ---------------------------------------------------------------------- */
 
 static inline ptr

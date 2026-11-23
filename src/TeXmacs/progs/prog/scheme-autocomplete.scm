@@ -69,7 +69,7 @@
          (filter (lambda (s)
                    (not (or (string-null? s)
                             (string-prefix? "%" s) (string-prefix? "$" s)
-                            (string-prefix? "c-glue-raw-" s)
+                            (string-prefix? "c-glue-" s)
                             (string-prefix? "chez:" s)
                             (string-prefix? "_tm_def_" s))))
                  (map symbol->string

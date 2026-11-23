@@ -17,11 +17,12 @@ rest of TeXmacs uses for every Scheme (`tmscm`, `tmscm_car`,
   locks its Scheme value (`Slock_object`, `object.cpp`); the builders of
   lists and vectors in `glue.cpp` keep their partial results on a locked
   root stack (`ChezRoot`).
-- **Strings** cross as bytevectors: `string_to_tmscm` copies the bytes of a
-  TeXmacs string into a bytevector, `tmscm_to_string` back. On the Scheme
-  side, the wrappers of the glue turn the bytevectors into byte strings and
-  back (`recur-utf8->string` and `recur-string->utf8`, recursively through
-  lists and vectors; the names come from the original UTF-8 strings).
+- **Strings** cross as they are, byte strings on both sides (#947):
+  `string_to_tmscm` makes a Scheme string of the bytes of a TeXmacs string
+  (`chez_bytes_to_string`), `tmscm_to_string` reads them back; a character
+  above 255, which only `integer->char` makes, comes out in UTF-8, and a
+  bytevector is accepted too (`string-save` of binary data). Nothing is
+  converted on the Scheme side.
 - **Strings and symbols made by C++** (`eval_scheme`, `symbol_to_tmscm`, the
   error messages of the glue) are built byte by byte
   (`chez_bytes_to_string`): Chez's `Sstring_of_length` and
@@ -40,14 +41,13 @@ generates:
 
 - `src/Scheme/Chez/glue_chez.cpp`: one C function `tmg_NAME` per routine,
   wrapped in a shim (`tmgc_tmg_NAME`) that catches C++ exceptions, and
-  `initialize_glue_chez`, which registers them as foreign symbols (1187);
+  `initialize_glue_chez`, which registers them as foreign symbols (1402);
 - `TeXmacs/progs/kernel/boot/glue-chez.scm`: the Scheme side, a
   `foreign-procedure` per routine, and the list `tm-glue-names`.
 
-Each routine is bound **raw** (the arguments and the result go through
-unchanged) or **transcoded** (the strings in the arguments and the result
-are converted, recursively). The raw ones are listed in
-`kernel/boot/raw-ffi-table.scm` (444 routines, which take or give no string).
+Every routine is bound the same way: the foreign procedure (`c-glue-NAME`)
+and the procedure `NAME`, which raises the errors of the C++ side
+(`tm-glue-check`). The arguments and the result go through unchanged.
 
 ## 4.3 Errors across the boundary
 
