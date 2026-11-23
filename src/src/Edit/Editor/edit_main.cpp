@@ -505,8 +505,10 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // a tagged PDF (PDF/UA, docs/pdf-tagging.md), and with it the places
   // of what included documents hold
   bool want_tags= suffix (name) == "pdf" && use_pdf () &&
+    // (on by default; TEXMACS_PDF_TAGGED=0 or 1 decides over the preference)
     (get_env ("TEXMACS_PDF_TAGGED") == "1" ||
-     get_preference ("texmacs->pdf:tagged", "off") == "on");
+     (get_env ("TEXMACS_PDF_TAGGED") != "0" &&
+      get_preference ("texmacs->pdf:tagged", "on") == "on"));
   env->style_init_env ();
   env->update ();
   // a tagged PDF typesets the included documents in place of their

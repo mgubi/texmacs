@@ -152,10 +152,12 @@ string pdf_strip_marked_content (string s, array<bool>& open, bool& changed);
 // The same for a grafted picture: its artifacts and the marked content of
 // the MCIDs keep (those of its elements) stay; any other marked content is
 // an artifact
-string pdf_graft_marked_content (string s, hashset<int> keep, bool& changed);
-// Whether all that the content s paints is in marked content (a picture
-// whose structure is grafted: else the rest would be untagged)
-bool pdf_content_fully_marked (string s);
+// (props: the MCIDs of the names of the properties of its resources); ok
+// says whether all that the result paints is tagged or an artifact, its
+// blocks balanced: else the picture is not grafted
+string pdf_graft_marked_content (string s, hashset<int> keep,
+                                 hashmap<string,int> props, bool& changed,
+                                 bool& ok);
 
 // the XMP metadata of a tagged PDF (UTF-8 title and author), with the part
 // of PDF/UA it follows

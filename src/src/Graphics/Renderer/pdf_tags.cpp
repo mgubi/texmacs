@@ -461,27 +461,96 @@ pdf_graft_prune (array<int> parent, array<string> role, array<string> alt,
   return g;
 }
 
-// the number after /MCID in the operands s of a BDC, -1 if none
+// The MCID of a BDC of operands s: the /MCID of its dictionary of
+// properties, or of the one its name gives (props: those of the
+// resources); -1 if none. (Strings are skipped: an /MCID in a string is
+// not one.)
 static int
-operand_mcid (string s) {
-  int i= search_forwards ("/MCID", s);
-  if (i < 0) return -1;
-  i += 5;
-  while (i < N(s) && pdf_white (s[i])) i++;
-  int j= i;
-  while (j < N(s) && j < i + 9 && is_digit (s[j])) j++;
-  return (j > i? as_int (s (i, j)): -1);
+operand_mcid (string s, hashmap<string,int> props) {
+  int n= N(s), i= 0, depth= 0, names= 0;
+  bool want= false;
+  while (i < n) {
+    char c= s[i];
+    if (pdf_white (c)) { i++; continue; }
+    if (c == '(') {
+      int level= 0;
+      for (; i < n; i++) {
+        if (s[i] == '\\') { i++; continue; }
+        if (s[i] == '(') level++;
+        else if (s[i] == ')' && --level == 0) { i++; break; }
+      }
+      want= false; continue;
+    }
+    if (c == '<' && i+1 < n && s[i+1] == '<') { depth++; i += 2; continue; }
+    if (c == '>' && i+1 < n && s[i+1] == '>') { depth--; i += 2; continue; }
+    if (c == '<') { while (i < n && s[i] != '>') i++; i++; want= false; continue; }
+    int start= i;
+    i++;
+    while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
+    string tok= s (start, i);
+    if (depth == 0 && c == '/') {
+      // the tag, then the name of the properties
+      if (++names == 2) return props->contains (tok) ? props [tok]: -1;
+      continue;
+    }
+    if (want) {
+      if (N(tok) > 0 && N(tok) <= 9 && is_digit (tok[0])) return as_int (tok);
+      want= false;
+    }
+    if (depth == 1 && tok == "/MCID") want= true;
+  }
+  return -1;
+}
+
+// Whether the content t of a grafted picture is all tagged: each painting
+// operator in kept marked content or in an artifact, never one in the
+// other, every block closed (else the picture is not grafted)
+static bool
+graft_content_ok (string t, hashset<int> keep, hashmap<string,int> props) {
+  array<pdf_content_op> ops= pdf_content_ops (t);
+  array<int> stack;   // 1 tagged, 2 artifact, 0 other
+  for (int k=0; k<N(ops); k++) {
+    pdf_content_op& o= ops[k];
+    string op= o.op;
+    if (op == "BDC" || op == "BMC") {
+      int kind= 0;
+      if (o.first == "/Artifact") kind= 2;
+      else if (op == "BDC") {
+        int m= operand_mcid (t (o.seg, o.start), props);
+        if (m >= 0 && keep->contains (m)) kind= 1;
+        else if (m >= 0) return false;   // (an MCID of no element)
+      }
+      for (int j=0; j<N(stack); j++)
+        if ((stack[j] == 1 && kind == 2) || (stack[j] == 2 && kind == 1))
+          return false;
+      stack << kind;
+    }
+    else if (op == "EMC") {
+      if (N(stack) == 0) return false;
+      stack->resize (N(stack) - 1);
+    }
+    else if (op == "Tj" || op == "TJ" || op == "'" || op == "\"" ||
+             op == "Do" || op == "BI" || op == "sh" || op == "f" ||
+             op == "F" || op == "f*" || op == "B" || op == "B*" ||
+             op == "b" || op == "b*" || op == "S" || op == "s") {
+      bool marked= false;
+      for (int j=0; j<N(stack); j++) if (stack[j] != 0) marked= true;
+      if (!marked) return false;
+    }
+  }
+  return N(stack) == 0;
 }
 
 string
-pdf_graft_marked_content (string s, hashset<int> keep, bool& changed) {
+pdf_graft_marked_content (string s, hashset<int> keep,
+                          hashmap<string,int> props, bool& changed,
+                          bool& ok) {
   array<pdf_content_op> ops= pdf_content_ops (s);
   int n= N(ops);
   // the marked content of the MCIDs of no element: an artifact, unless it
-  // holds marked content which is kept (tagged content may not be in an
-  // artifact): then it is taken out
-  // (and the picture's own irregularities: an artifact in tagged content,
-  // or which holds some, is taken out too)
+  // holds marked content which is kept, or is in some (tagged content may
+  // not be in an artifact, nor an artifact in it): then it is taken out;
+  // the same for the picture's own artifacts there
   array<int> kind (n);     // for a BDC or a BMC: 0 kept, 1 artifact, 2 out
   array<int> stack;
   array<bool> holds (n), inside (n), artifact (n);
@@ -495,7 +564,7 @@ pdf_graft_marked_content (string s, hashset<int> keep, bool& changed) {
         if (kind[stack[j]] == 3) inside[k]= true;
       if (o.first == "/Artifact") artifact[k]= true;
       else if (o.op == "BDC") {
-        int m= operand_mcid (s (o.seg, o.start));
+        int m= operand_mcid (s (o.seg, o.start), props);
         if (m >= 0 && keep->contains (m)) kept= true;
         else if (m >= 0) kind[k]= 1;
       }
@@ -519,36 +588,22 @@ pdf_graft_marked_content (string s, hashset<int> keep, bool& changed) {
     pdf_content_op& o= ops[k];
     int how= 0;
     if (o.op == "BDC" || o.op == "BMC") { how= kind[k]; stack << how; }
-    else if (o.op == "EMC" && N(stack) > 0) {
-      how= stack[N(stack)-1];
-      stack->resize (N(stack) - 1);
-      if (how == 1) how= 0;   // (its EMC stays)
+    else if (o.op == "EMC") {
+      if (N(stack) == 0) how= 2;   // (a stray EMC)
+      else {
+        how= stack[N(stack)-1];
+        stack->resize (N(stack) - 1);
+        if (how == 1) how= 0;   // (its EMC stays)
+      }
     }
     if (how == 0) r << s (o.seg, o.end);
-    else if (how == 1) { r << s (o.seg, o.seg) << "\n/Artifact BMC"; changed= true; }
+    else if (how == 1) { r << "\n/Artifact BMC"; changed= true; }
     else { r << "\n"; changed= true; }
     last= o.end;
   }
   r << s (last, N(s));
+  ok= graft_content_ok (r, keep, props);
   return r;
-}
-
-bool
-pdf_content_fully_marked (string s) {
-  array<pdf_content_op> ops= pdf_content_ops (s);
-  int depth= 0;
-  for (int k=0; k<N(ops); k++) {
-    string op= ops[k].op;
-    if (op == "BDC" || op == "BMC") depth++;
-    else if (op == "EMC") { if (depth > 0) depth--; }
-    else if (depth == 0 &&
-             (op == "Tj" || op == "TJ" || op == "'" || op == "\"" ||
-              op == "Do" || op == "BI" || op == "sh" || op == "f" ||
-              op == "F" || op == "f*" || op == "B" || op == "B*" ||
-              op == "b" || op == "b*" || op == "S" || op == "s"))
-      return false;
-  }
-  return true;
 }
 
 string

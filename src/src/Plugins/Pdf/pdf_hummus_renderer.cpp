@@ -2218,6 +2218,50 @@ hummus_form_ids (PDFParser& p, PDFDictionary* res, array<int>& ids,
   }
 }
 
+// Whether PDFHummus reads the PDF file u as it is: it parses, and is not
+// encrypted (its incremental update and its parser of the structure do
+// not decrypt: an encrypted picture made the export crash)
+bool
+hummus_pdf_plain (url u) {
+  // (by its bytes: the parser of PDFHummus itself crashed on some)
+  string s;
+  if (load_string (u, s, false)) return false;
+  if (!starts (s, "%PDF-")) return false;
+  return search_forwards ("/Encrypt", s) < 0;
+}
+
+// the MCIDs of the names of the properties of the resources res
+static hashmap<string,int>
+hummus_props (PDFParser& p, PDFDictionary* res) {
+  hashmap<string,int> r (-1);
+  if (res == NULL) return r;
+  PDFObjectCastPtr<PDFDictionary> pr (p.QueryDictionaryObject (res, "Properties"));
+  if (!pr) return r;
+  MapIterator<PDFNameToPDFObjectMap> it= pr->GetIterator ();
+  while (it.MoveNext ()) {
+    std::string k= it.GetKey ()->GetValue ();
+    PDFObjectCastPtr<PDFDictionary> d (p.QueryDictionaryObject (pr.GetPtr (), k));
+    if (!d) continue;
+    PDFObjectCastPtr<PDFInteger> m (p.QueryDictionaryObject (d.GetPtr (), "MCID"));
+    if (!m) continue;
+    r ("/" * string (k.c_str (), (int) k.size ()))= (int) m->GetValue ();
+  }
+  return r;
+}
+
+// the resources of the first page of a document
+static PDFDictionary*
+hummus_page_resources (PDFParser& p, PDFDictionary* page) {
+  PDFObjectCastPtr<PDFDictionary> res (p.QueryDictionaryObject (page, "Resources"));
+  if (!res) {
+    PDFObjectCastPtr<PDFDictionary> parent (p.QueryDictionaryObject (page, "Parent"));
+    if (!!parent) res= p.QueryDictionaryObject (parent.GetPtr (), "Resources");
+  }
+  PDFDictionary* r= res.GetPtr ();
+  if (r != NULL) r->AddRef ();
+  return r;
+}
+
 // the decoded content of the stream id, and its dictionary
 static bool
 hummus_read_stream (PDFParser& p, int id, string& s,
@@ -2268,7 +2312,7 @@ hummus_write_content (ObjectsContext& oc, PDFDocumentCopyingContext* cc,
 static bool
 hummus_strip_streams (PDFParser& p, ObjectsContext& oc,
                       PDFDocumentCopyingContext* cc, array<int> ids,
-                      hashset<int>* keep) {
+                      hashset<int>* keep, hashmap<string,int> props) {
   string s;
   array<RefCountPtr<PDFDictionary> > ds;
   bool structured= false;
@@ -2282,7 +2326,9 @@ hummus_strip_streams (PDFParser& p, ObjectsContext& oc,
   }
   bool changed= false;
   array<bool> open;
-  string t= (keep != NULL? pdf_graft_marked_content (s, *keep, changed):
+  bool ok= true;
+  string t= (keep != NULL? pdf_graft_marked_content (s, *keep, props,
+                                                     changed, ok):
                            pdf_strip_marked_content (s, open, changed));
   if (!changed && !structured) return false;
   for (int k=0; k<N(ids); k++)
@@ -2295,6 +2341,7 @@ hummus_strip_streams (PDFParser& p, ObjectsContext& oc,
 // when there was nothing to change or when it failed
 static bool
 hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
+  if (!hummus_pdf_plain (in)) return false;
   PDFWriter w;
   string sin= concretize (in), sout= concretize (out);
   if (w.ModifyPDF (std::string (&sin[0], N(sin)), ePDFVersion17,
@@ -2303,6 +2350,7 @@ hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
   PDFParser& p= w.GetModifiedFileParser ();
   ObjectsContext& oc= w.GetObjectsContext ();
   array<int> ids, contents, forms;
+  hashmap<string,int> props (-1);
   {
     RefCountPtr<PDFDictionary> page (p.ParsePage (0));
     if (!page) { w.EndPDF (); return false; }
@@ -2316,6 +2364,7 @@ hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
     hashset<int> visited;
     hummus_font_dicts (p, res.GetPtr (), ids, 0, visited);
     hummus_form_ids (p, res.GetPtr (), forms, 0);
+    props= hummus_props (p, res.GetPtr ());
     RefCountPtr<PDFObject> c (page->QueryDirectObject ("Contents"));
     if (!!c && c->GetType () == PDFObject::ePDFObjectIndirectObjectReference)
       contents << (int) ((PDFIndirectObjectReference*) c.GetPtr ())->mObjectID;
@@ -2332,12 +2381,13 @@ hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
   {
     PDFDocumentCopyingContext* cc= w.CreatePDFCopyingContextForModifiedFile ();
     if (cc != NULL) {
-      if (N(contents) > 0 && hummus_strip_streams (p, oc, cc, contents, keep))
+      if (N(contents) > 0 &&
+          hummus_strip_streams (p, oc, cc, contents, keep, props))
         done++;
       for (int k=0; k<N(forms); k++) {
         array<int> one;
         one << forms[k];
-        if (hummus_strip_streams (p, oc, cc, one, NULL)) done++;
+        if (hummus_strip_streams (p, oc, cc, one, NULL, props)) done++;
       }
       delete cc;
     }
@@ -2569,6 +2619,30 @@ pdf_image_rep::flush (PDFWriter& pdfw, hashmap<string,pointer>* shared,
     }
 
   }
+  // an encrypted picture, which PDFHummus does not read (it damages its
+  // memory), is written again by Ghostscript first, or else is the
+  // placeholder
+  if (!hummus_pdf_plain (temp)) {
+    bool done= false;
+#ifdef USE_GS
+    url clear= url_temp (".pdf");
+    if (gs_PDF_EmbedAllFonts (temp, clear) && hummus_pdf_plain (clear)) {
+      if (!is_none (name)) remove (temp);
+      else name= u;
+      temp= clear;
+      done= true;
+    }
+    else remove (clear);
+#endif
+    if (!done) {
+      convert_error << "pdf_hummus, cannot include " << u
+                    << " (encrypted or damaged)" << LF;
+      if (!is_none (name)) remove (temp);
+      name= u;
+      temp= url_temp (".pdf");
+      copy ("$TEXMACS_PATH/misc/pixmaps/unknown.pdf", temp);
+    }
+  }
   if (hummus_embed_fonts) {
     url with_fonts= url_temp (".pdf");
     if (hummus_embed_picture_fonts (temp, with_fonts,
@@ -2596,6 +2670,23 @@ pdf_image_rep::flush (PDFWriter& pdfw, hashmap<string,pointer>* shared,
     else delete copyingContext;
   }
   if(!is_none(name) && !kept) remove (temp);
+  // (a picture which cannot be copied, a damaged file: the placeholder, or
+  // the form, referred to on the pages, would be missing from the PDF)
+  if (status == PDFHummus::eFailure && !kept) {
+    url unknown= "$TEXMACS_PATH/misc/pixmaps/unknown.pdf";
+    url with_fonts= url_temp (".pdf");
+    bool embedded= (hummus_embed_fonts &&
+                    hummus_embed_picture_fonts (unknown, with_fonts, NULL));
+    if (embedded) unknown= with_fonts;
+    char* _unk= as_charp (concretize (unknown));
+    PDFDocumentCopyingContext* uc= pdfw.CreatePDFCopyingContext (_unk);
+    tm_delete_array (_unk);
+    if (uc != NULL) {
+      status= merge (uc, pdfw, unknown);
+      delete uc;
+    }
+    if (embedded) remove (with_fonts);
+  }
   
   if (status == PDFHummus::eFailure) {
     convert_error << "pdf_hummus, failed to include image file: "
@@ -2605,6 +2696,15 @@ pdf_image_rep::flush (PDFWriter& pdfw, hashmap<string,pointer>* shared,
 
 void
 hummus_pdf_image_size (url image, int& w, int& h) {
+  // (PDFHummus damages its memory on an encrypted file: Ghostscript then)
+  if (!hummus_pdf_plain (image)) {
+#ifdef USE_GS
+    gs_PDFimage_size (image, w, h);
+#else
+    w= h= 0;
+#endif
+    return;
+  }
   InputFile pdfFile;
   PDFParser* parser= new PDFParser();
   pdfFile.OpenFile(as_charp(concretize(image)));
@@ -3021,7 +3121,7 @@ hummus_graft_walk (PDFParser& p, PDFDictionary* rolemap, PDFObject* k,
 static bool
 hummus_graft_read (url u, pdf_tag_graft& r, hashset<int>& keep) {
   url name= resolve (u);
-  if (is_none (name)) return false;
+  if (is_none (name) || !hummus_pdf_plain (name)) return false;
   InputFile f;
   string path= concretize (name);
   if (f.OpenFile (std::string (&path[0], N(path))) != PDFHummus::eSuccess)
@@ -3042,6 +3142,8 @@ hummus_graft_read (url u, pdf_tag_graft& r, hashset<int>& keep) {
   hummus_graft_walk (p, rm.GetPtr (), k.GetPtr (), -1, 0,
                      p.GetPageObjectID (0), g, 0);
   if (g.stm || g.steps > 200000) return false;
+  r= pdf_graft_prune (g.parent, g.role, g.alt, g.owner, g.val, g.mcids, keep);
+  if (N(r.roles) == 0) return false;
   // (all that the page paints is in marked content: else it would be
   // untagged; the picture is then a Figure)
   RefCountPtr<PDFDictionary> page (p.ParsePage (0));
@@ -3064,9 +3166,12 @@ hummus_graft_read (url u, pdf_tag_graft& r, hashset<int>& keep) {
     if (!hummus_read_stream (p, cids[j], content, d)) return false;
     content << "\n";
   }
-  if (!pdf_content_fully_marked (content)) return false;
-  r= pdf_graft_prune (g.parent, g.role, g.alt, g.owner, g.val, g.mcids, keep);
-  return N(r.roles) > 0;
+  // (all that the content of the graft paints is tagged or an artifact)
+  RefCountPtr<PDFDictionary> res (hummus_page_resources (p, page.GetPtr ()));
+  bool changed= false, ok= false;
+  (void) pdf_graft_marked_content (content, keep, hummus_props (p, res.GetPtr ()),
+                                   changed, ok);
+  return ok;
 }
 
 void
@@ -3082,7 +3187,10 @@ pdf_hummus_renderer_rep::image (
   // form for each of its uses (an element is in one place of the tree)
   pdf_tag_graft g;
   hashset<int> keep;
+  // (not when the pictures are distilled again by Ghostscript, whose copy
+  // has other marked content)
   bool may= (tagger != NULL && contentContext != NULL &&
+              get_preference ("texmacs->pdf:distill inclusion") != "on" &&
               tg ()->can_graft (tag_ip) &&
               !untagged_files->contains (as_string (u)) &&
               locase_all (suffix (u)) == "pdf");

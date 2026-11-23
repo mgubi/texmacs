@@ -10,9 +10,10 @@ issue #945. A user had resorted to exporting to Typst
 ([texmacs-typst-exporter](https://github.com/ingolfschaefer/texmacs-typst-exporter)),
 which gives up the typesetting of TeXmacs.
 
-Both PDF writers write a tagged PDF when asked: *Preferences → Convert →
-Pdf → Tagged Pdf, for accessibility*, the preference
-`texmacs->pdf:tagged`, or `TEXMACS_PDF_TAGGED=1` -- the writer on MuPDF
+Both PDF writers write a tagged PDF, by default: *Preferences → Convert →
+Pdf → Tagged Pdf, for accessibility*, the preference `texmacs->pdf:tagged`
+(on), turns it off, and `TEXMACS_PDF_TAGGED=0` or `1` decides over the
+preference -- the writer on MuPDF
 (`src/Plugins/MuPDF/mupdf_pdf_renderer.cpp`, Vue since #942) and
 PDFHummus (`src/Plugins/Pdf/pdf_hummus_renderer.cpp`, Qt and Cocoa). What
 they share (the elements, the blocks of marked content, the order of the
@@ -203,6 +204,15 @@ content (its tags, its artifacts) and a structure of its own.
   the optional content (`BDC /OC`), and the `/StructParents` of its forms
   (`pdf_strip_marked_content`, in `pdf_tags.cpp`).
 
+Whether a picture is grafted is decided on the content the graft gives
+(`pdf_graft_marked_content`): all it paints tagged or an artifact, its
+blocks balanced; an MCID is read from the properties of a BDC or from
+the resource its name gives. PDFHummus does not graft when the pictures
+are distilled again (Ghostscript), and never reads an encrypted picture
+(its parser damages its memory, also untagged): Ghostscript gives its
+size and an unencrypted copy, or else the placeholder is included; a
+picture it cannot copy is the placeholder too, its fonts embedded.
+
 The lexer of the content skips the data of an inline image by its length,
 and the streams of a page are one content. The fonts and the forms of a
 picture are each read once (a picture may make cycles), and a font which
@@ -245,4 +255,3 @@ in the Matterhorn Protocol.
   fonts in a thesis of the corpus) is forbidden by PDF/UA (7.21.8).
 * **PDF/UA-2** (PDF 2.0): MathML as associated files of the formulas,
   the namespaces of PDF 2.0.
-* Tagging by default, once tried with screen readers and the viewers.

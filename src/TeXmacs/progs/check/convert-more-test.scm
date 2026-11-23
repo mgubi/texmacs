@@ -3394,6 +3394,32 @@
           (check-true (has? "/S/LBody"))
           (check-true (has? "/Alt(A page)"))))))
 
+;; Tagged by default: TEXMACS_PDF_TAGGED=0 (or the preference off) gives
+;; a PDF of no structure
+(define (test-untagged-pdf-export)
+  (check-group "untagged pdf export")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "untagged pdf export" "no native PDF writer")
+      (let* ((tm (url-append (temp-dir) "untagged.tm"))
+             (pdf (url-append (temp-dir) "untagged.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree (tmfile `(document (section "Title")
+                                                      "Text."))))
+                     tm)
+        (load-buffer tm :strict)
+        (system-setenv "TEXMACS_PDF_TAGGED" "0")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (check-true (string-starts? s "%PDF-"))
+          (check-false (>= (string-search-forwards "StructTreeRoot" 0 s) 0))))))
+
 (define (test-tagged-pdf-cycle)
   (check-group "tagged pdf export: an include cycle")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
@@ -3879,7 +3905,7 @@
                   test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-tagged-pdf-export test-tagged-pdf-include
                   test-tagged-pdf-cycle
-                  test-tagged-pdf-graft
+                  test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

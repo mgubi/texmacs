@@ -319,6 +319,9 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   hashmap<int,int> graft_of;       // by number of their forms
   hashset<string> untagged_files;  // the pictures which have none
   array<pdf_obj*> graft_forms;     // the form of each graft (pdf_tags)
+  hashmap<string,pointer> graft_docs;   // a grafted picture's document and
+  hashmap<string,pointer> graft_maps;   // map, for its other uses: one
+                                        // copy of its resources
   void embed_picture_fonts (pdf_obj* res, pdf_obj* form);
   bool strip_picture_tags (pdf_obj* res, pdf_obj* form, hashset<int>* keep);
   array<pdf_obj*> picture_font_objs;   // the programs embedded for them
@@ -550,6 +553,12 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   for (int i=0; i<N(pages); i++) pdf_drop_obj (ctx, pages[i]);
   for (int i=0; i<N(tag_objs); i++) pdf_drop_obj (ctx, tag_objs[i]);
   for (int i=0; i<N(graft_forms); i++) pdf_drop_obj (ctx, graft_forms[i]);
+  iterator<string> git= iterate (graft_maps);
+  while (git->busy ()) {
+    string k= git->next ();
+    pdf_drop_graft_map (ctx, (pdf_graft_map*) graft_maps [k]);
+    pdf_drop_document (ctx, (pdf_document*) graft_docs [k]);
+  }
   for (int i=0; i<N(picture_font_objs); i++)
     pdf_drop_obj (ctx, picture_font_objs[i]);
   if (tags != NULL) tm_delete (tags);
@@ -2200,10 +2209,12 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
     pdf_obj* kept_form= NULL;   // and the form of the picture
     graft_c* gc= NULL;     // its structure (graft)
     fz_var (gc);
+    bool reuse= (graft && s == "pdf" && graft_docs->contains (key));
     // made before fz_try: a throw is a longjmp, which skips destructors
     c_string path (concretize (pdf));
     fz_try (ctx) {
-      src= pdf_open_document (ctx, path);
+      if (reuse) src= pdf_keep_document (ctx, (pdf_document*) graft_docs [key]);
+      else src= pdf_open_document (ctx, path);
       pdf_obj* spage= pdf_lookup_page_obj (ctx, src, 0);
       if (graft && s == "pdf") {
         pdf_obj* str= pdf_dict_getp (ctx, pdf_trailer (ctx, src),
@@ -2226,10 +2237,15 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
       m= fz_concat (m, fz_scale (1, -1));
       buf= page_contents (ctx, pdf_dict_get (ctx, spage, PDF_NAME(Contents)));
       pdf_obj* sres= pdf_dict_get_inheritable (ctx, spage, PDF_NAME(Resources));
-      map= pdf_new_graft_map (ctx, doc);
+      if (reuse) map= pdf_keep_graft_map (ctx, (pdf_graft_map*) graft_maps [key]);
+      else map= pdf_new_graft_map (ctx, doc);
       pdf_obj* res= (sres == NULL) ? NULL
                                    : pdf_graft_mapped_object (ctx, map, sres);
-      merge_layers (src, map);
+      if (!reuse) merge_layers (src, map);   // (once for all the uses)
+      if (graft && s == "pdf" && !reuse) {
+        graft_docs (key)= (pointer) pdf_keep_document (ctx, src);
+        graft_maps (key)= (pointer) pdf_keep_graft_map (ctx, map);
+      }
       pdf_obj* xo= pdf_new_xobject (ctx, doc, box, m, res, buf);
       // a group, so that an alpha applies to the figure as a whole and not
       // to each of its paths and fills on its own (place_image); the form
@@ -2750,6 +2766,23 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form,
     }
   }
   fz_catch (ctx) {}
+  // the MCIDs of the names of the properties of the picture's resources
+  hashmap<string,int> props (-1);
+  fz_try (ctx) {
+    pdf_obj* pr= pdf_dict_get (ctx, pdf_resolve_indirect (ctx, res),
+                               PDF_NAME(Properties));
+    for (int i=0; pr != NULL && i < pdf_dict_len (ctx, pr) && i < 4096; i++) {
+      pdf_obj* v= pdf_dict_get_val (ctx, pr, i);
+      pdf_obj* m= pdf_dict_get (ctx, v, PDF_NAME(MCID));
+      if (pdf_is_int (ctx, m)) {
+        char nm[256];
+        nm[0]= '/';
+        fz_strlcpy (nm + 1, pdf_to_name (ctx, pdf_dict_get_key (ctx, pr, i)), 255);
+        props (string (nm))= pdf_to_int (ctx, m);
+      }
+    }
+  }
+  fz_catch (ctx) {}
   for (int k=0; k<nf; k++) {
     fz_buffer* b= NULL;
     unsigned char* data= NULL;
@@ -2770,14 +2803,18 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form,
     fz_drop_buffer (ctx, b);
     array<bool> open;
     bool changed= false;
-    // (the content of a grafted picture keeps its marked content)
-    if (k == 0 && keep != NULL && !pdf_content_fully_marked (s)) {
-      ok= false;
-      keep= NULL;
+    // (the content of a grafted picture keeps its marked content, if all
+    // it paints is then tagged or an artifact: else the picture is not
+    // grafted, and its tags are taken out)
+    string t;
+    bool gok= false;
+    if (k == 0 && keep != NULL)
+      t= pdf_graft_marked_content (s, *keep, props, changed, gok);
+    if (k == 0 && keep != NULL && !gok) { ok= false; keep= NULL; }
+    if (k > 0 || keep == NULL) {
+      changed= false;
+      t= pdf_strip_marked_content (s, open, changed);
     }
-    string t= (k == 0 && keep != NULL)?
-      pdf_graft_marked_content (s, *keep, changed):
-      pdf_strip_marked_content (s, open, changed);
     if (!changed) continue;
     fz_buffer* nb= NULL;
     fz_var (nb);
