@@ -1919,8 +1919,12 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
           // none: stmary, wasy), the character of its glyph, as a reader
           // reads it (a code below U+0020 is a control otherwise)
           else if (tagger != NULL) {
-            int g= hummus_glyph_unicode (cfid, gl_index);
+            // (code 161 is the glyph of code 0, requires_hack_notdef)
+            int g= hummus_glyph_unicode (cfid, ch == 161? 0: gl_index);
             if (g != 0xfffd) uc= g;
+            // (a font of a table: its code is no character, which a
+            // reader would take for one, as MuPDF does)
+            else if (ch == 161 || N(table) > 0) uc= 0xfffd;
           }
         }
         // (PDF/UA forbids 0, U+FEFF and U+FFFE in the map, and the
@@ -2242,11 +2246,22 @@ hummus_usable_unicode (int u) {
 }
 
 static int
-hummus_glyph_unicode (PDFUsedFont* f, unsigned int gid) {
+hummus_glyph_unicode (PDFUsedFont* f, unsigned int glyph) {
   FreeTypeFaceWrapper* w= (f == NULL? NULL: f->GetFreeTypeFont ());
   if (w == NULL) return 0xfffd;
   FT_Face face= *w;
   if (face == NULL) return 0xfffd;
+  // the glyph of FreeType (a Type 1 font of an encoding of its own, a TeX
+  // font: PDFHummus numbers its glyphs by their codes)
+  unsigned int gid= w->GetGlyphIndexInFreeTypeIndexes (glyph);
+  // (a piece is no character: mapsto of cmsy is the bar of the arrows
+  // which it begins, and varshortmid)
+  if (FT_HAS_GLYPH_NAMES (face)) {
+    char pb[32];
+    pb[0]= '\0';
+    if (!FT_Get_Glyph_Name (face, gid, pb, sizeof (pb)) &&
+        strcmp (pb, "mapsto") == 0) return 0xfffd;
+  }
   // the characters which the font maps to its glyphs, once for each font
   // (by its face, its names and its number of glyphs, a face being freed
   // and its address used again); the first character of a glyph which is
@@ -2723,9 +2738,8 @@ pdf_image_rep::merge (PDFDocumentCopyingContext* copyingContext,
   if(status == eSuccess) pdfw.EndFormXObjectAndRelease(form);
   if (hummus_missing_objects > missing)
     convert_warning << "the picture " << u << " refers to objects which "
-                    << "it lacks (a damaged file): they are null"
-                    << (hummus_embed_fonts? ", and the PDF is not PDF/UA": "")
-                    << LF;
+                    << "it lacks (a damaged file): they are null, and what "
+                    << "they were may be missing" << LF;
   return status;
 }
 

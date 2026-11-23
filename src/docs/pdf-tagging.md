@@ -145,10 +145,16 @@ fonts, and the CB Greek fonts, `grmn.enc`), a TeX font of no table in a
 tagged PDF from the names of its glyphs; a glyph of no character in the
 table, or drawn by its number (the variants of the OpenType math fonts,
 #943), has the character the font maps to it, else that of its name
-(uXXXX of hexadecimal digits only), else, for a variant (divides.v1),
+(uXXXX of hexadecimal digits only; uniXXXXYYYY of the ligatures ff, fi,
+fl, ffi, ffl their presentation forms; the names of the AMS, stmary,
+wasy... fonts which TeXmacs ships, from a table made from MuPDF's glyph
+list, as the PDFHummus build has none), else, for a variant (divides.v1),
 the one the font maps to the glyph of the name before the dot; never one
 of a private use area; only those of none (the pieces of the horizontal
-braces of cmex, the bar of mapsto of cmsy) are U+FFFD. The vendored
+braces of cmex, the bar of mapsto of cmsy) are U+FFFD (a code of a
+TeX font, by PDFHummus, is turned into its glyph of FreeType first:
+the encoding of the font numbers its glyphs; code 161 is the glyph of
+code 0, `requires_hack_notdef`). The vendored
 PDFHummus maps the glyph 0 of a simple font too (a symbol of stmary10 or
 wasy10, which it took for .notdef), and never to 0. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.
