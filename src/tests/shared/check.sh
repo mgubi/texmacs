@@ -38,7 +38,8 @@
 #   agent       the host applies a mode (propose, direct, read-only) and the content
 #               rules to a participant that is an agent; proposals accepted, rejected, withdrawn
 #   agentversion  the person resolves the proposals with the Version tools: accepted
-#               or rejected (an insertion, a deletion), pending again after an undo
+#               or rejected (an insertion, a deletion, next to equal or empty
+#               paragraphs), pending again after an undo (also of a withdrawal)
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
 #   fuzz        random patches with hostile integers through the patch functions: no crash

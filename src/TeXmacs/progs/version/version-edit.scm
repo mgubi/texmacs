@@ -143,17 +143,6 @@
 ;; Retaining only one version
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (the kept version of a difference in a line of text leaves adjacent
-;; strings in the concat: they are joined, so that the text is one stretch)
-(define (join-strings l concat?)
-  (cond ((not concat?) l)
-        ((or (null? l) (null? (cdr l))) l)
-        ((and (tree-atomic? (car l)) (tree-atomic? (cadr l)))
-         (join-strings (cons (tree (string-append (tree->string (car l))
-                                                  (tree->string (cadr l))))
-                             (cddr l)) #t))
-        (else (cons (car l) (join-strings (cdr l) #t)))))
-
 (define (tree-normalize t)
   (when (tree-compound? t)
     (for-each tree-normalize (tree-children t))
@@ -163,8 +152,7 @@
 	    (cond ((tree-is? u (tree-label t)) (tree-children u))
 		  ((and (== u (tree "")) (tree-is? t 'concat)) (list))
 		  (else (list u))))
-	(with c (join-strings (apply append (map fun (tree-children t)))
-                              (tree-is? t 'concat))
+	(with c (apply append (map fun (tree-children t)))
 	  (when (!= c (tree-children t))
 	    (cond ((null? c)
 		   (tree-assign t (if (tree-is? t 'concat) "" '(document ""))))

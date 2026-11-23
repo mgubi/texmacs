@@ -536,7 +536,7 @@
 ;; version-retain keeps the old (0) or new (1) version of the difference at
 ;; the cursor, or the shown one ('current: the new one of version-both),
 ;; and moves to the next difference; a version-suppressed part disappears.
-;; The concat around is flattened and its adjacent strings are joined (#867).
+;; The concat around is flattened but its strings are not joined.
 (define (test-retain)
   (check-group "retain")
   (with-buffer-body
@@ -545,34 +545,34 @@
      (version-first-difference)
      (version-retain 1)
      (check= (body)
-             '(document "a" "b x d"
+             '(document "a" (concat "b " "x " "d")
                         (version-both (document "e") (document "f"))))
      ;; the cursor went to the next difference
      (check= (cursor) '(2 0 0 0))
      (check-true (inside-version?))
      (version-retain 0)
-     (check= (body) '(document "a" "b x d" "e"))
+     (check= (body) '(document "a" (concat "b " "x " "d") "e"))
      (check-false (inside-version?))))
   (with-buffer-body '(document (concat "a " (version-both "b" "c") " d"))
     (lambda ()
       (go-to (at 0 1 0 0))
       (version-retain 0)
-      (check= (body) '(document "a b d"))))
+      (check= (body) '(document (concat "a " "b" " d")))))
   (with-buffer-body '(document (concat "a " (version-both "b" "c") " d"))
     (lambda ()
       (go-to (at 0 1 0 0))
       (version-retain 'current)
-      (check= (body) '(document "a c d"))))
+      (check= (body) '(document (concat "a " "c" " d")))))
   (with-buffer-body '(document (concat "a " (version-new "b" "c") " d"))
     (lambda ()
       (go-to (at 0 1 1 0))
       (version-retain 'current)
-      (check= (body) '(document "a c d"))))
+      (check= (body) '(document (concat "a " "c" " d")))))
   (with-buffer-body '(document (concat "a " (version-old "b" "c") " d"))
     (lambda ()
       (go-to (at 0 1 0 0))
       (version-retain 'current)
-      (check= (body) '(document "a b d"))))
+      (check= (body) '(document (concat "a " "b" " d")))))
   ;; suppressed parts
   (with-buffer-body
    '(document "x" (version-both (document "p") (document (version-suppressed)))
@@ -601,13 +601,13 @@
    (lambda ()
      (go-to (at 0 1 1 0))
      (version-retain 0)
-     (check= (body) '(document "xz"))))
+     (check= (body) '(document (concat "x" "z")))))
   (with-buffer-body
    '(document (concat "x" (version-both "p" (version-suppressed)) "z"))
    (lambda ()
      (go-to (at 0 1 0 0))
      (version-retain 0)
-     (check= (body) '(document "xpz"))))
+     (check= (body) '(document (concat "x" "p" "z")))))
   ;; a selection
   (with-buffer-body
    '(document (concat "a" (version-both "b" "c") "d" (version-both "e" "f") "g")
@@ -616,7 +616,7 @@
      (selection-set (at 0 0 0) (at 0 4 1))
      (version-retain 1)
      (check= (body)
-             '(document "acdfg"
+             '(document (concat "a" "c" "d" "f" "g")
                         (concat "h" (version-both "i" "j"))))
      (selection-cancel))))
 
@@ -630,25 +630,25 @@
     (with-buffer-body doc
       (lambda ()
         (version-retain-all 0)
-        (check= (body) '(document "a" "b c d" "e" "g"))
+        (check= (body) '(document "a" (concat "b " "c " "d") "e" "g"))
         (set-body doc)
         (version-retain-all 1)
-        (check= (body) '(document "a" "b x d" "f"))
+        (check= (body) '(document "a" (concat "b " "x " "d") "f"))
         (set-body doc)
         (version-retain-all 'current)
-        (check= (body) '(document "a" "b x d" "f"))
+        (check= (body) '(document "a" (concat "b " "x " "d") "f"))
         (set-body doc)
         (version-show-all 'version-old)
         (version-retain-all 'current)
-        (check= (body) '(document "a" "b c d" "e" "g"))
+        (check= (body) '(document "a" (concat "b " "c " "d") "e" "g"))
         (set-body doc)
         (version-retain-all 'current-old)
-        (check= (body) '(document "a" "b c d" "e" "g"))
+        (check= (body) '(document "a" (concat "b " "c " "d") "e" "g"))
         (set-body doc)
         (go-to (at 1 1 0 0))
         (version-show 'version-new)
         (version-retain-all 'current-old)
-        (check= (body) '(document "a" "b x d" "e" "g"))
+        (check= (body) '(document "a" (concat "b " "x " "d") "e" "g"))
         (check-false (inside-version?)))))
   (with-buffer-body
    (compare-versions '(document "a" "b" "c") '(document "a" "c"))
@@ -710,7 +710,7 @@
                 '(version-both (version-suppressed) "big "))
         (version-retain-all 0)
         (check= (body)
-                '(document "Hello world." "Second." "Third."))))
+                '(document (concat "Hello " "world.") "Second." "Third."))))
     (with-buffer-body '(document "Hello big world." "Second.")
       (lambda ()
         (compare-with-newer f)
@@ -724,7 +724,7 @@
         (check= (cursor) '(0 1 0 0))
         (version-retain-all 1)
         (check= (body)
-                '(document "Hello world." "Second." "Third."))))
+                '(document (concat "Hello " "world.") "Second." "Third."))))
     ;; the same document: nothing to show
     (with-buffer-body '(document "Hello world." "Second." "Third.")
       (lambda ()

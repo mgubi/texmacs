@@ -1689,9 +1689,13 @@
 ;; Retain), which do not go through shared-proposal-resolve!: the host finds
 ;; out which version was kept when the markup is gone (#867). The blocks are
 ;; compared after joining adjacent strings (the Version tools may leave the
-;; kept text in several strings), at the place of the proposal (between the
-;; blocks that surrounded the markup), so that an empty version (an insertion
-;; rejected, a deletion accepted) is recognized as well.
+;; kept text in several strings), at the place of the markup: between the
+;; blocks that surrounded it (the same trees, found again by identity), else
+;; at its index if the number of blocks agrees, so that an empty version (an
+;; insertion rejected, a deletion accepted) is recognized as well, and a
+;; block equal to its neighbour is not mistaken for it. An undo that brings
+;; the markup back makes the proposal pending again. The host looks only
+;; when the document changed (a new live state).
 
 (define (block-normalize st)
   ;; @st with nested concatenations flattened and adjacent strings joined
@@ -1711,81 +1715,120 @@
                  (else (cons 'concat l)))))
         (else (cons (car st) (map block-normalize (cdr st))))))
 
-(define (proposal-note-place! sf pr t)
-  ;; the pending proposal is the block @t: note its place, its neighbours
-  ;; and its markup (to recognize it when an undo brings it back)
+(define (proposal-note-place! sf pr t st)
+  ;; the pending proposal is the block @t, of stree @st: note its place, the
+  ;; number of blocks, its neighbours (the trees) and its markup (to
+  ;; recognize it when an undo brings it back)
   (let* ((body (sf-body sf)) (i (tree-index t)) (n (tree-arity body)))
     (prop-put! pr 'index i)
-    (prop-put! pr 'before (and (> i 0) (block-normalize (tm->stree (tree-ref body (- i 1))))))
-    (prop-put! pr 'after (and (< (+ i 1) n) (block-normalize (tm->stree (tree-ref body (+ i 1))))))
-    (prop-put! pr 'markup (tm->stree t))))
+    (prop-put! pr 'arity n)
+    (prop-put! pr 'before (and (> i 0) (tree-ref body (- i 1))))
+    (prop-put! pr 'after (and (< (+ i 1) n) (tree-ref body (+ i 1))))
+    (prop-put! pr 'markup st)))
+
+(define (block-position body t)
+  ;; the index of the block @t in @body, or #f when it is no longer there
+  (catch #t
+    (lambda ()
+      (and (tree? t) (with up (tree-up t) (and up (tree-eq? up body)))
+           (with i (tree-index t)
+             (and (< i (tree-arity body)) (tree-eq? (tree-ref body i) t) i))))
+    (lambda args #f)))
 
 (define (proposals-classify! sf pr)
   ;; the markup of a pending proposal is gone (the person used the Version
   ;; tools, or edited): was the new or the old version kept?
-  (let* ((sts (map (lambda (t) (block-normalize (tm->stree t)))
-                   (tree-children (sf-body sf))))
+  (let* ((body (sf-body sf))
+         (sts (map (lambda (t) (block-normalize (tm->stree t))) (tree-children body)))
          (n (length sts))
-         (before (prop-get pr 'before)) (after (prop-get pr 'after))
          (new (map block-normalize (prop-get pr 'new)))
          (old (map block-normalize (prop-get pr 'old)))
+         (b (if (prop-get pr 'before) (block-position body (prop-get pr 'before)) 'start))
+         (a (if (prop-get pr 'after) (block-position body (prop-get pr 'after)) 'end))
+         (i (or (prop-get pr 'index) 0))
+         (arity (or (prop-get pr 'arity) n))
          (at? (lambda (seq j)
                 (and (>= j 0) (<= (+ j (length seq)) n)
                      (equal? (sublist sts j (+ j (length seq))) seq))))
-         (placed? (lambda (seq)
-                    ;; @seq between the neighbours of the markup
-                    (let ((m (length seq)))
-                      (let loop ((j 0))
-                        (and (<= (+ j m) n)
-                             (or (and (if before (and (> j 0) (equal? (list-ref sts (- j 1)) before)) (= j 0))
-                                      (if after (and (< (+ j m) n) (equal? (list-ref sts (+ j m)) after)) (= (+ j m) n))
-                                      (at? seq j))
-                                 (loop (+ j 1))))))))
+         (between? (lambda (seq)
+                     ;; @seq between the neighbours of the markup
+                     (let* ((m (length seq))
+                            (j (cond ((== b 'start) 0) (b (+ b 1))
+                                     ((== a 'end) (- n m)) (a (- a m)) (else #f))))
+                       (and j (or b a) (or (and b a) (pair? seq))
+                            (at? seq j)
+                            (cond ((== a 'end) (= (+ j m) n)) (a (= (+ j m) a)) (else #t))))))
+         (at-index? (lambda (seq)
+                      ;; @seq at the place of the markup, the other blocks as they were
+                      (and (= n (+ arity (length seq) -1)) (at? seq i))))
          (has? (lambda (seq)
                  (let loop ((j 0))
                    (and (<= (+ j (length seq)) n)
-                        (or (at? seq j) (loop (+ j 1))))))))
+                        (or (at? seq j) (loop (+ j 1)))))))
+         ;; the side that is not empty first
+         (sides (if (null? new) (list (cons old "rejected") (cons new "accepted"))
+                    (list (cons new "accepted") (cons old "rejected"))))
+         (first-side (lambda (ok?)
+                       (list-or (map (lambda (s) (and (ok? (car s)) (cdr s))) sides)))))
     (prop-put! pr 'status
-               (cond ((placed? new) "accepted")
-                     ((placed? old) "rejected")
-                     ;; a neighbour changed as well: anywhere in the document
-                     ((and (pair? new) (has? new)) "accepted")
-                     ((and (pair? old) (has? old)) "rejected")
-                     ((null? new) "accepted")
-                     ((null? old) "rejected")
-                     (else "resolved")))))
+               (or (first-side between?)
+                   (first-side at-index?)
+                   ;; the blocks around changed as well: anywhere in the document
+                   (first-side (lambda (seq) (and (pair? seq) (has? seq))))
+                   (cond ((null? new) "accepted")
+                         ((null? old) "rejected")
+                         (else "resolved"))))))
 
-(define (proposal-back sf pr)
-  ;; the person resolved @pr, then the undo brought the markup back: the
-  ;; block, or #f
-  (let* ((body (sf-body sf)) (n (tree-arity body))
-         (markup (prop-get pr 'markup)) (i (or (prop-get pr 'index) 0))
-         (claimed (list-filter (map (lambda (q) (and (proposal-pending? q) (proposal-tree sf q)))
-                                    (or (sf-get sf 'proposals) '()))
-                               identity))
-         (ok? (lambda (t) (and (tree? t) (not (list-or (map (lambda (u) (tree-eq? u t)) claimed)))
-                               (equal? (tm->stree t) markup)))))
-    (and markup
-         (or (let ((t (proposal-tree sf pr))) (and t (ok? t) t))
-             (let loop ((j (max 0 (- i 3))))
-               (and (< j (min n (+ i 4)))
-                    (with t (tree-ref body j)
-                      (if (ok? t) t (loop (+ j 1))))))))))
+(define (proposal-back sf pr claimed block)
+  ;; the person (or the agent) resolved @pr, then the undo brought the markup
+  ;; back: the block, or #f; @claimed are the blocks of pending proposals,
+  ;; (@block j) the block j of the body when it is compound, else #f
+  (let* ((markup (prop-get pr 'markup)) (i (or (prop-get pr 'index) 0))
+         (ok? (lambda (t)
+                (and t (eq? (tree-label t) (car markup))
+                     (= (tree-arity t) (length (cdr markup)))
+                     (not (list-or (map (lambda (u) (tree-eq? u t)) claimed)))
+                     (equal? (tm->stree t) markup)))))
+    (and (pair? markup)
+         (let loop ((j (max 0 (- i 3))))
+           (and (< j (+ i 4))
+                (with t (block j)
+                  (if (ok? t) t (loop (+ j 1)))))))))
 
 (define (proposals-poll! sf)
-  (for (pr (or (sf-get sf 'proposals) '()))
-    (cond ((proposal-pending? pr)
-           (let ((t (proposal-tree sf pr)))
-             (if (and t (version-tag-in? (tm->stree t)))
-                 (proposal-note-place! sf pr t)
-                 (proposals-classify! sf pr))))
-          ((in? (prop-get pr 'status) '("accepted" "rejected" "resolved"))
-           (and-with t (proposal-back sf pr)
-             (unless (with u (tree-pointer->tree (prop-get pr 'ptr)) (and (tree? u) (tree-eq? u t)))
-               (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
-               (prop-put! pr 'ptr (tree->tree-pointer t)))
-             (prop-put! pr 'status "pending")
-             (proposal-note-place! sf pr t))))))
+  ;; only when the document changed since the last time
+  (let ((state (live-current-state (sf-key sf)))
+        (prs (or (sf-get sf 'proposals) '())))
+    (unless (and (sf-get sf 'prop-polled) (equal? state (sf-get sf 'prop-polled)))
+      (sf-put! sf 'prop-polled state)
+      (for (pr prs)
+        (when (proposal-pending? pr)
+          (let* ((t (proposal-tree sf pr)) (st (and t (tm->stree t))))
+            (if (and st (version-tag-in? st))
+                (proposal-note-place! sf pr t st)
+                (proposals-classify! sf pr)))))
+      (let* ((claimed #f) (body (sf-body sf)) (n (tree-arity body))
+             (cache (make-ahash-table))
+             (block (lambda (j)
+                      (and (< j n)
+                           (with c (ahash-ref cache j)
+                             (if c (car c)
+                                 (with t (tree-ref body j)
+                                   (with r (and (tree-compound? t) t)
+                                     (ahash-set! cache j (list r))
+                                     r))))))))
+        (for (pr prs)
+          (when (in? (prop-get pr 'status) '("accepted" "rejected" "resolved" "withdrawn"))
+            (unless claimed
+              (set! claimed (list-filter (map (lambda (q) (and (proposal-pending? q) (proposal-tree sf q))) prs)
+                                         identity)))
+            (and-with t (proposal-back sf pr claimed block)
+              (unless (with u (tree-pointer->tree (prop-get pr 'ptr)) (and (tree? u) (tree-eq? u t)))
+                (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
+                (prop-put! pr 'ptr (tree->tree-pointer t)))
+              (prop-put! pr 'status "pending")
+              (set! claimed (cons t claimed))
+              (proposal-note-place! sf pr t (tm->stree t)))))))))
 
 (define (proposals-sync! sf)
   ;; tell each agent about its proposals when they changed
@@ -1833,7 +1876,7 @@
     (prop-put! pr 'preview (proposal-preview new-sts old-sts))
     (prop-put! pr 'old old-sts)
     (prop-put! pr 'new new-sts)
-    (proposal-note-place! sf pr (tree-ref body p))
+    (proposal-note-place! sf pr (tree-ref body p) markup)
     (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
       ;; (the resolved ones are kept for a while, so that the agent hears of them)
       (sf-put! sf 'proposals
