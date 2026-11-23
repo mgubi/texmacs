@@ -140,7 +140,8 @@ tex_font_rep::tex_font_rep (string name, int status2,
   // math font which draws through it (add_glyph_encoding)
   switch (status) {
   case TEX_EC: add_glyph_encoding ("cork"); break;
-  case TEX_LA: add_glyph_encoding ("larm"); add_glyph_encoding ("t2a"); break;
+  // (T2A, not larm.enc: that one gives Є and є at the codes of Ѕ and ѕ)
+  case TEX_LA: add_glyph_encoding ("t2a"); break;
   case TEX_GR: add_glyph_encoding ("grmn"); break;
   case TEX_CM:
     // (the typewriter fonts of TeX, whose ligature program is not run)

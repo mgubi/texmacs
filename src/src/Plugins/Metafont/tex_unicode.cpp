@@ -183,6 +183,33 @@ tex_adobe_unicode (int c) {
   return -1;
 }
 
+// Whether the encoding file enc only gives letters and digits as themselves
+// (alphanum, capital, alpha...: the letters of a style, the glyphs of a
+// symbol font drawn as plain letters)
+static bool
+tex_encoding_plain (string enc) {
+  static hashmap<string,bool> plain (false);
+  if (plain->contains (enc)) return plain[enc];
+  string s;
+  url u ("$TEXMACS_HOME_PATH/fonts/enc:$TEXMACS_PATH/fonts/enc", enc * ".enc");
+  bool r= false;
+  if (!load_string (u, s, false)) {
+    r= true;
+    int n= N(s);
+    for (int i=0; i<n && r; i++)
+      if (s[i] == '\"') {
+        int j= i+1;
+        while (j < n && s[j] != '\"') j++;
+        if (j - i - 1 != 1 || (!is_alpha (s[i+1]) && !is_digit (s[i+1])))
+          r= false;
+        i= j;
+      }
+      else if (s[i] == '[') r= false;
+  }
+  plain (enc)= r;
+  return r;
+}
+
 array<int>
 tex_encoding_table (string encoding, string metric, bool text) {
   static hashmap<string,array<int> > tables;
@@ -193,12 +220,20 @@ tex_encoding_table (string encoding, string metric, bool text) {
   array<int> table (256);
   for (int c=0; c<256; c++) table[c]= -1;
   bool any= false, symbols= false;
+  // (the encodings of the letters as themselves last, whatever their
+  // place: the symbols of the glyphs first, ℝ of msbm, not R)
+  array<string> list, last;
   int i= 0, n= N(encoding);
   while (i < n) {
     int j= i;
     while (j < n && encoding[j] != '+') j++;
     string e= encoding (i, j);
     i= j + 1;
+    if (tex_encoding_plain (e)) last << e; else list << e;
+  }
+  list << last;
+  for (int k=0; k<N(list); k++) {
+    string e= list[k];
     if (e == "t2a" || (text && e == "cork")) {
       for (int c=0; c<256; c++)
         if (table[c] < 0) table[c]= tex_glyph_unicode (c, e == "t2a");

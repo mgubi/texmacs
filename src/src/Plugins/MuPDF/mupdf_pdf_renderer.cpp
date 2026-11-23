@@ -102,10 +102,12 @@ struct pdf_font_item {
   int      chunk;      // ... and which 256 characters of it this is
   string   path;       // the file the program was read from (for subsetting)
   string   tex_name;   // the TeX font (cmex10...) of the program
-  font_glyphs enc;     // the glyphs whose encoding (font_glyphs_rep::encoding)
-                       // the codes are in, for the characters of the text
-                       // layer (read when the fonts are written: a font
-                       // loaded later may still give it one)
+  array<font_glyphs> encs; // the glyphs drawn with the program, whose
+                       // encodings (font_glyphs_rep::encoding) the codes are
+                       // in, for the characters of the text layer (read when
+                       // the fonts are written: a font loaded later may
+                       // still give them one; the sizes of a TeX font share
+                       // the program, and their encodings are joined)
   array<int> gid;      // 256 entries: the glyph TeXmacs asked for, -1 if free
   // the letters a ligature glyph stands for, by the code (a simple font)
   // or the glyph (a CID font) it is written with; "" for a glyph which is
@@ -994,13 +996,15 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
   if (N(key) > 0 && font_by_file->contains (key)) {
     int k= font_by_file (key);
     font_index (name)= k;
-    if (is_nil (font_list[k].enc) || font_list[k].enc->get_encoding () == "")
-      font_list[k].enc= fn;
+    bool seen= false;
+    for (int e=0; e<N(font_list[k].encs); e++)
+      if (font_list[k].encs[e].rep == fn.rep) seen= true;
+    if (!seen) font_list[k].encs << fn;
     return k;
   }
   pdf_font_item it;
   it.num= N(font_list);
-  it.enc= fn;
+  it.encs << fn;
   if (!is_none (u)) {
     c_string path (concretize (u));
     fz_font* f= NULL;
@@ -1506,9 +1510,32 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
   // the same positions, a reader taking å for е; a text font goes by the
   // names of its glyphs)
   array<int> tex;
-  if (!is_nil (it.enc))
-    tex= tex_encoding_table (it.enc->get_encoding (), it.enc->get_metric (),
-                             false);
+  {
+    // (the encodings of all the glyphs drawn with it, in one order)
+    array<string> parts;
+    string metric;
+    for (int e=0; e<N(it.encs); e++) {
+      string enc= it.encs[e]->get_encoding ();
+      if (metric == "") metric= it.encs[e]->get_metric ();
+      int i= 0, n= N(enc);
+      while (i < n) {
+        int j= i;
+        while (j < n && enc[j] != '+') j++;
+        string p= enc (i, j);
+        i= j + 1;
+        int k= 0;
+        while (k < N(parts) && parts[k] < p) k++;
+        if (k < N(parts) && parts[k] == p) continue;
+        parts << p;
+        for (int m= N(parts) - 1; m > k; m--) parts[m]= parts[m-1];
+        parts[k]= p;
+      }
+    }
+    string joined;
+    for (int k=0; k<N(parts); k++)
+      joined= (k == 0? parts[k]: joined * "+" * parts[k]);
+    tex= tex_encoding_table (joined, metric, false);
+  }
   if (N(tex) == 0 && tagger != NULL) {
     // a tagged PDF maps every code used (PDF/UA): those of a font of no
     // table after the names of their glyphs, which a reader would read,

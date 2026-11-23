@@ -151,10 +151,15 @@ rubber font by its translator (`rubber-cmex`), a Unicode font as
 `unicode`; the transformations of glyphs (`slanted`, `bolden`, the
 effects...) have those of their font, `make_bbb` the double-struck forms
 (`bbb:`), the poor fonts pass them to their base. A list is kept in one order
-(by name, `alphanum`, the letters as themselves, last), so that a glyph
-drawn both as a letter of a style and as a symbol (the Euler letters and
-the Fraktur symbols, both of eufm) is the symbol whatever the document
-drew first. A TeX font used as a text font itself (`Bbb*`, `tex bbm`)
+(by name), and the table of an encoding which only gives the letters as
+themselves (`alphanum`, `capital`, `alpha`: the letters of a style) is
+read last, so that a glyph drawn both as a letter of a style and as a
+symbol (the Euler letters and the Fraktur symbols, both of eufm) is the
+symbol whatever the document drew first; a glyph only drawn as a letter
+of a style (R of the math font Bbb, a letter of msbm) is that letter.
+The Cyrillic fonts are T2A (not `larm.enc`, which has Є and є at the
+codes of Ѕ and ѕ); in the MuPDF writer the sizes of a TeX font, which
+share one program, join their encodings. A TeX font used as a text font itself (`Bbb*`, `tex bbm`)
 has no encoding: embedded, the names of its glyphs (the letters typed);
 drawn as Type 3, U+FFFD. The table of an
 encoding (`tex_encoding_table`, `Plugins/Metafont/tex_unicode.cpp`) is
