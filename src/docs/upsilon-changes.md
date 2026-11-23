@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 23 November 2026
 
+- **Program code: the first and last characters of a string can be
+  deleted again**: in C++, Python and the other languages with a syntax
+  tree, Backspace after the last character of a string (or Delete before
+  its first one) selected the content of the string instead of deleting
+  the character, and the next key press deleted it all; only the quotes
+  select the whole string now, as the brackets do (#873).
 - **Chez Scheme: a smaller boot image, less memory at start-up** (builds
   with Chez): the routines of the C++ glue are defined from a table in C++
   when TeXmacs starts, as with Guile and s7, with one foreign call per number

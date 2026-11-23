@@ -261,14 +261,39 @@
                (insert rb))
            #t))))
 
+(define (quote-char? c) (in? c '("\"" "'" "`")))
+
+(define (opening-quote root a)
+  ;; the quote which opens a string starting at the point a, after a prefix
+  ;; of letters or digits (u8"...", R"(...)", f"..."), or ""
+  (let* ((s (line-string root (car a)))
+         (i (let loop ((i (cadr a)))
+              (if (and (< i (string-length s))
+                       (let ((ch (string-ref s i)))
+                         (or (char-alphabetic? ch) (char-numeric? ch))))
+                  (loop (+ i 1)) i))))
+    (char-at root (list (car a) i))))
+
 (define (quote-pair root lan p)
-  ;; when a string starts or ends with the quote at p: (start end) of it
-  (let ((n (list-find (syntax-region-node-range root lan (car p) (cadr p)
-                                                (car p) (+ (cadr p) 1))
-                      (lambda (n) (and (string-contains? (node-type n) "string")
-                                       (or (== (node-start n) p)
-                                           (== (node-end n)
-                                               (list (car p) (+ (cadr p) 1)))))))))
+  ;; when a string starts or ends with the quote at p: (start end) of it.
+  ;; The node must be the whole string, from its opening quote to its
+  ;; closing one: the grammars also name "string..." the parts of a string,
+  ;; such as the content between the quotes (string_content in C++ and
+  ;; Python) or the quotes alone (string_start, string_end in Python), and
+  ;; their first or last character is no quote of a pair (#873)
+  (let* ((c (char-at root p))
+         (after (list (car p) (+ (cadr p) 1)))
+         (n (and (quote-char? c)
+                 (list-find (syntax-region-node-range root lan (car p) (cadr p)
+                                                      (car p) (+ (cadr p) 1))
+                            (lambda (n)
+                              (let ((a (node-start n)) (b (node-end n)))
+                                (and (string-contains? (node-type n) "string")
+                                     (or (== a p) (== b after))
+                                     (point<? (list (car a) (+ (cadr a) 1)) b)
+                                     (== (opening-quote root a) c)
+                                     (== (char-at root (list (car b) (- (cadr b) 1)))
+                                         c))))))))
     (and n (list (node-start n) (node-end n)))))
 
 (define (pair-at root lan p)

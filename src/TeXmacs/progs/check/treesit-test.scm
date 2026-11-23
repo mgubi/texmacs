@@ -1058,6 +1058,46 @@
           (check= (line 3) "\"\"")
           (check-true (syntax-delete-bracket #f))
           (check= (line 3) ""))))
+    ;; the first and last characters of a string are plain characters: the
+    ;; content of a string (string_content) or its quotes alone (string_start
+    ;; and string_end in Python) are no pair of quotes (#873)
+    (for (x '((cpp-code "x = \"test123\";") (python-code "x = \"test123\"")
+              (julia-code "x = \"test123\"")))
+      (with-test-buffer `(document (,(car x) (document ,(cadr x))))
+        (lambda (u b)
+          (update-forced)
+          (let* ((code (tree-ref b 0 0))
+                 (at (lambda (col) (rcons (tree->path (tree-ref code 0)) col))))
+            (go-to (at 12))                          ; after the 3
+            (check-false (syntax-delete-bracket #f))
+            (go-to (at 5))                           ; before the t
+            (check-false (syntax-delete-bracket #t))
+            (check-false (selection-active-any?))
+            ;; the quotes select the whole string, from both sides
+            (go-to (at 13))
+            (check-true (syntax-delete-bracket #f))
+            (check= (list (selection-get-start) (selection-get-end))
+                    (list (at 4) (at 13)))
+            (selection-cancel)
+            (go-to (at 4))
+            (check-true (syntax-delete-bracket #t))
+            (check= (list (selection-get-start) (selection-get-end))
+                    (list (at 4) (at 13)))
+            (selection-cancel)))))
+    ;; a prefix (u8"...") belongs to the string; an escaped quote is a
+    ;; plain character
+    (with-test-buffer '(document (cpp-code (document "x = u8\"ab\";" "y = \"a\\\"\";")))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col))))
+          (go-to (at 0 10))
+          (check-true (syntax-delete-bracket #f))
+          (check= (list (selection-get-start) (selection-get-end))
+                  (list (at 0 4) (at 0 10)))
+          (selection-cancel)
+          (go-to (at 1 8))
+          (check-false (syntax-delete-bracket #f)))))
 ;; structural edits: swap, delete, raise, remove brackets, wrap
     (with-test-buffer '(document (scm-code (document "(list a (f b) c)" "(g (h x))"
                                                      "(k y)" "(m (p q)" "   r)")))
