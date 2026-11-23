@@ -18,10 +18,11 @@ have the details, and the problems go to the
   accepted or rejected**: when the person keeps the new or the old version
   with Version > Differences (the Review bar, Retain) instead of the Accept
   and Reject of the agents, `list_proposals` said `resolved`. The host now
-  compares the blocks with their adjacent strings joined, at the place of the
-  proposal, so that a rejected insertion and an accepted deletion are
-  recognized too, also next to equal paragraphs; a proposal whose markup
-  comes back with an undo (also of a withdrawal) is pending again (#867).
+  records the version that the Version tools keep of the proposal's markup,
+  also for several proposals at once (a selection, Retain all); when the
+  markup disappears otherwise, it compares the blocks with their adjacent
+  strings joined, and recognizes a rejected insertion and an accepted
+  deletion (#867).
 - **Chez Scheme: a smaller boot image, less memory at start-up** (builds
   with Chez): the routines of the C++ glue are defined from a table in C++
   when TeXmacs starts, as with Guile and s7, with one foreign call per number

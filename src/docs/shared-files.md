@@ -400,19 +400,20 @@ process hosts, or only headless ones), the agent edits directly, as before.
   empty side). The agent receives that edit as a normal patch of the host. The
   person accepts or rejects with **Tools > Agents** (`shared-proposal-resolve!`,
   which replaces the markup by the new or the old version as an edit of the person,
-  so the person's undo brings the markup back) or with the Version tools (the host
-  notices that the markup is gone and finds out which version was kept: accepted,
-  rejected, or resolved when it was edited). The blocks are compared with their
-  adjacent strings joined (the Version tools leave the kept text in several
-  strings), at the place of the markup: between the blocks that surrounded it
-  (the same trees, noted while it is pending), else at its index when the
-  number of blocks agrees, so that an empty version (a rejected insertion, an
-  accepted deletion) is recognized and a block equal to its neighbour is not
-  taken for it; when the blocks around changed too, anywhere in the document.
-  A proposal whose markup comes back (the person's undo, also of a
-  withdrawal) is pending again, and classified again later. The host looks
-  only when the document changed (a new live state), so the polling costs
-  nothing more when nothing changes (#867). A patch of an agent that touches blocks
+  so the person's undo brings the markup back) or with the Version tools. `version-retain` and `version-retain-all` are overloaded
+  in `shared-files.scm`: before the tool changes the tree, the host notes which
+  differences of which pending proposals it resolves and which version it keeps
+  (the Review bar's Keep, Retain, Retain all, a selection), and records the
+  outcome when no difference of the proposal is left: accepted (new kept
+  everywhere), rejected (old everywhere), resolved (mixed). When the markup
+  disappears otherwise (deleted, typed over), the host compares the blocks, with
+  adjacent strings joined, with both versions; an empty version is taken as
+  kept when the other one is gone. The host looks only when the document
+  changed (a new live state). Known limit: an undo that brings back the markup
+  of a resolved proposal is not reported (the undo makes new trees, and
+  recognizing the markup by its content would take a comparison made by the
+  person for the proposal): the markup is plain version markup, the status
+  stays (#867). A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status
   (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are
@@ -621,7 +622,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentversion` (the person resolves proposals with the Version tools: accepted or rejected, an insertion, a deletion, next to equal or empty paragraphs, pending again after an undo, also of a withdrawal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) `edfuzz` (random patches applied to a real buffer) and `diskchange` (the host's saves are not changes on disk; a write by another program is said by the host only; the host's Revert reaches the participant with the date of the file, so that after a handover the new host says nothing and saves without asking). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentversion` (the person resolves proposals with the Version tools: accepted or rejected, an insertion, a deletion, next to equal or empty paragraphs, several at once with a selection or Retain all; a comparison made afterwards is not a proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) `edfuzz` (random patches applied to a real buffer) and `diskchange` (the host's saves are not changes on disk; a write by another program is said by the host only; the host's Revert reaches the participant with the date of the file, so that after a handover the new host says nothing and saves without asking). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with

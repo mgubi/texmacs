@@ -3,8 +3,8 @@
 ;; Old or New), not with Tools > Agents: the host finds out which version was
 ;; kept and the agent hears accepted or rejected (#867). An insertion (its old
 ;; version is empty) and a deletion (its new version is empty) as well, next
-;; to equal blocks; an undo brings the markup back and the proposal is
-;; pending again (also an undone withdrawal).
+;; to equal blocks; several proposals resolved at once; a comparison made by
+;; the person afterwards is not taken for a proposal.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -59,6 +59,30 @@
   ;; an edit of the person, then the agent may go on
   (list (act (sync-n n "person") (with-buffer (the-name) (edit!)) (sync-set! (sync-n n "p")))))
 
+;; Retain on the whole document: all selected, Keep (the Review bar), or
+;; Version > Retain all
+(define (keep-selected! which)
+  (with-buffer (the-name)
+    (select-all)
+    (start-editing) (version-retain which) (end-editing)
+    (selection-cancel) #t))
+(define (keep-all! which)
+  (with-buffer (the-name)
+    (start-editing) (version-retain-all which) (end-editing) #t))
+
+(define (a-round-all n ids keep expected . checks)
+  ;; wait for the proposals @ids, resolve them all at once with @keep, check
+  ;; that each is @expected
+  (list
+   (wait-sync (sync-n n "b"))
+   (step (sync-n n "pending") (list-and (map (lambda (id) (== (status-of id) "pending")) ids)))
+   (act (sync-n n "keep") (check (sync-n n "Retain") (keep)))
+   (step (sync-n n "settled") (and (not (version-in-doc?)) (not (list-or (map (lambda (id) (== (status-of id) "pending")) ids)))))
+   (act (sync-n n "check")
+        (for-each (lambda (id e) (check (string-append id ": " e) (== (status-of id) e))) ids expected)
+        (for-each (lambda (c) (check (car c) ((cadr c)))) checks)
+        (sync-set! (sync-n n "a")))))
+
 (define (A-steps)
   (append
    (list
@@ -76,16 +100,11 @@
    (a-round 2 "p2" 0 "rejected"
             (list "the document is as before" (lambda () (== (texts) '((section "Intro") "Hello big world." "Second paragraph." "Third one."))))
             (list "p1 is still accepted" (lambda () (== (status-of "p1") "accepted"))))
-   ;; 3. an insertion kept New, undone (pending again), kept Old: rejected
+   ;; 3. an insertion kept New: accepted
    (a-round 3 "p3" 1 "accepted"
             (list "the paragraph is in" (lambda () (== (para-text 3) "Inserted one."))))
-   (list
-    (act "undo 3" (with-buffer (the-name) (undo 0)))
-    (step "markup back" (version-in-doc?))
-    (step "p3 pending" (== (status-of "p3") "pending"))
-    (act "check 3b" (check "the undo makes the proposal pending again" (== (status-of "p3") "pending"))))
-   (a-round 31 "p3" 0 "rejected"
-            (list "the document is as before" (lambda () (== (texts) '((section "Intro") "Hello big world." "Second paragraph." "Third one.")))))
+   ;; (the person takes it out)
+   (person! 32 (lambda () (tree-remove (body) 3 1)))
    ;; 4. a deleted paragraph kept New: accepted
    (a-round 4 "p4" 1 "accepted"
             (list "the paragraph is gone" (lambda () (== (texts) '((section "Intro") "Hello big world." "Second paragraph.")))))
@@ -107,17 +126,36 @@
             (list "one paragraph" (lambda () (== (list-tail (texts) 4) '("Third one." "" "End.")))))
    (a-round 71 "p10" 1 "accepted"
             (list "two paragraphs" (lambda () (== (list-tail (texts) 4) '("Third one." "Third one." "" "End.")))))
-   ;; 8. a proposal withdrawn by the agent, the withdrawal undone by the
-   ;; person: pending again
+   ;; 9. an insertion and a deletion, all selected, Keep New: both accepted
+   (a-round-all 9 '("p11" "p12") (lambda () (keep-selected! 1)) '("accepted" "accepted")
+                (list "both changes are in" (lambda () (== (texts) '((section "Intro") "Hello big world." "Brand new." "Second paragraph." "Second paragraph." "Third one." "" "End.")))))
+   ;; 10. the same with Version > Retain all
+   (a-round-all 10 '("p13" "p14") (lambda () (keep-all! 1)) '("accepted" "accepted")
+                (list "both changes are in" (lambda () (== (texts) '((section "Intro") "Hello big world." "Brand two." "Brand new." "Second paragraph." "Second paragraph." "" "End.")))))
+   ;; 11. two adjacent insertions (the second before the first, which equals
+   ;; the paragraph before), Retain all Old: both rejected
+   (a-round-all 11 '("p15" "p16") (lambda () (keep-all! 0)) '("rejected" "rejected")
+                (list "the document is as before" (lambda () (== (texts) '((section "Intro") "Hello big world." "Brand two." "Brand new." "Second paragraph." "Second paragraph." "" "End.")))))
+   ;; 12. a proposal accepted with Tools > Agents, then the person compares
+   ;; the document with the saved file: the same markup, but the person's,
+   ;; and the proposal stays accepted
    (list
-    (wait-sync (sync-n 8 "b"))
-    (step "p11 withdrawn" (== (status-of "p11") "withdrawn"))
-    (act "undo 8" (with-buffer (the-name) (undo 0)))
-    (step "markup back 8" (version-in-doc?))
-    (step "p11 pending" (== (status-of "p11") "pending"))
-    (act "check 8" (check "an undone withdrawal: pending again" (== (status-of "p11") "pending"))
-         (sync-set! (sync-n 8 "a"))))
-   (a-round 81 "p11" 0 "rejected")
+    (act "save 12" (save-buffer-main (the-name)))
+    (step "saved 12" (not (buffer-modified? (the-name))))
+    (act "12p" (sync-set! (sync-n 12 "p")))
+    (wait-sync (sync-n 12 "b"))
+    (step "p17" (== (status-of "p17") "pending"))
+    (act "accept 17" (check "p17: accepted with Tools > Agents" (shared-proposal-resolve! (the-name) "p17" 'new)))
+    (act "compare" (with-buffer (the-name) (compare-with-older (string->url FILE))))
+    (step "compared" (version-in-doc?))
+    (timed-wait 600)
+    (act "check 12" (check "p17: still accepted after Compare" (== (status-of "p17") "accepted"))
+         (check "no proposal is pending" (not (list-or (map (lambda (e) (== (cadr e) "pending")) (shared-proposals (the-name)))))))
+    (act "retain 12" (keep-all! 1))
+    (step "no markup 12" (not (version-in-doc?)))
+    (timed-wait 300)
+    (act "check 12b" (check "p17: accepted" (== (status-of "p17") "accepted"))
+         (sync-set! (sync-n 12 "a"))))
    (list
     (wait-sync "b-done")
     (act "A out" (publish-body!) (sync-set! "a-done")))))
@@ -131,6 +169,15 @@
   (list (act (sync-n n "edit") (set! rb0 (shared-stat 'rolled-back)) (edit!))
         (step (sync-n n "verdict") (and (> (shared-stat 'rolled-back) rb0) (eq? (verdict-kind) 'proposed)))
         (step (sync-n n "markup") (version-in-doc?))
+        (act (sync-n n "b") (sync-set! (sync-n n "b")))))
+
+(define (propose-and-wait* n edit1! edit2!)
+  ;; two proposals pending at once
+  (list (act (sync-n n "edit1") (set! rb0 (shared-stat 'rolled-back)) (edit1!))
+        (step (sync-n n "verdict1") (and (> (shared-stat 'rolled-back) rb0) (eq? (verdict-kind) 'proposed)))
+        (step (sync-n n "markup1") (version-in-doc?))
+        (act (sync-n n "edit2") (set! rb0 (shared-stat 'rolled-back)) (edit2!))
+        (step (sync-n n "verdict2") (and (> (shared-stat 'rolled-back) rb0) (eq? (verdict-kind) 'proposed)))
         (act (sync-n n "b") (sync-set! (sync-n n "b")))))
 
 (define (agent-hears n id status)
@@ -153,9 +200,7 @@
    (round 1 (lambda () (insert-text! 1 6 "big ")) "p1" "accepted")
    (round 2 (lambda () (insert-block! 3 "New paragraph.")) "p2" "rejected")
    (round 3 (lambda () (insert-block! 3 "Inserted one.")) "p3" "accepted")
-   (list (step "p3 pending again" (== (status-of "p3") "pending"))
-         (act "31b" (sync-set! (sync-n 31 "b"))))
-   (agent-hears 31 "p3" "rejected")
+   (list (wait-sync (sync-n 32 "p")) (step "32 there" (= (para-count) 4)))
    (round 4 (lambda () (tree-remove (body) 3 1)) "p4" "accepted")
    (list (wait-sync (sync-n 5 "p")) (step "5 there" (= (para-count) 5)))
    (round 5 (lambda () (tree-remove (body) 3 1)) "p5" "rejected")
@@ -165,14 +210,15 @@
    (round 62 (lambda () (tree-remove (body) 6 1)) "p8" "accepted")
    (round 7 (lambda () (insert-block! 5 "Third one.")) "p9" "rejected")
    (round 71 (lambda () (insert-block! 5 "Third one.")) "p10" "accepted")
-   (propose-and-wait 8 (lambda () (insert-text! 2 6 ",")))
-   (list
-    (act "withdraw" (check "withdraw sent" (shared-file-send-withdraw (the-name) "p11")))
-    (step "withdrawn" (and (== (status-of "p11") "withdrawn") (not (version-in-doc?)))))
-   (agent-hears 8 "p11" "pending")
-   (list
-    (act "81b" (sync-set! (sync-n 81 "b"))))
-   (agent-hears 81 "p11" "rejected")
+   (propose-and-wait* 9 (lambda () (insert-block! 2 "Brand new.")) (lambda () (tree-remove (body) 5 1)))
+   (agent-hears 9 "p12" "accepted")
+   (propose-and-wait* 10 (lambda () (insert-block! 2 "Brand two.")) (lambda () (tree-remove (body) 6 1)))
+   (agent-hears 10 "p14" "accepted")
+   (propose-and-wait* 11 (lambda () (insert-block! 6 "Second paragraph.")) (lambda () (insert-block! 6 "Other.")))
+   (agent-hears 11 "p16" "rejected")
+   (list (wait-sync (sync-n 12 "p")))
+   (propose-and-wait 12 (lambda () (insert-text! 4 6 "X")))
+   (agent-hears 12 "p17" "accepted")
    (list
     (act "out" (publish-body!) (sync-set! "b-done"))
     (wait-sync "a-done"))))
