@@ -30,6 +30,9 @@ have the details, and the problems go to the
   delimiters) could not be read as a command by Chez, and each pass of the
   manual printed an error; a command is now first looked up as it is
   (#947).
+- **User Manual: the key of the small bar-separator** (Mathematics >
+  Keyboard > Large delimiters): the manual showed the key `|`, which makes
+  an absolute value; it now shows the key of the small separator.
 
 ## 22 November 2026
 

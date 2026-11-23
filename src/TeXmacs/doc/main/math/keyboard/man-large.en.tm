@@ -30,7 +30,7 @@
   For some delimiters, such as <math|\|>, the opening and closing delimiters
   coincide. For instance, entering a vertical bar <key|\|> will produce an
   absolute value. The (small) bar-separator <math|\|> is obtained using
-  <shortcut|\|>, or as a variant using <key|\| var>. The big bar-separator is
+  <shortcut|(math-separator "\|" #f)>, or as a variant using <key|\| var>. The big bar-separator is
   entered using <shortcut|(math-separator "\|" #t)>. In <TeX> and <LaTeX>,
   such large separators do not exist; they are used for producing the
   vertical bars in formulas like
