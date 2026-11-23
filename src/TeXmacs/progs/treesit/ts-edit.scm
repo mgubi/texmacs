@@ -261,40 +261,55 @@
                (insert rb))
            #t))))
 
-(define (quote-char? c) (in? c '("\"" "'" "`")))
+(define (alnum-char? c)
+  (and (== (string-length c) 1)
+       (let ((ch (string-ref c 0)))
+         (or (char-alphabetic? ch) (char-numeric? ch)))))
 
-(define (opening-quote root a)
-  ;; the quote which opens a string starting at the point a, after a prefix
-  ;; of letters or digits (u8"...", R"(...)", f"..."), or ""
+(define (whole-string-type? type)
+  ;; a node of a whole string: the grammars also name "string..." the parts
+  ;; of a string, such as the content between its quotes (string_content in
+  ;; C++, Python and Rust), its quotes alone (string_start and string_end in
+  ;; Python), the delimiters of a raw string (raw_string_delimiter in C++)
+  (and (string-contains? type "string")
+       (not (list-or (map (lambda (part) (string-contains? type part))
+                          '("start" "end" "content" "delimiter" "fragment"
+                            "escape" "interpolation"))))))
+
+(define (opening-point root a)
+  ;; the point of the quote which opens a string starting at the point a,
+  ;; after a prefix of letters or digits (u8"...", R"(...)", f"...", r#"..."#)
   (let* ((s (line-string root (car a)))
          (i (let loop ((i (cadr a)))
               (if (and (< i (string-length s))
-                       (let ((ch (string-ref s i)))
-                         (or (char-alphabetic? ch) (char-numeric? ch))))
+                       (alnum-char? (substring s i (+ i 1))))
                   (loop (+ i 1)) i))))
-    (char-at root (list (car a) i))))
+    (list (car a) i)))
 
 (define (quote-pair root lan p)
-  ;; when a string starts or ends with the quote at p: (start end) of it.
-  ;; The node must be the whole string, from its opening quote to its
-  ;; closing one: the grammars also name "string..." the parts of a string,
-  ;; such as the content between the quotes (string_content in C++ and
-  ;; Python) or the quotes alone (string_start, string_end in Python), and
-  ;; their first or last character is no quote of a pair (#873)
+  ;; when the character at p opens or closes a string: (start end) of it.
+  ;; The character must be the opening quote of the string (after its
+  ;; prefix) or its last one, which is no letter or digit (a quote, or the
+  ;; # of a raw string of Rust); the first or last character of the content
+  ;; of a string is a plain character (#873). In a string inside another
+  ;; one (Python f-strings) it is the innermost string.
   (let* ((c (char-at root p))
          (after (list (car p) (+ (cadr p) 1)))
-         (n (and (quote-char? c)
-                 (list-find (syntax-region-node-range root lan (car p) (cadr p)
-                                                      (car p) (+ (cadr p) 1))
-                            (lambda (n)
-                              (let ((a (node-start n)) (b (node-end n)))
-                                (and (string-contains? (node-type n) "string")
-                                     (or (== a p) (== b after))
-                                     (point<? (list (car a) (+ (cadr a) 1)) b)
-                                     (== (opening-quote root a) c)
-                                     (== (char-at root (list (car b) (- (cadr b) 1)))
-                                         c))))))))
-    (and n (list (node-start n) (node-end n)))))
+         (ok? (lambda (n)
+                (let ((a (node-start n)) (b (node-end n)))
+                  (and (whole-string-type? (node-type n))
+                       (point<? (list (car a) (+ (cadr a) 1)) b)
+                       (or (== (opening-point root a) p) (== b after))))))
+         (l (if (or (== c "") (alnum-char? c)) '()
+                (list-filter (syntax-region-node-range root lan (car p) (cadr p)
+                                                       (car p) (+ (cadr p) 1))
+                             ok?)))
+         (inner? (lambda (n m) (and (point<=? (node-start m) (node-start n))
+                                    (point<=? (node-end n) (node-end m))))))
+    (and (nnull? l)
+         (let loop ((best (car l)) (l (cdr l)))
+           (cond ((pair? l) (loop (if (inner? (car l) best) (car l) best) (cdr l)))
+                 (else (list (node-start best) (node-end best))))))))
 
 (define (pair-at root lan p)
   ;; the pair of brackets or quotes of which the character at p is one:

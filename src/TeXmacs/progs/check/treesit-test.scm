@@ -1058,46 +1058,6 @@
           (check= (line 3) "\"\"")
           (check-true (syntax-delete-bracket #f))
           (check= (line 3) ""))))
-    ;; the first and last characters of a string are plain characters: the
-    ;; content of a string (string_content) or its quotes alone (string_start
-    ;; and string_end in Python) are no pair of quotes (#873)
-    (for (x '((cpp-code "x = \"test123\";") (python-code "x = \"test123\"")
-              (julia-code "x = \"test123\"")))
-      (with-test-buffer `(document (,(car x) (document ,(cadr x))))
-        (lambda (u b)
-          (update-forced)
-          (let* ((code (tree-ref b 0 0))
-                 (at (lambda (col) (rcons (tree->path (tree-ref code 0)) col))))
-            (go-to (at 12))                          ; after the 3
-            (check-false (syntax-delete-bracket #f))
-            (go-to (at 5))                           ; before the t
-            (check-false (syntax-delete-bracket #t))
-            (check-false (selection-active-any?))
-            ;; the quotes select the whole string, from both sides
-            (go-to (at 13))
-            (check-true (syntax-delete-bracket #f))
-            (check= (list (selection-get-start) (selection-get-end))
-                    (list (at 4) (at 13)))
-            (selection-cancel)
-            (go-to (at 4))
-            (check-true (syntax-delete-bracket #t))
-            (check= (list (selection-get-start) (selection-get-end))
-                    (list (at 4) (at 13)))
-            (selection-cancel)))))
-    ;; a prefix (u8"...") belongs to the string; an escaped quote is a
-    ;; plain character
-    (with-test-buffer '(document (cpp-code (document "x = u8\"ab\";" "y = \"a\\\"\";")))
-      (lambda (u b)
-        (update-forced)
-        (let* ((code (tree-ref b 0 0))
-               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col))))
-          (go-to (at 0 10))
-          (check-true (syntax-delete-bracket #f))
-          (check= (list (selection-get-start) (selection-get-end))
-                  (list (at 0 4) (at 0 10)))
-          (selection-cancel)
-          (go-to (at 1 8))
-          (check-false (syntax-delete-bracket #f)))))
 ;; structural edits: swap, delete, raise, remove brackets, wrap
     (with-test-buffer '(document (scm-code (document "(list a (f b) c)" "(g (h x))"
                                                      "(k y)" "(m (p q)" "   r)")))
@@ -1642,6 +1602,81 @@
               (check-true (<= (strings-taken syntax-definitions-at-cursor) 2)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The quotes of strings (#873)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Backspace (Delete when forward?) at (row col) of the code lines: #f when
+;; it is a plain deletion, else the selected string (row1 col1 row2 col2)
+(define (string-deletion tag lines row col forward?)
+  (let ((r #f))
+    (with-test-buffer `(document (,tag (document ,@lines)))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (rc (lambda (p) (list (cAr (cDr p)) (cAr p)))))
+          (go-to (at row col))
+          (set! r (and (syntax-delete-bracket forward?)
+                       (if (selection-active-any?)
+                           (append (rc (selection-get-start))
+                                   (rc (selection-get-end)))
+                           'deleted)))
+          (selection-cancel))))
+    r))
+
+(define (test-string-quotes)
+  (check-group "the quotes of strings")
+  ;; the first and last characters of a string are plain characters (the
+  ;; grammars name "string..." the content of a string, string_content in
+  ;; C++ and Python, and its quotes alone, string_start and string_end in
+  ;; Python); its quotes select it, from both sides
+  (for (x '((cpp-code "x = \"test123\";") (python-code "x = \"test123\"")
+            (julia-code "x = \"test123\"")))
+    (let ((tag (car x)) (l (cdr x)))
+      (check= (string-deletion tag l 0 12 #f) #f)     ; after the 3
+      (check= (string-deletion tag l 0 5 #t) #f)      ; before the t
+      (check= (string-deletion tag l 0 13 #f) '(0 4 0 13))
+      (check= (string-deletion tag l 0 4 #t) '(0 4 0 13))))
+  ;; Julia: interpolations at the ends of a string
+  (check= (string-deletion 'julia-code '("x = \"a$x\"") 0 8 #f) #f)
+  (check= (string-deletion 'julia-code '("x = \"$x b\"") 0 5 #t) #f)
+  (check= (string-deletion 'julia-code '("x = \"a$(y)\"") 0 10 #f) #f)
+  (check= (string-deletion 'julia-code '("x = \"a$x\"") 0 9 #f) '(0 4 0 9))
+  ;; prefixes belong to the string, but are plain characters themselves
+  (let ((l '("x = f\"ab\"")))
+    (check= (string-deletion 'python-code l 0 6 #f) '(0 4 0 9))
+    (check= (string-deletion 'python-code l 0 5 #t) '(0 4 0 9))
+    (check= (string-deletion 'python-code l 0 9 #f) '(0 4 0 9))
+    (check= (string-deletion 'python-code l 0 4 #t) #f))
+  (check= (string-deletion 'python-code '("x = b'ab'") 0 6 #f) '(0 4 0 9))
+  (let ((l '("x = rb'ab'")))
+    (check= (string-deletion 'python-code l 0 7 #f) '(0 4 0 10))
+    (check= (string-deletion 'python-code l 0 10 #f) '(0 4 0 10))
+    (check= (string-deletion 'python-code l 0 4 #t) #f)
+    (check= (string-deletion 'python-code l 0 5 #t) #f))
+  (check= (string-deletion 'cpp-code '("x = u8\"ab\";") 0 10 #f) '(0 4 0 10))
+  ;; triple quotes, on one line and across lines
+  (let ((l '("x = \"\"\"ab\"\"\"")))
+    (check= (string-deletion 'python-code l 0 12 #f) '(0 4 0 12))
+    (check= (string-deletion 'python-code l 0 4 #t) '(0 4 0 12))
+    (check= (string-deletion 'python-code l 0 9 #f) #f))
+  (let ((l '("x = \"\"\"a" "b\"\"\"")))
+    (check= (string-deletion 'python-code l 1 4 #f) '(0 4 1 4))
+    (check= (string-deletion 'python-code l 0 4 #t) '(0 4 1 4))
+    (check= (string-deletion 'python-code l 0 8 #f) #f)
+    (check= (string-deletion 'python-code l 1 0 #t) #f))
+  ;; a string in a string (f-strings): the inner one
+  (check= (string-deletion 'python-code '("x = f\"{d['k']}\"") 0 12 #f)
+          '(0 9 0 12))
+  ;; the raw strings of Rust end with #
+  (let ((l '("let x = r#\"ab\"#;")))
+    (check= (string-deletion 'rust-code l 0 15 #f) '(0 8 0 15))
+    (check= (string-deletion 'rust-code l 0 9 #t) '(0 8 0 15)))
+  ;; an escaped quote is a plain character, an empty string goes at once
+  (check= (string-deletion 'cpp-code '("y = \"a\\\"\";") 0 8 #f) #f)
+  (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1668,4 +1703,5 @@
   (test-outline-items)
   (test-one-line-outline)
   (test-one-line-errors)
+  (test-string-quotes)
   (check-end))
