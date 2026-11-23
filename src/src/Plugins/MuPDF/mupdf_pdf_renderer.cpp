@@ -300,6 +300,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   string glyph_name (pdf_font_item& it, int key, int fallback, int& gid);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
+  void write_cid_to_gid (pdf_font_item& it);
   void write_tex_to_unicode (pdf_font_item& it, int first, int last,
                              array<string>& gname);
   int  glyph_name_unicode (pdf_font_item& it, int gid);
@@ -1378,6 +1379,23 @@ mupdf_pdf_renderer_rep::ligature_of (pdf_font_item& it, int key,
   return r;
 }
 
+// The /CIDToGIDMap of a TrueType CID font (PDF/UA). (A function of its
+// own: an fz_try, a setjmp, in the loop of write_fonts, among its arrays,
+// made GCC 13 fail, an internal compiler error of its uninit pass.)
+void
+mupdf_pdf_renderer_rep::write_cid_to_gid (pdf_font_item& it) {
+  fz_try (ctx) {
+    pdf_obj* df= pdf_array_get (ctx, pdf_dict_get (ctx, it.obj,
+                                PDF_NAME(DescendantFonts)), 0);
+    if (df != NULL &&
+        pdf_name_eq (ctx, pdf_dict_get (ctx, df, PDF_NAME(Subtype)),
+                     PDF_NAME(CIDFontType2)) &&
+        pdf_dict_get (ctx, df, PDF_NAME(CIDToGIDMap)) == NULL)
+      pdf_dict_put (ctx, df, PDF_NAME(CIDToGIDMap), PDF_NAME(Identity));
+  }
+  fz_catch (ctx) {}
+}
+
 // The encoding and the widths of the simple fonts, once every page has
 // been written and the codes in use are known.
 void
@@ -1387,19 +1405,7 @@ mupdf_pdf_renderer_rep::write_fonts () {
     if (it.t3) { write_type3 (it); continue; }
     if (it.font != NULL && !it.simple && it.obj != NULL) {
       // a TrueType CID font says how its CIDs are glyphs (PDF/UA)
-      // (braced: fz_catch is a statement of its own)
-      if (tagger != NULL) {
-        fz_try (ctx) {
-          pdf_obj* df= pdf_array_get (ctx, pdf_dict_get (ctx, it.obj,
-                                      PDF_NAME(DescendantFonts)), 0);
-          if (df != NULL &&
-              pdf_name_eq (ctx, pdf_dict_get (ctx, df, PDF_NAME(Subtype)),
-                           PDF_NAME(CIDFontType2)) &&
-              pdf_dict_get (ctx, df, PDF_NAME(CIDToGIDMap)) == NULL)
-            pdf_dict_put (ctx, df, PDF_NAME(CIDToGIDMap), PDF_NAME(Identity));
-        }
-        fz_catch (ctx) {}
-      }
+      if (tagger != NULL) write_cid_to_gid (it);
       fix_to_unicode (it); continue; }
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
     int first= 256, last= -1;
