@@ -1719,6 +1719,21 @@
   (let ((l '("#include <less>stdio.h<gtr>")))
     (check= (string-deletion 'cpp-code l 0 9 #t) '(0 9 0 27))
     (check= (string-deletion 'cpp-code l 0 27 #f) '(0 9 0 27)))
+  ;; an unterminated string (one node in Lua, Bash, OCaml): its escaped quote
+  ;; is no closing quote, and only Julia has suffixes; \\ before a quote
+  ;; escapes nothing, nor does \ in a raw string
+  (let ((l '("x = \"ab\\\"cd")))
+    (check= (string-deletion 'lua-code l 0 9 #f) #f)
+    (check= (string-deletion 'lua-code l 0 4 #t) #f))
+  (check= (string-deletion 'lua-code '("x = 'it\\'s") 0 9 #f) #f)
+  (check= (string-deletion 'lua-code '("x = 'it\\'s") 0 4 #t) #f)
+  (check= (string-deletion 'lua-code '("x = \"\\\"c") 0 7 #f) #f)
+  (check= (string-deletion 'lua-code '("x = \"ab\\\"") 0 9 #f) #f)
+  (check= (string-deletion 'shell-code '("x=\"ab\\\"cd") 0 7 #f) #f)
+  (check= (string-deletion 'ocaml-code '("let f = \"ab\\\"cd") 0 13 #f) #f)
+  (check= (string-deletion 'lua-code '("x = \"a\\\\\"") 0 9 #f) '(0 4 0 9))
+  (check= (string-deletion 'rust-code '("let x = r\"a\\\";") 0 13 #f) '(0 8 0 13))
+  (check= (string-deletion 'toml-code '("a = 'C:\\'") 0 9 #f) '(0 4 0 9))
   ;; an escaped quote is a plain character, an empty string goes at once
   (check= (string-deletion 'cpp-code '("y = \"a\\\"\";") 0 8 #f) #f)
   (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted)

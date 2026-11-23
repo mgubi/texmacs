@@ -275,8 +275,11 @@
 ;;    (raw strings of Rust), an opening quote q (" ' `), ..., a closing quote
 ;;    q and as many #; or <...> (#include <...>, <less>...<gtr> in the
 ;;    strings of TeXmacs), or the long brackets of
-;;    Lua ([[...]], [=[...]=]); a suffix of letters and digits may follow
-;;    (the flags of r"..."i in Julia).
+;;    Lua ([[...]], [=[...]=]); in Julia, whose grammar puts the suffix
+;;    of a string in its node (prefixed_string_literal), a suffix of
+;;    letters, digits and _ may follow (the flags of r"..."i). A closing "
+;;    after an odd run of \ is escaped (an unterminated string, as "ab\"
+;;    in Lua or Bash, is no pair), except in raw strings (r"a\").
 ;; The character must be the opening quote, or the closing quote (or its
 ;; last #); the characters in between, the prefix and the suffix are plain
 ;; characters.
@@ -313,16 +316,16 @@
 (define (suffix-char? ch)
   (or (char-alphabetic? ch) (char-numeric? ch) (== ch #\_)))
 
-(define (string-quotes root a b)
+(define (string-quotes root a b suffix?)
   ;; for a node from the point a to the point b, when its text has the shape
   ;; of a quoted string: (open close), the point of its opening quote and
-  ;; the point after its closing one (before a suffix, such as the flags of
-  ;; r"..."i in Julia); else #f
+  ;; the point after its closing one (before a suffix when suffix?, such as
+  ;; the flags of r"..."i in Julia); else #f
   (let* ((s (line-string root (car a)))
          (n (string-length s))
          (e (line-string root (car b)))
          (m (let loop ((m (cadr b)))        ; without the suffix
-              (if (and (> m 0) (<= m (string-length e))
+              (if (and suffix? (> m 0) (<= m (string-length e))
                        (suffix-char? (string-ref e (- m 1))))
                   (loop (- m 1)) m)))
          (skip (lambda (i ch?)
@@ -353,6 +356,14 @@
     (and close (ends? close)
          ;; the closing quote comes after the opening one
          (point<? (list (car a) o) (list (car b) (- m (string-length close))))
+         ;; and is not escaped, unless the string is raw (only for ", since
+         ;; \ escapes nothing in the '...' of Bash or TOML: 'C:\')
+         (or (!= ch #\") (!= hashes "")
+             (string-contains? (substring s (cadr a) i) "r")
+             (string-contains? (substring s (cadr a) i) "R")
+             (even? (let loop ((k (- m (string-length close) 1)) (c 0))
+                      (if (and (>= k 0) (== (string-ref e k) #\\))
+                          (loop (- k 1) (+ c 1)) c))))
          (list (list (car a) o) (list (car b) m)))))
 
 (define (quote-pair root lan p)
@@ -366,7 +377,9 @@
            (map (lambda (n)
                   (let ((a (node-start n)) (b (node-end n)))
                     (and (whole-string-type? (node-type n))
-                         (with q (string-quotes root a b)
+                         (with q (string-quotes root a b
+                                                (== (node-type n)
+                                                    "prefixed_string_literal"))
                            (and q (or (== (car q) p) (== (cadr q) after))
                                 (list a b (car q) (cadr q)))))))
                 (syntax-region-node-range root lan (car p) (cadr p)
