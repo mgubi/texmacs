@@ -261,59 +261,100 @@
                (insert rb))
            #t))))
 
-(define (alnum-char? c)
-  (and (== (string-length c) 1)
-       (let ((ch (string-ref c 0)))
-         (or (char-alphabetic? ch) (char-numeric? ch)))))
+;; A string is selected by its quotes (or deleted with them when it is
+;; empty) when two conditions hold, each covering the holes of the other
+;; (#873):
+;;  - the node names a whole string: its type has "string", but none of the
+;;    words of the grammars for the parts of a string (string_content,
+;;    string_start and string_end in Python, string_open and string_close
+;;    in R, raw_string_delimiter in C++...) nor for an unquoted value
+;;    (string_scalar in YAML);
+;;  - its text has the shape of a quoted string: a prefix of letters, digits,
+;;    _, $ and @ (f, rb, u8, R, r, $'...' of Bash, @"..." of C#), a run of #
+;;    (raw strings of Rust), an opening quote q (" ' `), ..., a closing quote
+;;    q and as many #; or <...> (#include <...>, <less>...<gtr> in the
+;;    strings of TeXmacs), or the long brackets of
+;;    Lua ([[...]], [=[...]=]).
+;; The character must be the opening quote, or the last character of the
+;; string (its closing quote, or its last #); the characters in between,
+;; the prefix included, are plain characters.
+
+(define string-part-words
+  '("start" "end" "open" "close" "content" "delimiter" "fragment" "escape"
+    "interpolation" "scalar"))
 
 (define (whole-string-type? type)
-  ;; a node of a whole string: the grammars also name "string..." the parts
-  ;; of a string, such as the content between its quotes (string_content in
-  ;; C++, Python and Rust), its quotes alone (string_start and string_end in
-  ;; Python), the delimiters of a raw string (raw_string_delimiter in C++)
   (and (string-contains? type "string")
-       (not (list-or (map (lambda (part) (string-contains? type part))
-                          '("start" "end" "content" "delimiter" "fragment"
-                            "escape" "interpolation"))))))
+       (not (list-or (map (lambda (w) (string-contains? type w))
+                          string-part-words)))))
 
-(define (opening-point root a)
-  ;; the point of the quote which opens a string starting at the point a,
-  ;; after a prefix of letters or digits (u8"...", R"(...)", f"...", r#"..."#)
+(define (prefix-char? ch)
+  (or (char-alphabetic? ch) (char-numeric? ch) (in? ch '(#\_ #\$ #\@))))
+
+(define (quote-char? ch) (in? ch '(#\" #\' #\`)))
+
+(define (string-quotes root a b)
+  ;; for a node from the point a to the point b, the point of its opening
+  ;; quote when its text has the shape of a quoted string, else #f
   (let* ((s (line-string root (car a)))
-         (i (let loop ((i (cadr a)))
-              (if (and (< i (string-length s))
-                       (alnum-char? (substring s i (+ i 1))))
-                  (loop (+ i 1)) i))))
-    (list (car a) i)))
+         (n (string-length s))
+         (e (line-string root (car b)))
+         (m (cadr b))
+         (skip (lambda (i ch?)
+                 (let loop ((i i))
+                   (if (and (< i n) (ch? (string-ref s i))) (loop (+ i 1)) i))))
+         (ends? (lambda (tail)               ; the text ends with tail
+                  (and (<= m (string-length e)) (>= m (string-length tail))
+                       (== (substring e (- m (string-length tail)) m) tail))))
+         (i (skip (cadr a) prefix-char?))
+         (o (skip i (lambda (ch) (== ch #\#))))
+         (hashes (make-string (- o i) #\#))
+         (ch (and (< o n) (string-ref s o)))
+         (close
+          (cond ((not ch) #f)
+                ((quote-char? ch) (string-append (string ch) hashes))
+                ((!= hashes "") #f)
+                ((== ch #\<)                       ; < > in TeXmacs strings
+                 (and (<= (+ o 6) n) (== (substring s o (+ o 6)) "<less>")
+                      "<gtr>"))
+                ((== ch #\[)                       ; [[ or [=[ of Lua
+                 (let* ((k (skip (+ o 1) (lambda (c) (== c #\=)))))
+                   (and (< k n) (== (string-ref s k) #\[)
+                        (string-append "]" (make-string (- k o 1) #\=) "]"))))
+                (else #f))))
+    (and close (ends? close)
+         ;; the closing quote comes after the opening one
+         (point<? (list (car a) o) (list (car b) (- m (string-length close))))
+         (list (car a) o))))
 
 (define (quote-pair root lan p)
-  ;; when the character at p opens or closes a string: (start end) of it.
-  ;; The character must be the opening quote of the string (after its
-  ;; prefix) or its last one, which is no letter or digit (a quote, or the
-  ;; # of a raw string of Rust); the first or last character of the content
-  ;; of a string is a plain character (#873). In a string inside another
+  ;; when the character at p opens or closes a string: (start end open),
+  ;; open being the point of its opening quote. In a string inside another
   ;; one (Python f-strings) it is the innermost string.
-  (let* ((c (char-at root p))
-         (after (list (car p) (+ (cadr p) 1)))
-         (ok? (lambda (n)
-                (let ((a (node-start n)) (b (node-end n)))
-                  (and (whole-string-type? (node-type n))
-                       (point<? (list (car a) (+ (cadr a) 1)) b)
-                       (or (== (opening-point root a) p) (== b after))))))
-         (l (if (or (== c "") (alnum-char? c)) '()
-                (list-filter (syntax-region-node-range root lan (car p) (cadr p)
-                                                       (car p) (+ (cadr p) 1))
-                             ok?)))
-         (inner? (lambda (n m) (and (point<=? (node-start m) (node-start n))
-                                    (point<=? (node-end n) (node-end m))))))
-    (and (nnull? l)
-         (let loop ((best (car l)) (l (cdr l)))
-           (cond ((pair? l) (loop (if (inner? (car l) best) (car l) best) (cdr l)))
-                 (else (list (node-start best) (node-end best))))))))
+  (let* ((after (list (car p) (+ (cadr p) 1)))
+         (pairs
+          (list-filter
+           (map (lambda (n)
+                  (let ((a (node-start n)) (b (node-end n)))
+                    (and (whole-string-type? (node-type n))
+                         (with o (string-quotes root a b)
+                           (and o (or (== o p) (== b after)) (list a b o))))))
+                (syntax-region-node-range root lan (car p) (cadr p)
+                                          (car p) (+ (cadr p) 1)))
+           identity))
+         (inner? (lambda (x y) (and (point<=? (car y) (car x))
+                                    (point<=? (cadr x) (cadr y))))))
+    (and (nnull? pairs)
+         (let loop ((best (car pairs)) (l (cdr pairs)))
+           (if (pair? l)
+               (loop (if (inner? (car l) best) (car l) best) (cdr l))
+               best)))))
 
 (define (pair-at root lan p)
   ;; the pair of brackets or quotes of which the character at p is one:
-  ;; (start end) from the opening one to after the closing one, or #f
+  ;; (start end) from the opening one to after the closing one, or #f; for a
+  ;; string, (start end open) with the point of its opening quote after
+  ;; its prefix
   (let ((q (syntax-matching-bracket root lan p)))
     (if q
         (let ((a (if (point<? p q) p q)) (b (if (point<? p q) q p)))
@@ -324,12 +365,13 @@
   ;; delete or select the pair of the character at p; whether there was one
   (let ((pair (pair-at root lan p)))
     (and pair
-         (let ((a (car pair)) (b (cadr pair)))
-           (if (and (== (car a) (car b)) (== (+ (cadr a) 2) (cadr b)))
-               ;; empty: both go
+         (let* ((a (car pair)) (b (cadr pair))
+                (o (if (pair? (cddr pair)) (caddr pair) a)))
+           (if (and (== (car o) (car b)) (== (+ (cadr o) 2) (cadr b)))
+               ;; empty: both go, and a prefix stays (f"" gives f)
                (begin
-                 (tree-remove! (tree-ref root (car a)) (cadr a) 2)
-                 (move-to ctx a))
+                 (tree-remove! (tree-ref root (car o)) (cadr o) 2)
+                 (move-to ctx o))
                (selection-set (context-path ctx a) (context-path ctx b)))
            #t))))
 

@@ -21,8 +21,9 @@ have the details, and the problems go to the
   selected the content of the string instead of deleting the character,
   and the next key press deleted it all. Only the quotes select the whole
   string now, as the brackets do, also with a prefix (`f"..."`, `rb'...'`,
-  `u8"..."`), triple quotes and the raw strings of Rust; Backspace after
-  the opening quote of `f"..."` no longer deletes `f"` at once (#873).
+  `u8"..."`), triple quotes and the raw strings of Rust and R; an empty
+  string with a prefix (`f""`) loses its quotes and keeps its prefix, and
+  the values of YAML without quotes are plain text (#873).
 - **Chez Scheme: a smaller boot image, less memory at start-up** (builds
   with Chez): the routines of the C++ glue are defined from a table in C++
   when TeXmacs starts, as with Guile and s7, with one foreign call per number

@@ -1671,10 +1671,51 @@
   ;; the raw strings of Rust end with #
   (let ((l '("let x = r#\"ab\"#;")))
     (check= (string-deletion 'rust-code l 0 15 #f) '(0 8 0 15))
-    (check= (string-deletion 'rust-code l 0 9 #t) '(0 8 0 15)))
+    (check= (string-deletion 'rust-code l 0 10 #t) '(0 8 0 15))
+    (check= (string-deletion 'rust-code l 0 9 #t) #f)      ; the # before "
+    (check= (string-deletion 'rust-code l 0 14 #f) #f))    ; the " before #
+  ;; the raw strings of R: their delimiters (string_open, string_close)
+  ;; are no strings
+  (let ((l '("x = r\"(ab)\"")))
+    (check= (string-deletion 'r-code l 0 11 #f) '(0 4 0 11))
+    (check= (string-deletion 'r-code l 0 5 #t) '(0 4 0 11))
+    (check= (string-deletion 'r-code l 0 6 #t) #f)         ; the (
+    (check= (string-deletion 'r-code l 0 10 #f) #f))       ; the )
+  (check= (string-deletion 'r-code '("x = r\"-[ab]-\"") 0 13 #f) '(0 4 0 13))
+  (check= (string-deletion 'r-code '("x = r\"()\"") 0 9 #f) '(0 4 0 9))
+  ;; the values of YAML without quotes are no strings
+  (check= (string-deletion 'yaml-code '("key: foo.bar") 0 8 #t) #f)
+  (check= (string-deletion 'yaml-code '("key: foo.bar") 0 9 #f) #f)
+  (check= (string-deletion 'yaml-code '("url: http://x/") 0 14 #f) #f)
+  (check= (string-deletion 'yaml-code '("foo.bar: 1") 0 3 #t) #f)
+  (check= (string-deletion 'yaml-code '("- a-b") 0 4 #f) #f)
+  ;; other shapes of strings: $'...' of Bash, the long brackets of Lua,
+  ;; #include <...> (<less>...<gtr> in the strings of TeXmacs)
+  (let ((l '("echo $'a\\n'")))
+    (check= (string-deletion 'shell-code l 0 6 #t) '(0 5 0 11))
+    (check= (string-deletion 'shell-code l 0 5 #t) #f)      ; the $
+    (check= (string-deletion 'shell-code l 0 11 #f) '(0 5 0 11)))
+  (let ((l '("x = [[ab]]")))
+    (check= (string-deletion 'lua-code l 0 4 #t) '(0 4 0 10))
+    (check= (string-deletion 'lua-code l 0 10 #f) '(0 4 0 10))
+    (check= (string-deletion 'lua-code l 0 6 #t) #f))
+  (let ((l '("#include <less>stdio.h<gtr>")))
+    (check= (string-deletion 'cpp-code l 0 9 #t) '(0 9 0 27))
+    (check= (string-deletion 'cpp-code l 0 27 #f) '(0 9 0 27)))
   ;; an escaped quote is a plain character, an empty string goes at once
   (check= (string-deletion 'cpp-code '("y = \"a\\\"\";") 0 8 #f) #f)
-  (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted))
+  (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted)
+  ;; an empty string with a prefix: its quotes go, its prefix stays
+  (for (x '((python-code "x = f\"\"" 6 "x = f") (python-code "x = rb''" 7 "x = rb")
+            (python-code "x = b\"\"" 6 "x = b") (cpp-code "x = u8\"\";" 7 "x = u8;")))
+    (with-test-buffer `(document (,(car x) (document ,(cadr x))))
+      (lambda (u b)
+        (update-forced)
+        (let ((line (tree-ref b 0 0 0)))
+          (go-to (rcons (tree->path line) (caddr x)))
+          (check-true (syntax-delete-bracket #f))
+          (check= (tree->string line) (cadddr x))
+          (check= (cAr (cursor-path)) (- (caddr x) 1)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
