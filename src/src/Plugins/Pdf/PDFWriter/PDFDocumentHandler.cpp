@@ -583,6 +583,9 @@ EStatusCode PDFDocumentHandler::CopyInDirectObject(ObjectIDType inSourceObjectID
 }
 
 
+// TeXmacs: the references to objects not in the file, written as null
+int hummus_missing_objects= 0;
+
 EStatusCode PDFDocumentHandler::CopyInDirectObject(ObjectIDType inSourceObjectID,ObjectIDType inTargetObjectID,ObjectIDTypeSet& ioCopiedObjects)
 {
 	// CopyInDirectObject will do this (lissen up)
@@ -602,6 +605,7 @@ EStatusCode PDFDocumentHandler::CopyInDirectObject(ObjectIDType inSourceObjectID
 		// its cross-reference table) is null (ISO 32000-1, 7.3.10); xrefEntry
 		// was NULL there, and the export hung
 		if (xrefEntry == NULL) {
+			hummus_missing_objects++;
 			mObjectsContext->StartNewIndirectObject(inTargetObjectID);
 			mObjectsContext->WriteNull(eTokenSeparatorEndLine);
 			mObjectsContext->EndIndirectObject();

@@ -335,8 +335,20 @@ name_unicode (string n) {
   int dot= search_forwards (".", n);
   if (dot > 0) n= n (0, dot);
   if (known->contains (n)) return known [n];
-  if (N(n) == 7 && starts (n, "uni")) return from_hexadecimal (n (3, 7));
-  if (N(n) >= 5 && N(n) <= 7 && n[0] == 'u') return from_hexadecimal (n (1, N(n)));
+  // (uniXXXX and uXXXX[XX] with hexadecimal digits only: uparrow, utilde
+  // are names)
+  if (N(n) >= 7 && starts (n, "uni") && (N(n) - 3) % 4 == 0) {
+    bool hex= true;
+    for (int i=3; i<N(n); i++)
+      if (!is_digit (n[i]) && !(n[i] >= 'A' && n[i] <= 'F')) hex= false;
+    if (hex) return from_hexadecimal (n (3, 7));
+  }
+  if (N(n) >= 5 && N(n) <= 7 && n[0] == 'u') {
+    bool hex= true;
+    for (int i=1; i<N(n); i++)
+      if (!is_digit (n[i]) && !(n[i] >= 'A' && n[i] <= 'F')) hex= false;
+    if (hex) return from_hexadecimal (n (1, N(n)));
+  }
   string u= cork_to_utf8 ("<" * n * ">");
   int i= 0;
   if (N(u) > 0 && u[0] != '<') {

@@ -13,6 +13,7 @@
 #include "pdf_tags.hpp"
 
 extern bool hummus_write_cidset;  // PDFWriter/DescendentFontWriter.cpp
+extern int hummus_missing_objects;  // PDFWriter/PDFDocumentHandler.cpp
 // the PDF pictures get their fonts embedded (a tagged PDF, PDF/UA)
 static bool hummus_embed_fonts= false;
 #include "Metafont/tex_files.hpp"
@@ -1914,9 +1915,17 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
         else if (!by_number) {
           array<int> table= tex_math_unicode (cfn);
           if (ch >= 0 && ch < N(table) && table[ch] >= 0) uc= table[ch];
+          // a tagged PDF: a code of no character in the table (a font of
+          // none: stmary, wasy), the character of its glyph, as a reader
+          // reads it (a code below U+0020 is a control otherwise)
+          else if (tagger != NULL) {
+            int g= hummus_glyph_unicode (cfid, gl_index);
+            if (g != 0xfffd) uc= g;
+          }
         }
-        // (PDF/UA forbids 0, U+FEFF and U+FFFE in the map)
-        if (tagger != NULL && (uc <= 0 || uc == 0xfeff || uc == 0xfffe))
+        // (PDF/UA forbids 0, U+FEFF and U+FFFE in the map, and the
+        // controls are no characters)
+        if (tagger != NULL && (uc < 0x20 || uc == 0xfeff || uc == 0xfffe))
           uc= 0xfffd;
         glyphs.push_back (GlyphUnicodeMapping (gl_index, uc));
       }
@@ -2225,23 +2234,23 @@ hummus_form_ids (PDFParser& p, PDFDictionary* res, array<int>& ids,
 
 // The character of the glyph gid of a font: of its name, or the one which
 // the font maps to it; U+FFFD when none
+static bool
+hummus_usable_unicode (int u) {
+  // (not a control, not U+FFFD, not of a private use area)
+  return u >= 0x20 && u != 0xfffd && !(u >= 0xe000 && u <= 0xf8ff) &&
+         u < 0xf0000;
+}
+
 static int
 hummus_glyph_unicode (PDFUsedFont* f, unsigned int gid) {
   FreeTypeFaceWrapper* w= (f == NULL? NULL: f->GetFreeTypeFont ());
   if (w == NULL) return 0xfffd;
   FT_Face face= *w;
   if (face == NULL) return 0xfffd;
-  if (FT_HAS_GLYPH_NAMES (face)) {
-    char buf[128];
-    buf[0]= '\0';
-    if (!FT_Get_Glyph_Name (face, gid, buf, sizeof (buf)) && buf[0] != '\0') {
-      int u= pdf_glyph_name_unicode (string (buf));
-      if (u >= 0x20 && u != 0xfffd) return u;
-    }
-  }
-  // (the characters of the glyphs of a font, once for each font: by its
-  // face, its names and its number of glyphs, a face being freed and its
-  // address used again)
+  // the characters which the font maps to its glyphs, once for each font
+  // (by its face, its names and its number of glyphs, a face being freed
+  // and its address used again); the first character of a glyph which is
+  // not of a private use area
   static std::map<std::string, std::map<unsigned int, int> > by_face;
   char kb[64];
   snprintf (kb, sizeof (kb), "%p:%ld:", (void*) face, (long) face->num_glyphs);
@@ -2250,16 +2259,42 @@ hummus_glyph_unicode (PDFUsedFont* f, unsigned int gid) {
     (face->style_name? face->style_name: "");
   if (by_face.find (key) == by_face.end ()) {
     std::map<unsigned int, int>& m= by_face[key];
-    FT_UInt g;
-    FT_ULong c= FT_Get_First_Char (face, &g);
-    while (g != 0) {
-      if (m.find (g) == m.end ()) m[g]= (int) c;
-      c= FT_Get_Next_Char (face, c, &g);
+    bool unicode= (face->charmap != NULL &&
+                   face->charmap->encoding == FT_ENCODING_UNICODE);
+    if (unicode) {
+      FT_UInt g;
+      FT_ULong c= FT_Get_First_Char (face, &g);
+      while (g != 0) {
+        if (m.find (g) == m.end () && hummus_usable_unicode ((int) c))
+          m[g]= (int) c;
+        c= FT_Get_Next_Char (face, c, &g);
+      }
     }
   }
   std::map<unsigned int, int>& m= by_face[key];
+  // the character the font maps to the glyph, else that of its name, else
+  // (a variant: divides.v1) the one the font maps to the glyph of the name
+  // before the dot
   std::map<unsigned int, int>::iterator it= m.find (gid);
-  if (it != m.end () && it->second >= 0x20) return it->second;
+  if (it != m.end ()) return it->second;
+  if (FT_HAS_GLYPH_NAMES (face)) {
+    char buf[128];
+    buf[0]= '\0';
+    if (!FT_Get_Glyph_Name (face, gid, buf, sizeof (buf)) && buf[0] != '\0') {
+      string nm (buf);
+      int u= pdf_glyph_name_unicode (nm);
+      if (hummus_usable_unicode (u)) return u;
+      int dot= search_forwards (".", nm);
+      if (dot > 0) {
+        c_string base (nm (0, dot));
+        FT_UInt g= FT_Get_Name_Index (face, (FT_String*) (char*) base);
+        if (g != 0) {
+          it= m.find (g);
+          if (it != m.end ()) return it->second;
+        }
+      }
+    }
+  }
   return 0xfffd;
 }
 
@@ -2359,7 +2394,7 @@ hummus_pdf_plain (url u) {
       // (the data of a stream: up to endstream)
       if (w == "stream") {
         int e= search_forwards ("endstream", i, s);
-        if (e < 0) break;
+        if (e < 0) return false;   // (damaged: not read)
         i= e + 9;
       }
     }
@@ -2665,6 +2700,7 @@ hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
 EStatusCode
 pdf_image_rep::merge (PDFDocumentCopyingContext* copyingContext,
                       PDFWriter& pdfw, url temp) {
+  int missing= hummus_missing_objects;
   DocumentContext& dc = pdfw.GetDocumentContext();
   PDFPageInput pageInput(copyingContext->GetSourceDocumentParser(),
                          copyingContext->GetSourceDocumentParser()->ParsePage(0));
@@ -2685,6 +2721,11 @@ pdf_image_rep::merge (PDFDocumentCopyingContext* copyingContext,
   PDFFormXObject *form = dc.StartFormXObject(cropBox, id, tMat, true);
   EStatusCode status = copyingContext->MergePDFPageToFormXObject(form,0);
   if(status == eSuccess) pdfw.EndFormXObjectAndRelease(form);
+  if (hummus_missing_objects > missing)
+    convert_warning << "the picture " << u << " refers to objects which "
+                    << "it lacks (a damaged file): they are null"
+                    << (hummus_embed_fonts? ", and the PDF is not PDF/UA": "")
+                    << LF;
   return status;
 }
 

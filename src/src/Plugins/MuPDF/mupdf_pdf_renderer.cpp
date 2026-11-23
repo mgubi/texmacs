@@ -1526,6 +1526,11 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
     for (int c=first; c<=last && c<N(tex); c++)
       if (it.gid[c] >= 0 && tex[c] < 0) {
         int u= -1;
+        // (a piece is no character: mapsto of cmsy is the bar of the
+        // arrows which it begins, and varshortmid)
+        bool piece= (c < N(gname) && gname[c] (0, max (0, N(gname[c]) - 1))
+                     == "mapsto");
+        if (piece) { tex[c]= 0xfffd; continue; }
         if (c < N(gname) && N(gname[c]) > 1)
           u= pdf_glyph_name_unicode (gname[c] (0, N(gname[c]) - 1));
         if (u < 0x20 || u == 0xfffd) {
@@ -3895,6 +3900,7 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
   // create nothing with a destructor, since a throw is a longjmp
   c_string in (concretize (pdf_path));
   c_string out (concretize (out_path));
+  bool objstms_ok= (get_env ("TEXMACS_PDF_OBJSTMS") != "0");
   array<string> att_names, att_bodies;
   for (int i=0; i<N(attachments); i++) {
     string body;
@@ -3955,6 +3961,10 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
     pdf_write_options opts= pdf_default_write_options;
     opts.do_compress= 1;
     opts.do_garbage= 3;
+    // (a tagged PDF keeps its structure in object streams, as it was made)
+    pdf_obj* sroot= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+    if (objstms_ok && pdf_dict_get (ctx, sroot, PDF_NAME(StructTreeRoot)) != NULL)
+      opts.do_use_objstms= 1;
     pdf_save_document (ctx, doc, out, &opts);
     ok= true;
   }
