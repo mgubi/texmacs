@@ -909,9 +909,14 @@ given_inclusion_add (tree t) {
   given_inclusions << t;
 }
 
+int
+given_inclusions_count () {
+  return N(given_inclusions);
+}
+
 void
-given_inclusions_clear () {
-  given_inclusions= array<tree> ();
+given_inclusions_clear (int n) {
+  if (n >= 0 && n < N(given_inclusions)) given_inclusions->resize (n);
 }
 
 bool

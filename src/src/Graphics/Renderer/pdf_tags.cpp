@@ -11,6 +11,7 @@
 
 #include "pdf_tags.hpp"
 #include "analyze.hpp"
+#include <string.h>
 
 pdf_tags_rep::pdf_tags_rep (tagger_rep* t):
   tagger (t), index (-1), block (-2), have (false), last_elem (-1), seq (0),
@@ -31,6 +32,7 @@ pdf_tags_rep::add (tag_node nd, int parent) {
     el.avals << as_int (av[j] (eq+1, N(av[j])));
   }
   el.parent= parent;
+  el.own_alt= nd.own_alt;
   elems << el;
   index (nd.key)= e;
   if (parent >= 0) {
@@ -140,6 +142,61 @@ pdf_tags_rep::add_annotation (int e, int id, int pg, path pos) {
   kids << k;
 }
 
+bool
+pdf_tags_rep::can_graft (path ip) {
+  resolve (ip);
+  int e= last_elem;
+  return e >= 0 && elems[e].role == "Figure" && !elems[e].own_alt;
+}
+
+string
+pdf_tags_rep::graft (path ip, int pg, pdf_tag_graft g, int& stream) {
+  resolve (ip);
+  int e= last_elem;
+  stream= N(stream_mcids);
+  string r;
+  if (block != -2) r << "EMC\n";
+  block= -2;
+  if (e < 0) { stream_mcids << array<int> (); return r; }
+  // (a Figure has an alternative text, which hides its children)
+  elems[e].role= "Div";
+  elems[e].alt = "";
+  int n= N(g.roles);
+  array<int> el (n);
+  for (int i=0; i<n; i++) {
+    pdf_tag_elem x;
+    x.role= g.roles[i];
+    x.alt = g.alts[i];
+    elems << x;
+    el[i]= N(elems) - 1;
+  }
+  for (int i=0; i<n; i++)
+    elems[el[i]].parent= (g.parents[i] < 0? e: el[g.parents[i]]);
+  array<int> mc (g.mcids);
+  for (int m=0; m<g.mcids; m++) mc[m]= -1;
+  // the children in their order: they all have the place of the picture
+  for (int t=0; t<N(g.tops); t++) {
+    pdf_tag_kid k;
+    k.parent= e; k.kind= 0; k.id= el[g.tops[t]]; k.pos= last_pos;
+    k.seq= seq++;
+    kids << k;
+  }
+  for (int i=0; i<n; i++)
+    for (int j=0; j<N(g.content[i]); j++) {
+      int c= g.content[i][j];
+      pdf_tag_kid k;
+      k.parent= el[i]; k.pos= last_pos; k.seq= seq++;
+      if (c >= 0) { k.kind= 0; k.id= el[c]; }
+      else {
+        k.kind= 3; k.id= -1-c; k.page= pg; k.stream= stream;
+        if (k.id < g.mcids) mc[k.id]= el[i];
+      }
+      kids << k;
+    }
+  stream_mcids << mc;
+  return r;
+}
+
 static bool
 tag_path_less (path a, path b) {
   while (!is_nil (a) && !is_nil (b)) {
@@ -194,6 +251,60 @@ pdf_delimiter (char c) {
          c == ']' || c == '{' || c == '}' || c == '/' || c == '%';
 }
 
+
+// The end of an inline image whose BI ends at i: after its EI. Its data is
+// skipped by its length (/L, or its size when it is not filtered), as a
+// reader does: the data may hold "EI" itself; else up to the first EI
+// between white spaces
+static int
+skip_inline_image (string s, int i) {
+  int n= N(s);
+  int id= i;
+  while (id+1 < n && !(s[id] == 'I' && s[id+1] == 'D' &&
+                       pdf_white (s[id-1]) &&
+                       (id+2 == n || pdf_white (s[id+2])))) id++;
+  if (id+1 >= n) return n;
+  // the dictionary of the image, as name value pairs
+  array<string> toks;
+  for (int j= i; j < id; ) {
+    if (pdf_white (s[j])) { j++; continue; }
+    int k= j + 1;
+    if (s[j] == '[') { while (k < id && s[k] != ']') k++; k++; }
+    else if (s[j] == '(') { while (k < id && s[k] != ')') k++; k++; }
+    else while (k < id && !pdf_white (s[k]) && !(s[k] == '/' && k > j) &&
+                s[k] != '[' && s[k] != '(') k++;
+    toks << s (j, min (k, id));
+    j= k;
+  }
+  int w= -1, h= -1, bpc= 8, comps= 1, len= -1;
+  bool filtered= false, mask= false;
+  for (int k=0; k+1<N(toks); k+=2) {
+    string key= toks[k], v= toks[k+1];
+    if (key == "/W" || key == "/Width") w= as_int (v);
+    else if (key == "/H" || key == "/Height") h= as_int (v);
+    else if (key == "/BPC" || key == "/BitsPerComponent") bpc= as_int (v);
+    else if (key == "/L" || key == "/Length") len= as_int (v);
+    else if (key == "/F" || key == "/Filter") filtered= (v != "[]");
+    else if (key == "/IM" || key == "/ImageMask") mask= (v == "true");
+    else if (key == "/CS" || key == "/ColorSpace") {
+      if (v == "/RGB" || v == "/DeviceRGB" || v == "/CalRGB") comps= 3;
+      else if (v == "/CMYK" || v == "/DeviceCMYK") comps= 4;
+      else comps= 1;
+    }
+  }
+  if (mask) { bpc= 1; comps= 1; }
+  int start= id + 3;   // (ID and one white space)
+  if (len < 0 && !filtered && w > 0 && h > 0 && bpc > 0)
+    len= h * ((w * comps * bpc + 7) / 8);
+  int j= start;
+  if (len >= 0 && start + len <= n) j= start + len;
+  // the EI after the data
+  while (j+1 < n && !(s[j] == 'E' && s[j+1] == 'I' &&
+                      (j == 0 || pdf_white (s[j-1])) &&
+                      (j+2 == n || pdf_white (s[j+2])))) j++;
+  return min (n, j + 2);
+}
+
 string
 pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
   string r;
@@ -232,11 +343,7 @@ pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
         // an operator
         if (tok == "BI") {
           // an inline image: its data, up to EI, as it is
-          int j= i;
-          while (j+2 < n && !(pdf_white (s[j]) && s[j+1] == 'E' &&
-                              s[j+2] == 'I' &&
-                              (j+3 == n || pdf_white (s[j+3])))) j++;
-          i= min (n, j + 3);
+          i= skip_inline_image (s, i);
           r << s (seg, i);
         }
         else if (tok == "BMC" || (tok == "BDC" && first != "/OC")) {
@@ -253,6 +360,138 @@ pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
           if (N(open) > 0) open->resize (N(open) - 1);
           if (kept) r << s (seg, i);
           else { changed= true; r << "\n"; }
+        }
+        else r << s (seg, i);
+        seg= i;
+        have_first= false;
+        first= "";
+        continue;
+      }
+    }
+    if (i <= start) i= start + 1;
+    if (!have_first) { first= s (start, i); have_first= true; }
+  }
+  r << s (seg, n);
+  return r;
+}
+
+static const char* pdf_standard_roles[]= {
+  "Part", "Art", "Sect", "Div", "BlockQuote", "Caption", "TOC", "TOCI",
+  "Index", "NonStruct", "Private", "P", "L", "LI", "Lbl", "LBody", "Table",
+  "TR", "TH", "TD", "THead", "TBody", "TFoot", "Span", "Quote", "Note",
+  "Reference", "BibEntry", "Code", "Link", "Annot", "Ruby", "RB", "RT", "RP",
+  "Warichu", "WT", "WP", "Figure", "Formula", "Form", NULL };
+
+const char*
+pdf_graft_role (const char* s) {
+  if (s == NULL) return NULL;
+  if (!strcmp (s, "Document")) return "Div";
+  if (!strcmp (s, "H") || (s[0] == 'H' && s[1] >= '1' && s[1] <= '6' &&
+                           s[2] == '\0')) return "P";
+  for (int i=0; pdf_standard_roles[i] != NULL; i++)
+    if (!strcmp (s, pdf_standard_roles[i])) return pdf_standard_roles[i];
+  return NULL;
+}
+
+pdf_tag_graft
+pdf_graft_prune (array<int> parent, array<string> role, array<string> alt,
+                 array<int> owner, array<int> val, int mcids,
+                 hashset<int>& keep) {
+  int n= N(parent);
+  array<bool> has (n);
+  for (int i=0; i<n; i++) has[i]= false;
+  for (int j=0; j<N(val); j++)
+    if (val[j] < 0 && owner[j] >= 0) has[owner[j]]= true;
+  for (int i=n-1; i>=0; i--)   // (an element comes after its parent)
+    if (has[i] && parent[i] >= 0) has[parent[i]]= true;
+  array<int> index (n);
+  pdf_tag_graft g;
+  for (int i=0; i<n; i++) {
+    index[i]= -1;
+    if (!has[i]) continue;
+    index[i]= N(g.roles);
+    string a= alt[i];
+    if (N(a) == 0 && (role[i] == "Figure" || role[i] == "Formula")) a= role[i];
+    g.roles << role[i];
+    g.alts << a;
+    g.parents << (parent[i] < 0? -1: index[parent[i]]);
+    g.content << array<int> ();
+  }
+  for (int j=0; j<N(val); j++) {
+    int o= owner[j], v= val[j];
+    if (v >= 0) {
+      if (index[v] < 0) continue;
+      if (o < 0) g.tops << index[v];
+      else if (index[o] >= 0) g.content[index[o]] << index[v];
+    }
+    else if (o >= 0 && index[o] >= 0) {
+      g.content[index[o]] << v;
+      keep->insert (-1-v);
+    }
+  }
+  g.mcids= mcids;
+  return g;
+}
+
+// the number after /MCID in the operands s of a BDC, -1 if none
+static int
+operand_mcid (string s) {
+  int i= search_forwards ("/MCID", s);
+  if (i < 0) return -1;
+  i += 5;
+  while (i < N(s) && pdf_white (s[i])) i++;
+  int j= i;
+  while (j < N(s) && is_digit (s[j])) j++;
+  return (j > i? as_int (s (i, j)): -1);
+}
+
+string
+pdf_graft_marked_content (string s, hashset<int> keep, bool& changed) {
+  // (the lexer of pdf_strip_marked_content, which this follows)
+  string r;
+  int n= N(s), i= 0;
+  int seg= 0;
+  string first;
+  bool have_first= false;
+  while (i < n) {
+    char c= s[i];
+    if (pdf_white (c)) { i++; continue; }
+    if (c == '%') { while (i < n && s[i] != '\n' && s[i] != '\r') i++; continue; }
+    int start= i;
+    if (c == '(') {
+      int level= 0;
+      for (; i < n; i++) {
+        if (s[i] == '\\') { i++; continue; }
+        if (s[i] == '(') level++;
+        else if (s[i] == ')' && --level == 0) { i++; break; }
+      }
+    }
+    else if (c == '<' && i+1 < n && s[i+1] == '<') i += 2;
+    else if (c == '>' && i+1 < n && s[i+1] == '>') i += 2;
+    else if (c == '<') { while (i < n && s[i] != '>') i++; i++; }
+    else if (c == '[' || c == ']' || c == '{' || c == '}' || c == ')' ||
+             c == '>') i++;
+    else if (c == '/') {
+      i++;
+      while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
+    }
+    else {
+      while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
+      string tok= s (start, i);
+      bool number= (N(tok) > 0 && (is_digit (tok[0]) || tok[0] == '-' ||
+                                   tok[0] == '+' || tok[0] == '.'));
+      if (!number && tok != "true" && tok != "false" && tok != "null") {
+        if (tok == "BI") {
+          i= skip_inline_image (s, i);
+          r << s (seg, i);
+        }
+        else if (tok == "BDC") {
+          int m= operand_mcid (s (seg, start));
+          if (m >= 0 && !keep->contains (m) && first != "/Artifact") {
+            r << "\n/Artifact BMC";
+            changed= true;
+          }
+          else r << s (seg, i);
         }
         else r << s (seg, i);
         seg= i;

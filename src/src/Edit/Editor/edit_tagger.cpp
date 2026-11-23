@@ -39,6 +39,7 @@ class pdf_tagger_rep: public tagger_rep {
   hashmap<string,string> roles;      // by tag; "" for none
   hashmap<string,string> child_roles;
   hashmap<string,string> alts;       // by key of element
+  hashset<string> own_alts;          // those which are the user's (image-alt)
   hashmap<string,string> heading_of; // the role of each heading, by key
   array<int> open_ranks;             // the ranks of the headings above
   int    appendix_rank;              // that of an appendix: chapter or section
@@ -124,6 +125,7 @@ pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above,
         if (w[j] == "image-alt" && is_atomic (w[j+1]) && N(w[j+1]->label) > 0) {
           string r= cork_to_utf8 (w[j+1]->label);
           alts (key)= r;
+          own_alts->insert (key);
           return r;
         }
     }
@@ -337,7 +339,9 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
         string alt;
         if (role == "Formula" || role == "Figure")
           alt= alt_of (as_string (cur), t, role, above, cur);
-        r << tag_node (as_string (cur), role, cur, alt);
+        tag_node fn (as_string (cur), role, cur, alt);
+        fn.own_alt= own_alts->contains (as_string (cur));
+        r << fn;
         last= role;
         if (is_atomic (t) || role == "Formula" || role == "Figure") break;
         continue;
@@ -384,6 +388,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     if (role == "Formula" || role == "Figure")
       alt= alt_of (key, t, role, above, cur);
     tag_node nd (key, role, cur, alt);
+    nd.own_alt= own_alts->contains (key);
     if (role == "TD" && N(above) >= 2 && is_compound (above[N(above)-2],
                                                      "table")) {
       // the spans of the cell, from the formats around its table

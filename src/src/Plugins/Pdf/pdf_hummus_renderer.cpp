@@ -69,6 +69,9 @@ static bool hummus_embed_fonts= false;
 #include "PDFWriter/PDFStreamInput.h"
 #include "PDFWriter/PDFIndirectObjectReference.h"
 #include "PDFWriter/PDFObjectCast.h"
+#include "PDFWriter/PDFLiteralString.h"
+#include "PDFWriter/PDFHexString.h"
+#include "PDFWriter/PDFTextString.h"
 #include "PDFWriter/FreeTypeWrapper.h"
 #include "PDFWriter/FreeTypeFaceWrapper.h"
 #include "PDFWriter/CFFEmbeddedFontWriter.h"
@@ -127,6 +130,8 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   hashset<string> T2A_fonts;
   hashmap<string,pdf_raw_image> pdf_glyphs;
   hashmap<tree,pdf_image> image_pool;
+  array<pdf_image> graft_images;     // the uses of grafted pictures
+  hashset<string> untagged_files;    // the pictures of no structure
   hashmap<tree,pdf_image> pattern_image_pool;
   hashmap<tree,pdf_pattern> pattern_pool;
   hashmap<unsigned long long int,url> picture_cache;
@@ -245,9 +250,24 @@ class pdf_hummus_renderer_rep : public renderer_rep {
       ren->on_page_write (inPageDictionaryContext);
       return eSuccess;
     }
+    virtual PDFHummus::EStatusCode OnFormXObjectWrite (
+                     ObjectIDType inFormXObjectID,
+                     ObjectIDType inFormXObjectResourcesDictionaryID,
+                     DictionaryContext* inFormDictionaryContext,
+                     ObjectsContext* inPDFWriterObjectContext,
+                     PDFHummus::DocumentContext* inDocumentContext)
+    {
+      (void) inFormXObjectResourcesDictionaryID;
+      (void) inPDFWriterObjectContext; (void) inDocumentContext;
+      ren->on_form_write (inFormXObjectID, inFormDictionaryContext);
+      return eSuccess;
+    }
   };
   
   void on_page_write (DictionaryContext* page_dict);
+  void on_form_write (ObjectIDType id, DictionaryContext* form_dict);
+  hashmap<int,int> form_struct_parents;   // the grafted pictures' forms
+  array<ObjectIDType> graft_form_ids;     // the form of each graft
   pdf_tags tg ();
   void tag_mark (int kind);
   void tag_close ();
@@ -506,6 +526,15 @@ pdf_hummus_renderer_rep::tg () {
 // The drawing which follows is of the box being drawn: of kind 0 (text),
 // 1 (lines, fills) or 2 (images)
 void
+pdf_hummus_renderer_rep::on_form_write (ObjectIDType id,
+                                        DictionaryContext* form_dict) {
+  // the form of a grafted picture: its key in the parent tree
+  if (!form_struct_parents->contains ((int) id)) return;
+  form_dict->WriteKey ("StructParents");
+  form_dict->WriteIntegerValue (form_struct_parents [(int) id]);
+}
+
+void
 pdf_hummus_renderer_rep::tag_mark (int kind) {
   if (tagger == NULL || contentContext == NULL) return;
   string ops= tg ()->mark (tag_ip, kind, page_num);
@@ -589,6 +618,12 @@ pdf_hummus_renderer_rep::write_structure () {
                kd.id < N(tag_annot_ids))
         d << " << /Type /OBJR /Obj " << as_string ((int) tag_annot_ids[kd.id])
           << " 0 R /Pg " << as_string ((int) page_id [kd.page]) << " 0 R >>";
+      else if (kd.kind == 3 && page_id->contains (kd.page) &&
+               kd.stream < N(graft_form_ids))
+        // the marked content of a grafted picture, in its form
+        d << " << /Type /MCR /Pg " << as_string ((int) page_id [kd.page])
+          << " 0 R /Stm " << as_string ((int) graft_form_ids[kd.stream])
+          << " 0 R /MCID " << as_string (kd.id) << " >>";
     }
     d << " ] >>\r\n";
     write_indirect_obj (oc, ids[e], d);
@@ -607,13 +642,24 @@ pdf_hummus_renderer_rep::write_structure () {
     if (tags->kids[i].kind == 2)
       pt << "\r\n " << as_string (pdf_tag_annot_key0 + tags->kids[i].id)
          << " " << as_string ((int) ids[tags->kids[i].parent]) << " 0 R";
+  // the forms of the grafted pictures: their elements by MCID
+  array<array<int> >& sm= tags->stream_mcids;
+  for (int k=0; k<N(sm); k++) {
+    pt << "\r\n " << as_string (pdf_tag_stream_key0 + k) << " [";
+    for (int m=0; m<N(sm[k]); m++)
+      if (sm[k][m] >= 0) pt << " " << as_string ((int) ids[sm[k][m]]) << " 0 R";
+      else pt << " null";
+    pt << " ]";
+  }
   pt << " ] >>\r\n";
   write_indirect_obj (oc, pt_id, pt);
   string root;
   root << "<< /Type /StructTreeRoot /K " << as_string ((int) ids[0])
        << " 0 R /ParentTree " << as_string ((int) pt_id)
        << " 0 R /ParentTreeNextKey "
-       << as_string (pdf_tag_annot_key0 + N(tag_annot_ids)) << " >>\r\n";
+       << as_string (N(sm) > 0? pdf_tag_stream_key0 + N(sm):
+                            pdf_tag_annot_key0 + N(tag_annot_ids))
+       << " >>\r\n";
   write_indirect_obj (oc, struct_tree_id, root);
   // the XMP metadata, with the part of PDF/UA (an uncompressed stream)
   string title= cork_to_utf8 (tagger->title ());
@@ -844,9 +890,11 @@ public:
   url u;
   int w,h;
   ObjectIDType id;
+  bool graft;            // a tagged picture whose structure is grafted:
+  hashset<int> keep;     // the MCIDs of its elements (pdf_tags_rep::graft)
   
   pdf_image_rep(url _u, ObjectIDType _id)
-    : u(_u), id(_id)
+    : u(_u), id(_id), graft (false)
   { image_size (u, w, h); } 
   ~pdf_image_rep() {}
 
@@ -2042,9 +2090,21 @@ hummus_name (PDFParser& p, PDFDictionary* d, const char* key) {
   return (!n? string (""): string (n->GetValue ().c_str ()));
 }
 
+// whether the object of the reference v is met for the first time (direct
+// objects are: they make no cycles)
+static bool
+hummus_first_visit (PDFObject* v, hashset<int>& visited) {
+  if (v == NULL || v->GetType () != PDFObject::ePDFObjectIndirectObjectReference)
+    return true;
+  int id= (int) ((PDFIndirectObjectReference*) v)->mObjectID;
+  if (visited->contains (id)) return false;
+  visited->insert (id);
+  return true;
+}
+
 static void
 hummus_font_dicts (PDFParser& p, PDFDictionary* res,
-                   array<int>& ids, int depth) {
+                   array<int>& ids, int depth, hashset<int>& visited) {
   if (res == NULL || depth > 8) return;
   PDFObjectCastPtr<PDFDictionary> fd (p.QueryDictionaryObject (res, "Font"));
   if (!!fd) {
@@ -2052,12 +2112,13 @@ hummus_font_dicts (PDFParser& p, PDFDictionary* res,
     while (it.MoveNext ()) {
       PDFObject* v= it.GetValue ();
       // (the fonts of the glyphs of a Type 3 font)
+      if (!hummus_first_visit (v, visited)) continue;
       PDFObjectCastPtr<PDFDictionary> f3 (p.QueryDictionaryObject (fd.GetPtr (),
                                             it.GetKey ()->GetValue ()));
       if (!!f3 && hummus_name (p, f3.GetPtr (), "Subtype") == "Type3") {
         PDFObjectCastPtr<PDFDictionary> r3 (p.QueryDictionaryObject (f3.GetPtr (),
                                                                      "Resources"));
-        if (!!r3) hummus_font_dicts (p, r3.GetPtr (), ids, depth + 1);
+        if (!!r3) hummus_font_dicts (p, r3.GetPtr (), ids, depth + 1, visited);
         continue;
       }
       if (v->GetType () != PDFObject::ePDFObjectIndirectObjectReference) {
@@ -2076,6 +2137,7 @@ hummus_font_dicts (PDFParser& p, PDFDictionary* res,
   if (!!pd) {
     MapIterator<PDFNameToPDFObjectMap> it= pd->GetIterator ();
     while (it.MoveNext ()) {
+      if (!hummus_first_visit (it.GetValue (), visited)) continue;
       PDFObjectCastPtr<PDFStreamInput> x (p.QueryDictionaryObject (pd.GetPtr (),
                                             it.GetKey ()->GetValue ()));
       if (!x) continue;
@@ -2083,13 +2145,14 @@ hummus_font_dicts (PDFParser& p, PDFDictionary* res,
       if (!xdict) continue;
       PDFObjectCastPtr<PDFDictionary> xr (p.QueryDictionaryObject (xdict.GetPtr (),
                                                                    "Resources"));
-      if (!!xr) hummus_font_dicts (p, xr.GetPtr (), ids, depth + 1);
+      if (!!xr) hummus_font_dicts (p, xr.GetPtr (), ids, depth + 1, visited);
     }
   }
   PDFObjectCastPtr<PDFDictionary> xd (p.QueryDictionaryObject (res, "XObject"));
   if (!xd) return;
   MapIterator<PDFNameToPDFObjectMap> it= xd->GetIterator ();
   while (it.MoveNext ()) {
+    if (!hummus_first_visit (it.GetValue (), visited)) continue;
     PDFObjectCastPtr<PDFStreamInput> x (p.QueryDictionaryObject (xd.GetPtr (),
                                           it.GetKey ()->GetValue ()));
     if (!x) continue;
@@ -2098,7 +2161,7 @@ hummus_font_dicts (PDFParser& p, PDFDictionary* res,
       continue;
     PDFObjectCastPtr<PDFDictionary> xr (p.QueryDictionaryObject (xdict.GetPtr (),
                                                                  "Resources"));
-    if (!!xr) hummus_font_dicts (p, xr.GetPtr (), ids, depth + 1);
+    if (!!xr) hummus_font_dicts (p, xr.GetPtr (), ids, depth + 1, visited);
   }
 }
 
@@ -2122,8 +2185,11 @@ static void
 hummus_form_ids (PDFParser& p, PDFDictionary* res, array<int>& ids,
                  int depth) {
   if (res == NULL || depth > 8) return;
-  PDFObjectCastPtr<PDFDictionary> xd (p.QueryDictionaryObject (res, "XObject"));
-  if (!xd) return;
+  // the forms, and the tiling patterns, which have content too
+  for (int pass=0; pass<2; pass++) {
+  PDFObjectCastPtr<PDFDictionary> xd (p.QueryDictionaryObject (res,
+                                        pass == 0? "XObject": "Pattern"));
+  if (!xd) continue;
   MapIterator<PDFNameToPDFObjectMap> it= xd->GetIterator ();
   while (it.MoveNext ()) {
     PDFObject* v= it.GetValue ();
@@ -2135,29 +2201,27 @@ hummus_form_ids (PDFParser& p, PDFDictionary* res, array<int>& ids,
     PDFObjectCastPtr<PDFStreamInput> x (p.ParseNewObject (id));
     if (!x) continue;
     PDFObjectCastPtr<PDFDictionary> xdict (x->QueryStreamDictionary ());
-    if (!xdict || hummus_name (p, xdict.GetPtr (), "Subtype") != "Form")
+    if (!xdict || (pass == 0 &&
+                   hummus_name (p, xdict.GetPtr (), "Subtype") != "Form"))
       continue;
     ids << id;
     PDFObjectCastPtr<PDFDictionary> xr (p.QueryDictionaryObject (xdict.GetPtr (),
                                                                  "Resources"));
     if (!!xr) hummus_form_ids (p, xr.GetPtr (), ids, depth + 1);
   }
+  }
 }
 
-// The stream id of a picture without its marked content and its places in
-// a structure tree (pdf_strip_marked_content), written again when there
-// were some; open: the blocks open from the stream before (of a page)
+// the decoded content of the stream id, and its dictionary
 static bool
-hummus_strip_stream (PDFParser& p, ObjectsContext& oc,
-                     PDFDocumentCopyingContext* cc, int id,
-                     array<bool>& open) {
+hummus_read_stream (PDFParser& p, int id, string& s,
+                    RefCountPtr<PDFDictionary>& d) {
   PDFObjectCastPtr<PDFStreamInput> st (p.ParseNewObject (id));
   if (!st) return false;
-  RefCountPtr<PDFDictionary> d (st->QueryStreamDictionary ());
+  d= st->QueryStreamDictionary ();
   if (!d) return false;
   IByteReader* rd= p.StartReadingFromStream (st.GetPtr ());
   if (rd == NULL) return false;
-  string s;
   IOBasicTypes::Byte buf[4096];
   while (rd->NotEnded ()) {
     IOBasicTypes::LongBufferSizeType k= rd->Read (buf, sizeof (buf));
@@ -2165,10 +2229,14 @@ hummus_strip_stream (PDFParser& p, ObjectsContext& oc,
     for (IOBasicTypes::LongBufferSizeType j=0; j<k; j++) s << (char) buf[j];
   }
   delete rd;
-  bool changed= false;
-  string t= pdf_strip_marked_content (s, open, changed);
-  if (!changed && !d->Exists ("StructParents") && !d->Exists ("StructParent"))
-    return false;
+  return true;
+}
+
+// the stream id written again with the content t, and its dictionary but
+// its places in a structure tree
+static void
+hummus_write_content (ObjectsContext& oc, PDFDocumentCopyingContext* cc,
+                      int id, RefCountPtr<PDFDictionary>& d, string t) {
   oc.StartModifiedIndirectObject (id);
   DictionaryContext* nd= oc.StartDictionary ();
   MapIterator<PDFNameToPDFObjectMap> it= d->GetIterator ();
@@ -2184,6 +2252,35 @@ hummus_strip_stream (PDFParser& p, ObjectsContext& oc,
     ps->GetWriteStream ()->Write ((const IOBasicTypes::Byte*) &t[0], N(t));
   oc.EndPDFStream (ps);
   delete ps;
+}
+
+// The streams ids of a picture (those of a page are one content: a token
+// may end one and the next begin the other) without its marked content
+// and its places in a structure tree (pdf_strip_marked_content), or for a
+// grafted picture, keep, with its own marked content
+// (pdf_graft_marked_content); written again when there were some
+static bool
+hummus_strip_streams (PDFParser& p, ObjectsContext& oc,
+                      PDFDocumentCopyingContext* cc, array<int> ids,
+                      hashset<int>* keep) {
+  string s;
+  array<RefCountPtr<PDFDictionary> > ds;
+  bool structured= false;
+  for (int k=0; k<N(ids); k++) {
+    RefCountPtr<PDFDictionary> d;
+    if (!hummus_read_stream (p, ids[k], s, d)) return false;
+    s << "\n";
+    if (d->Exists ("StructParents") || d->Exists ("StructParent"))
+      structured= true;
+    ds << d;
+  }
+  bool changed= false;
+  array<bool> open;
+  string t= (keep != NULL? pdf_graft_marked_content (s, *keep, changed):
+                           pdf_strip_marked_content (s, open, changed));
+  if (!changed && !structured) return false;
+  for (int k=0; k<N(ids); k++)
+    hummus_write_content (oc, cc, ids[k], ds[k], k == 0? t: string (""));
   return true;
 }
 
@@ -2191,7 +2288,7 @@ hummus_strip_stream (PDFParser& p, ObjectsContext& oc,
 // names only, and without its tags (a picture which is a tagged PDF); false
 // when there was nothing to change or when it failed
 static bool
-hummus_embed_picture_fonts (url in, url out) {
+hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
   PDFWriter w;
   string sin= concretize (in), sout= concretize (out);
   if (w.ModifyPDF (std::string (&sin[0], N(sin)), ePDFVersion17,
@@ -2210,7 +2307,8 @@ hummus_embed_picture_fonts (url in, url out) {
                                                                        "Parent"));
       if (!!parent) res= p.QueryDictionaryObject (parent.GetPtr (), "Resources");
     }
-    hummus_font_dicts (p, res.GetPtr (), ids, 0);
+    hashset<int> visited;
+    hummus_font_dicts (p, res.GetPtr (), ids, 0, visited);
     hummus_form_ids (p, res.GetPtr (), forms, 0);
     RefCountPtr<PDFObject> c (page->QueryDirectObject ("Contents"));
     if (!!c && c->GetType () == PDFObject::ePDFObjectIndirectObjectReference)
@@ -2228,12 +2326,12 @@ hummus_embed_picture_fonts (url in, url out) {
   {
     PDFDocumentCopyingContext* cc= w.CreatePDFCopyingContextForModifiedFile ();
     if (cc != NULL) {
-      array<bool> open;   // (the streams of the page are one content)
-      for (int k=0; k<N(contents); k++)
-        if (hummus_strip_stream (p, oc, cc, contents[k], open)) done++;
+      if (N(contents) > 0 && hummus_strip_streams (p, oc, cc, contents, keep))
+        done++;
       for (int k=0; k<N(forms); k++) {
-        array<bool> fopen;
-        if (hummus_strip_stream (p, oc, cc, forms[k], fopen)) done++;
+        array<int> one;
+        one << forms[k];
+        if (hummus_strip_streams (p, oc, cc, one, NULL)) done++;
       }
       delete cc;
     }
@@ -2430,7 +2528,8 @@ pdf_image_rep::flush (PDFWriter& pdfw)
   }
   if (hummus_embed_fonts) {
     url with_fonts= url_temp (".pdf");
-    if (hummus_embed_picture_fonts (temp, with_fonts)) {
+    if (hummus_embed_picture_fonts (temp, with_fonts,
+                                    graft? &keep: (hashset<int>*) NULL)) {
       if (!is_none (name)) remove (temp);
       else name= u;   // (a temporary file now, which is removed below)
       temp= with_fonts;
@@ -2753,6 +2852,7 @@ pdf_hummus_renderer_rep::flush_images ()
     pdf_image im = image_pool[it->next()];
     im->flush(pdfWriter);
   }
+  for (int i=0; i<N(graft_images); i++) graft_images[i]->flush (pdfWriter);
 }
 
 void
@@ -2772,19 +2872,163 @@ pdf_hummus_renderer_rep::flush_patterns ()
   }
 }
 
+
+/******************************************************************************
+* The structure of a picture which is itself a tagged PDF, to be grafted in
+* place of its Figure (docs/pdf-tagging.md, pdf_tags_rep::graft)
+******************************************************************************/
+
+struct hummus_graft {
+  array<int> parent, owner, val;
+  array<string> role, alt;
+  int mcids;
+  hummus_graft (): mcids (0) {}
+};
+
+static string
+hummus_text (PDFObject* o) {
+  if (o == NULL) return "";
+  std::string raw;
+  if (o->GetType () == PDFObject::ePDFObjectLiteralString)
+    raw= ((PDFLiteralString*) o)->GetValue ();
+  else if (o->GetType () == PDFObject::ePDFObjectHexString)
+    raw= ((PDFHexString*) o)->GetValue ();
+  else return "";
+  std::string u= PDFTextString (raw).ToUTF8String ();
+  return string (u.c_str (), (int) u.size ());
+}
+
+static void
+hummus_graft_walk (PDFParser& p, PDFDictionary* rolemap, PDFObject* k,
+                   int owner, ObjectIDType pg, ObjectIDType page0,
+                   hummus_graft& g, int depth) {
+  if (k == NULL || depth > 64 || N(g.parent) >= 4096 || N(g.val) >= 16384)
+    return;
+  if (k->GetType () == PDFObject::ePDFObjectArray) {
+    PDFArray* a= (PDFArray*) k;
+    for (unsigned long i=0; i < a->GetLength (); i++) {
+      RefCountPtr<PDFObject> c (p.QueryArrayObject (a, i));
+      hummus_graft_walk (p, rolemap, c.GetPtr (), owner, pg, page0, g,
+                         depth + 1);
+    }
+    return;
+  }
+  if (k->GetType () == PDFObject::ePDFObjectInteger) {
+    int m= (int) ((PDFInteger*) k)->GetValue ();
+    if (owner >= 0 && m >= 0 && m < 65536 && pg == page0) {
+      g.owner << owner; g.val << (-1-m);
+      if (m >= g.mcids) g.mcids= m + 1;
+    }
+    return;
+  }
+  if (k->GetType () != PDFObject::ePDFObjectDictionary) return;
+  PDFDictionary* d= (PDFDictionary*) k;
+  RefCountPtr<PDFObject> pgo (d->QueryDirectObject ("Pg"));
+  if (!!pgo && pgo->GetType () == PDFObject::ePDFObjectIndirectObjectReference)
+    pg= ((PDFIndirectObjectReference*) pgo.GetPtr ())->mObjectID;
+  string type= hummus_name (p, d, "Type");
+  if (type == "MCR") {
+    // (the marked content of a form of the picture: not kept)
+    if (d->Exists ("Stm")) return;
+    RefCountPtr<PDFObject> m (p.QueryDictionaryObject (d, "MCID"));
+    hummus_graft_walk (p, rolemap, m.GetPtr (), owner, pg, page0, g,
+                       depth + 1);
+    return;
+  }
+  if (type == "OBJR") return;
+  string st= hummus_name (p, d, "S");
+  if (N(st) == 0) return;
+  // the standard type, through the role map
+  const char* r= NULL;
+  string cur= st;
+  for (int j=0; j<8 && r == NULL && N(cur) > 0; j++) {
+    c_string cs (cur);
+    r= pdf_graft_role ((char*) cs);
+    if (r == NULL)
+      cur= (rolemap == NULL? string (""):
+            hummus_name (p, rolemap, (char*) cs));
+  }
+  int e= N(g.parent);
+  g.parent << owner;
+  g.role << string (r == NULL? "NonStruct": r);
+  RefCountPtr<PDFObject> alt (p.QueryDictionaryObject (d, "Alt"));
+  g.alt << hummus_text (alt.GetPtr ());
+  g.owner << owner; g.val << e;
+  RefCountPtr<PDFObject> kk (p.QueryDictionaryObject (d, "K"));
+  hummus_graft_walk (p, rolemap, kk.GetPtr (), e, pg, page0, g, depth + 1);
+}
+
+// the structure of the first page of the picture u, if it is tagged
+static bool
+hummus_graft_read (url u, pdf_tag_graft& r, hashset<int>& keep) {
+  url name= resolve (u);
+  if (is_none (name)) return false;
+  InputFile f;
+  string path= concretize (name);
+  if (f.OpenFile (std::string (&path[0], N(path))) != PDFHummus::eSuccess)
+    return false;
+  PDFParser p;
+  if (p.StartPDFParsing (f.GetInputStream ()) != PDFHummus::eSuccess)
+    return false;
+  PDFObjectCastPtr<PDFDictionary> root (p.QueryDictionaryObject (p.GetTrailer (),
+                                                                 "Root"));
+  if (!root) return false;
+  PDFObjectCastPtr<PDFDictionary> str (p.QueryDictionaryObject (root.GetPtr (),
+                                                                "StructTreeRoot"));
+  if (!str) return false;
+  PDFObjectCastPtr<PDFDictionary> rm (p.QueryDictionaryObject (str.GetPtr (),
+                                                               "RoleMap"));
+  RefCountPtr<PDFObject> k (p.QueryDictionaryObject (str.GetPtr (), "K"));
+  hummus_graft g;
+  hummus_graft_walk (p, rm.GetPtr (), k.GetPtr (), -1, 0,
+                     p.GetPageObjectID (0), g, 0);
+  r= pdf_graft_prune (g.parent, g.role, g.alt, g.owner, g.val, g.mcids, keep);
+  return N(r.roles) > 0;
+}
+
 void
 pdf_hummus_renderer_rep::image (
   url u, double w, double h, SI x, SI y, int alpha)
 {
-  tag_mark (2);
   // debug_convert << "pdf renderer, image " << u << ", " << w << " x " << h
   //		<< " + (" << x << ", " << y << ")" << LF;
   tree lookup= tuple (u->t);
-  pdf_image im = ( image_pool->contains(lookup) ? image_pool[lookup] : pdf_image() );
-  
-  if (is_nil(im)) {
-    im = pdf_image(u, pdfWriter.GetObjectsContext().GetInDirectObjectsRegistry().AllocateNewObjectID());
-    image_pool(lookup) = im;
+  pdf_image im;
+  // a tagged picture of no alternative text of the user's has its own
+  // structure grafted in place of its Figure (pdf_tags_rep::graft), and a
+  // form for each of its uses (an element is in one place of the tree)
+  pdf_tag_graft g;
+  hashset<int> keep;
+  bool may= (tagger != NULL && contentContext != NULL &&
+              tg ()->can_graft (tag_ip) &&
+              !untagged_files->contains (as_string (u)) &&
+              locase_all (suffix (u)) == "pdf");
+  if (may && !hummus_graft_read (u, g, keep)) {
+    untagged_files->insert (as_string (u));
+    may= false;
+  }
+  if (may) {
+    im= pdf_image (u, pdfWriter.GetObjectsContext().GetInDirectObjectsRegistry().AllocateNewObjectID());
+    im->graft= true;
+    im->keep = keep;
+    graft_images << im;
+    int stream;
+    string ops= tg ()->graft (tag_ip, page_num, g, stream);
+    if (N(ops) > 0) {
+      end_text ();
+      c_string cops (ops);
+      contentContext->WriteFreeCode (std::string ((char*) cops));
+    }
+    form_struct_parents ((int) im->id)= pdf_tag_stream_key0 + stream;
+    graft_form_ids << im->id;
+  }
+  else {
+    tag_mark (2);
+    im= ( image_pool->contains(lookup) ? image_pool[lookup] : pdf_image() );
+    if (is_nil(im)) {
+      im = pdf_image(u, pdfWriter.GetObjectsContext().GetInDirectObjectsRegistry().AllocateNewObjectID());
+      image_pool(lookup) = im;
+    }
   }
 
   if (is_nil(im)) return;
@@ -2854,14 +3098,16 @@ pdf_hummus_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 
 void
 pdf_hummus_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
-  tag_mark (2);
   // debug_convert << "pdf renderer, draw_scalable "
   //   << im->get_name () << " at " << x << ", " << y
   //   << " (" << alpha << ")" << LF;
   if (im->get_type () != scalable_image ||
-      (im->get_type () == scalable_image && im->get_effect () != tree ("")))
+      (im->get_type () == scalable_image && im->get_effect () != tree (""))) {
+    tag_mark (2);
     renderer_rep::draw_scalable (im, x, y, alpha);
+  }
   else {
+    // (image marks it, or grafts the structure of a tagged picture)
     url u= im->get_name ();
     rectangle r= im->get_logical_extents ();
     SI w= r->x2 - r->x1, h= r->y2 - r->y1;

@@ -350,7 +350,9 @@ struct body_swap {
   bool  swapped;
   array<hashmap<string,tree> > tables, copies;
   auto_id_snapshot ids;
-  body_swap (tree& s): slot (s), saved (s), swapped (false) {}
+  int given;   // the include* registered before (given_inclusion_add)
+  body_swap (tree& s): slot (s), saved (s), swapped (false),
+                       given (given_inclusions_count ()) {}
   void keep (hashmap<string,tree> h) { tables << h; copies << copy (h); }
   void put (tree t) { ids.take (saved); slot= t; swapped= true; }
   void restore () {
@@ -359,7 +361,7 @@ struct body_swap {
     for (int i=0; i<N(tables); i++) restore_table (tables[i], copies[i]);
     int k= 0;
     ids.restore (saved, k);
-    given_inclusions_clear ();
+    given_inclusions_clear (given);
     swapped= false;
   }
   ~body_swap () { restore (); }
@@ -614,7 +616,8 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
                       << " no alternative text (Focus > Alternative text): "
                       << "the tagged PDF describes "
                       << (n == 1? "it": "them") << " by a caption or a file name"
-                      << LF;
+                      << " (a picture which is a tagged PDF, by its own "
+                      << "structure)" << LF;
     tm_delete (tagger);
   }
   delete_typesetter (ttt);

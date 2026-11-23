@@ -3342,6 +3342,58 @@
 
 ;; A document which includes itself (twice) is expanded once: the typesetter
 ;; reports the cycle, as without tagging (the expansion grew as 2^16 before)
+;; A picture which is itself a tagged PDF, of no alternative text of the
+;; user's: its structure is grafted in place of its Figure (a Div), its
+;; marked content referred to in its form (/Stm, /StructParents); with an
+;; alternative text, it is a Figure (docs/pdf-tagging.md)
+(define (test-tagged-pdf-graft)
+  (check-group "tagged pdf export: a tagged picture")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf graft" "no native PDF writer")
+      (let* ((pic-tm (url-append (temp-dir) "graft-pic.tm"))
+             (pic (url-append (temp-dir) "graft-pic.pdf"))
+             (tm (url-append (temp-dir) "graft-main.tm"))
+             (pdf (url-append (temp-dir) "graft-main.pdf"))
+             (old (current-buffer))
+             (before (buffer-list))
+             (env (getenv "TEXMACS_PDF_TAGGED")))
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document "A paragraph of the picture."
+                                          (itemize
+                                           (document (concat (item) "Item")))))))
+                     pic-tm)
+        (string-save (serialize-texmacs
+                      (stree->tree
+                       (tmfile `(document
+                                 "Main."
+                                 (big-figure (image "graft-pic.pdf" "6cm" ""
+                                                    "" "")
+                                             "Grafted.")
+                                 (with "image-alt" "A page"
+                                   (image "graft-pic.pdf" "3cm" "" "" ""))))))
+                     tm)
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (load-buffer pic-tm :strict)
+        (export-buffer pic)
+        (load-buffer tm :strict)
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (when (buffer-exists? old) (switch-to-buffer old))
+        (with s (if (url-exists? pdf) (string-load pdf) "")
+          (define s* (string-replace
+                      (string-replace
+                       (string-replace (string-replace s " " "") "\t" "")
+                       "\r" "") "\n" ""))
+          (define (has? what)
+            (>= (string-search-forwards (string-replace what " " "") 0 s*) 0))
+          (check-true (has? "/StructParents 2000000"))
+          (check-true (has? "/Stm"))
+          (check-true (has? "/S/LBody"))
+          (check-true (has? "/Alt(A page)"))))))
+
 (define (test-tagged-pdf-cycle)
   (check-group "tagged pdf export: an include cycle")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
@@ -3827,6 +3879,7 @@
                   test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-tagged-pdf-export test-tagged-pdf-include
                   test-tagged-pdf-cycle
+                  test-tagged-pdf-graft
                   test-export-images))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

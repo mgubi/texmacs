@@ -1051,7 +1051,8 @@ void reset_inclusion (url u);
 // tagged PDF (<include*|f|doc>): only those are typeset so, by identity,
 // never an include* of a document, which would choose its trust
 void given_inclusion_add (tree t);
-void given_inclusions_clear ();
+int  given_inclusions_count ();
+void given_inclusions_clear (int n);   // those after the first n
 bool is_given_inclusion (tree t);
 bool refresh_inclusions ();
 // (whether the typesetting looked up a picture, see edit_env_rep::picture_value)

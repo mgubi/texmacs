@@ -314,9 +314,13 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
                     int border);
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
-  int  embed_image (url u);
+  int  embed_image (url u, bool graft= false);
+  array<pdf_tag_graft> grafts;     // the structures of tagged pictures
+  hashmap<int,int> graft_of;       // by number of their forms
+  hashset<string> untagged_files;  // the pictures which have none
+  array<pdf_obj*> graft_forms;     // the form of each graft (pdf_tags)
   void embed_picture_fonts (pdf_obj* res, pdf_obj* form);
-  void strip_picture_tags (pdf_obj* res, pdf_obj* form);
+  void strip_picture_tags (pdf_obj* res, pdf_obj* form, hashset<int>* keep);
   array<pdf_obj*> picture_font_objs;   // the programs embedded for them
   int picture_font_tags= 0;            // the tags of their subsets
   hashmap<string,int> picture_font_files;   // whole programs, by file
@@ -545,6 +549,7 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   }
   for (int i=0; i<N(pages); i++) pdf_drop_obj (ctx, pages[i]);
   for (int i=0; i<N(tag_objs); i++) pdf_drop_obj (ctx, tag_objs[i]);
+  for (int i=0; i<N(graft_forms); i++) pdf_drop_obj (ctx, graft_forms[i]);
   for (int i=0; i<N(picture_font_objs); i++)
     pdf_drop_obj (ctx, picture_font_objs[i]);
   if (tags != NULL) tm_delete (tags);
@@ -2050,12 +2055,107 @@ mupdf_svg_to_pdf (fz_context* ctx, url svg, url pdf) {
 // raster image as an image; anything else (EPS, PostScript, SVG) is
 // turned into a PDF first, which is what pdf_hummus_renderer does too.
 // Returns the number of the XObject, or -1.
+// The structure of a tagged picture, read in C (no destructors in fz_try)
+#define GRAFT_MAX 4096
+#define GRAFT_ITEMS 16384
+
+struct graft_c {
+  int  n, nitems, mcids;
+  int  parent[GRAFT_MAX];
+  char role[GRAFT_MAX][16];
+  char* alt[GRAFT_MAX];
+  int  owner[GRAFT_ITEMS], val[GRAFT_ITEMS];   // val: element, or -1-MCID
+};
+
+// the standard type of a type of the picture, through its role map; another
+// type is NonStruct
+static void
+graft_role (fz_context* ctx, pdf_obj* rolemap, const char* s, char* out) {
+  for (int k=0; k<8 && s != NULL; k++) {
+    const char* r= pdf_graft_role (s);
+    if (r != NULL) { fz_strlcpy (out, r, 16); return; }
+    pdf_obj* m= pdf_dict_gets (ctx, rolemap, s);
+    s= (pdf_is_name (ctx, m)? pdf_to_name (ctx, m): NULL);
+  }
+  fz_strlcpy (out, "NonStruct", 16);
+}
+
+static void
+graft_item (graft_c* g, int owner, int val) {
+  if (g->nitems >= GRAFT_ITEMS) return;
+  g->owner[g->nitems]= owner;
+  g->val[g->nitems++]= val;
+}
+
+// the content k of the element owner (-1: the root), on the page pg, of
+// which only what is on the page page0 of the picture is kept
+static void
+graft_walk (fz_context* ctx, pdf_obj* rolemap, pdf_obj* k, int owner,
+            pdf_obj* pg, pdf_obj* page0, graft_c* g, int depth) {
+  if (k == NULL || depth > 64) return;
+  if (pdf_is_array (ctx, k)) {
+    for (int i=0; i < pdf_array_len (ctx, k); i++)
+      graft_walk (ctx, rolemap, pdf_array_get (ctx, k, i), owner, pg, page0,
+                  g, depth + 1);
+    return;
+  }
+  if (pdf_is_int (ctx, k)) {
+    int m= pdf_to_int (ctx, k);
+    if (owner >= 0 && m >= 0 && m < 65536 && pg == page0) {
+      graft_item (g, owner, -1-m);
+      if (m >= g->mcids) g->mcids= m + 1;
+    }
+    return;
+  }
+  if (!pdf_is_dict (ctx, k)) return;
+  pdf_obj* p= pdf_dict_gets (ctx, k, "Pg");
+  if (p != NULL) pg= pdf_resolve_indirect (ctx, p);
+  pdf_obj* type= pdf_dict_get (ctx, k, PDF_NAME(Type));
+  if (pdf_name_eq (ctx, type, PDF_NAME(MCR))) {
+    // (the marked content of a form of the picture: not kept)
+    if (pdf_dict_gets (ctx, k, "Stm") != NULL) return;
+    graft_walk (ctx, rolemap, pdf_dict_get (ctx, k, PDF_NAME(MCID)), owner,
+                pg, page0, g, depth + 1);
+    return;
+  }
+  if (pdf_name_eq (ctx, type, PDF_NAME(OBJR))) return;
+  pdf_obj* st= pdf_dict_get (ctx, k, PDF_NAME(S));
+  if (!pdf_is_name (ctx, st) || g->n >= GRAFT_MAX) return;
+  int e= g->n++;
+  g->parent[e]= owner;
+  graft_role (ctx, rolemap, pdf_to_name (ctx, st), g->role[e]);
+  pdf_obj* alt= pdf_dict_get (ctx, k, PDF_NAME(Alt));
+  g->alt[e]= (alt == NULL? NULL: fz_strdup (ctx, pdf_to_text_string (ctx, alt)));
+  graft_item (g, owner, e);
+  graft_walk (ctx, rolemap, pdf_dict_get (ctx, k, PDF_NAME(K)), e, pg, page0,
+              g, depth + 1);
+}
+
+// The structure read, without the elements of no content on the page;
+// keep: the MCIDs which the elements have
+static pdf_tag_graft
+graft_structure (graft_c* gc, hashset<int>& keep) {
+  array<int> parent, owner, val;
+  array<string> role, alt;
+  for (int i=0; i<gc->n; i++) {
+    parent << gc->parent[i];
+    role << string (gc->role[i]);
+    alt << (gc->alt[i] == NULL? string (""): string (gc->alt[i]));
+  }
+  for (int j=0; j<gc->nitems; j++) { owner << gc->owner[j]; val << gc->val[j]; }
+  return pdf_graft_prune (parent, role, alt, owner, val, gc->mcids, keep);
+}
+
 int
-mupdf_pdf_renderer_rep::embed_image (url u) {
+mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
+  // graft: the structure of the picture is read, if it is a tagged PDF,
+  // for draw_scalable to graft it; such a picture has a form for each of
+  // its uses (an element is in one place of the structure tree)
   url name= resolve (u);
   if (is_none (name)) return -1;
   string key= concretize (name);
-  if (image_pool->contains (key)) return image_pool (key);
+  if (image_pool->contains (key) &&
+      (!graft || untagged_files->contains (key))) return image_pool (key);
   string s= locase_all (suffix (name));
   int num= -1;
   bool raster= (s == "png" || s == "jpg" || s == "jpeg" || s == "gif" ||
@@ -2087,11 +2187,23 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
     pdf_graft_map* map= NULL;
     pdf_obj* kept= NULL;   // the resources, for embed_picture_fonts
     pdf_obj* kept_form= NULL;   // and the form of the picture
+    graft_c* gc= NULL;     // its structure (graft)
+    fz_var (gc);
     // made before fz_try: a throw is a longjmp, which skips destructors
     c_string path (concretize (pdf));
     fz_try (ctx) {
       src= pdf_open_document (ctx, path);
       pdf_obj* spage= pdf_lookup_page_obj (ctx, src, 0);
+      if (graft && s == "pdf") {
+        pdf_obj* str= pdf_dict_getp (ctx, pdf_trailer (ctx, src),
+                                     "Root/StructTreeRoot");
+        if (str != NULL) {
+          gc= (graft_c*) fz_calloc (ctx, 1, sizeof (graft_c));
+          graft_walk (ctx, pdf_dict_get (ctx, str, PDF_NAME(RoleMap)),
+                      pdf_dict_get (ctx, str, PDF_NAME(K)), -1, NULL,
+                      pdf_resolve_indirect (ctx, spage), gc, 0);
+        }
+      }
       fz_rect box; fz_matrix m;
       pdf_page_obj_transform (ctx, spage, &box, &m);
       // pdf_page_obj_transform gives fitz's transform of the page, which
@@ -2128,10 +2240,30 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
                       << fz_caught_message (ctx) << LF;
       num= -1;
     }
+    // the structure of a tagged picture, its elements with marked content
+    pdf_tag_graft g;
+    hashset<int> keep;
+    if (gc != NULL) {
+      if (num >= 0) g= graft_structure (gc, keep);
+      for (int i=0; i<gc->n; i++) fz_free (ctx, gc->alt[i]);
+      fz_free (ctx, gc);
+    }
+    bool grafted= (num >= 0 && N(g.roles) > 0);
+    if (grafted) {
+      graft_of (num)= N(grafts);
+      grafts << g;
+    }
     // a tagged PDF embeds the fonts which the picture names only (PDF/UA)
-    if (kept != NULL && tagger != NULL) {
-      embed_picture_fonts (kept, kept_form);
-      strip_picture_tags (kept, kept_form);
+    if (kept_form != NULL && tagger != NULL) {
+      if (kept != NULL) embed_picture_fonts (kept, kept_form);
+      strip_picture_tags (kept, kept_form, grafted? &keep: NULL);
+    }
+    if (graft && !grafted) untagged_files->insert (key);
+    if (grafted) {
+      pdf_drop_obj (ctx, kept);
+      pdf_drop_obj (ctx, kept_form);
+      if (!is_none (tmp)) remove (tmp);
+      return num;   // (not in the pool: a form for each use)
     }
     pdf_drop_obj (ctx, kept);
     pdf_drop_obj (ctx, kept_form);
@@ -2165,6 +2297,9 @@ struct picture_usage {
   int      n;
   unsigned char (*used)[256];
   bool*    seen;
+  bool     lost;        // text of a font which was not found
+  pdf_obj* done[256];   // the forms processed (each once: no cycles, no
+  int      ndone;       // fan-out)
 };
 
 static void
@@ -2213,6 +2348,8 @@ pu_Tf (fz_context* ctx, pdf_processor* proc, const char* name,
 
 static void
 pu_text (picture_usage* p, const char* str, size_t len) {
+  // (a font set otherwise than by Tf, an ExtGState: its codes are unknown)
+  if (p->font == NULL) p->lost= true;
   for (int k=0; k<p->n; k++)
     if (p->fonts[k] == p->font) {
       p->seen[k]= true;
@@ -2255,6 +2392,10 @@ pu_Do_form (fz_context* ctx, pdf_processor* proc, const char* name,
   (void) name;
   picture_usage* p= (picture_usage*) proc;
   if (p->nesting >= 8) return;
+  pdf_obj* fo= pdf_resolve_indirect (ctx, form);
+  for (int i=0; i<p->ndone; i++) if (p->done[i] == fo) return;
+  if (p->ndone >= 256) { p->lost= true; return; }
+  p->done[p->ndone++]= fo;
   pdf_obj* fr= pdf_dict_get (ctx, form, PDF_NAME(Resources));
   if (fr == NULL && p->depth > 0 && p->depth <= 32) fr= p->res[p->depth - 1];
   pdf_obj* font= p->font;
@@ -2285,11 +2426,15 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
   static char diff[PICTURE_FONTS_MAX][256][64];
   int n= 0;
   pdf_obj* todo[256];
-  int ntodo= 0, seen= 0;
+  bool special[256];     // the resources of a pattern or a Type 3 font,
+  bool whole[PICTURE_FONTS_MAX];   // whose content is not processed: the
+  int ntodo= 0, seen= 0;           // fonts there are embedded whole
   fz_var (n);
   fz_try (ctx) {
+    special[ntodo]= false;
     todo[ntodo++]= pdf_resolve_indirect (ctx, res);
     while (seen < ntodo && n < PICTURE_FONTS_MAX) {
+      bool sp= special[seen];
       pdf_obj* r= todo[seen++];
       pdf_obj* fd= pdf_dict_get (ctx, r, PDF_NAME(Font));
       for (int i=0; fd != NULL && i < pdf_dict_len (ctx, fd) &&
@@ -2302,7 +2447,8 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
           pdf_obj* tr= pdf_resolve_indirect (ctx, pdf_dict_get (ctx, f, PDF_NAME(Resources)));
           int dup= 0;
           for (int j=0; j<ntodo; j++) if (todo[j] == tr) dup= 1;
-          if (tr != NULL && !dup && ntodo < 256) todo[ntodo++]= tr;
+          if (tr != NULL && !dup && ntodo < 256) {
+            special[ntodo]= true; todo[ntodo++]= tr; }
           continue;
         }
         if (!pdf_name_eq (ctx, st, PDF_NAME(Type1)) &&
@@ -2314,8 +2460,10 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
              pdf_dict_get (ctx, desc, PDF_NAME(FontFile2)) != NULL ||
              pdf_dict_get (ctx, desc, PDF_NAME(FontFile3)) != NULL)) continue;
         int dup= 0;
-        for (int j=0; j<n; j++) if (fonts[j] == f) dup= 1;
+        for (int j=0; j<n; j++)
+          if (fonts[j] == f) { dup= 1; if (sp) whole[j]= true; }
         if (dup) continue;
+        whole[n]= sp;
         fonts[n]= f;
         fz_strlcpy (base[n], pdf_to_name (ctx, pdf_dict_get (ctx, f, PDF_NAME(BaseFont))), 128);
         pdf_obj* e= pdf_dict_get (ctx, f, PDF_NAME(Encoding));
@@ -2348,8 +2496,9 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
         pdf_obj* xr= pdf_resolve_indirect (ctx, pdf_dict_get (ctx, x, PDF_NAME(Resources)));
         if (xr == NULL) continue;
         int dup= 0;
-        for (int j=0; j<ntodo; j++) if (todo[j] == xr) dup= 1;
-        if (!dup) todo[ntodo++]= xr;
+        for (int j=0; j<ntodo; j++)
+          if (todo[j] == xr) { dup= 1; if (i >= nx) special[j]= true; }
+        if (!dup) { special[ntodo]= (sp || i >= nx); todo[ntodo++]= xr; }
       }
     }
   }
@@ -2363,7 +2512,8 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
     for (int c=0; c<256; c++) used[k][c]= 0;
   }
   picture_usage* pu= NULL;
-  fz_var (pu);
+  int lost= 0;
+  fz_var (pu); fz_var (lost);
   if (n > 0 && form != NULL) {
     fz_try (ctx) {
       pu= (picture_usage*) pdf_new_processor (ctx, sizeof (picture_usage));
@@ -2383,6 +2533,7 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
       pdf_process_contents (ctx, &pu->super, doc, res, form, NULL, &out);
       pdf_drop_obj (ctx, out);
       pdf_close_processor (ctx, &pu->super);
+      lost= (pu->lost? 1: 0);
     }
     fz_always (ctx) {
       pdf_drop_processor (ctx, (pdf_processor*) pu);
@@ -2390,6 +2541,10 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
     fz_catch (ctx) {
       for (int k=0; k<n; k++) drawn[k]= false;
     }
+    // (text whose font is unknown, or a font also drawn by a pattern or a
+    // Type 3 glyph: those keep all their codes)
+    for (int k=0; k<n; k++)
+      if (lost || whole[k]) drawn[k]= false;
   }
   for (int k=0; k<n; k++) {
     // what goes in the font, made before the fz_try below
@@ -2535,7 +2690,8 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
 // In a tagged PDF it is taken out of the content of the picture and of its
 // forms (pdf_strip_marked_content), but optional content.
 void
-mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form) {
+mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form,
+                                            hashset<int>* keep) {
   pdf_obj* forms[256];   // (the references: a stream is loaded by them)
   pdf_obj* ids[256];     // (and the objects, to find them once each)
   int nf= 0;
@@ -2547,13 +2703,19 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form) {
     int ntodo= 0, seen= 0;
     todo[ntodo++]= pdf_resolve_indirect (ctx, res);
     while (seen < ntodo) {
-      pdf_obj* xd= pdf_dict_get (ctx, todo[seen++], PDF_NAME(XObject));
-      for (int i=0; xd != NULL && i < pdf_dict_len (ctx, xd); i++) {
-        pdf_obj* xref= pdf_dict_get_val (ctx, xd, i);
+      // the forms, and the tiling patterns, which have content too
+      pdf_obj* rs= todo[seen++];
+      pdf_obj* xd= pdf_dict_get (ctx, rs, PDF_NAME(XObject));
+      pdf_obj* pd= pdf_dict_get (ctx, rs, PDF_NAME(Pattern));
+      int nx= (xd == NULL? 0: pdf_dict_len (ctx, xd));
+      int np= (pd == NULL? 0: pdf_dict_len (ctx, pd));
+      for (int i=0; i < nx + np; i++) {
+        pdf_obj* xref= (i < nx? pdf_dict_get_val (ctx, xd, i):
+                                pdf_dict_get_val (ctx, pd, i - nx));
         pdf_obj* x= pdf_resolve_indirect (ctx, xref);
-        if (!pdf_is_indirect (ctx, xref) ||
-            !pdf_name_eq (ctx, pdf_dict_get (ctx, x, PDF_NAME(Subtype)),
-                          PDF_NAME(Form))) continue;
+        if (!pdf_is_indirect (ctx, xref) || !pdf_is_stream (ctx, xref)) continue;
+        if (i < nx && !pdf_name_eq (ctx, pdf_dict_get (ctx, x, PDF_NAME(Subtype)),
+                                    PDF_NAME(Form))) continue;
         int dup= 0;
         for (int j=0; j<nf; j++) if (ids[j] == x) dup= 1;
         if (dup || nf >= 256) continue;
@@ -2571,8 +2733,10 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form) {
     size_t len= 0;
     fz_var (b);
     fz_try (ctx) {
-      pdf_dict_del (ctx, forms[k], PDF_NAME(StructParents));
-      pdf_dict_del (ctx, forms[k], PDF_NAME(StructParent));
+      if (k > 0 || keep == NULL) {
+        pdf_dict_del (ctx, forms[k], PDF_NAME(StructParents));
+        pdf_dict_del (ctx, forms[k], PDF_NAME(StructParent));
+      }
       b= pdf_load_stream (ctx, forms[k]);
       len= fz_buffer_storage (ctx, b, &data);
     }
@@ -2583,7 +2747,10 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form) {
     fz_drop_buffer (ctx, b);
     array<bool> open;
     bool changed= false;
-    string t= pdf_strip_marked_content (s, open, changed);
+    // (the content of a grafted picture keeps its marked content)
+    string t= (k == 0 && keep != NULL)?
+      pdf_graft_marked_content (s, *keep, changed):
+      pdf_strip_marked_content (s, open, changed);
     if (!changed) continue;
     fz_buffer* nb= NULL;
     fz_var (nb);
@@ -2852,15 +3019,39 @@ mupdf_pdf_renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
 
 void
 mupdf_pdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
-  tag_mark (2);
   // an image with an effect on it has to be computed, so it is rasterized
   // (at a print resolution, see shadow); a plain one is included as it is
   if (im->get_type () != scalable_image || im->get_effect () != tree ("")) {
+    tag_mark (2);
     renderer_rep::draw_scalable (im, x, y, alpha);
     return;
   }
-  int num= embed_image (im->get_name ());
-  if (num < 0) { renderer_rep::draw_scalable (im, x, y, alpha); return; }
+  // a tagged picture of no alternative text of the user's has its own
+  // structure grafted in place of its Figure (pdf_tags_rep::graft)
+  bool graft= (tagger != NULL && contents != NULL && tg ()->can_graft (tag_ip));
+  int num= embed_image (im->get_name (), graft);
+  if (num < 0) {
+    tag_mark (2);
+    renderer_rep::draw_scalable (im, x, y, alpha);
+    return;
+  }
+  if (graft && graft_of->contains (num)) {
+    int stream;
+    string ops= tg ()->graft (tag_ip, page_num, grafts[graft_of[num]], stream);
+    if (N(ops) > 0) { end_text (); c_string cops (ops); put (cops); }
+    char cnm[32];
+    snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
+    fz_try (ctx) {
+      pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
+      pdf_dict_put_int (ctx, xo, PDF_NAME(StructParents),
+                        pdf_tag_stream_key0 + stream);
+      graft_forms << pdf_keep_obj (ctx, xo);
+    }
+    fz_catch (ctx) {
+      graft_forms << (pdf_obj*) NULL;
+    }
+  }
+  else tag_mark (2);
   rectangle r= im->get_logical_extents ();
   double w= ((double) (r->x2 - r->x1)) / pixel;
   double h= ((double) (r->y2 - r->y1)) / pixel;
@@ -3327,6 +3518,15 @@ mupdf_pdf_renderer_rep::write_structure () {
           pdf_dict_puts (ctx, m, "Obj", tag_annots[kd.id]);
           pdf_dict_puts (ctx, m, "Pg", pages[kd.page]);
         }
+        else if (kd.kind == 3 && kd.page < N(pages) &&
+                 kd.stream < N(graft_forms) && graft_forms[kd.stream] != NULL) {
+          // the marked content of a grafted picture, in its form
+          pdf_obj* m= pdf_array_push_dict (ctx, k, 4);
+          pdf_dict_put (ctx, m, PDF_NAME(Type), PDF_NAME(MCR));
+          pdf_dict_puts (ctx, m, "Pg", pages[kd.page]);
+          pdf_dict_puts (ctx, m, "Stm", graft_forms[kd.stream]);
+          pdf_dict_put_int (ctx, m, PDF_NAME(MCID), kd.id);
+        }
       }
     }
     pdf_dict_put (ctx, tree, PDF_NAME(K), tag_objs[0]);
@@ -3347,8 +3547,32 @@ mupdf_pdf_renderer_rep::write_structure () {
         pdf_array_push_int (ctx, nums, annots_base + tag_kids[i].id);
         pdf_array_push (ctx, nums, tag_objs[tag_kids[i].parent]);
       }
+    // the forms of the grafted pictures: their elements by MCID
+    array<array<int> >& sm= tags->stream_mcids;
+    for (int s=0; s<N(sm); s++) {
+      pdf_array_push_int (ctx, nums, pdf_tag_stream_key0 + s);
+      pdf_obj* a= pdf_array_push_array (ctx, nums, N(sm[s]));
+      for (int m=0; m<N(sm[s]); m++)
+        if (sm[s][m] >= 0) pdf_array_push (ctx, a, tag_objs[sm[s][m]]);
+        else pdf_array_push (ctx, a, PDF_NULL);
+    }
     pdf_dict_puts_drop (ctx, tree, "ParentTreeNextKey",
-                        pdf_new_int (ctx, annots_base + N(tag_annots)));
+                        pdf_new_int (ctx, N(sm) > 0? pdf_tag_stream_key0 + N(sm):
+                                          annots_base + N(tag_annots)));
+    // the configurations of the layers (merged from the pictures,
+    // merge_layers) have a name (PDF/UA)
+    pdf_obj* ocp= pdf_dict_get (ctx, root, PDF_NAME(OCProperties));
+    if (ocp != NULL) {
+      pdf_obj* dd= pdf_dict_get (ctx, ocp, PDF_NAME(D));
+      if (dd != NULL && pdf_dict_get (ctx, dd, PDF_NAME(Name)) == NULL)
+        pdf_dict_put_text_string (ctx, dd, PDF_NAME(Name), "Default");
+      pdf_obj* cf= pdf_dict_get (ctx, ocp, PDF_NAME(Configs));
+      for (int i=0; i < pdf_array_len (ctx, cf); i++) {
+        pdf_obj* c= pdf_array_get (ctx, cf, i);
+        if (pdf_dict_get (ctx, c, PDF_NAME(Name)) == NULL)
+          pdf_dict_put_text_string (ctx, c, PDF_NAME(Name), "Configuration");
+      }
+    }
     // the catalog
     pdf_obj* mi= pdf_new_dict (ctx, doc, 1);
     pdf_dict_puts_drop (ctx, root, "MarkInfo", mi);

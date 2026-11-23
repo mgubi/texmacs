@@ -172,13 +172,33 @@ dictionary, rare) as it is, with a warning. A font of pictograms
 (ZapfDingbats, Wingdings) has no replacement and is reported.
 
 **Tagged pictures.** A picture which is itself a tagged PDF has marked
-content (its tags, its artifacts) which would nest in its Figure, and
-MCIDs in no parent tree: both writers take it out of the content of the
-picture and of its forms, but the optional content (`BDC /OC`), and the
-`/StructParents` of its forms (`pdf_strip_marked_content`, in
-`pdf_tags.cpp`). The picture is then one Figure, described by its
-alternative text. (Its structure could be grafted under the Figure
-instead, with its own alternative texts; not done.)
+content (its tags, its artifacts) and a structure of its own.
+
+* Without an alternative text of the user's (*Alternative text...*), its
+  structure is grafted in place of its Figure, which becomes a Div (a
+  Figure has an alternative text, which hides its children from a screen
+  reader): the elements of its first page, read by the writer (types
+  through its role map; a Document is a Div, a heading a P, since its
+  level would not follow those of the document; another type
+  NonStruct), without those of no content there, are children of the Div
+  (`pdf_tags_rep::graft`), their marked content referred to in the form
+  of the picture (`/MCR` with `/Stm`), which gets `/StructParents`, a key
+  of the parent tree after those of the pages and the annotations. The
+  marked content of the picture stays, its artifacts too; marked content
+  of no element is an artifact (`pdf_graft_marked_content`); the forms
+  inside the picture lose theirs. Such a picture has a form for each use:
+  an element is in one place of the tree. PDFHummus adds `/StructParents`
+  to the form through `OnFormXObjectWrite`.
+* With an alternative text of the user's, it is a Figure: its marked
+  content is taken out of its content and of its forms and patterns, but
+  the optional content (`BDC /OC`), and the `/StructParents` of its forms
+  (`pdf_strip_marked_content`, in `pdf_tags.cpp`).
+
+The lexer of the content skips the data of an inline image by its length,
+and the streams of a page are one content. The fonts and the forms of a
+picture are each read once (a picture may make cycles), and a font which
+also draws in a pattern or a Type 3 glyph, or by an ExtGState, keeps all
+its codes.
 
 ## Checking it
 
@@ -196,10 +216,12 @@ in the Matterhorn Protocol.
 
 ## Left
 
-* **Included PDF pictures**: their content is a Figure as a whole, also
-  when it is itself tagged (its structure is not grafted). A font of
-  pictograms in a picture, and with PDFHummus a font which is a direct
-  dictionary, are not embedded.
+* **Included PDF pictures**: a picture which is not tagged is a Figure
+  as a whole. Of a tagged picture, only the structure of its first page,
+  without its attributes (the headers of its tables) and with its
+  headings as paragraphs, is grafted. A font of pictograms in a picture,
+  a Type 3 font of no ToUnicode, and with PDFHummus a font which is a
+  direct dictionary, are not compliant.
 * **Table headers** (TH, with a Scope): TeXmacs has no markup for them.
 * **The OpenType math variants** (#943): U+FFFD in the text until the
   fonts record their characters.

@@ -24,7 +24,9 @@ have the details, and the problems go to the
   documents are tagged too. A picture is described by its *alternative
   text* (*Focus → Alternative text...*), else by its caption. The fonts
   which a PDF picture (a plot) names without embedding them are embedded,
-  from the TeX Gyre fonts which TeXmacs ships. veraPDF
+  from the TeX Gyre fonts which TeXmacs ships. A picture which is itself a
+  tagged PDF brings its structure along, unless it has an alternative
+  text of its own. veraPDF
   finds the PDF of the sample documents compliant with PDF/UA-1. The
   author of a PDF is no longer garbled when it has accents (#945).
 - **Qt: the icon bars keep their height** (Qt builds, desktop

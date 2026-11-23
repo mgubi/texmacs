@@ -48,9 +48,10 @@ struct tag_node {
   string key, role, alt;
   path   pos;
   string attrs;   // integer attributes of the table: "ColSpan=2 RowSpan=3"
-  tag_node () {}
+  bool   own_alt; // the alternative text is the user's (not a caption's)
+  tag_node (): own_alt (false) {}
   tag_node (string k, string r, path p, string a= ""):
-    key (k), role (r), alt (a), pos (p) {}
+    key (k), role (r), alt (a), pos (p), own_alt (false) {}
 };
 inline bool operator == (const tag_node& a, const tag_node& b) {
   return a.key == b.key; }
