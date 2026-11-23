@@ -4,7 +4,8 @@
 ;; kept and the agent hears accepted or rejected (#867). An insertion (its old
 ;; version is empty) and a deletion (its new version is empty) as well, next
 ;; to equal blocks; several proposals resolved at once; a comparison made by
-;; the person afterwards is not taken for a proposal.
+;; the person afterwards is not taken for a proposal, and one made while a
+;; proposal is pending does not decide it; an undone choice is forgotten.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -156,6 +157,57 @@
     (timed-wait 300)
     (act "check 12b" (check "p17: accepted" (== (status-of "p17") "accepted"))
          (sync-set! (sync-n 12 "a"))))
+   ;; 13. two differences in a paragraph: Keep Old on the first, undo, then
+   ;; Retain all New: accepted (the choice undone is forgotten)
+   (person! 13 (lambda () (tree-assign (para 6) "one two three four five.")))
+   (list
+    (wait-sync (sync-n 13 "b"))
+    (step "p18" (== (status-of "p18") "pending"))
+    (act "keep old 13" (check "p18: Keep Old on the first difference" (keep! 0)))
+    (timed-wait 300)
+    (act "check 13" (check "p18: pending with one difference left" (and (== (status-of "p18") "pending") (version-in-doc?))))
+    (act "undo 13" (with-buffer (the-name) (undo 0)))
+    (timed-wait 300)
+    (act "retain 13" (keep-all! 1))
+    (step "settled 13" (and (not (version-in-doc?)) (!= (status-of "p18") "pending")))
+    (act "check 13b" (check "p18: accepted" (== (status-of "p18") "accepted"))
+         (check "p18: the new text" (== (version-normalize (para-text 6)) "ONE two three four FIVE."))
+         (sync-set! (sync-n 13 "a"))))
+   ;; 14. an insertion pending, the person compares with the saved file: still
+   ;; pending; Retain all New (the comparison), then again (the proposal): accepted
+   (list
+    (act "save 14" (save-buffer-main (the-name)))
+    (step "saved 14" (not (buffer-modified? (the-name))))
+    (act "14p" (sync-set! (sync-n 14 "p")))
+    (wait-sync (sync-n 14 "b"))
+    (step "p19" (== (status-of "p19") "pending"))
+    (act "compare 14" (with-buffer (the-name) (compare-with-older (string->url FILE))))
+    (timed-wait 600)
+    (act "check 14" (check "p19: pending after Compare" (== (status-of "p19") "pending")))
+    (act "retain 14" (keep-all! 1))
+    (timed-wait 600)
+    (act "check 14b" (check "p19: pending, its markup a block again" (== (status-of "p19") "pending")))
+    (act "retain 14b" (keep-all! 1))
+    (step "settled 14" (and (not (version-in-doc?)) (!= (status-of "p19") "pending")))
+    (act "check 14c" (check "p19: accepted" (== (status-of "p19") "accepted"))
+         (check "p19: the paragraph is in" (== (para-text 7) "Inserted X."))
+         (sync-set! (sync-n 14 "a"))))
+   ;; 15. a deletion pending, the person compares with the saved file: still
+   ;; pending; Retain all Old (the saved file): rejected
+   (list
+    (act "save 15" (save-buffer-main (the-name)))
+    (step "saved 15" (not (buffer-modified? (the-name))))
+    (act "15p" (sync-set! (sync-n 15 "p")))
+    (wait-sync (sync-n 15 "b"))
+    (step "p20" (== (status-of "p20") "pending"))
+    (act "compare 15" (with-buffer (the-name) (compare-with-older (string->url FILE))))
+    (timed-wait 600)
+    (act "check 15" (check "p20: pending after Compare" (== (status-of "p20") "pending")))
+    (act "retain 15" (keep-all! 0))
+    (step "settled 15" (and (not (version-in-doc?)) (!= (status-of "p20") "pending")))
+    (act "check 15b" (check "p20: rejected" (== (status-of "p20") "rejected"))
+         (check "p20: the paragraph is there" (== (para-text 7) "Inserted X."))
+         (sync-set! (sync-n 15 "a"))))
    (list
     (wait-sync "b-done")
     (act "A out" (publish-body!) (sync-set! "a-done")))))
@@ -219,6 +271,12 @@
    (list (wait-sync (sync-n 12 "p")))
    (propose-and-wait 12 (lambda () (insert-text! 4 6 "X")))
    (agent-hears 12 "p17" "accepted")
+   (list (wait-sync (sync-n 13 "p")) (step "13 there" (== (para-text 6) "one two three four five.")))
+   (round 13 (lambda () (tree-assign (para 6) "ONE two three four FIVE.")) "p18" "accepted")
+   (list (wait-sync (sync-n 14 "p")))
+   (round 14 (lambda () (insert-block! 7 "Inserted X.")) "p19" "accepted")
+   (list (wait-sync (sync-n 15 "p")))
+   (round 15 (lambda () (tree-remove (body) 7 1)) "p20" "rejected")
    (list
     (act "out" (publish-body!) (sync-set! "b-done"))
     (wait-sync "a-done"))))

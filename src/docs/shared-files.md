@@ -405,7 +405,11 @@ process hosts, or only headless ones), the agent edits directly, as before.
   differences of which pending proposals it resolves and which version it keeps
   (the Review bar's Keep, Retain, Retain all, a selection), and records the
   outcome when no difference of the proposal is left: accepted (new kept
-  everywhere), rejected (old everywhere), resolved (mixed). When the markup
+  everywhere), rejected (old everywhere), resolved (mixed). A choice for a difference that an undo
+  brought back is forgotten. When the block of a pending proposal is lost but its
+  markup is still in the document (the person compared the document with a saved
+  file: it is inside the comparison), the proposal stays pending, and is found
+  again when its markup is a block again. When the markup
   disappears otherwise (deleted, typed over), the host compares the blocks, with
   adjacent strings joined, with both versions; an empty version is taken as
   kept when the other one is gone. The host looks only when the document
