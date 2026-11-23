@@ -23,6 +23,7 @@
 ******************************************************************************/
 
 #include "renderer.hpp"
+#include "env.hpp"
 #include "tree.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
@@ -360,7 +361,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     }
     // an included document, given to the include* of the include macro
     // (print_doc), is in place of the include*, which is no element
-    if (is_func (t, VAR_INCLUDE, 2)) continue;
+    if (is_given_inclusion (t)) continue;
     // (a paragraph or a caption may be a mere string)
     string role= child_role_of (as_string (L(parent)), i, N(parent));
     if (role == "" && is_compound (t)) role= role_of (as_string (L(t)));

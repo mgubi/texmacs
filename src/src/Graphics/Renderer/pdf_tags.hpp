@@ -96,6 +96,13 @@ public:
 
 typedef pdf_tags_rep* pdf_tags;
 
+// The content of a stream of a picture without its marked content (BMC,
+// BDC, EMC), but optional content (BDC /OC): a picture which is itself a
+// tagged PDF, whose tags and artifacts would nest in its Figure. open
+// carries the blocks from a stream to the next (the streams of a page:
+// whether each was kept); changed says whether anything was taken out.
+string pdf_strip_marked_content (string s, array<bool>& open, bool& changed);
+
 // the XMP metadata of a tagged PDF (UTF-8 title and author), with the part
 // of PDF/UA it follows
 string pdf_tags_xmp (string title, string author, string producer);

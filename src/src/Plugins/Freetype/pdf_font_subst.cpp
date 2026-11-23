@@ -312,6 +312,23 @@ name_unicode (string n) {
         if (names[k][c][0] != '\0' && unis[k][c] > 0 &&
             !known->contains (names[k][c]))
           known (names[k][c])= unis[k][c];
+    // the glyphs of the Symbol font which the Adobe glyph list puts in the
+    // private use area: their characters
+    const char* sym[]= {
+      "arrowvertex", "23D0", "arrowhorizex", "23AF", "radicalex", "203E",
+      "registersans", "00AE", "registerserif", "00AE",
+      "copyrightsans", "00A9", "copyrightserif", "00A9",
+      "trademarksans", "2122", "trademarkserif", "2122",
+      "parenlefttp", "239B", "parenleftex", "239C", "parenleftbt", "239D",
+      "parenrighttp", "239E", "parenrightex", "239F", "parenrightbt", "23A0",
+      "bracketlefttp", "23A1", "bracketleftex", "23A2", "bracketleftbt", "23A3",
+      "bracketrighttp", "23A4", "bracketrightex", "23A5",
+      "bracketrightbt", "23A6", "bracelefttp", "23A7", "braceleftmid", "23A8",
+      "braceleftbt", "23A9", "braceex", "23AA", "bracerighttp", "23AB",
+      "bracerightmid", "23AC", "bracerightbt", "23AD", "integralex", "23AE",
+      NULL };
+    for (int i=0; sym[i] != NULL; i+=2)
+      known (sym[i])= from_hexadecimal (sym[i+1]);
   }
   if (N(n) == 0) return -1;
   if (known->contains (n)) return known [n];
@@ -357,12 +374,16 @@ substitute_name (string base, bool& symbolic) {
   if (plus == 6) base= base (7, N(base));
   string s= locase_all (base);
   symbolic= false;
-  if (search_forwards ("dingbat", s) >= 0) return "";
-  // (Termes has the Greek letters and the most of the Symbol font, in a
-  // program a tenth of the size of STIX)
+  // (fonts of pictograms: no font of letters in their place)
+  if (search_forwards ("dingbat", s) >= 0 ||
+      search_forwards ("wingding", s) >= 0 ||
+      search_forwards ("webding", s) >= 0 ||
+      search_forwards ("marlett", s) >= 0) return "";
+  // (STIX has all the glyphs of the Symbol font, the pieces of the large
+  // delimiters included)
   if (search_forwards ("symbol", s) >= 0) {
     symbolic= true;
-    return "texgyretermes-regular";
+    return "STIXTwoMath-Regular";
   }
   bool bold= (search_forwards ("bold", s) >= 0 ||
               search_forwards ("black", s) >= 0 ||
@@ -429,11 +450,13 @@ pdf_font_substitute (string base_font, array<string> names,
   r.unicode= array<int> (256);
   r.glyph= array<string> (256);
   array<int> adv (256);
-  r.first= 256; r.last= -1;
+  r.first= 256; r.last= -1; r.missing= 0; r.missing_width= 0;
+  if (!ft_load_glyph (face, 0, FT_LOAD_NO_SCALE))
+    r.missing_width= (int) (face->glyph->metrics.horiAdvance * k1000 / em + 0.5);
   r.gids= array<int> ();
   r.gids << 0;
   for (int c=0; c<256; c++) {
-    r.unicode[c]= -1; r.glyph[c]= ""; adv[c]= 0;
+    r.unicode[c]= -1; r.glyph[c]= ""; adv[c]= r.missing_width;
     if (c >= N(names) || N(names[c]) == 0) continue;
     int uc= name_unicode (names[c]);
     FT_UInt gid= (uc > 0? ft_get_char_index (face, uc): 0);
@@ -441,12 +464,16 @@ pdf_font_substitute (string base_font, array<string> names,
       c_string cn (names[c]);
       gid= ft_get_name_index (face, (FT_String*) (char*) cn);
     }
-    if (gid == 0) continue;
+    // (a code of no glyph: .notdef, rather than the glyph of the code in
+    // the encoding of the font program)
+    r.glyph[c]= ".notdef";
+    r.unicode[c]= uc;
+    if (gid == 0) { r.missing++; continue; }
     char buf[128];
     buf[0]= '\0';
-    if (ft_get_glyph_name (face, gid, buf, sizeof (buf)) || buf[0] == '\0')
-      continue;
-    if (ft_load_glyph (face, gid, FT_LOAD_NO_SCALE)) continue;
+    if (ft_get_glyph_name (face, gid, buf, sizeof (buf)) || buf[0] == '\0' ||
+        ft_load_glyph (face, gid, FT_LOAD_NO_SCALE)) {
+      r.missing++; continue; }
     r.glyph[c]= string (buf);
     r.unicode[c]= uc;
     r.gids << (int) gid;

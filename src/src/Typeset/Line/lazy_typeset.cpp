@@ -366,7 +366,7 @@ make_lazy_rewrite (edit_env env, tree t, path ip) {
   array<line_item> b= typeset_marker (env, descend (ip, 1));
   // <include*|f|doc>: the document doc of f, given as a child, is typeset
   // in place (a tagged PDF, print_doc), as bridge_rewrite_rep::my_typeset
-  if (is_func (t, VAR_INCLUDE, 2)) {
+  if (is_given_inclusion (t)) {
     url save_name= env->cur_file_name;
     url incl_file= relative (env->base_file_name,
                              url_unix (env->exec_string (t[0])));

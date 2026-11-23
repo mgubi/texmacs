@@ -127,7 +127,7 @@ edit_env_rep::rewrite (tree t) {
   case VAR_INCLUDE:
     {
       if (N(t) == 0) return tree (_ERROR, "invalid include");
-      if (N(t) == 2) return t[1];   // the document, given (print_doc)
+      if (is_given_inclusion (t)) return t[1];   // (print_doc)
       url file_name= url_unix (exec_string (t[0]));
       url file_rel = relative (base_file_name, file_name);
       //cout << "file_name= " << as_tree (file_name) << LF;
@@ -188,7 +188,7 @@ edit_env_rep::exec_include (tree t) {
   if (N(t) == 0) return exec_rewrite (t);
   url file_name= url_unix (exec_string (t[0]));
   url file_rel = relative (base_file_name, file_name);
-  if (N(t) == 2) {   // the document, given (print_doc)
+  if (is_given_inclusion (t)) {   // the document, given (print_doc)
     inclusion_guard guard (file_rel);
     return exec (t[1]);
   }
@@ -2431,7 +2431,7 @@ edit_env_rep::auto_label_tag (tree& tag, tree& root, path& where) {
     int  n = 1;
     for (path r= q->next; !is_nil (r); r= r->next, n++) {
       array<int> b;
-      if (is_func (up, VAR_INCLUDE, 2) && auto_label_data (up, b)) {
+      if (is_given_inclusion (up) && auto_label_data (up, b)) {
         tag= up; where= head (q, n); break; }
       up= up[r->item];
     }

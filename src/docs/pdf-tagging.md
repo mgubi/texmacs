@@ -82,6 +82,11 @@ a document (a P, or a Div when they hold paragraphs themselves).
   the three typesetters of `include*` (`bridge_rewrite`, the concater,
   `make_lazy_rewrite`). So a redefined `include`, a style without
   `part-info`, a script and a cycle give what they give without tagging.
+  Only the `include*` which `print_doc` made are typeset so, found by
+  their identity (`is_given_inclusion`, registered after `attach_dip`,
+  which makes the nodes of no place anew): an `include*` of two children
+  in a document is an error, as before, and cannot choose the trust of
+  its content.
   Nothing is expanded in the preamble mode, nor when the body assigns
   `include`, nor in inactive markup or raw data, nor for a file which is
   being expanded (the typesetter reports the cycle). The `include*` is no
@@ -98,7 +103,8 @@ a document (a P, or a Div when they hold paragraphs themselves).
   (`exec_auto_id`): the expanded body has those of the body, a tag of an
   included document numbers its labels on the `include*`, which has those
   of its include (as on the screen, where they are numbered on the
-  include), and the numbers of the tags of the body are put back after.
+  include, the content of the include having no places of its own), and
+  the numbers of the tags of the body are put back after.
   The buffer is as it was (convert-more checks the body, the auxiliary
   data and the labels after the document is typeset again).
 * A link of the document (`hlink`) is a Link element; a link of no
@@ -145,15 +151,34 @@ gets `/CIDToGIDMap /Identity`.
 which PDF/UA forbids. In a tagged PDF both writers embed a font which
 TeXmacs ships instead (`src/Plugins/Freetype/pdf_font_subst.cpp`): the
 TeX Gyre clone of a standard font, by its family and style (Termes,
-Heros, Cursor, Pagella, Bonum, Schola, Adventor; Termes for Symbol, which
-has its Greek letters and most of its signs), with the glyph of each
-code found by its name (the encoding of the font and its differences),
-the widths of the glyphs, the descriptor and a ToUnicode. The MuPDF
-writer does it in the resources it grafts; its subsetter fails on the TeX
-Gyre fonts, so each program is embedded whole, once for the document.
-PDFHummus makes a copy of the picture with the fonts embedded (an
-incremental update, subset by its CFF writer) and includes it. A font of
-no replacement (ZapfDingbats) is reported.
+Heros, Cursor, Pagella, Bonum, Schola, Adventor), STIX Two Math for
+Symbol (the pieces of the large delimiters included, with their Unicode
+characters rather than those of the private use area), with the glyph of
+each code found by its name (the encoding of the font and its
+differences), the widths of the glyphs, the descriptor and a ToUnicode.
+A code of no glyph in the replacement is `.notdef` (reported), never the
+glyph of the code in the encoding of the program. The fonts are found in
+the resources of the picture, of its forms, of its tiling patterns and of
+its Type 3 fonts. The widths are those of the replacement (PDF/UA wants
+them to agree with the program): a picture spaced for a font of other
+widths (Calibri) changes a little. The MuPDF writer does it in the
+resources it grafts, each program subset to the codes which the picture
+draws with the font (a processor of its content; MuPDF's subsetter fails
+on some glyphs of the TeX Gyre fonts, so a program is embedded whole
+when it does). PDFHummus makes a copy of the picture with the fonts
+embedded (an incremental update, subset by its CFF writer) and includes
+it; it leaves a font which is not an object of its own (a direct
+dictionary, rare) as it is, with a warning. A font of pictograms
+(ZapfDingbats, Wingdings) has no replacement and is reported.
+
+**Tagged pictures.** A picture which is itself a tagged PDF has marked
+content (its tags, its artifacts) which would nest in its Figure, and
+MCIDs in no parent tree: both writers take it out of the content of the
+picture and of its forms, but the optional content (`BDC /OC`), and the
+`/StructParents` of its forms (`pdf_strip_marked_content`, in
+`pdf_tags.cpp`). The picture is then one Figure, described by its
+alternative text. (Its structure could be grafted under the Figure
+instead, with its own alternative texts; not done.)
 
 ## Checking it
 
@@ -171,9 +196,10 @@ in the Matterhorn Protocol.
 
 ## Left
 
-* **Included PDF pictures**: their content is a Figure as a whole; a
-  picture which is itself tagged keeps its marked content, which the
-  structure tree does not know.
+* **Included PDF pictures**: their content is a Figure as a whole, also
+  when it is itself tagged (its structure is not grafted). A font of
+  pictograms in a picture, and with PDFHummus a font which is a direct
+  dictionary, are not embedded.
 * **Table headers** (TH, with a Scope): TeXmacs has no markup for them.
 * **The OpenType math variants** (#943): U+FFFD in the text until the
   fonts record their characters.

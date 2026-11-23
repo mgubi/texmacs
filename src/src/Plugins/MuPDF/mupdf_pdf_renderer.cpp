@@ -315,8 +315,10 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
   int  embed_image (url u);
-  void embed_picture_fonts (pdf_obj* res);
+  void embed_picture_fonts (pdf_obj* res, pdf_obj* form);
+  void strip_picture_tags (pdf_obj* res, pdf_obj* form);
   array<pdf_obj*> picture_font_objs;   // the programs embedded for them
+  int picture_font_tags= 0;            // the tags of their subsets
   hashmap<string,int> picture_font_files;   // whole programs, by file
   void merge_layers (pdf_document* src, pdf_graft_map* map);
   void place_image (int num, double w, double h, SI x, SI y, int alpha);
@@ -2084,6 +2086,7 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
     fz_buffer* buf= NULL;
     pdf_graft_map* map= NULL;
     pdf_obj* kept= NULL;   // the resources, for embed_picture_fonts
+    pdf_obj* kept_form= NULL;   // and the form of the picture
     // made before fz_try: a throw is a longjmp, which skips destructors
     c_string path (concretize (pdf));
     fz_try (ctx) {
@@ -2111,6 +2114,7 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
       num= n_xobj++;
       char cnm[32];
       snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
+      kept_form= pdf_keep_obj (ctx, xo);
       pdf_dict_puts_drop (ctx, res_xobj, cnm, xo);
       kept= res;
     }
@@ -2125,8 +2129,12 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
       num= -1;
     }
     // a tagged PDF embeds the fonts which the picture names only (PDF/UA)
-    if (kept != NULL && tagger != NULL) embed_picture_fonts (kept);
+    if (kept != NULL && tagger != NULL) {
+      embed_picture_fonts (kept, kept_form);
+      strip_picture_tags (kept, kept_form);
+    }
     pdf_drop_obj (ctx, kept);
+    pdf_drop_obj (ctx, kept_form);
     if (!is_none (tmp)) remove (tmp);
   }
   image_pool (key)= num;
@@ -2141,8 +2149,134 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
 
 #define PICTURE_FONTS_MAX 64
 
+// The codes which a picture draws with each of its fonts: a processor of
+// its content, which follows the font of each text operator through the
+// resources, the forms and the graphics states
+struct picture_usage {
+  pdf_processor super;
+  pdf_document* doc;
+  pdf_obj* res[32];
+  int      depth;
+  pdf_obj* font;
+  pdf_obj* saved[32];   // the font of each graphics state (q)
+  int      level;
+  int      nesting;     // of the forms
+  pdf_obj** fonts;
+  int      n;
+  unsigned char (*used)[256];
+  bool*    seen;
+};
+
+static void
+pu_push (fz_context* ctx, pdf_processor* proc, pdf_obj* res) {
+  picture_usage* p= (picture_usage*) proc;
+  if (p->depth < 32) p->res[p->depth]= pdf_keep_obj (ctx, res);
+  p->depth++;
+}
+
+static pdf_obj*
+pu_pop (fz_context* ctx, pdf_processor* proc) {
+  (void) ctx;
+  picture_usage* p= (picture_usage*) proc;
+  if (p->depth == 0) return NULL;
+  p->depth--;
+  return (p->depth < 32? p->res[p->depth]: NULL);
+}
+
+static void
+pu_q (fz_context* ctx, pdf_processor* proc) {
+  (void) ctx;
+  picture_usage* p= (picture_usage*) proc;
+  if (p->level < 32) p->saved[p->level]= p->font;
+  p->level++;
+}
+
+static void
+pu_Q (fz_context* ctx, pdf_processor* proc) {
+  (void) ctx;
+  picture_usage* p= (picture_usage*) proc;
+  if (p->level == 0) return;
+  p->level--;
+  if (p->level < 32) p->font= p->saved[p->level];
+}
+
+static void
+pu_Tf (fz_context* ctx, pdf_processor* proc, const char* name,
+       pdf_font_desc* font, float size) {
+  (void) font; (void) size;
+  picture_usage* p= (picture_usage*) proc;
+  p->font= NULL;
+  if (p->depth == 0 || p->depth > 32) return;
+  pdf_obj* fd= pdf_dict_get (ctx, p->res[p->depth - 1], PDF_NAME(Font));
+  p->font= pdf_resolve_indirect (ctx, pdf_dict_gets (ctx, fd, name));
+}
+
+static void
+pu_text (picture_usage* p, const char* str, size_t len) {
+  for (int k=0; k<p->n; k++)
+    if (p->fonts[k] == p->font) {
+      p->seen[k]= true;
+      for (size_t i=0; i<len; i++) p->used[k][(unsigned char) str[i]]= 1;
+    }
+}
+
+static void
+pu_Tj (fz_context* ctx, pdf_processor* proc, char* str, size_t len) {
+  (void) ctx;
+  pu_text ((picture_usage*) proc, str, len);
+}
+
+static void
+pu_squote (fz_context* ctx, pdf_processor* proc, char* str, size_t len) {
+  (void) ctx;
+  pu_text ((picture_usage*) proc, str, len);
+}
+
+static void
+pu_dquote (fz_context* ctx, pdf_processor* proc, float aw, float ac,
+           char* str, size_t len) {
+  (void) ctx; (void) aw; (void) ac;
+  pu_text ((picture_usage*) proc, str, len);
+}
+
+static void
+pu_TJ (fz_context* ctx, pdf_processor* proc, pdf_obj* a) {
+  for (int i=0; i < pdf_array_len (ctx, a); i++) {
+    pdf_obj* it= pdf_array_get (ctx, a, i);
+    if (pdf_is_string (ctx, it))
+      pu_text ((picture_usage*) proc, pdf_to_str_buf (ctx, it),
+               pdf_to_str_len (ctx, it));
+  }
+}
+
+static void
+pu_Do_form (fz_context* ctx, pdf_processor* proc, const char* name,
+            pdf_obj* form) {
+  (void) name;
+  picture_usage* p= (picture_usage*) proc;
+  if (p->nesting >= 8) return;
+  pdf_obj* fr= pdf_dict_get (ctx, form, PDF_NAME(Resources));
+  if (fr == NULL && p->depth > 0 && p->depth <= 32) fr= p->res[p->depth - 1];
+  pdf_obj* font= p->font;
+  int level= p->level;
+  pdf_obj* out= NULL;
+  p->nesting++;
+  fz_try (ctx) {
+    pdf_process_contents (ctx, proc, p->doc, fr, form, NULL, &out);
+  }
+  fz_always (ctx) {
+    p->nesting--;
+    pdf_drop_obj (ctx, out);
+  }
+  fz_catch (ctx) {
+    fz_rethrow (ctx);
+  }
+  p->font= font;
+  p->level= level;
+}
+
 void
-mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
+mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
   // the fonts of the resources and of the forms in them, which have no
   // program; read into C buffers (no destructors in fz_try)
   pdf_obj* fonts[PICTURE_FONTS_MAX];
@@ -2152,15 +2286,25 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
   int n= 0;
   pdf_obj* todo[256];
   int ntodo= 0, seen= 0;
+  fz_var (n);
   fz_try (ctx) {
-    todo[ntodo++]= res;
+    todo[ntodo++]= pdf_resolve_indirect (ctx, res);
     while (seen < ntodo && n < PICTURE_FONTS_MAX) {
       pdf_obj* r= todo[seen++];
       pdf_obj* fd= pdf_dict_get (ctx, r, PDF_NAME(Font));
       for (int i=0; fd != NULL && i < pdf_dict_len (ctx, fd) &&
                     n < PICTURE_FONTS_MAX; i++) {
-        pdf_obj* f= pdf_dict_get_val (ctx, fd, i);
+        // (by identity: two fonts may be the same direct dictionary)
+        pdf_obj* f= pdf_resolve_indirect (ctx, pdf_dict_get_val (ctx, fd, i));
         pdf_obj* st= pdf_dict_get (ctx, f, PDF_NAME(Subtype));
+        // (the fonts of the glyphs of a Type 3 font)
+        if (pdf_name_eq (ctx, st, PDF_NAME(Type3))) {
+          pdf_obj* tr= pdf_resolve_indirect (ctx, pdf_dict_get (ctx, f, PDF_NAME(Resources)));
+          int dup= 0;
+          for (int j=0; j<ntodo; j++) if (todo[j] == tr) dup= 1;
+          if (tr != NULL && !dup && ntodo < 256) todo[ntodo++]= tr;
+          continue;
+        }
         if (!pdf_name_eq (ctx, st, PDF_NAME(Type1)) &&
             !pdf_name_eq (ctx, st, PDF_NAME(TrueType)) &&
             !pdf_name_eq (ctx, st, PDF_NAME(MMType1))) continue;
@@ -2170,7 +2314,7 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
              pdf_dict_get (ctx, desc, PDF_NAME(FontFile2)) != NULL ||
              pdf_dict_get (ctx, desc, PDF_NAME(FontFile3)) != NULL)) continue;
         int dup= 0;
-        for (int j=0; j<n; j++) if (pdf_objcmp (ctx, fonts[j], f) == 0) dup= 1;
+        for (int j=0; j<n; j++) if (fonts[j] == f) dup= 1;
         if (dup) continue;
         fonts[n]= f;
         fz_strlcpy (base[n], pdf_to_name (ctx, pdf_dict_get (ctx, f, PDF_NAME(BaseFont))), 128);
@@ -2191,26 +2335,71 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
         }
         n++;
       }
+      // the resources of the forms and of the tiling patterns
       pdf_obj* xd= pdf_dict_get (ctx, r, PDF_NAME(XObject));
-      for (int i=0; xd != NULL && i < pdf_dict_len (ctx, xd) && ntodo < 256; i++) {
-        pdf_obj* x= pdf_dict_get_val (ctx, xd, i);
-        pdf_obj* xr= pdf_dict_get (ctx, x, PDF_NAME(Resources));
-        if (xr != NULL && pdf_name_eq (ctx, pdf_dict_get (ctx, x, PDF_NAME(Subtype)),
-                                       PDF_NAME(Form))) {
-          int dup= 0;
-          for (int j=0; j<ntodo; j++) if (todo[j] == xr) dup= 1;
-          if (!dup) todo[ntodo++]= xr;
-        }
+      pdf_obj* pd= pdf_dict_get (ctx, r, PDF_NAME(Pattern));
+      int nx= (xd == NULL? 0: pdf_dict_len (ctx, xd));
+      int np= (pd == NULL? 0: pdf_dict_len (ctx, pd));
+      for (int i=0; i < nx + np && ntodo < 256; i++) {
+        pdf_obj* x= (i < nx? pdf_dict_get_val (ctx, xd, i):
+                             pdf_dict_get_val (ctx, pd, i - nx));
+        if (i < nx && !pdf_name_eq (ctx, pdf_dict_get (ctx, x, PDF_NAME(Subtype)),
+                                    PDF_NAME(Form))) continue;
+        pdf_obj* xr= pdf_resolve_indirect (ctx, pdf_dict_get (ctx, x, PDF_NAME(Resources)));
+        if (xr == NULL) continue;
+        int dup= 0;
+        for (int j=0; j<ntodo; j++) if (todo[j] == xr) dup= 1;
+        if (!dup) todo[ntodo++]= xr;
       }
     }
   }
   fz_catch (ctx) { n= 0; }
+  // the codes which the picture draws with each font: only their glyphs
+  // go in (a font of no text seen, in a pattern or a Type 3 font, has all)
+  static unsigned char used[PICTURE_FONTS_MAX][256];
+  bool drawn[PICTURE_FONTS_MAX];
+  for (int k=0; k<n; k++) {
+    drawn[k]= false;
+    for (int c=0; c<256; c++) used[k][c]= 0;
+  }
+  picture_usage* pu= NULL;
+  fz_var (pu);
+  if (n > 0 && form != NULL) {
+    fz_try (ctx) {
+      pu= (picture_usage*) pdf_new_processor (ctx, sizeof (picture_usage));
+      pu->super.push_resources= pu_push;
+      pu->super.pop_resources = pu_pop;
+      pu->super.op_q = pu_q;
+      pu->super.op_Q = pu_Q;
+      pu->super.op_Tf= pu_Tf;
+      pu->super.op_Tj= pu_Tj;
+      pu->super.op_TJ= pu_TJ;
+      pu->super.op_squote= pu_squote;
+      pu->super.op_dquote= pu_dquote;
+      pu->super.op_Do_form= pu_Do_form;
+      pu->doc= doc; pu->fonts= fonts; pu->n= n;
+      pu->used= used; pu->seen= drawn;
+      pdf_obj* out= NULL;
+      pdf_process_contents (ctx, &pu->super, doc, res, form, NULL, &out);
+      pdf_drop_obj (ctx, out);
+      pdf_close_processor (ctx, &pu->super);
+    }
+    fz_always (ctx) {
+      pdf_drop_processor (ctx, (pdf_processor*) pu);
+    }
+    fz_catch (ctx) {
+      for (int k=0; k<n; k++) drawn[k]= false;
+    }
+  }
   for (int k=0; k<n; k++) {
     // what goes in the font, made before the fz_try below
     array<string> diffs (256);
     for (int c=0; c<256; c++) diffs[c]= string (diff[k][c]);
     string bname (base[k]);
     array<string> names= pdf_encoding_names (bname, string (enc[k]), diffs);
+    if (drawn[k])
+      for (int c=0; c<256; c++)
+        if (!used[k][c]) names[c]= "";
     pdf_font_subst r;
     if (!pdf_font_substitute (bname, names, r)) {
       convert_warning << "no font to embed for " << bname
@@ -2230,6 +2419,15 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
       cff= (N(prog) > 0);
       if (!cff && load_string (r.file, prog, false)) continue;
     }
+    if (r.missing > 0)
+      convert_warning << r.missing << " characters of "
+                      << bname << " (a picture) have no glyph in "
+                      << r.ps_name << LF;
+    // (a subset is named with a tag of its own)
+    string tag;
+    for (int t= picture_font_tags++, j=0; j<6; j++, t /= 26)
+      tag << (char) ('A' + (t % 26));
+    string ps_subset= tag * "+" * r.ps_name * string ((char) 0);
     string ps= r.ps_name * string ((char) 0);
     array<string> gn (256);
     for (int c=0; c<256; c++) gn[c]= r.glyph[c] * string ((char) 0);
@@ -2242,8 +2440,13 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
     fz_buffer* sb= NULL;
     fz_var (fb); fz_var (tb); fz_var (sb);
     pdf_obj* ff= NULL;
+    pdf_obj* d = NULL;
+    pdf_obj* w = NULL;
+    pdf_obj* e = NULL;
+    pdf_obj* tu_obj= NULL;
     int subset= 0;
-    fz_var (subset);
+    fz_var (subset); fz_var (ff); fz_var (d); fz_var (w); fz_var (e);
+    fz_var (tu_obj);
     fz_try (ctx) {
       if (fi < 0) {
         fb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) &prog[0],
@@ -2251,8 +2454,12 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
         // (the subsetter of MuPDF 1.28 fails on some glyphs of the TeX Gyre
         // fonts: the whole program then)
         if (cff) {
-          fz_try (ctx) sb= fz_subset_cff_for_gids (ctx, fb, gids, ng, 0, 0);
-          fz_catch (ctx) sb= NULL;
+          fz_try (ctx) {
+            sb= fz_subset_cff_for_gids (ctx, fb, gids, ng, 0, 0);
+          }
+          fz_catch (ctx) {
+            sb= NULL;
+          }
           if (sb != NULL) { fz_drop_buffer (ctx, fb); fb= sb; sb= NULL; subset= 1; }
         }
         pdf_obj* sd= pdf_new_dict (ctx, doc, 1);
@@ -2262,10 +2469,12 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
         pdf_drop_obj (ctx, sd);
       }
       else ff= pdf_keep_obj (ctx, picture_font_objs[fi]);
+      // the new objects first, then the font dictionary, all at once
       pdf_obj* f= fonts[k];
-      pdf_obj* d= pdf_add_new_dict (ctx, doc, 10);
+      char* name= (subset? &ps_subset[0]: &ps[0]);
+      d= pdf_add_new_dict (ctx, doc, 10);
       pdf_dict_put (ctx, d, PDF_NAME(Type), PDF_NAME(FontDescriptor));
-      pdf_dict_put_name (ctx, d, PDF_NAME(FontName), &ps[0]);
+      pdf_dict_put_name (ctx, d, PDF_NAME(FontName), name);
       pdf_dict_put_int (ctx, d, PDF_NAME(Flags), r.flags);
       pdf_obj* bb= pdf_dict_put_array (ctx, d, PDF_NAME(FontBBox), 4);
       for (int j=0; j<4; j++) pdf_array_push_int (ctx, bb, r.bbox[j]);
@@ -2274,34 +2483,38 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
       pdf_dict_put_int (ctx, d, PDF_NAME(Descent), r.descent);
       pdf_dict_put_int (ctx, d, PDF_NAME(CapHeight), r.cap_height);
       pdf_dict_put_int (ctx, d, PDF_NAME(StemV), r.stem_v);
+      pdf_dict_put_int (ctx, d, PDF_NAME(MissingWidth), r.missing_width);
       pdf_dict_put (ctx, d, PDF_NAME(FontFile3), ff);
-      pdf_dict_put_drop (ctx, f, PDF_NAME(FontDescriptor), d);
-      pdf_dict_put (ctx, f, PDF_NAME(Subtype), PDF_NAME(Type1));
-      pdf_dict_put_name (ctx, f, PDF_NAME(BaseFont), &ps[0]);
-      pdf_dict_put_int (ctx, f, PDF_NAME(FirstChar), r.first);
-      pdf_dict_put_int (ctx, f, PDF_NAME(LastChar), r.last);
-      pdf_obj* w= pdf_dict_put_array (ctx, f, PDF_NAME(Widths), N(r.widths));
+      w= pdf_new_array (ctx, doc, N(r.widths));
       for (int j=0; j<N(r.widths); j++) pdf_array_push_int (ctx, w, r.widths[j]);
       // the glyphs of the program by their names, whatever the encoding said
-      pdf_obj* e= pdf_new_dict (ctx, doc, 2);
+      e= pdf_new_dict (ctx, doc, 2);
       pdf_dict_put (ctx, e, PDF_NAME(Type), PDF_NAME(Encoding));
       pdf_obj* da= pdf_dict_put_array (ctx, e, PDF_NAME(Differences), 64);
       int prev= -2;
-      for (int c= r.first; c <= r.last; c++) {
+      for (int c= 0; c < 256; c++) {
         if (N(gn[c]) <= 1) continue;
         if (c != prev + 1) pdf_array_push_int (ctx, da, c);
         pdf_array_push_name (ctx, da, &gn[c][0]);
         prev= c;
       }
-      pdf_dict_put_drop (ctx, f, PDF_NAME(Encoding), pdf_add_object_drop (ctx, doc, e));
       tb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) &tu[0],
                                           (size_t) N(tu));
-      pdf_dict_put_drop (ctx, f, PDF_NAME(ToUnicode),
-                         pdf_add_stream (ctx, doc, tb, NULL, 0));
+      tu_obj= pdf_add_stream (ctx, doc, tb, NULL, 0);
+      pdf_dict_put (ctx, f, PDF_NAME(Subtype), PDF_NAME(Type1));
+      pdf_dict_put_name (ctx, f, PDF_NAME(BaseFont), name);
+      pdf_dict_put_int (ctx, f, PDF_NAME(FirstChar), r.first);
+      pdf_dict_put_int (ctx, f, PDF_NAME(LastChar), r.last);
+      pdf_dict_put (ctx, f, PDF_NAME(Widths), w);
+      pdf_dict_put (ctx, f, PDF_NAME(Encoding), e);
+      pdf_dict_put (ctx, f, PDF_NAME(ToUnicode), tu_obj);
+      pdf_dict_put (ctx, f, PDF_NAME(FontDescriptor), d);
     }
     fz_always (ctx) {
       fz_drop_buffer (ctx, fb); fz_drop_buffer (ctx, tb);
       fz_drop_buffer (ctx, sb);
+      pdf_drop_obj (ctx, d); pdf_drop_obj (ctx, w);
+      pdf_drop_obj (ctx, e); pdf_drop_obj (ctx, tu_obj);
     }
     fz_catch (ctx) {
       pdf_drop_obj (ctx, ff); ff= NULL;
@@ -2314,6 +2527,76 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res) {
       picture_font_objs << ff;
     }
     else if (ff != NULL) pdf_drop_obj (ctx, ff);
+  }
+}
+
+// A picture which is itself a tagged PDF: its marked content (its tags, its
+// artifacts) would nest in its Figure, and its MCIDs are in no parent tree.
+// In a tagged PDF it is taken out of the content of the picture and of its
+// forms (pdf_strip_marked_content), but optional content.
+void
+mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form) {
+  pdf_obj* forms[256];   // (the references: a stream is loaded by them)
+  pdf_obj* ids[256];     // (and the objects, to find them once each)
+  int nf= 0;
+  fz_var (nf);
+  fz_try (ctx) {
+    ids[nf]= pdf_resolve_indirect (ctx, form);
+    forms[nf++]= form;
+    pdf_obj* todo[256];
+    int ntodo= 0, seen= 0;
+    todo[ntodo++]= pdf_resolve_indirect (ctx, res);
+    while (seen < ntodo) {
+      pdf_obj* xd= pdf_dict_get (ctx, todo[seen++], PDF_NAME(XObject));
+      for (int i=0; xd != NULL && i < pdf_dict_len (ctx, xd); i++) {
+        pdf_obj* xref= pdf_dict_get_val (ctx, xd, i);
+        pdf_obj* x= pdf_resolve_indirect (ctx, xref);
+        if (!pdf_is_indirect (ctx, xref) ||
+            !pdf_name_eq (ctx, pdf_dict_get (ctx, x, PDF_NAME(Subtype)),
+                          PDF_NAME(Form))) continue;
+        int dup= 0;
+        for (int j=0; j<nf; j++) if (ids[j] == x) dup= 1;
+        if (dup || nf >= 256) continue;
+        ids[nf]= x;
+        forms[nf++]= xref;
+        pdf_obj* xr= pdf_resolve_indirect (ctx, pdf_dict_get (ctx, x, PDF_NAME(Resources)));
+        if (xr != NULL && ntodo < 256) todo[ntodo++]= xr;
+      }
+    }
+  }
+  fz_catch (ctx) {}
+  for (int k=0; k<nf; k++) {
+    fz_buffer* b= NULL;
+    unsigned char* data= NULL;
+    size_t len= 0;
+    fz_var (b);
+    fz_try (ctx) {
+      pdf_dict_del (ctx, forms[k], PDF_NAME(StructParents));
+      pdf_dict_del (ctx, forms[k], PDF_NAME(StructParent));
+      b= pdf_load_stream (ctx, forms[k]);
+      len= fz_buffer_storage (ctx, b, &data);
+    }
+    fz_catch (ctx) { fz_drop_buffer (ctx, b); continue; }
+    // (made outside fz_try: strings have destructors)
+    string s ((int) len);
+    for (size_t j=0; j<len; j++) s[(int) j]= (char) data[j];
+    fz_drop_buffer (ctx, b);
+    array<bool> open;
+    bool changed= false;
+    string t= pdf_strip_marked_content (s, open, changed);
+    if (!changed) continue;
+    fz_buffer* nb= NULL;
+    fz_var (nb);
+    fz_try (ctx) {
+      nb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) &t[0],
+                                          (size_t) N(t));
+      pdf_update_stream (ctx, doc, forms[k], nb, 0);
+    }
+    fz_always (ctx) { fz_drop_buffer (ctx, nb); }
+    fz_catch (ctx) {
+      convert_warning << "MuPDF could not take the tags out of a picture: "
+                      << fz_caught_message (ctx) << LF;
+    }
   }
 }
 

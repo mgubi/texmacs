@@ -31,7 +31,10 @@ struct pdf_font_subst {
   int    first, last;     // the codes which have a glyph
   array<int>    widths;   // by code, from first to last (thousandths)
   array<int>    unicode;  // by code (0..255): its character, -1 for none
-  array<string> glyph;    // by code: the name of its glyph, "" for none
+  array<string> glyph;    // by code: the name of its glyph, "" for no
+                          // code, ".notdef" for a code of no glyph
+  int    missing;         // the number of the codes of no glyph
+  int    missing_width;   // the width of .notdef (MissingWidth)
   array<int>    gids;     // the glyphs of the codes in the program, with 0,
                           // in order and once each
 };

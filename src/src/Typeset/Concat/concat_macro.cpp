@@ -172,20 +172,21 @@ void
 concater_rep::typeset_include (tree t, path ip) {
   // <include*|f|doc>: the document doc of f, given as a child, is typeset
   // in place (a tagged PDF, print_doc), its nodes with their own places
-  if (N(t) != 1 && N(t) != 2) { typeset_error (t, ip); return; }
+  bool given= is_given_inclusion (t);
+  if (N(t) != 1 && !given) { typeset_error (t, ip); return; }
   url file_name= url_unix (env->exec_string (t[0]));
   url incl_file= relative (env->base_file_name, file_name);
   if (inclusion_busy (incl_file)) {
     typeset_dynamic (tree (_ERROR, "inclusion cycle"), ip);
     return;
   }
-  tree incl= (N(t) == 2? t[1]: load_inclusion (incl_file));
+  tree incl= (given? t[1]: load_inclusion (incl_file));
   url save_name= env->cur_file_name;
   env->cur_file_name= incl_file;
   env->secure= is_secure (env->cur_file_name);
   {
     inclusion_guard guard (incl_file);
-    if (N(t) == 2) {
+    if (given) {
       marker (descend (ip, 0));
       typeset (t[1], descend (ip, 1));
       marker (descend (ip, 1));

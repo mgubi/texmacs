@@ -359,6 +359,7 @@ struct body_swap {
     for (int i=0; i<N(tables); i++) restore_table (tables[i], copies[i]);
     int k= 0;
     ids.restore (saved, k);
+    given_inclusions_clear ();
     swapped= false;
   }
   ~body_swap () { restore (); }
@@ -370,18 +371,17 @@ struct body_swap {
 // typesetter typesets for the include, the document in place
 static tree
 apply_include (tree body, string var, tree name, tree doc, tree incl,
-               bool& found) {
+               bool& found, array<tree>& given) {
   if (is_atomic (body)) return body;
   if (is_func (body, ARG, 1) && body[0] == var) return copy (name);
   if (is_func (body, MACRO) || is_func (body, XMACRO)) return copy (body);
   tree r (body, N(body));
   for (int i=0; i<N(body); i++)
-    r[i]= apply_include (body[i], var, name, doc, incl, found);
+    r[i]= apply_include (body[i], var, name, doc, incl, found, given);
   if (!found && is_func (r, VAR_INCLUDE, 1) && r[0] == name) {
     found= true;
     r << doc;
-    // (it numbers the labels of the document as the include does)
-    auto_id_copy (incl, r);
+    given << r << incl;
   }
   return r;
 }
@@ -393,7 +393,8 @@ apply_include (tree body, string var, tree name, tree doc, tree incl,
 // include in markup which is not typeset as such (inactive, raw data),
 // and an include which the macro does not load with include*.
 static tree
-expand_includes (tree t, url base, array<string> active, tree macro) {
+expand_includes (tree t, url base, array<string> active, tree macro,
+                 array<tree>& given) {
   if (is_atomic (t)) return t;
   if (is_compound (t, "inactive") || is_compound (t, "inactive*") ||
       is_compound (t, "var-inactive") || is_compound (t, "raw-data"))
@@ -408,18 +409,30 @@ expand_includes (tree t, url base, array<string> active, tree macro) {
     // the editor gave them, as decorations of the include)
     array<string> inner= copy (active);
     inner << fs;
-    tree doc= expand_includes (copy (d), base, inner, macro);
+    tree doc= expand_includes (copy (d), base, inner, macro, given);
     bool found= false;
-    tree r= apply_include (macro[1], macro[0]->label, t[0], doc, t, found);
+    tree r= apply_include (macro[1], macro[0]->label, t[0], doc, t, found,
+                           given);
     return found? r: t;
   }
   tree r (t, N(t));
   bool changed= false;
   for (int i=0; i<N(t); i++) {
-    r[i]= expand_includes (t[i], base, active, macro);
+    r[i]= expand_includes (t[i], base, active, macro, given);
     if (r[i] != t[i]) changed= true;
   }
   return changed? r: t;
+}
+
+// the nodes of after (attach_dip of before, which makes the nodes of no
+// place anew) which are those of before in nodes, in their order
+static void
+same_nodes (tree before, tree after, array<tree> nodes, array<tree>& r) {
+  if (is_atomic (before) || is_atomic (after) || N(before) != N(after))
+    return;
+  for (int i=0; i<N(nodes); i++)
+    if (nodes[i].operator-> () == before.operator-> ()) r[i]= after;
+  for (int i=0; i<N(before); i++) same_nodes (before[i], after[i], nodes, r);
 }
 
 // whether the document redefines include itself (the environment of
@@ -503,8 +516,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   if (want_tags && !env->preamble &&
       is_func (incl_macro, MACRO, 2) && is_atomic (incl_macro[0]) &&
       !assigns_include (body)) {
+    array<tree> given;   // each include* given its document, its include
     tree eb= expand_includes (body, env->base_file_name, array<string> (),
-                              incl_macro);
+                              incl_macro, given);
     if (!strong_equal (eb, body)) {
       // (the typesetter finds the places of the nodes in their observers:
       // the new ones get theirs, the others keep those they have; and it
@@ -512,8 +526,16 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
       // expanded body is the body of the buffer while it is typeset and
       // drawn, without telling the editor, and the body is put back after)
       body= attach_dip (eb, reverse (rp));
-      // (the same numbers of the labels: auto_buffer is the expanded body)
+      // (the same numbers of the labels: auto_buffer is the expanded body,
+      // and an include* numbers those of its document as its include;
+      // after attach_dip, which gives the nodes their observers)
       auto_id_copy (subtree (et, rp), body);
+      array<tree> made (N(given));
+      same_nodes (eb, body, given, made);
+      for (int i=0; i+1<N(given); i+=2) {
+        auto_id_copy (given[i+1], made[i]);
+        given_inclusion_add (made[i]);
+      }
       swap.keep (buf->data->ref);
       swap.keep (buf->data->aux);
       swap.keep (buf->data->att);

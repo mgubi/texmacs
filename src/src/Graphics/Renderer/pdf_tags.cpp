@@ -182,6 +182,92 @@ xml_escape (string s) {
   return r;
 }
 
+static inline bool
+pdf_white (char c) {
+  return c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '\f' ||
+         c == '\0';
+}
+
+static inline bool
+pdf_delimiter (char c) {
+  return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' ||
+         c == ']' || c == '{' || c == '}' || c == '/' || c == '%';
+}
+
+string
+pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
+  string r;
+  int n= N(s), i= 0;
+  int seg= 0;              // the start of the operands of the next operator
+  string first;            // its first operand
+  bool have_first= false;
+  while (i < n) {
+    char c= s[i];
+    if (pdf_white (c)) { i++; continue; }
+    if (c == '%') { while (i < n && s[i] != '\n' && s[i] != '\r') i++; continue; }
+    int start= i;
+    if (c == '(') {
+      int level= 0;
+      for (; i < n; i++) {
+        if (s[i] == '\\') { i++; continue; }
+        if (s[i] == '(') level++;
+        else if (s[i] == ')' && --level == 0) { i++; break; }
+      }
+    }
+    else if (c == '<' && i+1 < n && s[i+1] == '<') i += 2;
+    else if (c == '>' && i+1 < n && s[i+1] == '>') i += 2;
+    else if (c == '<') { while (i < n && s[i] != '>') i++; i++; }
+    else if (c == '[' || c == ']' || c == '{' || c == '}' || c == ')' ||
+             c == '>') i++;
+    else if (c == '/') {
+      i++;
+      while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
+    }
+    else {
+      while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
+      string tok= s (start, i);
+      bool number= (N(tok) > 0 && (is_digit (tok[0]) || tok[0] == '-' ||
+                                   tok[0] == '+' || tok[0] == '.'));
+      if (!number && tok != "true" && tok != "false" && tok != "null") {
+        // an operator
+        if (tok == "BI") {
+          // an inline image: its data, up to EI, as it is
+          int j= i;
+          while (j+2 < n && !(pdf_white (s[j]) && s[j+1] == 'E' &&
+                              s[j+2] == 'I' &&
+                              (j+3 == n || pdf_white (s[j+3])))) j++;
+          i= min (n, j + 3);
+          r << s (seg, i);
+        }
+        else if (tok == "BMC" || (tok == "BDC" && first != "/OC")) {
+          open << false;
+          changed= true;
+          r << "\n";
+        }
+        else if (tok == "BDC") {
+          open << true;
+          r << s (seg, i);
+        }
+        else if (tok == "EMC") {
+          bool kept= (N(open) > 0 && open[N(open)-1]);
+          if (N(open) > 0) open->resize (N(open) - 1);
+          if (kept) r << s (seg, i);
+          else { changed= true; r << "\n"; }
+        }
+        else r << s (seg, i);
+        seg= i;
+        have_first= false;
+        first= "";
+        continue;
+      }
+    }
+    if (i <= start) i= start + 1;
+    if (!have_first) { first= s (start, i); have_first= true; }
+  }
+  r << s (seg, n);
+  return r;
+}
+
 string
 pdf_tags_xmp (string title, string author, string producer) {
   string xmp;
