@@ -3883,6 +3883,10 @@
   (check-suite "convert-more")
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (system-mkdir (temp-dir))
+  ;; (the checks read the objects of the PDF files: none in compressed
+  ;; object streams, which a tagged PDF of MuPDF uses)
+  (define objstms (getenv "TEXMACS_PDF_OBJSTMS"))
+  (system-setenv "TEXMACS_PDF_OBJSTMS" "0")
   (for-each run-group
             (list test-mathml-export test-mathml-html test-html-formula-labels
                   test-html-mathjax-formulas test-html-pattern-background
@@ -3907,5 +3911,6 @@
                   test-tagged-pdf-cycle
                   test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
+  (system-setenv "TEXMACS_PDF_OBJSTMS" (or objstms ""))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))

@@ -55,6 +55,10 @@ bool pdf_font_substitute (string base_font, array<string> names,
 // embeds as /FontFile3 /Type1C and its writers can subset; "" if none
 string pdf_cff_program (url file);
 
+// The character of a glyph name (of the standard encodings, uniXXXX,
+// uXXXX, a symbol of TeXmacs, before a dot): -1 when unknown
+int pdf_glyph_name_unicode (string name);
+
 // The /ToUnicode CMap of the codes of a simple font
 string pdf_simple_to_unicode (array<int> unicode);
 

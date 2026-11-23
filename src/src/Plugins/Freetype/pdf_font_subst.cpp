@@ -346,6 +346,11 @@ name_unicode (string n) {
   return -1;
 }
 
+int
+pdf_glyph_name_unicode (string name) {
+  return name_unicode (name);
+}
+
 array<string>
 pdf_encoding_names (string base_font, string encoding, array<string> diffs) {
   const char** t= enc_standard_names;

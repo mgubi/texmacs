@@ -142,10 +142,19 @@ the vendored `DescendentFontWriter.cpp`), which PDF/UA allows.
 **Fonts.** PDF/UA wants a Unicode value for every glyph drawn. The TeX
 fonts take theirs from their encodings (`tex_math_unicode`: the math
 fonts, and the CB Greek fonts, `grmn.enc`), a TeX font of no table in a
-tagged PDF from the names of its glyphs; the glyphs of no known character
-(the pieces of the horizontal braces of cmex, some variants of the
-OpenType math fonts, #943) are mapped to U+FFFD, and a TrueType CID font
+tagged PDF from the names of its glyphs; a glyph of no character in the
+table, or drawn by its number (the variants of the OpenType math fonts,
+#943), has the character of its name, or the one the font maps to it
+(PDFHummus), as a reader would read it untagged; only those of none (the
+pieces of the horizontal braces of cmex) are U+FFFD. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.
+
+**Size.** The structure is tens of thousands of small objects in a long
+document: the MuPDF writer puts them in compressed object streams (PDF
+1.5), and a tagged PDF is about a tenth larger than an untagged one
+(`TEXMACS_PDF_OBJSTMS=0`: not, which convert-more uses to read the
+objects). PDFHummus writes no object streams: its tagged PDFs are up to
+twice as large.
 
 **Fonts of the pictures.** A PDF picture (a plot) often names its fonts
 (Times-Roman, Helvetica, Courier, Symbol, Arial) without embedding them,
@@ -209,9 +218,14 @@ Whether a picture is grafted is decided on the content the graft gives
 blocks balanced; an MCID is read from the properties of a BDC or from
 the resource its name gives. PDFHummus does not graft when the pictures
 are distilled again (Ghostscript), and never reads an encrypted picture
-(its parser damages its memory, also untagged): Ghostscript gives its
-size and an unencrypted copy, or else the placeholder is included; a
-picture it cannot copy is the placeholder too, its fonts embedded.
+(its parser damages its memory, also untagged; `hummus_pdf_plain` reads
+the key Encrypt of the trailers and of the cross-reference streams, the
+names decoded): Ghostscript gives its size and an unencrypted copy, or
+else the placeholder is included; a picture it cannot copy is the
+placeholder too, its fonts embedded. A reference of a picture to an
+object which it lacks is null (it made PDFHummus hang). The MuPDF writer
+reads each PDF picture once for all its uses: one copy of its resources
+and of its layers.
 
 The lexer of the content skips the data of an inline image by its length,
 and the streams of a page are one content. The fonts and the forms of a

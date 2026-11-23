@@ -76,6 +76,9 @@ static bool hummus_embed_fonts= false;
 #include "PDFWriter/FreeTypeFaceWrapper.h"
 #include "PDFWriter/CFFEmbeddedFontWriter.h"
 #include "Freetype/pdf_font_subst.hpp"
+#include <map>
+
+static int hummus_glyph_unicode (PDFUsedFont* f, unsigned int gid);
  
 /******************************************************************************
  * pdf_hummus_renderer
@@ -1896,8 +1899,10 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     if (cfid != NULL) {
       if (by_number && code <= 0 && tagger != NULL)
         // a tagged PDF maps every glyph drawn to a character (PDF/UA): those
-        // of no character known (#943) to U+FFFD, as readers took them
-        glyphs.push_back (GlyphUnicodeMapping (gl_index, 0xfffd));
+        // of no character known (#943) to that of the name of the glyph,
+        // or which the font maps to it, as readers read them; else U+FFFD
+        glyphs.push_back (GlyphUnicodeMapping (gl_index,
+                            hummus_glyph_unicode (cfid, gl_index)));
       else if (by_number && code <= 0)
         glyphs.push_back (GlyphUnicodeMapping (gl_index, ULongVector ()));
       else {
@@ -2218,16 +2223,158 @@ hummus_form_ids (PDFParser& p, PDFDictionary* res, array<int>& ids,
   }
 }
 
+// The character of the glyph gid of a font: of its name, or the one which
+// the font maps to it; U+FFFD when none
+static int
+hummus_glyph_unicode (PDFUsedFont* f, unsigned int gid) {
+  FreeTypeFaceWrapper* w= (f == NULL? NULL: f->GetFreeTypeFont ());
+  if (w == NULL) return 0xfffd;
+  FT_Face face= *w;
+  if (face == NULL) return 0xfffd;
+  if (FT_HAS_GLYPH_NAMES (face)) {
+    char buf[128];
+    buf[0]= '\0';
+    if (!FT_Get_Glyph_Name (face, gid, buf, sizeof (buf)) && buf[0] != '\0') {
+      int u= pdf_glyph_name_unicode (string (buf));
+      if (u >= 0x20 && u != 0xfffd) return u;
+    }
+  }
+  // (the characters of the glyphs of a font, once for each font: by its
+  // face, its names and its number of glyphs, a face being freed and its
+  // address used again)
+  static std::map<std::string, std::map<unsigned int, int> > by_face;
+  char kb[64];
+  snprintf (kb, sizeof (kb), "%p:%ld:", (void*) face, (long) face->num_glyphs);
+  std::string key= std::string (kb) +
+    (face->family_name? face->family_name: "") + ":" +
+    (face->style_name? face->style_name: "");
+  if (by_face.find (key) == by_face.end ()) {
+    std::map<unsigned int, int>& m= by_face[key];
+    FT_UInt g;
+    FT_ULong c= FT_Get_First_Char (face, &g);
+    while (g != 0) {
+      if (m.find (g) == m.end ()) m[g]= (int) c;
+      c= FT_Get_Next_Char (face, c, &g);
+    }
+  }
+  std::map<unsigned int, int>& m= by_face[key];
+  std::map<unsigned int, int>::iterator it= m.find (gid);
+  if (it != m.end () && it->second >= 0x20) return it->second;
+  return 0xfffd;
+}
+
 // Whether PDFHummus reads the PDF file u as it is: it parses, and is not
 // encrypted (its incremental update and its parser of the structure do
 // not decrypt: an encrypted picture made the export crash)
+// a name of a PDF file, its #xx escapes decoded
+static string
+hummus_name_decoded (string s, int i, int j) {
+  string r;
+  for (int k=i; k<j; k++)
+    if (s[k] == '#' && k+2 < j) {
+      r << (char) from_hexadecimal (s (k+1, k+3));
+      k += 2;
+    }
+    else r << s[k];
+  return r;
+}
+
 bool
 hummus_pdf_plain (url u) {
-  // (by its bytes: the parser of PDFHummus itself crashed on some)
+  // (by its bytes: the parser of PDFHummus damages its memory on an
+  // encrypted file) The key Encrypt of a trailer, or of the dictionary of
+  // a cross-reference stream, in their top level: names decoded, strings,
+  // comments and the data of the streams skipped
   string s;
   if (load_string (u, s, false)) return false;
-  if (!starts (s, "%PDF-")) return false;
-  return search_forwards ("/Encrypt", s) < 0;
+  int h= search_forwards ("%PDF-", s);
+  if (h < 0 || h > 1024) return false;
+  int n= N(s), i= h, depth= 0;
+  bool expect_key= false, trailer= false, after_trailer= false;
+  bool has_encrypt= false, xref= false;
+  string key, last_word;
+  while (i < n) {
+    char c= s[i];
+    if (c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '\f' ||
+        c == '\0') { i++; continue; }
+    if (c == '%') { while (i < n && s[i] != '\n' && s[i] != '\r') i++; continue; }
+    if (c == '(') {
+      int level= 0;
+      for (; i < n; i++) {
+        if (s[i] == '\\') { i++; continue; }
+        if (s[i] == '(') level++;
+        else if (s[i] == ')' && --level == 0) { i++; break; }
+      }
+      if (depth == 1 && !expect_key) expect_key= true;
+      continue;
+    }
+    if (c == '<' && i+1 < n && s[i+1] == '<') {
+      if (depth == 0) {
+        trailer= (last_word == "trailer");
+        has_encrypt= false; xref= false; expect_key= true; key= "";
+      }
+      depth++; i += 2; continue;
+    }
+    if (c == '>' && i+1 < n && s[i+1] == '>') {
+      depth--; i += 2;
+      if (depth == 0 && has_encrypt && (trailer || xref)) return false;
+      if (depth == 1) expect_key= true;
+      if (depth < 0) depth= 0;
+      continue;
+    }
+    if (c == '<') {   // a hex string
+      while (i < n && s[i] != '>') i++;
+      i++;
+      if (depth == 1) expect_key= true;
+      continue;
+    }
+    if (c == '[') { depth++; i++; continue; }
+    if (c == ']') { depth--; i++; if (depth == 1) expect_key= true;
+                    if (depth < 0) depth= 0; continue; }
+    int start= i;
+    i++;
+    while (i < n && !(s[i] == ' ' || s[i] == '\n' || s[i] == '\r' ||
+                      s[i] == '\t' || s[i] == '\f' || s[i] == '\0' ||
+                      s[i] == '(' || s[i] == ')' || s[i] == '<' ||
+                      s[i] == '>' || s[i] == '[' || s[i] == ']' ||
+                      s[i] == '{' || s[i] == '}' || s[i] == '/' ||
+                      s[i] == '%')) i++;
+    if (c == '/') {
+      string nm= hummus_name_decoded (s, start + 1, i);
+      if (depth == 1) {
+        if (expect_key) {
+          key= nm; expect_key= false;
+          if (nm == "Encrypt") has_encrypt= true;
+        }
+        else {
+          if (key == "Type" && nm == "XRef") xref= true;
+          expect_key= true;
+        }
+      }
+      continue;
+    }
+    string w= s (start, i);
+    if (depth == 0) {
+      last_word= w;
+      // (the data of a stream: up to endstream)
+      if (w == "stream") {
+        int e= search_forwards ("endstream", i, s);
+        if (e < 0) break;
+        i= e + 9;
+      }
+    }
+    else if (depth == 1 && !expect_key) {
+      // (a reference "n 0 R" is three words: the value ends at R)
+      if (w == "R" || !(N(w) > 0 && is_digit (w[0]))) expect_key= true;
+      else {
+        int j= i;
+        while (j < n && (s[j] == ' ' || s[j] == '\n' || s[j] == '\r')) j++;
+        if (!(j < n && is_digit (s[j]))) expect_key= true;
+      }
+    }
+  }
+  (void) after_trailer;
+  return true;
 }
 
 // the MCIDs of the names of the properties of the resources res

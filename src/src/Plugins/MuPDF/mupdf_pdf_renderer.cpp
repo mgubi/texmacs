@@ -523,6 +523,12 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   opts.do_compress_images= 1;
   opts.do_compress_fonts= 1;
   opts.do_garbage= 4;
+  // the elements of the structure of a tagged PDF, tens of thousands of
+  // small objects, go in compressed object streams (PDF 1.5, as PDF/UA's
+  // 1.7): the file is about half as large (TEXMACS_PDF_OBJSTMS=0: not, for
+  // the tests which read the objects)
+  if (tagger != NULL && get_env ("TEXMACS_PDF_OBJSTMS") != "0")
+    opts.do_use_objstms= 1;
   bool encrypt_ok= pdf_encryption (opts);
   if (broken)
     convert_error << "The PDF " << pdf_file_name << " is not written: "
@@ -1512,11 +1518,24 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
   if (N(tex) == 0) return;
   // (a position without a single character, below U+0020, is left out)
   for (int c=0; c<N(tex); c++) if (tex[c] < 0x20) tex[c]= -1;
-  // a tagged PDF maps every code used (PDF/UA): the pieces of the
-  // horizontal braces of cmex have no character, and are U+FFFD
+  // a tagged PDF maps every code used (PDF/UA): a code of no character in
+  // the table, the character of its glyph's name, which a reader would
+  // read (a vector accent, the symbols of msam), else U+FFFD (the pieces
+  // of the horizontal braces of cmex have none)
   if (tagger != NULL)
     for (int c=first; c<=last && c<N(tex); c++)
-      if (it.gid[c] >= 0 && tex[c] < 0) tex[c]= 0xfffd;
+      if (it.gid[c] >= 0 && tex[c] < 0) {
+        int u= -1;
+        if (c < N(gname) && N(gname[c]) > 1)
+          u= pdf_glyph_name_unicode (gname[c] (0, N(gname[c]) - 1));
+        if (u < 0x20 || u == 0xfffd) {
+          if (c < N(gname) && N(gname[c]) > 1) {
+            c_string cn (gname[c] (0, N(gname[c]) - 1));
+            u= fz_unicode_from_glyph_name (cn);
+          }
+        }
+        tex[c]= (u >= 0x20 && u != 0xfffd)? u: 0xfffd;
+      }
   int nused= 0;
   for (int c=first; c<=last; c++)
     if (it.gid[c] >= 0 && c < N(tex) && tex[c] >= 0) nused++;
@@ -2209,7 +2228,9 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
     pdf_obj* kept_form= NULL;   // and the form of the picture
     graft_c* gc= NULL;     // its structure (graft)
     fz_var (gc);
-    bool reuse= (graft && s == "pdf" && graft_docs->contains (key));
+    // (all the uses of a PDF picture share its document and its map: one
+    // copy of its resources, and of its layers)
+    bool reuse= (s == "pdf" && graft_docs->contains (key));
     // made before fz_try: a throw is a longjmp, which skips destructors
     c_string path (concretize (pdf));
     fz_try (ctx) {
@@ -2242,7 +2263,7 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
       pdf_obj* res= (sres == NULL) ? NULL
                                    : pdf_graft_mapped_object (ctx, map, sres);
       if (!reuse) merge_layers (src, map);   // (once for all the uses)
-      if (graft && s == "pdf" && !reuse) {
+      if (s == "pdf" && !reuse) {
         graft_docs (key)= (pointer) pdf_keep_document (ctx, src);
         graft_maps (key)= (pointer) pdf_keep_graft_map (ctx, map);
       }

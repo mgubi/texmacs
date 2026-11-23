@@ -598,6 +598,15 @@ EStatusCode PDFDocumentHandler::CopyInDirectObject(ObjectIDType inSourceObjectID
 	if(!sourceObject)
 	{
 		XrefEntryInput* xrefEntry = mParser->GetXrefEntry(inSourceObjectID);
+		// TeXmacs: a reference to an object which is not in the file (beyond
+		// its cross-reference table) is null (ISO 32000-1, 7.3.10); xrefEntry
+		// was NULL there, and the export hung
+		if (xrefEntry == NULL) {
+			mObjectsContext->StartNewIndirectObject(inTargetObjectID);
+			mObjectsContext->WriteNull(eTokenSeparatorEndLine);
+			mObjectsContext->EndIndirectObject();
+			return PDFHummus::eSuccess;
+		}
 		if (xrefEntry->mType == eXrefEntryDelete) {
 			// if the object is deleted, replace with a deleted object
 			mObjectsContext->GetInDirectObjectsRegistry().DeleteObject(inTargetObjectID);
