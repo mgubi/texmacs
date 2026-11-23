@@ -49,16 +49,23 @@
 (tm-define (kbd-insert s)
   (insert s))
 
-(define delayed-keyboard-time #f)
+(define delayed-keyboard-serial 0)
+
+(tm-define (delayed-keyboard-command x t)
+  (:synopsis "The command which presses the pre-edit @x after 100 ms idle")
+  ;; Only the last pre-edit is pressed: the command of an earlier one which
+  ;; has not run yet does nothing. The pre-edits are numbered, since several
+  ;; can come at the same time @t: a dead key typed after another one ends
+  ;; the first pre-edit and starts the next one in the same event (#870).
+  ;; The command takes the idle time and returns, as for exec-delayed-pause,
+  ;; the delay before it is called again, or #t when it is done.
+  (set! delayed-keyboard-serial (+ delayed-keyboard-serial 1))
+  (with serial delayed-keyboard-serial
+    (lambda (idle)
+      (cond ((!= serial delayed-keyboard-serial) #t)
+            ((< idle 100) (- 100 idle))
+            (else (keyboard-press x t) #t)))))
 
 (tm-define (delayed-keyboard-press x t)
-  (set! delayed-keyboard-time t)
-  (exec-delayed-pause
-   (lambda ()
-     (or (!= delayed-keyboard-time t)
-         (with left (- 100 (idle-time))
-           (if (> left 0) left
-               (begin
-                 (set! delayed-keyboard-time #f)
-                 (keyboard-press x t)
-                 #t)))))))
+  (with cmd (delayed-keyboard-command x t)
+    (exec-delayed-pause (lambda () (cmd (idle-time))))))

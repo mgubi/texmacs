@@ -518,6 +518,63 @@
                 (list "pre-edit:1:~" "pre-edit:" "~"))
       (check= (body) '(document "~")))))
 
+;; The interfaces send the pre-edits to delayed-keyboard-press, which runs
+;; the last one when the user has been idle for 100 ms. Without a window
+;; the delayed commands never run: the test makes them as that function
+;; does, and runs them once all the events of a key press are sent.
+(define (math-after-bursts bursts)
+  ;; the formula after each burst of events (a list of key and time)
+  (with r '()
+    (in-buffer '(document (math "")) '(0 0 0)
+      (lambda ()
+        (for-each
+          (lambda (burst)
+            (with cmds '()
+              (for-each
+                (lambda (ev)
+                  (let ((k (car ev)) (t (cadr ev)))
+                    (if (string-starts? k "pre-edit:")
+                        (set! cmds
+                              (append cmds
+                                      (list (delayed-keyboard-command k t))))
+                        (edit-step (lambda () (keyboard-press k t))))))
+                burst)
+              (for-each (lambda (cmd) (edit-step (lambda () (cmd 1000))))
+                        cmds))
+            (with m (cadr (body))
+              (set! r (cons (if (func? m 'math 1) (cadr m) m) r))))
+          bursts)))
+    (reverse r)))
+
+(define (test-dead-accents-delayed)
+  ;; Option-N typed three times in math, then a space (#870): each Option-N
+  ;; after the first ends the pre-edit and starts the next one in the same
+  ;; event, with the same time; the last pre-edit was dropped, and the
+  ;; tilde inserted only at the next key.
+  (check-group "dead accents in math, delayed pre-edits")
+  (with acc "pre-edit:1:~"
+    ;; Cocoa: the end of the pre-edit, the commit, the new pre-edit
+    (check= (math-after-bursts
+              `(((,acc 15377))
+                (("pre-edit:" 17160) ("~" 17160) (,acc 17160))
+                (("pre-edit:" 18882) ("~" 18882) (,acc 18882))
+                (("pre-edit:" 20549) ("~" 20549))))
+            '("<sim>" "<approx>" "<triplesim>" "<triplesim>"))
+    ;; Qt: the commit, the end of the pre-edit, the new pre-edit
+    (check= (math-after-bursts
+              `(((,acc 15377))
+                (("~" 17160) ("pre-edit:" 17160) (,acc 17160))
+                (("~" 18882) ("pre-edit:" 18882) (,acc 18882))
+                (("~" 20549) ("pre-edit:" 20549))))
+            '("<sim>" "<approx>" "<triplesim>" "<triplesim>"))
+    ;; a letter after the second tilde
+    (check= (math-after-bursts
+              `(((,acc 100))
+                (("pre-edit:" 200) ("~" 200) (,acc 200))
+                (("pre-edit:" 300) ("~" 300))
+                (("x" 400))))
+            '("<sim>" "<approx>" "<approx>" "<approx>x"))))
+
 ;; Without a window, the environment at the cursor (get-env, in-math?)
 ;; is the one of the last typesetting. Once the keyboard maps of programs
 ;; are loaded (by a key lookup in a program), the first key after $ in
@@ -1858,6 +1915,7 @@
   (test-typing-text)
   (test-typing-math)
   (test-dead-accents-math)
+  (test-dead-accents-delayed)
   (test-typing-math-mode)
   (test-typing-table)
   (test-kbd-map)
