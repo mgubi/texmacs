@@ -67,6 +67,12 @@ tex_rubber_font_rep::tex_rubber_font_rep (string name,
     ext (load_translator (trl_name))
 {
   load_tex (family2, size2, dpi2, dsize, tfm, pk);
+  // (the codes drawn, for the text of a PDF: those of the translator of
+  // the delimiters, and their larger variants after the metric)
+  if (!is_nil (pk)) {
+    pk->add_encoding (trl_name);
+    if (pk->metric == "") pk->metric= tfm->res_name;
+  }
 
   family       = family2;
   size         = size2;

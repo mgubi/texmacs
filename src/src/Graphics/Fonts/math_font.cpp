@@ -15,6 +15,7 @@
 #include "font.hpp"
 #include "translator.hpp"
 #include "convert.hpp"
+#include "file.hpp"
 
 bool operator == (font fn1, font fn2) { return fn1.rep == fn2.rep; }
 bool operator != (font fn1, font fn2) { return fn1.rep != fn2.rep; }
@@ -82,6 +83,36 @@ math_font_rep::math_font_rep (
 * Find the font and the corresponding character
 ******************************************************************************/
 
+// The name of section k of a translator made of sections ([cmr] [cmmi]...,
+// each one a font of 256 codes); "" for another translator
+static string
+translator_section (string name, int k) {
+  static hashmap<string,tree> sections ((tree (TUPLE)));
+  if (!sections->contains (name)) {
+    tree r (TUPLE);
+    string s;
+    url u ("$TEXMACS_HOME_PATH/fonts/enc:$TEXMACS_PATH/fonts/enc",
+           name * ".enc");
+    if (!load_string (u, s, false)) {
+      int i= 0, n= N(s);
+      while (i < n) {
+        if (s[i] == '[') {
+          int j= ++i;
+          while (i < n && s[i] != ']') i++;
+          r << tree (s (j, i));
+          i++;
+        }
+        else if (s[i] == ' ' || s[i] == '\n' || s[i] == '\t' ||
+                 s[i] == '\r') i++;
+        else { r= tree (TUPLE); break; }
+      }
+    }
+    sections (name)= r;
+  }
+  tree r= sections [name];
+  return (k >= 0 && k < N(r))? as_string (r[k]): string ("");
+}
+
 void
 math_font_rep::init_font (int fn_nr, font& fn) {
   tree t= font_name [fn_nr];
@@ -92,6 +123,11 @@ math_font_rep::init_font (int fn_nr, font& fn) {
   else
     fn= find_magnified_font (t, hzf, vzf);
   ASSERT (!is_nil (fn), "font not found");
+  // (the codes drawn, for the text of a PDF: those of the section of the
+  // translator for this font, [cmmi] in math.enc)
+  if (!is_tuple (t, "virtual", 3))
+    fn->add_glyph_encoding (translator_section (as_string (def[1][0]),
+                                                fn_nr));
   fn->copy_math_pars (base_fn);
   font_table [fn_nr]= fn;
 }

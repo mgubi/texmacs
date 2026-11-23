@@ -16,27 +16,6 @@
 #include "analyze.hpp"
 #include "converter.hpp"
 #include "hashmap.hpp"
-#include "Freetype/tt_file.hpp"
-
-// The encodings (fonts/enc) of the TeX math fonts, by the name of the font
-// without its size
-static const char* tex_math_encodings[][3]= {
-  { "cmr", "cmr", "" }, { "cmbx", "cmr", "" },
-  { "cmmi", "cmmi", "" }, { "cmmib", "cmmi", "" },
-  { "cmsy", "cmsy", "math-cal" }, { "cmbsy", "cmsy", "math-cal" },
-  { "cmex", "cmex", "rubber-cmex" }, { "cmexb", "cmex", "rubber-cmex" },
-  { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
-  { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
-  { "ccmi", "cmmi", "" }, { "xccmi", "cmmi", "" },
-  { "eurm", "cmmi", "" }, { "eurb", "cmmi", "" },
-  { "xccsy", "cmsy", "math-cal" }, { "xccam", "msam", "" },
-  { "xccex", "cmex", "rubber-cmex" }, { "xccbm", "msbm", "math-bbb" },
-  { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
-  { "grmn", "grmn", "math-upgreek" }, { "grxn", "grmn", "math-upgreek" },
-  { "stmary", "stmary", "rubber-stmary" },
-  { "wasy", "wasy", "rubber-wasy" }, { "wasyb", "wasy", "rubber-wasy" },
-  { "", "", "" }
-};
 
 // The Unicode character of the symbol name of an encoding file, or -1.
 // The variants of the big symbols stand for the symbol itself: large-(-1,
@@ -102,75 +81,6 @@ tex_encoding_unicode (string enc, array<int>& table) {
     }
 }
 
-// The Unicode characters of the glyphs of a TeX math font, by position, for
-// the text layer; an empty table for the other fonts, and -1 at a position
-// whose symbol has no single character
-array<int>
-tex_math_unicode (string fontname) {
-  static hashmap<string,array<int> > tables;
-  if (tables->contains (fontname)) return tables[fontname];
-  array<int> table;
-  int k, n= 0;
-  while (n < N(fontname) && is_alpha (fontname[n])) n++;
-  string base= fontname (0, n);
-  // the CB Greek fonts (grmn, grbx, grmi, gttn, gsmn...) have the encoding
-  // of grmn: their text letters, accents and punctuation
-  if (N(base) == 4 && (starts (base, "gr") || starts (base, "gt") ||
-                       starts (base, "gs")))
-    base= "grmn";
-  // the fonts of the pieces of slanted lines and of circles (LaTeX's
-  // picture mode) have no characters: a table of none, rather than their
-  // codes, which are letters (@, P...)
-  if ((base == "line" || base == "linew" || base == "lcircle" ||
-       base == "lcirclew") &&
-      (n == N(fontname) || is_digit (fontname[n]))) {
-    table= array<int> (256);
-    for (int i=0; i<256; i++) table[i]= -1;
-    tables (fontname)= table;
-    return table;
-  }
-  for (k=0; tex_math_encodings[k][0][0] != '\0'; k++)
-    if (base == tex_math_encodings[k][0]) break;
-  if (tex_math_encodings[k][0][0] != '\0' &&
-      n < N(fontname) && is_digit (fontname[n])) {
-    table= array<int> (256);
-    for (int i=0; i<256; i++) table[i]= -1;
-    for (int j=1; j<3; j++)
-      if (tex_math_encodings[k][j][0] != '\0')
-        tex_encoding_unicode (tex_math_encodings[k][j], table);
-    // the larger variants of a symbol follow it in the list of its metric
-    while (n < N(fontname) && is_digit (fontname[n])) n++;
-    string tfm_name= fontname (0, n) * ".tfm";
-    if (tex_font_metric::instances->contains (tfm_name)) {
-      tex_font_metric tfm (tfm_name);
-      for (int c= tfm->bc; c <= tfm->ec && c < 256; c++)
-        if (table[c] >= 0) {
-          int d= c;
-          for (int len=0; len<256 && tfm->tag (d) == 2; len++) {
-            d= tfm->rem (d);
-            if (d < tfm->bc || d > tfm->ec) break;
-            if (table[d] < 0) table[d]= table[c];
-          }
-          // the largest variant may be built from pieces (top, middle,
-          // bottom, repeated): each piece is the delimiter, which is what
-          // a search or a copy of the text expects; Hummus writes no
-          // mapping as the character 0, not as nothing
-          if (d >= tfm->bc && d <= tfm->ec && tfm->tag (d) == 3) {
-            int piece[4]= { tfm->top (d), tfm->mid (d),
-                            tfm->bot (d), tfm->rep (d) };
-            for (int k=0; k<4; k++)
-              if (piece[k] > 0 && piece[k] < 256 && table[piece[k]] < 0)
-                table[piece[k]]= table[c];
-          }
-        }
-    }
-    // see requires_hack_notdef_for_tex_font
-    table[161]= table[0];
-  }
-  tables (fontname)= table;
-  return table;
-}
-
 // the OT1 encoding (and its typewriter variant): the positions of no
 // ASCII character
 static int
@@ -221,82 +131,6 @@ double_struck (int u) {
   return u;
 }
 
-static int
-tex_type3_unicode_sub (string fontname, int c);
-
-int
-tex_type3_unicode (string fontname, int c) {
-  int u= tex_type3_unicode_sub (fontname, c);
-  if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u == 0xfeff || u == 0xfffe ||
-      u > 0x10ffff) u= 0xfffd;
-  return u;
-}
-
-static int
-tex_type3_unicode_sub (string fontname, int c) {
-  // a virtual font of TeXmacs (an emulated symbol): its codes are its own
-  if (search_forwards ("#virtual-", fontname) >= 0 ||
-      search_forwards ("#enhance-", fontname) >= 0) return 0xfffd;
-  // a font of transformed glyphs, name[inner,...]: those of the inner font
-  // (make_bbb: their double-struck forms)
-  int lb= search_forwards ("[", fontname);
-  if (lb > 0 && fontname[N(fontname)-1] == ']') {
-    int end= lb + 1, level= 0;
-    for (; end < N(fontname); end++) {
-      if (fontname[end] == '[') level++;
-      else if (fontname[end] == ']') { if (level == 0) break; level--; }
-      else if (fontname[end] == ',' && level == 0) break;
-    }
-    int u= tex_type3_unicode_sub (fontname (lb + 1, end), c);
-    if (starts (fontname, "make_bbb")) u= double_struck (u);
-    return u;
-  }
-  int u= -1;
-  array<int> table= tex_math_unicode (fontname);
-  if (c >= 0 && c < N(table) && table[c] >= 0) u= table[c];
-  else {
-    int n= 0;
-    while (n < N(fontname) && is_alpha (fontname[n])) n++;
-    string base= fontname (0, n);
-    static const char* ot1[]= {
-      "cmr", "cmbx", "cmsl", "cmti", "cmbxsl", "cmbxti", "cmss", "cmssi",
-      "cmssbx", "cmssdc", "cmcsc", "cmdunh", "cmff", "cmfi", "cmfib",
-      "cminch", "cmb", "ccr", "ccsl", "ccti", "cccsc", "cdr", "cdsl", "cdi",
-      NULL };
-    static const char* tt[]= {
-      "cmtt", "cmsltt", "cmitt", "cmvtt", "cmtcsc", NULL };
-    bool is_ot1= false, is_tt= false;
-    for (int i=0; ot1[i] != NULL; i++) if (base == ot1[i]) is_ot1= true;
-    for (int i=0; tt[i] != NULL; i++) if (base == tt[i]) is_tt= true;
-    if (N(table) > 0) u= 0xfffd;   // (a code of no character in the table)
-    else if (starts (base, "ec") || starts (base, "eo") ||
-             starts (base, "pn")) u= tex_glyph_unicode (c, false);
-    else if (is_ot1 || is_tt) u= tex_ot1_unicode (c, is_tt);
-    // a font loaded by FreeType (Name.k:size.dpitt): its codes are Unicode
-    // if it is TrueType or OpenType; a Type 1 font (a TeX font: the Adobe
-    // ec fonts, the T2A fonts...) has those of its encoding
-    else if (N(fontname) >= 3 && ends (fontname, "tt") &&
-             is_digit (fontname[N(fontname)-3]) &&
-             search_forwards (":", fontname) >= 0) {
-      string fam= fontname (0, search_forwards (":", fontname));
-      int dot= search_forwards (".", fam);
-      if (dot > 0) fam= fam (0, dot);
-      url f= tt_font_find (fam);
-      string sf= (is_none (f)? string (""): locase_all (suffix (f)));
-      if (sf == "pfb" || sf == "pfa") {
-        if (is_t2a_font_file (f)) u= tex_glyph_unicode (c, true);
-        // (the Adobe ec fonts, times-rm..., have no size: Cork)
-        else if (N(fam) > 0 && !is_digit (fam[N(fam)-1]))
-          u= tex_glyph_unicode (c, false);
-        else u= 0xfffd;
-      }
-      else u= c;
-    }
-    else u= 0xfffd;
-  }
-  return u;
-}
-
 // The Unicode character of the glyph at position ch of a TeX font in the
 // Cork encoding (the EC fonts) or the T2A encoding (the Cyrillic fonts),
 // for the text layer: the positions are not Unicode code points, and
@@ -324,19 +158,112 @@ tex_glyph_unicode (int ch, bool t2a) {
   return t2a? t2a_table[ch]: cork_table[ch];
 }
 
-// Whether the font file u is a Cyrillic TeX font in the T2A encoding: the LH
-// fonts of TeXmacs (fonts/type1/la) and the T2A fonts of cm-super are named
-// la + two letters for the shape + the size in hundredths of a point
-// (larm1000, larm700, labx1728, larm0500). Other TeX fonts begin with la
-// too: lasy10 and lasyb10 (the LaTeX symbols), which are not in T2A.
-bool
-is_t2a_font_file (url u) {
-  if (suffix (u) != "pfb") return false;
-  string s= basename (u);
-  int n= N(s);
-  if (n < 7 || n > 8 || !starts (s, "la")) return false;
-  if (!is_alpha (s[2]) || !is_alpha (s[3])) return false;
-  for (int i= 4; i < n; i++)
-    if (!is_digit (s[i])) return false;
-  return true;
+// The Adobe standard encoding (the raw PostScript fonts of TeX, rptmr...):
+// ASCII, but for the quotes, and above it the letters and accents which
+// TeXmacs draws in them (tex_font.cpp, ADOBE_accents)
+static int
+tex_adobe_unicode (int c) {
+  static const int high[96]= {
+    -1, 0xA1, 0xA2, 0xA3, 0x2044, 0xA5, 0x192, 0xA7,
+    0xA4, 0x27, 0x201C, 0xAB, 0x2039, 0x203A, 0xFB01, 0xFB02,
+    -1, 0x2013, 0x2020, 0x2021, 0xB7, -1, 0xB6, 0x2022,
+    0x201A, 0x201E, 0x201D, 0xBB, 0x2026, 0x2030, -1, 0xBF,
+    -1, 0x60, 0xB4, 0x2C6, 0x2DC, 0xAF, 0x2D8, 0x2D9,
+    0xA8, -1, 0x2DA, 0xB8, -1, 0x2DD, 0x2DB, 0x2C7,
+    0x2014, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, 0xC6, -1, 0xAA, -1, -1, -1, -1,
+    0x141, 0xD8, 0x152, 0xBA, -1, -1, -1, -1,
+    -1, 0xE6, -1, -1, -1, 0x131, -1, -1,
+    0x142, 0xF8, 0x153, 0xDF, -1, -1, -1, -1 };
+  if (c == 0x27) return 0x2019;
+  if (c == 0x60) return 0x2018;
+  if (c >= 0x20 && c < 0x7f) return c;
+  if (c >= 0xa0 && c <= 0xff) return high[c - 0xa0];
+  return -1;
+}
+
+array<int>
+tex_encoding_table (string encoding, string metric, bool text) {
+  static hashmap<string,array<int> > tables;
+  if (encoding == "" || encoding == "unicode" || encoding == "mixed" ||
+      starts (encoding, "bbb:")) return array<int> ();
+  string key= encoding * "@" * metric * (text? "": "@symbols");
+  if (tables->contains (key)) return tables[key];
+  array<int> table (256);
+  for (int c=0; c<256; c++) table[c]= -1;
+  bool any= false, symbols= false;
+  int i= 0, n= N(encoding);
+  while (i < n) {
+    int j= i;
+    while (j < n && encoding[j] != '+') j++;
+    string e= encoding (i, j);
+    i= j + 1;
+    if (e == "t2a" || (text && e == "cork")) {
+      for (int c=0; c<256; c++)
+        if (table[c] < 0) table[c]= tex_glyph_unicode (c, e == "t2a");
+      any= true;
+    }
+    else if (text && (e == "ot1" || e == "ot1-tt")) {
+      for (int c=0; c<128; c++)
+        if (table[c] < 0) table[c]= tex_ot1_unicode (c, e == "ot1-tt");
+      any= true;
+    }
+    else if (text && e == "adobe") {
+      for (int c=0; c<256; c++)
+        if (table[c] < 0) table[c]= tex_adobe_unicode (c);
+      any= true;
+    }
+    else if (e != "cork" && e != "ot1" && e != "ot1-tt" && e != "adobe") {
+      tex_encoding_unicode (e, table);
+      any= symbols= true;
+    }
+  }
+  if (!any) table= array<int> ();
+  else if (symbols && metric != "" &&
+           tex_font_metric::instances->contains (metric)) {
+    // the larger variants of a symbol follow it in the list of its metric
+    tex_font_metric tfm (metric);
+    for (int c= tfm->bc; c <= tfm->ec && c < 256; c++)
+      if (table[c] >= 0) {
+        int d= c;
+        for (int len=0; len<256 && tfm->tag (d) == 2; len++) {
+          d= tfm->rem (d);
+          if (d < tfm->bc || d > tfm->ec) break;
+          if (table[d] < 0) table[d]= table[c];
+        }
+        // the largest variant may be built from pieces (top, middle,
+        // bottom, repeated): each piece is the delimiter, which is what
+        // a search or a copy of the text expects
+        if (d >= tfm->bc && d <= tfm->ec && tfm->tag (d) == 3) {
+          int piece[4]= { tfm->top (d), tfm->mid (d),
+                          tfm->bot (d), tfm->rep (d) };
+          for (int k=0; k<4; k++)
+            if (piece[k] > 0 && piece[k] < 256 && table[piece[k]] < 0)
+              table[piece[k]]= table[c];
+        }
+      }
+  }
+  // (code 161 of a TeX font of no character there is the glyph of code 0,
+  // see requires_hack_notdef_for_tex_font)
+  if (N(table) > 161 && table[161] < 0) table[161]= table[0];
+  tables (key)= table;
+  return table;
+}
+
+int
+tex_encoding_char (string encoding, string metric, int c) {
+  int u;
+  if (starts (encoding, "bbb:")) {
+    u= tex_encoding_char (encoding (4, N(encoding)), metric, c);
+    if (u != 0xfffd) u= double_struck (u);
+  }
+  else if (encoding == "unicode") u= c;
+  else {
+    array<int> table= tex_encoding_table (encoding, metric, true);
+    u= (c >= 0 && c < N(table) && table[c] >= 0)? table[c]: 0xfffd;
+  }
+  if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u == 0xfeff || u == 0xfffe ||
+      u > 0x10ffff) u= 0xfffd;
+  return u;
 }

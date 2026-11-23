@@ -163,9 +163,19 @@ struct font_metric_rep: rep<font_metric> {
 
 struct font_glyphs_rep: rep<font_glyphs> {
   bool bad_font_glyphs; // when font glyphs could not be loaded
+  // what the codes of the glyphs stand for, said by the fonts which draw
+  // them (for the text of a PDF): a list of encodings joined by "+" (the
+  // .enc files of TeXmacs, cork, ot1, ot1-tt, adobe, unicode), the first
+  // giving a code its character; "" when unknown; and the TeX metric of
+  // the glyphs (cmex10.tfm), whose larger variants are those of a symbol
+  string encoding;
+  string metric;
   font_glyphs_rep (string name);
   virtual ~font_glyphs_rep ();
   virtual glyph& get (int char_code) = 0;
+  void add_encoding (string enc);
+  virtual string get_encoding ();   // (a transformation: its font's)
+  virtual string get_metric ();
 };
 
 font_metric std_font_metric (string s, metric* fnm, int bc, int ec);

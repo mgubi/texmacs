@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "bitmap_font.hpp"
+#include "analyze.hpp"
 
 RESOURCE_CODE(font_metric);
 RESOURCE_CODE(font_glyphs);
@@ -75,6 +76,48 @@ font_glyphs_rep::font_glyphs_rep (string name):
 
 font_glyphs_rep::~font_glyphs_rep () {
   FAILED ("not yet implemented"); }
+
+// (the encodings of a list in a fixed order, whatever order the fonts were
+// loaded in: by name, those of the letters as themselves, alphanum, last,
+// so that a glyph drawn as a letter of a style and as a symbol, the
+// Fraktur A of eufm, is the symbol)
+static bool
+encoding_before (string a, string b) {
+  bool la= starts (a, "alphanum"), lb= starts (b, "alphanum");
+  if (la != lb) return lb;
+  return a < b;
+}
+
+void
+font_glyphs_rep::add_encoding (string enc) {
+  if (N(enc) == 0 || encoding == "mixed") return;
+  array<string> list;
+  int i= 0, n= N(encoding);
+  while (i < n) {
+    int j= i;
+    while (j < n && encoding[j] != '+') j++;
+    list << encoding (i, j);
+    i= j + 1;
+  }
+  for (i=0; i<N(list); i++)
+    if (list[i] == enc) return;
+  // (the same glyphs drawn as Unicode and as positions: the codes say
+  // nothing)
+  if (N(list) > 0 && (enc == "unicode" || encoding == "unicode")) {
+    encoding= "mixed";
+    return;
+  }
+  list << copy (enc);
+  for (i=N(list)-1; i>0 && encoding_before (list[i], list[i-1]); i--) {
+    string t= list[i]; list[i]= list[i-1]; list[i-1]= t; }
+  // (a new string: << would change one shared with a caller)
+  string r;
+  for (i=0; i<N(list); i++) r= (i == 0? list[i]: r * "+" * list[i]);
+  encoding= r;
+}
+
+string font_glyphs_rep::get_encoding () { return encoding; }
+string font_glyphs_rep::get_metric () { return metric; }
 
 /******************************************************************************
 * Standard bitmap fonts

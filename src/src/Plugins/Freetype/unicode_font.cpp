@@ -219,6 +219,7 @@ unicode_font_rep::unicode_font_rep (string name,
   fnm = tt_font_metric (family, size, std_dpi, (std_dpi * vdpi) / hdpi);
   fng = tt_font_glyphs (family, size, hdpi, vdpi);
   color_font= tt_color_font (fng);
+  fng->add_encoding ("unicode");   // (the codes drawn are Unicode)
   if (fnm->bad_font_metric || fng->bad_font_glyphs) {
     fnm= std_font_metric (res_name, NULL, 0, -1);
     fng= std_font_glyphs (res_name, NULL, 0, -1);

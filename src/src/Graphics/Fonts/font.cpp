@@ -479,6 +479,11 @@ font_rep::get_glyph (string s) {
   return glyph (0, 0, 0, 0);
 }
 
+void
+font_rep::add_glyph_encoding (string enc) {
+  (void) enc;
+}
+
 int
 font_rep::index_glyph (string s, font_metric& fnm, font_glyphs& fng) {
   (void) fnm; (void) fng;

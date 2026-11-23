@@ -139,10 +139,30 @@ OBJR name them by the ids allocated when they were met. It writes a
 their glyphs: in a tagged PDF it writes none (`hummus_write_cidset`, in
 the vendored `DescendentFontWriter.cpp`), which PDF/UA allows.
 
-**Fonts.** PDF/UA wants a Unicode value for every glyph drawn. The TeX
-fonts take theirs from their encodings (`tex_math_unicode`: the math
-fonts, and the CB Greek fonts, `grmn.enc`), a TeX font of no table in a
-tagged PDF from the names of its glyphs; a glyph of no character in the
+**Fonts.** PDF/UA wants a Unicode value for every glyph drawn. The
+glyphs of a font (`font_glyphs_rep`) carry the encoding their codes are in
+(`encoding`, with the TeX metric, `metric`), said by the fonts which draw
+through them, not guessed from a name: a TeX text font by its kind (`ec`:
+Cork; `cm`: OT1, typewriter apart; `la`: the T2A of `larm.enc`; `gr`:
+`grmn.enc`; `adobe`: the Adobe standard encoding), a compound font by the
+`.enc` file of the charmap of the entry (`cmmi`, `math-cal`...), a math
+font by the section of its translator (`[cmmi]` of `math.enc`), a TeX
+rubber font by its translator (`rubber-cmex`), a Unicode font as
+`unicode`; the transformations of glyphs (`slanted`, `bolden`, the
+effects...) have those of their font, `make_bbb` the double-struck forms
+(`bbb:`), the poor fonts pass them to their base. A list is kept in one order
+(by name, `alphanum`, the letters as themselves, last), so that a glyph
+drawn both as a letter of a style and as a symbol (the Euler letters and
+the Fraktur symbols, both of eufm) is the symbol whatever the document
+drew first. A TeX font used as a text font itself (`Bbb*`, `tex bbm`)
+has no encoding: embedded, the names of its glyphs (the letters typed);
+drawn as Type 3, U+FFFD. The table of an
+encoding (`tex_encoding_table`, `Plugins/Metafont/tex_unicode.cpp`) is
+that of the same `.enc` files the typesetter draws with, the larger
+variants of a symbol (after the lists of the metric) standing for it. A
+TeX font embedded as Type 1 takes its map from the table of a math or
+T2A encoding, a text font from the names of its glyphs; in a tagged PDF,
+a glyph of no character in the
 table, or drawn by its number (the variants of the OpenType math fonts,
 #943), has the character the font maps to it, else that of its name
 (uXXXX of hexadecimal digits only; uniXXXXYYYY of the ligatures ff, fi,
@@ -154,23 +174,16 @@ the one the font maps to the glyph of the name before the dot; never one
 of a private use area; only those of none (the pieces of the horizontal
 braces of cmex, the bar of mapsto of cmsy) are U+FFFD (a code of a
 TeX font, by PDFHummus, is turned into its glyph of FreeType first:
-the encoding of the font numbers its glyphs; code 161 of a TeX math font
-is the glyph of code 0, `requires_hack_notdef`; of the map FreeType makes
+the encoding of the font numbers its glyphs; code 161 of a TeX font of no
+character there is the glyph of code 0, `requires_hack_notdef`; of the map
+FreeType makes
 of the names of a Type 1 font, the entries of aNN names are left out; of
 two characters of a glyph, the one of no compatibility block: 文, not
-the Kangxi radical ⽂). The fonts of the pieces of lines and circles
-(line10, lcircle10) have a table of no characters: U+FFFD, not their
-codes. A font drawn as Type 3 maps its codes (`tex_type3_unicode`): a
-virtual font of TeXmacs (`#virtual-`, `#enhance-`: the emulated symbols)
-to U+FFFD; a font of transformed glyphs (`make_bbb[...]`, `extended`,
-the font effects) through its inner font (make_bbb: the double-struck
-letters); a TeX font through its table (Concrete math: those of cmmi,
-cmsy, msam, cmex, msbm; Euler: cmmi), as Cork (the ec fonts, Pandora),
-as OT1 (cm, Concrete and Duerer text; typewriter apart); a font loaded
-by FreeType (`Name:size.dpitt`): a TrueType or OpenType one (GillSans,
-the keycaps of LucidaGrande) its codes, which are Unicode, a Type 1 one
-those of its encoding (the Adobe ec fonts, times-rm...: Cork; the T2A
-fonts), else U+FFFD; another to U+FFFD; never to a control. The vendored
+the Kangxi radical ⽂). A font drawn as Type 3 maps its codes
+(`tex_encoding_char`) through the table of its encoding, Unicode as
+themselves; a code of no character, and the glyphs of no encoding (the
+virtual fonts of TeXmacs, `#virtual-`, `#enhance-`: the emulated symbols;
+the pieces of lines and circles), to U+FFFD; never to a control. The vendored
 PDFHummus maps the glyph 0 of a simple font too (a symbol of stmary10 or
 wasy10, which it took for .notdef), and never to 0. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.

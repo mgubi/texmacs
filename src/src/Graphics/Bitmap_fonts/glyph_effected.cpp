@@ -131,6 +131,8 @@ struct effected_font_glyphs_rep: public font_glyphs_rep {
   hashmap<int,glyph> gs;
   effected_font_glyphs_rep (string name, font_glyphs fng2, effect e2):
     font_glyphs_rep (name), fng (fng2), eff (e2), gs (error_glyph) {}
+  string get_encoding () { return fng->get_encoding (); }
+  string get_metric () { return fng->get_metric (); }
   glyph& get (int c) {
     glyph& orig (fng->get (c));
     if ((&orig != &error_glyph) && !gs->contains (c))

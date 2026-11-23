@@ -101,8 +101,11 @@ struct pdf_font_item {
   font_glyphs fn;      // for a Type 3 font: where the bitmaps come from
   int      chunk;      // ... and which 256 characters of it this is
   string   path;       // the file the program was read from (for subsetting)
-  string   tex_name;   // the TeX font (cmex10...) whose positions the codes
-                       // are, for the characters of the text layer
+  string   tex_name;   // the TeX font (cmex10...) of the program
+  font_glyphs enc;     // the glyphs whose encoding (font_glyphs_rep::encoding)
+                       // the codes are in, for the characters of the text
+                       // layer (read when the fonts are written: a font
+                       // loaded later may still give it one)
   array<int> gid;      // 256 entries: the glyph TeXmacs asked for, -1 if free
   // the letters a ligature glyph stands for, by the code (a simple font)
   // or the glyph (a CID font) it is written with; "" for a glyph which is
@@ -991,10 +994,13 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
   if (N(key) > 0 && font_by_file->contains (key)) {
     int k= font_by_file (key);
     font_index (name)= k;
+    if (is_nil (font_list[k].enc) || font_list[k].enc->get_encoding () == "")
+      font_list[k].enc= fn;
     return k;
   }
   pdf_font_item it;
   it.num= N(font_list);
+  it.enc= fn;
   if (!is_none (u)) {
     c_string path (concretize (u));
     fz_font* f= NULL;
@@ -1495,13 +1501,14 @@ mupdf_pdf_renderer_rep::glyph_name_unicode (pdf_font_item& it, int gid) {
 void
 mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
                                               int last, array<string>& gname) {
+  // (the table of the encoding which the fonts drawing it gave it: a math
+  // font; T2A, whose fonts name their glyphs after the Latin-1 letters at
+  // the same positions, a reader taking å for е; a text font goes by the
+  // names of its glyphs)
   array<int> tex;
-  if (is_t2a_font_file (url_system (it.path))) {
-    // the Cyrillic fonts name their glyphs after the Latin-1 letters at
-    // the same positions: a reader took å for е
-    for (int c=0; c<256; c++) tex << tex_glyph_unicode (c, true);
-  }
-  else tex= tex_math_unicode (it.tex_name);
+  if (!is_nil (it.enc))
+    tex= tex_encoding_table (it.enc->get_encoding (), it.enc->get_metric (),
+                             false);
   if (N(tex) == 0 && tagger != NULL) {
     // a tagged PDF maps every code used (PDF/UA): those of a font of no
     // table after the names of their glyphs, which a reader would read,
@@ -1728,8 +1735,9 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
        << "1 begincodespacerange <" << as_hexadecimal (first, 2)
        << "> <" << as_hexadecimal (last, 2) << "> endcodespacerange\n";
   // (the glyphs of a TeX math font are positions: their characters come
-  // from the encoding of the font, see tex_math_unicode)
-  array<int> tex= tex_math_unicode (it.tex_name);
+  // from the encoding of the font, see tex_encoding_table)
+  array<int> tex= tex_encoding_table (it.fn->get_encoding (),
+                                      it.fn->get_metric (), false);
   int nused= 0;
   for (int c=first; c<=last; c++) if (it.gid[c] >= 0) nused++;
   int done= 0;
@@ -1737,8 +1745,9 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
     if (it.gid[c] >= 0) {
       int u= it.gid[c];
       // (a tagged PDF: the character of the code, in the encoding of the
-      // font, never a control, PDF/UA; tex_type3_unicode)
-      if (tagger != NULL) u= tex_type3_unicode (it.tex_name, u);
+      // font, never a control, PDF/UA; tex_encoding_char)
+      if (tagger != NULL)
+        u= tex_encoding_char (it.fn->get_encoding (), it.fn->get_metric (), u);
       else if (u >= 0 && u < N(tex) && tex[u] >= 0) u= tex[u];
       // (at most 100 entries in a block)
       if (done % 100 == 0)

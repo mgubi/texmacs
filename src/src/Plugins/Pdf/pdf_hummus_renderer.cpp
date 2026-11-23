@@ -133,7 +133,6 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   hashmap<string,PDFUsedFont*> native_fonts;
   hashset<string> not_native_fonts;
   hashset<string> EuropeanComputerModern_fonts;
-  hashset<string> T2A_fonts;
   hashmap<string,pdf_raw_image> pdf_glyphs;
   hashmap<tree,pdf_image> image_pool;
   array<pdf_image> graft_images;     // the uses of grafted pictures
@@ -1604,7 +1603,7 @@ t3font_rep::write_definition (int& registry_id) {
       if (k % 100 == 0)
         cmap << as_string (min (100, nall - k)) << " beginbfchar\r\n";
       int g= t3font_get_global_glyph (lch, font_chunk, fn->res_name);
-      int u= tex_type3_unicode (fn->res_name, g);
+      int u= tex_encoding_char (fn->get_encoding (), fn->get_metric (), g);
       string hex;
       if (u > 0xffff) {
         int v= u - 0x10000;
@@ -1730,8 +1729,6 @@ pdf_hummus_renderer_rep::make_pdf_font (string fontname)
       string ps_name (_ps_name.c_str ());
       if (starts (ps_name, "EuropeanComputerModern"))
 	EuropeanComputerModern_fonts->insert (fontname);
-      if (is_t2a_font_file (u))
-	T2A_fonts->insert (fontname);
       return;
     }
     else {
@@ -1939,10 +1936,11 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
         int uc= code;
         if (EuropeanComputerModern_fonts->contains (cfn))
           uc= tex_glyph_unicode (ch, false);
-        else if (T2A_fonts->contains (cfn))
-          uc= tex_glyph_unicode (ch, true);
         else if (!by_number) {
-          array<int> table= tex_math_unicode (cfn);
+          // (the table of the encoding the fonts which draw it gave it:
+          // a math font, T2A; a text font goes by the names of its glyphs)
+          array<int> table=
+            tex_encoding_table (fn->get_encoding (), fn->get_metric (), false);
           if (ch >= 0 && ch < N(table) && table[ch] >= 0) uc= table[ch];
           // a tagged PDF: a code of no character in the table (a font of
           // none: stmary, wasy), the character of its glyph, as a reader

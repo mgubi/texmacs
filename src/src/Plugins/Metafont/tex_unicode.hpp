@@ -13,26 +13,23 @@
 #define TEX_UNICODE_H
 #include "string.hpp"
 #include "array.hpp"
-#include "url.hpp"
 
-// The Unicode characters of the glyphs of a TeX math font (cmmi10, cmex10,
-// msbm10...), by position, for the text layer of a PDF: an empty table for
-// the other fonts, and -1 at a position whose symbol has no single character.
-// The larger variants of a symbol (in cmex) stand for the symbol.
-array<int> tex_math_unicode (string fontname);
+// The characters of the codes of a font of glyphs in the given encoding
+// (font_glyphs_rep::encoding: the .enc files of TeXmacs joined by "+",
+// cork, t2a, ot1, ot1-tt, adobe), by position, for the text layer of a PDF;
+// -1 at a code of no single character, the larger variants of a symbol
+// (after the TeX metric, cmex10.tfm) standing for the symbol. An empty
+// table for no encoding, and for the text encodings (cork, ot1, adobe)
+// unless text holds, a reader then going by the names of the glyphs.
+array<int> tex_encoding_table (string encoding, string metric, bool text);
 
 // The Unicode character of the glyph at position ch of a TeX font in the
 // Cork encoding (the EC fonts), or in T2A (the Cyrillic LH fonts)
 int tex_glyph_unicode (int ch, bool t2a);
 
-// Whether the font file u is a Cyrillic TeX font in the T2A encoding
-bool is_t2a_font_file (url u);
-
-// The character of position c of a TeX font drawn as Type 3 (a Metafont
-// font, a virtual font of TeXmacs), for a tagged PDF: of its table
-// (tex_math_unicode), of the Cork encoding (the ec fonts, Pandora), of OT1
-// (cm, Concrete and Duerer text, typewriter apart); U+FFFD for another
-// font (the emulated symbols) and for a control
-int tex_type3_unicode (string fontname, int c);
+// The character of code c of a font of glyphs in the given encoding (its
+// table, Unicode, the double-struck forms of bbb:...), for a tagged PDF;
+// U+FFFD for a code of no character, of no encoding, and for a control
+int tex_encoding_char (string encoding, string metric, int c);
 
 #endif // TEX_UNICODE_H
