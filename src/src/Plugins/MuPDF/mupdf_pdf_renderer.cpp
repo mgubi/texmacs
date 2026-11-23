@@ -1732,20 +1732,23 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
   array<int> tex= tex_math_unicode (it.tex_name);
   int nused= 0;
   for (int c=first; c<=last; c++) if (it.gid[c] >= 0) nused++;
-  cmap << as_string (nused) << " beginbfchar\n";
+  int done= 0;
   for (int c=first; c<=last; c++)
     if (it.gid[c] >= 0) {
       int u= it.gid[c];
-      if (u >= 0 && u < N(tex) && tex[u] >= 0) u= tex[u];
-      // (a tagged PDF: a text font of no table is of the OT1 encoding,
-      // and no position is a control, PDF/UA)
-      else if (tagger != NULL) u= tex_ot1_unicode (u);
-      if (tagger != NULL && (u < 0x20 || u == 0xfeff || u == 0xfffe))
-        u= 0xfffd;
+      // (a tagged PDF: the character of the code, in the encoding of the
+      // font, never a control, PDF/UA; tex_type3_unicode)
+      if (tagger != NULL) u= tex_type3_unicode (it.tex_name, u);
+      else if (u >= 0 && u < N(tex) && tex[u] >= 0) u= tex[u];
+      // (at most 100 entries in a block)
+      if (done % 100 == 0)
+        cmap << as_string (min (100, nused - done)) << " beginbfchar\n";
       cmap << "<" << as_hexadecimal (c, 2) << "> <"
            << utf16_hex (u) << ">\n";
+      done++;
+      if (done % 100 == 0 || done == nused) cmap << "endbfchar\n";
     }
-  cmap << "endbfchar\nendcmap CMapName currentdict /CMap defineresource "
+  cmap << "endcmap CMapName currentdict /CMap defineresource "
        << "pop end end\n";
 
   fz_try (ctx) {

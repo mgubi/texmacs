@@ -26,6 +26,7 @@ static const char* tex_math_encodings[][3]= {
   { "cmex", "cmex", "rubber-cmex" }, { "cmexb", "cmex", "rubber-cmex" },
   { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
   { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
+  { "ccmi", "cmmi", "" }, { "xccmi", "cmmi", "" },
   { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
   { "grmn", "grmn", "math-upgreek" }, { "grxn", "grmn", "math-upgreek" },
   { "stmary", "stmary", "rubber-stmary" },
@@ -166,16 +167,68 @@ tex_math_unicode (string fontname) {
   return table;
 }
 
-int
-tex_ot1_unicode (int c) {
+// the OT1 encoding (and its typewriter variant): the positions of no
+// ASCII character
+static int
+tex_ot1_unicode (int c, bool tt) {
   static const int low[32]= {
     0x393, 0x394, 0x398, 0x39B, 0x39E, 0x3A0, 0x3A3, 0x3A5,
     0x3A6, 0x3A8, 0x3A9, 0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04,
     0x131, 0x237, 0x60, 0xB4, 0x2C7, 0x2D8, 0xAF, 0x2DA,
     0xB8, 0xDF, 0xE6, 0x153, 0xF8, 0xC6, 0x152, 0xD8 };
-  if (c >= 0 && c < 32) return low[c];
-  if (c < 0 || c > 0x10ffff) return 0xfffd;
-  return c;
+  if (c < 0 || c > 0x7f) return 0xfffd;
+  if (tt) {
+    // (cmtt: arrows, quote, ¡ ¿ at 0x0B-0x0F, ASCII above)
+    static const int ttlow[5]= { 0x2191, 0x2193, 0x27, 0xA1, 0xBF };
+    if (c >= 0x0b && c <= 0x0f) return ttlow[c - 0x0b];
+    if (c < 32) return low[c];
+    return c;
+  }
+  if (c < 32) return low[c];
+  switch (c) {
+  case 0x22: return 0x201D;
+  case 0x3C: return 0xA1;
+  case 0x3E: return 0xBF;
+  case 0x5C: return 0x201C;
+  case 0x5E: return 0x2C6;
+  case 0x5F: return 0x2D9;
+  case 0x7B: return 0x2013;
+  case 0x7C: return 0x2014;
+  case 0x7D: return 0x2DD;
+  case 0x7E: return 0x2DC;
+  case 0x7F: return 0xA8;
+  default: return c;
+  }
+}
+
+int
+tex_type3_unicode (string fontname, int c) {
+  int u= -1;
+  array<int> table= tex_math_unicode (fontname);
+  if (c >= 0 && c < N(table) && table[c] >= 0) u= table[c];
+  else {
+    int n= 0;
+    while (n < N(fontname) && is_alpha (fontname[n])) n++;
+    string base= fontname (0, n);
+    static const char* ot1[]= {
+      "cmr", "cmbx", "cmsl", "cmti", "cmbxsl", "cmbxti", "cmss", "cmssi",
+      "cmssbx", "cmssdc", "cmcsc", "cmdunh", "cmff", "cmfi", "cmfib",
+      "cminch", "cmb", "ccr", "ccsl", "ccti", "cccsc", "cdr", "cdsl", "cdi",
+      NULL };
+    static const char* tt[]= {
+      "cmtt", "cmsltt", "cmitt", "cmvtt", "cmtcsc", NULL };
+    bool is_ot1= false, is_tt= false;
+    for (int i=0; ot1[i] != NULL; i++) if (base == ot1[i]) is_ot1= true;
+    for (int i=0; tt[i] != NULL; i++) if (base == tt[i]) is_tt= true;
+    if (N(table) > 0) u= 0xfffd;   // (a code of no character in the table)
+    else if (starts (base, "ec") || starts (base, "eo") ||
+             starts (base, "pn")) u= tex_glyph_unicode (c, false);
+    else if (is_ot1 || is_tt) u= tex_ot1_unicode (c, is_tt);
+    else u= 0xfffd;
+  }
+  if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u == 0xfeff || u == 0xfffe ||
+      u > 0x10ffff) u= 0xfffd;
+  return u;
 }
 
 // The Unicode character of the glyph at position ch of a TeX font in the

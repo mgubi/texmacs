@@ -154,12 +154,16 @@ the one the font maps to the glyph of the name before the dot; never one
 of a private use area; only those of none (the pieces of the horizontal
 braces of cmex, the bar of mapsto of cmsy) are U+FFFD (a code of a
 TeX font, by PDFHummus, is turned into its glyph of FreeType first:
-the encoding of the font numbers its glyphs; code 161 is the glyph of
-code 0, `requires_hack_notdef`; the map FreeType makes of the names of a
-Type 1 font is not read; of two characters of a glyph, the one of no
-compatibility block: 文, not the Kangxi radical ⽂). The fonts of the
-pieces of lines and circles (line10, lcircle10) have a table of no
-characters: U+FFFD, not their codes. The vendored
+the encoding of the font numbers its glyphs; code 161 of a TeX math font
+is the glyph of code 0, `requires_hack_notdef`; of the map FreeType makes
+of the names of a Type 1 font, the entries of aNN names are left out; of
+two characters of a glyph, the one of no compatibility block: 文, not
+the Kangxi radical ⽂). The fonts of the pieces of lines and circles
+(line10, lcircle10) have a table of no characters: U+FFFD, not their
+codes. A font drawn as Type 3 (a Metafont font, an emulated symbol)
+maps its codes through its table, as Cork (the ec fonts, Pandora), as
+OT1 (cm, Concrete and Duerer text; typewriter apart), else to U+FFFD
+(`tex_type3_unicode`); never to a control. The vendored
 PDFHummus maps the glyph 0 of a simple font too (a symbol of stmary10 or
 wasy10, which it took for .notdef), and never to 0. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.

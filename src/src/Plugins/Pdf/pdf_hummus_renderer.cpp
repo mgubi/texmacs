@@ -1596,17 +1596,25 @@ t3font_rep::write_definition (int& registry_id) {
   if (hummus_tagged_type3) {
     // a tagged PDF: the character of each code, not the code of the TeX
     // font (through its table, or as OT1), none a control (PDF/UA)
-    array<int> table= tex_math_unicode (fn->res_name);
-    cmap << as_string (lastchar - firstchar + 1) << " beginbfchar\r\n";
+    // (at most 100 entries in a block; a character beyond U+FFFF as
+    // its surrogates)
+    int nall= lastchar - firstchar + 1;
     for (int lch= firstchar; lch <= lastchar; lch++) {
+      int k= lch - firstchar;
+      if (k % 100 == 0)
+        cmap << as_string (min (100, nall - k)) << " beginbfchar\r\n";
       int g= t3font_get_global_glyph (lch, font_chunk, fn->res_name);
-      int u= (g >= 0 && g < N(table) && table[g] >= 0)? table[g]:
-             tex_ot1_unicode (g);
-      if (u < 0x20 || u == 0xfeff || u == 0xfffe || u > 0xffff) u= 0xfffd;
-      cmap << "\t<" << as_hexadecimal (lch, 2) << "> <"
-           << as_hexadecimal (u, 4) << ">\r\n";
+      int u= tex_type3_unicode (fn->res_name, g);
+      string hex;
+      if (u > 0xffff) {
+        int v= u - 0x10000;
+        hex= as_hexadecimal (0xd800 + (v >> 10), 4) *
+             as_hexadecimal (0xdc00 + (v & 0x3ff), 4);
+      }
+      else hex= as_hexadecimal (u, 4);
+      cmap << "\t<" << as_hexadecimal (lch, 2) << "> <" << hex << ">\r\n";
+      if ((k + 1) % 100 == 0 || k + 1 == nall) cmap << "endbfchar\r\n";
     }
-    cmap << "endbfchar\r\n";
   }
   else {
   cmap << "1 beginbfrange\r\n";
