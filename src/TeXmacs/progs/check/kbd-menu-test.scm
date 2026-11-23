@@ -619,6 +619,10 @@
       (check= (kbd-find-inv-binding '(insert "bee")) "A-F12 A-F12 b")))
   ;; the modeless reverse binding, as the documentation shows it
   (check= (kbd-find-rev-binding "(insert \"bee\")") "A-F12 A-F12 b")
+  ;; a command which Scheme cannot read ("|" on Chez) is found as it is, or
+  ;; not at all, without an error (#947)
+  (check-true (string? (kbd-find-rev-binding "|")))
+  (check-false (kbd-find-rev-binding "(unbalanced"))
   ;; removing them
   (kbd-unmap
     (:mode in-text?)

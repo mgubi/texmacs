@@ -25,6 +25,11 @@ have the details, and the problems go to the
   `graphics-wheel`, a function given as a mode). The mode now exists, and
   the keys of the documentation of the developers no longer use a variable
   as a mode (#947).
+- **Chez Scheme: no error traces when the User Manual is built** (builds
+  with Chez): the shortcut `|` shown in the manual (keyboard of the large
+  delimiters) could not be read as a command by Chez, and each pass of the
+  manual printed an error; a command is now first looked up as it is
+  (#947).
 
 ## 22 November 2026
 

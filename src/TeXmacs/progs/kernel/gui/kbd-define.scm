@@ -163,7 +163,14 @@
   (cond ((tree? cmd)
 	 (kbd-find-rev-binding (tree->stree cmd)))
 	((string? cmd)
-	 (with l (kbd-get-rev (object->string (string->object cmd)))
+	 ;; the command as it is first: a string which Scheme cannot read,
+	 ;; such as "|" on Chez (<shortcut|\|> in the manual), is a key
+	 ;; binding of a string (#947)
+	 (with l (or (kbd-get-rev cmd)
+		     (catch #t
+		       (lambda ()
+			 (kbd-get-rev (object->string (string->object cmd))))
+		       (lambda args #f)))
 	   (and l (nnull? l) (string? (car l)) (string->tmstring (car l)))))
 	(else #f)))
 
