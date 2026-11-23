@@ -1734,6 +1734,25 @@
   (check= (string-deletion 'lua-code '("x = \"a\\\\\"") 0 9 #f) '(0 4 0 9))
   (check= (string-deletion 'rust-code '("let x = r\"a\\\";") 0 13 #f) '(0 8 0 13))
   (check= (string-deletion 'toml-code '("a = 'C:\\'") 0 9 #f) '(0 4 0 9))
+  ;; where \ escapes the quote: in every string of Julia (r"...", raw"...",
+  ;; string macros), in '...' of Lua and $'...' of Bash; not in the raw
+  ;; strings of Lean, the `...` of Go, the '...' of Bash
+  (let ((l '("x = r\"ab\\\"")))
+    (check= (string-deletion 'julia-code l 0 10 #f) #f)
+    (check= (string-deletion 'julia-code l 0 5 #t) #f))
+  (let ((l '("x = raw\"ab\\\"")))
+    (check= (string-deletion 'julia-code l 0 12 #f) #f)
+    (check= (string-deletion 'julia-code l 0 7 #t) #f))
+  (check= (string-deletion 'julia-code '("x = <rho>\"ab\\\"") 0 9 #t) #f)
+  (let ((l '("x = 'ab\\'")))
+    (check= (string-deletion 'lua-code l 0 9 #f) #f)
+    (check= (string-deletion 'lua-code l 0 4 #t) #f))
+  (let ((l '("x=$'a\\'")))
+    (check= (string-deletion 'shell-code l 0 7 #f) #f)
+    (check= (string-deletion 'shell-code l 0 3 #t) #f))
+  (check= (string-deletion 'shell-code '("x='a\\'") 0 6 #f) '(0 2 0 6))
+  (check= (string-deletion 'go-code '("x := `a\\`") 0 9 #f) '(0 5 0 9))
+  (check= (string-deletion 'lean-code '("#eval r\"a\\\"") 0 11 #f) '(0 6 0 11))
   ;; an escaped quote is a plain character, an empty string goes at once
   (check= (string-deletion 'cpp-code '("y = \"a\\\"\";") 0 8 #f) #f)
   (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted)

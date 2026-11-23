@@ -277,9 +277,10 @@
 ;;    strings of TeXmacs), or the long brackets of
 ;;    Lua ([[...]], [=[...]=]); in Julia, whose grammar puts the suffix
 ;;    of a string in its node (prefixed_string_literal), a suffix of
-;;    letters, digits and _ may follow (the flags of r"..."i). A closing "
-;;    after an odd run of \ is escaped (an unterminated string, as "ab\"
-;;    in Lua or Bash, is no pair), except in raw strings (r"a\").
+;;    letters, digits and _ may follow (the flags of r"..."i). A closing
+;;    quote after an odd run of \ is escaped (an unterminated string, as
+;;    "ab\" or 'ab\' in Lua, is no pair), except in the strings where \
+;;    escapes nothing (escaping-string?: r"a\" of Rust, 'C:\' of TOML).
 ;; The character must be the opening quote, or the closing quote (or its
 ;; last #); the characters in between, the prefix and the suffix are plain
 ;; characters.
@@ -316,7 +317,21 @@
 (define (suffix-char? ch)
   (or (char-alphabetic? ch) (char-numeric? ch) (== ch #\_)))
 
-(define (string-quotes root a b suffix?)
+(define (escaping-string? lname prefix hashes q)
+  ;; whether \ escapes the quote q in a string of the program language
+  ;; lname with that prefix and hashes; not in the raw strings of Rust and
+  ;; Lean (r"a\", r#"a\"#), the `...` of Go, the '...' of TOML and Bash
+  ;; (but $'...' of Bash). In Julia, \" escapes in every string, r"..."
+  ;; and raw"..." included; the raw strings of C++ and R end with ) and a
+  ;; delimiter, those of Python cannot end with an odd run of \.
+  (not (or (!= hashes "")
+           (and (in? lname '("rust" "lean")) (string-contains? prefix "r"))
+           (and (== q #\`) (== lname "go"))
+           (and (== q #\') (== lname "toml"))
+           (and (== q #\') (in? lname '("shell" "bash" "sh" "zsh"))
+                (not (string-contains? prefix "$"))))))
+
+(define (string-quotes root a b suffix? lname)
   ;; for a node from the point a to the point b, when its text has the shape
   ;; of a quoted string: (open close), the point of its opening quote and
   ;; the point after its closing one (before a suffix when suffix?, such as
@@ -356,11 +371,9 @@
     (and close (ends? close)
          ;; the closing quote comes after the opening one
          (point<? (list (car a) o) (list (car b) (- m (string-length close))))
-         ;; and is not escaped, unless the string is raw (only for ", since
-         ;; \ escapes nothing in the '...' of Bash or TOML: 'C:\')
-         (or (!= ch #\") (!= hashes "")
-             (string-contains? (substring s (cadr a) i) "r")
-             (string-contains? (substring s (cadr a) i) "R")
+         ;; and is not escaped, unless \ escapes nothing in the string
+         (or (not (quote-char? ch))
+             (not (escaping-string? lname (substring s (cadr a) i) hashes ch))
              (even? (let loop ((k (- m (string-length close) 1)) (c 0))
                       (if (and (>= k 0) (== (string-ref e k) #\\))
                           (loop (- k 1) (+ c 1)) c))))
@@ -372,6 +385,7 @@
   ;; after its closing one. In a string inside another one (Python
   ;; f-strings) it is the innermost string.
   (let* ((after (list (car p) (+ (cadr p) 1)))
+         (lname (get-env "prog-language"))
          (pairs
           (list-filter
            (map (lambda (n)
@@ -379,7 +393,8 @@
                     (and (whole-string-type? (node-type n))
                          (with q (string-quotes root a b
                                                 (== (node-type n)
-                                                    "prefixed_string_literal"))
+                                                    "prefixed_string_literal")
+                                                lname)
                            (and q (or (== (car q) p) (== (cadr q) after))
                                 (list a b (car q) (cadr q)))))))
                 (syntax-region-node-range root lan (car p) (cadr p)
