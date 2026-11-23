@@ -663,8 +663,10 @@ mupdf_pdf_renderer_rep::end_page () {
       tag_annots << ((pdf_obj*) NULL);
       tag_annot_page << page_num;
       string l= links[i].label;
-      link_text << (cork_to_utf8 (starts (l, "#")? "Link to " * l (1, N(l)): l)
-                    * string ((char) 0));
+      // (PDF/UA: a description, never empty: a link of no target)
+      string d= cork_to_utf8 (starts (l, "#")? "Link to " * l (1, N(l)): l);
+      if (N(d) == 0 || d == "Link to ") d= "Link";
+      link_text << (d * string ((char) 0));
     }
   video_annot0= N(tag_annots);
   if (tagger != NULL)
@@ -1534,11 +1536,17 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
         if (c < N(gname) && N(gname[c]) > 1)
           u= pdf_glyph_name_unicode (gname[c] (0, N(gname[c]) - 1));
         if (u < 0x20 || u == 0xfffd) {
-          if (c < N(gname) && N(gname[c]) > 1) {
-            c_string cn (gname[c] (0, N(gname[c]) - 1));
+          // (aNN is a number for MuPDF, which says nothing: the line
+          // font; nor a private use character)
+          string nm= (c < N(gname) && N(gname[c]) > 1?
+                      gname[c] (0, N(gname[c]) - 1): string (""));
+          bool number= (N(nm) >= 2 && nm[0] == 'a' && is_digit (nm[1]));
+          if (N(nm) > 0 && !number) {
+            c_string cn (nm);
             u= fz_unicode_from_glyph_name (cn);
           }
         }
+        if (u >= 0xe000 && u <= 0xf8ff) u= 0xfffd;
         tex[c]= (u >= 0x20 && u != 0xfffd)? u: 0xfffd;
       }
   int nused= 0;

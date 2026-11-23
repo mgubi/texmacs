@@ -148,13 +148,18 @@ table, or drawn by its number (the variants of the OpenType math fonts,
 (uXXXX of hexadecimal digits only; uniXXXXYYYY of the ligatures ff, fi,
 fl, ffi, ffl their presentation forms; the names of the AMS, stmary,
 wasy... fonts which TeXmacs ships, from a table made from MuPDF's glyph
-list, as the PDFHummus build has none), else, for a variant (divides.v1),
+list, as the PDFHummus build has none; never aNN, a number, which says
+nothing), else, for a variant (divides.v1),
 the one the font maps to the glyph of the name before the dot; never one
 of a private use area; only those of none (the pieces of the horizontal
 braces of cmex, the bar of mapsto of cmsy) are U+FFFD (a code of a
 TeX font, by PDFHummus, is turned into its glyph of FreeType first:
 the encoding of the font numbers its glyphs; code 161 is the glyph of
-code 0, `requires_hack_notdef`). The vendored
+code 0, `requires_hack_notdef`; the map FreeType makes of the names of a
+Type 1 font is not read; of two characters of a glyph, the one of no
+compatibility block: 文, not the Kangxi radical ⽂). The fonts of the
+pieces of lines and circles (line10, lcircle10) have a table of no
+characters: U+FFFD, not their codes. The vendored
 PDFHummus maps the glyph 0 of a simple font too (a symbol of stmary10 or
 wasy10, which it took for .notdef), and never to 0. A TrueType CID font
 gets `/CIDToGIDMap /Identity`.

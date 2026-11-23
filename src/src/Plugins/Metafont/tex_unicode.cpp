@@ -113,6 +113,16 @@ tex_math_unicode (string fontname) {
   if (N(base) == 4 && (starts (base, "gr") || starts (base, "gt") ||
                        starts (base, "gs")))
     base= "grmn";
+  // the fonts of the pieces of slanted lines and of circles (LaTeX's
+  // picture mode) have no characters: a table of none, rather than their
+  // codes, which are letters (@, P...)
+  if ((base == "line" || base == "linew" || base == "lcircle" ||
+       base == "lcirclew") && n < N(fontname) && is_digit (fontname[n])) {
+    table= array<int> (256);
+    for (int i=0; i<256; i++) table[i]= -1;
+    tables (fontname)= table;
+    return table;
+  }
   for (k=0; tex_math_encodings[k][0][0] != '\0'; k++)
     if (base == tex_math_encodings[k][0]) break;
   if (tex_math_encodings[k][0][0] != '\0' &&

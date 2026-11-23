@@ -301,6 +301,7 @@ static const int enc_symbol_uni[256]= {
 // ships (their Type 1 programs), as MuPDF reads them (fz_unicode_from_
 // glyph_name, of the TeX glyph list): those of no other source
 static const char* tex_glyph_names[]= {
+  "dotlessj", "0237",
   "Digamma", "03DD",
   "Finv", "2132",
   "Gmir", "2141",
@@ -308,72 +309,6 @@ static const char* tex_glyph_names[]= {
   "Omegainv", "2127",
   "Rfractur", "211C",
   "Yen", "00A5",
-  "a101", "0065",
-  "a104", "0068",
-  "a105", "0069",
-  "a106", "006A",
-  "a107", "006B",
-  "a108", "006C",
-  "a111", "006F",
-  "a113", "0071",
-  "a115", "0073",
-  "a119", "0077",
-  "a121", "0079",
-  "a122", "007A",
-  "a125", "007D",
-  "a126", "007E",
-  "a32", "0020",
-  "a33", "0021",
-  "a34", "0022",
-  "a35", "0023",
-  "a37", "0025",
-  "a40", "0028",
-  "a41", "0029",
-  "a42", "002A",
-  "a43", "002B",
-  "a44", "002C",
-  "a45", "002D",
-  "a47", "002F",
-  "a49", "0031",
-  "a51", "0033",
-  "a54", "0036",
-  "a55", "0037",
-  "a57", "0039",
-  "a58", "003A",
-  "a61", "003D",
-  "a62", "003E",
-  "a63", "003F",
-  "a64", "0040",
-  "a65", "0041",
-  "a66", "0042",
-  "a67", "0043",
-  "a68", "0044",
-  "a69", "0045",
-  "a72", "0048",
-  "a73", "0049",
-  "a74", "004A",
-  "a75", "004B",
-  "a76", "004C",
-  "a77", "004D",
-  "a78", "004E",
-  "a79", "004F",
-  "a80", "0050",
-  "a81", "0051",
-  "a82", "0052",
-  "a83", "0053",
-  "a84", "0054",
-  "a85", "0055",
-  "a87", "0057",
-  "a88", "0058",
-  "a89", "0059",
-  "a90", "005A",
-  "a92", "005C",
-  "a93", "005D",
-  "a94", "005E",
-  "a96", "0060",
-  "a97", "0061",
-  "a98", "0062",
-  "a99", "0063",
   "angbracketleft", "27E8",
   "angbracketright", "27E9",
   "anticlockwise", "27F2",
@@ -642,6 +577,12 @@ name_unicode (string n) {
         known (tex_glyph_names[i])= from_hexadecimal (tex_glyph_names[i+1]);
   }
   if (N(n) == 0) return -1;
+  // (aNN: a number, ZapfDingbats or a font's own: says nothing)
+  if (N(n) >= 2 && n[0] == 'a' && is_digit (n[1])) {
+    bool num= true;
+    for (int i=1; i<N(n); i++) if (!is_digit (n[i])) num= false;
+    if (num) return -1;
+  }
   if (known->contains (n)) return known [n];
   int dot= search_forwards (".", n);
   if (dot > 0) n= n (0, dot);

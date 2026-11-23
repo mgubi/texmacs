@@ -2245,6 +2245,14 @@ hummus_usable_unicode (int u) {
          u < 0xf0000;
 }
 
+// a character of a compatibility block (the same as another one)
+static bool
+hummus_compatibility (int u) {
+  return (u >= 0x2e80 && u <= 0x2fdf) || (u >= 0xf900 && u <= 0xfaff) ||
+         (u >= 0x2f800 && u <= 0x2fa1f) || u == 0xb5 || u == 0x2126 ||
+         u == 0x212a || u == 0x212b;
+}
+
 static int
 hummus_glyph_unicode (PDFUsedFont* f, unsigned int glyph) {
   FreeTypeFaceWrapper* w= (f == NULL? NULL: f->GetFreeTypeFont ());
@@ -2274,14 +2282,22 @@ hummus_glyph_unicode (PDFUsedFont* f, unsigned int glyph) {
     (face->style_name? face->style_name: "");
   if (by_face.find (key) == by_face.end ()) {
     std::map<unsigned int, int>& m= by_face[key];
-    bool unicode= (face->charmap != NULL &&
+    // (a Type 1 font: the map which FreeType makes of its glyph names,
+    // the aNN of ZapfDingbats included, says nothing: its names say it)
+    bool unicode= (face->charmap != NULL && FT_IS_SFNT (face) &&
                    face->charmap->encoding == FT_ENCODING_UNICODE);
     if (unicode) {
       FT_UInt g;
       FT_ULong c= FT_Get_First_Char (face, &g);
       while (g != 0) {
-        if (m.find (g) == m.end () && hummus_usable_unicode ((int) c))
-          m[g]= (int) c;
+        // (a character of a compatibility block, a Kangxi radical, gives
+        // way to the one of the same glyph which is not: 文, not ⽂)
+        if (hummus_usable_unicode ((int) c)) {
+          std::map<unsigned int, int>::iterator e= m.find (g);
+          if (e == m.end ()) m[g]= (int) c;
+          else if (hummus_compatibility (e->second) &&
+                   !hummus_compatibility ((int) c)) e->second= (int) c;
+        }
         c= FT_Get_Next_Char (face, c, &g);
       }
     }
@@ -3705,6 +3721,8 @@ pdf_hummus_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2)
     tg ()->add_annotation (e, k, page_num, pos);
     string l= cork_to_utf8 (starts (label, "#")?
                             "Link to " * label (1, N(label)): label);
+    // (never empty: a link of no target)
+    if (N(l) == 0 || l == "Link to ") l= "Link";
     dict << "\t/Contents " << pdf_text_string (l) << "\r\n";
     dict << "\t/StructParent " << as_string (pdf_tag_annot_key0 + k) << "\r\n";
   }
