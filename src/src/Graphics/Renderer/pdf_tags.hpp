@@ -37,7 +37,8 @@ struct pdf_tag_elem {
   array<int> avals;
   int parent;           // -1 for the document
   bool own_alt;         // the alternative text is the user's
-  pdf_tag_elem (): parent (-1), own_alt (false) {}
+  bool picture;         // the element of an image (not a drawing)
+  pdf_tag_elem (): parent (-1), own_alt (false), picture (false) {}
 };
 
 // The structure of a picture which is itself a tagged PDF, as read from it
@@ -152,6 +153,9 @@ string pdf_strip_marked_content (string s, array<bool>& open, bool& changed);
 // the MCIDs keep (those of its elements) stay; any other marked content is
 // an artifact
 string pdf_graft_marked_content (string s, hashset<int> keep, bool& changed);
+// Whether all that the content s paints is in marked content (a picture
+// whose structure is grafted: else the rest would be untagged)
+bool pdf_content_fully_marked (string s);
 
 // the XMP metadata of a tagged PDF (UTF-8 title and author), with the part
 // of PDF/UA it follows

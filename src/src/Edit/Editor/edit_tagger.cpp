@@ -341,6 +341,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
           alt= alt_of (as_string (cur), t, role, above, cur);
         tag_node fn (as_string (cur), role, cur, alt);
         fn.own_alt= own_alts->contains (as_string (cur));
+        fn.picture= is_compound (t, "image");
         r << fn;
         last= role;
         if (is_atomic (t) || role == "Formula" || role == "Figure") break;
@@ -389,6 +390,7 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
       alt= alt_of (key, t, role, above, cur);
     tag_node nd (key, role, cur, alt);
     nd.own_alt= own_alts->contains (key);
+    nd.picture= is_compound (t, "image");
     if (role == "TD" && N(above) >= 2 && is_compound (above[N(above)-2],
                                                      "table")) {
       // the spans of the cell, from the formats around its table

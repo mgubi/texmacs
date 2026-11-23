@@ -902,7 +902,13 @@ public:
 #ifndef PDFHUMMUS_NO_PNG
   bool flush_png (PDFWriter& pdfw, url image);
 #endif
-  void flush (PDFWriter& pdfw);
+  // (the uses of a grafted picture share the copy of its file, shared:
+  // its copying context and its file, by the name of the picture)
+  void flush (PDFWriter& pdfw, hashmap<string,pointer>* shared= NULL,
+              hashmap<string,string>* shared_file= NULL,
+              array<url>* to_remove= NULL);
+  EStatusCode merge (PDFDocumentCopyingContext* cc, PDFWriter& pdfw,
+                     url temp);
 
   bool flush_for_pattern (PDFWriter& pdfw);
 }; // class pdf_image_ref
@@ -2459,9 +2465,46 @@ hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
   return done > 0;
 }
 
+EStatusCode
+pdf_image_rep::merge (PDFDocumentCopyingContext* copyingContext,
+                      PDFWriter& pdfw, url temp) {
+  DocumentContext& dc = pdfw.GetDocumentContext();
+  PDFPageInput pageInput(copyingContext->GetSourceDocumentParser(),
+                         copyingContext->GetSourceDocumentParser()->ParsePage(0));
+  EPDFVersion version= (EPDFVersion)(int)(copyingContext->GetSourceDocumentParser()->GetPDFLevel() * 10);
+  if (version > ePDFVersion)
+    convert_warning << "\"" << concretize (u) << "\" has version " << ((double) version)/10 << "." << LF
+                    << "But current PDF version has been set to " << ((double) ePDFVersion)/10
+                    << " (see the preference menu)." << LF;
+  double tMat[6] ={ 1,0, 0, 1, 0, 0} ;
+  PDFRectangle cropBox (0,0,0,0);
+  int neww,newh;
+  pdf_image_info (temp, neww, newh, cropBox, tMat, pageInput);
+  if ((neww != w) && (neww !=0)) {
+    //image size changed, resize it to what we wanted
+    double r = w/(double)neww;
+    for (int j= 0; j < 6; j++) tMat[j] *= r;
+  }
+  PDFFormXObject *form = dc.StartFormXObject(cropBox, id, tMat, true);
+  EStatusCode status = copyingContext->MergePDFPageToFormXObject(form,0);
+  if(status == eSuccess) pdfw.EndFormXObjectAndRelease(form);
+  return status;
+}
+
 void
-pdf_image_rep::flush (PDFWriter& pdfw)
+pdf_image_rep::flush (PDFWriter& pdfw, hashmap<string,pointer>* shared,
+                      hashmap<string,string>* shared_file,
+                      array<url>* to_remove)
 {
+  string skey= as_string (u);
+  if (graft && shared != NULL && (*shared)->contains (skey)) {
+    url temp= url_system ((*shared_file)[skey]);
+    if (merge ((PDFDocumentCopyingContext*) (*shared)[skey], pdfw, temp)
+        == PDFHummus::eFailure)
+      convert_error << "pdf_hummus, failed to include image file: "
+                    << temp << LF;
+    return;
+  }
   url name= resolve (u);
   if (is_none (name))
     name= "$TEXMACS_PATH/misc/pixmaps/unknown.ps";
@@ -2536,35 +2579,23 @@ pdf_image_rep::flush (PDFWriter& pdfw)
     }
   }
   EStatusCode status = PDFHummus::eFailure;
-  DocumentContext& dc = pdfw.GetDocumentContext();
 
   char* _temp= as_charp(concretize(temp));
   PDFDocumentCopyingContext *copyingContext = pdfw.CreatePDFCopyingContext(_temp);
+  tm_delete_array (_temp);
+  bool kept= false;
   if(copyingContext) {
-    PDFPageInput pageInput(copyingContext->GetSourceDocumentParser(),
-			   copyingContext->GetSourceDocumentParser()->ParsePage(0));
-    EPDFVersion version= (EPDFVersion)(int)(copyingContext->GetSourceDocumentParser()->GetPDFLevel() * 10);
-    if (version > ePDFVersion)
-      convert_warning << "\"" << concretize (u) << "\" has version " << ((double) version)/10 << "." << LF
-		      << "But current PDF version has been set to " << ((double) ePDFVersion)/10
-		      << " (see the preference menu)." << LF;
-    double tMat[6] ={ 1,0, 0, 1, 0, 0} ;
-    PDFRectangle cropBox (0,0,0,0);
-    int neww,newh;
-    pdf_image_info (temp, neww, newh, cropBox, tMat, pageInput);
-    //debug_convert << "new w,h :" << neww << " "<< newh << LF;
-    if ((neww != w) && (neww !=0)) {
-        //image size changed, resize it to what we wanted
-        double r = w/(double)neww;
-        int j;
-        for (j= 0; j < 6; j++) tMat[j] *= r;        
+    status= merge (copyingContext, pdfw, temp);
+    if (graft && shared != NULL) {
+      // (kept for the other uses of the picture, which share its fonts)
+      (*shared) (skey)= (pointer) copyingContext;
+      (*shared_file) (skey)= concretize (temp);
+      if (!is_none (name)) *to_remove << temp;
+      kept= true;
     }
-    PDFFormXObject *form = dc.StartFormXObject(cropBox, id, tMat, true);
-    status = copyingContext->MergePDFPageToFormXObject(form,0);
-    if(status == eSuccess) pdfw.EndFormXObjectAndRelease(form);
-    delete copyingContext;
+    else delete copyingContext;
   }
-  if(!is_none(name)) remove (temp);
+  if(!is_none(name) && !kept) remove (temp);
   
   if (status == PDFHummus::eFailure) {
     convert_error << "pdf_hummus, failed to include image file: "
@@ -2852,7 +2883,15 @@ pdf_hummus_renderer_rep::flush_images ()
     pdf_image im = image_pool[it->next()];
     im->flush(pdfWriter);
   }
-  for (int i=0; i<N(graft_images); i++) graft_images[i]->flush (pdfWriter);
+  hashmap<string,pointer> shared;
+  hashmap<string,string> shared_file;
+  array<url> to_remove;
+  for (int i=0; i<N(graft_images); i++)
+    graft_images[i]->flush (pdfWriter, &shared, &shared_file, &to_remove);
+  iterator<string> sit= iterate (shared);
+  while (sit->busy ())
+    delete (PDFDocumentCopyingContext*) shared [sit->next ()];
+  for (int i=0; i<N(to_remove); i++) remove (to_remove[i]);
 }
 
 void
@@ -2882,8 +2921,22 @@ struct hummus_graft {
   array<int> parent, owner, val;
   array<string> role, alt;
   int mcids;
-  hummus_graft (): mcids (0) {}
+  int steps;           // of the walk (a budget)
+  bool stm;            // marked content in forms of the picture: no graft
+  hashset<int> seen;   // the objects visited (a tree may share or loop)
+  hummus_graft (): mcids (0), steps (0), stm (false) {}
 };
+
+// whether the raw object v is met for the first time
+static bool
+hummus_graft_first (PDFObject* v, hummus_graft& g) {
+  if (v == NULL || v->GetType () != PDFObject::ePDFObjectIndirectObjectReference)
+    return true;
+  int id= (int) ((PDFIndirectObjectReference*) v)->mObjectID;
+  if (g.seen->contains (id)) return false;
+  g.seen->insert (id);
+  return true;
+}
 
 static string
 hummus_text (PDFObject* o) {
@@ -2902,11 +2955,14 @@ static void
 hummus_graft_walk (PDFParser& p, PDFDictionary* rolemap, PDFObject* k,
                    int owner, ObjectIDType pg, ObjectIDType page0,
                    hummus_graft& g, int depth) {
-  if (k == NULL || depth > 64 || N(g.parent) >= 4096 || N(g.val) >= 16384)
+  if (k == NULL || depth > 64 || N(g.parent) >= 4096 || N(g.val) >= 16384 ||
+      ++g.steps > 200000)
     return;
   if (k->GetType () == PDFObject::ePDFObjectArray) {
     PDFArray* a= (PDFArray*) k;
     for (unsigned long i=0; i < a->GetLength (); i++) {
+      RefCountPtr<PDFObject> raw (a->QueryObject (i));
+      if (!hummus_graft_first (raw.GetPtr (), g)) continue;
       RefCountPtr<PDFObject> c (p.QueryArrayObject (a, i));
       hummus_graft_walk (p, rolemap, c.GetPtr (), owner, pg, page0, g,
                          depth + 1);
@@ -2928,8 +2984,9 @@ hummus_graft_walk (PDFParser& p, PDFDictionary* rolemap, PDFObject* k,
     pg= ((PDFIndirectObjectReference*) pgo.GetPtr ())->mObjectID;
   string type= hummus_name (p, d, "Type");
   if (type == "MCR") {
-    // (the marked content of a form of the picture: not kept)
-    if (d->Exists ("Stm")) return;
+    // (the marked content of a form of the picture: such a picture is a
+    // Figure, its tags taken out)
+    if (d->Exists ("Stm")) { g.stm= true; return; }
     RefCountPtr<PDFObject> m (p.QueryDictionaryObject (d, "MCID"));
     hummus_graft_walk (p, rolemap, m.GetPtr (), owner, pg, page0, g,
                        depth + 1);
@@ -2954,6 +3011,8 @@ hummus_graft_walk (PDFParser& p, PDFDictionary* rolemap, PDFObject* k,
   RefCountPtr<PDFObject> alt (p.QueryDictionaryObject (d, "Alt"));
   g.alt << hummus_text (alt.GetPtr ());
   g.owner << owner; g.val << e;
+  RefCountPtr<PDFObject> kraw (d->QueryDirectObject ("K"));
+  if (!hummus_graft_first (kraw.GetPtr (), g)) return;
   RefCountPtr<PDFObject> kk (p.QueryDictionaryObject (d, "K"));
   hummus_graft_walk (p, rolemap, kk.GetPtr (), e, pg, page0, g, depth + 1);
 }
@@ -2982,6 +3041,30 @@ hummus_graft_read (url u, pdf_tag_graft& r, hashset<int>& keep) {
   hummus_graft g;
   hummus_graft_walk (p, rm.GetPtr (), k.GetPtr (), -1, 0,
                      p.GetPageObjectID (0), g, 0);
+  if (g.stm || g.steps > 200000) return false;
+  // (all that the page paints is in marked content: else it would be
+  // untagged; the picture is then a Figure)
+  RefCountPtr<PDFDictionary> page (p.ParsePage (0));
+  if (!page) return false;
+  RefCountPtr<PDFObject> c (page->QueryDirectObject ("Contents"));
+  array<int> cids;
+  if (!!c && c->GetType () == PDFObject::ePDFObjectIndirectObjectReference)
+    cids << (int) ((PDFIndirectObjectReference*) c.GetPtr ())->mObjectID;
+  else if (!!c && c->GetType () == PDFObject::ePDFObjectArray) {
+    PDFArray* a= (PDFArray*) c.GetPtr ();
+    for (unsigned long j=0; j < a->GetLength (); j++) {
+      RefCountPtr<PDFObject> e (a->QueryObject (j));
+      if (e->GetType () == PDFObject::ePDFObjectIndirectObjectReference)
+        cids << (int) ((PDFIndirectObjectReference*) e.GetPtr ())->mObjectID;
+    }
+  }
+  string content;
+  for (int j=0; j<N(cids); j++) {
+    RefCountPtr<PDFDictionary> d;
+    if (!hummus_read_stream (p, cids[j], content, d)) return false;
+    content << "\n";
+  }
+  if (!pdf_content_fully_marked (content)) return false;
   r= pdf_graft_prune (g.parent, g.role, g.alt, g.owner, g.val, g.mcids, keep);
   return N(r.roles) > 0;
 }

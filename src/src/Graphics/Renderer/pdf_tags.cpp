@@ -11,6 +11,7 @@
 
 #include "pdf_tags.hpp"
 #include "analyze.hpp"
+#include "iterator.hpp"
 #include <string.h>
 
 pdf_tags_rep::pdf_tags_rep (tagger_rep* t):
@@ -33,6 +34,7 @@ pdf_tags_rep::add (tag_node nd, int parent) {
   }
   el.parent= parent;
   el.own_alt= nd.own_alt;
+  el.picture= nd.picture;
   elems << el;
   index (nd.key)= e;
   if (parent >= 0) {
@@ -146,7 +148,10 @@ bool
 pdf_tags_rep::can_graft (path ip) {
   resolve (ip);
   int e= last_elem;
-  return e >= 0 && elems[e].role == "Figure" && !elems[e].own_alt;
+  // (the Figure of the picture itself, not one which holds more: a
+  // drawing whose pictures are among its lines and formulas)
+  return e >= 0 && elems[e].role == "Figure" && elems[e].picture &&
+         !elems[e].own_alt;
 }
 
 string
@@ -251,7 +256,6 @@ pdf_delimiter (char c) {
          c == ']' || c == '{' || c == '}' || c == '/' || c == '%';
 }
 
-
 // The end of an inline image whose BI ends at i: after its EI. Its data is
 // skipped by its length (/L, or its size when it is not filtered), as a
 // reader does: the data may hold "EI" itself; else up to the first EI
@@ -276,7 +280,7 @@ skip_inline_image (string s, int i) {
     toks << s (j, min (k, id));
     j= k;
   }
-  int w= -1, h= -1, bpc= 8, comps= 1, len= -1;
+  long long w= -1, h= -1, bpc= 8, comps= 1, len= -1;
   bool filtered= false, mask= false;
   for (int k=0; k+1<N(toks); k+=2) {
     string key= toks[k], v= toks[k+1];
@@ -294,23 +298,34 @@ skip_inline_image (string s, int i) {
   }
   if (mask) { bpc= 1; comps= 1; }
   int start= id + 3;   // (ID and one white space)
-  if (len < 0 && !filtered && w > 0 && h > 0 && bpc > 0)
+  // (in 64 bits, and a length beyond the content is no length)
+  if (len < 0 && !filtered && w > 0 && h > 0 && bpc > 0 &&
+      w <= 1000000 && h <= 1000000 && bpc <= 32)
     len= h * ((w * comps * bpc + 7) / 8);
   int j= start;
-  if (len >= 0 && start + len <= n) j= start + len;
+  if (len >= 0 && start <= n && len <= (long long) (n - start))
+    j= start + (int) len;
   // the EI after the data
+  if (j < 0) j= 0;
   while (j+1 < n && !(s[j] == 'E' && s[j+1] == 'I' &&
                       (j == 0 || pdf_white (s[j-1])) &&
                       (j+2 == n || pdf_white (s[j+2])))) j++;
   return min (n, j + 2);
 }
 
-string
-pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
-  string r;
+// The operators of a content stream, each with the start of its operands
+// (the end of the operator before), its own place, its first operand
+struct pdf_content_op {
+  int seg, start, end;
+  string op, first;
+};
+
+static array<pdf_content_op>
+pdf_content_ops (string s) {
+  array<pdf_content_op> r;
   int n= N(s), i= 0;
-  int seg= 0;              // the start of the operands of the next operator
-  string first;            // its first operand
+  int seg= 0;
+  string first;
   bool have_first= false;
   while (i < n) {
     char c= s[i];
@@ -340,38 +355,46 @@ pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
       bool number= (N(tok) > 0 && (is_digit (tok[0]) || tok[0] == '-' ||
                                    tok[0] == '+' || tok[0] == '.'));
       if (!number && tok != "true" && tok != "false" && tok != "null") {
-        // an operator
-        if (tok == "BI") {
-          // an inline image: its data, up to EI, as it is
-          i= skip_inline_image (s, i);
-          r << s (seg, i);
-        }
-        else if (tok == "BMC" || (tok == "BDC" && first != "/OC")) {
-          open << false;
-          changed= true;
-          r << "\n";
-        }
-        else if (tok == "BDC") {
-          open << true;
-          r << s (seg, i);
-        }
-        else if (tok == "EMC") {
-          bool kept= (N(open) > 0 && open[N(open)-1]);
-          if (N(open) > 0) open->resize (N(open) - 1);
-          if (kept) r << s (seg, i);
-          else { changed= true; r << "\n"; }
-        }
-        else r << s (seg, i);
-        seg= i;
+        // an operator (an inline image goes to its EI)
+        if (tok == "BI") i= skip_inline_image (s, i);
+        pdf_content_op o;
+        o.seg= seg; o.start= start; o.end= min (i, n);
+        o.op= tok; o.first= (have_first? first: string (""));
+        r << o;
+        seg= o.end;
         have_first= false;
         first= "";
         continue;
       }
     }
+    if (i > n) i= n;
     if (i <= start) i= start + 1;
-    if (!have_first) { first= s (start, i); have_first= true; }
+    if (!have_first) { first= s (start, min (i, n)); have_first= true; }
   }
-  r << s (seg, n);
+  return r;
+}
+
+string
+pdf_strip_marked_content (string s, array<bool>& open, bool& changed) {
+  array<pdf_content_op> ops= pdf_content_ops (s);
+  string r;
+  int last= 0;
+  for (int k=0; k<N(ops); k++) {
+    pdf_content_op& o= ops[k];
+    bool keep= true;
+    if (o.op == "BMC" || (o.op == "BDC" && o.first != "/OC")) {
+      open << false; keep= false;
+    }
+    else if (o.op == "BDC") open << true;
+    else if (o.op == "EMC") {
+      keep= (N(open) > 0 && open[N(open)-1]);
+      if (N(open) > 0) open->resize (N(open) - 1);
+    }
+    if (keep) r << s (o.seg, o.end);
+    else { changed= true; r << "\n"; }
+    last= o.end;
+  }
+  r << s (last, N(s));
   return r;
 }
 
@@ -424,12 +447,17 @@ pdf_graft_prune (array<int> parent, array<string> role, array<string> alt,
       if (o < 0) g.tops << index[v];
       else if (index[o] >= 0) g.content[index[o]] << index[v];
     }
-    else if (o >= 0 && index[o] >= 0) {
+    else if (o >= 0 && index[o] >= 0 && !keep->contains (-1-v)) {
+      // (an MCID is the content of one element: the first)
       g.content[index[o]] << v;
       keep->insert (-1-v);
     }
   }
-  g.mcids= mcids;
+  // (the parent tree has an entry up to the last MCID kept)
+  (void) mcids;
+  g.mcids= 0;
+  iterator<int> it= iterate (keep);
+  while (it->busy ()) { int m= it->next (); if (m + 1 > g.mcids) g.mcids= m + 1; }
   return g;
 }
 
@@ -441,70 +469,86 @@ operand_mcid (string s) {
   i += 5;
   while (i < N(s) && pdf_white (s[i])) i++;
   int j= i;
-  while (j < N(s) && is_digit (s[j])) j++;
+  while (j < N(s) && j < i + 9 && is_digit (s[j])) j++;
   return (j > i? as_int (s (i, j)): -1);
 }
 
 string
 pdf_graft_marked_content (string s, hashset<int> keep, bool& changed) {
-  // (the lexer of pdf_strip_marked_content, which this follows)
-  string r;
-  int n= N(s), i= 0;
-  int seg= 0;
-  string first;
-  bool have_first= false;
-  while (i < n) {
-    char c= s[i];
-    if (pdf_white (c)) { i++; continue; }
-    if (c == '%') { while (i < n && s[i] != '\n' && s[i] != '\r') i++; continue; }
-    int start= i;
-    if (c == '(') {
-      int level= 0;
-      for (; i < n; i++) {
-        if (s[i] == '\\') { i++; continue; }
-        if (s[i] == '(') level++;
-        else if (s[i] == ')' && --level == 0) { i++; break; }
+  array<pdf_content_op> ops= pdf_content_ops (s);
+  int n= N(ops);
+  // the marked content of the MCIDs of no element: an artifact, unless it
+  // holds marked content which is kept (tagged content may not be in an
+  // artifact): then it is taken out
+  // (and the picture's own irregularities: an artifact in tagged content,
+  // or which holds some, is taken out too)
+  array<int> kind (n);     // for a BDC or a BMC: 0 kept, 1 artifact, 2 out
+  array<int> stack;
+  array<bool> holds (n), inside (n), artifact (n);
+  for (int k=0; k<n; k++) {
+    kind[k]= 0; holds[k]= false; inside[k]= false; artifact[k]= false; }
+  for (int k=0; k<n; k++) {
+    pdf_content_op& o= ops[k];
+    if (o.op == "BDC" || o.op == "BMC") {
+      bool kept= false;
+      for (int j=0; j<N(stack); j++)
+        if (kind[stack[j]] == 3) inside[k]= true;
+      if (o.first == "/Artifact") artifact[k]= true;
+      else if (o.op == "BDC") {
+        int m= operand_mcid (s (o.seg, o.start));
+        if (m >= 0 && keep->contains (m)) kept= true;
+        else if (m >= 0) kind[k]= 1;
       }
-    }
-    else if (c == '<' && i+1 < n && s[i+1] == '<') i += 2;
-    else if (c == '>' && i+1 < n && s[i+1] == '>') i += 2;
-    else if (c == '<') { while (i < n && s[i] != '>') i++; i++; }
-    else if (c == '[' || c == ']' || c == '{' || c == '}' || c == ')' ||
-             c == '>') i++;
-    else if (c == '/') {
-      i++;
-      while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
-    }
-    else {
-      while (i < n && !pdf_white (s[i]) && !pdf_delimiter (s[i])) i++;
-      string tok= s (start, i);
-      bool number= (N(tok) > 0 && (is_digit (tok[0]) || tok[0] == '-' ||
-                                   tok[0] == '+' || tok[0] == '.'));
-      if (!number && tok != "true" && tok != "false" && tok != "null") {
-        if (tok == "BI") {
-          i= skip_inline_image (s, i);
-          r << s (seg, i);
-        }
-        else if (tok == "BDC") {
-          int m= operand_mcid (s (seg, start));
-          if (m >= 0 && !keep->contains (m) && first != "/Artifact") {
-            r << "\n/Artifact BMC";
-            changed= true;
-          }
-          else r << s (seg, i);
-        }
-        else r << s (seg, i);
-        seg= i;
-        have_first= false;
-        first= "";
-        continue;
+      if (kept) {
+        for (int j=0; j<N(stack); j++) holds[stack[j]]= true;
+        kind[k]= 3;   // (kept: 0 below)
       }
+      stack << k;
     }
-    if (i <= start) i= start + 1;
-    if (!have_first) { first= s (start, i); have_first= true; }
+    else if (o.op == "EMC" && N(stack) > 0) stack->resize (N(stack) - 1);
   }
-  r << s (seg, n);
+  for (int k=0; k<n; k++) {
+    if (kind[k] == 3) kind[k]= 0;
+    else if (kind[k] == 1 && (holds[k] || inside[k])) kind[k]= 2;
+    else if (artifact[k] && (holds[k] || inside[k])) kind[k]= 2;
+  }
+  string r;
+  int last= 0;
+  stack= array<int> ();
+  for (int k=0; k<n; k++) {
+    pdf_content_op& o= ops[k];
+    int how= 0;
+    if (o.op == "BDC" || o.op == "BMC") { how= kind[k]; stack << how; }
+    else if (o.op == "EMC" && N(stack) > 0) {
+      how= stack[N(stack)-1];
+      stack->resize (N(stack) - 1);
+      if (how == 1) how= 0;   // (its EMC stays)
+    }
+    if (how == 0) r << s (o.seg, o.end);
+    else if (how == 1) { r << s (o.seg, o.seg) << "\n/Artifact BMC"; changed= true; }
+    else { r << "\n"; changed= true; }
+    last= o.end;
+  }
+  r << s (last, N(s));
   return r;
+}
+
+bool
+pdf_content_fully_marked (string s) {
+  array<pdf_content_op> ops= pdf_content_ops (s);
+  int depth= 0;
+  for (int k=0; k<N(ops); k++) {
+    string op= ops[k].op;
+    if (op == "BDC" || op == "BMC") depth++;
+    else if (op == "EMC") { if (depth > 0) depth--; }
+    else if (depth == 0 &&
+             (op == "Tj" || op == "TJ" || op == "'" || op == "\"" ||
+              op == "Do" || op == "BI" || op == "sh" || op == "f" ||
+              op == "F" || op == "f*" || op == "B" || op == "B*" ||
+              op == "b" || op == "b*" || op == "S" || op == "s"))
+      return false;
+  }
+  return true;
 }
 
 string

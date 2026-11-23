@@ -187,8 +187,17 @@ content (its tags, its artifacts) and a structure of its own.
   marked content of the picture stays, its artifacts too; marked content
   of no element is an artifact (`pdf_graft_marked_content`); the forms
   inside the picture lose theirs. Such a picture has a form for each use:
-  an element is in one place of the tree. PDFHummus adds `/StructParents`
-  to the form through `OnFormXObjectWrite`.
+  an element is in one place of the tree (PDFHummus copies its file once
+  for all the uses, which share its fonts). PDFHummus adds
+  `/StructParents` to the form through `OnFormXObjectWrite`.
+* A picture is grafted only when its Figure is the image itself (not a
+  drawing which holds pictures among other things), when its structure
+  has no marked content in its forms (`/Stm`), and when all that its page
+  paints is in marked content (`pdf_content_fully_marked`); else it is a
+  Figure, its tags taken out. The structure tree is read once per object,
+  with a budget (a tree may share or loop); an MCID belongs to the first
+  element which has it; an artifact in kept marked content, or which
+  holds some, is taken out (the picture's own irregularities).
 * With an alternative text of the user's, it is a Figure: its marked
   content is taken out of its content and of its forms and patterns, but
   the optional content (`BDC /OC`), and the `/StructParents` of its forms

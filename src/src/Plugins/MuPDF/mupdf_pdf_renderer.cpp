@@ -320,7 +320,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   hashset<string> untagged_files;  // the pictures which have none
   array<pdf_obj*> graft_forms;     // the form of each graft (pdf_tags)
   void embed_picture_fonts (pdf_obj* res, pdf_obj* form);
-  void strip_picture_tags (pdf_obj* res, pdf_obj* form, hashset<int>* keep);
+  bool strip_picture_tags (pdf_obj* res, pdf_obj* form, hashset<int>* keep);
   array<pdf_obj*> picture_font_objs;   // the programs embedded for them
   int picture_font_tags= 0;            // the tags of their subsets
   hashmap<string,int> picture_font_files;   // whole programs, by file
@@ -2061,6 +2061,10 @@ mupdf_svg_to_pdf (fz_context* ctx, url svg, url pdf) {
 
 struct graft_c {
   int  n, nitems, mcids;
+  int  steps;            // of the walk (a budget)
+  int  stm;              // marked content in forms of the picture: no graft
+  int  nmarked;          // the objects marked (visited), to unmark
+  pdf_obj* marked[GRAFT_ITEMS];
   int  parent[GRAFT_MAX];
   char role[GRAFT_MAX][16];
   char* alt[GRAFT_MAX];
@@ -2092,7 +2096,13 @@ graft_item (graft_c* g, int owner, int val) {
 static void
 graft_walk (fz_context* ctx, pdf_obj* rolemap, pdf_obj* k, int owner,
             pdf_obj* pg, pdf_obj* page0, graft_c* g, int depth) {
-  if (k == NULL || depth > 64) return;
+  if (k == NULL || depth > 64 || ++g->steps > 200000) return;
+  // (each object once: a tree may share or loop)
+  if (pdf_is_indirect (ctx, k)) {
+    if (g->nmarked >= GRAFT_ITEMS) { g->steps= 200001; return; }
+    if (pdf_mark_obj (ctx, k)) return;
+    g->marked[g->nmarked++]= k;
+  }
   if (pdf_is_array (ctx, k)) {
     for (int i=0; i < pdf_array_len (ctx, k); i++)
       graft_walk (ctx, rolemap, pdf_array_get (ctx, k, i), owner, pg, page0,
@@ -2112,8 +2122,9 @@ graft_walk (fz_context* ctx, pdf_obj* rolemap, pdf_obj* k, int owner,
   if (p != NULL) pg= pdf_resolve_indirect (ctx, p);
   pdf_obj* type= pdf_dict_get (ctx, k, PDF_NAME(Type));
   if (pdf_name_eq (ctx, type, PDF_NAME(MCR))) {
-    // (the marked content of a form of the picture: not kept)
-    if (pdf_dict_gets (ctx, k, "Stm") != NULL) return;
+    // (the marked content of a form of the picture: such a picture is a
+    // Figure, its tags taken out)
+    if (pdf_dict_gets (ctx, k, "Stm") != NULL) { g->stm= 1; return; }
     graft_walk (ctx, rolemap, pdf_dict_get (ctx, k, PDF_NAME(MCID)), owner,
                 pg, page0, g, depth + 1);
     return;
@@ -2202,6 +2213,8 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
           graft_walk (ctx, pdf_dict_get (ctx, str, PDF_NAME(RoleMap)),
                       pdf_dict_get (ctx, str, PDF_NAME(K)), -1, NULL,
                       pdf_resolve_indirect (ctx, spage), gc, 0);
+          for (int i=0; i<gc->nmarked; i++) pdf_unmark_obj (ctx, gc->marked[i]);
+          gc->nmarked= 0;
         }
       }
       fz_rect box; fz_matrix m;
@@ -2244,7 +2257,8 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
     pdf_tag_graft g;
     hashset<int> keep;
     if (gc != NULL) {
-      if (num >= 0) g= graft_structure (gc, keep);
+      if (num >= 0 && !gc->stm && gc->steps <= 200000)
+        g= graft_structure (gc, keep);
       for (int i=0; i<gc->n; i++) fz_free (ctx, gc->alt[i]);
       fz_free (ctx, gc);
     }
@@ -2256,7 +2270,13 @@ mupdf_pdf_renderer_rep::embed_image (url u, bool graft) {
     // a tagged PDF embeds the fonts which the picture names only (PDF/UA)
     if (kept_form != NULL && tagger != NULL) {
       if (kept != NULL) embed_picture_fonts (kept, kept_form);
-      strip_picture_tags (kept, kept_form, grafted? &keep: NULL);
+        if (!strip_picture_tags (kept, kept_form, grafted? &keep: NULL) &&
+          grafted) {
+        // (a Figure then, as a picture which is not tagged)
+        graft_of->reset (num);
+        grafts->resize (N(grafts) - 1);
+        grafted= false;
+      }
     }
     if (graft && !grafted) untagged_files->insert (key);
     if (grafted) {
@@ -2689,9 +2709,12 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
 // artifacts) would nest in its Figure, and its MCIDs are in no parent tree.
 // In a tagged PDF it is taken out of the content of the picture and of its
 // forms (pdf_strip_marked_content), but optional content.
-void
+bool
 mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form,
                                             hashset<int>* keep) {
+  // keep: the picture is grafted; false when it cannot be (it paints
+  // outside its marked content), and its tags are then taken out
+  bool ok= true;
   pdf_obj* forms[256];   // (the references: a stream is loaded by them)
   pdf_obj* ids[256];     // (and the objects, to find them once each)
   int nf= 0;
@@ -2748,6 +2771,10 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form,
     array<bool> open;
     bool changed= false;
     // (the content of a grafted picture keeps its marked content)
+    if (k == 0 && keep != NULL && !pdf_content_fully_marked (s)) {
+      ok= false;
+      keep= NULL;
+    }
     string t= (k == 0 && keep != NULL)?
       pdf_graft_marked_content (s, *keep, changed):
       pdf_strip_marked_content (s, open, changed);
@@ -2765,6 +2792,7 @@ mupdf_pdf_renderer_rep::strip_picture_tags (pdf_obj* res, pdf_obj* form,
                       << fz_caught_message (ctx) << LF;
     }
   }
+  return ok;
 }
 
 // w and h are the size the picture must have, in the pixels of the
