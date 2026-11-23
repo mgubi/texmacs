@@ -208,6 +208,8 @@
               (toggle ("Expand beamer slides" "texmacs->pdf:expand slides"))
 	      (toggle ("Distill encapsulated Pdf files" "texmacs->pdf:distill inclusion"))
 	      (toggle ("Check exported files" "texmacs->pdf:check"))
+	      (when (get-boolean-preference "native pdf")
+	        (toggle ("Tagged Pdf (PDF/UA)" "texmacs->pdf:tagged")))
 	      (enum ("Pdf version" "texmacs->pdf:version")
 		    ("Default" "default")
 		    ("1.4" "1.4")

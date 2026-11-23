@@ -127,6 +127,7 @@ edit_env_rep::rewrite (tree t) {
   case VAR_INCLUDE:
     {
       if (N(t) == 0) return tree (_ERROR, "invalid include");
+      if (is_given_inclusion (t)) return t[1];   // (print_doc)
       url file_name= url_unix (exec_string (t[0]));
       url file_rel = relative (base_file_name, file_name);
       //cout << "file_name= " << as_tree (file_name) << LF;
@@ -187,6 +188,10 @@ edit_env_rep::exec_include (tree t) {
   if (N(t) == 0) return exec_rewrite (t);
   url file_name= url_unix (exec_string (t[0]));
   url file_rel = relative (base_file_name, file_name);
+  if (is_given_inclusion (t)) {   // the document, given (print_doc)
+    inclusion_guard guard (file_rel);
+    return exec (t[1]);
+  }
   tree r= rewrite_include (this, base_file_name, file_rel);
   inclusion_guard guard (file_rel);
   return exec (r);
@@ -2418,6 +2423,18 @@ edit_env_rep::auto_label_tag (tree& tag, tree& root, path& where) {
     tag = subtree (the_et, q);
     root= the_et[q->item];
     where= q;
+    // a tag in the document given to an include* (a tagged PDF, print_doc)
+    // numbers its labels on that include*, which has the numbers of its
+    // include: as the tags of an included document number theirs on their
+    // include, whose content has no places of its own
+    tree up= root;
+    int  n = 1;
+    for (path r= q->next; !is_nil (r); r= r->next, n++) {
+      array<int> b;
+      if (is_given_inclusion (up) && auto_label_data (up, b)) {
+        tag= up; where= head (q, n); break; }
+      up= up[r->item];
+    }
     if (is_compound (tag)) return true;
   }
   return false;

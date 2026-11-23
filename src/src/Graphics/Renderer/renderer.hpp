@@ -18,6 +18,7 @@
 #include "picture.hpp"
 #include "scalable.hpp"
 #include "spacial.hpp"
+#include "path.hpp"
 
 #define PIXEL          256
 #define PICTURE_ZOOM   1.0
@@ -35,6 +36,43 @@ class frame;
 typedef list<rectangle> rectangles;
 extern int std_shrinkf;
 
+/******************************************************************************
+* Tagged PDF (docs/pdf-tagging.md): the structure of what is drawn
+******************************************************************************/
+
+// A structure element: key names it (the place of its node in the
+// document), role is its standard type (Document, P, H2, Formula, L...),
+// alt its alternate description, pos the place of its node, for the order
+// of the elements
+struct tag_node {
+  string key, role, alt;
+  path   pos;
+  string attrs;   // integer attributes of the table: "ColSpan=2 RowSpan=3"
+  tag_node () {}
+  tag_node (string k, string r, path p, string a= ""):
+    key (k), role (r), alt (a), pos (p) {}
+};
+inline bool operator == (const tag_node& a, const tag_node& b) {
+  return a.key == b.key; }
+inline bool operator != (const tag_node& a, const tag_node& b) {
+  return a.key != b.key; }
+
+// What a tagging renderer asks about what it draws (made by print_doc)
+class tagger_rep {
+public:
+  virtual ~tagger_rep () {}
+  // the elements around the content of the box of inverse path ip, the
+  // outermost (the document) first, and the place of that content; none
+  // for an artifact (a header, a footer, a page number)
+  virtual array<tag_node> resolve (path ip, path& pos) = 0;
+  // the cells of the row at pos which are not covered by a span (TD)
+  virtual array<tag_node> row_cells (path pos) = 0;
+  virtual string language () = 0;   // of the document, as en or de-CH
+  virtual string title () = 0;
+  // the pictures met which have no alternative text of their own
+  virtual int pictures_without_alt () { return 0; }
+};
+
 class renderer_rep {
 public:
   SI  ox, oy;               // origin
@@ -50,6 +88,8 @@ public:
   renderer master;          // master renderer in case of shadow renderers
   rectangles clip_stack;    // stack with clipping regions
   int cur_page;             // current page number
+  tagger_rep* tagger;       // a tagging renderer: the structure, or NULL
+  path tag_ip;              // ... and the inverse path of the box drawn
 
 public:
   renderer_rep (bool screen_flag, double pixel_ratio= 1);
@@ -152,6 +192,8 @@ public:
   virtual void draw_invisible (int char_code, font_glyphs fn, SI x, SI y,
                                double hscale= 1.0);
   virtual void set_metadata (string kind, string val);
+  // whether the renderer writes a tagged PDF when given a tagger
+  virtual bool supports_tagging ();
 };
 
 /* native pictures and rendering on pictures */

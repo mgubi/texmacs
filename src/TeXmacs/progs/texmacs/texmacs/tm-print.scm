@@ -82,6 +82,7 @@
   ("native postscript" "on" noop)
   ("texmacs->pdf:expand slides" "off" noop)
   ("texmacs->pdf:check" "off" noop)
+  ("texmacs->pdf:tagged" "off" noop)
   ("preview command" "default" notify-preview-command)
   ("printing command" (get-default-printing-command) notify-printing-command)
   ("paper type" (get-default-paper-size) notify-paper-type)
@@ -335,3 +336,124 @@
   (choose-file (lambda (name) (print-pages-to-file name start end))
 	       "Print page selection to file" (printer-file-format)
 	       "Print:"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tagged PDF (PDF/UA, docs/pdf-tagging.md): the structure of a document
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The standard structure type of a tag; "H:n" is a heading of rank n (H1,
+;; H2... after the headings above it in the document), "H:A" an appendix (a
+;; chapter in a book, a section elsewhere). A tag which is
+;; not here is transparent, except at the level of a paragraph (a child of
+;; a document), where it is a P, or a Div when it holds paragraphs. A Sect
+;; (a bibliography, a table of contents, an index) has its title, which its
+;; macro writes, as a heading of the rank of an appendix.
+(define pdf-tag-roles
+  '((doc-data . "Div") (doc-title . "H:0") (doc-subtitle . "P")
+    (doc-author . "P") (doc-date . "P") (doc-note . "P") (doc-misc . "P")
+    (abstract-data . "Div") (abstract . "Div")
+    (abstract-keywords . "P") (abstract-msc . "P")
+    (part . "H:1") (part* . "H:1") (chapter . "H:2") (chapter* . "H:2")
+    (appendix . "H:A") (appendix* . "H:A") (section . "H:3") (section* . "H:3")
+    (subsection . "H:4") (subsection* . "H:4")
+    (subsubsection . "H:5") (subsubsection* . "H:5")
+    (paragraph . "H:6") (paragraph* . "H:6")
+    (subparagraph . "H:7") (subparagraph* . "H:7")
+    (math . "Formula") (equation . "Formula") (equation* . "Formula")
+    (eqnarray . "Formula") (eqnarray* . "Formula")
+    (align . "Formula") (align* . "Formula")
+    (gather . "Formula") (gather* . "Formula")
+    (multline . "Formula") (multline* . "Formula")
+    (alignat . "Formula") (alignat* . "Formula")
+    (flalign . "Formula") (flalign* . "Formula")
+    (item . "Lbl") (item* . "Lbl") (bib-list . "L")
+    (bibitem . "Lbl") (bibitem* . "Lbl")
+    (tabular . "Table") (tabular* . "Table") (block . "Table")
+    (block* . "Table") (wide-tabular . "Table") (wide-block . "Table")
+    (row . "TR") (cell . "TD")
+    (hlink . "Link") (href . "Link") (footnote . "Note")
+    (image . "Figure") (graphics . "Figure")
+    (bibliography . "Sect") (bibliography* . "Sect")
+    (table-of-contents . "Sect") (the-index . "Sect") (the-glossary . "Sect")
+    (list-of-figures . "Sect") (list-of-tables . "Sect") (tit . "H:3")
+    (big-figure . "Div") (small-figure . "Div")
+    (big-table . "Div") (small-table . "Div")
+    (quote-env . "BlockQuote") (quotation . "BlockQuote")
+    (verse . "BlockQuote")))
+
+(define pdf-tag-caption-tags
+  '("big-figure" "small-figure" "big-table" "small-table"))
+
+(tm-define (pdf-tag-role l)
+  (:synopsis "The structure type of the tag @l in a tagged PDF, or \"\"")
+  (let* ((s (if (string? l) l (symbol->string l)))
+         (p (assq (string->symbol s) pdf-tag-roles)))
+    (cond (p (cdr p))
+          ((or (string-starts? s "itemize") (string-starts? s "enumerate")
+               (string-starts? s "description")) "L")
+          (else ""))))
+
+(tm-define (pdf-tag-child-role l i n)
+  (:synopsis "The structure type of the child @i of @n of a tag @l, or \"\"")
+  (if (and (in? l pdf-tag-caption-tags) (== i (- n 1))) "Caption" ""))
+
+(define (pdf-tag-drop-labels s)
+  ;; @s without its \label{...}
+  (with i (string-search-forwards "\\label{" 0 s)
+    (if (< i 0) s
+        (with j (string-search-forwards "}" i s)
+          (if (< j 0) s
+              (pdf-tag-drop-labels
+               (string-append (substring s 0 i)
+                              (substring s (+ j 1) (string-length s)))))))))
+
+(define pdf-tag-environments
+  '("equation" "eqnarray" "align" "gather" "multline" "flalign" "alignat"))
+
+(define (pdf-tag-strip s)
+  ;; the formula of a LaTeX equation: without its environment and labels
+  (let loop ((s (pdf-tag-drop-labels s)) (l pdf-tag-environments))
+    (if (null? l)
+        (string-trim-both (string-replace s "  " " "))
+        (let* ((e (car l))
+               (s1 (string-replace s (string-append "\\begin{" e "*}") ""))
+               (s2 (string-replace s1 (string-append "\\end{" e "*}") ""))
+               (s3 (string-replace s2 (string-append "\\begin{" e "}") ""))
+               (s4 (string-replace s3 (string-append "\\end{" e "}") "")))
+          (loop s4 (cdr l))))))
+
+(define (pdf-tag-latex t)
+  (let* ((s (convert (tree->stree t) "texmacs-stree" "latex-snippet"))
+         (s1 (string-replace (string-replace s "\n" " ") "\t" " "))
+         (s2 (pdf-tag-strip (string-trim-both (cork->utf8 s1)))))
+    (cond ((and (string-starts? s2 "$") (string-ends? s2 "$")
+                (> (string-length s2) 1))
+           (string-trim-both (substring s2 1 (- (string-length s2) 1))))
+          ((and (string-starts? s2 "\\[") (string-ends? s2 "\\]"))
+           (string-trim-both (substring s2 2 (- (string-length s2) 2))))
+          (else s2))))
+
+(tm-define (pdf-tag-alt t role)
+  (:synopsis "The alternate description of @t, an element of type @role")
+  (catch #t
+    (lambda ()
+      (cond ((== role "Formula") (pdf-tag-latex t))
+            ((and (== role "Figure") (tree-is? t 'image)
+                  (tree-atomic? (tree-ref t 0)))
+             (string-append "Image " (cork->utf8 (tree->string (tree-ref t 0)))))
+            ((== role "Figure") "Image")
+            (else "")))
+    (lambda args (if (== role "Formula") "Formula" "Image"))))
+
+(tm-define (pdf-tag-text t)
+  (:synopsis "The text of @t, in UTF-8 on one line (a caption)")
+  (catch #t
+    (lambda ()
+      (let* ((s (convert (tree->stree t) "texmacs-stree" "verbatim-snippet"))
+             (s1 (string-replace (string-replace s "\n" " ") "\t" " ")))
+        (string-trim-both (string-replace s1 "  " " "))))
+    (lambda args "")))
+
+(tm-define (pdf-tag-language lan)
+  (:synopsis "The language @lan of TeXmacs as a code (de-DE) for a PDF")
+  (string-replace (language-to-locale lan) "_" "-"))

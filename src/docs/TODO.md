@@ -76,6 +76,12 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   locales of the manuals (de, es, fr, it, pl, pt, zh) every book adds
   "locale ... not found" warnings, counted as new problems.
 
+- **Tagged PDF (#945, docs/pdf-tagging.md)**: alternate descriptions for
+  the pictures (markup, and a check that each has one), the fonts and the
+  content of included PDF/EPS pictures, table headers (TH), tagging in
+  PDFHummus, PDF/UA-2 (MathML), and tagging by default once tried with
+  screen readers.
+
 - **The PDF writer on MuPDF, the native writer of Vue since #941**: the
   fixes of #341 and #249 are ported (the TeX math fonts in the text layer,
   the videos; the bookmarks and the URIs were right). Left (#943): the

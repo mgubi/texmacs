@@ -34,11 +34,13 @@
 
 (tm-menu (focus-misc-menu t)
   (:require (embedded-image-context? t))
-  (-> "Save image" (link embedded-save-menu)))
+  (-> "Save image" (link embedded-save-menu))
+  ("Alternative text..." (interactive set-current-image-alt)))
 
 (tm-menu (focus-misc-menu t)
   (:require (linked-image-context? t))
-  (-> "Embed image" (link embedded-load-menu)))
+  (-> "Embed image" (link embedded-load-menu))
+  ("Alternative text..." (interactive set-current-image-alt)))
 
 (tm-menu (focus-misc-icons t)
   (:require (embedded-image-context? t))

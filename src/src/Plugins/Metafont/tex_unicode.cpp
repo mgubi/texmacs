@@ -27,7 +27,7 @@ static const char* tex_math_encodings[][3]= {
   { "msam", "msam", "" }, { "msbm", "msbm", "math-bbb" },
   { "eufm", "math-frak", "" }, { "eufb", "math-frak", "" },
   { "bbm", "math-bbb", "" }, { "bbmbx", "math-bbb", "" },
-  { "grmn", "math-upgreek", "" }, { "grxn", "math-upgreek", "" },
+  { "grmn", "grmn", "math-upgreek" }, { "grxn", "grmn", "math-upgreek" },
   { "stmary", "stmary", "rubber-stmary" },
   { "wasy", "wasy", "rubber-wasy" }, { "wasyb", "wasy", "rubber-wasy" },
   { "", "", "" }
@@ -77,10 +77,17 @@ tex_encoding_unicode (string enc, array<int>& table) {
         if (s[i] == '\\' && i+1 < n) i++;
         name << s[i];
       }
-      if (N(name) > 0 && pos < 256 && table[pos] < 0)
+      // (in grmn.enc the symbols theta, phi and kappa come before the
+      // letters at their places: the letters win, as the glyphs say)
+      bool var= (pos < 256 && enc == "grmn" &&
+                 (table[pos] == 0x3d1 || table[pos] == 0x3d5 ||
+                  table[pos] == 0x3f0));
+      if (N(name) > 0 && pos < 256 && (table[pos] < 0 || var)) {
         // the "-" of the symbol fonts is the minus sign, not a hyphen
-        table[pos]= (name == "-" && enc == "cmsy")? 0x2212:
-                    tex_symbol_unicode (name);
+        int u= (name == "-" && enc == "cmsy")? 0x2212:
+               tex_symbol_unicode (name);
+        if (!var || (u >= 0x391 && u <= 0x3c9)) table[pos]= u;
+      }
       pos++;
     }
     else if (is_digit (s[i])) {
@@ -101,6 +108,11 @@ tex_math_unicode (string fontname) {
   int k, n= 0;
   while (n < N(fontname) && is_alpha (fontname[n])) n++;
   string base= fontname (0, n);
+  // the CB Greek fonts (grmn, grbx, grmi, gttn, gsmn...) have the encoding
+  // of grmn: their text letters, accents and punctuation
+  if (N(base) == 4 && (starts (base, "gr") || starts (base, "gt") ||
+                       starts (base, "gs")))
+    base= "grmn";
   for (k=0; tex_math_encodings[k][0][0] != '\0'; k++)
     if (base == tex_math_encodings[k][0]) break;
   if (tex_math_encodings[k][0][0] != '\0' &&

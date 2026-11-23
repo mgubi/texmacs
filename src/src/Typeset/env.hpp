@@ -1047,6 +1047,12 @@ bool inclusion_busy (url u);
 void inclusion_enter (url u);
 void inclusion_leave (url u);
 void reset_inclusion (url u);
+// The include* which print_doc gives the document of their file, for a
+// tagged PDF (<include*|f|doc>): only those are typeset so, by identity,
+// never an include* of a document, which would choose its trust
+void given_inclusion_add (tree t);
+void given_inclusions_clear ();
+bool is_given_inclusion (tree t);
 bool refresh_inclusions ();
 // (whether the typesetting looked up a picture, see edit_env_rep::picture_value)
 bool typeset_pictures_used ();
