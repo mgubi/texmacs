@@ -77,10 +77,9 @@
 ;; Checking modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;FIXME: in-active-graphics% and developer-mode%
-; seems to be the only two modes which do not have the associated procedure
-; is the code below meaningful? why we need to do the eval?
-; I want maybe to have the catch inside the eval
+; Every mode given to lazy-keyboard has its predicate here; the eval is only
+; a fallback for a mode defined elsewhere, and raising and catching an error
+; there at every lazy-keyboard-force is slow (#947)
 
 (define-public (texmacs-in-mode? mode)
   (with proc (symbol-procedure mode)
@@ -252,6 +251,7 @@
   (in-plugin-with-converters%
    (plugin-supports-math-input-ref (get-env "prog-language")))
   (in-screens% (inside? 'screens))
+  (in-active-graphics% (and (in-graphics?) (== (get-env "preamble") "false")))
   (in-article% (style-has? "header-article-package"))
   (in-book% (style-has? "header-book-package"))
   (in-letter% (style-has? "header-letter-package"))

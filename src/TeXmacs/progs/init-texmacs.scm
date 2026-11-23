@@ -261,7 +261,8 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting graphics mode\n")
-(lazy-keyboard (graphics graphics-kbd) in-active-graphics? graphics-wheel)
+(lazy-keyboard (graphics graphics-kbd) in-active-graphics?)
+(lazy-define (graphics graphics-kbd) graphics-wheel)
 (lazy-menu (graphics graphics-menu) graphics-icons
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
@@ -318,7 +319,7 @@
 
 ;(display "Booting documentation\n")
 (lazy-keyboard (doc tmdoc-kbd) in-manual?)
-(lazy-keyboard (doc apidoc-kbd) developer-mode?)
+(when developer-mode? (lazy-keyboard (doc apidoc-kbd) always?))
 (lazy-menu (doc tmdoc-menu) tmdoc-menu tmdoc-icons)
 (lazy-menu (doc help-menu) help-menu)
 (lazy-define (doc tmdoc) tmdoc-expand-help tmdoc-expand-help-manual

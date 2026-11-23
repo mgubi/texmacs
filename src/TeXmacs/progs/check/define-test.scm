@@ -324,6 +324,11 @@
   (check= (symbol-procedure 'define-test-on%) define-test-on?)
   (check= (texmacs-mode-mode 'define-test-on?) 'define-test-on%)
   (check= (texmacs-mode-mode define-test-on?) 'define-test-on%)
+  ;; the modes of the lazy keyboards of init-texmacs have their predicate:
+  ;; without it, every lazy-keyboard-force raised and caught an error in
+  ;; texmacs-in-mode? (#947)
+  (check-true (procedure? (symbol-procedure 'in-active-graphics%)))
+  (check-true (procedure? graphics-wheel))
   ;; the modes are evaluated each time
   (set! define-test-flag #f)
   (check-false (define-test-flag?))

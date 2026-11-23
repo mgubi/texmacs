@@ -22,9 +22,6 @@
 ;; Various contexts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (in-active-graphics?)
-  (and (in-graphics?) (== (get-env "preamble") "false")))
-
 (define (in-beamer-graphics?)
   (and (in-active-graphics?) (in-screens?)))
 
