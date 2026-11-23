@@ -143,7 +143,7 @@ the vendored `DescendentFontWriter.cpp`), which PDF/UA allows.
 glyphs of a font (`font_glyphs_rep`) carry the encoding their codes are in
 (`encoding`, with the TeX metric, `metric`), said by the fonts which draw
 through them, not guessed from a name: a TeX text font by its kind (`ec`:
-Cork; `cm`: OT1, typewriter apart; `la`: the T2A of `larm.enc`; `gr`:
+Cork; `cm`: OT1, typewriter apart; `la`: T2A; `gr`:
 `grmn.enc`; `adobe`: the Adobe standard encoding), a compound font by the
 `.enc` file of the charmap of the entry (`cmmi`, `math-cal`...), a math
 font by the section of its translator (`[cmmi]` of `math.enc`), a TeX
@@ -155,13 +155,25 @@ effects...) have those of their font, `make_bbb` the double-struck forms
 themselves (`alphanum`, `capital`, `alpha`: the letters of a style) is
 read last, so that a glyph drawn both as a letter of a style and as a
 symbol (the Euler letters and the Fraktur symbols, both of eufm) is the
-symbol whatever the document drew first; more generally a code which
-one encoding gives as a plain letter or digit and another as a symbol is
-the symbol (x of cmbx, drawn by the bold math font as x and by the math
-font as the bold x, is 𝐱), and of a Greek and a Latin letter of one
-shape at a code (math-bold-1: b-Alpha, b-up-A) the Latin one; a glyph
-only drawn as a letter of a style (R of the math font Bbb, a letter of
-msbm) is that letter. A family not found is drawn with the glyphs of
+symbol; more generally a code which one encoding gives as a plain letter
+or digit and another as a symbol is the symbol (x of cmbx, drawn by the
+bold math font as x and by the math font as the bold x, is 𝐱), and of a
+Greek and a Latin letter of one shape at a code (math-bold-1: b-Alpha,
+b-up-A) the Latin one; a glyph only drawn as a letter of a style (R of
+the math font Bbb, a letter of msbm) is that letter.
+
+*Left limit: one glyph, several characters.* A map of a font gives one
+character per glyph, but TeXmacs draws one glyph for different
+characters: x of cmmib is x in the bold math font and 𝒙 (`b-x`) in the
+math font, α of cmmib α and 𝜶. Which one the map says depends on what
+the document draws, since a math font loads the font of a section (and
+gives its glyphs that encoding) when it first draws a character of it:
+bold `a f` alone gives `af`, with a `b-f` somewhere `𝒂𝒇`; an explicit
+`b-alpha` in bold math gives α. The PDFHummus writer also does not join
+the encodings of the sizes of a TeX font, which share one program: the
+first size drawn decides. The way out is to write the text TeXmacs drew
+(`/ActualText`, from the strings of the typesetter) for such glyphs,
+which is left to a later change. A family not found is drawn with the glyphs of
 ecrm, which are Cork; Dingbats (rpzdr) has no encoding.
 The Cyrillic fonts are T2A (not `larm.enc`, which has Є and є at the
 codes of Ѕ and ѕ); in the MuPDF writer the sizes of a TeX font, which
