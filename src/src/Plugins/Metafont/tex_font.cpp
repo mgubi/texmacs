@@ -147,7 +147,10 @@ tex_font_rep::tex_font_rep (string name, int status2,
     // (the typewriter fonts of TeX, whose ligature program is not run)
     add_glyph_encoding (!exec || starts (family, "cmtcsc")? "ot1-tt": "ot1");
     break;
-  case TEX_ADOBE: add_glyph_encoding ("adobe"); break;
+  case TEX_ADOBE:
+    // (not Dingbats, rpzdr: pictograms at the codes of its own)
+    if (!starts (family, "rpzd")) add_glyph_encoding ("adobe");
+    break;
   }
 
   y1           = conv (-262080);   // -0.25 quad
@@ -256,8 +259,8 @@ tex_font_rep::tex_font_rep (string name, int status2,
 void
 tex_font_rep::add_glyph_encoding (string enc) {
   // (a family not found: ecrm took its place, its glyphs are Cork)
-  if (!found || is_nil (pk)) return;
-  pk->add_encoding (enc);
+  if (is_nil (pk)) return;
+  pk->add_encoding (found? enc: string ("cork"));
   if (pk->metric == "") pk->metric= tfm->res_name;
 }
 

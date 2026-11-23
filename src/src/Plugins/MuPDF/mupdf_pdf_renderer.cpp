@@ -1534,7 +1534,8 @@ mupdf_pdf_renderer_rep::write_tex_to_unicode (pdf_font_item& it, int first,
     string joined;
     for (int k=0; k<N(parts); k++)
       joined= (k == 0? parts[k]: joined * "+" * parts[k]);
-    tex= tex_encoding_table (joined, metric, false);
+    // (a copy: the table is cached, and is changed below)
+    tex= copy (tex_encoding_table (joined, metric, false));
   }
   if (N(tex) == 0 && tagger != NULL) {
     // a tagged PDF maps every code used (PDF/UA): those of a font of no

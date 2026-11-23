@@ -46,13 +46,27 @@ tex_symbol_unicode (string name) {
   return -1;
 }
 
+// A Greek capital or small letter (also bold, italic...), and a Latin one
+static bool
+greek_letter (int u) {
+  return (u >= 0x391 && u <= 0x3c9) || (u >= 0x1d6a8 && u <= 0x1d7c9);
+}
+
+static bool
+latin_letter (int u) {
+  return (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z') ||
+         (u >= 0x1d400 && u <= 0x1d6a3);
+}
+
 // The symbols of the encoding file enc are added to the table of the Unicode
-// characters by position; the first symbol at a position is the main one
-static void
+// characters by position; the first symbol at a position is the main one,
+// but a Latin letter wins over a Greek one of the same shape listed before
+// it (math-bold-1: b-Alpha, then b-up-A); false when there is no such file
+static bool
 tex_encoding_unicode (string enc, array<int>& table) {
   string s;
   url u ("$TEXMACS_HOME_PATH/fonts/enc:$TEXMACS_PATH/fonts/enc", enc * ".enc");
-  if (load_string (u, s, false)) return;
+  if (load_string (u, s, false)) return false;
   int i, n= N(s), pos= 0;
   for (i=0; i<n; i++)
     if (s[i] == '\"') {
@@ -66,11 +80,14 @@ tex_encoding_unicode (string enc, array<int>& table) {
       bool var= (pos < 256 && enc == "grmn" &&
                  (table[pos] == 0x3d1 || table[pos] == 0x3d5 ||
                   table[pos] == 0x3f0));
-      if (N(name) > 0 && pos < 256 && (table[pos] < 0 || var)) {
+      if (N(name) > 0 && pos < 256) {
         // the "-" of the symbol fonts is the minus sign, not a hyphen
         int u= (name == "-" && enc == "cmsy")? 0x2212:
                tex_symbol_unicode (name);
-        if (!var || (u >= 0x391 && u <= 0x3c9)) table[pos]= u;
+        if (table[pos] < 0) table[pos]= u;
+        else if (var && u >= 0x391 && u <= 0x3c9) table[pos]= u;
+        else if (greek_letter (table[pos]) && latin_letter (u))
+          table[pos]= u;
       }
       pos++;
     }
@@ -79,6 +96,7 @@ tex_encoding_unicode (string enc, array<int>& table) {
       while (i+1 < n && is_digit (s[i+1])) i++;
       pos= as_int (s (start, i+1));
     }
+  return true;
 }
 
 // the OT1 encoding (and its typewriter variant): the positions of no
@@ -232,8 +250,13 @@ tex_encoding_table (string encoding, string metric, bool text) {
     if (tex_encoding_plain (e)) last << e; else list << e;
   }
   list << last;
+  // (a code given as a plain letter or digit by one encoding, a symbol by
+  // another, is the symbol, whatever the order: x of cmbx drawn by a bold
+  // math font as x and by a math font as the bold x is the bold x)
+  array<int> main= copy (table);
   for (int k=0; k<N(list); k++) {
     string e= list[k];
+    for (int c=0; c<256; c++) table[c]= -1;
     if (e == "t2a" || (text && e == "cork")) {
       for (int c=0; c<256; c++)
         if (table[c] < 0) table[c]= tex_glyph_unicode (c, e == "t2a");
@@ -249,11 +272,19 @@ tex_encoding_table (string encoding, string metric, bool text) {
         if (table[c] < 0) table[c]= tex_adobe_unicode (c);
       any= true;
     }
-    else if (e != "cork" && e != "ot1" && e != "ot1-tt" && e != "adobe") {
-      tex_encoding_unicode (e, table);
+    else if (e != "cork" && e != "ot1" && e != "ot1-tt" && e != "adobe" &&
+             e != "unicode" && e != "mixed" &&
+             tex_encoding_unicode (e, table))
       any= symbols= true;
+    for (int c=0; c<256; c++) {
+      int u= table[c];
+      if (u < 0) continue;
+      int m= main[c];
+      bool plain= (m < 0x80 && (is_alpha ((char) m) || is_digit ((char) m)));
+      if (m < 0 || (plain && u >= 0x80)) main[c]= u;
     }
   }
+  table= main;
   if (!any) table= array<int> ();
   else if (symbols && metric != "" &&
            tex_font_metric::instances->contains (metric)) {
