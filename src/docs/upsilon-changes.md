@@ -14,6 +14,12 @@ have the details, and the problems go to the
 
 ## 24 November 2026
 
+- **Shared files: an agent's process that takes over the file**: when the
+  person's TeXmacs, with proposals of an agent, closed or lost the file and
+  the agent's process took it over, an error was printed at every tick
+  ("shared file error: hash-table-ref"); now a new host starts with no
+  proposals, and a pending proposal stays in the document as version
+  markup, which Version > Retain resolves (#956).
 - **Chez Scheme: `string-load` as with Guile and s7** (builds with Chez):
   `string-load` is the routine of the C++ glue, no longer a copy in
   Scheme, and a missing file is reported as with the other Schemes; a

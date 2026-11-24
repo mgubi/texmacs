@@ -1913,6 +1913,19 @@
             (ahash-set! sent (peer-id p) l)
             (msg-send (peer-link p) (list 'proposals l))))))))
 
+;; A change of host forgets the proposals (#956): the records of a host (tables,
+;; with tree pointers in its document) and the list that an agent was told by
+;; its host, (id status index), are both of the former host. The new host has
+;; no record of who proposed what: the markup of a pending proposal stays in
+;; the document as plain version markup, which the Version tools resolve.
+(define (proposals-forget! sf)
+  (for (pr (or (sf-get sf 'proposals) '()))
+    (when (not (list? pr))
+      (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))))
+  (sf-put! sf 'proposals '())
+  (sf-put! sf 'prop-sent #f)
+  (sf-put! sf 'prop-polled #f))
+
 (define (proposal-create! sf peer range new)
   ;; the patch of the agent @peer becomes a proposal in the document; gives
   ;; its id
@@ -2794,6 +2807,7 @@
 
 (define (participant-seek! sf old-token pref)
   ;; the host is gone: try the lock, in the order of the preference
+  (proposals-forget! sf)
   (let ((c (sf-get sf 'conn)))
     (when c (local-close c)))
   (sf-put! sf 'conn #f)
@@ -2851,6 +2865,7 @@
       (sf-put! sf 'reconnecting #f)
       (sf-put! sf 'seeking #f)
       (sf-put! sf 'peers '())
+      (proposals-forget! sf)
       (sf-put! sf 'token token)
       (sf-put! sf 'host-token token)
       (sf-put! sf 'host-id (sf-get sf 'id))
