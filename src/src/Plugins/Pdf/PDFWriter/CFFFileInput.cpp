@@ -846,6 +846,8 @@ void CFFFileInput::ReadEncoding(EncodingsInfo* inEncoding,LongFilePositionType i
 				}
 			}
 		}
+		// (TeXmacs: the supplements follow the codes; mEncodingEnd was never set)
+		inEncoding->mEncodingEnd = mPrimitivesReader.GetCurrentPosition();
 		if((encodingFormat & 0x80) !=  0) // supplaments exist, need to add to encoding end
 		{
 			mPrimitivesReader.SetOffset(inEncoding->mEncodingEnd); // set position to end of encoding, and start of supplamental, so that can read their count
