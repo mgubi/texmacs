@@ -3722,8 +3722,29 @@
 
 (define (proposal-key d id) (string-append (doc-id d) "/" id))
 
+(define mcp-prop-forgotten (make-ahash-table))   ; doc id -> shared-proposals-forgotten seen
+
+(define (forgotten-note d)
+  ;; the host of the document changed since the last call, dropping the
+  ;; proposals of this agent (#956): forget what was told of them, say it once
+  (let ((n (shared-proposals-forgotten (doc-url d))) (k (doc-id d)))
+    (and (integer? n)
+         (with seen (ahash-ref mcp-prop-forgotten k)
+           (ahash-set! mcp-prop-forgotten k n)
+           (and seen (> n seen)
+                (let ((pre (string-append k "/")))
+                  (for (e (ahash-table->list mcp-prop-seen))
+                    (when (string-starts? (car e) pre)
+                      (ahash-remove! mcp-prop-seen (car e))))
+                  "The host of the document changed: your earlier proposals are no longer tracked (list_proposals no longer lists them, they cannot be withdrawn); their markup stays in the document for the person to resolve with Version > Retain."))))))
+
 (define (proposal-note d)
   ;; what became of the proposals since the last call, or #f
+  (let* ((f (forgotten-note d)) (r (proposal-note* d)))
+    (cond ((and f r) (string-append f " " r))
+          (else (or f r)))))
+
+(define (proposal-note* d)
   (let ((l (list-filter (proposal-entries d)
                         (lambda (e) (and (!= (cadr e) "pending")
                                          (!= (ahash-ref mcp-prop-seen (proposal-key d (car e)))
@@ -4001,7 +4022,7 @@
    (list "withdraw_proposal" "Withdraw a pending proposal"
          "Takes back a proposal that is still pending: the person's document goes back to the old version."
          (schema (list (cons "document" document-prop)
-                       (cons "id" (prop "string" "The proposal (p1...), from the answer of the edit or from list_proposals.")))
+                       (cons "id" (prop "string" "The proposal (an id such as p1.3fa0), from the answer of the edit or from list_proposals.")))
                  '("document" "id"))
          tool-withdraw-proposal #t)
    (list "undo_agent" "Undo your own last steps"

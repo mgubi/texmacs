@@ -796,6 +796,7 @@
       (sf-put! sf 'lock #f))
     (and-with obs (sf-get sf 'observer)
       (catch #t (lambda () (tree-pointer-detach obs)) (lambda args #f)))
+    (proposals-forget! sf #f)
     (ahash-remove! sf-table key)
     (ahash-remove! sf-by-buffer (url->string (sf-buffer sf)))
     (live-forget-all key)))
@@ -1555,8 +1556,11 @@
                   ((== range 'bad)
                    (list 'refuse (list "patch" "code" "the patch does not keep the document a sequence of blocks")))
                   ((list-or (map version-tag-in? (blocks-stree old (car range) (cadr range))))
-                   (list 'refuse (list "pending" "mode"
-                                       "the blocks hold version markup (a pending proposal): resolve or withdraw it first")))
+                   (list 'refuse
+                         (list "pending" "mode"
+                               (if (proposal-in-range? sf (car range) (cadr range))
+                                   "the blocks hold version markup (a pending proposal): resolve or withdraw it first"
+                                   "the blocks hold version markup that no proposal of this host covers (a former host's proposal, or the person's comparison): only the person can resolve it, with Version > Retain"))))
                   (else
                     (let ((viol (agent-filter u old new range)))
                       (cond ((pair? viol) (cons 'refuse viol))
@@ -1641,6 +1645,15 @@
     (cond (t (tree-index t))
           ((proposal-pending? pr) -1)
           (else (or (prop-get pr 'index) -1)))))
+
+(define (proposal-in-range? sf p n)
+  ;; does a pending proposal of this host have its block among the blocks
+  ;; p..p+n-1 (n = 0: an insertion before p)?
+  (list-or (map (lambda (pr)
+                  (and (proposal-pending? pr)
+                       (with i (proposal-index sf pr)
+                         (and (>= i p) (< i (+ p (max n 1)))))))
+                (or (sf-get sf 'proposals) '()))))
 
 (define (proposal-find sf id)
   (with l (list-filter (or (sf-get sf 'proposals) '()) (lambda (pr) (== (prop-get pr 'id) id)))
@@ -1917,14 +1930,38 @@
 ;; with tree pointers in its document) and the list that an agent was told by
 ;; its host, (id status index), are both of the former host. The new host has
 ;; no record of who proposed what: the markup of a pending proposal stays in
-;; the document as plain version markup, which the Version tools resolve.
-(define (proposals-forget! sf)
-  (for (pr (or (sf-get sf 'proposals) '()))
-    (when (not (list? pr))
-      (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))))
+;; the document as plain version markup, which the Version tools resolve. The
+;; ids are p<n>.<tag>, the tag drawn by each host for its proposals, so that an
+;; id of a former host never names a proposal of the new one.
+(define proposals-forgotten (make-ahash-table))   ; key -> times an agent's list was dropped
+
+(define (proposals-forget! sf told?)
+  ;; @told?: a change of host (an agent that had a list is told by
+  ;; shared-proposals-forgotten), not the end of the sharing
+  (let ((l (or (sf-get sf 'proposals) '())))
+    (for (pr l)
+      (when (not (list? pr))
+        (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))))
+    (when (and told? (nnull? l))
+      (ahash-set! proposals-forgotten (sf-key sf)
+                  (+ 1 (or (ahash-ref proposals-forgotten (sf-key sf)) 0)))))
   (sf-put! sf 'proposals '())
+  (sf-put! sf 'prop-counter 0)
+  (sf-put! sf 'prop-tag #f)
   (sf-put! sf 'prop-sent #f)
   (sf-put! sf 'prop-polled #f))
+
+(tm-define (shared-proposals-forgotten name)
+  (:synopsis "How many times the proposals told on @name were dropped by a change of host")
+  (and-with sf (sf-by-name name)
+    (or (ahash-ref proposals-forgotten (sf-key sf)) 0)))
+
+(define (proposal-id sf n)
+  ;; p<n>.<tag>: the tag (4 hex digits) is drawn once per host
+  (let ((tag (or (sf-get sf 'prop-tag)
+                 (let ((t (substring (shared-random-token) 0 4)))
+                   (sf-put! sf 'prop-tag t) t))))
+    (string-append "p" (number->string n) "." tag)))
 
 (define (proposal-create! sf peer range new)
   ;; the patch of the agent @peer becomes a proposal in the document; gives
@@ -1934,7 +1971,7 @@
          (old-sts (blocks-stree body p n-old))
          (new-sts (blocks-stree new p n-new))
          (n (+ 1 (or (sf-get sf 'prop-counter) 0)))
-         (id (string-append "p" (number->string n)))
+         (id (proposal-id sf n))
          (markup (proposal-markup old-sts new-sts))
          (au (author-of sf (peer-id peer)))
          (pr (make-ahash-table)))
@@ -2807,7 +2844,7 @@
 
 (define (participant-seek! sf old-token pref)
   ;; the host is gone: try the lock, in the order of the preference
-  (proposals-forget! sf)
+  (proposals-forget! sf #t)
   (let ((c (sf-get sf 'conn)))
     (when c (local-close c)))
   (sf-put! sf 'conn #f)
@@ -2865,7 +2902,7 @@
       (sf-put! sf 'reconnecting #f)
       (sf-put! sf 'seeking #f)
       (sf-put! sf 'peers '())
-      (proposals-forget! sf)
+      (proposals-forget! sf #t)
       (sf-put! sf 'token token)
       (sf-put! sf 'host-token token)
       (sf-put! sf 'host-id (sf-get sf 'id))

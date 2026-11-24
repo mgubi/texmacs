@@ -11,7 +11,7 @@
 ;; With SH_INTERACTIVE set the process counts as the person's (interactive): it
 ;; applies the modes to agents (docs/shared-files.md), and
 ;;   mode M             propose, direct or read-only
-;;   accept ID / reject ID   resolve the proposal ID of an agent
+;;   accept ID / reject ID   resolve the proposal ID of an agent (p3: p3.<tag>)
 ;;   proposals          write (id status index owner) of the proposals to the sync file proposals
 ;;   save               save the buffer
 ;;   eval EXPR         write the value of the Scheme expression EXPR, in the buffer, to the sync file eval
@@ -43,8 +43,8 @@
           ((== name "peers")
            (sync-write! "peers" (number->string (shared-stat 'peer-patches))))
           ((== name "mode") (shared-set-agent-mode! (the-name) (string->symbol arg)))
-          ((== name "accept") (shared-proposal-resolve! (the-name) arg 'new))
-          ((== name "reject") (shared-proposal-resolve! (the-name) arg 'old))
+          ((== name "accept") (shared-proposal-resolve! (the-name) (prop-id arg) 'new))
+          ((== name "reject") (shared-proposal-resolve! (the-name) (prop-id arg) 'old))
           ((== name "proposals")
            (sync-write! "proposals" (object->string (shared-proposals (the-name)))))
           ((== name "eval")

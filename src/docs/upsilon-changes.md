@@ -19,7 +19,9 @@ have the details, and the problems go to the
   the agent's process took it over, an error was printed at every tick
   ("shared file error: hash-table-ref"); now a new host starts with no
   proposals, and a pending proposal stays in the document as version
-  markup, which Version > Retain resolves (#956).
+  markup, which Version > Retain resolves; the agent is told once, and the
+  ids of proposals carry a tag of their host (`p1.3fa0`), so that an old id
+  never names a new proposal (#956).
 - **Chez Scheme: `string-load` as with Guile and s7** (builds with Chez):
   `string-load` is the routine of the C++ glue, no longer a copy in
   Scheme, and a missing file is reported as with the other Schemes; a

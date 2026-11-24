@@ -157,7 +157,7 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
 
 - **Edit tools** (`replace`, `insert`, `delete`, `edit_text`, `undo_agent`) answer:
   - `applied` (direct mode);
-  - `proposed`, with `proposal` (`p3`): the person's TeXmacs keeps the change as a
+  - `proposed`, with `proposal` (`p3.3fa0`: a number and a tag of the host): the person's TeXmacs keeps the change as a
     proposal in the document (both versions side by side, the markup of Version >
     Compare); the agent's copy goes back to the host's document and contains the
     proposal. The step cannot be undone with `undo_agent`;
@@ -175,7 +175,10 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
 - **`save_document`** answers `refused` (with `reason`) when the file is open in the person's TeXmacs and the mode is not `direct`: the person saves it.
 - **Version markup** (`version-both`...) in content is refused (rule `version-markup`): only the person's TeXmacs writes it, for a proposal.
 - **Notes.** When the person accepted or rejected a proposal, the agent's next answer
-  has a `note` ("Your proposal p1 was accepted by the person."), once.
+  has a `note` ("Your proposal p1.3fa0 was accepted by the person."), once. When the
+  host of the document changed (the person closed it and opened it again, or another
+  process took it over), the proposals of the former host are no longer tracked: the
+  next answer says so once in its `note`; their markup stays for the person to resolve.
 - **The host's filter.** The same rules as the agent's own check, run by the host on
   the patched document (`mcp-host-check`): see shared-files.md. They apply to
   proposals too: refused content never becomes a proposal. The agent's own check still

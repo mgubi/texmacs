@@ -91,6 +91,17 @@
 (define (peers-count) (and-with i (shared-file-info (the-name)) (list-ref i 2)))
 (define (die!) (system (string-append "kill -9 " (number->string (shared-process-id)))))
 
+;; The ids of proposals are p<n>.<tag> (the tag is drawn by the host):
+;; (short-id "p3.3fa0") is "p3", (prop-id "p3") the full id of the proposal p3
+;; of the current host on the file, or "p3" when there is none
+(define (short-id id)
+  (let ((i (and (string? id) (string-index id #\.))))
+    (if i (substring id 0 i) id)))
+(define (prop-id short)
+  (let ((l (list-filter (or (shared-proposals (the-name)) '())
+                        (lambda (e) (== (short-id (car e)) short)))))
+    (if (nnull? l) (car (car l)) short)))
+
 (define (timed-wait ms)
   ;; a step which waits @ms milliseconds (the times of files have seconds)
   (let ((t0 #f))

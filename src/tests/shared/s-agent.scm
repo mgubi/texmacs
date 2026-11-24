@@ -35,20 +35,20 @@
    ;; 1. propose, accept
    (wait-sync (sync-n 1 "b"))
    (step "proposal 1" (nnull? (shared-proposals (the-name))))
-   (act "check 1" (check "a proposal, pending" (equal? (list-head (car (shared-proposals (the-name))) 2) '("p1" "pending")))
+   (act "check 1" (check "a proposal, pending" (and (== (short-id (car (car (shared-proposals (the-name))))) "p1") (== (cadr (car (shared-proposals (the-name)))) "pending")))
         (check "the document holds version markup" (version-in-doc?))
         (check "both versions are there" (let ((s (object->string (body-stree)))) (and (string-contains? s "\"Hello \"") (string-contains? s "\"HelloAA \""))))
         (check "the other paragraphs are untouched" (== (para-text 2) "Second paragraph."))
         (check "the host proposed, did not apply" (and (= (shared-stat 'agent-proposed) 1) (= (shared-stat 'peer-patches) 0)))
-        (check "accepting works" (shared-proposal-resolve! (the-name) "p1" 'new))
+        (check "accepting works" (shared-proposal-resolve! (the-name) (prop-id "p1") 'new))
         (check "the new version is in" (and (== (para-text 1) "HelloAA world.") (not (version-in-doc?))))
         (check "the proposal is accepted" (== (cadr (car (shared-proposals (the-name)))) "accepted"))
         (sync-set! (sync-n 1 "a")))
    ;; 2. reject
    (wait-sync (sync-n 2 "b"))
    (step "proposal 2" (= (length (shared-proposals (the-name))) 2))
-   (act "check 2" (check "reject: the old version is back" (and (shared-proposal-resolve! (the-name) "p2" 'old) (== (para-text 2) "Second paragraph.") (not (version-in-doc?))))
-        (check "a resolved proposal cannot be resolved again" (not (shared-proposal-resolve! (the-name) "p2" 'new)))
+   (act "check 2" (check "reject: the old version is back" (and (shared-proposal-resolve! (the-name) (prop-id "p2") 'old) (== (para-text 2) "Second paragraph.") (not (version-in-doc?))))
+        (check "a resolved proposal cannot be resolved again" (not (shared-proposal-resolve! (the-name) (prop-id "p2") 'new)))
         (sync-set! (sync-n 2 "a")))
    ;; 3. withdraw by the agent
    (wait-sync (sync-n 3 "b"))
@@ -58,7 +58,7 @@
    ;; 4. the person's undo after accepting
    (wait-sync (sync-n 4 "b"))
    (step "proposal 4" (= (length (shared-proposals (the-name))) 4))
-   (act "accept 4" (shared-proposal-resolve! (the-name) "p4" 'new)
+   (act "accept 4" (shared-proposal-resolve! (the-name) (prop-id "p4") 'new)
         (check "accepted" (string-contains? (para-text 1) "QQ")))
    (act "undo" (with-buffer (the-name) (undo 0)))
    (act "check 4" (check "the person's undo brings the markup back" (version-in-doc?))
@@ -107,7 +107,7 @@
    (act "check 9c" (check "two proposals pending, both markups there"
                           (>= (length (list-filter (tree-children (body)) (lambda (t) (version-in-doc-tree? t)))) 2))
         (check "the second was not refused" (= (shared-stat 'agent-refused) 5))
-        (check "reject both" (and (shared-proposal-resolve! (the-name) "p5" 'old) (shared-proposal-resolve! (the-name) "p6" 'old)))
+        (check "reject both" (and (shared-proposal-resolve! (the-name) (prop-id "p5") 'old) (shared-proposal-resolve! (the-name) (prop-id "p6") 'old)))
         (check "and the document is as it was" (and (not (version-in-doc?)) (== (para-text 3) "Third one.")))
         (sync-set! (sync-n 9 "a2")))
    ;; 10. the agent's Save
@@ -145,7 +145,7 @@
    ;; 1
    (edit-and-wait 1 (lambda () (insert-text! 1 5 "AA")))
    (list
-    (act "v1" (check "verdict: proposed p1" (and last-verdict (eq? (car last-verdict) 'proposed) (== (caddr last-verdict) "p1")))
+    (act "v1" (check "verdict: proposed p1" (and last-verdict (eq? (car last-verdict) 'proposed) (== (short-id (caddr last-verdict)) "p1")))
           (check "the edit is taken back" (== (pending-count) 0)))
     (step "markup" (version-in-doc?))
     (act "b1" (sync-set! (sync-n 1 "b")))
@@ -168,7 +168,7 @@
    (list
     (step "markup3" (version-in-doc?))
     (step "listed" (= (length (shared-proposals (the-name))) 3))
-    (act "withdraw" (check "withdraw sent" (shared-file-send-withdraw (the-name) "p3")))
+    (act "withdraw" (check "withdraw sent" (shared-file-send-withdraw (the-name) (prop-id "p3"))))
     (step "withdrawn" (and (== (cadr (list-ref (shared-proposals (the-name)) 2)) "withdrawn") (not (version-in-doc?))))
     (act "c3" (check "withdrawn: the old text is back" (== (para-text 3) "Third one."))
           (sync-set! (sync-n 3 "b")))
