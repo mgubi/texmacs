@@ -122,8 +122,12 @@
     (wait-sync "a-back")
     (step "participant again" (== (role-of) 'participant))
     (act "check 4" (check "B: the list of the former host is forgotten" (null? (props)))
-         (check "B: the drop is counted (the MCP server tells the agent)"
-                (>= (shared-proposals-forgotten (the-name)) 1))))
+         (with l (shared-proposals-dropped (the-name))
+           (check "B: the dropped list is kept for the agent (p1 accepted, the old one pending)"
+                  (and (list? l)
+                       (list-or (map (lambda (e) (and (== (short-id (car e)) "p1") (== (cadr e) "accepted"))) l))
+                       (list-or (map (lambda (e) (and (== (car e) (sync-read "old-id")) (== (cadr e) "pending"))) l)))))
+         (check "B: given once" (null? (shared-proposals-dropped (the-name))))))
    ;; an edit of the old markup: refused, only the person resolves it
    (edit-and-wait 7 (lambda () (tree-assign (para 2) (stree->tree "Replaced."))))
    (list

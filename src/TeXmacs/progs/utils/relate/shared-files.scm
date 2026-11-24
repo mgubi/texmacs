@@ -1931,35 +1931,47 @@
 ;; its host, (id status index), are both of the former host. The new host has
 ;; no record of who proposed what: the markup of a pending proposal stays in
 ;; the document as plain version markup, which the Version tools resolve. The
-;; ids are p<n>.<tag>, the tag drawn by each host for its proposals, so that an
-;; id of a former host never names a proposal of the new one.
-(define proposals-forgotten (make-ahash-table))   ; key -> times an agent's list was dropped
+;; ids are p<n>.<tag>, the tag (8 hex digits, random) drawn by each host for
+;; its proposals, so that an id of a former host does not name a proposal of
+;; the new one.
+(define proposals-dropped (make-ahash-table))   ; key -> (id status index) dropped, newest first
 
 (define (proposals-forget! sf told?)
-  ;; @told?: a change of host (an agent that had a list is told by
-  ;; shared-proposals-forgotten), not the end of the sharing
+  ;; @told?: a change of host: the list of an agent (the last one its host
+  ;; told, with the outcomes it may not have read yet) is kept for
+  ;; shared-proposals-dropped; not at the end of the sharing
   (let ((l (or (sf-get sf 'proposals) '())))
     (for (pr l)
       (when (not (list? pr))
         (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))))
-    (when (and told? (nnull? l))
-      (ahash-set! proposals-forgotten (sf-key sf)
-                  (+ 1 (or (ahash-ref proposals-forgotten (sf-key sf)) 0)))))
+    (when told?
+      (with mine (list-filter l list?)
+        (when (nnull? mine)
+          (ahash-set! proposals-dropped (sf-key sf)
+                      (list-head* (append (reverse mine)
+                                          (or (ahash-ref proposals-dropped (sf-key sf)) '()))
+                                  200))))))
   (sf-put! sf 'proposals '())
   (sf-put! sf 'prop-counter 0)
   (sf-put! sf 'prop-tag #f)
   (sf-put! sf 'prop-sent #f)
   (sf-put! sf 'prop-polled #f))
 
-(tm-define (shared-proposals-forgotten name)
-  (:synopsis "How many times the proposals told on @name were dropped by a change of host")
+(define (list-head* l n)
+  (if (or (null? l) (<= n 0)) '() (cons (car l) (list-head* (cdr l) (- n 1)))))
+
+(tm-define (shared-proposals-dropped name)
+  (:synopsis "The proposals (id status index) told on @name and dropped by a change of host since the last call (and forgets them)")
   (and-with sf (sf-by-name name)
-    (or (ahash-ref proposals-forgotten (sf-key sf)) 0)))
+    (let ((l (or (ahash-ref proposals-dropped (sf-key sf)) '())))
+      (ahash-remove! proposals-dropped (sf-key sf))
+      (reverse l))))
 
 (define (proposal-id sf n)
-  ;; p<n>.<tag>: the tag (4 hex digits) is drawn once per host
+  ;; p<n>.<tag>: the tag (8 hex digits of a random token of its own, not the
+  ;; token of the host) is drawn once per host
   (let ((tag (or (sf-get sf 'prop-tag)
-                 (let ((t (substring (shared-random-token) 0 4)))
+                 (let ((t (substring (shared-random-token) 0 8)))
                    (sf-put! sf 'prop-tag t) t))))
     (string-append "p" (number->string n) "." tag)))
 

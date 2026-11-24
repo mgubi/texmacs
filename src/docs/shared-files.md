@@ -435,7 +435,7 @@ process hosts, or only headless ones), the agent edits directly, as before.
   result read `accepted` (the undone choice is dropped only at the next Keep or
   Accept) (#867). A patch of an agent that touches blocks
   with version markup is refused (`pending`).
-- **The host's records** (`shared-proposals`): id (`p1.3fa0`...: a number and a tag of 4 hex digits drawn by the host, so that the ids of two hosts never meet), owner, status
+- **The host's records** (`shared-proposals`): id (`p1.3fa0c2d1`...: a number and a tag of 8 random hex digits drawn by each host, not its token, so that the ids of two hosts almost surely differ), owner, status
   (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are
   kept (30) so that the agent hears. The host sends each agent the list of its
   proposals when it changes (`(proposals ((id status index) ...))`); the agent
@@ -449,17 +449,23 @@ process hosts, or only headless ones), the agent edits directly, as before.
   of its proposals told by the former host. The markup of a pending proposal
   stays in the document as plain version markup (as in a saved file, below):
   the person resolves it with the Version tools; Tools > Agents and the focus
-  bar do not list it, `list_proposals` no longer lists it, and an agent patch
-  that touches it is still refused (`pending`), since that rule reads the
-  markup; the reason then says that only the person can resolve it (no
-  proposal of this host covers it, so it cannot be withdrawn). Rebuilding the
+  bar do not list it, `list_proposals` no longer lists it. While a person's
+  TeXmacs hosts, an agent patch that touches it is still refused (`pending`),
+  since that rule reads the markup; the reason then says that only the person
+  can resolve it (no proposal of this host covers it, so it cannot be
+  withdrawn). While the agent's own process hosts (no interactive host), its
+  edits are applied directly, on that markup too, as any edit of a file that
+  no person has open. Rebuilding the
   records from the markup was rejected: the owner is unknown, and the agent
   that hosts has nobody to propose to. The new host draws a new tag for its
   ids (`p1.<tag>` again), so a withdraw with an id of the former host names no
-  proposal ("no proposal ... of yours") instead of a new one. An agent whose list
-  was dropped is told once: `shared-proposals-forgotten` counts the drops, and
-  the MCP server forgets the statuses it had told and adds a `note` ("The host
-  of the document changed: your earlier proposals are no longer tracked...").
+  proposal ("no proposal ... of yours") instead of a new one. The list an agent
+  drops is kept for `shared-proposals-dropped`, which gives it once: the host
+  sends its last list (with an Accept just made) before it releases the file,
+  so the MCP server still tells the outcomes not yet read ("Your proposal ...
+  was accepted"), and names in its `note` the proposals that were pending ("The
+  host of the document changed: your pending proposal ... is no longer
+  tracked ...").
 - **Proposals in the saved file.** The markup is part of the document, so a saved
   file with pending proposals holds both versions and is valid and readable (it is
   the markup of Version > Compare, which the Version tools resolve). The author and

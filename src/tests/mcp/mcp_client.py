@@ -1371,6 +1371,73 @@ def s_propose(w):
     check("the other TeXmacs passed its checks", out == "ok")
 
 
+def s_propose_close(w):
+    """the person closes the file just after an Accept: the agent's process hosts it
+    and the agent still hears that its proposal was accepted, with no word of markup
+    left; the person opens it again (and hosts), the agent proposes, the person
+    closes it with the proposal pending: the agent is told once that this proposal is
+    no longer tracked and that its markup stays (#956)"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "shared.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_INTERACTIVE": "1"})
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins as a participant", not e and v["shared"]["role"] == "participant")
+    def doc():
+        return m.tool("list_documents")[1]["documents"][0]
+    def role():
+        return (doc().get("shared") or {}).get("role")
+    check("propose mode", poll(lambda: doc().get("agent_mode") == "propose", 10))
+    st = [0]
+    # 1. accepted, then the person closes the file at once
+    k = m.tool("read", document="d1", format="text")[1]["children"]
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="First", new="Initial", expect=k[0]["hash"])
+    p1 = r.get("proposal") if not e else None
+    check("a proposal", not e and r["status"] == "proposed" and str(p1).startswith("p1."))
+    hostcmd(w, st, "accept p1")
+    hostcmd(w, st, "close")
+    check("the agent's process hosts the file", poll(lambda: role() == "host", 15))
+    e, t = m.tool("read", document="d1", format="text")
+    note = t.get("note", "") if not e else ""
+    check("accepted then closed: the agent hears accepted", ("proposal %s was accepted" % p1) in note)
+    check("accepted then closed: no word of tracking or markup", "no longer tracked" not in note and "markup" not in note)
+    check("the accepted text", "Initial paragraph." in t.get("content", ""))
+    e, t = m.tool("read", document="d1", format="text")
+    check("and not again", "proposal" not in t.get("note", ""))
+    # 2. the person opens it again and hosts; a proposal left pending when it closes
+    hostcmd(w, st, "reopen")
+    check("the person hosts again", poll(lambda: role() == "participant" and doc().get("agent_mode") == "propose", 30))
+    k = m.tool("read", document="d1", format="text")[1]["children"]
+    e, r = m.tool("edit_text", document="d1", node=k[1]["handle"], old="Second", new="Other", expect=k[1]["hash"])
+    p2 = r.get("proposal") if not e else None
+    check("a new proposal, with a new tag", not e and r["status"] == "proposed" and str(p2).startswith("p1.") and p2 != p1)
+    e, lp = m.tool("list_proposals", document="d1")
+    check("listed, pending", not e and [x["status"] for x in lp["proposals"]] == ["pending"])
+    hostcmd(w, st, "close")
+    check("the agent's process hosts the file again", poll(lambda: role() == "host", 15))
+    e, t = m.tool("read", document="d1", format="text")
+    note = t.get("note", "") if not e else ""
+    check("pending then closed: the note names it, no longer tracked, markup stays",
+          p2 in note and "no longer tracked" in note and "markup stays" in note and "was accepted" not in note)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("the markup stays", "version-both" in t.get("content", "") and "no longer tracked" not in t.get("note", ""))
+    e, r = m.tool("withdraw_proposal", document="d1", id=p2)
+    check("it cannot be withdrawn", e)
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
+
+
 def s_undo(w):
     """the editor's undo in a headless process (single process, no sharing)"""
     f = os.path.join(w, "u.tm")
@@ -2802,7 +2869,7 @@ def s_gui_host(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host, "not-joined": s_not_joined, "save-guard": s_save_guard,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "propose-close": s_propose_close, "gui-host": s_gui_host, "not-joined": s_not_joined, "save-guard": s_save_guard,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":

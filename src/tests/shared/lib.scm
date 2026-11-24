@@ -92,7 +92,7 @@
 (define (die!) (system (string-append "kill -9 " (number->string (shared-process-id)))))
 
 ;; The ids of proposals are p<n>.<tag> (the tag is drawn by the host):
-;; (short-id "p3.3fa0") is "p3", (prop-id "p3") the full id of the proposal p3
+;; (short-id "p3.3fa0c2d1") is "p3", (prop-id "p3") the full id of the proposal p3
 ;; of the current host on the file, or "p3" when there is none
 (define (short-id id)
   (let ((i (and (string? id) (string-index id #\.))))

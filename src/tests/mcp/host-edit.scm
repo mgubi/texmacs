@@ -17,6 +17,7 @@
 ;;   eval EXPR         write the value of the Scheme expression EXPR, in the buffer, to the sync file eval
 ;;   snapshot DIR      write the windows as PNG files in DIR (a GUI host, offscreen); the count to snapshot
 ;;   agents-here      write #t when Tools > Agents has an agent (agents-here?)
+;;   close / reopen     close the buffer (the file goes to the agent) / load it again
 ;;   gate               write the count and the time (ms) the host spent checking agents' patches
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
@@ -61,6 +62,8 @@
                            (and (shared-file? (current-buffer))
                                 (nnull? (shared-file-agents (current-buffer))))))))
           ((== name "save") (save-buffer-main (the-name)))
+          ((== name "close") (buffer-close (the-name)))
+          ((== name "reopen") (load-buffer FILE))
           ((== name "gate")
            (sync-write! "gate" (object->string (shared-file-gate-stats (the-name)))))
           ((== name "stats")
