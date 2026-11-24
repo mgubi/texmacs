@@ -406,7 +406,8 @@ process hosts, or only headless ones), the agent edits directly, as before.
   (the Review bar's Keep, Retain, Retain all, a selection), and records the
   outcome when no difference of the proposal is left: accepted (new kept
   everywhere), rejected (old everywhere), resolved (mixed). A choice for a difference that an undo
-  brought back is forgotten (the newest choices); a difference that went away
+  brought back is forgotten (the newest choices), by the Version tools and by
+  Tools > Agents alike; a difference that went away
   without a choice (typed over by hand) makes the outcome `resolved`, also for
   Accept or Reject in Tools > Agents after some choices of the Version tools.
   Keeping a version made of blocks makes the body again (`tree-normalize`), so
@@ -426,7 +427,10 @@ process hosts, or only headless ones), the agent edits directly, as before.
   an undo that brings back the markup of a resolved proposal is not reported
   (the undo makes new trees; the markup is then plain version markup and the
   status stays); while the person's own Compare markup is in the document, a
-  proposal whose markup is lost is reported `resolved` (#867). A patch of an agent that touches blocks
+  proposal whose markup is lost is reported `resolved`; an undo of a Keep that
+  made the body again (a kept version made of blocks) can make another, untouched
+  pending proposal lose its block: it is then reported `resolved` while its
+  markup remains (#867). A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status
   (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are

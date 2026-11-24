@@ -1689,8 +1689,9 @@
                 ;; (not a proposal whose block is lost: nothing to resolve)
                 (proposal-tree sf pr)
                 (let* ((k (if (== which 'new) 1 0))
-                       (ks (map cdr (or (prop-get pr 'retained) '())))
-                       (n (+ (length ks) (length (version-nodes (proposal-tree sf pr))))))
+                       (present (length (version-nodes (proposal-tree sf pr))))
+                       (ks (map cdr (choices-still-made pr (or (prop-get pr 'retained) '()) present)))
+                       (n (+ (length ks) present)))
                   ;; (after a choice of the Version tools for some differences)
                   (proposal-resolve! sf pr which
                                      (cond ((< n (or (prop-get pr 'ndiffs) n)) "resolved")
@@ -1783,6 +1784,13 @@
         ((and (tree-is? t 'version-both) (== which 'current-old)) 0)
         (else 1)))
 
+(define (choices-still-made pr old present)
+  ;; the choices @old of the Version tools for differences of @pr that are no
+  ;; longer in its markup, when @present differences are: an undo that brought
+  ;; differences back undid the newest choices (undo goes back in time)
+  (let ((keep (max 0 (- (or (prop-get pr 'ndiffs) 0) present))))
+    (if (> (length old) keep) (list-tail old (- (length old) keep)) old)))
+
 (define (proposals-retain sf nodes which thunk)
   ;; the Version tools keep the version @which of the markup @nodes (#t: all
   ;; of it) when @thunk runs: note the outcome of the proposals concerned
@@ -1815,10 +1823,7 @@
       (let* ((pr (car e)) (hit (caddr e))
              (old (list-filter (or (prop-get pr 'retained) '())
                                (lambda (c) (not (node-in? (car c) (map car hit))))))
-             ;; an undo brought differences back: the choices made for them
-             ;; are no longer in the document (the newest ones: undo goes back in time)
-             (keep (max 0 (- (or (prop-get pr 'ndiffs) 0) (cadr e))))
-             (done (append hit (if (> (length old) keep) (list-tail old (- (length old) keep)) old))))
+             (done (append hit (choices-still-made pr old (cadr e)))))
         (if (not (cadddr e))
             (prop-put! pr 'retained done)
             (let ((ks (map cdr done)))
