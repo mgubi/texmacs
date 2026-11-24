@@ -46,7 +46,7 @@
 * shim also records the routine name (current_glue_proc) for the messages of
 * chez_tm.hpp.
 *
-* 1403 routines.
+* 1405 routines.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -628,6 +628,8 @@ extern tmscm tmg_tree_2tree_pointer (tmscm);
 extern tmscm tmg_tree_observe (tmscm, tmscm);
 extern tmscm tmg_tree_pointer_detach (tmscm);
 extern tmscm tmg_tree_pointer_2tree (tmscm);
+extern tmscm tmg_tree_note (tmscm);
+extern tmscm tmg_tree_set_note (tmscm, tmscm);
 extern tmscm tmg_current_link_types ();
 extern tmscm tmg_get_locus_rendering (tmscm);
 extern tmscm tmg_set_locus_rendering (tmscm, tmscm);
@@ -2137,6 +2139,8 @@ TMG_GUARDED_1 ("tree->tree-pointer", tmg_tree_2tree_pointer)
 TMG_GUARDED_2 ("tree-observe", tmg_tree_observe)
 TMG_GUARDED_1 ("tree-pointer-detach", tmg_tree_pointer_detach)
 TMG_GUARDED_1 ("tree-pointer->tree", tmg_tree_pointer_2tree)
+TMG_GUARDED_1 ("tree-note", tmg_tree_note)
+TMG_GUARDED_2 ("tree-set-note", tmg_tree_set_note)
 TMG_GUARDED_0 ("current-link-types", tmg_current_link_types)
 TMG_GUARDED_1 ("get-locus-rendering", tmg_get_locus_rendering)
 TMG_GUARDED_2 ("set-locus-rendering", tmg_set_locus_rendering)
@@ -3659,6 +3663,8 @@ static const tmg_entry tmg_entries[]= {
   { "tree-observe", 2, (void*) tmgc_tmg_tree_observe },
   { "tree-pointer-detach", 1, (void*) tmgc_tmg_tree_pointer_detach },
   { "tree-pointer->tree", 1, (void*) tmgc_tmg_tree_pointer_2tree },
+  { "tree-note", 1, (void*) tmgc_tmg_tree_note },
+  { "tree-set-note", 2, (void*) tmgc_tmg_tree_set_note },
   { "current-link-types", 0, (void*) tmgc_tmg_current_link_types },
   { "get-locus-rendering", 1, (void*) tmgc_tmg_get_locus_rendering },
   { "set-locus-rendering", 2, (void*) tmgc_tmg_set_locus_rendering },

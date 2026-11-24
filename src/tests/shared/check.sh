@@ -40,6 +40,8 @@
 #   agentversion  the person resolves the proposals with the Version tools: accepted
 #               or rejected (an insertion, a deletion, next to equal or empty
 #               paragraphs, several at once); a later comparison is not a proposal
+#   agentundo   the person undoes and redoes the resolution of proposals: pending
+#               again, then resolved again; the other proposals stay in their blocks
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
 #   fuzz        random patches with hostile integers through the patch functions: no crash
@@ -72,7 +74,7 @@ export TEXMACS_VUE_CLIPBOARD=private
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentversion agentplain malformed agentmode fuzz edfuzz diskchange
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentversion agentundo agentplain malformed agentmode fuzz edfuzz diskchange
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or

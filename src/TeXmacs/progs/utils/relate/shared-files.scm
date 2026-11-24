@@ -698,7 +698,8 @@
             (sf-put! sf 'collect
                      (cons (patch-pair (prefix-mod 1 m)
                                        (prefix-mod 1 (modification-invert m t)))
-                           (sf-get sf 'collect)))))))))
+                           (sf-get sf 'collect))))
+          (proposals-note-change! sf))))))
 
 (define (take-local-patch sf)
   ;; the local changes since the last time: a patch, or #f
@@ -1628,11 +1629,21 @@
 (define (prop-get pr k) (ahash-ref pr k))
 (define (prop-put! pr k v) (ahash-set! pr k v))
 
+(define sf-own-edit? #f)   ; the host edits the proposals (not a change to follow)
+
+(define (proposal-note pr) (string-append "agent-proposal " (prop-get pr 'id)))
+
 (define (proposal-tree sf pr)
-  ;; the block of the proposal, or #f when it is not in the document
+  ;; the block of the proposal, or #f when it is not in the document. The
+  ;; block has the note of the proposal (tree-note), which the copies kept
+  ;; by the history have too; a block with another note is not its block
+  ;; (its pointer went there when its block was removed), one without a note
+  ;; may be (a pending proposal whose block was made again)
   (let ((t (tree-pointer->tree (prop-get pr 'ptr))) (body (sf-body sf)))
     (and (tree? t) (not (tm-is? t 'uninit)) (not (tree-eq? t body))
          (let ((up (tree-up t))) (and up (tree-eq? up body)))
+         (let ((n (tree-note t)))
+           (or (== n (proposal-note pr)) (and (== n "") (proposal-pending? pr))))
          t)))
 
 (define (proposal-index sf pr)
@@ -1656,16 +1667,18 @@
       (let ((blocks (resolved-blocks (tm->stree t) (if (== which 'new) 1 0)))
             (parent (tree-up t)) (i (tree-index t)))
         (prop-put! pr 'index i)
-        (prop-put! pr 'retained '())
         (with-buffer (sf-buffer sf)
           (start-editing)
-          (cond ((null? blocks) (tree-remove parent i 1))
-                (else
-                  (tree-assign t (stree->tree (car blocks)))
-                  (when (pair? (cdr blocks))
-                    (tree-var-insert parent (+ i 1)
-                                     (stree->tree (cons 'document (cdr blocks)))))))
+          (with-global sf-own-edit? #t
+            (cond ((null? blocks) (tree-remove parent i 1))
+                  (else
+                    (tree-assign t (stree->tree (car blocks)))
+                    (when (pair? (cdr blocks))
+                      (tree-var-insert parent (+ i 1)
+                                       (stree->tree (cons 'document (cdr blocks))))))))
           (end-editing))))
+    (prop-put! pr 'count 0)
+    (prop-put! pr 'undone '())
     (prop-put! pr 'status status)
     (sf-put! sf 'prop-changed #t)
     (host-flush! sf)))
@@ -1684,20 +1697,16 @@
   (:synopsis "The person on @name: accept (which = new) or reject (old) the proposal @id")
   (and-with sf (sf-by-name name)
     (and (sf-host? sf)
+         (begin (proposals-flush! sf) #t)
          (with pr (proposal-find sf id)
            (and pr (proposal-pending? pr)
                 ;; (not a proposal whose block is lost: nothing to resolve)
                 (proposal-tree sf pr)
                 (let* ((k (if (== which 'new) 1 0))
-                       (present (length (version-nodes (proposal-tree sf pr))))
-                       (ks (map cdr (choices-still-made pr (or (prop-get pr 'retained) '()) present)))
-                       (n (+ (length ks) present)))
-                  ;; (after a choice of the Version tools for some differences)
-                  (proposal-resolve! sf pr which
-                                     (cond ((< n (or (prop-get pr 'ndiffs) n)) "resolved")
-                                           ((nnull? (list-filter ks (lambda (x) (!= x k)))) "resolved")
-                                           ((== k 1) "accepted")
-                                           (else "rejected")))
+                       (present (length (version-nodes (proposal-tree sf pr)))))
+                  ;; (after choices of the Version tools for some differences)
+                  (prop-put! pr 'done (append (make-list present k) (or (prop-get pr 'done) '())))
+                  (proposal-resolve! sf pr which (or (proposal-outcome pr) "resolved"))
                   #t))))))
 
 ;; The person may resolve a proposal with the Version tools (the Review bar,
@@ -1709,14 +1718,12 @@
 ;; each was kept, rejected when the old one, else resolved. When the markup
 ;; disappears otherwise (deleted, typed over), the host compares the blocks
 ;; (with adjacent strings joined) with both versions. The host looks only
-;; when the document changed (a new live state). Known limit: an undo that
-;; brings back the markup of a resolved proposal is not reported (the undo
-;; makes new trees, and recognizing the markup by its content would take a
-;; comparison made by the person for the proposal): the markup is then
-;; plain version markup, and the status stays. A proposal whose block is
-;; lost is never followed by its content: while the document holds other
-;; version markup (the person compared it with a file), its outcome is
-;; "resolved" (#867).
+;; when the document changed. Undo and redo are followed by the notes of
+;; the blocks, which the history keeps (see proposals-reconcile! below): an
+;; undo that brings back the markup of a resolved proposal makes it pending
+;; again (#957). A proposal whose block is lost is never followed by its
+;; content: while the document holds other version markup (the person
+;; compared it with a file), its outcome is "resolved" (#867).
 
 (define (block-normalize st)
   ;; @st with nested concatenations flattened and adjacent strings joined
@@ -1784,12 +1791,130 @@
         ((and (tree-is? t 'version-both) (== which 'current-old)) 0)
         (else 1)))
 
-(define (choices-still-made pr old present)
-  ;; the choices @old of the Version tools for differences of @pr that are no
-  ;; longer in its markup, when @present differences are: an undo that brought
-  ;; differences back undid the newest choices (undo goes back in time)
-  (let ((keep (max 0 (- (or (prop-get pr 'ndiffs) 0) present))))
-    (if (> (length old) keep) (list-tail old (- (length old) keep)) old)))
+;; Undo and redo (#957). An undo puts back copies of the trees that a change
+;; removed, so the pointer of a proposal does not follow its block there. The
+;; host follows the proposals through the history by the notes of their
+;; blocks (tree-set-note), which the copies kept by the history have too
+;; (the blocks of the resolved proposals keep them), and by the source of
+;; each change: an undo or a redo (busy-versioning?), or another one. Each
+;; proposal counts its differences in the document; the versions kept of
+;; those that went away are in 'done (the newest first; 'hand for one that
+;; went away without a choice). Differences that come back (an undo) take
+;; back the newest entries into 'undone (a resolved proposal is pending
+;; again); differences that go away again by a redo get them back, and
+;; those that go away otherwise are 'hand.
+
+(define (body-notes sf)
+  ;; note -> the first block of the body with it
+  (let ((h (make-ahash-table)))
+    (for (t (tree-children (sf-body sf)))
+      (let ((n (tree-note t)))
+        (when (and (!= n "") (not (ahash-ref h n))) (ahash-set! h n t))))
+    h))
+
+(define (proposal-block sf pr notes)
+  ;; the block of @pr: that of its pointer when it has its note, else the
+  ;; block with its note (put back by an undo or a redo), else that of its
+  ;; pointer (@notes: a thunk which gives the table of body-notes)
+  (let ((t (proposal-tree sf pr)))
+    (if (and t (== (tree-note t) (proposal-note pr))) t
+        (or (ahash-ref (notes) (proposal-note pr)) t))))
+
+(define (proposal-attach! sf pr t)
+  ;; the pointer and the note of @pr on its block @t
+  (unless (let ((u (tree-pointer->tree (prop-get pr 'ptr)))) (and (tree? u) (tree-eq? u t)))
+    (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
+    (prop-put! pr 'ptr (tree->tree-pointer t)))
+  (when (!= (tree-note t) (proposal-note pr))
+    (tree-set-note t (proposal-note pr)))
+  (prop-put! pr 'index (tree-index t)))
+
+(define (proposal-outcome pr)
+  ;; the outcome of @pr when no difference is left: accepted (new kept
+  ;; everywhere), rejected (old everywhere), resolved (mixed, or some went
+  ;; away without a choice), #f when none was chosen
+  (let* ((l (or (prop-get pr 'done) '()))
+         (ks (list-filter l number?)))
+    (cond ((null? ks) #f)
+          ((or (memq 'hand l) (< (length ks) (or (prop-get pr 'ndiffs) 0))) "resolved")
+          ((list-and (map (lambda (k) (== k 1)) ks)) "accepted")
+          ((list-and (map (lambda (k) (== k 0)) ks)) "rejected")
+          (else "resolved"))))
+
+(define (proposals-reconcile! sf source attach?)
+  ;; the differences of the proposals which came back or went away since the
+  ;; last time, by undo or redo (@source 'history) or otherwise ('hand); with
+  ;; @attach?, the pointers and notes go to the blocks found again (not
+  ;; while the document is being changed)
+  (let* ((h #f)
+         (notes (lambda () (or h (begin (set! h (body-notes sf)) h))))
+         (lost '()))
+    (for (pr (or (sf-get sf 'proposals) '()))
+      (let ((st (prop-get pr 'status)))
+        (when (or (== st "pending")
+                  (and (== source 'history) (in? st '("accepted" "rejected" "resolved"))))
+          (let* ((t (proposal-block sf pr notes))
+                 (present (if t (length (version-nodes t)) 0))
+                 (count (or (prop-get pr 'count) 0)))
+            (cond ((> present count)
+                   ;; an undo brought differences back: it took back the
+                   ;; newest choices
+                   (do ((k (- present count) (- k 1))) ((or (<= k 0) (null? (or (prop-get pr 'done) '()))))
+                     (let ((d (prop-get pr 'done)))
+                       (prop-put! pr 'undone (cons (car d) (or (prop-get pr 'undone) '())))
+                       (prop-put! pr 'done (cdr d))))
+                   (when (!= st "pending")
+                     (prop-put! pr 'status "pending")
+                     (sf-put! sf 'prop-changed #t)))
+                  ((< present count)
+                   ;; differences went away: a redo makes the undone choices
+                   ;; again, the newest undone first
+                   (do ((k (- count present) (- k 1))) ((<= k 0))
+                     (let ((u (or (prop-get pr 'undone) '())))
+                       (if (and (== source 'history) (nnull? u))
+                           (begin
+                             (prop-put! pr 'done (cons (car u) (or (prop-get pr 'done) '())))
+                             (prop-put! pr 'undone (cdr u)))
+                           (prop-put! pr 'done (cons 'hand (or (prop-get pr 'done) '()))))))))
+            (prop-put! pr 'count present)
+            (when (and attach? t (> present 0))
+              (proposal-attach! sf pr t))
+            (when (and (proposal-pending? pr) (== present 0))
+              (with o (proposal-outcome pr)
+                (if o
+                    (begin
+                      (prop-put! pr 'status o)
+                      (prop-put! pr 'undone '())
+                      (sf-put! sf 'prop-changed #t))
+                    (set! lost (cons pr lost)))))))))
+    (when (nnull? lost)
+      ;; no choice was made: the markup was deleted or typed over, or its
+      ;; block lost; version markup in the document that is not that of a
+      ;; pending proposal (e.g. the person compared the document with a file)
+      (let* ((tracked (apply + (map (lambda (pr) (if (proposal-pending? pr) (or (prop-get pr 'count) 0) 0))
+                                    (sf-get sf 'proposals))))
+             (foreign? (> (stree-version-count (tm->stree (sf-body sf))) tracked)))
+        (for (pr lost)
+          (proposals-classify! sf pr foreign?)
+          (prop-put! pr 'undone '())
+          (sf-put! sf 'prop-changed #t))))))
+
+(define (proposals-note-change! sf)
+  ;; a change of the document of @sf (in its observer, before the change),
+  ;; not by the host itself: an undo or a redo, or another; the changes of
+  ;; the other source since the last time are followed first
+  (when (and (not sf-own-edit?) (sf-host? sf) (nnull? (or (sf-get sf 'proposals) '())))
+    (let ((src (if (busy-versioning?) 'history 'hand))
+          (d (sf-get sf 'prop-dirty)))
+      (when (and d (!= d src))
+        (catch #t (lambda () (proposals-reconcile! sf d #f)) (lambda args #f)))
+      (sf-put! sf 'prop-dirty src))))
+
+(define (proposals-flush! sf)
+  ;; follow the changes since the last time
+  (and-with d (sf-get sf 'prop-dirty)
+    (sf-put! sf 'prop-dirty #f)
+    (proposals-reconcile! sf d #t)))
 
 (define (proposals-retain sf nodes which thunk)
   ;; the Version tools keep the version @which of the markup @nodes (#t: all
@@ -1807,35 +1932,26 @@
                          (all (version-nodes t))
                          (hit (if (== nodes #t) all
                                   (list-filter all (lambda (u) (node-in? u nodes)))))
-                         (choices (map (lambda (u) (cons u (retain-choice u which))) hit))
+                         (choices (map (lambda (u) (retain-choice u which)) hit))
                          (whole? (and (= (length hit) (length all)) (pair? hit)))
                          ;; the blocks that a whole block of markup becomes
                          (delta (if (and whole? (null? (cdr hit)) (tree-eq? (car hit) t))
-                                    (- (length (prop-get pr (if (== (cdar choices) 1) 'new 'old))) 1)
+                                    (- (length (prop-get pr (if (== (car choices) 1) 'new 'old))) 1)
                                     0)))
                     (and (nnull? hit) (list pr (length all) choices whole? (caddr x) delta))))
                 pend)
            identity))
          (body0 (sf-body sf))
          (arity (+ (tree-arity body0) (apply + (map (lambda (e) (list-ref e 5)) touched))))
-         (r (thunk)))
+         (r (with-global sf-own-edit? #t (thunk))))
     (for (e touched)
-      (let* ((pr (car e)) (hit (caddr e))
-             (old (list-filter (or (prop-get pr 'retained) '())
-                               (lambda (c) (not (node-in? (car c) (map car hit))))))
-             (done (append hit (choices-still-made pr old (cadr e)))))
-        (if (not (cadddr e))
-            (prop-put! pr 'retained done)
-            (let ((ks (map cdr done)))
-              (prop-put! pr 'retained '())
-              (prop-put! pr 'status
-                         (cond ((< (length ks) (or (prop-get pr 'ndiffs) 0))
-                                ;; a difference went away without a choice
-                                "resolved")
-                               ((list-and (map (lambda (k) (== k 1)) ks)) "accepted")
-                               ((list-and (map (lambda (k) (== k 0)) ks)) "rejected")
-                               (else "resolved")))
-              (sf-put! sf 'prop-changed #t)))))
+      (let ((pr (car e)) (ks (caddr e)))
+        (prop-put! pr 'done (append (reverse ks) (or (prop-get pr 'done) '())))
+        (prop-put! pr 'count (- (cadr e) (length ks)))
+        (when (cadddr e)
+          (prop-put! pr 'status (or (proposal-outcome pr) "resolved"))
+          (prop-put! pr 'undone '())
+          (sf-put! sf 'prop-changed #t))))
     ;; keeping a version made of blocks makes the body again (tree-normalize
     ;; in version-edit.scm), and the other pending proposals lose their
     ;; block: found again at their index, shifted by the blocks that the
@@ -1849,15 +1965,21 @@
                                           touched)))))
                 (when (and (>= j 0) (< j (tree-arity body))
                            (version-tag-in? (tm->stree (tree-ref body j))))
-                  (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
-                  (prop-put! pr 'ptr (tree->tree-pointer (tree-ref body j)))
-                  (prop-put! pr 'index j))))))))
+                  (proposal-attach! sf pr (tree-ref body j)))))))))
+    ;; (the blocks made again have no note: an undo of a later change puts
+    ;; them back with it)
+    (for (x pend)
+      (let ((pr (car x)))
+        (when (proposal-pending? pr)
+          (and-with t (proposal-tree sf pr) (proposal-attach! sf pr t)))))
     r))
 
 (define (retain-sf)
   ;; the shared file of the current buffer when it hosts pending proposals
+  ;; (after an undo, maybe resolved ones made pending again)
   (and-with sf (sf-by-name (current-buffer))
     (and (sf-host? sf)
+         (begin (proposals-flush! sf) #t)
          (list-or (map proposal-pending? (or (sf-get sf 'proposals) '())))
          sf)))
 
@@ -1879,23 +2001,12 @@
 
 (define (proposals-poll! sf)
   ;; only when the document changed since the last time
-  (let ((state (live-current-state (sf-key sf))))
-    (unless (and (sf-get sf 'prop-polled) (equal? state (sf-get sf 'prop-polled)))
+  (let ((state (live-current-state (sf-key sf)))
+        (d (sf-get sf 'prop-dirty)))
+    (when (or d (not (sf-get sf 'prop-polled)) (not (equal? state (sf-get sf 'prop-polled))))
       (sf-put! sf 'prop-polled state)
-      (let* ((pending (list-filter (or (sf-get sf 'proposals) '()) proposal-pending?))
-             (trees (map (lambda (pr)
-                           (let* ((t (proposal-tree sf pr)) (st (and t (tm->stree t))))
-                             (and st (version-tag-in? st) (cons t st))))
-                         pending))
-             (lost (list-filter (map (lambda (pr x) (and (not x) pr)) pending trees) identity)))
-        (for-each (lambda (pr x) (when x (prop-put! pr 'index (tree-index (car x)))))
-                  pending trees)
-        (when (nnull? lost)
-          ;; version markup in the document that is not that of a pending
-          ;; proposal (e.g. the person compared the document with a file)
-          (let* ((tracked (apply + (map (lambda (x) (if x (stree-version-count (cdr x)) 0)) trees)))
-                 (foreign? (> (stree-version-count (tm->stree (sf-body sf))) tracked)))
-            (for (pr lost) (proposals-classify! sf pr foreign?))))))))
+      (sf-put! sf 'prop-dirty #f)
+      (proposals-reconcile! sf (or d 'hand) #t))))
 
 (define (proposals-sync! sf)
   ;; tell each agent about its proposals when they changed
@@ -1929,11 +2040,12 @@
     (with-buffer u
       (start-editing)
       (with-author au
-        (cond ((> n-old 0)
-               (tree-assign (tree-ref body p) (stree->tree markup))
-               (when (> n-old 1) (tree-remove body (+ p 1) (- n-old 1))))
-              (else
-                (tree-var-insert body p (stree->tree (list 'document markup))))))
+        (with-global sf-own-edit? #t
+          (cond ((> n-old 0)
+                 (tree-assign (tree-ref body p) (stree->tree markup))
+                 (when (> n-old 1) (tree-remove body (+ p 1) (- n-old 1))))
+                (else
+                  (tree-var-insert body p (stree->tree (list 'document markup)))))))
       (end-editing))
     (prop-put! pr 'id id)
     (prop-put! pr 'owner (peer-id peer))
@@ -1944,6 +2056,10 @@
     (prop-put! pr 'old old-sts)
     (prop-put! pr 'new new-sts)
     (prop-put! pr 'ndiffs (stree-version-count markup))
+    (prop-put! pr 'count (length (version-nodes (tree-ref body p))))
+    (prop-put! pr 'done '())
+    (prop-put! pr 'undone '())
+    (tree-set-note (tree-ref body p) (proposal-note pr))
     (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
       ;; (the resolved ones are kept for a while, so that the agent hears of them)
       (sf-put! sf 'proposals

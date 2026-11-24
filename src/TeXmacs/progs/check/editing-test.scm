@@ -1806,6 +1806,50 @@
         (check= (body) '(document "abc"))
         (check= (get-init "font-base-size") "14")))))
 
+;; A note (tree-set-note) goes with its node, not with a plain copy; a node
+;; which an undo or a redo puts back has its note again, also when the whole
+;; body was replaced (#957)
+(define (test-undo-notes)
+  (check-group "notes through undo and redo")
+  (with-buffer-body '(document "a" "b" "c")
+    (lambda ()
+      (let* ((b (lambda () (buffer-get-body (current-buffer))))
+             (notes (lambda () (map tree-note (tree-children (b))))))
+        (tree-set-note (tree-ref (b) 1) "n1")
+        (check= (notes) '("" "n1" ""))
+        (check= (tree-note (tree-copy (tree-ref (b) 1))) "")
+        (edit (tree-remove (b) 1 1))
+        (check= (body) '(document "a" "c"))
+        (edit (undo 0))
+        (check= (body) '(document "a" "b" "c"))
+        (check= (notes) '("" "n1" ""))
+        (edit (redo 0))
+        (check= (body) '(document "a" "c"))
+        (edit (undo 0))
+        (check= (notes) '("" "n1" ""))
+        ;; the body replaced, then put back
+        (edit (tree-assign (b) '(document "x" "y")))
+        (check= (notes) '("" ""))
+        (edit (undo 0))
+        (check= (body) '(document "a" "b" "c"))
+        (check= (notes) '("" "n1" ""))
+        ;; a node assigned loses its note, which comes back with an undo
+        (edit (tree-assign (tree-ref (b) 1) "B"))
+        (check= (notes) '("" "" ""))
+        (edit (undo 0))
+        (check= (notes) '("" "n1" ""))
+        ;; and the note set on the result of a change is redone with it
+        (edit (tree-assign (tree-ref (b) 2) "C"))
+        (tree-set-note (tree-ref (b) 2) "n2")
+        (edit (undo 0))
+        (check= (notes) '("" "n1" ""))
+        (edit (redo 0))
+        (check= (body) '(document "a" "b" "C"))
+        (check= (notes) '("" "n1" "n2"))
+        ;; removed
+        (tree-set-note (tree-ref (b) 1) "")
+        (check= (notes) '("" "" "n2"))))))
+
 ;; Saving and undo: after a save the buffer is unmodified, an edit makes it
 ;; modified, and undoing the edit makes it unmodified again.
 (define (test-undo-save)
@@ -2673,6 +2717,7 @@
   (test-structure)
   (test-environment)
   (test-undo)
+  (test-undo-notes)
   (test-undo-save)
   (test-undo-authors)
   (test-undo-clear)

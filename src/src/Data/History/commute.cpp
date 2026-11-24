@@ -44,7 +44,8 @@ dup (modification m) {
 // names they had (a copy which is pasted, while the tree is still there,
 // takes new numbers). The copy shares the numbers with the tag (the same
 // blackbox, which exec_auto_id changes in place): only one of them is in
-// the document at a time
+// the document at a time. It also keeps the note of each node (tree_note),
+// so that a program can know a subtree which an undo or a redo brings back
 tree
 copy_for_undo (tree t) {
   tree c;
@@ -53,9 +54,7 @@ copy_for_undo (tree t) {
     c= tree (L(t), N(t));
     for (int i=0; i<N(t); i++) c[i]= copy_for_undo (t[i]);
   }
-  blackbox bb;
-  if (!is_nil (t->obs) && t->obs->get_contents (ADDENDUM_AUTO_ID, bb))
-    (void) tree_addendum_new (c, ADDENDUM_AUTO_ID, bb, false);
+  tree_addenda_copy (t, c);
   return c;
 }
 
@@ -103,9 +102,7 @@ invert (modification m, tree t) {
       tree c (L(u), N(u) - 1);
       for (int j=0; j<N(u); j++)
         if (j != i) c[j < i? j: j-1]= copy_for_undo (u[j]);
-      blackbox bb;
-      if (!is_nil (u->obs) && u->obs->get_contents (ADDENDUM_AUTO_ID, bb))
-        (void) tree_addendum_new (c, ADDENDUM_AUTO_ID, bb, false);
+      tree_addenda_copy (u, c);
       return mod_insert_node (rp, i, c);
     }
   case MOD_SET_CURSOR:
