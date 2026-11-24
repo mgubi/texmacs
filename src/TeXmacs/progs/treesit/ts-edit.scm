@@ -373,6 +373,9 @@
           (map (lambda (e)
                  (if (== (car e) "missing")
                      (and (pair? (cdddr e))
+                          ;; (not at the start: the missing name of a call
+                          ;; "ab" which starts a block of Lua)
+                          (not (== (cadr e) a))
                           (within? (car (cadddr e)) (cadr (cadddr e))))
                      (and (within? (cadr e) (caddr e))
                           (not (and (== (cadr e) a) (== (caddr e) b))))))

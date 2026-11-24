@@ -1763,6 +1763,12 @@
   (check= (string-deletion 'r-code '("f(r\"(ab)\"") 0 9 #f) '(0 2 0 9))
   (check= (string-deletion 'lua-code '("x = {\"a\"\"b\"}") 0 11 #f) '(0 8 0 11))
   (check= (string-deletion 'lua-code '("x = {\"a\"\"b\"}") 0 8 #t) '(0 8 0 11))
+  ;; nor a missing token at its start (a block of Lua which starts with a
+  ;; string is a call whose name is missing)
+  (check= (string-deletion 'lua-code '("\"ab\"") 0 4 #f) '(0 0 0 4))
+  (check= (string-deletion 'lua-code '("'ab'") 0 0 #t) '(0 0 0 4))
+  (check= (string-deletion 'lua-code '("[[ab]]") 0 6 #f) '(0 0 0 6))
+  (check= (string-deletion 'lua-code '("[[a" "b]]") 1 3 #f) '(0 0 1 3))
   ;; a missing token or an error around the string is not in it
   (check= (string-deletion 'rust-code '("let x = \"\"") 0 9 #f) 'deleted)
   (check= (string-deletion 'cpp-code '("x = \"%\" PRIu64;") 0 7 #f) '(0 4 0 7))
