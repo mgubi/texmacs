@@ -46,7 +46,7 @@
 * shim also records the routine name (current_glue_proc) for the messages of
 * chez_tm.hpp.
 *
-* 1407 routines.
+* 1405 routines.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -343,8 +343,6 @@ extern tmscm tmg_text_family_for_math (tmscm);
 extern tmscm tmg_hand_tuned_math_fontsP ();
 extern tmscm tmg_tmtm_eqnumber_2nonumber (tmscm);
 extern tmscm tmg_busy_versioningP ();
-extern tmscm tmg_versioning_direction ();
-extern tmscm tmg_versioning_step ();
 extern tmscm tmg_players_set_elapsed (tmscm, tmscm);
 extern tmscm tmg_players_set_speed (tmscm, tmscm);
 extern tmscm tmg_apply_effect (tmscm, tmscm, tmscm, tmscm, tmscm);
@@ -1856,8 +1854,6 @@ TMG_GUARDED_1 ("text-family-for-math", tmg_text_family_for_math)
 TMG_GUARDED_0 ("hand-tuned-math-fonts?", tmg_hand_tuned_math_fontsP)
 TMG_GUARDED_1 ("tmtm-eqnumber->nonumber", tmg_tmtm_eqnumber_2nonumber)
 TMG_GUARDED_0 ("busy-versioning?", tmg_busy_versioningP)
-TMG_GUARDED_0 ("versioning-direction", tmg_versioning_direction)
-TMG_GUARDED_0 ("versioning-step", tmg_versioning_step)
 TMG_GUARDED_2 ("players-set-elapsed", tmg_players_set_elapsed)
 TMG_GUARDED_2 ("players-set-speed", tmg_players_set_speed)
 TMG_GUARDED_5 ("apply-effect", tmg_apply_effect)
@@ -3382,8 +3378,6 @@ static const tmg_entry tmg_entries[]= {
   { "hand-tuned-math-fonts?", 0, (void*) tmgc_tmg_hand_tuned_math_fontsP },
   { "tmtm-eqnumber->nonumber", 1, (void*) tmgc_tmg_tmtm_eqnumber_2nonumber },
   { "busy-versioning?", 0, (void*) tmgc_tmg_busy_versioningP },
-  { "versioning-direction", 0, (void*) tmgc_tmg_versioning_direction },
-  { "versioning-step", 0, (void*) tmgc_tmg_versioning_step },
   { "players-set-elapsed", 2, (void*) tmgc_tmg_players_set_elapsed },
   { "players-set-speed", 2, (void*) tmgc_tmg_players_set_speed },
   { "apply-effect", 5, (void*) tmgc_tmg_apply_effect },

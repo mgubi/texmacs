@@ -424,40 +424,41 @@ process hosts, or only headless ones), the agent edits directly, as before.
   refuses to resolve it, and its menu, the count of pending proposals and the
   focus bar skip it until the next poll. The
   host looks only when the document changed (a new live state).
-  **Undo and redo** are followed (#957). The block of each proposal has a
-  *note* (`tree-set-note`, `tree-note`: a string on a node, an addendum of
-  kind `ADDENDUM_NOTE` in `tree_addendum.cpp`), which goes with the node and
-  is lost when the node leaves the document, but which the copies that the
-  history keeps have too (`copy_for_undo` in `commute.cpp`, as the numbers of
-  the automatic labels): a block that an undo or a redo puts back is found
-  again by its note, never by its content; the blocks of resolved proposals
-  keep theirs. The observer of the body notes the source of each change, an
-  undo, a redo (`versioning-direction`, -1 or 1 while the archiver applies
-  one) or another one; when the source changes, between two steps of undo
-  or redo (`versioning-step`: one undo may undo a choice of the person and
-  then the change of the agent), before a patch of a
-  participant is applied, and before the Version tools, Tools > Agents, a
-  withdrawal or the poll act, the host counts the differences of each
-  proposal in its block. The versions
-  kept of the differences that went away are a list, the newest first, in
-  which a difference that went away without a choice counts as such.
-  Differences that come back take back the newest entries (undo goes back in
-  time), and a resolved proposal whose markup comes back is pending again
-  (Tools > Agents can resolve it, the agent hears `pending`); differences
-  that go away again by a redo get the entries back, so that the outcome is
-  as before the undo; those that go away by an undo (the change of the agent
-  itself undone) make the outcome `rejected`; those that go away otherwise (typed over by
-  hand) make the outcome `resolved`. The undo of a Keep that made the body again puts
-  the untouched pending proposals back with their notes; the forward Keep
-  finds them by the shift described above and notes the blocks it made
-  again. Known limits: while the person's own Compare markup is in the
-  document, a proposal whose markup is lost is reported `resolved` (#867);
-  Return inside a pending block (a split), then Undo: the join makes a new
-  node without the note, so the proposal reads `resolved` while its markup
-  is back, and stays so; two proposal blocks joined with Delete: the joined
-  block has the note of the first, which then counts the differences of
-  both (as before #957: a note carried over a split or a join would need
-  the observers of `raw_split` and `raw_join` to keep it).
+  **Undo and redo** are followed (#957). A *note* (`tree-set-note`,
+  `tree-note`: a string on a node, an addendum of kind `ADDENDUM_NOTE` in
+  `tree_addendum.cpp`) goes with its node and is lost when the node leaves
+  the document, but the copies that the history keeps have it too
+  (`copy_for_undo` in `commute.cpp`, as the numbers of the automatic labels).
+  The state of a proposal (status, versions kept) is in the note of its
+  block, `(agent-proposals (id status done) ...)`, written only on blocks
+  made by the change that resolves it: the block kept by Tools > Agents or
+  by a Keep of the whole block; the block of a proposal resolved inside it
+  is made again by the same change (`block-renew!`), and when the block went
+  away, the block before it is made again with the state. When the host
+  makes a proposal, it writes the state `rejected` in the note of the block
+  it replaces. So the history has, at each point, the blocks with the states
+  of their proposals there: after a change of the history
+  (`busy-versioning?`: undo, redo, a cancellation), the host reads the state
+  of each proposal from the note of its block, whatever the number and the
+  direction of the steps; a resolved proposal whose markup came back is
+  pending again (Tools > Agents can resolve it, the agent hears `pending`),
+  a redo gives back the outcome it had, and an undo past the change of the
+  agent gives `rejected` (the block before it, or no block and no markup
+  where it was). Other changes are followed by the number of differences
+  in the block: one that went away without a choice makes the outcome
+  `resolved` (not counted while the block is that of several proposals:
+  two blocks joined). The observer of the body tells the two kinds of
+  changes apart; the host follows the changes of one kind before those of
+  the other, before a patch of a participant, and before the Version
+  tools, Tools > Agents, a withdrawal or the poll. Known limits: while the
+  person's own Compare markup is in the document, a proposal whose markup
+  is lost is reported `resolved` (#867); Return inside a pending block (a
+  split) leaves its pointer on the first part and its note on none, and
+  the join made by the undo is a new node without note (the undo of a split
+  or a join is a join or a split, not a copy): a proposal whose markup went
+  to the second part reads `resolved`; an undo past the change of the agent
+  and past an earlier change of the same block by hand also reads
+  `rejected`, while the forward rules would compare the blocks.
   A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status

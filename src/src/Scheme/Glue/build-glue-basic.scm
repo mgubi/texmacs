@@ -192,8 +192,6 @@
   (hand-tuned-math-fonts? get_hand_tuned_math_fonts (bool))
   (tmtm-eqnumber->nonumber eqnumber_to_nonumber (tree tree))
   (busy-versioning? is_busy_versioning (bool))
-  (versioning-direction get_versioning_direction (int))
-  (versioning-step get_versioning_step (int))
   (players-set-elapsed players_set_elapsed (void tree double))
   (players-set-speed players_set_speed (void tree double))
   (apply-effect apply_effect (void content array_url url int int))

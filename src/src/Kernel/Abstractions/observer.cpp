@@ -376,8 +376,6 @@ raw_apply (tree& t, modification mod) {
 
 bool busy_modifying= false;
 bool busy_versioning= false;
-int  versioning_direction= 0;
-int  versioning_step= 0;
 static bool is_busy= false;
 static list<path> busy_paths;
 static list<modification> upcoming;

@@ -189,19 +189,6 @@ is_busy_versioning () {
   return busy_versioning;
 }
 
-int
-get_versioning_direction () {
-  // while an undo (-1) or a redo (1) changes the document, else 0
-  return busy_versioning? versioning_direction: 0;
-}
-
-int
-get_versioning_step () {
-  // a number which changes with each step of an undo or a redo (one undo
-  // of the person may undo several steps of other authors)
-  return versioning_step;
-}
-
 array<SI>
 get_screen_size () {
   array<SI> r;

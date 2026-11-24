@@ -1363,22 +1363,6 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(versioning-direction)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|get_versioning_direction> which returns
-    <scm|int>.
-  </explain>
-
-  <\explain>
-    <scm|(versioning-step)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|get_versioning_step> which returns
-    <scm|int>.
-  </explain>
-
-  <\explain>
     <scm|(players-set-elapsed <scm-arg|tree> <scm-arg|double>)>
 <explain-synopsis|no synopsis>
   <|explain>
