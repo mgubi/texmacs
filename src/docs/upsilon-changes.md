@@ -12,6 +12,17 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 24 November 2026
+
+- **Beamer: a slideshow stays a slideshow**: a presentation in expanded
+  form (a slideshow) was wrapped into one screen by the Screens button or
+  by choosing the beamer style again, and choosing another style kept only
+  its first slide; now it is left as it is, and another style keeps all
+  its slides (#872, savannah #68928).
+- **Dead keys in formulas** (macOS): a second or third dead tilde in a
+  formula (Option-N) gives `<approx>` and `<triplesim>` at once, not at the
+  next key (#870).
+
 ## 23 November 2026
 
 - **Program code: the first and last characters of a string can be
