@@ -6,7 +6,9 @@
 ;; to equal blocks; several proposals resolved at once; a comparison made by
 ;; the person afterwards is not taken for a proposal, and one made while a
 ;; proposal is pending makes it "resolved" (its block is lost); an undone
-;; choice is forgotten; a proposal deleted by hand next to an equal one.
+;; choice is forgotten; a proposal deleted by hand next to an equal one;
+;; the other proposals stay pending when one is kept; a difference typed
+;; over by hand makes the outcome "resolved".
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -88,6 +90,21 @@
         (for-each (lambda (id e) (check (string-append id ": " e) (== (status-of id) e))) ids expected)
         (for-each (lambda (c) (check (car c) ((cadr c)))) checks)
         (sync-set! (sync-n n "a")))))
+
+(define (keep-in! i which)
+  ;; the Review bar: the cursor in the first difference of block @i, Keep @which
+  (with-buffer (the-name)
+    (let ((vt (first-version (para i))))
+      (and vt
+           (begin
+             (tree-go-to vt (if (tree-is? vt 'version-old) 0 1) :end)
+             (and (inside-version?)
+                  (begin (start-editing) (version-retain which) (end-editing) #t)))))))
+(define (find-para s)
+  (let loop ((i 0))
+    (cond ((>= i (para-count)) #f)
+          ((== (version-normalize (para-text i)) s) i)
+          (else (loop (+ i 1))))))
 
 (define (A-steps)
   (append
@@ -260,6 +277,80 @@
     (act "check 18b" (check "p24: still resolved" (== (status-of "p24") "resolved"))
          (check "the new text" (== (version-normalize (para-text 6)) "Second big paragraph."))
          (sync-set! (sync-n 18 "a"))))
+   ;; 19. a word change and an insertion pending; Keep New on the insertion
+   ;; (the body is made again): the word change is still pending, Keep Old on
+   ;; it: rejected
+   (list
+    (wait-sync (sync-n 19 "b"))
+    (step "p25 p26" (and (== (status-of "p25") "pending") (== (status-of "p26") "pending")))
+    (act "keep 19" (check "p26: Keep New" (keep-in! (index-of "p26") 1)))
+    (step "settled 19" (!= (status-of "p26") "pending"))
+    (timed-wait 300)
+    (act "check 19" (check "p26: accepted" (== (status-of "p26") "accepted"))
+         (check "p25: still pending, in its block" (and (== (status-of "p25") "pending") (>= (index-of "p25") 0))))
+    (act "keep 19b" (check "p25: Keep Old" (keep-in! (index-of "p25") 0)))
+    (step "settled 19b" (and (not (version-in-doc?)) (!= (status-of "p25") "pending")))
+    (act "check 19b" (check "p25: rejected" (== (status-of "p25") "rejected"))
+         (check "the text" (find-para "Inserted X."))
+         (sync-set! (sync-n 19 "a"))))
+   ;; 20. a deletion and an insertion pending; Keep New on the insertion: the
+   ;; deletion is still pending; Keep New on it: accepted
+   (list
+    (wait-sync (sync-n 20 "b"))
+    (step "p27 p28" (and (== (status-of "p27") "pending") (== (status-of "p28") "pending")))
+    (act "keep 20" (check "p28: Keep New" (keep-in! (index-of "p28") 1)))
+    (step "settled 20" (!= (status-of "p28") "pending"))
+    (timed-wait 300)
+    (act "check 20" (check "p28: accepted" (== (status-of "p28") "accepted"))
+         (check "p27: still pending, in its block" (and (== (status-of "p27") "pending") (>= (index-of "p27") 0))))
+    (act "keep 20b" (check "p27: Keep New" (keep-in! (index-of "p27") 1)))
+    (step "settled 20b" (and (not (version-in-doc?)) (!= (status-of "p27") "pending")))
+    (act "check 20b" (check "p27: accepted" (== (status-of "p27") "accepted"))
+         (check "the texts" (and (not (find-para "Appended.")) (== (find-para "Ins two.") 1)))
+         (sync-set! (sync-n 20 "a"))))
+   ;; 21. a deletion and an insertion pending; Keep Old on the deletion: the
+   ;; insertion is still pending; Keep New on it: accepted
+   (list
+    (wait-sync (sync-n 21 "b"))
+    (step "p29 p30" (and (== (status-of "p29") "pending") (== (status-of "p30") "pending")))
+    (act "keep 21" (check "p29: Keep Old" (keep-in! (index-of "p29") 0)))
+    (step "settled 21" (!= (status-of "p29") "pending"))
+    (timed-wait 300)
+    (act "check 21" (check "p29: rejected" (== (status-of "p29") "rejected"))
+         (check "p30: still pending, in its block" (and (== (status-of "p30") "pending") (>= (index-of "p30") 0))))
+    (act "keep 21b" (check "p30: Keep New" (keep-in! (index-of "p30") 1)))
+    (step "settled 21b" (and (not (version-in-doc?)) (!= (status-of "p30") "pending")))
+    (act "check 21b" (check "p30: accepted" (== (status-of "p30") "accepted"))
+         (check "the texts" (and (== (find-para "Ins two.") 1) (== (find-para "Last.") (- (para-count) 1))))
+         (sync-set! (sync-n 21 "a"))))
+   ;; 22. two differences; the person types the old text over the first by
+   ;; hand, then Keep New on the second: resolved
+   (person! 22 (lambda () (tree-assign (para (find-para "Last.")) "one two three.")))
+   (list
+    (wait-sync (sync-n 22 "b"))
+    (step "p31" (== (status-of "p31") "pending"))
+    (act "hand 22" (with-buffer (the-name)
+                     (let ((vt (first-version (para (index-of "p31")))))
+                       (start-editing) (tree-assign vt "one ") (end-editing))))
+    (timed-wait 300)
+    (act "check 22" (check "p31: still pending" (== (status-of "p31") "pending")))
+    (act "keep 22" (check "p31: Keep New on the second" (keep-in! (index-of "p31") 1)))
+    (step "settled 22" (and (not (version-in-doc?)) (!= (status-of "p31") "pending")))
+    (act "check 22b" (check "p31: resolved" (== (status-of "p31") "resolved"))
+         (check "the text" (find-para "one two THREE."))
+         (sync-set! (sync-n 22 "a"))))
+   ;; 23. two differences; Keep Old on the first, then Accept in Tools > Agents: resolved
+   (person! 23 (lambda () (tree-assign (para (find-para "one two THREE.")) "one two three.")))
+   (list
+    (wait-sync (sync-n 23 "b"))
+    (step "p32" (== (status-of "p32") "pending"))
+    (act "keep 23" (check "p32: Keep Old on the first" (keep-in! (index-of "p32") 0)))
+    (timed-wait 300)
+    (act "accept 23" (check "p32: Accept" (shared-proposal-resolve! (the-name) "p32" 'new)))
+    (step "settled 23" (not (version-in-doc?)))
+    (act "check 23" (check "p32: resolved" (== (status-of "p32") "resolved"))
+         (check "the text" (find-para "one two THREE."))
+         (sync-set! (sync-n 23 "a"))))
    (list
     (wait-sync "b-done")
     (act "A out" (publish-body!) (sync-set! "a-done")))))
@@ -335,6 +426,19 @@
    (agent-hears 17 "p23" "accepted")
    (list (wait-sync (sync-n 18 "p")))
    (round 18 (lambda () (insert-text! 6 6 " big")) "p24" "resolved")
+   (propose-and-wait* 19 (lambda () (insert-text! (find-para "Inserted X.") 8 " big"))
+                      (lambda () (insert-block! (para-count) "Appended.")))
+   (agent-hears 19 "p25" "rejected")
+   (propose-and-wait* 20 (lambda () (tree-remove (body) (find-para "Appended.") 1))
+                      (lambda () (insert-block! 1 "Ins two.")))
+   (agent-hears 20 "p27" "accepted")
+   (propose-and-wait* 21 (lambda () (tree-remove (body) (find-para "Ins two.") 1))
+                      (lambda () (insert-block! (para-count) "Last.")))
+   (agent-hears 21 "p30" "accepted")
+   (list (wait-sync (sync-n 22 "p")) (step "22 there" (find-para "one two three.")))
+   (round 22 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p31" "resolved")
+   (list (wait-sync (sync-n 23 "p")) (step "23 there" (find-para "one two three.")))
+   (round 23 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p32" "resolved")
    (list
     (act "out" (publish-body!) (sync-set! "b-done"))
     (wait-sync "a-done"))))

@@ -406,7 +406,13 @@ process hosts, or only headless ones), the agent edits directly, as before.
   (the Review bar's Keep, Retain, Retain all, a selection), and records the
   outcome when no difference of the proposal is left: accepted (new kept
   everywhere), rejected (old everywhere), resolved (mixed). A choice for a difference that an undo
-  brought back is forgotten (the newest choices). When the markup of a pending
+  brought back is forgotten (the newest choices); a difference that went away
+  without a choice (typed over by hand) makes the outcome `resolved`, also for
+  Accept or Reject in Tools > Agents after some choices of the Version tools.
+  Keeping a version made of blocks makes the body again (`tree-normalize`), so
+  the other pending proposals lose their block: the overload finds them again
+  at their former index, shifted by the blocks the resolved proposals became,
+  when the number of blocks agrees and the block there holds version markup. When the markup of a pending
   proposal disappears otherwise (deleted, typed over, or its block lost
   because the person compared the document with a file), the answer is the
   neutral `resolved` while the document holds other version markup than that
@@ -414,7 +420,8 @@ process hosts, or only headless ones), the agent edits directly, as before.
   compares the blocks, with adjacent strings joined, with both versions, and an
   empty version is taken as kept when the other one is gone. A proposal is never followed by its
   content, and one whose block is lost is never left pending: Tools > Agents
-  refuses to resolve it and the focus bar skips it until the next poll. The
+  refuses to resolve it, and its menu, the count of pending proposals and the
+  focus bar skip it until the next poll. The
   host looks only when the document changed (a new live state). Known limits:
   an undo that brings back the markup of a resolved proposal is not reported
   (the undo makes new trees; the markup is then plain version markup and the
