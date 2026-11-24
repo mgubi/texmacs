@@ -901,67 +901,43 @@ std::string Type1Input::GetGlyphCharStringName(Byte inCharStringIndex)
 
 std::string Type1Input::FromPSString(const std::string& inPSString)
 {
-	std::stringbuf stringBuffer;
-	Byte buffer;
-	std::string::const_iterator it = inPSString.begin();
-	size_t i=1;
-	++it; // skip first parenthesis
-	
-	for(; i < inPSString.size()-1;++it,++i)
+	// (TeXmacs: one index, checked at each step; an escape moved the
+	// iterator past the counter which bounded it, and read beyond the end
+	// of the string, an empty string underflowed size()-1)
+	std::string result;
+	size_t n = inPSString.size();
+	if(n < 2)
+		return result;
+	size_t end = n - 1; // skip the last parenthesis
+	for(size_t i = 1; i < end; ++i) // skip the first one
 	{
-		if(*it == '\\')
+		char c = inPSString[i];
+		if(c == '\\' && i + 1 < end)
 		{
-			++it;
-			if('0' <= *it && *it <= '7')
+			c = inPSString[++i];
+			if('0' <= c && c <= '7')
 			{
-				buffer = (*it - '0') * 64;
-				++it;
-				buffer += (*it - '0') * 8;
-				++it;
-				buffer += (*it - '0');
+				int v = 0;
+				for(int k = 0; k < 3 && i < end && '0' <= inPSString[i] && inPSString[i] <= '7'; ++k, ++i)
+					v = v * 8 + (inPSString[i] - '0');
+				--i;
+				result.push_back((char)(Byte)v);
+				continue;
 			}
-			else
+			switch(c)
 			{
-				switch(*it)
-				{
-					case 'n':
-						buffer = '\n';
-						break;
-					case 'r':
-						buffer = '\r';
-						break;
-					case 't':
-						buffer = '\t';
-						break;
-					case 'b':
-						buffer = '\b';
-						break;
-					case 'f':
-						buffer = '\f';
-						break;
-					case '\\':
-						buffer = '\\';
-						break;
-					case '(':
-						buffer = '(';
-						break;
-					case ')':
-						buffer = ')';
-						break;
-					default:
-						// error!
-						buffer = 0;
-						break;
-				}
+				case 'n': c = '\n'; break;
+				case 'r': c = '\r'; break;
+				case 't': c = '\t'; break;
+				case 'b': c = '\b'; break;
+				case 'f': c = '\f'; break;
+				case '\\': case '(': case ')': break;
+				default: c = 0; break; // error!
 			}
 		}
-		else
-		{
-			buffer = *it;
-		}
-		stringBuffer.sputn((const char*)&buffer,1);
+		result.push_back(c);
 	}
-	return stringBuffer.str();
+	return result;
 }
 
 Byte Type1Input::GetEncoding(const std::string& inCharStringName)
