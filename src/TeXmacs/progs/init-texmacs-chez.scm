@@ -79,8 +79,6 @@
 
 ;; --- Bootstrap kernel modules directly from compiled .so binaries ------------
 
-(unless (top-level-bound? 'notify-preferences-booted)
-  (define-top-level-value 'notify-preferences-booted (lambda () (noop))))
 
 
 ;; Note: In this ahead-of-time compiled architecture, module inheritance and

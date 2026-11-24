@@ -17,8 +17,6 @@
 #include "../Scheme/glue.hpp"
 #include "convert.hpp" // tree_to_texmacs, for printing blackboxes
 
-#include <map>
-#include <mutex>
 #include <string.h>
 #include <cstdio>
 #include <cstdlib>  /* getenv, _fullpath/_MAX_PATH on Windows */
@@ -28,19 +26,16 @@
  * ---------------------------------------------------------------------- */
 
 tmscm tm_null= 0;
-tmscm tm_blackbox_guardian= 0;
 tmscm tm_blackbox_rtd= 0;
 tmscm tm_make_blackbox= 0;
 tmscm tm_eval_string_proc= 0;
 tmscm tm_load_file_proc= 0;
-tmscm tm_apply_proc= 0;
 tmscm tm_call_0_proc= 0;
 tmscm tm_call_1_proc= 0;
 tmscm tm_call_2_proc= 0;
 tmscm tm_call_3_proc= 0;
 tmscm tm_call_4_proc= 0;
 tmscm tm_call_n_proc= 0;
-tmscm tm_list_pred= 0;
 tmscm tm_equal_pred= 0;
 tmscm tm_string_to_symbol= 0;
 tmscm object_stack= 0;
@@ -93,18 +88,18 @@ chez_root_stack_capacity () {
  *
  * TeXmacs C++ document trees (tree_rep, buffer) are strictly single-threaded
  * and non-reentrant; synchronization is handled at the Qt event loop level.
- * Therefore, leaf FFI dispatchers (tm_fast_call_N) and call_scheme do not
- * pay the overhead of an atomic recursive mutex.
+ * Therefore, the shims of the glue (glue_chez.cpp) and call_scheme take
+ * no lock.
  * ---------------------------------------------------------------------- */
 
 /* ------------------------------------------------------------------------
- * Basic list/equality predicates (need cached Scheme procedures)
+ * Basic list/equality predicates
  * ---------------------------------------------------------------------- */
 
 bool
 tmscm_is_list (tmscm obj) {
   /* Fast C-level cycle-detecting walk using Spairp/Scdr.
-     Do NOT call Scheme (Scall1 tm_list_pred) here: C++ traversal functions
+     Do NOT call Scheme (list?) here: C++ traversal functions
      like tmscm_to_scheme_tree call tmscm_is_list while holding unpinned tmscm
      pointers on the C++ stack; entering Scheme can trigger a copying GC which
      relocates the tree and causes a crash. */
@@ -186,13 +181,6 @@ tmscm_to_string (tmscm s) {
         return t;
       }
     }
-    return r;
-  }
-  if (Sbytevectorp (s)) {
-    // a bytevector given where a string is expected (string-save)
-    iptr n= Sbytevector_length (s);
-    string r ((int) n);
-    if (n > 0) memcpy (&r[0], Sbytevector_data (s), n);
     return r;
   }
   FAILED ("string expected in tmscm_to_string");
@@ -321,33 +309,16 @@ tmscm_blackbox_hash (uptr p) {
   return (iptr) type_box (*bb);
 }
 
-void
-reap_blackboxes () {
-  ASSERT (tm_blackbox_guardian != 0,
-          "reap_blackboxes called before tm_blackbox_guardian is initialized");
-  while (true) {
-    tmscm b= Scall0 (tm_blackbox_guardian);
-    if (b == Sboolean (0)) break;
-    if (Srecordp (b) && Srecord_type (b) == tm_blackbox_rtd) {
-      void* p= (void*) Sinteger_value (Srecord_uniform_ref (b, 0));
-      if (p) {
-        tm_delete ((blackbox*) p);
-        Srecord_uniform_ref (b, 0)= Sfixnum (0);
-      }
-    }
-  }
-}
-
 const char* current_glue_proc = NULL;
 
 /* ------------------------------------------------------------------------
  * Scheme bootstrap
  *
  * No Scheme source lives in this file.  Everything the kernel needs on the
- * Scheme side -- tm-apply, tm-load-file, tm-eval-string, the blackbox
- * guardian, the glue installer, texmacs-version -- is defined in
- * TeXmacs/progs/kernel/boot/boot-chez.scm, which initialize_scheme() loads
- * with Chez's primitive `load' before initialize_glue() runs.
+ * Scheme side -- tm-call-0..4/n, tm-load-file, tm-eval-string, the blackbox
+ * guardian, the glue routines -- is defined in
+ * TeXmacs/progs/kernel/boot/boot-chez.scm, which is in texmacs.boot, or
+ * which initialize_scheme() loads with Chez's primitive `load'.
  *
  * The only Scheme knowledge retained here is the *names* of the bindings the
  * kernel caches, because Stop_level_value() has to look them up by symbol.
@@ -513,12 +484,11 @@ custom_init (void) {
   /* called by Sbuild_heap before loading the boot files */
   s_chez_heap_built = false;
   register_foreign_symbols ();
-  /* The glue entry points are registered here, not in initialize_scheme(),
+  /* The table of the glue is registered here, not in initialize_scheme(),
      because Sforeign_symbol() only writes to a C table: it needs neither the
      heap nor a Scheme call, so it is legal this early.  Doing it here is what
      lets boot-chez.scm -- and therefore any boot file evaluated during heap
-     construction -- bind the glue with foreign-procedure.  See
-     docs/chez/GLUE_CHEZ_PLAN.md. */
+     construction -- define the glue.  See docs/chez/04-cpp-binding.md. */
   initialize_glue_chez ();
 }
 
@@ -545,7 +515,6 @@ boot_dir () {
 extern bool is_server_started ();
 
 static bool s_has_texmacs_boot = false;
-static string s_texmacs_boot_file = "";
 static int s_argc = 0;
 static char** s_argv = NULL;
 static bool s_scheme_initialized = false;
@@ -563,16 +532,6 @@ scheme_init_file () {
     return as_string (url ("$TEXMACS_BOOT_PATH:$TEXMACS_PATH/boot") *
                       "init-texmacs-boot-file.so");
   return "$TEXMACS_PATH/progs/init-texmacs-chez.scm";
-}
-
-bool
-chez_has_boot () {
-  return s_has_texmacs_boot;
-}
-
-string
-chez_boot_file () {
-  return s_texmacs_boot_file;
 }
 
 static void
@@ -637,7 +596,6 @@ build_chez_heap () {
           texmacs_boot = string (resolved);
         }
 #endif
-        s_texmacs_boot_file = texmacs_boot;
         s_has_texmacs_boot = true;
         fprintf (stderr, "Chez Scheme: booting from boot file %s\n", (char*) c_string (texmacs_boot));
         Sregister_boot_file (c_string (texmacs_boot));
@@ -668,10 +626,6 @@ chez_cache_runtime_procedures () {
   if (object_stack != 0) return;
   tm_null= Stop_level_value (Sstring_to_symbol ("tmscm-null"));
   Slock_object (tm_null);
-  tm_blackbox_guardian= Stop_level_value (Sstring_to_symbol ("tm-blackbox-guardian"));
-  ASSERT (tm_blackbox_guardian != 0 && Sprocedurep (tm_blackbox_guardian),
-          "tm-blackbox-guardian must be a procedure");
-  Slock_object (tm_blackbox_guardian);
   tm_blackbox_rtd= Stop_level_value (Sstring_to_symbol ("tm-blackbox-rtd"));
   ASSERT (tm_blackbox_rtd != 0 && Srecordp (tm_blackbox_rtd),
           "tm-blackbox-rtd must be a record type descriptor");
@@ -688,10 +642,6 @@ chez_cache_runtime_procedures () {
   ASSERT (tm_load_file_proc != 0 && Sprocedurep (tm_load_file_proc),
           "tm-load-file must be a procedure");
   Slock_object (tm_load_file_proc);
-  tm_apply_proc= Stop_level_value (Sstring_to_symbol ("tm-apply"));
-  ASSERT (tm_apply_proc != 0 && Sprocedurep (tm_apply_proc),
-          "tm-apply must be a procedure");
-  Slock_object (tm_apply_proc);
   tm_call_0_proc= Stop_level_value (Sstring_to_symbol ("tm-call-0"));
   Slock_object (tm_call_0_proc);
   tm_call_1_proc= Stop_level_value (Sstring_to_symbol ("tm-call-1"));
@@ -704,10 +654,6 @@ chez_cache_runtime_procedures () {
   Slock_object (tm_call_4_proc);
   tm_call_n_proc= Stop_level_value (Sstring_to_symbol ("tm-call-n"));
   Slock_object (tm_call_n_proc);
-  tm_list_pred= Stop_level_value (Sstring_to_symbol ("list?"));
-  ASSERT (tm_list_pred != 0 && Sprocedurep (tm_list_pred),
-          "list? must be a procedure");
-  Slock_object (tm_list_pred);
   tm_equal_pred= Stop_level_value (Sstring_to_symbol ("equal?"));
   ASSERT (tm_equal_pred != 0 && Sprocedurep (tm_equal_pred),
           "equal? must be a procedure");
@@ -739,7 +685,7 @@ initialize_scheme () {
     load_scheme_file (boot);
   }
 
-  // probably doesn't run, since boot-chez.scm will call this also at the end.
+  // already done by the last form of boot-chez.scm; a no-op then
   chez_cache_runtime_procedures ();
 
   if (s_has_texmacs_boot) {

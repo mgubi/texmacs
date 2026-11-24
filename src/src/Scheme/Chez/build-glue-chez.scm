@@ -69,24 +69,17 @@
 
 (define *out-cpp-relative-path* "src/Scheme/Chez/glue_chez.cpp")
 
-;; Routines the C++ side does not provide for Chez Scheme, because their
-;; definitions and/or registrations in src/Scheme/Glue/glue_basic.cpp sit
-;; inside
-;;     #ifndef TEXMACS_ENGINE_CHEZ
-;; blocks.  A table entry for any of them would either fail to link or
-;; shadow the definition the kernel already has:
+;; Routines of the specifications left out of the table, because Chez has
+;; its own definition, which the glue would replace:
 ;;
-;;   string-load                           defined by boot-chez.scm
-;;   string-search-{forwards,backwards}    defined by chez-compat.scm
+;;   string-search-{forwards,backwards}    defined by chez-compat.scm, which
+;;                                         checks the position
 ;;
-;; The five os-*? predicates used to be on this list.  Their guard has been
-;; removed from glue_basic.cpp, so they are now ordinary glue like everything
-;; else: generated here and installed by initialize_glue() on the legacy path.
 ;; tm-output and tm-errput are generated: Scheme output goes through the
 ;; C++ streams, which cout-buffer captures (tm-with-output-to-string); the
 ;; definitions of boot-chez.scm only serve until this glue is loaded.
 (define *chez-unsupported-names*
-  '(string-load string-search-forwards string-search-backwards))
+  '(string-search-forwards string-search-backwards))
 
 ;; The seven core predicates are not part of the declarative specifications:
 ;; initialize_glue() installs them directly from src/Scheme/Scheme/glue.cpp.
@@ -268,20 +261,18 @@
 *   src/Scheme/Glue/build-glue-basic.scm
 *   src/Scheme/Glue/build-glue-editor.scm
 *   src/Scheme/Glue/build-glue-server.scm
+*   src/Scheme/Glue/build-glue-treesit.scm (USE_TREE_SITTER)
+*   src/Scheme/Glue/build-glue-lsp.scm (USE_LSP)
 * Do not edit it by hand; re-run the generator instead.
 *
 * WHAT IT REPLACES
 * ----------------
-* initialize_glue() (src/Scheme/Scheme/glue.cpp) installs every C++ routine
-* into Scheme at run time: one tmscm_install_procedure() per routine, each of
-* which is a Scall3 into (tm-install-procedure! name id arity), which interns
-* a symbol and allocates a closure.  Two consequences matter here:
-*
-*   - it costs ~" (number->string entries) " round trips into the interpreter during
-*     every start-up, plus the resulting nursery churn;
-*   - it needs a live Scheme heap, so it cannot run before Sbuild_heap()
-*     returns.  Any boot file evaluated during heap construction -- a
-*     secondary boot file such as texmacs.boot -- therefore sees no glue.
+* For Guile and s7, initialize_glue() (src/Scheme/Scheme/glue.cpp) installs
+* every C++ routine into Scheme at run time, one tmscm_install_procedure()
+* per routine.  For Chez that would need a live Scheme heap, so it could not
+* run before Sbuild_heap() returns, and a boot file evaluated during heap
+* construction -- texmacs.boot -- would see no glue; tmscm_install_procedure
+* does nothing for Chez (chez_tm.hpp).
 *
 * This file replaces that with a table: the Scheme name, the number of
 * arguments and the shim of each routine.  initialize_glue_chez() registers
@@ -297,10 +288,10 @@
 * The generated tmg_* routines are ordinary C++ and may throw (tm_throw,
 * FAILED, and the kernel's string exceptions).  Letting a C++ exception unwind
 * through Chez's foreign-call frame would abort the process, so each entry
-* point is wrapped in a tmgc_ shim that contains the throw and returns the
-* (cons #t (cons msg '())) error pair the kernel already handles -- exactly
-* what tm_fast_call_N did on the legacy path.  The shim also records the
-* routine name for the diagnostics in chez_tm.hpp.
+* point is wrapped in a tmgc_ shim that contains the throw and returns
+* (tm-glue-error message), which tm-glue-check (boot-chez.scm) raises.  The
+* shim also records the routine name (current_glue_proc) for the messages of
+* chez_tm.hpp.
 *
 * " (number->string entries) " routines.
 ******************************************************************************/

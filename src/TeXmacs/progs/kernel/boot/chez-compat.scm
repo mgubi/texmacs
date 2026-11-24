@@ -348,16 +348,9 @@
 
 ;;; String searching
 ;;
-;; These used to be glue procedures over the C++ `search_forwards` and
-;; `search_backwards`, which count UTF-8 bytes. Chez strings count characters,
-;; so the two disagree as soon as a payload contains a character above U+00FF:
-;; the byte-oriented FFI bridge turns one UTF-8 byte into one Scheme character
-;; and truncates anything above U+00FF to its low byte. Searching the Chez
-;; string directly keeps the returned index in the units that `string-ref` and
-;; `substring` expect. The C++ glue installs these two names only for Guile
-;; (`#ifndef TEXMACS_ENGINE_CHEZ` in `src/Scheme/Glue/glue_basic.cpp`), where
-;; byte offsets are what strings index; `compile-texmacs.scm` does not shadow
-;; them, so the compiler and the editor share this implementation.
+;; Those of the glue (C++ search_forwards and search_backwards) are left out
+;; of the Chez glue (build-glue-chez.scm): these clamp the position to the
+;; string, which C++ does not check.
 
 (define (string-match-at? s in i k)
   (let loop ((j 0))

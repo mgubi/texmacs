@@ -20,9 +20,10 @@ rest of TeXmacs uses for every Scheme (`tmscm`, `tmscm_car`,
 - **Strings** cross as they are, byte strings on both sides (#947):
   `string_to_tmscm` makes a Scheme string of the bytes of a TeXmacs string
   (`chez_bytes_to_string`), `tmscm_to_string` reads them back; a character
-  above 255, which only `integer->char` makes, comes out in UTF-8, and a
-  bytevector is accepted too (`string-save` of binary data). Nothing is
-  converted on the Scheme side.
+  above 255, which only `integer->char` makes, comes out in UTF-8. A
+  bytevector is not a string for the glue. Nothing is converted on the
+  Scheme side, and `string-load` is the routine of the glue, as with Guile
+  and s7.
 - **Strings and symbols made by C++** (`eval_scheme`, `symbol_to_tmscm`, the
   error messages of the glue) are built byte by byte
   (`chez_bytes_to_string`): Chez's `Sstring_of_length` and

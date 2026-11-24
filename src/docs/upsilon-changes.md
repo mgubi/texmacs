@@ -14,6 +14,11 @@ have the details, and the problems go to the
 
 ## 24 November 2026
 
+- **Chez Scheme: `string-load` as with Guile and s7** (builds with Chez):
+  `string-load` is the routine of the C++ glue, no longer a copy in
+  Scheme, and a missing file is reported as with the other Schemes; a
+  bytevector is no longer taken for a string by the glue. The unused parts
+  of the C++/Scheme interface were removed (#947).
 - **Beamer: a slideshow stays a slideshow**: a presentation in expanded
   form (a slideshow) was wrapped into one screen by the Screens button or
   by choosing the beamer style again, and choosing another style kept only

@@ -291,7 +291,7 @@ This document tracks remaining open bugs, architectural improvements, and perfor
 
 ### [ ] Optimize Blackbox Object Allocation & Guardian Tracking
 - **Location**: [`src/Scheme/Chez/chez_tm.cpp:228-243`](src/Scheme/Chez/chez_tm.cpp#L228-L243)
-- **Problem**: Every C++ object (`tree`, `widget`, `command`, `url`) passed into Scheme triggers `tm_new<blackbox>(b)` and `Scall1 (tm_make_blackbox, Sinteger ((iptr) p))`, allocating a `tm-blackbox` record and registering it with `tm_blackbox_guardian`. Reclaiming requires running `reap_blackboxes` / `reap-blackboxes!` during GC (`collect-request-handler`).
+- **Problem**: Every C++ object (`tree`, `widget`, `command`, `url`) passed into Scheme triggers `tm_new<blackbox>(b)` and `Scall1 (tm_make_blackbox, Sinteger ((iptr) p))`, allocating a `tm-blackbox` record and registering it with `tm-blackbox-guardian`. Reclaiming requires running `reap-blackboxes!` during GC (`collect-request-handler`).
 - **Optimization**: Investigate pooling/recycling C++ `blackbox` wrappers or reducing C-to-Scheme callback overhead per blackbox creation to lower allocator and GC pressure.
 
 ### [ ] Further Dynamic Evaluation (`eval`) & Menu Generation Optimizations

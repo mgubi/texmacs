@@ -14,20 +14,18 @@
 *   src/Scheme/Glue/build-glue-basic.scm
 *   src/Scheme/Glue/build-glue-editor.scm
 *   src/Scheme/Glue/build-glue-server.scm
+*   src/Scheme/Glue/build-glue-treesit.scm (USE_TREE_SITTER)
+*   src/Scheme/Glue/build-glue-lsp.scm (USE_LSP)
 * Do not edit it by hand; re-run the generator instead.
 *
 * WHAT IT REPLACES
 * ----------------
-* initialize_glue() (src/Scheme/Scheme/glue.cpp) installs every C++ routine
-* into Scheme at run time: one tmscm_install_procedure() per routine, each of
-* which is a Scall3 into (tm-install-procedure! name id arity), which interns
-* a symbol and allocates a closure.  Two consequences matter here:
-*
-*   - it costs ~1402 round trips into the interpreter during
-*     every start-up, plus the resulting nursery churn;
-*   - it needs a live Scheme heap, so it cannot run before Sbuild_heap()
-*     returns.  Any boot file evaluated during heap construction -- a
-*     secondary boot file such as texmacs.boot -- therefore sees no glue.
+* For Guile and s7, initialize_glue() (src/Scheme/Scheme/glue.cpp) installs
+* every C++ routine into Scheme at run time, one tmscm_install_procedure()
+* per routine.  For Chez that would need a live Scheme heap, so it could not
+* run before Sbuild_heap() returns, and a boot file evaluated during heap
+* construction -- texmacs.boot -- would see no glue; tmscm_install_procedure
+* does nothing for Chez (chez_tm.hpp).
 *
 * This file replaces that with a table: the Scheme name, the number of
 * arguments and the shim of each routine.  initialize_glue_chez() registers
@@ -43,12 +41,12 @@
 * The generated tmg_* routines are ordinary C++ and may throw (tm_throw,
 * FAILED, and the kernel's string exceptions).  Letting a C++ exception unwind
 * through Chez's foreign-call frame would abort the process, so each entry
-* point is wrapped in a tmgc_ shim that contains the throw and returns the
-* (cons #t (cons msg '())) error pair the kernel already handles -- exactly
-* what tm_fast_call_N did on the legacy path.  The shim also records the
-* routine name for the diagnostics in chez_tm.hpp.
+* point is wrapped in a tmgc_ shim that contains the throw and returns
+* (tm-glue-error message), which tm-glue-check (boot-chez.scm) raises.  The
+* shim also records the routine name (current_glue_proc) for the messages of
+* chez_tm.hpp.
 *
-* 1402 routines.
+* 1403 routines.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -879,6 +877,7 @@ extern tmscm tmg_url_backup (tmscm);
 extern tmscm tmg_url_backupP (tmscm);
 extern tmscm tmg_url_cache_invalidate (tmscm);
 extern tmscm tmg_string_save (tmscm, tmscm);
+extern tmscm tmg_string_load (tmscm);
 extern tmscm tmg_string_append_to_file (tmscm, tmscm);
 extern tmscm tmg_system_move (tmscm, tmscm);
 extern tmscm tmg_system_copy (tmscm, tmscm);
@@ -2387,6 +2386,7 @@ TMG_GUARDED_1 ("url-backup", tmg_url_backup)
 TMG_GUARDED_1 ("url-backup?", tmg_url_backupP)
 TMG_GUARDED_1 ("url-cache-invalidate", tmg_url_cache_invalidate)
 TMG_GUARDED_2 ("string-save", tmg_string_save)
+TMG_GUARDED_1 ("string-load", tmg_string_load)
 TMG_GUARDED_2 ("string-append-to-file", tmg_string_append_to_file)
 TMG_GUARDED_2 ("system-move", tmg_system_move)
 TMG_GUARDED_2 ("system-copy", tmg_system_copy)
@@ -3908,6 +3908,7 @@ static const tmg_entry tmg_entries[]= {
   { "url-backup?", 1, (void*) tmgc_tmg_url_backupP },
   { "url-cache-invalidate", 1, (void*) tmgc_tmg_url_cache_invalidate },
   { "string-save", 2, (void*) tmgc_tmg_string_save },
+  { "string-load", 1, (void*) tmgc_tmg_string_load },
   { "string-append-to-file", 2, (void*) tmgc_tmg_string_append_to_file },
   { "system-move", 2, (void*) tmgc_tmg_system_move },
   { "system-copy", 2, (void*) tmgc_tmg_system_copy },

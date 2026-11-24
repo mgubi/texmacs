@@ -12,9 +12,6 @@
 
 (define load (lambda (f . ignore-env) (tm-load-file f)))
 
-(unless (top-level-bound? 'notify-preferences-booted)
-  (define-top-level-value 'notify-preferences-booted (lambda () (noop))))
-
 ;; 1. Import all 177 resident application modules (matches *startup-boot-modules* minus boot-chez.so)
 ;; into the interaction environment and mark them loaded in *texmacs-modules-loaded*.
 ;; The 177 startup modules are already loaded directly into the static generation via

@@ -493,7 +493,7 @@ bool exec_file (url u) {
   return tmscm_is_equal (object_to_tmscm (ret), TMSCM_UNSPECIFIED); }
 
 #if defined(USE_CHEZ)
-// tm-apply resolves a symbol by name, while eval compiles code on Chez
+// tm-call-0..4 resolve a symbol by name, while eval compiles code on Chez
 #define SCHEME_FUN(fun) symbol_to_tmscm (fun)
 #else
 #define SCHEME_FUN(fun) eval_scheme (fun)

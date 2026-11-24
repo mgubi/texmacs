@@ -36,20 +36,17 @@ typedef ptr tmscm;
 /* -- global engine state (defined in chez_tm.cpp) ------------------------ */
 
 extern tmscm tm_null;              /* the value of '()                        */
-extern tmscm tm_blackbox_guardian;  /* Guardian procedure for blackboxes      */
 extern tmscm tm_blackbox_rtd;       /* RTD for tm-blackbox records            */
 extern tmscm tm_make_blackbox;      /* (tm-make-blackbox addr)                */
 extern "C" void chez_cache_runtime_procedures ();
 extern tmscm tm_eval_string_proc;  /* (tm-eval-string s)                      */
 extern tmscm tm_load_file_proc;    /* (tm-load-file file)                     */
-extern tmscm tm_apply_proc;        /* (tm-apply fun args-list)                */
 extern tmscm tm_call_0_proc;       /* (tm-call-0 fun)                         */
 extern tmscm tm_call_1_proc;       /* (tm-call-1 fun a1)                      */
 extern tmscm tm_call_2_proc;       /* (tm-call-2 fun a1 a2)                   */
 extern tmscm tm_call_3_proc;       /* (tm-call-3 fun a1 a2 a3)                */
 extern tmscm tm_call_4_proc;       /* (tm-call-4 fun a1 a2 a3 a4)             */
 extern tmscm tm_call_n_proc;       /* (tm-call-n fun args)                    */
-extern tmscm tm_list_pred;         /* list?                                    */
 extern tmscm tm_equal_pred;        /* equal?                                   */
 extern tmscm tm_string_to_symbol;  /* string->symbol                          */
 tmscm chez_bytes_to_string (const char* s, iptr n);
@@ -118,9 +115,7 @@ inline bool tmscm_is_int (tmscm obj)   { return Sfixnump (obj) || Sbignump (obj)
 // an exact integer is accepted where a double is expected, as by s7
 inline bool tmscm_is_double (tmscm obj) {
   return Sflonump (obj) || Sfixnump (obj) || Sbignump (obj); }
-// a byte string, or a bytevector (string-save), read by tmscm_to_string
-inline bool tmscm_is_string (tmscm obj) {
-  return Sstringp (obj) || Sbytevectorp (obj); }
+inline bool tmscm_is_string (tmscm obj) { return Sstringp (obj); }
 inline bool tmscm_is_symbol (tmscm obj) { return Ssymbolp (obj); }
 bool tmscm_is_list (tmscm obj);   /* needs a call to list?; defined in cpp  */
 bool tmscm_is_equal (tmscm o1, tmscm o2); /* needs equal?; defined in cpp   */
@@ -187,14 +182,14 @@ string tmscm_to_symbol (tmscm obj);
    distinguish blackboxes from lists and pairs, and Chez's native equal? /
    equal-hash dispatch to C++ equality/hashing via record-type-equal-procedure
    and record-type-hash-procedure.
-   Lifetime is managed via a Chez Guardian (tm_blackbox_guardian): upon
+   Lifetime is managed via a Chez guardian (tm-blackbox-guardian): upon
    creation, every blackbox is registered with the guardian, and reclaimed
-   when unreachable by invoking tmscm_delete_blackbox in Scheme / C++. */
+   when unreachable by reap-blackboxes! (boot-chez.scm), which calls
+   tmscm_delete_blackbox. */
 
 bool tmscm_is_blackbox (tmscm obj);
 tmscm blackbox_to_tmscm (blackbox b);
 blackbox tmscm_to_blackbox (tmscm obj);
-void reap_blackboxes ();
 extern "C" void tmscm_delete_blackbox (void* ptr);
 
 /* -- evaluation and calls -------------------------------------------------- */
@@ -208,30 +203,19 @@ tmscm call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3);
 tmscm call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3, tmscm a4);
 tmscm call_scheme (tmscm fun, array<tmscm> a);
 
-/* -- registering C++ procedures as Scheme procedures ---------------------- */
-
-typedef tmscm (*FN)();
-
-template<typename T> inline FN
-tmscm_as_fn (T func) {
-  union {
-    T from;
-    FN to;
-  } cast = { func };
-  return cast.to;
-}
-
 /* -- native glue registration (src/Scheme/Chez/glue_chez.cpp) ------------- */
 
-/* Record every C++ glue entry point in Chez's foreign symbol table with
-   Sforeign_symbol().  That table is plain C memory, so this runs from
+/* Register the foreign symbol tm_glue_table, the table of the glue routines,
+   with Sforeign_symbol().  That table is plain C memory, so this runs from
    custom_init() inside Sbuild_heap(), before any boot file is evaluated;
-   boot-chez.scm then binds the names with foreign-procedure.  Idempotent. */
+   boot-chez.scm then defines the routines from it.  Idempotent. */
 void initialize_glue_chez ();
 
 /* Number of registered entry points, for the start-up diagnostic. */
 int chez_glue_procedure_count ();
 
+// initialize_glue() (glue.cpp) installs nothing: the routines come from
+// the table of glue_chez.cpp
 #define tmscm_install_procedure(name, func, args, p0, p1) (void) 0
 
 void tmscm_wrong_type_arg (tmscm arg, int pos, const char* subr);
@@ -252,7 +236,5 @@ void tmscm_wrong_type_arg (tmscm arg, int pos, const char* subr);
 #define TMSCM_UNSPECIFIED Svoid
 
 string scheme_dialect ();
-bool chez_has_boot ();
-string chez_boot_file ();
 
 #endif /* defined CHEZ_TM_H */

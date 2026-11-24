@@ -1,5 +1,9 @@
 # Handling Encoding in Chez Scheme (`wip-chez`)
 
+> **Superseded (#947):** strings now cross the glue as byte strings, one
+> character per byte, in both directions (`04-cpp-binding.md`); no
+> bytevector crosses the glue. This note records the earlier design.
+
 ## 1. Problem Statement: String Encoding Duality
 
 In TeXmacs C++, a single `string` type is overloaded for three distinct payloads:

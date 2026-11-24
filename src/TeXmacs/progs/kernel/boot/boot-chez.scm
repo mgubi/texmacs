@@ -80,8 +80,6 @@
 (unless (top-level-bound? 'primitive-load)
   (define-top-level-value 'primitive-load
     (top-level-value 'load (scheme-environment))))
-(unless (top-level-bound? 'load)
-  (define-top-level-value 'load primitive-load))
 
 ;; --- Guile eval/defined?/filter semantics ----------------------------------
 ;; Guile's eval accepts 1 argument (current module); R6RS eval requires 2.
@@ -843,14 +841,7 @@
 
 (define texmacs-user-kernel tm-user-env)
 
-(define developer-mode?
-  (if (top-level-bound? 'developer-mode?)
-      developer-mode?
-      (and (top-level-bound? 'cpp-get-preference)
-           (equal? (cpp-get-preference "developer tool" "off") "on"))))
-
-(unless (top-level-bound? 'notify-preferences-booted)
-  (define-top-level-value 'notify-preferences-booted (lambda () (noop))))
+(define developer-mode? #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Engine bootstrap
@@ -859,11 +850,11 @@
 ;;; src/Scheme/Chez/chez_tm.cpp, which initialize_scheme() evaluated form by
 ;;; form before any progs file was read.  chez_tm.cpp now carries no Scheme
 ;;; source at all: it registers the foreign entry points declared here and
-;;; loads this file.
+;;; loads this file (or boots texmacs.boot, which contains it).
 ;;;
-;;; Consequence: this file is evaluated BEFORE initialize_glue(), i.e. before a
-;;; single C++ glue procedure exists.  Nothing below may call glue at load
-;;; time.  The names the kernel caches by symbol are marked [C++].
+;;; The routines of the glue are defined at the end of this file: nothing
+;;; before may call one at load time.  The names the kernel caches by symbol
+;;; are marked [C++].
 ;;;
 ;;; The kernel also needs a `load' that predates tm-load-file (which is defined
 ;;; here), so it loads this file with Chez's primitive `load'.
@@ -894,17 +885,10 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Byte strings and bytevectors
 ;;; A Scheme string holds bytes (code points U+0000-U+00FF), which cross the
-;;; glue unchanged.  These two loops convert them from and to bytevectors,
-;;; for the files and the system; R6RS bytevector->string and
-;;; string->bytevector would allocate a transcoded port per string.
+;;; glue unchanged.  This loop converts one to a bytevector, for the paths
+;;; given to the system (tm-os-path); R6RS string->bytevector would allocate
+;;; a transcoded port per string.
 ;;; ---------------------------------------------------------------------------
-
-(define (cork-bytes->string bv)
-  (let* ((n (bytevector-length bv))
-         (s (make-string n)))
-    (do ((i 0 (fx+ i 1)))
-        ((fx= i n) s)
-      (string-set! s i (integer->char (bytevector-u8-ref bv i))))))
 
 ;; A byte string to its bytes.  A character above 255 (only integer->char
 ;; makes one) is written in UTF-8, so that nothing is lost.
@@ -925,56 +909,6 @@
                             (put-u8 p c)
                             (put-bytevector
                               p (string->utf8 (string (string-ref s j)))))))))))))))
-
-;;; ---------------------------------------------------------------------------
-;;; Native file loading
-;;;
-;;; `string-load' is not registered by initialize_glue() for Chez (see the
-;;; TEXMACS_ENGINE_CHEZ guard in src/Scheme/Glue/glue_basic.cpp).  The C++
-;;; glue can only hand back a raw bytevector, which forced the bridge above to
-;;; guess whether the payload was text or binary.  Reading the file here lets
-;;; us decide properly: valid UTF-8 becomes a native Scheme string, anything
-;;; else is returned as an R6RS bytevector -- exactly what string-save, the
-;;; artwork/tmfs handlers and embedded-edit.scm need for PNG/JPEG/font data.
-;;;
-;;; Chez's native transcoder uses the REPLACE error-handling mode, so
-;;; `call-with-input-file' + `get-string-all' silently substitutes U+FFFD for
-;;; invalid bytes and never raises an i/o-decoding-error.  An explicit RAISE
-;;; transcoder is required to be able to detect a binary file at all.
-;;; ---------------------------------------------------------------------------
-
-(define tm-text-transcoder
-  (make-transcoder (utf-8-codec) (native-eol-style) 'raise))
-
-;; Return an OS path only for a URL that resolves to an existing file.
-;; url-exists? must be checked first: materialize() raises a C++ FAILED error
-;; (a full crash report) for an unresolvable URL, and C++ exceptions cannot be
-;; caught from Scheme.  The old C++ string_load() just returned "" in that case.
-(define (tm-load-path u)
-  ;; a string is a url, as for the glue ("$TEXMACS_PATH/progs/...")
-  (and (url-exists? u) (tm-os-path (url-materialize u "r"))))
-
-(define (tm-loadable? path)
-  (and (string? path) (> (string-length path) 0) (file-exists? path)))
-
-;; Read raw bytes for the binary fallback (PNG, JPEG, fonts).
-(define (tm-load-bytes path)
-  (guard (e (else #vu8()))
-    (if (tm-loadable? path)
-        (call-with-port (open-file-input-port path)
-          (lambda (p)
-            ;; the end of file for an empty file
-            (let ((bv (get-bytevector-all p)))
-              (if (eof-object? bv) #vu8() bv))))
-        #vu8())))
-
-
-;; The contents of a file as a byte string, as C++ string_load() and Guile
-(define (string-load u)
-  (let ((path (tm-load-path u)))
-    (if (not path)
-        ""
-        (cork-bytes->string (tm-load-bytes path)))))
 
 ;; Keywords evaluate to themselves in Guile and s7. The module compiler binds
 ;; those of a module (tm-bind-keywords), and the list above the common ones;
@@ -1141,9 +1075,6 @@
   (guard (e (else (tm-handle-call-error e fun args)))
     (let ((proc (if (symbol? fun) (top-level-value fun (interaction-environment)) fun)))
       (apply proc args))))
-
-(define (tm-apply fun args)
-  (tm-call-n fun args))
 
 
 ;;; ---------------------------------------------------------------------------
