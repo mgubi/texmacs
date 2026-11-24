@@ -65,6 +65,8 @@ static unsigned char test_cff[]= {
 
 static void
 encoding_of (unsigned char* data, unsigned long n, int& count, std::string& codes) {
+  count= -1;   // (a failure below returns before setting it)
+  codes.clear ();
   InputByteArrayStream in (data, n);
   CFFFileInput cff;
   QCOMPARE ((int) cff.ReadCFFFile (&in), (int) PDFHummus::eSuccess);
