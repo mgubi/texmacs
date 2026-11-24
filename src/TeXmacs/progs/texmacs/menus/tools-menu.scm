@@ -49,7 +49,8 @@
 
 (define (pending-proposals)
   (list-filter (or (shared-proposals (current-buffer)) '())
-               (lambda (e) (== (cadr e) "pending"))))
+               ;; (not one whose block is lost, until the next poll)
+               (lambda (e) (and (== (cadr e) "pending") (>= (caddr e) 0)))))
 
 (define (short-agent id)
   ;; "agent.1234.xxxx.1" -> "agent 1234"

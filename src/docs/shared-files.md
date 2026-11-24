@@ -400,9 +400,40 @@ process hosts, or only headless ones), the agent edits directly, as before.
   empty side). The agent receives that edit as a normal patch of the host. The
   person accepts or rejects with **Tools > Agents** (`shared-proposal-resolve!`,
   which replaces the markup by the new or the old version as an edit of the person,
-  so the person's undo brings the markup back) or with the Version tools (the host
-  notices that the markup is gone and finds out which version was kept: accepted,
-  rejected, or resolved when it was edited). A patch of an agent that touches blocks
+  so the person's undo brings the markup back) or with the Version tools. `version-retain` and `version-retain-all` are overloaded
+  in `shared-files.scm`: before the tool changes the tree, the host notes which
+  differences of which pending proposals it resolves and which version it keeps
+  (the Review bar's Keep, Retain, Retain all, a selection), and records the
+  outcome when no difference of the proposal is left: accepted (new kept
+  everywhere), rejected (old everywhere), resolved (mixed). A choice for a difference that an undo
+  brought back is forgotten (the newest choices), by the Version tools and by
+  Tools > Agents alike; a difference that went away
+  without a choice (typed over by hand) makes the outcome `resolved`, also for
+  Accept or Reject in Tools > Agents after some choices of the Version tools.
+  Keeping a version made of blocks makes the body again (`tree-normalize`), so
+  the other pending proposals lose their block: the overload finds them again
+  at their former index, shifted by the blocks the resolved proposals became,
+  when the number of blocks agrees and the block there holds version markup. When the markup of a pending
+  proposal disappears otherwise (deleted, typed over, or its block lost
+  because the person compared the document with a file), the answer is the
+  neutral `resolved` while the document holds other version markup than that
+  of the pending proposals (the proposal may be inside it); otherwise the host
+  compares the blocks, with adjacent strings joined, with both versions, and an
+  empty version is taken as kept when the other one is gone. A proposal is never followed by its
+  content, and one whose block is lost is never left pending: Tools > Agents
+  refuses to resolve it, and its menu, the count of pending proposals and the
+  focus bar skip it until the next poll. The
+  host looks only when the document changed (a new live state). Known limits:
+  an undo that brings back the markup of a resolved proposal is not reported
+  (the undo makes new trees; the markup is then plain version markup and the
+  status stays); while the person's own Compare markup is in the document, a
+  proposal whose markup is lost is reported `resolved`; an undo of a Keep that
+  made the body again (a kept version made of blocks) can make another, untouched
+  pending proposal lose its block: it is then reported `resolved` while its
+  markup remains; an undo of a Version-tool choice followed by typing over
+  that difference by hand, before any other Keep or Accept, can make a mixed
+  result read `accepted` (the undone choice is dropped only at the next Keep or
+  Accept) (#867). A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status
   (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are
@@ -611,7 +642,7 @@ started by the test: nobody hosts, then one hosts and the other joins),
 `corrupt` (entries that are empty or of a program that serves nothing make no
 difference), `off` (preference off), `stale` (an entry of a dead process; a
 wrong token and a packet that is not a message are closed), `slow`, `attack`,
-`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) `edfuzz` (random patches applied to a real buffer) and `diskchange` (the host's saves are not changes on disk; a write by another program is said by the host only; the host's Revert reaches the participant with the date of the file, so that after a handover the new host says nothing and saves without asking). The tests pause the polling
+`conflict`, `meta`, `save`, `lockdel` (the lock file removed under a host: made again, or the host stops and joins), `race` (a host that closed the file opens it again at once while its participant has confirmed work: it waits, read-only, and joins), `seeksave` (a Save with no host is queued; a process that is not TeXmacs holds the lock), `diffdir` (different `TMPDIR` and `XDG_RUNTIME_DIR`, one folder), `dupe` (a patch sent twice; a replaced document saved whole), `agent` (the host applies the modes to a participant that is an agent: proposals accepted, rejected, withdrawn, the person's undo, direct, read-only, the content rules in each mode, a saved file with a pending proposal) `agentversion` (the person resolves proposals with the Version tools: accepted or rejected, an insertion, a deletion, next to equal or empty paragraphs, several at once with a selection or Retain all; a comparison made afterwards is not a proposal) `agentplain` (a headless participant that does not say it is an agent is treated as one, until the person marks it), `malformed` (patches and messages of a wrong shape, a dishonest inverse) `agentmode` (the mode survives a handover) `fuzz` (random patches with hostile integers, no crash) `edfuzz` (random patches applied to a real buffer) and `diskchange` (the host's saves are not changes on disk; a write by another program is said by the host only; the host's Revert reaches the participant with the date of the file, so that after a handover the new host says nothing and saves without asking). The tests pause the polling
 (`shared-pause!`) to make changes cross, set a process interactive
 (`shared-set-interactive!`) and read counters (`shared-stat`). Each scenario
 checks that the two documents end equal. Running them with
