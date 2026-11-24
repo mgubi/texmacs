@@ -61,10 +61,11 @@
   A file which is saved while proposals are pending holds both versions as
   markup; so accept or reject them before saving.
 
-  If you close the file (or open it again) while proposals are pending,
-  they are no longer listed in <menu|Tools|Agents>: their markup stays in
-  the document, and you resolve it with <menu|Version|Retain>. The agent is
-  told which of its proposals are no longer tracked.
+  If you close the file while proposals are pending, they are no longer
+  listed in <menu|Tools|Agents>, also when you open the file again later:
+  their markup stays in the document, and you resolve it with
+  <menu|Version|Retain>. The agent is told which of its proposals are no
+  longer tracked.
 
   <paragraph*|What the window shows>
 

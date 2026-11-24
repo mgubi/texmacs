@@ -465,7 +465,8 @@ process hosts, or only headless ones), the agent edits directly, as before.
   so the MCP server still tells the outcomes not yet read ("Your proposal ...
   was accepted"), and names in its `note` the proposals that were pending ("The
   host of the document changed: your pending proposal ... is no longer
-  tracked ...").
+  tracked ..."); when the call fails, the note goes with its error. The end
+  of the sharing (`sf-destroy!`) drops the kept list too.
 - **Proposals in the saved file.** The markup is part of the document, so a saved
   file with pending proposals holds both versions and is valid and readable (it is
   the markup of Version > Compare, which the Version tools resolve). The author and

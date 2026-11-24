@@ -1422,14 +1422,15 @@ def s_propose_close(w):
     check("listed, pending", not e and [x["status"] for x in lp["proposals"]] == ["pending"])
     hostcmd(w, st, "close")
     check("the agent's process hosts the file again", poll(lambda: role() == "host", 15))
-    e, t = m.tool("read", document="d1", format="text")
-    note = t.get("note", "") if not e else ""
-    check("pending then closed: the note names it, no longer tracked, markup stays",
-          p2 in note and "no longer tracked" in note and "markup stays" in note and "was accepted" not in note)
-    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
-    check("the markup stays", "version-both" in t.get("content", "") and "no longer tracked" not in t.get("note", ""))
+    # (the first call after the change of host fails: the note goes with the error)
     e, r = m.tool("withdraw_proposal", document="d1", id=p2)
-    check("it cannot be withdrawn", e)
+    msg = str(r)
+    check("it cannot be withdrawn: the error says it is of a previous host", e and "previous host" in msg)
+    check("pending then closed: the note goes with the error, names it, no longer tracked, markup stays",
+          p2 in msg and "(Note: " in msg and "no longer tracked" in msg and "markup stays" in msg and "was accepted" not in msg)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("the markup stays, and the note is not told again",
+          "version-both" in t.get("content", "") and "no longer tracked" not in t.get("note", ""))
     sync_set(w, "c-done")
     check("exit 0", m.close() == 0)
     try:

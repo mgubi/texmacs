@@ -1944,6 +1944,9 @@
     (for (pr l)
       (when (not (list? pr))
         (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))))
+    (when (not told?)
+      ;; (the end of the sharing: nothing is handed out when the file is shared again)
+      (ahash-remove! proposals-dropped (sf-key sf)))
     (when told?
       (with mine (list-filter l list?)
         (when (nnull? mine)

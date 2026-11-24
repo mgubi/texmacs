@@ -181,7 +181,10 @@ The person sets it from **Tools > Agents** (shared-files.md has the mechanism).
   outcomes the former host had told are still given in the next `note`, and the
   proposals that were pending are named there once ("The host of the document changed:
   your pending proposal p2.3fa0c2d1 is no longer tracked ..."): their markup stays in the
-  document for the person to resolve with the Version tools. While the agent's own process
+  document for the person to resolve with the Version tools. A withdraw of such a
+  proposal fails and says it was made under a previous host. When a call fails, the
+  notes it would have carried are added to its error (`(Note: ...)`), so that they are
+  not lost. While the agent's own process
   hosts the file (nobody else has it), its edits are applied directly, also on that markup.
 - **The host's filter.** The same rules as the agent's own check, run by the host on
   the patched document (`mcp-host-check`): see shared-files.md. They apply to
@@ -746,7 +749,7 @@ the work folder).
 | `stalled` | a host stopped with SIGSTOP stays listed and 40 listings do not block the server |
 | `logcap` | the log is rotated during the run, also with two servers on one home; the older log is private |
 | `outputs` | the outline and the references cut and continued; the server ends when the client is gone |
-| `propose-close` | the person closes the file just after an Accept (the agent still hears it, no word of markup) and with a proposal pending (named once as no longer tracked, its markup stays, it cannot be withdrawn) (#956) |
+| `propose-close` | the person closes the file just after an Accept (the agent still hears it, no word of markup) and with a proposal pending (named once as no longer tracked, its markup stays; a withdraw of it, the first call, fails with an error that says it is of a previous host and carries the note) (#956) |
 
 ## Decisions and open points
 
