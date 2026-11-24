@@ -555,8 +555,9 @@
                        (delayed-keyboard-press (car step) (cadr step)))
                       (else
                         (edit-step
-                          (lambda () (keyboard-press (car step)
-                                                     (cadr step)))))))
+                          (lambda ()
+                            (committed-keyboard-press (car step)
+                                                      (cadr step)))))))
               steps)))))
     (reverse r)))
 
@@ -616,7 +617,85 @@
                   ("~" 200) ("pre-edit:" 200) (,caron 200) 1000
                   (,(cork #xa3) 300) ("pre-edit:" 300) 1000))
               (list "<sim>" `(concat "<sim>" (pre-edit ,(cork 7)))
-                    (string-append "<sim>" (cork #xa3))))))
+                    (string-append "<sim>" (cork #xa3))))
+      ;; the same, with c typed less than 100 ms after the dead caron: the
+      ;; end of the pre-edit of the tilde, still pending, is pressed before
+      ;; the composed letter (#955; the letter was lost)
+      (check= (math-steps
+                `((,acc 100) 1000
+                  ("pre-edit:" 200) ("~" 200) (,caron 200)
+                  ("pre-edit:" 230) (,(cork #xa3) 230) 0 1000))
+              (list "<sim>" (string-append "<sim>" (cork #xa3))
+                    (string-append "<sim>" (cork #xa3))))
+      (check= (math-steps
+                `((,acc 100) 1000
+                  ("~" 200) ("pre-edit:" 200) (,caron 200)
+                  (,(cork #xa3) 230) ("pre-edit:" 230) 0 1000))
+              (list "<sim>" (string-append "<sim>" (cork #xa3))
+                    (string-append "<sim>" (cork #xa3)))))
+    ;; two or three dead tildes less than 100 ms apart (#955): the commit
+    ;; of a tilde whose pre-edit is pending is read after it (Qt) or after
+    ;; the end of the previous pre-edit (Cocoa); it was dropped
+    (check= (math-steps
+              `((,acc 100) 1000
+                ("~" 150) ("pre-edit:" 150) (,acc 150) 0
+                ("~" 200) ("pre-edit:" 200) 0 1000))
+            '("<sim>" "<sim>" "<approx>" "<approx>"))
+    (check= (math-steps
+              `((,acc 100) 1000
+                ("pre-edit:" 150) ("~" 150) (,acc 150) 0
+                ("pre-edit:" 200) ("~" 200) 0 1000))
+            '("<sim>" "<sim>" "<approx>" "<approx>"))
+    (check= (math-steps
+              `((,acc 100) 1000
+                ("~" 150) ("pre-edit:" 150) (,acc 150)
+                ("~" 200) ("pre-edit:" 200) (,acc 200) 0 1000
+                ("~" 300) ("pre-edit:" 300) 1000))
+            '("<sim>" "<approx>" "<triplesim>" "<triplesim>"))
+    (check= (math-steps
+              `((,acc 100) 1000
+                ("pre-edit:" 150) ("~" 150) (,acc 150)
+                ("pre-edit:" 200) ("~" 200) (,acc 200) 0 1000
+                ("pre-edit:" 300) ("~" 300) 1000))
+            '("<sim>" "<approx>" "<triplesim>" "<triplesim>"))
+    ;; all at once (no idle time at all)
+    (check= (math-steps
+              `((,acc 100)
+                ("~" 150) ("pre-edit:" 150) (,acc 150)
+                ("~" 200) ("pre-edit:" 200) (,acc 200)
+                ("~" 300) ("pre-edit:" 300) 1000))
+            '("<triplesim>"))
+    (check= (math-steps
+              `((,acc 100)
+                ("pre-edit:" 150) ("~" 150) (,acc 150)
+                ("pre-edit:" 200) ("~" 200) (,acc 200)
+                ("pre-edit:" 300) ("~" 300) 1000))
+            '("<triplesim>"))
+    ;; the delayed command of a superseded pre-edit stops at its first
+    ;; poll, the last one once it has run
+    (with polls '()
+      (with-global exec-delayed-pause
+          (lambda (c) (set! polls (append polls (list c))))
+        (with-global idle-time (lambda () 0)
+          (in-buffer '(document (math "")) '(0 0 0)
+            (lambda ()
+              (delayed-keyboard-press acc 100)
+              (delayed-keyboard-press "pre-edit:" 150)
+              (check= (map (lambda (c) (== (c) #t)) polls) '(#t #f))
+              (with-global idle-time (lambda () 100)
+                (edit-step (lambda () ((cadr polls)))))
+              (check-true (== ((cadr polls)) #t)))))))
+    ;; in text, a pending pre-edit followed by its commit (Qt), and the
+    ;; fast input of a Chinese input method: the pre-edit is not left
+    (check= (typed-steps '(document "") '(0 0)
+              `((,acc 100) (,(cork #xf1) 120) ("pre-edit:" 120) 0 1000))
+            (list (cork #xf1) (cork #xf1)))
+    (check= (typed-steps '(document "") '(0 0)
+              `(("pre-edit:1:n" 100) ("pre-edit:2:ni" 110)
+                ("<#4F60>" 130) ("pre-edit:" 130) 0
+                ("pre-edit:1:h" 140) ("pre-edit:" 150) ("<#597D>" 150)
+                0 1000))
+            '("<#4F60>" "<#4F60><#597D>" "<#4F60><#597D>")))
   ;; a dead tilde in math, the cursor moved to text with the dead key still
   ;; open, a dead tilde and n there: the commit of the first tilde, already
   ;; inserted, is dropped, the second one composes with n
