@@ -402,7 +402,7 @@
       (check= (syntax-region-sexp (string->tree "[true") json)
               "(document (array (true) (MISSING \"]\")))")
       (check= (syntax-region-errors (stree->tree '(document "[1, 2")) json)
-              '(("missing" (0 5) (0 5))))
+              '(("missing" (0 5) (0 5) ((0 0) (0 5)))))
       ;; edits of a JSON document
       (let ((t (stree->tree '(document "{\"a\": [1, 2]," " \"b\": null}"))))
         (syntax-region-sexp t json)
@@ -1751,6 +1751,18 @@
   (let ((l '("x = <less>a href='C:\\' /<gtr>;")))
     (check= (string-deletion 'javascript-code l 0 22 #f) '(0 17 0 22))
     (check= (string-deletion 'javascript-code l 0 17 #t) '(0 17 0 22)))
+  ;; a missing ; or ) after a string, or a missing token at its start, is
+  ;; not in it (its parent is larger than the string)
+  (check= (string-deletion 'shell-code '("x=('ab'") 0 7 #f) '(0 3 0 7))
+  (check= (string-deletion 'shell-code '("x=('ab'") 0 3 #t) '(0 3 0 7))
+  (check= (string-deletion 'shell-code '("x=($'ab'") 0 8 #f) '(0 3 0 8))
+  (check= (string-deletion 'rust-code '("let x = r\"ab\"") 0 13 #f) '(0 8 0 13))
+  (check= (string-deletion 'rust-code '("let x = r#\"ab\"#") 0 15 #f) '(0 8 0 15))
+  (check= (string-deletion 'lua-code '("f([[ab]]") 0 8 #f) '(0 2 0 8))
+  (check= (string-deletion 'julia-code '("f(\"ab\"") 0 6 #f) '(0 2 0 6))
+  (check= (string-deletion 'r-code '("f(r\"(ab)\"") 0 9 #f) '(0 2 0 9))
+  (check= (string-deletion 'lua-code '("x = {\"a\"\"b\"}") 0 11 #f) '(0 8 0 11))
+  (check= (string-deletion 'lua-code '("x = {\"a\"\"b\"}") 0 8 #t) '(0 8 0 11))
   ;; a missing token or an error around the string is not in it
   (check= (string-deletion 'rust-code '("let x = \"\"") 0 9 #f) 'deleted)
   (check= (string-deletion 'cpp-code '("x = \"%\" PRIu64;") 0 7 #f) '(0 4 0 7))

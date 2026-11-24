@@ -361,28 +361,22 @@
          (point<? (list (car a) o) (list (car b) (- m (string-length close))))
          (list (list (car a) o) (list (car b) m)))))
 
-(define (closing-token? root lan c)
-  ;; whether the character at the point c is a token of its own (the closing
-  ;; quote of a string), not a part of a longer one (an escape, a content)
-  (let ((l (syntax-region-node-range root lan (car c) (cadr c)
-                                     (car c) (+ (cadr c) 1))))
-    (and (pair? l) (== (node-start (car l)) c)
-         (== (node-end (car l)) (list (car c) (+ (cadr c) 1))))))
-
-(define (terminated? root lan errs a b c)
-  ;; whether the string from a to b, whose closing quote is at c, has no
-  ;; error of the parse (kind start end) inside it. A missing node at b may
-  ;; be its closing quote (an unterminated "ab\" in Lua, Bash, OCaml, Rust),
-  ;; or the token after it (the ; of let x = "" in Rust): it is the first
-  ;; when the quote at c is part of a longer token, an escape \". An error
-  ;; from a to b is a node around the string (x = "%" PRIu64; in C++).
-  (not (list-or
-        (map (lambda (x)
-               (and (point<=? a (cadr x)) (point<=? (caddr x) b)
-                    (not (and (== (cadr x) a) (== (caddr x) b)))
-                    (or (!= (cadr x) b) (!= (caddr x) b)
-                        (not (closing-token? root lan c)))))
-             errs))))
+(define (terminated? errs a b)
+  ;; whether the string from a to b has no error of the parse inside it
+  ;; (syntax-region-errors): no ERROR node inside it (one with its range is
+  ;; around it: x = "%" PRIu64; in C++), and no missing node whose parent is
+  ;; the string or inside it (the missing closing quote of an unterminated
+  ;; "ab\" in Lua, Bash, OCaml, Rust), while the missing ; or ) after a
+  ;; string (let x = r"ab" in Rust, f("ab" in Julia) has a larger parent
+  (let ((within? (lambda (x y) (and (point<=? a x) (point<=? y b)))))
+    (not (list-or
+          (map (lambda (e)
+                 (if (== (car e) "missing")
+                     (and (pair? (cdddr e))
+                          (within? (car (cadddr e)) (cadr (cadddr e))))
+                     (and (within? (cadr e) (caddr e))
+                          (not (and (== (cadr e) a) (== (caddr e) b))))))
+               errs)))))
 
 (define (quote-pair root lan p)
   ;; when the character at p opens or closes a string: (start end open
@@ -403,9 +397,7 @@
                                                 (== (node-type n)
                                                     "prefixed_string_literal"))
                            (and q (or (== (car q) p) (== (cadr q) after))
-                                (terminated? root lan (errors) a b
-                                             (list (car (cadr q))
-                                                   (- (cadr (cadr q)) 1)))
+                                (terminated? (errors) a b)
                                 (list a b (car q) (cadr q)))))))
                 (syntax-region-node-range root lan (car p) (cadr p)
                                           (car p) (+ (cadr p) 1)))

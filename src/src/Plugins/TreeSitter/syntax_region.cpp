@@ -985,26 +985,43 @@ syntax_region_last_nodes (tree root, int language) {
 }
 
 static void
-collect_errors (TSNode n, array<object>& l) {
+collect_errors (TSTreeCursor* c, TSNode parent, array<object>& l) {
+  // the errors of the node at the cursor and below it; a missing node comes
+  // with the range of its parent (the string of which it is the missing
+  // closing quote, or the statement of a missing ;). The cursor walks the
+  // children: ts_node_child (n, i) costs i, in a wide error node
+  TSNode n= ts_tree_cursor_current_node (c);
   if (ts_node_is_error (n) || ts_node_is_missing (n)) {
-    l << list_object (object (string (ts_node_is_missing (n)? "missing": "error")),
-                      point_object (ts_node_start_point (n)),
-                      point_object (ts_node_end_point (n)));
+    array<object> e;
+    e << object (string (ts_node_is_missing (n)? "missing": "error"));
+    e << point_object (ts_node_start_point (n));
+    e << point_object (ts_node_end_point (n));
+    if (ts_node_is_missing (n) && !ts_node_is_null (parent))
+      e << list_object (point_object (ts_node_start_point (parent)),
+                        point_object (ts_node_end_point (parent)));
+    l << as_list_object (e);
     if (ts_node_is_missing (n)) return;
   }
   if (!ts_node_has_error (n)) return;
-  for (uint32_t i= 0; i < ts_node_child_count (n); i++)
-    collect_errors (ts_node_child (n, i), l);
+  if (ts_tree_cursor_goto_first_child (c)) {
+    do collect_errors (c, n, l);
+    while (ts_tree_cursor_goto_next_sibling (c));
+    ts_tree_cursor_goto_parent (c);
+  }
 }
 
 object
 syntax_region_errors (tree root, int language) {
-  // (kind (row column) (row column)) for each error and missing node
+  // (kind (row column) (row column)) for each error and missing node, and
+  // for a missing node the range ((row column) (row column)) of its parent
   array<syntax_region_rep*> rs= regions_of (root, language);
   array<object> l;
+  TSNode none= { { 0, 0, 0, 0 }, NULL, NULL };
   for (int i= 0; i < N(rs); i++) {
     row_base= rs[i]->first;
-    collect_errors (ts_tree_root_node (rs[i]->ts_tree), l);
+    TSTreeCursor c= ts_tree_cursor_new (ts_tree_root_node (rs[i]->ts_tree));
+    collect_errors (&c, none, l);
+    ts_tree_cursor_delete (&c);
   }
   row_base= 0;
   return as_list_object (l);
