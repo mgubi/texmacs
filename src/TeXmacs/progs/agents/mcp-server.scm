@@ -3722,8 +3722,50 @@
 
 (define (proposal-key d id) (string-append (doc-id d) "/" id))
 
+(define (outcome-sentence e)
+  ;; "Your proposal p1.3fa0c2d1 was accepted by the person." for (id status ...)
+  (string-append "Your proposal " (car e) " was "
+                 (cond ((== (cadr e) "accepted") "accepted by the person")
+                       ((== (cadr e) "rejected") "rejected by the person")
+                       ((== (cadr e) "withdrawn") "withdrawn")
+                       (else "resolved by the person (changed, neither as proposed nor as before)"))
+                 "."))
+
+(define mcp-prop-dropped (make-ahash-table))   ; "d1/p3.<tag>" -> its status when a change of host dropped it
+
+(define (dropped-note d)
+  ;; the host of the document changed since the last call (#956): the outcomes
+  ;; told by the former host that were not read yet, and the proposals that
+  ;; were still pending, whose markup stays for the person
+  (let* ((l (or (shared-proposals-dropped (doc-url d)) '()))
+         (done (list-filter l (lambda (e) (and (!= (cadr e) "pending")
+                                               (!= (ahash-ref mcp-prop-seen (proposal-key d (car e)))
+                                                   (cadr e))))))
+         (pend (list-filter l (lambda (e) (== (cadr e) "pending")))))
+    (for (e done) (ahash-set! mcp-prop-seen (proposal-key d (car e)) (cadr e)))
+    (for (e pend) (ahash-remove! mcp-prop-seen (proposal-key d (car e))))
+    (for (e l) (ahash-set! mcp-prop-dropped (proposal-key d (car e)) (cadr e)))
+    (with parts (append (map outcome-sentence done)
+                        (if (null? pend) '()
+                            (list (string-append
+                                   "The host of the document changed: your pending "
+                                   (if (null? (cdr pend)) "proposal " "proposals ")
+                                   (string-recompose (map car pend) ", ")
+                                   " " (if (null? (cdr pend)) "is" "are")
+                                   " no longer tracked (list_proposals no longer lists "
+                                   (if (null? (cdr pend)) "it" "them")
+                                   ", withdraw_proposal cannot take "
+                                   (if (null? (cdr pend)) "it" "them")
+                                   " back); the markup stays in the document for the person to resolve with Version > Retain."))))
+      (and (nnull? parts) (string-recompose parts " ")))))
+
 (define (proposal-note d)
   ;; what became of the proposals since the last call, or #f
+  (let* ((f (dropped-note d)) (r (proposal-note* d)))
+    (cond ((and f r) (string-append f " " r))
+          (else (or f r)))))
+
+(define (proposal-note* d)
   (let ((l (list-filter (proposal-entries d)
                         (lambda (e) (and (!= (cadr e) "pending")
                                          (!= (ahash-ref mcp-prop-seen (proposal-key d (car e)))
@@ -3731,16 +3773,7 @@
     (and (nnull? l)
          (begin
            (for (e l) (ahash-set! mcp-prop-seen (proposal-key d (car e)) (cadr e)))
-           (string-recompose
-            (map (lambda (e)
-                   (string-append "Your proposal " (car e) " was "
-                                  (cond ((== (cadr e) "accepted") "accepted by the person")
-                                        ((== (cadr e) "rejected") "rejected by the person")
-                                        ((== (cadr e) "withdrawn") "withdrawn")
-                                        (else "resolved by the person (changed, neither as proposed nor as before)"))
-                                  "."))
-                 l)
-            " ")))))
+           (string-recompose (map outcome-sentence l) " ")))))
 
 (define (proposal-where d e)
   (let ((i (caddr e)) (body (doc-body d)))
@@ -3766,7 +3799,12 @@
          (id (opt-string args "id" #f)))
     (when (not id) (tool-error "the argument `id' (a proposal of list_proposals) is needed"))
     (let ((e (list-find (proposal-entries d) (lambda (e) (== (car e) id)))))
-      (when (not e) (tool-error (string-append "no proposal " id " of yours on this document")))
+      (when (not e)
+        (tool-error
+         (string-append "no proposal " id " of yours on this document"
+                        (if (ahash-ref mcp-prop-dropped (proposal-key d id))
+                            ": it was made under a previous host of this document and is no longer tracked (its markup, if it was pending, stays for the person to resolve)"
+                            ""))))
       (when (== (cadr e) "pending")
         (shared-file-send-withdraw u id)
         (let ((t0 (texmacs-time)))
@@ -4001,7 +4039,7 @@
    (list "withdraw_proposal" "Withdraw a pending proposal"
          "Takes back a proposal that is still pending: the person's document goes back to the old version."
          (schema (list (cons "document" document-prop)
-                       (cons "id" (prop "string" "The proposal (p1...), from the answer of the edit or from list_proposals.")))
+                       (cons "id" (prop "string" "The proposal (an id such as p1.3fa0c2d1), from the answer of the edit or from list_proposals.")))
                  '("document" "id"))
          tool-withdraw-proposal #t)
    (list "undo_agent" "Undo your own last steps"
@@ -4091,30 +4129,35 @@
   (let ((tool (list-find mcp-tools (lambda (t) (== (car t) name)))))
     (if (not tool)
         'unknown
-        (catch #t
-          (lambda ()
-            (set! mcp-param-error-message #f)
-            (when (and (editing-tool? tool) (mcp-read-only?)) (require-writable))
-            (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
-                   (d (and dref (find-doc dref)))
-                   (note (and d (begin (doc-refresh! d)
-                                       (let ((a (or (stale-note d) (change-note d))) (b (proposal-note d)))
-                                         (cond ((and a b) (string-append a " " b))
-                                               (else (or a b)))))))
-                   (r ((list-ref tool 4) args)))
-              (text-result (json-write (if (and note (func? r 'attr))
-                                           (append r (list "note" note))
-                                           r))
-                           #f)))
-          (lambda args*
-            (cond ((and (pair? args*) (eq? (car args*) 'mcp-tool-error))
-                   (text-result mcp-tool-error-message #t))
-                  ((and (pair? args*) (eq? (car args*) 'mcp-param-error))
-                   (cons 'invalid mcp-param-error-message))
-                  (else
-                    (mcp-log "error in tool " name ": " args*)
-                    (text-result (string-append "internal error in " name)
-                                 #t))))))))
+        (let ((note #f))
+          ;; (the notes are told once: when the tool fails, they go with the
+          ;; error, e.g. a withdraw_proposal after a change of host)
+          (define (with-note msg)
+            (if (and note (string? msg)) (string-append msg " (Note: " note ")") msg))
+          (catch #t
+            (lambda ()
+              (set! mcp-param-error-message #f)
+              (when (and (editing-tool? tool) (mcp-read-only?)) (require-writable))
+              (let* ((dref (let ((x (jref args "document"))) (and (string? x) x)))
+                     (d (and dref (find-doc dref))))
+                (set! note (and d (begin (doc-refresh! d)
+                                         (let ((a (or (stale-note d) (change-note d))) (b (proposal-note d)))
+                                           (cond ((and a b) (string-append a " " b))
+                                                 (else (or a b)))))))
+                (let ((r ((list-ref tool 4) args)))
+                  (text-result (json-write (if (and note (func? r 'attr))
+                                               (append r (list "note" note))
+                                               r))
+                               #f))))
+            (lambda args*
+              (cond ((and (pair? args*) (eq? (car args*) 'mcp-tool-error))
+                     (text-result (with-note mcp-tool-error-message) #t))
+                    ((and (pair? args*) (eq? (car args*) 'mcp-param-error))
+                     (cons 'invalid (with-note mcp-param-error-message)))
+                    (else
+                      (mcp-log "error in tool " name ": " args*)
+                      (text-result (with-note (string-append "internal error in " name))
+                                   #t)))))))))
 
 (define (handle-request id method params)
   ;; the response to the request @method, an stree

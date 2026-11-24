@@ -42,6 +42,8 @@
 #               paragraphs, several at once); a later comparison is not a proposal
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
+#   agenthost   the person's process with proposals of the agent closes the file: the agent's
+#               process hosts with no record of them (#956), the markup stays in the document
 #   fuzz        random patches with hostile integers through the patch functions: no crash
 #   edfuzz      random patches applied to a real buffer (editor and typesetter): no crash
 #   malformed   patches and messages of a wrong shape are refused and the host goes on
@@ -72,7 +74,7 @@ export TEXMACS_VUE_CLIPBOARD=private
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentversion agentplain malformed agentmode fuzz edfuzz diskchange
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentversion agentplain malformed agentmode agenthost fuzz edfuzz diskchange
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or
