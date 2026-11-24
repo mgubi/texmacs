@@ -430,7 +430,10 @@ process hosts, or only headless ones), the agent edits directly, as before.
   proposal whose markup is lost is reported `resolved`; an undo of a Keep that
   made the body again (a kept version made of blocks) can make another, untouched
   pending proposal lose its block: it is then reported `resolved` while its
-  markup remains (#867). A patch of an agent that touches blocks
+  markup remains; an undo of a Version-tool choice followed by typing over
+  that difference by hand, before any other Keep or Accept, can make a mixed
+  result read `accepted` (the undone choice is dropped only at the next Keep or
+  Accept) (#867). A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status
   (pending, accepted, rejected, withdrawn, resolved), the place; resolved ones are
