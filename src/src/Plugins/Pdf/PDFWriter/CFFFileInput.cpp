@@ -823,26 +823,31 @@ void CFFFileInput::ReadEncoding(EncodingsInfo* inEncoding,LongFilePositionType i
 				Byte firstCode;
 				Byte left;
 
-				inEncoding->mEncodingsCount = 0;
+				// (TeXmacs: a range is its first code and nLeft more, nLeft+1
+				// codes, not nLeft; at most 255 codes, those of the glyphs
+				// after .notdef, which mEncodingsCount, a Byte, can count)
+				int count = 0;
 				// get the encoding count (yap, reading twice here)				
 				for(Byte i=0; i < rangesCount; ++i)
 				{
 					mPrimitivesReader.ReadCard8(firstCode);
 					mPrimitivesReader.ReadCard8(left);
-					inEncoding->mEncodingsCount+= left;
+					count += (int)left + 1;
 				}
-				inEncoding->mEncoding = new Byte[inEncoding->mEncodingsCount];
+				if(count > 255)
+					count = 255;
+				inEncoding->mEncodingsCount = (Byte)count;
+				inEncoding->mEncoding = new Byte[count];
 				mPrimitivesReader.SetOffset(inEncodingPosition+2); // reset encoding to beginning of range reading
 
 				// now read the encoding array
-				Byte encodingIndex = 0;
+				int encodingIndex = 0;
 				for(Byte i=0; i < rangesCount; ++i)
 				{
 					mPrimitivesReader.ReadCard8(firstCode);
 					mPrimitivesReader.ReadCard8(left);
-					for(Byte j=0;j < left;++j)
-						inEncoding->mEncoding[encodingIndex+j] = firstCode+j;
-					encodingIndex+=left;
+					for(int j=0; j <= (int)left && encodingIndex < count; ++j, ++encodingIndex)
+						inEncoding->mEncoding[encodingIndex] = (Byte)(firstCode+j);
 				}
 			}
 		}

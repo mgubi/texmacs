@@ -1263,7 +1263,7 @@ def s_propose(w):
     k = handles()
     # 1. an edit becomes a proposal
     e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="First", new="Initial", expect=k[0]["hash"])
-    check("propose: the edit is proposed", not e and r["status"] == "proposed" and r.get("proposal") == "p1")
+    check("propose: the edit is proposed", not e and r["status"] == "proposed" and str(r.get("proposal")).startswith("p1."))
     hb = host_body(w, st)
     check("propose: the host's document holds both versions", "version-both" in hb and "First" in hb and "Initial" in hb)
     e, t = m.tool("read", document="d1", format="stree", max_size=100000)
@@ -1277,26 +1277,26 @@ def s_propose(w):
     hostcmd(w, st, "accept p1")
     time.sleep(0.5)
     e, t = m.tool("read", document="d1", format="text")
-    check("accepted: the note tells the agent (once)", "proposal p1 was accepted" in t.get("note", ""))
+    check("accepted: the note tells the agent (once)", re.search(r"proposal p1\.\w+ was accepted", t.get("note", "")))
     e, lp = m.tool("list_proposals", document="d1")
     check("accepted: listed as accepted", not e and lp["proposals"][0]["status"] == "accepted")
     hb = host_body(w, st)
     check("accepted: the new text in the host's document", "Initial paragraph." in hb and "version-both" not in hb)
     e, t = m.tool("read", document="d1", format="text")
-    check("and not again", "proposal p1" not in t.get("note", ""))
+    check("and not again", "proposal p1." not in t.get("note", ""))
     k = t["children"]
     # 3. reject
     e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Initial", new="Other")
-    check("a second proposal", not e and r["status"] == "proposed" and r["proposal"] == "p2")
+    check("a second proposal", not e and r["status"] == "proposed" and r["proposal"].startswith("p2."))
     hostcmd(w, st, "reject p2")
     time.sleep(0.5)
     e, t = m.tool("read", document="d1", format="text")
-    check("rejected: the note, and the old text", "proposal p2 was rejected" in t.get("note", "") and "Initial paragraph." in t["content"])
+    check("rejected: the note, and the old text", re.search(r"proposal p2\.\w+ was rejected", t.get("note", "")) and "Initial paragraph." in t["content"])
     k = t["children"]
     # 4. withdraw
     e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="Initial", new="Third")
-    check("a third proposal", not e and r["status"] == "proposed" and r["proposal"] == "p3")
-    e, r = m.tool("withdraw_proposal", document="d1", id="p3")
+    check("a third proposal", not e and r["status"] == "proposed" and r["proposal"].startswith("p3."))
+    e, r = m.tool("withdraw_proposal", document="d1", id=r["proposal"])
     check("withdraw_proposal", not e and r["status"] == "withdrawn")
     hb = host_body(w, st)
     check("withdrawn: the host's document is clean", "version-both" not in hb and "Initial paragraph." in hb)
@@ -1369,6 +1369,74 @@ def s_propose(w):
         other.kill()
     out = open(os.path.join(w, "out-B")).read() if os.path.exists(os.path.join(w, "out-B")) else ""
     check("the other TeXmacs passed its checks", out == "ok")
+
+
+def s_propose_close(w):
+    """the person closes the file just after an Accept: the agent's process hosts it
+    and the agent still hears that its proposal was accepted, with no word of markup
+    left; the person opens it again (and hosts), the agent proposes, the person
+    closes it with the proposal pending: the agent is told once that this proposal is
+    no longer tracked and that its markup stays (#956)"""
+    os.makedirs(os.path.join(w, "sync"), exist_ok=True)
+    os.makedirs(os.path.join(w, "tmp"), exist_ok=True)
+    f = os.path.join(w, "shared.tm")
+    write_small(f)
+    f = os.path.realpath(f)
+    envA, homeA = make_env(w, "A", "on")
+    envB, homeB = make_env(w, "B", "on")
+    other = start_other(w, envB, "host-edit.scm", f, {"SH_INTERACTIVE": "1"})
+    check("the host has loaded the file", wait_file(os.path.join(w, "sync", "h-loaded")))
+    m = Mcp(envA)
+    m.initialize()
+    e, v = m.tool("open_document", path=f)
+    check("the agent joins as a participant", not e and v["shared"]["role"] == "participant")
+    def doc():
+        return m.tool("list_documents")[1]["documents"][0]
+    def role():
+        return (doc().get("shared") or {}).get("role")
+    check("propose mode", poll(lambda: doc().get("agent_mode") == "propose", 10))
+    st = [0]
+    # 1. accepted, then the person closes the file at once
+    k = m.tool("read", document="d1", format="text")[1]["children"]
+    e, r = m.tool("edit_text", document="d1", node=k[0]["handle"], old="First", new="Initial", expect=k[0]["hash"])
+    p1 = r.get("proposal") if not e else None
+    check("a proposal", not e and r["status"] == "proposed" and str(p1).startswith("p1."))
+    hostcmd(w, st, "accept p1")
+    hostcmd(w, st, "close")
+    check("the agent's process hosts the file", poll(lambda: role() == "host", 15))
+    e, t = m.tool("read", document="d1", format="text")
+    note = t.get("note", "") if not e else ""
+    check("accepted then closed: the agent hears accepted", ("proposal %s was accepted" % p1) in note)
+    check("accepted then closed: no word of tracking or markup", "no longer tracked" not in note and "markup" not in note)
+    check("the accepted text", "Initial paragraph." in t.get("content", ""))
+    e, t = m.tool("read", document="d1", format="text")
+    check("and not again", "proposal" not in t.get("note", ""))
+    # 2. the person opens it again and hosts; a proposal left pending when it closes
+    hostcmd(w, st, "reopen")
+    check("the person hosts again", poll(lambda: role() == "participant" and doc().get("agent_mode") == "propose", 30))
+    k = m.tool("read", document="d1", format="text")[1]["children"]
+    e, r = m.tool("edit_text", document="d1", node=k[1]["handle"], old="Second", new="Other", expect=k[1]["hash"])
+    p2 = r.get("proposal") if not e else None
+    check("a new proposal, with a new tag", not e and r["status"] == "proposed" and str(p2).startswith("p1.") and p2 != p1)
+    e, lp = m.tool("list_proposals", document="d1")
+    check("listed, pending", not e and [x["status"] for x in lp["proposals"]] == ["pending"])
+    hostcmd(w, st, "close")
+    check("the agent's process hosts the file again", poll(lambda: role() == "host", 15))
+    # (the first call after the change of host fails: the note goes with the error)
+    e, r = m.tool("withdraw_proposal", document="d1", id=p2)
+    msg = str(r)
+    check("it cannot be withdrawn: the error says it is of a previous host", e and "previous host" in msg)
+    check("pending then closed: the note goes with the error, names it, no longer tracked, markup stays",
+          p2 in msg and "(Note: " in msg and "no longer tracked" in msg and "markup stays" in msg and "was accepted" not in msg)
+    e, t = m.tool("read", document="d1", format="stree", max_size=100000)
+    check("the markup stays, and the note is not told again",
+          "version-both" in t.get("content", "") and "no longer tracked" not in t.get("note", ""))
+    sync_set(w, "c-done")
+    check("exit 0", m.close() == 0)
+    try:
+        other.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        other.kill()
 
 
 def s_undo(w):
@@ -2735,8 +2803,8 @@ def s_gui_host(w):
     check("focus bar: one proposal pending", ev("(shared-file-pending-count (current-buffer))") == "1")
     ev("(go-to (list 1 0))")
     check("focus bar: no proposal at the cursor away from it", ev("(shared-proposal-at-cursor (current-buffer))") == "#f")
-    check("focus bar: next proposal goes to it", ev("(shared-proposal-go! (current-buffer) 1)") == '"p1"')
-    check("focus bar: the proposal at the cursor", ev("(shared-proposal-at-cursor (current-buffer))") == '"p1"')
+    check("focus bar: next proposal goes to it", ev("(shared-proposal-go! (current-buffer) 1)").startswith('"p1.'))
+    check("focus bar: the proposal at the cursor", ev("(shared-proposal-at-cursor (current-buffer))").startswith('"p1.'))
     shots = os.path.join(w, "shots")
     os.makedirs(shots, exist_ok=True)
     try:
@@ -2802,7 +2870,7 @@ def s_gui_host(w):
 SCENARIOS = {"protocol": s_protocol, "tools": s_tools, "shared": s_shared,
              "mcp-host": s_mcp_host, "unshared": s_unshared,
              "hostdeath": s_hostdeath, "nonascii": s_nonascii, "stalled": s_stalled, "logcap": s_logcap,
-             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "gui-host": s_gui_host, "not-joined": s_not_joined, "save-guard": s_save_guard,
+             "edit": s_edit, "readonly": s_readonly, "edit-shared": s_edit_shared, "propose": s_propose, "propose-close": s_propose_close, "gui-host": s_gui_host, "not-joined": s_not_joined, "save-guard": s_save_guard,
              "undo": s_undo, "static": s_static, "recursion": s_recursion, "guard": s_guard, "filter": s_filter, "styles": s_styles, "content": s_content, "launcher": s_launcher, "robust": s_robust, "outputs": s_outputs}
 
 if __name__ == "__main__":
