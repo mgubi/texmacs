@@ -143,7 +143,9 @@
 
     <item*|<scm|syntax-region-errors>>The <verbatim|ERROR> and
     <verbatim|MISSING> nodes, as <scm|("error" start end)> or
-    <scm|("missing" start end)>.
+    <scm|("missing" start end (pstart pend))>, with the range of the parent
+    of the missing node (the string of a missing closing quote, the
+    statement of a missing <verbatim|;>).
 
     <item*|<scm|syntax-region-last-nodes>>The root, its last child, the
     last child of that one..., outermost first (where the text ends).

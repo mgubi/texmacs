@@ -261,19 +261,163 @@
                (insert rb))
            #t))))
 
+;; A string is selected by its quotes (or deleted with them when it is
+;; empty) when two conditions hold, each covering the holes of the other
+;; (#873):
+;;  - the node names a whole string: its type has "string", but none of the
+;;    words of the grammars for the parts of a string (string_content,
+;;    string_start and string_end in Python, string_open and string_close
+;;    in R, raw_string_delimiter in C++...) nor for an unquoted value
+;;    (string_scalar in YAML);
+;;  - its text has the shape of a quoted string: a prefix of letters, digits,
+;;    _, $, @ and symbols of TeXmacs (f, rb, u8, R, r, $'...' of Bash,
+;;    @"..." of C#, the string macros of Julia, <alpha>"..."), a run of #
+;;    (raw strings of Rust), an opening quote q (" ' `), ..., a closing quote
+;;    q and as many #; or <...> (#include <...>, <less>...<gtr> in the
+;;    strings of TeXmacs), or the long brackets of
+;;    Lua ([[...]], [=[...]=]); in Julia, whose grammar puts the suffix
+;;    of a string in its node (prefixed_string_literal), a suffix of
+;;    letters, digits and _ may follow (the flags of r"..."i).
+;; A string with an error or a missing node of the parse inside it is no
+;; pair: an unterminated string ("ab\"cd in Lua, Bash, OCaml, Rust) is one
+;; string node with a missing closing quote; the parser knows which \
+;; escape, in each language ("C:\" in the attributes of JSX, the gaps \
+;; ... \ of Haskell strings).
+;; The character must be the opening quote, or the closing quote (or its
+;; last #); the characters in between, the prefix and the suffix are plain
+;; characters.
+
+(define string-part-words
+  '("start" "end" "open" "close" "content" "delimiter" "fragment" "escape"
+    "interpolation" "scalar"))
+
+(define (whole-string-type? type)
+  (and (string-contains? type "string")
+       (not (list-or (map (lambda (w) (string-contains? type w))
+                          string-part-words)))))
+
+(define (prefix-char? ch)
+  (or (char-alphabetic? ch) (char-numeric? ch) (in? ch '(#\_ #\$ #\@))))
+
+(define (quote-char? ch) (in? ch '(#\" #\' #\`)))
+
+(define (symbol-end s i)
+  ;; the end of a symbol <name> or <#xxxx> of TeXmacs at i in s (a letter
+  ;; such as the alpha of a string macro of Julia), else #f; not < and >
+  (and (< i (string-length s)) (== (string-ref s i) #\<)
+       (let loop ((k (+ i 1)))
+         (cond ((>= k (string-length s)) #f)
+               ((== (string-ref s k) #\>)
+                (and (> k (+ i 1))
+                     (not (in? (substring s (+ i 1) k) '("less" "gtr")))
+                     (+ k 1)))
+               ((or (char-alphabetic? (string-ref s k)) (char-numeric? (string-ref s k))
+                    (== (string-ref s k) #\#))
+                (loop (+ k 1)))
+               (else #f)))))
+
+(define (suffix-char? ch)
+  (or (char-alphabetic? ch) (char-numeric? ch) (== ch #\_)))
+
+(define (string-quotes root a b suffix?)
+  ;; for a node from the point a to the point b, when its text has the shape
+  ;; of a quoted string: (open close), the point of its opening quote and
+  ;; the point after its closing one (before a suffix when suffix?, such as
+  ;; the flags of r"..."i in Julia); else #f
+  (let* ((s (line-string root (car a)))
+         (n (string-length s))
+         (e (line-string root (car b)))
+         (m (let loop ((m (cadr b)))        ; without the suffix
+              (if (and suffix? (> m 0) (<= m (string-length e))
+                       (suffix-char? (string-ref e (- m 1))))
+                  (loop (- m 1)) m)))
+         (skip (lambda (i ch?)
+                 (let loop ((i i))
+                   (if (and (< i n) (ch? (string-ref s i))) (loop (+ i 1)) i))))
+         (ends? (lambda (tail)               ; the text ends with tail
+                  (and (<= m (string-length e)) (>= m (string-length tail))
+                       (== (substring e (- m (string-length tail)) m) tail))))
+         (i (let loop ((i (cadr a)))         ; the prefix
+              (cond ((and (< i n) (prefix-char? (string-ref s i))) (loop (+ i 1)))
+                    ((symbol-end s i) => loop)
+                    (else i))))
+         (o (skip i (lambda (ch) (== ch #\#))))
+         (hashes (make-string (- o i) #\#))
+         (ch (and (< o n) (string-ref s o)))
+         (close
+          (cond ((not ch) #f)
+                ((quote-char? ch) (string-append (string ch) hashes))
+                ((!= hashes "") #f)
+                ((== ch #\<)                       ; < > in TeXmacs strings
+                 (and (<= (+ o 6) n) (== (substring s o (+ o 6)) "<less>")
+                      "<gtr>"))
+                ((== ch #\[)                       ; [[ or [=[ of Lua
+                 (let* ((k (skip (+ o 1) (lambda (c) (== c #\=)))))
+                   (and (< k n) (== (string-ref s k) #\[)
+                        (string-append "]" (make-string (- k o 1) #\=) "]"))))
+                (else #f))))
+    (and close (ends? close)
+         ;; the closing quote comes after the opening one
+         (point<? (list (car a) o) (list (car b) (- m (string-length close))))
+         (list (list (car a) o) (list (car b) m)))))
+
+(define (terminated? errs a b)
+  ;; whether the string from a to b has no error of the parse inside it
+  ;; (syntax-region-errors): no ERROR node inside it (one with its range is
+  ;; around it: x = "%" PRIu64; in C++), and no missing node whose parent is
+  ;; the string or inside it (the missing closing quote of an unterminated
+  ;; "ab\" in Lua, Bash, OCaml, Rust), while the missing ; or ) after a
+  ;; string (let x = r"ab" in Rust, f("ab" in Julia) has a larger parent
+  (let ((within? (lambda (x y) (and (point<=? a x) (point<=? y b)))))
+    (not (list-or
+          (map (lambda (e)
+                 (if (== (car e) "missing")
+                     (and (pair? (cdddr e))
+                          ;; (not at the start: the missing name of a call
+                          ;; "ab" which starts a block of Lua)
+                          (not (== (cadr e) a))
+                          (within? (car (cadddr e)) (cadr (cadddr e))))
+                     (and (within? (cadr e) (caddr e))
+                          (not (and (== (cadr e) a) (== (caddr e) b))))))
+               errs)))))
+
 (define (quote-pair root lan p)
-  ;; when a string starts or ends with the quote at p: (start end) of it
-  (let ((n (list-find (syntax-region-node-range root lan (car p) (cadr p)
-                                                (car p) (+ (cadr p) 1))
-                      (lambda (n) (and (string-contains? (node-type n) "string")
-                                       (or (== (node-start n) p)
-                                           (== (node-end n)
-                                               (list (car p) (+ (cadr p) 1)))))))))
-    (and n (list (node-start n) (node-end n)))))
+  ;; when the character at p opens or closes a string: (start end open
+  ;; close), open being the point of its opening quote and close the point
+  ;; after its closing one. In a string inside another one (Python
+  ;; f-strings) it is the innermost string.
+  (let* ((after (list (car p) (+ (cadr p) 1)))
+         (errs #f)
+         (errors (lambda ()
+                   (when (not errs) (set! errs (syntax-region-errors root lan)))
+                   errs))
+         (pairs
+          (list-filter
+           (map (lambda (n)
+                  (let ((a (node-start n)) (b (node-end n)))
+                    (and (whole-string-type? (node-type n))
+                         (with q (string-quotes root a b
+                                                (== (node-type n)
+                                                    "prefixed_string_literal"))
+                           (and q (or (== (car q) p) (== (cadr q) after))
+                                (terminated? (errors) a b)
+                                (list a b (car q) (cadr q)))))))
+                (syntax-region-node-range root lan (car p) (cadr p)
+                                          (car p) (+ (cadr p) 1)))
+           identity))
+         (inner? (lambda (x y) (and (point<=? (car y) (car x))
+                                    (point<=? (cadr x) (cadr y))))))
+    (and (nnull? pairs)
+         (let loop ((best (car pairs)) (l (cdr pairs)))
+           (if (pair? l)
+               (loop (if (inner? (car l) best) (car l) best) (cdr l))
+               best)))))
 
 (define (pair-at root lan p)
   ;; the pair of brackets or quotes of which the character at p is one:
-  ;; (start end) from the opening one to after the closing one, or #f
+  ;; (start end) from the opening one to after the closing one, or #f; for a
+  ;; string, (start end open close) with the points of its quotes (after
+  ;; its prefix, before its suffix)
   (let ((q (syntax-matching-bracket root lan p)))
     (if q
         (let ((a (if (point<? p q) p q)) (b (if (point<? p q) q p)))
@@ -284,12 +428,14 @@
   ;; delete or select the pair of the character at p; whether there was one
   (let ((pair (pair-at root lan p)))
     (and pair
-         (let ((a (car pair)) (b (cadr pair)))
-           (if (and (== (car a) (car b)) (== (+ (cadr a) 2) (cadr b)))
-               ;; empty: both go
+         (let* ((a (car pair)) (b (cadr pair))
+                (o (if (pair? (cddr pair)) (caddr pair) a))
+                (c (if (pair? (cddr pair)) (cadddr pair) b)))
+           (if (and (== (car o) (car c)) (== (+ (cadr o) 2) (cadr c)))
+               ;; empty: both go, and a prefix stays (f"" gives f)
                (begin
-                 (tree-remove! (tree-ref root (car a)) (cadr a) 2)
-                 (move-to ctx a))
+                 (tree-remove! (tree-ref root (car o)) (cadr o) 2)
+                 (move-to ctx o))
                (selection-set (context-path ctx a) (context-path ctx b)))
            #t))))
 

@@ -14,6 +14,16 @@ have the details, and the problems go to the
 
 ## 23 November 2026
 
+- **Program code: the first and last characters of a string can be
+  deleted again**: in C++, Julia, Python and the other languages with a
+  syntax tree, Backspace after the last character of a string (or Delete
+  before its first one, also an interpolation such as `$x` in Julia)
+  selected the content of the string instead of deleting the character,
+  and the next key press deleted it all. Only the quotes select the whole
+  string now, as the brackets do, also with a prefix (`f"..."`, `rb'...'`,
+  `u8"..."`), triple quotes and the raw strings of Rust and R; an empty
+  string with a prefix (`f""`) loses its quotes and keeps its prefix, and
+  the values of YAML without quotes are plain text (#873).
 - **Agents: a proposal resolved with the Version tools is reported as
   accepted or rejected**: when the person keeps the new or the old version
   with Version > Differences (the Review bar, Retain) instead of the Accept

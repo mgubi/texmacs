@@ -402,7 +402,7 @@
       (check= (syntax-region-sexp (string->tree "[true") json)
               "(document (array (true) (MISSING \"]\")))")
       (check= (syntax-region-errors (stree->tree '(document "[1, 2")) json)
-              '(("missing" (0 5) (0 5))))
+              '(("missing" (0 5) (0 5) ((0 0) (0 5)))))
       ;; edits of a JSON document
       (let ((t (stree->tree '(document "{\"a\": [1, 2]," " \"b\": null}"))))
         (syntax-region-sexp t json)
@@ -1602,6 +1602,196 @@
               (check-true (<= (strings-taken syntax-definitions-at-cursor) 2)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The quotes of strings (#873)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Backspace (Delete when forward?) at (row col) of the code lines: #f when
+;; it is a plain deletion, else the selected string (row1 col1 row2 col2)
+(define (string-deletion tag lines row col forward?)
+  (let ((r #f))
+    (with-test-buffer `(document (,tag (document ,@lines)))
+      (lambda (u b)
+        (update-forced)
+        (let* ((code (tree-ref b 0 0))
+               (at (lambda (row col) (rcons (tree->path (tree-ref code row)) col)))
+               (rc (lambda (p) (list (cAr (cDr p)) (cAr p)))))
+          (go-to (at row col))
+          (set! r (and (syntax-delete-bracket forward?)
+                       (if (selection-active-any?)
+                           (append (rc (selection-get-start))
+                                   (rc (selection-get-end)))
+                           'deleted)))
+          (selection-cancel))))
+    r))
+
+(define (test-string-quotes)
+  (check-group "the quotes of strings")
+  ;; the first and last characters of a string are plain characters (the
+  ;; grammars name "string..." the content of a string, string_content in
+  ;; C++ and Python, and its quotes alone, string_start and string_end in
+  ;; Python); its quotes select it, from both sides
+  (for (x '((cpp-code "x = \"test123\";") (python-code "x = \"test123\"")
+            (julia-code "x = \"test123\"")))
+    (let ((tag (car x)) (l (cdr x)))
+      (check= (string-deletion tag l 0 12 #f) #f)     ; after the 3
+      (check= (string-deletion tag l 0 5 #t) #f)      ; before the t
+      (check= (string-deletion tag l 0 13 #f) '(0 4 0 13))
+      (check= (string-deletion tag l 0 4 #t) '(0 4 0 13))))
+  ;; Julia: interpolations at the ends of a string
+  (check= (string-deletion 'julia-code '("x = \"a$x\"") 0 8 #f) #f)
+  (check= (string-deletion 'julia-code '("x = \"$x b\"") 0 5 #t) #f)
+  (check= (string-deletion 'julia-code '("x = \"a$(y)\"") 0 10 #f) #f)
+  (check= (string-deletion 'julia-code '("x = \"a$x\"") 0 9 #f) '(0 4 0 9))
+  ;; Julia: the flags after a string (r"..."i) are plain characters, and the
+  ;; quotes before them select the string
+  (let ((l '("x = r\"a\"i")))
+    (check= (string-deletion 'julia-code l 0 5 #t) '(0 4 0 9))
+    (check= (string-deletion 'julia-code l 0 6 #f) '(0 4 0 9))
+    (check= (string-deletion 'julia-code l 0 8 #f) '(0 4 0 9))
+    (check= (string-deletion 'julia-code l 0 9 #f) #f)
+    (check= (string-deletion 'julia-code l 0 8 #t) #f))
+  (check= (string-deletion 'julia-code '("x = r\"a\"") 0 8 #f) '(0 4 0 8))
+  (let ((l '("x = r\"\"\"a\"\"\"i")))
+    (check= (string-deletion 'julia-code l 0 5 #t) '(0 4 0 13))
+    (check= (string-deletion 'julia-code l 0 12 #f) '(0 4 0 13)))
+  ;; and a string macro named by a symbol of TeXmacs (<alpha>"ab")
+  (let ((l '("x = <alpha>\"ab\"")))
+    (check= (string-deletion 'julia-code l 0 11 #t) '(0 4 0 15))
+    (check= (string-deletion 'julia-code l 0 15 #f) '(0 4 0 15))
+    (check= (string-deletion 'julia-code l 0 4 #t) #f))
+  ;; prefixes belong to the string, but are plain characters themselves
+  (let ((l '("x = f\"ab\"")))
+    (check= (string-deletion 'python-code l 0 6 #f) '(0 4 0 9))
+    (check= (string-deletion 'python-code l 0 5 #t) '(0 4 0 9))
+    (check= (string-deletion 'python-code l 0 9 #f) '(0 4 0 9))
+    (check= (string-deletion 'python-code l 0 4 #t) #f))
+  (check= (string-deletion 'python-code '("x = b'ab'") 0 6 #f) '(0 4 0 9))
+  (let ((l '("x = rb'ab'")))
+    (check= (string-deletion 'python-code l 0 7 #f) '(0 4 0 10))
+    (check= (string-deletion 'python-code l 0 10 #f) '(0 4 0 10))
+    (check= (string-deletion 'python-code l 0 4 #t) #f)
+    (check= (string-deletion 'python-code l 0 5 #t) #f))
+  (check= (string-deletion 'cpp-code '("x = u8\"ab\";") 0 10 #f) '(0 4 0 10))
+  ;; triple quotes, on one line and across lines
+  (let ((l '("x = \"\"\"ab\"\"\"")))
+    (check= (string-deletion 'python-code l 0 12 #f) '(0 4 0 12))
+    (check= (string-deletion 'python-code l 0 4 #t) '(0 4 0 12))
+    (check= (string-deletion 'python-code l 0 9 #f) #f))
+  (let ((l '("x = \"\"\"a" "b\"\"\"")))
+    (check= (string-deletion 'python-code l 1 4 #f) '(0 4 1 4))
+    (check= (string-deletion 'python-code l 0 4 #t) '(0 4 1 4))
+    (check= (string-deletion 'python-code l 0 8 #f) #f)
+    (check= (string-deletion 'python-code l 1 0 #t) #f))
+  ;; a string in a string (f-strings): the inner one
+  (check= (string-deletion 'python-code '("x = f\"{d['k']}\"") 0 12 #f)
+          '(0 9 0 12))
+  ;; the raw strings of Rust end with #
+  (let ((l '("let x = r#\"ab\"#;")))
+    (check= (string-deletion 'rust-code l 0 15 #f) '(0 8 0 15))
+    (check= (string-deletion 'rust-code l 0 10 #t) '(0 8 0 15))
+    (check= (string-deletion 'rust-code l 0 9 #t) #f)      ; the # before "
+    (check= (string-deletion 'rust-code l 0 14 #f) #f))    ; the " before #
+  ;; the raw strings of R: their delimiters (string_open, string_close)
+  ;; are no strings
+  (let ((l '("x = r\"(ab)\"")))
+    (check= (string-deletion 'r-code l 0 11 #f) '(0 4 0 11))
+    (check= (string-deletion 'r-code l 0 5 #t) '(0 4 0 11))
+    (check= (string-deletion 'r-code l 0 6 #t) #f)         ; the (
+    (check= (string-deletion 'r-code l 0 10 #f) #f))       ; the )
+  (check= (string-deletion 'r-code '("x = r\"-[ab]-\"") 0 13 #f) '(0 4 0 13))
+  (check= (string-deletion 'r-code '("x = r\"()\"") 0 9 #f) '(0 4 0 9))
+  ;; the values of YAML without quotes are no strings
+  (check= (string-deletion 'yaml-code '("key: foo.bar") 0 8 #t) #f)
+  (check= (string-deletion 'yaml-code '("key: foo.bar") 0 9 #f) #f)
+  (check= (string-deletion 'yaml-code '("url: http://x/") 0 14 #f) #f)
+  (check= (string-deletion 'yaml-code '("foo.bar: 1") 0 3 #t) #f)
+  (check= (string-deletion 'yaml-code '("- a-b") 0 4 #f) #f)
+  ;; other shapes of strings: $'...' of Bash, the long brackets of Lua,
+  ;; #include <...> (<less>...<gtr> in the strings of TeXmacs)
+  (let ((l '("echo $'a\\n'")))
+    (check= (string-deletion 'shell-code l 0 6 #t) '(0 5 0 11))
+    (check= (string-deletion 'shell-code l 0 5 #t) #f)      ; the $
+    (check= (string-deletion 'shell-code l 0 11 #f) '(0 5 0 11)))
+  (let ((l '("x = [[ab]]")))
+    (check= (string-deletion 'lua-code l 0 4 #t) '(0 4 0 10))
+    (check= (string-deletion 'lua-code l 0 10 #f) '(0 4 0 10))
+    (check= (string-deletion 'lua-code l 0 6 #t) #f))
+  (let ((l '("#include <less>stdio.h<gtr>")))
+    (check= (string-deletion 'cpp-code l 0 9 #t) '(0 9 0 27))
+    (check= (string-deletion 'cpp-code l 0 27 #f) '(0 9 0 27)))
+  ;; an unterminated string (one node in Lua, Bash, OCaml): its escaped quote
+  ;; is no closing quote, and only Julia has suffixes; \\ before a quote
+  ;; escapes nothing, nor does \ in a raw string
+  (let ((l '("x = \"ab\\\"cd")))
+    (check= (string-deletion 'lua-code l 0 9 #f) #f)
+    (check= (string-deletion 'lua-code l 0 4 #t) #f))
+  (check= (string-deletion 'lua-code '("x = 'it\\'s") 0 9 #f) #f)
+  (check= (string-deletion 'lua-code '("x = 'it\\'s") 0 4 #t) #f)
+  (check= (string-deletion 'lua-code '("x = \"\\\"c") 0 7 #f) #f)
+  (check= (string-deletion 'lua-code '("x = \"ab\\\"") 0 9 #f) #f)
+  (check= (string-deletion 'shell-code '("x=\"ab\\\"cd") 0 7 #f) #f)
+  (check= (string-deletion 'ocaml-code '("let f = \"ab\\\"cd") 0 13 #f) #f)
+  (check= (string-deletion 'lua-code '("x = \"a\\\\\"") 0 9 #f) '(0 4 0 9))
+  (check= (string-deletion 'rust-code '("let x = r\"a\\\";") 0 13 #f) '(0 8 0 13))
+  (check= (string-deletion 'toml-code '("a = 'C:\\'") 0 9 #f) '(0 4 0 9))
+  ;; an unterminated string is no pair: the parser marks its closing quote
+  ;; as missing (Lua, Bash, OCaml, Rust); the parser also tells where \
+  ;; escapes nothing: raw strings, '...' of Bash, the attributes of JSX, the
+  ;; gaps of Haskell strings
+  (let ((l '("x = 'ab\\'")))
+    (check= (string-deletion 'lua-code l 0 9 #f) #f)
+    (check= (string-deletion 'lua-code l 0 4 #t) #f))
+  (check= (string-deletion 'rust-code '("let x = \"ab\\\";") 0 13 #f) #f)
+  (check= (string-deletion 'shell-code '("x='a\\'") 0 6 #f) '(0 2 0 6))
+  (check= (string-deletion 'go-code '("x := `a\\`") 0 9 #f) '(0 5 0 9))
+  (check= (string-deletion 'lean-code '("#eval r\"a\\\"") 0 11 #f) '(0 6 0 11))
+  (let ((l '("x = <less>a href=\"C:\\\" /<gtr>;")))
+    (check= (string-deletion 'javascript-code l 0 22 #f) '(0 17 0 22))
+    (check= (string-deletion 'javascript-code l 0 17 #t) '(0 17 0 22)))
+  (let ((l '("x = <less>a href='C:\\' /<gtr>;")))
+    (check= (string-deletion 'javascript-code l 0 22 #f) '(0 17 0 22))
+    (check= (string-deletion 'javascript-code l 0 17 #t) '(0 17 0 22)))
+  ;; a missing ; or ) after a string, or a missing token at its start, is
+  ;; not in it (its parent is larger than the string)
+  (check= (string-deletion 'shell-code '("x=('ab'") 0 7 #f) '(0 3 0 7))
+  (check= (string-deletion 'shell-code '("x=('ab'") 0 3 #t) '(0 3 0 7))
+  (check= (string-deletion 'shell-code '("x=($'ab'") 0 8 #f) '(0 3 0 8))
+  (check= (string-deletion 'rust-code '("let x = r\"ab\"") 0 13 #f) '(0 8 0 13))
+  (check= (string-deletion 'rust-code '("let x = r#\"ab\"#") 0 15 #f) '(0 8 0 15))
+  (check= (string-deletion 'lua-code '("f([[ab]]") 0 8 #f) '(0 2 0 8))
+  (check= (string-deletion 'julia-code '("f(\"ab\"") 0 6 #f) '(0 2 0 6))
+  (check= (string-deletion 'r-code '("f(r\"(ab)\"") 0 9 #f) '(0 2 0 9))
+  (check= (string-deletion 'lua-code '("x = {\"a\"\"b\"}") 0 11 #f) '(0 8 0 11))
+  (check= (string-deletion 'lua-code '("x = {\"a\"\"b\"}") 0 8 #t) '(0 8 0 11))
+  ;; nor a missing token at its start (a block of Lua which starts with a
+  ;; string is a call whose name is missing)
+  (check= (string-deletion 'lua-code '("\"ab\"") 0 4 #f) '(0 0 0 4))
+  (check= (string-deletion 'lua-code '("'ab'") 0 0 #t) '(0 0 0 4))
+  (check= (string-deletion 'lua-code '("[[ab]]") 0 6 #f) '(0 0 0 6))
+  (check= (string-deletion 'lua-code '("[[a" "b]]") 1 3 #f) '(0 0 1 3))
+  ;; a missing token or an error around the string is not in it
+  (check= (string-deletion 'rust-code '("let x = \"\"") 0 9 #f) 'deleted)
+  (check= (string-deletion 'cpp-code '("x = \"%\" PRIu64;") 0 7 #f) '(0 4 0 7))
+  (let ((l '("f = \"ab\\" "    \\\"")))
+    (check= (string-deletion 'haskell-code l 1 6 #f) '(0 4 1 6))
+    (check= (string-deletion 'haskell-code l 0 4 #t) '(0 4 1 6)))
+  ;; an escaped quote is a plain character, an empty string goes at once
+  (check= (string-deletion 'cpp-code '("y = \"a\\\"\";") 0 8 #f) #f)
+  (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted)
+  ;; an empty string with a prefix: its quotes go, its prefix stays
+  (for (x '((python-code "x = f\"\"" 6 "x = f") (python-code "x = rb''" 7 "x = rb")
+            (python-code "x = b\"\"" 6 "x = b") (cpp-code "x = u8\"\";" 7 "x = u8;")
+            (julia-code "x = r\"\"i" 6 "x = ri")))
+    (with-test-buffer `(document (,(car x) (document ,(cadr x))))
+      (lambda (u b)
+        (update-forced)
+        (let ((line (tree-ref b 0 0 0)))
+          (go-to (rcons (tree->path line) (caddr x)))
+          (check-true (syntax-delete-bracket #f))
+          (check= (tree->string line) (cadddr x))
+          (check= (cAr (cursor-path)) (- (caddr x) 1)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Master routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1628,4 +1818,5 @@
   (test-outline-items)
   (test-one-line-outline)
   (test-one-line-errors)
+  (test-string-quotes)
   (check-end))
