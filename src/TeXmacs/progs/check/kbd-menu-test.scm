@@ -518,6 +518,118 @@
                 (list "pre-edit:1:~" "pre-edit:" "~"))
       (check= (body) '(document "~")))))
 
+;; The interfaces send the pre-edits to delayed-keyboard-press, which runs
+;; the last one when the user has been idle for 100 ms. Without a window the
+;; delayed commands never run: the test catches them (with-global works on
+;; the glue functions called by the code of the macro delayed, see
+;; define-test.scm) and runs them itself, as the event loop does.
+(define kbd-idle 0)
+
+(define (typed-steps doc path steps)
+  ;; the second element of the body of doc after each number of steps; a
+  ;; step is an event (key time), sent as the GUI sends it, a thunk (such
+  ;; as a move of the cursor) or the idle time at which the pending
+  ;; delayed commands are run
+  (let ((r '()) (cmds '()))
+    (with-global exec-delayed-pause
+        (lambda (c) (set! cmds (append cmds (list c))))
+      (with-global idle-time (lambda () kbd-idle)
+        (in-buffer doc path
+          (lambda ()
+            (for-each
+              (lambda (step)
+                (cond ((number? step)
+                       (set! kbd-idle step)
+                       (with left '()
+                         (for-each
+                           (lambda (c)
+                             (with res #t
+                               (edit-step (lambda () (set! res (c))))
+                               (if (!= res #t)
+                                   (set! left (append left (list c))))))
+                           cmds)
+                         (set! cmds left))
+                       (set! r (cons (cadr (body)) r)))
+                      ((procedure? step) (edit-step step))
+                      ((string-starts? (car step) "pre-edit:")
+                       (delayed-keyboard-press (car step) (cadr step)))
+                      (else
+                        (edit-step
+                          (lambda () (keyboard-press (car step)
+                                                     (cadr step)))))))
+              steps)))))
+    (reverse r)))
+
+(define (math-steps steps)
+  (map (lambda (m) (if (func? m 'math 1) (cadr m) m))
+       (typed-steps '(document (math "")) '(0 0 0) steps)))
+
+(define (test-dead-accents-delayed)
+  ;; Option-N typed three times in math, then a space (#870): each Option-N
+  ;; after the first ends the pre-edit and starts the next one in the same
+  ;; event, with the same time; the last pre-edit was dropped, and the
+  ;; tilde inserted only at the next key.
+  (check-group "dead accents in math, delayed pre-edits")
+  (with acc "pre-edit:1:~"
+    ;; Cocoa: the end of the pre-edit, the commit, the new pre-edit
+    (check= (math-steps
+              `((,acc 15377) 1000
+                ("pre-edit:" 17160) ("~" 17160) (,acc 17160) 1000
+                ("pre-edit:" 18882) ("~" 18882) (,acc 18882) 1000
+                ("pre-edit:" 20549) ("~" 20549) 1000))
+            '("<sim>" "<approx>" "<triplesim>" "<triplesim>"))
+    ;; Qt: the commit, the end of the pre-edit, the new pre-edit
+    (check= (math-steps
+              `((,acc 15377) 1000
+                ("~" 17160) ("pre-edit:" 17160) (,acc 17160) 1000
+                ("~" 18882) ("pre-edit:" 18882) (,acc 18882) 1000
+                ("~" 20549) ("pre-edit:" 20549) 1000))
+            '("<sim>" "<approx>" "<triplesim>" "<triplesim>"))
+    ;; a letter after the second tilde
+    (check= (math-steps
+              `((,acc 100) 1000
+                ("pre-edit:" 200) ("~" 200) (,acc 200) 1000
+                ("pre-edit:" 300) ("~" 300) 1000
+                ("x" 400) 1000))
+            '("<sim>" "<approx>" "<approx>" "<approx>x"))
+    ;; the pre-edit waits until the user is idle for 100 ms
+    (check= (math-steps `((,acc 100) 0 50 99 100))
+            '("" "" "" "<sim>"))
+    ;; keys typed while the pre-edit waits: the commit of the tilde, whose
+    ;; pre-edit has not run, is typed as the tilde
+    (check= (math-steps `((,acc 100) 0 ("pre-edit:" 150) ("~" 150) 0
+                          ("x" 200) 1000))
+            '("" "<sim>" "<sim>x"))
+    ;; a dead key which is not inserted at once (a caron) after a tilde:
+    ;; its pre-edit is shown and the composed letter is typed; the end of
+    ;; the first pre-edit, which comes in the same event, still resets the
+    ;; editor (else the letter was lost)
+    (with caron (string-append "pre-edit:1:" (cork 7))
+      (check= (math-steps
+                `((,acc 100) 1000
+                  ("pre-edit:" 200) ("~" 200) (,caron 200) 1000
+                  ("pre-edit:" 300) (,(cork #xa3) 300) 1000))
+              (list "<sim>" `(concat "<sim>" (pre-edit ,(cork 7)))
+                    (string-append "<sim>" (cork #xa3))))
+      (check= (math-steps
+                `((,acc 100) 1000
+                  ("~" 200) ("pre-edit:" 200) (,caron 200) 1000
+                  (,(cork #xa3) 300) ("pre-edit:" 300) 1000))
+              (list "<sim>" `(concat "<sim>" (pre-edit ,(cork 7)))
+                    (string-append "<sim>" (cork #xa3))))))
+  ;; a dead tilde in math, the cursor moved to text with the dead key still
+  ;; open, a dead tilde and n there: the commit of the first tilde, already
+  ;; inserted, is dropped, the second one composes with n
+  (check= (typed-steps '(document (concat (math "") "ab")) '(0 0 0 0)
+            `(("pre-edit:1:~" 100) 1000
+              ,(lambda () (go-to (append (buffer-path) '(0 1 0)))) 1000
+              ("pre-edit:" 200) ("~" 200) ("pre-edit:1:~" 200) 1000
+              ("pre-edit:" 300) (,(cork #xf1) 300) 1000))
+          `((concat (math "<sim>") "ab")
+            (concat (math "<sim>") "ab")
+            (concat (math "<sim>") (pre-edit "~") "ab")
+            (concat (math "<sim>") ,(string-append (cork #xf1) "ab")))))
+
 ;; Without a window, the environment at the cursor (get-env, in-math?)
 ;; is the one of the last typesetting. Once the keyboard maps of programs
 ;; are loaded (by a key lookup in a program), the first key after $ in
@@ -1858,6 +1970,7 @@
   (test-typing-text)
   (test-typing-math)
   (test-dead-accents-math)
+  (test-dead-accents-delayed)
   (test-typing-math-mode)
   (test-typing-table)
   (test-kbd-map)
