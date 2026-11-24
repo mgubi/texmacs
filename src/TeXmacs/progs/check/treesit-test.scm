@@ -1734,25 +1734,29 @@
   (check= (string-deletion 'lua-code '("x = \"a\\\\\"") 0 9 #f) '(0 4 0 9))
   (check= (string-deletion 'rust-code '("let x = r\"a\\\";") 0 13 #f) '(0 8 0 13))
   (check= (string-deletion 'toml-code '("a = 'C:\\'") 0 9 #f) '(0 4 0 9))
-  ;; where \ escapes the quote: in every string of Julia (r"...", raw"...",
-  ;; string macros), in '...' of Lua and $'...' of Bash; not in the raw
-  ;; strings of Lean, the `...` of Go, the '...' of Bash
-  (let ((l '("x = r\"ab\\\"")))
-    (check= (string-deletion 'julia-code l 0 10 #f) #f)
-    (check= (string-deletion 'julia-code l 0 5 #t) #f))
-  (let ((l '("x = raw\"ab\\\"")))
-    (check= (string-deletion 'julia-code l 0 12 #f) #f)
-    (check= (string-deletion 'julia-code l 0 7 #t) #f))
-  (check= (string-deletion 'julia-code '("x = <rho>\"ab\\\"") 0 9 #t) #f)
+  ;; an unterminated string is no pair: the parser marks its closing quote
+  ;; as missing (Lua, Bash, OCaml, Rust); the parser also tells where \
+  ;; escapes nothing: raw strings, '...' of Bash, the attributes of JSX, the
+  ;; gaps of Haskell strings
   (let ((l '("x = 'ab\\'")))
     (check= (string-deletion 'lua-code l 0 9 #f) #f)
     (check= (string-deletion 'lua-code l 0 4 #t) #f))
-  (let ((l '("x=$'a\\'")))
-    (check= (string-deletion 'shell-code l 0 7 #f) #f)
-    (check= (string-deletion 'shell-code l 0 3 #t) #f))
+  (check= (string-deletion 'rust-code '("let x = \"ab\\\";") 0 13 #f) #f)
   (check= (string-deletion 'shell-code '("x='a\\'") 0 6 #f) '(0 2 0 6))
   (check= (string-deletion 'go-code '("x := `a\\`") 0 9 #f) '(0 5 0 9))
   (check= (string-deletion 'lean-code '("#eval r\"a\\\"") 0 11 #f) '(0 6 0 11))
+  (let ((l '("x = <less>a href=\"C:\\\" /<gtr>;")))
+    (check= (string-deletion 'javascript-code l 0 22 #f) '(0 17 0 22))
+    (check= (string-deletion 'javascript-code l 0 17 #t) '(0 17 0 22)))
+  (let ((l '("x = <less>a href='C:\\' /<gtr>;")))
+    (check= (string-deletion 'javascript-code l 0 22 #f) '(0 17 0 22))
+    (check= (string-deletion 'javascript-code l 0 17 #t) '(0 17 0 22)))
+  ;; a missing token or an error around the string is not in it
+  (check= (string-deletion 'rust-code '("let x = \"\"") 0 9 #f) 'deleted)
+  (check= (string-deletion 'cpp-code '("x = \"%\" PRIu64;") 0 7 #f) '(0 4 0 7))
+  (let ((l '("f = \"ab\\" "    \\\"")))
+    (check= (string-deletion 'haskell-code l 1 6 #f) '(0 4 1 6))
+    (check= (string-deletion 'haskell-code l 0 4 #t) '(0 4 1 6)))
   ;; an escaped quote is a plain character, an empty string goes at once
   (check= (string-deletion 'cpp-code '("y = \"a\\\"\";") 0 8 #f) #f)
   (check= (string-deletion 'python-code '("x = ''") 0 5 #f) 'deleted)

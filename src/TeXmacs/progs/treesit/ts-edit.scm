@@ -277,10 +277,12 @@
 ;;    strings of TeXmacs), or the long brackets of
 ;;    Lua ([[...]], [=[...]=]); in Julia, whose grammar puts the suffix
 ;;    of a string in its node (prefixed_string_literal), a suffix of
-;;    letters, digits and _ may follow (the flags of r"..."i). A closing
-;;    quote after an odd run of \ is escaped (an unterminated string, as
-;;    "ab\" or 'ab\' in Lua, is no pair), except in the strings where \
-;;    escapes nothing (escaping-string?: r"a\" of Rust, 'C:\' of TOML).
+;;    letters, digits and _ may follow (the flags of r"..."i).
+;; A string with an error or a missing node of the parse inside it is no
+;; pair: an unterminated string ("ab\"cd in Lua, Bash, OCaml, Rust) is one
+;; string node with a missing closing quote; the parser knows which \
+;; escape, in each language ("C:\" in the attributes of JSX, the gaps \
+;; ... \ of Haskell strings).
 ;; The character must be the opening quote, or the closing quote (or its
 ;; last #); the characters in between, the prefix and the suffix are plain
 ;; characters.
@@ -317,21 +319,7 @@
 (define (suffix-char? ch)
   (or (char-alphabetic? ch) (char-numeric? ch) (== ch #\_)))
 
-(define (escaping-string? lname prefix hashes q)
-  ;; whether \ escapes the quote q in a string of the program language
-  ;; lname with that prefix and hashes; not in the raw strings of Rust and
-  ;; Lean (r"a\", r#"a\"#), the `...` of Go, the '...' of TOML and Bash
-  ;; (but $'...' of Bash). In Julia, \" escapes in every string, r"..."
-  ;; and raw"..." included; the raw strings of C++ and R end with ) and a
-  ;; delimiter, those of Python cannot end with an odd run of \.
-  (not (or (!= hashes "")
-           (and (in? lname '("rust" "lean")) (string-contains? prefix "r"))
-           (and (== q #\`) (== lname "go"))
-           (and (== q #\') (== lname "toml"))
-           (and (== q #\') (in? lname '("shell" "bash" "sh" "zsh"))
-                (not (string-contains? prefix "$"))))))
-
-(define (string-quotes root a b suffix? lname)
+(define (string-quotes root a b suffix?)
   ;; for a node from the point a to the point b, when its text has the shape
   ;; of a quoted string: (open close), the point of its opening quote and
   ;; the point after its closing one (before a suffix when suffix?, such as
@@ -371,13 +359,30 @@
     (and close (ends? close)
          ;; the closing quote comes after the opening one
          (point<? (list (car a) o) (list (car b) (- m (string-length close))))
-         ;; and is not escaped, unless \ escapes nothing in the string
-         (or (not (quote-char? ch))
-             (not (escaping-string? lname (substring s (cadr a) i) hashes ch))
-             (even? (let loop ((k (- m (string-length close) 1)) (c 0))
-                      (if (and (>= k 0) (== (string-ref e k) #\\))
-                          (loop (- k 1) (+ c 1)) c))))
          (list (list (car a) o) (list (car b) m)))))
+
+(define (closing-token? root lan c)
+  ;; whether the character at the point c is a token of its own (the closing
+  ;; quote of a string), not a part of a longer one (an escape, a content)
+  (let ((l (syntax-region-node-range root lan (car c) (cadr c)
+                                     (car c) (+ (cadr c) 1))))
+    (and (pair? l) (== (node-start (car l)) c)
+         (== (node-end (car l)) (list (car c) (+ (cadr c) 1))))))
+
+(define (terminated? root lan errs a b c)
+  ;; whether the string from a to b, whose closing quote is at c, has no
+  ;; error of the parse (kind start end) inside it. A missing node at b may
+  ;; be its closing quote (an unterminated "ab\" in Lua, Bash, OCaml, Rust),
+  ;; or the token after it (the ; of let x = "" in Rust): it is the first
+  ;; when the quote at c is part of a longer token, an escape \". An error
+  ;; from a to b is a node around the string (x = "%" PRIu64; in C++).
+  (not (list-or
+        (map (lambda (x)
+               (and (point<=? a (cadr x)) (point<=? (caddr x) b)
+                    (not (and (== (cadr x) a) (== (caddr x) b)))
+                    (or (!= (cadr x) b) (!= (caddr x) b)
+                        (not (closing-token? root lan c)))))
+             errs))))
 
 (define (quote-pair root lan p)
   ;; when the character at p opens or closes a string: (start end open
@@ -385,7 +390,10 @@
   ;; after its closing one. In a string inside another one (Python
   ;; f-strings) it is the innermost string.
   (let* ((after (list (car p) (+ (cadr p) 1)))
-         (lname (get-env "prog-language"))
+         (errs #f)
+         (errors (lambda ()
+                   (when (not errs) (set! errs (syntax-region-errors root lan)))
+                   errs))
          (pairs
           (list-filter
            (map (lambda (n)
@@ -393,9 +401,11 @@
                     (and (whole-string-type? (node-type n))
                          (with q (string-quotes root a b
                                                 (== (node-type n)
-                                                    "prefixed_string_literal")
-                                                lname)
+                                                    "prefixed_string_literal"))
                            (and q (or (== (car q) p) (== (cadr q) after))
+                                (terminated? root lan (errors) a b
+                                             (list (car (cadr q))
+                                                   (- (cadr (cadr q)) 1)))
                                 (list a b (car q) (cadr q)))))))
                 (syntax-region-node-range root lan (car p) (cadr p)
                                           (car p) (+ (cadr p) 1)))
