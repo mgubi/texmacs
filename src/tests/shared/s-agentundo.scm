@@ -4,7 +4,8 @@
 ;; pending again, and a redo resolves it again as before; the undo of a
 ;; Keep that made the body again leaves the other pending proposals in their
 ;; blocks; a difference whose choice was undone and that is then typed over
-;; by hand makes the outcome "resolved".
+;; by hand makes the outcome "resolved"; undoing further, the change of the
+;; agent itself: rejected.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -16,8 +17,13 @@
 (define (insert-block! i st)
   (tree-var-insert (body) i (stree->tree (list 'document st))))
 
+(define (same-id? a id)
+  ;; (an id may have a tag after its number: p3.1a2b3c4d)
+  (or (== a id)
+      (and (> (string-length a) (string-length id))
+           (== (substring a 0 (+ (string-length id) 1)) (string-append id ".")))))
 (define (entry-of id)
-  (with l (list-filter (or (shared-proposals (the-name)) '()) (lambda (e) (== (car e) id)))
+  (with l (list-filter (or (shared-proposals (the-name)) '()) (lambda (e) (same-id? (car e) id)))
     (and (nnull? l) (car l))))
 (define (index-of id) (and-with e (entry-of id) (caddr e)))
 (define (status-of id) (and-with e (entry-of id) (cadr e)))
@@ -39,6 +45,23 @@
                   (begin (start-editing) (version-retain which) (end-editing) #t)))))))
 
 (define (undo!) (with-buffer (the-name) (undo 0)) #t)
+(define (step-undo!)
+  ;; an undo as the event loop makes it: a step of its own
+  (with-buffer (the-name) (archive-state) (start-editing) (undo 0) (end-editing))
+  #t)
+(define (keep-step! id which)
+  (with-buffer (the-name) (archive-state))
+  (keep-in! (index-of id) which))
+(define (undo-until! s)
+  ;; undo, one step at a time, until the paragraph @s is there (at most 4;
+  ;; an undo of a change of the agent goes on to the previous step of the
+  ;; person, which the checks do not look at)
+  (let ((n 0))
+    (cons (string-append "undo until " s)
+          (lambda ()
+            (cond ((find-para s) #t)
+                  ((>= n 4) #t)
+                  (else (set! n (+ n 1)) (step-undo!) #f))))))
 (define (redo!) (with-buffer (the-name) (redo 0)) #t)
 
 (define (texts) (map version-normalize (cdr (body-stree))))
@@ -204,6 +227,38 @@
          (check "p8: rejected" (== (status-of "p8") "rejected"))
          (check "the texts" (and (find-para "Inserted.") (find-para "Third big one.")))
          (sync-set! (sync-n 7 "a"))))
+   ;; 8. a word change kept New: accepted; undo: pending; undo again (the
+   ;; change of the agent itself): rejected
+   (list
+    (wait-sync (sync-n 8 "b"))
+    (step "p10" (== (status-of "p10") "pending"))
+    (act "keep 8" (check "p10: Keep New" (keep-step! "p10" 1)))
+    (step "settled 8" (== (status-of "p10") "accepted"))
+    (act "undo 8" (step-undo!))
+    (timed-wait 600)
+    (act "check 8" (check "p10: pending again after undo" (holds-markup? "p10")))
+    (undo-until! "Removed.")
+    (timed-wait 600)
+    (act "check 8b" (check "p10: the change of the agent undone" (find-para "Removed."))
+         (check "p10: rejected" (== (status-of "p10") "rejected"))
+         (sync-set! (sync-n 8 "a"))))
+   ;; 9. the same with two differences, both kept New: rejected
+   (person! 9 (lambda () (tree-assign (para (find-para "Hello world.")) "one two three.")))
+   (list
+    (wait-sync (sync-n 9 "b"))
+    (step "p11" (== (status-of "p11") "pending"))
+    (act "keep 9" (check "p11: Keep New on the first" (keep-step! "p11" 1)))
+    (timed-wait 300)
+    (act "keep 9b" (check "p11: Keep New on the second" (keep-step! "p11" 1)))
+    (step "settled 9" (== (status-of "p11") "accepted"))
+    (act "undo 9" (step-undo!))
+    (timed-wait 600)
+    (act "check 9" (check "p11: pending again after undo" (holds-markup? "p11")))
+    (undo-until! "Hello world.")
+    (timed-wait 600)
+    (act "check 9b" (check "p11: the change of the agent undone" (find-para "Hello world."))
+         (check "p11: rejected" (== (status-of "p11") "rejected"))
+         (sync-set! (sync-n 9 "a"))))
    (list
     (wait-sync "b-done")
     (act "A out" (publish-body!) (sync-set! "a-done")))))
@@ -257,6 +312,9 @@
    (propose-and-wait* 7 (lambda () (tree-remove (body) (find-para "Inserted.") 1))
                       (lambda () (insert-text! (find-para "Third one.") 6 "big ")))
    (agent-hears 7 "p9" "accepted")
+   (round 8 (lambda () (tree-assign (para (find-para "Removed.")) "Gone.")) "p10" "rejected")
+   (list (wait-sync (sync-n 9 "p")) (step "9 there" (find-para "one two three.")))
+   (round 9 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p11" "rejected")
    (list
     (act "out" (publish-body!) (sync-set! "b-done"))
     (wait-sync "a-done"))))

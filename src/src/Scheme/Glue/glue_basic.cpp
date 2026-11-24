@@ -1984,6 +1984,24 @@ tmg_busy_versioningP () {
 }
 
 tmscm
+tmg_versioning_direction () {
+  // TMSCM_DEFER_INTS;
+  int out= get_versioning_direction ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_versioning_step () {
+  // TMSCM_DEFER_INTS;
+  int out= get_versioning_step ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_players_set_elapsed (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "players-set-elapsed");
   TMSCM_ASSERT_DOUBLE (arg2, TMSCM_ARG2, "players-set-elapsed");
@@ -13370,6 +13388,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("hand-tuned-math-fonts?",  tmg_hand_tuned_math_fontsP, 0, 0, 0);
   tmscm_install_procedure ("tmtm-eqnumber->nonumber",  tmg_tmtm_eqnumber_2nonumber, 1, 0, 0);
   tmscm_install_procedure ("busy-versioning?",  tmg_busy_versioningP, 0, 0, 0);
+  tmscm_install_procedure ("versioning-direction",  tmg_versioning_direction, 0, 0, 0);
+  tmscm_install_procedure ("versioning-step",  tmg_versioning_step, 0, 0, 0);
   tmscm_install_procedure ("players-set-elapsed",  tmg_players_set_elapsed, 2, 0, 0);
   tmscm_install_procedure ("players-set-speed",  tmg_players_set_speed, 2, 0, 0);
   tmscm_install_procedure ("apply-effect",  tmg_apply_effect, 5, 0, 0);

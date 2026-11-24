@@ -124,6 +124,8 @@ observer highlight_observer (int lan, array<int> cols);
 
 extern bool busy_modifying;
 extern bool busy_versioning;
+extern int  versioning_direction; // -1 in an undo, 1 in a redo, else 0
+extern int  versioning_step;      // counts the steps of undo and redo
 bool busy_tree (tree& ref);
 
 void assign      (tree& ref, tree t);

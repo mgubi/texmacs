@@ -561,7 +561,11 @@ archiver_rep::undo_one (int i) {
     ASSERT (i == 0, "index out of range");
     patch p= car (get_undo (archive));
     ASSERT (is_applicable (p, the_et), "history corrupted");
+    int old_direction= versioning_direction;
+    versioning_direction= -1;
+    versioning_step++;
     patch q= apply_undo (p);
+    versioning_direction= old_direction;
     patch re1= patch (q, get_redo (archive));
     patch nx = cdr (get_undo (archive));
     patch re2= get_redo (nx);
@@ -589,7 +593,11 @@ archiver_rep::redo_one (int i) {
     ASSERT (is_applicable (p, the_et), "future corrupted");
     patch q= invert (p, the_et);
     //cout << "q= " << q << "\n";
+    int old_direction= versioning_direction;
+    versioning_direction= 1;
+    versioning_step++;
     apply (p);
+    versioning_direction= old_direction;
     patch other= make_branches (append (branches (re, 0, i),
                                         branches (re, i+1, n)));
     //cout << "other= " << other << "\n";

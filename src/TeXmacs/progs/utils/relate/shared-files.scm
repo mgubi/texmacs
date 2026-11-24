@@ -676,6 +676,13 @@
   (let ((body (sf-body sf)) (meta (sf-meta sf))
         (mp (split-patch p 0)) (bp (split-patch p 1)))
     (and mp bp (patch-applicable? bp body) (patch-applicable? mp meta)
+         (begin
+           ;; (the proposals: the changes before it are followed first, an
+           ;; undo or a redo is not credited with this one)
+           (when (and (sf-host? sf) (nnull? (or (sf-get sf 'proposals) '())))
+             (proposals-flush! sf)
+             (sf-put! sf 'prop-dirty 'hand))
+           #t)
          (with-author author
            (with-global sf-applying? #t
              (patch-inplace-apply body bp)
@@ -1796,13 +1803,17 @@
 ;; host follows the proposals through the history by the notes of their
 ;; blocks (tree-set-note), which the copies kept by the history have too
 ;; (the blocks of the resolved proposals keep them), and by the source of
-;; each change: an undo or a redo (busy-versioning?), or another one. Each
-;; proposal counts its differences in the document; the versions kept of
-;; those that went away are in 'done (the newest first; 'hand for one that
-;; went away without a choice). Differences that come back (an undo) take
-;; back the newest entries into 'undone (a resolved proposal is pending
-;; again); differences that go away again by a redo get them back, and
-;; those that go away otherwise are 'hand.
+;; each change: an undo, a redo (versioning-direction), or another one.
+;; Each proposal counts its differences in the document; the versions kept
+;; of those that went away are in 'done (the newest first; 'hand for one
+;; that went away without a choice, 'gone for one that an undo took away:
+;; the change of the agent undone). Differences that come back take back the
+;; newest entries into 'undone (a resolved proposal is pending again);
+;; differences that go away by a redo get them back, those that go away by
+;; an undo are 'gone (the change of the agent is undone: rejected), and
+;; those that go away otherwise are 'hand. The host counts between two
+;; steps of undo or redo (versioning-step), not only when the source
+;; changes: an undo may undo a choice and then the change of the agent.
 
 (define (body-notes sf)
   ;; note -> the first block of the body with it
@@ -1832,10 +1843,12 @@
 (define (proposal-outcome pr)
   ;; the outcome of @pr when no difference is left: accepted (new kept
   ;; everywhere), rejected (old everywhere), resolved (mixed, or some went
-  ;; away without a choice), #f when none was chosen
+  ;; away without a choice; rejected when an undo took the change of the
+  ;; agent away), #f when none was chosen
   (let* ((l (or (prop-get pr 'done) '()))
          (ks (list-filter l number?)))
-    (cond ((null? ks) #f)
+    (cond ((memq 'gone l) "rejected")
+          ((null? ks) #f)
           ((or (memq 'hand l) (< (length ks) (or (prop-get pr 'ndiffs) 0))) "resolved")
           ((list-and (map (lambda (k) (== k 1)) ks)) "accepted")
           ((list-and (map (lambda (k) (== k 0)) ks)) "rejected")
@@ -1843,7 +1856,8 @@
 
 (define (proposals-reconcile! sf source attach?)
   ;; the differences of the proposals which came back or went away since the
-  ;; last time, by undo or redo (@source 'history) or otherwise ('hand); with
+  ;; last time, by an undo (@source 'undo), a redo ('redo) or otherwise
+  ;; ('hand); with
   ;; @attach?, the pointers and notes go to the blocks found again (not
   ;; while the document is being changed)
   (let* ((h #f)
@@ -1852,13 +1866,13 @@
     (for (pr (or (sf-get sf 'proposals) '()))
       (let ((st (prop-get pr 'status)))
         (when (or (== st "pending")
-                  (and (== source 'history) (in? st '("accepted" "rejected" "resolved"))))
+                  (and (in? source '(undo redo)) (in? st '("accepted" "rejected" "resolved"))))
           (let* ((t (proposal-block sf pr notes))
                  (present (if t (length (version-nodes t)) 0))
                  (count (or (prop-get pr 'count) 0)))
             (cond ((> present count)
-                   ;; an undo brought differences back: it took back the
-                   ;; newest choices
+                   ;; an undo (or a redo of the agent's change) brought
+                   ;; differences back: it took back the newest choices
                    (do ((k (- present count) (- k 1))) ((or (<= k 0) (null? (or (prop-get pr 'done) '()))))
                      (let ((d (prop-get pr 'done)))
                        (prop-put! pr 'undone (cons (car d) (or (prop-get pr 'undone) '())))
@@ -1868,14 +1882,16 @@
                      (sf-put! sf 'prop-changed #t)))
                   ((< present count)
                    ;; differences went away: a redo makes the undone choices
-                   ;; again, the newest undone first
+                   ;; again, the newest undone first; an undo took away the
+                   ;; change of the agent
                    (do ((k (- count present) (- k 1))) ((<= k 0))
                      (let ((u (or (prop-get pr 'undone) '())))
-                       (if (and (== source 'history) (nnull? u))
+                       (if (and (== source 'redo) (nnull? u))
                            (begin
                              (prop-put! pr 'done (cons (car u) (or (prop-get pr 'done) '())))
                              (prop-put! pr 'undone (cdr u)))
-                           (prop-put! pr 'done (cons 'hand (or (prop-get pr 'done) '()))))))))
+                           (prop-put! pr 'done (cons (if (== source 'undo) 'gone 'hand)
+                                                     (or (prop-get pr 'done) '()))))))))
             (prop-put! pr 'count present)
             (when (and attach? t (> present 0))
               (proposal-attach! sf pr t))
@@ -1904,10 +1920,20 @@
   ;; not by the host itself: an undo or a redo, or another; the changes of
   ;; the other source since the last time are followed first
   (when (and (not sf-own-edit?) (sf-host? sf) (nnull? (or (sf-get sf 'proposals) '())))
-    (let ((src (if (busy-versioning?) 'history 'hand))
-          (d (sf-get sf 'prop-dirty)))
-      (when (and d (!= d src))
-        (catch #t (lambda () (proposals-reconcile! sf d #f)) (lambda args #f)))
+    (let ((src (cond ((not (busy-versioning?)) 'hand)
+                     ((> (versioning-direction) 0) 'redo)
+                     (else 'undo)))
+          (d (sf-get sf 'prop-dirty))
+          (step (and (busy-versioning?) (versioning-step))))
+      (when (and d (or (!= d src)
+                       (and step (!= step (sf-get sf 'prop-step)))))
+        (catch #t
+          (lambda () (proposals-reconcile! sf d #f))
+          (lambda args
+            ;; (the counts stay those of the last time: the next one
+            ;; follows these changes with the next ones)
+            (display* "TeXmacs] shared file: following the proposals failed: " args "\n"))))
+      (when step (sf-put! sf 'prop-step step))
       (sf-put! sf 'prop-dirty src))))
 
 (define (proposals-flush! sf)
@@ -2294,6 +2320,7 @@
         ((func? msg 'withdraw)
          (when (not (and (list? msg) (= (length msg) 2) (string? (cadr msg))))
            (throw (quote malformed)))
+         (proposals-flush! sf)
          (with pr (proposal-find sf (cadr msg))
            (when (and pr (proposal-pending? pr) (== (prop-get pr 'owner) (peer-id peer)))
              (proposal-resolve! sf pr 'old "withdrawn"))))

@@ -432,21 +432,32 @@ process hosts, or only headless ones), the agent edits directly, as before.
   the automatic labels): a block that an undo or a redo puts back is found
   again by its note, never by its content; the blocks of resolved proposals
   keep theirs. The observer of the body notes the source of each change, an
-  undo or a redo (`busy-versioning?`) or another one; when the source
-  changes, and before the Version tools, Tools > Agents or the poll act, the
-  host counts the differences of each proposal in its block. The versions
+  undo, a redo (`versioning-direction`, -1 or 1 while the archiver applies
+  one) or another one; when the source changes, between two steps of undo
+  or redo (`versioning-step`: one undo may undo a choice of the person and
+  then the change of the agent), before a patch of a
+  participant is applied, and before the Version tools, Tools > Agents, a
+  withdrawal or the poll act, the host counts the differences of each
+  proposal in its block. The versions
   kept of the differences that went away are a list, the newest first, in
   which a difference that went away without a choice counts as such.
   Differences that come back take back the newest entries (undo goes back in
   time), and a resolved proposal whose markup comes back is pending again
   (Tools > Agents can resolve it, the agent hears `pending`); differences
   that go away again by a redo get the entries back, so that the outcome is
-  as before the undo; those that go away otherwise (typed over by hand) make
-  the outcome `resolved`. The undo of a Keep that made the body again puts
+  as before the undo; those that go away by an undo (the change of the agent
+  itself undone) make the outcome `rejected`; those that go away otherwise (typed over by
+  hand) make the outcome `resolved`. The undo of a Keep that made the body again puts
   the untouched pending proposals back with their notes; the forward Keep
   finds them by the shift described above and notes the blocks it made
-  again. Known limit: while the person's own Compare markup is in the
-  document, a proposal whose markup is lost is reported `resolved` (#867).
+  again. Known limits: while the person's own Compare markup is in the
+  document, a proposal whose markup is lost is reported `resolved` (#867);
+  Return inside a pending block (a split), then Undo: the join makes a new
+  node without the note, so the proposal reads `resolved` while its markup
+  is back, and stays so; two proposal blocks joined with Delete: the joined
+  block has the note of the first, which then counts the differences of
+  both (as before #957: a note carried over a split or a join would need
+  the observers of `raw_split` and `raw_join` to keep it).
   A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1`...), owner, status

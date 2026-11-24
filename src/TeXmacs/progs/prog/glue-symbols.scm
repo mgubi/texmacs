@@ -195,6 +195,8 @@
 "hand-tuned-math-fonts?"
 "tmtm-eqnumber->nonumber"
 "busy-versioning?"
+"versioning-direction"
+"versioning-step"
 "players-set-elapsed"
 "players-set-speed"
 "apply-effect"

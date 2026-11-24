@@ -19,9 +19,12 @@ have the details, and the problems go to the
   tools or Tools > Agents makes it pending again (the agent hears it, Tools >
   Agents can resolve it), and a redo resolves it again as before; the undo
   of a block-level Keep no longer makes the other pending proposals read
-  `resolved`; a choice undone and then typed over by hand gives `resolved`.
-  For programs, `tree-note` and `tree-set-note` attach a string to a node,
-  which undo and redo bring back with it (#957).
+  `resolved`; a choice undone and then typed over by hand gives `resolved`;
+  undoing further, the change of the agent itself, gives `rejected`. For
+  programs, `tree-note` and `tree-set-note` attach a string to a node, which
+  undo and redo bring back with it, and `versioning-direction` and
+  `versioning-step` tell an undo from a redo and one step from the next
+  (#957).
 - **Chez Scheme: `string-load` as with Guile and s7** (builds with Chez):
   `string-load` is the routine of the C++ glue, no longer a copy in
   Scheme, and a missing file is reported as with the other Schemes; a
