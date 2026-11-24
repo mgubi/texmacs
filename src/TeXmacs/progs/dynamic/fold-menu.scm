@@ -91,7 +91,7 @@
       ("Grouped" (make-toggle 'summarized-grouped)))
   (-> "Switch"
       ("Standard" (make-switch 'switch))
-      (when (not (screens-buffer?))
+      (when (not (presentation-buffer?))
         ("Screens" (make-screens)))
       ("Tiny" (make-switch 'tiny-switch)))
   (-> "Unroll"
@@ -278,7 +278,8 @@
 (tm-define (remove-single-slideshow)
 (let* ((t (buffer-tree))
        (l (tree-children t)))
-  (when (tree-func? (cAr l) 'slideshow 1)
+  (when (and (tree-func? (cAr l) 'slideshow 1)
+             (tree-func? (tree-ref (cAr l) 0) 'document 1))
     (when (tree-func? (tree-ref (cAr l) 0 0) 'slide 1)
       (let* ((d (tree-ref (cAr l) 0 0 0))
              (b (tree->path t))
@@ -291,7 +292,7 @@
 
 (tm-define (document-propose-screens?)
   (and (style-has? "beamer-style")
-       (not (screens-buffer?))))
+       (not (presentation-buffer?))))
 
 (tm-menu (focus-document-extra-menu t)
   (:require (document-propose-screens?))
@@ -306,7 +307,7 @@
 (tm-define (notify-new-style style)
   (former style)
   (cond ((style-has? "beamer-style")
-         (when (not (screens-buffer?))
+         (when (not (presentation-buffer?))
            (set-init-env "page-medium" "beamer") 
            (make-screens)))
         ((screens-buffer?) (remove-single-screens))

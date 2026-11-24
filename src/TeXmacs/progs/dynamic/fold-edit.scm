@@ -72,6 +72,10 @@
     (and (tree-is? t 'document)
         (tree-is? t :last 'slideshow))))
 
+(tm-define (presentation-buffer?)
+  ;; the body is a presentation, in screens or in expanded (slideshow) form
+  (or (screens-buffer?) (slideshow-buffer?)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic movements for fold tags and switches
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
