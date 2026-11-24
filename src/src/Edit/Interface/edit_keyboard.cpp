@@ -436,7 +436,7 @@ edit_interface_rep::handle_keypress (string key, time_t t) {
     if (starts (gkey, "pre-edit:"))
       call ("delayed-keyboard-press", object (gkey), object ((double) t));
     else
-      call ("keyboard-press", object (gkey), object ((double) t));
+      call ("committed-keyboard-press", object (gkey), object ((double) t));
     update_focus_loci ();
     if (!is_nil (focus_ids) && got_focus)
       call ("link-follow-ids", object (focus_ids), object ("focus"));
