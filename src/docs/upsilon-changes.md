@@ -24,6 +24,16 @@ have the details, and the problems go to the
   `u8"..."`), triple quotes and the raw strings of Rust and R; an empty
   string with a prefix (`f""`) loses its quotes and keeps its prefix, and
   the values of YAML without quotes are plain text (#873).
+- **Agents: a proposal resolved with the Version tools is reported as
+  accepted or rejected**: when the person keeps the new or the old version
+  with Version > Differences (the Review bar, Retain) instead of the Accept
+  and Reject of the agents, `list_proposals` said `resolved`. The host now
+  records the version that the Version tools keep of the proposal's markup,
+  also for several proposals at once (a selection, Retain all); when the
+  markup disappears otherwise, it compares the blocks with their adjacent
+  strings joined, and recognizes a rejected insertion and an accepted
+  deletion; while the person's own comparison is in the document, it says
+  `resolved` rather than guess (#867).
 - **Chez Scheme: a smaller boot image, less memory at start-up** (builds
   with Chez): the routines of the C++ glue are defined from a table in C++
   when TeXmacs starts, as with Guile and s7, with one foreign call per number

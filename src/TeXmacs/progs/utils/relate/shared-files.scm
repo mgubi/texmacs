@@ -22,7 +22,8 @@
 (texmacs-module (utils relate shared-files)
   (:use (utils relate live-document)
         (utils relate live-connection)
-        (texmacs texmacs tm-files)))
+        (texmacs texmacs tm-files)
+        (version version-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tables, records, switches
@@ -859,7 +860,7 @@
 (tm-define (shared-file-pending-count name)
   (:synopsis "The number of proposals of agents waiting for the person on @name")
   (with l (or (shared-proposals name) '())
-    (length (list-filter l (lambda (e) (== (cadr e) "pending"))))))
+    (length (list-filter l (lambda (e) (and (== (cadr e) "pending") (>= (caddr e) 0)))))))
 
 (tm-define (shared-file-footer-text name)
   (:synopsis "The text the footer shows for the shared file @name, or #f (nothing for a file hosted alone)")
@@ -979,7 +980,7 @@
 ;; document, and the one at the cursor (the block with the cursor)
 (define (pending-by-index name)
   (list-sort (list-filter (or (shared-proposals name) '())
-                          (lambda (e) (== (cadr e) "pending")))
+                          (lambda (e) (and (== (cadr e) "pending") (>= (caddr e) 0))))
              (lambda (a b) (< (caddr a) (caddr b)))))
 
 (define (cursor-block-index)
@@ -1635,8 +1636,11 @@
          t)))
 
 (define (proposal-index sf pr)
+  ;; (-1 for a pending proposal whose block is lost, until the next poll)
   (let ((t (proposal-tree sf pr)))
-    (if t (tree-index t) (or (prop-get pr 'index) -1))))
+    (cond (t (tree-index t))
+          ((proposal-pending? pr) -1)
+          (else (or (prop-get pr 'index) -1)))))
 
 (define (proposal-find sf id)
   (with l (list-filter (or (sf-get sf 'proposals) '()) (lambda (pr) (== (prop-get pr 'id) id)))
@@ -1652,6 +1656,7 @@
       (let ((blocks (resolved-blocks (tm->stree t) (if (== which 'new) 1 0)))
             (parent (tree-up t)) (i (tree-index t)))
         (prop-put! pr 'index i)
+        (prop-put! pr 'retained '())
         (with-buffer (sf-buffer sf)
           (start-editing)
           (cond ((null? blocks) (tree-remove parent i 1))
@@ -1681,34 +1686,216 @@
     (and (sf-host? sf)
          (with pr (proposal-find sf id)
            (and pr (proposal-pending? pr)
-                (begin
-                  (proposal-resolve! sf pr which (if (== which 'new) "accepted" "rejected"))
+                ;; (not a proposal whose block is lost: nothing to resolve)
+                (proposal-tree sf pr)
+                (let* ((k (if (== which 'new) 1 0))
+                       (present (length (version-nodes (proposal-tree sf pr))))
+                       (ks (map cdr (choices-still-made pr (or (prop-get pr 'retained) '()) present)))
+                       (n (+ (length ks) present)))
+                  ;; (after a choice of the Version tools for some differences)
+                  (proposal-resolve! sf pr which
+                                     (cond ((< n (or (prop-get pr 'ndiffs) n)) "resolved")
+                                           ((nnull? (list-filter ks (lambda (x) (!= x k)))) "resolved")
+                                           ((== k 1) "accepted")
+                                           (else "rejected")))
                   #t))))))
 
-(define (proposals-classify! sf pr)
-  ;; the markup of a pending proposal is gone (the person used the Version
-  ;; tools, or edited): was the new or the old version kept?
-  (let* ((body (sf-body sf))
-         (sts (map tm->stree (tree-children body)))
-         (has (lambda (seq)
-                (let ((n (length seq)))
-                  (and (> n 0) (>= (length sts) n)
-                       (let loop ((l sts))
-                         (cond ((< (length l) n) #f)
-                               ((equal? (sublist l 0 n) seq) #t)
-                               (else (loop (cdr l))))))))))
+;; The person may resolve a proposal with the Version tools (the Review bar,
+;; Retain, Retain all), which do not go through shared-proposal-resolve!:
+;; version-retain and version-retain-all are overloaded below and record the
+;; outcome at the source, for the markup of the proposals they resolve (the
+;; version kept of each difference, found before the tool changes the tree).
+;; A proposal with several differences is accepted when the new version of
+;; each was kept, rejected when the old one, else resolved. When the markup
+;; disappears otherwise (deleted, typed over), the host compares the blocks
+;; (with adjacent strings joined) with both versions. The host looks only
+;; when the document changed (a new live state). Known limit: an undo that
+;; brings back the markup of a resolved proposal is not reported (the undo
+;; makes new trees, and recognizing the markup by its content would take a
+;; comparison made by the person for the proposal): the markup is then
+;; plain version markup, and the status stays. A proposal whose block is
+;; lost is never followed by its content: while the document holds other
+;; version markup (the person compared it with a file), its outcome is
+;; "resolved" (#867).
+
+(define (block-normalize st)
+  ;; @st with nested concatenations flattened and adjacent strings joined
+  (define (flat l)
+    (cond ((null? l) l)
+          ((and (pair? (car l)) (eq? (car (car l)) 'concat))
+           (flat (append (cdr (car l)) (cdr l))))
+          ((equal? (car l) "") (flat (cdr l)))
+          ((and (string? (car l)) (pair? (cdr l)) (string? (cadr l)))
+           (flat (cons (string-append (car l) (cadr l)) (cddr l))))
+          (else (cons (car l) (flat (cdr l))))))
+  (cond ((not (pair? st)) st)
+        ((eq? (car st) 'concat)
+         (with l (flat (map block-normalize (cdr st)))
+           (cond ((null? l) "")
+                 ((null? (cdr l)) (car l))
+                 (else (cons 'concat l)))))
+        (else (cons (car st) (map block-normalize (cdr st))))))
+
+(define (proposals-classify! sf pr foreign?)
+  ;; the markup of a pending proposal is gone, not by the Version tools (the
+  ;; person edited): was the new or the old version kept? An empty version
+  ;; counts as kept when the other one is gone. While the document holds
+  ;; other version markup (@foreign?: the proposal may be inside it), the
+  ;; neutral "resolved"
+  (let* ((sts (map (lambda (t) (block-normalize (tm->stree t)))
+                   (tree-children (sf-body sf))))
+         (n (length sts))
+         (new (map block-normalize (prop-get pr 'new)))
+         (old (map block-normalize (prop-get pr 'old)))
+         (has? (lambda (seq)
+                 (let ((m (length seq)))
+                   (let loop ((l sts) (k n))
+                     (and (>= k m)
+                          (or (equal? (list-head l m) seq)
+                              (loop (cdr l) (- k 1)))))))))
     (prop-put! pr 'status
-               (cond ((has (prop-get pr 'new)) "accepted")
-                     ((has (prop-get pr 'old)) "rejected")
+               (cond (foreign? "resolved")
+                     ((and (pair? new) (has? new)) "accepted")
+                     ((and (pair? old) (has? old)) "rejected")
+                     ((null? new) "accepted")
+                     ((null? old) "rejected")
                      (else "resolved")))))
 
+(define (stree-version-count st)
+  ;; the number of outermost version markups in the stree @st
+  (cond ((not (pair? st)) 0)
+        ((memq (car st) '(version-both version-old version-new)) 1)
+        (else (apply + (map stree-version-count (cdr st))))))
+
+(define (version-nodes t)
+  ;; the outermost version markup in @t (@t included), as the Version tools
+  ;; find it
+  (cond ((tree-atomic? t) '())
+        ((version-context? t) (list t))
+        (else (apply append (map version-nodes (tree-children t))))))
+
+(define (node-in? t l) (list-or (map (lambda (u) (tree-eq? u t)) l)))
+
+(define (retain-choice t which)
+  ;; the version (0 old, 1 new) of the markup @t that the Version tools keep
+  ;; for @which (as version-retain-version* in version-edit.scm)
+  (cond ((number? which) which)
+        ((tree-is? t 'version-old) 0)
+        ((and (tree-is? t 'version-both) (== which 'current-old)) 0)
+        (else 1)))
+
+(define (choices-still-made pr old present)
+  ;; the choices @old of the Version tools for differences of @pr that are no
+  ;; longer in its markup, when @present differences are: an undo that brought
+  ;; differences back undid the newest choices (undo goes back in time)
+  (let ((keep (max 0 (- (or (prop-get pr 'ndiffs) 0) present))))
+    (if (> (length old) keep) (list-tail old (- (length old) keep)) old)))
+
+(define (proposals-retain sf nodes which thunk)
+  ;; the Version tools keep the version @which of the markup @nodes (#t: all
+  ;; of it) when @thunk runs: note the outcome of the proposals concerned
+  (let* ((pend (list-filter
+                (map (lambda (pr)
+                       (with t (and (proposal-pending? pr) (proposal-tree sf pr))
+                         (and t (list pr t (tree-index t)))))
+                     (or (sf-get sf 'proposals) '()))
+                identity))
+         (touched
+          (list-filter
+           (map (lambda (x)
+                  (let* ((pr (car x)) (t (cadr x))
+                         (all (version-nodes t))
+                         (hit (if (== nodes #t) all
+                                  (list-filter all (lambda (u) (node-in? u nodes)))))
+                         (choices (map (lambda (u) (cons u (retain-choice u which))) hit))
+                         (whole? (and (= (length hit) (length all)) (pair? hit)))
+                         ;; the blocks that a whole block of markup becomes
+                         (delta (if (and whole? (null? (cdr hit)) (tree-eq? (car hit) t))
+                                    (- (length (prop-get pr (if (== (cdar choices) 1) 'new 'old))) 1)
+                                    0)))
+                    (and (nnull? hit) (list pr (length all) choices whole? (caddr x) delta))))
+                pend)
+           identity))
+         (body0 (sf-body sf))
+         (arity (+ (tree-arity body0) (apply + (map (lambda (e) (list-ref e 5)) touched))))
+         (r (thunk)))
+    (for (e touched)
+      (let* ((pr (car e)) (hit (caddr e))
+             (old (list-filter (or (prop-get pr 'retained) '())
+                               (lambda (c) (not (node-in? (car c) (map car hit))))))
+             (done (append hit (choices-still-made pr old (cadr e)))))
+        (if (not (cadddr e))
+            (prop-put! pr 'retained done)
+            (let ((ks (map cdr done)))
+              (prop-put! pr 'retained '())
+              (prop-put! pr 'status
+                         (cond ((< (length ks) (or (prop-get pr 'ndiffs) 0))
+                                ;; a difference went away without a choice
+                                "resolved")
+                               ((list-and (map (lambda (k) (== k 1)) ks)) "accepted")
+                               ((list-and (map (lambda (k) (== k 0)) ks)) "rejected")
+                               (else "resolved")))
+              (sf-put! sf 'prop-changed #t)))))
+    ;; keeping a version made of blocks makes the body again (tree-normalize
+    ;; in version-edit.scm), and the other pending proposals lose their
+    ;; block: found again at their index, shifted by the blocks that the
+    ;; resolved ones became, when the count of the blocks agrees
+    (let ((body (sf-body sf)))
+      (when (= (tree-arity body) arity)
+        (for (x pend)
+          (let ((pr (car x)) (i (caddr x)))
+            (when (and (proposal-pending? pr) (not (proposal-tree sf pr)))
+              (let ((j (+ i (apply + (map (lambda (e) (if (and (cadddr e) (< (list-ref e 4) i)) (list-ref e 5) 0))
+                                          touched)))))
+                (when (and (>= j 0) (< j (tree-arity body))
+                           (version-tag-in? (tm->stree (tree-ref body j))))
+                  (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
+                  (prop-put! pr 'ptr (tree->tree-pointer (tree-ref body j)))
+                  (prop-put! pr 'index j))))))))
+    r))
+
+(define (retain-sf)
+  ;; the shared file of the current buffer when it hosts pending proposals
+  (and-with sf (sf-by-name (current-buffer))
+    (and (sf-host? sf)
+         (list-or (map proposal-pending? (or (sf-get sf 'proposals) '())))
+         sf)))
+
+(tm-define (version-retain which)
+  (with sf (retain-sf)
+    (if (not sf) (former which)
+        (proposals-retain
+         sf
+         (cond ((selection-active-any?)
+                (apply append (map version-nodes (selection-trees))))
+               ((tree-innermost version-context?) => list)
+               (else '()))
+         which (lambda () (former which))))))
+
+(tm-define (version-retain-all which)
+  (with sf (retain-sf)
+    (if (not sf) (former which)
+        (proposals-retain sf #t which (lambda () (former which))))))
+
 (define (proposals-poll! sf)
-  (for (pr (or (sf-get sf 'proposals) '()))
-    (when (proposal-pending? pr)
-      (let ((t (proposal-tree sf pr)))
-        (if (and t (version-tag-in? (tm->stree t)))
-            (prop-put! pr 'index (tree-index t))
-            (proposals-classify! sf pr))))))
+  ;; only when the document changed since the last time
+  (let ((state (live-current-state (sf-key sf))))
+    (unless (and (sf-get sf 'prop-polled) (equal? state (sf-get sf 'prop-polled)))
+      (sf-put! sf 'prop-polled state)
+      (let* ((pending (list-filter (or (sf-get sf 'proposals) '()) proposal-pending?))
+             (trees (map (lambda (pr)
+                           (let* ((t (proposal-tree sf pr)) (st (and t (tm->stree t))))
+                             (and st (version-tag-in? st) (cons t st))))
+                         pending))
+             (lost (list-filter (map (lambda (pr x) (and (not x) pr)) pending trees) identity)))
+        (for-each (lambda (pr x) (when x (prop-put! pr 'index (tree-index (car x)))))
+                  pending trees)
+        (when (nnull? lost)
+          ;; version markup in the document that is not that of a pending
+          ;; proposal (e.g. the person compared the document with a file)
+          (let* ((tracked (apply + (map (lambda (x) (if x (stree-version-count (cdr x)) 0)) trees)))
+                 (foreign? (> (stree-version-count (tm->stree (sf-body sf))) tracked)))
+            (for (pr lost) (proposals-classify! sf pr foreign?))))))))
 
 (define (proposals-sync! sf)
   ;; tell each agent about its proposals when they changed
@@ -1756,6 +1943,7 @@
     (prop-put! pr 'preview (proposal-preview new-sts old-sts))
     (prop-put! pr 'old old-sts)
     (prop-put! pr 'new new-sts)
+    (prop-put! pr 'ndiffs (stree-version-count markup))
     (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
       ;; (the resolved ones are kept for a while, so that the agent hears of them)
       (sf-put! sf 'proposals
