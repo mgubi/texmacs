@@ -1,7 +1,10 @@
 ;; The person (the host A) resolves proposals of an agent (B), undoes past
-;; the change of the agent and redoes everything (#957): each proposal ends
-;; as it was before the undos; two blocks of pending proposals joined by
-;; hand stay pending, and Keep New resolves both.
+;; the change of the agent and redoes everything (#957): the change of the
+;; agent undone reads the neutral "resolved" (its block was replaced); after
+;; the redos, a proposal resolved inside its block or by keeping a block is
+;; found again from its block (accepted), one whose block was removed reads
+;; "resolved"; two blocks of pending proposals joined by hand stay pending,
+;; and Keep New resolves both.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -100,8 +103,8 @@
     (act "check 1" (check "p1: pending after undo" (holds-markup? "p1")))
     (act "undo 1b" (step-undo!))
     (timed-wait 600)
-    (act "check 1b" (check "p1: the change of the agent undone: rejected"
-                           (and (find-para "Hello world.") (== (status-of "p1") "rejected"))))
+    (act "check 1b" (check "p1: the change of the agent undone: resolved (neutral)"
+                           (and (find-para "Hello world.") (== (status-of "p1") "resolved"))))
     (act "undo 1c" (step-undo!))
     (timed-wait 600)
     (act "redo 1" (step-redo!))
@@ -129,12 +132,12 @@
                     (insert-text! (find-para "Third one.") 0 "T") (end-editing))))
    (undos 6)
    (list (timed-wait 600)
-         (act "check 2" (check "p2: rejected after undoing the change of the agent" (== (status-of "p2") "rejected"))))
+         (act "check 2" (check "p2: resolved (neutral) after undoing the change of the agent" (== (status-of "p2") "resolved"))))
    (redos 6)
    (list
     (timed-wait 600)
     (act "check 2b" (check "p2: accepted after redoing everything" (== (status-of "p2") "accepted"))
-         (check "p3: rejected after redoing everything" (== (status-of "p3") "rejected"))
+         (check "p3: its block removed, resolved (neutral) after redoing everything" (== (status-of "p3") "resolved"))
          (check "p1: still accepted" (== (status-of "p1") "accepted"))
          (check "the texts" (== (texts) '((section "Intro") "Hello big world." "Second new paragraph." "TThird one.")))
          (sync-set! (sync-n 2 "a"))))

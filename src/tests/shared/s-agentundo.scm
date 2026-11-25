@@ -1,11 +1,10 @@
 ;; The person (the host A, interactive) resolves the proposals of an agent (B)
 ;; with the Version tools or Tools > Agents, then undoes and redoes (#957):
 ;; an undo that brings back the markup of a resolved proposal makes it
-;; pending again, and a redo resolves it again as before; the undo of a
-;; Keep that made the body again leaves the other pending proposals in their
-;; blocks; a difference whose choice was undone and that is then typed over
-;; by hand makes the outcome "resolved"; undoing further, the change of the
-;; agent itself: rejected.
+;; pending again, and a redo gives the outcome found from the blocks; the
+;; undo of a Keep that made the body again leaves the other pending
+;; proposals in their blocks; undoing further, the change of the agent
+;; itself: the neutral "resolved" (its block was replaced).
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -157,41 +156,21 @@
     (act "check 4b" (check "p5: accepted" (== (status-of "p5") "accepted"))
          (check "the text" (== (find-para "Removed.") 1))
          (sync-set! (sync-n 4 "a"))))
-   ;; 5. two differences; Keep New on the first, undo, the first typed over
-   ;; by hand, Keep New on the second: resolved
-   (person! 5 (lambda () (tree-assign (para (find-para "Appended.")) "one two three.")))
-   (list
-    (wait-sync (sync-n 5 "b"))
-    (step "p6" (== (status-of "p6") "pending"))
-    (act "keep 5" (check "p6: Keep New on the first" (keep-in! (index-of "p6") 1)))
-    (timed-wait 300)
-    (act "undo 5" (undo!))
-    (timed-wait 300)
-    (act "hand 5" (with-buffer (the-name)
-                    (let ((vt (first-version (para (index-of "p6")))))
-                      (start-editing) (tree-assign vt "one ") (end-editing))))
-    (timed-wait 300)
-    (act "check 5" (check "p6: still pending" (== (status-of "p6") "pending")))
-    (act "keep 5b" (check "p6: Keep New on the second" (keep-in! (index-of "p6") 1)))
-    (step "settled 5" (and (not (version-in-doc?)) (!= (status-of "p6") "pending")))
-    (act "check 5b" (check "p6: resolved" (== (status-of "p6") "resolved"))
-         (check "the text" (find-para "one two THREE."))
-         (sync-set! (sync-n 5 "a"))))
    ;; 6. two differences; Keep New on the first, undo, redo, Accept in Tools
    ;; > Agents: accepted
-   (person! 6 (lambda () (tree-assign (para (find-para "one two THREE.")) "one two three.")))
+   (person! 6 (lambda () (tree-assign (para (find-para "Appended.")) "one two three.")))
    (list
     (wait-sync (sync-n 6 "b"))
-    (step "p7" (== (status-of "p7") "pending"))
-    (act "keep 6" (check "p7: Keep New on the first" (keep-in! (index-of "p7") 1)))
+    (step "p6" (== (status-of "p6") "pending"))
+    (act "keep 6" (check "p6: Keep New on the first" (keep-in! (index-of "p6") 1)))
     (timed-wait 300)
     (act "undo 6" (undo!))
     (timed-wait 300)
     (act "redo 6" (redo!))
     (timed-wait 300)
-    (act "accept 6" (check "p7: Accept" (shared-proposal-resolve! (the-name) (prop-id "p7") 'new)))
+    (act "accept 6" (check "p6: Accept" (shared-proposal-resolve! (the-name) (prop-id "p6") 'new)))
     (step "settled 6" (not (version-in-doc?)))
-    (act "check 6" (check "p7: accepted" (== (status-of "p7") "accepted"))
+    (act "check 6" (check "p6: accepted" (== (status-of "p6") "accepted"))
          (check "the text" (find-para "ONE two THREE."))
          (sync-set! (sync-n 6 "a"))))
    ;; 7. a deletion and a word change after it pending; Keep Old on the
@@ -200,59 +179,59 @@
    ;; accepted
    (list
     (wait-sync (sync-n 7 "b"))
-    (step "p8 p9" (and (== (status-of "p8") "pending") (== (status-of "p9") "pending")))
-    (act "keep 7" (check "p8: Keep Old" (keep-in! (index-of "p8") 0)))
-    (step "settled 7" (== (status-of "p8") "rejected"))
+    (step "p7 p8" (and (== (status-of "p7") "pending") (== (status-of "p8") "pending")))
+    (act "keep 7" (check "p7: Keep Old" (keep-in! (index-of "p7") 0)))
+    (step "settled 7" (== (status-of "p7") "rejected"))
     (timed-wait 300)
-    (act "check 7" (check "p9: still pending after Keep, in its block" (holds-markup? "p9")))
+    (act "check 7" (check "p8: still pending after Keep, in its block" (holds-markup? "p8")))
     (act "undo 7" (undo!))
     (timed-wait 600)
     (timed-wait 300)
-    (act "check 7b" (check "p8: pending again after undo, in its block" (holds-markup? "p8"))
-         (check "p9: still pending after undo, in its block" (holds-markup? "p9"))
-         (check "p9: after p8" (> (index-of "p9") (index-of "p8"))))
+    (act "check 7b" (check "p7: pending again after undo, in its block" (holds-markup? "p7"))
+         (check "p8: still pending after undo, in its block" (holds-markup? "p8"))
+         (check "p8: after p7" (> (index-of "p8") (index-of "p7"))))
     (act "redo 7" (redo!))
     (timed-wait 600)
     (timed-wait 300)
-    (act "check 7c" (check "p8: rejected again after redo" (== (status-of "p8") "rejected"))
-         (check "p9: still pending after redo, in its block" (holds-markup? "p9")))
-    (act "keep 7b" (check "p9: Keep New" (keep-in! (index-of "p9") 1)))
-    (step "settled 7b" (and (not (version-in-doc?)) (!= (status-of "p9") "pending")))
-    (act "check 7d" (check "p9: accepted" (== (status-of "p9") "accepted"))
-         (check "p8: rejected" (== (status-of "p8") "rejected"))
+    (act "check 7c" (check "p7: rejected again after redo" (== (status-of "p7") "rejected"))
+         (check "p8: still pending after redo, in its block" (holds-markup? "p8")))
+    (act "keep 7b" (check "p8: Keep New" (keep-in! (index-of "p8") 1)))
+    (step "settled 7b" (and (not (version-in-doc?)) (!= (status-of "p8") "pending")))
+    (act "check 7d" (check "p8: accepted" (== (status-of "p8") "accepted"))
+         (check "p7: rejected" (== (status-of "p7") "rejected"))
          (check "the texts" (and (find-para "Inserted.") (find-para "Third big one.")))
          (sync-set! (sync-n 7 "a"))))
    ;; 8. a word change kept New: accepted; undo: pending; undo again (the
-   ;; change of the agent itself): rejected
+   ;; change of the agent itself): resolved
    (list
     (wait-sync (sync-n 8 "b"))
-    (step "p10" (== (status-of "p10") "pending"))
-    (act "keep 8" (check "p10: Keep New" (keep-step! "p10" 1)))
-    (step "settled 8" (== (status-of "p10") "accepted"))
+    (step "p9" (== (status-of "p9") "pending"))
+    (act "keep 8" (check "p9: Keep New" (keep-step! "p9" 1)))
+    (step "settled 8" (== (status-of "p9") "accepted"))
     (act "undo 8" (step-undo!))
     (timed-wait 600)
-    (act "check 8" (check "p10: pending again after undo" (holds-markup? "p10")))
+    (act "check 8" (check "p9: pending again after undo" (holds-markup? "p9")))
     (undo-until! "Removed.")
     (timed-wait 600)
-    (act "check 8b" (check "p10: the change of the agent undone" (find-para "Removed."))
-         (check "p10: rejected" (== (status-of "p10") "rejected"))
+    (act "check 8b" (check "p9: the change of the agent undone" (find-para "Removed."))
+         (check "p9: resolved (neutral: its block was replaced)" (== (status-of "p9") "resolved"))
          (sync-set! (sync-n 8 "a"))))
-   ;; 9. the same with two differences, both kept New: rejected
+   ;; 9. the same with two differences, both kept New: resolved
    (person! 9 (lambda () (tree-assign (para (find-para "Hello world.")) "one two three.")))
    (list
     (wait-sync (sync-n 9 "b"))
-    (step "p11" (== (status-of "p11") "pending"))
-    (act "keep 9" (check "p11: Keep New on the first" (keep-step! "p11" 1)))
+    (step "p10" (== (status-of "p10") "pending"))
+    (act "keep 9" (check "p10: Keep New on the first" (keep-step! "p10" 1)))
     (timed-wait 300)
-    (act "keep 9b" (check "p11: Keep New on the second" (keep-step! "p11" 1)))
-    (step "settled 9" (== (status-of "p11") "accepted"))
+    (act "keep 9b" (check "p10: Keep New on the second" (keep-step! "p10" 1)))
+    (step "settled 9" (== (status-of "p10") "accepted"))
     (act "undo 9" (step-undo!))
     (timed-wait 600)
-    (act "check 9" (check "p11: pending again after undo" (holds-markup? "p11")))
+    (act "check 9" (check "p10: pending again after undo" (holds-markup? "p10")))
     (undo-until! "Hello world.")
     (timed-wait 600)
-    (act "check 9b" (check "p11: the change of the agent undone" (find-para "Hello world."))
-         (check "p11: rejected" (== (status-of "p11") "rejected"))
+    (act "check 9b" (check "p10: the change of the agent undone" (find-para "Hello world."))
+         (check "p10: resolved (neutral: its block was replaced)" (== (status-of "p10") "resolved"))
          (sync-set! (sync-n 9 "a"))))
    (list
     (wait-sync "b-done")
@@ -300,16 +279,14 @@
    (round 2 (lambda () (insert-text! 2 7 "new ")) "p3" "rejected")
    (round 3 (lambda () (insert-block! 5 "Appended.")) "p4" "accepted")
    (round 4 (lambda () (insert-block! 1 "Removed.")) "p5" "accepted")
-   (list (wait-sync (sync-n 5 "p")) (step "5 there" (find-para "one two three.")))
-   (round 5 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p6" "resolved")
    (list (wait-sync (sync-n 6 "p")) (step "6 there" (find-para "one two three.")))
-   (round 6 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p7" "accepted")
+   (round 6 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p6" "accepted")
    (propose-and-wait* 7 (lambda () (tree-remove (body) (find-para "Inserted.") 1))
                       (lambda () (insert-text! (find-para "Third one.") 6 "big ")))
-   (agent-hears 7 "p9" "accepted")
-   (round 8 (lambda () (tree-assign (para (find-para "Removed.")) "Gone.")) "p10" "rejected")
+   (agent-hears 7 "p8" "accepted")
+   (round 8 (lambda () (tree-assign (para (find-para "Removed.")) "Gone.")) "p9" "resolved")
    (list (wait-sync (sync-n 9 "p")) (step "9 there" (find-para "one two three.")))
-   (round 9 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p11" "rejected")
+   (round 9 (lambda () (tree-assign (para (find-para "one two three.")) "ONE two THREE.")) "p10" "resolved")
    (list
     (act "out" (publish-body!) (sync-set! "b-done"))
     (wait-sync "a-done"))))

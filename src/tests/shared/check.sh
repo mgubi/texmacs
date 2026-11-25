@@ -44,6 +44,8 @@
 #               again, then resolved again; the other proposals stay in their blocks
 #   agentredo   the person undoes past the change of the agent and redoes everything:
 #               the outcomes come back; two proposal blocks joined stay pending
+#   agentcross  undo of unrelated changes, a withdrawal after it, changes crossing a
+#               Keep: nothing confidently wrong, nothing lost
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
 #   agenthost   the person's process with proposals of the agent closes the file: the agent's
@@ -78,7 +80,7 @@ export TEXMACS_VUE_CLIPBOARD=private
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 unset XDG_RUNTIME_DIR TEXMACS_SHARED_DIR
 
-[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentversion agentundo agentredo agentplain malformed agentmode agenthost fuzz edfuzz diskchange
+[ $# -eq 0 ] && set -- basic concurrent conflict meta refuse save handover death takeover takeover-window off stale slow attack hostage corrupt late lockheld lockdel race seeksave diffdir dupe closeunconn lockerr agent agentversion agentundo agentredo agentcross agentplain malformed agentmode agenthost fuzz edfuzz diskchange
 status=0
 
 # wait for the processes (pids), stopping those which use too much memory or

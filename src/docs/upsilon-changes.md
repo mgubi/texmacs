@@ -17,12 +17,11 @@ have the details, and the problems go to the
 - **Agents, propose mode: undo and redo of a proposal's resolution**: an
   undo that brings back the markup of a proposal resolved with the Version
   tools or Tools > Agents makes it pending again (the agent hears it, Tools >
-  Agents can resolve it), a redo gives back the outcome it had, and an undo
-  past the change of the agent itself gives `rejected`; the undo of a
-  block-level Keep no longer makes the other pending proposals read
-  `resolved`; a choice undone and then typed over by hand gives `resolved`.
+  Agents can resolve it); the undo of a block-level Keep no longer makes the
+  other pending proposals read `resolved`; after a redo, the outcome is
+  found from the block of the proposal only (`resolved` when it is gone).
   For programs, `tree-note` and `tree-set-note` attach a string to a node,
-  which undo and redo bring back with it (#957).
+  which undo and redo bring back with it (part of #957).
 - **Shared files: an agent's process that takes over the file**: when the
   person's TeXmacs, with proposals of an agent, closed or lost the file and
   the agent's process took it over, an error was printed at every tick
