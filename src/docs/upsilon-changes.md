@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 25 November 2026
+
+- **Keyboard: a key typed just after a dead key**: a key typed less than
+  100 ms after a dead key (or the end of an input method's composition)
+  could be lost or read with the wrong accent, because the end of the
+  composition was applied late; now the pending composition is ended
+  before the next key is handled (#955, desktop applications).
+
 ## 24 November 2026
 
 - **Agents, propose mode: undo and redo of a proposal's resolution**: an

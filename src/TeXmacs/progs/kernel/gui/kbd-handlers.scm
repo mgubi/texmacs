@@ -49,8 +49,11 @@
 (tm-define (kbd-insert s)
   (insert s))
 
-(define delayed-keyboard-serial 0)
+;; The pre-edit waiting to be pressed, (key time), and the end of a pre-edit
+;; ("pre-edit:") which it superseded and which is pressed just before it.
+(define delayed-keyboard-pending #f)
 (define delayed-keyboard-end #f)
+(define delayed-keyboard-serial 0)
 
 (define (pre-edit-end? x)
   ;; the empty pre-edit which ends a composition ("pre-edit:")
@@ -60,23 +63,46 @@
              (string->number (substring s 0 (- (string-length s) 1)))
              #t))))
 
+(define (delayed-keyboard-flush)
+  ;; press the pending pre-edit now, after the end it superseded; its
+  ;; delayed command stops at its next poll
+  (let ((pending delayed-keyboard-pending) (end delayed-keyboard-end))
+    (set! delayed-keyboard-pending #f)
+    (set! delayed-keyboard-end #f)
+    (when pending
+      (set! delayed-keyboard-serial (+ delayed-keyboard-serial 1))
+      (if (and end (not (pre-edit-end? (car pending))))
+          (keyboard-press (car end) (cadr end)))
+      (keyboard-press (car pending) (cadr pending)))))
+
 (tm-define (delayed-keyboard-press x t)
   (:synopsis "Press the pre-edit @x once the user has been idle for 100 ms")
   ;; Only the last pre-edit is pressed: the command of an earlier one which
-  ;; has not run yet does nothing. The pre-edits are numbered, since several
-  ;; can come at the same time @t: a dead key typed after another one ends
-  ;; the first pre-edit and starts the next one in the same event (#870).
+  ;; has not run yet stops at its next poll. The pre-edits are numbered,
+  ;; since several can come at the same time @t: a dead key typed after
+  ;; another one ends the first pre-edit and starts the next one in the
+  ;; same event (#870).
   ;; The end of a pre-edit is never skipped, since it resets the state of
   ;; the editor (pre_edit_skip, edit_keyboard.cpp): when a newer pre-edit
-  ;; comes, the end is pressed just before it.
+  ;; comes, the end is pressed just before it. A committed key flushes
+  ;; them first (committed-keyboard-press).
   (set! delayed-keyboard-serial (+ delayed-keyboard-serial 1))
   (if (pre-edit-end? x) (set! delayed-keyboard-end (list x t)))
+  (set! delayed-keyboard-pending (list x t))
   (with serial delayed-keyboard-serial
     (delayed
+      (:while (== serial delayed-keyboard-serial))
       (:idle 100)
-      (when (== serial delayed-keyboard-serial)
-        (with end delayed-keyboard-end
-          (set! delayed-keyboard-end #f)
-          (if (and end (not (pre-edit-end? x)))
-              (keyboard-press (car end) (cadr end))))
-        (keyboard-press x t)))))
+      (delayed-keyboard-flush))))
+
+(tm-define (committed-keyboard-press key t)
+  (:synopsis "Press the key @key, which is not a pre-edit, at once")
+  ;; The pending pre-edits are pressed first, so that the key is read in
+  ;; the state they leave, as when the user types slowly (#955). Else a key
+  ;; typed less than 100 ms after the end of the pre-edit of an accent
+  ;; inserted at once (math) was still read as its commit: a letter
+  ;; composed after a dead caron was lost, the commit of a second dead
+  ;; tilde dropped. The order of the interfaces is kept: the end of a
+  ;; pre-edit comes after the commit in Qt, before it in Cocoa and SDL.
+  (delayed-keyboard-flush)
+  (keyboard-press key t))
