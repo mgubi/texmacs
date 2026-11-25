@@ -641,7 +641,10 @@ EStatusCode CFFEmbeddedFontWriter::WriteEncodings(const UIntVector& inSubsetGlyp
 		mPrimitivesWriter.WriteCard8(encodingGlyphsCount);
 		for(Byte i=0; i < encodingGlyphsCount;++i)
 		{
-			if(inSubsetGlyphIDs[i+1] < encodingInfo->mEncodingsCount)
+			// (TeXmacs: no table, a custom encoding of no codes; the codes
+			// are those of the glyphs 1 to mEncodingsCount, at gid-1)
+			if(encodingInfo->mEncoding != NULL && inSubsetGlyphIDs[i+1] >= 1 &&
+			   inSubsetGlyphIDs[i+1] <= encodingInfo->mEncodingsCount)
 				mPrimitivesWriter.WriteCard8(encodingInfo->mEncoding[inSubsetGlyphIDs[i+1]-1]);
 			else
 				mPrimitivesWriter.WriteCard8(0);

@@ -98,7 +98,11 @@ typedef std::pair<Byte,unsigned short> ByteAndUShort;
 
 struct EncodingsInfo
 {
-	EncodingsInfo() {mEncoding = NULL;}
+	// (TeXmacs: every field set; mEncodingsCount was left undefined for a
+	// custom encoding of no codes, and WriteEncodings read that many codes
+	// through mEncoding, NULL: a crash which depended on the heap)
+	EncodingsInfo() {mEncoding = NULL; mEncodingsCount = 0;
+	                 mEncodingStart = mEncodingEnd = 0; mType = eEncodingStandard;}
 
 	LongFilePositionType mEncodingStart;
 	LongFilePositionType mEncodingEnd;
