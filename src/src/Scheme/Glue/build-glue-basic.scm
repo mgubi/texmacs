@@ -511,6 +511,8 @@
   (tree-observe tree_pointer_cb_new (observer tree string))
   (tree-pointer-detach tree_pointer_delete (void observer))
   (tree-pointer->tree obtain_tree (tree observer))
+  (tree-note tree_note (string tree))
+  (tree-set-note tree_set_note (void tree string))
   (current-link-types all_link_types (list_string))
   (get-locus-rendering get_locus_rendering (string string))
   (set-locus-rendering set_locus_rendering (void string string))

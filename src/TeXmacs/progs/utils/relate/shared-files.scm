@@ -689,6 +689,23 @@
 
 (tm-define (shared-notify event t mod)
   (:secure #t)
+  (when (and (== event 'announce) (!= (modification-type mod) 'set-cursor)
+             (not (busy-versioning?)) (not sf-own-edit?))
+    ;; (an edit inside the block of a resolved proposal, by hand or by a
+    ;; participant: the block no longer stands for the proposal, see
+    ;; proposals-untag!)
+    (catch #t
+      (lambda ()
+        (let ((p (modification-path mod)))
+          (when (and (pair? p) (pair? (cdr p)) (integer? (car p))
+                     (< (car p) (tree-arity t)))
+            (let* ((b (tree-ref t (car p))) (n (tree-note b)))
+              (when (string-starts? n "agent-proposal ")
+                (and-with buf (path->buffer (tree->path t))
+                  (and-with key (ahash-ref sf-by-buffer (url->string buf))
+                    (and-with sf (ahash-ref sf-table key)
+                      (proposals-note-edit! sf b n)))))))))
+      (lambda args (noop))))
   (when (and (not sf-applying?) (== event 'announce)
              (!= (modification-type mod) 'set-cursor))
     (and-with buf (path->buffer (tree->path t))
@@ -698,7 +715,10 @@
             (sf-put! sf 'collect
                      (cons (patch-pair (prefix-mod 1 m)
                                        (prefix-mod 1 (modification-invert m t)))
-                           (sf-get sf 'collect)))))))))
+                           (sf-get sf 'collect))))
+          ;; (an undo, a redo or a cancellation: the blocks of the
+          ;; proposals may be copies put back, see proposals-after-history!)
+          (when (busy-versioning?) (sf-put! sf 'prop-history #t)))))))
 
 (define (take-local-patch sf)
   ;; the local changes since the last time: a patch, or #f
@@ -1632,6 +1652,49 @@
 (define (prop-get pr k) (ahash-ref pr k))
 (define (prop-put! pr k v) (ahash-set! pr k v))
 
+(define sf-own-edit? #f)   ; the host changes the proposals itself
+
+(define (proposals-note-edit! sf b n)
+  ;; the block @b with the note @n is edited (in the observer, before the
+  ;; change): when its proposal is resolved, its note goes at the next poll
+  (let ((pr (list-find (or (sf-get sf 'proposals) '())
+                       (lambda (x) (and (not (list? x)) (== (proposal-note x) n))))))
+    (when (and pr (not (proposal-pending? pr)))
+      (sf-put! sf 'prop-edited (cons b (or (sf-get sf 'prop-edited) '()))))))
+
+(define (proposals-untag! sf)
+  ;; the blocks of resolved proposals edited in place no longer have their
+  ;; note (an undo of the edit does not bring it back: the block stays)
+  (let ((l (or (sf-get sf 'prop-edited) '())) (body (sf-body sf)))
+    (sf-put! sf 'prop-edited '())
+    (for (b l)
+      (when (and (tree? b) (not (tm-is? b 'uninit))
+                 (let ((up (tree-up b))) (and up (tree-eq? up body))))
+        (let* ((n (tree-note b))
+               (pr (list-find (or (sf-get sf 'proposals) '())
+                              (lambda (x) (and (not (list? x)) (== (proposal-note x) n))))))
+          (when (and pr (not (proposal-pending? pr)))
+            (tree-set-note b "")))))))
+
+(define (proposal-own-markup? pr t)
+  ;; is the version markup in the block @t that of @pr? Its differences are
+  ;; among those made with it (by their content), at most as many
+  (let ((l (map tm->stree (version-nodes t))))
+    (and (pair? l)
+         (<= (length l) (length (or (prop-get pr 'vnodes) '())))
+         (let loop ((l l) (rest (or (prop-get pr 'vnodes) '())))
+           (cond ((null? l) #t)
+                 ((member (car l) rest)
+                  (loop (cdr l) (let del ((r rest))
+                                  (if (equal? (car r) (car l)) (cdr r)
+                                      (cons (car r) (del (cdr r)))))))
+                 (else #f))))))
+
+(define (proposal-note pr)
+  ;; the note of the block of @pr (tree-note), which the copies kept by the
+  ;; history have too; it is on that block only
+  (string-append "agent-proposal " (prop-get pr 'id)))
+
 (define (proposal-tree sf pr)
   ;; the block of the proposal, or #f when it is not in the document
   (let ((t (tree-pointer->tree (prop-get pr 'ptr))) (body (sf-body sf)))
@@ -1675,6 +1738,8 @@
           (cond ((null? blocks) (tree-remove parent i 1))
                 (else
                   (tree-assign t (stree->tree (car blocks)))
+                  ;; (the block kept is that of the proposal: its note)
+                  (tree-set-note (tree-ref parent i) (proposal-note pr))
                   (when (pair? (cdr blocks))
                     (tree-var-insert parent (+ i 1)
                                      (stree->tree (cons 'document (cdr blocks)))))))
@@ -1697,6 +1762,7 @@
   (:synopsis "The person on @name: accept (which = new) or reject (old) the proposal @id")
   (and-with sf (sf-by-name name)
     (and (sf-host? sf)
+         (begin (proposals-after-history! sf) #t)
          (with pr (proposal-find sf id)
            (and pr (proposal-pending? pr)
                 ;; (not a proposal whose block is lost: nothing to resolve)
@@ -1722,11 +1788,9 @@
 ;; each was kept, rejected when the old one, else resolved. When the markup
 ;; disappears otherwise (deleted, typed over), the host compares the blocks
 ;; (with adjacent strings joined) with both versions. The host looks only
-;; when the document changed (a new live state). Known limit: an undo that
-;; brings back the markup of a resolved proposal is not reported (the undo
-;; makes new trees, and recognizing the markup by its content would take a
-;; comparison made by the person for the proposal): the markup is then
-;; plain version markup, and the status stays. A proposal whose block is
+;; when the document changed (a new live state). An undo that brings back
+;; the markup of a resolved proposal makes it pending again (its block is
+;; found by its note, see proposals-after-history!). A proposal whose block is
 ;; lost is never followed by its content: while the document holds other
 ;; version markup (the person compared it with a file), its outcome is
 ;; "resolved" (#867).
@@ -1772,6 +1836,26 @@
                      ((and (pair? old) (has? old)) "rejected")
                      ((null? new) "accepted")
                      ((null? old) "rejected")
+                     (else "resolved")))))
+
+(define (proposals-classify-noted! sf pr)
+  ;; as proposals-classify!, after an undo or a redo: only the blocks from
+  ;; the block with the note of @pr are compared with its versions (an undo
+  ;; or a redo may bring back an equal block elsewhere); without that block
+  ;; (its block was replaced or removed), the neutral "resolved"
+  (let* ((l (tree-children (sf-body sf)))
+         (t (list-find l (lambda (u) (== (tree-note u) (proposal-note pr)))))
+         (sts (if t (map (lambda (u) (block-normalize (tm->stree u)))
+                         (list-tail l (tree-index t)))
+                  '()))
+         (new (map block-normalize (prop-get pr 'new)))
+         (old (map block-normalize (prop-get pr 'old)))
+         (at? (lambda (seq)
+                (and (pair? seq) (>= (length sts) (length seq))
+                     (equal? (list-head sts (length seq)) seq)))))
+    (prop-put! pr 'status
+               (cond ((at? new) "accepted")
+                     ((at? old) "rejected")
                      (else "resolved")))))
 
 (define (stree-version-count st)
@@ -1823,15 +1907,16 @@
                          (choices (map (lambda (u) (cons u (retain-choice u which))) hit))
                          (whole? (and (= (length hit) (length all)) (pair? hit)))
                          ;; the blocks that a whole block of markup becomes
-                         (delta (if (and whole? (null? (cdr hit)) (tree-eq? (car hit) t))
+                         (block? (and whole? (null? (cdr hit)) (tree-eq? (car hit) t)))
+                         (delta (if block?
                                     (- (length (prop-get pr (if (== (cdar choices) 1) 'new 'old))) 1)
                                     0)))
-                    (and (nnull? hit) (list pr (length all) choices whole? (caddr x) delta))))
+                    (and (nnull? hit) (list pr (length all) choices whole? (caddr x) delta block?))))
                 pend)
            identity))
          (body0 (sf-body sf))
          (arity (+ (tree-arity body0) (apply + (map (lambda (e) (list-ref e 5)) touched))))
-         (r (thunk)))
+         (r (with-global sf-own-edit? #t (thunk))))
     (for (e touched)
       (let* ((pr (car e)) (hit (caddr e))
              (old (list-filter (or (prop-get pr 'retained) '())
@@ -1840,7 +1925,10 @@
         (if (not (cadddr e))
             (prop-put! pr 'retained done)
             (let ((ks (map cdr done)))
-              (prop-put! pr 'retained '())
+              ;; (kept: an undo may bring differences back, see
+              ;; proposals-after-history!; choices-still-made keeps those
+              ;; still made)
+              (prop-put! pr 'retained done)
               (prop-put! pr 'status
                          (cond ((< (length ks) (or (prop-get pr 'ndiffs) 0))
                                 ;; a difference went away without a choice
@@ -1862,15 +1950,87 @@
                                           touched)))))
                 (when (and (>= j 0) (< j (tree-arity body))
                            (version-tag-in? (tm->stree (tree-ref body j))))
-                  (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
-                  (prop-put! pr 'ptr (tree->tree-pointer (tree-ref body j)))
-                  (prop-put! pr 'index j))))))))
+                  (proposal-attach! sf pr (tree-ref body j))
+                  ;; (a copy of its block: its note again)
+                  (tree-set-note (tree-ref body j) (proposal-note pr))))))))
+      ;; the first block kept of a whole block of markup is the block of
+      ;; its proposal, with its note (a redo puts it back with it)
+      (when (= (tree-arity body) arity)
+        (for (e touched)
+          (when (and (list-ref e 6) (>= (list-ref e 5) 0))
+            (let ((j (+ (list-ref e 4)
+                        (apply + (map (lambda (f) (if (and (cadddr f) (< (list-ref f 4) (list-ref e 4))) (list-ref f 5) 0))
+                                      touched)))))
+              (when (< j (tree-arity body))
+                (tree-set-note (tree-ref body j) (proposal-note (car e)))))))))
     r))
+
+(define (proposal-attach! sf pr t)
+  ;; the pointer of @pr on its block @t
+  (catch #t (lambda () (tree-pointer-detach (prop-get pr 'ptr))) (lambda args #f))
+  (prop-put! pr 'ptr (tree->tree-pointer t))
+  (prop-put! pr 'index (tree-index t)))
+
+;; Undo and redo (#957). An undo or a redo puts back copies of the trees
+;; that a change removed, so the pointer of a proposal does not follow its
+;; block there; the copies kept by the history have the note of the block
+;; (proposal-note), which is set when the proposal is made and is on that
+;; block only. After a change of the history, a pending proposal whose
+;; block is lost goes to the block with its note, and a resolved one whose
+;; block comes back with version markup is pending again (its resolution
+;; was undone). Nothing else is taken from the notes: the outcome of a
+;; proposal resolved again is found as usual (by the Version tools, Tools >
+;; Agents, or from the blocks when its markup goes away otherwise).
+
+(define (proposals-after-history! sf)
+  (proposals-untag! sf)
+  (when (sf-get sf 'prop-history)
+    (sf-put! sf 'prop-history #f)
+    (when (sf-host? sf)
+      (let ((h (make-ahash-table))
+            (body (sf-body sf)))
+        (for (t (tree-children body))
+          (let ((n (tree-note t)))
+            (when (and (string-starts? n "agent-proposal ") (not (ahash-ref h n)))
+              (ahash-set! h n t))))
+        (for (pr (list-filter (or (sf-get sf 'proposals) '()) (lambda (x) (not (list? x)))))
+          (let ((t (ahash-ref h (proposal-note pr)))
+                (st (prop-get pr 'status)))
+            (cond ((and t (== st "pending"))
+                   ;; (its block, with its own markup or none: an equal
+                   ;; block elsewhere is not its block)
+                   (unless (let ((u (proposal-tree sf pr))) (and u (tree-eq? u t)))
+                     (if (or (proposal-own-markup? pr t) (not (version-tag-in? (tm->stree t))))
+                         (proposal-attach! sf pr t)
+                         (proposal-attach! sf pr (sf-body sf)))))
+                  ((and (== st "pending") (not t))
+                   ;; (its pointer went to a block next to its block when an
+                   ;; undo or a redo removed it: a block with the note of
+                   ;; another pending proposal and no more markup than that
+                   ;; one's is not its block, which is lost; blocks joined
+                   ;; by hand hold the markup of both)
+                   (and-with u (proposal-tree sf pr)
+                     (let* ((n (tree-note u))
+                            (q (list-find (or (sf-get sf 'proposals) '())
+                                          (lambda (x) (and (not (list? x)) (not (eq? x pr))
+                                                           (proposal-pending? x)
+                                                           (== (proposal-note x) n))))))
+                       (when (and q (proposal-own-markup? q u))
+                         (proposal-attach! sf pr (sf-body sf)))))))
+            ;; (a resolved proposal whose block comes back with markup: its
+            ;; resolution was undone)
+            (when (and t (in? st '("accepted" "rejected" "resolved"))
+                       (proposal-own-markup? pr t))
+              (proposal-attach! sf pr t)
+              (prop-put! pr 'status "pending")
+              (sf-put! sf 'prop-changed #t))))
+        (sf-put! sf 'prop-history-seen #t)))))
 
 (define (retain-sf)
   ;; the shared file of the current buffer when it hosts pending proposals
   (and-with sf (sf-by-name (current-buffer))
     (and (sf-host? sf)
+         (begin (proposals-after-history! sf) #t)
          (list-or (map proposal-pending? (or (sf-get sf 'proposals) '())))
          sf)))
 
@@ -1892,6 +2052,7 @@
 
 (define (proposals-poll! sf)
   ;; only when the document changed since the last time
+  (proposals-after-history! sf)
   (let ((state (live-current-state (sf-key sf))))
     (unless (and (sf-get sf 'prop-polled) (equal? state (sf-get sf 'prop-polled)))
       (sf-put! sf 'prop-polled state)
@@ -1908,7 +2069,10 @@
           ;; proposal (e.g. the person compared the document with a file)
           (let* ((tracked (apply + (map (lambda (x) (if x (stree-version-count (cdr x)) 0)) trees)))
                  (foreign? (> (stree-version-count (tm->stree (sf-body sf))) tracked)))
-            (for (pr lost) (proposals-classify! sf pr foreign?))))))))
+            (if (sf-get sf 'prop-history-seen)
+                (for (pr lost) (proposals-classify-noted! sf pr))
+                (for (pr lost) (proposals-classify! sf pr foreign?)))))
+        (sf-put! sf 'prop-history-seen #f)))))
 
 (define (proposals-sync! sf)
   ;; tell each agent about its proposals when they changed
@@ -1958,7 +2122,10 @@
   (sf-put! sf 'prop-counter 0)
   (sf-put! sf 'prop-tag #f)
   (sf-put! sf 'prop-sent #f)
-  (sf-put! sf 'prop-polled #f))
+  (sf-put! sf 'prop-polled #f)
+  (sf-put! sf 'prop-history #f)
+  (sf-put! sf 'prop-history-seen #f)
+  (sf-put! sf 'prop-edited '()))
 
 (define (list-head* l n)
   (if (or (null? l) (<= n 0)) '() (cons (car l) (list-head* (cdr l) (- n 1)))))
@@ -2009,6 +2176,8 @@
     (prop-put! pr 'old old-sts)
     (prop-put! pr 'new new-sts)
     (prop-put! pr 'ndiffs (stree-version-count markup))
+    (prop-put! pr 'vnodes (map tm->stree (version-nodes (tree-ref body p))))
+    (tree-set-note (tree-ref body p) (proposal-note pr))
     (let ((l (cons pr (or (sf-get sf 'proposals) '()))))
       ;; (the resolved ones are kept for a while, so that the agent hears of them)
       (sf-put! sf 'proposals
@@ -2243,6 +2412,7 @@
         ((func? msg 'withdraw)
          (when (not (and (list? msg) (= (length msg) 2) (string? (cadr msg))))
            (throw (quote malformed)))
+         (proposals-after-history! sf)
          (with pr (proposal-find sf (cadr msg))
            (when (and pr (proposal-pending? pr) (== (prop-get pr 'owner) (peer-id peer)))
              (proposal-resolve! sf pr 'old "withdrawn"))))

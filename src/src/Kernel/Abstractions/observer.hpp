@@ -36,6 +36,7 @@ typedef list<int> path;
 
 #define ADDENDUM_PLAYER     1
 #define ADDENDUM_AUTO_ID    2
+#define ADDENDUM_NOTE       3
 
 /******************************************************************************
 * The observer class
@@ -169,6 +170,9 @@ path obtain_position (observer o);
 observer tree_addendum_new (tree t, int kind, blackbox bb, bool keep= true);
 void tree_addendum_delete (observer o);
 void tree_addendum_delete (tree t, int type);
+void tree_addenda_copy (tree from, tree to);
+string tree_note (tree t);
+void tree_set_note (tree t, string s);
 
 observer search_observer (tree& ref, int type);
 bool admits_edit_observer (tree t);

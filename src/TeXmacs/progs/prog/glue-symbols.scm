@@ -480,6 +480,8 @@
 "tree-observe"
 "tree-pointer-detach"
 "tree-pointer->tree"
+"tree-note"
+"tree-set-note"
 "current-link-types"
 "get-locus-rendering"
 "set-locus-rendering"

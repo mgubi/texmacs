@@ -3643,6 +3643,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-note <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_note> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-set-note <scm-arg|tree> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|tree_set_note> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(current-link-types)>
 <explain-synopsis|no synopsis>
   <|explain>

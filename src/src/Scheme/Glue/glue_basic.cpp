@@ -5977,6 +5977,34 @@ tmg_tree_pointer_2tree (tmscm arg1) {
 }
 
 tmscm
+tmg_tree_note (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-note");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_note (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_set_note (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-set-note");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-set-note");
+
+  tree in1= tmscm_to_tree (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree_set_note (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_current_link_types () {
   // TMSCM_DEFER_INTS;
   list_string out= all_link_types ();
@@ -13627,6 +13655,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-observe",  tmg_tree_observe, 2, 0, 0);
   tmscm_install_procedure ("tree-pointer-detach",  tmg_tree_pointer_detach, 1, 0, 0);
   tmscm_install_procedure ("tree-pointer->tree",  tmg_tree_pointer_2tree, 1, 0, 0);
+  tmscm_install_procedure ("tree-note",  tmg_tree_note, 1, 0, 0);
+  tmscm_install_procedure ("tree-set-note",  tmg_tree_set_note, 2, 0, 0);
   tmscm_install_procedure ("current-link-types",  tmg_current_link_types, 0, 0, 0);
   tmscm_install_procedure ("get-locus-rendering",  tmg_get_locus_rendering, 1, 0, 0);
   tmscm_install_procedure ("set-locus-rendering",  tmg_set_locus_rendering, 2, 0, 0);

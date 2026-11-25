@@ -216,3 +216,41 @@ tree_addendum_delete (tree t, int type) {
   bool deleted= tree_addendum_delete (o, type);
   if (deleted) tree_addendum_delete (t, type);
 }
+
+/******************************************************************************
+* Addenda which go with the copies made for the history
+******************************************************************************/
+
+void
+tree_addenda_copy (tree from, tree to) {
+  // the addenda of the node from which the copy to of from keeps: the
+  // numbers of the automatic labels and the note (see copy_for_undo)
+  if (is_nil (from->obs)) return;
+  blackbox bb;
+  if (from->obs->get_contents (ADDENDUM_AUTO_ID, bb))
+    (void) tree_addendum_new (to, ADDENDUM_AUTO_ID, bb, false);
+  if (from->obs->get_contents (ADDENDUM_NOTE, bb))
+    (void) tree_addendum_new (to, ADDENDUM_NOTE, bb, false);
+}
+
+/******************************************************************************
+* Notes: a string attached to a node of a tree, for programs. A note goes
+* with the node and is lost when the node leaves the document (assigned,
+* removed, split or joined); a plain copy has none, but the copies which the
+* history keeps have the notes of the nodes they copy, so that a node which
+* an undo or a redo puts back has its note again. A note is not saved.
+******************************************************************************/
+
+string
+tree_note (tree t) {
+  blackbox bb;
+  if (is_nil (t->obs) || !t->obs->get_contents (ADDENDUM_NOTE, bb)) return "";
+  return open_box<string> (bb);
+}
+
+void
+tree_set_note (tree t, string s) {
+  tree_addendum_delete (t, ADDENDUM_NOTE);
+  if (N(s) != 0)
+    (void) tree_addendum_new (t, ADDENDUM_NOTE, close_box<string> (s), false);
+}
