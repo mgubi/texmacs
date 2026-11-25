@@ -477,7 +477,15 @@ process hosts, or only headless ones), the agent edits directly, as before.
   the first part; the block of a resolved proposal edited in place (even
   by a word) no longer stands for it, so an undo of that edit and then of
   the resolution does not make it pending again (its markup is then plain
-  version markup and the status stays).
+  version markup and the status stays); a pending difference edited by
+  the person before it is resolved (a typo fixed inside it) no longer
+  matches what the proposal recorded, so an undo of its resolution leaves
+  the status as it was (also on upsilon_texmacs before #960, where it reads
+  `accepted` with the markup back), and an undo of another proposal's
+  block-level Keep makes it `resolved`; the redo of a Keep that rebuilt
+  the body gives the proposals resolved inside their blocks `resolved`
+  rather than their outcome (only block-level proposals get their note
+  back).
   A patch of an agent that touches blocks
   with version markup is refused (`pending`).
 - **The host's records** (`shared-proposals`): id (`p1.3fa0c2d1`...: a number and a tag of 8 random hex digits drawn by each host, not its token, so that the ids of two hosts almost surely differ), owner, status
