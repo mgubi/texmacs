@@ -8,7 +8,11 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include <QtTest/QtTest>
+#include "tm_test.hpp"
+
+// PDFHummus is built only with Qt or Cocoa (PDF_RENDERER); the Vue builds
+// export through MuPDF and skip these tests
+#ifdef PDF_RENDERER
 #include <new>
 #include <string>
 #include <cstring>
@@ -18,15 +22,6 @@
 #include "Pdf/PDFWriter/InputStringStream.h"
 #include "Pdf/PDFWriter/InputByteArrayStream.h"
 
-class TestHummusFonts: public QObject {
-  Q_OBJECT
-
-private slots:
-  void test_cff_encodings_info ();
-  void test_cff_encoding_ranges ();
-  void test_type1_ps_string ();
-};
-
 // A custom CFF encoding of no codes (format 1, no ranges: STIX Two,
 // Libertinus, EB Garamond) left mEncodingsCount undefined, and
 // CFFEmbeddedFontWriter::WriteEncodings read that many codes through
@@ -34,16 +29,16 @@ private slots:
 // else before, as the heap does (written through a volatile pointer: an
 // ordinary memset before the constructor may be dropped by the compiler,
 // GCC's -flifetime-dse).
-void
-TestHummusFonts::test_cff_encodings_info () {
+static void
+test_cff_encodings_info () {
   alignas (EncodingsInfo) unsigned char mem[sizeof (EncodingsInfo)];
   volatile unsigned char* v= mem;
   for (size_t i=0; i<sizeof (mem); i++) v[i]= 0xAA;
   EncodingsInfo* e= new (mem) EncodingsInfo ();
-  QCOMPARE ((int) e->mEncodingsCount, 0);
-  QVERIFY (e->mEncoding == NULL);
-  QCOMPARE ((long long) e->mEncodingStart, 0LL);
-  QCOMPARE ((long long) e->mEncodingEnd, 0LL);
+  CHECK_EQ ((int) e->mEncodingsCount, 0);
+  CHECK (e->mEncoding == NULL);
+  CHECK_EQ ((long long) e->mEncodingStart, 0LL);
+  CHECK_EQ ((long long) e->mEncodingEnd, 0LL);
   e->~EncodingsInfo ();
 }
 
@@ -69,28 +64,31 @@ encoding_of (unsigned char* data, unsigned long n, int& count, std::string& code
   codes.clear ();
   InputByteArrayStream in (data, n);
   CFFFileInput cff;
-  QCOMPARE ((int) cff.ReadCFFFile (&in), (int) PDFHummus::eSuccess);
+  int status= (int) cff.ReadCFFFile (&in);
+  CHECK_EQ (status, (int) PDFHummus::eSuccess);
+  if (status != (int) PDFHummus::eSuccess) return;
   EncodingsInfo* e= cff.mTopDictIndex[0].mEncoding;
-  QVERIFY (e != NULL);
+  CHECK (e != NULL);
+  if (e == NULL) return;
   count= e->mEncodingsCount;
   codes.clear ();
   for (int i=0; i<count && e->mEncoding != NULL; i++)
     codes += (char) e->mEncoding[i];
 }
 
-void
-TestHummusFonts::test_cff_encoding_ranges () {
+static void
+test_cff_encoding_ranges () {
   int count; std::string codes;
   encoding_of (test_cff, sizeof (test_cff), count, codes);
-  QCOMPARE (count, 4);
-  QCOMPARE (QString::fromStdString (codes), QString ("ABCX"));
+  CHECK_EQ (count, 4);
+  CHECK_EQ (string (codes.c_str ()), string ("ABCX"));
   // the same encoding with no ranges (as in STIX Two): no codes
   unsigned char empty[sizeof (test_cff)];
   memcpy (empty, test_cff, sizeof (test_cff));
-  QCOMPARE ((int) empty[60], 1);   // format 1, at the offset of the encoding
+  CHECK_EQ ((int) empty[60], 1);   // format 1, at the offset of the encoding
   empty[61]= 0;                    // nRanges
   encoding_of (empty, sizeof (empty), count, codes);
-  QCOMPARE (count, 0);
+  CHECK_EQ (count, 0);
 }
 
 // A Type 1 font of one segment of clear text (then an empty binary one and
@@ -106,8 +104,8 @@ pfb_segment (int type, const std::string& data) {
   return s + data;
 }
 
-void
-TestHummusFonts::test_type1_ps_string () {
+static void
+test_type1_ps_string () {
   std::string clear=
     "%!PS-AdobeFont-1.0: TestFont 001\n"
     "11 dict begin\n"
@@ -123,13 +121,23 @@ TestHummusFonts::test_type1_ps_string () {
   InputStringStream in (pfb);
   Type1Input t1;
   t1.ReadType1File (&in);   // (the font has no Private dictionary)
-  QCOMPARE (QString::fromStdString (t1.mFontInfoDictionary.Notice),
-            QString ("a(b) \\c Ad"));
-  QCOMPARE (QString::fromStdString (t1.mFontInfoDictionary.Copyright),
-            QString (""));
-  QCOMPARE (QString::fromStdString (t1.mFontDictionary.FontName),
-            QString ("TestFont"));
+  CHECK_EQ (string (t1.mFontInfoDictionary.Notice.c_str ()),
+            string ("a(b) \\c Ad"));
+  CHECK_EQ (string (t1.mFontInfoDictionary.Copyright.c_str ()), string (""));
+  CHECK_EQ (string (t1.mFontDictionary.FontName.c_str ()),
+            string ("TestFont"));
 }
 
-QTEST_MAIN(TestHummusFonts)
-#include "hummus_fonts_test.moc"
+#else
+static void test_cff_encodings_info () { SKIP ("no PDFHummus in this build"); }
+static void test_cff_encoding_ranges () { SKIP ("no PDFHummus in this build"); }
+static void test_type1_ps_string () { SKIP ("no PDFHummus in this build"); }
+#endif
+
+int
+main () {
+  RUN (test_cff_encodings_info);
+  RUN (test_cff_encoding_ranges);
+  RUN (test_type1_ps_string);
+  return test_report ();
+}
