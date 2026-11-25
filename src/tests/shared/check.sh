@@ -45,7 +45,8 @@
 #   agentredo   the person undoes past the change of the agent and redoes everything:
 #               the outcomes come back; two proposal blocks joined stay pending
 #   agentcross  undo of unrelated changes, a withdrawal after it, changes crossing a
-#               Keep: nothing confidently wrong, nothing lost
+#               Keep, markup of another proposal pasted into a resolved block:
+#               nothing confidently wrong, nothing lost
 #   agentplain  a participant that is a person (marked so by the host) is not filtered
 #   agentmode   the mode chosen by the person is kept when the file is handed over and comes back
 #   agenthost   the person's process with proposals of the agent closes the file: the agent's

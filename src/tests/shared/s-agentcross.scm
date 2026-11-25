@@ -4,7 +4,8 @@
 ;; blocks; a withdrawal after it takes nothing else away; undo and redo of
 ;; two resolutions never give a confident wrong answer; a change of the
 ;; agent (or of a person) that crosses a Keep in another block, or in the
-;; same block, is not lost.
+;; same block, is not lost; the markup of another proposal copied or moved
+;; by hand into the block of a resolved one does not make it pending again.
 (load (string-append (getenv "SH_DIR") "/lib.scm"))
 
 (define (has-version? st)
@@ -103,6 +104,57 @@
 (define (text-has? i s)
   (and i (>= i 0) (>= (string-search-forwards s 0 (object->string (para-text i))) 0)))
 (define refused0 0)
+(define (keep-all! which)
+  (with-buffer (the-name) (archive-state) (start-editing) (version-retain-all which) (end-editing)) #t)
+(define (move-difference! from to cut?)
+  ;; the person copies (or cuts) the difference of the proposal @from and
+  ;; pastes it at the end of the block of @to
+  (with-buffer (the-name)
+    (archive-state)
+    (let ((vt (first-version (para (index-of from))))
+          (b (para (index-of to))))
+      (tree-select vt)
+      (if cut?
+          (begin (start-editing) (clipboard-cut "primary") (end-editing))
+          (clipboard-copy "primary"))
+      (selection-cancel)
+      (tree-go-to b :end)
+      (start-editing)
+      (clipboard-paste "primary")
+      (end-editing)))
+  #t)
+(define (paste-round n a b how)
+  ;; two word changes pending, @a kept New; the difference of @b copied or
+  ;; moved into the block of @a; a word typed elsewhere and undone: @a stays
+  ;; accepted, @how (then the markup is resolved with Retain all New)
+  (list
+   (wait-sync (sync-n n "b"))
+   (step (string-append a " " b) (and (== (status-of a) "pending") (== (status-of b) "pending")))
+   (act (sync-n n "keep") (check (string-append a ": Keep New") (keep-step! a 1)))
+   (step (sync-n n "settled") (== (status-of a) "accepted"))
+   (act (sync-n n "paste") (check "the difference moved" (move-difference! b a (== how 'accept))))
+   (timed-wait 600)
+   (act (sync-n n "type") (type! "Second paragraph." "Z"))
+   (timed-wait 600)
+   (act (sync-n n "undo") (step-undo!))
+   (timed-wait 600)
+   (act (sync-n n "check")
+        (check (string-append a ": still accepted after the undo") (== (status-of a) "accepted"))
+        (cond ((== how 'reject)
+               (check (string-append a ": Tools > Agents does not reject it")
+                      (not (shared-proposal-resolve! (the-name) (prop-id a) 'old))))
+              ((== how 'accept)
+               (check (string-append a ": Tools > Agents does not accept it")
+                      (not (shared-proposal-resolve! (the-name) (prop-id a) 'new))))
+              (else
+               (check "Keep Old on the difference in its block" (keep-in! (index-of a) 0)))))
+   (timed-wait 600)
+   (act (sync-n n "check b")
+        (check (string-append a ": accepted") (== (status-of a) "accepted"))
+        (check (string-append b ": not resolved by it") (!= (status-of b) "accepted")))
+   (act (sync-n n "clean") (keep-all! 1))
+   (step (sync-n n "clean") (not (version-in-doc?)))
+   (act (sync-n n "a") (sync-set! (sync-n n "a")))))
 
 (define (A-steps)
   (append
@@ -191,23 +243,35 @@
          (check "it is proposed" (list-or (map (lambda (i) (text-has? i "HelloXX")) (markup-blocks))))
          (check "p5: rejected" (== (status-of "p5") "rejected"))
          (sync-set! (sync-n 4 "a"))))
+   ;; 6. (the pending change of the agent of round 4 accepted) a resolved
+   ;; proposal whose block gets the markup of another one, copied or moved
+   ;; by hand, is not taken for an undone resolution: it stays accepted,
+   ;; Tools > Agents does not resolve it again, Keep Old there does not
+   ;; change it
+   (list (act "clean 6" (keep-all! 1)) (step "clean 6b" (not (version-in-doc?))))
+   (person! 61 (lambda () (insert-block! (para-count) "Alpha one.") (insert-block! (para-count) "Beta two.")))
+   (paste-round 61 "p7" "p8" 'reject)
+   (person! 62 (lambda () (insert-block! (para-count) "Gamma one.") (insert-block! (para-count) "Delta two.")))
+   (paste-round 62 "p9" "p10" 'keep-old)
+   (person! 63 (lambda () (insert-block! (para-count) "Eta one.") (insert-block! (para-count) "Theta two.")))
+   (paste-round 63 "p11" "p12" 'accept)
    ;; 5. a proposal with two differences; the participant is taken for a
    ;; person and edits that block while the host keeps New on the first
    ;; difference: the edit of the person is kept
    (person! 5 (lambda () (tree-assign (para (find-para "Second paragraph.")) "one two three four five six seven eight nine ten.")))
    (list
     (wait-sync (sync-n 5 "b"))
-    (step "p7" (== (status-of "p7") "pending"))
+    (step "p13" (== (status-of "p13") "pending"))
     (act "mark 5" (check "marked a person" (shared-treat-as-person! (the-name) (car (shared-file-agents (the-name))) #t))
          (sync-set! (sync-n 5 "marked")))
     (wait-sync (sync-n 5 "b-ready"))
     (act "pause 5" (set! refused0 (shared-stat 'refused)) (shared-pause! #t)
-         (check "p7: Keep New on the first" (keep-step! "p7" 1)) (sync-set! (sync-n 5 "ready")))
+         (check "p13: Keep New on the first" (keep-step! "p13" 1)) (sync-set! (sync-n 5 "ready")))
     (wait-sync (sync-n 5 "submitted"))
     (act "resume 5" (shared-pause! #f))
     (timed-wait 2500)
     (act "check 5" (check "the edit of the person is not refused" (== (shared-stat 'refused) refused0))
-         (check "the edit of the person is in" (text-has? (index-of "p7") "very "))
+         (check "the edit of the person is in" (text-has? (index-of "p13") "very "))
          (sync-set! (sync-n 5 "a"))))
    (list
     (wait-sync "b-done")
@@ -266,6 +330,18 @@
          (step "submitted 4" (> (shared-stat 'submitted) rb0))
          (act "sig 4" (sync-set! (sync-n 4 "submitted"))))
    (agent-hears 4 "p5" "rejected")
+   (list (wait-sync (sync-n 61 "p")) (step "61 there" (find-para "Beta two.")))
+   (propose-and-wait* 61 (lambda () (tree-assign (para (find-para "Alpha one.")) "Alpha big one."))
+                      (lambda () (tree-assign (para (find-para "Beta two.")) "Beta fine two.")))
+   (agent-hears 61 "p7" "accepted")
+   (list (wait-sync (sync-n 62 "p")) (step "62 there" (find-para "Delta two.")))
+   (propose-and-wait* 62 (lambda () (tree-assign (para (find-para "Gamma one.")) "Gamma big one."))
+                      (lambda () (tree-assign (para (find-para "Delta two.")) "Delta fine two.")))
+   (agent-hears 62 "p9" "accepted")
+   (list (wait-sync (sync-n 63 "p")) (step "63 there" (find-para "Theta two.")))
+   (propose-and-wait* 63 (lambda () (tree-assign (para (find-para "Eta one.")) "Eta big one."))
+                      (lambda () (tree-assign (para (find-para "Theta two.")) "Theta fine two.")))
+   (agent-hears 63 "p11" "accepted")
    (list (wait-sync (sync-n 5 "p")) (step "5 there" (find-para "one two three four five six seven eight nine ten.")))
    (propose-and-wait 5 (lambda () (tree-assign (para (find-para "one two three four five six seven eight nine ten."))
                                               "ONE two three four five six seven eight nine TEN.")))
