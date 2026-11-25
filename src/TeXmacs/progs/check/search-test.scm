@@ -1736,7 +1736,7 @@
     (with r (check-run (lambda () (thunk u)))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       r)))
 
 (define test-search-filter '(attr))

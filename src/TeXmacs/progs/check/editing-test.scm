@@ -118,7 +118,7 @@
         (check-report #f "the group" (object->string r)))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffers
@@ -166,7 +166,7 @@
     (buffer-close u)
     (check-false (buffer-exists? u))
     (check-false (in? u (buffer-list)))
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (check= (current-buffer) old)))
 
 ;; A buffer which has a view can be renamed to a relative name, and to a
@@ -370,7 +370,7 @@
     (buffer-close u2)
     (check-false (buffer-exists? u1))
     (check-false (buffer-exists? u2))
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (check= (current-buffer) old)))
 
 ;; Closing an embedded TeXmacs widget (the console, a dialog with a
@@ -494,7 +494,7 @@
         (check-report #f "the group" (object->string r))))
     (buffer-close w)
     (check-false (buffer-exists? w))
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (check= (current-buffer) old)))
 
 ;; What was typed in a named texmacs-input stays reachable by undo whatever
@@ -550,7 +550,7 @@
     (for (u (list g h))
       (when (buffer-exists? u) (buffer-close u))
       (check-false (buffer-exists? u)))
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (check= (current-buffer) old)))
 
 ;; A dialog whose build fails ends its opening at once, with the
@@ -640,7 +640,7 @@
     (for (u (list d a o i l))
       (when (buffer-exists? u) (buffer-close u))
       (check-false (buffer-exists? u)))
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (check= (current-buffer) old)))
 
 ;; A document written to a .tm file and loaded: the body, the style and the
@@ -679,7 +679,7 @@
     (check= (cursor) '(0 0 0))
     (buffer-close f)
     (check-false (buffer-exists? f))
-    (when (buffer-exists? old) (switch-to-buffer old)))
+    (check-restore-buffer old))
   ;; a long document: loading it does not go through all its subtrees (the
   ;; test for an encrypted document, in load-buffer-open, overflowed the
   ;; Guile stack from a few thousand paragraphs on, #418)
@@ -709,7 +709,7 @@
     (check-false (buffer-modified? f))
     (buffer-close f)
     (check-false (buffer-exists? f))
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; The question before a large source file (#710): a source-code or
 ;; plain-text file of 5 MB or more. The predicate is tested at the threshold
@@ -761,7 +761,7 @@
     (check= (current-buffer) f)
     (check-true (buffer-exists? f))
     (buffer-close f)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; The files of the system (load-buffer-from-system) ask before the startup
 ;; buffer is taken or a window is made, with the question stubbed to keep its
@@ -828,7 +828,7 @@
     (set-large-load-test-interactive! #f)
     (buffer-pretend-saved u)
     (startup-buffer-release)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting
@@ -2159,7 +2159,7 @@
     (for (x (buffer-list))
       (when (nin? x before) (buffer-close x)))
     (startup-buffer-release)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; A file given by the system (the Finder, the command line, the dialogs of
 ;; files) is named as it is, by system-literal->url (#905): a star is not a
@@ -2236,7 +2236,7 @@
       (system-setenv var ""))
     (for (x (buffer-list))
       (when (nin? x before) (buffer-close x)))
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; The initial environment belongs to the buffer (#528): a change made in
 ;; one view of it (init-env, init-default) is in its other views, in
@@ -2349,7 +2349,7 @@
       (when (nin? b before)
         (buffer-pretend-saved b)
         (buffer-close b)))
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; The style belongs to the buffer too (#535): a change of the style made
 ;; in one view (set-style-tree, add-style-package, remove-style-package) is
@@ -2430,7 +2430,7 @@
       (when (nin? b before)
         (buffer-pretend-saved b)
         (buffer-close b)))
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 (define (test-export)
   (check-group "export")

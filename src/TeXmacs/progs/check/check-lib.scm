@@ -126,6 +126,34 @@
 (define-public-macro (check-error expr key)
   `(check-raises ,(object->string expr) (lambda () ,expr) ,key))
 
+;; The buffer which was current before a check opened its own: buffer-close
+;; of the check's buffer already shows the most recent view of another one
+;; in the window, often that of @buf, and switch-to-buffer to the buffer
+;; shown makes a second view and hides the first (#925); switch-to-buffer*
+;; does nothing for the current buffer, goes to the window of a buffer
+;; shown elsewhere, and otherwise shows a view of @buf not in a window.
+(tm-define (check-restore-buffer buf)
+  (:synopsis "Make @buf current again without giving it a new view")
+  (when (buffer-exists? buf) (switch-to-buffer* buf)))
+
+;; The views of a buffer, to compare before and after a suite: a suite
+;; leaves the buffer where it started with the views it had
+(tm-define (check-buffer-views buf)
+  (:synopsis "The views of @buf, as sorted strings")
+  (if (buffer-exists? buf)
+      (sort (map url->string (buffer->views buf)) string<?)
+      '()))
+
+;; A window which is killed keeps its views, hidden: a check which made one
+;; of @buf (a new window, or the deletion of a view, which shows another
+;; buffer) deletes it afterwards
+(tm-define (check-delete-new-views buf views)
+  (:synopsis "Delete the views of @buf not among @views and not in a window")
+  (when (buffer-exists? buf)
+    (for (v (buffer->views buf))
+      (when (and (nin? v views) (url-none? (view->window-url v)))
+        (view-delete v)))))
+
 (tm-define (check-end)
   (:synopsis "End the test suite and return its number of failures")
   (display* "Total: " (number->string check-count) " checks, "

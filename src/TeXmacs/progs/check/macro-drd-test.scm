@@ -120,7 +120,7 @@
         (check-report #f "the group" (object->string r)))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (doc-with style body . init)
   ;; a document of style @style (a list) with @body and the macros @init

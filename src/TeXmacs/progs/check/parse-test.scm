@@ -627,7 +627,7 @@
                        (loop (cdr ls) (cdr p) (cons (car p) acc)))))))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       r)))
 
 (define-macro (check-lines lan . l)

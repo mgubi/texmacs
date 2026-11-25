@@ -128,7 +128,7 @@
       (graphics-forget-states)
       (buffer-pretend-saved u)
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (with-graphics vars objs thunk)
   ;; a graphics with the variables @vars and the objects @objs, with the
