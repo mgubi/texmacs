@@ -13,7 +13,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (convert latex tmtex-pdflatex)
+  (:use (check check-lib)
+        (convert latex tmtex-pdflatex)
         (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
@@ -177,6 +178,22 @@
 ;; the number of failures of a suite; an error which escapes the suite
 ;; counts as one, and does not stop the suites after it
 (define (suite-failures suite)
+  ;; a suite leaves the buffer where it started with the views it had: a
+  ;; view it added stays hidden, and makes the views (and the undo
+  ;; histories) of the suites after it differ (#925)
+  (let* ((buf (current-buffer))
+         (views (check-buffer-views buf))
+         (n (suite-failures* suite))
+         (after (check-buffer-views buf)))
+    (if (== after views) n
+        (begin
+          (display* "  FAILED [" (car suite) "] the views of the buffer "
+                    "where the suite started: expected "
+                    (object->string views) ", got "
+                    (object->string after) "\n")
+          (+ n 1)))))
+
+(define (suite-failures* suite)
   (let ((f (eval (cadr suite)))
         (kind (caddr suite)))
     (set! integration-failure-total 0)

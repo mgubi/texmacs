@@ -53,6 +53,7 @@ Logs are in `tests/build/<runner>/`. Some references depend on the machine's fon
 - A suite is a module `TeXmacs/progs/check/<name>-test.scm` using `(check check-lib)` and defining `(<name>-test-failures)`: `(check-suite "name")`, groups with `(check-group "...")`, checks with `check=`, `check-true`, `check-false`, `check-error`, then `(check-end)`, which returns the number of failures. Wrap each group so that an error counts as one failure (see `run-group` in `plugins-test.scm` or `with-buffer-body` in `editing-test.scm`).
 - Register it in `check-master.scm` (the `:use` list and `regression-suites`). The order matters: suites run in ONE process, so a suite must leave no state behind:
   - close every buffer it opens, including buffers renamed by `save-buffer-as` (compare `(buffer-list)` before and after);
+  - go back to the buffer where it started with `(check-restore-buffer old)`, not `switch-to-buffer`: after `buffer-close` that buffer is often current again, and `switch-to-buffer` would give it a second view (#925); the runner fails a suite which changes the views of its starting buffer;
   - restore every global it changes; never call `lazy-keyboard-force` or anything that loads all keyboard maps;
   - after `buffer-set-body`, run `(archive-state) (start-editing) (end-editing) (clear-undo-history)` before testing undo;
   - word completion uses all open buffers, and buffer indices change with the number of open buffers: do not depend on them;

@@ -888,7 +888,7 @@
       (check= (current-buffer) f)
       (check= (cursor) '(3 0))
       (buffer-close f)
-      (switch-to-buffer here)
+      (check-restore-buffer here)
       ;; a relative link: it names the file of the directory of the buffer
       ;; where it was followed, also when the buffer has changed before the
       ;; answer (a decoy of the same name is in the directory of the other)
@@ -917,7 +917,7 @@
         (system-remove decoy)
         (system-remove other))
       (set-large-load-test-interactive! #f)
-      (switch-to-buffer here))))
+      (check-restore-buffer here))))
 
 ;; A link by a file: url loads the file, as the link by the name of the file
 ;; does, and applies its query (the line, the word) or its anchor; it was
@@ -952,7 +952,7 @@
     (check= (url->stree (system->url (url->system (system->url (file-url f "")))))
             (url->stree (system->url (file-url f ""))))
     (buffer-close (current-buffer))
-    (switch-to-buffer here)
+    (check-restore-buffer here)
     ;; a file already open is not opened again by a link to it
     (load-browse-buffer f)
     (let ((open (length (buffer-list))))
@@ -961,7 +961,7 @@
       (check= (url->stree (current-buffer)) (url->stree f))
       (check= (cursor) '(2 0))
       (buffer-close (current-buffer))
-      (switch-to-buffer here))
+      (check-restore-buffer here))
     ;; from a buffer of the web, a file: link stays local (the load is
     ;; stubbed, nothing is fetched)
     (let ((loaded '()))
@@ -979,7 +979,7 @@
       (check= (url->system (url-tail (current-buffer))) "file query.scm")
       (check= (cursor) '(2 1))
       (buffer-close (current-buffer))
-      (switch-to-buffer here)
+      (check-restore-buffer here)
       (system-remove g))
     ;; the anchor of a document
     (write-doc "file-anchor.tm" '("article") '()
@@ -988,7 +988,7 @@
     (check= (url->system (url-tail (current-buffer))) "file-anchor.tm")
     (check= (cursor) '(0 0 1 1))
     (buffer-close (current-buffer))
-    (switch-to-buffer here)
+    (check-restore-buffer here)
     ;; a large source file asks the question, which names the file
     (let* ((line (apply string-append
                         (make-list 40 "(define (f x) (+ x 1111111111111111111111111111111111111))   ")))
@@ -1019,7 +1019,7 @@
       (check= (cursor) '(3 0))
       (set-large-load-test-interactive! #f)
       (buffer-close (current-buffer))
-      (switch-to-buffer here))))
+      (check-restore-buffer here))))
 
 ;; The loci of a typeset document: their identifiers are on their bodies,
 ;; and the links between them are found from either end.

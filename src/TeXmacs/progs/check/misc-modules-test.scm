@@ -137,7 +137,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 ;; A position of the cursor history whose buffer was closed is forgotten,
 ;; not read
@@ -1585,7 +1585,7 @@
         (if (and old-view (in? old-view (view-list))
                  (in? old-win (window-list)))
             (window-set-view old-win old-view #t)
-            (when (buffer-exists? old) (switch-to-buffer old)))))
+            (check-restore-buffer old))))
     (check= (buffer-list) buffers)
     (check= (window-layout) layout)))
 
