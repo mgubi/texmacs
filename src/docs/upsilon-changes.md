@@ -12,6 +12,15 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 26 November 2026
+
+- **Sessions: the size of an image without Qt**: a PNG which a session
+  sends without a size (the plots of Sage, gnuplot's PNG output) is
+  inserted at its size in pixels in the Vue and Cocoa applications too; it
+  was its size scaled to 300 dpi, three times too large for the 100-dpi
+  plots of Sage (790 x 440 pixels became 2367 x 1317). The image effects
+  are computed at the pixel size of the image, as with Qt (#969).
+
 ## 25 November 2026
 
 - **Keyboard: a key typed just after a dead key**: a key typed less than

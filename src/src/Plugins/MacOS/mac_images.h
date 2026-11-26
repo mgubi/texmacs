@@ -19,6 +19,7 @@
   || !defined(AC_QT_MAJOR_VERSION) || AC_QT_MAJOR_VERSION < 6
 bool mac_supports (url img_file) ;
 bool mac_image_size (url img_file, int& w, int& h) ;
+bool mac_native_image_size (url img_file, int& w, int& h) ;
 void mac_image_to_png (url img_file, url png_file, int w, int h) ;
 void mac_ps_to_pdf (url ps_file, url pdf_file) ;
 #endif

@@ -195,6 +195,16 @@ mupdf_image_size (url u, int& w, int& h) {
   return w > 0 && h > 0;
 }
 
+bool
+mupdf_native_image_size (url u, int& w, int& h) {
+  // the size of a bitmap in pixels (that of the fz_image, as
+  // mupdf_image_size gives it); false for the formats without a pixel grid
+  string suf= locase_all (suffix (u));
+  if (suf == "pdf" || suf == "svg" || suf == "ps" || suf == "eps")
+    return false;
+  return mupdf_image_size (u, w, h);
+}
+
 fz_pixmap*
 mupdf_new_pixmap (int w, int h) {
   fz_context* ctx= mupdf_context ();
