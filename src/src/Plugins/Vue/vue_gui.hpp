@@ -16,6 +16,7 @@
 #include "font.hpp"
 #include "vue_widget.hpp"
 #include "clay.h"
+#include "wheel_steps.hpp" // qt_wheel_axis
 
 /******************************************************************************
 * Themes
@@ -116,6 +117,9 @@ struct vue_input_state {
                            // captures the wheel gets (see wheel_event)
   double wheel_over_x, wheel_over_y;
   time_t wheel_smooth_time;
+  // the fractions of a single step carried to the next event, as by the
+  // scroll bars of the Qt port (wheel_like_qt in vue_gui.cpp)
+  qt_wheel_axis wheel_qt_x, wheel_qt_y;
   // the wheel for the Clay scroll containers, in units of Clay, applied
   // once before the next layout (see push_wheel)
   double clay_wheel_x, clay_wheel_y;

@@ -4120,6 +4120,17 @@ static const time_t vue_repaint_dt= 16;
 * wheel_glides) the speed of the fingers is estimated from the events and,
 * when they stop above wheel_launch_speed, the view goes on with that
 * velocity, decaying exponentially with the time constant wheel_tau.
+*
+* On macOS (not in a browser) the wheel scrolls as in the Qt port instead
+* (wheel_like_qt, issue #971): there a notch was travelled over 45 ms, and
+* notches which came fast were taken for a trackpad (#373), which made the
+* wheel feel sluggish beside the Qt port. SDL rounds the deltas of a mouse
+* wheel (no precise deltas) to whole numbers and leaves those of a trackpad
+* fractional, so a stream is a trackpad once one of its deltas has a
+* fraction, and whole deltas which open a stream are a wheel, whatever
+* their timing. Each event then scrolls at once what QScrollBar scrolls in
+* the Qt port (wheel_steps.hpp): a notch three single steps of the view,
+* a trackpad an angle delta of twice its scrolling delta in points.
 ******************************************************************************/
 
 static const double wheel_tau= 350.0;          // ms: the glide of a trackpad
@@ -4253,6 +4264,13 @@ static const bool wheel_system_momentum= false;
 static const bool wheel_bursts_are_swipes= true;
 #else
 static const bool wheel_bursts_are_swipes= false;
+#endif
+
+// does the wheel scroll as in the Qt port (see above)?
+#if defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
+static const bool wheel_like_qt= true;
+#else
+static const bool wheel_like_qt= false;
 #endif
 
 // does the view glide when the events of a trackpad stop? Not where the
@@ -4393,6 +4411,40 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
   return dt;
 }
 
+// a wheel event as in the Qt port (wheel_like_qt, see above): the deltas
+// x, y of SDL are whole numbers of lines for a mouse wheel (the delta of
+// the NSEvent, rounded away from zero) and the delta of the NSEvent for a
+// trackpad, a tenth of its scrolling delta in points. The view is the one
+// of the window less its bars, as in wheel_notch_step_of
+static void
+wheel_event_qt (vue_window win, double x, double y) {
+  vue_input_state& in= win->input;
+  in.wheel_ambiguous= false;
+  in.wheel_over_x= in.wheel_over_y= 0;
+  in.wheel_est_x= in.wheel_est_y= 0; // the system glides, not us
+  if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
+  bool precise= in.wheel_precise; // for the rest of the stream
+  int ax= qt_wheel_mac_angle (10.0 * x, x, precise);
+  int ay= qt_wheel_mac_angle (10.0 * y, y, precise);
+  SI w, h;
+  win->get_size (w, h);
+  int vw= (int) max (100.0, ((double) w) / PIXEL);
+  int vh= (int) max (100.0, ((double) h) / PIXEL - 120.0);
+  // the bar of the dominant axis scrolls (QAbstractScrollArea::wheelEvent)
+  double dx= 0, dy= 0;
+  if (qt_wheel_horizontal (ax, ay))
+    dx= in.wheel_qt_x.scroll (ax, qt_wheel_single_step (vw), vw);
+  else if (ay != 0)
+    dy= in.wheel_qt_y.scroll (ay, qt_wheel_single_step (vh), vh);
+  // an editor which captures the wheel gets the pixel delta of the Qt port:
+  // the scrolling delta, of 20 points per line for a mouse wheel
+  double gf= precise ? 10.0 : 20.0;
+  double gx= gf * x * win->density, gy= gf * y * win->density;
+  dx *= win->density; dy *= win->density;
+  in.wheel_event_time= texmacs_time ();
+  if (dx != 0 || dy != 0 || gx != 0 || gy != 0) push_wheel (win, dx, dy, gx, gy);
+}
+
 // a wheel event: scroll and update the estimated speed of the wheel
 // (x, y are the deltas as reported by SDL, in wheel units; stamp is the
 // timestamp SDL gave the event, in ns, or in ms of the X server (see
@@ -4414,6 +4466,7 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     // is then a few pixels)
     in.wheel_pend_g= 1.0;
   }
+  if (wheel_like_qt) { wheel_event_qt (win, x, y); return; }
   // fractional deltas are a trackpad; so is a second event which follows
   // the opening one too soon for a wheel to have turned twice (see above)
   bool precise= ((x != floor (x) && !wheel_in_eighths (x)) ||

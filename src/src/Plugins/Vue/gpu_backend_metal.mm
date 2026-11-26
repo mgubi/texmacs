@@ -277,6 +277,7 @@ public:
   string description () { return device_name * " (Metal)"; }
   void begin_screen (int dw, int dh);
   void present (SDL_Window* w);
+  void present_in_transaction ();
   bool ready_to_present ();
   bool wakes_when_ready ();
   void detach (SDL_Window* w);
@@ -521,6 +522,10 @@ void
 metal_backend::present (SDL_Window* w) {
   (void) w;
   end_encoder ();
+  // (a layer of the Cocoa port presented last with a transaction: the
+  // drawable is presented with the command buffer again)
+  if (layer != nil && layer.presentsWithTransaction)
+    layer.presentsWithTransaction= NO;
   if (drawable != nil) {
     if (layer != nil) {
       double t= now_ms ();
@@ -554,6 +559,32 @@ metal_backend::present (SDL_Window* w) {
     drawable= nil;
   }
   flush ();
+}
+
+// A scroll of the Cocoa port moves the view of a canvas in the Core
+// Animation transaction of the event (-[TMDocView scrolled:]); the drawable
+// repainted for it was presented with the command buffer, which the
+// compositor showed a refresh later or so: in between the old pixels were
+// shown at the new place of the view, a flicker (issue #971). Presented
+// with the transaction, as Apple documents presentsWithTransaction: the
+// commands are committed, scheduled, and the drawable presented by the
+// thread, so that it shows with the move of the view. The property stays
+// set until the next present of the layer (present clears it), rather than
+// being changed within the transaction it applies to
+void
+metal_backend::present_in_transaction () {
+  end_encoder ();
+  if (drawable == nil || layer == nil) { flush (); return; }
+  if (!layer.presentsWithTransaction) layer.presentsWithTransaction= YES;
+  id<CAMetalDrawable> d= drawable;
+  drawable= nil;
+  id<MTLCommandBuffer> c= commands ();
+  flush ();
+  [c waitUntilScheduled];
+  [d present];
+  if (debug_present ())
+    fprintf (stderr, "PRESENT %.3f with the transaction, layer %p\n",
+             now_ms (), (__bridge void*) layer);
 }
 
 bool

@@ -44,7 +44,11 @@ file types), the color picker, printing (the PDF written by TeXmacs with
 PDFHummus, handed to the print panel of the system; PostScript only through
 Ghostscript), the clipboard (text, HTML, TeXmacs, images, both ways),
 drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
-(command-wheel zooms). The keys are named as in Qt (`space`, `S-tab`,
+(command-wheel zooms; the wheel and the trackpad scroll the distances of
+the Qt port, `-[TMView scrollLikeQt:]` and `Graphics/Gui/wheel_steps.hpp`:
+three single steps of a sixteenth of the view plus a point per notch,
+at once, and for a trackpad an angle delta of twice its scrolling delta
+in points, as `-[QNSView scrollWheel:]` and `QScrollBar` do, #971). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the
@@ -190,6 +194,11 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   screen", followed at once);
 * `TEXMACS_NS_GPU=0`: the canvases drawn by Core Graphics, as before the
   GPU renderer (see "Drawn by the GPU" below);
+* `TEXMACS_NS_SCROLL_SYNC=0`: the frame of a scroll drawn by the GPU is
+  presented at the next refresh, as the other repaints, and not with the
+  transaction which moves the view (see "Drawn by the GPU": a flicker);
+* `TEXMACS_NS_WHEEL=native`: the wheel scrolls as `NSScrollView` does (a
+  line of 10 points per notch), not as the Qt port;
 * `TEXMACS_NS_GLYPH_BOLD=<pixels>`: how much bolder the outlines are made
   (they are stroked too, that wide), instead of the preference
   `gpu glyph boldness` (0.22 by default: the weight of the bitmaps of
@@ -486,7 +495,17 @@ wait for the screen: a layer has three drawables, which the compositor
 gives back once it has shown them, and more repaints than refreshes
 blocked in `nextDrawable` (2 to 9 ms a step, depending on the pacing of
 the display); AppKit likewise draws the views marked as needing display
-once a refresh. `TEXMACS_NS_DEBUG_DRAW` prints the presents.
+once a refresh. `TEXMACS_NS_DEBUG_DRAW` prints the presents. A scroll
+is the exception (#971): it moves the view in the Core Animation
+transaction of its event (`-[TMDocView scrolled:]`), and its frame,
+presented at the next refresh, came a refresh or so after the move, so
+that the old pixels showed for a moment at the new place of the view, a
+flicker. `scrolled:` marks the canvas (`gpu_sync`) while it forces the
+update, and the store is then presented at once with the transaction
+(`metal_backend::present_in_transaction`: `presentsWithTransaction`, the
+commands committed and scheduled, the drawable presented by the main
+thread), no two such presents within 4 ms; the property is cleared by the
+next present of the link. `TEXMACS_NS_SCROLL_SYNC=0` turns it off.
 
 `TEXMACS_NS_BENCH=1` on the FAQ (Apple M4, retina_factor 2, ms a step;
 two runs of each):

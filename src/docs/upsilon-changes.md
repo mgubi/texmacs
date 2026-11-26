@@ -12,6 +12,22 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 26 November 2026
+
+- **macOS: the mouse wheel scrolls as in the Qt interface** (desktop
+  applications, Vue and Cocoa interfaces): a notch of a mouse wheel
+  scrolled 10 points in the Cocoa interface and was eased over a tenth of
+  a second in the Vue one, where notches turned fast were taken for a
+  trackpad and scrolled eight times less (#373 on macOS); now both scroll
+  as the Qt interface does, at once: three steps of a sixteenth of the
+  view per notch, whatever the acceleration, and a trackpad its movement
+  times a twentieth of that step (two and a half times the movement in a
+  view 800 points high), the momentum of the system included. In the Cocoa
+  interface the frame of a scroll drawn by the GPU is now shown with the
+  move of the view, which removes a flicker while scrolling
+  (`TEXMACS_NS_SCROLL_SYNC=0` goes back to the next refresh,
+  `TEXMACS_NS_WHEEL=native` to the scrolling of AppKit) (#971).
+
 ## 25 November 2026
 
 - **Keyboard: a key typed just after a dead key**: a key typed less than

@@ -11,6 +11,7 @@
 
 #include "MacOS/mac_cocoa.h"
 #include "ns_simple_widget.h"
+#include "wheel_steps.hpp"
 
 @interface TMView : NSView  <NSTextInputClient>
 {
@@ -18,6 +19,7 @@
   NSString *workingText;
   BOOL processingCompose;
   BOOL hasFocus;  // TeXmacs was told that the canvas has the focus
+  qt_wheel_axis wheelX, wheelY; // the wheel scrolls as in Qt (scrollWheel:)
 }
 - (void) setWidget: (widget_rep*) w;
 - (widget_rep*) widget;

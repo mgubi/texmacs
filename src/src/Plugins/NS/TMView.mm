@@ -30,6 +30,7 @@ hashmap<int,string> nskeymap("");
 @interface TMView (Private)
 - (void) focusIn;
 - (void) focusOut;
+- (BOOL) scrollLikeQt: (NSEvent*) event;
 @end
 
 /******************************************************************************
@@ -694,8 +695,10 @@ mouse_decode (unsigned int mstate) {
   if (as_bool (call ("wheel-capture?"))) {
     NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
-    coord2 wh = from_nspoint (NSMakePoint ([event scrollingDeltaX],
-                                           [event scrollingDeltaY]));
+    // the pixel delta of the Qt port: for a mouse wheel, 20 points a line
+    CGFloat f= [event hasPreciseScrollingDeltas]? 1.0: 20.0;
+    coord2 wh = from_nspoint (NSMakePoint (f * [event scrollingDeltaX],
+                                           f * [event scrollingDeltaY]));
     array<double> data;
     data << ((double) wh.x1) << ((double) wh.x2);
     the_gui->process_mouse (wid, "wheel", pt.x1, pt.x2,
@@ -708,7 +711,48 @@ mouse_decode (unsigned int mstate) {
                                       fabs (dy): 2.0))));
     call (dy > 0? "zoom-in": "zoom-out", object (f));
   }
-  else [super scrollWheel: event];
+  else if (![self scrollLikeQt: event]) [super scrollWheel: event];
+}
+
+// The wheel scrolls the document as in the Qt port (wheel_steps.hpp, issue
+// #971): a notch of a mouse wheel scrolls three single steps of the view (a
+// sixteenth of it plus a point) at once, whatever the acceleration, where
+// NSScrollView scrolled a line of 10 points; a trackpad an angle delta of
+// twice its scrolling delta, the system momentum included, without the
+// elastic bounce of AppKit. TEXMACS_NS_WHEEL=native leaves it to AppKit.
+- (BOOL) scrollLikeQt: (NSEvent*) event
+{
+  static int native= -1;
+  if (native < 0) {
+    const char* v= getenv ("TEXMACS_NS_WHEEL");
+    native= (v != NULL && strcmp (v, "native") == 0);
+  }
+  NSScrollView* sv= [self enclosingScrollView];
+  NSClipView* clip= [sv contentView];
+  if (native || sv == nil || clip == nil) return NO;
+  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:])
+  if ([event phase] == NSEventPhaseCancelled) return YES;
+  bool precise= [event hasPreciseScrollingDeltas];
+  int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
+  int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);
+  if (ax == 0 && ay == 0) return YES;
+  NSRect b= [clip bounds];
+  int vw= (int) b.size.width, vh= (int) b.size.height;
+  NSPoint o= b.origin;
+  // the bar of the dominant axis; a positive delta scrolls to the start
+  if (qt_wheel_horizontal (ax, ay))
+    o.x -= wheelX.scroll (ax, qt_wheel_single_step (vw), vw);
+  else
+    o.y -= wheelY.scroll (ay, qt_wheel_single_step (vh), vh);
+  o= [clip constrainBoundsRect: NSMakeRect (o.x, o.y, b.size.width,
+                                            b.size.height)].origin;
+  if (!NSEqualPoints (o, b.origin)) {
+    [clip scrollToPoint: o];
+    [sv reflectScrolledClipView: clip];
+    [sv flashScrollers];
+  }
+  else { wheelX.reset (); wheelY.reset (); } // at an end (as QAbstractSlider)
+  return YES;
 }
 
 - (BOOL) isFlipped
