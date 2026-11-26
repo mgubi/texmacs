@@ -5444,7 +5444,7 @@ public:
   bool autosize; // size the window to its contents at the next layout pass
   bool fits_contents; // it was sized to its contents (a dialog), and is
                       // again when they change size (refit_window)
-  bool quit_sent; // the quit command has been queued
+  bool quit_sent; // a close request is queued and has not run yet
   bool contents_destroyed; // SLOT_DESTROY went to the contents
   SI last_cw, last_ch; // contents size measured in the previous layout pass
   // the point on which the window is centred once it is sized to its
@@ -5468,6 +5468,7 @@ public:
   void write (slot s, blackbox index, widget w);
   void notify (slot s, blackbox new_val);
   void close_request ();
+  void run_close_request ();
   
   void do_layout ();
   bool post_layout ();
@@ -5477,6 +5478,9 @@ public:
 // the texmacs widget learns its window from the window around it (defined
 // with vue_texmacs_widget_rep below)
 static void texmacs_widget_set_window (vue_widget w, vue_window win);
+// the close request of a main window goes to the texmacs widget inside: its
+// command (safely-kill-window), false when the contents are no such widget
+static bool texmacs_widget_close_request (widget w);
 
 vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name,
                                                           command _quit, bool _popup)
@@ -5612,20 +5616,57 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
   }
 }
 
+// a close request, queued: it keeps the window widget alive until it runs
+class vue_close_request_command_rep: public command_rep {
+  widget w;
+public:
+  vue_close_request_command_rep (widget w2): w (w2) {}
+  void apply ();
+  tm_ostream& print (tm_ostream& out) { return out << "<close request>"; }
+};
+
 void
 vue_plain_window_widget_rep::close_request () {
-  // the close button of the window (or the close of a script): the quit
-  // command, which usually deletes the window (window_delete, which sends
-  // SLOT_DESTROY), queued only once. The main TeXmacs window has no quit
-  // command of its own: the request goes to its contents (the texmacs
-  // widget, whose command kills the window or quits), as the X11 port does
+  // the close button of the window, the close box of its tab, Cmd-W (or
+  // the close of a script): the request runs from the event loop, once
+  // however many came before it ran (a dialog would otherwise run its
+  // quit command twice, 03dd3f84e0). It does not delete the window by
+  // itself: its command decides, and may ask first ("Really close it?",
+  // safely-kill-window). The latch is only for the queued request: a
+  // close refused by the user leaves a window which closes again (#970:
+  // it was never reset, and the window could never be closed again)
   if (quit_sent) return;
+  if (is_nil (quit) && is_nil (wid)) return;
   quit_sent= true;
-  if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
-  else if (!is_nil (wid)) {
+  cmd_list= list (command (tm_new<vue_close_request_command_rep>
+                             (widget (this))), cmd_list);
+}
+
+void
+vue_plain_window_widget_rep::run_close_request () {
+  // the quit command of the window (a dialog), which usually deletes it
+  // (window_delete, which sends SLOT_DESTROY). The main TeXmacs window has
+  // no quit command of its own: the request goes to the command of its
+  // contents (the texmacs widget, whose command kills the window or quits,
+  // after asking for a modified document), as the X11 port does, and as
+  // the close button of Qt and Cocoa does. The contents are not
+  // destroyed: the window may stay (the user said no), and SLOT_DESTROY
+  // is for its deletion (#566)
+  if (!is_nil (quit)) quit ();
+  else if (texmacs_widget_close_request (wid)) {}
+  else if (!is_nil (wid) && !contents_destroyed) {
+    // other contents without a command: the request is their end
     contents_destroyed= true;
     wid->send (SLOT_DESTROY, blackbox ());
   }
+  quit_sent= false;
+}
+
+void
+vue_close_request_command_rep::apply () {
+  vue_plain_window_widget_rep* ww=
+    dynamic_cast<vue_plain_window_widget_rep*> (w.rep);
+  if (ww != NULL) ww->run_close_request ();
 }
 
 void
@@ -5979,6 +6020,7 @@ public:
   
   void do_layout ();
   friend void texmacs_widget_set_window (vue_widget w, vue_window win);
+  friend bool texmacs_widget_close_request (widget w);
 }; // class vue_plain_window_widget_rep
 
 widget texmacs_widget (int mask, command quit) {
@@ -6477,6 +6519,15 @@ layout_side_bar_content (int key, vue_widget content, Clay_Color bg,
   }
   Clay_ScrollContainerData sd= Clay_GetScrollContainerData (clip_id);
   if (sd.found) scroll_markers (clip_id, sd, bg, false, 2);
+}
+
+static bool
+texmacs_widget_close_request (widget w) {
+  if (is_nil (w)) return false;
+  vue_texmacs_widget_rep* tw= dynamic_cast<vue_texmacs_widget_rep*> (w.rep);
+  if (tw == NULL) return false;
+  if (!is_nil (tw->quit)) tw->quit ();
+  return true;
 }
 
 static void

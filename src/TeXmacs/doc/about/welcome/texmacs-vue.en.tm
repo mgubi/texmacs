@@ -301,6 +301,14 @@
 
   The additions to <TeXmacs> Upsilon, the newest first.
 
+  <paragraph|26 November 2026>
+
+  <\itemize>
+    <item>A document whose close was refused (<em|Really close it?>
+    answered <em|No>) can be closed again with the close box of its tab: it
+    did nothing on that document any more.
+  </itemize>
+
   <paragraph|21 November 2026>
 
   <\itemize>

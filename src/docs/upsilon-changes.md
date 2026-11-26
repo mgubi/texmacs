@@ -12,6 +12,14 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 26 November 2026
+
+- **A window whose close was refused closes again**: after "The document
+  has not been saved. Really close it?" answered No (for instance on a
+  master document whose inclusions were expanded), the close button, Cmd-W
+  and the close box of the tab did nothing on that window any more, also
+  after a save; they now ask again (#970, Vue).
+
 ## 25 November 2026
 
 - **Keyboard: a key typed just after a dead key**: a key typed less than
