@@ -101,7 +101,7 @@ string mupdf_get_icon_theme ();
 * skips them).
 ******************************************************************************/
 
-fz_image*  mupdf_image_from_file (const char* path);
+fz_image*  mupdf_image_from_file (const char* path, bool quiet= false);
 fz_image*  mupdf_image_from_pixmap (fz_pixmap* pix);
 fz_pixmap* mupdf_pixmap_from_image (fz_image* im);
 fz_pixmap* mupdf_new_pixmap (int w, int h); // cleared; 1x1 on failure
