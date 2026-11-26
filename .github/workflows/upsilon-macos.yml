@@ -4,7 +4,8 @@
 # the GPU with OpenGL and ThorVG, src/docs/vue-graphics-stack.md):
 #   * deps (for arm64 and x86_64, the latter under Rosetta): the libraries
 #     which do not come with macOS (libpng, FreeType, SDL3, SDL3_ttf,
-#     MuPDF, ThorVG) built for macOS 13 with packages/macos/build-deps.sh
+#     MuPDF, ThorVG; GnuTLS) built for macOS 13 with
+#     packages/macos/build-deps.sh, those of arm64 also for the Qt jobs
 #     (cached, until it, misc/thorvg/build-thorvg.sh or the version of
 #     macOS change; S7 is in the sources);
 #   * gs (for arm64 and x86_64): Ghostscript, the program gs which TeXmacs
@@ -26,12 +27,15 @@
 #     pre-release upsilon-latest of the repository, replaced at each build
 #     (its tag moved to the commit built):
 #     https://github.com/<owner>/<repo>/releases/tag/upsilon-latest
-#   * qt: the Qt 6 interface, with S7, for Apple silicon and the libraries
-#     of Homebrew (the job of ci.yml): built, the regression suites run,
-#     and "TeXmacs Upsilon Qt.app" (deployed with macdeployqt) kept as an artifact of
-#     the run. It is on its own: not in the disk images nor in the release.
+#   * qt: the Qt 6 interface, with S7, for Apple silicon and macOS 13: the
+#     libraries of the job deps and the official binaries of Qt 6.8 (not
+#     Homebrew's, which need the macOS of the runner, #972): built, the
+#     regression suites run, and "TeXmacs Upsilon Qt.app" (deployed with
+#     macdeployqt) kept as an artifact of the run and published with the
+#     others (not in the disk images);
 #   * qt-chez: the same Qt 6 build with Chez Scheme instead of S7
-#     (src/docs/chez/README.md), Chez from Homebrew: built, with its Scheme
+#     (src/docs/chez/README.md), Chez built from its sources for macOS 13
+#     (cached): built, with its Scheme
 #     modules, its boot image and the heap images of Chez in TeXmacs/boot
 #     (make CHEZ_MODULES), the regression suites and the startup checks run,
 #     and "TeXmacs Upsilon Qt Chez.app" deployed as the Qt one, checked to
@@ -350,27 +354,74 @@ jobs:
           path: distr/snapshots
           if-no-files-found: ignore
 
+  # The Qt 6 packages are made for macOS 13 as the Cocoa and Vue ones (#972):
+  # the libraries of the job deps for Apple silicon (libpng, FreeType,
+  # GnuTLS; the ones of the Vue port are not linked), the official binaries
+  # of Qt (universal, for macOS 12 and later: Qt 6.8, the last version of
+  # Qt with macOS 12 and the last open-source one of its LTS, installed by
+  # aqtinstall) and no library of Homebrew, which only runs on the macOS of
+  # its bottles (15 on these runners). configure --with-osx=MIN_MACOS gives
+  # the flags of the compilers and the LSMinimumSystemVersion of Info.plist,
+  # which the step "Minimum macOS" checks against every bundled file. Qt's
+  # own modules: base (with svg, printsupport, network, concurrent),
+  # websockets and imageformats, as in the Qt of Homebrew (cached).
   qt:
     name: macOS (Apple silicon, Qt 6)
-    needs: gs
+    needs: [deps, gs]
     runs-on: macos-15
     timeout-minutes: 60
+    env:
+      QT_VERSION: 6.8.3
+      QT_MODULES: qtwebsockets qtimageformats
     defaults:
       run:
         working-directory: src
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: brew install qt freetype libpng jpeg gnutls sqlite
+      - name: Place of the libraries
+        run: |
+          echo "DEPS=$RUNNER_TOOL_CACHE/texmacs-deps-maxs-arm64" >> "$GITHUB_ENV"
+          echo "MACOSX_DEPLOYMENT_TARGET=$MIN_MACOS" >> "$GITHUB_ENV"
 
+      # the libraries made by the job deps (the key of the job app)
+      - name: The libraries
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.DEPS }}
+          key: texmacs-deps-maxs-arm64-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+          fail-on-cache-miss: true
+
+      # (aqtinstall in a venv of its own, not install-qt-action, whose
+      # setup-python puts another python3 first in the PATH: the server of
+      # the suite web-files then did not start within its 10 seconds)
+      - name: Cache of Qt
+        id: qt-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.tool_cache }}/texmacs-qt
+          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}
+
+      - name: Qt
+        run: |
+          qt="$RUNNER_TOOL_CACHE/texmacs-qt"
+          if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
+            python3 -m venv "$RUNNER_TEMP/aqt"
+            "$RUNNER_TEMP/aqt/bin/pip" install -q 'aqtinstall==3.3.*'
+            "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
+          fi
+          echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
+          "$qt/$QT_VERSION/macos/bin/qmake" -query QT_VERSION
+
+      # only the libraries of DEPS for pkg-config (GnuTLS), not Homebrew's
       - name: Configure
         run: |
-          B=$(brew --prefix)
-          ./configure --with-scheme=s7 \
-            QMAKE="$(brew --prefix qt)/bin/qmake" \
-            CPPFLAGS="-I$(brew --prefix libpng)/include/libpng16 -I$B/include" \
-            LDFLAGS="-L$(brew --prefix libpng)/lib -L$B/lib"
+          PATH="$QT_ROOT_DIR/bin:$DEPS/bin:$PATH" \
+          PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" PKG_CONFIG_LIBDIR="$DEPS/lib/pkgconfig" \
+          ./configure --with-scheme=s7 --with-osx="$MIN_MACOS" \
+            --with-freetype="$DEPS/bin" --with-gnutls \
+            QMAKE="$QT_ROOT_DIR/bin/qmake" \
+            CPPFLAGS="-I$DEPS/include" LDFLAGS="-L$DEPS/lib"
 
       - name: Build
         run: make -j"$(sysctl -n hw.ncpu)"
@@ -396,22 +447,20 @@ jobs:
 
       - name: Bundle
         run: |
-          # bundle-libs.sh does not handle Homebrew's /opt/homebrew, so the
-          # libraries, frameworks and plugins are deployed with macdeployqt
+          # the frameworks and plugins of Qt deployed with macdeployqt (not
+          # bundle-libs.sh); the other libraries are static
           GSDIR="$RUNNER_TOOL_CACHE/texmacs-gs-arm64"
           make MACOS_BUNDLE MACOS_DEPLOY=none GS_BUNDLE="$GSDIR/bin/gs" \
             GS_LICENSES="$GSDIR/share/licenses/ghostscript"
-          "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
+          "$QT_ROOT_DIR/bin/macdeployqt" ../distr/TeXmacs.app
           # the name and the identity of Upsilon, signed again (ad hoc)
           name=$(packages/macos/upsilon-identity.sh ../distr/TeXmacs.app qt)
           rm -rf "../distr/$name.app"
           mv ../distr/TeXmacs.app "../distr/$name.app"
-          # Homebrew's libraries target macOS 15 (the Sequoia bottles): the
-          # minimum is 15.0, not the macOS of the runner, which configure
-          # puts there (#733); --with-osx would also change the flags of
-          # the build, the step "Minimum macOS" checks the libraries
-          plutil -replace LSMinimumSystemVersion -string 15.0 \
-            "../distr/$name.app/Contents/Info.plist"
+          # the minimum of configure --with-osx, not the macOS of the runner
+          # (#733, #972)
+          min=$(plutil -extract LSMinimumSystemVersion raw "../distr/$name.app/Contents/Info.plist")
+          [ "$min" = "$MIN_MACOS" ] || { echo "error: LSMinimumSystemVersion $min, not $MIN_MACOS"; exit 1; }
           codesign --force --deep -s - "../distr/$name.app"
           # the commit of the build (#753)
           plutil -p "../distr/$name.app/Contents/Info.plist" | grep -E 'CFBundle(Short)?Version|GetInfoString'
@@ -421,12 +470,19 @@ jobs:
           # the Ghostscript of the application runs, with no gs of the system
           # (#662)
           app="../distr/$name.app"
-          # (the Qt of macdeployqt has no offscreen platform)
+          # (macdeployqt deploys only the platform cocoa, not offscreen)
           TM_CHECK_QPA= packages/bundled-tools/check.sh -r "$PWD/$app/Contents/Resources/share/TeXmacs" \
             -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$PWD/$app/Contents/MacOS/TeXmacs"
 
+      # every bundled file for MIN_MACOS at most, and no library outside the
+      # application but those of macOS
       - name: Minimum macOS
-        run: ../.github/fixes/check-min-macos.sh ../distr/*.app
+        run: |
+          ../.github/fixes/check-min-macos.sh ../distr/*.app
+          bad=$(find ../distr/*.app/Contents -type f -exec sh -c \
+                  'file -b "$1" | grep -q Mach-O && otool -L "$1"' _ {} \; |
+                grep -E '^[[:space:]]+/(opt/homebrew|usr/local|Users)/' || true)
+          [ -z "$bad" ] || { echo "error: libraries outside the application:"; echo "$bad"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -434,30 +490,96 @@ jobs:
           path: src/texmacs-qt-macos-arm64.zip
           retention-days: 14
 
+  # As the job qt, with Chez Scheme instead of S7: Chez built from its
+  # sources for MIN_MACOS (cached), not the one of Homebrew, whose kernel
+  # (linked into TeXmacs) targets the macOS of its bottle
   qt-chez:
     name: macOS (Apple silicon, Qt 6, Chez Scheme)
-    needs: gs
+    needs: [deps, gs]
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 75
+    env:
+      QT_VERSION: 6.8.3
+      QT_MODULES: qtwebsockets qtimageformats
+      CHEZ_VERSION: 10.4.1
+      CHEZ_SHA256: 2e74952db7bc177f0c3602e2217a341ba677d733eec4cd7726418c3a4e1ef308
     defaults:
       run:
         working-directory: src
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: brew install qt freetype libpng jpeg gnutls sqlite chezscheme
+      - name: Place of the libraries
+        run: |
+          echo "DEPS=$RUNNER_TOOL_CACHE/texmacs-deps-maxs-arm64" >> "$GITHUB_ENV"
+          echo "CHEZ=$RUNNER_TOOL_CACHE/texmacs-chez-arm64" >> "$GITHUB_ENV"
+          echo "MACOSX_DEPLOYMENT_TARGET=$MIN_MACOS" >> "$GITHUB_ENV"
+
+      - name: The libraries
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.DEPS }}
+          key: texmacs-deps-maxs-arm64-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+          fail-on-cache-miss: true
+
+      - name: Cache of Chez Scheme
+        id: chez-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CHEZ }}
+          key: texmacs-chez-arm64-${{ env.MIN_MACOS }}-${{ env.CHEZ_VERSION }}
+
+      # as Homebrew's formula, without X11 (the expression editor only)
+      - name: Chez Scheme
+        if: steps.chez-cache.outputs.cache-hit != 'true'
+        run: |
+          work="$RUNNER_TEMP/chez-src"
+          mkdir -p "$work"
+          cd "$work"
+          curl -sSfL --retry 3 -o chez.tar.gz \
+            "https://github.com/cisco/ChezScheme/releases/download/v$CHEZ_VERSION/csv$CHEZ_VERSION.tar.gz"
+          [ "$(shasum -a 256 chez.tar.gz | cut -d' ' -f1)" = "$CHEZ_SHA256" ] ||
+            { echo "error: wrong SHA-256 for Chez Scheme"; exit 1; }
+          tar xzf chez.tar.gz
+          cd "csv$CHEZ_VERSION"
+          ./configure --installprefix="$CHEZ" --threads --installschemename=chez --disable-x11
+          make
+          make install
+
+      # (aqtinstall in a venv of its own, not install-qt-action, whose
+      # setup-python puts another python3 first in the PATH: the server of
+      # the suite web-files then did not start within its 10 seconds)
+      - name: Cache of Qt
+        id: qt-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.tool_cache }}/texmacs-qt
+          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}
+
+      - name: Qt
+        run: |
+          qt="$RUNNER_TOOL_CACHE/texmacs-qt"
+          if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
+            python3 -m venv "$RUNNER_TEMP/aqt"
+            "$RUNNER_TEMP/aqt/bin/pip" install -q 'aqtinstall==3.3.*'
+            "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
+          fi
+          echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
+          "$qt/$QT_VERSION/macos/bin/qmake" -query QT_VERSION
 
       # configure finds the machine directory of Chez (scheme.h, libkernel.a,
       # the heap images) from the chez of the PATH
       - name: Configure
         run: |
-          B=$(brew --prefix)
+          echo "$CHEZ/bin" >> "$GITHUB_PATH"
+          export PATH="$CHEZ/bin:$PATH"
           chez --version
-          ./configure --with-scheme=chez \
-            QMAKE="$(brew --prefix qt)/bin/qmake" \
-            CPPFLAGS="-I$(brew --prefix libpng)/include/libpng16 -I$B/include" \
-            LDFLAGS="-L$(brew --prefix libpng)/lib -L$B/lib"
+          PATH="$QT_ROOT_DIR/bin:$DEPS/bin:$PATH" \
+          PKG_CONFIG_PATH="$DEPS/lib/pkgconfig" PKG_CONFIG_LIBDIR="$DEPS/lib/pkgconfig" \
+          ./configure --with-scheme=chez --with-osx="$MIN_MACOS" \
+            --with-freetype="$DEPS/bin" --with-gnutls \
+            QMAKE="$QT_ROOT_DIR/bin/qmake" \
+            CPPFLAGS="-I$DEPS/include" LDFLAGS="-L$DEPS/lib"
 
       # the binary, then the Scheme modules compiled into TeXmacs/boot and
       # the boot image (docs/chez/01-build.md)
@@ -491,15 +613,16 @@ jobs:
           GSDIR="$RUNNER_TOOL_CACHE/texmacs-gs-arm64"
           make MACOS_BUNDLE MACOS_DEPLOY=none GS_BUNDLE="$GSDIR/bin/gs" \
             GS_LICENSES="$GSDIR/share/licenses/ghostscript"
-          "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
+          "$QT_ROOT_DIR/bin/macdeployqt" ../distr/TeXmacs.app
           name=$(packages/macos/upsilon-identity.sh ../distr/TeXmacs.app qt-chez)
           rm -rf "../distr/$name.app"
           mv ../distr/TeXmacs.app "../distr/$name.app"
           app="../distr/$name.app"
           boot="$app/Contents/Resources/share/TeXmacs/boot"
           ls -l "$boot/texmacs.boot" "$boot/petite.boot" "$boot/scheme.boot"
-          # (Homebrew's libraries target macOS 15, as for the job qt)
-          plutil -replace LSMinimumSystemVersion -string 15.0 "$app/Contents/Info.plist"
+          # (the minimum of configure --with-osx, as for the job qt)
+          min=$(plutil -extract LSMinimumSystemVersion raw "$app/Contents/Info.plist")
+          [ "$min" = "$MIN_MACOS" ] || { echo "error: LSMinimumSystemVersion $min, not $MIN_MACOS"; exit 1; }
           codesign --force --deep -s - "$app"
           codesign --verify --deep --strict "$app"
           "$app/Contents/MacOS/TeXmacs" -v | grep "^Revision $(git log -1 --abbrev=10 --format=%h) "
@@ -519,7 +642,12 @@ jobs:
             -v "$(sed -n 's/^GS_VERSION=//p' packages/build-gs.sh)" -- "$PWD/$app/Contents/MacOS/TeXmacs"
 
       - name: Minimum macOS
-        run: ../.github/fixes/check-min-macos.sh ../distr/*.app
+        run: |
+          ../.github/fixes/check-min-macos.sh ../distr/*.app
+          bad=$(find ../distr/*.app/Contents -type f -exec sh -c \
+                  'file -b "$1" | grep -q Mach-O && otool -L "$1"' _ {} \; |
+                grep -E '^[[:space:]]+/(opt/homebrew|usr/local|Users)/' || true)
+          [ -z "$bad" ] || { echo "error: libraries outside the application:"; echo "$bad"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -636,7 +764,7 @@ jobs:
             see [src/docs/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/ns-port.md);
             \`TeXmacs-*-vue-universal.dmg\`, the Vue interface, drawn by the
             GPU, see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md);
-            \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only, macOS 15
+            \`texmacs-qt-macos-arm64.zip\`, Qt 6, Apple silicon only, macOS 13
             or later; \`texmacs-qt-chez-macos-arm64.zip\`, the same with Chez
             Scheme instead of S7 (experimental), see
             [src/docs/chez](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/chez/README.md).

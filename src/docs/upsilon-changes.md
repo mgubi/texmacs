@@ -12,6 +12,17 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 26 November 2026
+
+- **The macOS Qt packages run on macOS 13 again** (desktop applications,
+  Apple silicon): `texmacs-qt-macos-arm64.zip` and
+  `texmacs-qt-chez-macos-arm64.zip` needed macOS 15, as they bundled the
+  libraries of Homebrew, built for the macOS of the machine which made
+  them; they are now built as the Cocoa and Vue packages, with libraries
+  made for macOS 13, the official binaries of Qt 6.8 and, for the Chez one,
+  Chez Scheme built for macOS 13, and declare macOS 13.0 as their minimum,
+  checked against every bundled file (#972).
+
 ## 25 November 2026
 
 - **Keyboard: a key typed just after a dead key**: a key typed less than

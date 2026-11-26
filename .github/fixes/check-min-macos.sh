@@ -2,8 +2,10 @@
 #
 # Checks that no program or library of a macOS application needs a newer macOS
 # than the LSMinimumSystemVersion of its Info.plist (#733). The Homebrew
-# libraries of the Qt packages target the macOS of their bottles (15.0), and
-# the workflows declare that minimum with plutil after macdeployqt.
+# libraries of the Qt package of fixes.yml target the macOS of their bottles
+# (15.0), which it declares with plutil after macdeployqt; the Qt packages of
+# upsilon-macos.yml have no library of Homebrew and declare 13.0, the
+# MIN_MACOS of configure --with-osx (#972).
 #
 # It is not src/packages/macos/check-app.sh (Upsilon only), which also
 # checks the signature, the libraries outside the application and the rpaths:
@@ -68,7 +70,7 @@ if [ $files -eq 0 ]; then
 fi
 if [ $status -ne 0 ]; then
   echo "If macOS $min is no longer the true minimum and the new one is accepted," >&2
-  echo "raise the 15.0 of the plutil -replace LSMinimumSystemVersion line of the" >&2
-  echo "workflow (Homebrew's libraries now need more); else find the library." >&2
+  echo "raise the minimum of the workflow (the 15.0 of plutil -replace" >&2
+  echo "LSMinimumSystemVersion, or MIN_MACOS); else find the library." >&2
 fi
 exit $status
