@@ -4782,6 +4782,10 @@ headless_loop () {
       for (; !is_nil (l); l= l->next) l->item->apply ();
     }
     if (the_interpose_handler != NULL) the_interpose_handler ();
+    // the steps of a test of the driver (gui-test-run), as in the loop
+    // with a display: the tests of the windows which need no drawing
+    // run headless (tests/Plugins/Vue/close-refused.scm)
+    if (script_pump) call ("gui-test-pump");
     usleep (10000);
   }
 }
@@ -5886,6 +5890,7 @@ gui_test_busy () {
   // events, keys still to be given one per turn (a text committed at once),
   // or an animation (a menu which slides in: the places of its items change
   // until it ends)
+  if (is_headless ()) return N(pending_keys) > 0; // (no SDL)
   return SDL_PollEvent (NULL) || N(pending_keys) > 0 || transitions_running ();
 }
 

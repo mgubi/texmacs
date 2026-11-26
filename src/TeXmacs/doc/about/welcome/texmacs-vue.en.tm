@@ -309,6 +309,9 @@
     on the desktop with Qt, instead of the picture enlarged about four
     times: they are faster, and their radii have the size they have on the
     desktop.
+    <item>A document whose close was refused (<em|Really close it?>
+    answered <em|No>) can be closed again with the close box of its tab: it
+    did nothing on that document any more.
   </itemize>
 
   <paragraph|21 November 2026>
