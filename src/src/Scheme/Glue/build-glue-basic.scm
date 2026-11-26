@@ -90,6 +90,7 @@
   (cpu-idle-time cpu_idle_time (int))
   (pretty-date pretty_date (string int string))
   (texmacs-memory mem_used (double))
+  (delete-deferred-widgets delete_deferred_widgets (void))
   (bench-print bench_print (void string))
   (bench-print-all bench_print (void))
   (system-wait system_wait (void string string))

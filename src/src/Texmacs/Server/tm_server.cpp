@@ -45,6 +45,7 @@ void del_obj_qt_renderer(void);
 #endif
 #if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 void qt_forget_deferred_deletes ();
+void qt_delete_deferred ();
 #endif
 
 /******************************************************************************
@@ -367,6 +368,14 @@ tm_server_rep::quit () {
 int
 cpu_idle_time () {
   return get_server () -> cpu_idle_time ();
+}
+
+void
+delete_deferred_widgets () {
+  // the widgets which the GUI deletes once its event loop runs again
+#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
+  qt_delete_deferred ();
+#endif
 }
 
 

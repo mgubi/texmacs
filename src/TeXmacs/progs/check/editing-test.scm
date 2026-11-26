@@ -828,6 +828,7 @@
     (set-large-load-test-interactive! #f)
     (buffer-pretend-saved u)
     (startup-buffer-release)
+    (buffer-close u)
     (check-restore-buffer old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -180,18 +180,46 @@
 (define (suite-failures suite)
   ;; a suite leaves the buffer where it started with the views it had: a
   ;; view it added stays hidden, and makes the views (and the undo
-  ;; histories) of the suites after it differ (#925)
+  ;; histories) of the suites after it differ (#925). It closes the
+  ;; buffers it opened: they stay in memory, and the completion of words
+  ;; and the indices of the buffers of the suites after it differ (#967)
   (let* ((buf (current-buffer))
          (views (check-buffer-views buf))
+         (bufs (buffer-list))
          (n (suite-failures* suite))
-         (after (check-buffer-views buf)))
-    (if (== after views) n
-        (begin
-          (display* "  FAILED [" (car suite) "] the views of the buffer "
-                    "where the suite started: expected "
-                    (object->string views) ", got "
-                    (object->string after) "\n")
-          (+ n 1)))))
+         (left (list-filter (buffer-list) (lambda (b) (nin? b bufs))))
+         (errors 0)
+         (cleanup
+          (lambda (what thunk)
+            ;; an error of the cleanup is a failure of the suite, and does
+            ;; not stop the cleanup nor the suites after it
+            (catch #t thunk
+              (lambda (key . args)
+                (set! errors (+ errors 1))
+                (display* "  FAILED [" (car suite) "] " what ": "
+                          (object->string (cons key args)) "\n"))))))
+    (when (nnull? left)
+      (display* "  FAILED [" (car suite) "] buffers left open: "
+                (object->string (map url->string left)) "\n")
+      (for (b left)
+        (cleanup (string-append "closing " (url->string b))
+                 (lambda () (buffer-pretend-saved b) (buffer-close b))))
+      (cleanup "going back to the buffer where the suite started"
+               (lambda () (check-restore-buffer buf))))
+    ;; the widgets of the views which the suite closed (check-lib)
+    (cleanup "deleting the widgets of the closed views"
+             (lambda () (check-free-closed-views)))
+    ;; (after the cleanup, which may also change them)
+    (with after (check-buffer-views buf)
+      (+ n errors
+         (if (null? left) 0 1)
+         (if (== after views) 0
+             (begin
+               (display* "  FAILED [" (car suite) "] the views of the buffer "
+                         "where the suite started: expected "
+                         (object->string views) ", got "
+                         (object->string after) "\n")
+               1))))))
 
 (define (suite-failures* suite)
   (let ((f (eval (cadr suite)))
