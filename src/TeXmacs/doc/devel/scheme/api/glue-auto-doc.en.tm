@@ -579,6 +579,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(delete-deferred-widgets)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|delete_deferred_widgets> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(bench-print <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

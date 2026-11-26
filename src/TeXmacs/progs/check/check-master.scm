@@ -180,18 +180,31 @@
 (define (suite-failures suite)
   ;; a suite leaves the buffer where it started with the views it had: a
   ;; view it added stays hidden, and makes the views (and the undo
-  ;; histories) of the suites after it differ (#925)
+  ;; histories) of the suites after it differ (#925). It closes the
+  ;; buffers it opened: they stay in memory, and the completion of words
+  ;; and the indices of the buffers of the suites after it differ (#967)
   (let* ((buf (current-buffer))
          (views (check-buffer-views buf))
+         (bufs (buffer-list))
          (n (suite-failures* suite))
-         (after (check-buffer-views buf)))
-    (if (== after views) n
-        (begin
-          (display* "  FAILED [" (car suite) "] the views of the buffer "
-                    "where the suite started: expected "
-                    (object->string views) ", got "
-                    (object->string after) "\n")
-          (+ n 1)))))
+         (after (check-buffer-views buf))
+         (left (list-filter (buffer-list) (lambda (b) (nin? b bufs)))))
+    (when (nnull? left)
+      (display* "  FAILED [" (car suite) "] buffers left open: "
+                (object->string (map url->string left)) "\n")
+      (for (b left) (buffer-pretend-saved b) (buffer-close b))
+      (check-restore-buffer buf))
+    ;; the widgets of the views which the suite closed (check-lib)
+    (check-free-closed-views)
+    (+ n
+       (if (null? left) 0 1)
+       (if (== after views) 0
+           (begin
+             (display* "  FAILED [" (car suite) "] the views of the buffer "
+                       "where the suite started: expected "
+                       (object->string views) ", got "
+                       (object->string after) "\n")
+             1)))))
 
 (define (suite-failures* suite)
   (let ((f (eval (cadr suite)))

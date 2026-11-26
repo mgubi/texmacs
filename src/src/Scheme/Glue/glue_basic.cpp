@@ -794,6 +794,15 @@ tmg_texmacs_memory () {
 }
 
 tmscm
+tmg_delete_deferred_widgets () {
+  // TMSCM_DEFER_INTS;
+  delete_deferred_widgets ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_bench_print (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "bench-print");
 
@@ -11815,6 +11824,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpu-idle-time",  tmg_cpu_idle_time, 0, 0, 0);
   tmscm_install_procedure ("pretty-date",  tmg_pretty_date, 2, 0, 0);
   tmscm_install_procedure ("texmacs-memory",  tmg_texmacs_memory, 0, 0, 0);
+  tmscm_install_procedure ("delete-deferred-widgets",  tmg_delete_deferred_widgets, 0, 0, 0);
   tmscm_install_procedure ("bench-print",  tmg_bench_print, 1, 0, 0);
   tmscm_install_procedure ("bench-print-all",  tmg_bench_print_all, 0, 0, 0);
   tmscm_install_procedure ("system-wait",  tmg_system_wait, 2, 0, 0);

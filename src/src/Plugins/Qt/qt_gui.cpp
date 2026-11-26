@@ -152,6 +152,19 @@ qt_forget_deferred_deletes () {
     QCoreApplication::removePostedEvents (NULL, QEvent::DeferredDelete);
 }
 
+void
+qt_delete_deferred () {
+  // the widgets given to deleteLater, as the QTMWidget of a view which a
+  // window no longer shows (#713), which keeps the editor of the view alive
+  // with its boxes and its history, are deleted when the event loop gets
+  // the control back. A script given by -x runs before the event loop
+  // starts: when it opens and closes many buffers (the test suites), they
+  // are deleted only here, else its memory only grows (#967). Not to be
+  // called from an event handler of one of those widgets
+  if (qt_exit_begun || QCoreApplication::instance () == NULL) return;
+  QCoreApplication::sendPostedEvents (NULL, QEvent::DeferredDelete);
+}
+
 qt_gui_rep::qt_gui_rep (int &argc, char **argv):
 interrupted (false), waitWindow (NULL), popup_wid_time (0), q_translator (0),
 time_credit (100), do_check_events (false), updating (false), 
