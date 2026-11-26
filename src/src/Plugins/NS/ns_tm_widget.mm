@@ -1023,7 +1023,7 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
           }
         }
         else {
-          sc= [[[NSScrollView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
+          sc= [[[TMScrollAreaView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
           [sc setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
           [sc setHasVerticalScroller: YES];
           [sc setAutohidesScrollers: YES];

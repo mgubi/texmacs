@@ -88,6 +88,40 @@ test_fractions () {
   CHECK_EQ (c.scroll (2, 51, 800), 2);     // 2.55: nothing left from before
 }
 
+static void
+test_scroll_bar () {
+  // a slow trackpad in a small view (single step 8): less than a point an
+  // event, which adds up while the bar can move, and is not lost (#976)
+  qt_wheel_axis a;
+  bool taken= false;
+  int total= 0;
+  for (int i= 0; i < 10; i++) {
+    total += a.scroll_bar (2, 8, 120, true, taken);
+    CHECK (taken);
+  }
+  CHECK_EQ (total, 4);                       // 10 x 0.4
+  // at its end that way: nothing scrolled, the event is not taken (the
+  // enclosing scroll view gets it) and the fraction is dropped
+  CHECK_EQ (a.scroll_bar (2, 8, 120, false, taken), 0);
+  CHECK (!taken);
+  CHECK_EQ (a.scroll_bar (2, 8, 120, true, taken), 0); // 0.4, from nothing
+  CHECK (taken);
+  CHECK_EQ (a.scroll_bar (2, 8, 120, true, taken), 0); // 0.8
+  CHECK_EQ (a.scroll_bar (2, 8, 120, true, taken), 1); // 1.2
+}
+
+static void
+test_area () {
+  // a QScrollArea (side tools, dialogs; the menus and lists of Vue): 60
+  // points a notch, a trackpad as many points as it moves
+  CHECK_EQ (QT_WHEEL_AREA_STEP, 20);
+  CHECK_EQ (qt_wheel_area_points (120), 60.0);
+  CHECK_EQ (qt_wheel_area_points (-120), -60.0);
+  CHECK_EQ (qt_wheel_area_points (qt_wheel_mac_angle (7.0, 0.7, true)), 7.0);
+  qt_wheel_axis a;
+  CHECK_EQ (a.scroll (120, QT_WHEEL_AREA_STEP, 300), 60);
+}
+
 int
 main () {
   RUN (test_mac_angle);
@@ -95,5 +129,7 @@ main () {
   RUN (test_axis);
   RUN (test_notch);
   RUN (test_fractions);
+  RUN (test_scroll_bar);
+  RUN (test_area);
   return test_report ();
 }

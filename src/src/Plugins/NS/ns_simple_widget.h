@@ -95,7 +95,8 @@ public:
   void*                   gpu_layer;   //!< the CAMetalLayer of the view
   void*                   gpu_presenter; //!< shows it once a refresh
   bool                    gpu_dirty;   //!< the layer shows an older store
-  bool                    gpu_sync;    //!< a scroll: shown with its transaction
+  bool                    gpu_sync;    //!< a scroll: the next frame is shown
+                                       //!< with its transaction
   double                  gpu_sync_last; //!< when it was last (ns_bench_now)
   static bool gpu_mode ();
   bool has_store ();
@@ -147,6 +148,28 @@ protected:
 
 // Export for TeXmacs' use
 typedef ns_simple_widget_rep simple_widget_rep;
+
+#ifdef __OBJC__
+#include "wheel_steps.hpp"
+
+// The wheel scrolls the scroll view sv as a QAbstractScrollArea of the Qt
+// port (TMView.mm, issue #971), by single steps of step points (0: those of
+// an editor, a sixteenth of the view plus a point); x and y carry the
+// fractions of a step. NO when the view cannot scroll that way (at its end):
+// the event then goes to the enclosing views, as Qt ignores it
+BOOL ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
+                       qt_wheel_axis& x, qt_wheel_axis& y);
+bool ns_wheel_native ();  // TEXMACS_NS_WHEEL=native: as AppKit scrolls
+
+/*! A scroll view of widgets, which the wheel scrolls as a QScrollArea of
+ the Qt port: single steps of 20 points */
+@interface TMScrollAreaView : NSScrollView
+{
+@public
+  qt_wheel_axis wheelX, wheelY;
+}
+@end
+#endif // defined __OBJC__
 
 
 #endif // defined NS_SIMPLE_WIDGET_H

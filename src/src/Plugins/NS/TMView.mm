@@ -719,39 +719,16 @@ mouse_decode (unsigned int mstate) {
 // sixteenth of it plus a point) at once, whatever the acceleration, where
 // NSScrollView scrolled a line of 10 points; a trackpad an angle delta of
 // twice its scrolling delta, the system momentum included, without the
-// elastic bounce of AppKit. TEXMACS_NS_WHEEL=native leaves it to AppKit.
+// elastic bounce of AppKit. At the end of the document the event goes to
+// the views around the scroll view (a scroll view of the side tools, of a
+// dialog), as Qt passes an event which the scroll bar ignores to the
+// parent. TEXMACS_NS_WHEEL=native leaves it to AppKit.
 - (BOOL) scrollLikeQt: (NSEvent*) event
 {
-  static int native= -1;
-  if (native < 0) {
-    const char* v= getenv ("TEXMACS_NS_WHEEL");
-    native= (v != NULL && strcmp (v, "native") == 0);
-  }
   NSScrollView* sv= [self enclosingScrollView];
-  NSClipView* clip= [sv contentView];
-  if (native || sv == nil || clip == nil) return NO;
-  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:])
-  if ([event phase] == NSEventPhaseCancelled) return YES;
-  bool precise= [event hasPreciseScrollingDeltas];
-  int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
-  int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);
-  if (ax == 0 && ay == 0) return YES;
-  NSRect b= [clip bounds];
-  int vw= (int) b.size.width, vh= (int) b.size.height;
-  NSPoint o= b.origin;
-  // the bar of the dominant axis; a positive delta scrolls to the start
-  if (qt_wheel_horizontal (ax, ay))
-    o.x -= wheelX.scroll (ax, qt_wheel_single_step (vw), vw);
-  else
-    o.y -= wheelY.scroll (ay, qt_wheel_single_step (vh), vh);
-  o= [clip constrainBoundsRect: NSMakeRect (o.x, o.y, b.size.width,
-                                            b.size.height)].origin;
-  if (!NSEqualPoints (o, b.origin)) {
-    [clip scrollToPoint: o];
-    [sv reflectScrolledClipView: clip];
-    [sv flashScrollers];
-  }
-  else { wheelX.reset (); wheelY.reset (); } // at an end (as QAbstractSlider)
+  if (ns_wheel_native () || sv == nil || [sv contentView] == nil) return NO;
+  if (!ns_wheel_like_qt (sv, event, 0, wheelX, wheelY))
+    [[sv nextResponder] scrollWheel: event];
   return YES;
 }
 
@@ -951,3 +928,75 @@ ns_test_drop (NSView* v, NSString* path) {
                           pt.x1, pt.x2, ticket, texmacs_time ());
   [pb releaseGlobally];
 }
+
+/******************************************************************************
+* The wheel of the Qt port (issue #971)
+******************************************************************************/
+
+bool
+ns_wheel_native () {
+  static int native= -1;
+  if (native < 0) {
+    const char* v= getenv ("TEXMACS_NS_WHEEL");
+    native= (v != NULL && strcmp (v, "native") == 0);
+  }
+  return native == 1;
+}
+
+// -[QNSView scrollWheel:] gives the angle deltas of the event,
+// QAbstractScrollArea::wheelEvent gives the event to the bar of the dominant
+// axis, and QAbstractSliderPrivate::scrollByDelta scrolls it: the fraction
+// of a step is kept while the bar can still move that way, and the event is
+// ignored (passed to the parent widget) with the fraction dropped when the
+// bar is at its end that way
+BOOL
+ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
+                  qt_wheel_axis& x, qt_wheel_axis& y) {
+  NSClipView* clip= [sv contentView];
+  if (clip == nil) return NO;
+  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:])
+  if ([event phase] == NSEventPhaseCancelled) return YES;
+  bool precise= [event hasPreciseScrollingDeltas];
+  int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
+  int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);
+  if (ax == 0 && ay == 0) return YES;
+  bool hor= qt_wheel_horizontal (ax, ay);
+  int angle= hor? ax: ay;
+  qt_wheel_axis& a= hor? x: y;
+  NSRect b= [clip bounds];
+  int view= (int) (hor? b.size.width: b.size.height);
+  if (step <= 0) step= qt_wheel_single_step (view);
+  // a positive angle scrolls to the start: towards smaller coordinates in
+  // a flipped document view (all those of TeXmacs), larger ones otherwise
+  CGFloat dir= -1;
+  if (!hor && ![[sv documentView] isFlipped]) dir= 1;
+  if (angle < 0) dir= -dir;
+  // can the view move that way at all? (QAbstractSlider: value > minimum,
+  // value < maximum)
+  NSPoint o= b.origin, p= o;
+  if (hor) p.x += dir; else p.y += dir;
+  p= [clip constrainBoundsRect: NSMakeRect (p.x, p.y, b.size.width,
+                                            b.size.height)].origin;
+  bool taken;
+  int n= a.scroll_bar (angle, step, view, !NSEqualPoints (p, o), taken);
+  if (!taken) return NO;
+  if (n == 0) return YES; // less than a point: kept for the next event
+  CGFloat d= dir * (n < 0? -n: n);
+  if (hor) o.x += d; else o.y += d;
+  o= [clip constrainBoundsRect: NSMakeRect (o.x, o.y, b.size.width,
+                                            b.size.height)].origin;
+  [clip scrollToPoint: o];
+  [sv reflectScrolledClipView: clip];
+  [sv flashScrollers];
+  return YES;
+}
+
+@implementation TMScrollAreaView
+- (void) scrollWheel: (NSEvent*) event
+{
+  // QScrollArea: single steps of 20 points (the default of QScrollBar)
+  if (ns_wheel_native ()) { [super scrollWheel: event]; return; }
+  if (!ns_wheel_like_qt (self, event, QT_WHEEL_AREA_STEP, wheelX, wheelY))
+    [[self nextResponder] scrollWheel: event];
+}
+@end

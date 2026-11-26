@@ -436,7 +436,11 @@ when the window is resized under an open menu.
   `wheelScrollLines` steps per 120; a stream with a fractional delta is a
   trackpad, and an angle delta of twice its scrolling delta (ten times the
   delta of SDL) scrolls as many single steps over 40, the fractions carried,
-  at most a page per event, on the dominant axis only. What follows holds
+  at most a page per event, on the dominant axis only; the Clay containers
+  (menus, lists, dialogs) scroll by the single steps of a `QScrollArea`, 20
+  points (`qt_wheel_area_points`). An editor which captures the wheel gets
+  20 points per line of a mouse wheel as Qt's pixel delta, but of the delta
+  rounded by SDL (Qt has it unrounded). What follows holds
   on the other systems: a trackpad and a mouse wheel ask for different things and
   are answered differently. A swipe *drags* the view: its events carry the
   displacement of the fingers and are applied at once, so the page follows

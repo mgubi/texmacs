@@ -48,7 +48,11 @@ drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
 the Qt port, `-[TMView scrollLikeQt:]` and `Graphics/Gui/wheel_steps.hpp`:
 three single steps of a sixteenth of the view plus a point per notch,
 at once, and for a trackpad an angle delta of twice its scrolling delta
-in points, as `-[QNSView scrollWheel:]` and `QScrollBar` do, #971). The keys are named as in Qt (`space`, `S-tab`,
+in points, as `-[QNSView scrollWheel:]` and `QScrollBar` do, #971; an
+editor at its end passes the event to the views around it, as Qt passes
+an event which the scroll bar ignores to the parent widget, and the scroll
+views of widgets, `TMScrollAreaView`, scroll by the single steps of a
+`QScrollArea`, 20 points). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the
@@ -500,11 +504,15 @@ is the exception (#971): it moves the view in the Core Animation
 transaction of its event (`-[TMDocView scrolled:]`), and its frame,
 presented at the next refresh, came a refresh or so after the move, so
 that the old pixels showed for a moment at the new place of the view, a
-flicker. `scrolled:` marks the canvas (`gpu_sync`) while it forces the
-update, and the store is then presented at once with the transaction
+flicker. `scrolled:` marks the canvas (`gpu_sync`), and its next frame,
+the one of the update which `scrolled:` forces or, for a scroll made by an
+update (the cursor kept visible), the one which ends that update, is
+presented at once with the transaction
 (`metal_backend::present_in_transaction`: `presentsWithTransaction`, the
 commands committed and scheduled, the drawable presented by the main
-thread), no two such presents within 4 ms; the property is cleared by the
+thread), no two such presents within 4 ms (a frame closer to the last
+one goes to the link); the mark is used up by that frame; the property is
+cleared by the
 next present of the link. `TEXMACS_NS_SCROLL_SYNC=0` turns it off.
 
 `TEXMACS_NS_BENCH=1` on the FAQ (Apple M4, retina_factor 2, ms a step;

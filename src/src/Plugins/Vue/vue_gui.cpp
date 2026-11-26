@@ -4299,9 +4299,12 @@ wheel_glides (const vue_input_state& in) {
 // notch (wheel_units_are_notches), as the Qt port does on Wayland and
 // macOS with the pixels of the event. It is added up apart, each delta at
 // its scale, since a frame
-// may have both the travel of a notch and a trackpad
+// may have both the travel of a notch and a trackpad. kx, ky are the delta
+// for the Clay scroll containers (the same, but where the wheel scrolls as
+// in the Qt port: by the steps of a QScrollArea, see wheel_event_qt)
 static void
-push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
+push_wheel (vue_window win, double dx, double dy, double gx, double gy,
+            double kx, double ky) {
   vue_input_state& in= win->input;
   if (in.mouse_action == "wheel" && N(in.mouse_data) == 2) {
     in.mouse_data[0] += dx; // several deltas in the same frame add up
@@ -4318,7 +4321,7 @@ push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
   with_window frame (win);
   Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
   // a bar which only scrolls sideways takes the wheel sideways
-  double cx= dx, cy= dy;
+  double cx= kx, cy= ky;
   vue_wheel_axes (cx, cy);
   // Clay scrolls its containers by ten pixels per unit of delta. The deltas
   // are applied once, before the next layout (clay_wheel_flush): each call
@@ -4330,8 +4333,13 @@ push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
 }
 
 static void
+push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
+  push_wheel (win, dx, dy, gx, gy, dx, dy);
+}
+
+static void
 push_wheel (vue_window win, double dx, double dy) {
-  push_wheel (win, dx, dy, dx, dy);
+  push_wheel (win, dx, dy, dx, dy, dx, dy);
 }
 
 // the wheel of the frame to the Clay scroll containers of the window, as
@@ -4436,13 +4444,21 @@ wheel_event_qt (vue_window win, double x, double y) {
     dx= in.wheel_qt_x.scroll (ax, qt_wheel_single_step (vw), vw);
   else if (ay != 0)
     dy= in.wheel_qt_y.scroll (ay, qt_wheel_single_step (vh), vh);
+  // the scroll containers of Clay (menus, lists, dialogs) scroll as a
+  // QScrollArea: single steps of 20 points, of which a float is enough
+  double kx= 0, ky= 0;
+  if (qt_wheel_horizontal (ax, ay)) kx= qt_wheel_area_points (ax);
+  else ky= qt_wheel_area_points (ay);
   // an editor which captures the wheel gets the pixel delta of the Qt port:
-  // the scrolling delta, of 20 points per line for a mouse wheel
+  // the scrolling delta, of 20 points per line for a mouse wheel (Qt takes
+  // the delta of the event as it is; SDL gives it rounded away from zero)
   double gf= precise ? 10.0 : 20.0;
   double gx= gf * x * win->density, gy= gf * y * win->density;
   dx *= win->density; dy *= win->density;
+  kx *= win->density; ky *= win->density;
   in.wheel_event_time= texmacs_time ();
-  if (dx != 0 || dy != 0 || gx != 0 || gy != 0) push_wheel (win, dx, dy, gx, gy);
+  if (dx != 0 || dy != 0 || gx != 0 || gy != 0 || kx != 0 || ky != 0)
+    push_wheel (win, dx, dy, gx, gy, kx, ky);
 }
 
 // a wheel event: scroll and update the estimated speed of the wheel

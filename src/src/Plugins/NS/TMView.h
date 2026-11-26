@@ -11,7 +11,6 @@
 
 #include "MacOS/mac_cocoa.h"
 #include "ns_simple_widget.h"
-#include "wheel_steps.hpp"
 
 @interface TMView : NSView  <NSTextInputClient>
 {

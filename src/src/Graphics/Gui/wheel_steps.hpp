@@ -68,7 +68,27 @@ struct qt_wheel_axis {
     if (n > page) n= page;
     return n;
   }
+  // the same for a scroll bar which can or cannot move the way of the
+  // delta (QAbstractSlider: value > minimum, value < maximum): at its end
+  // the fraction is dropped and the event is not taken (Qt passes it to the
+  // parent widget); else the fraction is kept, also when less than a point
+  // is scrolled (stepsToScroll == 0)
+  int scroll_bar (int delta, int step, int page, bool can_move, bool& taken) {
+    if (!can_move) { acc= 0; taken= false; return 0; }
+    taken= true;
+    return scroll (delta, step, page);
+  }
   void reset () { acc= 0; }
 };
+
+// the single step of a QScrollArea (of QScrollBar by default), in points
+#define QT_WHEEL_AREA_STEP 20
+
+// the points a QScrollArea scrolls for an angle delta, as a float (the
+// scroll containers of Vue take fractions)
+inline double
+qt_wheel_area_points (int delta) {
+  return 3.0 * delta / 120.0 * QT_WHEEL_AREA_STEP;
+}
 
 #endif // defined WHEEL_STEPS_H

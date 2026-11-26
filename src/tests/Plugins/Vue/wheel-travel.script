@@ -14,6 +14,20 @@
 #    unit and not the eighty of a notch: the deltas of the last stream add up
 #    to (1 + 0.4 + 0.5 + 0.3) x 10 x 256 = 5632 SI and none of them is
 #    negative, nothing having to be taken back
+#
+# The above holds on Linux and Windows, with the distance of a notch of the
+# Qt port there (3 x (h/16 + 1) points, see wheel_notch_step_of) instead of
+# 80 points. On macOS the wheel scrolls as in the Qt port since #971
+# (wheel_event_qt): there is no travel, and the deltas are not added up
+# over frames, so the checks above do not apply. There
+#  * each "wheel ... 0 3" line is one event and scrolls 3 x (h/16 + 1)
+#    points at once (whatever its delta of 3), in one "handling wheel" line;
+#    the four notches scroll four times that
+#  * the last stream opens with a whole delta, a notch of that distance at
+#    once (the timing which told a swipe from a notch is gone), and its
+#    fractional deltas then scroll as a trackpad in the Qt port: an angle
+#    delta of int (20 x delta) (8, 10, 6), 3 x angle / 120 single steps,
+#    the fractions carried
 wait 7000
 window #2
 # the document is inserted by wheel-travel.scm

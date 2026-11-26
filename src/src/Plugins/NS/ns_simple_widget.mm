@@ -148,13 +148,17 @@ ns_bench_now () {
     else atEnd= h > b.size.height + 1 && NSMaxY (b) >= h - 1;
     lastClip= b.size;
   }
-  // (a canvas drawn by the GPU is then shown with the transaction which
-  // moves it, see ns_simple_widget_rep::show_gpu_store)
+  // (a canvas drawn by the GPU then shows its next frame with the
+  // transaction which moves it, see ns_simple_widget_rep::show_gpu_store:
+  // the one of this forced update, or, for a scroll made by an update (the
+  // cursor kept visible, SLOT_SCROLL_POSITION), where force_update only
+  // asks for another one, the one of the repaint which ends that update.
+  // The mark is used up by that frame, so that an error in the update
+  // leaves at most one more frame presented with its transaction)
   wid->gpu_sync= true;
   wid->follow_visible_part ();
   if (wid && wid->has_store () && [NSApp isRunning] && [self window])
     the_gui->force_update ();
-  if (wid) wid->gpu_sync= false;
   NS_ENTRY_END ("-[TMDocView scrolled:]")
 }
 @end
@@ -348,7 +352,9 @@ ns_simple_widget_rep::show_gpu_store () {
   // presents of the refreshes of a screen at 120 Hz), so that a burst of
   // events does not wait for the drawables of the layer
   if (!view || is_nil (gpu_store)) return;
-  if (gpu_sync && gpu_scroll_sync () && [view window] &&
+  bool sync= gpu_sync;
+  gpu_sync= false;
+  if (sync && gpu_scroll_sync () && [view window] &&
       ns_bench_now () - gpu_sync_last >= 0.004) {
     bool done= present_gpu_store (true);
     gpu_sync_last= ns_bench_now ();

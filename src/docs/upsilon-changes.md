@@ -24,7 +24,10 @@ have the details, and the problems go to the
   times a twentieth of that step (two and a half times the movement in a
   view 800 points high), the momentum of the system included. In the Cocoa
   interface the frame of a scroll drawn by the GPU is now shown with the
-  move of the view, which removes a flicker while scrolling
+  move of the view, which removes a flicker while scrolling; an editor at
+  its end passes the wheel to the scroll view around it (side tools,
+  dialogs), and the menus, lists and side tools scroll 60 points a notch,
+  as the scroll areas of Qt
   (`TEXMACS_NS_SCROLL_SYNC=0` goes back to the next refresh,
   `TEXMACS_NS_WHEEL=native` to the scrolling of AppKit) (#971).
 
