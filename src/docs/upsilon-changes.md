@@ -17,8 +17,10 @@ have the details, and the problems go to the
 - **A window whose close was refused closes again**: after "The document
   has not been saved. Really close it?" answered No (for instance on a
   master document whose inclusions were expanded), the close button, Cmd-W
-  and the close box of the tab did nothing on that window any more, also
-  after a save; they now ask again (#970, Vue).
+  (the Close item of the Window menu of macOS) and the close box of the tab
+  did nothing on that window any more, also after a save; they now ask
+  again. A close request which comes after its window was closed by other
+  means no longer quits TeXmacs when one window is left (#970, Vue).
 
 ## 25 November 2026
 

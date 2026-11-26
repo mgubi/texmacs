@@ -2,7 +2,8 @@
 ;; Really close it?" -> No) closes at a later request: the request asks
 ;; again, and the window goes on a yes (#970: the window latched its first
 ;; close request and never let another through, also after a save). Two
-;; requests before the first ran ask once. The question is answered by a
+;; requests before the first ran ask once. A request for a window killed
+;; before it ran does nothing (it quit TeXmacs when one window was left). The question is answered by a
 ;; stand-in for user-confirm. It needs no drawing, and runs headless (no
 ;; window on the screen):
 ;;   TM_ARGS="-headless -X" sh tests/Plugins/Vue/run.sh close-refused 40
@@ -61,6 +62,20 @@
        (gt-check "asked a third time" (lambda () (== cr-asked 3)))
        (gt-check "yes: the window is closed"
                  (lambda () (== (length (window-list)) cr-windows)))
+       ;; a request queued for a window which is killed before it runs:
+       ;; nothing happens (safely-kill-window on a window which is gone
+       ;; found one window left, and quit TeXmacs)
+       (gt-eval (lambda () (load-buffer-in-new-window cr-file)))
+       (gt-idle)
+       (gt-window "close-refused")
+       (gt-eval (lambda ()
+                  (with w (current-window)
+                    (cr-close)
+                    (kill-window w))))
+       (gt-idle)
+       (gt-check "killed before its close request ran: TeXmacs goes on"
+                 (lambda () (== (length (window-list)) cr-windows)))
+       (gt-check "and nothing was asked" (lambda () (== cr-asked 3)))
        (gt-eval (lambda ()
                   (set! user-confirm cr-old-confirm)
                   (when (cr-shown?)

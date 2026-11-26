@@ -393,8 +393,16 @@
      (:idle 100)
      (close-buffer-if-no-window buf confirmed?))))
 
+(define (window-exists? u)
+  (and (list-find (window-list) (lambda (w) (== w u))) #t))
+
 (tm-define (safely-kill-window . opt-name)
-  (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
+  (cond ((and (nnull? opt-name) (not (window-exists? (car opt-name))))
+         ;; the window is gone already (a close request queued by the
+         ;; interface which ran after the window was killed): nothing to
+         ;; do, and above all no quit when one window is left (#970)
+         (noop))
+        ((and (buffer-embedded? (current-buffer)) (null? opt-name))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((<= (length (window-list)) 1)
          (safely-quit-TeXmacs))
@@ -403,7 +411,8 @@
              (user-confirm
                  (buffer-close-question (window->buffer (car opt-name))) #f
                (lambda (answ)
-                 (when answ (do-kill-window* (car opt-name) #t))))
+                 (when (and answ (window-exists? (car opt-name)))
+                   (do-kill-window* (car opt-name) #t))))
              (do-kill-window* (car opt-name) #f)))
         ((last-window-on-modified-buffer? (current-buffer))
          (user-confirm (buffer-close-question (current-buffer)) #f
