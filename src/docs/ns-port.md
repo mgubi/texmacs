@@ -52,7 +52,8 @@ in points, as `-[QNSView scrollWheel:]` and `QScrollBar` do, #971; an
 editor at its end passes the event to the views around it, as Qt passes
 an event which the scroll bar ignores to the parent widget, and the scroll
 views of widgets, `TMScrollAreaView`, scroll by the single steps of a
-`QScrollArea`, 20 points). The keys are named as in Qt (`space`, `S-tab`,
+`QScrollArea`, 20 points; a canvas which is not the document of a scroll
+view of its own, a box widget say, passes the event on to them). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the
@@ -510,7 +511,8 @@ update (the cursor kept visible), the one which ends that update, is
 presented at once with the transaction
 (`metal_backend::present_in_transaction`: `presentsWithTransaction`, the
 commands committed and scheduled, the drawable presented by the main
-thread), no two such presents within 4 ms (a frame closer to the last
+thread), at most one a refresh of the screen (0.9 of
+`minimumRefreshInterval` of its `NSScreen`, a frame closer to the last
 one goes to the link); the mark is used up by that frame; the property is
 cleared by the
 next present of the link. `TEXMACS_NS_SCROLL_SYNC=0` turns it off.

@@ -122,6 +122,46 @@ test_area () {
   CHECK_EQ (a.scroll (120, QT_WHEEL_AREA_STEP, 300), 60);
 }
 
+static void
+test_sdl_delta () {
+  // the deltas of SDL: a mouse rounded away from zero, a trackpad as it is
+  CHECK_EQ (qt_wheel_sdl_delta (0.1, false), 1.0f);
+  CHECK_EQ (qt_wheel_sdl_delta (-2.3, false), -3.0f);
+  CHECK_EQ (qt_wheel_sdl_delta (0.0, false), 0.0f);
+  CHECK_EQ (qt_wheel_sdl_delta (0.25, true), 0.25f);
+  CHECK_EQ (qt_wheel_sdl_delta (3.0, true), 3.0f);
+}
+
+static void
+test_queue () {
+  // a swipe which opens with a whole delta is a trackpad, from the event
+  // (#976: it was taken for a notch, six times too far)
+  qt_wheel_queue q;
+  qt_wheel_record e;
+  q.push ({ 0.0f, 3.0f, true, false });     // a trackpad, whole delta
+  q.push ({ 0.0f, 1.0f, false, false });    // a mouse
+  q.push ({ 0.0f, 0.0f, true, false });     // no delta: SDL sends nothing
+  CHECK (q.take (0.0f, 3.0f, e));
+  CHECK (e.precise);
+  CHECK (q.take (0.0f, 1.0f, e));
+  CHECK (!e.precise);
+  CHECK_EQ (q.count, 0);
+  // an event which went to no window of SDL is skipped; a scripted event
+  // has no record
+  q.push ({ 0.0f, -1.0f, false, false });   // over a menu of the system
+  q.push ({ 0.5f, 0.0f, true, true });      // cancelled
+  CHECK (q.take (0.5f, 0.0f, e));
+  CHECK (e.cancelled);
+  CHECK_EQ (q.count, 0);
+  CHECK (!q.take (0.0f, -1.0f, e));
+  // the oldest records go when there are too many
+  for (int i= 0; i < qt_wheel_queue::max + 5; i++)
+    q.push ({ 0.0f, (float) (i + 1), false, false });
+  CHECK_EQ (q.count, (int) qt_wheel_queue::max);
+  CHECK (!q.take (0.0f, 1.0f, e));
+  CHECK (q.take (0.0f, (float) (qt_wheel_queue::max + 5), e));
+}
+
 int
 main () {
   RUN (test_mac_angle);
@@ -131,5 +171,7 @@ main () {
   RUN (test_fractions);
   RUN (test_scroll_bar);
   RUN (test_area);
+  RUN (test_sdl_delta);
+  RUN (test_queue);
   return test_report ();
 }

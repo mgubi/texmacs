@@ -3876,6 +3876,10 @@ void gui_open (int& argc, char** argv) {
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
   }
+#ifdef OS_MACOS
+  // which wheel events come from a trackpad (see wheel_event_qt)
+  vue_mac_wheel_monitor ();
+#endif
   // the shaders of the GPU renderer (Metal), compiled while TeXmacs boots
   vue_gpu_warm_up ();
 
@@ -4422,16 +4426,34 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
 // a wheel event as in the Qt port (wheel_like_qt, see above): the deltas
 // x, y of SDL are whole numbers of lines for a mouse wheel (the delta of
 // the NSEvent, rounded away from zero) and the delta of the NSEvent for a
-// trackpad, a tenth of its scrolling delta in points. The view is the one
-// of the window less its bars, as in wheel_notch_step_of
+// trackpad, a tenth of its scrolling delta in points. Whether the event has
+// precise deltas is read from the NSEvent (vue_mac_wheel_info), as Qt
+// does: a swipe of a trackpad may open with whole deltas, which scrolled
+// as notches, six times too far. Without it (a scripted event) a stream
+// with a fractional delta is a trackpad, whole deltas which open a stream
+// a wheel. The view is the one of the window less its bars, as in
+// wheel_notch_step_of. (An editor at the end of its document does not pass
+// the wheel on to the Clay container around it, as a QTMWidget passes it
+// to its parent: the editor clamps its position after the layout which
+// used the wheel, see vue_widget.cpp)
 static void
 wheel_event_qt (vue_window win, double x, double y) {
   vue_input_state& in= win->input;
   in.wheel_ambiguous= false;
   in.wheel_over_x= in.wheel_over_y= 0;
   in.wheel_est_x= in.wheel_est_y= 0; // the system glides, not us
-  if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
-  bool precise= in.wheel_precise; // for the rest of the stream
+  bool precise, cancelled= false;
+#ifdef OS_MACOS
+  if (vue_mac_wheel_info ((float) x, (float) y, precise, cancelled))
+    in.wheel_precise= precise;
+  else
+#endif
+  {
+    if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
+    precise= in.wheel_precise; // for the rest of the stream
+  }
+  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:])
+  if (cancelled) return;
   int ax= qt_wheel_mac_angle (10.0 * x, x, precise);
   int ay= qt_wheel_mac_angle (10.0 * y, y, precise);
   SI w, h;

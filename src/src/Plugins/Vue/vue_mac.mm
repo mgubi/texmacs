@@ -58,3 +58,36 @@ vue_mac_document_state (void* ns_window) {
   }
   return buf;
 }
+
+/******************************************************************************
+* The precise deltas and the phases of the scroll events (issue #971)
+******************************************************************************/
+
+#include "wheel_steps.hpp"
+
+static qt_wheel_queue wheel_queue;
+static id wheel_monitor= nil;
+
+void
+vue_mac_wheel_monitor () {
+  if (wheel_monitor != nil) return;
+  wheel_monitor=
+    [NSEvent addLocalMonitorForEventsMatchingMask: NSEventMaskScrollWheel
+                                          handler: ^NSEvent* (NSEvent* e) {
+      bool precise= [e hasPreciseScrollingDeltas];
+      qt_wheel_record r= { qt_wheel_sdl_delta (- [e deltaX], precise),
+                           qt_wheel_sdl_delta ([e deltaY], precise),
+                           precise, [e phase] == NSEventPhaseCancelled };
+      wheel_queue.push (r);
+      return e;
+    }];
+}
+
+bool
+vue_mac_wheel_info (float x, float y, bool& precise, bool& cancelled) {
+  qt_wheel_record r;
+  if (!wheel_queue.take (x, y, r)) return false;
+  precise= r.precise;
+  cancelled= r.cancelled;
+  return true;
+}

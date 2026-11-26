@@ -722,11 +722,21 @@ mouse_decode (unsigned int mstate) {
 // elastic bounce of AppKit. At the end of the document the event goes to
 // the views around the scroll view (a scroll view of the side tools, of a
 // dialog), as Qt passes an event which the scroll bar ignores to the
-// parent. TEXMACS_NS_WHEEL=native leaves it to AppKit.
+// parent. A canvas which is not the document of a scroll view of its own
+// (a box widget, a canvas in the side tools or in a scrollable widget)
+// does not scroll: the views around it get the event, as a QTMWidget
+// without a scroll range ignores it and its parent QScrollArea scrolls by
+// its own steps (TMScrollAreaView). TEXMACS_NS_WHEEL=native leaves it to
+// AppKit.
 - (BOOL) scrollLikeQt: (NSEvent*) event
 {
+  if (ns_wheel_native ()) return NO;
   NSScrollView* sv= [self enclosingScrollView];
-  if (ns_wheel_native () || sv == nil || [sv contentView] == nil) return NO;
+  if (sv == nil || [sv contentView] == nil ||
+      [sv documentView] != [self superview]) {
+    [[self nextResponder] scrollWheel: event];
+    return YES;
+  }
   if (!ns_wheel_like_qt (sv, event, 0, wheelX, wheelY))
     [[sv nextResponder] scrollWheel: event];
   return YES;
@@ -994,7 +1004,7 @@ ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
 @implementation TMScrollAreaView
 - (void) scrollWheel: (NSEvent*) event
 {
-  // QScrollArea: single steps of 20 points (the default of QScrollBar)
+  // QScrollArea: single steps of 20 points (set by its constructor)
   if (ns_wheel_native ()) { [super scrollWheel: event]; return; }
   if (!ns_wheel_like_qt (self, event, QT_WHEEL_AREA_STEP, wheelX, wheelY))
     [[self nextResponder] scrollWheel: event];

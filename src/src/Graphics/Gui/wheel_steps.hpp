@@ -81,7 +81,8 @@ struct qt_wheel_axis {
   void reset () { acc= 0; }
 };
 
-// the single step of a QScrollArea (of QScrollBar by default), in points
+// the single step of a QScrollArea, in points (set by the constructor of
+// QScrollArea, qscrollarea.cpp; the default of a QScrollBar is 1)
 #define QT_WHEEL_AREA_STEP 20
 
 // the points a QScrollArea scrolls for an angle delta, as a float (the
@@ -90,5 +91,51 @@ inline double
 qt_wheel_area_points (int delta) {
   return 3.0 * delta / 120.0 * QT_WHEEL_AREA_STEP;
 }
+
+// The scroll events of AppKit which SDL turned into wheel events, kept so
+// that the Vue port reads their precise flag and their phase, which SDL
+// drops (vue_mac.mm). SDL (Cocoa_HandleMouseWheel) gives x= -deltaX,
+// y= deltaY of the event, rounded away from zero without precise deltas,
+// as floats, and drops an event with no delta (SDL_SendMouseWheel)
+inline float
+qt_wheel_sdl_delta (double d, bool precise) {
+  if (!precise) d= d > 0 ? ceil (d) : (d < 0 ? floor (d) : 0.0);
+  return (float) d;
+}
+
+struct qt_wheel_record {
+  float x, y;      // the deltas as SDL gives them
+  bool precise;    // hasPreciseScrollingDeltas
+  bool cancelled;  // the phase is NSEventPhaseCancelled
+};
+
+// the records in the order of the events; take finds the one of a wheel
+// event of SDL by its deltas: the oldest with them, the older ones being
+// events which went to no window of SDL (a menu, a panel); the oldest are
+// forgotten when there are too many
+struct qt_wheel_queue {
+  enum { max= 64 };
+  qt_wheel_record r[max];
+  int first, count;
+  qt_wheel_queue (): first (0), count (0) {}
+  void push (const qt_wheel_record& e) {
+    if (e.x == 0.0f && e.y == 0.0f) return; // never sent by SDL
+    if (count == max) { first= (first + 1) % max; count--; }
+    r[(first + count) % max]= e;
+    count++;
+  }
+  bool take (float x, float y, qt_wheel_record& e) {
+    for (int i= 0; i < count; i++) {
+      const qt_wheel_record& c= r[(first + i) % max];
+      if (c.x == x && c.y == y) {
+        e= c;
+        first= (first + i + 1) % max;
+        count -= i + 1;
+        return true;
+      }
+    }
+    return false;
+  }
+};
 
 #endif // defined WHEEL_STEPS_H

@@ -344,18 +344,33 @@ gpu_scroll_sync () {
   return on == 1;
 }
 
+// the refresh period of the screen of a window (s): the shortest one of a
+// screen of variable rate (ProMotion), 60 Hz before macOS 12
+static double
+refresh_period (NSWindow* w) {
+  double p= 1.0 / 60;
+  if (@available (macOS 12.0, *)) {
+    NSScreen* s= [w screen];
+    if (s != nil && [s minimumRefreshInterval] > 0)
+      p= [s minimumRefreshInterval];
+  }
+  return p;
+}
+
 void
 ns_simple_widget_rep::show_gpu_store () {
   // at the next refresh of the screen (TMGpuPresenter); the frame of a
   // scroll at once, with the transaction which moves the view (see
-  // metal_backend::present_in_transaction), but no two within 4 ms (the
-  // presents of the refreshes of a screen at 120 Hz), so that a burst of
-  // events does not wait for the drawables of the layer
+  // metal_backend::present_in_transaction), but at most one a refresh of
+  // the screen (with some leeway for the jitter of the events): the
+  // compositor gives the drawables of the layer back once a refresh, and a
+  // burst of events faster than that would wait for them in nextDrawable
   if (!view || is_nil (gpu_store)) return;
   bool sync= gpu_sync;
   gpu_sync= false;
   if (sync && gpu_scroll_sync () && [view window] &&
-      ns_bench_now () - gpu_sync_last >= 0.004) {
+      ns_bench_now () - gpu_sync_last >=
+        0.9 * refresh_period ([view window])) {
     bool done= present_gpu_store (true);
     gpu_sync_last= ns_bench_now ();
     if (done) { gpu_dirty= false; return; }
