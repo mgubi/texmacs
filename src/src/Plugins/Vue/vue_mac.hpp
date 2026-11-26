@@ -26,15 +26,17 @@ const char* vue_mac_document_state (void* ns_window);
 // a mouse and of a trackpad without hasPreciseScrollingDeltas, the
 // scrolling deltas and the phases, which the Qt port reads. A local monitor
 // of the scroll events (vue_mac_wheel_monitor, installed once) keeps the
-// last one; vue_mac_wheel_attach, called by the event watch of SDL when it
-// queues a wheel event (x, y, stamp), within the handling of that NSEvent,
-// attaches it to the wheel event when its deltas are those of the event;
-// vue_mac_wheel_take gives the record of the wheel event of that stamp when
-// it is handled (false: none, a scripted event), and drops those of older
-// events (see qt_wheel_queue in wheel_steps.hpp)
+// NSEvent which AppKit is handing to SDL; vue_mac_wheel_attach, called by
+// the event watch of SDL for the wheel event which SDL queues while it
+// handles that NSEvent (NSApplication sendEvent:, the monitor, SDL3View
+// scrollWheel:, SDL_SendMouseWheel, SDL_PushEvent, the watch: all at once
+// on the main thread), keeps it for that event and gives its serial number
+// (0: none), which the event carries; vue_mac_wheel_take gives the record
+// of the event of that number when it is handled (see qt_wheel_queue in
+// wheel_steps.hpp). The wheel events of scripts are not given to it
 #include "wheel_steps.hpp"
 void vue_mac_wheel_monitor ();
-void vue_mac_wheel_attach (float x, float y, unsigned long long stamp);
-bool vue_mac_wheel_take (unsigned long long stamp, qt_wheel_record& r);
+unsigned vue_mac_wheel_attach ();
+bool vue_mac_wheel_take (unsigned id, qt_wheel_record& r);
 
 #endif // VUE_MAC_HPP

@@ -122,78 +122,57 @@ test_area () {
   CHECK_EQ (a.scroll (120, QT_WHEEL_AREA_STEP, 300), 60);
 }
 
-static void
-test_sdl_delta () {
-  // the deltas of SDL: a mouse rounded away from zero, a trackpad as it is
-  CHECK_EQ (qt_wheel_sdl_delta (0.1, false), 1.0f);
-  CHECK_EQ (qt_wheel_sdl_delta (-2.3, false), -3.0f);
-  CHECK_EQ (qt_wheel_sdl_delta (0.0, false), 0.0f);
-  CHECK_EQ (qt_wheel_sdl_delta (0.25, true), 0.25f);
-  CHECK_EQ (qt_wheel_sdl_delta (3.0, true), 3.0f);
-}
-
 static qt_wheel_record
-record (double dx, double dy, double sx, double sy, bool precise) {
+record (double dy, double sy, bool precise) {
   qt_wheel_record r;
-  r.dx= dx; r.dy= dy; r.sx= sx; r.sy= sy;
+  r.dx= 0; r.dy= dy; r.sx= 0; r.sy= sy;
   r.precise= precise; r.ignored= false;
   return r;
 }
 
 static void
 test_record () {
-  // the deltas of SDL, which matches its wheel event with them
-  qt_wheel_record m= record (0, 0.3, 0, 0.3, false);  // a slow notch
-  CHECK_EQ (m.sdl_y (), 1.0f);
-  CHECK (m.matches (-0.0f, 1.0f));
-  CHECK (m.sent_by_sdl ());
-  qt_wheel_record t= record (-0.5, 3.0, -5.0, 30.0, true); // a swipe
-  CHECK_EQ (t.sdl_x (), 0.5f);
-  CHECK (t.matches (0.5f, 3.0f));
-  CHECK (!t.matches (0.5f, 2.0f));
-  CHECK (!record (0, 0, 0, 0, true).sent_by_sdl ());
-  // Qt's angles from the NSEvent: a swipe opening with a whole delta, a
-  // slow notch (Qt does not round it: less than 120), the exact angle of a
-  // scrolling delta, where ten times a float delta lost one
+  // Qt's angles from the NSEvent, never from the deltas of SDL (whose
+  // formula changed between SDL 3.4.2 and 3.4.20): a swipe opening with a
+  // whole delta, a slow notch (less than 120, as in Qt), the exact angle
+  qt_wheel_record t= record (3.0, 30.0, true);
   CHECK_EQ (qt_wheel_mac_angle (t.sy, t.dy, t.precise), 60);
   CHECK_EQ (qt_wheel_mac_angle (0.0, 0.005, false), 50);
-  CHECK_EQ (qt_wheel_mac_angle (3.5, 0.35, true), 7);
   CHECK_EQ (qt_wheel_mac_angle (7.0, 0.7, true), 14);
-  // (from the float delta of SDL: 10 x 0.35f x 2 = 6.99..., 7 in Qt)
-  CHECK_EQ (qt_wheel_mac_angle (10.0 * (double) 0.35f, 0.35, true), 6);
+  // the pixel delta (a QPoint): truncated, 20 points a line for a mouse
+  CHECK_EQ (qt_wheel_mac_pixels (7.9, true), 7);
+  CHECK_EQ (qt_wheel_mac_pixels (-7.9, true), -7);
+  CHECK_EQ (qt_wheel_mac_pixels (0.1, false), 2);
+  CHECK_EQ (qt_wheel_mac_pixels (1.37, false), 27);
 }
 
 static void
 test_queue () {
   qt_wheel_queue q;
   qt_wheel_record e;
-  // each wheel event of SDL gets the record of its NSEvent, by its stamp
-  q.push (100, record (0, 3.0, 0, 30.0, true));
-  q.push (110, record (0, 1.0, 0, 1.0, false));
-  CHECK (q.take (100, e));
+  // each wheel event of SDL gets the record of its NSEvent, by the serial
+  // number it carries
+  q.push (1, record (3.0, 30.0, true));
+  q.push (2, record (1.0, 1.0, false));
+  CHECK (q.take (1, e));
   CHECK (e.precise);
-  CHECK (q.take (110, e));
+  CHECK (q.take (2, e));
   CHECK (!e.precise);
   CHECK_EQ (q.count, 0);
-  // a scripted event has no record
-  CHECK (!q.take (120, e));
-  // the record of an event handled without asking (a zoom) does not
-  // outlive it: a later event with the same deltas does not take it (#976)
-  q.push (200, record (0, 1.0, 0, 1.0, false));   // a notch, zoomed
-  q.push (210, record (0, 1.0, 0, 10.0, true));   // a swipe, same deltas
-  CHECK (q.take (210, e));
+  CHECK (!q.take (3, e));
+  // the record of an event handled without asking does not outlive it: a
+  // later event does not take it, whatever its deltas (#976)
+  q.push (4, record (1.0, 1.0, false));   // a notch, zoomed
+  q.push (5, record (1.0, 10.0, true));   // a swipe
+  CHECK (q.take (5, e));
   CHECK (e.precise);
-  CHECK_EQ (q.count, 0);
-  // and a record whose event never came is dropped by a later event
-  q.push (300, record (0, 1.0, 0, 1.0, false));
-  CHECK (!q.take (310, e));
   CHECK_EQ (q.count, 0);
   // the oldest records go when there are too many
   for (int i= 0; i < qt_wheel_queue::max + 5; i++)
-    q.push (1000 + i, record (0, 1.0, 0, 1.0, false));
+    q.push (100 + i, record (1.0, 1.0, false));
   CHECK_EQ (q.count, (int) qt_wheel_queue::max);
-  CHECK (!q.take (1000, e));
-  CHECK (q.take (1000 + qt_wheel_queue::max + 4, e));
+  CHECK (!q.take (100, e));
+  CHECK (q.take (100 + qt_wheel_queue::max + 4, e));
 }
 
 int
@@ -205,7 +184,6 @@ main () {
   RUN (test_fractions);
   RUN (test_scroll_bar);
   RUN (test_area);
-  RUN (test_sdl_delta);
   RUN (test_record);
   RUN (test_queue);
   return test_report ();

@@ -692,13 +692,18 @@ mouse_decode (unsigned int mstate) {
   // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
   // command zooms, and otherwise the scroll view scrolls
   if (!wid) { [super scrollWheel: event]; return; }
+  // what -[QNSView scrollWheel:] drops before any widget sees it: neither
+  // the capture nor the zoom get it
+  if (!ns_wheel_native () && ns_wheel_dropped (event)) return;
   if (as_bool (call ("wheel-capture?"))) {
     NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
-    // the pixel delta of the Qt port: for a mouse wheel, 20 points a line
-    CGFloat f= [event hasPreciseScrollingDeltas]? 1.0: 20.0;
-    coord2 wh = from_nspoint (NSMakePoint (f * [event scrollingDeltaX],
-                                           f * [event scrollingDeltaY]));
+    // the pixel delta of the Qt port (a QPoint): for a mouse wheel, 20
+    // points a line
+    bool precise= [event hasPreciseScrollingDeltas];
+    coord2 wh = from_nspoint (NSMakePoint (
+      qt_wheel_mac_pixels ([event scrollingDeltaX], precise),
+      qt_wheel_mac_pixels ([event scrollingDeltaY], precise)));
     array<double> data;
     data << ((double) wh.x1) << ((double) wh.x2);
     the_gui->process_mouse (wid, "wheel", pt.x1, pt.x2,
@@ -953,6 +958,22 @@ ns_wheel_native () {
   return native == 1;
 }
 
+// does -[QNSView scrollWheel:] drop the event? A cancelled gesture (its
+// deltas are zeroed), the end of a gesture which a momentum follows (which
+// Qt finds in the queue)
+bool
+ns_wheel_dropped (NSEvent* event) {
+  if ([event phase] == NSEventPhaseCancelled) return true;
+  if ([event phase] == NSEventPhaseEnded) {
+    NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
+                                   untilDate: [NSDate distantPast]
+                                      inMode: @"TMMomentumEventSearchMode"
+                                     dequeue: NO];
+    if (n != nil && [n momentumPhase] == NSEventPhaseBegan) return true;
+  }
+  return false;
+}
+
 // -[QNSView scrollWheel:] gives the angle deltas of the event,
 // QAbstractScrollArea::wheelEvent gives the event to the bar of the dominant
 // axis, and QAbstractSliderPrivate::scrollByDelta scrolls it: the fraction
@@ -964,17 +985,7 @@ ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
                   qt_wheel_axis& x, qt_wheel_axis& y) {
   NSClipView* clip= [sv contentView];
   if (clip == nil) return NO;
-  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:];
-  // nor does the end of a gesture which a momentum follows, which Qt finds
-  // in the queue)
-  if ([event phase] == NSEventPhaseCancelled) return YES;
-  if ([event phase] == NSEventPhaseEnded) {
-    NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
-                                   untilDate: [NSDate distantPast]
-                                      inMode: @"TMMomentumEventSearchMode"
-                                     dequeue: NO];
-    if (n != nil && [n momentumPhase] == NSEventPhaseBegan) return YES;
-  }
+  if (ns_wheel_dropped (event)) return YES;
   bool precise= [event hasPreciseScrollingDeltas];
   int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
   int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);

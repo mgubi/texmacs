@@ -64,9 +64,10 @@ vue_mac_document_state (void* ns_window) {
 ******************************************************************************/
 
 static qt_wheel_queue wheel_queue;
-static qt_wheel_record wheel_last;    // of the last scroll event
+static qt_wheel_record wheel_last;    // of the NSEvent being handled
 static bool wheel_last_valid= false;
 static bool wheel_last_ended= false;  // its phase is NSEventPhaseEnded
+static unsigned wheel_serial= 0;
 static id wheel_monitor= nil;
 
 void
@@ -87,11 +88,10 @@ vue_mac_wheel_monitor () {
     }];
 }
 
-void
-vue_mac_wheel_attach (float x, float y, unsigned long long stamp) {
-  if (!wheel_last_valid) return; // an event of a script
+unsigned
+vue_mac_wheel_attach () {
+  if (!wheel_last_valid) return 0;
   wheel_last_valid= false;
-  if (!wheel_last.matches (x, y)) return;
   qt_wheel_record r= wheel_last;
   // -[QNSView scrollWheel:]: an ended phase which a momentum follows does
   // not scroll (what the queue has now: this is called while AppKit hands
@@ -103,10 +103,13 @@ vue_mac_wheel_attach (float x, float y, unsigned long long stamp) {
                                      dequeue: NO];
     if (n != nil && [n momentumPhase] == NSEventPhaseBegan) r.ignored= true;
   }
-  wheel_queue.push (stamp, r);
+  if (++wheel_serial == 0) wheel_serial= 1;
+  wheel_queue.push (wheel_serial, r);
+  return wheel_serial;
 }
 
 bool
-vue_mac_wheel_take (unsigned long long stamp, qt_wheel_record& r) {
-  return wheel_queue.take (stamp, r);
+vue_mac_wheel_take (unsigned id, qt_wheel_record& r) {
+  if (id == 0) return false;
+  return wheel_queue.take (id, r);
 }

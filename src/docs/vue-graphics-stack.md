@@ -433,12 +433,17 @@ when the window is resized under an open menu.
   does, with its deltas and scrolling deltas (which SDL rounds or drops)
   and its phases (a cancelled gesture does not scroll, nor the end of one
   which a momentum follows): a local monitor of the scroll events
-  (`vue_mac_wheel_monitor`, `vue_mac.mm`) keeps the last one, the event
-  watch of SDL attaches it to the wheel event which SDL queues for it, by
-  the timestamp of that event (`vue_mac_wheel_attach`, `qt_wheel_queue`),
-  and the wheel event takes it when it is handled, before anything else,
-  which drops the records of older events. Only a scripted event, which
-  has none, is classified by its deltas (SDL rounds those of a mouse
+  (`vue_mac_wheel_monitor`, `vue_mac.mm`) keeps the one which AppKit is
+  handing to SDL, and the event watch of SDL, called when SDL queues the
+  wheel event for it (all of it at once on the main thread), keeps it for
+  that event under a serial number which the event carries in its
+  `reserved` field (`vue_mac_wheel_attach`, `qt_wheel_queue`); the event
+  takes it when it is handled, before anything else, which drops the
+  records of older events. The deltas of SDL are not used: their formula
+  changed between versions of SDL (3.4.2 gives `deltaY`, 3.4.20 a tenth of
+  `scrollingDeltaY` for a trackpad). Only a scripted event, which has no
+  record (`wheel_scripted`), is classified by its deltas (SDL rounds those
+  of a mouse
   wheel and leaves those of a trackpad fractional). A mouse wheel scrolls
   at once three single steps (a sixteenth
   of the view plus a point) per event, whatever the acceleration, as

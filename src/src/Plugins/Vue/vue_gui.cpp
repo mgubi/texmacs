@@ -4426,6 +4426,8 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
 // the NSEvent of the wheel event being handled (vue_mac_wheel_take), or
 // NULL (a scripted event, another system)
 static const qt_wheel_record* wheel_record= NULL;
+// a script is pushing a wheel event (see event_filter)
+static bool wheel_scripted= false;
 
 // a wheel event as in the Qt port (wheel_like_qt, see above). The NSEvent
 // it came from (wheel_record) gives what -[QNSView scrollWheel:] reads:
@@ -4481,12 +4483,18 @@ wheel_event_qt (vue_window win, double x, double y) {
   double kx= 0, ky= 0;
   if (qt_wheel_horizontal (ax, ay)) kx= qt_wheel_area_points (ax);
   else ky= qt_wheel_area_points (ay);
-  // an editor which captures the wheel gets the pixel delta of the Qt port:
-  // the scrolling delta, times 20 for a mouse wheel (without the NSEvent,
-  // of the delta rounded by SDL)
-  double gf= precise ? 1.0 : 20.0;
-  double gx= gf * px * win->density, gy= gf * py * win->density;
-  if (rec == NULL && !precise) { gx= 20.0 * x * win->density; gy= 20.0 * y * win->density; }
+  // an editor which captures the wheel gets the pixel delta of the Qt port
+  // (a QPoint): the scrolling delta truncated, 20 points a line for a mouse
+  // wheel (without the NSEvent, the delta of SDL is taken for the line)
+  double gx, gy;
+  if (rec != NULL || precise) {
+    gx= qt_wheel_mac_pixels (px, precise) * win->density;
+    gy= qt_wheel_mac_pixels (py, precise) * win->density;
+  }
+  else {
+    gx= qt_wheel_mac_pixels (x, false) * win->density;
+    gy= qt_wheel_mac_pixels (y, false) * win->density;
+  }
   dx *= win->density; dy *= win->density;
   kx *= win->density; ky *= win->density;
   in.wheel_event_time= texmacs_time ();
@@ -5741,7 +5749,10 @@ script_exec (string line) {
     ev.wheel.mouse_y= wy;
     ev.wheel.x= as_double (a[3]);
     ev.wheel.y= as_double (a[4]);
+    // (no NSEvent behind it: see event_filter)
+    wheel_scripted= true;
     SDL_PushEvent (&ev);
+    wheel_scripted= false;
   }
   else if (cmd == "key" && N(a) > 1) {
     // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
@@ -6792,9 +6803,12 @@ process_event (SDL_Event *event) {
       qt_wheel_record rec;
       bool has_rec= false;
 #ifdef OS_MACOS
-      has_rec= vue_mac_wheel_take (event->wheel.timestamp, rec);
+      has_rec= vue_mac_wheel_take (event->wheel.reserved, rec);
 #endif
       update_mouse_state ();
+      // nor does any widget see an event which Qt drops (a cancelled
+      // gesture, the end of one which a momentum follows), also no zoom
+      if (has_rec && rec.ignored) break;
       if (DEBUG_VUE_EVENTS)
         SDL_Log ("Window %d got wheel event %f %f (stamp %llu%s)",
                  event->wheel.windowID, event->wheel.x, event->wheel.y,
@@ -7019,10 +7033,12 @@ repaint_editors_of (vue_window win) {
 
 bool event_filter (void *userdata, SDL_Event *event) {
 #ifdef OS_MACOS
-  // the NSEvent which SDL is turning into this wheel event (wheel_event_qt)
+  // the NSEvent which SDL is turning into this wheel event (wheel_event_qt):
+  // its serial number goes into the reserved field of the event, which SDL
+  // copies into its queue after the watches (SDL_PushEvent) and does not
+  // use; 0 for the events of scripts, which have no NSEvent behind them
   if (event->type == SDL_EVENT_MOUSE_WHEEL)
-    vue_mac_wheel_attach (event->wheel.x, event->wheel.y,
-                          event->wheel.timestamp);
+    event->wheel.reserved= wheel_scripted ? 0 : vue_mac_wheel_attach ();
 #endif
   if (event->type == SDL_EVENT_WINDOW_RESIZED) {
     // A resize is handled here, inside SDL's event pump, so that the window

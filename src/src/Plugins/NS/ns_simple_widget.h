@@ -160,6 +160,7 @@ typedef ns_simple_widget_rep simple_widget_rep;
 BOOL ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
                        qt_wheel_axis& x, qt_wheel_axis& y);
 bool ns_wheel_native ();  // TEXMACS_NS_WHEEL=native: as AppKit scrolls
+bool ns_wheel_dropped (NSEvent* event); // as -[QNSView scrollWheel:]
 
 /*! A scroll view of widgets, which the wheel scrolls as a QScrollArea of
  the Qt port: single steps of 20 points */

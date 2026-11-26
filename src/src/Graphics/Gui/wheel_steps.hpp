@@ -92,51 +92,46 @@ qt_wheel_area_points (int delta) {
   return 3.0 * delta / 120.0 * QT_WHEEL_AREA_STEP;
 }
 
-// The scroll events of AppKit which SDL turned into wheel events, kept so
-// that the Vue port reads what SDL drops: the precise flag, the scrolling
-// deltas and the phases (vue_mac.mm). SDL (Cocoa_HandleMouseWheel) gives
-// x= -deltaX, y= deltaY of the event, rounded away from zero without
-// precise deltas, as floats, and drops an event with no delta
-// (SDL_SendMouseWheel)
-inline float
-qt_wheel_sdl_delta (double d, bool precise) {
-  if (!precise) d= d > 0 ? ceil (d) : (d < 0 ? floor (d) : 0.0);
-  return (float) d;
-}
-
+// The scroll events of AppKit behind the wheel events of SDL, kept so that
+// the Vue port reads what SDL drops (vue_mac.mm): the precise flag, the
+// deltas, the scrolling deltas and the phases; everything is computed from
+// them as in -[QNSView scrollWheel:] and the Cocoa port, never from the
+// deltas of SDL, whose formula changes between versions of SDL
 struct qt_wheel_record {
   double dx, dy;   // deltaX, deltaY of the NSEvent
   double sx, sy;   // scrollingDeltaX, scrollingDeltaY
   bool precise;    // hasPreciseScrollingDeltas
   bool ignored;    // no scroll: a cancelled phase, or an ended phase which
                    // a momentum follows (-[QNSView scrollWheel:])
-  float sdl_x () const { return qt_wheel_sdl_delta (-dx, precise); }
-  float sdl_y () const { return qt_wheel_sdl_delta (dy, precise); }
-  bool sent_by_sdl () const { return sdl_x () != 0.0f || sdl_y () != 0.0f; }
-  bool matches (float x, float y) const { return sdl_x () == x && sdl_y () == y; }
 };
 
-// the records of the wheel events of SDL, by their timestamps, in the order
-// of the events: a record is attached to its wheel event when SDL queues
-// it (an event watch, called by SDL_PushEvent within the handling of the
-// NSEvent), and taken when the event is handled; the records of older
-// events, which were handled without asking (a zoom, no window under the
-// pointer), are dropped then, so that no record outlives its event
+// the pixel delta of -[QNSView scrollWheel:] for one axis (a QPoint: the
+// points truncated): the scrolling delta, 20 points a line for a mouse
+inline int
+qt_wheel_mac_pixels (double scrolling_delta, bool precise) {
+  return (int) (precise ? scrolling_delta : 20.0 * scrolling_delta);
+}
+
+// the records by the serial numbers which the wheel events of SDL carry
+// (numbered by the port when SDL queues them, one clock for all), in the
+// order of the events: a record is taken when its event is handled, and
+// those of older events (handled without asking) are dropped then, so that
+// no record outlives its event; the oldest go when there are too many
 struct qt_wheel_queue {
   enum { max= 64 };
   qt_wheel_record r[max];
-  unsigned long long stamp[max];
+  unsigned serial[max];
   int first, count;
   qt_wheel_queue (): first (0), count (0) {}
-  void push (unsigned long long t, const qt_wheel_record& e) {
+  void push (unsigned id, const qt_wheel_record& e) {
     if (count == max) { first= (first + 1) % max; count--; }
     r[(first + count) % max]= e;
-    stamp[(first + count) % max]= t;
+    serial[(first + count) % max]= id;
     count++;
   }
-  bool take (unsigned long long t, qt_wheel_record& e) {
-    while (count > 0 && stamp[first] < t) { first= (first + 1) % max; count--; }
-    if (count == 0 || stamp[first] != t) return false;
+  bool take (unsigned id, qt_wheel_record& e) {
+    while (count > 0 && serial[first] < id) { first= (first + 1) % max; count--; }
+    if (count == 0 || serial[first] != id) return false;
     e= r[first];
     first= (first + 1) % max;
     count--;
