@@ -4423,39 +4423,49 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
   return dt;
 }
 
-// a wheel event as in the Qt port (wheel_like_qt, see above): the deltas
-// x, y of SDL are whole numbers of lines for a mouse wheel (the delta of
-// the NSEvent, rounded away from zero) and the delta of the NSEvent for a
-// trackpad, a tenth of its scrolling delta in points. Whether the event has
-// precise deltas is read from the NSEvent (vue_mac_wheel_info), as Qt
-// does: a swipe of a trackpad may open with whole deltas, which scrolled
-// as notches, six times too far. Without it (a scripted event) a stream
-// with a fractional delta is a trackpad, whole deltas which open a stream
-// a wheel. The view is the one of the window less its bars, as in
-// wheel_notch_step_of. (An editor at the end of its document does not pass
-// the wheel on to the Clay container around it, as a QTMWidget passes it
-// to its parent: the editor clamps its position after the layout which
-// used the wheel, see vue_widget.cpp)
+// the NSEvent of the wheel event being handled (vue_mac_wheel_take), or
+// NULL (a scripted event, another system)
+static const qt_wheel_record* wheel_record= NULL;
+
+// a wheel event as in the Qt port (wheel_like_qt, see above). The NSEvent
+// it came from (wheel_record) gives what -[QNSView scrollWheel:] reads:
+// whether its deltas are precise (a swipe of a trackpad may open with
+// whole deltas, which scrolled as notches, six times too far), its deltas
+// and scrolling deltas, which SDL rounds or drops, and whether it scrolls
+// at all (a cancelled phase, an ended one which a momentum follows).
+// Without it (a scripted event) the deltas x, y of SDL are taken: whole
+// numbers of lines for a mouse wheel (the delta of the NSEvent rounded
+// away from zero), the delta of the NSEvent for a trackpad (a tenth of its
+// scrolling delta in points); a stream with a fractional delta is then a
+// trackpad, whole deltas which open a stream a wheel. The view is the one
+// of the window less its bars, as in wheel_notch_step_of. (An editor at
+// the end of its document does not pass the wheel on to the Clay
+// container around it, as a QTMWidget passes it to its parent: the editor
+// clamps its position after the layout which used the wheel, see
+// vue_widget.cpp)
 static void
 wheel_event_qt (vue_window win, double x, double y) {
   vue_input_state& in= win->input;
   in.wheel_ambiguous= false;
   in.wheel_over_x= in.wheel_over_y= 0;
   in.wheel_est_x= in.wheel_est_y= 0; // the system glides, not us
-  bool precise, cancelled= false;
-#ifdef OS_MACOS
-  if (vue_mac_wheel_info ((float) x, (float) y, precise, cancelled))
-    in.wheel_precise= precise;
-  else
-#endif
-  {
+  const qt_wheel_record* rec= wheel_record;
+  bool precise;
+  // the deltas (lines) and scrolling deltas (points) of the NSEvent, with
+  // the signs of SDL (x is minus deltaX)
+  double lx, ly, px, py;
+  if (rec != NULL) {
+    if (rec->ignored) return;
+    precise= in.wheel_precise= rec->precise;
+    lx= - rec->dx; ly= rec->dy; px= - rec->sx; py= rec->sy;
+  }
+  else {
     if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
     precise= in.wheel_precise; // for the rest of the stream
+    lx= x; ly= y; px= 10.0 * x; py= 10.0 * y;
   }
-  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:])
-  if (cancelled) return;
-  int ax= qt_wheel_mac_angle (10.0 * x, x, precise);
-  int ay= qt_wheel_mac_angle (10.0 * y, y, precise);
+  int ax= qt_wheel_mac_angle (px, lx, precise);
+  int ay= qt_wheel_mac_angle (py, ly, precise);
   SI w, h;
   win->get_size (w, h);
   int vw= (int) max (100.0, ((double) w) / PIXEL);
@@ -4472,10 +4482,11 @@ wheel_event_qt (vue_window win, double x, double y) {
   if (qt_wheel_horizontal (ax, ay)) kx= qt_wheel_area_points (ax);
   else ky= qt_wheel_area_points (ay);
   // an editor which captures the wheel gets the pixel delta of the Qt port:
-  // the scrolling delta, of 20 points per line for a mouse wheel (Qt takes
-  // the delta of the event as it is; SDL gives it rounded away from zero)
-  double gf= precise ? 10.0 : 20.0;
-  double gx= gf * x * win->density, gy= gf * y * win->density;
+  // the scrolling delta, times 20 for a mouse wheel (without the NSEvent,
+  // of the delta rounded by SDL)
+  double gf= precise ? 1.0 : 20.0;
+  double gx= gf * px * win->density, gy= gf * py * win->density;
+  if (rec == NULL && !precise) { gx= 20.0 * x * win->density; gy= 20.0 * y * win->density; }
   dx *= win->density; dy *= win->density;
   kx *= win->density; ky *= win->density;
   in.wheel_event_time= texmacs_time ();
@@ -6776,6 +6787,13 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_WHEEL:
     {
+      // the NSEvent of the wheel event, taken before anything returns, so
+      // that no record outlives its event (see qt_wheel_queue)
+      qt_wheel_record rec;
+      bool has_rec= false;
+#ifdef OS_MACOS
+      has_rec= vue_mac_wheel_take (event->wheel.timestamp, rec);
+#endif
       update_mouse_state ();
       if (DEBUG_VUE_EVENTS)
         SDL_Log ("Window %d got wheel event %f %f (stamp %llu%s)",
@@ -6792,8 +6810,10 @@ process_event (SDL_Event *event) {
         in.mouse_time= texmacs_time();
         in.mouse_x= (int) (wx * win->density);
         in.mouse_y= (int) (wy * win->density);
+        wheel_record= has_rec ? &rec : NULL;
         wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time,
                      event->wheel.timestamp); // see "Scrolling with the wheel"
+        wheel_record= NULL;
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
@@ -6998,6 +7018,12 @@ repaint_editors_of (vue_window win) {
 }
 
 bool event_filter (void *userdata, SDL_Event *event) {
+#ifdef OS_MACOS
+  // the NSEvent which SDL is turning into this wheel event (wheel_event_qt)
+  if (event->type == SDL_EVENT_MOUSE_WHEEL)
+    vue_mac_wheel_attach (event->wheel.x, event->wheel.y,
+                          event->wheel.timestamp);
+#endif
   if (event->type == SDL_EVENT_WINDOW_RESIZED) {
     // A resize is handled here, inside SDL's event pump, so that the window
     // never shows stale content while it is dragged. The pump runs from

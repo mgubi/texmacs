@@ -63,9 +63,10 @@ vue_mac_document_state (void* ns_window) {
 * The precise deltas and the phases of the scroll events (issue #971)
 ******************************************************************************/
 
-#include "wheel_steps.hpp"
-
 static qt_wheel_queue wheel_queue;
+static qt_wheel_record wheel_last;    // of the last scroll event
+static bool wheel_last_valid= false;
+static bool wheel_last_ended= false;  // its phase is NSEventPhaseEnded
 static id wheel_monitor= nil;
 
 void
@@ -74,20 +75,38 @@ vue_mac_wheel_monitor () {
   wheel_monitor=
     [NSEvent addLocalMonitorForEventsMatchingMask: NSEventMaskScrollWheel
                                           handler: ^NSEvent* (NSEvent* e) {
-      bool precise= [e hasPreciseScrollingDeltas];
-      qt_wheel_record r= { qt_wheel_sdl_delta (- [e deltaX], precise),
-                           qt_wheel_sdl_delta ([e deltaY], precise),
-                           precise, [e phase] == NSEventPhaseCancelled };
-      wheel_queue.push (r);
+      qt_wheel_record r;
+      r.dx= [e deltaX]; r.dy= [e deltaY];
+      r.sx= [e scrollingDeltaX]; r.sy= [e scrollingDeltaY];
+      r.precise= [e hasPreciseScrollingDeltas];
+      r.ignored= ([e phase] == NSEventPhaseCancelled);
+      wheel_last= r;
+      wheel_last_valid= true;
+      wheel_last_ended= ([e phase] == NSEventPhaseEnded);
       return e;
     }];
 }
 
+void
+vue_mac_wheel_attach (float x, float y, unsigned long long stamp) {
+  if (!wheel_last_valid) return; // an event of a script
+  wheel_last_valid= false;
+  if (!wheel_last.matches (x, y)) return;
+  qt_wheel_record r= wheel_last;
+  // -[QNSView scrollWheel:]: an ended phase which a momentum follows does
+  // not scroll (what the queue has now: this is called while AppKit hands
+  // the ended event to SDL)
+  if (wheel_last_ended) {
+    NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
+                                   untilDate: [NSDate distantPast]
+                                      inMode: @"TMMomentumEventSearchMode"
+                                     dequeue: NO];
+    if (n != nil && [n momentumPhase] == NSEventPhaseBegan) r.ignored= true;
+  }
+  wheel_queue.push (stamp, r);
+}
+
 bool
-vue_mac_wheel_info (float x, float y, bool& precise, bool& cancelled) {
-  qt_wheel_record r;
-  if (!wheel_queue.take (x, y, r)) return false;
-  precise= r.precise;
-  cancelled= r.cancelled;
-  return true;
+vue_mac_wheel_take (unsigned long long stamp, qt_wheel_record& r) {
+  return wheel_queue.take (stamp, r);
 }

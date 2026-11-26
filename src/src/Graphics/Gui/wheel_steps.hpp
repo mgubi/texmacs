@@ -93,10 +93,11 @@ qt_wheel_area_points (int delta) {
 }
 
 // The scroll events of AppKit which SDL turned into wheel events, kept so
-// that the Vue port reads their precise flag and their phase, which SDL
-// drops (vue_mac.mm). SDL (Cocoa_HandleMouseWheel) gives x= -deltaX,
-// y= deltaY of the event, rounded away from zero without precise deltas,
-// as floats, and drops an event with no delta (SDL_SendMouseWheel)
+// that the Vue port reads what SDL drops: the precise flag, the scrolling
+// deltas and the phases (vue_mac.mm). SDL (Cocoa_HandleMouseWheel) gives
+// x= -deltaX, y= deltaY of the event, rounded away from zero without
+// precise deltas, as floats, and drops an event with no delta
+// (SDL_SendMouseWheel)
 inline float
 qt_wheel_sdl_delta (double d, bool precise) {
   if (!precise) d= d > 0 ? ceil (d) : (d < 0 ? floor (d) : 0.0);
@@ -104,37 +105,42 @@ qt_wheel_sdl_delta (double d, bool precise) {
 }
 
 struct qt_wheel_record {
-  float x, y;      // the deltas as SDL gives them
+  double dx, dy;   // deltaX, deltaY of the NSEvent
+  double sx, sy;   // scrollingDeltaX, scrollingDeltaY
   bool precise;    // hasPreciseScrollingDeltas
-  bool cancelled;  // the phase is NSEventPhaseCancelled
+  bool ignored;    // no scroll: a cancelled phase, or an ended phase which
+                   // a momentum follows (-[QNSView scrollWheel:])
+  float sdl_x () const { return qt_wheel_sdl_delta (-dx, precise); }
+  float sdl_y () const { return qt_wheel_sdl_delta (dy, precise); }
+  bool sent_by_sdl () const { return sdl_x () != 0.0f || sdl_y () != 0.0f; }
+  bool matches (float x, float y) const { return sdl_x () == x && sdl_y () == y; }
 };
 
-// the records in the order of the events; take finds the one of a wheel
-// event of SDL by its deltas: the oldest with them, the older ones being
-// events which went to no window of SDL (a menu, a panel); the oldest are
-// forgotten when there are too many
+// the records of the wheel events of SDL, by their timestamps, in the order
+// of the events: a record is attached to its wheel event when SDL queues
+// it (an event watch, called by SDL_PushEvent within the handling of the
+// NSEvent), and taken when the event is handled; the records of older
+// events, which were handled without asking (a zoom, no window under the
+// pointer), are dropped then, so that no record outlives its event
 struct qt_wheel_queue {
   enum { max= 64 };
   qt_wheel_record r[max];
+  unsigned long long stamp[max];
   int first, count;
   qt_wheel_queue (): first (0), count (0) {}
-  void push (const qt_wheel_record& e) {
-    if (e.x == 0.0f && e.y == 0.0f) return; // never sent by SDL
+  void push (unsigned long long t, const qt_wheel_record& e) {
     if (count == max) { first= (first + 1) % max; count--; }
     r[(first + count) % max]= e;
+    stamp[(first + count) % max]= t;
     count++;
   }
-  bool take (float x, float y, qt_wheel_record& e) {
-    for (int i= 0; i < count; i++) {
-      const qt_wheel_record& c= r[(first + i) % max];
-      if (c.x == x && c.y == y) {
-        e= c;
-        first= (first + i + 1) % max;
-        count -= i + 1;
-        return true;
-      }
-    }
-    return false;
+  bool take (unsigned long long t, qt_wheel_record& e) {
+    while (count > 0 && stamp[first] < t) { first= (first + 1) % max; count--; }
+    if (count == 0 || stamp[first] != t) return false;
+    e= r[first];
+    first= (first + 1) % max;
+    count--;
+    return true;
   }
 };
 

@@ -964,8 +964,17 @@ ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
                   qt_wheel_axis& x, qt_wheel_axis& y) {
   NSClipView* clip= [sv contentView];
   if (clip == nil) return NO;
-  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:])
+  // (a cancelled gesture does not scroll, as in -[QNSView scrollWheel:];
+  // nor does the end of a gesture which a momentum follows, which Qt finds
+  // in the queue)
   if ([event phase] == NSEventPhaseCancelled) return YES;
+  if ([event phase] == NSEventPhaseEnded) {
+    NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
+                                   untilDate: [NSDate distantPast]
+                                      inMode: @"TMMomentumEventSearchMode"
+                                     dequeue: NO];
+    if (n != nil && [n momentumPhase] == NSEventPhaseBegan) return YES;
+  }
   bool precise= [event hasPreciseScrollingDeltas];
   int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
   int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);

@@ -429,24 +429,28 @@ when the window is resized under an open menu.
   `wheel_step`). *On macOS* (not in a browser) the wheel scrolls as in the
   Qt port since #971 (`wheel_like_qt`, `wheel_event_qt`, and
   `Graphics/Gui/wheel_steps.hpp`, which the Cocoa port uses too). Whether
-  an event comes from a trackpad is read from its `NSEvent`
-  (`hasPreciseScrollingDeltas`, and the cancelled phase, which does not
-  scroll): a local monitor of the scroll events (`vue_mac_wheel_monitor`,
-  `vue_mac.mm`) keeps them, and each wheel event of SDL finds its own by its
-  deltas (`qt_wheel_queue`), since SDL drops both; only a scripted event,
-  which has none, is classified by its deltas (SDL rounds those of a mouse
+  an event comes from a trackpad is read from its `NSEvent`, as the Qt port
+  does, with its deltas and scrolling deltas (which SDL rounds or drops)
+  and its phases (a cancelled gesture does not scroll, nor the end of one
+  which a momentum follows): a local monitor of the scroll events
+  (`vue_mac_wheel_monitor`, `vue_mac.mm`) keeps the last one, the event
+  watch of SDL attaches it to the wheel event which SDL queues for it, by
+  the timestamp of that event (`vue_mac_wheel_attach`, `qt_wheel_queue`),
+  and the wheel event takes it when it is handled, before anything else,
+  which drops the records of older events. Only a scripted event, which
+  has none, is classified by its deltas (SDL rounds those of a mouse
   wheel and leaves those of a trackpad fractional). A mouse wheel scrolls
   at once three single steps (a sixteenth
   of the view plus a point) per event, whatever the acceleration, as
   `-[QNSView scrollWheel:]` gives 120 per event and `QScrollBar` scrolls
-  `wheelScrollLines` steps per 120; a stream with a fractional delta is a
-  trackpad, and an angle delta of twice its scrolling delta (ten times the
-  delta of SDL) scrolls as many single steps over 40, the fractions carried,
+  `wheelScrollLines` steps per 120; a trackpad gives an angle delta of
+  twice its scrolling delta, which scrolls as many single steps over 40,
+  the fractions carried,
   at most a page per event, on the dominant axis only; the Clay containers
   (menus, lists, dialogs) scroll by the single steps of a `QScrollArea`, 20
   points (`qt_wheel_area_points`). An editor which captures the wheel gets
-  20 points per line of a mouse wheel as Qt's pixel delta, but of the delta
-  rounded by SDL (Qt has it unrounded). Unlike a `QTMWidget`, an editor at
+  Qt's pixel delta: the scrolling delta, 20 points per line for a mouse
+  wheel. Unlike a `QTMWidget`, an editor at
   the end of its document does not pass the wheel on to the Clay container
   around it, nor drop the fraction of a step there (`scroll_bar`): it
   clamps its position only after the layout which used the wheel. What

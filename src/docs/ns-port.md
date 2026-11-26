@@ -53,7 +53,9 @@ editor at its end passes the event to the views around it, as Qt passes
 an event which the scroll bar ignores to the parent widget, and the scroll
 views of widgets, `TMScrollAreaView`, scroll by the single steps of a
 `QScrollArea`, 20 points; a canvas which is not the document of a scroll
-view of its own, a box widget say, passes the event on to them). The keys are named as in Qt (`space`, `S-tab`,
+view of its own, a box widget say, passes the event on to them; as in Qt,
+a cancelled gesture does not scroll, nor the end of a gesture which a
+momentum follows). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the
