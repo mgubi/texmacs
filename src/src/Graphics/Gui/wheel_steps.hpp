@@ -68,7 +68,6 @@ struct qt_wheel_axis {
     }
     double f= 3 * offset * step; // wheelScrollLines
     if (acc != 0 && offset / acc < 0) acc= 0; // the wheel changed direction
-    if (acc != 0 && offset / acc < 0) acc= 0; // the wheel changed direction
     acc += f;
     int n= (int) acc;
     acc -= n;
@@ -81,11 +80,14 @@ struct qt_wheel_axis {
   // the fraction is dropped and the event is not taken (Qt passes it to the
   // parent widget); else the fraction is kept, also when less than a point
   // is scrolled (stepsToScroll == 0)
+  // (paging less than a point: the bar does not move, and Qt ignores the
+  // event, which the parent widget gets)
   int scroll_bar (int delta, int step, int page, bool can_move, bool& taken,
                   bool paging= false) {
     if (!can_move) { acc= 0; taken= false; return 0; }
-    taken= true;
-    return scroll (delta, step, page, paging);
+    int n= scroll (delta, step, page, paging);
+    taken= !(paging && n == 0);
+    return n;
   }
   void reset () { acc= 0; }
 };
@@ -163,8 +165,10 @@ struct qt_wheel_latch {
 };
 
 // QTMWidget::wheelEvent zooms with control alone (keyboardModifiers () ==
-// ControlModifier); QAbstractSliderPrivate::scrollByDelta pages with
-// control or shift
+// ControlModifier: command alone on macOS), over an editor;
+// QAbstractSliderPrivate::scrollByDelta pages with control or shift, with
+// any other keys: shift alone, command with shift or another key over an
+// editor, and command alone too over a scroll bar or a scroll area
 inline bool qt_wheel_zooms (int mods) { return mods == QT_WHEEL_CONTROL; }
 inline bool qt_wheel_pages (int mods) {
   return (mods & (QT_WHEEL_CONTROL | QT_WHEEL_SHIFT)) != 0; }

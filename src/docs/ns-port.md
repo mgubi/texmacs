@@ -56,11 +56,15 @@ views of widgets, `TMScrollAreaView`, scroll by the single steps of a
 view of its own, a box widget say, passes the event on to them; as in Qt,
 the end of a gesture which a momentum follows is dropped, and a cancelled
 gesture is a wheel of (0, 0) for an editor which captures it; command
-alone zooms by the pixel delta as `QTMWidget::wheelEvent`, command or
-shift with other keys page (`scrollByDelta`), with the modifiers of the
-gesture during its momentum; over a legacy scroll bar the wheel scrolls
-that bar as `QScrollBar`, a vertical wheel also a horizontal bar, with no
-zoom nor capture. A deliberate deviation from Qt: over the margins
+alone zooms an editor by the pixel delta as `QTMWidget::wheelEvent`;
+shift alone, command with other keys, and command alone over a scroll bar
+or a scroll area page, a page a notch (`scrollByDelta`); the modifiers are
+those of the gesture during its momentum (one latch for all windows,
+where Qt has one a window); over a scroll bar, a legacy one beside the
+view or an overlay one over it (which owns its strip at the edge whenever
+it has a range, as the transient bars of Qt), the wheel scrolls that bar
+as `QScrollBar`, a vertical wheel also a horizontal bar, with no zoom nor
+capture, and the square between two legacy bars passes it on. A deliberate deviation from Qt: over the margins
 beside a centered page, where Qt does nothing (only the surface gets the
 wheel), the document scrolls as over the page, which is more natural;
 `ns_wheel_margins_scroll` in `TMView.mm` is the switch). The keys are named as in Qt (`space`, `S-tab`,

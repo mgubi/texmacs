@@ -123,6 +123,10 @@ struct vue_input_state {
   // the wheel for the Clay scroll containers, in units of Clay, applied
   // once before the next layout (see push_wheel)
   double clay_wheel_x, clay_wheel_y;
+  // the wheel which pages a Clay container (command or shift, as a
+  // QScrollArea, see wheel_event_qt), in notches: the page of the
+  // container is known when it is applied (clay_wheel_flush)
+  double clay_page_x, clay_page_y;
   bool   wheel_taken;  // a widget used the wheel of the last layout (an
                        // editor): the Clay containers do not get it
   // popups and balloons
@@ -158,7 +162,8 @@ struct vue_input_state {
       wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
       wheel_pend_g (1.0),
       wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
-      clay_wheel_x (0), clay_wheel_y (0), wheel_taken (false),
+      clay_wheel_x (0), clay_wheel_y (0), clay_page_x (0), clay_page_y (0),
+      wheel_taken (false),
       current_popup (false), cancel_popup (false),
       hover_item (0), hover_menu (0), hover_since (0), swallow_mouse (false),
       current_balloon (0), balloon_time (0),

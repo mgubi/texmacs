@@ -4357,19 +4357,50 @@ push_wheel (vue_window win, double dx, double dy) {
 // After the layout which gave the wheel to the widgets, and only if none
 // of them used it: an editor in a dialog scrolls, not the dialog around
 // it (Clay itself gives the wheel to the innermost of its containers)
+// the Clay container which the wheel scrolls (as Clay_UpdateScrollContainers
+// chooses it: the innermost under the pointer which can scroll), after
+// Clay_SetPointerState
+static bool
+clay_wheel_target (Clay_ScrollContainerData& c) {
+  Clay_ElementIdArray ids= Clay_GetPointerOverIds ();
+  for (int i= ids.length - 1; i >= 0; i--) {
+    c= Clay_GetScrollContainerData (ids.internalArray[i]);
+    if (!c.found) continue;
+    if ((c.config.vertical &&
+         c.contentDimensions.height > c.scrollContainerDimensions.height) ||
+        (c.config.horizontal &&
+         c.contentDimensions.width > c.scrollContainerDimensions.width))
+      return true;
+  }
+  return false;
+}
+
 static void
 clay_wheel_flush (vue_window_rep* win) {
   vue_input_state& in= win->input;
   bool taken= in.wheel_taken;
   in.wheel_taken= false;
-  if (in.clay_wheel_x == 0 && in.clay_wheel_y == 0) return;
+  if (in.clay_wheel_x == 0 && in.clay_wheel_y == 0 &&
+      in.clay_page_x == 0 && in.clay_page_y == 0) return;
   if (!taken) {
     Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
-    Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) in.clay_wheel_x,
-                                                        (float) in.clay_wheel_y }, 0.01f);
-    gui_needs_relayout= true; // shown at once, by another layout
+    double ux= in.clay_wheel_x, uy= in.clay_wheel_y;
+    Clay_ScrollContainerData c;
+    if ((in.clay_page_x != 0 || in.clay_page_y != 0) && clay_wheel_target (c)) {
+      // a page an event, scaled by the delta (scrollByDelta with control
+      // or shift), in units of Clay (ten pixels)
+      double pw= c.scrollContainerDimensions.width;
+      double ph= c.scrollContainerDimensions.height;
+      ux += max (-pw, min (pw, (double) (int) (in.clay_page_x * pw))) / 10;
+      uy += max (-ph, min (ph, (double) (int) (in.clay_page_y * ph))) / 10;
+    }
+    if (ux != 0 || uy != 0) {
+      Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) ux, (float) uy }, 0.01f);
+      gui_needs_relayout= true; // shown at once, by another layout
+    }
   }
   in.clay_wheel_x= in.clay_wheel_y= 0;
+  in.clay_page_x= in.clay_page_y= 0;
 }
 
 // is a timestamp given by SDL a time of the X server in ms? SDL counts the
@@ -4522,8 +4553,14 @@ wheel_event_qt (vue_window win, double x, double y) {
     dy= in.wheel_qt_y.scroll (ay, qt_wheel_single_step (vh), vh, paging);
   // the scroll containers of Clay (menus, lists, dialogs) scroll as a
   // QScrollArea: single steps of 20 points, of which a float is enough
+  // (with command or shift a page an event, when the container is known:
+  // clay_page_x/y, see clay_wheel_flush)
   double kx= 0, ky= 0;
-  if (qt_wheel_horizontal (ax, ay)) kx= qt_wheel_area_points (ax);
+  if (paging) {
+    if (qt_wheel_horizontal (ax, ay)) in.clay_page_x += ax / 120.0;
+    else in.clay_page_y += ay / 120.0;
+  }
+  else if (qt_wheel_horizontal (ax, ay)) kx= qt_wheel_area_points (ax);
   else ky= qt_wheel_area_points (ay);
   // an editor which captures the wheel gets the pixel delta of the Qt port
   // (a QPoint): the scrolling delta truncated, 20 points a line for a mouse
@@ -4540,7 +4577,8 @@ wheel_event_qt (vue_window win, double x, double y) {
   dx *= win->density; dy *= win->density;
   kx *= win->density; ky *= win->density;
   in.wheel_event_time= texmacs_time ();
-  if (dx != 0 || dy != 0 || gx != 0 || gy != 0 || kx != 0 || ky != 0)
+  if (dx != 0 || dy != 0 || gx != 0 || gy != 0 || kx != 0 || ky != 0 ||
+      paging)
     push_wheel (win, dx, dy, gx, gy, kx, ky);
 }
 
@@ -6536,7 +6574,8 @@ vue_web_tab_document (int id) {
 // window is. Returns true if the event was used; not when the editor
 // captures the wheel.
 static bool
-wheel_zooms (vue_window win, double y, const qt_wheel_record* rec) {
+wheel_zooms (vue_window win, double y, const qt_wheel_record* rec,
+             double px, double py) {
 #ifdef OS_MACOS
   const SDL_Keymod zoom_mod= SDL_KMOD_GUI;
 #else
@@ -6546,7 +6585,16 @@ wheel_zooms (vue_window win, double y, const qt_wheel_record* rec) {
   // command alone, as Qt has it during a gesture and its momentum
   (void) zoom_mod;
   if (!qt_wheel_zooms (wheel_mods)) return false;
+  // and over the editor, as in Qt only a QTMWidget zooms: elsewhere (a
+  // menu, a list, a dialog: a QScrollArea in Qt) command pages
+  if (vue_simple_widget_rep* ed=
+        dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep)) {
+    with_window frame (win);
+    Clay_SetPointerState ((Clay_Vector2) { (float) px, (float) py }, false);
+    if (!Clay_PointerOver (CLAY_IDI ("simple_widget", ed->id))) return false;
+  }
 #else
+  (void) px; (void) py;
   const SDL_Keymod all= SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
   SDL_Keymod mods= SDL_GetModState () & all;
   if (mods == 0 || (mods & ~zoom_mod) != 0) return false;
@@ -6873,6 +6921,16 @@ process_event (SDL_Event *event) {
       if (has_rec && rec.ignored) break;
       wheel_mods= wheel_latch.update (has_rec ? rec.mods : wheel_sdl_mods (),
                                       has_rec && rec.momentum);
+#ifdef OS_MACOS
+      // the modifiers which an editor capturing the wheel gets, as Qt's
+      // wheel_state (QTMWidget.cpp) reads those of the event: the latched
+      // ones (command is control for Qt, GUI for SDL)
+      mouse_state= mouse_bits (mouse_buttons (), (SDL_Keymod)
+        (((wheel_mods & QT_WHEEL_SHIFT) ? SDL_KMOD_SHIFT : 0) |
+         ((wheel_mods & QT_WHEEL_CONTROL) ? SDL_KMOD_GUI : 0) |
+         ((wheel_mods & QT_WHEEL_ALT) ? SDL_KMOD_ALT : 0) |
+         ((wheel_mods & QT_WHEEL_META) ? SDL_KMOD_CTRL : 0)));
+#endif
       if (DEBUG_VUE_EVENTS)
         SDL_Log ("Window %d got wheel event %f %f (stamp %llu%s)",
                  event->wheel.windowID, event->wheel.x, event->wheel.y,
@@ -6882,7 +6940,8 @@ process_event (SDL_Event *event) {
       float wx= event->wheel.mouse_x, wy= event->wheel.mouse_y;
       win= under_tooltip (win, wx, wy);
       win= route_pointer (win, wx, wy, 3);
-      if (win && wheel_zooms (win, event->wheel.y, has_rec ? &rec : NULL)) break;
+      if (win && wheel_zooms (win, event->wheel.y, has_rec ? &rec : NULL,
+                              wx * win->density, wy * win->density)) break;
       if (win) {
         vue_input_state& in= win->input;
         in.mouse_time= texmacs_time();

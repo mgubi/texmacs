@@ -201,7 +201,8 @@ test_zoom () {
 
 static void
 test_modifiers () {
-  // command (control in Qt) alone zooms; with shift or alone it pages
+  // command (control in Qt) alone zooms an editor; command or shift, with
+  // any other keys, pages (an editor when it does not zoom, a bar, an area)
   CHECK (qt_wheel_zooms (QT_WHEEL_CONTROL));
   CHECK (!qt_wheel_zooms (QT_WHEEL_CONTROL | QT_WHEEL_SHIFT));
   CHECK (!qt_wheel_zooms (QT_WHEEL_CONTROL | QT_WHEEL_ALT));
@@ -230,6 +231,13 @@ test_paging () {
   CHECK_EQ (a.scroll (15, 51, 800), 19);          // not paging: 19.125
   CHECK_EQ (a.scroll (15, 51, 800, true), 100);   // the 0.125 dropped
   CHECK_EQ (a.scroll (7, 51, 800), 8);            // 8.925, from nothing
+  // less than a point of a page: the bar does not take the event (Qt
+  // passes it to the parent widget)
+  bool taken= true;
+  CHECK_EQ (a.scroll_bar (1, 51, 80, true, taken, true), 0);
+  CHECK (!taken);
+  CHECK_EQ (a.scroll_bar (2, 51, 80, true, taken, true), 1);
+  CHECK (taken);
 }
 
 static void

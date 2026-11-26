@@ -443,9 +443,13 @@ when the window is resized under an open menu.
   records of older events (the serial numbers wrap around safely). As in
   Qt, the end of a gesture which a momentum follows is dropped, a
   cancelled gesture is a wheel of (0, 0) for an editor which captures it,
-  command alone zooms by the pixel delta of the `NSEvent`, and command or
-  shift with other keys page an editor (not a Clay container), with the
-  modifiers of the gesture during its momentum (`qt_wheel_latch`). The deltas of SDL are not used: their formula
+  command alone zooms by the pixel delta of the `NSEvent` when the pointer
+  is over the editor which has the focus (only a `QTMWidget` zooms in Qt;
+  over another editor of the window it does not), and shift alone or
+  command otherwise page, a page a notch, an editor or a Clay container
+  (whose page is found when the wheel is applied, `clay_wheel_flush`),
+  with the modifiers of the gesture during its momentum (`qt_wheel_latch`),
+  which an editor capturing the wheel gets too. The deltas of SDL are not used: their formula
   changed between versions of SDL (3.4.2 gives `deltaY`, 3.4.20 a tenth of
   `scrollingDeltaY` for a trackpad). Only a scripted event, which has no
   record (`wheel_scripted`), is classified by its deltas (SDL rounds those
