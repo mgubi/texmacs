@@ -187,24 +187,39 @@
          (views (check-buffer-views buf))
          (bufs (buffer-list))
          (n (suite-failures* suite))
-         (after (check-buffer-views buf))
-         (left (list-filter (buffer-list) (lambda (b) (nin? b bufs)))))
+         (left (list-filter (buffer-list) (lambda (b) (nin? b bufs))))
+         (errors 0)
+         (cleanup
+          (lambda (what thunk)
+            ;; an error of the cleanup is a failure of the suite, and does
+            ;; not stop the cleanup nor the suites after it
+            (catch #t thunk
+              (lambda (key . args)
+                (set! errors (+ errors 1))
+                (display* "  FAILED [" (car suite) "] " what ": "
+                          (object->string (cons key args)) "\n"))))))
     (when (nnull? left)
       (display* "  FAILED [" (car suite) "] buffers left open: "
                 (object->string (map url->string left)) "\n")
-      (for (b left) (buffer-pretend-saved b) (buffer-close b))
-      (check-restore-buffer buf))
+      (for (b left)
+        (cleanup (string-append "closing " (url->string b))
+                 (lambda () (buffer-pretend-saved b) (buffer-close b))))
+      (cleanup "going back to the buffer where the suite started"
+               (lambda () (check-restore-buffer buf))))
     ;; the widgets of the views which the suite closed (check-lib)
-    (check-free-closed-views)
-    (+ n
-       (if (null? left) 0 1)
-       (if (== after views) 0
-           (begin
-             (display* "  FAILED [" (car suite) "] the views of the buffer "
-                       "where the suite started: expected "
-                       (object->string views) ", got "
-                       (object->string after) "\n")
-             1)))))
+    (cleanup "deleting the widgets of the closed views"
+             (lambda () (check-free-closed-views)))
+    ;; (after the cleanup, which may also change them)
+    (with after (check-buffer-views buf)
+      (+ n errors
+         (if (null? left) 0 1)
+         (if (== after views) 0
+             (begin
+               (display* "  FAILED [" (car suite) "] the views of the buffer "
+                         "where the suite started: expected "
+                         (object->string views) ", got "
+                         (object->string after) "\n")
+               1))))))
 
 (define (suite-failures* suite)
   (let ((f (eval (cadr suite)))
