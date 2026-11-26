@@ -56,9 +56,14 @@ views of widgets, `TMScrollAreaView`, scroll by the single steps of a
 view of its own, a box widget say, passes the event on to them; as in Qt,
 the end of a gesture which a momentum follows is dropped, and a cancelled
 gesture is a wheel of (0, 0) for an editor which captures it; command
-zooms by the pixel delta as `QTMWidget::wheelEvent`; the margins beside a
-centered page and the scroll bars of an editor, `TMEditorScrollView`, give
-the wheel to its canvas, as the viewport and the bars of `QTMScrollView`). The keys are named as in Qt (`space`, `S-tab`,
+alone zooms by the pixel delta as `QTMWidget::wheelEvent`, command or
+shift with other keys page (`scrollByDelta`), with the modifiers of the
+gesture during its momentum; over a legacy scroll bar the wheel scrolls
+that bar as `QScrollBar`, a vertical wheel also a horizontal bar, with no
+zoom nor capture. A deliberate deviation, pending a decision: over the
+margins beside a centered page, where Qt does nothing (only the surface
+gets the wheel), the document scrolls as over the page,
+`ns_wheel_margins_scroll` in `TMView.mm`). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the

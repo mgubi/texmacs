@@ -80,6 +80,12 @@ vue_mac_wheel_monitor () {
       r.dx= [e deltaX]; r.dy= [e deltaY];
       r.sx= [e scrollingDeltaX]; r.sy= [e scrollingDeltaY];
       r.precise= [e hasPreciseScrollingDeltas];
+      NSEventModifierFlags f= [e modifierFlags];
+      r.mods= ((f & NSEventModifierFlagShift) ? QT_WHEEL_SHIFT : 0) |
+              ((f & NSEventModifierFlagCommand) ? QT_WHEEL_CONTROL : 0) |
+              ((f & NSEventModifierFlagOption) ? QT_WHEEL_ALT : 0) |
+              ((f & NSEventModifierFlagControl) ? QT_WHEEL_META : 0);
+      r.momentum= ([e momentumPhase] != NSEventPhaseNone);
       r.cancelled= ([e phase] == NSEventPhaseCancelled);
       r.ignored= false;
       wheel_last= r;

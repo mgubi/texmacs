@@ -126,6 +126,7 @@ static qt_wheel_record
 record (double dy, double sy, bool precise) {
   qt_wheel_record r;
   r.dx= 0; r.dy= dy; r.sx= 0; r.sy= sy;
+  r.mods= 0; r.momentum= false;
   r.precise= precise; r.cancelled= false; r.ignored= false;
   return r;
 }
@@ -178,9 +179,13 @@ test_queue () {
 static void
 test_zoom () {
   // QTMWidget::wheelEvent with command: the pixel delta, by its sixteenth
-  // root; a notch of a mouse gives 20 pixels, a trackpad its points
-  double notch= qt_wheel_zoom (0, qt_wheel_mac_pixels (1.0, false), 0, 120);
-  CHECK (fabs (notch - pow (20.0, 1.0 / 16)) < 1e-12);
+  // root; a notch of a mouse gives 20 times its scrolling delta (a slow
+  // notch, 0.1: 2 points, 2^(1/16) = 1.044; an accelerated notch more), a
+  // trackpad its points
+  double slow= qt_wheel_zoom (0, qt_wheel_mac_pixels (0.1, false), 0, 120);
+  CHECK (fabs (slow - pow (2.0, 1.0 / 16)) < 1e-12);
+  double fast= qt_wheel_zoom (0, qt_wheel_mac_pixels (1.0, false), 0, 120);
+  CHECK (fabs (fast - pow (20.0, 1.0 / 16)) < 1e-12);
   CHECK (qt_wheel_zoom (0, -7, 0, -14) < 0);
   CHECK (fabs (qt_wheel_zoom (0, -16, 0, -32) + pow (16.0, 1.0 / 16)) < 1e-12);
   // no pixel delta: the angle in degrees; nothing at all: no zoom
@@ -188,6 +193,59 @@ test_zoom () {
   CHECK_EQ (qt_wheel_zoom (0, 0, 0, 0), 0.0);
   // a cancelled gesture (zeroed deltas) and a sideways pixel delta: none
   CHECK_EQ (qt_wheel_zoom (5, 0, 10, 0), 0.0);
+  // the degrees are rounded as QPoint / 8 (qRound): 12 / 8 = 1.5 gives 2
+  CHECK (fabs (qt_wheel_zoom (0, 0, 0, 12) - pow (2.0, 1.0 / 16)) < 1e-12);
+  CHECK (fabs (qt_wheel_zoom (0, 0, 0, -12) + pow (2.0, 1.0 / 16)) < 1e-12);
+  CHECK_EQ (qt_wheel_zoom (0, 0, 0, 3), 0.0);  // 0.375 gives 0
+}
+
+static void
+test_modifiers () {
+  // command (control in Qt) alone zooms; with shift or alone it pages
+  CHECK (qt_wheel_zooms (QT_WHEEL_CONTROL));
+  CHECK (!qt_wheel_zooms (QT_WHEEL_CONTROL | QT_WHEEL_SHIFT));
+  CHECK (!qt_wheel_zooms (QT_WHEEL_CONTROL | QT_WHEEL_ALT));
+  CHECK (!qt_wheel_zooms (QT_WHEEL_META));
+  CHECK (qt_wheel_pages (QT_WHEEL_SHIFT));
+  CHECK (qt_wheel_pages (QT_WHEEL_CONTROL | QT_WHEEL_SHIFT));
+  CHECK (!qt_wheel_pages (QT_WHEEL_ALT));
+  CHECK (!qt_wheel_pages (0));
+  // the modifiers of a gesture hold during its momentum
+  qt_wheel_latch l;
+  CHECK_EQ (l.update (QT_WHEEL_CONTROL, false), (int) QT_WHEEL_CONTROL);
+  CHECK_EQ (l.update (0, true), (int) QT_WHEEL_CONTROL);
+  CHECK_EQ (l.update (QT_WHEEL_SHIFT, true), (int) QT_WHEEL_CONTROL);
+  CHECK_EQ (l.update (0, false), 0);
+}
+
+static void
+test_paging () {
+  // scrollByDelta with control or shift: a page an event, scaled by the
+  // delta, the fraction dropped
+  qt_wheel_axis a;
+  CHECK_EQ (a.scroll (120, 51, 800, true), 800);
+  CHECK_EQ (a.scroll (-120, 51, 800, true), -800);
+  CHECK_EQ (a.scroll (15, 51, 800, true), 100);   // 800 / 8
+  CHECK_EQ (a.scroll (2400, 51, 800, true), 800);
+  CHECK_EQ (a.scroll (15, 51, 800), 19);          // not paging: 19.125
+  CHECK_EQ (a.scroll (15, 51, 800, true), 100);   // the 0.125 dropped
+  CHECK_EQ (a.scroll (7, 51, 800), 8);            // 8.925, from nothing
+}
+
+static void
+test_bar () {
+  // QScrollBar::wheelEvent: a bar scrolls by the dominant angle, a vertical
+  // wheel also scrolls a horizontal bar, but not with a sideways part
+  int a= 0;
+  CHECK (qt_wheel_bar_angle (false, 0, 120, a));
+  CHECK_EQ (a, 120);
+  CHECK (qt_wheel_bar_angle (true, 0, -120, a));
+  CHECK_EQ (a, -120);
+  CHECK (!qt_wheel_bar_angle (true, 4, 120, a));
+  CHECK (qt_wheel_bar_angle (true, 120, 4, a));
+  CHECK_EQ (a, 120);
+  CHECK (qt_wheel_bar_angle (false, -60, 4, a));  // a horizontal wheel too
+  CHECK_EQ (a, -60);
 }
 
 static void
@@ -218,6 +276,9 @@ main () {
   RUN (test_record);
   RUN (test_queue);
   RUN (test_zoom);
+  RUN (test_modifiers);
+  RUN (test_paging);
+  RUN (test_bar);
   RUN (test_serial_wrap);
   return test_report ();
 }

@@ -4434,6 +4434,20 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
 static const qt_wheel_record* wheel_record= NULL;
 // a script is pushing a wheel event (see wheel_watch)
 static bool wheel_scripted= false;
+// the modifiers of the wheel event being handled, as Qt has them on macOS
+// (qt_wheel_latch: those of the gesture during its momentum)
+static qt_wheel_latch wheel_latch;
+static int wheel_mods= 0;
+
+// the modifiers of SDL as those of Qt on macOS (command is control)
+static int
+wheel_sdl_mods () {
+  SDL_Keymod m= SDL_GetModState ();
+  return ((m & SDL_KMOD_SHIFT) ? QT_WHEEL_SHIFT : 0) |
+         ((m & SDL_KMOD_GUI) ? QT_WHEEL_CONTROL : 0) |
+         ((m & SDL_KMOD_ALT) ? QT_WHEEL_ALT : 0) |
+         ((m & SDL_KMOD_CTRL) ? QT_WHEEL_META : 0);
+}
 
 #ifdef OS_MACOS
 // the NSEvent which SDL is turning into a wheel event (wheel_event_qt): its
@@ -4499,10 +4513,13 @@ wheel_event_qt (vue_window win, double x, double y) {
   int vh= (int) max (100.0, ((double) h) / PIXEL - 120.0);
   // the bar of the dominant axis scrolls (QAbstractScrollArea::wheelEvent)
   double dx= 0, dy= 0;
+  // (with command or shift, a page an event: QAbstractSliderPrivate::
+  // scrollByDelta; not in the Clay containers, whose page is not known here)
+  bool paging= qt_wheel_pages (wheel_mods);
   if (qt_wheel_horizontal (ax, ay))
-    dx= in.wheel_qt_x.scroll (ax, qt_wheel_single_step (vw), vw);
+    dx= in.wheel_qt_x.scroll (ax, qt_wheel_single_step (vw), vw, paging);
   else if (ay != 0)
-    dy= in.wheel_qt_y.scroll (ay, qt_wheel_single_step (vh), vh);
+    dy= in.wheel_qt_y.scroll (ay, qt_wheel_single_step (vh), vh, paging);
   // the scroll containers of Clay (menus, lists, dialogs) scroll as a
   // QScrollArea: single steps of 20 points, of which a float is enough
   double kx= 0, ky= 0;
@@ -6525,9 +6542,15 @@ wheel_zooms (vue_window win, double y, const qt_wheel_record* rec) {
 #else
   const SDL_Keymod zoom_mod= SDL_KMOD_CTRL;
 #endif
+#ifdef OS_MACOS
+  // command alone, as Qt has it during a gesture and its momentum
+  (void) zoom_mod;
+  if (!qt_wheel_zooms (wheel_mods)) return false;
+#else
   const SDL_Keymod all= SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
   SDL_Keymod mods= SDL_GetModState () & all;
   if (mods == 0 || (mods & ~zoom_mod) != 0) return false;
+#endif
   if (dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep) == NULL) return false;
   // as in Qt, the editor gets the wheel when it captures it (graphics)
   if (as_bool (call ("wheel-capture?"))) return false;
@@ -6848,6 +6871,8 @@ process_event (SDL_Event *event) {
       // nor does any widget see an event which Qt drops (the end of a
       // gesture which a momentum follows), also no zoom
       if (has_rec && rec.ignored) break;
+      wheel_mods= wheel_latch.update (has_rec ? rec.mods : wheel_sdl_mods (),
+                                      has_rec && rec.momentum);
       if (DEBUG_VUE_EVENTS)
         SDL_Log ("Window %d got wheel event %f %f (stamp %llu%s)",
                  event->wheel.windowID, event->wheel.x, event->wheel.y,

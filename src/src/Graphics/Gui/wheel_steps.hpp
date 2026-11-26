@@ -57,9 +57,17 @@ qt_wheel_horizontal (int angle_x, int angle_y) {
 struct qt_wheel_axis {
   double acc;
   qt_wheel_axis (): acc (0) {}
-  int scroll (int delta, int step, int page, int lines= 3) {
+  // (paging: with control or shift, a page an event, scaled by the delta,
+  // the fraction dropped)
+  int scroll (int delta, int step, int page, bool paging= false) {
     double offset= ((double) delta) / 120.0;
-    double f= lines * offset * step;
+    if (paging) {
+      acc= 0;
+      int n= (int) (offset * page);
+      return n < -page ? -page : (n > page ? page : n);
+    }
+    double f= 3 * offset * step; // wheelScrollLines
+    if (acc != 0 && offset / acc < 0) acc= 0; // the wheel changed direction
     if (acc != 0 && offset / acc < 0) acc= 0; // the wheel changed direction
     acc += f;
     int n= (int) acc;
@@ -73,10 +81,11 @@ struct qt_wheel_axis {
   // the fraction is dropped and the event is not taken (Qt passes it to the
   // parent widget); else the fraction is kept, also when less than a point
   // is scrolled (stepsToScroll == 0)
-  int scroll_bar (int delta, int step, int page, bool can_move, bool& taken) {
+  int scroll_bar (int delta, int step, int page, bool can_move, bool& taken,
+                  bool paging= false) {
     if (!can_move) { acc= 0; taken= false; return 0; }
     taken= true;
-    return scroll (delta, step, page);
+    return scroll (delta, step, page, paging);
   }
   void reset () { acc= 0; }
 };
@@ -101,6 +110,8 @@ struct qt_wheel_record {
   double dx, dy;   // deltaX, deltaY of the NSEvent
   double sx, sy;   // scrollingDeltaX, scrollingDeltaY
   bool precise;    // hasPreciseScrollingDeltas
+  int mods;        // its modifiers (QT_WHEEL_SHIFT...)
+  bool momentum;   // momentumPhase != None
   bool cancelled;  // a cancelled phase: Qt zeroes its deltas (an editor
                    // which captures the wheel gets a wheel of (0, 0))
   bool ignored;    // an ended phase which a momentum follows: Qt drops it
@@ -123,11 +134,51 @@ inline double
 qt_wheel_zoom (int pix_x, int pix_y, int angle_x, int angle_y) {
   int v;
   if (pix_x != 0 || pix_y != 0) v= pix_y;
-  else if (angle_x != 0 || angle_y != 0) v= angle_y / 8;
+  else if (angle_x != 0 || angle_y != 0) {
+    // (QPoint / 8: qRound, half away from zero)
+    double d= angle_y / 8.0;
+    v= (int) (d >= 0 ? d + 0.5 : d - 0.5);
+  }
   else return 0;
   if (v == 0) return 0;
   double f= sqrt (sqrt (sqrt (sqrt ((double) (v < 0 ? -v : v)))));
   return v > 0 ? f : -f;
+}
+
+// The modifiers of a wheel event as Qt has them on macOS (command is
+// control, control is meta): -[QNSView scrollWheel:] takes those of an
+// event of a gesture or of a wheel, and keeps them during the momentum
+// which follows it (momentumPhase != None), so that a key pressed while
+// the view glides does not change what the glide does
+enum { QT_WHEEL_SHIFT= 1, QT_WHEEL_CONTROL= 2, QT_WHEEL_ALT= 4,
+       QT_WHEEL_META= 8 };
+
+struct qt_wheel_latch {
+  int mods;
+  qt_wheel_latch (): mods (0) {}
+  int update (int event_mods, bool momentum) {
+    if (!momentum) mods= event_mods;
+    return mods;
+  }
+};
+
+// QTMWidget::wheelEvent zooms with control alone (keyboardModifiers () ==
+// ControlModifier); QAbstractSliderPrivate::scrollByDelta pages with
+// control or shift
+inline bool qt_wheel_zooms (int mods) { return mods == QT_WHEEL_CONTROL; }
+inline bool qt_wheel_pages (int mods) {
+  return (mods & (QT_WHEEL_CONTROL | QT_WHEEL_SHIFT)) != 0; }
+
+// QScrollBar::wheelEvent, for a wheel over a scroll bar: the angle by
+// which the bar scrolls (a vertical wheel also scrolls a horizontal bar),
+// or false when it ignores the event (a horizontal bar, a vertical wheel
+// with some sideways part)
+inline bool
+qt_wheel_bar_angle (bool horizontal_bar, int angle_x, int angle_y, int& a) {
+  bool hor= qt_wheel_horizontal (angle_x, angle_y);
+  if (!hor && angle_x != 0 && horizontal_bar) return false;
+  a= hor ? angle_x : angle_y;
+  return true;
 }
 
 // the serial numbers of the wheel events of SDL wrap around: a is before b
