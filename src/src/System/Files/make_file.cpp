@@ -39,6 +39,10 @@ make_file (int cmd, tree data, array<url> args) {
   tree key (TUPLE, as_string (cmd), data);
   for (int i=0; i<N(args); i++)
     key << as_string (args[i]);
+  // the version of the results of effects: without Qt, they were computed
+  // at 300 dpi before #969, now at the size in pixels of the image; the
+  // tag gives them new names, so that those of before are not taken
+  if (cmd == CMD_APPLY_EFFECT) key << "pixels";
   if (make_cache->contains (key))
     return as_url (make_cache[key]);
 
