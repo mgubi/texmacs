@@ -692,29 +692,35 @@ mouse_decode (unsigned int mstate) {
   // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
   // command zooms, and otherwise the scroll view scrolls
   if (!wid) { [super scrollWheel: event]; return; }
-  // what -[QNSView scrollWheel:] drops before any widget sees it: neither
-  // the capture nor the zoom get it
-  if (!ns_wheel_native () && ns_wheel_dropped (event)) return;
+  // what -[QNSView scrollWheel:] drops before any widget sees it (the end
+  // of a gesture which a momentum follows): neither the capture nor the
+  // zoom get it; the deltas of a cancelled gesture are zeroes
+  bool qt= !ns_wheel_native ();
+  if (qt && ns_wheel_dropped (event)) return;
+  bool cancelled= qt && [event phase] == NSEventPhaseCancelled;
+  bool precise= [event hasPreciseScrollingDeltas];
+  int px= cancelled? 0: qt_wheel_mac_pixels ([event scrollingDeltaX], precise);
+  int py= cancelled? 0: qt_wheel_mac_pixels ([event scrollingDeltaY], precise);
   if (as_bool (call ("wheel-capture?"))) {
     NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
     // the pixel delta of the Qt port (a QPoint): for a mouse wheel, 20
     // points a line
-    bool precise= [event hasPreciseScrollingDeltas];
-    coord2 wh = from_nspoint (NSMakePoint (
-      qt_wheel_mac_pixels ([event scrollingDeltaX], precise),
-      qt_wheel_mac_pixels ([event scrollingDeltaY], precise)));
+    coord2 wh = from_nspoint (NSMakePoint (px, py));
     array<double> data;
     data << ((double) wh.x1) << ((double) wh.x2);
     the_gui->process_mouse (wid, "wheel", pt.x1, pt.x2,
                             mouse_state (event, false), texmacs_time (), data);
   }
   else if ([event modifierFlags] & NSEventModifierFlagCommand) {
-    double dy= [event scrollingDeltaY];
-    if (dy == 0) return;
-    double f= sqrt (sqrt (sqrt (sqrt ([event hasPreciseScrollingDeltas]?
-                                      fabs (dy): 2.0))));
-    call (dy > 0? "zoom-in": "zoom-out", object (f));
+    // as QTMWidget::wheelEvent (Qt 6): by the pixel delta, else the angle
+    int ax= cancelled? 0: qt_wheel_mac_angle ([event scrollingDeltaX],
+                                              [event deltaX], precise);
+    int ay= cancelled? 0: qt_wheel_mac_angle ([event scrollingDeltaY],
+                                              [event deltaY], precise);
+    double f= qt_wheel_zoom (px, py, ax, ay);
+    if (f == 0) return;
+    call (f > 0? "zoom-in": "zoom-out", object (fabs (f)));
   }
   else if (![self scrollLikeQt: event]) [super scrollWheel: event];
 }
@@ -958,12 +964,11 @@ ns_wheel_native () {
   return native == 1;
 }
 
-// does -[QNSView scrollWheel:] drop the event? A cancelled gesture (its
-// deltas are zeroed), the end of a gesture which a momentum follows (which
-// Qt finds in the queue)
+// does -[QNSView scrollWheel:] drop the event? The end of a gesture which
+// a momentum follows (which Qt finds in the queue); a cancelled gesture is
+// sent, its deltas zeroed
 bool
 ns_wheel_dropped (NSEvent* event) {
-  if ([event phase] == NSEventPhaseCancelled) return true;
   if ([event phase] == NSEventPhaseEnded) {
     NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
                                    untilDate: [NSDate distantPast]
@@ -986,6 +991,8 @@ ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
   NSClipView* clip= [sv contentView];
   if (clip == nil) return NO;
   if (ns_wheel_dropped (event)) return YES;
+  // (a cancelled gesture: no deltas, nothing to scroll)
+  if ([event phase] == NSEventPhaseCancelled) return YES;
   bool precise= [event hasPreciseScrollingDeltas];
   int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
   int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);
@@ -1020,6 +1027,25 @@ ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
   [sv flashScrollers];
   return YES;
 }
+
+@implementation TMEditorScrollView
+- (void) scrollWheel: (NSEvent*) event
+{
+  // the margins beside a centered page (TMClipView) and the scroll bars
+  // give the wheel to the canvas, as the whole viewport and the scroll bars
+  // of QTMScrollView do in the Qt port (and not to the native scrolling of
+  // NSScrollView: 10 points a notch, no zoom, no capture)
+  static bool busy= false;
+  NSView* canvas= nil;
+  if (!ns_wheel_native () && !busy)
+    for (NSView* v in [[self documentView] subviews])
+      if ([v isKindOfClass: [TMView class]]) { canvas= v; break; }
+  if (canvas == nil) { [super scrollWheel: event]; return; }
+  busy= true;
+  @try { [canvas scrollWheel: event]; }
+  @finally { busy= false; }
+}
+@end
 
 @implementation TMScrollAreaView
 - (void) scrollWheel: (NSEvent*) event

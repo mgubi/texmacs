@@ -434,12 +434,16 @@ when the window is resized under an open menu.
   and its phases (a cancelled gesture does not scroll, nor the end of one
   which a momentum follows): a local monitor of the scroll events
   (`vue_mac_wheel_monitor`, `vue_mac.mm`) keeps the one which AppKit is
-  handing to SDL, and the event watch of SDL, called when SDL queues the
+  handing to SDL, and an event watch of SDL (`wheel_watch`, installed with
+  the monitor at `SDL_Init`), called when SDL queues the
   wheel event for it (all of it at once on the main thread), keeps it for
   that event under a serial number which the event carries in its
   `reserved` field (`vue_mac_wheel_attach`, `qt_wheel_queue`); the event
   takes it when it is handled, before anything else, which drops the
-  records of older events. The deltas of SDL are not used: their formula
+  records of older events (the serial numbers wrap around safely). As in
+  Qt, the end of a gesture which a momentum follows is dropped, a
+  cancelled gesture is a wheel of (0, 0) for an editor which captures it,
+  and command zooms by the pixel delta of the `NSEvent`. The deltas of SDL are not used: their formula
   changed between versions of SDL (3.4.2 gives `deltaY`, 3.4.20 a tenth of
   `scrollingDeltaY` for a trackpad). Only a scripted event, which has no
   record (`wheel_scripted`), is classified by its deltas (SDL rounds those

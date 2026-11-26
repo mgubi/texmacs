@@ -54,8 +54,11 @@ an event which the scroll bar ignores to the parent widget, and the scroll
 views of widgets, `TMScrollAreaView`, scroll by the single steps of a
 `QScrollArea`, 20 points; a canvas which is not the document of a scroll
 view of its own, a box widget say, passes the event on to them; as in Qt,
-a cancelled gesture does not scroll, nor the end of a gesture which a
-momentum follows). The keys are named as in Qt (`space`, `S-tab`,
+the end of a gesture which a momentum follows is dropped, and a cancelled
+gesture is a wheel of (0, 0) for an editor which captures it; command
+zooms by the pixel delta as `QTMWidget::wheelEvent`; the margins beside a
+centered page and the scroll bars of an editor, `TMEditorScrollView`, give
+the wheel to its canvas, as the viewport and the bars of `QTMScrollView`). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the

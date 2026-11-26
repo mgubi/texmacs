@@ -80,7 +80,8 @@ vue_mac_wheel_monitor () {
       r.dx= [e deltaX]; r.dy= [e deltaY];
       r.sx= [e scrollingDeltaX]; r.sy= [e scrollingDeltaY];
       r.precise= [e hasPreciseScrollingDeltas];
-      r.ignored= ([e phase] == NSEventPhaseCancelled);
+      r.cancelled= ([e phase] == NSEventPhaseCancelled);
+      r.ignored= false;
       wheel_last= r;
       wheel_last_valid= true;
       wheel_last_ended= ([e phase] == NSEventPhaseEnded);
@@ -110,6 +111,8 @@ vue_mac_wheel_attach () {
 
 bool
 vue_mac_wheel_take (unsigned id, qt_wheel_record& r) {
-  if (id == 0) return false;
+  // (0: a scripted event; a number not given yet: an event of another
+  // origin, whose reserved field is not ours)
+  if (id == 0 || qt_wheel_serial_before (wheel_serial, id)) return false;
   return wheel_queue.take (id, r);
 }

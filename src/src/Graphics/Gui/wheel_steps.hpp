@@ -101,8 +101,10 @@ struct qt_wheel_record {
   double dx, dy;   // deltaX, deltaY of the NSEvent
   double sx, sy;   // scrollingDeltaX, scrollingDeltaY
   bool precise;    // hasPreciseScrollingDeltas
-  bool ignored;    // no scroll: a cancelled phase, or an ended phase which
-                   // a momentum follows (-[QNSView scrollWheel:])
+  bool cancelled;  // a cancelled phase: Qt zeroes its deltas (an editor
+                   // which captures the wheel gets a wheel of (0, 0))
+  bool ignored;    // an ended phase which a momentum follows: Qt drops it
+                   // (-[QNSView scrollWheel:])
 };
 
 // the pixel delta of -[QNSView scrollWheel:] for one axis (a QPoint: the
@@ -112,13 +114,35 @@ qt_wheel_mac_pixels (double scrolling_delta, bool precise) {
   return (int) (precise ? scrolling_delta : 20.0 * scrolling_delta);
 }
 
+// the zoom of QTMWidget::wheelEvent (Qt 6, with control, the command key
+// of macOS): of the pixel delta when it has one, by its vertical part, else
+// of the angle delta in degrees (an eighth of it), by the sixteenth root;
+// 0 for no zoom (a pixel delta with no vertical part, where Qt zooms out by
+// a factor 0), the sign for in (> 0) or out (< 0)
+inline double
+qt_wheel_zoom (int pix_x, int pix_y, int angle_x, int angle_y) {
+  int v;
+  if (pix_x != 0 || pix_y != 0) v= pix_y;
+  else if (angle_x != 0 || angle_y != 0) v= angle_y / 8;
+  else return 0;
+  if (v == 0) return 0;
+  double f= sqrt (sqrt (sqrt (sqrt ((double) (v < 0 ? -v : v)))));
+  return v > 0 ? f : -f;
+}
+
+// the serial numbers of the wheel events of SDL wrap around: a is before b
+inline bool
+qt_wheel_serial_before (unsigned a, unsigned b) {
+  return (int) (a - b) < 0;
+}
+
 // the records by the serial numbers which the wheel events of SDL carry
 // (numbered by the port when SDL queues them, one clock for all), in the
 // order of the events: a record is taken when its event is handled, and
 // those of older events (handled without asking) are dropped then, so that
 // no record outlives its event; the oldest go when there are too many
 struct qt_wheel_queue {
-  enum { max= 64 };
+  enum { max= 1024 };
   qt_wheel_record r[max];
   unsigned serial[max];
   int first, count;
@@ -130,7 +154,10 @@ struct qt_wheel_queue {
     count++;
   }
   bool take (unsigned id, qt_wheel_record& e) {
-    while (count > 0 && serial[first] < id) { first= (first + 1) % max; count--; }
+    while (count > 0 && qt_wheel_serial_before (serial[first], id)) {
+      first= (first + 1) % max;
+      count--;
+    }
     if (count == 0 || serial[first] != id) return false;
     e= r[first];
     first= (first + 1) % max;

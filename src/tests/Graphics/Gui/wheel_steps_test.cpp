@@ -126,7 +126,7 @@ static qt_wheel_record
 record (double dy, double sy, bool precise) {
   qt_wheel_record r;
   r.dx= 0; r.dy= dy; r.sx= 0; r.sy= sy;
-  r.precise= precise; r.ignored= false;
+  r.precise= precise; r.cancelled= false; r.ignored= false;
   return r;
 }
 
@@ -175,6 +175,37 @@ test_queue () {
   CHECK (q.take (100 + qt_wheel_queue::max + 4, e));
 }
 
+static void
+test_zoom () {
+  // QTMWidget::wheelEvent with command: the pixel delta, by its sixteenth
+  // root; a notch of a mouse gives 20 pixels, a trackpad its points
+  double notch= qt_wheel_zoom (0, qt_wheel_mac_pixels (1.0, false), 0, 120);
+  CHECK (fabs (notch - pow (20.0, 1.0 / 16)) < 1e-12);
+  CHECK (qt_wheel_zoom (0, -7, 0, -14) < 0);
+  CHECK (fabs (qt_wheel_zoom (0, -16, 0, -32) + pow (16.0, 1.0 / 16)) < 1e-12);
+  // no pixel delta: the angle in degrees; nothing at all: no zoom
+  CHECK (fabs (qt_wheel_zoom (0, 0, 0, 120) - pow (15.0, 1.0 / 16)) < 1e-12);
+  CHECK_EQ (qt_wheel_zoom (0, 0, 0, 0), 0.0);
+  // a cancelled gesture (zeroed deltas) and a sideways pixel delta: none
+  CHECK_EQ (qt_wheel_zoom (5, 0, 10, 0), 0.0);
+}
+
+static void
+test_serial_wrap () {
+  // the serial numbers wrap around after 2^32 events
+  CHECK (qt_wheel_serial_before (1, 2));
+  CHECK (!qt_wheel_serial_before (2, 1));
+  CHECK (qt_wheel_serial_before (0xfffffffeu, 1));
+  CHECK (!qt_wheel_serial_before (1, 0xfffffffeu));
+  qt_wheel_queue q;
+  qt_wheel_record e= record (1.0, 1.0, false);
+  q.push (0xfffffffeu, e);
+  q.push (0xffffffffu, e);
+  q.push (1, e);
+  CHECK (q.take (1, e));     // the two before the wrap are older: dropped
+  CHECK_EQ (q.count, 0);
+}
+
 int
 main () {
   RUN (test_mac_angle);
@@ -186,5 +217,7 @@ main () {
   RUN (test_area);
   RUN (test_record);
   RUN (test_queue);
+  RUN (test_zoom);
+  RUN (test_serial_wrap);
   return test_report ();
 }

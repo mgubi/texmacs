@@ -162,6 +162,11 @@ BOOL ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
 bool ns_wheel_native ();  // TEXMACS_NS_WHEEL=native: as AppKit scrolls
 bool ns_wheel_dropped (NSEvent* event); // as -[QNSView scrollWheel:]
 
+/*! The scroll view of an editor: the wheel over its margins and its scroll
+ bars goes to the canvas (TMView), as over the canvas */
+@interface TMEditorScrollView : NSScrollView
+@end
+
 /*! A scroll view of widgets, which the wheel scrolls as a QScrollArea of
  the Qt port: single steps of 20 points */
 @interface TMScrollAreaView : NSScrollView
