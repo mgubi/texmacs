@@ -14,6 +14,18 @@ have the details, and the problems go to the
 
 ## 26 November 2026
 
+- **Sessions: the size of an image without Qt**: a PNG which a session
+  sends without a size (the plots of Sage, gnuplot's PNG output) is
+  inserted at its size in pixels in the Vue and Cocoa applications too; it
+  was its size scaled to 300 dpi, three times too large for the 100-dpi
+  plots of Sage (790 x 440 pixels became 2367 x 1317). The effects on
+  pictures (blurs, shadows...) are computed on the picture at its size in
+  pixels, as with Qt, in the Vue and Cocoa applications and in the
+  browser: their radii are now relative to the real pixels (before, to the
+  picture enlarged to 300 dpi, about four times with MuPDF), and the
+  results made before are made again. The browser has no session which
+  sends a PNG file (its Python sends its figures as SVG), so only the
+  effects change there (#969).
 - **A window whose close was refused closes again**: after "The document
   has not been saved. Really close it?" answered No (for instance on a
   master document whose inclusions were expanded), the close button, Cmd-W

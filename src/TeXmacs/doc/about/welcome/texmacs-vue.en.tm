@@ -304,6 +304,11 @@
   <paragraph|26 November 2026>
 
   <\itemize>
+    <item>The effects on pictures (blurs, shadows... of the ornaments and
+    of the graphics) are computed on the picture at its size in pixels, as
+    on the desktop with Qt, instead of the picture enlarged about four
+    times: they are faster, and their radii have the size they have on the
+    desktop.
     <item>A document whose close was refused (<em|Really close it?>
     answered <em|No>) can be closed again with the close box of its tab: it
     did nothing on that document any more.

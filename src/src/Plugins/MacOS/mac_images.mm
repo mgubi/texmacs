@@ -17,6 +17,7 @@
 
 #include "converter.hpp"
 #include "wencoding.hpp"
+#include "analyze.hpp"
 #include "MacOS/mac_cocoa.h"
 #include "ApplicationServices/ApplicationServices.h"
 
@@ -89,6 +90,43 @@ bool mac_image_size (url img_file, int& w, int& h)
     w = size.width;
     h = size.height;
     res = true;
+  }
+  [pool release];
+  return res;
+}
+
+bool mac_native_image_size (url img_file, int& w, int& h)
+{
+  // the size of a bitmap in pixels (mac_image_size gives the size of the
+  // NSImage, in points, which honours the resolution stored in the file:
+  // pixels x 72 / dpi); false for the formats without a pixel grid
+  string suf= locase_all (suffix (img_file));
+  if (suf == "ps" || suf == "eps" || suf == "pdf" || suf == "svg")
+    return false;
+  bool res= false;
+  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+  NSString *path= to_nsstring_utf8 (concretize (img_file));
+  CGImageSourceRef src= NULL;
+  if (path) src= CGImageSourceCreateWithURL
+    ((CFURLRef) [NSURL fileURLWithPath: path], NULL);
+  if (src) {
+    CFDictionaryRef props= CGImageSourceCopyPropertiesAtIndex (src, 0, NULL);
+    if (props) {
+      CFNumberRef pw= (CFNumberRef)
+        CFDictionaryGetValue (props, kCGImagePropertyPixelWidth);
+      CFNumberRef ph= (CFNumberRef)
+        CFDictionaryGetValue (props, kCGImagePropertyPixelHeight);
+      int ww= 0, hh= 0;
+      if (pw && ph &&
+          CFNumberGetValue (pw, kCFNumberIntType, &ww) &&
+          CFNumberGetValue (ph, kCFNumberIntType, &hh) &&
+          ww > 0 && hh > 0) {
+        w= ww; h= hh;
+        res= true;
+      }
+      CFRelease (props);
+    }
+    CFRelease (src);
   }
   [pool release];
   return res;
