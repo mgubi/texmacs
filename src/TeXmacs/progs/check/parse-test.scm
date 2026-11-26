@@ -785,7 +785,79 @@
     ("  end if"
      `(("end" ,f-declare) ("if" ,f-keyword)))
     ("end program"
-     `(("end" ,f-declare) ("program" ,f-declare)))))
+     `(("end" ,f-declare) ("program" ,f-declare))))
+  (test-fortran-classes))
+
+;; The session colors give several classes the same color (#4040c0 for
+;; declarations and numbers; dark red for operators, brackets, types and
+;; strings). To tell each class apart, every syntax:fortran:* preference
+;; gets a color of its own, in memory only (cpp-set-preference, never saved),
+;; then the preferences are restored and read again, also on an error.
+(define fortran-classes
+  '("none" "comment" "error" "preprocessor" "preprocessor_directive"
+    "constant" "constant_identifier" "constant_function" "constant_type"
+    "constant_category" "constant_module" "constant_number"
+    "constant_string" "constant_char" "variable" "variable_identifier"
+    "variable_function" "variable_type" "variable_category"
+    "variable_module" "variable_ioarg" "declare" "declare_identifier"
+    "declare_function" "declare_type" "declare_category" "declare_module"
+    "operator" "operator_openclose" "operator_field" "operator_special"
+    "operator_decoration" "keyword" "keyword_conditional" "keyword_control"))
+
+(define (fortran-class-color cl)
+  ;; a distinct color for each class, none of them black
+  (let* ((i (list-find-index fortran-classes (lambda (x) (== x cl))))
+         (h (number->string (+ 16 (* 6 i)) 16)))
+    (string-append "#" h "40" h)))
+
+(define (with-fortran-class-colors thunk)
+  (let* ((prefs (map (lambda (cl) (string-append "syntax:fortran:" cl))
+                     fortran-classes))
+         (saved (map (lambda (p)
+                       (and (cpp-has-preference? p) (cpp-get-preference p "")))
+                     prefs)))
+    (dynamic-wind
+      (lambda ()
+        (for-each (lambda (p cl) (cpp-set-preference p (fortran-class-color cl)))
+                  prefs fortran-classes)
+        (syntax-read-preferences "fortran"))
+      thunk
+      (lambda ()
+        (for-each (lambda (p old)
+                    (if old (cpp-set-preference p old) (cpp-reset-preference p)))
+                  prefs saved)
+        (syntax-read-preferences "fortran")))))
+
+(define (test-fortran-classes)
+  (with-fortran-class-colors
+    (lambda ()
+      (let ((declare (fortran-class-color "declare_function"))
+            (cfun (fortran-class-color "constant_function"))
+            (vtype (fortran-class-color "variable_type"))
+            (number (fortran-class-color "constant_number"))
+            (str (fortran-class-color "constant_string"))
+            (comment (fortran-class-color "comment"))
+            (kcond (fortran-class-color "keyword_conditional"))
+            (op (fortran-class-color "operator"))
+            (special (fortran-class-color "operator_special"))
+            (openclose (fortran-class-color "operator_openclose")))
+        (check-lines "fortran"
+          ("program p ! c"
+           `(("program" ,declare) ("p" ,black) ("!" ,comment)
+             ("c" ,comment)))
+          ("  integer :: i = 10"
+           `(("integer" ,vtype) ("::" ,special) ("i" ,black) ("=" ,op)
+             ("10" ,number)))
+          ("  if (i .eq. 1) then"
+           `(("if" ,kcond) ("(" ,openclose) ("i" ,black) (".eq." ,black)
+             ("1" ,number) (")" ,openclose) ("then" ,kcond)))
+          ("    print *, 'hi', 1.5e3"
+           `(("print" ,cfun) ("*" ,op) ("," ,black) ("'hi'" ,str)
+             ("," ,black) ("1.5e3" ,number)))
+          ("  end if"
+           `(("end" ,declare) ("if" ,kcond)))
+          ("end program"
+           `(("end" ,declare) ("program" ,declare))))))))
 
 ;; r_language.cpp: keywords, constants, numbers and strings in the colors
 ;; of the environment, operators in red, assignments in dark green, index
