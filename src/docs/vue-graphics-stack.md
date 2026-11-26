@@ -426,9 +426,25 @@ when the window is resized under an open menu.
   left to say where they had gone.
 
 * **Scrolling with the wheel** (`vue_gui.cpp`, `wheel_event`,
-  `wheel_step`). *On macOS* (not in a browser) the wheel scrolls as in the
-  Qt port since #971 (`wheel_like_qt`, `wheel_event_qt`, and
-  `Graphics/Gui/wheel_steps.hpp`, which the Cocoa port uses too). Whether
+  `wheel_step`). *On macOS, Linux and Windows* (not in a browser) the
+  wheel scrolls as in the Qt port since #971 (`wheel_like_qt`,
+  `wheel_event_qt`, and `Graphics/Gui/wheel_steps.hpp`, which the Cocoa
+  port uses too), at once, with no travel, glide or timing. *On Linux and
+  Windows* the delta of SDL is in notches, as the angle delta of Qt over
+  120, on every system (`qt_wheel_unit_angle`): Windows gives
+  `WM_MOUSEWHEEL` over 120 (high resolution wheels and precision touchpads
+  in fractions), X11 (XInput 2) the motion of a scroll valuator over its
+  increment (Qt the same times 120, truncated), Wayland `axis_value120`
+  over 120 for a wheel and a tenth of the pixels of the fingers (Qt 12
+  times them); so wheels and touchpads scroll alike, as in Qt, which does
+  not tell them apart for scrolling. A notch scrolls `wheelScrollLines`
+  single steps (3; on Windows the setting of the system,
+  `SPI_GETWHEELSCROLLLINES`); alt turns a vertical wheel into a horizontal
+  one; control alone zooms (Qt's pixel delta on Wayland for the fingers,
+  else the degrees). An editor capturing the wheel gets ten points a unit
+  for the fingers and the distance of a notch for a wheel, where Qt gives
+  no pixel delta (a graphics would not move: a deliberate deviation).
+  *On macOS*: whether
   an event comes from a trackpad is read from its `NSEvent`, as the Qt port
   does, with its deltas and scrolling deltas (which SDL rounds or drops)
   and its phases (a cancelled gesture does not scroll, nor the end of one

@@ -45,6 +45,25 @@ qt_wheel_mac_angle (double scrolling_delta, double delta, bool precise) {
   return a < -120 ? -120 : (a > 120 ? 120 : a);
 }
 
+// the angle delta of the Qt port on Linux and Windows for one axis, from
+// the delta of a wheel event of SDL, which is the same unit on all of them:
+// a notch is 1 and 120 for Qt. Windows: WM_MOUSEWHEEL gives 120 a notch
+// and less for a wheel of high resolution or a precision touchpad
+// (qwindowspointerhandler.cpp), SDL that over 120. X11 (XInput 2): the
+// motion of a scroll valuator over its increment, times 120 for Qt
+// (qxcbconnection_xi2.cpp, truncated), the same quotient for SDL
+// (SDL_x11xinput2.c); a wheel as buttons 4 to 7, 120 a click, 1 for SDL.
+// Wayland: axis_value120 (or 120 a discrete step) for a wheel, which SDL
+// divides by 120; a finger or a continuous axis, 12 times its pixels for
+// Qt (qwaylandinputdevice.cpp, rounded), a tenth of them for SDL
+// (WAYLAND_WHEEL_AXIS_UNIT). truncate: as Qt under X11
+inline int
+qt_wheel_unit_angle (double units, bool truncate) {
+  double a= 120.0 * units;
+  if (truncate) return (int) a;
+  return (int) (a >= 0 ? a + 0.5 : a - 0.5);
+}
+
 // is the horizontal axis the dominant one (QAbstractScrollArea::wheelEvent)?
 inline bool
 qt_wheel_horizontal (int angle_x, int angle_y) {
@@ -59,14 +78,16 @@ struct qt_wheel_axis {
   qt_wheel_axis (): acc (0) {}
   // (paging: with control or shift, a page an event, scaled by the delta,
   // the fraction dropped)
-  int scroll (int delta, int step, int page, bool paging= false) {
+  // (lines: QApplication::wheelScrollLines, 3, or the setting of Windows)
+  int scroll (int delta, int step, int page, bool paging= false,
+              int lines= 3) {
     double offset= ((double) delta) / 120.0;
     if (paging) {
       acc= 0;
       int n= (int) (offset * page);
       return n < -page ? -page : (n > page ? page : n);
     }
-    double f= 3 * offset * step; // wheelScrollLines
+    double f= lines * offset * step;
     if (acc != 0 && offset / acc < 0) acc= 0; // the wheel changed direction
     acc += f;
     int n= (int) acc;
@@ -83,9 +104,9 @@ struct qt_wheel_axis {
   // (paging less than a point: the bar does not move, and Qt ignores the
   // event, which the parent widget gets)
   int scroll_bar (int delta, int step, int page, bool can_move, bool& taken,
-                  bool paging= false) {
+                  bool paging= false, int lines= 3) {
     if (!can_move) { acc= 0; taken= false; return 0; }
-    int n= scroll (delta, step, page, paging);
+    int n= scroll (delta, step, page, paging, lines);
     taken= !(paging && n == 0);
     return n;
   }
@@ -99,8 +120,8 @@ struct qt_wheel_axis {
 // the points a QScrollArea scrolls for an angle delta, as a float (the
 // scroll containers of Vue take fractions)
 inline double
-qt_wheel_area_points (int delta) {
-  return 3.0 * delta / 120.0 * QT_WHEEL_AREA_STEP;
+qt_wheel_area_points (int delta, int lines= 3) {
+  return lines * delta / 120.0 * QT_WHEEL_AREA_STEP;
 }
 
 // The scroll events of AppKit behind the wheel events of SDL, kept so that

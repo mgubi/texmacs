@@ -14,6 +14,15 @@ have the details, and the problems go to the
 
 ## 26 November 2026
 
+- **Linux and Windows: the mouse wheel and the touchpad scroll as in the
+  Qt interface** (desktop applications, Vue interface): a notch was eased
+  over a tenth of a second and fast notches could be taken for a touchpad;
+  now every event scrolls at once what Qt scrolls: three steps of a
+  sixteenth of the view per notch (on Windows, the number of lines set in
+  the system), a fraction of a notch for a wheel of high resolution or a
+  touchpad, with no glide after it; Ctrl+wheel zooms and Shift or Ctrl
+  with other keys pages, as in Qt (#971).
+
 - **macOS: the mouse wheel scrolls as in the Qt interface** (desktop
   applications, Vue and Cocoa interfaces): a notch of a mouse wheel
   scrolled 10 points in the Cocoa interface and was eased over a tenth of

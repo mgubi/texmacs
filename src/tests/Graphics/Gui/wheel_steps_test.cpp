@@ -272,6 +272,34 @@ test_serial_wrap () {
   CHECK_EQ (q.count, 0);
 }
 
+static void
+test_linux_windows () {
+  // the delta of SDL is the angle delta of Qt over 120 on Linux and
+  // Windows: a notch (X11 buttons, Wayland value120 / 120, WM_MOUSEWHEEL /
+  // 120), a wheel of high resolution (Windows: 30 of WM_MOUSEWHEEL)
+  CHECK_EQ (qt_wheel_unit_angle (1.0, false), 120);
+  CHECK_EQ (qt_wheel_unit_angle (-1.0, true), -120);
+  CHECK_EQ (qt_wheel_unit_angle (0.25, false), 30);
+  // a touchpad: X11 (XInput 2, valuator over increment), truncated as Qt
+  // there; Wayland (pixels over 10, Qt 12 a pixel), rounded
+  CHECK_EQ (qt_wheel_unit_angle (0.33, true), 39);     // 39.6
+  CHECK_EQ (qt_wheel_unit_angle (0.33, false), 40);
+  CHECK_EQ (qt_wheel_unit_angle (-0.33, true), -39);
+  CHECK_EQ (qt_wheel_unit_angle (-0.33, false), -40);
+  // a notch scrolls wheelScrollLines single steps: 3, or what Windows says
+  qt_wheel_axis a;
+  CHECK_EQ (a.scroll (120, 51, 800), 153);
+  CHECK_EQ (a.scroll (120, 51, 800, false, 5), 255);
+  CHECK_EQ (a.scroll (120, 51, 800, false, 1), 51);
+  CHECK_EQ (qt_wheel_area_points (120, 5), 100.0);
+  // the zoom with control: no pixel delta (X11, Windows, a wheel on
+  // Wayland), by the degrees, 15 a notch; the fingers on Wayland, by
+  // their pixels
+  CHECK (fabs (qt_wheel_zoom (0, 0, 0, 120) - pow (15.0, 1.0 / 16)) < 1e-12);
+  CHECK (fabs (qt_wheel_zoom (0, 7, 0, qt_wheel_unit_angle (0.7, false))
+               - pow (7.0, 1.0 / 16)) < 1e-12);
+}
+
 int
 main () {
   RUN (test_mac_angle);
@@ -287,6 +315,7 @@ main () {
   RUN (test_modifiers);
   RUN (test_paging);
   RUN (test_bar);
+  RUN (test_linux_windows);
   RUN (test_serial_wrap);
   return test_report ();
 }
