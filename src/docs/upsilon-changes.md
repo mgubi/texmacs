@@ -19,8 +19,9 @@ have the details, and the problems go to the
   master document whose inclusions were expanded), the close button, Cmd-W
   (the Close item of the Window menu of macOS) and the close box of the tab
   did nothing on that window any more, also after a save; they now ask
-  again. A close request which comes after its window was closed by other
-  means no longer quits TeXmacs when one window is left (#970, Vue).
+  again (Vue). A close request which comes after its window was closed by
+  other means no longer quits TeXmacs when one window is left (all the
+  interfaces) (#970).
 
 ## 25 November 2026
 

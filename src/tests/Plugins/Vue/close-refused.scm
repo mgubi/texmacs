@@ -3,9 +3,9 @@
 ;; again, and the window goes on a yes (#970: the window latched its first
 ;; close request and never let another through, also after a save). Two
 ;; requests before the first ran ask once. A request for a window killed
-;; before it ran does nothing (it quit TeXmacs when one window was left). The question is answered by a
-;; stand-in for user-confirm. It needs no drawing, and runs headless (no
-;; window on the screen):
+;; before it ran does nothing (it quit TeXmacs when one window was left).
+;; The question is answered by a stand-in for user-confirm. It needs no
+;; drawing, and runs headless (no window on the screen):
 ;;   TM_ARGS="-headless -X" sh tests/Plugins/Vue/run.sh close-refused 40
 (use-modules (check gui-driver))
 
@@ -21,7 +21,8 @@
   (cont cr-answer))
 
 (define (cr-open)
-  (string-save "<TeXmacs|2.1.4>\n\n<style|generic>\n\n<\\body>\n  close-refused\n</body>\n"
+  (string-save (string-append "<TeXmacs|2.1.4>\n\n<style|generic>\n\n"
+                              "<\\body>\n  close-refused\n</body>\n")
                (url->system cr-file))
   (set! cr-windows (length (window-list)))
   (load-buffer-in-new-window cr-file))
