@@ -1082,10 +1082,11 @@ ns_wheel_over_bar (NSScrollView* sv, NSEvent* event, int step,
   return ns_scroll_bar (sv, on_h, a, step, on_h? x: y, paging)? 1: 2;
 }
 
-// DEVIATION from the Qt port, pending a decision: a wheel over the margins
-// beside a centered page (TMClipView) does nothing in Qt (only the surface
-// of the document gets the wheel, QTMScrollView::viewportEvent), and
-// scrolls the document here, as over the page. False goes back to Qt
+// A deliberate deviation from the Qt port: a wheel over the margins beside
+// a centered page (TMClipView) does nothing in Qt (only the surface of the
+// document gets the wheel, QTMScrollView::viewportEvent), and scrolls the
+// document here, as over the page, which is more natural. False goes back
+// to Qt
 static bool
 ns_wheel_margins_scroll () {
   return true;

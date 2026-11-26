@@ -60,10 +60,10 @@ alone zooms by the pixel delta as `QTMWidget::wheelEvent`, command or
 shift with other keys page (`scrollByDelta`), with the modifiers of the
 gesture during its momentum; over a legacy scroll bar the wheel scrolls
 that bar as `QScrollBar`, a vertical wheel also a horizontal bar, with no
-zoom nor capture. A deliberate deviation, pending a decision: over the
-margins beside a centered page, where Qt does nothing (only the surface
-gets the wheel), the document scrolls as over the page,
-`ns_wheel_margins_scroll` in `TMView.mm`). The keys are named as in Qt (`space`, `S-tab`,
+zoom nor capture. A deliberate deviation from Qt: over the margins
+beside a centered page, where Qt does nothing (only the surface gets the
+wheel), the document scrolls as over the page, which is more natural;
+`ns_wheel_margins_scroll` in `TMView.mm` is the switch). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the
