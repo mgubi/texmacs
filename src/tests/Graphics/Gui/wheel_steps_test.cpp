@@ -300,6 +300,36 @@ test_linux_windows () {
                - pow (7.0, 1.0 / 16)) < 1e-12);
 }
 
+static void
+test_alt () {
+  // alt in the signs of SDL (x to the right, y up): xcb and Wayland
+  // transpose Qt's angle (x to the left), so a wheel turned up (y > 0)
+  // scrolls left (x < 0), and a horizontal one to the right turns down
+  int x= 0, y= 120;
+  qt_wheel_alt_swap (x, y, false);
+  CHECK_EQ (x, -120);
+  CHECK_EQ (y, 0);
+  x= 120; y= 0;
+  qt_wheel_alt_swap (x, y, false);
+  CHECK_EQ (x, 0);
+  CHECK_EQ (y, -120);
+  // Windows makes the vertical wheel horizontal the same way, and leaves
+  // a horizontal one (WM_MOUSEHWHEEL) as it is
+  x= 0; y= -120;
+  qt_wheel_alt_swap (x, y, true);
+  CHECK_EQ (x, 120);
+  CHECK_EQ (y, 0);
+  x= 120; y= 0;
+  qt_wheel_alt_swap (x, y, true);
+  CHECK_EQ (x, 120);
+  CHECK_EQ (y, 0);
+  // the deltas of SDL follow (an editor capturing the wheel)
+  double dx= 0.25, dy= -1.5;
+  qt_wheel_alt_swap (dx, dy, false);
+  CHECK_EQ (dx, 1.5);
+  CHECK_EQ (dy, -0.25);
+}
+
 int
 main () {
   RUN (test_mac_angle);
@@ -316,6 +346,7 @@ main () {
   RUN (test_paging);
   RUN (test_bar);
   RUN (test_linux_windows);
+  RUN (test_alt);
   RUN (test_serial_wrap);
   return test_report ();
 }

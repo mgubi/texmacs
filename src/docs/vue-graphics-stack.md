@@ -439,9 +439,16 @@ when the window is resized under an open menu.
   times them); so wheels and touchpads scroll alike, as in Qt, which does
   not tell them apart for scrolling. A notch scrolls `wheelScrollLines`
   single steps (3; on Windows the setting of the system,
-  `SPI_GETWHEELSCROLLLINES`); alt turns a vertical wheel into a horizontal
-  one; control alone zooms (Qt's pixel delta on Wayland for the fingers,
-  else the degrees). An editor capturing the wheel gets ten points a unit
+  `SPI_GETWHEELSCROLLLINES`; in a KDE session `WheelScrollLines` of
+  `kdeglobals`, as Qt's KDE theme); alt turns a vertical wheel into a
+  horizontal one, and under X11 and Wayland a horizontal one into a vertical
+  one (`qt_wheel_alt_swap`, Qt transposes); control alone zooms (Qt's pixel
+  delta on Wayland for the fingers, else the degrees; under X11 Qt also has
+  a pixel delta for a synaptics touchpad, whose increment SDL does not
+  give, so the degrees there). Guesses left as they are: a fractional delta
+  which is no whole number of eighths is taken for the fingers (for the
+  pixels of an editor capturing the wheel only), and the deltas of X11
+  reach us as floats. An editor capturing the wheel gets ten points a unit
   for the fingers and the distance of a notch for a wheel, where Qt gives
   no pixel delta (a graphics would not move: a deliberate deviation).
   *On macOS*: whether

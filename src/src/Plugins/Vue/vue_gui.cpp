@@ -33,6 +33,9 @@
 #include "editor.hpp"
 #include "new_view.hpp"      // get_current_editor()
 #include <time.h>            // clock_gettime (wheel_stamp_of_x)
+#include <stdio.h>           // fopen (wheel_kde_scroll_lines)
+#include <stdlib.h>          // atoi
+#include <string.h>          // strncmp
 #include "image_files.hpp"
 #include "boot.hpp"      // is_headless
 #include "tm_window.hpp"
@@ -4298,6 +4301,48 @@ wheel_x11_driver () {
 }
 #endif
 
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+// QApplication::wheelScrollLines on Linux: 3, but in a KDE session (where
+// Qt takes the theme of KDE, QKdeTheme in qgenericunixthemes.cpp) the
+// setting WheelScrollLines of the group [KDE] of kdeglobals, of the user
+// (XDG_CONFIG_HOME, ~/.config) before the system (/etc/xdg). Read once, as
+// Qt reads it when it starts (it follows its changes over D-Bus too)
+static int
+kde_wheel_lines_in (const string& file) {
+  c_string f (file);
+  FILE* in= fopen (f, "r");
+  if (in == NULL) return -1;
+  char line[512];
+  bool kde= false;
+  int r= -1;
+  while (fgets (line, sizeof (line), in) != NULL) {
+    if (line[0] == '[') { kde= (strncmp (line, "[KDE]", 5) == 0); continue; }
+    if (kde && strncmp (line, "WheelScrollLines=", 17) == 0) {
+      int n= atoi (line + 17);
+      if (n > 0) r= n;
+      break;
+    }
+  }
+  fclose (in);
+  return r;
+}
+
+static int
+wheel_kde_scroll_lines () {
+  static int lines= 0;
+  if (lines != 0) return lines;
+  lines= 3;
+  string desk= get_env ("XDG_CURRENT_DESKTOP");
+  if (search_forwards ("KDE", desk) < 0) return lines;
+  string conf= get_env ("XDG_CONFIG_HOME");
+  if (conf == "") conf= get_env ("HOME") * "/.config";
+  int n= kde_wheel_lines_in (conf * "/kdeglobals");
+  if (n < 0) n= kde_wheel_lines_in ("/etc/xdg/kdeglobals");
+  if (n > 0) lines= n;
+  return lines;
+}
+#endif
+
 #ifdef _WIN32
 // QApplication::wheelScrollLines on Windows: SPI_GETWHEELSCROLLLINES (3 by
 // default; "a screen at a time", WHEEL_PAGESCROLL, is 3 in Qt too, see
@@ -4604,21 +4649,33 @@ wheel_event_qt (vue_window win, double x, double y) {
   bool x11= wheel_x11_driver ();
   ax= qt_wheel_unit_angle (x, x11);
   ay= qt_wheel_unit_angle (y, x11);
-  // with alt, Qt turns a vertical wheel into a horizontal one (xcb,
-  // Wayland, Windows)
+  // with alt, Qt turns a vertical wheel into a horizontal one, and under
+  // xcb and Wayland a horizontal one into a vertical one (qt_wheel_alt_swap;
+  // the deltas of SDL follow, for an editor capturing the wheel)
   if ((wheel_mods & QT_WHEEL_ALT) != 0) {
-    int t= ax; ax= ay; ay= t;
-    double u= x; x= y; y= u;
+#ifdef _WIN32
+    const bool windows= true;
+#else
+    const bool windows= false;
+#endif
+    qt_wheel_alt_swap (ax, ay, windows);
+    qt_wheel_alt_swap (x, y, windows);
   }
 #ifdef _WIN32
   lines= wheel_windows_scroll_lines ();
+#else
+  lines= wheel_kde_scroll_lines ();
 #endif
   // the pixel delta: Qt has one for the fingers on Wayland (their pixels,
-  // ten a unit of SDL) and none for a wheel; here the fingers (a fractional
-  // delta which is no whole number of eighths, wheel_in_eighths) get ten
-  // points a unit on every system, and a notch the distance it scrolls
-  // (Qt gives an editor capturing the wheel nothing then, and a graphics
-  // would not move: a deliberate deviation)
+  // ten a unit of SDL) and under X11 for a touchpad whose increment is
+  // above 15 (synaptics: the motion of the valuator, which SDL divides by
+  // the increment, which it does not give), none for a wheel, nor for
+  // libinput under X11, nor on Windows. Here the fingers (a fractional
+  // delta which is no whole number of eighths, wheel_in_eighths: a guess;
+  // a precision touchpad on Windows and a wheel of high resolution in
+  // eighths go the other way) get ten points a unit on every system, and a
+  // notch the distance it scrolls (Qt gives an editor capturing the wheel
+  // nothing then, and a graphics would not move: a deliberate deviation)
   bool fingers= (x != floor (x) && !wheel_in_eighths (x)) ||
                 (y != floor (y) && !wheel_in_eighths (y));
   if (fingers) { gpx= 10.0 * x; gpy= 10.0 * y; }
@@ -6706,8 +6763,10 @@ wheel_zooms (vue_window win, double y, const qt_wheel_record* rec,
 #if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
   {
     // Linux and Windows, as QTMWidget::wheelEvent: by the pixel delta, which
-    // Qt has for the fingers on Wayland only (their pixels, ten a unit of
-    // SDL), else by the angle delta in degrees
+    // Qt has for the fingers on Wayland (their pixels, ten a unit of SDL)
+    // and under X11 for a touchpad of synaptics (its increment above 15),
+    // which SDL does not let us know: there by the degrees, as for the
+    // others, else by the angle delta in degrees
     bool x11= wheel_x11_driver ();
     const char* d= SDL_GetCurrentVideoDriver ();
     bool wayland= (d != NULL && strcmp (d, "wayland") == 0);

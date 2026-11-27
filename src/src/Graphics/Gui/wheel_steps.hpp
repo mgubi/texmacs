@@ -64,6 +64,20 @@ qt_wheel_unit_angle (double units, bool truncate) {
   return (int) (a >= 0 ? a + 0.5 : a - 0.5);
 }
 
+// alt with the wheel on Linux and Windows: the deltas in the signs of SDL
+// (x positive to the right, y positive up; Qt has x positive to the left).
+// xcb and Wayland transpose the angle (and pixel) delta of Qt, which in
+// the signs of SDL is x' = -y, y' = -x; Windows only makes the vertical
+// wheel horizontal (QPoint (delta, 0)) and leaves a horizontal one
+// (WM_MOUSEHWHEEL, a tilt of the wheel: only x) as it is
+template<class T> inline void
+qt_wheel_alt_swap (T& x, T& y, bool windows) {
+  if (windows && y == 0) return;
+  T t= x;
+  x= -y;
+  y= -t;
+}
+
 // is the horizontal axis the dominant one (QAbstractScrollArea::wheelEvent)?
 inline bool
 qt_wheel_horizontal (int angle_x, int angle_y) {
