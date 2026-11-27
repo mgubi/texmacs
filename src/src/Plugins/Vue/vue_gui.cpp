@@ -4313,7 +4313,10 @@ wheel_x11_driver () {
 // prefixes of KDE 4 (KDEHOME...), and the DesktopNames of a session given
 // by the path of its .desktop file in DESKTOP_SESSION. A value of 0 or
 // which is no number is skipped (the next file, else 3), where Qt would
-// scroll nothing; at most 1000 lines
+// scroll nothing; at most 1000 lines. Simpler than QSettings too: the
+// first WheelScrollLines of the group counts (Qt takes the last), and a
+// value in quotes or followed by a ';' comment is no number here (it is
+// skipped); "+5" is 5, as for Qt
 
 // the value of WheelScrollLines in the group [KDE] of a file, or -1
 static int
@@ -4321,12 +4324,25 @@ kde_wheel_lines_in (const string& file) {
   c_string f (file);
   FILE* in= fopen (f, "r");
   if (in == NULL) return -1;
-  char buf[512];
-  bool kde= false;
+  char* buf= NULL;
+  size_t cap= 0;
+  bool kde= false, first= true;
   int r= -1;
-  while (fgets (buf, sizeof (buf), in) != NULL) {
-    string line= trim_spaces (string (buf));
-    if (N(line) > 0 && line[0] == '[') { kde= (line == "[KDE]"); continue; }
+  // whole lines, however long (getline)
+  while (getline (&buf, &cap, in) >= 0) {
+    string line (buf);
+    // (a byte order mark of UTF-8 at the start of the file)
+    if (first && N(line) >= 3 && line (0, 3) == "\xEF\xBB\xBF")
+      line= line (3, N(line));
+    first= false;
+    line= trim_spaces (line);
+    if (N(line) > 0 && line[0] == '[') {
+      // the group is the text up to the first ']', as QSettings reads it:
+      // [KDE][$i] (a group locked by the kiosk) is [KDE]
+      int close= search_forwards ("]", line);
+      kde= close > 0 && trim_spaces (line (1, close)) == "KDE";
+      continue;
+    }
     if (!kde) continue;
     int eq= search_forwards ("=", line);
     if (eq < 0 || trim_spaces (line (0, eq)) != "WheelScrollLines") continue;
@@ -4337,6 +4353,7 @@ kde_wheel_lines_in (const string& file) {
       r= (int) min (n, 1000L);
     break;
   }
+  free (buf);
   fclose (in);
   return r;
 }
@@ -4362,13 +4379,16 @@ wheel_kde_scroll_lines () {
   if (!wheel_kde_session ()) return lines;
   string ver= get_env ("KDE_SESSION_VERSION");
   if (!is_int (ver) || as_int (ver) < 5) return lines;
+  // (relative folders are ignored, as in qstandardpaths_unix.cpp)
   string home= get_env ("XDG_CONFIG_HOME");
-  if (home == "") home= get_env ("HOME") * "/.config";
-  string dirs= get_env ("XDG_CONFIG_DIRS");
-  if (dirs == "") dirs= "/etc/xdg";
+  if (!starts (home, "/")) home= get_env ("HOME") * "/.config";
   array<string> all;
   all << home;
-  all << tokenize (dirs, ":");
+  array<string> dirs= tokenize (get_env ("XDG_CONFIG_DIRS"), ":");
+  int n0= N(all);
+  for (int k= 0; k < N(dirs); k++)
+    if (starts (dirs[k], "/")) all << dirs[k];
+  if (N(all) == n0) all << string ("/etc/xdg");
   for (int k= 0; k < N(all); k++) {
     if (all[k] == "") continue;
     int n= kde_wheel_lines_in (all[k] * "/kdeglobals");
