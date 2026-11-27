@@ -4302,29 +4302,56 @@ wheel_x11_driver () {
 #endif
 
 #if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__) && !defined(_WIN32)
-// QApplication::wheelScrollLines on Linux: 3, but in a KDE session (where
-// Qt takes the theme of KDE, QKdeTheme in qgenericunixthemes.cpp) the
-// setting WheelScrollLines of the group [KDE] of kdeglobals, of the user
-// (XDG_CONFIG_HOME, ~/.config) before the system (/etc/xdg). Read once, as
-// Qt reads it when it starts (it follows its changes over D-Bus too)
+// QApplication::wheelScrollLines on Linux: 3, but in a session of Plasma
+// 5 or later, where Qt takes the theme of KDE (QKdeTheme, created when
+// detectDesktopEnvironment of qdesktopunixservices.cpp says KDE and
+// KDE_SESSION_VERSION is at least 5, qgenericunixthemes.cpp), the setting
+// WheelScrollLines of the group [KDE] of kdeglobals, in the first of the
+// configuration folders (XDG_CONFIG_HOME, ~/.config, then those of
+// XDG_CONFIG_DIRS, /etc/xdg) which has it. Read once: Qt reads it when its
+// theme is made and does not follow a change of it alone. Not done: the
+// prefixes of KDE 4 (KDEHOME...), and the DesktopNames of a session given
+// by the path of its .desktop file in DESKTOP_SESSION. A value of 0 or
+// which is no number is skipped (the next file, else 3), where Qt would
+// scroll nothing; at most 1000 lines
+
+// the value of WheelScrollLines in the group [KDE] of a file, or -1
 static int
 kde_wheel_lines_in (const string& file) {
   c_string f (file);
   FILE* in= fopen (f, "r");
   if (in == NULL) return -1;
-  char line[512];
+  char buf[512];
   bool kde= false;
   int r= -1;
-  while (fgets (line, sizeof (line), in) != NULL) {
-    if (line[0] == '[') { kde= (strncmp (line, "[KDE]", 5) == 0); continue; }
-    if (kde && strncmp (line, "WheelScrollLines=", 17) == 0) {
-      int n= atoi (line + 17);
-      if (n > 0) r= n;
-      break;
-    }
+  while (fgets (buf, sizeof (buf), in) != NULL) {
+    string line= trim_spaces (string (buf));
+    if (N(line) > 0 && line[0] == '[') { kde= (line == "[KDE]"); continue; }
+    if (!kde) continue;
+    int eq= search_forwards ("=", line);
+    if (eq < 0 || trim_spaces (line (0, eq)) != "WheelScrollLines") continue;
+    c_string v (trim_spaces (line (eq + 1, N(line))));
+    char* end= NULL;
+    long n= strtol (v, &end, 10);
+    if (end != NULL && *end == '\0' && end != (char*) v && n >= 1)
+      r= (int) min (n, 1000L);
+    break;
   }
   fclose (in);
   return r;
+}
+
+// is the session one of KDE, as detectDesktopEnvironment of Qt sees it?
+static bool
+wheel_kde_session () {
+  string desk= get_env ("XDG_CURRENT_DESKTOP");
+  if (desk != "") return upcase_all (desk) == "KDE";
+  if (get_env ("KDE_FULL_SESSION") != "") return true;
+  if (get_env ("GNOME_DESKTOP_SESSION_ID") != "") return false;
+  string ds= get_env ("DESKTOP_SESSION");
+  int slash= search_backwards ("/", ds);
+  if (slash >= 0) ds= ds (slash + 1, N(ds));
+  return ds == "kde";
 }
 
 static int
@@ -4332,13 +4359,21 @@ wheel_kde_scroll_lines () {
   static int lines= 0;
   if (lines != 0) return lines;
   lines= 3;
-  string desk= get_env ("XDG_CURRENT_DESKTOP");
-  if (search_forwards ("KDE", desk) < 0) return lines;
-  string conf= get_env ("XDG_CONFIG_HOME");
-  if (conf == "") conf= get_env ("HOME") * "/.config";
-  int n= kde_wheel_lines_in (conf * "/kdeglobals");
-  if (n < 0) n= kde_wheel_lines_in ("/etc/xdg/kdeglobals");
-  if (n > 0) lines= n;
+  if (!wheel_kde_session ()) return lines;
+  string ver= get_env ("KDE_SESSION_VERSION");
+  if (!is_int (ver) || as_int (ver) < 5) return lines;
+  string home= get_env ("XDG_CONFIG_HOME");
+  if (home == "") home= get_env ("HOME") * "/.config";
+  string dirs= get_env ("XDG_CONFIG_DIRS");
+  if (dirs == "") dirs= "/etc/xdg";
+  array<string> all;
+  all << home;
+  all << tokenize (dirs, ":");
+  for (int k= 0; k < N(all); k++) {
+    if (all[k] == "") continue;
+    int n= kde_wheel_lines_in (all[k] * "/kdeglobals");
+    if (n > 0) { lines= n; break; }
+  }
   return lines;
 }
 #endif
