@@ -28,7 +28,7 @@
 #     (its tag moved to the commit built):
 #     https://github.com/<owner>/<repo>/releases/tag/upsilon-latest
 #   * qt: the Qt 6 interface, with S7, for Apple silicon and macOS 13: the
-#     libraries of the job deps and the official binaries of Qt 6.8 (not
+#     libraries of the job deps and the official binaries of Qt 6.11 (not
 #     Homebrew's, which need the macOS of the runner, #972): built, the
 #     regression suites run, and "TeXmacs Upsilon Qt.app" (deployed with
 #     macdeployqt) kept as an artifact of the run and published with the
@@ -357,9 +357,9 @@ jobs:
   # The Qt 6 packages are made for macOS 13 as the Cocoa and Vue ones (#972):
   # the libraries of the job deps for Apple silicon (libpng, FreeType,
   # GnuTLS; the ones of the Vue port are not linked), the official binaries
-  # of Qt (universal, for macOS 12 and later: Qt 6.8, the last version of
-  # Qt with macOS 12 and the last open-source one of its LTS, installed by
-  # aqtinstall) and no library of Homebrew, which only runs on the macOS of
+  # of Qt (universal; Qt 6.11, the newest for macOS 13: 6.12 needs 14.4,
+  # QT_SUPPORTED_MIN_MACOS_VERSION of qtbase/.cmake.conf; installed by
+  # aqtinstall, its wheel checked against its SHA-256) and no library of Homebrew, which only runs on the macOS of
   # its bottles (15 on these runners). configure --with-osx=MIN_MACOS gives
   # the flags of the compilers and the LSMinimumSystemVersion of Info.plist,
   # which the step "Minimum macOS" checks against every bundled file. Qt's
@@ -371,7 +371,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     env:
-      QT_VERSION: 6.8.3
+      QT_VERSION: 6.11.3
+      AQT_VERSION: 3.3.0
+      AQT_SHA256: e88dbd87226f276fdd5d05347a44578d390d93a7f176e9476fbda0a7c9635f69
       QT_MODULES: qtwebsockets qtimageformats
     defaults:
       run:
@@ -400,14 +402,18 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.tool_cache }}/texmacs-qt
-          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}
+          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-aqt${{ env.AQT_VERSION }}
 
       - name: Qt
         run: |
           qt="$RUNNER_TOOL_CACHE/texmacs-qt"
           if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
             python3 -m venv "$RUNNER_TEMP/aqt"
-            "$RUNNER_TEMP/aqt/bin/pip" install -q 'aqtinstall==3.3.*'
+            "$RUNNER_TEMP/aqt/bin/pip" download -q --no-deps -d "$RUNNER_TEMP/aqt-wheel" "aqtinstall==$AQT_VERSION"
+            whl="$RUNNER_TEMP/aqt-wheel/aqtinstall-$AQT_VERSION-py3-none-any.whl"
+            [ "$(shasum -a 256 "$whl" | cut -d' ' -f1)" = "$AQT_SHA256" ] ||
+              { echo "error: wrong SHA-256 for aqtinstall"; exit 1; }
+            "$RUNNER_TEMP/aqt/bin/pip" install -q "$whl"
             "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
           fi
           echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
@@ -499,10 +505,14 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 75
     env:
-      QT_VERSION: 6.8.3
+      QT_VERSION: 6.11.3
+      AQT_VERSION: 3.3.0
+      AQT_SHA256: e88dbd87226f276fdd5d05347a44578d390d93a7f176e9476fbda0a7c9635f69
       QT_MODULES: qtwebsockets qtimageformats
       CHEZ_VERSION: 10.4.1
       CHEZ_SHA256: 2e74952db7bc177f0c3602e2217a341ba677d733eec4cd7726418c3a4e1ef308
+      # (in the key of its cache: a change rebuilds it)
+      CHEZ_CONFIGURE: --threads --installschemename=chez --disable-x11
     defaults:
       run:
         working-directory: src
@@ -527,7 +537,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ env.CHEZ }}
-          key: texmacs-chez-arm64-${{ env.MIN_MACOS }}-${{ env.CHEZ_VERSION }}
+          key: texmacs-chez-arm64-${{ env.MIN_MACOS }}-${{ env.CHEZ_VERSION }}-${{ env.CHEZ_SHA256 }}-${{ env.CHEZ_CONFIGURE }}
 
       # as Homebrew's formula, without X11 (the expression editor only)
       - name: Chez Scheme
@@ -542,7 +552,7 @@ jobs:
             { echo "error: wrong SHA-256 for Chez Scheme"; exit 1; }
           tar xzf chez.tar.gz
           cd "csv$CHEZ_VERSION"
-          ./configure --installprefix="$CHEZ" --threads --installschemename=chez --disable-x11
+          ./configure --installprefix="$CHEZ" $CHEZ_CONFIGURE
           make
           make install
 
@@ -554,14 +564,18 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.tool_cache }}/texmacs-qt
-          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}
+          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-aqt${{ env.AQT_VERSION }}
 
       - name: Qt
         run: |
           qt="$RUNNER_TOOL_CACHE/texmacs-qt"
           if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
             python3 -m venv "$RUNNER_TEMP/aqt"
-            "$RUNNER_TEMP/aqt/bin/pip" install -q 'aqtinstall==3.3.*'
+            "$RUNNER_TEMP/aqt/bin/pip" download -q --no-deps -d "$RUNNER_TEMP/aqt-wheel" "aqtinstall==$AQT_VERSION"
+            whl="$RUNNER_TEMP/aqt-wheel/aqtinstall-$AQT_VERSION-py3-none-any.whl"
+            [ "$(shasum -a 256 "$whl" | cut -d' ' -f1)" = "$AQT_SHA256" ] ||
+              { echo "error: wrong SHA-256 for aqtinstall"; exit 1; }
+            "$RUNNER_TEMP/aqt/bin/pip" install -q "$whl"
             "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
           fi
           echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
