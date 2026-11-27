@@ -142,7 +142,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 ;; run @thunk in a buffer loaded from a file with the style packages @styles
 ;; ("generic|dark-mode"), then close it
@@ -163,7 +163,7 @@
         (check-report #f "the group" (object->string r)))
       (buffer-close f)
       (url-remove f)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 ;; the colors defined in the PostScript of a label (with its flag) and a
 ;; code block, in the order of their first use: a list of (r g b), from 0
@@ -2658,7 +2658,7 @@
         (if (and old-view (in? old-view (view-list))
                  (in? old-win (window-list)))
             (window-set-view old-win old-view #t)
-            (when (buffer-exists? old) (switch-to-buffer old)))))
+            (check-restore-buffer old))))
     (check= (buffer-list) buffers)
     (check= (window-layout) layout)))
 

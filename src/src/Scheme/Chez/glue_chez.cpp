@@ -46,7 +46,7 @@
 * shim also records the routine name (current_glue_proc) for the messages of
 * chez_tm.hpp.
 *
-* 1405 routines.
+* 1406 routines.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -276,6 +276,7 @@ extern tmscm tmg_pretty_time (tmscm);
 extern tmscm tmg_cpu_idle_time ();
 extern tmscm tmg_pretty_date (tmscm, tmscm);
 extern tmscm tmg_texmacs_memory ();
+extern tmscm tmg_delete_deferred_widgets ();
 extern tmscm tmg_bench_print (tmscm);
 extern tmscm tmg_bench_print_all ();
 extern tmscm tmg_system_wait (tmscm, tmscm);
@@ -1787,6 +1788,7 @@ TMG_GUARDED_1 ("pretty-time", tmg_pretty_time)
 TMG_GUARDED_0 ("cpu-idle-time", tmg_cpu_idle_time)
 TMG_GUARDED_2 ("pretty-date", tmg_pretty_date)
 TMG_GUARDED_0 ("texmacs-memory", tmg_texmacs_memory)
+TMG_GUARDED_0 ("delete-deferred-widgets", tmg_delete_deferred_widgets)
 TMG_GUARDED_1 ("bench-print", tmg_bench_print)
 TMG_GUARDED_0 ("bench-print-all", tmg_bench_print_all)
 TMG_GUARDED_2 ("system-wait", tmg_system_wait)
@@ -3311,6 +3313,7 @@ static const tmg_entry tmg_entries[]= {
   { "cpu-idle-time", 0, (void*) tmgc_tmg_cpu_idle_time },
   { "pretty-date", 2, (void*) tmgc_tmg_pretty_date },
   { "texmacs-memory", 0, (void*) tmgc_tmg_texmacs_memory },
+  { "delete-deferred-widgets", 0, (void*) tmgc_tmg_delete_deferred_widgets },
   { "bench-print", 1, (void*) tmgc_tmg_bench_print },
   { "bench-print-all", 0, (void*) tmgc_tmg_bench_print_all },
   { "system-wait", 2, (void*) tmgc_tmg_system_wait },

@@ -254,6 +254,10 @@
   <menu|File> menu (without argument):
 
   <\enumerate>
+    <item>If a window was given which is no longer in <scm|window-list> (a
+    close request of the interface which comes after the window was killed
+    by other means), it does nothing.
+
     <item>If the current buffer is an embedded buffer and no window was
     given, it deletes the alternative windows which contain it (see
     <hlink|embedded widgets|#embedded>).

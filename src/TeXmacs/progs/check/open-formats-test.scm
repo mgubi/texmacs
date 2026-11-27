@@ -81,7 +81,7 @@
       (check-true (in? (url->unix u)
                        (map cdar (learned-interactive "recent-buffer"))))
       (buffer-close u))
-    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+    (when old (check-restore-buffer old))))
 
 (define (check-not-opened u)
   ;; opening @u gives a message and no buffer
@@ -214,7 +214,7 @@
     (check= calls (list (list 'new pdf) (list 'current md)))
     (startup-buffer-release)
     (when (buffer-exists? u) (buffer-close u))
-    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+    (when old (check-restore-buffer old))))
 
 (define (failing-import s fm)
   (stree->tree '(error "bad format or data")))
@@ -237,7 +237,7 @@
       (check-true (stree-has-string? (tm->stree (buffer-get-body u))
                                      "Revert me"))
       (buffer-close u))
-    (when (and old (buffer-exists? old)) (switch-to-buffer old)))
+    (when old (check-restore-buffer old)))
   ;; the autosave file of a file whose converter fails: no empty document
   ;; in place of the autosave, a message, and the file is not loaded either
   (let* ((u (write-file "r.md" "Autosaved\n"))
@@ -256,7 +256,7 @@
                                 msgs))))
     (when (buffer-exists? u) (buffer-close u))
     (system-remove a)
-    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+    (when old (check-restore-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Drops
@@ -307,7 +307,7 @@
       (check-false (dropped-documents "k.md"))
       (check-false (dropped-documents "./k.md"))
       (when (buffer-exists? host) (buffer-close host))
-      (when (and old (buffer-exists? old)) (switch-to-buffer old)))
+      (when old (check-restore-buffer old)))
     (check-false (dropped-documents "https://example.org/a.md"))
     (check-false (dropped-documents "file:///tmp/a.md"))
     ;; the styles and packages of TeXmacs are not documents (.ts is also
@@ -333,7 +333,7 @@
       (check= (tm->stree (buffer-get-body scratch)) '(document ""))
       (buffer-pretend-saved scratch)
       (buffer-close scratch)
-      (when (and old (buffer-exists? old)) (switch-to-buffer old)))))
+      (when old (check-restore-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; texmacs -c
@@ -349,7 +349,7 @@
     (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
               (buffer-list))
     (when (url-exists? out) (system-remove out))
-    (when (and old (buffer-exists? old)) (switch-to-buffer old))))
+    (when old (check-restore-buffer old))))
 
 (define (test-convert-file)
   (check-group "convert file")
@@ -385,7 +385,7 @@
       (check-false (url-exists? (tmp-file "t7-out.tm")))
       (for-each (lambda (b) (when (nin? b before) (buffer-close b)))
                 (buffer-list))
-      (when (and old (buffer-exists? old)) (switch-to-buffer old)))))
+      (when old (check-restore-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The document types of the application on macOS

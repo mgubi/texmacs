@@ -429,7 +429,7 @@
     (buffer-set-body u (stree->tree doc))
     (thunk u (buffer-get-body u))
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; a long region is parsed by parts (syntax_region.cpp): its colours after
 ;; edits are those of a fresh copy, and the answers have the rows of the
@@ -488,7 +488,7 @@
       (check-true (in? 6001 (map (lambda (e) (car (cadr e)))
                                  (syntax-region-errors d lan)))))
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; a long region which has no place to be cut at (indented statements at the
 ;; top level of a C file: no node of the top level starts a line) is one
@@ -529,7 +529,7 @@
       (with lan (tree-sitter-program-language "c")
         (check= (length (syntax-region-statistics d lan)) 3)))
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; the colours of the lines of a buffer after edits (the text, the offsets
 ;; and the colours of the region are changed in place by a keystroke, made
@@ -592,7 +592,7 @@
       (tree-sitter-line-colors "c" (tree-ref d 3))
       (check= (errors (tree-sitter-line-colors "c" (tree-ref d 1))) '()))
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 (define (test-highlight)
   (check= (treesit-capture-class "keyword") "keyword")

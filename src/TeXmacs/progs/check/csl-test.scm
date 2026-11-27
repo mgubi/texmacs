@@ -816,7 +816,7 @@
     (with r (tree->stree (buffer-get-body f))
       (buffer-pretend-saved f)
       (buffer-close f)
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       r)))
 
 (define (generated-bibliography name text)
@@ -1027,7 +1027,7 @@
     (export-buffer-main (current-buffer) tex "latex" '())
     (buffer-pretend-saved f)
     (buffer-close f)
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (if (url-exists? tex) (string-load tex) "")))
 
 (define (one-line s)

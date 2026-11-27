@@ -113,7 +113,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (with-scratch-buffer thunk)
   ;; (@thunk u) in a new buffer u, which is closed afterwards, also when an
@@ -2530,7 +2530,7 @@
             (set! bad (+ bad 1)))))
       (lambda ()
         (buffer-close u)
-        (when (buffer-exists? old) (switch-to-buffer old))))
+        (check-restore-buffer old)))
     bad))
 
 (define (test-random-documents)
@@ -3638,7 +3638,7 @@
       (check-false (buffer-nesting-skipped? deep))
       (buffer-pretend-saved deep)
       (buffer-close deep)
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       (system-rmdir-recursive dir))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -51,7 +51,7 @@
                                   "Outline"))
     (code-provider-remove! 'outline 'test)
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (system-remove u)))
 
 (define (focus-menu-count name)
@@ -69,7 +69,7 @@
     (apply-changes)
     (proc)
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (system-remove u)))
 
 (define (test-focus-source-files)
@@ -247,7 +247,7 @@
       (check-true (string-contains? (object->string (tree->stree (buffer-get-body w)))
                                     "typed")))
     (buffer-close w)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 (define (test-providers)
   (check-group "providers")
@@ -282,7 +282,7 @@
     (new-buffer-with u `(document ,@lines))
     (proc (buffer-get-body (current-buffer)))
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 (define (new-buffer-with u doc)
   (buffer-set-body u (stree->tree doc))

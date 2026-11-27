@@ -14,6 +14,26 @@ have the details, and the problems go to the
 
 ## 26 November 2026
 
+- **Sessions: the size of an image without Qt**: a PNG which a session
+  sends without a size (the plots of Sage, gnuplot's PNG output) is
+  inserted at its size in pixels in the Vue and Cocoa applications too; it
+  was its size scaled to 300 dpi, three times too large for the 100-dpi
+  plots of Sage (790 x 440 pixels became 2367 x 1317). The effects on
+  pictures (blurs, shadows...) are computed on the picture at its size in
+  pixels, as with Qt, in the Vue and Cocoa applications and in the
+  browser: their radii are now relative to the real pixels (before, to the
+  picture enlarged to 300 dpi, about four times with MuPDF), and the
+  results made before are made again. The browser has no session which
+  sends a PNG file (its Python sends its figures as SVG), so only the
+  effects change there (#969).
+- **A window whose close was refused closes again**: after "The document
+  has not been saved. Really close it?" answered No (for instance on a
+  master document whose inclusions were expanded), the close button, Cmd-W
+  (the Close item of the Window menu of macOS) and the close box of the tab
+  did nothing on that window any more, also after a save; they now ask
+  again (Vue). A close request which comes after its window was closed by
+  other means no longer quits TeXmacs when one window is left (all the
+  interfaces) (#970).
 - **Linux and Windows: the mouse wheel and the touchpad scroll as in the
   Qt interface** (desktop applications, Vue interface): a notch was eased
   over a tenth of a second and fast notches could be taken for a touchpad;
@@ -22,7 +42,6 @@ have the details, and the problems go to the
   the system), a fraction of a notch for a wheel of high resolution or a
   touchpad, with no glide after it; Ctrl+wheel zooms and Shift or Ctrl
   with other keys pages, as in Qt (#971).
-
 - **macOS: the mouse wheel scrolls as in the Qt interface** (desktop
   applications, Vue and Cocoa interfaces): a notch of a mouse wheel
   scrolled 10 points in the Cocoa interface and was eased over a tenth of

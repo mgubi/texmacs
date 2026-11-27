@@ -547,6 +547,16 @@
 (define (char-codes s)
   (map char->integer (string->list s)))
 
+(define png-790x440-100dpi
+  ;; a blank PNG of 790 x 440 pixels, 1 bit grey, at 100 dpi (pHYs of 3937
+  ;; pixels per metre), as the plots of Sage
+  '(137 80 78 71 13 10 26 10 0 0 0 13 73 72 68 82 0 0 3 22 0 0 1 184 1 0 0
+    0 0 240 76 76 189 0 0 0 9 112 72 89 115 0 0 15 97 0 0 15 97 1 168 63
+    167 105 0 0 0 66 73 68 65 84 120 218 237 193 49 1 0 0 0 194 160 245 79
+    109 13 15 160 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 224 199 0 171 224 0 1 73 45 179 245 0 0 0
+    0 73 69 78 68 174 66 96 130))
+
 ;; The answer of a plugin is a stream of blocks DATA_BEGIN format: ...
 ;; DATA_END, possibly nested, or DATA_BEGIN channel# ... DATA_END, which
 ;; send their content to another channel (prompt, input, error...). The
@@ -606,6 +616,25 @@
           '(document "cm is not allowed, please pt, px or par!"))
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png?height=3par"))
           '(document "par is not allowed, please pt, px or pag!"))
+
+  (check-group "parse: the size of an image file")
+  ;; a PNG without ?width= gets its size in pixels, whatever its resolution
+  ;; and whatever the GUI (#969: without Qt it was pixels x 300 / dpi on
+  ;; macOS and pixels x 300 / 72 with MuPDF): here 790 x 440 at 100 dpi
+  (let* ((dir (url-append (url-temp-dir) "plugins-test-images"))
+         (png (url-append dir "plot.png")))
+    (when (url-exists? dir) (system-rmdir-recursive dir))
+    (system-mkdir dir)
+    (string-save (list->string (map integer->char png-790x440-100dpi)) png)
+    (check= (string-length (string-load png)) 144)
+    (with t (echo (blk "file:" (url->system png)))
+      (check= (and (pair? t) (pair? (cdr t)) (pair? (cadr t))
+                   (car (cadr t)))
+              'image)
+      (check= (and (pair? t) (pair? (cdr t)) (pair? (cadr t))
+                   (list-tail (cadr t) 2))
+              '("790px" "440px" "" "")))
+    (system-rmdir-recursive dir))
 
   (check-group "parse: nesting and escapes")
   (check= (echo (blk "verbatim:" "a" (blk "scheme:" "(strong \"b\")") "c"))

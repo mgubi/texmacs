@@ -91,7 +91,7 @@
       (selection-cancel)
       (set-cell-mode "cell")
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (rows . l)
   ;; the table with the rows @l, each one a list of cell contents

@@ -90,7 +90,7 @@
                              (url-sys-concretize preview-pdf))))))
     (buffer-pretend-saved u)
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))
+    (check-restore-buffer old)
     (when (url-exists? preview-pdf) (system-remove preview-pdf))))
 
 (define (run-group thunk)

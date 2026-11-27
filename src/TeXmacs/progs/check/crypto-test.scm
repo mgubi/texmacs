@@ -540,7 +540,7 @@
     (buffer-pretend-saved f)
     (buffer-close f)
     (url-remove f)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Untrusted documents
@@ -596,7 +596,7 @@
     (check= (run) "done")
     (buffer-pretend-saved in)
     (buffer-close in)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Without GnuPG
@@ -788,7 +788,7 @@
     (buffer-set-body u (stree->tree doc))
     (guarded "the buffer" thunk)
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;; The commands of gpg-edit.scm use the GnuPG home of TeXmacs. A passphrase
 ;; block of a buffer is encrypted and decrypted in place; a key block is
