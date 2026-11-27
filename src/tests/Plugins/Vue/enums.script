@@ -28,12 +28,27 @@ wait 500
 snapshot e3
 move 105 300
 wait 200
-wheel 105 300 0 -5
+# (one event per notch: on macOS an event scrolls one notch whatever its
+# delta, as in the Qt port since #971, 60 points in a menu, a list or a
+# bar; these 7 events go at least as far as one event of -5 did)
+wheel 105 300 0 -1
+wheel 105 300 0 -1
+wheel 105 300 0 -1
+wheel 105 300 0 -1
+wheel 105 300 0 -1
+wheel 105 300 0 -1
+wheel 105 300 0 -1
 wait 700
 snapshot e4
 click 100 300
 wait 500
-wheel 60 100 0 -3
+# (one event per notch: on macOS an event scrolls one notch whatever its
+# delta, as in the Qt port since #971, 60 points in a menu, a list or a
+# bar; these 4 events go at least as far as one event of -3 did)
+wheel 60 100 0 -1
+wheel 60 100 0 -1
+wheel 60 100 0 -1
+wheel 60 100 0 -1
 wait 700
 snapshot e5
 # the output, which run.sh checks

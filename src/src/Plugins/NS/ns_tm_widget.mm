@@ -186,7 +186,7 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   NSRect r2 = r; r2.size.height = s.height;
   NSRect r3 = r2; 
   r2.size.width -= s.width; r3.origin.x =+ r2.size.width;
-  sv = [[[NSScrollView alloc] initWithFrame:r1] autorelease];
+  sv = [[[TMEditorScrollView alloc] initWithFrame:r1] autorelease];
   [sv setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
   [sv setHasVerticalScroller:YES];
   [sv setHasHorizontalScroller:YES];
@@ -1023,7 +1023,7 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
           }
         }
         else {
-          sc= [[[NSScrollView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
+          sc= [[[TMScrollAreaView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
           [sc setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
           [sc setHasVerticalScroller: YES];
           [sc setAutohidesScrollers: YES];

@@ -18,6 +18,8 @@
   NSString *workingText;
   BOOL processingCompose;
   BOOL hasFocus;  // TeXmacs was told that the canvas has the focus
+@public
+  qt_wheel_axis wheelX, wheelY; // the wheel scrolls as in Qt (scrollWheel:)
 }
 - (void) setWidget: (widget_rep*) w;
 - (widget_rep*) widget;

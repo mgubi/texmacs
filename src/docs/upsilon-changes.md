@@ -34,6 +34,31 @@ have the details, and the problems go to the
   again (Vue). A close request which comes after its window was closed by
   other means no longer quits TeXmacs when one window is left (all the
   interfaces) (#970).
+- **Linux and Windows: the mouse wheel and the touchpad scroll as in the
+  Qt interface** (desktop applications, Vue interface): a notch was eased
+  over a tenth of a second and fast notches could be taken for a touchpad;
+  now every event scrolls at once what Qt scrolls: three steps of a
+  sixteenth of the view per notch (on Windows, the number of lines set in
+  the system), a fraction of a notch for a wheel of high resolution or a
+  touchpad, with no glide after it; Ctrl+wheel zooms and Shift or Ctrl
+  with other keys pages, as in Qt (#971).
+- **macOS: the mouse wheel scrolls as in the Qt interface** (desktop
+  applications, Vue and Cocoa interfaces): a notch of a mouse wheel
+  scrolled 10 points in the Cocoa interface and was eased over a tenth of
+  a second in the Vue one, where notches turned fast were taken for a
+  trackpad and scrolled eight times less (#373 on macOS); now both scroll
+  as the Qt interface does, at once: three steps of a sixteenth of the
+  view per notch, whatever the acceleration, and a trackpad its movement
+  times a twentieth of that step (two and a half times the movement in a
+  view 800 points high), the momentum of the system included. In the Cocoa
+  interface the frame of a scroll drawn by the GPU is now shown with the
+  move of the view, which removes a flicker while scrolling; an editor at
+  its end passes the wheel to the scroll view around it (side tools,
+  dialogs), the margins beside the page scroll it too (in Qt they do
+  nothing), and the menus, lists and side tools scroll 60 points a notch,
+  as the scroll areas of Qt
+  (`TEXMACS_NS_SCROLL_SYNC=0` goes back to the next refresh,
+  `TEXMACS_NS_WHEEL=native` to the scrolling of AppKit) (#971).
 
 ## 25 November 2026
 

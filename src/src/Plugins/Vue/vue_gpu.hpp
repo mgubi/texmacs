@@ -83,10 +83,13 @@ bool is_gpu_renderer (renderer ren);
 // the canvases of the Cocoa port drawn by the GPU (Metal, unless
 // TEXMACS_NS_GPU=0): their backing stores (gpu_backing_picture) are shown in
 // a CAMetalLayer of their view (dw x dh pixels, scaled when the sizes
-// differ), and read back (premultiplied RGBA, rows from the top: the
-// snapshots, which draw the views)
+// differ; in_transaction: with the Core Animation transaction of the
+// thread, as the scroll which moved the view, see TMDocView), and read back
+// (premultiplied RGBA, rows from the top: the snapshots, which draw the
+// views)
 bool gpu_layers_enabled ();
-bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh);
+bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh,
+                       bool in_transaction= false);
 bool gpu_read_picture (picture p, unsigned char* rgba);
 
 #endif // defined VUE_GPU_HPP

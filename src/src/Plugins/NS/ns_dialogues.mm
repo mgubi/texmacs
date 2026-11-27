@@ -755,7 +755,7 @@ ns_tm_embedded_widget_rep::~ns_tm_embedded_widget_rep () {
  widget has a fixed width (papyrus, page-width of the resize, see
  attach-resize), whose right part was under the scroll bar; and the width of
  the editor does not change when the scroll bar appears */
-@interface TMEmbeddedScrollView : NSScrollView
+@interface TMEmbeddedScrollView : TMEditorScrollView
 @end
 
 @implementation TMEmbeddedScrollView

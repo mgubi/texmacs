@@ -27,9 +27,13 @@
 
 hashmap<int,string> nskeymap("");
 
+static int ns_wheel_over_bar (NSScrollView* sv, NSEvent* event, int step,
+                              qt_wheel_axis& x, qt_wheel_axis& y);
+
 @interface TMView (Private)
 - (void) focusIn;
 - (void) focusOut;
+- (BOOL) scrollLikeQt: (NSEvent*) event;
 @end
 
 /******************************************************************************
@@ -536,6 +540,21 @@ mouse_state (NSEvent* event, bool flag) {
   return i;
 }
 
+// a mouse state (mouse_state) with the modifiers m (QT_WHEEL_..., the
+// latched ones of a wheel event) instead of those of the event
+static unsigned int
+wheel_mouse_state (unsigned int st, int m) {
+  // the buttons: control and option made the right and middle buttons
+  unsigned int i= st & 31;
+  if (st & 1024) i= 0;
+  if (st & 2048) i= 0;
+  if (m & QT_WHEEL_META) i= 1024 + 4;
+  if (m & QT_WHEEL_ALT)  i= 2048 + 2;
+  if (m & QT_WHEEL_SHIFT) i += 256;
+  if (m & QT_WHEEL_CONTROL) i += 4096;
+  return i;
+}
+
 static string
 mouse_decode (unsigned int mstate) {
   if      (mstate & 1 ) return "left";
@@ -691,24 +710,82 @@ mouse_decode (unsigned int mstate) {
   // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
   // command zooms, and otherwise the scroll view scrolls
   if (!wid) { [super scrollWheel: event]; return; }
+  // what -[QNSView scrollWheel:] drops before any widget sees it (the end
+  // of a gesture which a momentum follows): neither the capture nor the
+  // zoom get it; the deltas of a cancelled gesture are zeroes
+  bool qt= !ns_wheel_native ();
+  if (qt && ns_wheel_dropped (event)) return;
+  // over an overlay scroll bar of its scroll view (which lies over the
+  // canvas): that bar scrolls, with no capture and no zoom, as in Qt
+  if (qt) {
+    NSScrollView* sv= [self enclosingScrollView];
+    if (sv != nil && [sv documentView] == [self superview]) {
+      int r= ns_wheel_over_bar (sv, event, 0, wheelX, wheelY);
+      if (r == 1) return;
+      if (r == 2) { [[sv nextResponder] scrollWheel: event]; return; }
+    }
+  }
+  bool cancelled= qt && [event phase] == NSEventPhaseCancelled;
+  bool precise= [event hasPreciseScrollingDeltas];
+  int px= cancelled? 0: qt_wheel_mac_pixels ([event scrollingDeltaX], precise);
+  int py= cancelled? 0: qt_wheel_mac_pixels ([event scrollingDeltaY], precise);
   if (as_bool (call ("wheel-capture?"))) {
     NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
-    coord2 wh = from_nspoint (NSMakePoint ([event scrollingDeltaX],
-                                           [event scrollingDeltaY]));
+    // the pixel delta of the Qt port (a QPoint): for a mouse wheel, 20
+    // points a line
+    coord2 wh = from_nspoint (NSMakePoint (px, py));
     array<double> data;
     data << ((double) wh.x1) << ((double) wh.x2);
+    // (with the modifiers of the gesture during its momentum, as the
+    // wheel_state of the Qt port reads those of the event)
+    unsigned int st= mouse_state (event, false);
+    if (qt) st= wheel_mouse_state (st, ns_wheel_mods (event));
     the_gui->process_mouse (wid, "wheel", pt.x1, pt.x2,
-                            mouse_state (event, false), texmacs_time (), data);
+                            st, texmacs_time (), data);
   }
-  else if ([event modifierFlags] & NSEventModifierFlagCommand) {
-    double dy= [event scrollingDeltaY];
-    if (dy == 0) return;
-    double f= sqrt (sqrt (sqrt (sqrt ([event hasPreciseScrollingDeltas]?
-                                      fabs (dy): 2.0))));
-    call (dy > 0? "zoom-in": "zoom-out", object (f));
+  else if (qt ? qt_wheel_zooms (ns_wheel_mods (event))
+              : ([event modifierFlags] & NSEventModifierFlagCommand) != 0) {
+    // as QTMWidget::wheelEvent (Qt 6): command alone (control for Qt), with
+    // the modifiers of the gesture during its momentum; by the pixel delta,
+    // else the angle
+    int ax= cancelled? 0: qt_wheel_mac_angle ([event scrollingDeltaX],
+                                              [event deltaX], precise);
+    int ay= cancelled? 0: qt_wheel_mac_angle ([event scrollingDeltaY],
+                                              [event deltaY], precise);
+    double f= qt_wheel_zoom (px, py, ax, ay);
+    if (f == 0) return;
+    call (f > 0? "zoom-in": "zoom-out", object (fabs (f)));
   }
-  else [super scrollWheel: event];
+  else if (![self scrollLikeQt: event]) [super scrollWheel: event];
+}
+
+// The wheel scrolls the document as in the Qt port (wheel_steps.hpp, issue
+// #971): a notch of a mouse wheel scrolls three single steps of the view (a
+// sixteenth of it plus a point) at once, whatever the acceleration, where
+// NSScrollView scrolled a line of 10 points; a trackpad an angle delta of
+// twice its scrolling delta, the system momentum included, without the
+// elastic bounce of AppKit. At the end of the document the event goes to
+// the views around the scroll view (a scroll view of the side tools, of a
+// dialog), as Qt passes an event which the scroll bar ignores to the
+// parent. A canvas which is not the document of a scroll view of its own
+// (a box widget, a canvas in the side tools or in a scrollable widget)
+// does not scroll: the views around it get the event, as a QTMWidget
+// without a scroll range ignores it and its parent QScrollArea scrolls by
+// its own steps (TMScrollAreaView). TEXMACS_NS_WHEEL=native leaves it to
+// AppKit.
+- (BOOL) scrollLikeQt: (NSEvent*) event
+{
+  if (ns_wheel_native ()) return NO;
+  NSScrollView* sv= [self enclosingScrollView];
+  if (sv == nil || [sv contentView] == nil ||
+      [sv documentView] != [self superview]) {
+    [[self nextResponder] scrollWheel: event];
+    return YES;
+  }
+  if (!ns_wheel_like_qt (sv, event, 0, wheelX, wheelY))
+    [[sv nextResponder] scrollWheel: event];
+  return YES;
 }
 
 - (BOOL) isFlipped
@@ -907,3 +984,205 @@ ns_test_drop (NSView* v, NSString* path) {
                           pt.x1, pt.x2, ticket, texmacs_time ());
   [pb releaseGlobally];
 }
+
+/******************************************************************************
+* The wheel of the Qt port (issue #971)
+******************************************************************************/
+
+bool
+ns_wheel_native () {
+  static int native= -1;
+  if (native < 0) {
+    const char* v= getenv ("TEXMACS_NS_WHEEL");
+    native= (v != NULL && strcmp (v, "native") == 0);
+  }
+  return native == 1;
+}
+
+// does -[QNSView scrollWheel:] drop the event? The end of a gesture which
+// a momentum follows (which Qt finds in the queue); a cancelled gesture is
+// sent, its deltas zeroed
+bool
+ns_wheel_dropped (NSEvent* event) {
+  if ([event phase] == NSEventPhaseEnded) {
+    NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
+                                   untilDate: [NSDate distantPast]
+                                      inMode: @"TMMomentumEventSearchMode"
+                                     dequeue: NO];
+    if (n != nil && [n momentumPhase] == NSEventPhaseBegan) return true;
+  }
+  return false;
+}
+
+// the modifiers of a wheel event as Qt has them (qt_wheel_latch): those of
+// the gesture during its momentum
+int
+ns_wheel_mods (NSEvent* event) {
+  static qt_wheel_latch latch;
+  NSEventModifierFlags f= [event modifierFlags];
+  int m= ((f & NSEventModifierFlagShift) ? QT_WHEEL_SHIFT : 0) |
+         ((f & NSEventModifierFlagCommand) ? QT_WHEEL_CONTROL : 0) |
+         ((f & NSEventModifierFlagOption) ? QT_WHEEL_ALT : 0) |
+         ((f & NSEventModifierFlagControl) ? QT_WHEEL_META : 0);
+  return latch.update (m, [event momentumPhase] != NSEventPhaseNone);
+}
+
+// QAbstractSliderPrivate::scrollByDelta for the bar of the scroll view sv
+// along an axis (hor), by an angle, single steps of step points (0: those
+// of an editor), a page an event when paging: the fraction of a step is
+// kept while the bar can still move that way, and the event is ignored
+// (NO: passed to the parent widget) with the fraction dropped when the bar
+// is at its end that way
+static BOOL
+ns_scroll_bar (NSScrollView* sv, bool hor, int angle, int step,
+               qt_wheel_axis& a, bool paging) {
+  NSClipView* clip= [sv contentView];
+  if (clip == nil) return NO;
+  if (angle == 0) return YES;
+  NSRect b= [clip bounds];
+  int view= (int) (hor? b.size.width: b.size.height);
+  if (step <= 0) step= qt_wheel_single_step (view);
+  // a positive angle scrolls to the start: towards smaller coordinates in
+  // a flipped document view (all those of TeXmacs), larger ones otherwise
+  CGFloat dir= -1;
+  if (!hor && ![[sv documentView] isFlipped]) dir= 1;
+  if (angle < 0) dir= -dir;
+  // can the view move that way at all? (QAbstractSlider: value > minimum,
+  // value < maximum)
+  NSPoint o= b.origin, p= o;
+  if (hor) p.x += dir; else p.y += dir;
+  p= [clip constrainBoundsRect: NSMakeRect (p.x, p.y, b.size.width,
+                                            b.size.height)].origin;
+  bool taken;
+  int n= a.scroll_bar (angle, step, view, !NSEqualPoints (p, o), taken,
+                       paging);
+  if (!taken) return NO;
+  if (n == 0) return YES; // less than a point: kept for the next event
+  CGFloat d= dir * (n < 0? -n: n);
+  if (hor) o.x += d; else o.y += d;
+  o= [clip constrainBoundsRect: NSMakeRect (o.x, o.y, b.size.width,
+                                            b.size.height)].origin;
+  [clip scrollToPoint: o];
+  [sv reflectScrolledClipView: clip];
+  [sv flashScrollers];
+  return YES;
+}
+
+// -[QNSView scrollWheel:] gives the angle deltas of the event, and
+// QAbstractScrollArea::wheelEvent gives the event to the bar of the
+// dominant axis (ns_scroll_bar), which pages with control or shift
+BOOL
+ns_wheel_like_qt (NSScrollView* sv, NSEvent* event, int step,
+                  qt_wheel_axis& x, qt_wheel_axis& y) {
+  if ([sv contentView] == nil) return NO;
+  if (ns_wheel_dropped (event)) return YES;
+  // (a cancelled gesture: no deltas, nothing to scroll)
+  if ([event phase] == NSEventPhaseCancelled) return YES;
+  bool precise= [event hasPreciseScrollingDeltas];
+  int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
+  int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);
+  if (ax == 0 && ay == 0) return YES;
+  bool hor= qt_wheel_horizontal (ax, ay);
+  return ns_scroll_bar (sv, hor, hor? ax: ay, step, hor? x: y,
+                        qt_wheel_pages (ns_wheel_mods (event)));
+}
+
+// can the bar of sv along an axis move at all (QAbstractSlider: a range
+// which is not empty; Qt shows the bar only then)?
+static bool
+ns_bar_has_range (NSScrollView* sv, bool hor) {
+  NSView* d= [sv documentView];
+  NSClipView* c= [sv contentView];
+  if (d == nil || c == nil) return false;
+  NSSize ds= [d frame].size, cs= [c bounds].size;
+  return hor? ds.width > cs.width + 0.5: ds.height > cs.height + 0.5;
+}
+
+// a wheel over a scroll bar of sv scrolls that bar, as
+// QScrollBar::wheelEvent: a vertical wheel also scrolls a horizontal bar,
+// with no capture and no zoom, a page an event with control or shift. A
+// legacy bar takes room beside the view; an overlay one (the transient
+// bars of QMacStyle) lies over the view and owns its strip at its edge
+// whenever its range is not empty, also while it is faded out. The square
+// between two legacy bars (the corner widget of Qt) passes the event on.
+// 0: not over a bar; 1: done; 2: over a bar which ignores it (the parent
+// widget gets it)
+static int
+ns_wheel_over_bar (NSScrollView* sv, NSEvent* event, int step,
+                   qt_wheel_axis& x, qt_wheel_axis& y) {
+  NSClipView* clip= [sv contentView];
+  if (clip == nil) return 0;
+  bool legacy= [sv scrollerStyle] == NSScrollerStyleLegacy;
+  NSPoint p= [sv convertPoint: [event locationInWindow] fromView: nil];
+  NSScroller* vs= [sv hasVerticalScroller]? [sv verticalScroller]: nil;
+  NSScroller* hs= [sv hasHorizontalScroller]? [sv horizontalScroller]: nil;
+  bool on_v= vs != nil && (!legacy || ![vs isHidden]) &&
+             ns_bar_has_range (sv, false) && NSPointInRect (p, [vs frame]);
+  bool on_h= !on_v && hs != nil && (!legacy || ![hs isHidden]) &&
+             ns_bar_has_range (sv, true) && NSPointInRect (p, [hs frame]);
+  if (!on_v && !on_h) {
+    if (legacy && NSPointInRect (p, [sv bounds]) &&
+        !NSPointInRect (p, [clip frame]) &&
+        (vs == nil || !NSPointInRect (p, [vs frame])) &&
+        (hs == nil || !NSPointInRect (p, [hs frame])) &&
+        vs != nil && ![vs isHidden] && hs != nil && ![hs isHidden])
+      return 2; // the corner
+    return 0;
+  }
+  if (ns_wheel_dropped (event) || [event phase] == NSEventPhaseCancelled)
+    return 1;
+  bool precise= [event hasPreciseScrollingDeltas];
+  int ax= qt_wheel_mac_angle ([event scrollingDeltaX], [event deltaX], precise);
+  int ay= qt_wheel_mac_angle ([event scrollingDeltaY], [event deltaY], precise);
+  int a;
+  if (!qt_wheel_bar_angle (on_h, ax, ay, a)) return 2;
+  bool paging= qt_wheel_pages (ns_wheel_mods (event));
+  return ns_scroll_bar (sv, on_h, a, step, on_h? x: y, paging)? 1: 2;
+}
+
+// A deliberate deviation from the Qt port: a wheel over the margins beside
+// a centered page (TMClipView) does nothing in Qt (only the surface of the
+// document gets the wheel, QTMScrollView::viewportEvent), and scrolls the
+// document here, as over the page, which is more natural. False goes back
+// to Qt
+static bool
+ns_wheel_margins_scroll () {
+  return true;
+}
+
+@implementation TMEditorScrollView
+- (void) scrollWheel: (NSEvent*) event
+{
+  // the wheel over the scroll bars scrolls them as QScrollBar (with the
+  // fractions of the canvas, the same bars in Qt), over the margins beside
+  // a centered page see ns_wheel_margins_scroll; never the native
+  // scrolling of NSScrollView (10 points a notch, no zoom, no capture)
+  static bool busy= false;
+  TMView* canvas= nil;
+  if (!ns_wheel_native () && !busy)
+    for (NSView* v in [[self documentView] subviews])
+      if ([v isKindOfClass: [TMView class]]) { canvas= (TMView*) v; break; }
+  if (canvas == nil) { [super scrollWheel: event]; return; }
+  int r= ns_wheel_over_bar (self, event, 0, canvas->wheelX, canvas->wheelY);
+  if (r == 1) return;
+  if (r == 2) { [[self nextResponder] scrollWheel: event]; return; }
+  if (!ns_wheel_margins_scroll ()) return;
+  busy= true;
+  @try { [canvas scrollWheel: event]; }
+  @finally { busy= false; }
+}
+@end
+
+@implementation TMScrollAreaView
+- (void) scrollWheel: (NSEvent*) event
+{
+  // QScrollArea: single steps of 20 points (set by its constructor)
+  if (ns_wheel_native ()) { [super scrollWheel: event]; return; }
+  int r= ns_wheel_over_bar (self, event, QT_WHEEL_AREA_STEP, wheelX, wheelY);
+  if (r == 1) return;
+  if (r == 0 &&
+      ns_wheel_like_qt (self, event, QT_WHEEL_AREA_STEP, wheelX, wheelY))
+    return;
+  [[self nextResponder] scrollWheel: event];
+}
+@end

@@ -148,6 +148,14 @@ ns_bench_now () {
     else atEnd= h > b.size.height + 1 && NSMaxY (b) >= h - 1;
     lastClip= b.size;
   }
+  // (a canvas drawn by the GPU then shows its next frame with the
+  // transaction which moves it, see ns_simple_widget_rep::show_gpu_store:
+  // the one of this forced update, or, for a scroll made by an update (the
+  // cursor kept visible, SLOT_SCROLL_POSITION), where force_update only
+  // asks for another one, the one of the repaint which ends that update.
+  // The mark is used up by that frame, so that an error in the update
+  // leaves at most one more frame presented with its transaction)
+  wid->gpu_sync= true;
   wid->follow_visible_part ();
   if (wid && wid->has_store () && [NSApp isRunning] && [self window])
     the_gui->force_update ();
@@ -237,7 +245,8 @@ ns_bench_now () {
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
-  gpu_presenter (NULL), gpu_dirty (false),
+  gpu_presenter (NULL), gpu_dirty (false), gpu_sync (false),
+  gpu_sync_last (0),
   zoom_now (0), zoom_pending (false), zoom_image (NULL),
   zoom_rect (NSZeroRect), zoom_origin (NSZeroPoint), zoom_ratio (1),
   extents (coord4 (0, 0, 0, 0)), too_large_said (false),
@@ -322,10 +331,50 @@ ns_draw_gpu_canvases (NSView* root, NSBitmapImageRep* rep) {
   draw_gpu_canvases (root, root, rep);
 }
 
+// is a frame of a scroll presented with the Core Animation transaction which
+// moves the view (gpu_sync)? Unless TEXMACS_NS_SCROLL_SYNC=0, which goes
+// back to the next refresh (a flicker while scrolling, issue #971)
+static bool
+gpu_scroll_sync () {
+  static int on= -1;
+  if (on < 0) {
+    const char* v= getenv ("TEXMACS_NS_SCROLL_SYNC");
+    on= (v == NULL || strcmp (v, "0") != 0);
+  }
+  return on == 1;
+}
+
+// the refresh period of the screen of a window (s): the shortest one of a
+// screen of variable rate (ProMotion), 60 Hz before macOS 12
+static double
+refresh_period (NSWindow* w) {
+  double p= 1.0 / 60;
+  if (@available (macOS 12.0, *)) {
+    NSScreen* s= [w screen];
+    if (s != nil && [s minimumRefreshInterval] > 0)
+      p= [s minimumRefreshInterval];
+  }
+  return p;
+}
+
 void
 ns_simple_widget_rep::show_gpu_store () {
-  // at the next refresh of the screen (TMGpuPresenter)
+  // at the next refresh of the screen (TMGpuPresenter); the frame of a
+  // scroll at once, with the transaction which moves the view (see
+  // metal_backend::present_in_transaction), but at most one a refresh of
+  // the screen (with some leeway for the jitter of the events): the
+  // compositor gives the drawables of the layer back once a refresh, and a
+  // burst of events faster than that would wait for them in nextDrawable
   if (!view || is_nil (gpu_store)) return;
+  bool sync= gpu_sync;
+  gpu_sync= false;
+  if (sync && gpu_scroll_sync () && [view window] &&
+      ns_bench_now () - gpu_sync_last >=
+        0.9 * refresh_period ([view window])) {
+    bool done= present_gpu_store (true);
+    gpu_sync_last= ns_bench_now ();
+    if (done) { gpu_dirty= false; return; }
+  }
   gpu_dirty= true;
   if (gpu_presenter == NULL) {
     TMGpuPresenter* p= [[TMGpuPresenter alloc] init];
@@ -336,7 +385,7 @@ ns_simple_widget_rep::show_gpu_store () {
 }
 
 bool
-ns_simple_widget_rep::present_gpu_store () {
+ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   // the view hosts a CAMetalLayer (made when first shown: by name, so that
   // a build without Metal needs no QuartzCore), into which the store is
   // copied, scaled when the pixels of the screen are not those of the store
@@ -345,7 +394,7 @@ ns_simple_widget_rep::present_gpu_store () {
   if (!view || is_nil (gpu_store) || ![view window]) return true;
   if (gpu_layer == NULL) {
     Class mlc= NSClassFromString (@"CAMetalLayer");
-    if (mlc == nil) return;
+    if (mlc == nil) return true;
     CALayer* l= [[mlc alloc] init];
     [l setOpaque: NO];
     [view setLayer: l];
@@ -358,7 +407,7 @@ ns_simple_widget_rep::present_gpu_store () {
   NSSize sz= [view bounds].size;
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
   // (a failure is not tried again before the next repaint)
-  gpu_show_picture (gpu_layer, gpu_store, dw, dh);
+  gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
   return true;
 }
 
