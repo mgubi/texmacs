@@ -47,7 +47,7 @@ CXXGNUTLS = @GNUTLS_CFLAGS@
 CXXLIBCURL = @LIBCURL_CFLAGS@
 CXXFREETYPE = @FREETYPE_CFLAGS@
 CXXICONV = @ICONV_CXX@
-CXXGUILE = @GUILE_CFLAGS@
+CXXGUILE = @GUILE_CFLAGS@ @GCPP_CFLAGS@
 CXXSPARKLE = @SPARKLE_CXX@ @SPARKLE_CPP@
 CXXPDF = @PDF_CFLAGS@
 CXXMUPDF = @MUPDF_CFLAGS@
@@ -57,7 +57,7 @@ CXXRESVG = @RESVG_CFLAGS@
 
 LD = @CXX@
 LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE) $(CXXSANITIZERS)
-LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ @CHEZ_LIBS@
+LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ @CHEZ_LIBS@ @GCPP_LDFLAGS@
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
 LDPATH = @CONFIG_BPATH@
@@ -78,8 +78,16 @@ RM = rm -f
 CP = @CONFIG_CP@
 GUILE_BIN = @GUILE_BIN@
 SCHEME_DIR = @SCHEME_DIR@
+ifeq ($(SCHEME_DIR),guile_cpp)
+SCHEME_CXX_STD = -std=c++20
+else
+SCHEME_CXX_STD =
+endif
 GLUE = cd Scheme/Glue; ./build-glue
-ifeq ($(SCHEME_DIR),S7)
+ifeq ($(SCHEME_DIR),guile_cpp)
+GLUE_BIN = $(if $(strip @GCPP_BIN@),@GCPP_BIN@,$(CURDIR)/Objects/s7-run)
+GLUE_DEPS = $(if $(strip @GCPP_BIN@),,Objects/s7-run)
+else ifeq ($(SCHEME_DIR),S7)
 # the glue generators run on a small S7 interpreter, see Scheme/Glue/s7-run.c
 GLUE_BIN = $(CURDIR)/Objects/s7-run
 GLUE_DEPS = Objects/s7-run
@@ -385,8 +393,10 @@ endif
 cxx_incl     = $(call cxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS)) 
 objcxx_flags = $(strip $(OBJCXX) $(1) $(depflags) -c $< -o $@)
+# the Objective-C++ of the Cocoa port includes scheme.hpp, which includes
+# object.hpp: with guile_cpp, it needs C++20 and the headers of guile_cpp too
 objcxx_incl  = $(call objcxx_flags,$(1) \
- $(CPPFLAGS) $(CXXFLAGS))
+ $(CPPFLAGS) $(CXXFLAGS) $(SCHEME_CXX_STD) $(GCPP_CFLAGS))
 cc_flags    = $(strip $(CC) $(1) $(depflags) -c $< -o $@)
 cc_incl     = $(call cc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS)) 
@@ -403,7 +413,7 @@ $(data_obj): Objects/%.o: %.cpp
 $(edit_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(edit_incl) $(CXXGUI))
 $(scheme_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(scheme_incl) $(CXXGUILE) $(CXXGUI))
+	$(call cxx_incl,$(SCHEME_CXX_STD) $(scheme_incl) $(CXXGUILE) $(CXXGUI))
 $(scheme_c_obj): Objects/%.o: %.c
 	$(call cc_incl,$(scheme_incl) $(SCHEME_C_FLAGS))
 $(graphics_obj): Objects/%.o: %.cpp
