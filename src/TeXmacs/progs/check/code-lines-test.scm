@@ -42,7 +42,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 ;; (in a monospaced font, as the files of source code: a space is a glyph
 ;; there, and the lines all have the height of the font)
@@ -714,7 +714,7 @@
                        (tree->stree (buffer-get-body u))))))
       (check= r '("true" (document "yxint a;" "int b;" "z"))))
     (buffer-close u)
-    (when (buffer-exists? prev) (switch-to-buffer prev))
+    (check-restore-buffer prev)
     (system-remove u)
     (code-lines-env old)))
 
@@ -829,7 +829,7 @@
         (check-true (in? '(associate "code-lines" "true")
                          (cdadr (assoc 'initial (cdr t))))))
       (system-remove u))
-    (when (buffer-exists? prev) (switch-to-buffer prev))
+    (check-restore-buffer prev)
     (code-lines-env old)))
 
 ;; Fixes of the audit of 14707e2593: the rectangles of lines with spaces

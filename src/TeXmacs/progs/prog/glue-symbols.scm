@@ -128,6 +128,7 @@
 "cpu-idle-time"
 "pretty-date"
 "texmacs-memory"
+"delete-deferred-widgets"
 "bench-print"
 "bench-print-all"
 "system-wait"

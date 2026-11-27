@@ -171,7 +171,7 @@
         (check-report #f "the group" (object->string r)))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (after-key s pos key)
   ;; the text @s once @key was pressed with the cursor at @pos

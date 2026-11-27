@@ -54,7 +54,8 @@ Logs are in `tests/build/<runner>/`. Some references depend on the machine's fon
 ### Writing a Scheme suite
 - A suite is a module `TeXmacs/progs/check/<name>-test.scm` using `(check check-lib)` and defining `(<name>-test-failures)`: `(check-suite "name")`, groups with `(check-group "...")`, checks with `check=`, `check-true`, `check-false`, `check-error`, then `(check-end)`, which returns the number of failures. Wrap each group so that an error counts as one failure (see `run-group` in `plugins-test.scm` or `with-buffer-body` in `editing-test.scm`).
 - Register it in `check-master.scm` (the `:use` list and `regression-suites`). The order matters: suites run in ONE process, so a suite must leave no state behind:
-  - close every buffer it opens, including buffers renamed by `save-buffer-as` (compare `(buffer-list)` before and after);
+  - close every buffer it opens, including buffers renamed by `save-buffer-as` (compare `(buffer-list)` before and after); the runner fails a suite which leaves a buffer open, and closes it;
+  - go back to the buffer where it started with `(check-restore-buffer old)`, not `switch-to-buffer`: after `buffer-close` that buffer is often current again, and `switch-to-buffer` would give it a second view (#925); the runner fails a suite which changes the views of its starting buffer;
   - restore every global it changes; never call `lazy-keyboard-force` or anything that loads all keyboard maps;
   - after `buffer-set-body`, run `(archive-state) (start-editing) (end-editing) (clear-undo-history)` before testing undo;
   - word completion uses all open buffers, and buffer indices change with the number of open buffers: do not depend on them;
@@ -68,6 +69,7 @@ Logs are in `tests/build/<runner>/`. Some references depend on the machine's fon
 - Without a window: nothing is typeset until `update-forced`; `delayed` and idle work never run; auxiliary data needs `generate-all-aux` (see `tests/documents/export.scm`); page numbers are `?` unless the page medium is paper; modifier key presses do not work (call the command instead, e.g. `(make-fraction)` for `math f`).
 - Box-based cursor moves (`kbd-right`, `kbd-down`... the arrow keys) do nothing while the editor has pending changes (`has_changed` in `go_right`, `edit_cursor.cpp`), and `update-forced` does not clear them: call `(update-forced) (apply-changes)` after each edit, then `(kbd-right)` etc. work (`key-press "right"` alone does not). The arity of macros defined in a document is only learned by `drd_update`, which runs in `update_menus`: call `(update-menus)` after loading or editing the preamble, or `\name` Return inserts the macro without fields.
 - One process gets slower over many loaded documents (leaked views, #61); restart it every few hundred documents.
+- A script given by `-x` runs before the Qt event loop starts, so the widgets of closed views (`deleteLater`), and with them their editors (about 1 MB each), are never freed and memory only grows: call `(delete-deferred-widgets)` after closing buffers (`check-lib` does it at each group, in `check-restore-buffer` and after each suite, #967). The Qt queue of GUI events (focus, resize) is not processed either and still keeps some editors alive.
 
 ## Known pitfalls
 - `.tm` files are Cork-encoded: never write raw UTF-8 into them; use `\<name\>` or `\<#xxxx\>` (never a bare `<#xxxx>`), or the Cork bytes already used in the file. In Scheme tests, build Cork characters with `(integer->char n)`.

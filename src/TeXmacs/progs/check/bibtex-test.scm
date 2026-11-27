@@ -746,7 +746,7 @@
     (with r (first-of 'bibliography (tree->stree (buffer-get-body u)))
       (buffer-pretend-saved u)
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       r)))
 
 (define (bib-items t)

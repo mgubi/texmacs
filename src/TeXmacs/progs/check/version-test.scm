@@ -107,7 +107,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (set-body doc)
   (buffer-set-body (current-buffer) (stree->tree doc))
@@ -953,7 +953,7 @@
           (check= (body) '(document "One."))
           (buffer-pretend-saved f)
           (buffer-close f)
-          (when (buffer-exists? old) (switch-to-buffer old)))
+          (check-restore-buffer old))
         ;; the history is relative to the repository of the file, also
         ;; when the current buffer is outside it
         (check-false (== (and-with r (current-git-root) (url->system r))

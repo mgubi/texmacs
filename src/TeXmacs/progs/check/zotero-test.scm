@@ -409,7 +409,7 @@
       (update-forced)
       (buffer-pretend-saved u)
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (test-update)
   (check-group "update")
@@ -1787,7 +1787,7 @@
       (update-forced)
       (buffer-pretend-saved u)
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (body) (tree->stree (buffer-get-body (current-buffer))))
 

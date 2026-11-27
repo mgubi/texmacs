@@ -1755,6 +1755,7 @@
         (check-true (in? "Git was not found: locate it in the preferences" l))
         (check-false (in? "Commit" l))
         (check-false (in? "Git panel" l)))))
+  (buffer-close F)
   (set-preference "git executable" "git")
   (check-true (git-available?))
   (check-true (git-ok? (git-run R "status"))))
