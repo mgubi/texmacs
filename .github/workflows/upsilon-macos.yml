@@ -394,9 +394,9 @@ jobs:
           key: texmacs-deps-maxs-arm64-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
           fail-on-cache-miss: true
 
-      # (aqtinstall in a venv of its own, not install-qt-action, whose
-      # setup-python puts another python3 first in the PATH: the server of
-      # the suite web-files then did not start within its 10 seconds)
+      # (aqtinstall in a venv of its own, rather than install-qt-action,
+      # whose setup-python would put another python3 first in the PATH of
+      # the regression suites)
       - name: Cache of Qt
         id: qt-cache
         uses: actions/cache@v6
@@ -556,9 +556,9 @@ jobs:
           make
           make install
 
-      # (aqtinstall in a venv of its own, not install-qt-action, whose
-      # setup-python puts another python3 first in the PATH: the server of
-      # the suite web-files then did not start within its 10 seconds)
+      # (aqtinstall in a venv of its own, rather than install-qt-action,
+      # whose setup-python would put another python3 first in the PATH of
+      # the regression suites)
       - name: Cache of Qt
         id: qt-cache
         uses: actions/cache@v6

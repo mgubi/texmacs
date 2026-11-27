@@ -23,10 +23,11 @@
 ;; 127.0.0.1, a python3 script which this suite starts in the temporary
 ;; directory, logs the paths asked to it, and stops at the end (or after
 ;; ten minutes, if TeXmacs does not stop it). It does not look up the name
-;; of 127.0.0.1 (socket.getfqdn of HTTPServer.server_bind): on the macOS
-;; runners (Python 3.15 of Homebrew, November 2026) the server never wrote
-;; its port within the 10 seconds of server-start, after the silent one. The script also listens on a
-;; second port, where it takes the connections and never answers: a
+;; of 127.0.0.1 (socket.getfqdn, which HTTPServer.server_bind calls): that
+;; lookup goes to the resolver of the machine, and took 35 seconds on some
+;; macOS runners of GitHub (from their shell too, without TeXmacs), more
+;; than the 10 seconds which server-start waits. The script also listens
+;; on a second port, where it takes the connections and never answers: a
 ;; download from there gives up after the network timeout (10s by
 ;; default, the preference "http request timeout"). Without python3, on
 ;; Windows, or without a way to download (Qt 6, wget or curl), the suite
