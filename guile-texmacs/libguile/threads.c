@@ -392,7 +392,16 @@ suspend (void)
   t->top = SCM_STACK_PTR (&t);
   /* save registers. */
   SCM_FLUSH_REGISTER_WINDOWS;
+#if defined (__MINGW64__) && !defined (_M_ARM64) && !defined (__clang__)
+  /* On MinGW64 GCC, SCM_I_SETJMP is __builtin_setjmp which only saves
+     rbp/rip/rsp and omits callee-saved registers (rbx, rsi, rdi, r12-r15),
+     causing live SCM values in those registers to be missed by conservative
+     GC marking.  t->regs is only scanned by GC (never passed to longjmp),
+     so use setjmp() here to save all callee-saved registers. */
+  setjmp (t->regs);
+#else
   SCM_I_SETJMP (t->regs);
+#endif
   return t;
 }
 
