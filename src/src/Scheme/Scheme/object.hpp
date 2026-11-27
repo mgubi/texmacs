@@ -20,6 +20,8 @@
 #include "../Femtolisp/femtolisp_tm.hpp" // interface to femtolisp
 #elif defined(USE_CHEZ)
 #include "../Chez/chez_tm.hpp" // interface to Chez Scheme
+#elif defined(USE_GUILE_CPP)
+#include "../guile_cpp/guile_cpp_tm.hpp" // interface to guile_cpp
 #else
 #include "../Guile/guile_tm.hpp" // interface to guile
 #endif

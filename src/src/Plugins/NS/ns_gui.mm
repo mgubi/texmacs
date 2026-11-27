@@ -915,7 +915,7 @@ ns_snapshot (string dir) {
   text= replace (replace (text, "\\r", "\r"), "\\b", "\x7f");
   NSWindow* win= [NSApp keyWindow];
   if (!win) win= [[NSApp windows] firstObject];
-  NSView* v= [win firstResponder];
+  NSView* v= (NSView*) [win firstResponder];
   // NOTE: the window does not become the key window when TeXmacs is not the
   // active application, so that the canvas does not get the focus
   if ([v respondsToSelector: @selector(focusIn)])
