@@ -110,8 +110,10 @@ GLUE_DEPS = Objects/s7-run
 GCPP_DIR = Scheme/guile_cpp/guile_cpp
 SCHEME_CXX_FLAGS = -std=c++17 -I$(GCPP_DIR)/include
 gcpp_src := $(notdir $(wildcard $(GCPP_DIR)/src/*.cpp))
-# -O3 as guile_cpp's own build, unless the flags ask for -O0 (debug)
-GCPP_OPT = $(if $(findstring -O0,$(CXXFLAGS)),,-O3)
+# -O3 as guile_cpp's own build, when TeXmacs is built with its default
+# optimisation (-O2): not with --disable-optimize, another
+# --enable-optimize, or -O0 in the flags
+GCPP_OPT = $(if $(findstring -O0,$(CXXFLAGS)),,$(if $(findstring -O2,@CONFIG_CXXOPTIMIZE@),-O3,))
 else
 GLUE_BIN = $(GUILE_BIN)
 GLUE_DEPS =

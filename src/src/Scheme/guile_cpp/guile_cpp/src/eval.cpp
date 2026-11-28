@@ -679,6 +679,7 @@ SCM run_cek(VM& v, CekState& st) {
     } dguard{v, v.current_cont};
 
     while (true) {
+        v.run_pending_after_gc();  // (TeXmacs: a safe point of the evaluator)
         v.current_cont = st.cont;
         sync_args();
         try {

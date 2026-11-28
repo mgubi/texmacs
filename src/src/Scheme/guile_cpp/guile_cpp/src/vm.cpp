@@ -120,8 +120,12 @@ void VM::init(void* stack_base, bool load_boot) {
     init_load_path();
 
     // Enable GC now that all core roots are initialized
+    // (TeXmacs: the after-gc-hook runs at the next safe point of the
+    // evaluators, not inside the allocation which collected, as the async
+    // of Guile 1.8: Scheme run there would overwrite the live slots of the
+    // VM, which are only synchronized at its calls)
     heap_.after_gc_callback = [](void* data) {
-        static_cast<VM*>(data)->run_after_gc_hook();
+        static_cast<VM*>(data)->after_gc_pending = true;
     };
     heap_.set_enabled(true);
     initialized_ = true;

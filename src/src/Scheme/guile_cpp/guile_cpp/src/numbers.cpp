@@ -856,9 +856,7 @@ static SCM parse_ureal(string s, int radix, int exactness, bool negative) {
         c_string norm_c(norm);  // (kept alive: endp points into it)
         double d = std::strtod(norm_c, &endp);
         if (endp != static_cast<char*>(norm_c) + N(norm)) return SCM_BOOL_F;
-        if (errno == ERANGE && std::isinf(d)) {
-            vm().out_of_range("string->number", vm().make_string(s));
-        }
+        // (TeXmacs: a number too large is +inf.0 or -inf.0, as in Guile 1.8)
         return vm().make_real(d);
     }
 

@@ -402,6 +402,10 @@ public:
     void init(void* stack_base, bool load_boot = true);
     void mark_roots(const Marker& mark);
     void run_after_gc_hook();
+    bool after_gc_pending = false;
+    inline void run_pending_after_gc() {
+        if (GCPP_UNLIKELY(after_gc_pending)) { after_gc_pending = false; run_after_gc_hook(); }
+    }
     bool is_initialized() const noexcept { return initialized_; }
 
     Heap& heap() noexcept { return heap_; }

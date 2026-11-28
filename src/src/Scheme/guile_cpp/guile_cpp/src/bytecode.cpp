@@ -1,4 +1,7 @@
 #include "guile_cpp/vm.hpp"
+#include <sys/mman.h>
+#include <cstdio>
+#include <cstdlib>
 #include "guile_cpp/bytecode_ops.hpp"
 #include <algorithm>
 #include <cmath>
@@ -1543,16 +1546,37 @@ struct VmFrame {
     uint32_t ret_slot;
 };
 
+// The value stack and the frame stack of the VM never move (TeXmacs): they
+// are reserved once (mmap, MAP_NORESERVE: the system gives pages to them
+// when they are first touched, so that only the depth reached counts in the
+// memory of the process), and never reallocated, so that a pointer into
+// them stays valid whatever runs (a nested run of the VM, the expansion of
+// macros, the hooks of the collector). Their capacity bounds the depth of
+// the Scheme recursion: beyond it, the error stack-overflow.
+// (about 8 million nested calls, 512 MB when all is touched: a runaway
+// recursion gives the error well under the 2 GB of a test run)
+static const size_t VM_STACK_CAPACITY = size_t(1) << 25;   // values (256 MB)
+static const size_t VM_FRAMES_CAPACITY = size_t(1) << 23;  // frames (256 MB)
+
+static void* reserve_vm_memory(size_t bytes) {
+    void* p = ::mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
+    if (p == MAP_FAILED) {
+        std::fprintf(stderr, "guile_cpp: cannot reserve the VM stack\n");
+        std::abort();
+    }
+    return p;
+}
+
+[[noreturn, gnu::noinline]] static void vm_stack_overflow() {
+    auto& v = vm();
+    v.error(v.make_symbol("stack-overflow"), nullptr, "Stack overflow", SCM_EOL, SCM_BOOL_F);
+}
+
 struct BytecodeEngine {
-    // (TeXmacs: arrays; the VM reads and writes the stack through a raw
-    // pointer, A (stack), reloaded when it grows)
-    array<SCM> stack;
-    array<VmFrame> frames;
-    VmFrame* frame_data = nullptr;  // A (frames), kept by ensure_frames
-    // (the data and the sizes, kept when they grow: A and N take the arrays
-    // by value, which changes their count of references at each call)
     SCM* stack_data = nullptr;
-    size_t stack_n = 0, frames_n = 0;
+    VmFrame* frame_data = nullptr;
+    size_t stack_n = 0, frames_n = 0;  // the capacities
     size_t active_sp = 0;
     size_t active_fp = 0;
     SCM foreach1_helper = SCM_BOOL_F;
@@ -1560,11 +1584,11 @@ struct BytecodeEngine {
     SCM dynwind_helper = SCM_BOOL_F;
 
     BytecodeEngine() {
-        stack = array<SCM>(131072);
-        for (int i = 0; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
-        frames = array<VmFrame>(16384);
-        frame_data = A(frames);
-        stack_data = A(stack); stack_n = N(stack); frames_n = N(frames);
+        // (the pages are zeros: SCM 0 is no heap object, for the collector)
+        stack_data = static_cast<SCM*>(reserve_vm_memory(VM_STACK_CAPACITY * sizeof(SCM)));
+        frame_data = static_cast<VmFrame*>(reserve_vm_memory(VM_FRAMES_CAPACITY * sizeof(VmFrame)));
+        stack_n = VM_STACK_CAPACITY;
+        frames_n = VM_FRAMES_CAPACITY;
     }
 
     SCM get_dynwind_helper() {
@@ -1652,28 +1676,13 @@ struct BytecodeEngine {
         return SCM_BOOL_F;
     }
 
-    // (the checks are inline, the growth is not: the VM checks at each call)
+    // (the stacks never grow: past their capacity, an error)
     inline void ensure_stack(size_t needed) {
-        if (GCPP_UNLIKELY(needed >= stack_n)) grow_stack(needed);
-    }
-
-    __attribute__((noinline)) void grow_stack(size_t needed) {
-        size_t new_sz = static_cast<size_t>(N(stack)) * 2;
-        while (new_sz <= needed) new_sz *= 2;
-        int old_sz = N(stack);
-        stack->resize(static_cast<int>(new_sz));
-        for (int i = old_sz; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
-        stack_data = A(stack); stack_n = N(stack);
+        if (GCPP_UNLIKELY(needed >= stack_n)) vm_stack_overflow();
     }
 
     inline void ensure_frames(size_t needed) {
-        if (GCPP_UNLIKELY(needed >= frames_n)) grow_frames();
-    }
-
-    __attribute__((noinline)) void grow_frames() {
-        frames->resize(N(frames) * 2);
-        frame_data = A(frames);
-        frames_n = N(frames);
+        if (GCPP_UNLIKELY(needed >= frames_n)) vm_stack_overflow();
     }
 };
 
@@ -1784,20 +1793,6 @@ static inline void fast_hash_store(SCM ht_scm, HashTableObj* ht, SCM key, SCM va
     return v.apply(proc, tmp, na);
 }
 
-// A subr which may run Scheme (string-tabulate, sort...) would keep reading
-// its arguments in the VM stack, which a nested run can reallocate: the
-// arguments are copied first (TeXmacs; the glue routines, raw_fn, read
-// theirs before running anything and get the stack directly)
-[[gnu::noinline]] static SCM call_subr_copied(SubrObj* sb, const SCM* args, size_t nargs) {
-    if (nargs <= 16) {
-        SCM tmp[16];
-        for (size_t i = 0; i < nargs; ++i) tmp[i] = args[i];
-        return sb->fn(tmp, nargs);
-    }
-    array<SCM> tmp = array_from<SCM>(args, nargs);
-    return sb->fn(gcpp_data(tmp), nargs);
-}
-
 // Out-of-line helper so temporary SCM arrays (tmp[16]) don't linger on run_bytecode_loop's C++ stack across GC!
 [[gnu::noinline]] static SCM call_subr_padded(VM& v, SubrObj* sb, const SCM* args, size_t nargs) {
     int req = sb->req, opt = sb->opt;
@@ -1869,17 +1864,8 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
     };
 
     auto setup_closure_args = [&](ClosureObj* target_cl, BytecodeObj* target_bc,
-                                  uint32_t target_base, const SCM* a0, size_t na) {
+                                  uint32_t target_base, const SCM* a, size_t na) {
         size_t req = target_bc->arity_req;
-        // (TeXmacs: a may point into the VM stack, which ensure_stack can
-        // reallocate: the arguments are copied first when it would grow)
-        SCM abuf[16];
-        array<SCM> aheap;
-        const SCM* a = a0;
-        if (target_base + target_bc->max_locals + 64 >= eng.stack_n) {
-            if (na <= 16) { for (size_t i = 0; i < na; ++i) abuf[i] = a0[i]; a = abuf; }
-            else { aheap = array_from<SCM>(a0, na); a = gcpp_data(aheap); }
-        }
         if (!target_bc->has_rest) {
             if (na != req) { sync_gc(); v.wrong_num_args(nullptr, SCM::from_obj(target_cl)); }
             eng.ensure_stack(target_base + target_bc->max_locals + 64);
@@ -1923,7 +1909,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         pc = topf.pc;
         base_off = topf.base_off;
         sp_idx = entry_sp + sn;
-        eng.stack[sp_idx++] = resume_val;
+        eng.stack_data[sp_idx++] = resume_val;
     } else {
         auto* entry_bc = as_obj<BytecodeObj>(entry_cl->bytecode);
         setup_closure_args(entry_cl, entry_bc, base_off, entry_args, entry_nargs);
@@ -2188,6 +2174,11 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         }
 
         L_CALL: {
+            if (GCPP_UNLIKELY(v.after_gc_pending)) {  // (a safe point: the stack is synchronized)
+                sync_gc();
+                v.run_pending_after_gc();
+                RELOAD_STK();
+            }
             size_t nargs = dec_u24(insn);
             size_t fn_slot = sp_idx - 1 - nargs;
             SCM callee = stk[fn_slot];
@@ -2269,7 +2260,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     if (static_cast<int>(nargs) >= req && (sb->rst || static_cast<int>(nargs) <= req + opt)) {
                         sync_gc();
                         SCM r = (sb->raw_varargs || (!sb->rst && static_cast<int>(nargs) == req + opt))
-                            ? (sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : call_subr_copied(sb, stk + fn_slot + 1, nargs))
+                            ? (sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : sb->fn(stk + fn_slot + 1, nargs))
                             : call_subr_padded(v, sb, stk + fn_slot + 1, nargs);
                         RELOAD_STK();
                         stk[fn_slot] = r;
@@ -2450,6 +2441,11 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         }
 
         L_TAIL_CALL: {
+            if (GCPP_UNLIKELY(v.after_gc_pending)) {  // (a safe point: the stack is synchronized)
+                sync_gc();
+                v.run_pending_after_gc();
+                RELOAD_STK();
+            }
             size_t nargs = dec_u24(insn);
             size_t fn_slot = sp_idx - 1 - nargs;
             SCM callee = stk[fn_slot];
@@ -2525,7 +2521,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         sync_gc();
                         SCM res;
                         if (sb->raw_varargs || (!sb->rst && static_cast<int>(nargs) == req + opt)) {
-                            res = sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : call_subr_copied(sb, stk + fn_slot + 1, nargs);
+                            res = sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : sb->fn(stk + fn_slot + 1, nargs);
                         } else {
                             res = call_subr_padded(v, sb, stk + fn_slot + 1, nargs);
                         }
@@ -4084,7 +4080,7 @@ void bytecode_mark_roots(const Marker& mark) {
     mark(eng.map1_helper);
     mark(eng.dynwind_helper);
     for (size_t i = 0; i < eng.active_sp; ++i) {
-        mark(eng.stack[i]);
+        mark(eng.stack_data[i]);
     }
     for (size_t i = 0; i < eng.active_fp; ++i) {
         mark(eng.frame_data[i].closure);

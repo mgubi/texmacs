@@ -132,20 +132,31 @@ small sizes, and A and N take the array by value (its count of references
 changes at each call). Measured on tak and the suites, the stacks which
 grow and shrink at each step got a count of their own over an array which
 never shrinks (the worklist of the collector, the active VM invocations),
-and the hot pointers of the bytecode VM are kept (the stacks, the code,
-the globals and the constants of the running bytecode); the string
+and the hot pointers of the bytecode VM are kept (the code, the globals
+and the constants of the running bytecode; its stacks never move, see
+below); the string
 operations read the characters in place (StringObj::chars, sub) instead
 of copying the whole string.
 
 Other fixes of guile_cpp
 ------------------------
 
-* The VM stack can be reallocated by a nested run of the VM: the subrs
-  (not the glue routines of TeXmacs, raw_fn, which read their arguments
-  before running anything) get a copy of their arguments
-  (call_subr_copied, bytecode.cpp), setup_closure_args copies its
-  arguments when the stack would grow, and GLOBAL_REF / GLOBAL_SET reload
-  the stack pointer after sym2var (a module binder runs Scheme).
+* The value stack and the frame stack of the bytecode VM never move: they
+  are reserved once with mmap (MAP_NORESERVE: only the pages touched count
+  in the memory of the process) at a fixed capacity, 32 million values and
+  8 million frames (256 MB each when all is touched), and never
+  reallocated; past it, the error stack-overflow. guile_cpp grew them by
+  reallocation, which left dangling the pointers into them that the code
+  keeps across anything which may run Scheme (the arguments of a subr or
+  of setup_closure_args, the compilation of a closure which expands
+  macros, a module binder, the after-gc-hook...). The collector scans them
+  up to the active depth. GLOBAL_REF / GLOBAL_SET still reload the stack
+  pointer after sym2var.
+* The after-gc-hook runs at the next safe point (the calls of the
+  bytecode VM, the steps of the evaluator), not inside the allocation
+  which collected, as the async of Guile 1.8.
+* A number too large for a double is +inf.0 or -inf.0 (string->number,
+  the reader), as in Guile 1.8.
 * dlerror is read once (dynamic-link of a missing file crashed).
 
 Still from the standard library

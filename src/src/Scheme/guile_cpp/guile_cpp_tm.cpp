@@ -48,6 +48,19 @@ int tmscm_builders= 0;
 tmscm object_stack= guile::SCM_EOL;
 
 static int scheme_errors= 0;
+
+// a root of the collector for two values, popped however the scope is left
+// (an exception left a span pushed, which the collector then read)
+struct root_pair {
+  SCM roots[2];
+  guile::GcRootSpan span;
+  root_pair (SCM a, SCM b) {
+    roots[0]= a; roots[1]= b;
+    span.data= roots; span.count= 2; span.prev= NULL;
+    guile::vm ().heap ().push_root_span (&span);
+  }
+  ~root_pair () { guile::vm ().heap ().pop_root_span (); }
+};
 static bool scheme_started= false;
 static size_t blackbox_smob_type= (size_t) -1;
 
@@ -74,9 +87,8 @@ handle_scheme_throw (SCM key, SCM args) {
   scheme_errors++;
   // the key and the arguments were only referenced by the exception object,
   // which the collector does not see, and printing them allocates
-  SCM roots[2]= { key, args };
-  guile::GcRootSpan span= { roots, 2, NULL };
-  v.heap ().push_root_span (&span);
+  root_pair guard (key, args);
+  try {
   SCM errp= v.current_error_port ();
   port_write (errp, "ERROR: ");
   if (guile::is_pair (args) &&
@@ -97,24 +109,41 @@ handle_scheme_throw (SCM key, SCM args) {
     port_write (errp, "'.\n");
   }
   guile::port_flush (guile::as_obj<PortObj> (errp));
-  SCM r= v.cons (key, args);
-  v.heap ().pop_root_span ();
-  return r;
+  }
+  catch (...) {
+    // (an error while printing the error: it is not printed)
+  }
+  return v.cons (key, args);
 }
 
 // An exception of C++ which crossed Scheme (a continuation invoked out of
 // its extent, an exception of the C++ library): the frames of dynamic-wind,
 // with-fluids and catch which it left are unwound, and it is reported as
 // an error of Scheme, (misc-error #f message () #f)
+// Unwind to the frame dynwind; an error in an after-thunk is reported and
+// the unwinding goes on from the frame where it happened (switch_dynwind
+// leaves a frame before running its after-thunk), so that the outer frames
+// are unwound too
+static tmscm handle_scheme_throw (SCM key, SCM args);
+
 static void
 unwind_to (SCM dynwind) {
   VM& v= guile::vm ();
-  try {
-    if (v.current_dynwind != dynwind) guile::switch_dynwind_pub (dynwind);
+  for (int tries= 0; tries < 10000; tries++) {
+    try {
+      if (v.current_dynwind != dynwind) guile::switch_dynwind_pub (dynwind);
+      return;
+    }
+    catch (const guile::SchemeThrow& ex) {
+      SCM key= ex.key, args= ex.args;
+      root_pair guard (key, args);
+      try { handle_scheme_throw (key, args); }
+      catch (...) {}
+    }
+    catch (...) {
+    }
   }
-  catch (...) {
-    v.current_dynwind= dynwind;
-  }
+  v.current_dynwind= dynwind;
 }
 
 static tmscm
@@ -145,11 +174,8 @@ handle_exception (SCM dynwind) {
     // the frames of dynamic-wind, with-fluids... which the error left are
     // unwound (their after-thunks run), as for the other exceptions
     SCM key= ex.key, args= ex.args;
-    SCM roots[2]= { key, args };
-    guile::GcRootSpan span= { roots, 2, NULL };
-    guile::vm ().heap ().push_root_span (&span);
+    root_pair guard (key, args);
     unwind_to (dynwind);
-    guile::vm ().heap ().pop_root_span ();
     return handle_scheme_throw (key, args);
   }
   catch (const guile::ContinuationEscape&) {
