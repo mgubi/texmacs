@@ -14,6 +14,14 @@ have the details, and the problems go to the
 
 ## 26 November 2026
 
+- **The macOS Qt packages run on macOS 13 again** (desktop applications,
+  Apple silicon): `texmacs-qt-macos-arm64.zip` and
+  `texmacs-qt-chez-macos-arm64.zip` needed macOS 15, as they bundled the
+  libraries of Homebrew, built for the macOS of the machine which made
+  them; they are now built as the Cocoa and Vue packages, with libraries
+  made for macOS 13, the official binaries of Qt 6.11 and, for the Chez one,
+  Chez Scheme built for macOS 13, and declare macOS 13.0 as their minimum,
+  checked against every bundled file (#972).
 - **Sessions: the size of an image without Qt**: a PNG which a session
   sends without a size (the plots of Sage, gnuplot's PNG output) is
   inserted at its size in pixels in the Vue and Cocoa applications too; it

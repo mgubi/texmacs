@@ -22,8 +22,12 @@
 ;; There is no internet: the files are served by a small HTTP server on
 ;; 127.0.0.1, a python3 script which this suite starts in the temporary
 ;; directory, logs the paths asked to it, and stops at the end (or after
-;; ten minutes, if TeXmacs does not stop it). The script also listens on a
-;; second port, where it takes the connections and never answers: a
+;; ten minutes, if TeXmacs does not stop it). It does not look up the name
+;; of 127.0.0.1 (socket.getfqdn, which HTTPServer.server_bind calls): that
+;; lookup goes to the resolver of the machine, and took 35 seconds on some
+;; macOS runners of GitHub (from their shell too, without TeXmacs), more
+;; than the 10 seconds which server-start waits. The script also listens
+;; on a second port, where it takes the connections and never answers: a
 ;; download from there gives up after the network timeout (10s by
 ;; default, the preference "http request timeout"). Without python3, on
 ;; Windows, or without a way to download (Qt 6, wget or curl), the suite
@@ -55,7 +59,7 @@
 
 (define server-script
   (string-append
-   "import http.server, os, socket, sys, threading\n"
+   "import http.server, os, socket, socketserver, sys, threading\n"
    "d, portfile, logfile = sys.argv[1:4]\n"
    "os.chdir(d)\n"
    "threading.Timer(600, os._exit, (0,)).start()\n"
@@ -67,7 +71,12 @@
    "class H(http.server.SimpleHTTPRequestHandler):\n"
    "    def log_message(self, fmt, *args):\n"
    "        with open(logfile, 'a') as f: f.write(self.path + '\\n')\n"
-   "s = http.server.HTTPServer(('127.0.0.1', 0), H)\n"
+   "class S(http.server.HTTPServer):\n"
+   "    def server_bind(self):\n"
+   "        socketserver.TCPServer.server_bind(self)\n"
+   "        self.server_name = '127.0.0.1'\n"
+   "        self.server_port = self.server_address[1]\n"
+   "s = S(('127.0.0.1', 0), H)\n"
    "with open(portfile + '.tmp', 'w') as f:\n"
    "    f.write(str(s.server_address[1]))\n"
    "os.rename(portfile + '.tmp', portfile)\n"
