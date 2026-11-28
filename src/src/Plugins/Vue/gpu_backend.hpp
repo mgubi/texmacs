@@ -114,6 +114,23 @@ public:
   virtual bool wakes_when_ready () { return false; }
   // the window is about to be destroyed: forget what is kept for it
   virtual void detach (SDL_Window* w) { (void) w; }
+  // true when a present shows the frame at once, without waiting for the
+  // screen nor pacing (Metal on macOS: the frames are IOSurfaces set as
+  // the contents of a layer, issue #988); the loop of the Vue port then
+  // repaints at every turn
+  virtual bool presents_at_once () { return false; }
+  // a layer for attach_layer, which the GUI puts in its view (the Cocoa
+  // port): a CALayer shown by IOSurfaces, or NULL when the GUI is to make a
+  // CAMetalLayer itself (presents_at_once is false); forget_layer before
+  // it is released
+  virtual void* new_layer () { return NULL; }
+  virtual void forget_layer (void* layer) { (void) layer; }
+  // what a layer made by new_layer shows, drawn as Core Animation draws it
+  // (w x h pixels, premultiplied RGBA, rows from the top), and the number
+  // of its surfaces (the tests)
+  virtual bool layer_pixels (void* layer, int w, int h, unsigned char* rgba,
+                             int& surfaces) {
+    (void) layer; (void) w; (void) h; (void) rgba; surfaces= 0; return false; }
 
   // textures: data has rows from the top, without padding (or is NULL: zeros)
   virtual gpu_texture new_texture (int w, int h, gpu_format f, bool linear,

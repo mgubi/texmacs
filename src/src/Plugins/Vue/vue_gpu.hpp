@@ -91,5 +91,19 @@ bool gpu_layers_enabled ();
 bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh,
                        bool in_transaction= false);
 bool gpu_read_picture (picture p, unsigned char* rgba);
+// whether a present shows the frame at once (Metal: IOSurfaces set as the
+// contents of a layer, unless TEXMACS_NS_PRESENT=metal in the Cocoa port
+// and TEXMACS_VUE_PRESENT=metal in the Vue port, issue #988): no pacing,
+// no display link, no repaint put off
+bool gpu_presents_at_once ();
+// the layer of a canvas of the Cocoa port when presents_at_once (a
+// CALayer, retained; NULL otherwise: a CAMetalLayer is made), and what to
+// do before it is released
+void* gpu_new_layer ();
+void gpu_forget_layer (void* layer);
+// what such a layer shows (w x h, premultiplied RGBA, rows from the top),
+// as Core Animation draws it, and how many surfaces it has (the tests)
+bool gpu_layer_pixels (void* layer, int w, int h, unsigned char* rgba,
+                       int& surfaces);
 
 #endif // defined VUE_GPU_HPP

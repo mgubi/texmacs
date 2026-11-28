@@ -10,7 +10,10 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-// One device and one queue for all the windows; each window has a
+// One device and one queue for all the windows. On the screen, the frames
+// are IOSurfaces set as the contents of a layer (see "Presenting by
+// IOSurfaces" below, issue #988); with TEXMACS_VUE_PRESENT=metal (the Vue
+// port) or TEXMACS_NS_PRESENT=metal (Cocoa), as before: each window has a
 // CAMetalLayer (SDL_Metal_CreateView), whose drawable is taken when the
 // window is first drawn into in a frame and presented by present. The
 // commands go into one command buffer, committed when it is presented,
@@ -41,12 +44,14 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 #import <QuartzCore/QuartzCore.h>
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <IOSurface/IOSurface.h>
 #include <unordered_map>
 #include <cmath>
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 struct gpu_texture_rep {
   id<MTLTexture> tex;
@@ -246,6 +251,33 @@ class metal_backend: public gpu_backend {
   };
   std::unordered_map<void*, pacing> pacings;
   unsigned refresh_event= 0;       // the SDL event of a tick
+  // Presenting by IOSurfaces (issue #988): the frames of a layer (made by
+  // new_layer for the Cocoa port, a sublayer of the CAMetalLayer of SDL for
+  // the Vue port) are drawn into a ring of IOSurfaces, and the surface of a
+  // frame becomes the contents of the layer once the GPU is done with it
+  struct surface {
+    IOSurfaceRef s= NULL;
+    id<MTLTexture> tex= nil;         // the same pixels, for Metal
+    int w= 0, h= 0;
+  };
+  struct surface_ring {
+    CALayer* host= nil;              // whose contents are the frames
+    CALayer* follow= nil;            // (Vue) the layer of SDL, which host covers
+    bool own_transaction= false;     // (Vue) the contents set in a transaction
+                                     // of their own, else in that of the thread
+    std::vector<surface> s;
+    int front= -1;                   // shown (the contents of host)
+    int back= -1;                    // drawn into, for the next present
+    bool fresh= false;               // back not cleared yet
+    int made= 0;                     // surfaces allocated (the debug output)
+  };
+  std::unordered_map<void*, surface_ring> rings;  // by layer (Vue: of SDL)
+  surface_ring* ring= NULL;          // of the window being drawn, or NULL
+  int take_surface (surface_ring& r, int w, int h);
+  void clear_back (surface_ring& r);
+  void present_surface ();
+  void drop_ring (void* key);
+  void use_ring (surface_ring* r);
   // the commands being encoded
   id<MTLCommandBuffer> cmd= nil;
   id<MTLCommandBuffer> last= nil;        // committed last (finish waits)
@@ -282,6 +314,10 @@ public:
   bool wakes_when_ready ();
   void detach (SDL_Window* w);
   void refresh (void* layer);
+  bool presents_at_once ();
+  void* new_layer ();
+  void forget_layer (void* layer);
+  bool layer_pixels (void* layer, int w, int h, unsigned char* rgba, int& n);
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);
@@ -417,10 +453,54 @@ configure_layer (CAMetalLayer* l, id<MTLDevice> device) {
   CGColorSpaceRelease (cs);
 }
 
+// the changes of the layers which show the frames are not animated (a
+// layer which is not the layer of a view animates them by default)
+static NSDictionary*
+no_actions () {
+  static NSDictionary* d= nil;
+  if (d == nil) {
+    NSNull* n= [NSNull null];
+    d= @{ @"contents": n, @"bounds": n, @"position": n, @"frame": n,
+          @"contentsScale": n, @"hidden": n, @"opaque": n };
+  }
+  return d;
+}
+
+// Present by IOSurfaces (the default, issue #988), unless
+// TEXMACS_VUE_PRESENT=metal (Vue port) or TEXMACS_NS_PRESENT=metal (Cocoa):
+// the drawables of a CAMetalLayer, as before
+static bool
+surfaces_wanted () {
+  static int on= -1;
+  if (on < 0) {
+#ifdef VUETEXMACS
+    const char* v= getenv ("TEXMACS_VUE_PRESENT");
+#else
+    const char* v= getenv ("TEXMACS_NS_PRESENT");
+#endif
+    on= (v == NULL || strcmp (v, "metal") != 0) ? 1 : 0;
+  }
+  return on == 1;
+}
+
+bool
+metal_backend::presents_at_once () {
+  return started && !failed && surfaces_wanted ();
+}
+
 bool
 metal_backend::attach_layer (void* lp) {
   if (failed || lp == NULL || !started) return false;
-  CAMetalLayer* l= (__bridge CAMetalLayer*) lp;
+  CALayer* cl= (__bridge CALayer*) lp;
+  if (![cl isKindOfClass: [CAMetalLayer class]]) {
+    // a layer of new_layer: shown by IOSurfaces
+    surface_ring& r= rings[lp];
+    if (r.host == nil) r.host= cl;
+    use_ring (&r);
+    return true;
+  }
+  use_ring (NULL);
+  CAMetalLayer* l= (CAMetalLayer*) cl;
   configure_layer (l, device);
   if (layer != l) {
     // (what was drawn into the last layer is presented by present)
@@ -452,7 +532,25 @@ metal_backend::attach (SDL_Window* w) {
     // (TEXMACS_VUE_DISPLAY_LINK=0: no display link, as before macOS 14)
     static bool no_link= (getenv ("TEXMACS_VUE_DISPLAY_LINK") != NULL &&
                           strcmp (getenv ("TEXMACS_VUE_DISPLAY_LINK"), "0") == 0);
-    if (no_link) {}
+    if (presents_at_once ()) {
+      // the frames are the contents of a sublayer which covers the layer of
+      // SDL (never drawn into itself), set in a transaction of their own:
+      // the loop of the Vue port runs outside of the run loop of AppKit,
+      // whose implicit transaction would be committed only when SDL next
+      // waits for events. No display link: nothing is paced
+      surface_ring& r= rings[(__bridge void*) l];
+      CALayer* h= [CALayer layer];
+      h.opaque= YES;           // (as the CAMetalLayer: the frames are opaque)
+      h.actions= no_actions ();
+      h.frame= l.bounds;
+      h.contentsScale= l.contentsScale;
+      h.autoresizingMask= kCALayerWidthSizable | kCALayerHeightSizable;
+      [l addSublayer: h];
+      r.host= h;
+      r.follow= l;
+      r.own_transaction= true;
+    }
+    else if (no_link) {}
     else if (@available (macOS 14.0, *)) {
       // (the view is an NSView of SDL, whose display link follows the
       // screen of its window)
@@ -467,6 +565,8 @@ metal_backend::attach (SDL_Window* w) {
       if (refresh_event == 0) refresh_event= SDL_RegisterEvents (1);
     }
   }
+  auto rit= rings.find ((__bridge void*) it->second);
+  if (rit != rings.end ()) { use_ring (&rit->second); return true; }
   if (!attach_layer ((__bridge void*) it->second)) return false;
   // the refresh period of the screen of the window (it may move)
   double rate= 60.0;
@@ -480,6 +580,16 @@ metal_backend::attach (SDL_Window* w) {
 
 void
 metal_backend::begin_screen (int dw, int dh) {
+  if (ring != NULL) {
+    // the surface of the next frame (kept when the last one was drawn but
+    // not presented, vue_gpu_skip), cleared when first drawn into
+    surface_ring& r= *ring;
+    if (r.back >= 0 && enc_target == r.s[r.back].tex) end_encoder ();
+    if (r.back < 0 || r.s[r.back].w != dw || r.s[r.back].h != dh)
+      r.back= take_surface (r, dw, dh);
+    r.fresh= true;
+    return;
+  }
   if (layer == nil) return;
   CGSize s= layer.drawableSize;
   if ((int) s.width != dw || (int) s.height != dh)
@@ -521,6 +631,7 @@ now_ms () {
 void
 metal_backend::present (SDL_Window* w) {
   (void) w;
+  if (ring != NULL) { present_surface (); return; }
   end_encoder ();
   // (a layer of the Cocoa port presented last with a transaction: the
   // drawable is presented with the command buffer again)
@@ -573,6 +684,8 @@ metal_backend::present (SDL_Window* w) {
 // being changed within the transaction it applies to
 void
 metal_backend::present_in_transaction () {
+  // (by IOSurfaces, every frame is shown with the transaction of the thread)
+  if (ring != NULL) { present_surface (); return; }
   end_encoder ();
   if (drawable == nil || layer == nil) { flush (); return; }
   if (!layer.presentsWithTransaction) layer.presentsWithTransaction= YES;
@@ -607,7 +720,8 @@ metal_backend::ready_to_present () {
   // TEXMACS_VUE_DISPLAY_LINK=0 goes back to half a period). What is left
   // of the wait is the latency of the GPU and of the compositor (a frame
   // is shown 25 to 35 ms after it was presented), which no pacing removes.
-  if (layer == nil) return true;
+  // Presented by IOSurfaces (issue #988), nothing waits: always ready.
+  if (ring != NULL || layer == nil) return true;
   auto it= pacings.find ((__bridge void*) layer);
   if (it == pacings.end () || it->second.period <= 0) return true;
   pacing& p= it->second;
@@ -666,6 +780,7 @@ metal_backend::detach (SDL_Window* w) {
   auto it= layers.find ((unsigned) SDL_GetWindowID (w));
   if (it == layers.end ()) return;
   void* l= (__bridge void*) it->second;
+  drop_ring (l);
   auto pit= pacings.find (l);
   if (pit != pacings.end ()) {
     if (pit->second.link != nil) [pit->second.link invalidate];
@@ -681,6 +796,276 @@ metal_backend::detach (SDL_Window* w) {
 #else
   (void) w;
 #endif
+}
+
+/******************************************************************************
+* Presenting by IOSurfaces (issue #988)
+*
+* A CAMetalLayer has three drawables, which the compositor gives back about
+* once a refresh: frames presented faster than that waited in nextDrawable,
+* and the ports paced their presents (once a refresh, by display links),
+* so that a frame reached the screen one to three refreshes after the event
+* which caused it, a lag which the wheel made visible. As the backing store
+* of Qt 6 on macOS (QCALayerBackingStore), a frame is now drawn into an
+* IOSurface and becomes the contents of a layer, in a Core Animation
+* transaction: that of the event for the Cocoa port (a scroll moves the
+* view in it, so the move and the new pixels are shown together, #971),
+* one of its own for the Vue port. Nothing waits for the screen: a frame
+* goes to a surface which is neither shown (front) nor still used by the
+* compositor (IOSurfaceIsInUse; the surface shown holds a use count of
+* ours, as in Qt), another surface is made when they all are, and the free
+* ones beyond three are released. The only wait is for the GPU to be done
+* with the frame (waitUntilCompleted, a fraction of a millisecond), since
+* the compositor reads the surface as soon as the transaction commits.
+* The surfaces are BGRA8 premultiplied, in sRGB (the colorspace of the
+* CAMetalLayers before), their first row at the top; a frame is cleared
+* when it is first drawn into, unless a copy replaces all of it.
+******************************************************************************/
+
+// TEXMACS_VUE_DEBUG_PRESENT or TEXMACS_NS_DEBUG_DRAW, by IOSurfaces: each
+// present (SURFACE: when the GPU was done and the contents were set, the
+// wait for the GPU, how long setting them took (with the commit for the
+// Vue port, whose present commits its transaction), the surfaces of the
+// layer and how many were allocated so far), the commit of its transaction
+// (COMMIT), and when the compositor let go of the frame before (SHOWN: the
+// new frame is on the screen then, if the compositor held the old one);
+// times in ms of CACurrentMediaTime, as the WHEEL lines of the ports (the
+// timestamp of the event, [NSEvent timestamp], and when it was handled)
+static bool
+debug_surfaces () {
+  static int on= -1;
+  if (on < 0) on= (getenv ("TEXMACS_VUE_DEBUG_PRESENT") != NULL ||
+                   getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  return on != 0;
+}
+
+static double
+media_ms () {
+  return CACurrentMediaTime () * 1000.0;
+}
+
+static CFDataRef
+srgb_icc () {
+  static CFDataRef icc= NULL;
+  if (icc == NULL) {
+    CGColorSpaceRef cs= CGColorSpaceCreateWithName (kCGColorSpaceSRGB);
+    if (cs != NULL) { icc= CGColorSpaceCopyICCData (cs); CGColorSpaceRelease (cs); }
+  }
+  return icc;
+}
+
+static const int max_surfaces= 8;
+static bool too_large (int w, int h);
+
+void
+metal_backend::use_ring (surface_ring* r) {
+  if (r != NULL && layer != nil) {
+    // (what was drawn into the last CAMetalLayer is presented by present)
+    end_encoder ();
+    drawable= nil;
+    layer= nil;
+  }
+  if (r != ring) end_encoder ();
+  ring= r;
+}
+
+int
+metal_backend::take_surface (surface_ring& r, int w, int h) {
+  if (w <= 0 || h <= 0 || too_large (w, h)) return -1;
+  // those of another size go (not the one shown: it stays until replaced)
+  for (int i= (int) r.s.size () - 1; i >= 0; i--)
+    if (i != r.front && (r.s[i].w != w || r.s[i].h != h)) {
+      if (r.s[i].s != NULL) CFRelease (r.s[i].s);
+      r.s.erase (r.s.begin () + i);
+      if (r.front > i) r.front--;
+    }
+  int pick= -1;
+  for (int i= 0; i < (int) r.s.size (); i++)
+    if (i != r.front && r.s[i].w == w && r.s[i].h == h &&
+        !IOSurfaceIsInUse (r.s[i].s)) { pick= i; break; }
+  if (pick < 0 && (int) r.s.size () < max_surfaces) {
+    // all in use: one more, rather than waiting for the compositor
+    NSDictionary* props= @{
+      (id) kIOSurfaceWidth: @(w), (id) kIOSurfaceHeight: @(h),
+      (id) kIOSurfaceBytesPerElement: @4,
+      (id) kIOSurfacePixelFormat: @((unsigned) 'BGRA') };
+    surface n;
+    n.s= IOSurfaceCreate ((__bridge CFDictionaryRef) props);
+    if (n.s == NULL) return -1;
+    if (srgb_icc () != NULL)
+      IOSurfaceSetValue (n.s, kIOSurfaceColorSpace, srgb_icc ());
+    MTLTextureDescriptor* d=
+      [MTLTextureDescriptor texture2DDescriptorWithPixelFormat: MTLPixelFormatBGRA8Unorm
+                                                         width: w height: h
+                                                     mipmapped: NO];
+    // (managed: the storage of a texture of an IOSurface on any Mac)
+    d.storageMode= MTLStorageModeManaged;
+    d.usage= MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    n.tex= [device newTextureWithDescriptor: d iosurface: n.s plane: 0];
+    if (n.tex == nil) { CFRelease (n.s); return -1; }
+    n.w= w; n.h= h;
+    r.s.push_back (n);
+    r.made++;
+    pick= (int) r.s.size () - 1;
+  }
+  if (pick < 0) {
+    // (max_surfaces held by the compositor, which should not happen: one
+    // of them is drawn into anyway, which may show half drawn)
+    for (int i= 0; i < (int) r.s.size (); i++)
+      if (i != r.front) { pick= i; break; }
+    if (debug_surfaces ())
+      fprintf (stderr, "SURFACE %.3f all %d in use\n", media_ms (),
+               (int) r.s.size ());
+    if (pick < 0) return -1;
+  }
+  // no more than three kept, beyond those which are in use
+  for (int i= (int) r.s.size () - 1; i >= 0 && r.s.size () > 3; i--)
+    if (i != r.front && i != pick && !IOSurfaceIsInUse (r.s[i].s)) {
+      CFRelease (r.s[i].s);
+      r.s.erase (r.s.begin () + i);
+      if (r.front > i) r.front--;
+      if (pick > i) pick--;
+    }
+  return pick;
+}
+
+void
+metal_backend::clear_back (surface_ring& r) {
+  r.fresh= false;
+  if (r.back < 0) return;
+  // transparent: a canvas of Cocoa is transparent until painted, and a
+  // copy at another scale is composed over what is there
+  id<MTLTexture> t= r.s[r.back].tex;
+  end_encoder ();
+  MTLRenderPassDescriptor* pd= [MTLRenderPassDescriptor renderPassDescriptor];
+  pd.colorAttachments[0].texture= t;
+  pd.colorAttachments[0].loadAction= MTLLoadActionClear;
+  pd.colorAttachments[0].clearColor= MTLClearColorMake (0, 0, 0, 0);
+  pd.colorAttachments[0].storeAction= MTLStoreActionStore;
+  [[commands () renderCommandEncoderWithDescriptor: pd] endEncoding];
+}
+
+void
+metal_backend::present_surface () {
+  surface_ring& r= *ring;
+  end_encoder ();
+  if (r.back < 0) { flush (); return; }
+  if (r.fresh) clear_back (r);   // (nothing drawn: shown empty)
+  flush ();
+  double t0= media_ms ();
+  if (last != nil) { [last waitUntilCompleted]; last= nil; }
+  double t1= media_ms ();
+  surface& n= r.s[r.back];
+  if (r.own_transaction) {
+    [CATransaction begin];
+    [CATransaction setDisableActions: YES];
+  }
+  if (debug_surfaces ()) {
+    // (after the completion block of the transaction, if any)
+    void (^prev) (void)= [CATransaction completionBlock];
+    double t= t1;
+    [CATransaction setCompletionBlock: ^{
+      fprintf (stderr, "COMMIT %.3f +%.2f\n", media_ms (), media_ms () - t);
+      if (prev != nil) prev ();
+    }];
+  }
+  if (r.follow != nil) {
+    if (!CGRectEqualToRect (r.host.frame, r.follow.bounds))
+      r.host.frame= r.follow.bounds;
+    if (r.host.contentsScale != r.follow.contentsScale)
+      r.host.contentsScale= r.follow.contentsScale;
+  }
+  r.host.contents= (__bridge id) n.s;
+  if (r.own_transaction) {
+    [CATransaction commit];
+    // (committed now, also when an implicit transaction of the thread was
+    // open, in which the one above is nested)
+    [CATransaction flush];
+  }
+  double t2= media_ms ();
+  // the surface shown is in use until it is replaced (as in Qt)
+  IOSurfaceIncrementUseCount (n.s);
+  int old= r.front;
+  if (old >= 0) IOSurfaceDecrementUseCount (r.s[old].s);
+  if (debug_surfaces ()) {
+    fprintf (stderr, "SURFACE %.3f wait %.2f set %.2f surfaces %d made %d "
+             "%dx%d layer %p\n", t1, t1 - t0, t2 - t1, (int) r.s.size (),
+             r.made, n.w, n.h, (__bridge void*) r.host);
+    if (old >= 0) {
+      // when the compositor lets go of the frame before (polled)
+      IOSurfaceRef o= r.s[old].s;
+      CFRetain (o);
+      dispatch_async (dispatch_get_global_queue (QOS_CLASS_USER_INTERACTIVE, 0), ^{
+        double end= t1 + 200;
+        while (IOSurfaceIsInUse (o) && media_ms () < end) usleep (250);
+        fprintf (stderr, "SHOWN %.3f +%.2f%s\n", media_ms (), media_ms () - t1,
+                 IOSurfaceIsInUse (o) ? " (still held)" : "");
+        CFRelease (o);
+      });
+    }
+  }
+  r.front= r.back;
+  r.back= -1;
+}
+
+void
+metal_backend::drop_ring (void* key) {
+  auto it= rings.find (key);
+  if (it == rings.end ()) return;
+  surface_ring& r= it->second;
+  if (ring == &r) { end_encoder (); ring= NULL; }
+  [CATransaction begin];
+  [CATransaction setDisableActions: YES];
+  r.host.contents= nil;
+  if (r.follow != nil) [r.host removeFromSuperlayer];
+  [CATransaction commit];
+  if (r.front >= 0) IOSurfaceDecrementUseCount (r.s[r.front].s);
+  // (the commands which draw into them keep their textures)
+  for (surface& x: r.s) if (x.s != NULL) CFRelease (x.s);
+  rings.erase (it);
+}
+
+void*
+metal_backend::new_layer () {
+  if (!presents_at_once ()) return NULL;
+  CALayer* l= [CALayer layer];
+  l.opaque= NO;   // (a canvas is transparent where it is not painted)
+  l.actions= no_actions ();
+  return (__bridge_retained void*) l;
+}
+
+void
+metal_backend::forget_layer (void* lp) {
+  drop_ring (lp);
+}
+
+bool
+metal_backend::layer_pixels (void* lp, int w, int h, unsigned char* rgba,
+                             int& n) {
+  auto it= rings.find (lp);
+  n= (it == rings.end ()) ? 0 : (int) it->second.s.size ();
+  if (lp == NULL || w <= 0 || h <= 0) return false;
+  CALayer* l= (__bridge CALayer*) lp;
+  if (l.bounds.size.width <= 0 || l.bounds.size.height <= 0) {
+    // (a layer which is in no view yet: w x h points)
+    [CATransaction begin];
+    [CATransaction setDisableActions: YES];
+    l.bounds= CGRectMake (0, 0, w, h);
+    [CATransaction commit];
+  }
+  CGSize b= l.bounds.size;
+  memset (rgba, 0, (size_t) w * h * 4);
+  CGColorSpaceRef cs= CGColorSpaceCreateWithName (kCGColorSpaceSRGB);
+  CGContextRef ctx= CGBitmapContextCreate (rgba, w, h, 8, (size_t) w * 4, cs,
+                                           (uint32_t) kCGImageAlphaPremultipliedLast |
+                                           (uint32_t) kCGBitmapByteOrder32Big);
+  CGColorSpaceRelease (cs);
+  if (ctx == NULL) return false;
+  // (the first row of the bitmap is the top of the layer, as on the screen)
+  CGContextScaleCTM (ctx, w / b.width, h / b.height);
+  [l renderInContext: ctx];
+  CGContextRelease (ctx);
+  return true;
 }
 
 /******************************************************************************
@@ -713,6 +1098,11 @@ metal_backend::finish () {
 id<MTLTexture>
 metal_backend::texture_of (gpu_texture t) {
   if (t != NULL) return t->tex;
+  if (ring != NULL) {
+    if (ring->back < 0) return nil;
+    if (ring->fresh) clear_back (*ring);
+    return ring->s[ring->back].tex;
+  }
   if (drawable == nil && layer != nil) {
     double t= debug_present () ? now_ms () : 0;
     drawable= [layer nextDrawable];
@@ -1010,6 +1400,13 @@ metal_backend::copy (gpu_texture src, int sw, int sh, int x1, int y1, int x2, in
                      gpu_texture dst, int dw, int dh,
                      int dx1, int dy1, int dx2, int dy2) {
   if (!started || x2 <= x1 || y2 <= y1 || dx2 <= dx1 || dy2 <= dy1) return;
+  if (dst == NULL && ring != NULL && ring->back >= 0 && ring->fresh &&
+      src != NULL && dx1 == 0 && dy1 == 0 &&
+      dx2 == ring->s[ring->back].w && dy2 == ring->s[ring->back].h &&
+      x2 - x1 == dx2 && y2 - y1 == dy2 && x1 >= 0 && y1 >= 0 &&
+      x2 <= (int) src->tex.width && y2 <= (int) src->tex.height)
+    // (the copy replaces every pixel of the frame: no clear)
+    ring->fresh= false;
   id<MTLTexture> s= texture_of (src), d= texture_of (dst);
   if (s == nil || d == nil) return;
   int w= x2 - x1, h= y2 - y1;

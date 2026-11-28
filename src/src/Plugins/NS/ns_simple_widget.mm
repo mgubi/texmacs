@@ -269,7 +269,10 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     [(TMGpuPresenter*) gpu_presenter stop];
     [(TMGpuPresenter*) gpu_presenter release];
   }
-  if (gpu_layer != NULL) [(CALayer*) gpu_layer release];
+  if (gpu_layer != NULL) {
+    gpu_forget_layer (gpu_layer);
+    [(CALayer*) gpu_layer release];
+  }
 }
 
 /******************************************************************************
@@ -359,13 +362,30 @@ refresh_period (NSWindow* w) {
 
 void
 ns_simple_widget_rep::show_gpu_store () {
+  // By IOSurfaces (the default, issue #988): at once, every frame, with the
+  // Core Animation transaction of the thread (that of the event, which
+  // moves the view for a scroll, #971): nothing waits for the screen, and
+  // nothing is paced. TEXMACS_NS_SCROLL_SYNC=0 shows the frame of a scroll
+  // at the next refresh instead (by the presenter, as below), to compare.
+  if (!view || is_nil (gpu_store)) return;
+  if (gpu_presents_at_once ()) {
+    bool sync= gpu_sync;
+    gpu_sync= false;
+    if (!sync || gpu_scroll_sync ()) {
+      double t= ns_bench_now ();
+      present_gpu_store ();
+      gpu_dirty= false;
+      ns_bench_display += ns_bench_now () - t;
+      return;
+    }
+  }
+  // With TEXMACS_NS_PRESENT=metal, the drawables of a CAMetalLayer:
   // at the next refresh of the screen (TMGpuPresenter); the frame of a
   // scroll at once, with the transaction which moves the view (see
   // metal_backend::present_in_transaction), but at most one a refresh of
   // the screen (with some leeway for the jitter of the events): the
   // compositor gives the drawables of the layer back once a refresh, and a
   // burst of events faster than that would wait for them in nextDrawable
-  if (!view || is_nil (gpu_store)) return;
   bool sync= gpu_sync;
   gpu_sync= false;
   if (sync && gpu_scroll_sync () && [view window] &&
@@ -386,16 +406,22 @@ ns_simple_widget_rep::show_gpu_store () {
 
 bool
 ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
-  // the view hosts a CAMetalLayer (made when first shown: by name, so that
-  // a build without Metal needs no QuartzCore), into which the store is
-  // copied, scaled when the pixels of the screen are not those of the store
+  // the view hosts a layer (made when first shown), into whose next
+  // IOSurface the store is copied, or a CAMetalLayer (made by name, so that
+  // a build without Metal needs no QuartzCore) into whose drawable it is
+  // copied (TEXMACS_NS_PRESENT=metal), scaled when the pixels of the screen
+  // are not those of the store
   // (a retina_factor of 1 on a Retina screen); nothing to do while the view
   // is not in a window (it is shown when it is put back in one)
   if (!view || is_nil (gpu_store) || ![view window]) return true;
   if (gpu_layer == NULL) {
-    Class mlc= NSClassFromString (@"CAMetalLayer");
-    if (mlc == nil) return true;
-    CALayer* l= [[mlc alloc] init];
+    // (a CALayer shown by IOSurfaces, issue #988, or a CAMetalLayer)
+    CALayer* l= (CALayer*) gpu_new_layer ();
+    if (l == nil) {
+      Class mlc= NSClassFromString (@"CAMetalLayer");
+      if (mlc == nil) return true;
+      l= [[mlc alloc] init];
+    }
     [l setOpaque: NO];
     [view setLayer: l];
     [view setWantsLayer: YES];
@@ -408,6 +434,11 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
   // (a failure is not tried again before the next repaint)
   gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
+  // by IOSurfaces: as QCALayerBackingStore::flush, a display cycle of the
+  // window, so that the transaction is committed with it (and with the
+  // other changes of the views, the move of a scroll) rather than at the
+  // next pass of the run loop, which Core Animation may throttle
+  if (gpu_presents_at_once ()) [[view window] setViewsNeedDisplay: YES];
   return true;
 }
 

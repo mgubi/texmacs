@@ -91,6 +91,17 @@ vue_mac_wheel_monitor () {
       wheel_last= r;
       wheel_last_valid= true;
       wheel_last_ended= ([e phase] == NSEventPhaseEnded);
+      // (TEXMACS_VUE_DEBUG_PRESENT: when the event was made and when AppKit
+      // hands it to SDL, in ms of the clock of the events and of
+      // CACurrentMediaTime (the uptime), as the SURFACE lines of
+      // gpu_backend_metal.mm: the latency of the wheel, issue #988)
+      static int dbg= -1;
+      if (dbg < 0) dbg= (getenv ("TEXMACS_VUE_DEBUG_PRESENT") != NULL);
+      if (dbg)
+        fprintf (stderr, "WHEEL event %.3f now %.3f dy %.2f%s\n",
+                 [e timestamp] * 1000.0,
+                 [[NSProcessInfo processInfo] systemUptime] * 1000.0,
+                 (double) [e scrollingDeltaY], r.precise ? " precise" : "");
       return e;
     }];
 }

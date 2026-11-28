@@ -5667,11 +5667,16 @@ loop_iteration_body () {
   // delivers its events faster than a frame is drawn, though, and its
   // stream never runs dry: the repaint then never got its turn for as
   // long as a swipe lasted and the page stood still. It is therefore
-  // done anyway once it is older than vue_repaint_dt.
+  // done anyway once it is older than vue_repaint_dt. When a present
+  // shows the frame at once (Metal on macOS, by IOSurfaces, issue #988) it
+  // is not put off at all: the events queued meanwhile were taken with the
+  // one which started this turn (see take_event), and a repaint put off
+  // for the next ones added up to 16 ms to the latency of a wheel event.
   static time_t last_repaint= 0;
   time_t now_rep= texmacs_time ();
   int n_events= SDL_PollEvent (NULL);
-  if (n_events == 0 || request_partial_redraw ||
+  bool at_once= gpu_presents_at_once ();
+  if (n_events == 0 || request_partial_redraw || at_once ||
       now_rep - last_repaint >= vue_repaint_dt) {
     last_repaint= now_rep;
     request_partial_redraw= false;

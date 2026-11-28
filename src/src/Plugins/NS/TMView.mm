@@ -710,6 +710,17 @@ mouse_decode (unsigned int mstate) {
   // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
   // command zooms, and otherwise the scroll view scrolls
   if (!wid) { [super scrollWheel: event]; return; }
+  // (TEXMACS_NS_DEBUG_DRAW: when the event was made and when it is handled,
+  // in ms of the clock of the events, that of CACurrentMediaTime, as the
+  // SURFACE lines of the presents: the latency of the wheel, issue #988)
+  static int dbg= -1;
+  if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  if (dbg)
+    fprintf (stderr, "WHEEL event %.3f now %.3f dy %.2f%s\n",
+             [event timestamp] * 1000.0,
+             [[NSProcessInfo processInfo] systemUptime] * 1000.0,
+             (double) [event scrollingDeltaY],
+             [event hasPreciseScrollingDeltas] ? " precise" : "");
   // what -[QNSView scrollWheel:] drops before any widget sees it (the end
   // of a gesture which a momentum follows): neither the capture nor the
   // zoom get it; the deltas of a cancelled gesture are zeroes

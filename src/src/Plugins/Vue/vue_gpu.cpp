@@ -73,6 +73,11 @@ bool gpu_show_picture (void* l, picture p, int dw, int dh, bool t) {
   (void) l; (void) p; (void) dw; (void) dh; (void) t; return false; }
 bool gpu_read_picture (picture p, unsigned char* rgba) {
   (void) p; (void) rgba; return false; }
+bool gpu_presents_at_once () { return false; }
+void* gpu_new_layer () { return NULL; }
+void gpu_forget_layer (void* l) { (void) l; }
+bool gpu_layer_pixels (void* l, int w, int h, unsigned char* rgba, int& n) {
+  (void) l; (void) w; (void) h; (void) rgba; n= 0; return false; }
 
 #else
 
@@ -1899,6 +1904,29 @@ gpu_read_picture (picture p, unsigned char* rgba) {
   if (g == NULL || !ensure_target (&g->t)) return false;
   gpu_flush_all ();
   return G.B->read (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h, rgba);
+}
+
+bool
+gpu_presents_at_once () {
+  return G.B != NULL && G.started && !G.failed && G.B->presents_at_once ();
+}
+
+void*
+gpu_new_layer () {
+  if (G.B == NULL || !G.started || G.failed) return NULL;
+  return G.B->new_layer ();
+}
+
+void
+gpu_forget_layer (void* layer) {
+  if (G.B != NULL && layer != NULL) G.B->forget_layer (layer);
+}
+
+bool
+gpu_layer_pixels (void* layer, int w, int h, unsigned char* rgba, int& n) {
+  n= 0;
+  if (G.B == NULL || !G.started || layer == NULL) return false;
+  return G.B->layer_pixels (layer, w, h, rgba, n);
 }
 
 picture

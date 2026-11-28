@@ -14,6 +14,18 @@ have the details, and the problems go to the
 
 ## 28 November 2026
 
+- **Wheel scrolling on macOS reaches the screen sooner in the Cocoa and Vue
+  applications** (desktop applications, macOS; a user on the forum found
+  it less responsive than in the Qt application, a follow-up of #971,
+  #988). A frame drawn by the GPU is now an IOSurface set as the contents
+  of a layer, as the Qt application does, instead of a Metal drawable
+  presented at the next refresh. Every repaint (a scroll, typing, a
+  selection) is shown with the event which caused it, and nothing waits
+  for the screen. The Cocoa application no longer alternates between
+  frames shown at once and frames shown one to three refreshes later. The
+  Vue application no longer paces its frames, nor puts a repaint off while
+  events are queued. `TEXMACS_NS_PRESENT=metal` and
+  `TEXMACS_VUE_PRESENT=metal` go back to the old way, to compare.
 - **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
   the Chez backend (21 November) the compiler flags of the vendored
   femtolisp were set only in Chez builds, and `fl_core.c` did not find
