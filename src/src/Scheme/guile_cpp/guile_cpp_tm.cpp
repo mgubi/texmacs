@@ -16,11 +16,13 @@
 
 #include <limits.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdlib.h>
 
 #include "blackbox.hpp"
 #include "file.hpp"
 #include "sys_utils.hpp"
+#include "stack_guard.hpp"
 #include "../Scheme/glue.hpp"
 #include "convert.hpp" // tree_to_texmacs
 
@@ -62,9 +64,8 @@ scheme_caught_errors () {
 }
 
 static tmscm
-handle_scheme_throw (const guile::SchemeThrow& ex) {
+handle_scheme_throw (SCM key, SCM args) {
   VM& v= guile::vm ();
-  SCM key= ex.key, args= ex.args;
   if (key == v.sym_quit) {
     int code= 0;
     if (guile::is_pair (args)) {
@@ -78,6 +79,11 @@ handle_scheme_throw (const guile::SchemeThrow& ex) {
     exit (code);
   }
   scheme_errors++;
+  // the key and the arguments were only referenced by the exception object,
+  // which the collector does not see, and printing them allocates
+  SCM roots[2]= { key, args };
+  guile::GcRootSpan span= { roots, 2, NULL };
+  v.heap ().push_root_span (&span);
   SCM errp= v.current_error_port ();
   port_write (errp, "ERROR: ");
   if (guile::is_pair (args) &&
@@ -98,7 +104,73 @@ handle_scheme_throw (const guile::SchemeThrow& ex) {
     port_write (errp, "'.\n");
   }
   guile::port_flush (guile::as_obj<PortObj> (errp));
-  return v.cons (key, args);
+  SCM r= v.cons (key, args);
+  v.heap ().pop_root_span ();
+  return r;
+}
+
+// An exception of C++ which crossed Scheme (a continuation invoked out of
+// its extent, an exception of the C++ library): the frames of dynamic-wind,
+// with-fluids and catch which it left are unwound, and it is reported as
+// an error of Scheme, (misc-error #f message () #f)
+static tmscm
+handle_cpp_exception (SCM dynwind, const char* what) {
+  VM& v= guile::vm ();
+  try {
+    if (v.current_dynwind != dynwind) guile::switch_dynwind_pub (dynwind);
+  }
+  catch (...) {
+    v.current_dynwind= dynwind;
+  }
+  try {
+    SCM msg = v.make_string (what);
+    SCM args= v.list4 (guile::SCM_BOOL_F, msg, guile::SCM_EOL,
+                       guile::SCM_BOOL_F);
+    return handle_scheme_throw (v.make_symbol ("misc-error"), args);
+  }
+  catch (...) {
+    scheme_errors++;
+    return guile::SCM_BOOL_F;
+  }
+}
+
+// Every call from C++ into Scheme catches every exception (guile_cpp's
+// errors and escapes are exceptions of C++), so that none of them reaches
+// the event loop of the interface; called in a handler of catch (...)
+static tmscm
+handle_exception (SCM dynwind) {
+  try {
+    throw;
+  }
+  catch (const guile::SchemeThrow& ex) {
+    return handle_scheme_throw (ex.key, ex.args);
+  }
+  catch (const guile::ContinuationEscape&) {
+    return handle_cpp_exception (dynwind,
+                                 "continuation invoked out of its extent");
+  }
+  catch (const string&) {
+    return handle_cpp_exception (dynwind, "exception of TeXmacs");
+  }
+  catch (const std::exception& e) {
+    return handle_cpp_exception (dynwind, e.what ());
+  }
+  catch (...) {
+    return handle_cpp_exception (dynwind, "exception of C++");
+  }
+}
+
+static inline SCM
+current_dynwind () {
+  return guile::vm ().current_dynwind;
+}
+
+// An exception of TeXmacs (tm_throw) in a routine of the glue becomes an
+// error of Scheme, as with the other interpreters: guile_cpp unwinds its
+// own frames for it
+void
+tmscm_raise_error (string msg) {
+  guile::vm ().misc_error ("glue", std::string (as_view (msg)));
 }
 
 void
@@ -219,6 +291,22 @@ tmscm_to_blackbox (tmscm obj) {
 * Startup and initialization
 ******************************************************************************/
 
+// guile_cpp stops with "Stack overflow" when the C stack is deeper than
+// c_stack_limit_bytes from where it started (start_scheme): the guards of
+// TeXmacs (stack_guard.hpp) stop the recursions of C++ before that point,
+// so that a deep document gives the error "nesting too deep" of TeXmacs
+static pthread_t main_thread;
+
+static char*
+guile_cpp_stack_low () {
+  if (!pthread_equal (pthread_self (), main_thread)) return NULL;
+  VM& v= guile::vm ();
+  char* base= (char*) v.heap ().stack_base ();
+  size_t limit= v.c_stack_limit_bytes ();
+  if (base == NULL || limit >= (size_t) (uintptr_t) base) return NULL;
+  return base - limit;
+}
+
 static bool
 env_is (const char* val, const char* a, const char* b,
         const char* c, const char* d) {
@@ -254,9 +342,11 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   try {
     v.init ((int*) &stack_anchor, true);
   }
-  catch (const guile::SchemeThrow& ex) {
-    handle_scheme_throw (ex);
+  catch (...) {
+    handle_exception (guile::SCM_EOL);
   }
+  main_thread= pthread_self ();
+  scheme_stack_low= guile_cpp_stack_low;
   v.set_program_arguments (argc, argv);
 
   call_back (argc, argv);
@@ -283,11 +373,12 @@ initialize_scheme () {
     "(define object-stack '(()))\n";
 
   VM& v= guile::vm ();
+  SCM dw= current_dynwind ();
   try {
     v.eval_string (init_prg);
   }
-  catch (const guile::SchemeThrow& ex) {
-    handle_scheme_throw (ex);
+  catch (...) {
+    handle_exception (dw);
   }
 
   initialize_smobs ();
@@ -316,71 +407,78 @@ scheme_init_file () {
 tmscm
 eval_scheme_file (string file) {
   if (DEBUG_STD) debug_std << "Evaluating " << file << "...\n";
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().primitive_load (std::string (as_view (file)));
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
 tmscm
 eval_scheme (string s) {
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().eval_string (as_view (s));
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
 tmscm
 call_scheme (tmscm fun) {
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().call0 (fun);
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
 tmscm
 call_scheme (tmscm fun, tmscm a1) {
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().call1 (fun, a1);
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
 tmscm
 call_scheme (tmscm fun, tmscm a1, tmscm a2) {
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().call2 (fun, a1, a2);
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
 tmscm
 call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3) {
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().call3 (fun, a1, a2, a3);
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
 tmscm
 call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3, tmscm a4) {
+  SCM dw= current_dynwind ();
   try {
     return guile::vm ().call4 (fun, a1, a2, a3, a4);
   }
-  catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+  catch (...) {
+    return handle_exception (dw);
   }
 }
 
@@ -390,11 +488,12 @@ call_scheme (tmscm fun, array<tmscm> a) {
   STACK_NEW_ARRAY (args, tmscm, n);
   for (i= 0; i < n; i++) args[i]= a[i];
   tmscm r;
+  SCM dw= current_dynwind ();
   try {
     r= guile::vm ().apply (fun, args, (size_t) n);
   }
-  catch (const guile::SchemeThrow& ex) {
-    r= handle_scheme_throw (ex);
+  catch (...) {
+    r= handle_exception (dw);
   }
   STACK_DELETE_ARRAY (args);
   return r;

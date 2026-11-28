@@ -14,6 +14,7 @@
 #include "tm_configure.hpp"
 #include "blackbox.hpp"
 #include "array.hpp"
+#include "string.hpp"
 
 // only the tagged values and the pairs of guile_cpp (included through the
 // path of this file: the rest of TeXmacs needs no include flag for it)
@@ -110,53 +111,61 @@ typedef tmscm (*tmscm_raw_proc) (const tmscm* args, size_t nargs);
 void tmscm_install_raw_procedure (const char* name, int req, int opt, int rst,
                                   tmscm_raw_proc fn);
 
+// an exception of TeXmacs (tm_throw) in a glue routine becomes an error of
+// Scheme (the errors of guile_cpp are exceptions of C++, which pass)
+[[noreturn]] void tmscm_raise_error (string msg);
+#define TMSCM_GLUE_CALL(call) \
+  try { return call; } \
+  catch (const string& e) { tmscm_raise_error (e); }
+
 template<tmscm (*PROC) ()> tmscm
 tmscm_proc (const tmscm*, size_t) {
-  return PROC ();
+  TMSCM_GLUE_CALL (PROC ());
 }
 template<tmscm (*PROC) (tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0]);
+  TMSCM_GLUE_CALL (PROC (a[0]));
 }
 template<tmscm (*PROC) (tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3], a[4]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3], a[4]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm, tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3], a[4], a[5]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3], a[4], a[5]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm, tmscm, tmscm,
                         tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm, tmscm, tmscm,
                         tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm, tmscm, tmscm,
                         tmscm, tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]));
 }
 template<tmscm (*PROC) (tmscm, tmscm, tmscm, tmscm, tmscm, tmscm,
                         tmscm, tmscm, tmscm, tmscm)> tmscm
 tmscm_proc (const tmscm* a, size_t) {
-  return PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+  TMSCM_GLUE_CALL (PROC (a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
+                         a[8], a[9]));
 }
 
 #define tmscm_install_procedure(name, func, args, p0, p1) \
