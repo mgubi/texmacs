@@ -401,6 +401,8 @@ public:
     SCM list4(SCM a, SCM b, SCM c, SCM d);
     SCM list_n(const SCM* elts, size_t n);
     SCM make_symbol(std::string_view name);
+    SCM make_symbol(string name);
+    SCM make_symbol(const char* name) { return make_symbol(std::string_view(name)); }
     SCM make_uninterned_symbol(std::string_view name);
     SCM make_keyword(SCM sym);
     SCM make_keyword(std::string_view name);
@@ -783,6 +785,7 @@ public:
     SCM permanent_object(SCM x) { permanent_roots.push_back(x); return x; }
 
     hashmap<string, SCM> symbol_table{SCM_BOOL_F};
+    array<SCM> interned_symbols;  // the values of symbol_table, for the collector
     hashmap<string, pointer> extensions{(pointer) nullptr};  // (void (*)())
     std::vector<SmobTypeInfo> smob_types_;
 
@@ -824,8 +827,14 @@ private:
     bool initialized_ = false;
 };
 
-// Global thread-local / singleton VM accessor
-VM& vm();
+// Global thread-local / singleton VM accessor (TeXmacs: inline, as it is
+// called everywhere; vm_create makes the VM at the first call)
+extern VM* g_vm;
+VM& vm_create();
+inline VM& vm() {
+    if (GCPP_UNLIKELY(g_vm == nullptr)) return vm_create();
+    return *g_vm;
+}
 
 // ============================================================================
 // Shared cross-module helper declarations

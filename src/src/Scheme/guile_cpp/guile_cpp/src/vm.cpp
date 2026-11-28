@@ -2,9 +2,9 @@
 
 namespace guile {
 
-static VM* g_vm = nullptr;
+VM* g_vm = nullptr;
 
-VM& vm() {
+VM& vm_create() {
     if (!g_vm) g_vm = new VM();
     return *g_vm;
 }
@@ -233,8 +233,7 @@ void VM::mark_roots(const Marker& mark) {
     bytecode_mark_roots(mark);
 
     // Symbol intern table
-    iterator<string> it = iterate(symbol_table);
-    while (it->busy()) mark(symbol_table[it->next()]);
+    for (int i = 0; i < N(interned_symbols); i++) mark(interned_symbols[i]);
 }
 
 void VM::run_after_gc_hook() {

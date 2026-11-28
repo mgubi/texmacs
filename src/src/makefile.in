@@ -423,7 +423,7 @@ $(scheme_obj): Objects/%.o: %.cpp
 # dependency files
 $(gcpp_obj): Objects/gcpp_%.o: $(GCPP_DIR)/src/%.cpp
 	$(strip $(CXX) $(kernel_incl) $(SCHEME_CXX_FLAGS) $(CPPFLAGS) $(CXXFLAGS) \
-	  -MMD -MP -MF Deps/gcpp_$*.d -MT $@ -c $< -o $@)
+	  -O3 -MMD -MP -MF Deps/gcpp_$*.d -MT $@ -c $< -o $@)
 $(scheme_c_obj): Objects/%.o: %.c
 	$(call cc_incl,$(scheme_incl) $(SCHEME_C_FLAGS))
 $(graphics_obj): Objects/%.o: %.cpp

@@ -2,6 +2,19 @@
 
 namespace guile {
 
+// (TeXmacs: the lookup shares the name, without allocation; only a new
+// symbol copies it, as the key of the table and its name)
+SCM VM::make_symbol(string name) {
+    SCM* found = symbol_table->find(name);
+    if (found != nullptr) return *found;
+    string key = copy(name);
+    std::string_view sv(N(key) > 0 ? &key[0] : "", N(key));
+    SCM sym = heap_.alloc_scm<SymbolObj>(std::string(sv), scm_hash_string(sv), true);
+    symbol_table(key) = sym;
+    interned_symbols << sym;
+    return sym;
+}
+
 SCM VM::make_symbol(std::string_view name) {
     string key(name.data(), static_cast<int>(name.size()));
     SCM* found = symbol_table->find(key);
@@ -9,6 +22,7 @@ SCM VM::make_symbol(std::string_view name) {
     uint64_t h = scm_hash_string(name);
     SCM sym = heap_.alloc_scm<SymbolObj>(std::string(name), h, true);
     symbol_table(key) = sym;
+    interned_symbols << sym;
     return sym;
 }
 

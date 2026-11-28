@@ -610,7 +610,7 @@ tmscm_to_string (tmscm obj) {
 
 tmscm
 symbol_to_tmscm (string s) {
-  return guile::vm ().make_symbol (as_view (s));
+  return guile::vm ().make_symbol (s);
 }
 
 string

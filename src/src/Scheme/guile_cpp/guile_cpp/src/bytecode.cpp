@@ -1646,21 +1646,26 @@ struct BytecodeEngine {
         return SCM_BOOL_F;
     }
 
-    void ensure_stack(size_t needed) {
-        if (needed >= static_cast<size_t>(N(stack))) {
-            size_t new_sz = static_cast<size_t>(N(stack)) * 2;
-            while (new_sz <= needed) new_sz *= 2;
-            int old_sz = N(stack);
-            stack->resize(static_cast<int>(new_sz));
-            for (int i = old_sz; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
-        }
+    // (the checks are inline, the growth is not: the VM checks at each call)
+    inline void ensure_stack(size_t needed) {
+        if (GCPP_UNLIKELY(needed >= static_cast<size_t>(N(stack)))) grow_stack(needed);
     }
 
-    void ensure_frames(size_t needed) {
-        if (needed >= static_cast<size_t>(N(frames))) {
-            frames->resize(N(frames) * 2);
-            frame_data = A(frames);
-        }
+    __attribute__((noinline)) void grow_stack(size_t needed) {
+        size_t new_sz = static_cast<size_t>(N(stack)) * 2;
+        while (new_sz <= needed) new_sz *= 2;
+        int old_sz = N(stack);
+        stack->resize(static_cast<int>(new_sz));
+        for (int i = old_sz; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
+    }
+
+    inline void ensure_frames(size_t needed) {
+        if (GCPP_UNLIKELY(needed >= static_cast<size_t>(N(frames)))) grow_frames();
+    }
+
+    __attribute__((noinline)) void grow_frames() {
+        frames->resize(N(frames) * 2);
+        frame_data = A(frames);
     }
 };
 
