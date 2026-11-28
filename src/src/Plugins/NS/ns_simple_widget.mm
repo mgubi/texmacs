@@ -251,7 +251,7 @@ ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
   gpu_presenter (NULL), gpu_dirty (false), gpu_sync (false),
-  gpu_sync_last (0),
+  gpu_sync_last (0), factor (0), dbg_size { -1, -1, -1, -1 },
   zoom_now (0), zoom_pending (false), zoom_image (NULL),
   zoom_rect (NSZeroRect), zoom_origin (NSZeroPoint), zoom_ratio (1),
   extents (coord4 (0, 0, 0, 0)), too_large_said (false),
@@ -417,7 +417,7 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   // a build without Metal needs no QuartzCore) into whose drawable it is
   // copied (TEXMACS_NS_PRESENT=metal), scaled when the pixels of the screen
   // are not those of the store
-  // (a retina_factor of 1 on a Retina screen); nothing to do while the view
+  // (a factor of 1 on a Retina screen, retina-factor off); nothing to do while the view
   // is not in a window (it is shown when it is put back in one)
   if (!view || is_nil (gpu_store) || ![view window]) return true;
   if (gpu_layer != NULL && !gpu_presents_at_once () &&
@@ -451,12 +451,12 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   static int dbg= -1;
   if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
   if (dbg) {
-    static int lw= -1, lh= -1, ldw= -1, ldh= -1;
     int sw= gpu_store->get_width (), sh= gpu_store->get_height ();
-    if (sw != lw || sh != lh || dw != ldw || dh != ldh) {
-      lw= sw; lh= sh; ldw= dw; ldh= dh;
-      fprintf (stderr, "CANVAS store %dx%d retina_factor %d view %.1fx%.1f "
-               "backing %.1f screen %dx%d%s\n", sw, sh, retina_factor,
+    if (sw != dbg_size[0] || sh != dbg_size[1] ||
+        dw != dbg_size[2] || dh != dbg_size[3]) {
+      dbg_size[0]= sw; dbg_size[1]= sh; dbg_size[2]= dw; dbg_size[3]= dh;
+      fprintf (stderr, "CANVAS %p store %dx%d factor %d view %.1fx%.1f "
+               "backing %.1f screen %dx%d%s\n", (void*) this, sw, sh, factor,
                sz.width, sz.height, sc, dw, dh,
                (sw < dw || sh < dh) ? " (scaled up)" : "");
     }
@@ -997,8 +997,8 @@ ns_simple_widget_rep::invalidate_all () {
   // NOTE: the backing store has the size of the visible part
   NSSize sz= view? [view frame].size: NSZeroSize;
   invalid_regions = rectangles();
-  invalidate_rect (0, 0, (int) ceil (sz.width * retina_factor),
-                   (int) ceil (sz.height * retina_factor));
+  int k= factor > 0 ? factor : canvas_factor ();
+  invalidate_rect (0, 0, (int) ceil (sz.width * k), (int) ceil (sz.height * k));
   //QSize sz = canvas()->surface()->size();
   //cout << "invalidate all " << LF;
   //invalidate_rect (0, 0, retina_factor * sz.width(),
@@ -1017,7 +1017,7 @@ basic_renderer
 ns_simple_widget_rep::get_renderer() {
   if (gpu_mode ()) {
     if (gpu_ren == NULL)
-      gpu_ren= gpu_picture_renderer (gpu_store, std_shrinkf * retina_factor);
+      gpu_ren= gpu_picture_renderer (gpu_store, std_shrinkf * factor);
     return (basic_renderer) gpu_ren;
   }
   ns_renderer_rep * ren = the_ns_renderer();
@@ -1144,7 +1144,7 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
     CGDataProviderRelease (prov);
     if (!img) return;
     CGContextRef cgc= [[NSGraphicsContext currentContext] CGContext];
-    double k= retina_factor;
+    double k= factor > 0 ? factor : retina_factor;
     CGContextSaveGState (cgc);
     CGContextClipToRect (cgc, NSRectToCGRect (rect));
     // the view is flipped: the image upside down
@@ -1176,7 +1176,7 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
   CGColorSpaceRelease (cs);
   CGDataProviderRelease (prov);
   if (!img) return;
-  double k= retina_factor;
+  double k= factor > 0 ? factor : retina_factor;
   // only what the backing store holds: the rectangle asked for may go
   // beyond the view (the snapshots ask for the whole document view when it
   // is centered in a wider clip view, from x < 0), and the part outside the
@@ -1206,9 +1206,53 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
   CGImageRelease (img);
 }
 
+// the global retina_factor while a canvas is painted: its own (the
+// renderers, the pictures and the editor read the global)
+struct ns_factor_scope {
+  int saved;
+  ns_factor_scope (int f): saved (retina_factor) { retina_factor= f; }
+  ~ns_factor_scope () { retina_factor= saved; }
+};
+
+int  ns_simple_widget_rep::default_factor= 1;
+bool ns_simple_widget_rep::factor_fixed= false;
+
+// the pixels per point of the screen of a window (1 or 2)
+int
+ns_canvas_factor_for (double backing_scale) {
+  return backing_scale >= 1.5 ? 2 : 1;
+}
+
+int
+ns_simple_widget_rep::canvas_factor () {
+  // (as it was, for a canvas which left its window for a while)
+  if (factor_fixed) return default_factor;
+  if (!view || ![view window]) return factor > 0 ? factor : default_factor;
+  return ns_canvas_factor_for ([[view window] backingScaleFactor]);
+}
+
+void
+ns_simple_widget_rep::set_factor (int f) {
+  if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+    fprintf (stderr, "CANVAS %p factor %d -> %d\n", (void*) this, factor, f);
+  factor= f;
+  // a new store, at the new scale, painted in full (by the repaint which
+  // follows: has_store is false, so the store is made at the size of the
+  // view and all of it is invalid)
+  if (gpu_ren != NULL) { tm_delete (gpu_ren); gpu_ren= NULL; }
+  gpu_store= picture ();
+  if (backingPixmap) { [backingPixmap release]; backingPixmap= nil; }
+  ring= cring= 0;
+  invalid_regions= rectangles ();
+  invalidate_all ();
+}
+
 void
 ns_simple_widget_rep::repaint_invalid_regions () {
   double tr0= ns_bench_now ();
+  int f= canvas_factor ();
+  if (f != factor) set_factor (f);
+  ns_factor_scope scope (factor);
   // the zoom the editor starts with (the first one is not sent to the
   // widget): the smooth zoom needs the old zoom to scale from
   if (zoom_now == 0 && is_editor_widget ())
@@ -1233,20 +1277,20 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     backing_pos= origin;
   // NOTE: when the backing store moves or changes its size, all the view
   // is shown again (the view keeps its old image on screen otherwise)
-  // NOTE: the backing store moves by whole pixels (retina_factor per point),
+  // NOTE: the backing store moves by whole pixels (factor per point),
   // and backing_pos by what was moved: the scroll positions are whole pixels
   // of the screen, which may be half pixels of the backing store (with a
-  // retina_factor of 1 on a Retina screen); the rest is moved later
+  // factor of 1 on a Retina screen); the rest is moved later
   bool moved= false;
-  int dx = (int) round (retina_factor * (origin.x - backing_pos.x));
-  int dy = (int) round (retina_factor * (origin.y - backing_pos.y));
+  int dx = (int) round (factor * (origin.x - backing_pos.x));
+  int dy = (int) round (factor * (origin.y - backing_pos.y));
   if (dx != 0 || dy != 0) {
     double tm0= ns_bench_now ();
     moved= true;
     if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
       fprintf (stderr, "SHIFT %g -> %g dy %d size %d\n", backing_pos.y, origin.y, dy, store_height ());
-    backing_pos.x += dx / (double) retina_factor;
-    backing_pos.y += dy / (double) retina_factor;
+    backing_pos.x += dx / (double) factor;
+    backing_pos.y += dy / (double) factor;
     // NOTE: nothing is moved: where the view starts in the backing store
     // (on the GPU: a copy, shifted)
     if (gpu) gpu_translate_picture (gpu_store, -dx, -dy);
@@ -1296,8 +1340,8 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     // NOTE: sizes in pixels, rounded as the pixels of the backing store
     NSSize _oldSize = NSMakeSize (store_width (), store_height ());
     NSSize _new_logical_Size = [view frame].size;
-    NSSize _newSize = NSMakeSize (ceil (_new_logical_Size.width * retina_factor),
-                                  ceil (_new_logical_Size.height * retina_factor));
+    NSSize _newSize = NSMakeSize (ceil (_new_logical_Size.width * factor),
+                                  ceil (_new_logical_Size.height * factor));
 
     //cout << "      surface size of " << _newSize.width() << " x "
     // << _newSize.height() << LF;
@@ -1412,7 +1456,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
         if (!moved) show_gpu_store (); // (timed when presented)
       }
       else if (!moved) {
-        double k= retina_factor;
+        double k= factor;
         [view displayRect: NSMakeRect (lub->x1 / k, lub->y1 / k,
                                        (lub->x2 - lub->x1) / k,
                                        (lub->y2 - lub->y1) / k)];
@@ -1484,7 +1528,7 @@ static CGImageRef
 canvas_image (ns_simple_widget_rep* w, NSView* view) {
   NSRect vis= [view bounds];
   if (NSIsEmptyRect (vis)) return NULL;
-  double k= retina_factor;
+  double k= w->factor > 0 ? w->factor : retina_factor;
   int W= (int) ceil (vis.size.width * k), H= (int) ceil (vis.size.height * k);
   NSBitmapImageRep* rep= [[NSBitmapImageRep alloc]
     initWithBitmapDataPlanes: NULL pixelsWide: W pixelsHigh: H

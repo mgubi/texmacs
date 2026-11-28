@@ -67,14 +67,17 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
   refresh_language();
   
   
+  // Each canvas has the pixels of the screen of its window (its factor,
+  // see ns_simple_widget_rep::canvas_factor, #989), unless the user fixed
+  // them (-retina, -no-retina, TEXMACS_RETINA, the preference retina-factor).
+  // retina_factor is the default: for canvases in no window, the images of
+  // the widgets (menus, icons) and Scheme; it is the largest scale of the
+  // screens, not that of [NSScreen mainScreen] (mac_screen_scale_factor),
+  // the screen of the window with the keyboard focus, which may be a
+  // terminal on another screen
+  bool fixed= retina_manual;
   if (!retina_manual) {
     retina_manual= true;
-    // the largest scale of the screens, not that of [NSScreen mainScreen]
-    // (mac_screen_scale_factor), which is the screen of the window with the
-    // keyboard focus: TeXmacs started from a terminal on a screen of 1x had
-    // a retina_factor of 1, and its windows on a Retina screen showed
-    // their canvases scaled up, blurred (#989). A store of 2x on a screen
-    // of 1x is scaled down by the GPU, which stays sharp
     double mac_hidpi = mac_screen_scale_factor();
     for (NSScreen* s in [NSScreen screens])
       if ([s backingScaleFactor] > mac_hidpi) mac_hidpi= [s backingScaleFactor];
@@ -94,8 +97,12 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
       retina_scale = 1.0;
     }
   }
-  if (has_user_preference ("retina-factor"))
+  if (has_user_preference ("retina-factor")) {
     retina_factor= get_user_preference ("retina-factor") == "on"? 2: 1;
+    fixed= true;
+  }
+  ns_simple_widget_rep::default_factor= retina_factor;
+  ns_simple_widget_rep::factor_fixed= fixed;
   if (has_user_preference ("retina-icons"))
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))

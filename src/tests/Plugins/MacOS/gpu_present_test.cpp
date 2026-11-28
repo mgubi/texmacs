@@ -140,27 +140,53 @@ test_scaled () {
 static void
 test_geometry () {
   if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
-  // the contents have the pixels of the bounds times the contentsScale: a
-  // store presented at twice its pixels on a layer of 64 x 32 points (a
-  // Retina screen) shows 2 pixels a point, not 1 stretched (#989)
-  CHECK (gpu_show_picture (layer, store, 128, 64));
-  spin ();
+  // the contents have the pixels of the bounds times the contentsScale (a
+  // layer of its own, of 64 x 32 points: gpu_layer_pixels gives the bounds
+  // to a layer in no view, #989)
+  void* l= gpu_new_layer ();
+  std::vector<unsigned char> img (128 * 64 * 4);
+  int n= 0;
+  gpu_layer_pixels (l, 64, 32, img.data (), n);
   int pw= 0, ph= 0;
   double sc= 0, bw= 0, bh= 0;
-  CHECK (gpu_layer_geometry (layer, pw, ph, sc, bw, bh));
+  // a store of 1x on a screen of 2x (scaled up)
+  CHECK (gpu_show_picture (l, store, 128, 64));
+  spin ();
+  CHECK (gpu_layer_geometry (l, pw, ph, sc, bw, bh));
   CHECK_EQ (pw, 128);
   CHECK_EQ (ph, 64);
   CHECK_EQ (bw, 64.0);
   CHECK_EQ (bh, 32.0);
   CHECK_EQ (sc, 2.0);
-  CHECK_EQ ((int) (bw * sc + 0.5), pw);
-  CHECK_EQ ((int) (bh * sc + 0.5), ph);
-  // and back to one pixel a point
-  CHECK (gpu_show_picture (layer, store, 64, 32));
+  // a store of 1x on a screen of 1x
+  CHECK (gpu_show_picture (l, store, 64, 32));
   spin ();
-  CHECK (gpu_layer_geometry (layer, pw, ph, sc, bw, bh));
+  CHECK (gpu_layer_geometry (l, pw, ph, sc, bw, bh));
   CHECK_EQ (pw, 64);
+  CHECK_EQ (ph, 32);
   CHECK_EQ (sc, 1.0);
+  // a store of 2x on a screen of 1x (scaled down): 64 x 32 pixels shown,
+  // the top half red, the bottom transparent
+  picture big= gpu_backing_picture (128, 64, true);
+  renderer ren= gpu_picture_renderer (big, std_shrinkf);
+  SI p= ren->pixel;
+  ren->set_origin (0, 0);
+  ren->set_clipping (0, -64 * p, 128 * p, 0);
+  ren->set_pencil (rgb_color (255, 0, 0));
+  ren->fill (0, -32 * p, 128 * p, 0);
+  tm_delete (ren);
+  CHECK (gpu_show_picture (l, big, 64, 32));
+  spin ();
+  CHECK (gpu_layer_geometry (l, pw, ph, sc, bw, bh));
+  CHECK_EQ (pw, 64);
+  CHECK_EQ (ph, 32);
+  CHECK_EQ (sc, 1.0);
+  CHECK (gpu_layer_pixels (l, 64, 32, img.data (), n));
+  CHECK_EQ (px (img, 64, 10, 4, 0), 255);
+  CHECK_EQ (px (img, 64, 10, 4, 3), 255);
+  CHECK_EQ (px (img, 64, 10, 28, 3), 0);
+  gpu_forget_layer (l);
+  CFRelease ((CFTypeRef) l);
 }
 
 static void

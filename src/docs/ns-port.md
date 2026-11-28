@@ -556,14 +556,31 @@ over it. A change of size or of screen allocates surfaces of the new size
 (the one shown stays until replaced); occluded windows present as the
 others, which no longer blocks anything. The snapshots still read the store
 back. A canvas which is deleted releases its surfaces (`gpu_forget_layer`).
-`retina_factor` (the pixels of the stores per point) is 2 when any screen
-is Retina: it was that of `[NSScreen mainScreen]`, the screen of the window
-with the keyboard focus, so that TeXmacs started from a terminal on an
-external screen of 1x drew stores of 1x, which a window on the Retina
-screen showed scaled up, blurred; a store of 2x on a screen of 1x is scaled
-down, sharp. `TEXMACS_NS_DEBUG_DRAW` prints the pixels of the store and of
-the screen when they change (`CANVAS`, with `(scaled up)` when the store has
-fewer), and the scale and bounds of the layer in the `SURFACE` lines.
+**The pixels of a canvas follow its screen (#989).** Each canvas has its
+own factor, the pixels of its store per point (`ns_simple_widget_rep::
+factor`): that of the screen of its window (`backingScaleFactor`, 1 or 2,
+`canvas_factor`). When the window goes to a screen of another scale
+(`-[TMView viewDidChangeBackingProperties]`), the next repaint makes a new
+store at the new factor and paints all of it (`set_factor`), so a window
+dragged from a Retina screen to a screen of 1x and back is drawn at the
+pixels of each screen, never scaled; two windows on two screens each have
+theirs. The global `retina_factor`, which the renderers (their zoom), the
+pictures (their cache) and the editor read, is set to the factor of a
+canvas while it is painted (`repaint_invalid_regions`); otherwise it is the
+default: the largest scale of the screens, for the canvases in no window,
+the images of the widgets (`impress`), Scheme (`get-retina-factor`) and
+headless runs. It was taken once from `[NSScreen mainScreen]`, the screen of
+the window with the keyboard focus, so that TeXmacs started from a terminal
+on a screen of 1x drew all its canvases at 1x, scaled up and blurred on the
+Retina screen; a store of 2x shown on a screen of 1x, the other way, is
+filtered down, which greys the lines of one pixel and softens the glyphs.
+`-retina`, `-no-retina`, `TEXMACS_RETINA` and the preference `retina-factor`
+fix the factor of all the canvases, as before. `TEXMACS_NS_DEBUG_DRAW`
+prints the changes of factor (`CANVAS <p> factor 1 -> 2`), those of the
+backing scale of a window (`CANVAS backing 2.0`), the pixels of a store and
+of the screen when they change (`CANVAS <p> store ... (scaled up)` when the
+store has fewer), and the scale and bounds of the layer in the `SURFACE`
+lines.
 Should three IOSurfaces in a row fail to be made, TeXmacs says so and goes
 back to the drawables (`metal_backend::surface_failed`; the layer of a
 canvas is replaced by a `CAMetalLayer`; a frame which could not be shown is

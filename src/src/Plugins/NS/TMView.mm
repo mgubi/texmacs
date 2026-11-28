@@ -311,6 +311,23 @@ initkeymap () {
   NS_ENTRY_END ("-[TMView viewWillMoveToWindow:]")
 }
 
+// the window moved to a screen of another scale (or its scale changed): the
+// canvas is repainted at the pixels of that screen (#989), the store being
+// made again by the repaint (ns_simple_widget_rep::canvas_factor)
+- (void) viewDidChangeBackingProperties
+{
+  [super viewDidChangeBackingProperties];
+  if (!wid) return;
+  NS_ENTRY_BEGIN
+    ns_simple_widget_rep* w= (ns_simple_widget_rep*) wid;
+    if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+      fprintf (stderr, "CANVAS backing %.1f (factor %d)\n",
+               [[self window] backingScaleFactor], w->factor);
+    w->invalidate_all ();
+    if ([NSApp isRunning] && [self window]) the_gui->force_update ();
+  NS_ENTRY_END ("-[TMView viewDidChangeBackingProperties]")
+}
+
 - (void) viewDidMoveToWindow
 {
   [super viewDidMoveToWindow];

@@ -98,6 +98,17 @@ public:
   bool                    gpu_sync;    //!< a scroll: the next frame is shown
                                        //!< with its transaction
   double                  gpu_sync_last; //!< when it was last (ns_bench_now)
+  // the pixels of the store per point: those of the screen of the window
+  // of the canvas (1 or 2), each canvas its own (#989); the global
+  // retina_factor is set to it while the canvas is painted (the renderers
+  // and the pictures read it), and is otherwise the default (default_factor:
+  // canvases in no window, the images of the widgets, Scheme)
+  int                     factor;      //!< 0 until first painted
+  int                     dbg_size[4]; //!< (TEXMACS_NS_DEBUG_DRAW)
+  static int              default_factor;
+  static bool             factor_fixed; //!< by the user (retina-factor...)
+  int canvas_factor ();                //!< what it should be now
+  void set_factor (int f);             //!< a new store, all repainted
   static bool gpu_mode ();
   bool has_store ();
   int store_width ();                  //!< in pixels
@@ -178,5 +189,8 @@ int ns_wheel_mods (NSEvent* event);     // QT_WHEEL_..., latched (Qt)
 @end
 #endif // defined __OBJC__
 
+
+// the pixels of a canvas per point on a screen of this backingScaleFactor
+int ns_canvas_factor_for (double backing_scale);
 
 #endif // defined NS_SIMPLE_WIDGET_H
