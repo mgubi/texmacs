@@ -213,9 +213,14 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   screen", followed at once);
 * `TEXMACS_NS_GPU=0`: the canvases drawn by Core Graphics, as before the
   GPU renderer (see "Drawn by the GPU" below);
+* `TEXMACS_NS_PRESENT=metal`: the canvases drawn by the GPU are presented
+  as before #988, through the drawables of a `CAMetalLayer`, paced by a
+  display link, and not as IOSurfaces set as the contents of their layer
+  (see "Drawn by the GPU"), to compare;
 * `TEXMACS_NS_SCROLL_SYNC=0`: the frame of a scroll drawn by the GPU is
-  presented at the next refresh, as the other repaints, and not with the
-  transaction which moves the view (see "Drawn by the GPU": a flicker);
+  presented at the next refresh (by the display link of the canvas), and
+  not with the transaction which moves the view (see "Drawn by the GPU": a
+  flicker);
 * `TEXMACS_NS_WHEEL=native`: the wheel scrolls as `NSScrollView` does (a
   line of 10 points per notch), not as the Qt port;
 * `TEXMACS_NS_GLYPH_BOLD=<pixels>`: how much bolder the outlines are made
@@ -227,7 +232,14 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   parts which it does not keep are red until they are repainted;
 * `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
   printed (the snapshots redraw everything, and do not show what is on
-  screen; other programs cannot capture the windows of TeXmacs);
+  screen; other programs cannot capture the windows of TeXmacs), and the
+  latency of the wheel can be read: `WHEEL event <t> now <t>` when a wheel
+  event was made and when the canvas handled it, `SURFACE <t> wait <ms>`
+  when the contents of the layer were set (after a wait for the GPU),
+  `COMMIT <t>` when the transaction was committed and `SHOWN <t>` when the
+  compositor let go of the frame before, that is, once the new one is on
+  the screen (all times in ms of `CACurrentMediaTime`, the clock of the
+  events; see "Drawn by the GPU");
 * `TEXMACS_NS_WINDOW_TEST=<steps>`: after 4 seconds, the steps separated
   by `;`, one per second, on the windows: the close and full screen buttons,
   moves and sizes, a window becoming main, the menu bar and the last pop-up
@@ -503,33 +515,111 @@ and the glyphs of MuPDF are not available. The snapshots draw the views,
 which do not show the layer: the store is read back and drawn where the
 canvas is (`ns_draw_gpu_canvases`).
 
-The view hosts a `CAMetalLayer`, and a repaint only marks the canvas
-(`show_gpu_store`): its `TMGpuPresenter`, woken up, copies the store into
-the layer and presents it at the next refresh of the screen
-(`present_gpu_store`), then sleeps until the next mark. It is driven by a
-`CADisplayLink` of the view (macOS 14, made through AppKit, so that
-QuartzCore is not linked to), which follows the refreshes of its screen,
-or else by a timer at 120 Hz. To present at each repaint made the repaints
-wait for the screen: a layer has three drawables, which the compositor
-gives back once it has shown them, and more repaints than refreshes
-blocked in `nextDrawable` (2 to 9 ms a step, depending on the pacing of
-the display); AppKit likewise draws the views marked as needing display
-once a refresh. `TEXMACS_NS_DEBUG_DRAW` prints the presents. A scroll
-is the exception (#971): it moves the view in the Core Animation
-transaction of its event (`-[TMDocView scrolled:]`), and its frame,
-presented at the next refresh, came a refresh or so after the move, so
-that the old pixels showed for a moment at the new place of the view, a
-flicker. `scrolled:` marks the canvas (`gpu_sync`), and its next frame,
-the one of the update which `scrolled:` forces or, for a scroll made by an
-update (the cursor kept visible), the one which ends that update, is
-presented at once with the transaction
-(`metal_backend::present_in_transaction`: `presentsWithTransaction`, the
-commands committed and scheduled, the drawable presented by the main
-thread), at most one a refresh of the screen (0.9 of
-`minimumRefreshInterval` of its `NSScreen`, a frame closer to the last
-one goes to the link); the mark is used up by that frame; the property is
-cleared by the
-next present of the link. `TEXMACS_NS_SCROLL_SYNC=0` turns it off.
+**Presented as IOSurfaces (#988).** The view hosts a plain `CALayer`
+(`gpu_new_layer`), and every repaint (a scroll, typing, a selection) is
+shown at once (`show_gpu_store`, `present_gpu_store`, `gpu_show_picture`):
+the store is copied into the next IOSurface of the canvas (a texture of
+Metal made on it, `newTextureWithDescriptor:iosurface:plane:`), the main
+thread waits for the GPU to be done with it (`waitUntilCompleted`, 0.3 to
+0.6 ms for a window of 2000 x 1600 pixels on an Apple M4), and the surface
+becomes the `contents` of the layer, in the Core Animation transaction of
+the thread: that of the event, which for a scroll also moves the view
+(`-[TMDocView scrolled:]`), so that the move and the new pixels are shown
+together, with no flicker (#971). As `QCALayerBackingStore::flush` of Qt 6,
+the window is then marked as needing display, so that the transaction is
+committed with its display cycle. This is how the Qt port presents, and
+what made its wheel scroll with less lag: before, the frames were Metal
+drawables, of which a layer has three, given back by the compositor about
+once a refresh. More presents than refreshes blocked in `nextDrawable`, so
+the repaints were presented by a display link (`TMGpuPresenter`) at the
+next refresh, and only the frame of a scroll with the transaction
+(`presentsWithTransaction`), at most once per 0.9 refresh period: the
+frames of a fast wheel reached the screen at once or one to three
+refreshes later, alternately, which showed as judder.
+
+The surfaces of a layer are a ring kept by the Metal backend
+(`metal_backend::take_surface`, `present_surface`; see the comment
+"Presenting by IOSurfaces" in `gpu_backend_metal.mm`). A frame goes to a
+surface which is neither shown nor still held by the compositor
+(`IOSurfaceIsInUse`; the surface shown has a use count of ours, as in Qt,
+and the one it replaced keeps it until the transaction is committed, by a
+completion block, which also releases the surfaces replaced before it: two
+repaints in one pass of the run loop do not draw into what the compositor
+still shows),
+another one is allocated when all of them are in use (up to eight), and the
+free ones beyond three are released, so that nothing waits for the screen.
+The surfaces are BGRA8, premultiplied, in sRGB (as the `CAMetalLayer` was),
+of the pixels of the view on its screen (`backingScaleFactor`): the store is
+scaled into them when the two differ (a retina_factor of 1 on a Retina
+screen), the surface being cleared first, since a scaled copy is composed
+over it. A change of size or of screen allocates surfaces of the new size
+(the one shown stays until replaced); occluded windows present as the
+others, which no longer blocks anything. The snapshots still read the store
+back. A canvas which is deleted releases its surfaces (`gpu_forget_layer`).
+**The pixels of a canvas follow its screen (#989).** Each canvas has its
+own factor, the pixels of its store per point (`ns_simple_widget_rep::
+factor`): that of the screen of its window (`backingScaleFactor`, 1 or 2,
+`canvas_factor`). When the window goes to a screen of another scale
+(`-[TMView viewDidChangeBackingProperties]`, which asks for an update only
+when the factor changes), the next repaint makes a new store at the new
+factor and paints all of it (`set_factor`), so a window
+dragged from a Retina screen to a screen of 1x and back is drawn at the
+pixels of each screen, never scaled; two windows on two screens each have
+theirs. The global `retina_factor`, which the renderers (their zoom), the
+pictures (their cache) and the editor read, is set to the factor of a
+canvas while it is painted, with the shared renderer `the_ns_renderer`
+reset to it (`ns_canvas_scope`, in `repaint_invalid_regions` and, at the
+default, `impress`); the rectangles which the editor invalidates are turned
+into the pixels of the store from the factor of the canvas alone
+(`ns_store_pixels`), not from the state of the shared renderer. Otherwise
+the global is the default: the largest scale of the screens (of those
+attached at the start; the windowless canvases and `impress` take those
+attached now), for the canvases in no window, the images of the widgets,
+Scheme (`get-retina-factor`) and headless runs. It was taken once from `[NSScreen mainScreen]`, the screen of
+the window with the keyboard focus, so that TeXmacs started from a terminal
+on a screen of 1x drew all its canvases at 1x, scaled up and blurred on the
+Retina screen; a store of 2x shown on a screen of 1x, the other way, is
+filtered down, which greys the lines of one pixel and softens the glyphs.
+`-retina`, `-no-retina`, `TEXMACS_RETINA` and the preference `retina-factor`
+fix the factor of all the canvases, as before. `TEXMACS_NS_DEBUG_DRAW`
+prints the changes of factor (`CANVAS <p> factor 1 -> 2`), those of the
+backing scale of a window (`CANVAS backing 2.0`), the pixels of a store and
+of the screen when they change (`CANVAS <p> store ... (scaled up)` when the
+store has fewer), and the scale and bounds of the layer in the `SURFACE`
+lines.
+Should three IOSurfaces in a row fail to be made, TeXmacs says so and goes
+back to the drawables (`metal_backend::surface_failed`; the layer of a
+canvas is replaced by a `CAMetalLayer`; a frame which could not be shown is
+tried again by the display link, a few times).
+
+`TEXMACS_NS_PRESENT=metal` goes back to the drawables: the view hosts a
+`CAMetalLayer`, and a repaint only marks the canvas (`show_gpu_store`): its
+`TMGpuPresenter`, woken up, copies the store into the layer and presents it
+at the next refresh of the screen (`present_gpu_store`), then sleeps until
+the next mark. It is driven by a `CADisplayLink` of the view (macOS 14,
+made through AppKit, so that QuartzCore is not linked to), which follows
+the refreshes of its screen, or else by a timer at 120 Hz. A scroll marks
+the canvas (`gpu_sync`), and its next frame, the one of the update which
+`scrolled:` forces or, for a scroll made by an update (the cursor kept
+visible), the one which ends that update, is presented at once with the
+transaction (`metal_backend::present_in_transaction`:
+`presentsWithTransaction`, the commands committed and scheduled, the
+drawable presented by the main thread), at most one a refresh of the
+screen (0.9 of `minimumRefreshInterval` of its `NSScreen`, a frame closer
+to the last one goes to the link); the mark is used up by that frame; the
+property is cleared by the next present of the link.
+`TEXMACS_NS_SCROLL_SYNC=0` turns that off; with the IOSurfaces, it sends
+the frame of a scroll to the display link instead of the transaction (a
+flicker, to compare).
+
+`TEXMACS_NS_DEBUG_DRAW=1` prints the times of a wheel event and of its
+frame (`WHEEL`, `SURFACE`, `COMMIT`, `SHOWN`, see above): the latency from
+the event to the screen is about `SHOWN` minus the `event` time of the
+`WHEEL` line before it. `tests/Plugins/MacOS/gpu_present_test.cpp` checks
+the ring without a window (`make -C tests`): the layer drawn by Core
+Animation (`renderInContext`) shows the store the right way up, scaled,
+from two surfaces in a burst, and a present of 2000 x 1600 pixels takes
+less than a millisecond.
 
 `TEXMACS_NS_BENCH=1` on the FAQ (Apple M4, retina_factor 2, ms a step;
 two runs of each):
@@ -544,6 +634,9 @@ two runs of each):
 The worst step of a repaint or a scroll is 1.1 ms (98 ms when presented at
 each repaint). In a run of 70 repaints and scrolls the store was presented
 12 times, 8 ms apart (the refreshes at 120 Hz), a present taking 0.3 ms.
+(These numbers are those of the drawables, `TEXMACS_NS_PRESENT=metal`: with
+the IOSurfaces every repaint presents, adding 0.3 to 0.6 ms to its step;
+the bench is still to be run with them, on a screen.)
 The first repaint after the start takes some 13 ms (the first textures
 and glyphs). The shaders are compiled in the background from the start of
 the GUI (`vue_gpu_warm_up`): when Metal has not cached them (the first

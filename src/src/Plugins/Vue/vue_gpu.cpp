@@ -50,7 +50,7 @@ bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
 bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 bool vue_gpu_wakes_when_ready () { return false; }
 void vue_gpu_detach (SDL_Window* w) { (void) w; }
-void vue_gpu_present (SDL_Window* w) { (void) w; }
+bool vue_gpu_present (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_skip (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
 bool     is_gpu_picture (picture p) { (void) p; return false; }
@@ -73,6 +73,14 @@ bool gpu_show_picture (void* l, picture p, int dw, int dh, bool t) {
   (void) l; (void) p; (void) dw; (void) dh; (void) t; return false; }
 bool gpu_read_picture (picture p, unsigned char* rgba) {
   (void) p; (void) rgba; return false; }
+bool gpu_presents_at_once () { return false; }
+void* gpu_new_layer () { return NULL; }
+void gpu_forget_layer (void* l) { (void) l; }
+bool gpu_layer_pixels (void* l, int w, int h, unsigned char* rgba, int& n) {
+  (void) l; (void) w; (void) h; (void) rgba; n= 0; return false; }
+bool gpu_layer_geometry (void* l, int& pw, int& ph, double& sc, double& bw,
+                         double& bh) {
+  (void) l; pw= ph= 0; sc= bw= bh= 0; return false; }
 
 #else
 
@@ -323,10 +331,11 @@ vue_gpu_detach (SDL_Window* w) {
   if (G.B != NULL && G.started) G.B->detach (w);
 }
 
-void
+bool
 vue_gpu_present (SDL_Window* w) {
   gpu_flush_all ();
   G.B->present (w);
+  return G.B->last_shown ();
 }
 
 void
@@ -1831,6 +1840,11 @@ gpu_begin_screen (renderer ren, int w, int h, int dw, int dh) {
   gpu_flush_all ();
   G.screen.w= w; G.screen.h= h;
   G.screen.dw= dw; G.screen.dh= dh;
+  // (by IOSurfaces, the surface of the frame is taken now: the window of a
+  // CAMetalLayer takes its drawable when first drawn into, at the size
+  // which SDL gives the layer)
+  if (G.B != NULL && G.started && G.B->presents_at_once ())
+    G.B->begin_screen (dw, dh);
   G.frame_hash= 14695981039346656037ULL;
   int sz[2]= { w, h };
   feed (sz);
@@ -1890,7 +1904,7 @@ gpu_show_picture (void* layer, picture p, int dw, int dh, bool in_transaction) {
              NULL, dw, dh, 0, 0, dw, dh);
   if (in_transaction) G.B->present_in_transaction ();
   else G.B->present (NULL);
-  return true;
+  return G.B->last_shown ();
 }
 
 bool
@@ -1899,6 +1913,37 @@ gpu_read_picture (picture p, unsigned char* rgba) {
   if (g == NULL || !ensure_target (&g->t)) return false;
   gpu_flush_all ();
   return G.B->read (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h, rgba);
+}
+
+bool
+gpu_presents_at_once () {
+  return G.B != NULL && G.started && !G.failed && G.B->presents_at_once ();
+}
+
+void*
+gpu_new_layer () {
+  if (G.B == NULL || !G.started || G.failed) return NULL;
+  return G.B->new_layer ();
+}
+
+void
+gpu_forget_layer (void* layer) {
+  if (G.B != NULL && layer != NULL) G.B->forget_layer (layer);
+}
+
+bool
+gpu_layer_geometry (void* layer, int& pw, int& ph, double& sc, double& bw,
+                    double& bh) {
+  pw= ph= 0; sc= bw= bh= 0;
+  if (G.B == NULL || !G.started || layer == NULL) return false;
+  return G.B->layer_geometry (layer, pw, ph, sc, bw, bh);
+}
+
+bool
+gpu_layer_pixels (void* layer, int w, int h, unsigned char* rgba, int& n) {
+  n= 0;
+  if (G.B == NULL || !G.started || layer == NULL) return false;
+  return G.B->layer_pixels (layer, w, h, rgba, n);
 }
 
 picture

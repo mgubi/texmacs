@@ -36593,7 +36593,7 @@ printf '%s\n' "enabling the Metal backend of the GPU renderer" >&6; }
 
 printf '%s\n' "#define USE_METAL 1" >>confdefs.h
 
-        METAL_LDFLAGS="-framework Metal -framework QuartzCore -framework CoreGraphics"
+        METAL_LDFLAGS="-framework Metal -framework QuartzCore -framework CoreGraphics -framework IOSurface"
       fi
       ;;
   esac
@@ -36939,7 +36939,7 @@ printf '%s\n' "enabling the Metal backend of the GPU renderer" >&6; }
 
 printf '%s\n' "#define USE_METAL 1" >>confdefs.h
 
-        METAL_LDFLAGS="-framework Metal -framework QuartzCore -framework CoreGraphics"
+        METAL_LDFLAGS="-framework Metal -framework QuartzCore -framework CoreGraphics -framework IOSurface"
       fi
       ;;
   esac

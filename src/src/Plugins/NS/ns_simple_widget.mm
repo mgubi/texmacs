@@ -179,6 +179,7 @@ ns_bench_now () {
   ns_simple_widget_rep* wid;
   id link;              // a CADisplayLink (macOS 14), or nil
   NSTimer* timer;       // else
+  int retries;          // presents which showed nothing, in a row
 }
 - (void) wake;
 - (void) stop;
@@ -209,6 +210,7 @@ ns_bench_now () {
 
 - (void) sleep
 {
+  retries= 0;
   if (link != nil) [link setPaused: YES];
   if (timer != nil) { [timer invalidate]; [timer release]; timer= nil; }
 }
@@ -230,6 +232,9 @@ ns_bench_now () {
   bool done= false;
   NS_ENTRY_BEGIN
     if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
+    else if (++retries >= 4) {
+      // (given up until the next repaint)
+      wid->gpu_dirty= false; [self sleep]; }
     done= true;
   NS_ENTRY_END ("the presentation of a canvas drawn by the GPU")
   if (!done) {
@@ -242,11 +247,59 @@ ns_bench_now () {
 }
 @end
 
+/* The pixels per point of a canvas (its factor) are those of the screen of
+ its window (#989), and the code which converts between the coordinates of
+ TeXmacs and the pixels of a store reads them from the global retina_factor
+ (the zoom of the renderers: set_zoom_factor, reset_zoom_factor; the cache
+ of the pictures; the editor) and from the shared renderer the_ns_renderer
+ (its pixel, set by its last reset). So every entry point of a canvas which
+ does such a conversion runs in this scope: the global set to the factor of
+ the canvas and the shared renderer reset to it, both put back after (the
+ default factor outside: the images of the widgets, Scheme). They are:
+ repaint_invalid_regions (all the painting: get_renderer, the shadows, the
+ zoom transition) and impress (at the default). The rest uses the member
+ factor (send SLOT_INVALIDATE: ns_store_pixels; store sizes, scrolls,
+ invalidate_all, draw_backing_store, the snapshots) or points (the
+ events). */
+// a rectangle of TeXmacs (x1, y1, x2, y2: SI, y up) to the pixels of a
+// store of k pixels per point whose origin is at (ox, oy): what
+// renderer_rep::outer_round and decode do for a renderer reset at that
+// factor (pixel PIXEL / k, retina_pixel PIXEL)
+void
+ns_store_pixels (int k, SI ox, SI oy, SI& x1, SI& y1, SI& x2, SI& y2) {
+  SI pix= PIXEL / max (k, 1), rpix= PIXEL;
+  auto rnd= [rpix] (SI x) {
+    return x >= 0 ? (x / rpix) * rpix : ((x - rpix + 1) / rpix) * rpix; };
+  x1= rnd (x1 + ox) - ox;
+  y1= rnd (y1 + oy) - oy;
+  x2= rnd (x2 + ox + pix - 1) - ox;
+  y2= rnd (y2 + oy + pix - 1) - oy;
+  auto dec= [pix, ox, oy] (SI& x, SI& y) {
+    x += ox; y += oy;
+    if (x >= 0) x= x / pix; else x= (x - pix + 1) / pix;
+    if (y >= 0) y= -(y / pix); else y= -((y - pix + 1) / pix);
+  };
+  dec (x1, y1);
+  dec (x2, y2);
+}
+
+struct ns_canvas_scope {
+  int saved;
+  ns_canvas_scope (int f): saved (retina_factor) {
+    retina_factor= f;
+    the_ns_renderer ()->reset_zoom_factor ();
+  }
+  ~ns_canvas_scope () {
+    retina_factor= saved;
+    the_ns_renderer ()->reset_zoom_factor ();
+  }
+};
+
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
   gpu_presenter (NULL), gpu_dirty (false), gpu_sync (false),
-  gpu_sync_last (0),
+  gpu_sync_last (0), factor (0), dbg_size { -1, -1, -1, -1 },
   zoom_now (0), zoom_pending (false), zoom_image (NULL),
   zoom_rect (NSZeroRect), zoom_origin (NSZeroPoint), zoom_ratio (1),
   extents (coord4 (0, 0, 0, 0)), too_large_said (false),
@@ -269,7 +322,10 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     [(TMGpuPresenter*) gpu_presenter stop];
     [(TMGpuPresenter*) gpu_presenter release];
   }
-  if (gpu_layer != NULL) [(CALayer*) gpu_layer release];
+  if (gpu_layer != NULL) {
+    gpu_forget_layer (gpu_layer);
+    [(CALayer*) gpu_layer release];
+  }
 }
 
 /******************************************************************************
@@ -359,13 +415,31 @@ refresh_period (NSWindow* w) {
 
 void
 ns_simple_widget_rep::show_gpu_store () {
+  // By IOSurfaces (the default, issue #988): at once, every frame, with the
+  // Core Animation transaction of the thread (that of the event, which
+  // moves the view for a scroll, #971): nothing waits for the screen, and
+  // nothing is paced. TEXMACS_NS_SCROLL_SYNC=0 shows the frame of a scroll
+  // at the next refresh instead (by the presenter, as below), to compare.
+  if (!view || is_nil (gpu_store)) return;
+  if (gpu_presents_at_once ()) {
+    bool sync= gpu_sync;
+    gpu_sync= false;
+    if (!sync || gpu_scroll_sync ()) {
+      double t= ns_bench_now ();
+      bool done= present_gpu_store ();
+      ns_bench_display += ns_bench_now () - t;
+      if (done) { gpu_dirty= false; return; }
+      // (not shown: no surface could be made; tried again at the next
+      // refresh, by drawables once they are used instead)
+    }
+  }
+  // With TEXMACS_NS_PRESENT=metal, the drawables of a CAMetalLayer:
   // at the next refresh of the screen (TMGpuPresenter); the frame of a
   // scroll at once, with the transaction which moves the view (see
   // metal_backend::present_in_transaction), but at most one a refresh of
   // the screen (with some leeway for the jitter of the events): the
   // compositor gives the drawables of the layer back once a refresh, and a
   // burst of events faster than that would wait for them in nextDrawable
-  if (!view || is_nil (gpu_store)) return;
   bool sync= gpu_sync;
   gpu_sync= false;
   if (sync && gpu_scroll_sync () && [view window] &&
@@ -386,16 +460,30 @@ ns_simple_widget_rep::show_gpu_store () {
 
 bool
 ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
-  // the view hosts a CAMetalLayer (made when first shown: by name, so that
-  // a build without Metal needs no QuartzCore), into which the store is
-  // copied, scaled when the pixels of the screen are not those of the store
-  // (a retina_factor of 1 on a Retina screen); nothing to do while the view
+  // the view hosts a layer (made when first shown), into whose next
+  // IOSurface the store is copied, or a CAMetalLayer (made by name, so that
+  // a build without Metal needs no QuartzCore) into whose drawable it is
+  // copied (TEXMACS_NS_PRESENT=metal), scaled when the pixels of the screen
+  // are not those of the store
+  // (a factor of 1 on a Retina screen, retina-factor off); nothing to do while the view
   // is not in a window (it is shown when it is put back in one)
   if (!view || is_nil (gpu_store) || ![view window]) return true;
+  if (gpu_layer != NULL && !gpu_presents_at_once () &&
+      ![(CALayer*) gpu_layer isKindOfClass: NSClassFromString (@"CAMetalLayer")]) {
+    // (no IOSurface could be made, see metal_backend::surface_failed: the
+    // layer is replaced by a CAMetalLayer)
+    gpu_forget_layer (gpu_layer);
+    [(CALayer*) gpu_layer release];
+    gpu_layer= NULL;
+  }
   if (gpu_layer == NULL) {
-    Class mlc= NSClassFromString (@"CAMetalLayer");
-    if (mlc == nil) return true;
-    CALayer* l= [[mlc alloc] init];
+    // (a CALayer shown by IOSurfaces, issue #988, or a CAMetalLayer)
+    CALayer* l= (CALayer*) gpu_new_layer ();
+    if (l == nil) {
+      Class mlc= NSClassFromString (@"CAMetalLayer");
+      if (mlc == nil) return true;
+      l= [[mlc alloc] init];
+    }
     [l setOpaque: NO];
     [view setLayer: l];
     [view setWantsLayer: YES];
@@ -406,9 +494,35 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   if ([l contentsScale] != sc) [l setContentsScale: sc];
   NSSize sz= [view bounds].size;
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
+  // (TEXMACS_NS_DEBUG_DRAW: the pixels of the store and of the screen, when
+  // they change: a store of fewer pixels is scaled up, blurred)
+  static int dbg= -1;
+  if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  if (dbg) {
+    int sw= gpu_store->get_width (), sh= gpu_store->get_height ();
+    if (sw != dbg_size[0] || sh != dbg_size[1] ||
+        dw != dbg_size[2] || dh != dbg_size[3]) {
+      dbg_size[0]= sw; dbg_size[1]= sh; dbg_size[2]= dw; dbg_size[3]= dh;
+      fprintf (stderr, "CANVAS %p store %dx%d factor %d view %.1fx%.1f "
+               "backing %.1f screen %dx%d%s\n", (void*) this, sw, sh, factor,
+               sz.width, sz.height, sc, dw, dh,
+               (sw < dw || sh < dh) ? " (scaled up)" : "");
+    }
+  }
   // (a failure is not tried again before the next repaint)
-  gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
-  return true;
+  // (by IOSurfaces before this present: a third failure in it turns them
+  // off, and its frame is then to be presented again, by drawables)
+  bool at_once= gpu_presents_at_once ();
+  bool shown= gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
+  // by IOSurfaces: as QCALayerBackingStore::flush, a display cycle of the
+  // window, so that the transaction is committed with it (and with the
+  // other changes of the views, the move of a scroll) rather than at the
+  // next pass of the run loop, which Core Animation may throttle
+  if (shown && at_once) [[view window] setViewsNeedDisplay: YES];
+  // (not shown, by IOSurfaces: tried again by the presenter, a few times,
+  // which after three failures presents by drawables, see
+  // metal_backend::surface_failed)
+  return shown || !at_once;
 }
 
 NSRect
@@ -594,17 +708,13 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       coord4 p= open_box<coord4> (val);
       
       {
-        ns_renderer_rep* ren = the_ns_renderer ();
-        {
-          coord2 pt_or = from_nspoint (backing_pos);
-          SI ox = -pt_or.x1;
-          SI oy = -pt_or.x2;
-          ren->set_origin (ox,oy);
-        }
+        // in the pixels of the store of this canvas (its factor), as the
+        // renderer of the canvas would round and decode them, but without
+        // the shared renderer, whose pixel is that of its last reset (#989)
+        int k= factor > 0 ? factor : canvas_factor ();
+        coord2 pt_or = from_nspoint (backing_pos);
         SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;
-        ren->outer_round (x1, y1, x2, y2);
-        ren->decode (x1, y1);
-        ren->decode (x2, y2);
+        ns_store_pixels (k, -pt_or.x1, -pt_or.x2, x1, y1, x2, y2);
         invalidate_rect (x1, y2, x2, y1);
       }
     }
@@ -859,6 +969,8 @@ NSBitmapImageRep*
 ns_simple_widget_rep::impress () {
   SI width, height;
   handle_get_size_hint (width, height);
+  // (at the default factor, the renderer reset to it: ns_canvas_scope)
+  ns_canvas_scope scope (current_default_factor ());
   NSSize s = to_nssize (coord2 (width, height));
   NSInteger pw= max ((NSInteger) ceil (s.width * retina_factor), (NSInteger) 1);
   NSInteger ph= max ((NSInteger) ceil (s.height * retina_factor), (NSInteger) 1);
@@ -931,8 +1043,8 @@ ns_simple_widget_rep::invalidate_all () {
   // NOTE: the backing store has the size of the visible part
   NSSize sz= view? [view frame].size: NSZeroSize;
   invalid_regions = rectangles();
-  invalidate_rect (0, 0, (int) ceil (sz.width * retina_factor),
-                   (int) ceil (sz.height * retina_factor));
+  int k= factor > 0 ? factor : canvas_factor ();
+  invalidate_rect (0, 0, (int) ceil (sz.width * k), (int) ceil (sz.height * k));
   //QSize sz = canvas()->surface()->size();
   //cout << "invalidate all " << LF;
   //invalidate_rect (0, 0, retina_factor * sz.width(),
@@ -951,11 +1063,13 @@ basic_renderer
 ns_simple_widget_rep::get_renderer() {
   if (gpu_mode ()) {
     if (gpu_ren == NULL)
-      gpu_ren= gpu_picture_renderer (gpu_store, std_shrinkf * retina_factor);
+      gpu_ren= gpu_picture_renderer (gpu_store, std_shrinkf * factor);
     return (basic_renderer) gpu_ren;
   }
   ns_renderer_rep * ren = the_ns_renderer();
   ren->begin ([NSGraphicsContext graphicsContextWithBitmapImageRep: backingPixmap]);
+  // (at the factor of this canvas, which repaint_invalid_regions set)
+  ren->reset_zoom_factor ();
   return ren;
 }
 
@@ -1078,7 +1192,7 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
     CGDataProviderRelease (prov);
     if (!img) return;
     CGContextRef cgc= [[NSGraphicsContext currentContext] CGContext];
-    double k= retina_factor;
+    double k= factor > 0 ? factor : retina_factor;
     CGContextSaveGState (cgc);
     CGContextClipToRect (cgc, NSRectToCGRect (rect));
     // the view is flipped: the image upside down
@@ -1110,7 +1224,7 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
   CGColorSpaceRelease (cs);
   CGDataProviderRelease (prov);
   if (!img) return;
-  double k= retina_factor;
+  double k= factor > 0 ? factor : retina_factor;
   // only what the backing store holds: the rectangle asked for may go
   // beyond the view (the snapshots ask for the whole document view when it
   // is centered in a wider clip view, from x < 0), and the part outside the
@@ -1140,9 +1254,57 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
   CGImageRelease (img);
 }
 
+int  ns_simple_widget_rep::default_factor= 1;
+bool ns_simple_widget_rep::factor_fixed= false;
+
+// the pixels per point of the screen of a window (1 or 2)
+int
+ns_canvas_factor_for (double backing_scale) {
+  return backing_scale >= 1.5 ? 2 : 1;
+}
+
+// the default: fixed by the user, else the largest scale of the screens
+// attached now (that of the start when there is none: headless)
+int
+ns_simple_widget_rep::current_default_factor () {
+  if (factor_fixed) return default_factor;
+  int f= 0;
+  for (NSScreen* s in [NSScreen screens])
+    f= max (f, ns_canvas_factor_for ([s backingScaleFactor]));
+  return f > 0 ? f : default_factor;
+}
+
+int
+ns_simple_widget_rep::canvas_factor () {
+  // (as it was, for a canvas which left its window for a while)
+  if (factor_fixed) return default_factor;
+  if (!view || ![view window])
+    return factor > 0 ? factor : current_default_factor ();
+  return ns_canvas_factor_for ([[view window] backingScaleFactor]);
+}
+
+void
+ns_simple_widget_rep::set_factor (int f) {
+  if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+    fprintf (stderr, "CANVAS %p factor %d -> %d\n", (void*) this, factor, f);
+  factor= f;
+  // a new store, at the new scale, painted in full (by the repaint which
+  // follows: has_store is false, so the store is made at the size of the
+  // view and all of it is invalid)
+  if (gpu_ren != NULL) { tm_delete (gpu_ren); gpu_ren= NULL; }
+  gpu_store= picture ();
+  if (backingPixmap) { [backingPixmap release]; backingPixmap= nil; }
+  ring= cring= 0;
+  invalid_regions= rectangles ();
+  invalidate_all ();
+}
+
 void
 ns_simple_widget_rep::repaint_invalid_regions () {
   double tr0= ns_bench_now ();
+  int f= canvas_factor ();
+  if (f != factor) set_factor (f);
+  ns_canvas_scope scope (factor);
   // the zoom the editor starts with (the first one is not sent to the
   // widget): the smooth zoom needs the old zoom to scale from
   if (zoom_now == 0 && is_editor_widget ())
@@ -1167,20 +1329,20 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     backing_pos= origin;
   // NOTE: when the backing store moves or changes its size, all the view
   // is shown again (the view keeps its old image on screen otherwise)
-  // NOTE: the backing store moves by whole pixels (retina_factor per point),
+  // NOTE: the backing store moves by whole pixels (factor per point),
   // and backing_pos by what was moved: the scroll positions are whole pixels
   // of the screen, which may be half pixels of the backing store (with a
-  // retina_factor of 1 on a Retina screen); the rest is moved later
+  // factor of 1 on a Retina screen); the rest is moved later
   bool moved= false;
-  int dx = (int) round (retina_factor * (origin.x - backing_pos.x));
-  int dy = (int) round (retina_factor * (origin.y - backing_pos.y));
+  int dx = (int) round (factor * (origin.x - backing_pos.x));
+  int dy = (int) round (factor * (origin.y - backing_pos.y));
   if (dx != 0 || dy != 0) {
     double tm0= ns_bench_now ();
     moved= true;
     if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
       fprintf (stderr, "SHIFT %g -> %g dy %d size %d\n", backing_pos.y, origin.y, dy, store_height ());
-    backing_pos.x += dx / (double) retina_factor;
-    backing_pos.y += dy / (double) retina_factor;
+    backing_pos.x += dx / (double) factor;
+    backing_pos.y += dy / (double) factor;
     // NOTE: nothing is moved: where the view starts in the backing store
     // (on the GPU: a copy, shifted)
     if (gpu) gpu_translate_picture (gpu_store, -dx, -dy);
@@ -1230,8 +1392,8 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
     // NOTE: sizes in pixels, rounded as the pixels of the backing store
     NSSize _oldSize = NSMakeSize (store_width (), store_height ());
     NSSize _new_logical_Size = [view frame].size;
-    NSSize _newSize = NSMakeSize (ceil (_new_logical_Size.width * retina_factor),
-                                  ceil (_new_logical_Size.height * retina_factor));
+    NSSize _newSize = NSMakeSize (ceil (_new_logical_Size.width * factor),
+                                  ceil (_new_logical_Size.height * factor));
 
     //cout << "      surface size of " << _newSize.width() << " x "
     // << _newSize.height() << LF;
@@ -1346,7 +1508,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
         if (!moved) show_gpu_store (); // (timed when presented)
       }
       else if (!moved) {
-        double k= retina_factor;
+        double k= factor;
         [view displayRect: NSMakeRect (lub->x1 / k, lub->y1 / k,
                                        (lub->x2 - lub->x1) / k,
                                        (lub->y2 - lub->y1) / k)];
@@ -1418,7 +1580,7 @@ static CGImageRef
 canvas_image (ns_simple_widget_rep* w, NSView* view) {
   NSRect vis= [view bounds];
   if (NSIsEmptyRect (vis)) return NULL;
-  double k= retina_factor;
+  double k= w->factor > 0 ? w->factor : retina_factor;
   int W= (int) ceil (vis.size.width * k), H= (int) ceil (vis.size.height * k);
   NSBitmapImageRep* rep= [[NSBitmapImageRep alloc]
     initWithBitmapDataPlanes: NULL pixelsWide: W pixelsHigh: H

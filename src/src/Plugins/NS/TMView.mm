@@ -311,6 +311,29 @@ initkeymap () {
   NS_ENTRY_END ("-[TMView viewWillMoveToWindow:]")
 }
 
+// the window moved to a screen of another scale (or its scale changed): the
+// canvas is repainted at the pixels of that screen (#989), the store being
+// made again by the repaint (ns_simple_widget_rep::canvas_factor)
+- (void) viewDidChangeBackingProperties
+{
+  [super viewDidChangeBackingProperties];
+  if (!wid) return;
+  // (also when the view is put in a window of the same scale: nothing then;
+  // the update is asked for, not done here, since this may come within a
+  // command which builds or switches views)
+  NS_ENTRY_BEGIN
+    ns_simple_widget_rep* w= (ns_simple_widget_rep*) wid;
+    int f= w->canvas_factor ();
+    if (w->factor > 0 && f != w->factor) {
+      if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+        fprintf (stderr, "CANVAS backing %.1f (factor %d -> %d)\n",
+                 [[self window] backingScaleFactor], w->factor, f);
+      w->invalidate_all ();
+      if (the_gui) the_gui->need_update ();
+    }
+  NS_ENTRY_END ("-[TMView viewDidChangeBackingProperties]")
+}
+
 - (void) viewDidMoveToWindow
 {
   [super viewDidMoveToWindow];
@@ -710,6 +733,17 @@ mouse_decode (unsigned int mstate) {
   // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
   // command zooms, and otherwise the scroll view scrolls
   if (!wid) { [super scrollWheel: event]; return; }
+  // (TEXMACS_NS_DEBUG_DRAW: when the event was made and when it is handled,
+  // in ms of the clock of the events, that of CACurrentMediaTime, as the
+  // SURFACE lines of the presents: the latency of the wheel, issue #988)
+  static int dbg= -1;
+  if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  if (dbg)
+    fprintf (stderr, "WHEEL event %.3f now %.3f dy %.2f%s\n",
+             [event timestamp] * 1000.0,
+             [[NSProcessInfo processInfo] systemUptime] * 1000.0,
+             (double) [event scrollingDeltaY],
+             [event hasPreciseScrollingDeltas] ? " precise" : "");
   // what -[QNSView scrollWheel:] drops before any widget sees it (the end
   // of a gesture which a momentum follows): neither the capture nor the
   // zoom get it; the deltas of a cancelled gesture are zeroes

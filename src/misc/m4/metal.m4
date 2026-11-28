@@ -14,7 +14,7 @@ AC_DEFUN([LC_METAL],[
       else
         AC_MSG_RESULT([enabling the Metal backend of the GPU renderer])
         AC_DEFINE(USE_METAL, 1, [Use Metal for the GPU renderer of the Vue port])
-        METAL_LDFLAGS="-framework Metal -framework QuartzCore -framework CoreGraphics"
+        METAL_LDFLAGS="-framework Metal -framework QuartzCore -framework CoreGraphics -framework IOSurface"
       fi
       ;;
   esac

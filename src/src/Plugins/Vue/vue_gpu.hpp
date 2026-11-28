@@ -37,7 +37,7 @@ void vue_gpu_prepare ();
 // draw into the window from now on (the backend makes the one, shared GL
 // context or Metal device with the first window); false when it cannot
 bool vue_gpu_attach (SDL_Window* w);
-void vue_gpu_present (SDL_Window* w);
+bool vue_gpu_present (SDL_Window* w);  // false: nothing was shown
 void vue_gpu_skip (SDL_Window* w);    // a frame drawn and not presented
 // attached, and presenting into the window would not wait for the screen
 // (Metal: the compositor does not hold too many of its frames); else the
@@ -88,8 +88,26 @@ bool is_gpu_renderer (renderer ren);
 // (premultiplied RGBA, rows from the top: the snapshots, which draw the
 // views)
 bool gpu_layers_enabled ();
+// (false: nothing was shown)
 bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh,
                        bool in_transaction= false);
 bool gpu_read_picture (picture p, unsigned char* rgba);
+// whether a present shows the frame at once (Metal: IOSurfaces set as the
+// contents of a layer, unless TEXMACS_NS_PRESENT=metal in the Cocoa port
+// and TEXMACS_VUE_PRESENT=metal in the Vue port, issue #988): no pacing,
+// no display link, no repaint put off
+bool gpu_presents_at_once ();
+// the layer of a canvas of the Cocoa port when presents_at_once (a
+// CALayer, retained; NULL otherwise: a CAMetalLayer is made), and what to
+// do before it is released
+void* gpu_new_layer ();
+void gpu_forget_layer (void* layer);
+// what such a layer shows (w x h, premultiplied RGBA, rows from the top),
+// as Core Animation draws it, and how many surfaces it has (the tests)
+bool gpu_layer_pixels (void* layer, int w, int h, unsigned char* rgba,
+                       int& surfaces);
+// the pixels of the surface which it shows, its contentsScale and bounds
+bool gpu_layer_geometry (void* layer, int& pw, int& ph, double& scale,
+                         double& bw, double& bh);
 
 #endif // defined VUE_GPU_HPP

@@ -67,9 +67,20 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
   refresh_language();
   
   
+  // Each canvas has the pixels of the screen of its window (its factor,
+  // see ns_simple_widget_rep::canvas_factor, #989), unless the user fixed
+  // them (-retina, -no-retina, TEXMACS_RETINA, the preference retina-factor).
+  // retina_factor is the default: for canvases in no window, the images of
+  // the widgets (menus, icons) and Scheme; it is the largest scale of the
+  // screens, not that of [NSScreen mainScreen] (mac_screen_scale_factor),
+  // the screen of the window with the keyboard focus, which may be a
+  // terminal on another screen
+  bool fixed= retina_manual;
   if (!retina_manual) {
     retina_manual= true;
     double mac_hidpi = mac_screen_scale_factor();
+    for (NSScreen* s in [NSScreen screens])
+      if ([s backingScaleFactor] > mac_hidpi) mac_hidpi= [s backingScaleFactor];
     if (DEBUG_STD)
       debug_boot << "Mac Screen scale factor: " << mac_hidpi <<  "\n";
     
@@ -86,8 +97,12 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
       retina_scale = 1.0;
     }
   }
-  if (has_user_preference ("retina-factor"))
+  if (has_user_preference ("retina-factor")) {
     retina_factor= get_user_preference ("retina-factor") == "on"? 2: 1;
+    fixed= true;
+  }
+  ns_simple_widget_rep::default_factor= retina_factor;
+  ns_simple_widget_rep::factor_fixed= fixed;
   if (has_user_preference ("retina-icons"))
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
@@ -1303,7 +1318,7 @@ canvas_frame () {
       [w setFrame: frame0 display: YES];
       for (int i= 0; i < 5; i++) the_gui->force_update ();
     }
-    fprintf (stderr, "TEXMACS_NS_BENCH (ms a step; retina_factor %d, "
+    fprintf (stderr, "TEXMACS_NS_BENCH (ms a step; default retina_factor %d, "
              "canvas %.0fx%.0f points, glyphs %s)\n%s", retina_factor,
              cf.size.width, cf.size.height,
              get_env ("TEXMACS_NS_GLYPHS") == "bitmap"? "bitmap": "outline",

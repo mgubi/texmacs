@@ -14,6 +14,23 @@ have the details, and the problems go to the
 
 ## 28 November 2026
 
+- **Wheel scrolling on macOS reaches the screen sooner in the Cocoa and Vue
+  applications** (desktop applications, macOS; a user on the forum found
+  it less responsive than in the Qt application, a follow-up of #971,
+  #988). A frame drawn by the GPU is now an IOSurface set as the contents
+  of a layer, as the Qt application does, instead of a Metal drawable
+  presented at the next refresh. Every repaint (a scroll, typing, a
+  selection) is shown with the event which caused it, and nothing waits
+  for the screen. The Cocoa application no longer alternates between
+  frames shown at once and frames shown one to three refreshes later. The
+  Vue application no longer paces its frames, nor puts a repaint off while
+  events are queued. `TEXMACS_NS_PRESENT=metal` and
+  `TEXMACS_VUE_PRESENT=metal` go back to the old way, to compare. The
+  Cocoa application now draws each window at the pixels of the screen it
+  is on, and again when the window is moved to a screen of another scale.
+  Before, the scale was chosen once at the start, from the screen which had
+  the keyboard focus: started from a terminal on an external screen of 1x,
+  its windows on a Retina screen were blurred.
 - **Tagged PDF: no warnings on export, a check in the Tools menu**
   (desktop applications): since the PDF is tagged by default, every
   export of a document with pictures lacking an alternative text opened

@@ -111,7 +111,11 @@ Each iteration:
    only until it is `vue_repaint_dt` (16 ms) old: a trackpad delivers its
    events faster than a frame is drawn and its stream never runs dry, so
    the repaint never got its turn for as long as a fast swipe lasted and
-   the page stood still;
+   the page stood still. When a present shows the frame at once (Metal on
+   macOS, by IOSurfaces, `gpu_presents_at_once`, #988) it is not put off
+   at all: the wheel and motion events already queued were taken with the
+   first one (step 1), and putting the repaint off for those which came
+   since added up to 16 ms to the latency of a wheel event;
 7. the same check again, up to four times: the repaint runs the typesetter,
    which executes Scheme and can replace widgets in its turn;
 8. `process_redraw ()` replays the render commands of every window.
@@ -1064,7 +1068,47 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   from a buffer, encoded after them; the targets are BGRA8, their first
   row at the top (`targets_flipped`), and copies at another scale are
   quads sampled linearly. The shapes are rasterized by Core Graphics over
-  their box, uploaded and composed. A window is not presented again within
+  their box, uploaded and composed.
+  **Presented as IOSurfaces (#988).** The frames of a window are drawn into
+  IOSurfaces (a texture of Metal on each,
+  `newTextureWithDescriptor:iosurface:plane:`), and the surface of a frame
+  becomes the `contents` of a `CALayer` which covers the `CAMetalLayer` of
+  SDL (a sublayer, following its bounds and scale; the `CAMetalLayer`
+  itself is never drawn into), in a Core Animation transaction which the
+  present commits (`[CATransaction commit]` and `flush`: the loop runs
+  outside of the run loop of AppKit, whose implicit transaction would be
+  committed only when SDL next waits for events). The present waits for
+  the GPU to be done with the frame (`waitUntilCompleted`, 0.3 to 0.6 ms
+  for 2000 x 1600 pixels on an M4), since the compositor reads the surface
+  once the transaction is committed. A frame goes to a surface which is
+  neither shown nor held by the compositor (`IOSurfaceIsInUse`; the one
+  shown has a use count of ours, as in Qt, and the one it replaced until
+  the transaction is committed), another one is made when all
+  are in use (up to eight), the free ones beyond three are released: no
+  present waits for the screen, so the frames are neither paced nor put
+  off (`ready_to_present` is always true, there is no display link, and the
+  loop repaints at every turn, see step 6 above). This is how the backing
+  store of Qt 6 on macOS (`QCALayerBackingStore`) presents, and why its
+  wheel scrolled with less lag. The ring is in `gpu_backend_metal.mm`
+  ("Presenting by IOSurfaces"; the Cocoa port uses it too, for its
+  canvases, see *ns-port.md*); the surfaces are BGRA8 in sRGB, as the
+  `CAMetalLayer`, and cleared when first drawn into; `gpu_begin_screen`
+  takes the surface of a frame (should three IOSurfaces in a row fail to
+  be made, the windows go back to the drawables, and a frame which could
+  not be shown is drawn again, `vue_gpu_present`). A skipped frame (the
+  same hash) keeps its surface for the next one. `TEXMACS_VUE_DEBUG_PRESENT`
+  prints, for each wheel event, when it was made and when AppKit handed it
+  to SDL (`WHEEL event <t> now <t>`, `vue_mac.mm`), and for each present
+  when the contents were set, the wait for the GPU and how long the commit
+  took (`SURFACE <t> wait <ms> set <ms>`), the commit (`COMMIT`) and when
+  the compositor let go of the frame before (`SHOWN`, about when the new one
+  is on the screen), in ms of `CACurrentMediaTime`, the clock of the
+  events: the latency of a wheel event is about `SHOWN` minus its `event`
+  time. `tests/Plugins/MacOS/gpu_present_test.cpp` checks the ring without
+  a window.
+  **Before (`TEXMACS_VUE_PRESENT=metal`)**, which the paragraphs below
+  describe, the frames were the drawables of the `CAMetalLayer`, presented
+  with the command buffer. A window is not presented again within
   half a refresh period of its screen (`ready_to_present`, the period from
   SDL's display mode; `vue_gpu_ready` before it is drawn, the loop coming
   back within 2 ms otherwise): a layer has three drawables, which the
