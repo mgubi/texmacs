@@ -88,15 +88,15 @@ else ifeq ($(SCHEME_DIR),Femtolisp)
 # the glue generators also run on the S7 interpreter of Scheme/Glue/s7-run.c
 GLUE_BIN = $(CURDIR)/Objects/s7-run
 GLUE_DEPS = Objects/s7-run
+# the vendored femtolisp (Scheme/Femtolisp/fl_core.c, fl_llt.c) finds the
+# headers of its library llt by their names alone
+SCHEME_C_FLAGS = -IScheme/Femtolisp/femtolisp/llt -w
 else ifeq ($(SCHEME_DIR),Chez)
 # the glue generators also run on the S7 interpreter of Scheme/Glue/s7-run.c;
 # Chez itself turns the same specifications into its static FFI glue
 GLUE_BIN = $(CURDIR)/Objects/s7-run
 GLUE_DEPS = Objects/s7-run
 GLUE_CHEZ = Scheme/Chez/glue_chez.cpp
-# the vendored femtolisp (Scheme/Femtolisp/fl_core.c, fl_llt.c) finds the
-# headers of its library llt by their names alone
-SCHEME_C_FLAGS = -IScheme/Femtolisp/femtolisp/llt -w
 else
 GLUE_BIN = $(GUILE_BIN)
 GLUE_DEPS =
