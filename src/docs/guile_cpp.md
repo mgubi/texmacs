@@ -37,3 +37,32 @@ by C++ exceptions (`guile::SchemeThrow`, `guile::ContinuationEscape`): every
 call from TeXmacs into Scheme catches them and returns `(key . args)` as
 the Guile backend does. The collector scans the C stack conservatively, as
 Guile 1.8, so C++ variables holding Scheme values need no protection.
+
+The guards of the stack: guile_cpp stops with "Stack overflow" when the C
+stack is deeper than 5 MB from `start_scheme`; the binding sets
+`scheme_stack_low` (`System/Misc/stack_guard.hpp`) to that limit, so that
+the guards of TeXmacs stop the recursions of C++ first and a deep document
+gives "nesting too deep". An exception of TeXmacs in a glue routine becomes
+an error of Scheme (`tmscm_raise_error`); any other exception of C++ which
+reaches a call from C++ into Scheme unwinds the frames of `dynamic-wind`
+it left and is reported as `(misc-error ...)`.
+
+## The containers
+
+guile_cpp is written with the standard library; on this branch
+`std::function`, the hash tables, `unique_ptr`, `deque` and `std::pair` are
+replaced by function pointers and the containers of TeXmacs, and the
+stacks of the bytecode VM are arrays. `std::string`, `std::string_view`
+and `std::vector` remain (about 500 uses): the vendored `README` says why
+(the sharing of TeXmacs strings and arrays on copy, the freeing of an
+array resized to 0) and what else of the standard library is used.
+
+## Open problems
+
+- The license of guile_cpp.
+- No CMake build, no Windows, no browser.
+- `(read-enable 'positions)` and `(debug-enable 'debug)` only with
+  `DEBUG_ON` (the Guile backend sets them always); errors are printed after
+  the unwinding, without a backtrace.
+- Trees used as keys of `equal?` hash tables are hashed by content
+  (`hash_blackbox_smob`), Guile 1.8 gives smobs a constant hash.
