@@ -550,10 +550,11 @@
          (pdf-tag-printed-files) (pdf-tag-printed-sources))))
 
 (define (pdf-tag-signature)
-  ;; what changes when the buffer is edited: the undo history and the
-  ;; number of images (Next checks again then, pdf-tag-pictures)
-  (list (undo-possibilities) (redo-possibilities)
-        (length (pdf-tag-images (buffer-tree)))))
+  ;; the images of the buffer, by their places and whether they have an
+  ;; alternative text: what an edit which may give a picture to describe
+  ;; changes (a walk of the body, no print; pdf-tag-pictures)
+  (map (lambda (t) (cons (tree->path t) (pdf-tag-own-alt? t)))
+       (pdf-tag-images (buffer-tree))))
 
 (define (pdf-tag-tree-at t p)
   ;; the subtree of @t at @p, or #f
@@ -692,18 +693,21 @@
 (define (pdf-tag-pictures)
   ;; the places of the pictures of the last check of the current buffer
   ;; which still have no alternative text (the trees follow the edits).
-  ;; It is checked again for another buffer, and when the buffer was
-  ;; edited since (pdf-tag-signature) and none is left, or one is no
-  ;; longer in it (deleted, or replaced by an undo)
+  ;; It is checked again for another buffer, after a check which failed,
+  ;; when one of them is no longer in the buffer (deleted, moved, replaced
+  ;; by an undo: the new check keeps the trees which are), and when none
+  ;; is left and the images of the buffer changed since (pdf-tag-signature:
+  ;; a picture added, an alternative text taken away), so that pressing
+  ;; Next again when nothing is left does not print the document again
   (define (valid)
     (list-filter (cadr pdf-tag-found)
                  (lambda (t) (and (tree->path t) (tree-is? t 'image)
                                   (not (pdf-tag-own-alt? t))))))
   (when (or (null? pdf-tag-found) (!= (car pdf-tag-found) (current-buffer))
-            (and (!= (caddr pdf-tag-found) (pdf-tag-signature))
-                 (or (null? (valid))
-                     (list-find (cadr pdf-tag-found)
-                                (lambda (t) (not (tree->path t)))))))
+            (cadddr pdf-tag-found)
+            (list-find (cadr pdf-tag-found) (lambda (t) (not (tree->path t))))
+            (and (null? (valid))
+                 (!= (caddr pdf-tag-found) (pdf-tag-signature))))
     (pdf-tag-check))
   (sort (map tree->path (valid)) path-inf?))
 

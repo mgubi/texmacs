@@ -335,7 +335,7 @@ pictures, as for a presentation of 100 slides of 10 pictures, on a recent
 Mac); the buffer is left as it was (the expanded body is swapped back,
 the copy of a presentation closed, also when making the slides fails). A
 print which fails is reported with its error (its key and message), not
-as a result, and so does *Next picture* after it. During the
+as a result, and so does *Next picture* after it, which checks again. During the
 check the message "Done printing" and the check of the PDF by Ghostscript
 (*texmacs->pdf:check*) are left out (`TEXMACS_PDF_TAG_CHECK`).
 
@@ -372,11 +372,13 @@ check the message "Done printing" and the check of the PDF by Ghostscript
 *Next picture* steps through the pictures of the last check of the buffer,
 kept as trees, which follow the edits: those still without an alternative
 text (an `image-alt` around them). It checks again for another buffer,
-and when the buffer was edited since the last check (its undo history or
-its number of images changed, `pdf-tag-signature`) and none is left or
-one is no longer in it (deleted, or replaced by an undo), so that a
-picture added since is found; pressing it again when nothing is left
-does not print the document again. The next one is the one after the picture in focus
+after a check which failed, when one of them is no longer in the buffer
+(deleted, moved, replaced by an undo; the new check keeps the trees which
+are), and when none is left and the images of the buffer changed since
+the last check (their places and whether they have an alternative text,
+`pdf-tag-signature`, a walk of the body: a picture added), so that
+pressing it again when nothing is left does not print the document
+again. The next one is the one after the picture in focus
 (the one it went to: the editor moves a cursor put before an image in a
 line to the end of the text before it, and one put in a specific out of
 it), else the first one at or after the cursor. The image in focus is

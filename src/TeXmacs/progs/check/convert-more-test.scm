@@ -51,7 +51,8 @@
         (convert latex latex-tools)
         (convert rewrite tmtm-brackets)
         (tools spell spell-lantool)
-        (tools ai ai-translate)))
+        (tools ai ai-translate)
+        (dynamic fold-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -3743,6 +3744,58 @@
           (when (nin? b before) (buffer-close b)))
         (check-restore-buffer old))))
 
+;; Next picture checks the document again when one of the pictures of the
+;; last check is no longer in the buffer (a picture moved: deleted and put
+;; elsewhere), and after a check which failed (the slides could not be made:
+;; dynamic-make-slides fails while check-slides-fail? is set), and says
+;; the error while the check fails.
+(define check-slides-fail? #f)
+
+(tm-define (dynamic-make-slides)
+  (:require check-slides-fail?)
+  (error "check-slides-fail"))
+
+(define (test-tagged-pdf-check-next)
+  (check-group "tagged pdf: next picture checks again")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf check" "no native PDF writer")
+      (let* ((old (current-buffer))
+             (before (buffer-list))
+             (img (lambda (n) `(image ,(string-append n ".png")
+                                      "1cm" "" "" ""))))
+        ;; a picture moved
+        (with (tm r alts)
+            (check-pictures-doc "check-next" "generic"
+                                `(document "Text." ,(img "na") ,(img "nb"))
+                                '("na.png" "nb.png"))
+          (let ((rp (tree->path (buffer-tree))))
+            (check= (picture-files (assoc-ref r 'pictures))
+                    '("na.png" "nb.png"))
+            (image-set-alt (path->tree (append rp '(2))) "B")
+            (tree-remove! (buffer-tree) 1 1)
+            (tree-insert! (buffer-tree) 2 (list (stree->tree (img "na"))))
+            (update-forced) (apply-changes)
+            (check= (pdf-tag-next-picture) (append rp '(2)))
+            (buffer-pretend-saved tm)))
+        ;; a check which fails, then one which does not
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-next-slides" "beamer"
+             `(document (screens (shown (document "S1" ,(img "nc")))))
+             '("nc.png"))
+          (let ((rp (tree->path (buffer-tree))))
+            (set! check-slides-fail? #t)
+            (with r2 (pdf-tag-check)
+              (check-true (string? (assoc-ref r2 'error)))
+              (check= (assoc-ref r2 'pictures) '()))
+            (check= (pdf-tag-next-picture) #f)
+            (set! check-slides-fail? #f)
+            (check= (pdf-tag-next-picture) (append rp '(0 0 0 1)))))
+        (set! check-slides-fail? #f)
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (check-restore-buffer old))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -4209,6 +4262,7 @@
                   test-tagged-pdf-export test-tagged-pdf-include
                   test-tagged-pdf-cycle test-tagged-pdf-check
                   test-tagged-pdf-check-hidden test-tagged-pdf-check-slides
+                  test-tagged-pdf-check-next
                   test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
   (system-setenv "TEXMACS_PDF_OBJSTMS" (or objstms ""))
