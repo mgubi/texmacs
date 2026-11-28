@@ -142,7 +142,8 @@ void VM::init_stime() {
         struct tm t{};
         t.tm_isdst = -1;
         ::tzset();
-        char* end = ::strptime(((char*) c_string(str)), ((char*) c_string(fmt)), &t);
+        c_string str_c(str), fmt_c(fmt);  // (kept alive: end points into str_c)
+        char* end = ::strptime(str_c, fmt_c, &t);
         if (!end) misc_error("strptime", "failed to parse time string");
         long gmtoff = t.tm_gmtoff;
         const char* zone = t.tm_zone;
@@ -155,7 +156,7 @@ void VM::init_stime() {
             gmtoff = lt.tm_gmtoff;
             zone = lt.tm_zone;
         }
-        return cons(tm_to_vector(t, gmtoff, zone), make_integer(end - ((char*) c_string(str))));
+        return cons(tm_to_vector(t, gmtoff, zone), make_integer(end - static_cast<char*>(str_c)));
     });
     define_proc("tzset", 0, 0, false, [](const SCM*, size_t) -> SCM {
         ::tzset();

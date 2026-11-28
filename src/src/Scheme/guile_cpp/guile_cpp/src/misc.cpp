@@ -5,6 +5,12 @@
 
 namespace guile {
 
+// the message of dlerror, read once (a second call returns NULL)
+static const char* dl_error_message(const char* dflt) {
+    const char* e = dlerror();
+    return e ? e : dflt;
+}
+
 void VM::register_extension(string lib, string init_fn, void (*fn)()) {
     string key = lib * ":" * init_fn;
     extensions(string(gcpp_data(key), static_cast<int>(static_cast<size_t>(N(key))))) = (pointer) fn;
@@ -21,7 +27,7 @@ void VM::load_extension(string lib, string init_fn) {
     void* h = dlopen(((char*) c_string(lib)), RTLD_LAZY | RTLD_GLOBAL);
     if (!h) {
         misc_error("load-extension", "file: ~S, message: ~S",
-                   list2(make_string(lib), make_string(dlerror() ? dlerror() : "not found")));
+                   list2(make_string(lib), make_string(dl_error_message("not found"))));
     }
     void* sym = dlsym(h, ((char*) c_string(init_fn)));
     if (!sym) {
@@ -48,15 +54,17 @@ void VM::init_misc() {
     // Dynamic linking (dynl.c)
     define_proc("dynamic-link", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         string fn;
+        c_string fn_c;  // (kept alive for dlopen)
         const char* p = nullptr;
         if (nargs >= 1 && !a[0].is_undefined() && a[0].is_true()) {
             if (!is_string(a[0])) wrong_type_arg("dynamic-link", 1, a[0], "string");
             fn = as_obj<StringObj>(a[0])->str();
-            p = ((char*) c_string(fn));
+            fn_c = c_string(fn);
+            p = fn_c;
         }
         void* h = dlopen(p, RTLD_LAZY | RTLD_GLOBAL);
         if (!h) misc_error("dynamic-link", "file: ~S, message: ~S",
-                           list2(nargs >= 1 ? a[0] : SCM_BOOL_F, make_string(dlerror() ? dlerror() : "dlopen failed")));
+                           list2(nargs >= 1 ? a[0] : SCM_BOOL_F, make_string(dl_error_message("dlopen failed"))));
         return heap_.alloc_scm<DynamicLibObj>(h, fn);
     });
     define_proc("dynamic-object?", 1, 0, false, [](const SCM* a, size_t) -> SCM {
@@ -79,11 +87,11 @@ void VM::init_misc() {
     define_proc("setlocale", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         int cat = static_cast<int>(scm_to_int64(a[0], "setlocale", 1));
         const char* loc = nullptr;
-        string tmp;
+        c_string loc_c;  // (kept alive for setlocale)
         if (nargs >= 2 && !a[1].is_undefined()) {
             if (!is_string(a[1])) wrong_type_arg("setlocale", 2, a[1], "string");
-            tmp = as_obj<StringObj>(a[1])->str();
-            loc = ((char*) c_string(tmp));
+            loc_c = c_string(as_obj<StringObj>(a[1])->str());
+            loc = loc_c;
         }
         const char* r = std::setlocale(cat, loc);
         if (!r) misc_error("setlocale", "invalid locale");

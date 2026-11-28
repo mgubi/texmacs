@@ -7,6 +7,11 @@
 
 namespace guile {
 
+// (TeXmacs: the errors of gcpp_stoll / gcpp_stoi / gcpp_stod, tm_string.hpp)
+[[noreturn]] void gcpp_number_error(const char* subr, string s) {
+    vm().misc_error(subr, "invalid or out of range number: ~S", vm().list1(vm().make_string(s)));
+}
+
 // ============================================================================
 // Integer / Bignum / Fraction / Real / Complex Constructors & Conversions
 // ============================================================================
@@ -848,8 +853,9 @@ static SCM parse_ureal(string s, int radix, int exactness, bool negative) {
         }
         errno = 0;
         char* endp = nullptr;
-        double d = std::strtod(((char*) c_string(norm)), &endp);
-        if (endp != ((char*) c_string(norm)) + static_cast<size_t>(N(norm))) return SCM_BOOL_F;
+        c_string norm_c(norm);  // (kept alive: endp points into it)
+        double d = std::strtod(norm_c, &endp);
+        if (endp != static_cast<char*>(norm_c) + N(norm)) return SCM_BOOL_F;
         if (errno == ERANGE && std::isinf(d)) {
             vm().out_of_range("string->number", vm().make_string(s));
         }

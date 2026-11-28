@@ -571,56 +571,59 @@ void VM::init_posix() {
     define_proc("execl", 1, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("execl", 1, a[0], "string");
         string path = as_obj<StringObj>(a[0])->str();
-        array<string> storage;
+        array<c_string> storage;  // (0-terminated, alive until the exec)
         SCM rest = nargs > 1 ? a[1] : SCM_EOL;
         while (is_pair(rest)) {
             if (!is_string(car(rest))) wrong_type_arg("execl", 2, car(rest), "string");
-            (storage << as_obj<StringObj>(car(rest))->str());
+            (storage << c_string(as_obj<StringObj>(car(rest))->str()));
             rest = cdr(rest);
         }
         array<char*> argv;
-        for (auto& s : storage) (argv << gcpp_data(s));
+        for (int i = 0; i < N(storage); i++) (argv << static_cast<char*>(storage[i]));
         (argv << static_cast<char*>(nullptr));
-        ::execv(((char*) c_string(path)), gcpp_data(argv));
+        c_string path_c(path);
+        ::execv(path_c, gcpp_data(argv));
         syserror("execl", errno);
     });
     define_proc("execlp", 1, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("execlp", 1, a[0], "string");
         string file = as_obj<StringObj>(a[0])->str();
-        array<string> storage;
+        array<c_string> storage;  // (0-terminated, alive until the exec)
         SCM rest = nargs > 1 ? a[1] : SCM_EOL;
         while (is_pair(rest)) {
             if (!is_string(car(rest))) wrong_type_arg("execlp", 2, car(rest), "string");
-            (storage << as_obj<StringObj>(car(rest))->str());
+            (storage << c_string(as_obj<StringObj>(car(rest))->str()));
             rest = cdr(rest);
         }
         array<char*> argv;
-        for (auto& s : storage) (argv << gcpp_data(s));
+        for (int i = 0; i < N(storage); i++) (argv << static_cast<char*>(storage[i]));
         (argv << static_cast<char*>(nullptr));
-        ::execvp(((char*) c_string(file)), gcpp_data(argv));
+        c_string file_c(file);
+        ::execvp(file_c, gcpp_data(argv));
         syserror("execlp", errno);
     });
     define_proc("execle", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("execle", 1, a[0], "string");
         string path = as_obj<StringObj>(a[0])->str();
-        array<string> env_storage;
+        array<c_string> env_storage;
         for (SCM e = a[1]; is_pair(e); e = cdr(e)) {
             if (!is_string(car(e))) wrong_type_arg("execle", 2, car(e), "list of strings");
-            (env_storage << as_obj<StringObj>(car(e))->str());
+            (env_storage << c_string(as_obj<StringObj>(car(e))->str()));
         }
-        array<string> arg_storage;
+        array<c_string> arg_storage;
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
         while (is_pair(rest)) {
             if (!is_string(car(rest))) wrong_type_arg("execle", 3, car(rest), "string");
-            (arg_storage << as_obj<StringObj>(car(rest))->str());
+            (arg_storage << c_string(as_obj<StringObj>(car(rest))->str()));
             rest = cdr(rest);
         }
         array<char*> argv, envp;
-        for (auto& s : arg_storage) (argv << gcpp_data(s));
+        for (int i = 0; i < N(arg_storage); i++) (argv << static_cast<char*>(arg_storage[i]));
         (argv << static_cast<char*>(nullptr));
-        for (auto& s : env_storage) (envp << gcpp_data(s));
+        for (int i = 0; i < N(env_storage); i++) (envp << static_cast<char*>(env_storage[i]));
         (envp << static_cast<char*>(nullptr));
-        ::execve(((char*) c_string(path)), gcpp_data(argv), gcpp_data(envp));
+        c_string path_c(path);
+        ::execve(path_c, gcpp_data(argv), gcpp_data(envp));
         syserror("execle", errno);
     });
 

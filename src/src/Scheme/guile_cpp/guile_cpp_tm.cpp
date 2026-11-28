@@ -106,8 +106,8 @@ handle_scheme_throw (SCM key, SCM args) {
 // its extent, an exception of the C++ library): the frames of dynamic-wind,
 // with-fluids and catch which it left are unwound, and it is reported as
 // an error of Scheme, (misc-error #f message () #f)
-static tmscm
-handle_cpp_exception (SCM dynwind, const char* what) {
+static void
+unwind_to (SCM dynwind) {
   VM& v= guile::vm ();
   try {
     if (v.current_dynwind != dynwind) guile::switch_dynwind_pub (dynwind);
@@ -115,6 +115,12 @@ handle_cpp_exception (SCM dynwind, const char* what) {
   catch (...) {
     v.current_dynwind= dynwind;
   }
+}
+
+static tmscm
+handle_cpp_exception (SCM dynwind, const char* what) {
+  VM& v= guile::vm ();
+  unwind_to (dynwind);
   try {
     SCM msg = v.make_string (what);
     SCM args= v.list4 (guile::SCM_BOOL_F, msg, guile::SCM_EOL,
@@ -136,7 +142,15 @@ handle_exception (SCM dynwind) {
     throw;
   }
   catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex.key, ex.args);
+    // the frames of dynamic-wind, with-fluids... which the error left are
+    // unwound (their after-thunks run), as for the other exceptions
+    SCM key= ex.key, args= ex.args;
+    SCM roots[2]= { key, args };
+    guile::GcRootSpan span= { roots, 2, NULL };
+    guile::vm ().heap ().push_root_span (&span);
+    unwind_to (dynwind);
+    guile::vm ().heap ().pop_root_span ();
+    return handle_scheme_throw (key, args);
   }
   catch (const guile::ContinuationEscape&) {
     return handle_cpp_exception (dynwind,
@@ -163,7 +177,9 @@ current_dynwind () {
 // own frames for it
 void
 tmscm_raise_error (string msg) {
-  guile::vm ().misc_error ("glue", msg);
+  // (the message is an argument: a ~ in it is not a directive)
+  guile::vm ().misc_error ("glue", "~A",
+                           guile::vm ().list1 (guile::vm ().make_string (msg)));
 }
 
 void

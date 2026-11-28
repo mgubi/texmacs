@@ -1784,6 +1784,20 @@ static inline void fast_hash_store(SCM ht_scm, HashTableObj* ht, SCM key, SCM va
     return v.apply(proc, tmp, na);
 }
 
+// A subr which may run Scheme (string-tabulate, sort...) would keep reading
+// its arguments in the VM stack, which a nested run can reallocate: the
+// arguments are copied first (TeXmacs; the glue routines, raw_fn, read
+// theirs before running anything and get the stack directly)
+[[gnu::noinline]] static SCM call_subr_copied(SubrObj* sb, const SCM* args, size_t nargs) {
+    if (nargs <= 16) {
+        SCM tmp[16];
+        for (size_t i = 0; i < nargs; ++i) tmp[i] = args[i];
+        return sb->fn(tmp, nargs);
+    }
+    array<SCM> tmp = array_from<SCM>(args, nargs);
+    return sb->fn(gcpp_data(tmp), nargs);
+}
+
 // Out-of-line helper so temporary SCM arrays (tmp[16]) don't linger on run_bytecode_loop's C++ stack across GC!
 [[gnu::noinline]] static SCM call_subr_padded(VM& v, SubrObj* sb, const SCM* args, size_t nargs) {
     int req = sb->req, opt = sb->opt;
@@ -1855,8 +1869,17 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
     };
 
     auto setup_closure_args = [&](ClosureObj* target_cl, BytecodeObj* target_bc,
-                                  uint32_t target_base, const SCM* a, size_t na) {
+                                  uint32_t target_base, const SCM* a0, size_t na) {
         size_t req = target_bc->arity_req;
+        // (TeXmacs: a may point into the VM stack, which ensure_stack can
+        // reallocate: the arguments are copied first when it would grow)
+        SCM abuf[16];
+        array<SCM> aheap;
+        const SCM* a = a0;
+        if (target_base + target_bc->max_locals + 64 >= eng.stack_n) {
+            if (na <= 16) { for (size_t i = 0; i < na; ++i) abuf[i] = a0[i]; a = abuf; }
+            else { aheap = array_from<SCM>(a0, na); a = gcpp_data(aheap); }
+        }
         if (!target_bc->has_rest) {
             if (na != req) { sync_gc(); v.wrong_num_args(nullptr, SCM::from_obj(target_cl)); }
             eng.ensure_stack(target_base + target_bc->max_locals + 64);
@@ -2083,6 +2106,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             }
             sync_gc();
             gv = v.sym2var(bc->global_syms[gi], bc->eval_closure, false);
+            RELOAD_STK();  // (sym2var may run Scheme: a module binder)
             if (!is_variable(gv) || as_obj<VariableObj>(gv)->value.is_undefined()) {
                 v.error(v.sym_unbound_variable, nullptr, "Unbound variable: ~S", v.list1(bc->global_syms[gi]), SCM_BOOL_F);
             }
@@ -2098,6 +2122,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             if (!is_variable(gv)) {
                 sync_gc();
                 gv = v.sym2var(bc->global_syms[gi], bc->eval_closure, false);
+                RELOAD_STK();  // (sym2var may run Scheme: a module binder)
                 if (!is_variable(gv)) {
                     v.error(v.sym_unbound_variable, "set!", "Unbound variable: ~S", v.list1(bc->global_syms[gi]));
                 }
@@ -2244,7 +2269,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     if (static_cast<int>(nargs) >= req && (sb->rst || static_cast<int>(nargs) <= req + opt)) {
                         sync_gc();
                         SCM r = (sb->raw_varargs || (!sb->rst && static_cast<int>(nargs) == req + opt))
-                            ? (sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : sb->fn(stk + fn_slot + 1, nargs))
+                            ? (sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : call_subr_copied(sb, stk + fn_slot + 1, nargs))
                             : call_subr_padded(v, sb, stk + fn_slot + 1, nargs);
                         RELOAD_STK();
                         stk[fn_slot] = r;
@@ -2500,7 +2525,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         sync_gc();
                         SCM res;
                         if (sb->raw_varargs || (!sb->rst && static_cast<int>(nargs) == req + opt)) {
-                            res = sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : sb->fn(stk + fn_slot + 1, nargs);
+                            res = sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : call_subr_copied(sb, stk + fn_slot + 1, nargs);
                         } else {
                             res = call_subr_padded(v, sb, stk + fn_slot + 1, nargs);
                         }

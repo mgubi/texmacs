@@ -8,6 +8,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <cerrno>
 #include <cstddef>
 #include <initializer_list>
 #include "string.hpp"
@@ -64,20 +65,28 @@ inline bool str_starts_with(string s, const char* t) {
     return N(s) >= m && std::memcmp(str_data(s), t, m) == 0;
 }
 
-// std::stoll and std::stoi (an exception if s does not start with a number)
+// std::stoll and std::stoi: an error of Scheme (gcpp_number_error, in
+// numbers.cpp) if s does not start with a number or if it is out of range
+[[noreturn]] void gcpp_number_error(const char* subr, string s);
 inline long long gcpp_stoll(string s, int base = 10) {
     c_string cs(s);
     char* endp = nullptr;
+    errno = 0;
     long long r = std::strtoll(cs, &endp, base);
-    if (endp == static_cast<char*>(cs)) throw static_cast<int>(0);
+    if (endp == static_cast<char*>(cs)) gcpp_number_error("stoll", s);
+    if (errno == ERANGE) gcpp_number_error("stoll", s);
     return r;
 }
-inline int gcpp_stoi(string s, int base = 10) { return static_cast<int>(gcpp_stoll(s, base)); }
+inline int gcpp_stoi(string s, int base = 10) {
+    long long r = gcpp_stoll(s, base);
+    if (r < -2147483647LL - 1 || r > 2147483647LL) gcpp_number_error("stoi", s);
+    return static_cast<int>(r);
+}
 inline double gcpp_stod(string s) {
     c_string cs(s);
     char* endp = nullptr;
     double r = std::strtod(cs, &endp);
-    if (endp == static_cast<char*>(cs)) throw static_cast<int>(0);
+    if (endp == static_cast<char*>(cs)) gcpp_number_error("stod", s);
     return r;
 }
 // the first position from pos of a character of set, or -1

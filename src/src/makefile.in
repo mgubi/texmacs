@@ -110,6 +110,8 @@ GLUE_DEPS = Objects/s7-run
 GCPP_DIR = Scheme/guile_cpp/guile_cpp
 SCHEME_CXX_FLAGS = -std=c++17 -I$(GCPP_DIR)/include
 gcpp_src := $(notdir $(wildcard $(GCPP_DIR)/src/*.cpp))
+# -O3 as guile_cpp's own build, unless the flags ask for -O0 (debug)
+GCPP_OPT = $(if $(findstring -O0,$(CXXFLAGS)),,-O3)
 else
 GLUE_BIN = $(GUILE_BIN)
 GLUE_DEPS =
@@ -423,7 +425,7 @@ $(scheme_obj): Objects/%.o: %.cpp
 # dependency files
 $(gcpp_obj): Objects/gcpp_%.o: $(GCPP_DIR)/src/%.cpp
 	$(strip $(CXX) $(kernel_incl) $(SCHEME_CXX_FLAGS) $(CPPFLAGS) $(CXXFLAGS) \
-	  -O3 -MMD -MP -MF Deps/gcpp_$*.d -MT $@ -c $< -o $@)
+	  $(GCPP_OPT) -MMD -MP -MF Deps/gcpp_$*.d -MT $@ -c $< -o $@)
 $(scheme_c_obj): Objects/%.o: %.c
 	$(call cc_incl,$(scheme_incl) $(SCHEME_C_FLAGS))
 $(graphics_obj): Objects/%.o: %.cpp

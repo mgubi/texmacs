@@ -1156,7 +1156,7 @@ void create_struct_classes() {
             SCM vt = car(entry);
             SCM data = cdr(entry);
             if (is_pair(data) && is_symbol(car(data))) {
-                const char* nm = ((char*) c_string(as_obj<SymbolObj>(car(data))->name));
+                c_string nm(as_obj<SymbolObj>(car(data))->name);
                 bool app = (struct_class_flags(vt) & CLASSF_OPERATOR) != 0;
                 set_cdr(data, goops_make_extended_class(nm, app));
             }
@@ -1236,7 +1236,8 @@ SCM goops_class_of(SCM obj) {
             return cdr(data);
         }
         SCM nm = is_pair(data) ? car(data) : SCM_BOOL_F;
-        const char* cname = is_symbol(nm) ? ((char*) c_string(as_obj<SymbolObj>(nm)->name)) : nullptr;
+        c_string cname_c(is_symbol(nm) ? as_obj<SymbolObj>(nm)->name : string());
+        const char* cname = is_symbol(nm) ? static_cast<char*>(cname_c) : nullptr;
         bool app = (obj_class_flags(obj) & CLASSF_OPERATOR) != 0;
         SCM cls = goops_make_extended_class(cname, app);
         if (is_pair(data)) set_cdr(data, cls);
