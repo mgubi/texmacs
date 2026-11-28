@@ -78,10 +78,13 @@ public:
 
 // What the last tagged PDF drew (print_doc, for pdf-tag-check): whether a
 // tagged PDF was made, the places of its pictures without an alternative
-// text of the user's in the body which it printed, and those pictures
-bool        pdf_tag_printed ();
-array<path> pdf_tag_printed_places ();
-array<tree> pdf_tag_printed_images ();
+// text of the user's in the body which it printed, those pictures, the
+// included files which hold them and the marks of pdf-tag-check on them
+bool          pdf_tag_printed ();
+array<path>   pdf_tag_printed_places ();
+array<tree>   pdf_tag_printed_images ();
+array<string> pdf_tag_printed_files ();
+array<string> pdf_tag_printed_sources ();
 
 class renderer_rep {
 public:

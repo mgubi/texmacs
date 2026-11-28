@@ -320,29 +320,43 @@ own which it removes (`pdf-tag-render`). The tagger notes each picture it
 meets without an alternative text of the user's (`no_alt`, in `alt_of`:
 once per picture, when it is drawn), and `print_doc` keeps their places in
 the body it printed and the pictures themselves (`pdf-tag-printed?`,
-`pdf-tag-printed-places`, `pdf-tag-printed-images`). So the pictures
+`pdf-tag-printed-places`, `pdf-tag-printed-images`, and the included
+file and the mark on the way to each, `pdf-tag-printed-files`,
+`pdf-tag-printed-sources`; all reset when a print begins, so that nothing
+of an earlier PDF is read). So the pictures
 reported are those which the PDF describes by a caption or a file name,
 whatever decides what is printed (folds, conditions, notes in the margin,
 styles, macros), with no rules of its own. A picture which is itself a
 tagged PDF is reported too: its structure describes it, but not as the
 author would. It costs an export (half a second for a document of 3000
-pictures, on a recent Mac); the buffer is left as it was (the expanded
-body is swapped back, the copy of a presentation closed).
+pictures, as for a presentation of 100 slides of 10 pictures, on a recent
+Mac); the buffer is left as it was (the expanded body is swapped back,
+the copy of a presentation closed, also when making the slides fails). A
+print which fails is reported with its error, not as a result. During the
+check the message "Done printing" and the check of the PDF by Ghostscript
+(*texmacs->pdf:check*) are left out (`TEXMACS_PDF_TAG_CHECK`).
 
 `(pdf-tag-check)` gives an association list, for scripts and the tests:
 
 * `tagged`: whether a tagged PDF could be made (a native PDF writer).
 * `drawn`: how many pictures the PDF describes by a caption or a file name.
-* `pictures`: the places of those in the body, in their order. A place of
-  the printed body is the same in the buffer, except through an include,
-  which the printed body expands: the picture there, when it is the same
-  image, is the one. For a presentation, whose slides were made in a copy,
-  it is the first equal image of the body not taken yet.
-* `included`: the `(file . n)` of those drawn from included files (their
-  place is in the file, where the check finds them).
-* `elsewhere`: how many have no place of their own: drawn by a macro, or
-  the copies of a picture in the slides which a fold of a presentation
-  makes.
+* `error`: the error which stopped the print, else `#f`.
+* `pictures`: the places of those in the body, in their order, each once.
+  A place of the printed body is the same in the buffer (the printed body
+  differs from it only by the expanded includes), the picture there being
+  the same image. A presentation is printed from a copy whose slides are
+  made: before they are, the check puts each picture of the copy, whose
+  body is still that of the document, in `<with|pdf-tag-source|i|...>`
+  (`pdf-tag-mark-copy`, through the optional argument of
+  `wrapped-print-to-file`), which the slides keep and which is transparent
+  to the typesetting and the tagger: a picture printed, and each of its
+  copies in the slides which a fold makes, is the picture i of the
+  document.
+* `included`: the `(file . n)` of those drawn from included files, the
+  file being the innermost included one which holds the picture (the
+  `include*` on the way in the printed body); their place is in that
+  file, where the check finds them.
+* `elsewhere`: how many have no place of their own (drawn by a macro).
 * `title`: whether the document has a title of its own (`get-metadata`
   gives the name of the file otherwise, which becomes the title of the
   PDF).
@@ -350,9 +364,10 @@ body is swapped back, the copy of a presentation closed).
   does not know it (the PDF then says `en-US`), else `#f`.
 
 *Next picture* steps through the pictures of the last check of the buffer,
-kept as trees, which follow the edits: those still in the buffer and still
-without an alternative text (an `image-alt` around them), checking again
-when there is none. The next one is the one after the picture in focus
+kept as trees, which follow the edits: those still without an alternative
+text (an `image-alt` around them). It checks again when there is none
+left, or when one is no longer in the buffer (deleted, or replaced by an
+undo), so that a picture added since is found. The next one is the one after the picture in focus
 (the one it went to: the editor moves a cursor put before an image in a
 line to the end of the text before it, and one put in a specific out of
 it), else the first one at or after the cursor. The image in focus is
@@ -365,12 +380,15 @@ images only). The tables have no header rows to check (TeXmacs has no
 markup for them, see *Left*), and what only the writer finds (the fonts
 of the pictures) is for veraPDF. `convert-more` checks, on documents of
 folded, hidden, conditional and specific parts, notes in the margin,
-macro definitions, includes and a presentation with a fold, that the
+macro definitions, nested includes, a presentation with a fold and one
+with the same pictures on several slides, with and without an
+alternative text, that the
 pictures reported are those which the tagged export describes as "Image
 f.png", that the buffer is not modified, the steps through pictures in
 lines of text with the editor typesetting between them, the alternative
-text set from the focus, and that a tagged export adds no message to the
-window of the errors.
+text set from the focus, a picture added after all were described, the
+copy of a presentation closed when making its slides fails, and that a
+tagged export adds no message to the window of the errors.
 
 ## Checking it
 

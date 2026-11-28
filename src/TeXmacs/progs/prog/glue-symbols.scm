@@ -93,6 +93,8 @@
 "pdf-tag-printed?"
 "pdf-tag-printed-places"
 "pdf-tag-printed-images"
+"pdf-tag-printed-files"
+"pdf-tag-printed-sources"
 "supports-ghostscript?"
 "gs-executable"
 "rescue-mode?"

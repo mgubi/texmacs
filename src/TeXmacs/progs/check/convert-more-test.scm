@@ -3520,7 +3520,11 @@
         (check= (assoc-ref r2 'pictures) '())
         (check-true (assoc-ref r2 'title))
         (check= (assoc-ref r2 'language) "arabic")
-        (check= (pdf-tag-next-picture) #f))
+        (check= (pdf-tag-next-picture) #f)
+        ;; a picture added after: Next checks again when none is left
+        (tree-insert! (buffer-tree) 0 (list (stree->tree (img))))
+        (update-forced) (apply-changes)
+        (check= (pdf-tag-next-picture) (append rp '(0))))
       (init-env "language" "german")
       (buffer-set-body tm (stree->tree '(document "Nothing to say.")))
       (with r3 (pdf-tag-check)
@@ -3587,13 +3591,18 @@
          (img (lambda (n) `(image ,(string-append n ".png") "1cm" "" "" "")))
          (names '("a" "b" "c" "fold" "unfold" "ign" "scr" "prn" "iff" "ift"
                   "ifc1" "ifc2" "mn" "case1" "case2" "case3" "case4" "mac"
-                  "inc"))
+                  "inc" "inner"))
          (files (map (lambda (n) (string-append n ".png")) names))
          (shown '("a.png" "b.png" "c.png" "unfold.png" "prn.png" "ift.png"
                   "ifc1.png" "mn.png" "case2.png" "case4.png")))
     (string-save (serialize-texmacs
-                  (stree->tree (tmfile `(document "I." ,(img "inc")))))
+                  (stree->tree (tmfile `(document "I." ,(img "inc")
+                                                  (include
+                                                   "check-hidden-inner.tm")))))
                  (url-append (temp-dir) "check-hidden-inc.tm"))
+    (string-save (serialize-texmacs
+                  (stree->tree (tmfile `(document "J." ,(img "inner")))))
+                 (url-append (temp-dir) "check-hidden-inner.tm"))
     (with (tm r alts)
         (check-pictures-doc
          "check-hidden" "generic"
@@ -3623,9 +3632,11 @@
                        p))))
         ;; the check and the export agree, picture by picture
         (check= (picture-files pics) shown)
-        (check= alts (append shown '("inc.png")))
+        (check= alts (append shown '("inc.png" "inner.png")))
         (check= (assoc-ref r 'drawn) (length alts))
-        (check= (assoc-ref r 'included) '(("check-hidden-inc.tm" . 1)))
+        ;; (the file which holds the picture, also in an included one)
+        (check= (assoc-ref r 'included) '(("check-hidden-inc.tm" . 1)
+                                          ("check-hidden-inner.tm" . 1)))
         (check= (assoc-ref r 'elsewhere) 0)
         (check-false (buffer-modified? tm))
         ;; the steps, the editor typesetting between them (it puts the
@@ -3645,8 +3656,12 @@
 
 ;; A presentation is printed with its slides made (wrapped-print-to-file):
 ;; a folded part of a slide gives a slide more, whose pictures are copies
-;; of those of the document, drawn but of no place of their own; a hidden
-;; slide is printed too. The document is left as it was.
+;; of those of the document, each found by the mark which the check puts
+;; on the pictures of the copy before the slides are made
+;; (pdf-tag-mark-copy); a hidden slide is printed too. The document is left
+;; as it was. The same picture on several slides, with and without an
+;; alternative text, is found where it has none, each time; and the copy
+;; is closed when the making of the slides fails.
 (define (test-tagged-pdf-check-slides)
   (check-group "tagged pdf: the check of a presentation")
   (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
@@ -3667,9 +3682,40 @@
           (check= (assoc-ref r 'drawn) 4)
           (check= (picture-files (assoc-ref r 'pictures))
                   '("s1.png" "sfold.png" "s2.png"))
-          (check= (assoc-ref r 'elsewhere) 1)
+          (check= (assoc-ref r 'elsewhere) 0)
           (check-false (buffer-modified? tm))
           (check= (length (buffer-list)) (+ (length before) 1)))
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-slides-same" "beamer"
+             `(document
+               (screens (shown (document "S1" ,(img "y")))
+                        (hidden (document "S2" ,(img "y")))
+                        (hidden (document "S3" (with "image-alt" "d"
+                                                 ,(img "z"))))
+                        (hidden (document "S4" ,(img "z")
+                                          (folded "f" "more")))))
+             '("y.png" "z.png"))
+          (let ((rp (tree->path (buffer-tree)))
+                (n (length (buffer-list))))
+            (check= alts '("y.png" "y.png" "z.png" "z.png"))
+            (check= (assoc-ref r 'drawn) 4)
+            (check= (assoc-ref r 'pictures)
+                    (map (lambda (p) (append rp p))
+                         '((0 0 0 1) (0 1 0 1) (0 3 0 1))))
+            (check= (assoc-ref r 'elsewhere) 0)
+            (check-false (buffer-modified? tm))
+            ;; a failure while the slides are made
+            (check-true
+             (catch #t
+               (lambda ()
+                 (wrapped-print-to-file
+                  (url-append (temp-dir) "check-slides-fail.pdf")
+                  (lambda () (error "check-slides-fail")))
+                 #f)
+               (lambda args #t)))
+            (check= (current-buffer) tm)
+            (check= (length (buffer-list)) n)))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
         (check-restore-buffer old))))

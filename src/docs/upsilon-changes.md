@@ -24,8 +24,8 @@ have the details, and the problems go to the
   says what the document lacks for an accessible PDF: the pictures without
   an alternative text, exactly those which the tagged PDF describes by a
   caption or a file name (the check prints the document as the export
-  does, to a file of its own), those of the included files and those drawn
-  by macros or in the slides made of a presentation, a missing title and
+  does, to a file of its own), those of the included files, those drawn by
+  macros, a missing title and
   a language which a PDF cannot name, or that nothing is missing; *Next
   picture without alternative text* goes to each of them in turn, for
   *Focus → Alternative text...*, which now also works on the picture in

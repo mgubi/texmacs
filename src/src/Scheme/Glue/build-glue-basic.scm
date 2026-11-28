@@ -84,6 +84,8 @@
   (pdf-tag-printed? pdf_tag_printed (bool))
   (pdf-tag-printed-places pdf_tag_printed_places (array_path))
   (pdf-tag-printed-images pdf_tag_printed_images (array_tree))
+  (pdf-tag-printed-files pdf_tag_printed_files (array_string))
+  (pdf-tag-printed-sources pdf_tag_printed_sources (array_string))
   (supports-ghostscript? supports_ghostscript (bool))
   (gs-executable get_gs_executable (string))
   (rescue-mode? in_rescue_mode (bool))

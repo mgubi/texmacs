@@ -46,7 +46,7 @@
 * shim also records the routine name (current_glue_proc) for the messages of
 * chez_tm.hpp.
 *
-* 1409 routines.
+* 1411 routines.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -241,6 +241,8 @@ extern tmscm tmg_mupdf_writes_pdfP ();
 extern tmscm tmg_pdf_tag_printedP ();
 extern tmscm tmg_pdf_tag_printed_places ();
 extern tmscm tmg_pdf_tag_printed_images ();
+extern tmscm tmg_pdf_tag_printed_files ();
+extern tmscm tmg_pdf_tag_printed_sources ();
 extern tmscm tmg_supports_ghostscriptP ();
 extern tmscm tmg_gs_executable ();
 extern tmscm tmg_rescue_modeP ();
@@ -1756,6 +1758,8 @@ TMG_GUARDED_0 ("mupdf-writes-pdf?", tmg_mupdf_writes_pdfP)
 TMG_GUARDED_0 ("pdf-tag-printed?", tmg_pdf_tag_printedP)
 TMG_GUARDED_0 ("pdf-tag-printed-places", tmg_pdf_tag_printed_places)
 TMG_GUARDED_0 ("pdf-tag-printed-images", tmg_pdf_tag_printed_images)
+TMG_GUARDED_0 ("pdf-tag-printed-files", tmg_pdf_tag_printed_files)
+TMG_GUARDED_0 ("pdf-tag-printed-sources", tmg_pdf_tag_printed_sources)
 TMG_GUARDED_0 ("supports-ghostscript?", tmg_supports_ghostscriptP)
 TMG_GUARDED_0 ("gs-executable", tmg_gs_executable)
 TMG_GUARDED_0 ("rescue-mode?", tmg_rescue_modeP)
@@ -3284,6 +3288,8 @@ static const tmg_entry tmg_entries[]= {
   { "pdf-tag-printed?", 0, (void*) tmgc_tmg_pdf_tag_printedP },
   { "pdf-tag-printed-places", 0, (void*) tmgc_tmg_pdf_tag_printed_places },
   { "pdf-tag-printed-images", 0, (void*) tmgc_tmg_pdf_tag_printed_images },
+  { "pdf-tag-printed-files", 0, (void*) tmgc_tmg_pdf_tag_printed_files },
+  { "pdf-tag-printed-sources", 0, (void*) tmgc_tmg_pdf_tag_printed_sources },
   { "supports-ghostscript?", 0, (void*) tmgc_tmg_supports_ghostscriptP },
   { "gs-executable", 0, (void*) tmgc_tmg_gs_executable },
   { "rescue-mode?", 0, (void*) tmgc_tmg_rescue_modeP },

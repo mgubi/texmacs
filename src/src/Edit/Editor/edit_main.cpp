@@ -287,14 +287,50 @@ tagger_rep* make_pdf_tagger (tree body, path rp, string lang, string title);
 // document as Export does, to a file of its own, and reads them): the
 // pictures without an alternative text of the user's, their places in the
 // body printed (the body with its includes expanded, or the copy of a
-// presentation with its slides made) and the pictures themselves
-static bool        tag_printed= false;
-static array<path> tag_places;
-static array<tree> tag_images;
+// presentation with its slides made), the pictures themselves, the file of
+// the innermost included document which holds each ("" for none) and the
+// mark which pdf-tag-check puts around each picture of the copy of a
+// presentation (<with|pdf-tag-source|i|...>, "" for none)
+static bool          tag_printed= false;
+static array<path>   tag_places;
+static array<tree>   tag_images;
+static array<string> tag_files;
+static array<string> tag_sources;
 
 bool pdf_tag_printed () { return tag_printed; }
 array<path> pdf_tag_printed_places () { return tag_places; }
 array<tree> pdf_tag_printed_images () { return tag_images; }
+array<string> pdf_tag_printed_files () { return tag_files; }
+array<string> pdf_tag_printed_sources () { return tag_sources; }
+
+static void
+tag_reset () {
+  tag_printed= false;
+  tag_places = array<path> ();
+  tag_images = array<tree> ();
+  tag_files  = array<string> ();
+  tag_sources= array<string> ();
+}
+
+// the picture at p of the body printed, with the included file and the
+// mark of pdf-tag-check on the way to it
+static void
+tag_keep (tree body, path p) {
+  string file, source;
+  tree t= body;
+  for (path q= p; !is_nil (q); q= q->next) {
+    if (is_compound (t, "include*", 2) && is_atomic (t[0])) file= t[0]->label;
+    if (is_compound (t, "with"))
+      for (int j=0; j+1<N(t); j+=2)
+        if (t[j] == "pdf-tag-source" && is_atomic (t[j+1]))
+          source= t[j+1]->label;
+    t= t[q->item];
+  }
+  tag_places  << p;
+  tag_images  << copy (t);
+  tag_files   << file;
+  tag_sources << source;
+}
 
 // The tables the typesetting writes (the references, the auxiliary data,
 // the attributes of the buffer or its project), put back as they were
@@ -471,6 +507,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // (a missing folder) is only a message: it says afterwards whether it
   // saved the file
   bool mupdf_target= suffix (name) == "pdf" && use_pdf () && use_mupdf_pdf ();
+  tag_reset ();   // (nothing of an earlier PDF, also when this one fails)
 #ifdef USE_GS
   bool ps  = (suffix (name) == "ps");
   bool pdf = (suffix (name) == "pdf");
@@ -597,9 +634,6 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   
   // a tagged PDF (PDF/UA, docs/pdf-tagging.md): the structure of the body
   tagger_rep* tagger= NULL;
-  tag_printed= false;
-  tag_places = array<path> ();
-  tag_images = array<tree> ();
   if (ok && want_tags && ren->supports_tagging ()) {
     string lan= as_string (call ("pdf-tag-language",
                                  object (env->get_string (LANGUAGE))));
@@ -633,10 +667,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     tag_printed= true;
     array<path> a= tagger->pictures_without_alt ();
     for (int i=0; i<N(a); i++)
-      if (has_subtree (body, a[i])) {
-        tag_places << a[i];
-        tag_images << copy (subtree (body, a[i]));
-      }
+      if (has_subtree (body, a[i])) tag_keep (body, a[i]);
     tm_delete (tagger);
   }
   delete_typesetter (ttt);
@@ -666,7 +697,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     ok= ok && exists (orig);
   }
   if (ok && (ps || pdf))
-    if (get_preference ("texmacs->pdf:check", "off") == "on") {
+    // (not the PDF which pdf-tag-check makes for itself)
+    if (get_preference ("texmacs->pdf:check", "off") == "on" &&
+        get_env ("TEXMACS_PDF_TAG_CHECK") != "1") {
 # if QT_VERSION >= 0x060000
       system_wait ("Checking exported file '" *
 		   as_string (tail (orig)) * "' for correctness");
@@ -686,7 +719,9 @@ edit_main_rep::print_to_file (url name, string first, string last) {
     set_message (concat ("Could not save ",
                          verbatim (as_string (name, URL_SYSTEM))),
                  "print to file");
-  else set_message ("Done printing", "print to file");
+  // (pdf-tag-check says what it found instead)
+  else if (get_env ("TEXMACS_PDF_TAG_CHECK") != "1")
+    set_message ("Done printing", "print to file");
 }
 
 void

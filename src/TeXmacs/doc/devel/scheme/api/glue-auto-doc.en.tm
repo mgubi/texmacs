@@ -547,6 +547,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(pdf-tag-printed-files)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_files> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-sources)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_sources> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
     <scm|(supports-ghostscript?)>
 <explain-synopsis|no synopsis>
   <|explain>
