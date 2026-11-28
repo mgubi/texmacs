@@ -137,6 +137,17 @@ the globals and the constants of the running bytecode); the string
 operations read the characters in place (StringObj::chars, sub) instead
 of copying the whole string.
 
+Other fixes of guile_cpp
+------------------------
+
+* The VM stack can be reallocated by a nested run of the VM: the subrs
+  (not the glue routines of TeXmacs, raw_fn, which read their arguments
+  before running anything) get a copy of their arguments
+  (call_subr_copied, bytecode.cpp), setup_closure_args copies its
+  arguments when the stack would grow, and GLOBAL_REF / GLOBAL_SET reload
+  the stack pointer after sym2var (a module binder runs Scheme).
+* dlerror is read once (dynamic-link of a missing file crashed).
+
 Still from the standard library
 -------------------------------
 
