@@ -63,3 +63,32 @@ Changes to guile_cpp
   (set_data_dirs, called before VM::init), instead of the paths compiled in
   by the CMake build (GUILE_CPP_PKGDATA_DIR...), which remain the defaults
   when they are defined.
+* No std::function: SubrFn (the builtins) is a function pointer, or for a
+  lambda which captures a copy of it made with tm_new, shared by reference
+  counting (SubrClosure); the callbacks of the collector and of the smob
+  types are function pointers with a data pointer (Marker); the recursive
+  local lambdas take themselves as first argument.
+* The containers of TeXmacs where the change was local: the tables of the
+  VM are hashmaps (symbols, extensions, fast builtins, GOOPS cmethods,
+  source positions), with hash (SCM) in scm.hpp; copy-tree uses a hashset;
+  the zombies of guardians, the stacks of the bytecode VM (with a raw
+  pointer to the frames, frame_data, as fast as std::vector on tak) are
+  arrays; the bindings of environments are TeXmacs pairs; bigint.cpp owns
+  its scratch chunks with tm_new_array instead of unique_ptr.
+
+Still from the standard library
+-------------------------------
+
+The strings and vectors of guile_cpp (std::string about 240 uses,
+std::string_view 60, std::vector 200, the shared_ptr<StringBuf> of the
+strings) are not replaced yet: TeXmacs string and array share their
+representation when they are copied (no copy on write), so that every copy
+of a std::string or std::vector which is then changed needs copy (); and
+array<T>::resize (0) frees the storage, which the evaluator's argument
+buffers (CekState::args, cleared at each call) would reallocate at every
+call. They need a growable buffer in the style of TeXmacs (with a
+capacity) for the hot buffers, and an audit of the copies. Also left:
+<algorithm> (std::sort and std::stable_sort with comparators in sort.cpp,
+gc.cpp and vm.hpp; std::min / std::max on size_t and int64_t, for which
+TeXmacs has no overloads), std::move / std::swap, <complex>, <chrono>,
+<limits>, std::to_string / std::stoll / std::stod.
