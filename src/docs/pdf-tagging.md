@@ -67,8 +67,8 @@ a document (a P, or a Div when they hold paragraphs themselves).
   (`pdf-tag-alt`). The Alt of a picture is the variable `image-alt` around
   it, `<with|image-alt|A plot of the solution|<image|...>>`, which *Focus →
   Alternative text...* sets on an image (`set-current-image-alt`); without
-  it, the caption of its figure, or else the name of its file, and the
-  export warns of the pictures without one.
+  it, the caption of its figure, or else the name of its file (the
+  export does not warn of it: see *Checking a document* below).
 * A Sect (a bibliography, a table of contents, an index, a glossary, a
   list of figures) has the title its macro writes as a heading, of the
   rank of an appendix; the title of a slide (`tit`) is a heading.
@@ -294,6 +294,51 @@ and the streams of a page are one content. The fonts and the forms of a
 picture are each read once (a picture may make cycles), and a font which
 also draws in a pattern or a Type 3 glyph, or by an ExtGState, keeps all
 its codes.
+
+## Checking a document
+
+The export warns of nothing that the document lacks for accessibility: a
+tagged PDF is the default, and a warning at each export of a document
+with pictures (the window of the error messages, "94 images have no
+alternative text...") was a nuisance, reported on the forum. The notes
+of the writers on the fonts of pictures (no font to embed, characters of
+no glyph in the replacement, a font which is not an object of its own)
+are debugging output (`debug_convert`, the debug flag `convert`); the
+failures of the writers themselves (MuPDF could not write the structure,
+a font could not be embedded) are warnings as before.
+
+*Tools → Accessibility → Check for a tagged PDF* (`pdf-tag-show-check`,
+`tm-print.scm`) says what is missing, in a dialog, and puts the cursor on
+the first picture without an alternative text; *Next picture without
+alternative text* (`pdf-tag-next-picture`) goes to the next one after the
+cursor, then to the first again. What it finds is `(pdf-tag-check)`, an
+association list, for scripts and the tests:
+
+* `pictures`: the places of the images which the tagged PDF describes by
+  a caption or a file name. They are found by the tagger itself
+  (`pdf_tag_pictures_without_alt`, `edit_tagger.cpp`, the glue
+  `pdf-tag-pictures-without-alt` of a body): each `image` of the body is
+  resolved as the export resolves what it draws, and is counted when it is
+  a Figure of its own (`picture`) without an alternative text of the user's
+  (`own_alt`), so that an image in a formula or a drawing, which is no
+  Figure, is not; the rules of `image-alt` are those of `alt_of`, in one
+  place. Inactive markup and raw data are not looked into, as
+  `expand_includes` leaves them.
+* `included`: the included files (and theirs) which have such pictures,
+  with how many: they are checked in their own file, where the cursor can
+  go to them.
+* `title`: whether the document has a title of its own (`get-metadata`
+  gives the name of the file otherwise, which becomes the title of the
+  PDF).
+* `language`: the language of the document when `language_to_locale`
+  does not know it (the PDF then says `en-US`), else `#f`.
+
+The tables have no header rows to check (TeXmacs has no markup for them,
+see *Left*), and what only the writer finds (the fonts of the pictures) is
+for veraPDF. `convert-more` checks the report of a small document (two
+pictures without alternative text, one with, one in a formula, one in an
+included file), the steps through them, and that a tagged export leaves
+no message in the window of the errors.
 
 ## Checking it
 

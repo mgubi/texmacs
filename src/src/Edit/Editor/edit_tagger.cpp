@@ -51,7 +51,6 @@ public:
   array<tag_node> row_cells (path pos);
   string language () { return lang; }
   string title () { return ttl; }
-  int pictures_without_alt () { return without_alt; }
 
 private:
   bool   child (tree t, int i, tree& c);
@@ -60,7 +59,6 @@ private:
   string child_role_of (string tag, int i, int n);
   string alt_of (string key, tree t, string role, array<tree> above,
                  path cur);
-  int    without_alt;   // the pictures with no alternative text of their own
   void   collect_ranks (tree t, hashset<int>& ranks);
   string heading (string key, string role);
   string cell_spans (array<tree> trail, int row, int col);
@@ -70,7 +68,7 @@ pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
                                 string title2):
   body (body2), rp (rp2), lang (lang2), ttl (title2),
   roles ("?"), child_roles ("?"), alts (""),
-  heading_of (""), appendix_rank (3), without_alt (0)
+  heading_of (""), appendix_rank (3)
 {
   // the ranks of the headings which the document uses: an appendix is a
   // chapter in a book, a section elsewhere
@@ -129,9 +127,6 @@ pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above,
           return r;
         }
     }
-    // (the warning of print_doc counts the images, for which the focus
-    // menu has the alternative text)
-    if (is_compound (t, "image")) without_alt++;
     for (int k= N(above) - 1; k >= 0; k--) {
       tree f= above[k];
       if (!is_compound (f) || N(f) < 2) continue;
@@ -473,4 +468,43 @@ pdf_tagger_rep::row_cells (path pos) {
 tagger_rep*
 make_pdf_tagger (tree body, path rp, string lang, string title) {
   return tm_new<pdf_tagger_rep> (body, rp, lang, title);
+}
+
+/******************************************************************************
+* The pictures without an alternative text (pdf-tag-check, tm-print.scm)
+******************************************************************************/
+
+// The images of t (at cur in the body) which the tagger makes Figures of
+// their own without an alternative text of the user's: those which a
+// tagged PDF describes by a caption or a file name. Each is resolved as
+// the export resolves what it draws, so that the check and the export
+// agree (an image in a formula or a drawing is not a Figure of its own).
+// What a tagged PDF would not typeset as such (inactive markup, raw data)
+// and the includes (checked in their own files) are not looked into.
+static void
+pictures_without_alt (pdf_tagger_rep& tg, tree t, path cur, array<path>& r) {
+  if (is_atomic (t)) return;
+  if (is_compound (t, "inactive") || is_compound (t, "inactive*") ||
+      is_compound (t, "var-inactive") || is_compound (t, "raw-data") ||
+      is_compound (t, "include"))
+    return;
+  if (is_compound (t, "image")) {
+    path pos;
+    array<tag_node> a= tg.resolve (reverse (cur), pos);
+    if (N(a) > 0) {
+      tag_node nd= a[N(a)-1];
+      if (nd.role == "Figure" && nd.picture && !nd.own_alt && nd.pos == cur)
+        r << cur;
+    }
+    return;
+  }
+  for (int i=0; i<N(t); i++) pictures_without_alt (tg, t[i], cur * i, r);
+}
+
+array<path>
+pdf_tag_pictures_without_alt (tree body) {
+  pdf_tagger_rep tg (body, path (), "", "");
+  array<path> r;
+  pictures_without_alt (tg, body, path (), r);
+  return r;
 }

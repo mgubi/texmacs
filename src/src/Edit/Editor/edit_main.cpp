@@ -610,16 +610,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   }
   tm_delete (ren);
   if (tagger != NULL) {
-    // a picture without an alternative text of its own is described by its
-    // caption or its file: the author should say what it shows
-    int n= tagger->pictures_without_alt ();
-    if (n > 0)
-      convert_warning << as_string (n) << (n == 1? " image has": " images have")
-                      << " no alternative text (Focus > Alternative text): "
-                      << "the tagged PDF describes "
-                      << (n == 1? "it": "them") << " by a caption or a file name"
-                      << " (a picture which is a tagged PDF, by its own "
-                      << "structure)" << LF;
+    // (no warning of the pictures without an alternative text: the export
+    // says nothing of what the document lacks for accessibility, which
+    // Tools > Accessibility > Check for a tagged PDF reports, pdf-tag-check)
     tm_delete (tagger);
   }
   delete_typesetter (ttt);

@@ -673,6 +673,19 @@ tmg_mupdf_writes_pdfP () {
 }
 
 tmscm
+tmg_pdf_tag_pictures_without_alt (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "pdf-tag-pictures-without-alt");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_path out= pdf_tag_pictures_without_alt (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_path_to_tmscm (out);
+}
+
+tmscm
 tmg_supports_ghostscriptP () {
   // TMSCM_DEFER_INTS;
   bool out= supports_ghostscript ();
@@ -13274,6 +13287,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-error",  tmg_cpp_error, 0, 0, 0);
   tmscm_install_procedure ("supports-native-pdf?",  tmg_supports_native_pdfP, 0, 0, 0);
   tmscm_install_procedure ("mupdf-writes-pdf?",  tmg_mupdf_writes_pdfP, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-pictures-without-alt",  tmg_pdf_tag_pictures_without_alt, 1, 0, 0);
   tmscm_install_procedure ("supports-ghostscript?",  tmg_supports_ghostscriptP, 0, 0, 0);
   tmscm_install_procedure ("gs-executable",  tmg_gs_executable, 0, 0, 0);
   tmscm_install_procedure ("rescue-mode?",  tmg_rescue_modeP, 0, 0, 0);

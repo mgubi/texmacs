@@ -81,6 +81,7 @@
   (cpp-error cpp_error (void))
   (supports-native-pdf? supports_native_pdf (bool))
   (mupdf-writes-pdf? mupdf_writes_pdf (bool))
+  (pdf-tag-pictures-without-alt pdf_tag_pictures_without_alt (array_path tree))
   (supports-ghostscript? supports_ghostscript (bool))
   (gs-executable get_gs_executable (string))
   (rescue-mode? in_rescue_mode (bool))

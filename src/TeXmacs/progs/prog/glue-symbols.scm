@@ -90,6 +90,7 @@
 "cpp-error"
 "supports-native-pdf?"
 "mupdf-writes-pdf?"
+"pdf-tag-pictures-without-alt"
 "supports-ghostscript?"
 "gs-executable"
 "rescue-mode?"

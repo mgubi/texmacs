@@ -457,3 +457,136 @@
 (tm-define (pdf-tag-language lan)
   (:synopsis "The language @lan of TeXmacs as a code (de-DE) for a PDF")
   (string-replace (language-to-locale lan) "_" "-"))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Checking a document for a tagged PDF (Tools > Accessibility): what an
+;; accessible PDF wants and the document does not say. The export itself
+;; warns of nothing (docs/pdf-tagging.md).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (pdf-tag-includes t)
+  ;; the files of the includes of @t, in their order, outside the markup
+  ;; which a tagged PDF does not expand (edit_main.cpp, expand_includes)
+  (cond ((tree-atomic? t) '())
+        ((tree-in? t '(inactive inactive* var-inactive raw-data)) '())
+        ((and (tree-is? t 'include) (tree-atomic? (tree-ref t 0)))
+         (list (tree->string (tree-ref t 0))))
+        (else (append-map pdf-tag-includes (tree-children t)))))
+
+(define (pdf-tag-included-pictures base t seen)
+  ;; the (file . count) of the included files of @t (relative to @base),
+  ;; and of theirs, which have pictures without an alternative text
+  (append-map
+   (lambda (f)
+     (let ((u (url-relative base f)))
+       (if (or (in? (url->string u) seen) (not (url-exists? u))) '()
+           (let* ((d (catch #t (lambda () (tree-import u "texmacs"))
+                       (lambda args #f)))
+                  (b (and d (tmfile-get d 'body))))
+             (if (not (tree? b)) '()
+                 (let ((n (length (pdf-tag-pictures-without-alt b)))
+                       (more (pdf-tag-included-pictures
+                              u b (cons (url->string u) seen))))
+                   (if (> n 0) (cons (cons f n) more) more)))))))
+   (pdf-tag-includes t)))
+
+(define (pdf-tag-known-language? lan)
+  ;; (pdf-tag-language gives en-US for a language it does not know)
+  (or (in? lan '("english" "american"))
+      (!= (language-to-locale lan) "en_US")))
+
+(tm-define (pdf-tag-check)
+  (:synopsis "What the current document lacks for an accessible tagged PDF")
+  ;; an association list: the places of the pictures which a tagged PDF
+  ;; describes by a caption or a file name (as the export does, through
+  ;; the tagger: pdf-tag-pictures-without-alt), the included files which
+  ;; have such pictures and how many, whether the document has a title
+  ;; of its own (else the PDF has the name of the file), and the language
+  ;; of the document when a PDF cannot say it (else #f)
+  (let* ((body (buffer-tree))
+         (rp (tree->path body))
+         (pics (map (lambda (p) (append rp p))
+                    (pdf-tag-pictures-without-alt body)))
+         (buf (current-buffer))
+         (incl (pdf-tag-included-pictures buf body (list (url->string buf))))
+         (ttl (get-metadata "title"))
+         (own-title? (and (!= ttl "")
+                          (!= ttl (utf8->cork (url->string (url-tail buf))))))
+         (lan (get-init "language")))
+    (list (cons 'pictures pics)
+          (cons 'included incl)
+          (cons 'title own-title?)
+          (cons 'language (and (not (pdf-tag-known-language? lan)) lan)))))
+
+(tm-define (pdf-tag-check-lines r)
+  (:synopsis "The lines which say what the check @r of pdf-tag-check found")
+  (let* ((pics (length (assoc-ref r 'pictures)))
+         (incl (assoc-ref r 'included))
+         (lan (assoc-ref r 'language))
+         (plural (lambda (n one many)
+                   (string-append (number->string n) " " (if (== n 1) one many))))
+         (l (append
+             (if (> pics 0)
+                 (list (string-append
+                        (plural pics "picture has" "pictures have")
+                        " no alternative text (Focus > Alternative text)")
+                       (string-append
+                        "  (Tools > Accessibility > Next picture without"
+                        " alternative text goes to " (if (== pics 1) "it" "them")
+                        ")"))
+                 '())
+             (map (lambda (x)
+                    (string-append "The included file " (car x) ": "
+                                   (plural (cdr x) "picture" "pictures")
+                                   " without alternative text"))
+                  incl)
+             (if (assoc-ref r 'title) '()
+                 (list (string-append "No title (Document > Metadata > Title,"
+                                      " or a title in the document):")
+                       "  the PDF has the name of the file as its title"))
+             (if lan
+                 (list (string-append "The language " lan " has no code"
+                                      " for a PDF: it is said to be English"))
+                 '()))))
+    (if (null? l) (list "Nothing is missing for an accessible tagged PDF")
+        l)))
+
+(define (pdf-tag-go-to p)
+  ;; the cursor before the picture at @p, the picture in focus
+  (go-to (rcons p 0))
+  (with t (path->tree p)
+    (when (tree? t) (tree-focus t))))
+
+(tm-define (pdf-tag-next-picture)
+  (:synopsis "Go to the next picture without an alternative text")
+  ;; after the cursor, else the first one again; #f when there is none
+  (let* ((l (assoc-ref (pdf-tag-check) 'pictures))
+         (cur (cursor-path))
+         (next (list-find l (lambda (p) (path-less? cur (rcons p 0))))))
+    (cond ((null? l)
+           (set-message "No picture without an alternative text" "")
+           #f)
+          (else
+           (let* ((p (or next (car l)))
+                  (i (+ 1 (list-find-index l (lambda (q) (== q p))))))
+             (pdf-tag-go-to p)
+             (set-message (string-append "Picture " (number->string i) " of "
+                                         (number->string (length l))
+                                         " without an alternative text")
+                          "Focus > Alternative text")
+             p)))))
+
+(tm-widget ((pdf-tag-check-widget lines) done)
+  (padded
+    (for (x lines)
+      (hlist (text x) >>))
+    ===
+    (bottom-buttons >> ("Ok" (done)))))
+
+(tm-define (pdf-tag-show-check)
+  (:synopsis "Check the document for an accessible tagged PDF")
+  (:interactive #t)
+  (let* ((r (pdf-tag-check))
+         (l (assoc-ref r 'pictures)))
+    (when (nnull? l) (pdf-tag-go-to (car l)))
+    (dialogue-window (pdf-tag-check-widget (pdf-tag-check-lines r)) noop
+                     "Check for a tagged PDF")))

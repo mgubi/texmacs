@@ -14,6 +14,19 @@ have the details, and the problems go to the
 
 ## 28 November 2026
 
+- **Tagged PDF: no warnings on export, a check in the Tools menu**
+  (desktop applications): since the PDF is tagged by default, every
+  export of a document with pictures lacking an alternative text opened
+  the window of the error messages ("94 images have no alternative
+  text..."), which a user on the forum found annoying. The export is still
+  tagged but warns of nothing (the notes on the fonts of pictures are
+  debugging output now). *Tools → Accessibility → Check for a tagged PDF*
+  says what the document lacks for an accessible PDF: the pictures without
+  an alternative text (the same ones as the export, found by its tagger),
+  those of the included files, a missing title and a language which a PDF
+  cannot name, or that nothing is missing; *Next picture without
+  alternative text* goes to each of them in turn, for *Focus → Alternative
+  text...*.
 - **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
   the Chez backend (21 November) the compiler flags of the vendored
   femtolisp were set only in Chez builds, and `fl_core.c` did not find

@@ -523,6 +523,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(pdf-tag-pictures-without-alt <scm-arg|tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_pictures_without_alt> which
+    returns <scm|array_path>.
+  </explain>
+
+  <\explain>
     <scm|(supports-ghostscript?)>
 <explain-synopsis|no synopsis>
   <|explain>

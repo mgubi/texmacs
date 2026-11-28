@@ -3444,6 +3444,83 @@
         (check-true (url-exists? pdf))
         (check-true (< (url-size pdf) 1000000)))))
 
+;; Tools > Accessibility > Check for a tagged PDF (pdf-tag-check): the
+;; pictures which a tagged PDF describes by no alternative text of the
+;; user's, as the tagger resolves them (not an image in a formula), those of
+;; the included files, the title and the language; and the export, tagged,
+;; warns of none of it (it used to say "2 images have no alternative text"
+;; in the window of the errors at each export, a report of the forum)
+(define (test-tagged-pdf-check)
+  (check-group "tagged pdf: the check of a document")
+  (let* ((inc (url-append (temp-dir) "check-inc.tm"))
+         (tm (url-append (temp-dir) "check-main.tm"))
+         (pdf (url-append (temp-dir) "check-main.pdf"))
+         (old (current-buffer))
+         (before (buffer-list))
+         (env (getenv "TEXMACS_PDF_TAGGED"))
+         (img (lambda () `(image (tuple (raw-data ,(export-png)) "png")
+                                 "1cm" "" "" "")))
+         (errors (lambda () (tree-children (get-debug-messages "Errors"
+                                                               1000000)))))
+    (string-save (serialize-texmacs
+                  (stree->tree (tmfile `(document "Included." ,(img)))))
+                 inc)
+    (string-save (serialize-texmacs
+                  (stree->tree
+                   (tmfile `(document
+                             "Text."
+                             ,(img)
+                             (with "image-alt" "A drawing" ,(img))
+                             (concat "In a formula " (math ,(img)) ".")
+                             (big-figure ,(img) "A caption.")
+                             (include "check-inc.tm")))))
+                 tm)
+    (load-buffer tm :strict)
+    (let* ((r (pdf-tag-check))
+           (pics (assoc-ref r 'pictures))
+           (rp (tree->path (buffer-tree))))
+      (check= (length pics) 2)
+      (check= pics (list (append rp '(1)) (append rp '(4 0))))
+      (check= (assoc-ref r 'included) '(("check-inc.tm" . 1)))
+      (check-false (assoc-ref r 'title))
+      (check-false (assoc-ref r 'language))
+      (check= (length (pdf-tag-check-lines r)) 5)
+      ;; the next picture after the cursor, then the first one again
+      (go-to (append rp '(0 0)))
+      (check= (pdf-tag-next-picture) (append rp '(1)))
+      (check= (pdf-tag-next-picture) (append rp '(4 0)))
+      (check= (pdf-tag-next-picture) (append rp '(1)))
+      ;; the export says nothing of them
+      (with n (length (errors))
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (check-true (url-exists? pdf))
+        (check= (length (errors)) n)
+        (check-false (list-find (errors)
+                                (lambda (m) (string-occurs?
+                                             "alternative text"
+                                             (object->string (tm->stree m)))))))
+      ;; with the alternative texts, a title and a language which a PDF
+      ;; cannot say
+      (for (p pics) (image-set-alt (path->tree p) "A picture"))
+      (init-env "global-title" "A title")
+      (init-env "language" "arabic")
+      (let ((r2 (pdf-tag-check)))
+        (check= (assoc-ref r2 'pictures) '())
+        (check-true (assoc-ref r2 'title))
+        (check= (assoc-ref r2 'language) "arabic")
+        (check= (pdf-tag-next-picture) #f))
+      (init-env "language" "german")
+      (buffer-set-body tm (stree->tree '(document "Nothing to say.")))
+      (with r3 (pdf-tag-check)
+        (check= (pdf-tag-check-lines r3)
+                '("Nothing is missing for an accessible tagged PDF"))))
+    (buffer-pretend-saved tm)
+    (for (b (buffer-list))
+      (when (nin? b before) (buffer-close b)))
+    (check-restore-buffer old)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3908,7 +3985,7 @@
                   test-compress test-compress-tables
                   test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-tagged-pdf-export test-tagged-pdf-include
-                  test-tagged-pdf-cycle
+                  test-tagged-pdf-cycle test-tagged-pdf-check
                   test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
   (system-setenv "TEXMACS_PDF_OBJSTMS" (or objstms ""))
