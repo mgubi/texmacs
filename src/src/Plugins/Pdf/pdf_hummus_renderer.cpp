@@ -2175,7 +2175,9 @@ hummus_font_dicts (PDFParser& p, PDFDictionary* res,
         continue;
       }
       if (v->GetType () != PDFObject::ePDFObjectIndirectObjectReference) {
-        convert_warning << "a font of a picture is not an object of its own, "
+        // (a shortcoming of the tagged PDF: debug output only)
+        if (DEBUG_CONVERT)
+          debug_convert << "a font of a picture is not an object of its own, "
                         << "it is left as it is" << LF;
         continue;
       }
@@ -2679,14 +2681,17 @@ hummus_embed_picture_fonts (url in, url out, hashset<int>* keep) {
     }
     if (e != NULL) e->Release ();
     pdf_font_subst r;
+    // (the shortcomings of a tagged PDF are not warned of on export:
+    // debug output only, see docs/pdf-tagging.md)
     if (!pdf_font_substitute (base, pdf_encoding_names (base, enc, diffs), r)) {
-      convert_warning << "no font to embed for " << base
+      if (DEBUG_CONVERT)
+        debug_convert << "no font to embed for " << base
                       << " (a picture), the PDF is not PDF/UA" << LF;
       continue;
     }
-    if (r.missing > 0)
-      convert_warning << r.missing << " characters of " << base
-                      << " (a picture) have no glyph in " << r.ps_name << LF;
+    if (r.missing > 0 && DEBUG_CONVERT)
+      debug_convert << r.missing << " characters of " << base
+                    << " (a picture) have no glyph in " << r.ps_name << LF;
     // the program, subset to the glyphs of the font
     string path= concretize (r.file);
     std::string spath (&path[0], N(path));

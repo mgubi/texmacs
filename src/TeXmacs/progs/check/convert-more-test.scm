@@ -51,7 +51,8 @@
         (convert latex latex-tools)
         (convert rewrite tmtm-brackets)
         (tools spell spell-lantool)
-        (tools ai ai-translate)))
+        (tools ai ai-translate)
+        (dynamic fold-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -3444,6 +3445,357 @@
         (check-true (url-exists? pdf))
         (check-true (< (url-size pdf) 1000000)))))
 
+;; Tools > Accessibility > Check for a tagged PDF (pdf-tag-check): the
+;; pictures which a tagged PDF describes by no alternative text of the
+;; user's, met by its tagger while the document is printed (not an image in
+;; a formula), those of the included files, the title and the language; and
+;; the export, tagged, warns of none of it (it used to say "2 images have no
+;; alternative text" in the window of the errors at each export, a report
+;; of the forum)
+(define (test-tagged-pdf-check)
+  (check-group "tagged pdf: the check of a document")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf check" "no native PDF writer")
+      (test-tagged-pdf-check*)))
+
+(define (test-tagged-pdf-check*)
+  (let* ((inc (url-append (temp-dir) "check-inc.tm"))
+         (tm (url-append (temp-dir) "check-main.tm"))
+         (pdf (url-append (temp-dir) "check-main.pdf"))
+         (old (current-buffer))
+         (before (buffer-list))
+         (env (getenv "TEXMACS_PDF_TAGGED"))
+         (img (lambda () `(image (tuple (raw-data ,(export-png)) "png")
+                                 "1cm" "" "" "")))
+         (errors (lambda () (tree-children (get-debug-messages "Errors"
+                                                               1000000)))))
+    (string-save (serialize-texmacs
+                  (stree->tree (tmfile `(document "Included." ,(img)))))
+                 inc)
+    (string-save (serialize-texmacs
+                  (stree->tree
+                   (tmfile `(document
+                             "Text."
+                             ,(img)
+                             (with "image-alt" "A drawing" ,(img))
+                             (concat "In a formula " (math ,(img)) ".")
+                             (big-figure ,(img) "A caption.")
+                             (include "check-inc.tm")))))
+                 tm)
+    (load-buffer tm :strict)
+    (let* ((r (pdf-tag-check))
+           (pics (assoc-ref r 'pictures))
+           (rp (tree->path (buffer-tree))))
+      (check-true (assoc-ref r 'tagged))
+      (check= (assoc-ref r 'drawn) 3)
+      (check= (assoc-ref r 'elsewhere) 0)
+      (check= (length pics) 2)
+      (check-false (buffer-modified? tm))
+      (check= pics (list (append rp '(1)) (append rp '(4 0))))
+      (check= (assoc-ref r 'included) '(("check-inc.tm" . 1)))
+      (check-false (assoc-ref r 'title))
+      (check-false (assoc-ref r 'language))
+      (check= (length (pdf-tag-check-lines r)) 5)
+      ;; the next picture after the cursor, then the first one again
+      (go-to (append rp '(0 0)))
+      (check= (pdf-tag-next-picture) (append rp '(1)))
+      (check= (pdf-tag-next-picture) (append rp '(4 0)))
+      (check= (pdf-tag-next-picture) (append rp '(1)))
+      ;; the export says nothing of them
+      (with n (length (errors))
+        (system-setenv "TEXMACS_PDF_TAGGED" "1")
+        (export-buffer pdf)
+        (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+        (check-true (url-exists? pdf))
+        (check= (length (errors)) n)
+        (check-false (list-find (errors)
+                                (lambda (m) (string-occurs?
+                                             "alternative text"
+                                             (object->string (tm->stree m)))))))
+      ;; with the alternative texts, a title and a language which a PDF
+      ;; cannot say
+      (for (p pics) (image-set-alt (path->tree p) "A picture"))
+      (init-env "global-title" "A title")
+      (init-env "language" "arabic")
+      (let ((r2 (pdf-tag-check)))
+        (check= (assoc-ref r2 'pictures) '())
+        (check-true (assoc-ref r2 'title))
+        (check= (assoc-ref r2 'language) "arabic")
+        (check= (pdf-tag-next-picture) #f)
+        ;; a picture added after: Next checks again when none is left
+        (tree-insert! (buffer-tree) 0 (list (stree->tree (img))))
+        (update-forced) (apply-changes)
+        (check= (pdf-tag-next-picture) (append rp '(0))))
+      (init-env "language" "german")
+      (buffer-set-body tm (stree->tree '(document "Nothing to say.")))
+      (with r3 (pdf-tag-check)
+        (check= (pdf-tag-check-lines r3)
+                '("Nothing is missing for an accessible tagged PDF"))))
+    (buffer-pretend-saved tm)
+    (for (b (buffer-list))
+      (when (nin? b before) (buffer-close b)))
+    (check-restore-buffer old)))
+
+;; The pictures which the check reports are those of which the tagged export
+;; makes Figures without an alternative text of the user's ("Image f.png"),
+;; whatever decides what is printed: folded, hidden, ignore, specific, if
+;; and case (literal or computed conditions), a marginal note, a macro
+;; definition, an include. Next picture goes from one to the next also when
+;; the editor puts the cursor out of the picture (the end of the text before
+;; an image in a line, before a specific), and the alternative text set then
+;; goes to the picture in focus.
+
+(define (pdf-alt-images pdf)
+  ;; the files of the pictures described as "Image f.png" in @pdf
+  (with s (if (url-exists? pdf) (string-load pdf) "")
+    (let loop ((i 0) (r '()))
+      (with j (string-search-forwards "/Alt(Image " i s)
+        (if (< j 0) (reverse r)
+            (with k (string-search-forwards ")" j s)
+              (loop k (cons (substring s (+ j 11) k) r))))))))
+
+(define (picture-files l)
+  ;; the files of the images at the places @l
+  (map (lambda (p) (tree->string (tree-ref (path->tree p) 0))) l))
+
+(define (check-pictures-doc name style body files)
+  ;; save @body (images of the @files, written next to it), load it and
+  ;; check it, then export it as Export as PDF does: the check and the
+  ;; export, of the document loaded
+  (for (n files)
+    (string-save (export-png) (url-append (temp-dir) n)))
+  (with tm (url-append (temp-dir) (string-append name ".tm"))
+    (string-save (serialize-texmacs
+                  (stree->tree
+                   `(document (TeXmacs ,(texmacs-version)) (style ,style)
+                              (body ,body))))
+                 tm)
+    (load-buffer tm :strict)
+    (update-forced) (apply-changes)
+    (let* ((r (pdf-tag-check))
+           (pdf (url-append (temp-dir) (string-append name ".pdf")))
+           (env (getenv "TEXMACS_PDF_TAGGED")))
+      (system-setenv "TEXMACS_PDF_TAGGED" "1")
+      (wrapped-print-to-file pdf)
+      (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+      (list tm r (pdf-alt-images pdf)))))
+
+(define (test-tagged-pdf-check-hidden)
+  (check-group "tagged pdf: the check prints what the export prints")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf check" "no native PDF writer")
+      (test-tagged-pdf-check-hidden*)))
+
+(define (test-tagged-pdf-check-hidden*)
+  (let* ((old (current-buffer))
+         (before (buffer-list))
+         (img (lambda (n) `(image ,(string-append n ".png") "1cm" "" "" "")))
+         (names '("a" "b" "c" "fold" "unfold" "ign" "scr" "prn" "iff" "ift"
+                  "ifc1" "ifc2" "mn" "case1" "case2" "case3" "case4" "mac"
+                  "inc" "inner"))
+         (files (map (lambda (n) (string-append n ".png")) names))
+         (shown '("a.png" "b.png" "c.png" "unfold.png" "prn.png" "ift.png"
+                  "ifc1.png" "mn.png" "case2.png" "case4.png")))
+    (string-save (serialize-texmacs
+                  (stree->tree (tmfile `(document "I." ,(img "inc")
+                                                  (include
+                                                   "check-hidden-inner.tm")))))
+                 (url-append (temp-dir) "check-hidden-inc.tm"))
+    (string-save (serialize-texmacs
+                  (stree->tree (tmfile `(document "J." ,(img "inner")))))
+                 (url-append (temp-dir) "check-hidden-inner.tm"))
+    (with (tm r alts)
+        (check-pictures-doc
+         "check-hidden" "generic"
+         `(document
+           (concat "Some text " ,(img "a") " more " ,(img "b") ".")
+           "Para."
+           (concat "x " ,(img "c"))
+           (folded "Summary" ,(img "fold"))
+           (unfolded "Summary" ,(img "unfold"))
+           (ignore ,(img "ign"))
+           (specific "screen" ,(img "scr"))
+           (specific "printer" ,(img "prn"))
+           (if "false" ,(img "iff"))
+           (if "true" ,(img "ift"))
+           (if (equal "a" "a") ,(img "ifc1") ,(img "ifc2"))
+           (concat "m" (marginal-note "normal" "c" ,(img "mn")))
+           (case "false" ,(img "case1") ,(img "case2"))
+           (case (equal "a" "b") ,(img "case3") ,(img "case4"))
+           (assign "logo" (macro ,(img "mac")))
+           (include "check-hidden-inc.tm"))
+         files)
+      (let* ((rp (tree->path (buffer-tree)))
+             (pics (assoc-ref r 'pictures))
+             (step (lambda ()
+                     (with p (pdf-tag-next-picture)
+                       (update-forced) (apply-changes)
+                       p))))
+        ;; the check and the export agree, picture by picture
+        (check= (picture-files pics) shown)
+        (check= alts (append shown '("inc.png" "inner.png")))
+        (check= (assoc-ref r 'drawn) (length alts))
+        ;; (the file which holds the picture, also in an included one)
+        (check= (assoc-ref r 'included) '(("check-hidden-inc.tm" . 1)
+                                          ("check-hidden-inner.tm" . 1)))
+        (check= (assoc-ref r 'elsewhere) 0)
+        (check-false (buffer-modified? tm))
+        ;; the steps, the editor typesetting between them (it puts the
+        ;; cursor at the end of "Some text " for the first picture)
+        (go-to (append rp '(0 0 0)))
+        (for (p pics) (check= (step) p))
+        (check= (step) (car pics))
+        ;; Focus > Alternative text, the cursor out of the picture
+        (set-current-image-alt "First")
+        (check= (picture-files (assoc-ref (pdf-tag-check) 'pictures))
+                (cdr shown))
+        (check= (step) (cadr pics))
+        (buffer-pretend-saved tm)))
+    (for (b (buffer-list))
+      (when (nin? b before) (buffer-close b)))
+    (check-restore-buffer old)))
+
+;; A presentation is printed with its slides made (wrapped-print-to-file):
+;; a folded part of a slide gives a slide more, whose pictures are copies
+;; of those of the document, each found by the mark which the check puts
+;; on the pictures of the copy before the slides are made
+;; (pdf-tag-mark-copy); a hidden slide is printed too. The document is left
+;; as it was. The same picture on several slides, with and without an
+;; alternative text, is found where it has none, each time; and the copy
+;; is closed when the making of the slides fails.
+(define (test-tagged-pdf-check-slides)
+  (check-group "tagged pdf: the check of a presentation")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf check" "no native PDF writer")
+      (let* ((old (current-buffer))
+             (before (buffer-list))
+             (img (lambda (n) `(image ,(string-append n ".png")
+                                      "1cm" "" "" ""))))
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-slides" "beamer"
+             `(document
+               (screens (shown (document "S1" ,(img "s1")
+                                         (folded "x" ,(img "sfold"))))
+                        (hidden (document "S2" ,(img "s2")))))
+             '("s1.png" "sfold.png" "s2.png"))
+          (check= alts '("s1.png" "s1.png" "sfold.png" "s2.png"))
+          (check= (assoc-ref r 'drawn) 4)
+          (check= (picture-files (assoc-ref r 'pictures))
+                  '("s1.png" "sfold.png" "s2.png"))
+          (check= (assoc-ref r 'elsewhere) 0)
+          (check-false (buffer-modified? tm))
+          (check= (length (buffer-list)) (+ (length before) 1)))
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-slides-same" "beamer"
+             `(document
+               (screens (shown (document "S1" ,(img "y")))
+                        (hidden (document "S2" ,(img "y")))
+                        (hidden (document "S3" (with "image-alt" "d"
+                                                 ,(img "z"))))
+                        (hidden (document "S4" ,(img "z")
+                                          (folded "f" "more")))))
+             '("y.png" "z.png"))
+          (let ((rp (tree->path (buffer-tree)))
+                (n (length (buffer-list))))
+            (check= alts '("y.png" "y.png" "z.png" "z.png"))
+            (check= (assoc-ref r 'drawn) 4)
+            (check= (assoc-ref r 'pictures)
+                    (map (lambda (p) (append rp p))
+                         '((0 0 0 1) (0 1 0 1) (0 3 0 1))))
+            (check= (assoc-ref r 'elsewhere) 0)
+            (check-false (buffer-modified? tm))
+            ;; a failure while the slides are made
+            (check-true
+             (catch #t
+               (lambda ()
+                 (wrapped-print-to-file
+                  (url-append (temp-dir) "check-slides-fail.pdf")
+                  (lambda () (error "check-slides-fail")))
+                 #f)
+               (lambda args #t)))
+            (check= (current-buffer) tm)
+            (check= (length (buffer-list)) n)))
+        ;; included documents in a presentation: no mark, the file which
+        ;; holds the picture
+        (string-save (serialize-texmacs
+                      (stree->tree (tmfile `(document "I." ,(img "i1")
+                                                      (include
+                                                       "check-slides-i2.tm")))))
+                     (url-append (temp-dir) "check-slides-i1.tm"))
+        (string-save (serialize-texmacs
+                      (stree->tree (tmfile `(document "J." ,(img "i2")))))
+                     (url-append (temp-dir) "check-slides-i2.tm"))
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-slides-incl" "beamer"
+             `(document
+               (screens (shown (document "S1" ,(img "s1")
+                                         (include "check-slides-i1.tm")))))
+             '("s1.png" "i1.png" "i2.png"))
+          (check= alts '("s1.png" "i1.png" "i2.png"))
+          (check= (assoc-ref r 'drawn) 3)
+          (check= (picture-files (assoc-ref r 'pictures)) '("s1.png"))
+          (check= (assoc-ref r 'included) '(("check-slides-i1.tm" . 1)
+                                            ("check-slides-i2.tm" . 1)))
+          (check= (assoc-ref r 'elsewhere) 0))
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (check-restore-buffer old))))
+
+;; Next picture checks the document again when one of the pictures of the
+;; last check is no longer in the buffer (a picture moved: deleted and put
+;; elsewhere), and after a check which failed (the slides could not be made:
+;; dynamic-make-slides fails while check-slides-fail? is set), and says
+;; the error while the check fails.
+(define check-slides-fail? #f)
+
+(tm-define (dynamic-make-slides)
+  (:require check-slides-fail?)
+  (error "check-slides-fail"))
+
+(define (test-tagged-pdf-check-next)
+  (check-group "tagged pdf: next picture checks again")
+  (if (not (and (supports-native-pdf?) (get-boolean-preference "native pdf")))
+      (images-skip "tagged pdf check" "no native PDF writer")
+      (let* ((old (current-buffer))
+             (before (buffer-list))
+             (img (lambda (n) `(image ,(string-append n ".png")
+                                      "1cm" "" "" ""))))
+        ;; a picture moved
+        (with (tm r alts)
+            (check-pictures-doc "check-next" "generic"
+                                `(document "Text." ,(img "na") ,(img "nb"))
+                                '("na.png" "nb.png"))
+          (let ((rp (tree->path (buffer-tree))))
+            (check= (picture-files (assoc-ref r 'pictures))
+                    '("na.png" "nb.png"))
+            (image-set-alt (path->tree (append rp '(2))) "B")
+            (tree-remove! (buffer-tree) 1 1)
+            (tree-insert! (buffer-tree) 2 (list (stree->tree (img "na"))))
+            (update-forced) (apply-changes)
+            (check= (pdf-tag-next-picture) (append rp '(2)))
+            (buffer-pretend-saved tm)))
+        ;; a check which fails, then one which does not
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-next-slides" "beamer"
+             `(document (screens (shown (document "S1" ,(img "nc")))))
+             '("nc.png"))
+          (let ((rp (tree->path (buffer-tree))))
+            (set! check-slides-fail? #t)
+            (with r2 (pdf-tag-check)
+              (check-true (string? (assoc-ref r2 'error)))
+              (check= (assoc-ref r2 'pictures) '()))
+            (check= (pdf-tag-next-picture) #f)
+            (set! check-slides-fail? #f)
+            (check= (pdf-tag-next-picture) (append rp '(0 0 0 1)))))
+        (set! check-slides-fail? #f)
+        (for (b (buffer-list))
+          (when (nin? b before) (buffer-close b)))
+        (check-restore-buffer old))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3908,7 +4260,9 @@
                   test-compress test-compress-tables
                   test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-tagged-pdf-export test-tagged-pdf-include
-                  test-tagged-pdf-cycle
+                  test-tagged-pdf-cycle test-tagged-pdf-check
+                  test-tagged-pdf-check-hidden test-tagged-pdf-check-slides
+                  test-tagged-pdf-check-next
                   test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
   (system-setenv "TEXMACS_PDF_OBJSTMS" (or objstms ""))

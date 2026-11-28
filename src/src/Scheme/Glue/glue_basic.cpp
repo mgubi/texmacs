@@ -673,6 +673,60 @@ tmg_mupdf_writes_pdfP () {
 }
 
 tmscm
+tmg_pdf_tag_printedP () {
+  // TMSCM_DEFER_INTS;
+  bool out= pdf_tag_printed ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_places () {
+  // TMSCM_DEFER_INTS;
+  array_path out= pdf_tag_printed_places ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_path_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_images () {
+  // TMSCM_DEFER_INTS;
+  array_tree out= pdf_tag_printed_images ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_files () {
+  // TMSCM_DEFER_INTS;
+  array_string out= pdf_tag_printed_files ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_sources () {
+  // TMSCM_DEFER_INTS;
+  array_string out= pdf_tag_printed_sources ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_reset () {
+  // TMSCM_DEFER_INTS;
+  pdf_tag_printed_reset ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_supports_ghostscriptP () {
   // TMSCM_DEFER_INTS;
   bool out= supports_ghostscript ();
@@ -13274,6 +13328,12 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-error",  tmg_cpp_error, 0, 0, 0);
   tmscm_install_procedure ("supports-native-pdf?",  tmg_supports_native_pdfP, 0, 0, 0);
   tmscm_install_procedure ("mupdf-writes-pdf?",  tmg_mupdf_writes_pdfP, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed?",  tmg_pdf_tag_printedP, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-places",  tmg_pdf_tag_printed_places, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-images",  tmg_pdf_tag_printed_images, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-files",  tmg_pdf_tag_printed_files, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-sources",  tmg_pdf_tag_printed_sources, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-reset",  tmg_pdf_tag_printed_reset, 0, 0, 0);
   tmscm_install_procedure ("supports-ghostscript?",  tmg_supports_ghostscriptP, 0, 0, 0);
   tmscm_install_procedure ("gs-executable",  tmg_gs_executable, 0, 0, 0);
   tmscm_install_procedure ("rescue-mode?",  tmg_rescue_modeP, 0, 0, 0);
