@@ -414,6 +414,14 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   // (a retina_factor of 1 on a Retina screen); nothing to do while the view
   // is not in a window (it is shown when it is put back in one)
   if (!view || is_nil (gpu_store) || ![view window]) return true;
+  if (gpu_layer != NULL && !gpu_presents_at_once () &&
+      ![(CALayer*) gpu_layer isKindOfClass: NSClassFromString (@"CAMetalLayer")]) {
+    // (no IOSurface could be made, see metal_backend::surface_failed: the
+    // layer is replaced by a CAMetalLayer)
+    gpu_forget_layer (gpu_layer);
+    [(CALayer*) gpu_layer release];
+    gpu_layer= NULL;
+  }
   if (gpu_layer == NULL) {
     // (a CALayer shown by IOSurfaces, issue #988, or a CAMetalLayer)
     CALayer* l= (CALayer*) gpu_new_layer ();

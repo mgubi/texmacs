@@ -197,11 +197,17 @@ struct quad_uniforms { float size[2]; float porig[2]; float ptile[2]; int mode; 
 
 // a surface which a present replaced: in use until the transaction of that
 // present is committed (the completion block of the transaction gives the
-// use count up), or until it is 250 ms old (should a block not run)
+// use count up, and those of the presents before, since the transactions
+// are committed in order); should a block not run, until a later one has
+// run and it is 250 ms old, or until it is 5 s old
 struct replaced_surface {
   IOSurfaceRef s= NULL;            // retained until released
   double since= 0;                 // ms of CACurrentMediaTime
   bool done= false;
+};
+struct replaced_list {
+  std::vector<std::shared_ptr<replaced_surface>> v;
+  double committed= 0;             // since of the last one whose block ran
 };
 
 class metal_backend;
@@ -280,10 +286,14 @@ class metal_backend: public gpu_backend {
     int back= -1;                    // drawn into, for the next present
     bool fresh= false;               // back not cleared yet
     int made= 0;                     // surfaces allocated (the debug output)
-    std::vector<std::shared_ptr<replaced_surface>> pending;
+    std::shared_ptr<replaced_list> pending= std::make_shared<replaced_list> ();
   };
   std::unordered_map<void*, surface_ring> rings;  // by layer (Vue: of SDL)
   surface_ring* ring= NULL;          // of the window being drawn, or NULL
+  bool shown= true;                  // the last present showed a frame
+  int failures= 0;                   // surfaces not made, in a row
+  bool broken= false;                // so many: drawables instead
+  void surface_failed ();
   int take_surface (surface_ring& r, int w, int h);
   void clear_back (surface_ring& r);
   void present_surface ();
@@ -326,6 +336,7 @@ public:
   void detach (SDL_Window* w);
   void refresh (void* layer);
   bool presents_at_once ();
+  bool last_shown () { return shown; }
   void* new_layer ();
   void forget_layer (void* layer);
   bool layer_pixels (void* layer, int w, int h, unsigned char* rgba, int& n);
@@ -496,7 +507,18 @@ surfaces_wanted () {
 
 bool
 metal_backend::presents_at_once () {
-  return started && !failed && surfaces_wanted ();
+  return started && !failed && !broken && surfaces_wanted ();
+}
+
+// an IOSurface or its texture could not be made: after three in a row, the
+// frames are presented by drawables again (the layers made for the
+// IOSurfaces are then replaced, see attach and present_gpu_store)
+void
+metal_backend::surface_failed () {
+  if (++failures < 3 || broken) return;
+  broken= true;
+  cout << "TeXmacs] GPU: no IOSurface could be made, "
+       << "presenting by CAMetalLayer drawables" << LF;
 }
 
 bool
@@ -577,7 +599,10 @@ metal_backend::attach (SDL_Window* w) {
     }
   }
   auto rit= rings.find ((__bridge void*) it->second);
-  if (rit != rings.end ()) { use_ring (&rit->second); return true; }
+  if (rit != rings.end ()) {
+    if (!broken) { use_ring (&rit->second); return true; }
+    drop_ring ((__bridge void*) it->second);
+  }
   if (!attach_layer ((__bridge void*) it->second)) return false;
   // the refresh period of the screen of the window (it may move)
   double rate= 60.0;
@@ -645,6 +670,7 @@ void
 metal_backend::present (SDL_Window* w) {
   (void) w;
   if (ring != NULL) { present_surface (); return; }
+  shown= true;
   end_encoder ();
   // (a layer of the Cocoa port presented last with a transaction: the
   // drawable is presented with the command buffer again)
@@ -906,16 +932,21 @@ release_replaced (replaced_surface& p) {
 int
 metal_backend::take_surface (surface_ring& r, int w, int h) {
   if (w <= 0 || h <= 0 || too_large (w, h)) return -1;
-  // the surfaces replaced long ago are no longer in use (if a completion
-  // block did not run), those released are forgotten
+  // the surfaces replaced long ago are no longer in use, if a completion
+  // block did not run (not merely 250 ms ago: the pass of the run loop of
+  // the Cocoa port, whose end commits, may last longer); those released
+  // are forgotten
   double now= media_ms ();
-  for (int i= (int) r.pending.size () - 1; i >= 0; i--) {
-    if (!r.pending[i]->done && now - r.pending[i]->since > 250) {
+  std::vector<std::shared_ptr<replaced_surface>>& pv= r.pending->v;
+  for (int i= (int) pv.size () - 1; i >= 0; i--) {
+    replaced_surface& e= *pv[i];
+    if (!e.done && ((e.since < r.pending->committed && now - e.since > 250) ||
+                    now - e.since > 5000)) {
       if (debug_surfaces ())
         fprintf (stderr, "SURFACE %.3f released late\n", now);
-      release_replaced (*r.pending[i]);
+      release_replaced (e);
     }
-    if (r.pending[i]->done) r.pending.erase (r.pending.begin () + i);
+    if (e.done) pv.erase (pv.begin () + i);
   }
   // those of another size go (not the one shown: it stays until replaced)
   for (int i= (int) r.s.size () - 1; i >= 0; i--)
@@ -936,7 +967,7 @@ metal_backend::take_surface (surface_ring& r, int w, int h) {
       (id) kIOSurfacePixelFormat: @((unsigned) 'BGRA') };
     surface n;
     n.s= IOSurfaceCreate ((__bridge CFDictionaryRef) props);
-    if (n.s == NULL) return -1;
+    if (n.s == NULL) { surface_failed (); return -1; }
     if (srgb_icc () != NULL)
       IOSurfaceSetValue (n.s, kIOSurfaceColorSpace, srgb_icc ());
     MTLTextureDescriptor* d=
@@ -947,7 +978,8 @@ metal_backend::take_surface (surface_ring& r, int w, int h) {
     d.storageMode= MTLStorageModeManaged;
     d.usage= MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     n.tex= [device newTextureWithDescriptor: d iosurface: n.s plane: 0];
-    if (n.tex == nil) { CFRelease (n.s); return -1; }
+    if (n.tex == nil) { CFRelease (n.s); surface_failed (); return -1; }
+    failures= 0;
     n.w= w; n.h= h;
     r.s.push_back (n);
     r.made++;
@@ -955,9 +987,13 @@ metal_backend::take_surface (surface_ring& r, int w, int h) {
   }
   if (pick < 0) {
     // (max_surfaces held by the compositor, which should not happen: one
-    // of them is drawn into anyway, which may show half drawn)
-    for (int i= 0; i < (int) r.s.size (); i++)
-      if (i != r.front) { pick= i; break; }
+    // of them is drawn into anyway, which may show half drawn: the one
+    // replaced last, which no transaction committed yet may have shown)
+    for (int k= (int) pv.size () - 1; k >= 0 && pick < 0; k--)
+      for (int i= 0; i < (int) r.s.size (); i++)
+        if (i != r.front && r.s[i].s == pv[k]->s) { pick= i; break; }
+    for (int i= 0; i < (int) r.s.size () && pick < 0; i++)
+      if (i != r.front) pick= i;
     if (debug_surfaces ())
       fprintf (stderr, "SURFACE %.3f all %d in use\n", media_ms (),
                (int) r.s.size ());
@@ -996,7 +1032,8 @@ void
 metal_backend::present_surface () {
   surface_ring& r= *ring;
   end_encoder ();
-  if (r.back < 0) { flush (); return; }
+  if (r.back < 0) { flush (); shown= false; return; }
+  shown= true;
   if (r.fresh) clear_back (r);   // (nothing drawn: shown empty)
   flush ();
   double t0= media_ms ();
@@ -1035,8 +1072,12 @@ metal_backend::present_surface () {
     p->s= r.s[old].s;
     CFRetain (p->s);
     p->since= t1;
-    r.pending.push_back (p);
-    [CATransaction setCompletionBlock: ^{ release_replaced (*p); }];
+    std::shared_ptr<replaced_list> l= r.pending;
+    l->v.push_back (p);
+    [CATransaction setCompletionBlock: ^{
+      l->committed= max (l->committed, p->since);
+      for (auto& e: l->v) if (e->since <= p->since) release_replaced (*e);
+    }];
   }
   r.host.contents= (__bridge id) n.s;
   if (r.own_transaction) {
@@ -1079,7 +1120,7 @@ metal_backend::drop_ring (void* key) {
   if (r.follow != nil) [r.host removeFromSuperlayer];
   [CATransaction commit];
   if (r.front >= 0) IOSurfaceDecrementUseCount (r.s[r.front].s);
-  for (auto& p: r.pending) release_replaced (*p);
+  for (auto& p: r.pending->v) release_replaced (*p);
   // (the commands which draw into them keep their textures)
   for (surface& x: r.s) if (x.s != NULL) CFRelease (x.s);
   rings.erase (it);

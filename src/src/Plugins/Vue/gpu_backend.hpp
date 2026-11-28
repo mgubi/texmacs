@@ -119,6 +119,8 @@ public:
   // the contents of a layer, issue #988); the loop of the Vue port then
   // repaints at every turn
   virtual bool presents_at_once () { return false; }
+  // whether the last present showed a frame (false: none could be drawn)
+  virtual bool last_shown () { return true; }
   // a layer for attach_layer, which the GUI puts in its view (the Cocoa
   // port): a CALayer shown by IOSurfaces, or NULL when the GUI is to make a
   // CAMetalLayer itself (presents_at_once is false); forget_layer before

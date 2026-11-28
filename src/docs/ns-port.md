@@ -543,8 +543,9 @@ The surfaces of a layer are a ring kept by the Metal backend
 surface which is neither shown nor still held by the compositor
 (`IOSurfaceIsInUse`; the surface shown has a use count of ours, as in Qt,
 and the one it replaced keeps it until the transaction is committed, by a
-completion block: two repaints in one pass of the run loop do not draw
-into what the compositor still shows),
+completion block, which also releases the surfaces replaced before it: two
+repaints in one pass of the run loop do not draw into what the compositor
+still shows),
 another one is allocated when all of them are in use (up to eight), and the
 free ones beyond three are released, so that nothing waits for the screen.
 The surfaces are BGRA8, premultiplied, in sRGB (as the `CAMetalLayer` was),
@@ -555,6 +556,9 @@ over it. A change of size or of screen allocates surfaces of the new size
 (the one shown stays until replaced); occluded windows present as the
 others, which no longer blocks anything. The snapshots still read the store
 back. A canvas which is deleted releases its surfaces (`gpu_forget_layer`).
+Should three IOSurfaces in a row fail to be made, TeXmacs says so and goes
+back to the drawables (`metal_backend::surface_failed`; the layer of a
+canvas is replaced by a `CAMetalLayer`).
 
 `TEXMACS_NS_PRESENT=metal` goes back to the drawables: the view hosts a
 `CAMetalLayer`, and a repaint only marks the canvas (`show_gpu_store`): its

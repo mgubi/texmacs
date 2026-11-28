@@ -50,7 +50,7 @@ bool vue_gpu_attach (SDL_Window* w) { (void) w; return false; }
 bool vue_gpu_ready (SDL_Window* w) { (void) w; return false; }
 bool vue_gpu_wakes_when_ready () { return false; }
 void vue_gpu_detach (SDL_Window* w) { (void) w; }
-void vue_gpu_present (SDL_Window* w) { (void) w; }
+bool vue_gpu_present (SDL_Window* w) { (void) w; return false; }
 void vue_gpu_skip (SDL_Window* w) { (void) w; }
 picture  gpu_backing_picture (int w, int h, bool t) { (void) w; (void) h; (void) t; return picture (); }
 bool     is_gpu_picture (picture p) { (void) p; return false; }
@@ -328,10 +328,11 @@ vue_gpu_detach (SDL_Window* w) {
   if (G.B != NULL && G.started) G.B->detach (w);
 }
 
-void
+bool
 vue_gpu_present (SDL_Window* w) {
   gpu_flush_all ();
   G.B->present (w);
+  return G.B->last_shown ();
 }
 
 void

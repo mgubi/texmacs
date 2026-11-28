@@ -2016,7 +2016,8 @@ vue_sdl_gpu_window_rep::process_redraw () {
   if (same) { vue_gpu_skip (sdl_win); return; }
   presented= h;
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
-  vue_gpu_present (sdl_win);
+  // (a frame which could not be shown is drawn again at the next turn)
+  if (!vue_gpu_present (sdl_win)) presented= 0;
   if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
   // On Wayland, with software OpenGL (llvmpipe), the first frame of a window
   // was seen in a buffer of the size it was created at (200x200, the context

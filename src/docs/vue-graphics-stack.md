@@ -1093,7 +1093,9 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   ("Presenting by IOSurfaces"; the Cocoa port uses it too, for its
   canvases, see *ns-port.md*); the surfaces are BGRA8 in sRGB, as the
   `CAMetalLayer`, and cleared when first drawn into; `gpu_begin_screen`
-  takes the surface of a frame. A skipped frame (the
+  takes the surface of a frame (should three IOSurfaces in a row fail to
+  be made, the windows go back to the drawables, and a frame which could
+  not be shown is drawn again, `vue_gpu_present`). A skipped frame (the
   same hash) keeps its surface for the next one. `TEXMACS_VUE_DEBUG_PRESENT`
   prints, for each wheel event, when it was made and when AppKit handed it
   to SDL (`WHEEL event <t> now <t>`, `vue_mac.mm`), and for each present
