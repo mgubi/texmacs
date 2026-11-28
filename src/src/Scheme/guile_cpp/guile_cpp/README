@@ -1,0 +1,65 @@
+guile_cpp, vendored in TeXmacs
+==============================
+
+guile_cpp is GNU Guile 1.8.8 rewritten in C++ by PikachuHy: a tagged value
+representation, a mark-and-sweep collector which scans the C stack
+conservatively, a CEK evaluator and a bytecode compiler with its VM, and the
+library of libguile 1.8 (numbers with their own bignums, strings, ports,
+modules, GOOPS, SRFIs...). It boots the unmodified Scheme library of Guile
+1.8.8 (ice-9/boot-9.scm...).
+
+Origin:   https://github.com/PikachuHy/guile_cpp
+Commit:   cd6c4b5c6df9ef22d8fc96190a0d879adaafee6a (27 November 2026)
+Author:   PikachuHy <pikachuhy@163.com>
+License:  pending with its author (guile_cpp is derived from Guile 1.8.8,
+          LGPL 2.1 or later; the Scheme files of share/ keep their GNU
+          notices). TeXmacs packages must not ship it until it is settled.
+
+The interface of TeXmacs (the tmscm functions) is ../guile_cpp_tm.cpp and
+../guile_cpp_tm.hpp. Configure TeXmacs with --with-scheme=guile_cpp (macOS
+and Linux only: guile_cpp uses POSIX headers; the browser cannot scan its C
+stack). The Scheme side is the one of Guile 1.8: TeXmacs/progs/init-guile.scm.
+
+What is kept
+------------
+
+src/                the sources of libguile_cpp, without main.cpp (the guile
+                    command line) and jit_arm64.cpp (see below)
+include/guile_cpp/  its headers
+share/guile/1.8/    the Scheme library (ice-9, oop, srfi), without the
+                    Makefile.am of Guile; `make` copies it into
+                    TeXmacs/boot/guile_cpp (target GUILE_CPP_DATA of
+                    src/Makefile.in), where guile_cpp_tm.cpp finds it from
+                    TEXMACS_PATH, so that the packages are relocatable
+
+Not kept: the CMake build, the tests (tests/, test-suite/), the benchmarks,
+the README of the project.
+
+Building
+--------
+
+The sources are compiled by src/src/makefile.in as Objects/gcpp_<name>.o
+(some names are those of sources of TeXmacs, list.cpp, so that this folder
+is also left out of the vpath of the makefile), with the flags of TeXmacs:
+C++17 and -O2 (guile_cpp itself is built with -O3 by its CMake). Only the
+objects of src/Scheme/guile_cpp see the include folder: the rest of TeXmacs
+includes include/guile_cpp/value.hpp alone, through guile_cpp_tm.hpp.
+
+Changes to guile_cpp
+--------------------
+
+* C++17 instead of C++20: include/guile_cpp/compat.hpp replaces <bit>
+  (gcpp_countr_zero, gcpp_countl_zero, gcpp_popcount, gcpp_bit_ceil, with
+  the results of the standard functions for 0) and the attributes
+  [[likely]] / [[unlikely]] of the if and while statements
+  (GCPP_LIKELY / GCPP_UNLIKELY, with __builtin_expect).
+* No JIT: jit_arm64.cpp (the ARM64 compiler of macOS) is not compiled; its
+  calls in bytecode.cpp are under #ifdef GUILE_CPP_JIT, which TeXmacs never
+  defines, and VM::jit_enabled is false by default.
+* include/guile_cpp/value.hpp: the tagged values (SCM), the header of the
+  heap objects (Obj, ObjTag), the pairs and is_pair, is_symbol, is_string,
+  moved out of scm.hpp, which includes it.
+* load.cpp: the directories of the Scheme library are given at run time
+  (set_data_dirs, called before VM::init), instead of the paths compiled in
+  by the CMake build (GUILE_CPP_PKGDATA_DIR...), which remain the defaults
+  when they are defined.

@@ -79,7 +79,8 @@ src/Plugins/Qt*/moc_*.cpp
 
 # written by misc/wasm/build-info.py at each build of the browser version
 TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm
-# compiled Chez Scheme modules and boot image (./TeXmacs/bin/texmacs.bin -recompile-modules)
+# compiled Chez Scheme modules and boot image (./TeXmacs/bin/texmacs.bin
+# -recompile-modules); the Scheme library of guile_cpp (make GUILE_CPP_DATA)
 TeXmacs/boot/
 # the home of TeXmacs while make compiles the Chez modules
 .chez-compile-home/

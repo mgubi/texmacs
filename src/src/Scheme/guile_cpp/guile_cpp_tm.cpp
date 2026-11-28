@@ -1,205 +1,260 @@
 /******************************************************************************
- * MODULE     : guile_cpp_tm.cpp
- * DESCRIPTION: Interface to guile_cpp (portable C++20 rewrite of Guile 1.8)
- * COPYRIGHT  : (C) 2026  TeXmacs contributors
- *******************************************************************************
- * This software falls under the GNU general public license version 3 or later.
- * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
- * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
- ******************************************************************************/
+* MODULE     : guile_cpp_tm.cpp
+* DESCRIPTION: Interface to guile_cpp (Guile 1.8 rewritten in C++)
+* COPYRIGHT  : (C) 2026  PikachuHy and Massimiliano Gubinelli
+*******************************************************************************
+* This software falls under the GNU general public license version 3 or later.
+* It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+* in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+******************************************************************************/
+
+// the headers of guile_cpp first: they use names which TeXmacs defines
+#include "guile_cpp/scm.hpp"
+#include "guile_cpp/vm.hpp"
 
 #include "guile_cpp_tm.hpp"
 
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
-#include <limits>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
 
 #include "blackbox.hpp"
 #include "file.hpp"
+#include "sys_utils.hpp"
 #include "../Scheme/glue.hpp"
 #include "convert.hpp" // tree_to_texmacs
 
+using guile::SCM;
+using guile::VM;
+using guile::PortObj;
+using guile::SmobObj;
+
 /******************************************************************************
- * State & error handling
- ******************************************************************************/
+* Strings between TeXmacs and guile_cpp
+******************************************************************************/
+
+static std::string_view
+as_view (string s) {
+  int n= N (s);
+  if (n == 0) return std::string_view ();
+  return std::string_view (&s[0], (size_t) n);
+}
+
+static void
+port_write (SCM port, string s) {
+  guile::port_puts (guile::as_obj<PortObj> (port), as_view (s));
+}
+
+/******************************************************************************
+* State and errors
+******************************************************************************/
 
 int tmscm_builders= 0;
 tmscm object_stack= guile::SCM_EOL;
 
-namespace {
+static int scheme_errors= 0;
+static bool scheme_started= false;
+static size_t blackbox_smob_type= (size_t) -1;
 
-int g_caught_errors= 0;
-bool g_scheme_started= false;
-size_t g_blackbox_smob_type= static_cast<size_t> (-1);
+int
+scheme_caught_errors () {
+  return scheme_errors;
+}
 
-tmscm handle_scheme_throw (const guile::SchemeThrow& ex) {
-  auto& v= guile::vm ();
-  if (ex.key == v.sym_quit) {
+static tmscm
+handle_scheme_throw (const guile::SchemeThrow& ex) {
+  VM& v= guile::vm ();
+  SCM key= ex.key, args= ex.args;
+  if (key == v.sym_quit) {
     int code= 0;
-    if (guile::is_pair (ex.args)) {
-      guile::SCM arg= guile::car (ex.args);
+    if (guile::is_pair (args)) {
+      SCM arg= guile::car (args);
       if (arg.is_false ()) code= 1;
       else if (arg == guile::SCM_BOOL_T) code= 0;
       else if (guile::is_exact_integer (arg))
-        code= static_cast<int> (guile::scm_to_int64 (arg, "quit", 1));
+        code= (int) guile::scm_to_int64 (arg, "quit", 1);
     }
     guile::flush_all_ports ();
-    std::exit (code);
+    exit (code);
   }
-  ++g_caught_errors;
-  guile::SCM errp= v.current_error_port ();
-  guile::port_puts (guile::as_obj<guile::PortObj> (errp), "ERROR: ");
-  if (guile::is_pair (ex.args) &&
-      guile::is_pair (guile::cdr (ex.args)) &&
-      guile::is_pair (guile::cdr (guile::cdr (ex.args)))) {
-    guile::SCM subr= guile::car (ex.args);
-    guile::SCM msg= guile::car (guile::cdr (ex.args));
-    guile::SCM margs= guile::car (guile::cdr (guile::cdr (ex.args)));
-    guile::SCM rest= guile::is_pair (guile::cdr (guile::cdr (guile::cdr (ex.args))))
-                       ? guile::car (guile::cdr (guile::cdr (guile::cdr (ex.args))))
-                       : guile::SCM_BOOL_F;
+  scheme_errors++;
+  SCM errp= v.current_error_port ();
+  port_write (errp, "ERROR: ");
+  if (guile::is_pair (args) &&
+      guile::is_pair (guile::cdr (args)) &&
+      guile::is_pair (guile::cdr (guile::cdr (args)))) {
+    SCM subr = guile::car (args);
+    SCM msg  = guile::car (guile::cdr (args));
+    SCM margs= guile::car (guile::cdr (guile::cdr (args)));
+    SCM tail = guile::cdr (guile::cdr (guile::cdr (args)));
+    SCM rest = guile::is_pair (tail)? guile::car (tail): guile::SCM_BOOL_F;
     guile::display_error_impl (guile::SCM_BOOL_F, errp, subr, msg, margs, rest);
-  } else {
-    guile::port_puts (guile::as_obj<guile::PortObj> (errp), "Throw to key `");
-    v.write_to_port (ex.key, errp, true);
-    guile::port_puts (guile::as_obj<guile::PortObj> (errp), "' with args `");
-    v.write_to_port (ex.args, errp, false);
-    guile::port_puts (guile::as_obj<guile::PortObj> (errp), "'.\n");
   }
-  guile::port_flush (guile::as_obj<guile::PortObj> (errp));
-  return v.cons (ex.key, ex.args);
+  else {
+    port_write (errp, "Throw to key `");
+    v.write_to_port (key, errp, true);
+    port_write (errp, "' with args `");
+    v.write_to_port (args, errp, false);
+    port_write (errp, "'.\n");
+  }
+  guile::port_flush (guile::as_obj<PortObj> (errp));
+  return v.cons (key, args);
 }
 
-void free_blackbox_smob (guile::SCM obj) {
-  auto* sm= guile::as_obj<guile::SmobObj> (obj);
-  auto* ptr= static_cast<blackbox*> (sm->user_data);
-  if (ptr != nullptr) {
-    sm->user_data= nullptr;
+void
+tmscm_wrong_type_arg (const char* subr, int pos, tmscm arg) {
+  guile::vm ().wrong_type_arg (subr, pos, arg, "valid argument");
+}
+
+/******************************************************************************
+* The blackboxes of TeXmacs as smobs
+******************************************************************************/
+
+static void
+free_blackbox_smob (SCM obj) {
+  SmobObj* sm= guile::as_obj<SmobObj> (obj);
+  blackbox* ptr= (blackbox*) sm->user_data;
+  if (ptr != NULL) {
+    sm->user_data= NULL;
     tm_delete (ptr);
   }
 }
 
-void print_blackbox_smob (guile::SCM obj, guile::SCM port) {
+static void
+print_blackbox_smob (SCM obj, SCM port) {
   string s= "<blackbox>";
   int type_= type_box (tmscm_to_blackbox (obj));
   if (type_ == type_helper<tree>::id) {
     tree t= tmscm_to_tree (obj);
     s= "<tree " * tree_to_texmacs (t) * ">";
-  } else if (type_ == type_helper<observer>::id) {
-    s= "<observer>";
-  } else if (type_ == type_helper<widget>::id) {
-    s= "<widget>";
-  } else if (type_ == type_helper<promise<widget> >::id) {
-    s= "<promise-widget>";
-  } else if (type_ == type_helper<command>::id) {
+  }
+  else if (type_ == type_helper<observer>::id) s= "<observer>";
+  else if (type_ == type_helper<widget>::id) s= "<widget>";
+  else if (type_ == type_helper<promise<widget> >::id) s= "<promise-widget>";
+  else if (type_ == type_helper<command>::id) {
     command cmd= tmscm_to_command (obj);
     s= print_to_string<command> (cmd);
-  } else if (type_ == type_helper<url>::id) {
+  }
+  else if (type_ == type_helper<url>::id) {
     url u= tmscm_to_url (obj);
     s= "<url " * as_string (u) * ">";
-  } else if (type_ == type_helper<modification>::id) {
-    s= "<modification>";
-  } else if (type_ == type_helper<patch>::id) {
-    s= "<patch>";
   }
-  int n= N (s);
-  guile::port_puts (guile::as_obj<guile::PortObj> (port),
-                    n > 0 ? std::string_view (&s[0], static_cast<size_t> (n))
-                          : std::string_view ());
+  else if (type_ == type_helper<modification>::id) s= "<modification>";
+  else if (type_ == type_helper<patch>::id) s= "<patch>";
+  port_write (port, s);
 }
 
-guile::SCM equalp_blackbox_smob (guile::SCM a, guile::SCM b) {
+static SCM
+equalp_blackbox_smob (SCM a, SCM b) {
   if (a == b) return guile::SCM_BOOL_T;
   if (!tmscm_is_blackbox (b)) return guile::SCM_BOOL_F;
-  return guile::SCM::from_bool (tmscm_to_blackbox (a) == tmscm_to_blackbox (b));
+  return SCM::from_bool (tmscm_to_blackbox (a) == tmscm_to_blackbox (b));
 }
 
-uint64_t hash_tree_bounded (tree t, int& budget) {
+static uint64_t
+hash_tree_bounded (tree t, int& budget) {
   if (budget <= 0) return 0;
-  --budget;
-  if (is_atomic (t)) {
-    return static_cast<uint64_t> (static_cast<uint32_t> (hash (t->label))) ^ 0x9e3779b97f4a7c15ULL;
-  }
-  uint64_t h= static_cast<uint64_t> (static_cast<uint32_t> (L (t))) * 2654435761ULL;
-  int n= N (t);
-  h^= static_cast<uint64_t> (n) * 2246822519ULL;
-  int lim= n < 4 ? n : 4;
-  for (int i= 0; i < lim && budget > 0; ++i) {
+  budget--;
+  if (is_atomic (t))
+    return ((uint64_t) (uint32_t) hash (t->label)) ^ 0x9e3779b97f4a7c15ULL;
+  uint64_t h= ((uint64_t) (uint32_t) L (t)) * 2654435761ULL;
+  int i, n= N (t);
+  h ^= ((uint64_t) n) * 2246822519ULL;
+  for (i= 0; i < min (n, 4) && budget > 0; i++)
     h= (h * 1315423911ULL) ^ hash_tree_bounded (t[i], budget);
-  }
   return h;
 }
 
-uint64_t hash_blackbox_smob (guile::SCM obj) {
+static uint64_t
+hash_blackbox_smob (SCM obj) {
   blackbox bb= tmscm_to_blackbox (obj);
   int type_= type_box (bb);
   if (type_ == type_helper<tree>::id) {
     int budget= 12;
     return hash_tree_bounded (tmscm_to_tree (obj), budget);
-  } else if (type_ == type_helper<url>::id) {
-    return static_cast<uint64_t> (static_cast<uint32_t> (hash (as_string (tmscm_to_url (obj)))));
-  } else if (type_ == type_helper<path>::id) {
+  }
+  else if (type_ == type_helper<url>::id)
+    return (uint64_t) (uint32_t) hash (as_string (tmscm_to_url (obj)));
+  else if (type_ == type_helper<path>::id) {
     path p= open_box<path> (bb);
     uint64_t h= 0x517cc1b727220a95ULL;
-    for (int k= 0; !is_nil (p) && k < 16; p= p->next, ++k) {
-      h= (h * 1315423911ULL) ^ static_cast<uint64_t> (static_cast<uint32_t> (p->item));
-    }
+    for (int k= 0; !is_nil (p) && k < 16; p= p->next, k++)
+      h= (h * 1315423911ULL) ^ ((uint64_t) (uint32_t) p->item);
     return h;
   }
-  return static_cast<uint64_t> (static_cast<uint32_t> (type_)) * 2654435761ULL;
+  return ((uint64_t) (uint32_t) type_) * 2654435761ULL;
 }
 
-void initialize_smobs () {
+static void
+initialize_smobs () {
   guile::SmobTypeInfo info;
-  info.name= "blackbox";
+  info.name   = "blackbox";
   info.free_fn= free_blackbox_smob;
-  info.print= print_blackbox_smob;
-  info.equalp= equalp_blackbox_smob;
+  info.print  = print_blackbox_smob;
+  info.equalp = equalp_blackbox_smob;
   info.hash_fn= hash_blackbox_smob;
-  g_blackbox_smob_type= guile::vm ().make_smob_type (info);
+  blackbox_smob_type= guile::vm ().make_smob_type (info);
 }
 
-} // namespace
+bool
+tmscm_is_blackbox (tmscm obj) {
+  return guile::is_smob (obj) &&
+         guile::as_obj<SmobObj> (obj)->smob_type == blackbox_smob_type;
+}
 
-int
-scheme_caught_errors () {
-  return g_caught_errors;
+tmscm
+blackbox_to_tmscm (blackbox b) {
+  SmobObj* sm= guile::vm ().heap ().alloc<SmobObj> (blackbox_smob_type);
+  sm->user_data= (void*) tm_new<blackbox> (b);
+  return SCM::from_obj (sm);
+}
+
+blackbox
+tmscm_to_blackbox (tmscm obj) {
+  SmobObj* sm= guile::as_obj<SmobObj> (obj);
+  return *((blackbox*) sm->user_data);
 }
 
 /******************************************************************************
- * Startup & initialization
- ******************************************************************************/
+* Startup and initialization
+******************************************************************************/
+
+static bool
+env_is (const char* val, const char* a, const char* b,
+        const char* c, const char* d) {
+  return strcmp (val, a) == 0 || strcmp (val, b) == 0 ||
+         strcmp (val, c) == 0 || strcmp (val, d) == 0;
+}
 
 void
 start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
-  if (g_scheme_started) return;
-  g_scheme_started= true;
+  if (scheme_started) return;
+  scheme_started= true;
 
   volatile int stack_anchor= 0;
-  auto& v= guile::vm ();
+  VM& v= guile::vm ();
 
-  if (const char* env_jit= std::getenv ("GUILE_JIT")) {
-    if (std::strcmp (env_jit, "0") == 0 || std::strcmp (env_jit, "off") == 0 ||
-        std::strcmp (env_jit, "false") == 0 || std::strcmp (env_jit, "no") == 0) {
-      v.jit_enabled= false;
-    } else if (std::strcmp (env_jit, "1") == 0 || std::strcmp (env_jit, "on") == 0 ||
-               std::strcmp (env_jit, "true") == 0 || std::strcmp (env_jit, "yes") == 0) {
-      v.jit_enabled= true;
-    }
+  // the Scheme library of Guile 1.8 (ice-9, oop, srfi), which the build
+  // copies into TeXmacs/boot/guile_cpp (see src/Makefile.in)
+  c_string dir (get_env ("TEXMACS_PATH") * "/boot/guile_cpp");
+  guile::set_data_dirs (dir, dir, NULL);
+
+  string jit= get_env ("GUILE_JIT");
+  if (jit != "") {
+    c_string val (jit);
+    if (env_is (val, "0", "off", "false", "no")) v.jit_enabled= false;
+    else if (env_is (val, "1", "on", "true", "yes")) v.jit_enabled= true;
   }
 
-  // Pre-size initial GC threshold so startup finishes without mid-boot GC pauses,
-  // then settle to a cache-friendly 1.5M cell threshold for steady-state editing.
+  // a large first threshold, so that the boot is done without collections,
+  // then collections from 1.5 million cells on
   v.heap ().set_min_gc_threshold (1500000);
   v.heap ().set_initial_gc_threshold (4500000);
 
   try {
-    v.init (const_cast<int*> (&stack_anchor), true);
-  } catch (const guile::SchemeThrow& ex) {
+    v.init ((int*) &stack_anchor, true);
+  }
+  catch (const guile::SchemeThrow& ex) {
     handle_scheme_throw (ex);
   }
   v.set_program_arguments (argc, argv);
@@ -227,22 +282,21 @@ initialize_scheme () {
     "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
     "(define object-stack '(()))\n";
 
-  auto& v= guile::vm ();
+  VM& v= guile::vm ();
   try {
     v.eval_string (init_prg);
-  } catch (const guile::SchemeThrow& ex) {
+  }
+  catch (const guile::SchemeThrow& ex) {
     handle_scheme_throw (ex);
   }
 
   initialize_smobs ();
   initialize_glue ();
 
-  guile::SCM ovar= v.lookup ("object-stack");
-  if (guile::is_variable (ovar)) {
+  SCM ovar= v.lookup ("object-stack");
+  if (guile::is_variable (ovar))
     object_stack= guile::as_obj<guile::VariableObj> (ovar)->value;
-  } else {
-    object_stack= v.list1 (guile::SCM_EOL);
-  }
+  else object_stack= v.list1 (guile::SCM_EOL);
 }
 
 string
@@ -256,29 +310,26 @@ scheme_init_file () {
 }
 
 /******************************************************************************
- * Evaluation & calls
- ******************************************************************************/
+* Evaluation and calls
+******************************************************************************/
 
 tmscm
 eval_scheme_file (string file) {
   if (DEBUG_STD) debug_std << "Evaluating " << file << "...\n";
-  int n= N (file);
-  std::string path (n > 0 ? &file[0] : "", static_cast<size_t> (n));
   try {
-    return guile::vm ().primitive_load (path);
-  } catch (const guile::SchemeThrow& ex) {
+    return guile::vm ().primitive_load (std::string (as_view (file)));
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
 
 tmscm
 eval_scheme (string s) {
-  int n= N (s);
   try {
-    return guile::vm ().eval_string (
-        n > 0 ? std::string_view (&s[0], static_cast<size_t> (n))
-              : std::string_view ());
-  } catch (const guile::SchemeThrow& ex) {
+    return guile::vm ().eval_string (as_view (s));
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
@@ -287,7 +338,8 @@ tmscm
 call_scheme (tmscm fun) {
   try {
     return guile::vm ().call0 (fun);
-  } catch (const guile::SchemeThrow& ex) {
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
@@ -296,7 +348,8 @@ tmscm
 call_scheme (tmscm fun, tmscm a1) {
   try {
     return guile::vm ().call1 (fun, a1);
-  } catch (const guile::SchemeThrow& ex) {
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
@@ -305,7 +358,8 @@ tmscm
 call_scheme (tmscm fun, tmscm a1, tmscm a2) {
   try {
     return guile::vm ().call2 (fun, a1, a2);
-  } catch (const guile::SchemeThrow& ex) {
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
@@ -314,7 +368,8 @@ tmscm
 call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3) {
   try {
     return guile::vm ().call3 (fun, a1, a2, a3);
-  } catch (const guile::SchemeThrow& ex) {
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
@@ -323,42 +378,83 @@ tmscm
 call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3, tmscm a4) {
   try {
     return guile::vm ().call4 (fun, a1, a2, a3, a4);
-  } catch (const guile::SchemeThrow& ex) {
+  }
+  catch (const guile::SchemeThrow& ex) {
     return handle_scheme_throw (ex);
   }
 }
 
 tmscm
 call_scheme (tmscm fun, array<tmscm> a) {
-  const int n= N (a);
-  if (n <= 8) {
-    tmscm buf[8];
-    for (int i= 0; i < n; ++i) buf[i]= a[i];
-    try {
-      return guile::vm ().apply (fun, buf, static_cast<size_t> (n));
-    } catch (const guile::SchemeThrow& ex) {
-      return handle_scheme_throw (ex);
-    }
-  }
-  std::vector<tmscm> v (static_cast<size_t> (n));
-  for (int i= 0; i < n; ++i) v[static_cast<size_t> (i)]= a[i];
+  int i, n= N (a);
+  STACK_NEW_ARRAY (args, tmscm, n);
+  for (i= 0; i < n; i++) args[i]= a[i];
+  tmscm r;
   try {
-    return guile::vm ().apply (fun, v.data (), static_cast<size_t> (n));
-  } catch (const guile::SchemeThrow& ex) {
-    return handle_scheme_throw (ex);
+    r= guile::vm ().apply (fun, args, (size_t) n);
   }
+  catch (const guile::SchemeThrow& ex) {
+    r= handle_scheme_throw (ex);
+  }
+  STACK_DELETE_ARRAY (args);
+  return r;
 }
 
 /******************************************************************************
- * Numeric, string & symbol conversions
- ******************************************************************************/
+* Gluing
+******************************************************************************/
+
+void
+tmscm_install_raw_procedure (const char* name, int req, int opt, int rst,
+                             tmscm_raw_proc fn) {
+  SCM p= guile::vm ().define_proc (name, req, opt, rst != 0, fn);
+  guile::as_obj<guile::SubrObj> (p)->raw_fn= fn;
+}
+
+/******************************************************************************
+* Predicates and constructors
+******************************************************************************/
+
+bool
+tmscm_is_equal (tmscm o1, tmscm o2) {
+  return guile::scm_equal (o1, o2);
+}
+
+bool
+tmscm_is_list (tmscm obj) {
+  return guile::is_proper_list (obj);
+}
+
+bool
+tmscm_is_double (tmscm obj) {
+  return guile::is_real_number (obj);
+}
+
+tmscm
+tmscm_cons (tmscm o1, tmscm o2) {
+  return guile::vm ().cons (o1, o2);
+}
+
+tmscm
+long_to_tmscm (long l) {
+  return guile::vm ().make_integer ((int64_t) l);
+}
+
+tmscm
+double_to_tmscm (double r) {
+  return guile::vm ().make_real (r);
+}
+
+/******************************************************************************
+* Numbers, strings and symbols
+******************************************************************************/
 
 bool
 tmscm_is_int (tmscm obj) {
   if (guile::is_exact_integer (obj)) return true;
   if (guile::is_real_obj (obj)) {
     double d= guile::as_obj<guile::RealObj> (obj)->val;
-    return std::isfinite (d) && std::trunc (d) == d;
+    return isfinite (d) && trunc (d) == d;
   }
   return false;
 }
@@ -366,41 +462,33 @@ tmscm_is_int (tmscm obj) {
 int
 tmscm_to_int (tmscm obj) {
   int64_t v= 0;
-  if (obj.is_fixnum ()) {
-    v= obj.to_fixnum ();
-  } else if (guile::is_real_obj (obj)) {
+  if (obj.is_fixnum ()) v= obj.to_fixnum ();
+  else if (guile::is_real_obj (obj)) {
     double d= guile::as_obj<guile::RealObj> (obj)->val;
-    if (!std::isfinite (d) || d < -2147483648.0 || d > 2147483647.0) {
+    if (!isfinite (d) || d < -2147483648.0 || d > 2147483647.0)
       guile::vm ().out_of_range ("tmscm_to_int", obj);
-    }
-    return static_cast<int> (std::llround (d));
-  } else {
-    v= guile::scm_to_int64 (obj, "tmscm_to_int", 1);
+    return (int) llround (d);
   }
-  if (v < std::numeric_limits<int>::min () || v > std::numeric_limits<int>::max ()) {
+  else v= guile::scm_to_int64 (obj, "tmscm_to_int", 1);
+  if (v < (int64_t) INT_MIN || v > (int64_t) INT_MAX)
     guile::vm ().out_of_range ("tmscm_to_int", obj);
-  }
-  return static_cast<int> (v);
+  return (int) v;
 }
 
 unsigned int
 tmscm_to_uint (tmscm obj) {
   int64_t v= 0;
-  if (obj.is_fixnum ()) {
-    v= obj.to_fixnum ();
-  } else if (guile::is_real_obj (obj)) {
+  if (obj.is_fixnum ()) v= obj.to_fixnum ();
+  else if (guile::is_real_obj (obj)) {
     double d= guile::as_obj<guile::RealObj> (obj)->val;
-    if (!std::isfinite (d) || d < 0.0 || d > 4294967295.0) {
+    if (!isfinite (d) || d < 0.0 || d > 4294967295.0)
       guile::vm ().out_of_range ("tmscm_to_uint", obj);
-    }
-    return static_cast<unsigned int> (std::llround (d));
-  } else {
-    v= guile::scm_to_int64 (obj, "tmscm_to_uint", 1);
+    return (unsigned int) llround (d);
   }
-  if (v < 0 || v > static_cast<int64_t> (std::numeric_limits<unsigned int>::max ())) {
+  else v= guile::scm_to_int64 (obj, "tmscm_to_uint", 1);
+  if (v < 0 || v > (int64_t) UINT_MAX)
     guile::vm ().out_of_range ("tmscm_to_uint", obj);
-  }
-  return static_cast<unsigned int> (v);
+  return (unsigned int) v;
 }
 
 double
@@ -410,57 +498,26 @@ tmscm_to_double (tmscm obj) {
 
 tmscm
 string_to_tmscm (string s) {
-  int n= N (s);
-  return guile::vm ().make_string (
-      n > 0 ? std::string_view (&s[0], static_cast<size_t> (n))
-            : std::string_view ());
+  return guile::vm ().make_string (as_view (s));
 }
 
 string
 tmscm_to_string (tmscm obj) {
-  if (!guile::is_string (obj)) {
+  if (!guile::is_string (obj))
     guile::vm ().wrong_type_arg ("tmscm_to_string", 1, obj, "string");
-  }
-  auto sv= guile::as_obj<guile::StringObj> (obj)->view ();
-  return string (sv.data (), static_cast<int> (sv.size ()));
+  std::string_view sv= guile::as_obj<guile::StringObj> (obj)->view ();
+  return string (sv.data (), (int) sv.size ());
 }
 
 tmscm
 symbol_to_tmscm (string s) {
-  int n= N (s);
-  return guile::vm ().make_symbol (
-      n > 0 ? std::string_view (&s[0], static_cast<size_t> (n))
-            : std::string_view ());
+  return guile::vm ().make_symbol (as_view (s));
 }
 
 string
 tmscm_to_symbol (tmscm obj) {
-  if (!guile::is_symbol (obj)) {
+  if (!guile::is_symbol (obj))
     guile::vm ().wrong_type_arg ("tmscm_to_symbol", 1, obj, "symbol");
-  }
-  const auto& nm= guile::as_obj<guile::SymbolObj> (obj)->name;
-  return string (nm.data (), static_cast<int> (nm.size ()));
-}
-
-/******************************************************************************
- * Blackbox SMOB
- ******************************************************************************/
-
-bool
-tmscm_is_blackbox (tmscm obj) {
-  return guile::is_smob (obj) &&
-         guile::as_obj<guile::SmobObj> (obj)->smob_type == g_blackbox_smob_type;
-}
-
-tmscm
-blackbox_to_tmscm (blackbox b) {
-  auto* sm= guile::vm ().heap ().alloc<guile::SmobObj> (g_blackbox_smob_type);
-  sm->user_data= static_cast<void*> (tm_new<blackbox> (b));
-  return guile::SCM::from_obj (sm);
-}
-
-blackbox
-tmscm_to_blackbox (tmscm obj) {
-  auto* sm= guile::as_obj<guile::SmobObj> (obj);
-  return *static_cast<blackbox*> (sm->user_data);
+  const std::string& nm= guile::as_obj<guile::SymbolObj> (obj)->name;
+  return string (nm.data (), (int) nm.size ());
 }

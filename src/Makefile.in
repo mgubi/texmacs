@@ -63,6 +63,21 @@ TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS @MKGUILE@
 	cd src; $(MAKE) -r -f makefile
 	$(MAKE) -f Makefile PLUGINS
 	$(MAKE) -f Makefile CHEZ_MODULES
+	$(MAKE) -f Makefile GUILE_CPP_DATA
+
+# With guile_cpp: its Scheme library (that of Guile 1.8: ice-9, oop, srfi),
+# vendored in src/Scheme/guile_cpp/guile_cpp/share/guile/1.8, is copied into
+# TeXmacs/boot/guile_cpp, where guile_cpp_tm.cpp finds it from TEXMACS_PATH:
+# the packages carry it with the TeXmacs folder (INSTALL_DATA copies boot)
+GUILE_CPP_DATA_SRC = src/Scheme/guile_cpp/guile_cpp/share/guile/1.8
+GUILE_CPP_DATA:
+	@if test "$(SCHEME_DIR)" = "guile_cpp"; then \
+	  $(MKDIR) $(tmdir)/boot/guile_cpp; \
+	  for d in ice-9 oop srfi; do \
+	    $(RM) -r $(tmdir)/boot/guile_cpp/$$d; \
+	    cp -R $(GUILE_CPP_DATA_SRC)/$$d $(tmdir)/boot/guile_cpp/ || exit 1; \
+	  done; \
+	fi
 
 # With Chez Scheme: compile the modules of TeXmacs/progs (those whose source
 # changed) into TeXmacs/boot, then the boot image TeXmacs/boot/texmacs.boot
@@ -97,6 +112,7 @@ CHEZ_MODULES:
 
 STATIC_TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS 
 	cd src; $(MAKE) -r -f makefile link=static CFLAGS=-D__TMSTATIC__
+	$(MAKE) -f Makefile GUILE_CPP_DATA
 	$(MAKE) -f Makefile PLUGINS
 	$(MAKE) -f Makefile EX_PLUGINS
 	$(CP) misc/scripts/fig2ps $(tmdir)/bin
@@ -127,7 +143,7 @@ GLUE:
 SAFE_TEXMACS_REV:
 	@echo "@ALTERNATIVE_VERSION@" > "$(tmdir)/SVNREV"
 
-.PHONY: TEXMACS STATIC_TEXMACS DEPS GLUE EXPERIMENTAL CHEZ_MODULES
+.PHONY: TEXMACS STATIC_TEXMACS DEPS GLUE EXPERIMENTAL CHEZ_MODULES GUILE_CPP_DATA
 
 deps: DEPS
 clean: CLEAN
@@ -199,6 +215,8 @@ INSTALL_DATA:
 	$(CP) $(tmdir)/progs $(DESTDIR)
 	if test "$(SCHEME_DIR)" = "Chez" -a -d $(tmdir)/boot; then \
 	  $(CP) $(tmdir)/boot $(DESTDIR); fi
+	if test "$(SCHEME_DIR)" = "guile_cpp" -a -d $(tmdir)/boot/guile_cpp; then \
+	  $(MKDIR) $(DESTDIR)/boot; $(CP) $(tmdir)/boot/guile_cpp $(DESTDIR)/boot; fi
 	$(CP) $(tmdir)/styles $(DESTDIR)
 	$(CP) $(tmdir)/texts $(DESTDIR)
 	$(CP) $(tmdir)/SVNREV $(DESTDIR)

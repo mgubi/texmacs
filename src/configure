@@ -1666,7 +1666,7 @@ Optional Packages:
   --with-tmrepo[=no]      absolute texmacs sdk path
   --with-texmacs-builder[=no]
                           absolute texmacs builder path
-  --with-scheme[=s7|guile|femtolisp|chez]
+  --with-scheme[=s7|guile|femtolisp|chez|guile_cpp]
                           Scheme interpreter to use [default=s7]
   --with-guile[=system]   path to to find guile-config or [embedded] if any
                           tm-guile package included
@@ -13525,8 +13525,20 @@ printf '%s\n' "#define USE_CHEZ 1" >>confdefs.h
 
       SCHEME_DIR=Chez
       ;;
+    (guile_cpp | guile-cpp)
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: using guile_cpp, Guile 1.8 in C++ (vendored in src/Scheme/guile_cpp)" >&5
+printf '%s\n' "$as_me: using guile_cpp, Guile 1.8 in C++ (vendored in src/Scheme/guile_cpp)" >&6;}
+
+printf '%s\n' "#define USE_GUILE_CPP 1" >>confdefs.h
+
+      SCHEME_DIR=guile_cpp
+      case "$host_os" in
+        (mingw* | cygwin*)
+          as_fn_error $? "guile_cpp needs a POSIX system (macOS or Linux)" "$LINENO" 5 ;;
+      esac
+      ;;
     (*)
-      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7, guile, femtolisp or chez" "$LINENO" 5
+      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7, guile, femtolisp, chez or guile_cpp" "$LINENO" 5
       ;;
   esac
 

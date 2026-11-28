@@ -2,7 +2,7 @@
 #--------------------------------------------------------------------
 #
 # MODULE      : scheme.m4
-# DESCRIPTION : Selection of the Scheme interpreter (S7, Guile, femtolisp or Chez)
+# DESCRIPTION : Selection of the Scheme interpreter (S7, Guile, femtolisp, Chez or guile_cpp)
 # COPYRIGHT   : (C) 2026  Massimiliano Gubinelli
 #
 # This software falls under the GNU general public license version 3 or later.
@@ -13,16 +13,10 @@
 
 AC_DEFUN([LC_SCHEME],[
   AC_ARG_WITH(scheme,
-    AS_HELP_STRING([--with-scheme@<:@=guile_cpp|s7|guile|femtolisp|chez@:>@],
-                   [Scheme interpreter to use @<:@default=guile_cpp@:>@]),
-    [], [with_scheme=guile_cpp])
+    AS_HELP_STRING([--with-scheme@<:@=s7|guile|femtolisp|chez|guile_cpp@:>@],
+                   [Scheme interpreter to use @<:@default=s7@:>@]),
+    [], [with_scheme=s7])
   case "$with_scheme" in
-    (guile_cpp | guile-cpp | GuileCpp)
-      AC_MSG_NOTICE([using the guile_cpp Scheme interpreter (C++20 rewrite of Guile 1.8)])
-      LC_GUILE_CPP
-      AC_DEFINE([USE_GUILE_CPP], [1], [Use the guile_cpp Scheme interpreter])
-      SCHEME_DIR=guile_cpp
-      ;;
     (s7 | S7)
       AC_MSG_NOTICE([using the S7 Scheme interpreter (vendored in src/Scheme/S7)])
       AC_DEFINE([USE_S7], [1], [Use the S7 Scheme interpreter])
@@ -45,56 +39,20 @@ AC_DEFUN([LC_SCHEME],[
       AC_DEFINE([USE_CHEZ], [1], [Use Chez Scheme])
       SCHEME_DIR=Chez
       ;;
+    (guile_cpp | guile-cpp)
+      AC_MSG_NOTICE([using guile_cpp, Guile 1.8 in C++ (vendored in src/Scheme/guile_cpp)])
+      AC_DEFINE([USE_GUILE_CPP], [1], [Use the guile_cpp Scheme interpreter])
+      SCHEME_DIR=guile_cpp
+      case "$host_os" in
+        (mingw* | cygwin*)
+          AC_MSG_ERROR([guile_cpp needs a POSIX system (macOS or Linux)]) ;;
+      esac
+      ;;
     (*)
-      AC_MSG_ERROR([unknown Scheme interpreter '$with_scheme', use guile_cpp, s7, guile, femtolisp or chez])
+      AC_MSG_ERROR([unknown Scheme interpreter '$with_scheme', use s7, guile, femtolisp, chez or guile_cpp])
       ;;
   esac
   AC_SUBST(SCHEME_DIR)
-])
-
-#--------------------------------------------------------------------
-# guile_cpp: portable C++20 rewrite of Guile 1.8 (zero third-party
-# dependencies: headers in include/guile_cpp/ and build/libguile_cpp.a).
-# --with-guile-cpp=DIR specifies its root directory; otherwise common
-# sibling/home/system locations are searched automatically.
-#--------------------------------------------------------------------
-
-AC_DEFUN([LC_GUILE_CPP],[
-  AC_ARG_WITH(guile-cpp,
-    AS_HELP_STRING([--with-guile-cpp@<:@=DIR@:>@],
-                   [directory of guile_cpp (with include/guile_cpp and build/libguile_cpp.a)]),
-    [], [with_guile_cpp=auto])
-  GCPP_DIR=""
-  if test "$with_guile_cpp" != "auto" -a "$with_guile_cpp" != "yes"; then
-    GCPP_DIR="$with_guile_cpp"
-  else
-    for d in "$srcdir/../../scheme_guile_cpp" "$HOME/code/scheme_guile_cpp" /usr/local /opt/homebrew /usr; do
-      if test -f "$d/include/guile_cpp/scm.hpp" -a -f "$d/build/libguile_cpp.a"; then
-        GCPP_DIR=`cd "$d" && pwd`
-        break
-      fi
-    done
-  fi
-  AC_MSG_CHECKING([for guile_cpp])
-  if test -z "$GCPP_DIR" -o ! -f "$GCPP_DIR/include/guile_cpp/scm.hpp"; then
-    AC_MSG_RESULT([no])
-    AC_MSG_ERROR([guile_cpp not found: pass --with-guile-cpp=DIR (with include/guile_cpp/scm.hpp and build/libguile_cpp.a)])
-  fi
-  if test ! -f "$GCPP_DIR/build/libguile_cpp.a"; then
-    AC_MSG_RESULT([no])
-    AC_MSG_ERROR([missing $GCPP_DIR/build/libguile_cpp.a: build guile_cpp first])
-  fi
-  AC_MSG_RESULT([$GCPP_DIR])
-  GCPP_CFLAGS="-I$GCPP_DIR/include"
-  GCPP_LDFLAGS="$GCPP_DIR/build/libguile_cpp.a"
-  GCPP_BIN=""
-  if test -x "$GCPP_DIR/build/guile"; then
-    GCPP_BIN="$GCPP_DIR/build/guile"
-  fi
-  AC_SUBST(GCPP_DIR)
-  AC_SUBST(GCPP_CFLAGS)
-  AC_SUBST(GCPP_LDFLAGS)
-  AC_SUBST(GCPP_BIN)
 ])
 
 #--------------------------------------------------------------------

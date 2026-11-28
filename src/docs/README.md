@@ -53,6 +53,7 @@ say otherwise; C++ is under `src/src/`, Scheme under `src/TeXmacs/progs/`.
 |---|---|
 | [s7/](s7/README.md) | TeXmacs on s7: the binding, the boot and the module system, the compatibility layer, open issues, performance |
 | [femtolisp/](femtolisp/README.md) | TeXmacs on femtolisp: the binding, modules, the compatibility layer, the browser build |
+| [guile_cpp.md](guile_cpp.md) | TeXmacs on guile_cpp (Guile 1.8 in C++, branch `wip_guile_cpp`): the vendored copy, the build, the binding |
 
 ## Documents and references
 

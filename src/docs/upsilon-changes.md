@@ -14,6 +14,13 @@ have the details, and the problems go to the
 
 ## 28 November 2026
 
+- **A new Scheme backend, guile_cpp** (builds with
+  `--with-scheme=guile_cpp`, macOS and Linux; the branch `wip_guile_cpp`):
+  Guile 1.8 rewritten in C++ by PikachuHy, vendored in
+  `src/Scheme/guile_cpp` and built with TeXmacs (C++17, without its ARM64
+  JIT); it runs the Guile code of TeXmacs (`init-guile.scm`) without the
+  old Guile. Its Scheme library (`ice-9`...) is installed in
+  `TeXmacs/boot/guile_cpp`. The default stays s7.
 - **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
   the Chez backend (21 November) the compiler flags of the vendored
   femtolisp were set only in Chez builds, and `fl_core.c` did not find
