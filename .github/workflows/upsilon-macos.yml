@@ -404,13 +404,29 @@ jobs:
           path: ${{ runner.tool_cache }}/texmacs-qt
           key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-${{ hashFiles('.github/fixes/aqtinstall-requirements.txt') }}
 
+      # the Python of that venv: one with wheels for all the dependencies of
+      # aqtinstall (the python3 of the runner, 3.15, has none for inflate64,
+      # pybcj...: pip would build them, with build tools not in the hashes);
+      # update-environment false: the python3 of the PATH does not change
+      - name: Python for aqtinstall
+        id: aqt-python
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          update-environment: false
+
       - name: Qt
+        env:
+          AQT_PYTHON: ${{ steps.aqt-python.outputs.python-path }}
         run: |
           qt="$RUNNER_TOOL_CACHE/texmacs-qt"
           if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
-            python3 -m venv "$RUNNER_TEMP/aqt"
-            # aqtinstall and all its dependencies checked by their hashes
-            "$RUNNER_TEMP/aqt/bin/pip" install -q --require-hashes -r ../.github/fixes/aqtinstall-requirements.txt
+            "$AQT_PYTHON" -m venv "$RUNNER_TEMP/aqt"
+            # aqtinstall and all its dependencies, wheels checked by their
+            # hashes, nothing built
+            "$RUNNER_TEMP/aqt/bin/pip" install -q --require-hashes --only-binary :all: \
+              -r ../.github/fixes/aqtinstall-requirements.txt
             "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
           fi
           echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
@@ -432,7 +448,9 @@ jobs:
         run: |
           set -o pipefail
           make -j"$(sysctl -n hw.ncpu)" 2>&1 | tee "$RUNNER_TEMP/build.log"
-          if grep "built for newer macOS version" "$RUNNER_TEMP/build.log"; then exit 1; fi
+          # ("was built for newer 'macOS' version" for an object of an
+          # archive, "which was built for newer version" for a dylib)
+          if grep "built for newer" "$RUNNER_TEMP/build.log"; then exit 1; fi
 
       - name: Run the regression suites
         run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
@@ -563,13 +581,29 @@ jobs:
           path: ${{ runner.tool_cache }}/texmacs-qt
           key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-${{ hashFiles('.github/fixes/aqtinstall-requirements.txt') }}
 
+      # the Python of that venv: one with wheels for all the dependencies of
+      # aqtinstall (the python3 of the runner, 3.15, has none for inflate64,
+      # pybcj...: pip would build them, with build tools not in the hashes);
+      # update-environment false: the python3 of the PATH does not change
+      - name: Python for aqtinstall
+        id: aqt-python
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          update-environment: false
+
       - name: Qt
+        env:
+          AQT_PYTHON: ${{ steps.aqt-python.outputs.python-path }}
         run: |
           qt="$RUNNER_TOOL_CACHE/texmacs-qt"
           if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
-            python3 -m venv "$RUNNER_TEMP/aqt"
-            # aqtinstall and all its dependencies checked by their hashes
-            "$RUNNER_TEMP/aqt/bin/pip" install -q --require-hashes -r ../.github/fixes/aqtinstall-requirements.txt
+            "$AQT_PYTHON" -m venv "$RUNNER_TEMP/aqt"
+            # aqtinstall and all its dependencies, wheels checked by their
+            # hashes, nothing built
+            "$RUNNER_TEMP/aqt/bin/pip" install -q --require-hashes --only-binary :all: \
+              -r ../.github/fixes/aqtinstall-requirements.txt
             "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
           fi
           echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
@@ -596,7 +630,9 @@ jobs:
         run: |
           set -o pipefail
           make -j"$(sysctl -n hw.ncpu)" 2>&1 | tee "$RUNNER_TEMP/build.log"
-          if grep "built for newer macOS version" "$RUNNER_TEMP/build.log"; then exit 1; fi
+          # ("was built for newer 'macOS' version" for an object of an
+          # archive, "which was built for newer version" for a dylib)
+          if grep "built for newer" "$RUNNER_TEMP/build.log"; then exit 1; fi
           make CHEZ_MODULES
           ls -l TeXmacs/boot/texmacs.boot
 

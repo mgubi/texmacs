@@ -3,12 +3,14 @@
 # #972); made with
 #   echo aqtinstall==3.3.0 > in.txt
 #   uv pip compile in.txt --generate-hashes --universal --python-version 3.10
-# (the Python of the runner may have no wheel of the compiled ones:
-# their sources are then built, checked by the same hashes)
+# installed with --only-binary :all: by a Python 3.13 of setup-python, which
+# has wheels of all of them (the python3 of the runner, 3.15, has none of
+# inflate64, pybcj, pyppmd: pip would build them with build tools which are
+# not in the hashes)
 aqtinstall==3.3.0 \
     --hash=sha256:9c7d85fbe7258be2d7d23fda33f8aff2e8b7536817255eaeaaf4226da8546a31 \
     --hash=sha256:e88dbd87226f276fdd5d05347a44578d390d93a7f176e9476fbda0a7c9635f69
-    # via -r /private/tmp/claude-501/-Users-mgubi-t-lab/b18b8115-d8b2-4205-95eb-81ba38e2092a/scratchpad/aqt/in.txt
+    # via aqtinstall (the requirement)
 backports-zstd==1.8.1 ; python_full_version < '3.14' \
     --hash=sha256:00c73c9a60cc4e75d515b38afa516b9c6de5945f0ba8579d23959bebd311321f \
     --hash=sha256:04b2f99a3e03a8d2a431f668d681fc111c89bff859e3bc834230cabde4b8824b \
