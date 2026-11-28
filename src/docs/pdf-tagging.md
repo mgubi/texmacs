@@ -335,8 +335,8 @@ pictures, as for a presentation of 100 slides of 10 pictures, on a recent
 Mac); the buffer is left as it was (the expanded body is swapped back,
 the copy of a presentation closed, also when making the slides fails). A
 print which fails is reported with its error (its key and message), not
-as a result, and so does *Next picture* after it, which checks again. During the
-check the message "Done printing" and the check of the PDF by Ghostscript
+as a result, and so does *Next picture* after it, which checks again.
+During the check the message "Done printing" and the check of the PDF by Ghostscript
 (*texmacs->pdf:check*) are left out (`TEXMACS_PDF_TAG_CHECK`).
 
 `(pdf-tag-check)` gives an association list, for scripts and the tests:
