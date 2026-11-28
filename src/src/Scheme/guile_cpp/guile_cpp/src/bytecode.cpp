@@ -2174,11 +2174,6 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         }
 
         L_CALL: {
-            if (GCPP_UNLIKELY(v.after_gc_pending)) {  // (a safe point: the stack is synchronized)
-                sync_gc();
-                v.run_pending_after_gc();
-                RELOAD_STK();
-            }
             size_t nargs = dec_u24(insn);
             size_t fn_slot = sp_idx - 1 - nargs;
             SCM callee = stk[fn_slot];
@@ -2259,6 +2254,10 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     int req = sb->req, opt = sb->opt;
                     if (static_cast<int>(nargs) >= req && (sb->rst || static_cast<int>(nargs) <= req + opt)) {
                         sync_gc();
+                        // (the after-gc-hook runs at the calls of subrs, where the
+                        // stack is synchronized: a check at every call of a closure
+                        // made the dispatch loop 20% slower on tak)
+                        v.run_pending_after_gc();
                         SCM r = (sb->raw_varargs || (!sb->rst && static_cast<int>(nargs) == req + opt))
                             ? (sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : sb->fn(stk + fn_slot + 1, nargs))
                             : call_subr_padded(v, sb, stk + fn_slot + 1, nargs);
@@ -2441,11 +2440,6 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         }
 
         L_TAIL_CALL: {
-            if (GCPP_UNLIKELY(v.after_gc_pending)) {  // (a safe point: the stack is synchronized)
-                sync_gc();
-                v.run_pending_after_gc();
-                RELOAD_STK();
-            }
             size_t nargs = dec_u24(insn);
             size_t fn_slot = sp_idx - 1 - nargs;
             SCM callee = stk[fn_slot];
@@ -2519,6 +2513,10 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     int req = sb->req, opt = sb->opt;
                     if (static_cast<int>(nargs) >= req && (sb->rst || static_cast<int>(nargs) <= req + opt)) {
                         sync_gc();
+                        // (the after-gc-hook runs at the calls of subrs, where the
+                        // stack is synchronized: a check at every call of a closure
+                        // made the dispatch loop 20% slower on tak)
+                        v.run_pending_after_gc();
                         SCM res;
                         if (sb->raw_varargs || (!sb->rst && static_cast<int>(nargs) == req + opt)) {
                             res = sb->raw_fn ? sb->raw_fn(stk + fn_slot + 1, nargs) : sb->fn(stk + fn_slot + 1, nargs);

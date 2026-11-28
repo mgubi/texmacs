@@ -152,9 +152,11 @@ Other fixes of guile_cpp
   macros, a module binder, the after-gc-hook...). The collector scans them
   up to the active depth. GLOBAL_REF / GLOBAL_SET still reload the stack
   pointer after sym2var.
-* The after-gc-hook runs at the next safe point (the calls of the
-  bytecode VM, the steps of the evaluator), not inside the allocation
-  which collected, as the async of Guile 1.8.
+* The after-gc-hook runs at the next safe point (the calls of subrs by
+  the bytecode VM, where its stack is synchronized, and the steps of the
+  evaluator), not inside the allocation which collected, as the async of
+  Guile 1.8. (A check at every call of a closure made the VM 20% slower
+  on tak.)
 * A number too large for a double is +inf.0 or -inf.0 (string->number,
   the reader), as in Guile 1.8.
 * dlerror is read once (dynamic-link of a missing file crashed).
