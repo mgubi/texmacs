@@ -1544,8 +1544,11 @@ struct VmFrame {
 };
 
 struct BytecodeEngine {
-    std::vector<SCM> stack;
-    std::vector<VmFrame> frames;
+    // (TeXmacs: arrays; the VM reads and writes the stack through a raw
+    // pointer, A (stack), reloaded when it grows)
+    array<SCM> stack;
+    array<VmFrame> frames;
+    VmFrame* frame_data = nullptr;  // A (frames), kept by ensure_frames
     size_t active_sp = 0;
     size_t active_fp = 0;
     SCM foreach1_helper = SCM_BOOL_F;
@@ -1553,8 +1556,10 @@ struct BytecodeEngine {
     SCM dynwind_helper = SCM_BOOL_F;
 
     BytecodeEngine() {
-        stack.resize(131072, SCM_UNSPECIFIED);
-        frames.resize(16384);
+        stack = array<SCM>(131072);
+        for (int i = 0; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
+        frames = array<VmFrame>(16384);
+        frame_data = A(frames);
     }
 
     SCM get_dynwind_helper() {
@@ -1642,16 +1647,19 @@ struct BytecodeEngine {
     }
 
     void ensure_stack(size_t needed) {
-        if (needed >= stack.size()) {
-            size_t new_sz = stack.size() * 2;
+        if (needed >= static_cast<size_t>(N(stack))) {
+            size_t new_sz = static_cast<size_t>(N(stack)) * 2;
             while (new_sz <= needed) new_sz *= 2;
-            stack.resize(new_sz, SCM_UNSPECIFIED);
+            int old_sz = N(stack);
+            stack->resize(static_cast<int>(new_sz));
+            for (int i = old_sz; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
         }
     }
 
     void ensure_frames(size_t needed) {
-        if (needed >= frames.size()) {
-            frames.resize(frames.size() * 2);
+        if (needed >= static_cast<size_t>(N(frames))) {
+            frames->resize(N(frames) * 2);
+            frame_data = A(frames);
         }
     }
 };
@@ -1835,7 +1843,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         if (!target_bc->has_rest) {
             if (na != req) { sync_gc(); v.wrong_num_args(nullptr, SCM::from_obj(target_cl)); }
             eng.ensure_stack(target_base + target_bc->max_locals + 64);
-            SCM* dst = eng.stack.data() + target_base;
+            SCM* dst = A(eng.stack) + target_base;
             for (size_t i = 0; i < na; ++i) dst[i] = a[i];
             for (size_t i = na; i < target_bc->max_locals; ++i) dst[i] = SCM_UNSPECIFIED;
         } else {
@@ -1843,7 +1851,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             sync_gc();
             SCM rest_lst = v.list_n(a + req, na - req);
             eng.ensure_stack(target_base + target_bc->max_locals + 64);
-            SCM* dst = eng.stack.data() + target_base;
+            SCM* dst = A(eng.stack) + target_base;
             for (size_t i = 0; i < req; ++i) dst[i] = a[i];
             dst[req] = rest_lst;
             for (size_t i = req + 1; i < target_bc->max_locals; ++i) dst[i] = SCM_UNSPECIFIED;
@@ -1858,19 +1866,19 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         }
         eng.ensure_stack(entry_sp + sn + 64);
         eng.ensure_frames(entry_fp + fn + 16);
-        std::memcpy(eng.stack.data() + entry_sp, resume_k->snap_stack_data(), sn * sizeof(SCM));
+        std::memcpy(A(eng.stack) + entry_sp, resume_k->snap_stack_data(), sn * sizeof(SCM));
         const VmFrameSnap* fd = resume_k->snap_frames_data();
         for (size_t i = 0; i < fn; ++i) {
             const auto& sf = fd[i];
             auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
-            eng.frames[entry_fp + i] = {
+            eng.frame_data[entry_fp + i] = {
                 sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
                 static_cast<uint32_t>(entry_sp + sf.base_off),
                 static_cast<uint32_t>(entry_sp + sf.ret_slot)
             };
         }
         fp_idx = entry_fp + fn - 1;
-        const auto& topf = eng.frames[fp_idx];
+        const auto& topf = eng.frame_data[fp_idx];
         load_frame_regs(as_obj<ClosureObj>(topf.closure), as_obj<BytecodeObj>(topf.bytecode));
         pc = topf.pc;
         base_off = topf.base_off;
@@ -1911,11 +1919,11 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                                    na > 2 ? args_p[2] : SCM_UNSPECIFIED, na);
     };
 
-    SCM* stk = eng.stack.data();
+    SCM* stk = A(eng.stack);
     uint32_t insn = 0;
 
     #define DISPATCH() do { insn = *pc++; goto *dispatch_table[dec_op(insn)]; } while (0)
-    #define RELOAD_STK() do { stk = eng.stack.data(); } while (0)
+    #define RELOAD_STK() do { stk = A(eng.stack); } while (0)
 
     while (true) {
         try {
@@ -2174,7 +2182,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         }
 #endif
                         eng.ensure_frames(fp_idx + 2);
-                        eng.frames[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
+                        eng.frame_data[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
                         uint32_t new_base = static_cast<uint32_t>(fn_slot + 1);
                         eng.ensure_stack(new_base + tbc->max_locals + 64);
                         RELOAD_STK();
@@ -2186,7 +2194,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         DISPATCH();
                     }
                     eng.ensure_frames(fp_idx + 2);
-                    eng.frames[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
+                    eng.frame_data[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
                     uint32_t new_base = static_cast<uint32_t>(fn_slot + 1);
                     setup_closure_args(tcl, tbc, new_base, stk + fn_slot + 1, nargs);
                     RELOAD_STK();
@@ -2201,7 +2209,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     if (bytecode_compile_closure(tcl)) {
                         auto* tbc = as_obj<BytecodeObj>(tcl->bytecode);
                         eng.ensure_frames(fp_idx + 2);
-                        eng.frames[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
+                        eng.frame_data[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
                         uint32_t new_base = static_cast<uint32_t>(fn_slot + 1);
                         setup_closure_args(tcl, tbc, new_base, stk + fn_slot + 1, nargs);
                         RELOAD_STK();
@@ -2237,7 +2245,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     size_t n_frames = fp_idx - entry_fp;
                     k->reserve_frames_snap(n_frames + 1);
                     for (size_t i = 0; i < n_frames; ++i) {
-                        const auto& fr = eng.frames[entry_fp + i];
+                        const auto& fr = eng.frame_data[entry_fp + i];
                         auto* fbc = as_obj<BytecodeObj>(fr.bytecode);
                         k->push_frame_snap({
                             fr.closure, fr.bytecode,
@@ -2355,14 +2363,14 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     for (size_t i = 0; i < fn; ++i) {
                         const auto& sf = fd[i];
                         auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
-                        eng.frames[entry_fp + i] = {
+                        eng.frame_data[entry_fp + i] = {
                             sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
                             static_cast<uint32_t>(entry_sp + sf.base_off),
                             static_cast<uint32_t>(entry_sp + sf.ret_slot)
                         };
                     }
                     fp_idx = entry_fp + fn - 1;
-                    const auto& topf = eng.frames[fp_idx];
+                    const auto& topf = eng.frame_data[fp_idx];
                     load_frame_regs(as_obj<ClosureObj>(topf.closure), as_obj<BytecodeObj>(topf.bytecode));
                     pc = topf.pc;
                     base_off = topf.base_off;
@@ -2492,11 +2500,11 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     k->has_vm_snap = true;
                     size_t n_frames = fp_idx - entry_fp;
                     if (n_frames > 0) {
-                        const auto& caller = eng.frames[fp_idx - 1];
+                        const auto& caller = eng.frame_data[fp_idx - 1];
                         k->set_stack_snap(stk + entry_sp, caller.ret_slot - entry_sp);
                         k->reserve_frames_snap(n_frames);
                         for (size_t i = 0; i < n_frames; ++i) {
-                            const auto& fr = eng.frames[entry_fp + i];
+                            const auto& fr = eng.frame_data[entry_fp + i];
                             auto* fbc = as_obj<BytecodeObj>(fr.bytecode);
                             k->push_frame_snap({
                                 fr.closure, fr.bytecode,
@@ -2608,14 +2616,14 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     for (size_t i = 0; i < fn; ++i) {
                         const auto& sf = fd[i];
                         auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
-                        eng.frames[entry_fp + i] = {
+                        eng.frame_data[entry_fp + i] = {
                             sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
                             static_cast<uint32_t>(entry_sp + sf.base_off),
                             static_cast<uint32_t>(entry_sp + sf.ret_slot)
                         };
                     }
                     fp_idx = entry_fp + fn - 1;
-                    const auto& topf = eng.frames[fp_idx];
+                    const auto& topf = eng.frame_data[fp_idx];
                     load_frame_regs(as_obj<ClosureObj>(topf.closure), as_obj<BytecodeObj>(topf.bytecode));
                     pc = topf.pc;
                     base_off = topf.base_off;
@@ -2655,7 +2663,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             if (fp_idx == entry_fp) {
                 return stk[sp_idx - 1];
             }
-            const auto& caller = eng.frames[--fp_idx];
+            const auto& caller = eng.frame_data[--fp_idx];
             load_frame_regs(as_obj<ClosureObj>(caller.closure), as_obj<BytecodeObj>(caller.bytecode));
             pc = caller.pc;
             base_off = caller.base_off;
@@ -3236,7 +3244,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             size_t n_frames = fp_idx - entry_fp;
             k->reserve_frames_snap(n_frames + 1);
             for (size_t i = 0; i < n_frames; ++i) {
-                const auto& fr = eng.frames[entry_fp + i];
+                const auto& fr = eng.frame_data[entry_fp + i];
                 auto* fbc = as_obj<BytecodeObj>(fr.bytecode);
                 k->push_frame_snap({
                     fr.closure, fr.bytecode,
@@ -3265,7 +3273,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     if (GCPP_LIKELY(!tbc->has_rest && tbc->arity_req == 1)) {
                         size_t fn_slot = sp_idx - 2;
                         eng.ensure_frames(fp_idx + 2);
-                        eng.frames[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
+                        eng.frame_data[fp_idx++] = {SCM::from_obj(cl), SCM::from_obj(bc), pc, base_off, static_cast<uint32_t>(fn_slot)};
                         uint32_t new_base = static_cast<uint32_t>(fn_slot + 1);
                         eng.ensure_stack(new_base + tbc->max_locals + 64);
                         RELOAD_STK();
@@ -3385,14 +3393,14 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                 for (size_t i = 0; i < fn; ++i) {
                     const auto& sf = fd[i];
                     auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
-                    eng.frames[entry_fp + i] = {
+                    eng.frame_data[entry_fp + i] = {
                         sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
                         static_cast<uint32_t>(entry_sp + sf.base_off),
                         static_cast<uint32_t>(entry_sp + sf.ret_slot)
                     };
                 }
                 fp_idx = entry_fp + fn - 1;
-                const auto& topf = eng.frames[fp_idx];
+                const auto& topf = eng.frame_data[fp_idx];
                 load_frame_regs(as_obj<ClosureObj>(topf.closure), as_obj<BytecodeObj>(topf.bytecode));
                 pc = topf.pc;
                 base_off = topf.base_off;
@@ -4037,8 +4045,8 @@ void bytecode_mark_roots(const Marker& mark) {
         mark(eng.stack[i]);
     }
     for (size_t i = 0; i < eng.active_fp; ++i) {
-        mark(eng.frames[i].closure);
-        mark(eng.frames[i].bytecode);
+        mark(eng.frame_data[i].closure);
+        mark(eng.frame_data[i].bytecode);
     }
 }
 
