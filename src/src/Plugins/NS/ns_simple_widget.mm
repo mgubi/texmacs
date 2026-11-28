@@ -210,6 +210,7 @@ ns_bench_now () {
 
 - (void) sleep
 {
+  retries= 0;
   if (link != nil) [link setPaused: YES];
   if (timer != nil) { [timer invalidate]; [timer release]; timer= nil; }
 }
@@ -230,11 +231,10 @@ ns_bench_now () {
   double t= ns_bench_now ();
   bool done= false;
   NS_ENTRY_BEGIN
-    if (wid->present_gpu_store ()) {
-      retries= 0; wid->gpu_dirty= false; [self sleep]; }
+    if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
     else if (++retries >= 4) {
       // (given up until the next repaint)
-      retries= 0; wid->gpu_dirty= false; [self sleep]; }
+      wid->gpu_dirty= false; [self sleep]; }
     done= true;
   NS_ENTRY_END ("the presentation of a canvas drawn by the GPU")
   if (!done) {
@@ -447,16 +447,19 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   NSSize sz= [view bounds].size;
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
   // (a failure is not tried again before the next repaint)
+  // (by IOSurfaces before this present: a third failure in it turns them
+  // off, and its frame is then to be presented again, by drawables)
+  bool at_once= gpu_presents_at_once ();
   bool shown= gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
   // by IOSurfaces: as QCALayerBackingStore::flush, a display cycle of the
   // window, so that the transaction is committed with it (and with the
   // other changes of the views, the move of a scroll) rather than at the
   // next pass of the run loop, which Core Animation may throttle
-  if (shown && gpu_presents_at_once ()) [[view window] setViewsNeedDisplay: YES];
+  if (shown && at_once) [[view window] setViewsNeedDisplay: YES];
   // (not shown, by IOSurfaces: tried again by the presenter, a few times,
   // which after three failures presents by drawables, see
   // metal_backend::surface_failed)
-  return shown || !gpu_presents_at_once ();
+  return shown || !at_once;
 }
 
 NSRect
