@@ -86,6 +86,7 @@
   (pdf-tag-printed-images pdf_tag_printed_images (array_tree))
   (pdf-tag-printed-files pdf_tag_printed_files (array_string))
   (pdf-tag-printed-sources pdf_tag_printed_sources (array_string))
+  (pdf-tag-printed-reset pdf_tag_printed_reset (void))
   (supports-ghostscript? supports_ghostscript (bool))
   (gs-executable get_gs_executable (string))
   (rescue-mode? in_rescue_mode (bool))

@@ -563,6 +563,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(pdf-tag-printed-reset)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_reset> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(supports-ghostscript?)>
 <explain-synopsis|no synopsis>
   <|explain>

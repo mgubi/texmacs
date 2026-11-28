@@ -85,6 +85,7 @@ array<path>   pdf_tag_printed_places ();
 array<tree>   pdf_tag_printed_images ();
 array<string> pdf_tag_printed_files ();
 array<string> pdf_tag_printed_sources ();
+void          pdf_tag_printed_reset ();
 
 class renderer_rep {
 public:

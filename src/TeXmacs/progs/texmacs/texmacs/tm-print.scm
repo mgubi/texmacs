@@ -498,16 +498,33 @@
   ;; #t when a tagged PDF of the document was made, else #f or the error
   (let ((pdf (url-append (url-temp-dir) "pdf-tag-check.pdf"))
         (env (getenv "TEXMACS_PDF_TAGGED"))
+        (env-check (getenv "TEXMACS_PDF_TAG_CHECK"))
         (err #f))
     (system-setenv "TEXMACS_PDF_TAGGED" "1")
+    ;; (print_doc keeps the pictures for the check only; no "Done printing")
     (system-setenv "TEXMACS_PDF_TAG_CHECK" "1")
     (catch #t
       (lambda () (wrapped-print-to-file pdf pdf-tag-mark-copy))
       (lambda args (set! err args)))
     (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
-    (system-setenv "TEXMACS_PDF_TAG_CHECK" "")
+    (system-setenv "TEXMACS_PDF_TAG_CHECK" (or env-check ""))
     (when (url-exists? pdf) (system-remove pdf))
     (or err (pdf-tag-printed?))))
+
+(define (pdf-tag-error-text err)
+  ;; the error @err (the arguments of a catch) said shortly: its key and
+  ;; its message, when the message is a plain string
+  (let* ((key (if (and (pair? err) (symbol? (car err)))
+                  (symbol->string (car err)) "error"))
+         (strings (let walk ((x (if (pair? err) (cdr err) '())))
+                    (cond ((string? x) (list x))
+                          ((pair? x) (append (walk (car x)) (walk (cdr x))))
+                          (else '()))))
+         (msg (list-find strings
+                         (lambda (s) (and (!= s "")
+                                          (not (string-starts? s "["))
+                                          (not (string-occurs? "~" s)))))))
+    (if msg (string-append key ": " msg) key)))
 
 (define (pdf-tag-locate body slides?)
   ;; for each picture printed: the image of the buffer (#f for none) and
@@ -519,8 +536,10 @@
     (map (lambda (p img file source)
            (cond (slides?
                   (with i (and (!= source "") (string->number source))
-                    (cons (and i (< i (vector-length all)) (vector-ref all i))
-                          "")))
+                    (if (and i (< i (vector-length all)))
+                        (cons (vector-ref all i) "")
+                        ;; (no mark: an included document, or a macro)
+                        (cons #f file))))
                  ((!= file "") (cons #f file))
                  (else
                   (with t (pdf-tag-tree-at body p)
@@ -529,6 +548,12 @@
                           "")))))
          (pdf-tag-printed-places) (pdf-tag-printed-images)
          (pdf-tag-printed-files) (pdf-tag-printed-sources))))
+
+(define (pdf-tag-signature)
+  ;; what changes when the buffer is edited: the undo history and the
+  ;; number of images (Next checks again then, pdf-tag-pictures)
+  (list (undo-possibilities) (redo-possibilities)
+        (length (pdf-tag-images (buffer-tree)))))
 
 (define (pdf-tag-tree-at t p)
   ;; the subtree of @t at @p, or #f
@@ -559,7 +584,8 @@
   (or (in? lan '("english" "american"))
       (!= (language-to-locale lan) "en_US")))
 
-(define pdf-tag-found '())   ; the buffer and its pictures, of the last check
+(define pdf-tag-found '())   ; the buffer, its pictures, its signature and
+                             ; the error of the last check
 
 (tm-define (pdf-tag-check)
   (:synopsis "What the current document lacks for an accessible tagged PDF")
@@ -580,6 +606,7 @@
          (err (and (pair? res) res))
          (tagged? (== res #t))
          (found (if tagged? (pdf-tag-locate body slides?) '()))
+         (_ (pdf-tag-printed-reset))   ; (what print_doc kept is read)
          (trees (pdf-tag-distinct (list-filter (map car found) identity)))
          (paths (sort (map tree->path trees) path-inf?))
          (files (list-filter (map cdr found) (lambda (f) (!= f ""))))
@@ -589,9 +616,10 @@
          (own-title? (and (!= ttl "")
                           (!= ttl (utf8->cork (url->string (url-tail buf))))))
          (lan (get-init "language")))
-    (set! pdf-tag-found (list buf trees))
+    (set! pdf-tag-found (list buf trees (pdf-tag-signature)
+                              (and err (pdf-tag-error-text err))))
     (list (cons 'tagged tagged?)
-          (cons 'error (and err (object->string err)))
+          (cons 'error (and err (pdf-tag-error-text err)))
           (cons 'drawn (length found))
           (cons 'pictures paths)
           (cons 'included (pdf-tag-count files))
@@ -611,8 +639,8 @@
          (l (append
              (cond ((assoc-ref r 'error)
                     (list "The document could not be printed, the pictures"
-                          (string-append "  were not checked: "
-                                         (assoc-ref r 'error))))
+                          (string-append "  were not checked ("
+                                         (assoc-ref r 'error) ")")))
                    ((assoc-ref r 'tagged) '())
                    (else
                     (list "No tagged PDF can be made here (a native PDF"
@@ -663,16 +691,19 @@
 
 (define (pdf-tag-pictures)
   ;; the places of the pictures of the last check of the current buffer
-  ;; which still have no alternative text (the trees follow the edits);
-  ;; checked again when there is none, or one is no longer in the buffer
-  ;; (deleted, or replaced by an undo)
+  ;; which still have no alternative text (the trees follow the edits).
+  ;; It is checked again for another buffer, and when the buffer was
+  ;; edited since (pdf-tag-signature) and none is left, or one is no
+  ;; longer in it (deleted, or replaced by an undo)
   (define (valid)
     (list-filter (cadr pdf-tag-found)
                  (lambda (t) (and (tree->path t) (tree-is? t 'image)
                                   (not (pdf-tag-own-alt? t))))))
   (when (or (null? pdf-tag-found) (!= (car pdf-tag-found) (current-buffer))
-            (null? (valid))
-            (list-find (cadr pdf-tag-found) (lambda (t) (not (tree->path t)))))
+            (and (!= (caddr pdf-tag-found) (pdf-tag-signature))
+                 (or (null? (valid))
+                     (list-find (cadr pdf-tag-found)
+                                (lambda (t) (not (tree->path t)))))))
     (pdf-tag-check))
   (sort (map tree->path (valid)) path-inf?))
 
@@ -725,7 +756,12 @@
                    ;; (path-inf?: the order of the nodes, p being one)
                    (list-find l (lambda (p) (or (list-starts? cur p)
                                                 (path-inf? cur p)))))))
-    (cond ((null? l)
+    (cond ((cadddr pdf-tag-found)
+           (set-message (string-append "The document could not be checked: "
+                                       (cadddr pdf-tag-found))
+                        "Check for a tagged PDF")
+           #f)
+          ((null? l)
            (set-message "No picture without an alternative text" "")
            #f)
           (else

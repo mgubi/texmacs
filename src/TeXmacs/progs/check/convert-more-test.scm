@@ -3716,6 +3716,29 @@
                (lambda args #t)))
             (check= (current-buffer) tm)
             (check= (length (buffer-list)) n)))
+        ;; included documents in a presentation: no mark, the file which
+        ;; holds the picture
+        (string-save (serialize-texmacs
+                      (stree->tree (tmfile `(document "I." ,(img "i1")
+                                                      (include
+                                                       "check-slides-i2.tm")))))
+                     (url-append (temp-dir) "check-slides-i1.tm"))
+        (string-save (serialize-texmacs
+                      (stree->tree (tmfile `(document "J." ,(img "i2")))))
+                     (url-append (temp-dir) "check-slides-i2.tm"))
+        (with (tm r alts)
+            (check-pictures-doc
+             "check-slides-incl" "beamer"
+             `(document
+               (screens (shown (document "S1" ,(img "s1")
+                                         (include "check-slides-i1.tm")))))
+             '("s1.png" "i1.png" "i2.png"))
+          (check= alts '("s1.png" "i1.png" "i2.png"))
+          (check= (assoc-ref r 'drawn) 3)
+          (check= (picture-files (assoc-ref r 'pictures)) '("s1.png"))
+          (check= (assoc-ref r 'included) '(("check-slides-i1.tm" . 1)
+                                            ("check-slides-i2.tm" . 1)))
+          (check= (assoc-ref r 'elsewhere) 0))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
         (check-restore-buffer old))))

@@ -718,6 +718,15 @@ tmg_pdf_tag_printed_sources () {
 }
 
 tmscm
+tmg_pdf_tag_printed_reset () {
+  // TMSCM_DEFER_INTS;
+  pdf_tag_printed_reset ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_supports_ghostscriptP () {
   // TMSCM_DEFER_INTS;
   bool out= supports_ghostscript ();
@@ -13324,6 +13333,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("pdf-tag-printed-images",  tmg_pdf_tag_printed_images, 0, 0, 0);
   tmscm_install_procedure ("pdf-tag-printed-files",  tmg_pdf_tag_printed_files, 0, 0, 0);
   tmscm_install_procedure ("pdf-tag-printed-sources",  tmg_pdf_tag_printed_sources, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-reset",  tmg_pdf_tag_printed_reset, 0, 0, 0);
   tmscm_install_procedure ("supports-ghostscript?",  tmg_supports_ghostscriptP, 0, 0, 0);
   tmscm_install_procedure ("gs-executable",  tmg_gs_executable, 0, 0, 0);
   tmscm_install_procedure ("rescue-mode?",  tmg_rescue_modeP, 0, 0, 0);

@@ -95,6 +95,7 @@
 "pdf-tag-printed-images"
 "pdf-tag-printed-files"
 "pdf-tag-printed-sources"
+"pdf-tag-printed-reset"
 "supports-ghostscript?"
 "gs-executable"
 "rescue-mode?"

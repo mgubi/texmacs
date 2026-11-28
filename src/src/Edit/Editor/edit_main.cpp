@@ -303,8 +303,8 @@ array<tree> pdf_tag_printed_images () { return tag_images; }
 array<string> pdf_tag_printed_files () { return tag_files; }
 array<string> pdf_tag_printed_sources () { return tag_sources; }
 
-static void
-tag_reset () {
+void
+pdf_tag_printed_reset () {
   tag_printed= false;
   tag_places = array<path> ();
   tag_images = array<tree> ();
@@ -507,7 +507,8 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   // (a missing folder) is only a message: it says afterwards whether it
   // saved the file
   bool mupdf_target= suffix (name) == "pdf" && use_pdf () && use_mupdf_pdf ();
-  tag_reset ();   // (nothing of an earlier PDF, also when this one fails)
+  pdf_tag_printed_reset ();   // (nothing of an earlier PDF, also when this
+                              // one fails)
 #ifdef USE_GS
   bool ps  = (suffix (name) == "ps");
   bool pdf = (suffix (name) == "pdf");
@@ -665,9 +666,13 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     // Tools > Accessibility > Check for a tagged PDF reports, pdf-tag-check,
     // from what is kept here)
     tag_printed= true;
-    array<path> a= tagger->pictures_without_alt ();
-    for (int i=0; i<N(a); i++)
-      if (has_subtree (body, a[i])) tag_keep (body, a[i]);
+    // (kept for the check only, which reads them and resets them: not the
+    // copies of the pictures of each export)
+    if (get_env ("TEXMACS_PDF_TAG_CHECK") == "1") {
+      array<path> a= tagger->pictures_without_alt ();
+      for (int i=0; i<N(a); i++)
+        if (has_subtree (body, a[i])) tag_keep (body, a[i]);
+    }
     tm_delete (tagger);
   }
   delete_typesetter (ttt);

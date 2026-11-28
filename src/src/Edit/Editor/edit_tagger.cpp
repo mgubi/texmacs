@@ -367,6 +367,9 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     // an included document, given to the include* of the include macro
     // (print_doc), is in place of the include*, which is no element
     if (is_given_inclusion (t)) continue;
+    // the mark which pdf-tag-check puts around the pictures of the copy of
+    // a presentation (tm-print.scm, pdf-tag-mark-copy) is no element
+    if (is_compound (t, "with", 3) && t[0] == "pdf-tag-source") continue;
     // (a paragraph or a caption may be a mere string)
     string role= child_role_of (as_string (L(parent)), i, N(parent));
     if (role == "" && is_compound (t)) role= role_of (as_string (L(t)));

@@ -322,8 +322,10 @@ once per picture, when it is drawn), and `print_doc` keeps their places in
 the body it printed and the pictures themselves (`pdf-tag-printed?`,
 `pdf-tag-printed-places`, `pdf-tag-printed-images`, and the included
 file and the mark on the way to each, `pdf-tag-printed-files`,
-`pdf-tag-printed-sources`; all reset when a print begins, so that nothing
-of an earlier PDF is read). So the pictures
+`pdf-tag-printed-sources`; kept only while the check prints,
+`TEXMACS_PDF_TAG_CHECK`, not for each export; reset when a print begins,
+so that nothing of an earlier PDF is read, and by the check once it has
+read them, `pdf-tag-printed-reset`). So the pictures
 reported are those which the PDF describes by a caption or a file name,
 whatever decides what is printed (folds, conditions, notes in the margin,
 styles, macros), with no rules of its own. A picture which is itself a
@@ -332,7 +334,8 @@ author would. It costs an export (half a second for a document of 3000
 pictures, as for a presentation of 100 slides of 10 pictures, on a recent
 Mac); the buffer is left as it was (the expanded body is swapped back,
 the copy of a presentation closed, also when making the slides fails). A
-print which fails is reported with its error, not as a result. During the
+print which fails is reported with its error (its key and message), not
+as a result, and so does *Next picture* after it. During the
 check the message "Done printing" and the check of the PDF by Ghostscript
 (*texmacs->pdf:check*) are left out (`TEXMACS_PDF_TAG_CHECK`).
 
@@ -348,10 +351,13 @@ check the message "Done printing" and the check of the PDF by Ghostscript
   made: before they are, the check puts each picture of the copy, whose
   body is still that of the document, in `<with|pdf-tag-source|i|...>`
   (`pdf-tag-mark-copy`, through the optional argument of
-  `wrapped-print-to-file`), which the slides keep and which is transparent
-  to the typesetting and the tagger: a picture printed, and each of its
-  copies in the slides which a fold makes, is the picture i of the
-  document.
+  `wrapped-print-to-file`), which the slides keep: a picture printed, and
+  each of its copies in the slides which a fold makes, is the picture i of
+  the document. The mark changes nothing of the pages (a `with` of a
+  variable which nothing reads), and the tagger passes over it (no
+  element, as for the `include*` of an included document), so that the
+  structure of the check's PDF is that of the export. A picture of an
+  included document has no mark: it is counted in `included`.
 * `included`: the `(file . n)` of those drawn from included files, the
   file being the innermost included one which holds the picture (the
   `include*` on the way in the printed body); their place is in that
@@ -365,9 +371,12 @@ check the message "Done printing" and the check of the PDF by Ghostscript
 
 *Next picture* steps through the pictures of the last check of the buffer,
 kept as trees, which follow the edits: those still without an alternative
-text (an `image-alt` around them). It checks again when there is none
-left, or when one is no longer in the buffer (deleted, or replaced by an
-undo), so that a picture added since is found. The next one is the one after the picture in focus
+text (an `image-alt` around them). It checks again for another buffer,
+and when the buffer was edited since the last check (its undo history or
+its number of images changed, `pdf-tag-signature`) and none is left or
+one is no longer in it (deleted, or replaced by an undo), so that a
+picture added since is found; pressing it again when nothing is left
+does not print the document again. The next one is the one after the picture in focus
 (the one it went to: the editor moves a cursor put before an image in a
 line to the end of the text before it, and one put in a specific out of
 it), else the first one at or after the cursor. The image in focus is
@@ -385,7 +394,8 @@ with the same pictures on several slides, with and without an
 alternative text, that the
 pictures reported are those which the tagged export describes as "Image
 f.png", that the buffer is not modified, the steps through pictures in
-lines of text with the editor typesetting between them, the alternative
+lines of text with the editor typesetting between them, the included
+documents of a presentation, the alternative
 text set from the focus, a picture added after all were described, the
 copy of a presentation closed when making its slides fails, and that a
 tagged export adds no message to the window of the errors.
