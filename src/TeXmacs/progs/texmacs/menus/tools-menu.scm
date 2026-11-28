@@ -144,6 +144,9 @@
       ("Count characters" (show-character-count))
       ("Count words" (show-word-count))
       ("Count lines" (show-line-count)))
+  (-> "Accessibility"
+      ("Check for a tagged PDF" (pdf-tag-show-check))
+      ("Next picture without alternative text" (pdf-tag-next-picture)))
   ---
   (-> "AI engine"
       ("Off" (reset-preference "ai"))

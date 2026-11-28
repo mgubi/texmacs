@@ -31,6 +31,23 @@ have the details, and the problems go to the
   Before, the scale was chosen once at the start, from the screen which had
   the keyboard focus: started from a terminal on an external screen of 1x,
   its windows on a Retina screen were blurred.
+- **Tagged PDF: no warnings on export, a check in the Tools menu**
+  (desktop applications): since the PDF is tagged by default, every
+  export of a document with pictures lacking an alternative text opened
+  the window of the error messages ("94 images have no alternative
+  text..."), which a user on the forum found annoying. The export is still
+  tagged but warns of nothing (the notes on the fonts of pictures are
+  debugging output now). *Tools → Accessibility → Check for a tagged PDF*
+  says what the document lacks for an accessible PDF: the pictures without
+  an alternative text, exactly those which the tagged PDF describes by a
+  caption or a file name (the check prints the document as the export
+  does, to a file of its own), those of the included files, those drawn by
+  macros, a missing title and
+  a language which a PDF cannot name, or that nothing is missing; *Next
+  picture without alternative text* goes to each of them in turn, for
+  *Focus → Alternative text...*, which now also works on the picture in
+  focus when the cursor is next to it. A drawing is not reported (it
+  cannot be given an alternative text).
 - **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
   the Chez backend (21 November) the compiler flags of the vendored
   femtolisp were set only in Chez builds, and `fl_core.c` did not find

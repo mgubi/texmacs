@@ -44,6 +44,8 @@ class pdf_tagger_rep: public tagger_rep {
   array<int> open_ranks;             // the ranks of the headings above
   int    appendix_rank;              // that of an appendix: chapter or section
   hashmap<string,hashset<int> > covered;  // the cells a span covers, by table
+  array<path> no_alt;   // the pictures drawn with no alternative text of
+                        // the user's, in the order met (pdf-tag-check)
 
 public:
   pdf_tagger_rep (tree body, path rp, string lang, string title);
@@ -51,7 +53,7 @@ public:
   array<tag_node> row_cells (path pos);
   string language () { return lang; }
   string title () { return ttl; }
-  int pictures_without_alt () { return without_alt; }
+  array<path> pictures_without_alt () { return no_alt; }
 
 private:
   bool   child (tree t, int i, tree& c);
@@ -60,7 +62,6 @@ private:
   string child_role_of (string tag, int i, int n);
   string alt_of (string key, tree t, string role, array<tree> above,
                  path cur);
-  int    without_alt;   // the pictures with no alternative text of their own
   void   collect_ranks (tree t, hashset<int>& ranks);
   string heading (string key, string role);
   string cell_spans (array<tree> trail, int row, int col);
@@ -70,7 +71,7 @@ pdf_tagger_rep::pdf_tagger_rep (tree body2, path rp2, string lang2,
                                 string title2):
   body (body2), rp (rp2), lang (lang2), ttl (title2),
   roles ("?"), child_roles ("?"), alts (""),
-  heading_of (""), appendix_rank (3), without_alt (0)
+  heading_of (""), appendix_rank (3)
 {
   // the ranks of the headings which the document uses: an appendix is a
   // chapter in a book, a section elsewhere
@@ -129,9 +130,8 @@ pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above,
           return r;
         }
     }
-    // (the warning of print_doc counts the images, for which the focus
-    // menu has the alternative text)
-    if (is_compound (t, "image")) without_alt++;
+    // (once per picture: the alternative text is kept, alts)
+    if (is_compound (t, "image")) no_alt << cur;
     for (int k= N(above) - 1; k >= 0; k--) {
       tree f= above[k];
       if (!is_compound (f) || N(f) < 2) continue;
@@ -367,6 +367,9 @@ pdf_tagger_rep::resolve (path ip, path& pos) {
     // an included document, given to the include* of the include macro
     // (print_doc), is in place of the include*, which is no element
     if (is_given_inclusion (t)) continue;
+    // the mark which pdf-tag-check puts around the pictures of the copy of
+    // a presentation (tm-print.scm, pdf-tag-mark-copy) is no element
+    if (is_compound (t, "with", 3) && t[0] == "pdf-tag-source") continue;
     // (a paragraph or a caption may be a mere string)
     string role= child_role_of (as_string (L(parent)), i, N(parent));
     if (role == "" && is_compound (t)) role= role_of (as_string (L(t)));

@@ -523,6 +523,54 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(pdf-tag-printed?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-places)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_places> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-images)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_images> which returns
+    <scm|array_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-files)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_files> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-sources)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_sources> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-reset)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_reset> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(supports-ghostscript?)>
 <explain-synopsis|no synopsis>
   <|explain>

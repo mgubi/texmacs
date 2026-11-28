@@ -2680,8 +2680,11 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
       for (int c=0; c<256; c++)
         if (!used[k][c]) names[c]= "";
     pdf_font_subst r;
+    // (the shortcomings of a tagged PDF are not warned of on export:
+    // debug output only, see docs/pdf-tagging.md)
     if (!pdf_font_substitute (bname, names, r)) {
-      convert_warning << "no font to embed for " << bname
+      if (DEBUG_CONVERT)
+        debug_convert << "no font to embed for " << bname
                       << " (a picture), the PDF is not PDF/UA" << LF;
       continue;
     }
@@ -2698,10 +2701,10 @@ mupdf_pdf_renderer_rep::embed_picture_fonts (pdf_obj* res, pdf_obj* form) {
       cff= (N(prog) > 0);
       if (!cff && load_string (r.file, prog, false)) continue;
     }
-    if (r.missing > 0)
-      convert_warning << r.missing << " characters of "
-                      << bname << " (a picture) have no glyph in "
-                      << r.ps_name << LF;
+    if (r.missing > 0 && DEBUG_CONVERT)
+      debug_convert << r.missing << " characters of "
+                    << bname << " (a picture) have no glyph in "
+                    << r.ps_name << LF;
     // (a subset is named with a tag of its own)
     string tag;
     for (int t= picture_font_tags++, j=0; j<6; j++, t /= 26)

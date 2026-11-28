@@ -71,9 +71,21 @@ public:
   virtual array<tag_node> row_cells (path pos) = 0;
   virtual string language () = 0;   // of the document, as en or de-CH
   virtual string title () = 0;
-  // the pictures met which have no alternative text of their own
-  virtual int pictures_without_alt () { return 0; }
+  // the places of the pictures drawn without an alternative text of the
+  // user's, in the body (they are described by a caption or a file name)
+  virtual array<path> pictures_without_alt () { return array<path> (); }
 };
+
+// What the last tagged PDF drew (print_doc, for pdf-tag-check): whether a
+// tagged PDF was made, the places of its pictures without an alternative
+// text of the user's in the body which it printed, those pictures, the
+// included files which hold them and the marks of pdf-tag-check on them
+bool          pdf_tag_printed ();
+array<path>   pdf_tag_printed_places ();
+array<tree>   pdf_tag_printed_images ();
+array<string> pdf_tag_printed_files ();
+array<string> pdf_tag_printed_sources ();
+void          pdf_tag_printed_reset ();
 
 class renderer_rep {
 public:
