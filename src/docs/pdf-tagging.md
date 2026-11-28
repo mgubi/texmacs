@@ -310,20 +310,38 @@ a font could not be embedded) are warnings as before.
 *Tools → Accessibility → Check for a tagged PDF* (`pdf-tag-show-check`,
 `tm-print.scm`) says what is missing, in a dialog, and puts the cursor on
 the first picture without an alternative text; *Next picture without
-alternative text* (`pdf-tag-next-picture`) goes to the next one after the
-cursor, then to the first again. What it finds is `(pdf-tag-check)`, an
-association list, for scripts and the tests:
+alternative text* (`pdf-tag-next-picture`) goes to the next one, then to
+the first again. The next one is the one after the picture in focus (the
+one it went to: the editor moves a cursor put before an image in a line
+to the end of the text before it, and one put in a specific out of it),
+else the first one at or after the cursor. The image in focus is also the
+one which *Focus → Alternative text...* sets when the cursor is not in an
+image (`current-image`, `embedded-edit.scm`). What the check finds is
+`(pdf-tag-check)`, an association list, for scripts and the tests:
 
 * `pictures`: the places of the images which the tagged PDF describes by
   a caption or a file name. They are found by the tagger itself
   (`pdf_tag_pictures_without_alt`, `edit_tagger.cpp`, the glue
-  `pdf-tag-pictures-without-alt` of a body): each `image` of the body is
-  resolved as the export resolves what it draws, and is counted when it is
-  a Figure of its own (`picture`) without an alternative text of the user's
-  (`own_alt`), so that an image in a formula or a drawing, which is no
-  Figure, is not; the rules of `image-alt` are those of `alt_of`, in one
-  place. Inactive markup and raw data are not looked into, as
-  `expand_includes` leaves them.
+  `pdf-tag-pictures-without-alt` of a body): each `image` is resolved as
+  the export resolves what it draws, and is counted when it is a Figure of
+  its own (`picture`) without an alternative text of the user's
+  (`own_alt`), so that an image in a formula, which is no Figure, is not;
+  the rules of `image-alt` are those of `alt_of`, in one place.
+  The export resolves only what it draws, the check walks the source:
+  it looks only into what is typeset when the document is printed, as the
+  source says it (`typeset_child`): the children which the cursor may
+  enter (the DRD: not the body of a folded part, of `ignore`, of a hidden
+  branch, nor the definitions of macros, `assign`, `macro`, `xmacro`), the
+  content of `specific` for the printer, TeXmacs or an image (not the
+  screen), both branches of an `if` but the one its literal `true` or
+  `false` excludes, the hidden slides of `screens` (an exported
+  presentation has them all); not inactive markup and raw data, as
+  `expand_includes`. It is approximate where the source does not say what
+  is drawn: an `if` or a `case` of a computed condition (both branches
+  counted), the arguments of a macro of a style or of the user which the
+  DRD says to be hidden or shown otherwise than the macro draws them.
+  `convert-more` checks that on a document of these cases the pictures
+  reported are those of which the export makes Figures.
 * `included`: the included files (and theirs) which have such pictures,
   with how many: they are checked in their own file, where the cursor can
   go to them.
@@ -333,12 +351,17 @@ association list, for scripts and the tests:
 * `language`: the language of the document when `language_to_locale`
   does not know it (the PDF then says `en-US`), else `#f`.
 
-The tables have no header rows to check (TeXmacs has no markup for them,
-see *Left*), and what only the writer finds (the fonts of the pictures) is
-for veraPDF. `convert-more` checks the report of a small document (two
-pictures without alternative text, one with, one in a formula, one in an
-included file), the steps through them, and that a tagged export leaves
-no message in the window of the errors.
+A drawing (`graphics`) is a Figure of Alt "Image": it is not reported,
+and *Alternative text...* cannot give it one (the Focus menu has it for
+images only). The tables have no header rows to check (TeXmacs has no
+markup for them, see *Left*), and what only the writer finds (the fonts
+of the pictures) is for veraPDF. `convert-more` checks the report of a
+small document (two pictures without alternative text, one with, one in a
+formula, one in an included file), the pictures of a document of hidden
+and conditional parts against the Figures of its export, the steps through
+pictures in lines of text with the editor typesetting between them, the
+alternative text set from the focus, and that a tagged export adds no
+message to the window of the errors.
 
 ## Checking it
 

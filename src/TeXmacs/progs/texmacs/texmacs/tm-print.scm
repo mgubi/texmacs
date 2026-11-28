@@ -550,18 +550,53 @@
     (if (null? l) (list "Nothing is missing for an accessible tagged PDF")
         l)))
 
+(define pdf-tag-last-picture #f)   ; where pdf-tag-go-to went last
+
 (define (pdf-tag-go-to p)
-  ;; the cursor before the picture at @p, the picture in focus
+  ;; the cursor before the picture at @p (shown if it is in hidden markup,
+  ;; a slide), the picture in focus
   (go-to (rcons p 0))
+  (cursor-show-if-hidden)
   (with t (path->tree p)
-    (when (tree? t) (tree-focus t))))
+    (when (tree? t) (tree-focus t)))
+  (set! pdf-tag-last-picture p))
+
+(define (pdf-tag-at-picture? cur p)
+  ;; whether the cursor @cur is at the picture at @p: in it, or where the
+  ;; editor puts a cursor before or after an image in a line once it is
+  ;; typeset (the end of the string before it, the start of the one after)
+  (or (list-starts? cur p)
+      (let* ((up (cDr p))
+             (i (cAr p))
+             (par (path->tree up)))
+        (and (tree? par) (tree-is? par 'concat)
+             (or (and (> i 0)
+                      (tree-atomic? (tree-ref par (- i 1)))
+                      (== cur (rcons (rcons up (- i 1))
+                                     (string-length
+                                      (tree->string (tree-ref par (- i 1)))))))
+                 (and (< (+ i 1) (tree-arity par))
+                      (tree-atomic? (tree-ref par (+ i 1)))
+                      (== cur (rcons (rcons up (+ i 1)) 0))))))))
 
 (tm-define (pdf-tag-next-picture)
   (:synopsis "Go to the next picture without an alternative text")
-  ;; after the cursor, else the first one again; #f when there is none
+  ;; the one after the picture in focus or which the cursor is at (the
+  ;; last one gone to: the editor may move the cursor out of it, before an
+  ;; image in a line or a specific), else the first one at or after the
+  ;; cursor, else the first one; #f when there is none
   (let* ((l (assoc-ref (pdf-tag-check) 'pictures))
          (cur (cursor-path))
-         (next (list-find l (lambda (p) (path-less? cur (rcons p 0))))))
+         (last pdf-tag-last-picture)
+         (ft (focus-tree))
+         (fp (and (tree? ft) (tree->path ft)))
+         (here (or (and fp (member fp l))
+                   (and last (pdf-tag-at-picture? cur last) (member last l))))
+         (next (if here
+                   (and (pair? (cdr here)) (cadr here))
+                   ;; (path-inf?: the order of the nodes, p being one)
+                   (list-find l (lambda (p) (or (list-starts? cur p)
+                                                (path-inf? cur p)))))))
     (cond ((null? l)
            (set-message "No picture without an alternative text" "")
            #f)

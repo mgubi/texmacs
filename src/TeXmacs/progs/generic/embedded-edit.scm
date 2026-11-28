@@ -60,7 +60,12 @@
         (tree-insert-node! t 2 `(with "image-alt" ,(utf8->cork s))))))
 
 (define (current-image)
-  (tree-innermost image-context? #t))
+  ;; the image around the cursor, else the image in focus: a cursor before
+  ;; or after an image in a line is at the end or the start of the text
+  ;; next to it (pdf-tag-next-picture puts the image in focus)
+  (or (tree-innermost image-context? #t)
+      (with t (focus-tree)
+        (and (tree? t) (image-context? t) t))))
 
 (tm-define (current-image-alt)
   (with t (current-image) (if t (image-alt t) "")))

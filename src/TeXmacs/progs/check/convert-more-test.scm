@@ -3521,6 +3521,85 @@
       (when (nin? b before) (buffer-close b)))
     (check-restore-buffer old)))
 
+;; The check leaves out the pictures which are not typeset (the body of a
+;; folded part, ignore, specific for the screen, the false branch of an if,
+;; the definition of a macro) and keeps the others (unfolded, specific for
+;; the printer, the true branch): the same ones as the Figures of the
+;; export, each of which says its file ("Image u.png"). Next picture goes
+;; from one to the next also when the editor puts the cursor out of the
+;; picture (the end of the text before an image in a line, before a
+;; specific), and the alternative text set then goes to the picture in focus.
+(define (test-tagged-pdf-check-hidden)
+  (check-group "tagged pdf: the check skips what is not typeset")
+  (let* ((tm (url-append (temp-dir) "check-hidden.tm"))
+         (pdf (url-append (temp-dir) "check-hidden.pdf"))
+         (old (current-buffer))
+         (before (buffer-list))
+         (env (getenv "TEXMACS_PDF_TAGGED"))
+         (names '("a" "b" "c" "fold" "unfold" "ign" "scr" "prn" "iff" "ift"
+                  "mac"))
+         (img (lambda (n) `(image ,(string-append n ".png") "1cm" "" "" "")))
+         (shown '("a" "b" "c" "unfold" "prn" "ift"))
+         (hidden '("fold" "ign" "scr" "iff" "mac")))
+    (for (n names)
+      (string-save (export-png) (url-append (temp-dir)
+                                            (string-append n ".png"))))
+    (string-save (serialize-texmacs
+                  (stree->tree
+                   (tmfile `(document
+                             (concat "Some text " ,(img "a") " more "
+                                     ,(img "b") ".")
+                             "Para."
+                             (concat "x " ,(img "c"))
+                             (folded "Summary" ,(img "fold"))
+                             (unfolded "Summary" ,(img "unfold"))
+                             (ignore ,(img "ign"))
+                             (specific "screen" ,(img "scr"))
+                             (specific "printer" ,(img "prn"))
+                             (if "false" ,(img "iff"))
+                             (if "true" ,(img "ift"))
+                             (assign "logo" (macro ,(img "mac")))))))
+                 tm)
+    (load-buffer tm :strict)
+    (update-forced) (apply-changes)
+    (let* ((rp (tree->path (buffer-tree)))
+           (at (lambda (p) (append rp p)))
+           (pics (assoc-ref (pdf-tag-check) 'pictures))
+           (step (lambda ()
+                   (with p (pdf-tag-next-picture)
+                     (update-forced) (apply-changes)
+                     p))))
+      (check= pics (map at '((0 1) (0 3) (2 1) (4 1) (7 1) (9 1))))
+      ;; the export draws a Figure of each of them, of none of the others
+      (system-setenv "TEXMACS_PDF_TAGGED" "1")
+      (export-buffer pdf)
+      (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+      (with s (if (url-exists? pdf) (string-load pdf) "")
+        (define (alt? n)
+          (>= (string-search-forwards
+               (string-append "/Alt(Image " n ".png)") 0 s) 0))
+        (check= (list-filter shown alt?) shown)
+        (check= (list-filter hidden alt?) '()))
+      ;; the steps, the editor typesetting between them (it puts the cursor
+      ;; at the end of "Some text " for the first picture)
+      (go-to (at '(0 0 0)))
+      (check= (step) (at '(0 1)))
+      (check= (step) (at '(0 3)))
+      (check= (step) (at '(2 1)))
+      (check= (step) (at '(4 1)))
+      (check= (step) (at '(7 1)))
+      (check= (step) (at '(9 1)))
+      (check= (step) (at '(0 1)))
+      ;; Focus > Alternative text, the cursor out of the picture
+      (set-current-image-alt "First")
+      (check= (assoc-ref (pdf-tag-check) 'pictures)
+              (map at '((0 3) (2 1) (4 1) (7 1) (9 1))))
+      (check= (step) (at '(0 3))))
+    (buffer-pretend-saved tm)
+    (for (b (buffer-list))
+      (when (nin? b before) (buffer-close b)))
+    (check-restore-buffer old)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The images written by an export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3986,6 +4065,7 @@
                   test-html-escape test-serialize-special test-big-document test-pdf-export
                   test-tagged-pdf-export test-tagged-pdf-include
                   test-tagged-pdf-cycle test-tagged-pdf-check
+                  test-tagged-pdf-check-hidden
                   test-tagged-pdf-graft test-untagged-pdf-export
                   test-export-images))
   (system-setenv "TEXMACS_PDF_OBJSTMS" (or objstms ""))

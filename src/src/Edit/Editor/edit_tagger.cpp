@@ -31,6 +31,7 @@
 #include "iterator.hpp"
 #include "scheme.hpp"
 #include "converter.hpp"
+#include "tree_traverse.hpp"
 
 class pdf_tagger_rep: public tagger_rep {
   tree   body;     // the body of the document
@@ -474,15 +475,41 @@ make_pdf_tagger (tree body, path rp, string lang, string title) {
 * The pictures without an alternative text (pdf-tag-check, tm-print.scm)
 ******************************************************************************/
 
+// Whether the child i of t is typeset when the document is printed, as far
+// as its source says: what the cursor may enter (the DRD: not the body of
+// a folded or a hidden part, ignore, the definitions of macros), with the
+// exceptions of print: the content of specific for the printer or for
+// TeXmacs, the branch of an if which is not literally false, and the
+// hidden slides of screens (an exported presentation shows them all)
+static bool
+typeset_child (tree t, int i, bool in_screens) {
+  if (is_compound (t, "specific", 2)) {
+    if (i != 1 || !is_atomic (t[0])) return false;
+    string w= t[0]->label;
+    if (ends (w, "*")) w= w (0, N(w) - 1);
+    return w == "texmacs" || w == "image" || w == "printer" ||
+           w == "even" || w == "odd";
+  }
+  if ((is_compound (t, "if") || is_compound (t, "if*")) && N(t) >= 2) {
+    if (i == 0) return false;
+    if (t[0] == "false") return i != 1;
+    if (t[0] == "true") return i == 1;
+    return true;
+  }
+  if (in_screens && is_compound (t, "hidden")) return true;
+  return is_accessible_child (t, i);
+}
+
 // The images of t (at cur in the body) which the tagger makes Figures of
 // their own without an alternative text of the user's: those which a
 // tagged PDF describes by a caption or a file name. Each is resolved as
 // the export resolves what it draws, so that the check and the export
 // agree (an image in a formula or a drawing is not a Figure of its own).
-// What a tagged PDF would not typeset as such (inactive markup, raw data)
-// and the includes (checked in their own files) are not looked into.
+// What is not typeset (typeset_child), inactive markup, raw data and the
+// includes (checked in their own files) are not looked into.
 static void
-pictures_without_alt (pdf_tagger_rep& tg, tree t, path cur, array<path>& r) {
+pictures_without_alt (pdf_tagger_rep& tg, tree t, path cur, bool in_screens,
+                      array<path>& r) {
   if (is_atomic (t)) return;
   if (is_compound (t, "inactive") || is_compound (t, "inactive*") ||
       is_compound (t, "var-inactive") || is_compound (t, "raw-data") ||
@@ -498,13 +525,16 @@ pictures_without_alt (pdf_tagger_rep& tg, tree t, path cur, array<path>& r) {
     }
     return;
   }
-  for (int i=0; i<N(t); i++) pictures_without_alt (tg, t[i], cur * i, r);
+  bool scr= in_screens || is_compound (t, "screens");
+  for (int i=0; i<N(t); i++)
+    if (typeset_child (t, i, scr))
+      pictures_without_alt (tg, t[i], cur * i, scr, r);
 }
 
 array<path>
 pdf_tag_pictures_without_alt (tree body) {
   pdf_tagger_rep tg (body, path (), "", "");
   array<path> r;
-  pictures_without_alt (tg, body, path (), r);
+  pictures_without_alt (tg, body, path (), false, r);
   return r;
 }
