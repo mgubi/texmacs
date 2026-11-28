@@ -12,6 +12,13 @@ branch [`upsilon_texmacs`](https://github.com/mgubi/texmacs/commits/upsilon_texm
 have the details, and the problems go to the
 [issues of the repository](https://github.com/mgubi/texmacs/issues).
 
+## 28 November 2026
+
+- **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
+  the Chez backend (21 November) the compiler flags of the vendored
+  femtolisp were set only in Chez builds, and `fl_core.c` did not find
+  `llt.h`.
+
 ## 26 November 2026
 
 - **The macOS Qt packages run on macOS 13 again** (desktop applications,
